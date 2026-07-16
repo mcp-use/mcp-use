@@ -1,5 +1,5 @@
 /**
- * Tunnel lifecycle for `mcp-use dev` — spawns `@mcp-use/tunnel` via `npx`,
+ * Tunnel lifecycle for `mcp-use dev` — spawns `@mcp-use/tunnel`,
  * parses the public URL from stdout, persists the subdomain under
  * `.mcp-use/state/tunnel.json`, and releases it through the tunnel API before
  * reuse.
@@ -74,6 +74,7 @@ export function createTunnelManager(stateFilePath: string): TunnelManager {
     try {
       await fetch(`${tunnelApiBase()}/api/tunnels/${subdomain}`, {
         method: "DELETE",
+        signal: AbortSignal.timeout(2_000),
       });
     } catch {
       // Best-effort cleanup; ignore DELETE failures.
@@ -114,12 +115,20 @@ export function createTunnelManager(stateFilePath: string): TunnelManager {
     new Promise((resolve, reject) => {
       console.log(`[mcp-use] starting tunnel for port ${port}…`);
 
-      const tunnelArgs = ["--yes", "@mcp-use/tunnel", String(port)];
+      const userAgent = process.env["npm_config_user_agent"] ?? "";
+      const [tunnelCommand, tunnelArgs] = userAgent.startsWith("pnpm/")
+        ? ["pnpm", ["--silent", "dlx", "@mcp-use/tunnel", String(port)]]
+        : userAgent.startsWith("bun/")
+          ? ["bunx", ["@mcp-use/tunnel", String(port)]]
+          : [
+              "npx",
+              ["--yes", "--prefer-offline", "@mcp-use/tunnel", String(port)],
+            ];
       if (subdomain !== undefined) {
         tunnelArgs.push("--subdomain", subdomain);
       }
 
-      const child = spawn("npx", tunnelArgs, {
+      const child = spawn(tunnelCommand, tunnelArgs, {
         stdio: ["ignore", "pipe", "pipe"],
         shell: process.platform === "win32",
       });
@@ -191,6 +200,14 @@ export function createTunnelManager(stateFilePath: string): TunnelManager {
         if (code !== 0 && code !== null && !resolved) {
           clearTimeout(setupTimeout);
           reject(new Error(`Tunnel process exited with code ${code}`));
+        }
+        // The tunnel CLI can exit after setup when its bore connection or
+        // server-side registration disappears. Do not keep reporting a dead
+        // public URL through dev/info.
+        if (proc === child) {
+          proc = undefined;
+          currentUrl = null;
+          currentSubdomain = undefined;
         }
       });
 

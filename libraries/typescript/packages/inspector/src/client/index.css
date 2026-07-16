@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&display=swap");
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "streamdown/styles.css";
@@ -478,5 +479,78 @@
 
   .sidebar-nav-scroll:hover {
     scrollbar-color: var(--border) transparent;
+  }
+}
+
+.inspector-view-transition {
+  view-transition-name: inspector-view;
+  background-color: #f3f3f3;
+}
+
+.dark .inspector-view-transition {
+  background-color: #000;
+}
+
+html,
+body {
+  background-color: #f3f3f3;
+}
+
+.dark html,
+.dark body {
+  background-color: #000;
+}
+
+/* Disable default root crossfade — only the named inspector-view animates. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-group(inspector-view) {
+  background-color: #f3f3f3;
+}
+
+.dark ::view-transition-group(inspector-view) {
+  background-color: #000;
+}
+
+/* Inspector view cross-fade — opacity only (matches website public-site pattern). */
+@keyframes inspector-view-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes inspector-view-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+::view-transition-old(inspector-view),
+::view-transition-new(inspector-view) {
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(inspector-view) {
+  animation: inspector-view-fade-out 200ms ease-in-out both;
+}
+
+::view-transition-new(inspector-view) {
+  animation: inspector-view-fade-in 200ms ease-in-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(inspector-view),
+  ::view-transition-new(inspector-view) {
+    animation: none;
   }
 }

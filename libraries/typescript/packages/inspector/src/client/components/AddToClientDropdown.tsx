@@ -62,6 +62,8 @@ interface AddToClientDropdownProps {
 
 type ClientType = "claude-code" | "gemini-cli" | "codex-cli" | null;
 
+const clientMenuItemClassName = "flex h-10 items-center gap-2";
+
 /**
  * Reusable dropdown component for adding MCP servers to various clients
  *
@@ -455,7 +457,7 @@ export function AddToClientDropdown({
               onClick={async () => {
                 await item.onClick();
               }}
-              className="flex items-center gap-2"
+              className={clientMenuItemClassName}
             >
               {item.icon}
               <span className="min-w-0 max-w-full whitespace-nowrap">
@@ -470,7 +472,7 @@ export function AddToClientDropdown({
           {showClients.cursor && (
             <DropdownMenuItem
               onClick={handleCursorClick}
-              className="flex items-center gap-2"
+              className={clientMenuItemClassName}
             >
               <img
                 src="https://cdn.simpleicons.org/cursor"
@@ -486,7 +488,7 @@ export function AddToClientDropdown({
           {showClients.claudeCode && (
             <DropdownMenuItem
               onClick={handleClaudeCodeClick}
-              className="flex items-center gap-2"
+              className={clientMenuItemClassName}
             >
               <img
                 src="https://cdn.simpleicons.org/claude"
@@ -502,7 +504,7 @@ export function AddToClientDropdown({
           {showClients.claudeDesktop && (
             <DropdownMenuItem
               onClick={handleClaudeDesktopClick}
-              className="flex items-center gap-2"
+              className={clientMenuItemClassName}
             >
               <img
                 src="https://cdn.simpleicons.org/claude"
@@ -518,7 +520,7 @@ export function AddToClientDropdown({
           {showClients.vsCode && (
             <DropdownMenuItem
               onClick={handleVSCodeClick}
-              className="flex items-center gap-2"
+              className={clientMenuItemClassName}
             >
               <VSCodeIcon className="h-4 w-4 text-blue-500" />
               <span className="min-w-0 max-w-full whitespace-nowrap">
@@ -530,7 +532,7 @@ export function AddToClientDropdown({
           {showClients.vsCodeInsiders && (
             <DropdownMenuItem
               onClick={handleVSCodeInsidersClick}
-              className="flex items-center gap-2"
+              className={clientMenuItemClassName}
             >
               <VSCodeIcon className="h-4 w-4 text-teal-400" />
               <span className="min-w-0 max-w-full whitespace-nowrap">
@@ -542,7 +544,7 @@ export function AddToClientDropdown({
           {showClients.geminiCli && (
             <DropdownMenuItem
               onClick={handleGeminiCLIClick}
-              className="flex items-center gap-2"
+              className={clientMenuItemClassName}
             >
               <img
                 src="https://cdn.simpleicons.org/googlegemini"
@@ -558,7 +560,7 @@ export function AddToClientDropdown({
           {showClients.codexCli && (
             <DropdownMenuItem
               onClick={handleCodexCLIClick}
-              className="flex items-center gap-2"
+              className={clientMenuItemClassName}
             >
               <img
                 src="https://inspector-cdn.mcp-use.com/providers/openai.png"

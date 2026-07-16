@@ -980,39 +980,24 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
 
         // Get tools, resources, and prompts through the protocol-neutral connection.
         setTools(connection.tools || []);
-        const resourcesResult = await connection.listAllResources();
+        const [resourcesResult, promptsResult, templatesResult] =
+          await Promise.all([
+            connection.listAllResources(),
+            connection.listPrompts(),
+            connection.supports("resources")
+              ? connection.listResourceTemplates()
+              : Promise.resolve({ resourceTemplates: [] }),
+          ]);
         if (!isMountedRef.current) {
           addLog(
             "debug",
-            "Connection aborted after listing resources - component unmounted"
+            "Connection aborted after discovery - component unmounted"
           );
           return "failed";
         }
         setResources(resourcesResult.resources || []);
-        const promptsResult = await connection.listPrompts();
-        if (!isMountedRef.current) {
-          addLog(
-            "debug",
-            "Connection aborted after listing prompts - component unmounted"
-          );
-          return "failed";
-        }
         setPrompts(promptsResult.prompts || []);
-
-        // Fetch resource templates if server supports them
-        if (connection.supports("resources")) {
-          const templatesResult = await connection.listResourceTemplates();
-          if (!isMountedRef.current) {
-            addLog(
-              "debug",
-              "Connection aborted after listing resource templates - component unmounted"
-            );
-            return "failed";
-          }
-          setResourceTemplates(templatesResult.resourceTemplates || []);
-        } else {
-          setResourceTemplates([]);
-        }
+        setResourceTemplates(templatesResult.resourceTemplates || []);
 
         const {
           server: serverInfo,

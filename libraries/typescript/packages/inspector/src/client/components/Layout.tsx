@@ -6,6 +6,7 @@ import {
   type TabType,
 } from "@/client/context/InspectorContext";
 import { useAutoConnect } from "@/client/hooks/useAutoConnect";
+import { cn } from "@/client/lib/utils";
 import { useKeyboardShortcuts } from "@/client/hooks/useKeyboardShortcuts";
 import { useSavedRequests } from "@/client/hooks/useSavedRequests";
 import {
@@ -25,8 +26,15 @@ import {
 } from "@/client/utils/connectionUpdates";
 import { getServerDisplayName } from "@/client/utils/servers";
 import { useMcpClient, type McpServer } from "@mcp-use/client/react";
-import type { ReactNode } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { flushSync } from "react-dom";
 import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 import { CommandPalette } from "./CommandPalette";
@@ -34,6 +42,7 @@ import { LayoutContent } from "./LayoutContent";
 import { LayoutHeader } from "./LayoutHeader";
 import { InspectorSidebar } from "./layout/sidebar/InspectorSidebar";
 import { SidebarRpcPanel } from "./layout/sidebar/SidebarRpcPanel";
+import { useTunnelConnectionSync } from "./layout/useTunnelConnectionSync";
 
 interface LayoutProps {
   children: ReactNode;
@@ -108,9 +117,9 @@ export function Layout({ children }: LayoutProps) {
   });
   const [rpcLoggerOpen, setRpcLoggerOpen] = useState(() => {
     try {
-      return localStorage.getItem("inspector-rpc-logger-open") !== "false";
+      return localStorage.getItem("inspector-rpc-logger-open") === "true";
     } catch {
-      return true;
+      return false;
     }
   });
 
@@ -160,8 +169,10 @@ export function Layout({ children }: LayoutProps) {
   // Read tunnelUrl from query parameters and store in context
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
-    const tunnelUrl = urlParams.get("tunnelUrl");
-    setTunnelUrl(tunnelUrl);
+    const tunnelUrlParam = urlParams.get("tunnelUrl");
+    if (tunnelUrlParam !== null) {
+      setTunnelUrl(tunnelUrlParam);
+    }
   }, [location.search, setTunnelUrl]);
 
   // Read tab from query parameters and set active tab
@@ -338,6 +349,24 @@ export function Layout({ children }: LayoutProps) {
     embedded: isEmbedded,
   });
 
+  // Shell inline style can stay #0c0c0d until a full reload; match VT backdrop for crossfade.
+  useEffect(() => {
+    const syncPageBg = () => {
+      const bg = document.documentElement.classList.contains("dark")
+        ? "#000000"
+        : "#f3f3f3";
+      document.documentElement.style.backgroundColor = bg;
+      document.body.style.backgroundColor = bg;
+    };
+    syncPageBg();
+    const observer = new MutationObserver(syncPageBg);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => observer.disconnect();
+  }, []);
+
   // Track command palette open
   const handleCommandPaletteOpen = useCallback(
     (trigger: "keyboard" | "button") => {
@@ -410,6 +439,28 @@ export function Layout({ children }: LayoutProps) {
     itemName?: string,
     serverId?: string
   ) => {
+    // #region agent log
+    fetch("http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "831b88",
+      },
+      body: JSON.stringify({
+        sessionId: "831b88",
+        location: "Layout.tsx:handleCommandPaletteNavigate",
+        message: "layout navigate entry",
+        data: {
+          tab,
+          itemName: itemName ?? null,
+          serverId: serverId ?? null,
+          hasServerId: !!serverId,
+        },
+        timestamp: Date.now(),
+        hypothesisId: "H1",
+      }),
+    }).catch(() => {});
+    // #endregion
     console.warn("[Layout] handleCommandPaletteNavigate called:", {
       tab,
       itemName,
@@ -436,6 +487,31 @@ export function Layout({ children }: LayoutProps) {
         tab,
         itemName,
       });
+      // #region agent log
+      fetch(
+        "http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Debug-Session-Id": "831b88",
+          },
+          body: JSON.stringify({
+            sessionId: "831b88",
+            location: "Layout.tsx:navigateToItem-call",
+            message: "calling navigateToItem",
+            data: {
+              serverId,
+              tab,
+              itemName: itemName ?? null,
+              serverState: server?.state ?? null,
+            },
+            timestamp: Date.now(),
+            hypothesisId: "H1",
+          }),
+        }
+      ).catch(() => {});
+      // #endregion
       // Use the context's navigateToItem to set all state atomically
       navigateToItem(serverId, tab, itemName);
       // Navigate using query params
@@ -460,6 +536,16 @@ export function Layout({ children }: LayoutProps) {
   };
 
   const selectedServer = connections.find((c) => c.id === selectedServerId);
+
+  const isTunnelConnecting = useTunnelConnectionSync({
+    tunnelUrl,
+    selectedServerId,
+    selectedServer,
+    configLoaded,
+    removeConnection,
+    updateConnection: updateServer,
+    connections,
+  });
 
   // Aggregate tools, prompts, and resources from all connected servers
   // When a server is selected, use only that server's items
@@ -511,6 +597,8 @@ export function Layout({ children }: LayoutProps) {
 
   // Sync URL query params with selected server state
   useEffect(() => {
+    if (isTunnelConnecting) return;
+
     const searchParams = new URLSearchParams(location.search);
     // Note: searchParams.get() already URL-decodes, no need for decodeURIComponent
     const serverId = searchParams.get("server");
@@ -544,10 +632,13 @@ export function Layout({ children }: LayoutProps) {
     setSelectedServerId,
     connections,
     navigate,
+    isTunnelConnecting,
   ]);
 
   // Handle missing server connections - redirect to home when URL points at unknown server
   useEffect(() => {
+    if (isTunnelConnecting) return;
+
     const searchParams = new URLSearchParams(location.search);
     const serverId = searchParams.get("server");
     if (!serverId) {
@@ -560,7 +651,7 @@ export function Layout({ children }: LayoutProps) {
       const timeoutId = setTimeout(() => navigate("/"), 3000);
       return () => clearTimeout(timeoutId);
     }
-  }, [location.search, navigate, connections]);
+  }, [location.search, navigate, connections, isTunnelConnecting]);
 
   // Handle mcp-inspector:connect_servers postMessage from parent frame.
   // Allows a host page to securely pass server configs (incl. auth) without
@@ -730,19 +821,36 @@ export function Layout({ children }: LayoutProps) {
     },
   });
 
-  // Show loading spinner during auto-connection
-  if (isAutoConnecting) {
-    return (
-      <div className="h-screen bg-white dark:bg-zinc-900 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Spinner className="h-8 w-8 text-zinc-600 dark:text-zinc-400" />
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Connecting to MCP server...
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // Show loading until auto-connect finishes or saved connections hydrate a ?server= link
+  const urlServerId = new URLSearchParams(location.search).get("server");
+  const isBootstrappingServer =
+    !configLoaded &&
+    !!urlServerId &&
+    !urlServerId.startsWith("http://") &&
+    !urlServerId.startsWith("https://");
+  const showBootScreen =
+    isAutoConnecting || isBootstrappingServer || isTunnelConnecting;
+  const layoutViewKey = selectedServer?.id ?? "home";
+  const viewTransitionKey = showBootScreen ? "boot" : layoutViewKey;
+  const [displayKey, setDisplayKey] = useState(viewTransitionKey);
+
+  useLayoutEffect(() => {
+    if (viewTransitionKey === displayKey) return;
+
+    const apply = () => flushSync(() => setDisplayKey(viewTransitionKey));
+
+    if (typeof document.startViewTransition === "function") {
+      document.startViewTransition(apply);
+    } else {
+      apply();
+    }
+  }, [viewTransitionKey, displayKey]);
+
+  const showDisplayBoot = displayKey === "boot";
+  const displayServer =
+    showDisplayBoot || displayKey === "home"
+      ? undefined
+      : connections.find((c) => c.id === displayKey);
 
   // Apply embedded styling
   const isSingleTab = isEmbedded && embeddedConfig.singleTab;
@@ -758,13 +866,15 @@ export function Layout({ children }: LayoutProps) {
     ? isSingleTab
       ? "h-screen flex flex-col"
       : "h-screen flex flex-col gap-2 sm:gap-4"
-    : selectedServer
-      ? "h-screen bg-[#f3f3f3] dark:bg-black flex flex-col px-4 lg:px-0 pb-4"
-      : "h-screen bg-[#f3f3f3] dark:bg-black flex flex-col px-4 lg:pl-4 lg:pr-0 pb-4";
+    : "h-screen bg-[#f3f3f3] dark:bg-black flex flex-col px-4 lg:px-0 pb-4";
 
   const mainClassName = isSingleTab
     ? "flex-1 w-full bg-white dark:bg-black p-0 overflow-auto"
-    : "flex-1 min-h-0 w-full bg-white dark:bg-black rounded-2xl border border-zinc-200 dark:border-zinc-700 overflow-auto lg:mr-4";
+    : cn(
+        "flex-1 min-h-0 w-full bg-white dark:bg-black rounded-2xl border border-zinc-200 dark:border-zinc-700 overflow-auto",
+        !displayServer && "lg:mx-4",
+        displayServer && "lg:mr-4"
+      );
 
   const bodyClassName = isSingleTab
     ? "flex-1 min-h-0"
@@ -772,7 +882,7 @@ export function Layout({ children }: LayoutProps) {
 
   const headerProps = {
     connections,
-    selectedServer,
+    selectedServer: displayServer,
     activeTab,
     onServerSelect: handleServerSelect,
     onTabChange: handleTabChange,
@@ -782,59 +892,74 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <TooltipProvider>
-      <div className={containerClassName} style={containerStyle}>
-        {/* Header - hidden in single-tab mode */}
-        {!isSingleTab && <LayoutHeader {...headerProps} />}
+      <div className="inspector-view-transition h-screen bg-[#f3f3f3] dark:bg-black">
+        {showDisplayBoot ? (
+          <div className="flex h-full items-center justify-center bg-[#f3f3f3] dark:bg-black">
+            <div className="flex flex-col items-center gap-4">
+              <Spinner className="h-8 w-8 text-zinc-600 dark:text-zinc-400" />
+              <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                Connecting to MCP server...
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className={containerClassName} style={containerStyle}>
+            {/* Header - hidden in single-tab mode */}
+            {!isSingleTab && <LayoutHeader {...headerProps} />}
 
-        <div className={bodyClassName}>
-          {selectedServer && !isSingleTab && (
-            <InspectorSidebar
-              activeTab={activeTab}
-              onTabChange={handleTabChange}
-              selectedServer={selectedServer}
-              visibleTabs={embeddedConfig.visibleTabs}
-              collapsed={sidebarCollapsed}
-              onCollapsedChange={setSidebarCollapsed}
-              rpcLoggerOpen={rpcLoggerOpen}
-              onRpcLoggerOpenChange={setRpcLoggerOpen}
-              onCommandPaletteOpen={() => handleCommandPaletteOpen("button")}
-            />
-          )}
-          <main className={mainClassName}>
-            <LayoutContent
-              selectedServer={selectedServer}
-              activeTab={activeTab}
-              toolsSearchRef={toolsSearchRef}
-              promptsSearchRef={promptsSearchRef}
-              resourcesSearchRef={resourcesSearchRef}
-              onUpdateConnection={handleUpdateConnection}
-            >
-              {children}
-            </LayoutContent>
-          </main>
-          {selectedServer && !isSingleTab && (
-            <SidebarRpcPanel
-              serverId={selectedServer.id}
-              open={rpcLoggerOpen}
-            />
-          )}
-        </div>
-
-        {/* Command Palette */}
-        <CommandPalette
-          isOpen={isCommandPaletteOpen}
-          onOpenChange={setIsCommandPaletteOpen}
-          tools={aggregatedTools}
-          prompts={aggregatedPrompts}
-          resources={aggregatedResources}
-          savedRequests={savedRequests}
-          connections={connections}
-          selectedServer={selectedServer}
-          tunnelUrl={tunnelUrl}
-          onNavigate={handleCommandPaletteNavigate}
-          onServerSelect={handleServerSelect}
-        />
+            <div className={bodyClassName}>
+              {displayServer && !isSingleTab && (
+                <InspectorSidebar
+                  activeTab={activeTab}
+                  onTabChange={handleTabChange}
+                  selectedServer={displayServer}
+                  visibleTabs={embeddedConfig.visibleTabs}
+                  collapsed={sidebarCollapsed}
+                  onCollapsedChange={setSidebarCollapsed}
+                  rpcLoggerOpen={rpcLoggerOpen}
+                  onRpcLoggerOpenChange={setRpcLoggerOpen}
+                  onCommandPaletteOpen={() =>
+                    handleCommandPaletteOpen("button")
+                  }
+                />
+              )}
+              <main className={mainClassName}>
+                <LayoutContent
+                  selectedServer={displayServer}
+                  activeTab={activeTab}
+                  toolsSearchRef={toolsSearchRef}
+                  promptsSearchRef={promptsSearchRef}
+                  resourcesSearchRef={resourcesSearchRef}
+                  onUpdateConnection={handleUpdateConnection}
+                >
+                  {children}
+                </LayoutContent>
+              </main>
+              {displayServer && !isSingleTab && (
+                <SidebarRpcPanel
+                  serverId={displayServer.id}
+                  open={rpcLoggerOpen}
+                />
+              )}
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Command Palette */}
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onOpenChange={setIsCommandPaletteOpen}
+        tools={aggregatedTools}
+        prompts={aggregatedPrompts}
+        resources={aggregatedResources}
+        savedRequests={savedRequests}
+        connections={connections}
+        selectedServer={selectedServer}
+        tunnelUrl={tunnelUrl}
+        onNavigate={handleCommandPaletteNavigate}
+        onServerSelect={handleServerSelect}
+      />
     </TooltipProvider>
   );
 }

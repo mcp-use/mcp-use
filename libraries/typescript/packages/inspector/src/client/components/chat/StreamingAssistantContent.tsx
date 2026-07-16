@@ -1,7 +1,14 @@
-import { memo } from "react";
-import { Streamdown } from "streamdown";
+import { memo, useMemo } from "react";
+import { Streamdown, parseMarkdownIntoBlocks } from "streamdown";
 import { slimCode } from "./streamdown-code-slim";
 import { cn } from "@/client/lib/utils";
+
+/** ponytail: remount when block boundaries shift — Streamdown keys blocks by index only. */
+function streamingStructureKey(content: string): string {
+  return parseMarkdownIntoBlocks(content)
+    .map((block, i) => `${i}:${block.length}:${block.charCodeAt(0) ?? 0}`)
+    .join("|");
+}
 
 const streamdownPlugins = { code: slimCode };
 
@@ -24,9 +31,14 @@ export const StreamingAssistantContent = memo(
     content,
     isStreaming = false,
   }: StreamingAssistantContentProps) {
+    const structureKey = useMemo(
+      () => (isStreaming ? streamingStructureKey(content) : "static"),
+      [content, isStreaming]
+    );
+
     return (
       <Streamdown
-        key={isStreaming ? "streaming" : "static"}
+        key={structureKey}
         className={cn(
           "text-[14px] leading-relaxed text-foreground",
           "[&_p]:mb-2 [&_p:last-child]:mb-0",

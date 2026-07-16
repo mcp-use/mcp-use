@@ -73,6 +73,23 @@ function hookInitialized(bridge: AppBridge): Promise<void> {
   });
 }
 
+function buildToolResultPayload(
+  toolOutput: unknown,
+  customProps?: Record<string, string>
+): Parameters<AppBridge["sendToolResult"]>[0] | null {
+  const structuredContent = parseCustomProps(customProps);
+  if (Object.keys(structuredContent).length > 0) {
+    return {
+      ...(typeof toolOutput === "object" && toolOutput !== null
+        ? toolOutput
+        : {}),
+      structuredContent,
+    } as Parameters<AppBridge["sendToolResult"]>[0];
+  }
+  if (toolOutput === undefined || toolOutput === null) return null;
+  return toolOutput as Parameters<AppBridge["sendToolResult"]>[0];
+}
+
 function ViewRendererBase({
   viewId,
   source,
@@ -487,11 +504,12 @@ function ViewRendererBase({
           ...parseCustomProps(customPropsRef.current),
         };
         bridge.sendToolInput({ arguments: mergedArgs });
-        const output = toolOutputRef.current;
-        if (output) {
-          bridge.sendToolResult(
-            output as Parameters<typeof bridge.sendToolResult>[0]
-          );
+        const toolResultPayload = buildToolResultPayload(
+          toolOutputRef.current,
+          customPropsRef.current
+        );
+        if (toolResultPayload) {
+          bridge.sendToolResult(toolResultPayload);
         }
         onLifecycleChangeRef.current?.({ status: "ready" });
       } catch (err) {
@@ -568,17 +586,10 @@ function ViewRendererBase({
   // Tool output
   useEffect(() => {
     const bridge = bridgeRef.current;
-    if (!bridge || initCount === 0 || !toolOutput) return;
-    if (customProps && Object.keys(customProps).length > 0) {
-      bridge.sendToolResult({
-        ...(toolOutput as object),
-        structuredContent: parseCustomProps(customProps),
-      } as Parameters<typeof bridge.sendToolResult>[0]);
-    } else {
-      bridge.sendToolResult(
-        toolOutput as Parameters<typeof bridge.sendToolResult>[0]
-      );
-    }
+    if (!bridge || initCount === 0) return;
+    const toolResultPayload = buildToolResultPayload(toolOutput, customProps);
+    if (!toolResultPayload) return;
+    bridge.sendToolResult(toolResultPayload);
   }, [initCount, toolOutput, customProps]);
 
   // Cancellation

@@ -88,7 +88,7 @@ function serializeForInlineScript(value: string): string {
 /**
  * Render the inspector shell page.
  *
- * A minimal dark-background document (no white flash before the UI paints)
+ * A minimal shell document whose background matches the inspector UI
  * with a `#root` mount node, an inline script publishing
  * `window.__MCP_USE_INSPECTOR__ = { autoConnectUrl, basePath }` — where
  * `autoConnectUrl` is computed client-side as
@@ -112,10 +112,16 @@ export function renderInspectorShell(options: InspectorShellOptions): string {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${escapeHtml(serverName)} — MCP Inspector</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="${stylesHref}" />
     <style>
-      :root { color-scheme: dark; }
-      html, body { height: 100%; margin: 0; background-color: #0c0c0d; }
+      :root { color-scheme: light dark; }
+      html, body { height: 100%; margin: 0; background-color: #f3f3f3; }
     </style>
   </head>
   <body>

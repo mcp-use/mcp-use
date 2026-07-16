@@ -121,12 +121,32 @@ Example: {"query": "example search term", "results": [{"fruit": "Apple", "color"
         throw new Error("Could not parse props from LLM response");
       }
 
-      // Fallback: generic prop generation without schema.
-      const systemPrompt = `You are helping a developer configure props for a UI widget/resource. 
+      // Fallback: sample structuredContent for widget preview (no propsSchema).
+      const isViewResource =
+        resource.uri?.startsWith("ui://") ||
+        resource.mimeType === "text/html;profile=mcp-app" ||
+        !!(resourceAnnotations as Record<string, unknown> | undefined)?.ui;
+
+      const systemPrompt = isViewResource
+        ? `You are helping preview an MCP App widget in the inspector.
+Generate sample tool result data (structuredContent) that the widget receives via useToolContext().
+Return ONLY a JSON object with realistic sample data the widget needs to render — query strings, item arrays, IDs, labels, etc.
+Do NOT generate UI styling props like theme, width, height, or showFilters unless explicitly required.
+For search/list widgets, always include the collection array (e.g. "items") with at least 2 sample entries.`
+        : `You are helping a developer configure props for a UI widget/resource. 
 Analyze the provided information and suggest appropriate props in key-value format.
 Return ONLY a JSON object with key-value pairs, where both keys and values are strings.
 Example format: {"theme": "dark", "width": "400", "title": "My Widget"}`;
-      const userPrompt = `Resource Information:
+
+      const userPrompt = isViewResource
+        ? `Widget: ${resource.name || resource.uri}
+Description: ${resourceDescription}
+
+Generate sample structuredContent for previewing this widget in the inspector.
+Include every data field the widget likely reads from toolOutput (arrays must be non-empty).
+Example for a fruit search widget: {"query": "apple", "items": [{"id": "apple", "name": "Apple"}, {"id": "banana", "name": "Banana"}]}
+Return ONLY JSON.`
+        : `Resource Information:
 - URI: ${resource.uri}
 - Name: ${resource.name || "N/A"}
 - Type: ${resourceType}

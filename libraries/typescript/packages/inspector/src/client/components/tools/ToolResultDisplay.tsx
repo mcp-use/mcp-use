@@ -438,9 +438,14 @@ function ToolResultViewPanel({
       ? "w-full h-full flex items-center justify-center relative p-4 min-h-0"
       : "w-full h-full relative p-4";
 
+  const propsRenderKey = customProps
+    ? JSON.stringify(customProps)
+    : "no-custom-props";
+
   return (
     <WidgetWrapper className="w-full h-full min-h-[240px]">
       <ViewRenderer
+        key={propsRenderKey}
         viewId={viewId}
         toolName={toolName}
         toolInput={toolInput}

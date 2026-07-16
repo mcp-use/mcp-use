@@ -13,6 +13,28 @@ import { getInspectorBase } from "@/client/utils/basePath";
 /** Survives full page reload; avoids fragile long JSON in query (was resolving to localhost + http). */
 export const INSPECTOR_RECONNECT_STORAGE_KEY = "__mcpUseInspectorReconnect";
 
+/** Sync check on first paint — avoids a dashboard flash before useAutoConnect runs. */
+export function detectPendingAutoConnect(search?: string): boolean {
+  const resolvedSearch =
+    search ?? (typeof window !== "undefined" ? window.location.search : "");
+
+  if (typeof window !== "undefined") {
+    try {
+      if (sessionStorage.getItem(INSPECTOR_RECONNECT_STORAGE_KEY)) return true;
+    } catch {
+      // sessionStorage unavailable
+    }
+
+    const shellAutoConnectUrl = (
+      window as Window & { __MCP_USE_INSPECTOR__?: { autoConnectUrl?: string } }
+    ).__MCP_USE_INSPECTOR__?.autoConnectUrl;
+    if (shellAutoConnectUrl) return true;
+  }
+
+  const params = new URLSearchParams(resolvedSearch);
+  return !!params.get("autoConnect");
+}
+
 interface UseAutoConnectOptions {
   connections: McpServer[];
   addServer: (id: string, config: McpServerConfig) => void;
@@ -258,7 +280,9 @@ export function useAutoConnect({
   embedded = false,
 }: UseAutoConnectOptions): AutoConnectState {
   const navigate = useNavigate();
-  const [isAutoConnecting, setIsAutoConnecting] = useState(false);
+  const [isAutoConnecting, setIsAutoConnecting] = useState(() =>
+    detectPendingAutoConnect()
+  );
   const [autoConnectConfig, setAutoConnectConfig] =
     useState<ConnectionConfig | null>(null);
   const [configLoaded, setConfigLoaded] = useState(false);

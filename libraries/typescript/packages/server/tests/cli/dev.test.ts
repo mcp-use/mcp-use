@@ -617,7 +617,7 @@ describe("runDev (views)", () => {
     );
     expect(loopbackResponse.headers.get("vary")).toMatch(/Origin/i);
 
-    // …while foreign, opaque (`null`), and missing Origin get no ACAO…
+    // …while foreign and missing Origin get no ACAO…
     const foreignResponse = await fetch(virtualUrl, {
       headers: { origin: "https://host.example" },
     });
@@ -626,13 +626,14 @@ describe("runDev (views)", () => {
       foreignResponse.headers.get("access-control-allow-origin")
     ).toBeNull();
 
+    // …opaque sandbox iframes (`Origin: null`) get `null` so dev widgets load.
     const nullOriginResponse = await fetch(virtualUrl, {
       headers: { origin: "null" },
     });
     expect(nullOriginResponse.status).toBe(200);
-    expect(
-      nullOriginResponse.headers.get("access-control-allow-origin")
-    ).toBeNull();
+    expect(nullOriginResponse.headers.get("access-control-allow-origin")).toBe(
+      "null"
+    );
 
     const noOriginResponse = await fetch(virtualUrl);
     expect(noOriginResponse.status).toBe(200);

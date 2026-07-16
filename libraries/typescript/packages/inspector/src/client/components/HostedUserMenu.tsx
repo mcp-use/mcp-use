@@ -57,25 +57,6 @@ export function HostedUserMenu({
   const { user, loaded, authorizing, authorize, logout, mode } =
     useHostedSession(chatApiUrl);
 
-  // #region agent log
-  fetch("http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Debug-Session-Id": "243e61",
-    },
-    body: JSON.stringify({
-      sessionId: "243e61",
-      runId: "oauth-flow-2",
-      hypothesisId: "O5",
-      location: "HostedUserMenu.tsx:render",
-      message: "hosted user menu state",
-      data: { loaded, authorizing, hasUser: !!user, mode },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
-
   // Notify the parent (LayoutHeader) whenever the resolved session changes.
   const lastReportedId = useRef<string | null | undefined>(undefined);
   useEffect(() => {

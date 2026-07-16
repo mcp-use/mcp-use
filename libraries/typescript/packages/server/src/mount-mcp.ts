@@ -66,6 +66,7 @@ export function createMcpMount(
     handler: handlerOptions,
     authInfo: getAuthInfo,
   } = options;
+  const legacyMode = handlerOptions?.legacy ?? "stateless";
   const handler = createMcpHandler(factory, {
     legacy: "stateless",
     ...handlerOptions,
@@ -74,6 +75,15 @@ export function createMcpMount(
   const fetch: FetchHandler = async (request) => {
     if (!matchesPath(request, path)) {
       return new Response("Not Found", { status: 404 });
+    }
+
+    // ponytail: stateless wire is POST-only; SDK GET/DELETE/HEAD probes are optional.
+    // 204 avoids browser console noise from 405 while remaining client-safe.
+    if (legacyMode === "stateless") {
+      const method = request.method.toUpperCase();
+      if (method === "GET" || method === "DELETE" || method === "HEAD") {
+        return new Response(null, { status: 204 });
+      }
     }
 
     const bag = getRequestBag(request);

@@ -353,24 +353,6 @@ export function getSharedManufactSession(
 async function load(origin: string): Promise<void> {
   const existing = loading.get(origin);
   if (existing) {
-    // #region agent log
-    fetch("http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Debug-Session-Id": "243e61",
-      },
-      body: JSON.stringify({
-        sessionId: "243e61",
-        runId: "oauth-flow-2",
-        hypothesisId: "O1",
-        location: "manufact-auth.ts:load",
-        message: "auth load reused in-flight request",
-        data: { origin },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     return existing;
   }
   snapshots.set(origin, {
@@ -384,56 +366,9 @@ async function load(origin: string): Promise<void> {
       const shareSession = canShareManufactSession(inspectorUrl, origin);
       const skipSession = shouldSkipSharedSession(origin);
       const tokens = await validTokens(origin);
-      // #region agent log
-      fetch(
-        "http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Session-Id": "243e61",
-          },
-          body: JSON.stringify({
-            sessionId: "243e61",
-            runId: "oauth-flow-2",
-            hypothesisId: "O2",
-            location: "manufact-auth.ts:load",
-            message: "auth load token state",
-            data: {
-              origin,
-              shareSession,
-              skipSession,
-              hasValidTokens: !!tokens,
-            },
-            timestamp: Date.now(),
-          }),
-        }
-      ).catch(() => {});
-      // #endregion
       const oauthUser = tokens
         ? await fetchUser(origin, tokens.access_token)
         : null;
-      // #region agent log
-      fetch(
-        "http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Session-Id": "243e61",
-          },
-          body: JSON.stringify({
-            sessionId: "243e61",
-            runId: "oauth-flow-2",
-            hypothesisId: "O2",
-            location: "manufact-auth.ts:load",
-            message: "auth load userinfo result",
-            data: { origin, hadTokens: !!tokens, hasOauthUser: !!oauthUser },
-            timestamp: Date.now(),
-          }),
-        }
-      ).catch(() => {});
-      // #endregion
       if (oauthUser && tokens) {
         setSkipSharedSession(origin, false);
         emit(origin, {
@@ -555,55 +490,11 @@ export async function completeManufactAuthorization(
   const code = url.searchParams.get("code");
   const oauthError =
     url.searchParams.get("error_description") ?? url.searchParams.get("error");
-  // #region agent log
-  fetch("http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Debug-Session-Id": "243e61",
-    },
-    body: JSON.stringify({
-      sessionId: "243e61",
-      runId: "oauth-flow-2",
-      hypothesisId: "O3",
-      location: "manufact-auth.ts:complete",
-      message: "oauth callback entered",
-      data: {
-        hasState: !!state,
-        hasCode: !!code,
-        hasOauthError: !!oauthError,
-        hasOpener: !!window.opener,
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
   if (oauthError) throw new Error(oauthError);
   if (!state || !code) throw new Error("Missing OAuth code or state");
   const key = stateKey(state);
   const pending = readJson<PendingAuthorization>(key);
   browserStorage()?.removeItem(key);
-  // #region agent log
-  fetch("http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Debug-Session-Id": "243e61",
-    },
-    body: JSON.stringify({
-      sessionId: "243e61",
-      runId: "oauth-flow-2",
-      hypothesisId: "O3",
-      location: "manufact-auth.ts:complete",
-      message: "oauth callback pending state",
-      data: {
-        hasPending: !!pending,
-        pendingExpired: !!pending && pending.expiresAt < Date.now(),
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
   if (!pending || pending.expiresAt < Date.now()) {
     throw new Error("OAuth state is invalid or expired");
   }
@@ -618,28 +509,6 @@ export async function completeManufactAuthorization(
   writeJson(storageKey(pending.authOrigin, "tokens"), tokens);
   setSkipSharedSession(pending.authOrigin, false);
   const user = await fetchUser(pending.authOrigin, tokens.access_token);
-  // #region agent log
-  fetch("http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Debug-Session-Id": "243e61",
-    },
-    body: JSON.stringify({
-      sessionId: "243e61",
-      runId: "oauth-flow-2",
-      hypothesisId: "O4",
-      location: "manufact-auth.ts:complete",
-      message: "oauth exchange completed",
-      data: {
-        hasAccessToken: !!tokens.access_token,
-        hasRefreshToken: !!tokens.refresh_token,
-        hasUser: !!user,
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
   emit(pending.authOrigin, {
     loaded: true,
     authorizing: false,

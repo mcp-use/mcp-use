@@ -103,8 +103,7 @@ export default function LogoAnimated({
   const labelEl = showLabel ? (
     <span
       className={cn(
-        "flex gap-2 whitespace-nowrap",
-        pinSymbolInIconColumn ? "items-center" : "items-baseline",
+        "font-ubuntu flex items-center gap-2 whitespace-nowrap",
         pinSymbolInIconColumn
           ? cn(
               "pl-(--sidebar-nav-text-pl-absolute)",
@@ -112,14 +111,14 @@ export default function LogoAnimated({
                 ? "relative opacity-100 blur-0"
                 : "pointer-events-none absolute left-0 top-1/2 w-0 -translate-y-1/2 overflow-hidden opacity-0 blur-[3px]"
             )
-          : "ml-0 gap-2"
+          : "mr-3"
       )}
     >
-      <span className="font-ubuntu text-xl font-medium leading-none text-foreground [text-box:trim-both_cap_alphabetic]">
+      <span className="text-xl font-bold leading-none text-foreground [text-box:trim-both_cap_alphabetic]">
         mcp-use
       </span>
-      <span className="text-sm font-semibold uppercase tracking-wide leading-none text-muted-foreground [text-box:trim-both_cap_alphabetic]">
-        inspector
+      <span className="text-lg font-sans font-light leading-none tracking-wide text-muted-foreground [text-box:trim-both_cap_alphabetic]">
+        Inspector
       </span>
     </span>
   ) : null;

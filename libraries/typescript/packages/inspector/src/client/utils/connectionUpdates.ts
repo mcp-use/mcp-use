@@ -1,5 +1,9 @@
 import { inspectorApi } from "@/client/utils/basePath";
 import {
+  isLocalhostServerUrl,
+  isMcpUseTunnelUrl,
+} from "@/client/utils/servers";
+import {
   LocalStorageProvider,
   type McpServer,
   type McpServerConfig,
@@ -420,6 +424,14 @@ export class InspectorConnectionStorageProvider extends LocalStorageProvider {
         {
           ...pickInspectorConnectionExtras(prev[id]),
           ...config,
+          // Tunnel switching is a live transport override. Persist the stable
+          // localhost endpoint so a later dev-process restart cannot boot into
+          // an expired tunnel URL.
+          ...(isLocalhostServerUrl(id) &&
+          typeof config.url === "string" &&
+          isMcpUseTunnelUrl(config.url)
+            ? { url: id }
+            : {}),
         },
       ])
     ) as Record<string, McpServerConfig>;

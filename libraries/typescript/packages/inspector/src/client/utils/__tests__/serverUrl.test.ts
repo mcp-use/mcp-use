@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isLocalhostServerUrl } from "../servers";
+import { isLocalhostServerUrl, isMcpUseTunnelUrl } from "../servers";
 
 describe("isLocalhostServerUrl", () => {
   it("returns true for loopback hostnames", () => {
@@ -33,5 +33,15 @@ describe("isLocalhostServerUrl", () => {
   it("returns false for unparseable URLs", () => {
     expect(isLocalhostServerUrl("not a url")).toBe(false);
     expect(isLocalhostServerUrl("")).toBe(false);
+  });
+});
+
+describe("isMcpUseTunnelUrl", () => {
+  it("only matches mcp-use tunnel hosts", () => {
+    expect(
+      isMcpUseTunnelUrl("https://gentle-silver.local.mcp-use.run/mcp")
+    ).toBe(true);
+    expect(isMcpUseTunnelUrl("https://example.com/mcp-use.run")).toBe(false);
+    expect(isMcpUseTunnelUrl("not a url")).toBe(false);
   });
 });

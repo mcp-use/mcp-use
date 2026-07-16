@@ -16,6 +16,14 @@ export function isLocalhostServerUrl(serverUrl: string): boolean {
   }
 }
 
+export function isMcpUseTunnelUrl(serverUrl: string): boolean {
+  try {
+    return new URL(serverUrl).hostname.endsWith(".mcp-use.run");
+  } catch {
+    return false;
+  }
+}
+
 interface ServerNameLike {
   name?: string;
   url?: string;

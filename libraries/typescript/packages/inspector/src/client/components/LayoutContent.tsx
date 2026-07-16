@@ -90,6 +90,38 @@ export function LayoutContent({
     manufactAuthMode === "session" ? ("include" as const) : undefined;
   const isManufactAuthenticated = user != null;
 
+  const chatApiUrl = embeddedConfig.chatApiUrl;
+  const isLoopbackServer =
+    !!selectedServer?.url && isLocalhostServerUrl(selectedServer.url);
+  const useManagedClientSide = selectedServer
+    ? shouldUseManagedClientSide({
+        isLoopback: isLoopbackServer,
+        chatApiUrl: embeddedConfig.chatApiUrl,
+        enableFreeTierUpgrade: embeddedConfig.chatEnableFreeTierUpgrade,
+      })
+    : false;
+  const managedCloudModel = useManagedCloudModel(
+    chatApiUrl,
+    accessToken,
+    manufactAuthMode,
+    !!selectedServer && !!chatApiUrl && isManufactAuthenticated
+  );
+  const managedLlmConfig = useManagedClientSide
+    ? buildManagedLlmProxyConfig(
+        chatApiUrl!,
+        accessToken,
+        manufactAuthMode === "session",
+        isManufactAuthenticated ? managedCloudModel.selectedModelId : undefined
+      )
+    : (embeddedConfig.managedLlmConfig ??
+      (chatApiUrl && !isLoopbackServer
+        ? {
+            provider: "anthropic" as const,
+            model: "claude-haiku-4-5",
+            apiKey: "server-managed",
+          }
+        : undefined));
+
   // When forceConnected is enabled, render the chat tab directly without a
   // real server connection. The backend (chatApiUrl) manages everything.
   if (!selectedServer && embeddedConfig.forceConnected) {
@@ -157,65 +189,6 @@ export function LayoutContent({
   };
 
   const allKnownTabs = ALL_KNOWN_TABS;
-
-  // Localhost MCP + hosted chat URL: browser MCPAgent owns tools; only LLM
-  // calls go through the cloud `/inspector/llm/*` proxy (MCP-2419 follow-up).
-  const isLoopbackServer =
-    !!selectedServer.url && isLocalhostServerUrl(selectedServer.url);
-  const useManagedClientSide = shouldUseManagedClientSide({
-    isLoopback: isLoopbackServer,
-    chatApiUrl: embeddedConfig.chatApiUrl,
-    enableFreeTierUpgrade: embeddedConfig.chatEnableFreeTierUpgrade,
-  });
-  const chatApiUrl = embeddedConfig.chatApiUrl;
-  const managedCloudModel = useManagedCloudModel(
-    chatApiUrl,
-    accessToken,
-    manufactAuthMode,
-    !!chatApiUrl && isManufactAuthenticated
-  );
-  // #region agent log
-  fetch("http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Debug-Session-Id": "243e61",
-    },
-    body: JSON.stringify({
-      sessionId: "243e61",
-      location: "LayoutContent.tsx:managedCloud",
-      message: "layout managed cloud state",
-      data: {
-        useManagedClientSide,
-        isLoopbackServer,
-        isManufactAuthenticated,
-        hasAccessToken: !!accessToken,
-        authMode: manufactAuthMode,
-        modelsEnabled: useManagedClientSide && isManufactAuthenticated,
-        modelCount: managedCloudModel.models.length,
-        isLoading: managedCloudModel.isLoading,
-        serverUrl: selectedServer?.url ?? null,
-      },
-      timestamp: Date.now(),
-      hypothesisId: "H-B",
-    }),
-  }).catch(() => {});
-  // #endregion
-  const managedLlmConfig = useManagedClientSide
-    ? buildManagedLlmProxyConfig(
-        chatApiUrl!,
-        accessToken,
-        manufactAuthMode === "session",
-        isManufactAuthenticated ? managedCloudModel.selectedModelId : undefined
-      )
-    : (embeddedConfig.managedLlmConfig ??
-      (chatApiUrl && !isLoopbackServer
-        ? {
-            provider: "anthropic" as const,
-            model: "claude-haiku-4-5",
-            apiKey: "server-managed",
-          }
-        : undefined));
 
   // Load tab chunks on first visit; keep mounted (display:none) to preserve state.
   return (

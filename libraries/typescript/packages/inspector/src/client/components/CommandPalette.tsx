@@ -10,8 +10,19 @@ import {
   Server,
   Wrench,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { useNavigate } from "react-router";
+import { useProximityHover } from "@/client/hooks/use-proximity-hover";
+import { spring } from "@/client/lib/springs";
+import { shapeMap } from "@/client/lib/shape-context";
+import { cn } from "@/client/lib/utils";
 import type { SavedRequest } from "./tools/SavedRequestsList";
 
 import {
@@ -115,6 +126,15 @@ export function CommandPalette({
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const shape = shapeMap.pill;
+  const {
+    activeIndex: hoverIndex,
+    itemRects,
+    sessionRef,
+    handlers,
+    registerItem,
+    measureItems,
+  } = useProximityHover(listRef);
 
   // Get server URL for "Open in..." commands
   const serverUrl = selectedServer
@@ -461,6 +481,33 @@ export function CommandPalette({
                 ? "tools" // Navigate to tools tab for saved requests
                 : ("resources" as const);
 
+        // #region agent log
+        fetch(
+          "http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Debug-Session-Id": "831b88",
+            },
+            body: JSON.stringify({
+              sessionId: "831b88",
+              location: "CommandPalette.tsx:handleSelect",
+              message: "palette navigate item",
+              data: {
+                itemType: item.type,
+                itemName: item.name,
+                itemIdentifier,
+                tabName,
+                serverId: item.metadata?.serverId ?? null,
+              },
+              timestamp: Date.now(),
+              hypothesisId: "H1",
+            }),
+          }
+        ).catch(() => {});
+        // #endregion
+
         console.warn("[CommandPalette] Navigating to item:", {
           tab: tabName,
           itemIdentifier,
@@ -642,6 +689,15 @@ export function CommandPalette({
     }
   }, [activeIndex, filteredItems.length]);
 
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    measureItems();
+  }, [isOpen, measureItems, filteredItems]);
+
+  const checkedRect = itemRects[activeIndex] ?? null;
+  const hoverRect = hoverIndex !== null ? itemRects[hoverIndex] : null;
+  const isHoveringOther = hoverIndex !== null && hoverIndex !== activeIndex;
+
   if (!isOpen) return null;
 
   const onPaletteKeyDown = (event: React.KeyboardEvent) => {
@@ -685,9 +741,67 @@ export function CommandPalette({
         />
         <div
           ref={listRef}
-          className="min-h-[200px] sm:min-h-[330px] max-h-[400px] overflow-auto overscroll-contain transition-[height] duration-100 ease-out"
+          onMouseEnter={handlers.onMouseEnter}
+          onMouseMove={handlers.onMouseMove}
+          onMouseLeave={handlers.onMouseLeave}
+          className="relative isolate min-h-[200px] sm:min-h-[330px] max-h-[400px] overflow-auto overscroll-contain transition-[height] duration-100 ease-out px-1"
           data-testid="command-palette-list"
         >
+          <AnimatePresence>
+            {checkedRect && (
+              <motion.div
+                aria-hidden
+                className={cn(
+                  "pointer-events-none absolute bg-active",
+                  shape.bg
+                )}
+                initial={false}
+                animate={{
+                  top: checkedRect.top,
+                  left: checkedRect.left,
+                  width: checkedRect.width,
+                  height: checkedRect.height,
+                  opacity: isHoveringOther ? 0.8 : 1,
+                }}
+                exit={{ opacity: 0, transition: spring.moderate.exit }}
+                transition={{
+                  ...spring.moderate,
+                  opacity: { duration: 0.08 },
+                }}
+              />
+            )}
+          </AnimatePresence>
+          <AnimatePresence>
+            {hoverRect && (
+              <motion.div
+                key={sessionRef.current}
+                aria-hidden
+                className={cn(
+                  "pointer-events-none absolute bg-hover",
+                  shape.bg
+                )}
+                initial={{
+                  opacity: 0,
+                  top: checkedRect?.top ?? hoverRect.top,
+                  left: checkedRect?.left ?? hoverRect.left,
+                  width: checkedRect?.width ?? hoverRect.width,
+                  height: checkedRect?.height ?? hoverRect.height,
+                }}
+                animate={{
+                  opacity: 1,
+                  top: hoverRect.top,
+                  left: hoverRect.left,
+                  width: hoverRect.width,
+                  height: hoverRect.height,
+                }}
+                exit={{ opacity: 0, transition: spring.fast.exit }}
+                transition={{
+                  ...spring.fast,
+                  opacity: { duration: 0.08 },
+                }}
+              />
+            )}
+          </AnimatePresence>
           {filteredItems.length === 0 ? (
             <div className="text-sm flex items-center justify-center h-12 whitespace-pre-wrap text-muted-foreground">
               No results found.
@@ -696,15 +810,12 @@ export function CommandPalette({
             filteredItems.map((item, index) => (
               <button
                 key={item.id}
+                ref={(el) => registerItem(index, el)}
                 type="button"
                 data-testid={`command-palette-item-${item.id}`}
-                onMouseEnter={() => setActiveIndex(index)}
+                data-proximity-index={index}
                 onClick={() => handleSelect(item)}
-                className={`[content-visibility:auto] cursor-pointer h-12 rounded-lg text-sm flex items-center gap-3 px-4 text-foreground select-none w-full text-left transition-all duration-150 mt-1 first:mt-0 ${
-                  index === activeIndex
-                    ? "bg-accent text-foreground"
-                    : "bg-transparent"
-                }`}
+                className="[content-visibility:auto] relative z-10 cursor-pointer h-12 text-sm flex items-center gap-3 px-3 text-foreground select-none w-full text-left mt-1 first:mt-0"
               >
                 {getIcon(item.type, item.category, item.name)}
                 <span className="font-medium truncate flex-1 min-w-0">

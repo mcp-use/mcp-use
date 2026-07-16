@@ -303,15 +303,19 @@ export function MCPAppsDebugControls({
     if (!onPropsChange) return;
 
     if (selectValue === NO_PROPS_VALUE || selectValue === TOOL_PROPS_VALUE) {
-      // Both "None" and "Tool Props" mean no custom override — use natural tool result flow.
-      // Per SEP-1865, widget props come from structuredContent in the tool result, not from
-      // tool call arguments; overriding with args would erase the real structured data.
       onPropsChange(null);
-    } else if (activePresetId) {
+    } else if (activePresetId && selectValue === activePresetId) {
       const props = getActiveProps();
-      onPropsChange(props);
+      if (props) onPropsChange(props);
     }
-  }, [selectValue, activePresetId, toolInput, getActiveProps, onPropsChange]);
+  }, [
+    selectValue,
+    activePresetId,
+    toolInput,
+    getActiveProps,
+    onPropsChange,
+    presets,
+  ]);
 
   const handleValueChange = (value: string) => {
     if (value === CREATE_PRESET_VALUE) {
@@ -323,9 +327,12 @@ export function MCPAppsDebugControls({
     if (value === NO_PROPS_VALUE || value === TOOL_PROPS_VALUE) {
       setActivePreset(null);
       setSelectValue(value);
+      onPropsChange?.(null);
     } else {
       setActivePreset(value);
       setSelectValue(value);
+      const preset = presets.find((p) => p.id === value);
+      onPropsChange?.(preset?.props ?? null);
     }
   };
 
@@ -333,6 +340,8 @@ export function MCPAppsDebugControls({
     savePreset(preset);
     setActivePreset(preset.id);
     setSelectValue(preset.id);
+    // Apply immediately — getActiveProps() can lag savePreset's state update.
+    onPropsChange?.(preset.props);
   };
 
   const handleDeletePreset = (presetId: string, e: React.MouseEvent) => {

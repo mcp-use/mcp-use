@@ -4,7 +4,11 @@ import type { TabType } from "@/client/context/InspectorContext";
 import { useInspector } from "@/client/context/InspectorContext";
 import { cn } from "@/client/lib/utils";
 import { getServerHeaders } from "@/client/utils/connectionUpdates";
-import { getServerDisplayName } from "@/client/utils/servers";
+import {
+  getServerDisplayName,
+  isLocalhostServerUrl,
+} from "@/client/utils/servers";
+import { getBasePath } from "@/client/utils/basePath";
 import { ChevronDown, Plus } from "lucide-react";
 import type { McpServer } from "@mcp-use/client/react";
 import { useState } from "react";
@@ -14,11 +18,17 @@ import { MCPDeployClickEvent, captureInspectorEvent } from "@/client/telemetry";
 import { TabCountBadge } from "./shared/TabCountBadge";
 import { AddToClientDropdown } from "./AddToClientDropdown";
 import LogoAnimated from "./LogoAnimated";
-import { SdkIntegrationModal } from "./SdkIntegrationModal";
 import { ServerDropdown } from "./ServerDropdown";
-import { getTabCount, shouldShowDot } from "./layout/layoutHeaderUtils";
+import {
+  getTabCount,
+  isMcpUseTunnelUrl,
+  shouldShowDot,
+} from "./layout/layoutHeaderUtils";
 import { LAYOUT_TABS } from "./layout/layoutTabs";
 import { ServerUrlChip } from "./layout/ServerUrlChip";
+import { TunnelStartButton } from "./layout/TunnelBadge";
+import { useTunnelControls } from "./layout/useTunnelControls";
+import { useTunnelPopoverOpen } from "./layout/useTunnelPopoverOpen";
 
 interface LayoutHeaderProps {
   connections: McpServer[];
@@ -39,11 +49,25 @@ export function LayoutHeader({
   embedded = false,
   sidebarCollapsed = false,
 }: LayoutHeaderProps) {
-  const { tunnelUrl, embeddedConfig } = useInspector();
-  const [tsSdkModalOpen, setTsSdkModalOpen] = useState(false);
-  const [pySdkModalOpen, setPySdkModalOpen] = useState(false);
+  const {
+    tunnelUrl,
+    isTunnelStarting,
+    setTunnelUrl,
+    setIsTunnelStarting,
+    embeddedConfig,
+  } = useInspector();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [mobileTabsCollapsed] = useState(true);
+
+  const tunnelPopover = useTunnelPopoverOpen(tunnelUrl);
+
+  const tunnel = useTunnelControls({
+    tunnelUrl,
+    setTunnelUrl,
+    isTunnelStarting,
+    setIsTunnelStarting,
+    onTunnelStarted: tunnelPopover.openWithAutoCopy,
+  });
 
   if (embeddedConfig.singleTab) {
     return null;
@@ -57,11 +81,60 @@ export function LayoutHeader({
       )
     : LAYOUT_TABS;
 
+  const onServerRoute = !!selectedServer;
+
+  const showTunnelBadge =
+    !!selectedServer &&
+    (isLocalhostServerUrl(selectedServer.url ?? "") ||
+      isMcpUseTunnelUrl(selectedServer.url ?? "") ||
+      !!tunnelUrl);
+
   const serverUrl = selectedServer
     ? tunnelUrl
-      ? `${tunnelUrl}/mcp`
+      ? `${tunnelUrl.replace(/\/+$/, "")}${getBasePath()}`
       : (selectedServer.url ?? "")
     : "";
+
+  const displayMcpUrl =
+    tunnel.mcpUrl ??
+    (tunnelUrl ? `${tunnelUrl.replace(/\/+$/, "")}${getBasePath()}` : null);
+
+  const renderUrlCluster = (
+    row: "desktop" | "mobile",
+    chipClassName?: string
+  ) => {
+    if (!selectedServer || !serverUrl) return null;
+    const rowVisible =
+      row === "desktop" ? tunnelPopover.isLgUp : !tunnelPopover.isLgUp;
+
+    return (
+      <>
+        <ServerUrlChip
+          url={serverUrl}
+          className={chipClassName}
+          tunnelPopover={
+            tunnelUrl && displayMcpUrl && rowVisible
+              ? {
+                  mcpUrl: displayMcpUrl,
+                  onStop: tunnel.handleStopTunnel,
+                  open: tunnelPopover.open,
+                  onOpenChange: tunnelPopover.onOpenChange,
+                  autoCopyOnOpen: tunnelPopover.autoCopyOnOpen,
+                }
+              : undefined
+          }
+        />
+        {showTunnelBadge && !tunnelUrl && (
+          <TunnelStartButton
+            devFromCli={tunnel.devFromCli}
+            isTunnelStarting={isTunnelStarting}
+            waitTicks={tunnel.waitTicks}
+            onStart={tunnel.handleStartTunnel}
+          />
+        )}
+      </>
+    );
+  };
 
   const renderActionButtons = () => {
     if (embedded) return null;
@@ -86,32 +159,6 @@ export function LayoutHeader({
                   onError={(error: Error) =>
                     toast.error(`Failed: ${error.message}`)
                   }
-                  additionalItems={[
-                    {
-                      id: "ts-sdk",
-                      label: "TypeScript SDK",
-                      icon: (
-                        <img
-                          src="https://cdn.simpleicons.org/typescript"
-                          alt="TypeScript"
-                          className="h-4 w-4"
-                        />
-                      ),
-                      onClick: () => setTsSdkModalOpen(true),
-                    },
-                    {
-                      id: "py-sdk",
-                      label: "Python SDK",
-                      icon: (
-                        <img
-                          src="https://cdn.simpleicons.org/python"
-                          alt="Python"
-                          className="h-4 w-4"
-                        />
-                      ),
-                      onClick: () => setPySdkModalOpen(true),
-                    },
-                  ]}
                   trigger={
                     <Button
                       variant="ghost"
@@ -128,24 +175,6 @@ export function LayoutHeader({
                       </span>
                     </Button>
                   }
-                />
-                <SdkIntegrationModal
-                  open={tsSdkModalOpen}
-                  onOpenChange={setTsSdkModalOpen}
-                  serverUrl={serverUrl}
-                  serverName={displayName}
-                  serverId={undefined}
-                  headers={getServerHeaders(selectedServer)}
-                  language="typescript"
-                />
-                <SdkIntegrationModal
-                  open={pySdkModalOpen}
-                  onOpenChange={setPySdkModalOpen}
-                  serverUrl={serverUrl}
-                  serverName={displayName}
-                  serverId={undefined}
-                  headers={getServerHeaders(selectedServer)}
-                  language="python"
                 />
               </>
             );
@@ -190,14 +219,17 @@ export function LayoutHeader({
               <div
                 className={cn(
                   "hidden lg:block shrink-0",
-                  sidebarCollapsed &&
+                  onServerRoute &&
+                    sidebarCollapsed &&
                     "-mr-[calc(var(--sidebar-width-icon)/2-0.625rem)]"
                 )}
               >
                 <LogoAnimated
                   pinSymbolInIconColumn
-                  showLabel={!sidebarCollapsed}
-                  state={sidebarCollapsed ? "collapsed" : "expanded"}
+                  showLabel={!onServerRoute || !sidebarCollapsed}
+                  state={
+                    onServerRoute && sidebarCollapsed ? "collapsed" : "expanded"
+                  }
                 />
               </div>
               <span className="text-sm text-muted-foreground/60 shrink-0 [text-box:trim-both_cap_alphabetic]">
@@ -209,7 +241,7 @@ export function LayoutHeader({
                 onServerSelect={onServerSelect}
                 variant="header"
               />
-              {selectedServer && serverUrl && <ServerUrlChip url={serverUrl} />}
+              {renderUrlCluster("desktop")}
             </>
           )}
         </div>
@@ -239,7 +271,9 @@ export function LayoutHeader({
         </div>
 
         {selectedServer && serverUrl && !embedded && (
-          <ServerUrlChip url={serverUrl} className="px-1" />
+          <div className="flex items-center gap-2 px-1 min-w-0">
+            {renderUrlCluster("mobile", "min-w-0")}
+          </div>
         )}
 
         {selectedServer && (
@@ -250,11 +284,11 @@ export function LayoutHeader({
               collapsed={mobileTabsCollapsed}
             >
               <TabsList className="w-full justify-center border-0 bg-transparent p-0">
-                {filteredTabs.map((tab) => {
+                {filteredTabs.map((tab, index) => {
                   if (tab.id === "separator") {
                     return (
                       <div
-                        key="separator"
+                        key={`separator-${index}`}
                         className="h-5 w-px bg-zinc-300 dark:bg-zinc-600 mx-1 shrink-0"
                       />
                     );

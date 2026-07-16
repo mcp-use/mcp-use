@@ -563,32 +563,6 @@ export function ChatTab({
         }
       : undefined;
 
-  // #region agent log
-  fetch("http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Debug-Session-Id": "243e61",
-    },
-    body: JSON.stringify({
-      sessionId: "243e61",
-      location: "ChatTab.tsx:managedCloudInfo",
-      message: "chat managed cloud info",
-      data: {
-        isManaged,
-        isHostedAuthenticated,
-        hasManagedCloudModel: !!managedCloudModel,
-        showManagedCloudInfo: !!managedCloudInfo,
-        modelCount: managedCloudModel?.models.length ?? 0,
-        isLoading: managedCloudModel?.isLoading ?? false,
-        hostedUserId: hostedUser?.id ?? null,
-      },
-      timestamp: Date.now(),
-      hypothesisId: "H-C",
-    }),
-  }).catch(() => {});
-  // #endregion
-
   const modelBadgeMode = isManaged ? ("managed" as const) : ("byok" as const);
   const modelDisplayName =
     isManaged && managedCloudModel?.selectedModel

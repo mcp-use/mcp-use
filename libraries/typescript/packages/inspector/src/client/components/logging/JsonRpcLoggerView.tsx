@@ -12,6 +12,7 @@ import {
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
 import { useRpcLogVirtualizer } from "@/client/hooks/use-rpc-log-virtualizer";
+import { cn } from "@/client/lib/utils";
 import { ensureRpcTrafficBridge } from "@/client/rpc-traffic-bridge";
 import { getRpcTrafficMethod } from "@/client/rpc-traffic-coalesce";
 import {
@@ -58,6 +59,7 @@ export function JsonRpcLoggerView({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [sourceFilters, setSourceFilters] = useState<Set<RpcTrafficSource>>(
     () => new Set(["mcp", "widget"])
   );
@@ -201,7 +203,7 @@ export function JsonRpcLoggerView({
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center justify-between gap-2 px-2 pt-2">
+      <div className="flex shrink-0 items-center justify-between gap-2 pr-2 pt-2 pl-1">
         <h2 className="text-xs font-medium text-foreground">RPC Logs</h2>
         <div className="flex items-center gap-0.5">
           <Button
@@ -239,38 +241,50 @@ export function JsonRpcLoggerView({
           </Button>
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-2 p-2 pt-1">
-        <div className="relative min-w-0 flex-1">
+      <div className="flex shrink-0 items-center pr-2 pb-2 pt-1 pl-1">
+        <div className="relative min-w-0 flex-1 transition-[flex-grow] duration-200 ease-out">
           <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
+            onFocus={() => setIsSearchFocused(true)}
+            onBlur={() => setIsSearchFocused(false)}
             placeholder="Search"
             aria-label="Search RPC traffic"
-            className="h-8 pl-7 text-xs shadow-none"
+            className="h-8 w-full pl-7 text-xs shadow-none transition-[width] duration-200 ease-out"
           />
         </div>
-        <CheckboxGroup
-          checkedIndices={sourceCheckedIndices}
-          orientation="horizontal"
-          aria-label="Filter RPC traffic by source"
-          className="w-auto shrink-0"
+        <div
+          aria-hidden={isSearchFocused}
+          className={cn(
+            "shrink-0 overflow-hidden transition-[max-width,opacity,margin] duration-200 ease-out",
+            isSearchFocused
+              ? "pointer-events-none ml-0 max-w-0 opacity-0"
+              : "ml-2 max-w-32 opacity-100"
+          )}
         >
-          <CheckboxItem
-            index={0}
-            label="MCP"
-            size="sm"
-            checked={sourceFilters.has("mcp")}
-            onToggle={() => toggleSourceFilter("mcp")}
-          />
-          <CheckboxItem
-            index={1}
-            label="UI"
-            size="sm"
-            checked={sourceFilters.has("widget")}
-            onToggle={() => toggleSourceFilter("widget")}
-          />
-        </CheckboxGroup>
+          <CheckboxGroup
+            checkedIndices={sourceCheckedIndices}
+            orientation="horizontal"
+            aria-label="Filter RPC traffic by source"
+            className="w-auto shrink-0"
+          >
+            <CheckboxItem
+              index={0}
+              label="MCP"
+              size="sm"
+              checked={sourceFilters.has("mcp")}
+              onToggle={() => toggleSourceFilter("mcp")}
+            />
+            <CheckboxItem
+              index={1}
+              label="UI"
+              size="sm"
+              checked={sourceFilters.has("widget")}
+              onToggle={() => toggleSourceFilter("widget")}
+            />
+          </CheckboxGroup>
+        </div>
       </div>
       <div
         ref={scrollRef}
@@ -341,7 +355,7 @@ function RpcLogRow({
         type="button"
         aria-expanded={expanded}
         onClick={onToggle}
-        className="flex h-9 w-full items-center gap-2 px-3 py-2 text-left text-muted-foreground transition-colors hover:text-foreground"
+        className="flex h-9 w-full cursor-pointer items-center gap-2 py-2 pr-3 pl-1 text-left text-muted-foreground transition-colors hover:text-foreground"
       >
         <Tooltip>
           <TooltipTrigger

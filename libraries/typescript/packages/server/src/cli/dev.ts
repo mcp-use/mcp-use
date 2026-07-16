@@ -201,8 +201,8 @@ function appendVaryOrigin(res: ServerResponse): void {
  *
  * Tunnel active → `Access-Control-Allow-Origin: *` (foreign / opaque hosts).
  * No tunnel on a localhost bind → reflect a validated loopback `Origin`
- * (exact value) and set `Vary: Origin`; foreign, `null`, or missing Origin
- * get no ACAO so the source module graph stays unreadable to arbitrary sites.
+ * (exact value) and set `Vary: Origin`; reflect `null` for opaque sandbox
+ * iframes; foreign or missing Origin get no ACAO.
  *
  * @param req - Incoming request (reads `Origin`).
  * @param res - Response to receive CORS headers.
@@ -222,6 +222,11 @@ function applyViteModuleCors(
     return;
   }
   const originHeader = req.headers.origin;
+  // Sandboxed MCP App iframes (opaque origin) send `Origin: null` on module GETs.
+  if (originHeader === "null") {
+    res.setHeader("Access-Control-Allow-Origin", "null");
+    return;
+  }
   // validateOriginHeader treats a missing Origin as ok (no header to check);
   // CORS reflection requires a concrete loopback origin string.
   if (typeof originHeader !== "string" || originHeader === "") {
@@ -522,6 +527,19 @@ export async function runDev(options: DevOptions): Promise<void> {
 
   // --- One long-lived HTTP listener delegating to the current handler. -----
   const tunnelManager = createTunnelManager(paths.tunnel);
+
+  // Vite owns the upgrade listener and validates Host before our HTTP request
+  // guard runs. The public tunnel has already been validated by the proxy and
+  // tunnel manager, so present only that active host as the local listener.
+  httpServer.prependListener("upgrade", (req) => {
+    const tunnelUrl = tunnelManager.status().url;
+    if (tunnelUrl === null) return;
+    const tunnelHost = new URL(tunnelUrl).hostname;
+    const requestHost = req.headers.host?.split(":")[0];
+    if (requestHost === tunnelHost) {
+      req.headers.host = `localhost:${port}`;
+    }
+  });
 
   // --- DNS-rebinding protection. --------------------------------------------
   // getHandler() applies no Host/Origin validation (its contract assumes a

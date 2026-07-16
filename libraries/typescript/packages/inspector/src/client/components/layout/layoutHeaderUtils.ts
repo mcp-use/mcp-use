@@ -1,4 +1,18 @@
 import type { McpServer } from "@mcp-use/client/react";
+export { isMcpUseTunnelUrl } from "@/client/utils/servers";
+
+export function tunnelOriginFromMcpUrl(mcpUrl: string | null): string | null {
+  if (!mcpUrl) return null;
+  try {
+    const u = new URL(mcpUrl);
+    if (u.protocol === "https:") {
+      return u.origin;
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
 
 export function getTabCount(tabId: string, server: McpServer): number {
   if (tabId === "tools") {

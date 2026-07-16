@@ -1,17 +1,30 @@
-export async function copyToClipboard(text: string): Promise<void> {
-  if (navigator.clipboard?.writeText) {
-    return navigator.clipboard.writeText(text);
-  }
+function copyWithExecCommand(text: string): boolean {
   const textarea = document.createElement("textarea");
   textarea.value = text;
   textarea.style.cssText = "position:fixed;top:-9999px;left:-9999px;opacity:0";
   document.body.appendChild(textarea);
   textarea.focus();
   textarea.select();
-  if (!document.execCommand("copy")) {
-    throw new Error("execCommand copy failed");
+  try {
+    return document.execCommand("copy");
+  } finally {
+    document.body.removeChild(textarea);
   }
-  document.body.removeChild(textarea);
+}
+
+/** Sync copy — use inside click handlers to stay within user activation. */
+export function copyToClipboardSync(text: string): boolean {
+  return copyWithExecCommand(text);
+}
+
+export async function copyToClipboard(text: string): Promise<void> {
+  // ponytail: execCommand first — avoids Chrome's clipboard permission prompt
+  // that navigator.clipboard.writeText can show without a fresh user gesture.
+  if (copyWithExecCommand(text)) return;
+  if (navigator.clipboard?.writeText) {
+    return navigator.clipboard.writeText(text);
+  }
+  throw new Error("copy failed");
 }
 
 export function formatRelativeTime(timestamp: number): string {

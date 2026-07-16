@@ -132,11 +132,11 @@ the local bundle:
 curl -s http://127.0.0.1:3000/mcp/inspector | rg '127.0.0.1:4173/inspector.js'
 ```
 
-`serve:cdn` rebuilds `dist/cdn` before starting Vite Preview. Restart the
-mcp-use dev process after changing `MCP_USE_INSPECTOR_ASSETS_URL`, because the
-shell HTML is generated when the server mounts. An explicit
-`inspector.assetsUrl` constructor option takes precedence over the environment
-variable.
+`serve:cdn` rebuilds `dist/cdn`, then runs Vite Preview with a watch rebuild
+loop — refresh the browser after source changes land. Restart the mcp-use dev
+process after changing `MCP_USE_INSPECTOR_ASSETS_URL`, because the shell HTML
+is generated when the server mounts. An explicit `inspector.assetsUrl`
+constructor option takes precedence over the environment variable.
 
 ---
 

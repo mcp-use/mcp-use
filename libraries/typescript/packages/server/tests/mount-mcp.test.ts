@@ -94,6 +94,19 @@ describe("mountMcp", () => {
     }
   });
 
+  it("answers GET session probe with 204 on stateless mount (not 405)", async () => {
+    const response = await fetch(new URL("/mcp", baseUrl), {
+      method: "GET",
+      headers: { Accept: "text/event-stream" },
+    });
+    expect(response.status).toBe(204);
+  });
+
+  it("answers HEAD health probe with 204 on stateless mount (not 405)", async () => {
+    const response = await fetch(new URL("/mcp", baseUrl), { method: "HEAD" });
+    expect(response.status).toBe(204);
+  });
+
   it("mounts on a custom path", async () => {
     const options: MountMcpOptions = { path: "/custom/mcp" };
     const { handler, fetch: mcpFetch } = mountMcp(buildTestServer, options);
