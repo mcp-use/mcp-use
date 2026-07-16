@@ -35,6 +35,7 @@
     "changeset": "changeset",
     "version": "changeset version && pnpm install --no-frozen-lockfile",
     "version:beta": "node scripts/version-packages.mjs && pnpm install --no-frozen-lockfile",
+    "publish:beta": "node scripts/publish-beta.mjs",
     "release": "pnpm build && changeset publish",
     "version:check": "changeset status",
     "verify:beta-plan": "node scripts/beta-release-plan.mjs",

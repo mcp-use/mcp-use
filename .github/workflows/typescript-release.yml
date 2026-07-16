@@ -680,7 +680,9 @@ jobs:
       - name: Publish beta packages with trusted publishing
         if: steps.publication.outputs.needed == 'true'
         working-directory: libraries/typescript
-        run: pnpm changeset publish --tag beta
+        # Publish the pnpm-produced tarballs explicitly so even packages that are
+        # new to npm receive beta instead of npm's default latest dist-tag.
+        run: pnpm publish:beta
 
       - name: Verify npm versions and dist-tags
         working-directory: libraries/typescript
