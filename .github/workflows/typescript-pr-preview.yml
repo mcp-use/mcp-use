@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - canary
+      - v2
     paths:
       - "libraries/typescript/**"
       - ".github/workflows/typescript-pr-preview.yml"
