@@ -1,5 +1,11 @@
 # mcp-use
 
+## 2.0.0-beta.1
+
+### Minor Changes
+
+- 389c7b8: Add `MCPServer.fromOpenAPI` to the v2 server, generating validated MCP tools and upstream HTTP request handlers from bundled OpenAPI documents, with a runnable National Weather Service example.
+
 ## 2.0.0-beta.0
 
 ### Major Changes

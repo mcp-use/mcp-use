@@ -13,6 +13,7 @@
     "client-sdk-v2-migration",
     "dialect-json-schema-validator",
     "localhost-managed-inspector-chat",
+    "openapi-server-tools-v2",
     "strip-tools-list-schema-dialect",
     "v2-server-scaffold"
   ]
