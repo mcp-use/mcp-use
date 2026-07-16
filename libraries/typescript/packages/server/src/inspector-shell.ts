@@ -13,29 +13,20 @@ import type { InspectorOptions } from "./config.js";
 import type { FetchHandler } from "./fetch-app.js";
 
 /**
- * Exact version of the `@mcp-use/inspector` CDN bundle the default URL pins
- * to (matching the R2 object key `inspector@{version}.js`).
+ * npm dist-tag of the `@mcp-use/inspector` CDN bundle the default URL follows.
  *
- * Bumping the inspector requires uploading the full `dist/cdn/` output (entry,
- * lazy chunks, and CSS) and raising this constant together.
+ * Every new Inspector beta published with this tag becomes the default
+ * inspector for mcp-use servers without requiring an mcp-use release.
  */
-export const INSPECTOR_VERSION = "11.0.0";
+export const INSPECTOR_TAG = "beta";
 
 /**
  * Default URL the inspector shell loads the UI bundle from: the
  * `@mcp-use/inspector` CDN build (`dist/cdn/inspector.js`) built from this
- * branch and hosted on Cloudflare R2, pinned to {@link INSPECTOR_VERSION}.
+ * branch and served by jsDelivr from npm's {@link INSPECTOR_TAG} tag.
  * Override per server with {@link InspectorOptions.assetsUrl}.
- *
- * TODO(inspector-cdn): swap to the jsDelivr npm copy
- * (`https://cdn.jsdelivr.net/npm/@mcp-use/inspector@<major>/dist/cdn/inspector.js`)
- * once an inspector release includes this branch's basePath-aware client —
- * published bundles up to 12.x hardcode `/inspector` as the router basename
- * and cannot run under `${basePath}/inspector`. Also replace the temporary
- * `r2.dev` development URL with the `inspector-cdn.mcp-use.com` custom
- * domain if R2 hosting outlives the v2 merge.
  */
-export const DEFAULT_INSPECTOR_ASSETS_URL = `https://pub-5337e54ad50f432cab3e646138da1efc.r2.dev/inspector@${INSPECTOR_VERSION}.js`;
+export const DEFAULT_INSPECTOR_ASSETS_URL = `https://cdn.jsdelivr.net/npm/@mcp-use/inspector@${INSPECTOR_TAG}/dist/cdn/inspector.js`;
 
 /**
  * Derive the stylesheet URL that accompanies an inspector bundle URL.
