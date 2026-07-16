@@ -587,7 +587,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [20, 22]
+        node-version: [24.15.0]
     name: typescript-lint (node-${{ matrix.node-version }})
     defaults:
       run:
@@ -599,9 +599,9 @@ jobs:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v4
         with:
-          version: 10.6.1
+          version: 11.13.1
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -612,6 +612,9 @@ jobs:
 
       - name: Install Dependencies
         run: pnpm install --no-frozen-lockfile
+
+      - name: Build Client Types
+        run: pnpm build:client
 
       - name: Check Formatting
         run: pnpm format:check
@@ -624,7 +627,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [20, 22]
+        node-version: [24.15.0]
     name: typescript-build (node-${{ matrix.node-version }})
     defaults:
       run:
@@ -636,9 +639,9 @@ jobs:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v4
         with:
-          version: 10.6.1
+          version: 11.13.1
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -664,7 +667,7 @@ jobs:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     strategy:
       matrix:
-        node-version: [20, 22]
+        node-version: [24.15.0]
     defaults:
       run:
         working-directory: libraries/typescript
@@ -672,9 +675,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
-      - uses: pnpm/action-setup@v3
+      - uses: pnpm/action-setup@v4
         with:
-          version: 10.6.1
+          version: 11.13.1
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
@@ -713,12 +716,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
-      - uses: pnpm/action-setup@v3
+      - uses: pnpm/action-setup@v4
         with:
-          version: 10.6.1
+          version: 11.13.1
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24.15.0
           cache: "pnpm"
           cache-dependency-path: libraries/typescript/pnpm-lock.yaml
       - name: Install Dependencies
@@ -747,7 +750,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [20, 22]
+        node-version: [24.15.0]
     defaults:
       run:
         working-directory: libraries/typescript
@@ -755,9 +758,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
-      - uses: pnpm/action-setup@v3
+      - uses: pnpm/action-setup@v4
         with:
-          version: 10.6.1
+          version: 11.13.1
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
@@ -779,7 +782,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
-        node-version: [20, 22]
+        node-version: [24.15.0]
     defaults:
       run:
         working-directory: libraries/typescript
@@ -787,9 +790,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
-      - uses: pnpm/action-setup@v3
+      - uses: pnpm/action-setup@v4
         with:
-          version: 10.6.1
+          version: 11.13.1
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
@@ -822,14 +825,14 @@ jobs:
           fetch-depth: 0
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v4
         with:
-          version: 10.6.1
+          version: 11.13.1
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24.15.0
           cache: "pnpm"
           cache-dependency-path: libraries/typescript/pnpm-lock.yaml
 
@@ -860,12 +863,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
-      - uses: pnpm/action-setup@v3
+      - uses: pnpm/action-setup@v4
         with:
-          version: 10.6.1
+          version: 11.13.1
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24.15.0
           cache: "pnpm"
           cache-dependency-path: libraries/typescript/pnpm-lock.yaml
       - name: Install Dependencies
@@ -922,13 +925,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
-      - uses: pnpm/action-setup@v3
+      - uses: pnpm/action-setup@v4
         if: matrix.pm == 'pnpm'
         with:
-          version: 10.6.1
+          version: 11.13.1
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24.15.0
       - name: Setup Yarn
         if: matrix.pm == 'yarn'
         run: corepack enable
