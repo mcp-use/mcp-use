@@ -587,7 +587,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [22]
+        node-version: [20, 22]
     name: typescript-lint (node-${{ matrix.node-version }})
     defaults:
       run:
@@ -624,7 +624,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [22]
+        node-version: [20, 22]
     name: typescript-build (node-${{ matrix.node-version }})
     defaults:
       run:
@@ -664,7 +664,7 @@ jobs:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     strategy:
       matrix:
-        node-version: [22]
+        node-version: [20, 22]
     defaults:
       run:
         working-directory: libraries/typescript
@@ -718,7 +718,7 @@ jobs:
           version: 10.6.1
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
           cache: "pnpm"
           cache-dependency-path: libraries/typescript/pnpm-lock.yaml
       - name: Install Dependencies
@@ -747,7 +747,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [22]
+        node-version: [20, 22]
     defaults:
       run:
         working-directory: libraries/typescript
@@ -779,7 +779,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
-        node-version: [22]
+        node-version: [20, 22]
     defaults:
       run:
         working-directory: libraries/typescript
@@ -829,7 +829,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
           cache: "pnpm"
           cache-dependency-path: libraries/typescript/pnpm-lock.yaml
 
@@ -865,7 +865,7 @@ jobs:
           version: 10.6.1
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
           cache: "pnpm"
           cache-dependency-path: libraries/typescript/pnpm-lock.yaml
       - name: Install Dependencies
@@ -928,7 +928,7 @@ jobs:
           version: 10.6.1
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
       - name: Setup Yarn
         if: matrix.pm == 'yarn'
         run: corepack enable
