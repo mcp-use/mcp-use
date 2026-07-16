@@ -320,6 +320,7 @@ Default **enabled**, mounted in both dev and production; users set `inspector: {
 ## Offline & self-hosting
 
 - `inspector.assetsUrl` overrides the CDN base (FastAPI's `swagger_js_url` analog) — point it at a self-hosted copy of the bundle for air-gapped environments.
+- `MCP_USE_INSPECTOR_ASSETS_URL` supplies the same override for local `dev`/`start` runs without modifying server code; explicit constructor config wins.
 - Browsers will serve the CDN bundle from HTTP cache after first load; that's best-effort, not the offline story.
 - The framework never discovers or serves a local `@mcp-use/inspector` package. Standalone/offline inspector use remains the independently installed inspector's responsibility.
 

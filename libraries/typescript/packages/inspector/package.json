@@ -49,6 +49,7 @@
     "dev:standalone": "tsx watch src/server/server.ts",
     "build": "npm run build:client && npm run build:client-exports && npm run build:server && npm run build:cli && npm run build:cdn",
     "build:cdn": "vite build --config vite.cdn.config.ts",
+    "serve:cdn": "pnpm build:cdn && vite preview --config vite.cdn.config.ts --host 127.0.0.1",
     "analyze:cdn": "ANALYZE=true vite build --config vite.cdn.config.ts",
     "build:client": "vite build",
     "build:client-exports": "tsup --config tsup.client.ts && tsc -p tsconfig.client.json --emitDeclarationOnly --declaration",

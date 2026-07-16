@@ -4,13 +4,17 @@
  * `{ assetsUrl }`), script-injection escaping, and coexistence with the MCP
  * endpoint — driven through `getHandler()`, no network.
  */
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MCPServer } from "../src/index.js";
 import type { ServerConfig } from "../src/index.js";
 
 const DEFAULT_CDN_URL =
   "https://pub-5337e54ad50f432cab3e646138da1efc.r2.dev/inspector@11.0.0.js";
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 function makeServer(config: Partial<ServerConfig> = {}): MCPServer {
   const server = new MCPServer({
@@ -151,6 +155,36 @@ describe("inspector shell route", () => {
     );
     // The default CDN URL is fully replaced, not merely preferred.
     expect(html).not.toContain("r2.dev");
+    await server.close();
+  });
+
+  it("supports a local assets URL through the environment", async () => {
+    vi.stubEnv(
+      "MCP_USE_INSPECTOR_ASSETS_URL",
+      "http://127.0.0.1:4173/inspector.js"
+    );
+    const server = makeServer();
+    const html = await (await get(server, "/mcp/inspector")).text();
+    expect(html).toContain(
+      '<script type="module" src="http://127.0.0.1:4173/inspector.js">'
+    );
+    expect(html).toContain(
+      '<link rel="stylesheet" href="http://127.0.0.1:4173/inspector.css" />'
+    );
+    await server.close();
+  });
+
+  it("prefers configured assetsUrl over the environment", async () => {
+    vi.stubEnv(
+      "MCP_USE_INSPECTOR_ASSETS_URL",
+      "http://127.0.0.1:4173/inspector.js"
+    );
+    const server = makeServer({
+      inspector: { assetsUrl: "https://configured.example/inspector.js" },
+    });
+    const html = await (await get(server, "/mcp/inspector")).text();
+    expect(html).toContain("https://configured.example/inspector.js");
+    expect(html).not.toContain("127.0.0.1:4173");
     await server.close();
   });
 

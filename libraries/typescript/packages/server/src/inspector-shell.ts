@@ -178,7 +178,10 @@ export function mountInspectorShell<E extends Env>(
   if (inspector?.enabled === false) {
     return;
   }
-  const { assetsUrl, manufactChatUrl: configManufactChatUrl } = inspector ?? {};
+  const { assetsUrl: configAssetsUrl, manufactChatUrl: configManufactChatUrl } =
+    inspector ?? {};
+  const assetsUrl =
+    configAssetsUrl ?? process.env.MCP_USE_INSPECTOR_ASSETS_URL ?? undefined;
   const manufactChatUrl =
     configManufactChatUrl ?? process.env.MANUFACT_CHAT_URL ?? undefined;
   // Config is fixed at mount time, so the page renders once, not per request.

@@ -115,7 +115,9 @@ interface BaseServerConfig {
    *
    * Enabled by default; set `{ enabled: false }` to disable the route, or
    * pass `{ assetsUrl }` to load the bundle from a self-hosted copy instead
-   * of the public CDN (air-gapped environments).
+   * of the public CDN (air-gapped environments). For local development,
+   * `MCP_USE_INSPECTOR_ASSETS_URL` provides the same override without changing
+   * application code; an explicit `assetsUrl` takes precedence.
    *
    * @example
    * ```ts
