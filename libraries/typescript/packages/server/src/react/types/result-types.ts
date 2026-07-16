@@ -72,41 +72,9 @@ export class ToolError extends Error {
 }
 
 /**
- * Thrown when a view-bound tool's non-error result is missing
- * `structuredContent`.
- *
- * Only the view-bound result channel ({@link useToolContext}) produces this:
- * registration requires an `outputSchema` on every view-bound tool, so a
- * non-error result without `structuredContent` there is a framework/host
- * contract violation. Valid MCP tool errors (`isError: true`) are
- * {@link ToolError}, not this class.
- */
-export class InvalidToolResultError extends Error {
-  /**
-   * The malformed non-error {@link CallToolResult} that lacked
-   * `structuredContent`.
-   */
-  readonly result: CallToolResult;
-
-  /**
-   * @param message - Human-readable description of the contract violation.
-   * @param result - The non-error result missing `structuredContent`.
-   */
-  constructor(message: string, result: CallToolResult) {
-    super(message);
-    this.name = "InvalidToolResultError";
-    this.result = result;
-  }
-}
-
-/**
  * Error that can appear in the `"error"` branch of {@link ToolContextHandle}.
- *
- * Narrow with `instanceof` {@link ToolError} vs
- * {@link InvalidToolResultError} when the class matters; both expose
- * `message` for rendering.
  */
-export type ToolContextError = ToolError | InvalidToolResultError;
+export type ToolContextError = ToolError;
 
 /**
  * Successful non-error tool result returned by {@link useCallTool}.

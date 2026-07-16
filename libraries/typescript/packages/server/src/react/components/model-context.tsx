@@ -49,11 +49,10 @@ function requireActiveModelContextStore(): ModelContextStore {
  * Registers `content` in a hierarchical tree that serializes into an indented
  * markdown list and is pushed to the host via `ui/update-model-context`
  * (ext-apps `App.updateModelContext`). Updates batch per microtask. An async
- * flush pump acknowledges a payload only after a successful send; failures and
- * missing host capability stay dirty and retry on the next mutation or
- * successful reconnect. Each push carries the complete current context — the
- * spec's overwrite semantics (the host may defer delivery until the next model
- * turn).
+ * flush pump acknowledges a payload only after a successful send; failed
+ * update requests and missing host capability stay dirty and retry on the next
+ * mutation. Each push carries the complete current context — the spec's
+ * overwrite semantics (the host may defer delivery until the next model turn).
  *
  * An empty `content` (trimmed) does not register a node and does not orphan
  * children — nested {@link ModelContext} nodes re-parent to the nearest

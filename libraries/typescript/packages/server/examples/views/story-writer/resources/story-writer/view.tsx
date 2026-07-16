@@ -1,4 +1,4 @@
-import { useToolContext, useViewTheme, ToolError } from "@mcp-use/server/react";
+import { useToolContext, useViewTheme } from "@mcp-use/server/react";
 
 import "./view.css";
 
@@ -99,7 +99,7 @@ export default function StoryWriter() {
     );
   }
 
-  if (ctx.status === "streaming") {
+  if (ctx.status === "pending") {
     return (
       <div className={root} aria-busy="true">
         <div className="mb-4">
@@ -114,53 +114,10 @@ export default function StoryWriter() {
     );
   }
 
-  if (ctx.status === "pending") {
-    return (
-      <div className={root} aria-busy="true">
-        <div className="mb-4">
-          <StatusLine label="Finishing…" />
-        </div>
-        <StoryBody
-          title={ctx.toolInput?.title}
-          story={ctx.toolInput?.story}
-          showCaret={false}
-        />
-      </div>
-    );
-  }
-
-  if (ctx.status === "cancelled") {
-    return (
-      <div className={root}>
-        <div className="relative">
-          <div className="opacity-40">
-            <StoryBody
-              title={ctx.toolInput?.title}
-              story={ctx.toolInput?.story}
-              showCaret={false}
-            />
-          </div>
-          <div className="mt-4 rounded-md border border-neutral-300 bg-neutral-50 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-900">
-            <p className="m-0 font-medium">Story cancelled</p>
-            {typeof ctx.reason === "string" && ctx.reason.length > 0 ? (
-              <p className="mt-1 mb-0 text-neutral-600 dark:text-neutral-400">
-                {ctx.reason}
-              </p>
-            ) : null}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   if (ctx.status === "error") {
     return (
       <div className={root} role="alert">
-        <p className="m-0 font-medium">
-          {ctx.error instanceof ToolError
-            ? "Story failed"
-            : "Invalid tool result"}
-        </p>
+        <p className="m-0 font-medium">Story failed</p>
         <p className="mt-2 mb-0 text-sm text-neutral-600 dark:text-neutral-400">
           {ctx.error.message}
         </p>

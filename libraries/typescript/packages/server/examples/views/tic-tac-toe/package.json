@@ -1,9 +1,9 @@
 {
-  "name": "@mcp-use/server-example-excalidraw",
+  "name": "@mcp-use/server-example-tic-tac-toe",
   "type": "module",
   "version": "0.0.0",
   "private": true,
-  "description": "Excalidraw MCP Apps views example ported to @mcp-use/server.",
+  "description": "Reference example: a tic-tac-toe game where the model plays via an ephemeral useViewTool tool.",
   "engines": {
     "node": ">=24.0.0"
   },
@@ -14,22 +14,22 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@excalidraw/excalidraw": "^0.18.0",
     "@mcp-use/server": "workspace:*",
     "@modelcontextprotocol/client": "https://pkg.pr.new/@modelcontextprotocol/client@2501",
     "@modelcontextprotocol/core": "https://pkg.pr.new/@modelcontextprotocol/core@2501",
     "@modelcontextprotocol/ext-apps": "https://pkg.pr.new/@modelcontextprotocol/ext-apps@712",
     "@modelcontextprotocol/server": "https://pkg.pr.new/@modelcontextprotocol/server@2501",
-    "morphdom": "^2.7.8",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.2.0",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
+    "tailwindcss": "^4.2.0",
     "typescript": "7.0.1-rc",
     "vite": "^8.0.16"
   }

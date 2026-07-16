@@ -15,7 +15,10 @@
   },
   "dependencies": {
     "@mcp-use/server": "workspace:*",
-    "@modelcontextprotocol/ext-apps": "^1.7.4",
+    "@modelcontextprotocol/client": "https://pkg.pr.new/@modelcontextprotocol/client@2501",
+    "@modelcontextprotocol/core": "https://pkg.pr.new/@modelcontextprotocol/core@2501",
+    "@modelcontextprotocol/ext-apps": "https://pkg.pr.new/@modelcontextprotocol/ext-apps@712",
+    "@modelcontextprotocol/server": "https://pkg.pr.new/@modelcontextprotocol/server@2501",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "zod": "^4.4.3"

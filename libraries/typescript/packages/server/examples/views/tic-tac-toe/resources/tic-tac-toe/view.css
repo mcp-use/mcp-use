@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+@keyframes mark-pop {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.mark-pop {
+  display: inline-block;
+  animation: mark-pop 0.18s ease-out;
+}
