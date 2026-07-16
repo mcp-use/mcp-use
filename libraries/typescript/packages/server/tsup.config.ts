@@ -12,6 +12,10 @@ export default defineConfig([
       "oauth/workos": "src/oauth/workos.ts",
       "oauth/supabase": "src/oauth/supabase.ts",
       "oauth/keycloak": "src/oauth/keycloak.ts",
+      // Keep the OpenAPI integration in a sibling chunk. `MCPServer` imports
+      // it synchronously so `fromOpenAPI()` stays a synchronous constructor,
+      // while the root entry retains its independently enforced size budget.
+      "openapi/index": "src/openapi/index.ts",
       // The `mcp-use` bin (package.json "bin"). Its source shebang is
       // preserved by esbuild, so dist/bin.js stays directly executable.
       bin: "src/bin.ts",

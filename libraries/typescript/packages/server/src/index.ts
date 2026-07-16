@@ -68,6 +68,12 @@ export type {
 
 export type { InspectorOptions, ServerConfig } from "./config.js";
 export type {
+  FromOpenAPIOptions,
+  OpenAPIAuth,
+  OpenAPIDocument,
+  OpenAPIExcludeRule,
+} from "./openapi/index.js";
+export type {
   Elicit,
   ElicitationResult,
   OAuthAuth,
