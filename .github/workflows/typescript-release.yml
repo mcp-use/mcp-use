@@ -644,7 +644,9 @@ jobs:
       - name: Version beta packages
         if: steps.changesets.outputs.pending == 'true'
         working-directory: libraries/typescript
-        run: pnpm version:beta
+        run: |
+          git branch --force main origin/main
+          pnpm version:beta
 
       - name: Commit beta versions
         if: steps.changesets.outputs.pending == 'true'
