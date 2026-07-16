@@ -17,7 +17,7 @@ const server = MCPServer.fromOpenAPI({
   spec: openapiSpec,
   baseUrl: "https://api.weather.gov",
   headers: {
-    "User-Agent": "mcp-use-openapi-example/1.0",
+    "User-Agent": process.env.WEATHER_USER_AGENT ?? "mcp-use-openapi-example/1.0 (https://github.com/mcp-use/mcp-use)",
   },
 });
 ```
