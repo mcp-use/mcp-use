@@ -1003,12 +1003,14 @@ async function main(): Promise<void> {
   let skillsInstalled = false;
   if (shouldInstallSkills) {
     console.log("");
-    console.log(ansi.cyan("📚 Installing skills..."));
+    const s = spinner();
+    s.start("Installing skills...");
     try {
       await installSkills(projectPath);
       skillsInstalled = true;
-      console.log(ansi.green("✅ Skills installed successfully!"));
+      s.stop("Skills installed successfully!");
     } catch {
+      s.stop("Skills install failed");
       console.log(
         ansi.yellow(
           "⚠️  Skills install failed. Run `npx --yes skills add mcp-use/mcp-use --yes --skill mcp-apps-builder -a cursor -a claude-code -a codex` manually in the project directory."
