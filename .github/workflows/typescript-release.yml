@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       force_publish:
-        description: 'Force publish packages'
+        description: "Force publish packages"
         required: false
         type: boolean
         default: false
@@ -118,11 +118,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          
+
           # Ensure we're on the latest commit (commits were pushed in previous step)
           git fetch --tags --force
           git pull origin canary
-          
+
           cd libraries/typescript
           pnpm changeset tag
           cd ../..
@@ -348,8 +348,8 @@ jobs:
 
       - name: Publish packages (Main)
         if: github.ref == 'refs/heads/main' &&
-            steps.check-prerelease.outputs.in_prerelease == 'false' &&
-            steps.check-release.outputs.should_publish == 'true'
+          steps.check-prerelease.outputs.in_prerelease == 'false' &&
+          steps.check-release.outputs.should_publish == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -364,7 +364,7 @@ jobs:
           git fetch --tags --force
           git checkout main
           git pull origin main
-          
+
           # Publish to npm using trusted publishing (OIDC) - no token needed
           cd libraries/typescript
           pnpm changeset publish
@@ -373,12 +373,12 @@ jobs:
           # Capture new tags created by changeset before pushing
           cd ../..
           NEW_TAGS=$(git tag --points-at HEAD)
-          
+
           if [ -z "$NEW_TAGS" ]; then
             echo "❌ No tags were created by changeset tag - packages were published to npm but tagging failed"
             exit 1
           fi
-          
+
           echo "📦 Tags created: $NEW_TAGS"
 
           # Save tags to a file for the next step
@@ -396,16 +396,16 @@ jobs:
 
       - name: Create deployment marker (Main)
         if: github.ref == 'refs/heads/main' &&
-            steps.check-prerelease.outputs.in_prerelease == 'false' &&
-            steps.check-release.outputs.should_publish == 'true'
+          steps.check-prerelease.outputs.in_prerelease == 'false' &&
+          steps.check-release.outputs.should_publish == 'true'
         run: |
           echo "packages_published=true" > .railway-deploy-marker
           echo "branch=main" >> .railway-deploy-marker
 
       - name: Upload deployment marker (Main)
         if: github.ref == 'refs/heads/main' &&
-            steps.check-prerelease.outputs.in_prerelease == 'false' &&
-            steps.check-release.outputs.should_publish == 'true'
+          steps.check-prerelease.outputs.in_prerelease == 'false' &&
+          steps.check-release.outputs.should_publish == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: railway-deploy-marker
@@ -687,21 +687,34 @@ jobs:
       - name: Verify npm versions and dist-tags
         working-directory: libraries/typescript
         run: |
-          pnpm verify:beta-plan --output beta-release-after.json
-          node - <<'NODE'
-          const fs = require('fs')
-          const before = JSON.parse(fs.readFileSync('beta-release-plan.json', 'utf8'))
-          const after = JSON.parse(fs.readFileSync('beta-release-after.json', 'utf8'))
-          for (const release of after.releases) {
-            const previous = before.releases.find((item) => item.name === release.name)
-            if (!release.published) throw new Error(`${release.name}@${release.version} is missing from npm`)
-            if (release.betaBefore !== release.version) throw new Error(`${release.name} beta tag is ${release.betaBefore}, expected ${release.version}`)
-            if (release.latestBefore !== previous.latestBefore) throw new Error(`${release.name} latest tag changed`)
-            if (JSON.stringify(release.nonBetaTagsBefore) !== JSON.stringify(previous.nonBetaTagsBefore)) {
-              throw new Error(`${release.name} non-beta dist-tags changed: ${JSON.stringify({ before: previous.nonBetaTagsBefore, after: release.nonBetaTagsBefore })}`)
+          for attempt in 1 2 3 4 5 6; do
+            pnpm verify:beta-plan --output beta-release-after.json
+            if node - <<'NODE'
+            const fs = require('fs')
+            const before = JSON.parse(fs.readFileSync('beta-release-plan.json', 'utf8'))
+            const after = JSON.parse(fs.readFileSync('beta-release-after.json', 'utf8'))
+            for (const release of after.releases) {
+              const previous = before.releases.find((item) => item.name === release.name)
+              if (!release.published) throw new Error(`${release.name}@${release.version} is missing from npm`)
+              if (release.betaBefore !== release.version) throw new Error(`${release.name} beta tag is ${release.betaBefore}, expected ${release.version}`)
+              if (release.latestBefore !== previous.latestBefore) throw new Error(`${release.name} latest tag changed`)
+              if (JSON.stringify(release.nonBetaTagsBefore) !== JSON.stringify(previous.nonBetaTagsBefore)) {
+                throw new Error(`${release.name} non-beta dist-tags changed: ${JSON.stringify({ before: previous.nonBetaTagsBefore, after: release.nonBetaTagsBefore })}`)
+              }
             }
-          }
-          NODE
+            NODE
+            then
+              exit 0
+            fi
+
+            if [ "$attempt" = 6 ]; then
+              echo "npm registry verification did not converge after 60 seconds" >&2
+              exit 1
+            fi
+
+            echo "npm registry has not propagated yet; retrying in 10 seconds ($attempt/6)"
+            sleep 10
+          done
 
       - name: Create and push package tags
         working-directory: libraries/typescript
