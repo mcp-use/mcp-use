@@ -1,4 +1,7 @@
-import type { ToolAnnotations } from "@modelcontextprotocol/server";
+import type {
+  InputRequiredResult,
+  ToolAnnotations,
+} from "@modelcontextprotocol/server";
 import { useEffect, useRef } from "react";
 
 import type {
@@ -8,7 +11,6 @@ import type {
   ToolResult,
 } from "../../tools.js";
 import { resolveToolInputSchema } from "../../tools.js";
-import type { CallToolResult } from "../types/result-types.js";
 import { useViewRuntime } from "../runtime/view-runtime-context.js";
 import type { McpAppRuntime } from "../runtime/view-runtime.js";
 
@@ -33,13 +35,13 @@ type RegisteredViewTool = ReturnType<McpAppRuntime["registerViewTool"]>;
 /**
  * Register an ephemeral tool the host/model can call while this component is mounted.
  *
- * Registration waits for {@link McpAppRuntime.connect} and is keyed by `name`
- * only (`[runtime, name]`): the tool registers once per mounted name and is
- * removed on unmount. Changing `inputSchema` / `outputSchema` without changing
- * `name` does **not** re-register — schemas are captured at registration time
- * (ext-apps fixes handler arity at registration); to change a tool's schema,
- * register it under a new name. `schema` is accepted as an alias for
- * `inputSchema`.
+ * Registration is synchronous against the runtime-owned App and independent
+ * of connection completion. It is keyed by `name` only (`[runtime, name]`):
+ * the tool registers once per mounted name and is removed on unmount. Changing
+ * `inputSchema` / `outputSchema` without changing `name` does **not**
+ * re-register — schemas are captured at registration time (ext-apps fixes
+ * handler arity at registration); to change a tool's schema, register it under
+ * a new name. `schema` is accepted as an alias for `inputSchema`.
  *
  * `title`, `description`, and `annotations` changes are applied in place via
  * the ext-apps handle's `update()`, passing explicit `undefined` so omitted
@@ -51,9 +53,8 @@ type RegisteredViewTool = ReturnType<McpAppRuntime["registerViewTool"]>;
  *
  * Cleanup captures the registration handle inside the effect so an older
  * cleanup cannot remove a newer registration (e.g. after a rapid `name`
- * change). Unmount before connection aborts registration; registration
- * failures are reported with `console.error` and do not leave half-registered
- * state.
+ * change). Registration failures are reported with `console.error` and do not
+ * leave half-registered state.
  *
  * @example
  * ```tsx
@@ -72,7 +73,11 @@ export function useViewTool<
   TOutput = InferToolOutput<TDef>,
 >(
   definition: TDef,
-  handler: (args: TInput) => ToolResult<TOutput> | Promise<ToolResult<TOutput>>
+  handler: (
+    args: TInput
+  ) =>
+    | Exclude<ToolResult<TOutput>, InputRequiredResult>
+    | Promise<Exclude<ToolResult<TOutput>, InputRequiredResult>>
 ): void {
   const runtime = useViewRuntime();
   const handlerRef = useRef(handler);
@@ -83,6 +88,12 @@ export function useViewTool<
   // never removes through this ref alone — each registering effect removes
   // only the handle it captured locally.
   const registeredRef = useRef<RegisteredViewTool | null>(null);
+  const registeredMetadataRef = useRef<{
+    registration: RegisteredViewTool;
+    title: string | undefined;
+    description: string | undefined;
+    annotationsJson: string | undefined;
+  } | null>(null);
 
   const { name, title, description, enabled = true } = definition;
   // Annotations are plain JSON data (MCP wire shape); serialize for change
@@ -93,88 +104,72 @@ export function useViewTool<
       : JSON.stringify(definition.annotations);
 
   useEffect(() => {
-    let cancelled = false;
-    let registration: RegisteredViewTool | undefined;
+    const def = definitionRef.current;
+    const config: {
+      title?: string;
+      description?: string;
+      inputSchema?: NonNullable<ViewToolDefinition["inputSchema"]>;
+      outputSchema?: NonNullable<ViewToolDefinition["outputSchema"]>;
+      annotations?: ToolAnnotations;
+    } = {};
 
-    void runtime
-      .connect()
-      .then(() => {
-        if (cancelled) return;
+    if (def.title !== undefined) config.title = def.title;
+    if (def.description !== undefined) config.description = def.description;
+    const inputSchema = resolveToolInputSchema(def);
+    if (inputSchema !== undefined) config.inputSchema = inputSchema;
+    if (def.outputSchema !== undefined) {
+      config.outputSchema = def.outputSchema;
+    }
+    if (def.annotations !== undefined) {
+      config.annotations = def.annotations;
+    }
 
-        // Read the latest definition: config may have changed while connecting.
-        const def = definitionRef.current;
-        const config: {
-          title?: string;
-          description?: string;
-          inputSchema?: NonNullable<ViewToolDefinition["inputSchema"]>;
-          outputSchema?: NonNullable<ViewToolDefinition["outputSchema"]>;
-          annotations?: ToolAnnotations;
-        } = {};
+    // ext-apps fixes callback arity at registration: schema-backed tools call
+    // `(parsedArgs, extra)`, while schema-less tools call `(extra)`. Adapt the
+    // latter so the public handler receives an empty input object rather than
+    // RequestHandlerExtra. Validation remains entirely owned by ext-apps.
+    const callback =
+      inputSchema !== undefined
+        ? async (args: unknown) => handlerRef.current(args as TInput)
+        : async (_extra: unknown) => handlerRef.current({} as TInput);
 
-        if (def.title !== undefined) config.title = def.title;
-        if (def.description !== undefined) config.description = def.description;
-        const inputSchema = resolveToolInputSchema(def);
-        if (inputSchema !== undefined) config.inputSchema = inputSchema;
-        if (def.outputSchema !== undefined) {
-          config.outputSchema = def.outputSchema;
-        }
-        if (def.annotations !== undefined) {
-          config.annotations = def.annotations;
-        }
+    let registration: RegisteredViewTool;
+    try {
+      registration = runtime.registerViewTool(name, config, callback);
+    } catch (error: unknown) {
+      console.error(
+        `[mcp-use] useViewTool failed to register tool "${name}":`,
+        error
+      );
+      return;
+    }
 
-        // ToolResult (v2 SDK) is wire-compatible with ext-apps' CallToolResult.
-        const callback = async (args: unknown) =>
-          (await handlerRef.current(args as TInput)) as CallToolResult;
+    registeredRef.current = registration;
+    registeredMetadataRef.current = {
+      registration,
+      title: def.title,
+      description: def.description,
+      annotationsJson:
+        def.annotations === undefined
+          ? undefined
+          : JSON.stringify(def.annotations),
+    };
 
-        try {
-          registration = runtime.registerViewTool(
-            name,
-            config,
-            // v2 ToolResult matches ext-apps CallToolResult on the wire; SDK index signatures differ.
-            callback as never
-          );
-        } catch (error: unknown) {
-          console.error(
-            `[mcp-use] useViewTool failed to register tool "${name}":`,
-            error
-          );
-          return;
-        }
-
-        // Unmount may have raced the sync register above; drop immediately.
-        if (cancelled) {
-          try {
-            registration.remove();
-          } catch {
-            // App may already be closing during disposal.
-          }
-          return;
-        }
-
-        registeredRef.current = registration;
-
-        if (def.enabled === false) {
-          registration.disable();
-        }
-      })
-      .catch((error: unknown) => {
-        if (cancelled) return;
-        console.error(
-          `[mcp-use] useViewTool failed to connect before registering tool "${name}":`,
-          error
-        );
-      });
+    if (def.enabled === false) {
+      registration.disable();
+    }
 
     return () => {
-      cancelled = true;
       if (registeredRef.current === registration) {
         registeredRef.current = null;
       }
+      if (registeredMetadataRef.current?.registration === registration) {
+        registeredMetadataRef.current = null;
+      }
       try {
-        registration?.remove();
+        registration.remove();
       } catch {
-        // App may already be closing during disposal; a racing connect can
-        // also leave remove() unable to notify. Swallow quietly.
+        // App may already be closing during disposal. Swallow quietly.
       }
     };
   }, [runtime, name]);
@@ -184,6 +179,15 @@ export function useViewTool<
     // Pre-registration changes are picked up from definitionRef at
     // registration time; this effect only applies post-registration edits.
     if (!registered) return;
+    const applied = registeredMetadataRef.current;
+    if (
+      applied?.registration === registered &&
+      applied.title === title &&
+      applied.description === description &&
+      applied.annotationsJson === annotationsJson
+    ) {
+      return;
+    }
     const def = definitionRef.current;
     // Pass explicit undefined so Object.assign clears previously set fields.
     // Cast: exactOptionalPropertyTypes rejects `string | undefined` on
@@ -195,6 +199,15 @@ export function useViewTool<
       description: def.description,
       annotations: def.annotations,
     } as Parameters<RegisteredViewTool["update"]>[0]);
+    registeredMetadataRef.current = {
+      registration: registered,
+      title: def.title,
+      description: def.description,
+      annotationsJson:
+        def.annotations === undefined
+          ? undefined
+          : JSON.stringify(def.annotations),
+    };
   }, [title, description, annotationsJson]);
 
   useEffect(() => {

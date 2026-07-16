@@ -394,9 +394,9 @@ export class MCPServer<TUser = never> {
    * export default { fetch: handler };
    * ```
    */
-  getHandler(
-    options: { bus?: ServerEventBus } = {}
-  ): (request: Request) => Promise<Response> {
+  getHandler(options: { bus?: ServerEventBus } = {}): (
+    request: Request
+  ) => Promise<Response> {
     const { app } = this.#ensureMounted("handler", undefined, options.bus);
     return async (request) => app.fetch(request);
   }

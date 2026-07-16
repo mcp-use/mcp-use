@@ -186,7 +186,9 @@ test.describe("Inspector MCP Server Connections", () => {
 
     await page.getByTestId("server-tile-settings").click();
 
-    await expect(page.getByTestId("connection-form-alias-input")).toBeVisible();
+    await expect(
+      page.getByTestId("connection-form-alias-input")
+    ).toBeVisible();
     await page
       .getByTestId("connection-form-alias-input")
       .fill("QA Conformance");

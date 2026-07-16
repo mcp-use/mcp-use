@@ -77,9 +77,9 @@
   "dependencies": {
     "@hono/node-server": "^2.0.6",
     "@mcp-use/client": "workspace:*",
-    "@modelcontextprotocol/ext-apps": "^1.7.4",
-    "@modelcontextprotocol/hono": "2.0.0-beta.3",
-    "@modelcontextprotocol/server": "2.0.0-beta.3",
+    "@modelcontextprotocol/ext-apps": "https://pkg.pr.new/@modelcontextprotocol/ext-apps@712",
+    "@modelcontextprotocol/hono": "2.0.0-beta.4",
+    "@modelcontextprotocol/server": "https://pkg.pr.new/@modelcontextprotocol/server@2501",
     "@vitejs/plugin-react": "^6.0.3",
     "hono": "^4.12.27",
     "jose": "^6.1.3",
@@ -98,7 +98,8 @@
     }
   },
   "devDependencies": {
-    "@modelcontextprotocol/client": "2.0.0-beta.3",
+    "@modelcontextprotocol/client": "https://pkg.pr.new/@modelcontextprotocol/client@2501",
+    "@modelcontextprotocol/core": "https://pkg.pr.new/@modelcontextprotocol/core@2501",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",

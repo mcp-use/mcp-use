@@ -7,8 +7,11 @@
  * wrapper entry that primes views before re-exporting the server (VIEWS_SPEC.md §
  * Build system).
  *
- * This module is reached only through the bin's dedicated dynamic build
- * import, so library consumers and production startup never evaluate Vite.
+ * `vite` is an optional peer dependency of `mcp-use` (never a regular
+ * dependency): this module is only ever reached through the bin's dynamic
+ * `import("./cli/index.js")`, so a missing install surfaces as a rejected
+ * promise there (classified by `bin/main.ts`'s `isViteMissing`), not at
+ * package load time.
  */
 
 import { randomBytes } from "node:crypto";
@@ -89,7 +92,7 @@ async function writeWrapperEntry(
  * text into an inline manifest entry.
  *
  * @param view - Discovered view to build.
- * @param options - Project paths.
+ * @param options - Project paths and Vite config.
  * @param emptyOutDir - Whether to wipe the views output directory first.
  */
 async function buildInlineView(
@@ -193,10 +196,13 @@ async function buildInlineView(
  * users run `tsc --noEmit` via their own script.
  *
  * @param options - Project root and optional entry override.
- * @throws If no entry is found (see {@link discoverEntry}) or the build fails.
+ * @throws If no entry is found (see {@link discoverEntry}), or if `vite` is
+ * not installed (`mcp-use build` requires it as a devDependency) — the
+ * `import("vite")` rejection propagates to the bin's dispatch boundary,
+ * which classifies it and prints the install hint.
  *
- * @internal Reached only via the bin's dedicated build chunk — not
- * re-exported from the package's "." entry.
+ * @internal Reached only via the bin's `import("./cli/index.js")`
+ * dispatch (`bin/main.ts`) — not re-exported from the package's "." entry.
  */
 export async function runBuild(options: BuildOptions): Promise<void> {
   const startedAt = performance.now();

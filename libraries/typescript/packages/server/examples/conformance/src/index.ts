@@ -6,7 +6,12 @@
  *
  * Default-export the server; `mcp-use dev` / `build` / `start` own the socket.
  */
-import { completable, inputRequired, inputResponse, MCPServer } from "mcp-use";
+import {
+  completable,
+  inputRequired,
+  inputResponse,
+  MCPServer,
+} from "mcp-use";
 import { z } from "zod";
 
 const sleep = (ms: number) =>

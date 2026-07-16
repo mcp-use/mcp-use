@@ -105,15 +105,7 @@ type RequestContextBase = {
   ): Promise<boolean>;
   /** Send a log message notification to the client during tool execution. */
   sendLog(
-    level:
-      | "debug"
-      | "info"
-      | "notice"
-      | "warning"
-      | "error"
-      | "critical"
-      | "alert"
-      | "emergency",
+    level: "debug" | "info" | "notice" | "warning" | "error" | "critical" | "alert" | "emergency",
     data: unknown,
     logger?: string
   ): Promise<void>;

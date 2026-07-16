@@ -1,11 +1,10 @@
-# mcp-use v2 authorization contract
+# mcp-use authorization spec
 
 **Status:** Direct resource-server mode implemented. OAuth proxy mode is deferred; its design remains in this document.
-**Package:** `mcp-use@2`; imports use `mcp-use` subpaths.
 
 > **Implementation phase note:** OAuth proxy mode is deferred and must not be implemented in the current auth implementation phase. Its detailed future design remains in this document. Direct resource-server mode follows [AUTH_IMPLEMENTATION.md](./AUTH_IMPLEMENTATION.md).
 
-**Protocol basis:** Current [MCP authorization](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization) (revision 2025-11-25) and [MCP security guidance](https://modelcontextprotocol.io/docs/tutorials/security/security_best_practices), OAuth 2.1 resource-server guidance, and `@modelcontextprotocol/server@2.0.0-beta.3`. Beta.3 provides runtime-neutral resource-server helpers in server core; it does not provide authorization-server primitives.
+**Protocol basis:** Current [MCP authorization](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization) (revision 2025-11-25) and [MCP security guidance](https://modelcontextprotocol.io/docs/tutorials/security/security_best_practices), OAuth 2.1 resource-server guidance, and `@modelcontextprotocol/server@2.0.0-beta.4`. Beta.4 provides runtime-neutral resource-server helpers in server core; it does not provide authorization-server primitives.
 
 **Scope:** This is the v2 resource-server contract. Direct external-authorization-server mode is the default. mcp-use verifies an access token when its external authorization server is advertised for the canonical MCP resource and the token is issued specifically for that resource. This is direct mode, not proxy pass-through.
 
@@ -899,9 +898,9 @@ Expired, consumed, revoked, mismatched, or replayed codes, state, and refresh to
 
 The first release has no `/revoke` endpoint and does not advertise `revocation_endpoint` or claim RFC 7009 support. JTI mappings, token vaults, and refresh families remain internally revocable for security events (refresh-token replay, upstream refresh failure, administrative action), never as a capability exposed to OAuth clients. The proxy does not support private local clients, token exchange, arbitrary upstream client credentials, `private_key_jwt` upstream authentication, wildcard redirect URIs, browser-delivered upstream tokens, or Client ID Metadata Documents in its first release. It must not advertise unsupported capabilities. Relevant standards: [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414), [RFC 9728](https://www.rfc-editor.org/rfc/rfc9728), [RFC 8707](https://www.rfc-editor.org/rfc/rfc8707), [RFC 7636](https://www.rfc-editor.org/rfc/rfc7636), [RFC 9700](https://www.rfc-editor.org/rfc/rfc9700), and [RFC 9207](https://www.rfc-editor.org/rfc/rfc9207).
 
-## SDK dependency prerequisite
+## Meet the SDK dependency prerequisite
 
-`@modelcontextprotocol/server`, `@modelcontextprotocol/hono`, and `@modelcontextprotocol/client` are pinned together at `2.0.0-beta.3`.
+`@modelcontextprotocol/server`, `@modelcontextprotocol/hono`, and `@modelcontextprotocol/client` use coordinated `2.0.0-beta.4` pins.
 
 ## Verify the implementation
 

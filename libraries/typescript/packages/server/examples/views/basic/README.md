@@ -28,10 +28,9 @@ and the per-action hooks).
   the client does not advertise MCP Apps support.
 - **Hook-first data flow** — the default export takes no props; tool output
   arrives via `useToolContext<"search-fruits">()` once `status === "ready"`.
-- **Tool-error handling** — `status === "error"` distinguishes
-  `ToolError` from `InvalidToolResultError` (`instanceof`); `useCallTool`
-  rejects tool errors (success-only `data`, with `structuredContent` typed
-  because `get-fruit-details` declares an `outputSchema`).
+- **Tool-error handling** — `status === "error"` exposes `ToolError`;
+  `useCallTool` rejects tool errors while preserving its previous successful
+  data.
 - **`useViewTool` without an opt-in flag** — `highlight-fruit` registers when
   mounted and is removed on unmount.
 - **Tailwind CSS v4** — styling is the project's own declaration via
@@ -99,21 +98,16 @@ View-bound tool handlers return a plain `CallToolResult` — no response helpers
 
 While waiting for a result, branch on `view.status`:
 
-- `"pending"` — no result yet and arguments are not mid-stream (nothing
-  arrived, or complete input received and awaiting result); render a static
-  skeleton from `view.toolInput` when present.
-- `"streaming"` — tool arguments are streaming into `view.toolInput` (a
-  `DeepPartial` of the tool input); drive a pulsing skeleton from that field.
-- `"cancelled"` — host cancelled the call; `view.reason` is the optional
-  host-provided string; `view.toolInput` may still hold the last partial.
-- `"error"` — a valid tool error (`instanceof ToolError`) or a malformed
-  non-error result (`instanceof InvalidToolResultError`); both expose
-  `error.message` for rendering; `toolOutput` is undefined.
+- `"pending"` — no terminal result yet; partial and complete arguments replace
+  the same `DeepPartial` `view.toolInput`, which can drive the skeleton.
+- `"error"` — the rendering invocation returned `isError: true`; `ToolError`
+  exposes its message and `toolOutput` is undefined.
 - `"ready"` — render from `view.toolOutput` (and optionally `view.content`,
   `view.meta`).
 
-`view.toolInput` is the single streaming field for arguments (partial or
-complete; last write wins). Host environment comes from `useHostContext()` /
+The first structured result or tool error is latched. Content-only ambient
+results are valid and ignored; later lifecycle notifications cannot replace
+the initial View context. Host environment comes from `useHostContext()` /
 `useViewTheme()`; actions from `useCallTool`, `useSendFollowUp()`,
 `useOpenExternal()`, and `useDisplayMode()`. See
 [Views spec — Channel visibility](../../../specs/VIEWS_SPEC.md#channel-visibility-what-the-model-sees-vs-what-the-view-sees).

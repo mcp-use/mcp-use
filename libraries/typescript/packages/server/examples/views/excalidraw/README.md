@@ -18,13 +18,20 @@ export to excalidraw.com.
   `useCallTool`. They declare no `outputSchema`, so their successes are
   content-only results — `callTool` resolves them and the view reads
   `result.content`; tool errors and transport failures reject.
-- **Tool-error handling** — `status === "error"` distinguishes `ToolError`
-  from `InvalidToolResultError` (`instanceof`); `create_view` can return
-  `isError: true` for oversized or invalid JSON.
+- **Latched tool lifecycle** — every pending `toolInput` update is treated as
+  progressive; only the first structured result finalizes the diagram and
+  checkpoint. `create_view` can return `isError: true` for oversized or
+  invalid JSON.
 - **Model context** — `<ModelContext>` plus imperative `modelContext.set` for
   user edit summaries from fullscreen.
 - **External assets CSP** — Excalidraw CSS/fonts load from `https://esm.sh`
   via `view.csp`.
+
+The pending input snapshot does not distinguish partial from complete
+notifications, so the View keeps using its partial-JSON parser until
+`useToolContext` becomes `ready` or `error`. After that terminal latch,
+content-only lifecycle results from checkpoint/export helper tools cannot
+replace the diagram or checkpoint id.
 
 ## Tools
 

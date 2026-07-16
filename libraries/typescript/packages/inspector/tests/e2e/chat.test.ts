@@ -439,13 +439,10 @@ test.describe("Inspector Chat Tests - hosted mode + localhost server", () => {
   test.beforeEach(async ({ page, context }) => {
     await context.clearCookies();
 
-    ({
-      calls: cloudCalls,
-      llmCalls,
-      llmAuthorizations,
-    } = await enableHostedChatMode(page, CLOUD_CHAT_URL, {
-      mockLlmProxy: "success",
-    }));
+    ({ calls: cloudCalls, llmCalls, llmAuthorizations } =
+      await enableHostedChatMode(page, CLOUD_CHAT_URL, {
+        mockLlmProxy: "success",
+      }));
 
     const { usesBuiltinInspector, inspectorUrl } = getTestMatrix();
     if (usesBuiltinInspector) {
@@ -481,12 +478,8 @@ test.describe("Inspector Chat Tests - hosted mode + localhost server", () => {
     expect(llmCalls.length).toBeGreaterThan(0);
   });
 
-  test("anonymous send offers delegated cloud sign-in on 429", async ({
-    page,
-  }) => {
-    await page.unroute(
-      `${CLOUD_CHAT_URL.replace(/\/chat\/stream\/?$/, "/llm")}/**`
-    );
+  test("anonymous send offers delegated cloud sign-in on 429", async ({ page }) => {
+    await page.unroute(`${CLOUD_CHAT_URL.replace(/\/chat\/stream\/?$/, "/llm")}/**`);
     const llmBase = CLOUD_CHAT_URL.replace(/\/chat\/stream\/?$/, "/llm");
     await page.route(`${llmBase}/**`, async (route) => {
       llmCalls.push(route.request().url());
@@ -505,14 +498,10 @@ test.describe("Inspector Chat Tests - hosted mode + localhost server", () => {
     await page.getByTestId("chat-send-button").click();
 
     await expect(
-      page.getByText(
-        "Sign in through Manufact Cloud to continue with managed chat."
-      )
+      page.getByText("Sign in through Manufact Cloud to continue with managed chat.")
     ).toBeVisible({ timeout: 10000 });
     await expect(page.getByRole("dialog")).not.toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Sign in" }).last()
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Sign in" }).last()).toBeVisible();
   });
 
   test("delegates OAuth to cloud and sends its bearer token", async ({
@@ -552,36 +541,31 @@ test.describe("Inspector Chat Tests - hosted mode + localhost server", () => {
         }),
       });
     });
-    await context.route(
-      `${origin}/api/auth/oauth2/authorize**`,
-      async (route) => {
-        const requestUrl = new URL(route.request().url());
-        const redirectUri = requestUrl.searchParams.get("redirect_uri")!;
-        const state = requestUrl.searchParams.get("state")!;
-        const callback = new URL(redirectUri);
-        callback.searchParams.set("code", "oauth-e2e-code");
-        callback.searchParams.set("state", state);
-        await route.fulfill({
-          status: 200,
-          contentType: "text/html",
-          body: `<script>location.href=${JSON.stringify(callback.toString())}</script>`,
-        });
-      }
-    );
+    await context.route(`${origin}/api/auth/oauth2/authorize**`, async (route) => {
+      const requestUrl = new URL(route.request().url());
+      const redirectUri = requestUrl.searchParams.get("redirect_uri")!;
+      const state = requestUrl.searchParams.get("state")!;
+      const callback = new URL(redirectUri);
+      callback.searchParams.set("code", "oauth-e2e-code");
+      callback.searchParams.set("state", state);
+      await route.fulfill({
+        status: 200,
+        contentType: "text/html",
+        body: `<script>location.href=${JSON.stringify(callback.toString())}</script>`,
+      });
+    });
 
     const popupPromise = page.waitForEvent("popup");
     await page.getByRole("button", { name: "Sign in" }).first().click();
     const popup = await popupPromise;
     await popup.waitForEvent("close");
 
-    await expect(
-      page.getByRole("button", { name: "User menu" }).first()
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "User menu" }).first()).toBeVisible();
     await page.getByTestId("chat-input").fill("authenticated hello");
     await page.getByTestId("chat-send-button").click();
-    await expect
-      .poll(() => llmAuthorizations.at(-1))
-      .toBe("Bearer oauth-e2e-token");
+    await expect.poll(() => llmAuthorizations.at(-1)).toBe(
+      "Bearer oauth-e2e-token"
+    );
   });
 });
 

@@ -1,11 +1,10 @@
-# mcp-use v2 authorization implementation contract
+# mcp-use authorization implementation
 
-**Status:** Direct external authorization-server/resource-server mode is implemented.
-**Package:** `mcp-use@2`; imports use `mcp-use` subpaths.
+**Status:** Approved implementation scope. Implement this document in the current auth phase.
 
 **Scope:** This phase implements direct external authorization-server and resource-server mode only. mcp-use verifies externally issued access tokens that are bound to the canonical MCP resource. It does not issue, store, refresh, or proxy tokens.
 
-**Protocol basis:** Current [MCP authorization](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization) (revision 2025-11-25) and [MCP security guidance](https://modelcontextprotocol.io/docs/tutorials/security/security_best_practices), OAuth 2.1 resource-server guidance, and `@modelcontextprotocol/server@2.0.0-beta.3`. Beta.3 provides runtime-neutral resource-server helpers in server core.
+**Protocol basis:** Current [MCP authorization](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization) (revision 2025-11-25) and [MCP security guidance](https://modelcontextprotocol.io/docs/tutorials/security/security_best_practices), OAuth 2.1 resource-server guidance, and `@modelcontextprotocol/server@2.0.0-beta.4`. Beta.4 provides runtime-neutral resource-server helpers in server core.
 
 ## OAuth proxy is deferred
 
@@ -449,9 +448,9 @@ In direct mode, clients use the external authorization server's registration, au
 
 Better Auth is explicitly deferred. Do not port `oauthBetterAuthProvider` as part of the resource-server adapter phase. Its v2 integration will be designed separately so a Better Auth instance can compose with `MCPServer` more directly than the v1 provider wrapper. The custom provider escape hatch remains available in the meantime, but its shape does not constrain the future first-class Better Auth API.
 
-## SDK dependency prerequisite
+## Meet the SDK dependency prerequisite
 
-`@modelcontextprotocol/server`, `@modelcontextprotocol/hono`, and `@modelcontextprotocol/client` are pinned together at `2.0.0-beta.3`.
+`@modelcontextprotocol/server`, `@modelcontextprotocol/hono`, and `@modelcontextprotocol/client` use coordinated `2.0.0-beta.4` pins.
 
 ## Verify the implementation
 
