@@ -94,7 +94,7 @@ Opens the inspector in your browser at `http://localhost:8080`
 When you create an MCP server with `mcp-use`, the inspector is automatically available at `/inspector`:
 
 ```typescript
-import { MCPServer } from "mcp-use/server";
+import { MCPServer } from "mcp-use";
 
 const server = new MCPServer({
   name: "my-server",
@@ -102,10 +102,41 @@ const server = new MCPServer({
 });
 
 // Add your tools, resources, prompts...
-
-server.listen(3000);
-// 🎉 Inspector automatically available at http://localhost:3000/inspector
+export default server;
 ```
+
+Run `mcp-use dev`; the inspector is available at
+`http://localhost:3000/mcp/inspector`.
+
+#### Test the local CDN bundle with an mcp-use server
+
+From the TypeScript workspace, build and serve the current inspector source:
+
+```bash
+pnpm --filter @mcp-use/inspector serve:cdn -- --port 4173
+```
+
+In another terminal, rebuild mcp-use and start the app with the local asset
+override:
+
+```bash
+pnpm --filter mcp-use build
+cd test_app
+MCP_USE_INSPECTOR_ASSETS_URL=http://127.0.0.1:4173/inspector.js pnpm dev
+```
+
+Open `http://localhost:3000/mcp/inspector`. The served shell should reference
+the local bundle:
+
+```bash
+curl -s http://127.0.0.1:3000/mcp/inspector | rg '127.0.0.1:4173/inspector.js'
+```
+
+`serve:cdn` rebuilds `dist/cdn` before starting Vite Preview. Restart the
+mcp-use dev process after changing `MCP_USE_INSPECTOR_ASSETS_URL`, because the
+shell HTML is generated when the server mounts. An explicit
+`inspector.assetsUrl` constructor option takes precedence over the environment
+variable.
 
 ---
 
