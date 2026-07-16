@@ -160,7 +160,6 @@ const releases = manifests.map(({ bootstrap, manifest, name }) => {
     version: manifest.version,
     published,
     bootstrap: !registry,
-    requiresToken: bootstrap === true,
     latestBefore: registry?.["dist-tags"]?.latest ?? null,
     betaBefore: betaTag ?? null,
     nonBetaTagsBefore: nonBetaDistTags(registry),

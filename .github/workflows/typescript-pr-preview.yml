@@ -80,8 +80,7 @@ jobs:
           cat > deno.json << EOF
           {
             "imports": {
-              "mcp-use/server": "https://esm.sh/pr/mcp-use/mcp-use@$PR_NUMBER/server?no-dts&external=zod",
-              "mcp-use/client": "https://esm.sh/pr/mcp-use/mcp-use@$PR_NUMBER/client?no-dts&external=zod",
+              "mcp-use": "https://esm.sh/pr/mcp-use/mcp-use@$PR_NUMBER?no-dts&external=zod",
               "zod": "https://esm.sh/zod@3.24.4",
               "zod/v3": "https://esm.sh/zod@3.24.4",
               "zod/v4": "https://esm.sh/zod@4.2.0",
@@ -105,8 +104,8 @@ jobs:
           MAX_RETRIES=10
           RETRY_DELAY=30
           
-          PR_URL="https://esm.sh/pr/mcp-use/mcp-use@${PR_NUMBER}/server"
-          COMMIT_URL="https://esm.sh/pr/mcp-use/mcp-use@${SHORT_SHA}/server"
+          PR_URL="https://esm.sh/pr/mcp-use/mcp-use@${PR_NUMBER}"
+          COMMIT_URL="https://esm.sh/pr/mcp-use/mcp-use@${SHORT_SHA}"
           
           echo "Checking URLs:"
           echo "  PR URL: $PR_URL"

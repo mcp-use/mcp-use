@@ -609,18 +609,6 @@ jobs:
           }
           NODE
 
-      - name: Verify bootstrap credential before changing versions
-        working-directory: libraries/typescript
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo "NPM_TOKEN is required for @mcp-use/client and @mcp-use/agent" >&2
-            exit 1
-          fi
-          npm whoami
-          npm org ls mcp-use --json >/dev/null
-
       - name: Install dependencies
         working-directory: libraries/typescript
         run: pnpm install --frozen-lockfile
@@ -687,49 +675,7 @@ jobs:
           console.log(unpublished)
           NODE
 
-      - name: Publish token-authenticated scoped packages
-        if: steps.publication.outputs.needed == 'true'
-        working-directory: libraries/typescript
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          node - <<'NODE' > /tmp/bootstrap-packages
-          const fs = require('fs')
-          const plan = JSON.parse(fs.readFileSync('beta-release-plan.json', 'utf8'))
-          for (const release of plan.releases) {
-            if (!release.published && release.requiresToken) console.log(release.name)
-          }
-          NODE
-          while IFS= read -r package; do
-            [ -z "$package" ] && continue
-            pnpm --filter "$package" publish --tag beta --access public --no-git-checks
-          done < /tmp/bootstrap-packages
-
-      - name: Wait for bootstrapped packages
-        if: steps.publication.outputs.needed == 'true'
-        working-directory: libraries/typescript
-        run: |
-          node - <<'NODE'
-          const fs = require('fs')
-          const { execFileSync } = require('child_process')
-          const plan = JSON.parse(fs.readFileSync('beta-release-plan.json', 'utf8'))
-          for (const release of plan.releases.filter((item) => item.requiresToken && !item.published)) {
-            let found = false
-            for (let attempt = 0; attempt < 12; attempt += 1) {
-              try {
-                const version = execFileSync('npm', ['view', `${release.name}@${release.version}`, 'version'], { encoding: 'utf8' }).trim()
-                if (version === release.version) {
-                  found = true
-                  break
-                }
-              } catch {}
-              Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5000)
-            }
-            if (!found) throw new Error(`${release.name}@${release.version} did not become visible on npm`)
-          }
-          NODE
-
-      - name: Publish remaining beta packages with trusted publishing
+      - name: Publish beta packages with trusted publishing
         if: steps.publication.outputs.needed == 'true'
         working-directory: libraries/typescript
         run: pnpm changeset publish --tag beta
