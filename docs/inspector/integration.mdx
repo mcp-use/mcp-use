@@ -6,11 +6,11 @@ icon: "plug-2"
 
 {/* TODO: Add Inspector media when a screenshot or short clip would clarify the workflow. */}
 
-Mount the Inspector when you want it served from the same app as your MCP server. Servers built with `mcp-use/server` mount it automatically at `/inspector`.
+Mount the Inspector when you want it served from the same app as your MCP server. **Prefer `mcp-use/server`** — it mounts a thin HTML shell at `/inspector` and loads the UI bundle from jsDelivr by default (no npm dependency on `@mcp-use/inspector`).
 
 ## Auto-Mounting with mcp-use
 
-When using `mcp-use` to create your MCP server, the Inspector is automatically available at `/inspector`.
+When using `mcp-use` to create your MCP server, the Inspector is automatically available at `/inspector`. The shell loads `dist/cdn/inspector.js` from jsDelivr (`@mcp-use/inspector@beta` by default). Override with `inspector.assetsUrl` or `MCP_USE_INSPECTOR_ASSETS_URL`.
 
 ### Example
 
@@ -34,6 +34,8 @@ server.listen(3000)
 ```
 
 ## Manual Integration
+
+For non-`mcp-use` Hono/Express apps, `mountInspector()` from `@mcp-use/inspector` provides the full inspector server (proxy, OAuth BFF, and UI shell). By default the UI bundle loads from jsDelivr; standalone `npx @mcp-use/inspector` serves `dist/cdn/` locally instead.
 
 ### Hono Integration
 
