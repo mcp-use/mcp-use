@@ -209,7 +209,9 @@ describe("MCPAgent Telemetry Integration", () => {
 
   describe("trackAgentExecution in stream()", () => {
     it("should track execution on successful stream run", async () => {
-      const { MCPAgent } = await import("../../../src/agents/mcp_agent.js");
+      const { MCPAgent } = await import(
+        "../../../src/agents/mcp_agent_langchain.js"
+      );
 
       const connector = new MockConnector();
       const agent = new MCPAgent({
@@ -240,7 +242,9 @@ describe("MCPAgent Telemetry Integration", () => {
     });
 
     it("should track execution with correct server count", async () => {
-      const { MCPAgent } = await import("../../../src/agents/mcp_agent.js");
+      const { MCPAgent } = await import(
+        "../../../src/agents/mcp_agent_langchain.js"
+      );
 
       const connector1 = new MockConnector();
       const connector2 = new MockConnector();
@@ -267,7 +271,9 @@ describe("MCPAgent Telemetry Integration", () => {
     });
 
     it("should track execution with tools information", async () => {
-      const { MCPAgent } = await import("../../../src/agents/mcp_agent.js");
+      const { MCPAgent } = await import(
+        "../../../src/agents/mcp_agent_langchain.js"
+      );
 
       const connector = new MockConnector();
       const agent = new MCPAgent({
@@ -287,7 +293,9 @@ describe("MCPAgent Telemetry Integration", () => {
     });
 
     it("should track execution time", async () => {
-      const { MCPAgent } = await import("../../../src/agents/mcp_agent.js");
+      const { MCPAgent } = await import(
+        "../../../src/agents/mcp_agent_langchain.js"
+      );
 
       const connector = new MockConnector();
       const agent = new MCPAgent({
@@ -309,7 +317,9 @@ describe("MCPAgent Telemetry Integration", () => {
     });
 
     it("should track manageConnector parameter", async () => {
-      const { MCPAgent } = await import("../../../src/agents/mcp_agent.js");
+      const { MCPAgent } = await import(
+        "../../../src/agents/mcp_agent_langchain.js"
+      );
 
       const connector = new MockConnector();
       const agent = new MCPAgent({
@@ -328,7 +338,9 @@ describe("MCPAgent Telemetry Integration", () => {
     });
 
     it("should track external history usage", async () => {
-      const { MCPAgent } = await import("../../../src/agents/mcp_agent.js");
+      const { MCPAgent } = await import(
+        "../../../src/agents/mcp_agent_langchain.js"
+      );
       const { HumanMessage, AIMessage } = await import("langchain");
 
       const connector = new MockConnector();
@@ -354,7 +366,9 @@ describe("MCPAgent Telemetry Integration", () => {
     });
 
     it("should track conversation history length when memory is enabled", async () => {
-      const { MCPAgent } = await import("../../../src/agents/mcp_agent.js");
+      const { MCPAgent } = await import(
+        "../../../src/agents/mcp_agent_langchain.js"
+      );
 
       const connector = new MockConnector();
       const agent = new MCPAgent({
@@ -376,7 +390,9 @@ describe("MCPAgent Telemetry Integration", () => {
 
   describe("trackAgentExecution in streamEvents()", () => {
     it("should track execution on streamEvents run", async () => {
-      const { MCPAgent } = await import("../../../src/agents/mcp_agent.js");
+      const { MCPAgent } = await import(
+        "../../../src/agents/mcp_agent_langchain.js"
+      );
 
       const connector = new MockConnector();
       const agent = new MCPAgent({
@@ -404,7 +420,9 @@ describe("MCPAgent Telemetry Integration", () => {
     });
 
     it("should track response length for streamed responses", async () => {
-      const { MCPAgent } = await import("../../../src/agents/mcp_agent.js");
+      const { MCPAgent } = await import(
+        "../../../src/agents/mcp_agent_langchain.js"
+      );
 
       const connector = new MockConnector();
       const agent = new MCPAgent({
@@ -427,7 +445,9 @@ describe("MCPAgent Telemetry Integration", () => {
 
   describe("error tracking", () => {
     it("should track error type on failure", async () => {
-      const { MCPAgent } = await import("../../../src/agents/mcp_agent.js");
+      const { MCPAgent } = await import(
+        "../../../src/agents/mcp_agent_langchain.js"
+      );
 
       const connector = new MockConnector();
       const agent = new MCPAgent({
@@ -449,7 +469,9 @@ describe("MCPAgent Telemetry Integration", () => {
 
   describe("useServerManager tracking", () => {
     it("should track useServerManager configuration", async () => {
-      const { MCPAgent } = await import("../../../src/agents/mcp_agent.js");
+      const { MCPAgent } = await import(
+        "../../../src/agents/mcp_agent_langchain.js"
+      );
       const { MCPClient } = await import("@mcp-use/client");
 
       const client = new MCPClient();
@@ -472,7 +494,9 @@ describe("MCPAgent Telemetry Integration", () => {
 
   describe("model info extraction", () => {
     it("should extract model provider and name", async () => {
-      const { MCPAgent } = await import("../../../src/agents/mcp_agent.js");
+      const { MCPAgent } = await import(
+        "../../../src/agents/mcp_agent_langchain.js"
+      );
 
       const connector = new MockConnector();
       const agent = new MCPAgent({

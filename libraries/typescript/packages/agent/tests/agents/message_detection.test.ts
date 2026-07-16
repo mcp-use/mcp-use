@@ -5,7 +5,7 @@
 
 import { AIMessage, HumanMessage, ToolMessage } from "langchain";
 import { beforeEach, describe, expect, it } from "vitest";
-import { MCPAgent } from "../../src/agents/mcp_agent.js";
+import { MCPAgent } from "../../src/agents/mcp_agent_langchain.js";
 
 describe("MCPAgent Message Detection Methods", () => {
   let agent: MCPAgent;
