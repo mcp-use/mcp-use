@@ -45,7 +45,7 @@
   "devDependencies": {
     "@changesets/cli": "^2.30.0",
     "@types/node": "^25.6.0",
-    "@types/react": "^19.2.14",
+    "@types/react": "19.2.17",
     "@types/react-dom": "^19.2.3",
     "@typescript-eslint/eslint-plugin": "^8.58.2",
     "@typescript-eslint/parser": "^8.58.2",
