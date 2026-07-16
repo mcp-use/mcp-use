@@ -124,6 +124,9 @@ importers:
       rimraf:
         specifier: ^6.1.3
         version: 6.1.3
+      semver:
+        specifier: ^7.7.3
+        version: 7.8.5
       tsup:
         specifier: ^8.5.1
         version: 8.5.1(jiti@2.7.0)(postcss@8.5.15)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.3)
@@ -184,14 +187,30 @@ importers:
         specifier: 2.1.11
         version: 2.1.11
 
+  packages/cli:
+    dependencies:
+      mcp-use:
+        specifier: workspace:*
+        version: link:../server
+    devDependencies:
+      rimraf:
+        specifier: ^6.1.3
+        version: 6.1.3
+      tsup:
+        specifier: ^8.5.1
+        version: 8.5.1(jiti@2.7.0)(postcss@8.5.15)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   packages/client:
     dependencies:
       '@modelcontextprotocol/client':
-        specifier: https://pkg.pr.new/@modelcontextprotocol/client@2501
-        version: https://pkg.pr.new/@modelcontextprotocol/client@2501
+        specifier: https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee
+        version: https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee
       '@modelcontextprotocol/ext-apps':
-        specifier: https://pkg.pr.new/@modelcontextprotocol/ext-apps@712
-        version: https://pkg.pr.new/@modelcontextprotocol/ext-apps@712(@modelcontextprotocol/client@https://pkg.pr.new/@modelcontextprotocol/client@2501)(@modelcontextprotocol/core@2.0.0-beta.4)(@modelcontextprotocol/server@2.0.0-beta.4)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.4.3)
+        specifier: https://pkg.pr.new/@modelcontextprotocol/ext-apps@432d42bb02a569078ab31ab6458428df6027809d
+        version: https://pkg.pr.new/@modelcontextprotocol/ext-apps@432d42bb02a569078ab31ab6458428df6027809d(@modelcontextprotocol/client@https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee)(@modelcontextprotocol/core@2.0.0-beta.4)(@modelcontextprotocol/server@2.0.0-beta.4)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.4.3)
     devDependencies:
       '@e2b/code-interpreter':
         specifier: ^2.6.1
@@ -479,11 +498,11 @@ importers:
   packages/server:
     dependencies:
       '@modelcontextprotocol/ext-apps':
-        specifier: https://pkg.pr.new/@modelcontextprotocol/ext-apps@712
-        version: https://pkg.pr.new/@modelcontextprotocol/ext-apps@712(@modelcontextprotocol/client@https://pkg.pr.new/@modelcontextprotocol/client@2501)(@modelcontextprotocol/core@https://pkg.pr.new/@modelcontextprotocol/core@2501)(@modelcontextprotocol/server@https://pkg.pr.new/@modelcontextprotocol/server@2501)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.4.3)
+        specifier: https://pkg.pr.new/@modelcontextprotocol/ext-apps@432d42bb02a569078ab31ab6458428df6027809d
+        version: https://pkg.pr.new/@modelcontextprotocol/ext-apps@432d42bb02a569078ab31ab6458428df6027809d(@modelcontextprotocol/client@https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee)(@modelcontextprotocol/core@https://pkg.pr.new/@modelcontextprotocol/core@f60b40179b0f090f6d64248be1312245a160b5ee)(@modelcontextprotocol/server@https://pkg.pr.new/@modelcontextprotocol/server@f60b40179b0f090f6d64248be1312245a160b5ee)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.4.3)
       '@modelcontextprotocol/server':
-        specifier: https://pkg.pr.new/@modelcontextprotocol/server@2501
-        version: https://pkg.pr.new/@modelcontextprotocol/server@2501
+        specifier: https://pkg.pr.new/@modelcontextprotocol/server@f60b40179b0f090f6d64248be1312245a160b5ee
+        version: https://pkg.pr.new/@modelcontextprotocol/server@f60b40179b0f090f6d64248be1312245a160b5ee
       '@tailwindcss/vite':
         specifier: ^4.2.0
         version: 4.2.0(vite@8.0.16(@types/node@24.13.2)(esbuild@0.27.1)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.3))
@@ -504,11 +523,11 @@ importers:
         specifier: workspace:*
         version: link:../client
       '@modelcontextprotocol/client':
-        specifier: https://pkg.pr.new/@modelcontextprotocol/client@2501
-        version: https://pkg.pr.new/@modelcontextprotocol/client@2501
+        specifier: https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee
+        version: https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee
       '@modelcontextprotocol/core':
-        specifier: https://pkg.pr.new/@modelcontextprotocol/core@2501
-        version: https://pkg.pr.new/@modelcontextprotocol/core@2501
+        specifier: https://pkg.pr.new/@modelcontextprotocol/core@f60b40179b0f090f6d64248be1312245a160b5ee
+        version: https://pkg.pr.new/@modelcontextprotocol/core@f60b40179b0f090f6d64248be1312245a160b5ee
       '@testing-library/react':
         specifier: ^16.3.2
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -675,6 +694,19 @@ importers:
       vite:
         specifier: '>=8.0.5'
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.1)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.3)
+
+  packages/server/examples/openapi:
+    dependencies:
+      mcp-use:
+        specifier: workspace:*
+        version: link:../..
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.2
+        version: 24.13.2
+      typescript:
+        specifier: 7.0.1-rc
+        version: 7.0.1-rc
 
   packages/server/examples/railway:
     dependencies:
@@ -1614,8 +1646,8 @@ packages:
     resolution: {integrity: sha512-o9z9YCGNxWNdklPdjcD0tr8pocC9OgjdArqgx3OjPMlTe0M/SSPC2olOJs5ueq77HSpz36mND0f0KteqEhKF3A==}
     engines: {node: '>=20'}
 
-  '@modelcontextprotocol/client@https://pkg.pr.new/@modelcontextprotocol/client@2501':
-    resolution: {integrity: sha512-5FvmSf2qWlJXlI9ydf8230f1rsDHMEw9Jgcq2ZUGmA3DJShaYV6t49zKJBuawetMcLOzWBGs8+qDzhZOZTk6Fw==, tarball: https://pkg.pr.new/@modelcontextprotocol/client@2501}
+  '@modelcontextprotocol/client@https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee':
+    resolution: {integrity: sha512-5FvmSf2qWlJXlI9ydf8230f1rsDHMEw9Jgcq2ZUGmA3DJShaYV6t49zKJBuawetMcLOzWBGs8+qDzhZOZTk6Fw==, tarball: https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee}
     version: 2.0.0-beta.4
     engines: {node: '>=20'}
 
@@ -1623,8 +1655,8 @@ packages:
     resolution: {integrity: sha512-nsMXd4wQBKzmph6r+WOhum+mXjDYljTAqwY/XUg3hLtvNOQ8+JVqBSJOVCMJvx9lXhTpTOPrGZ3BuNiaNPjSvg==}
     engines: {node: '>=20'}
 
-  '@modelcontextprotocol/core@https://pkg.pr.new/@modelcontextprotocol/core@2501':
-    resolution: {integrity: sha512-nsMXd4wQBKzmph6r+WOhum+mXjDYljTAqwY/XUg3hLtvNOQ8+JVqBSJOVCMJvx9lXhTpTOPrGZ3BuNiaNPjSvg==, tarball: https://pkg.pr.new/@modelcontextprotocol/core@2501}
+  '@modelcontextprotocol/core@https://pkg.pr.new/@modelcontextprotocol/core@f60b40179b0f090f6d64248be1312245a160b5ee':
+    resolution: {integrity: sha512-nsMXd4wQBKzmph6r+WOhum+mXjDYljTAqwY/XUg3hLtvNOQ8+JVqBSJOVCMJvx9lXhTpTOPrGZ3BuNiaNPjSvg==, tarball: https://pkg.pr.new/@modelcontextprotocol/core@f60b40179b0f090f6d64248be1312245a160b5ee}
     version: 2.0.0-beta.4
     engines: {node: '>=20'}
 
@@ -1633,8 +1665,8 @@ packages:
     version: 2.0.0-beta.4
     engines: {node: '>=20'}
 
-  '@modelcontextprotocol/ext-apps@https://pkg.pr.new/@modelcontextprotocol/ext-apps@712':
-    resolution: {integrity: sha512-ZrbpADXYYPsD21SNE/R5iadnZk6Rn8ZS3yVjSq9cDK++H1awsU93n23czZZ+ruYAFunWtJj9RNkXCVfKw4r2ow==, tarball: https://pkg.pr.new/@modelcontextprotocol/ext-apps@712}
+  '@modelcontextprotocol/ext-apps@https://pkg.pr.new/@modelcontextprotocol/ext-apps@432d42bb02a569078ab31ab6458428df6027809d':
+    resolution: {integrity: sha512-ZrbpADXYYPsD21SNE/R5iadnZk6Rn8ZS3yVjSq9cDK++H1awsU93n23czZZ+ruYAFunWtJj9RNkXCVfKw4r2ow==, tarball: https://pkg.pr.new/@modelcontextprotocol/ext-apps@432d42bb02a569078ab31ab6458428df6027809d}
     version: 1.7.4
     engines: {node: '>=20'}
     peerDependencies:
@@ -1654,8 +1686,8 @@ packages:
     resolution: {integrity: sha512-pjMZcNEt1dOq0aJCcY3b7w1Ayh+qmQN2xlfTELcGV9yiAjEGIczBPBLWWW0k0zzo5T8kiv15jtKPsWeHGxLvLg==}
     engines: {node: '>=20'}
 
-  '@modelcontextprotocol/server@https://pkg.pr.new/@modelcontextprotocol/server@2501':
-    resolution: {integrity: sha512-mI+V52bTdSCHDrsrVG3TeOzgy+apDQXz6l1B4KuwKV/8xbRAsV9LZ2Nf67SEoLszuYYH0as4pZQUG4cCMYP5/g==, tarball: https://pkg.pr.new/@modelcontextprotocol/server@2501}
+  '@modelcontextprotocol/server@https://pkg.pr.new/@modelcontextprotocol/server@f60b40179b0f090f6d64248be1312245a160b5ee':
+    resolution: {integrity: sha512-mI+V52bTdSCHDrsrVG3TeOzgy+apDQXz6l1B4KuwKV/8xbRAsV9LZ2Nf67SEoLszuYYH0as4pZQUG4cCMYP5/g==, tarball: https://pkg.pr.new/@modelcontextprotocol/server@f60b40179b0f090f6d64248be1312245a160b5ee}
     version: 2.0.0-beta.4
     engines: {node: '>=20'}
 
@@ -6611,16 +6643,6 @@ packages:
     resolution: {integrity: sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA==}
     hasBin: true
 
-  semver@7.7.4:
-    resolution: {integrity: sha512-vFKC2IEtQnVhpT78h1Yp8wzwrf8CM+MzKMHGJZfBtzhZNycRFnXsHk6E5TxIkkMsgNS7mdX3AGB7x2QM2di4lA==}
-    engines: {node: '>=10'}
-    hasBin: true
-
-  semver@7.8.1:
-    resolution: {integrity: sha512-rkVq3IXh+4FDGch+KwzX3aV9W3kO54GyEgpvBzSyctDA6Xtd7RJQV1xmXbeQp5v7+VzLOfVqiutSE6GICgPFvg==}
-    engines: {node: '>=10'}
-    hasBin: true
-
   semver@7.8.5:
     resolution: {integrity: sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA==}
     engines: {node: '>=10'}
@@ -7625,7 +7647,7 @@ snapshots:
       outdent: 0.5.0
       prettier: 2.8.8
       resolve-from: 5.0.0
-      semver: 7.7.4
+      semver: 7.8.5
 
   '@changesets/assemble-release-plan@6.0.9':
     dependencies:
@@ -7634,7 +7656,7 @@ snapshots:
       '@changesets/should-skip-package': 0.1.2
       '@changesets/types': 6.1.0
       '@manypkg/get-packages': 1.1.3
-      semver: 7.7.4
+      semver: 7.8.5
 
   '@changesets/changelog-git@0.2.1':
     dependencies:
@@ -7665,7 +7687,7 @@ snapshots:
       package-manager-detector: 0.2.11
       picocolors: 1.1.1
       resolve-from: 5.0.0
-      semver: 7.7.4
+      semver: 7.8.5
       spawndamnit: 3.0.1
       term-size: 2.2.1
     transitivePeerDependencies:
@@ -7691,7 +7713,7 @@ snapshots:
       '@changesets/types': 6.1.0
       '@manypkg/get-packages': 1.1.3
       picocolors: 1.1.1
-      semver: 7.7.4
+      semver: 7.8.5
 
   '@changesets/get-release-plan@4.0.15':
     dependencies:
@@ -8275,7 +8297,7 @@ snapshots:
       pkce-challenge: 5.0.1
       zod: 4.4.3
 
-  '@modelcontextprotocol/client@https://pkg.pr.new/@modelcontextprotocol/client@2501':
+  '@modelcontextprotocol/client@https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee':
     dependencies:
       '@modelcontextprotocol/core': https://pkg.pr.new/modelcontextprotocol/typescript-sdk/@modelcontextprotocol/core@f60b401
       cross-spawn: 7.0.6
@@ -8289,7 +8311,7 @@ snapshots:
     dependencies:
       zod: 4.4.3
 
-  '@modelcontextprotocol/core@https://pkg.pr.new/@modelcontextprotocol/core@2501':
+  '@modelcontextprotocol/core@https://pkg.pr.new/@modelcontextprotocol/core@f60b40179b0f090f6d64248be1312245a160b5ee':
     dependencies:
       zod: 4.4.3
 
@@ -8297,9 +8319,9 @@ snapshots:
     dependencies:
       zod: 4.4.3
 
-  '@modelcontextprotocol/ext-apps@https://pkg.pr.new/@modelcontextprotocol/ext-apps@712(@modelcontextprotocol/client@https://pkg.pr.new/@modelcontextprotocol/client@2501)(@modelcontextprotocol/core@2.0.0-beta.4)(@modelcontextprotocol/server@2.0.0-beta.4)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.4.3)':
+  '@modelcontextprotocol/ext-apps@https://pkg.pr.new/@modelcontextprotocol/ext-apps@432d42bb02a569078ab31ab6458428df6027809d(@modelcontextprotocol/client@https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee)(@modelcontextprotocol/core@2.0.0-beta.4)(@modelcontextprotocol/server@2.0.0-beta.4)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.4.3)':
     dependencies:
-      '@modelcontextprotocol/client': https://pkg.pr.new/@modelcontextprotocol/client@2501
+      '@modelcontextprotocol/client': https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee
       '@modelcontextprotocol/core': 2.0.0-beta.4
       '@modelcontextprotocol/server': 2.0.0-beta.4
       '@standard-schema/spec': 1.1.0
@@ -8308,11 +8330,11 @@ snapshots:
       react: 19.2.4
       react-dom: 19.2.4(react@19.2.4)
 
-  '@modelcontextprotocol/ext-apps@https://pkg.pr.new/@modelcontextprotocol/ext-apps@712(@modelcontextprotocol/client@https://pkg.pr.new/@modelcontextprotocol/client@2501)(@modelcontextprotocol/core@https://pkg.pr.new/@modelcontextprotocol/core@2501)(@modelcontextprotocol/server@https://pkg.pr.new/@modelcontextprotocol/server@2501)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.4.3)':
+  '@modelcontextprotocol/ext-apps@https://pkg.pr.new/@modelcontextprotocol/ext-apps@432d42bb02a569078ab31ab6458428df6027809d(@modelcontextprotocol/client@https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee)(@modelcontextprotocol/core@https://pkg.pr.new/@modelcontextprotocol/core@f60b40179b0f090f6d64248be1312245a160b5ee)(@modelcontextprotocol/server@https://pkg.pr.new/@modelcontextprotocol/server@f60b40179b0f090f6d64248be1312245a160b5ee)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.4.3)':
     dependencies:
-      '@modelcontextprotocol/client': https://pkg.pr.new/@modelcontextprotocol/client@2501
-      '@modelcontextprotocol/core': https://pkg.pr.new/@modelcontextprotocol/core@2501
-      '@modelcontextprotocol/server': https://pkg.pr.new/@modelcontextprotocol/server@2501
+      '@modelcontextprotocol/client': https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee
+      '@modelcontextprotocol/core': https://pkg.pr.new/@modelcontextprotocol/core@f60b40179b0f090f6d64248be1312245a160b5ee
+      '@modelcontextprotocol/server': https://pkg.pr.new/@modelcontextprotocol/server@f60b40179b0f090f6d64248be1312245a160b5ee
       '@standard-schema/spec': 1.1.0
       zod: 4.4.3
     optionalDependencies:
@@ -8324,7 +8346,7 @@ snapshots:
       '@modelcontextprotocol/core': 2.0.0-beta.4
       zod: 4.4.3
 
-  '@modelcontextprotocol/server@https://pkg.pr.new/@modelcontextprotocol/server@2501':
+  '@modelcontextprotocol/server@https://pkg.pr.new/@modelcontextprotocol/server@f60b40179b0f090f6d64248be1312245a160b5ee':
     dependencies:
       '@modelcontextprotocol/core': https://pkg.pr.new/modelcontextprotocol/typescript-sdk/@modelcontextprotocol/core@f60b401
       zod: 4.4.3
@@ -9714,7 +9736,7 @@ snapshots:
       '@typescript-eslint/visitor-keys': 8.58.2
       debug: 4.4.3
       minimatch: 10.2.5
-      semver: 7.7.4
+      semver: 7.8.5
       tinyglobby: 0.2.17
       ts-api-utils: 2.5.0(typescript@5.9.3)
       typescript: 5.9.3
@@ -11689,7 +11711,7 @@ snapshots:
 
   is-bun-module@2.0.0:
     dependencies:
-      semver: 7.8.1
+      semver: 7.8.5
 
   is-callable@1.2.7: {}
 
@@ -13476,10 +13498,6 @@ snapshots:
   semifies@1.0.0: {}
 
   semver@6.3.1: {}
-
-  semver@7.7.4: {}
-
-  semver@7.8.1: {}
 
   semver@7.8.5: {}
 
