@@ -81,6 +81,12 @@ import type {
   TemplateVariableValue,
 } from "./resources.js";
 import type {
+  ProxyConnection,
+  ProxyMountHost,
+  ProxyOptions,
+  ProxyServerConfig,
+} from "./proxy.js";
+import type {
   InferToolInput,
   InferToolName,
   InferToolOutput,
@@ -222,6 +228,8 @@ export class MCPServer<TUser = never> {
   #hostValidated = false;
   readonly #mcpMiddlewares: McpMiddlewareEntry[] = [];
   readonly #mcpEventListeners: McpEventListenerEntry[] = [];
+  /** Client instances created by {@link MCPServer.proxy} and owned by this server. */
+  readonly #proxyOwners: Array<{ close(): Promise<void> }> = [];
 
   /**
    * Create an MCP server from a parsed, bundled OpenAPI document.
@@ -434,6 +442,59 @@ export class MCPServer<TUser = never> {
       >,
     });
     return this;
+  }
+
+  /**
+   * Compose upstream MCP servers into this server.
+   *
+   * A namespace-keyed config creates all upstream connections through the
+   * optional `@mcp-use/client` v2 peer. The namespace prefixes every mounted
+   * tool, resource, and prompt name. You may instead pass an existing ready
+   * {@link ProxyConnection}; that connection remains caller-owned.
+   *
+   * @param servers - Namespace-keyed upstream connection settings.
+   * @throws If `@mcp-use/client` is not installed, an upstream cannot connect
+   * or be introspected, a mounted name collides, or the server already started.
+   *
+   * @example
+   * ```ts
+   * await server.proxy({
+   *   database: { command: "node", args: ["./database.mjs"] },
+   *   weather: { url: "https://weather.example.com/mcp" },
+   * });
+   * ```
+   */
+  async proxy(servers: Record<string, ProxyServerConfig>): Promise<void>;
+  /**
+   * Mount an existing ready `@mcp-use/client` v2 connection.
+   *
+   * @param connection - Ready connection to introspect and forward through.
+   * @param options - Optional namespace. Without one, upstream names and URIs
+   * are preserved.
+   * @throws If introspection fails, a mounted name collides, or the server
+   * already started.
+   *
+   * @example
+   * ```ts
+   * const connection = await client.connect("database");
+   * await server.proxy(connection, { namespace: "database" });
+   * ```
+   */
+  async proxy(
+    connection: ProxyConnection,
+    options?: ProxyOptions
+  ): Promise<void>;
+  async proxy(
+    input: Record<string, ProxyServerConfig> | ProxyConnection,
+    options?: ProxyOptions
+  ): Promise<void> {
+    const { isProxyConnection, mountProxyConnection, mountProxyServers } =
+      await import("./proxy.js");
+    if (isProxyConnection(input)) {
+      await mountProxyConnection(this.#proxyHost(), input, options);
+      return;
+    }
+    await mountProxyServers(this.#proxyHost(), input);
   }
 
   /**
@@ -683,6 +744,8 @@ export class MCPServer<TUser = never> {
    * instance to serve again.
    */
   async close(): Promise<void> {
+    const proxyOwners = this.#proxyOwners.splice(0);
+    await Promise.all(proxyOwners.map((owner) => owner.close()));
     await this.#handler?.close();
     const httpServer = this.#httpServer;
     if (httpServer !== undefined) {
@@ -752,6 +815,48 @@ export class MCPServer<TUser = never> {
           `so register everything before listen()/getHandler().`
       );
     }
+  }
+
+  #proxyHost(): ProxyMountHost {
+    return {
+      isStarted: () => this.#handler !== undefined,
+      hasTool: (name) => this.#tools.has(name),
+      hasResource: (name) => this.#resources.has(name),
+      hasPrompt: (name) => this.#prompts.has(name),
+      registerTool: (definition, callback) => {
+        this.#assertNotStarted("tool", definition.name);
+        this.#tools.set(definition.name, {
+          definition,
+          callback: callback as ToolCallback<
+            Record<string, unknown>,
+            never,
+            TUser,
+            HasOAuth<TUser>
+          >,
+        });
+      },
+      registerResource: (definition, callback) => {
+        this.#assertNotStarted("resource", definition.name);
+        this.#resources.set(definition.name, {
+          definition,
+          callback: callback as ResourceCallback<TUser, HasOAuth<TUser>>,
+        });
+      },
+      registerPrompt: (definition, callback) => {
+        this.#assertNotStarted("prompt", definition.name);
+        this.#prompts.set(definition.name, {
+          definition,
+          callback: callback as PromptCallback<
+            Record<string, unknown>,
+            TUser,
+            HasOAuth<TUser>
+          >,
+        });
+      },
+      trackOwner: (owner) => {
+        this.#proxyOwners.push(owner);
+      },
+    };
   }
 
   /**

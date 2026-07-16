@@ -41,6 +41,7 @@ const START_FORBIDDEN_STATIC = [
 describe("published CLI boundaries", () => {
   it("keeps dist/index.js free of static node and toolchain leaks", async () => {
     const index = await readFile(new URL("index.js", DIST), "utf8");
+    const proxyTypes = await readFile(new URL("proxy.d.ts", DIST), "utf8");
 
     for (const { label, pattern } of EDGE_FORBIDDEN_STATIC) {
       expect(index, `index.js must not statically import ${label}`).not.toMatch(
@@ -58,6 +59,17 @@ describe("published CLI boundaries", () => {
     expect(index).toMatch(
       /\bimport\s*\(\s*["'][^"']*public-route[^"']*["']\s*\)/
     );
+    expect(index, "proxying must stay behind its own lazy chunk").toMatch(
+      /\bimport\s*\(\s*["'][^"']*proxy[^"']*["']\s*\)/
+    );
+    expect(
+      index,
+      "the library entry must not resolve the optional client peer"
+    ).not.toContain("@mcp-use/client");
+    expect(
+      proxyTypes,
+      "public declarations must not require the optional client peer"
+    ).not.toMatch(/\bfrom\s+["']@mcp-use\/client["']/);
   });
 
   it("keeps dist/commands/start.js free of toolchain and cross-command leaks", async () => {
