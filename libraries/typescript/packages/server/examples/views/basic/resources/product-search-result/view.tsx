@@ -14,8 +14,6 @@ import {
   useViewTool,
 } from "mcp-use/react";
 
-import "./view.css";
-
 const rootClass =
   "p-4 font-sans bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100";
 

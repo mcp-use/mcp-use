@@ -55,7 +55,9 @@ export const viewConfig = {
 
 function fsLog(msg: string) {
   // Dev-only breadcrumb; hosts may surface console output.
-  if (import.meta.env.DEV) console.debug(`[Excalidraw] ${msg}`);
+  if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
+    console.debug(`[Excalidraw] ${msg}`);
+  }
 }
 
 // ============================================================

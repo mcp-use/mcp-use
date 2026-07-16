@@ -216,6 +216,8 @@ describe("runBuild (views)", () => {
     }
     expect(product.js.length).toBeGreaterThan(0);
     expect(product.js).toMatch(/bootstrapView|createElement|react/i);
+    expect(product.css).toContain("tailwindcss");
+    expect(product.css).toMatch(/\.grid\{display:grid\}/);
 
     const publicFile = join(buildDir, "views", "public", "test.txt");
     expect(existsSync(publicFile)).toBe(true);

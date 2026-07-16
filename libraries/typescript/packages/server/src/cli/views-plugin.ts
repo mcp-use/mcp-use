@@ -11,6 +11,9 @@ import {
   virtualViewId,
 } from "./views.js";
 
+const VIRTUAL_TAILWIND_ID = "virtual:mcp-use/tailwind.css";
+const VIRTUAL_TAILWIND_RESOLVED_ID = `\0${VIRTUAL_TAILWIND_ID}`;
+
 /**
  * Options for {@link mcpUseViewsPlugin}.
  *
@@ -53,12 +56,18 @@ export function mcpUseViewsPlugin(options: McpUseViewsPluginOptions): Plugin {
       return environment.name === "client";
     },
     resolveId(id) {
+      if (id === VIRTUAL_TAILWIND_ID) {
+        return VIRTUAL_TAILWIND_RESOLVED_ID;
+      }
       if (!id.startsWith(VIRTUAL_VIEW_PREFIX)) {
         return undefined;
       }
       return `\0${id}`;
     },
     load(id) {
+      if (id === VIRTUAL_TAILWIND_RESOLVED_ID) {
+        return `@import "tailwindcss";`;
+      }
       if (!id.startsWith(VIRTUAL_VIEW_RESOLVED_PREFIX)) {
         return undefined;
       }
@@ -74,6 +83,7 @@ export function mcpUseViewsPlugin(options: McpUseViewsPluginOptions): Plugin {
         // or any refresh-wrapped view module evaluates.
         lines.push(`import "@vitejs/plugin-react/preamble";`);
       }
+      lines.push(`import ${JSON.stringify(VIRTUAL_TAILWIND_ID)};`);
       lines.push(
         `import { bootstrapView } from "mcp-use/react";`,
         `import * as viewModule from ${JSON.stringify(view.entryPath)};`,

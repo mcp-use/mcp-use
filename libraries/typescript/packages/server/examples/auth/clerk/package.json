@@ -19,7 +19,6 @@
   },
   "devDependencies": {
     "@types/node": "^24.13.2",
-    "typescript": "7.0.1-rc",
-    "vite": "^8.0.16"
+    "typescript": "7.0.1-rc"
   }
 }

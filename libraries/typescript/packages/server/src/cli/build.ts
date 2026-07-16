@@ -18,6 +18,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { build } from "vite";
 
@@ -30,6 +31,7 @@ import {
   virtualViewId,
   type DiscoveredView,
 } from "./views.js";
+import { resolveTailwindCss, resolveUserViteConfig } from "./vite-config.js";
 import { resolveWorkspacePaths, type BuildManifest } from "./workspace.js";
 import type { ViewsManifest } from "../views/types.js";
 
@@ -101,16 +103,22 @@ async function buildInlineView(
     cwd: string;
     cacheDir: string;
     viewsOutDir: string;
+    userViteConfig: string | false;
   }
 ): Promise<ViewsManifest[string]> {
   const viewOutDir = join(options.viewsOutDir, view.name);
   const clientResult = await build({
     root: options.cwd,
-    configFile: false,
+    configFile: options.userViteConfig,
     envFile: false,
     logLevel: "warn",
     cacheDir: options.cacheDir,
-    plugins: [react(), mcpUseViewsPlugin({ getViews: () => [view] })],
+    resolve: { alias: { tailwindcss: resolveTailwindCss() } },
+    plugins: [
+      tailwindcss(),
+      react(),
+      mcpUseViewsPlugin({ getViews: () => [view] }),
+    ],
     build: {
       outDir: viewOutDir,
       emptyOutDir: true,
@@ -209,6 +217,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
   const entry = discoverEntry(options.cwd, options.entry);
   const paths = resolveWorkspacePaths(options.cwd);
   const views = discoverViews(options.cwd);
+  const userViteConfig = resolveUserViteConfig(options.cwd);
 
   if (views.length === 0) {
     await build({
@@ -269,6 +278,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
       cwd: options.cwd,
       cacheDir: paths.cache,
       viewsOutDir,
+      userViteConfig,
     });
   }
 

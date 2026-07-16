@@ -8,7 +8,7 @@ export default function ProductSearchResult({
   items: { id: string; name: string }[];
 }) {
   return (
-    <div data-testid="results">
+    <div className="grid gap-2" data-testid="results">
       <img src={badgeUrl} alt="" data-testid="badge" />
       <p>{query}</p>
       <ul>

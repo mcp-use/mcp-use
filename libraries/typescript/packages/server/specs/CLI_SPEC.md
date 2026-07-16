@@ -193,7 +193,7 @@ The bin contains only top-level argument classification and error presentation. 
 
 `dist/index.js`, `dist/react/index.js`, `dist/bin.js`, and the `start` chunk have no static import path to Vite. Vite imports live only in the command chunks that use them; `dev` and `build` are separate so loading one does not evaluate the other. Structural build-output tests enforce these boundaries rather than relying on source naming.
 
-`mcp-use` owns the Vite configuration for both server and views builds. v2 alpha does not discover or load `vite.config.*`; aliases, plugins, build overrides, and environment settings from a user Vite config have no effect. The framework injects its own React plugin when views are present.
+`mcp-use` owns the server build configuration. When views are present, it loads the project's optional `vite.config.*` for the views client environment only, then injects the framework's built-in Tailwind, React, and views plugins. Every virtual view entry imports the framework's virtual Tailwind stylesheet, so utility classes work without a project CSS import, dependency, or config. A project config is only for additional client plugins and aliases and cannot alter the server build.
 
 Vite is a **regular dependency** of `mcp-use`:
 

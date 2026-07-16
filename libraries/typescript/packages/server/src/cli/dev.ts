@@ -23,6 +23,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync } from "node:fs";
 import { networkInterfaces } from "node:os";
 import { join } from "node:path";
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { createServer, createServerModuleRunner } from "vite";
 import { getRequestListener } from "@hono/node-server";
@@ -38,6 +39,7 @@ import {
 import { resolvePort as resolvePreferredPort } from "../bin/args.js";
 import { discoverEntry } from "./entry.js";
 import { resolvePort } from "./port.js";
+import { resolveTailwindCss, resolveUserViteConfig } from "./vite-config.js";
 import { createDevApiHandler } from "./dev-api.js";
 import { createTunnelManager } from "./tunnel.js";
 import { resolveWorkspacePaths } from "./workspace.js";
@@ -328,6 +330,7 @@ export async function runDev(options: DevOptions): Promise<void> {
   // stays live for request routing and re-priming, but a project that starts
   // with zero views needs a dev-server restart to pick up its first view.
   const viewsAtStartup = currentViews.length > 0;
+  const userViteConfig = resolveUserViteConfig(options.cwd);
 
   // The bind address is not always a browsable address: `0.0.0.0`/`::`
   // accept connections on every interface but are not valid request hosts
@@ -342,12 +345,14 @@ export async function runDev(options: DevOptions): Promise<void> {
 
   const vite = await createServer({
     root: options.cwd,
-    configFile: false,
+    configFile: viewsAtStartup ? userViteConfig : false,
     envFile: false,
     logLevel: "warn",
     cacheDir: paths.cache,
+    resolve: { alias: { tailwindcss: resolveTailwindCss() } },
     plugins: viewsAtStartup
       ? [
+          tailwindcss(),
           mcpUseViewsPlugin({
             getViews: () => currentViews,
             dev: { reactRefresh: true },

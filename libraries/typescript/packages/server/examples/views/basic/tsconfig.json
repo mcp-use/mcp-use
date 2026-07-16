@@ -17,5 +17,5 @@
     "noEmit": true,
     "resolveJsonModule": true
   },
-  "include": ["src/**/*", "resources/**/*", "vite-env.d.ts"]
+  "include": ["src/**/*", "resources/**/*"]
 }
