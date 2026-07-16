@@ -4,13 +4,12 @@ Sibling examples for MCP Apps views with `@mcp-use/server`:
 
 - [`basic/`](./basic/) — fruit store: default `viewConfig`, `ThemeProvider` /
   `ViewControls`, typed hooks, `useCallTool` error narrowing, `useViewTool`
-- [`story-writer/`](./story-writer/) — streaming tool input into a live view
-  (default `viewConfig`, error-status handling)
+- [`story-writer/`](./story-writer/) — progressive pending tool input into a
+  live view (default `viewConfig`, terminal result latch)
 - [`excalidraw/`](./excalidraw/) — port of the original
   [`excalidraw/excalidraw-mcp`](https://github.com/excalidraw/excalidraw-mcp)
-  app with `viewConfig.autoResize` / `displayModes`, diagram streaming,
-  fullscreen editing, and checkpoints
+  app with `viewConfig.autoResize` / `displayModes`, safe partial parsing until
+  the structured result latch, fullscreen editing, and checkpoints
 - [`view-tool-debugger/`](./view-tool-debugger/) — deliberately verbose
-  `useViewTool` diagnostic view with raw bridge snapshots, live registration
-  controls, latest-closure state tests, success/error/throw paths, and an event
-  log
+  `useViewTool` diagnostic view with schema-backed and schema-less commands,
+  live registration controls, latest-closure tests, and an event log

@@ -8,7 +8,6 @@ import type { CallToolResult, ContentBlock } from "@modelcontextprotocol/server"
 
 import type { DisplayMode } from "../types/host-types.js";
 import {
-  InvalidToolResultError,
   ToolError,
   type ToolContextError,
 } from "../types/result-types.js";
@@ -21,40 +20,30 @@ export type ViewRuntimeTransport = NonNullable<Parameters<App["connect"]>[0]>;
 type Listener = () => void;
 
 /**
- * Tool-channel snapshot: inbound tool input, result, cancel, and errors.
+ * Tool-channel snapshot for the invocation that rendered this View.
  *
- * `hasToolResult` is true only for a non-error result with `structuredContent`
- * (the `"ready"` branch). Tool errors and invalid results set `error` instead.
+ * Input notifications replace `toolInput` while the invocation is pending.
+ * The first structured result or tool error latches a terminal state; all
+ * later ambient lifecycle notifications are ignored.
  *
  * @internal
  */
 export interface ToolSnapshot {
+  /** Pending until the first structured result or tool error, then terminal. */
+  status: "pending" | "ready" | "error";
   /** Model-visible tool output from the last ready result's `structuredContent`. */
   toolOutput: unknown;
   /** Model-visible content blocks from the last tool result (ready or error). */
   content: ContentBlock[] | undefined;
   /**
-   * Whether a ready (non-error, with `structuredContent`) tool result has
-   * arrived for the current call cycle.
-   */
-  hasToolResult: boolean;
-  /**
-   * Latest tool arguments from the host — partial while streaming, complete
-   * after `ui/notifications/tool-input`. Last write wins.
+   * Latest progressive tool arguments from the host. Partial and complete
+   * notifications replace the same snapshot; last write wins.
    */
   toolInput: Record<string, unknown> | undefined;
-  /** Whether an argument stream is in progress. */
-  isStreaming: boolean;
-  /**
-   * Set when the host sends `ui/notifications/tool-cancelled`; `reason` is the
-   * optional spec-provided string.
-   */
-  cancelled: { reason?: string } | undefined;
   /** View-only result `_meta` channel. */
   meta: Record<string, unknown> | undefined;
   /**
-   * Tool or invalid-result error for the current call cycle; cleared on a new
-   * input/streaming cycle or a ready result.
+   * Tool error for the rendering invocation.
    */
   error: ToolContextError | undefined;
 }
@@ -225,12 +214,10 @@ export interface McpAppRuntime {
 const APP_VERSION = "2.0.0-alpha.0";
 
 const defaultToolSnapshot: ToolSnapshot = {
+  status: "pending",
   toolOutput: undefined,
   content: undefined,
-  hasToolResult: false,
   toolInput: undefined,
-  isStreaming: false,
-  cancelled: undefined,
   meta: undefined,
   error: undefined,
 };
@@ -442,47 +429,31 @@ export function createMcpAppRuntime(
     syncDisplayFromHost(nextHostContext);
   }
 
-  /** Clear ready/error result fields shared by new call-cycle transitions. */
-  const clearResultPatch = {
-    hasToolResult: false,
-    toolOutput: undefined,
-    content: undefined,
-    meta: undefined,
-    error: undefined,
-  } as const satisfies Partial<ToolSnapshot>;
-
   function installRuntimeEventHandlers(app: App): void {
-    // Both tool-input and tool-input-partial clear `cancelled` (a new/continuing
-    // call cycle). Result/error state is cleared on every partial (new stream =
-    // new call). On complete tool-input, result state is cleared only when a
-    // prior result or error already exists — that input belongs to a subsequent
-    // call; within a single call, tool-input always precedes tool-result so
-    // hasToolResult/error are still unset and the mid-cycle pending→ready path
-    // is unchanged.
+    // The draft notification shape has no tool name or request id. While the
+    // rendering invocation is pending, both complete and partial input replace
+    // the same progressive snapshot. Once a result is latched, later ambient
+    // lifecycle notifications must not mutate the View context.
     app.ontoolinput = (params) => {
-      if (disposed) return;
-      const clearResult =
-        toolSnapshot.hasToolResult || toolSnapshot.error !== undefined;
-      patchTool({
-        toolInput: params.arguments ?? {},
-        isStreaming: false,
-        cancelled: undefined,
-        ...(clearResult && clearResultPatch),
-      });
+      if (disposed || toolSnapshot.status !== "pending") return;
+      patchTool({ toolInput: params.arguments ?? {} });
     };
 
     app.ontoolinputpartial = (params) => {
-      if (disposed) return;
-      patchTool({
-        toolInput: params.arguments ?? {},
-        isStreaming: true,
-        cancelled: undefined,
-        ...clearResultPatch,
-      });
+      if (disposed || toolSnapshot.status !== "pending") return;
+      patchTool({ toolInput: params.arguments ?? {} });
     };
 
     app.ontoolresult = (params) => {
-      if (disposed) return;
+      if (disposed || toolSnapshot.status !== "pending") return;
+
+      // Content-only successes are valid CallToolResults from ambient server
+      // or View tools. Without correlation metadata they cannot be classified
+      // as malformed rendering results, so leave the pending context alone.
+      if (params.isError !== true && params.structuredContent === undefined) {
+        return;
+      }
+
       const content = Array.isArray(params.content)
         ? (params.content as ContentBlock[])
         : undefined;
@@ -496,58 +467,27 @@ export function createMcpAppRuntime(
       if (params.isError === true) {
         const result = params as CallToolResult & { isError: true };
         patchTool({
+          status: "error",
           error: new ToolError(result),
-          hasToolResult: false,
           toolOutput: undefined,
           content,
           meta,
-          isStreaming: false,
-          cancelled: undefined,
-        });
-        return;
-      }
-
-      if (params.structuredContent === undefined) {
-        const invalid = new InvalidToolResultError(
-          "View-bound tool returned a non-error result without structuredContent",
-          params
-        );
-        console.error(
-          "[mcp-use] View-bound tool returned a non-error result without structuredContent:",
-          params
-        );
-        patchTool({
-          error: invalid,
-          hasToolResult: false,
-          toolOutput: undefined,
-          content,
-          meta,
-          isStreaming: false,
-          cancelled: undefined,
         });
         return;
       }
 
       patchTool({
+        status: "ready",
         error: undefined,
         toolOutput: params.structuredContent,
         content,
         meta,
-        hasToolResult: true,
-        isStreaming: false,
-        cancelled: undefined,
       });
     };
 
-    app.ontoolcancelled = (params) => {
-      if (disposed) return;
-      patchTool({
-        cancelled: {
-          ...(params.reason !== undefined && { reason: params.reason }),
-        },
-        isStreaming: false,
-      });
-    };
+    // Cancellation cannot be correlated either and has no public bound-state
+    // branch. A cancelled rendering invocation therefore remains pending.
+    app.ontoolcancelled = () => {};
 
     app.onhostcontextchanged = (params) => {
       if (disposed) return;

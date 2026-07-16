@@ -707,47 +707,19 @@ export default function ExcalidrawView() {
   const { callTool: saveCheckpoint } = useCallTool("save_checkpoint");
   const { callTool: readCheckpoint } = useCallTool("read_checkpoint");
 
-  const toolInput =
-    toolCtx.toolInput !== undefined
-      ? toolCtx.toolInput
-      : null;
-  const isCancelled = toolCtx.status === "cancelled";
-  // `status === "pending"` covers two cases per `useToolContext`'s contract:
-  // nothing has arrived yet (`toolInput === undefined`), or complete input
-  // was delivered and the result is still pending (`toolInput` is the full,
-  // non-partial args). So `toolInput !== undefined` here already means
-  // "streaming is done, input is complete" — not "streaming ended early".
-  // This is the same complete-vs-partial signal the public story-writer
-  // example relies on to stop showing its streaming caret, so no different
-  // "isFinal" condition is warranted here.
-  //
-  // On `"cancelled"` / `"error"` the host will send no further tool-input
-  // notifications, so `toolInput` (partial or not) is final by definition —
-  // treat it as final too so the diagram renders whatever was captured
-  // instead of waiting forever for updates that will never arrive (see the
-  // cancelled / error banners below for the corresponding user-visible state).
-  const inputIsFinal =
-    toolCtx.status === "ready" ||
-    isCancelled ||
-    toolCtx.status === "error" ||
-    (toolCtx.status === "pending" && toolCtx.toolInput !== undefined);
+  const toolInput = toolCtx.toolInput ?? null;
+  // Partial and complete input share one pending snapshot, so the presence of
+  // input is not a completeness signal. Keep using the safe partial parser
+  // until the rendering invocation's structured result or tool error latches.
+  const inputIsFinal = toolCtx.status === "ready" || toolCtx.status === "error";
   const checkpointId =
     toolCtx.status === "ready" ? toolCtx.toolOutput.checkpointId : undefined;
-  const cancelledReason =
-    isCancelled && typeof toolCtx.reason === "string" && toolCtx.reason.length > 0
-      ? toolCtx.reason
-      : undefined;
   const errorBanner =
     toolCtx.status === "error"
-      ? toolCtx.error instanceof ToolError
-        ? {
-            title: "Drawing failed",
-            message: toolCtx.error.message,
-          }
-        : {
-            title: "Invalid tool result",
-            message: toolCtx.error.message,
-          }
+      ? {
+          title: "Drawing failed",
+          message: toolCtx.error.message,
+        }
       : undefined;
 
   const [elements, setElements] = useState<any[]>([]);
@@ -913,13 +885,12 @@ export default function ExcalidrawView() {
     }
   }, [displayMode, isNarrow, safeAreaInsets]);
 
-  const modelContextText = isCancelled
-    ? `Excalidraw diagram drawing was cancelled${cancelledReason ? `: ${cancelledReason}` : "."} Showing whatever elements were drawn before cancellation.`
-    : errorBanner !== undefined
+  const modelContextText =
+    errorBanner !== undefined
       ? `Excalidraw diagram failed: ${errorBanner.message}`
       : toolCtx.status === "ready"
         ? `Excalidraw diagram ready (checkpoint: ${toolCtx.toolOutput.checkpointId}). Display mode: ${displayMode}.`
-        : toolCtx.status === "streaming"
+        : toolInput !== null
           ? "Excalidraw diagram is streaming into the view."
           : "Excalidraw diagram view is waiting for elements.";
 
@@ -933,18 +904,10 @@ export default function ExcalidrawView() {
       }
     >
       <ModelContext content={modelContextText} />
-      {isCancelled && displayMode === "inline" && (
-        <div className="cancelled-banner" role="status">
-          <p className="cancelled-banner-title">Drawing cancelled</p>
-          {cancelledReason ? (
-            <p className="cancelled-banner-reason">{cancelledReason}</p>
-          ) : null}
-        </div>
-      )}
       {errorBanner !== undefined && displayMode === "inline" && (
-        <div className="cancelled-banner" role="alert">
-          <p className="cancelled-banner-title">{errorBanner.title}</p>
-          <p className="cancelled-banner-reason">{errorBanner.message}</p>
+        <div className="error-banner" role="alert">
+          <p className="error-banner-title">{errorBanner.title}</p>
+          <p className="error-banner-reason">{errorBanner.message}</p>
         </div>
       )}
       {displayMode === "inline" && (

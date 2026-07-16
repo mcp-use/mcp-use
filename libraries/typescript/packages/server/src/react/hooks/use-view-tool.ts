@@ -117,8 +117,14 @@ export function useViewTool<
       config.annotations = def.annotations;
     }
 
-    const callback = async (args: unknown) =>
-      handlerRef.current(args as TInput);
+    // ext-apps fixes callback arity at registration: schema-backed tools call
+    // `(parsedArgs, extra)`, while schema-less tools call `(extra)`. Adapt the
+    // latter so the public handler receives an empty input object rather than
+    // RequestHandlerExtra. Validation remains entirely owned by ext-apps.
+    const callback =
+      inputSchema !== undefined
+        ? async (args: unknown) => handlerRef.current(args as TInput)
+        : async (_extra: unknown) => handlerRef.current({} as TInput);
 
     let registration: RegisteredViewTool;
     try {

@@ -146,26 +146,13 @@ server.tool({
 
 Use a separate view resource when another tool needs a rendered result. App-only helper tools remain viewless and are called from the view through `useCallTool`.
 
-### Distinguish tool errors from invalid results
+### Latch the rendering invocation
 
 A valid MCP tool error may set `isError: true` without returning `structuredContent`. This must not become a typed `"ready"` result.
 
-A non-error result from a schema-backed tool must contain `structuredContent`. Missing content is a protocol or framework contract violation.
+A lifecycle result notification contains no tool name or request id. A content-only success may therefore belong to a later schema-less server or View tool and cannot be classified as an invalid rendering result. Ignore it.
 
-`useToolContext` will expose:
-
-```ts
-type ToolContextError =
-  | {
-      kind: "tool";
-      result: CallToolResult & { isError: true };
-    }
-  | {
-      kind: "invalid-result";
-      message: string;
-      result: CallToolResult;
-    };
-```
+While pending, partial and complete inputs replace one progressive snapshot. The first structured success or tool error is assumed to belong to the rendering invocation and is latched permanently. Cancellation leaves the context pending.
 
 The error branch has this shape:
 
@@ -176,18 +163,19 @@ interface ErrorToolContext<Name extends keyof RegisteredTools> {
   toolOutput: undefined;
   content: ContentBlock[] | undefined;
   meta: Record<string, unknown> | undefined;
-  reason?: undefined;
-  error: ToolContextError;
+  error: ToolError;
 }
 ```
+
+`PendingToolContext.toolInput` is `DeepPartial<Input> | undefined`; complete
+and partial notifications replace the same last-write-wins snapshot without a
+separate streaming state.
 
 The full lifecycle becomes:
 
 ```ts
 type ToolContextHandle<Name extends keyof RegisteredTools> =
   | PendingToolContext<Name>
-  | StreamingToolContext<Name>
-  | CancelledToolContext<Name>
   | ReadyToolContext<Name>
   | ErrorToolContext<Name>;
 ```
@@ -268,20 +256,8 @@ function AspectRatioContent() {
 export default function ProductSearchView() {
   const view = useToolContext<"search-products">();
 
-  if (view.status === "streaming") {
-    return <SearchProgress query={view.toolInput?.query} />;
-  }
-
-  if (view.status === "cancelled") {
-    return <Cancelled reason={view.reason} />;
-  }
-
   if (view.status === "error") {
-    if (view.error.kind === "tool") {
-      return <ToolError content={view.content} />;
-    }
-
-    return <InvalidResult message={view.error.message} />;
+    return <ToolError message={view.error.message} />;
   }
 
   if (view.status === "pending") {
@@ -947,10 +923,10 @@ Before calling:
 
 After receiving a result:
 
-- Resolve valid `isError: true` results into `data`.
-- Resolve non-error results with structured content into typed `data`.
-- Throw `InvalidToolResultError` for non-error results without structured content.
-- Let only the latest call update hook state.
+- Reject `isError: true` results with `ToolError`.
+- Resolve every non-error result, including content-only schema-less results.
+- Preserve previous successful data across pending or failed calls.
+- Let only the latest direct call update hook state; ambient lifecycle delivery is handled separately by the terminal View-context latch.
 
 ## Phase 9: Centralize capability checks
 

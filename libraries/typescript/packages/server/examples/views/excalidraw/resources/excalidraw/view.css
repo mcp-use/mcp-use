@@ -103,8 +103,8 @@ body {
   max-height: 100%;
 }
 
-/* Cancelled-drawing banner */
-.cancelled-banner {
+/* Terminal tool-error banner */
+.error-banner {
   position: absolute;
   top: 8px;
   left: 8px;
@@ -117,14 +117,14 @@ body {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
-.cancelled-banner-title {
+.error-banner-title {
   margin: 0;
   font-size: 0.8125rem;
   font-weight: 600;
   color: var(--text-primary-color, #1a1a1a);
 }
 
-.cancelled-banner-reason {
+.error-banner-reason {
   margin: 2px 0 0;
   font-size: 0.75rem;
   color: var(--color-gray-60, #666);

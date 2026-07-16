@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import {
   ThemeProvider,
-  ToolError,
   ViewControls,
   useHostContext,
   useToolContext,
@@ -54,6 +53,7 @@ const debugViewToolOutputSchema = z.object({
 });
 
 const TOOL_NAME = "debug-view-state";
+const RESET_TOOL_NAME = "reset-debug-state";
 const DEFAULT_TITLE = "Debug the mounted view state";
 const DEFAULT_DESCRIPTION =
   "Inspect or mutate the live React state in the visible useViewTool debugger. Use inspect first; requestId is useful for correlating the host call with the on-screen event log.";
@@ -261,6 +261,37 @@ function DebugSession({ initialCounter }: { initialCounter: number }) {
     }
   );
 
+  useViewTool(
+    {
+      name: RESET_TOOL_NAME,
+      title: "Reset the mounted debugger state",
+      description:
+        "Schema-less command that resets local React state and returns content only.",
+    },
+    async (args) => {
+      callSequenceRef.current += 1;
+      const callId = callSequenceRef.current;
+      setCounter(initialCounter);
+      setNote("Change me locally or through the view tool.");
+      const result = {
+        content: [
+          {
+            type: "text" as const,
+            text: `Reset debugger state to counter ${initialCounter}.`,
+          },
+        ],
+      };
+      setLastResult(result);
+      appendEvent("view-tool/schema-less-reset", {
+        callId,
+        received: args,
+        expected: {},
+        result,
+      });
+      return result;
+    }
+  );
+
   const toolContextSnapshot = {
     status: view.status,
     toolInput: view.toolInput,
@@ -273,7 +304,6 @@ function DebugSession({ initialCounter }: { initialCounter: number }) {
       view.status === "ready" || view.status === "error"
         ? view.meta
         : undefined,
-    reason: view.status === "cancelled" ? view.reason : undefined,
     error: view.status === "error" ? errorSnapshot(view.error) : undefined,
   };
   const hostSnapshot = {
@@ -315,6 +345,13 @@ function DebugSession({ initialCounter }: { initialCounter: number }) {
       stateBefore: "DebugState",
       stateAfter: "DebugState",
       renderNumber: "positive integer",
+    },
+    schemaLessCommand: {
+      name: RESET_TOOL_NAME,
+      inputSchema: undefined,
+      outputSchema: undefined,
+      handlerReceives: {},
+      result: "content-only CallToolResult",
     },
   };
   const stateSnapshot = {
@@ -368,8 +405,9 @@ function DebugSession({ initialCounter }: { initialCounter: number }) {
           <p className="eyebrow">useViewTool diagnostic</p>
           <h1>View Tool Debugger</h1>
           <p className="lede">
-            One host tool opens this view. One ephemeral view tool exposes its
-            live React state. Every boundary is shown as raw JSON.
+            One host tool opens this view. Schema-backed and schema-less View
+            tools expose its live React state. Every boundary is shown as raw
+            JSON.
           </p>
         </div>
         <div className={`status ${toolEnabled ? "enabled" : "disabled"}`}>
@@ -381,6 +419,7 @@ function DebugSession({ initialCounter }: { initialCounter: number }) {
       <section className="callout">
         <strong>Call this from the host/model while the view is open:</strong>
         <code>{`${TOOL_NAME}({ "action": "inspect", "requestId": "first-call" })`}</code>
+        <code>{`${RESET_TOOL_NAME}()`}</code>
         <p>
           The view cannot call its own view tool. That tool exists on the
           host/model side of the Apps bridge, so use the host tool UI or ask the
@@ -566,24 +605,20 @@ function DebugSession({ initialCounter }: { initialCounter: number }) {
 function ViewToolDebuggerContent() {
   const view = useToolContext<"open-view-tool-debugger">();
 
-  if (view.status === "streaming") {
-    return <LoadingState message="Receiving partial tool input…" />;
-  }
   if (view.status === "pending") {
-    return <LoadingState message="Waiting for the server tool result…" />;
-  }
-  if (view.status === "cancelled") {
     return (
       <LoadingState
-        message={`Tool call cancelled${view.reason ? `: ${view.reason}` : "."}`}
+        message={
+          view.toolInput === undefined
+            ? "Waiting for the server tool input…"
+            : "Waiting for the structured server tool result…"
+        }
       />
     );
   }
   if (view.status === "error") {
     return (
-      <LoadingState
-        message={`${view.error instanceof ToolError ? "Server tool failed" : "Invalid server tool result"}: ${view.error.message}`}
-      />
+      <LoadingState message={`Server tool failed: ${view.error.message}`} />
     );
   }
 

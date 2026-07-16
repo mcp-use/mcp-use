@@ -3,7 +3,6 @@ import { z } from "zod";
 import {
   ModelContext,
   ThemeProvider,
-  ToolError,
   ViewControls,
   useSendFollowUp,
   useToolContext,
@@ -334,31 +333,10 @@ function TicTacToeContent() {
   const theme = useViewTheme();
   const root = theme === "dark" ? `dark ${rootClass}` : rootClass;
 
-  if (view.status === "streaming") {
-    return <BoardSkeleton pulsing />;
-  }
-
-  if (view.status === "cancelled") {
-    return (
-      <div className={root}>
-        <p className="m-0 font-medium">Game cancelled</p>
-        {typeof view.reason === "string" && view.reason.length > 0 ? (
-          <p className="mt-2 mb-0 text-sm text-neutral-600 dark:text-neutral-400">
-            {view.reason}
-          </p>
-        ) : null}
-      </div>
-    );
-  }
-
   if (view.status === "error") {
     return (
       <div className={root} role="alert">
-        <p className="m-0 font-medium">
-          {view.error instanceof ToolError
-            ? "Failed to start game"
-            : "Invalid tool result"}
-        </p>
+        <p className="m-0 font-medium">Failed to start game</p>
         <p className="mt-2 mb-0 text-sm text-neutral-600 dark:text-neutral-400">
           {view.error.message}
         </p>
@@ -367,7 +345,7 @@ function TicTacToeContent() {
   }
 
   if (view.status === "pending") {
-    return <BoardSkeleton />;
+    return <BoardSkeleton pulsing={view.toolInput !== undefined} />;
   }
 
   // Mount game only when ready so `useState(firstMove)` seeds once.

@@ -6,8 +6,8 @@ host and the bridge. The entire view is instrumentation.
 
 ## What is visible
 
-- The complete server-tool → view context: status, input, structured output,
-  content, view-only `_meta`, cancellation, and errors.
+- The latched server-tool → view context: progressive pending input, structured
+  output, content, view-only `_meta`, and tool errors.
 - Resolved host state: bridge availability, host identity and capabilities,
   raw host context, theme, locale, display mode, dimensions, and safe areas.
 - The requested view-tool definition, including live title, description,
@@ -24,10 +24,13 @@ host and the bridge. The entire view is instrumentation.
 | --- | --- | --- | --- |
 | `open-view-tool-debugger` | MCP server | host/model | Opens and seeds the diagnostic view |
 | `debug-view-state` | `useViewTool` in the mounted view | host/model | Inspects or mutates the live React closure |
+| `reset-debug-state` | `useViewTool` in the mounted view | host/model | Schema-less local-state command returning content only |
 
-`debug-view-state` deliberately does **not** appear in the server's tool list
-and cannot be called with `useCallTool`. It exists only while the view component
-is mounted and must be invoked by a host that supports MCP Apps view tools.
+The two View tools deliberately do **not** appear in the server's tool list and
+cannot be called with `useCallTool`. `debug-view-state` demonstrates parsed
+schema input and validated structured output. `reset-debug-state` declares no
+schemas: its handler receives `{}`, mutates local state, and returns a
+content-only `CallToolResult`.
 
 ## Suggested debug sequence
 
@@ -47,6 +50,11 @@ is mounted and must be invoked by a host that supports MCP Apps view tools.
 5. Edit the title or description to exercise in-place metadata updates.
 6. Disable the tool to exercise list/call behavior without unmounting it.
 7. Try `return-error` and `throw-error` to compare both failure paths.
+8. Call `reset-debug-state` and inspect the log entry showing `received: {}`.
+
+The initial `open-view-tool-debugger` structured result is latched by
+`useToolContext`. Later View-tool lifecycle notifications are ambient and
+cannot replace that initial context.
 
 ## Run locally
 

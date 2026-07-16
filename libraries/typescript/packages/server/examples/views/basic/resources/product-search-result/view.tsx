@@ -4,7 +4,6 @@ import {
   Image,
   ModelContext,
   ThemeProvider,
-  ToolError,
   ViewControls,
   useCallTool,
   useDisplayMode,
@@ -175,38 +174,10 @@ function ProductSearchResultContent() {
 
   const root = theme === "dark" ? `dark ${rootClass}` : rootClass;
 
-  if (view.status === "streaming") {
-    return (
-      <SearchSkeleton
-        {...(view.toolInput?.query !== undefined && {
-          query: view.toolInput.query,
-        })}
-        pulsing
-      />
-    );
-  }
-
-  if (view.status === "cancelled") {
-    return (
-      <div className={root}>
-        <p className="m-0 font-medium">Search cancelled</p>
-        {typeof view.reason === "string" && view.reason.length > 0 ? (
-          <p className="mt-2 mb-0 text-sm text-neutral-600 dark:text-neutral-400">
-            {view.reason}
-          </p>
-        ) : null}
-      </div>
-    );
-  }
-
   if (view.status === "error") {
     return (
       <div className={root} role="alert">
-        <p className="m-0 font-medium">
-          {view.error instanceof ToolError
-            ? "Search failed"
-            : "Invalid tool result"}
-        </p>
+        <p className="m-0 font-medium">Search failed</p>
         <p className="mt-2 mb-0 text-sm text-neutral-600 dark:text-neutral-400">
           {view.error.message}
         </p>
@@ -220,6 +191,7 @@ function ProductSearchResultContent() {
         {...(view.toolInput?.query !== undefined && {
           query: view.toolInput.query,
         })}
+        pulsing={view.toolInput !== undefined}
       />
     );
   }

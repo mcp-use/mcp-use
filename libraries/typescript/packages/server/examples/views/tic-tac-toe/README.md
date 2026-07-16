@@ -20,6 +20,10 @@ the model plays O by calling `place-mark` while the view is open.
   `start-game`.
 - **Zero-codegen typing** via `src/tools.d.ts` and the exported `startGame`
   tool ref.
+- **Latched initial context** — `useToolContext<"start-game">()` remains
+  pending through progressive input, then permanently latches the first
+  structured result or tool error. Later `place-mark` lifecycle notifications
+  cannot replace the game bootstrap data.
 - **Tailwind CSS v4** — `vite.config.ts` (`@tailwindcss/vite`) and
   `@import "tailwindcss"` in `view.css`.
 

@@ -9,7 +9,6 @@ import {
   bootstrapView,
   disposeView,
   Image,
-  InvalidToolResultError,
   ModelContext,
   modelContext,
   ToolError,
@@ -119,7 +118,7 @@ async function startHost(
 }
 
 describe("react bridge runtime", () => {
-  it("mounts the default export immediately and transitions useToolContext pending → streaming → ready", async () => {
+  it("mounts immediately, exposes progressive pending input, then latches ready", async () => {
     resetRuntime();
     const { bridge, init } = await startHost();
 
@@ -134,7 +133,9 @@ describe("react bridge runtime", () => {
           <div data-testid="view">
             {query}:{items.join(",")}
             <span data-testid="content">{handle.content?.[0]?.type ?? ""}</span>
-            <span data-testid="meta">{handle.meta ? JSON.stringify(handle.meta) : ""}</span>
+            <span data-testid="meta">
+              {handle.meta ? JSON.stringify(handle.meta) : ""}
+            </span>
           </div>
         );
       }
@@ -155,7 +156,7 @@ describe("react bridge runtime", () => {
 
     await bridge.sendToolInputPartial({ arguments: { query: "ap" } });
     await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe("streaming-ap");
+      expect(screen.getByTestId("lifecycle").textContent).toBe("pending-ap");
     });
 
     await bridge.sendToolInput({ arguments: { query: "apple" } });
@@ -173,7 +174,7 @@ describe("react bridge runtime", () => {
     expect(screen.queryByTestId("lifecycle")).toBeNull();
   });
 
-  it("streams toolInput through partial → complete → ready with status streaming → pending → ready", async () => {
+  it("replaces toolInput across partial and complete notifications while pending", async () => {
     resetRuntime();
     const { bridge, init } = await startHost();
 
@@ -196,12 +197,12 @@ describe("react bridge runtime", () => {
 
     await bridge.sendToolInputPartial({ arguments: { query: "a" } });
     await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe("streaming|a");
+      expect(screen.getByTestId("lifecycle").textContent).toBe("pending|a");
     });
 
     await bridge.sendToolInputPartial({ arguments: { query: "ap" } });
     await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe("streaming|ap");
+      expect(screen.getByTestId("lifecycle").textContent).toBe("pending|ap");
     });
 
     await bridge.sendToolInput({ arguments: { query: "apple" } });
@@ -219,7 +220,7 @@ describe("react bridge runtime", () => {
     });
   });
 
-  it("surfaces cancelled status with reason and last partial toolInput", async () => {
+  it("leaves the progressive pending snapshot unchanged on cancellation", async () => {
     resetRuntime();
     const { bridge, init } = await startHost();
 
@@ -228,8 +229,7 @@ describe("react bridge runtime", () => {
       return (
         <div data-testid="lifecycle">
           {handle.status}|
-          {(handle.toolInput as { query?: string } | undefined)?.query ?? ""}|
-          {handle.status === "cancelled" ? (handle.reason ?? "none") : ""}
+          {(handle.toolInput as { query?: string } | undefined)?.query ?? ""}
         </div>
       );
     }
@@ -239,14 +239,12 @@ describe("react bridge runtime", () => {
 
     await bridge.sendToolInputPartial({ arguments: { query: "ap" } });
     await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe("streaming|ap|");
+      expect(screen.getByTestId("lifecycle").textContent).toBe("pending|ap");
     });
 
     await bridge.sendToolCancelled({ reason: "user action" });
     await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe(
-        "cancelled|ap|user action"
-      );
+      expect(screen.getByTestId("lifecycle").textContent).toBe("pending|ap");
     });
   });
 
@@ -366,27 +364,19 @@ describe("react bridge runtime", () => {
     ).toBeUndefined();
   });
 
-  it("surfaces missing structuredContent as InvalidToolResultError", async () => {
+  it("ignores content-only successes while pending and can later latch structured output", async () => {
     resetRuntime();
     const { bridge, init } = await startHost();
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     function View() {
       const handle = useToolContext();
-      if (handle.status === "error") {
-        return (
-          <div data-testid="lifecycle">
-            error|
-            {handle.error instanceof InvalidToolResultError
-              ? "invalid-result"
-              : "other"}|
-            {handle.error instanceof InvalidToolResultError
-              ? handle.error.message
-              : ""}|
-            {handle.toolOutput === undefined ? "no-out" : "has-out"}
-          </div>
-        );
-      }
-      return <div data-testid="lifecycle">{handle.status}</div>;
+      return (
+        <div data-testid="lifecycle">
+          {handle.status}|
+          {handle.status === "ready" ? JSON.stringify(handle.toolOutput) : ""}
+        </div>
+      );
     }
 
     bootstrapView({ default: View as ComponentType });
@@ -398,17 +388,27 @@ describe("react bridge runtime", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toContain(
-        "error|invalid-result|"
-      );
-      expect(screen.getByTestId("lifecycle").textContent).toContain(
-        "without structuredContent"
-      );
-      expect(screen.getByTestId("lifecycle").textContent).toContain("|no-out");
+      expect(screen.getByTestId("lifecycle").textContent).toBe("pending|");
     });
+    expect(
+      errorSpy.mock.calls.some((args) =>
+        String(args[0]).includes("non-error result without structuredContent")
+      )
+    ).toBe(false);
+
+    await bridge.sendToolResult({
+      content: [{ type: "text", text: "ready" }],
+      structuredContent: { ok: true },
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("lifecycle").textContent).toBe(
+        'ready|{"ok":true}'
+      );
+    });
+    errorSpy.mockRestore();
   });
 
-  it("clears error state on a subsequent tool-input cycle", async () => {
+  it("latches a tool error and ignores subsequent input", async () => {
     resetRuntime();
     const { bridge, init } = await startHost();
 
@@ -430,38 +430,11 @@ describe("react bridge runtime", () => {
 
     await bridge.sendToolInput({ arguments: { query: "retry" } });
     await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe("pending");
+      expect(screen.getByTestId("lifecycle").textContent).toBe("error");
     });
   });
 
-  it("surfaces cancelled status with undefined reason when host omits it", async () => {
-    resetRuntime();
-    const { bridge, init } = await startHost();
-
-    function View() {
-      const handle = useToolContext();
-      return (
-        <div data-testid="lifecycle">
-          {handle.status}|
-          {handle.status === "cancelled"
-            ? handle.reason === undefined
-              ? "undef"
-              : handle.reason
-            : ""}
-        </div>
-      );
-    }
-
-    bootstrapView({ default: View as ComponentType });
-    await init;
-
-    await bridge.sendToolCancelled({});
-    await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe("cancelled|undef");
-    });
-  });
-
-  it("post-cancel retry: new tool-input-partial returns to streaming then ready", async () => {
+  it("continues accepting progressive input after cancellation until a result latches", async () => {
     resetRuntime();
     const { bridge, init } = await startHost();
 
@@ -484,17 +457,17 @@ describe("react bridge runtime", () => {
 
     await bridge.sendToolInputPartial({ arguments: { query: "ap" } });
     await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe("streaming|ap");
+      expect(screen.getByTestId("lifecycle").textContent).toBe("pending|ap");
     });
 
     await bridge.sendToolCancelled({ reason: "user action" });
     await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe("cancelled|ap");
+      expect(screen.getByTestId("lifecycle").textContent).toBe("pending|ap");
     });
 
     await bridge.sendToolInputPartial({ arguments: { query: "or" } });
     await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe("streaming|or");
+      expect(screen.getByTestId("lifecycle").textContent).toBe("pending|or");
     });
 
     await bridge.sendToolInput({ arguments: { query: "orange" } });
@@ -508,7 +481,7 @@ describe("react bridge runtime", () => {
     });
   });
 
-  it("post-ready second call: tool-input clears ready, cancel surfaces, then new result", async () => {
+  it("keeps the first ready result latched across all later lifecycle notifications", async () => {
     resetRuntime();
     const { bridge, init } = await startHost();
 
@@ -518,13 +491,7 @@ describe("react bridge runtime", () => {
         const { query } = handle.toolOutput as { query: string };
         return <div data-testid="lifecycle">ready|{query}</div>;
       }
-      return (
-        <div data-testid="lifecycle">
-          {handle.status}|
-          {(handle.toolInput as { query?: string } | undefined)?.query ?? ""}|
-          {handle.status === "cancelled" ? (handle.reason ?? "") : ""}
-        </div>
-      );
+      return <div data-testid="lifecycle">{handle.status}</div>;
     }
 
     bootstrapView({ default: View as ComponentType });
@@ -539,32 +506,24 @@ describe("react bridge runtime", () => {
       expect(screen.getByTestId("lifecycle").textContent).toBe("ready|apple");
     });
 
-    // Second call without partials: tool-input after a delivered result clears
-    // result state → pending.
+    // These notifications can belong to useCallTool/useViewTool executions.
+    // None may overwrite the invocation that rendered the View.
     await bridge.sendToolInput({ arguments: { query: "banana" } });
-    await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe("pending|banana|");
-    });
-
     await bridge.sendToolCancelled({ reason: "retry aborted" });
-    await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe(
-        "cancelled|banana|retry aborted"
-      );
-    });
-
     await bridge.sendToolInputPartial({ arguments: { query: "ch" } });
-    await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe("streaming|ch|");
+    await bridge.sendToolResult({
+      content: [{ type: "text", text: "content only" }],
     });
-
-    await bridge.sendToolInput({ arguments: { query: "cherry" } });
     await bridge.sendToolResult({
       content: [{ type: "text", text: "ok" }],
       structuredContent: { query: "cherry", items: ["c"] },
     });
+    await bridge.sendToolResult({
+      content: [{ type: "text", text: "late failure" }],
+      isError: true,
+    });
     await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe("ready|cherry");
+      expect(screen.getByTestId("lifecycle").textContent).toBe("ready|apple");
     });
   });
 
@@ -625,11 +584,11 @@ describe("react bridge runtime", () => {
 
     await bridge.sendToolInputPartial({ arguments: { query: "a" } });
     await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe("streaming");
+      expect(screen.getByTestId("lifecycle").textContent).toBe("pending");
     });
     await bridge.sendToolInputPartial({ arguments: { query: "ap" } });
     await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe("streaming");
+      expect(screen.getByTestId("lifecycle").textContent).toBe("pending");
     });
 
     expect(hostRenders).toBe(hostRendersAfterConnect);
@@ -890,8 +849,7 @@ describe("react bridge runtime", () => {
 
       return (
         <div data-testid="stable">
-          {theme}|{displayMode}|
-          {String(refs.openExternal === openExternal)}|
+          {theme}|{displayMode}|{String(refs.openExternal === openExternal)}|
           {String(refs.sendFollowUp === sendFollowUp)}|
           {String(refs.sendSizeChanged === sendSizeChanged)}|
           {String(refs.requestDisplayMode === requestDisplayMode)}
@@ -1046,7 +1004,9 @@ describe("react bridge runtime", () => {
     // A bare content-only success (schema-less tool) resolves into data.
     screen.getByText("bare").click();
     await waitFor(() => {
-      expect(screen.getByTestId("data").textContent).toBe("content:bare content");
+      expect(screen.getByTestId("data").textContent).toBe(
+        "content:bare content"
+      );
       expect(screen.getByTestId("error").textContent).toBe("");
       expect(screen.getByTestId("pending").textContent).toBe("false");
     });
@@ -1056,6 +1016,20 @@ describe("react bridge runtime", () => {
       expect(screen.getByTestId("data").textContent).toBe('{"value":"42"}');
       expect(screen.getByTestId("error").textContent).toBe("");
     });
+
+    // A compliant host also forwards lifecycle notifications for the later
+    // useCallTool execution. The rendering invocation is already latched.
+    await bridge.sendToolInput({ arguments: { id: "bare" } });
+    await bridge.sendToolResult({
+      content: [{ type: "text", text: "bare content" }],
+    });
+    await bridge.sendToolResult({
+      content: [{ type: "text", text: "unrelated structured result" }],
+      structuredContent: { value: "ambient" },
+      _meta: { secret: false },
+    });
+    expect(screen.getByTestId("meta").textContent).toContain("secret");
+    expect(screen.getByTestId("meta").textContent).toContain("true");
   });
 
   it("useHostContext reflects host-context notifications", async () => {
@@ -1101,9 +1075,7 @@ describe("react bridge runtime", () => {
       return (
         <div>
           <span data-testid="mode">{displayMode}</span>
-          <span data-testid="available">
-            {availableDisplayModes.join(",")}
-          </span>
+          <span data-testid="available">{availableDisplayModes.join(",")}</span>
           <button
             type="button"
             onClick={() => {
@@ -1194,9 +1166,7 @@ describe("react bridge runtime", () => {
 
     let followUpPrompt: string | undefined;
     let openedUrl: string | undefined;
-    let openExternalRef:
-      | ((args: { url: string }) => Promise<void>)
-      | undefined;
+    let openExternalRef: ((args: { url: string }) => Promise<void>) | undefined;
 
     bridge.onmessage = async ({ content }) => {
       const block = content?.[0];
@@ -1434,6 +1404,7 @@ describe("react bridge runtime", () => {
     const { bridge, init } = await startHost();
 
     function View() {
+      const initialContext = useToolContext();
       const [selected, setSelected] = useState<string | null>(null);
       useViewTool(
         {
@@ -1458,7 +1429,16 @@ describe("react bridge runtime", () => {
           content: [{ type: "text", text: `echo:${id}` }],
         })
       );
-      return <div data-testid="selected">{selected ?? ""}</div>;
+      return (
+        <div>
+          <div data-testid="selected">{selected ?? ""}</div>
+          <div data-testid="initial-context">
+            {initialContext.status === "ready"
+              ? JSON.stringify(initialContext.toolOutput)
+              : initialContext.status}
+          </div>
+        </div>
+      );
     }
 
     bootstrapView({ default: View as ComponentType });
@@ -1467,7 +1447,13 @@ describe("react bridge runtime", () => {
     await bridge.sendToolInput({ arguments: {} });
     await bridge.sendToolResult({
       content: [],
-      structuredContent: {},
+      structuredContent: { source: "rendering-invocation" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("initial-context").textContent).toBe(
+        '{"source":"rendering-invocation"}'
+      );
     });
 
     await waitFor(async () => {
@@ -1491,6 +1477,82 @@ describe("react bridge runtime", () => {
       expect(screen.getByTestId("selected").textContent).toBe("x");
       expect(callCount).toBe(1);
     });
+
+    await expect(
+      bridge.callTool({ name: "pick-item", arguments: { id: 123 } })
+    ).rejects.toThrow();
+    expect(callCount).toBe(1);
+
+    // Mirror the host lifecycle notification for the content-only View-tool
+    // response. It is valid ambient activity and cannot replace the latched
+    // initial context.
+    await bridge.sendToolInput({ arguments: { id: "x" } });
+    await bridge.sendToolResult(pickResult);
+    expect(screen.getByTestId("initial-context").textContent).toBe(
+      '{"source":"rendering-invocation"}'
+    );
+  });
+
+  it("useViewTool passes parsed schema input and normalizes schema-less input to an empty object", async () => {
+    resetRuntime();
+    const { bridge, init } = await startHost();
+
+    let parsedArgs: unknown;
+    let schemaLessArgs: unknown;
+    let schemaCalls = 0;
+    let schemaLessCalls = 0;
+
+    function View() {
+      useViewTool(
+        {
+          name: "parsed-command",
+          inputSchema: z.object({
+            value: z.string().transform((value) => value.toUpperCase()),
+          }),
+        },
+        async (args) => {
+          schemaCalls += 1;
+          parsedArgs = args;
+          return { content: [{ type: "text", text: args.value }] };
+        }
+      );
+      useViewTool({ name: "reset-command" }, async (args) => {
+        schemaLessCalls += 1;
+        schemaLessArgs = args;
+        return { content: [{ type: "text", text: "reset" }] };
+      });
+      return <div data-testid="registered">ready</div>;
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+    await waitFor(() => {
+      expect(screen.getByTestId("registered").textContent).toBe("ready");
+    });
+
+    const parsedResult = await bridge.callTool({
+      name: "parsed-command",
+      arguments: { value: "hello" },
+    });
+    expect(parsedResult.content?.[0]).toMatchObject({ text: "HELLO" });
+    expect(parsedArgs).toEqual({ value: "HELLO" });
+    expect(schemaCalls).toBe(1);
+
+    await expect(
+      bridge.callTool({
+        name: "parsed-command",
+        arguments: { value: 42 },
+      })
+    ).rejects.toThrow();
+    expect(schemaCalls).toBe(1);
+
+    const resetResult = await bridge.callTool({
+      name: "reset-command",
+      arguments: { shouldBeIgnored: true },
+    });
+    expect(resetResult.content?.[0]).toMatchObject({ text: "reset" });
+    expect(schemaLessArgs).toEqual({});
+    expect(schemaLessCalls).toBe(1);
   });
 
   it("useViewTool with inline schema does not re-register per render and toggles enabled in place", async () => {
@@ -1538,6 +1600,9 @@ describe("react bridge runtime", () => {
       });
       expect(result.content?.[0]).toMatchObject({ text: "a:0" });
     });
+    await expect(
+      bridge.callTool({ name: "pick-item", arguments: { id: 1 } })
+    ).rejects.toThrow();
     expect(listChangedCount).toBe(1);
 
     screen.getByText("rerender").click();
@@ -2528,9 +2593,7 @@ describe("react bridge runtime", () => {
     resetRuntime();
     const [guest1, host1] = createPairedTransports();
     let startCount = 0;
-    const wrapStart = (
-      transport: (typeof guest1)
-    ): typeof guest1 => {
+    const wrapStart = (transport: typeof guest1): typeof guest1 => {
       const originalStart = transport.start.bind(transport);
       transport.start = async () => {
         startCount += 1;

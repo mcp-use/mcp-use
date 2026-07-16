@@ -50,7 +50,6 @@ export type {
   SafeAreaInsets,
 } from "./types/host-types.js";
 export {
-  InvalidToolResultError,
   ToolError,
   toolResultText,
   type CallToolResult,
