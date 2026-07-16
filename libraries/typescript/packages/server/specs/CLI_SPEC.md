@@ -9,7 +9,7 @@
 - `npm install mcp-use` is sufficient for `mcp-use dev`, `mcp-use build`, and `mcp-use start`; users do not install Vite separately.
 - `mcp-use start` and library imports never statically evaluate Vite or unrelated command code.
 - Every substantial command is a genuine dynamically imported build chunk. `dev` and `build` are separate chunks so neither evaluates the other's machinery.
-- The built-in `client` command consumes independently published `@mcp-use/client`; it does not fold the client SDK into the framework's public library boundary.
+- The built-in `client` and `screenshot` commands consume independently published `@mcp-use/client` via a runtime dynamic import; it is an optional peer dependency with a clear install hint when missing. Those commands do not fold the client SDK into the framework's public library boundary.
 - The inspector UI ships over HTTP/CDN with no npm dependency edge from `mcp-use` to `@mcp-use/inspector`.
 - Install size, evaluated modules/startup, and production artifacts have separate measurable budgets (§ Verification and budgets).
 
@@ -208,7 +208,7 @@ Vite is a **regular dependency** of `mcp-use`:
 
 Vite is framework implementation machinery: the package owns the compatible version and one install must provide the complete dev/build experience. Dependency installation and runtime evaluation are separate concerns; lazy chunks keep production startup lean even though Vite is installed. When views land, `@vitejs/plugin-react` is also a regular dependency. `react` and `react-dom` remain optional peers because applications own their singleton versions.
 
-`@mcp-use/client` is also a regular dependency at its compatible published version. It remains independently published and independently installable; its dependency edge here exists only to guarantee `mcp-use client` out of the box. Server library exports do not re-export or absorb the SDK.
+`@mcp-use/client` is an optional peer at a compatible published version (`^2.0.0-alpha.0`). It remains independently published and independently installable; `mcp-use client` and `mcp-use screenshot` dynamic-import it and print install instructions when it is absent. Server library exports do not re-export or absorb the SDK.
 
 **Hard rule:** `mcp-use` declares **no dependency of any kind** — regular, peer, or optional — on `@mcp-use/inspector`. Embedded integration is reached only over HTTP/CDN (below), never imported or resolved from `node_modules`.
 
@@ -270,7 +270,7 @@ A single long-lived process. It:
 
 1. Creates a Vite dev server (Environment API, node/SSR environment only) and loads the entry through the module runner.
 2. Grabs the default-exported `MCPServer`, wraps `server.getHandler()` behind an **atomically swappable reference**.
-3. Binds **one** `@hono/node-server` listener that delegates every request to the current handler.
+3. Binds **one** Node HTTP listener (vendored `toNodeHandler` bridge) that delegates every request to the current handler.
 
 On file change (only files in the entry's module graph count): Vite invalidates, dev re-imports the entry through the runner, and swaps the handler reference. There is no registration diffing: the next request hits the new handler, which is correct by construction under the stateless model. Every handler generation shares one process-scoped SDK `ServerEventBus`; after a successful swap, dev publishes `tools/list_changed`, `prompts/list_changed`, and `resources/list_changed`. Modern clients with an open `subscriptions/listen` stream therefore refetch the authoritative lists from the new handler. Publishing all three is deliberate invalidation, not change detection — the protocol carries no delta, and avoiding schema/function comparison keeps server reload independent of registry internals. A failed reload keeps the old handler and publishes nothing. Stateless legacy clients receive no push but remain correct on their next manual list request.
 
@@ -350,7 +350,7 @@ Budgets are measured on Linux x64 in the CI-pinned Node 24 container image; the 
 
 Installed bytes are an on-disk distribution concern; they do not count modules evaluated at runtime. Evaluation has separate tests:
 
-- The bundler metafile/static-import traversal for `dist/index.js` must reach no `dist/commands/**`, `vite`, or `@vitejs/**`.
+- The bundler metafile/static-import traversal for `dist/index.js` must reach no `dist/commands/**`, `vite`, `@vitejs/**`, `@mcp-use/client`, v1 `@modelcontextprotocol/sdk`, `express`, or Node builtins (`fs`, `path`, `stream`, `node:*`, …) via **static** `from` imports. `listen()` and view public assets may lazy-load Node modules via dynamic `import()` only (including `./node-bridge.js` for the HTTP adapter).
 - The traversal for `dist/commands/start.js` may reach the production runtime and start helpers only; reaching Vite or any other command chunk is an unconditional failure.
 - Runtime tracing must observe the same invariant for `import "mcp-use"` and `mcp-use start`.
 

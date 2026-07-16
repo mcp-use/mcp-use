@@ -1,15 +1,14 @@
-import { serve, type ServerType } from "@hono/node-server";
 import {
   OAuthError,
   OAuthErrorCode,
   type AuthInfo,
   type OAuthMetadata,
 } from "@modelcontextprotocol/server";
-import { Hono } from "hono";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { MCPServer } from "../src/index.js";
 import { oauthCustomProvider } from "../src/oauth/index.js";
+import { listenFetch } from "./helpers/listen-fetch.js";
 
 type IntrospectionPayload = Record<string, unknown>;
 
@@ -367,31 +366,27 @@ async function callTool(url: URL, token: string): Promise<Response> {
 }
 
 async function startIntrospectionServer(): Promise<IntrospectionServer> {
-  const app = new Hono();
   const receivedTokens: string[] = [];
   const state = { response: activePayload() };
-  app.post("/introspect", async (context) => {
-    const body = await context.req.parseBody();
-    const token = body["token"];
-    if (typeof token === "string") receivedTokens.push(token);
-    return context.json(state.response);
-  });
 
-  const { server, port } = await new Promise<{
-    server: ServerType;
-    port: number;
-  }>((resolve) => {
-    const server = serve(
-      { fetch: app.fetch, port: 0, hostname: "127.0.0.1" },
-      (info) => {
-        resolve({ server, port: info.port });
-      }
-    );
-  });
+  const fetch = async (request: Request): Promise<Response> => {
+    if (
+      request.method !== "POST" ||
+      new URL(request.url).pathname !== "/introspect"
+    ) {
+      return new Response("Not Found", { status: 404 });
+    }
+    const body = await request.text();
+    const token = new URLSearchParams(body).get("token");
+    if (typeof token === "string") receivedTokens.push(token);
+    return Response.json(state.response);
+  };
+
+  const started = await listenFetch(fetch);
   let closed = false;
 
   return {
-    endpoint: new URL(`http://127.0.0.1:${port}/introspect`),
+    endpoint: new URL(`${started.url}/introspect`),
     get response() {
       return state.response;
     },
@@ -402,9 +397,7 @@ async function startIntrospectionServer(): Promise<IntrospectionServer> {
     close: async () => {
       if (closed) return;
       closed = true;
-      await new Promise<void>((resolve, reject) => {
-        server.close((error) => (error ? reject(error) : resolve()));
-      });
+      await started.close();
     },
   };
 }

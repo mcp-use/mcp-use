@@ -33,7 +33,8 @@ import {
   type RequestMethod,
   type RequestTypeMap,
 } from "@modelcontextprotocol/server";
-import type { Context, MiddlewareHandler } from "hono";
+
+import { getRequestBag, type FetchMiddleware } from "./fetch-app.js";
 
 /** Verbosity of the request logger. */
 export type LogLevel = "info" | "debug" | "trace";
@@ -397,7 +398,7 @@ function formatForDump(value: unknown): string {
 const DUMP_BODY_MAX_LENGTH = 10_000;
 
 async function printTraceDump(
-  c: Context,
+  response: Response,
   requestHeaders: Record<string, string>,
   requestBody: unknown,
   readResponseBody: boolean
@@ -418,7 +419,7 @@ async function printTraceDump(
   }
 
   const responseHeaders: Record<string, string> = {};
-  c.res.headers.forEach((value, key) => {
+  response.headers.forEach((value, key) => {
     responseHeaders[key] = value;
   });
   if (Object.keys(responseHeaders).length > 0) {
@@ -428,11 +429,11 @@ async function printTraceDump(
 
   if (!readResponseBody) {
     console.log(`${yellow("Response Body:")} (streaming — not dumped)`);
-  } else if (c.res.body === null) {
+  } else if (response.body === null) {
     console.log(`${yellow("Response Body:")} (no body)`);
   } else {
     try {
-      const text = await c.res.clone().text();
+      const text = await response.clone().text();
       if (text.length === 0) {
         console.log(`${yellow("Response Body:")} (empty)`);
       } else {
@@ -480,55 +481,50 @@ function isNoisyRequest(httpMethod: string, pathname: string): boolean {
 }
 
 /**
- * Hono middleware logging every request in the compact two-line format (see
- * the module docs). Register it on the app the MCP endpoint is mounted on;
- * `MCPServer` does so automatically unless `config.logging.enabled` is
- * `false`.
+ * Fetch middleware logging every request in the compact two-line format (see
+ * the module docs). `MCPServer` registers it automatically unless
+ * `config.logging.enabled` is `false`.
  */
-export function requestLogger(options: LoggingOptions = {}): MiddlewareHandler {
+export function requestLogger(options: LoggingOptions = {}): FetchMiddleware {
   if (options.enabled === false) {
-    return (_c, next) => next();
+    return (_request, next) => next();
   }
-  return async (c, next) => {
+  return async (request, next) => {
     const level = resolveLogLevel(options.level);
     const startedAt = Date.now();
-    const httpMethod = c.req.method;
-    const pathname = new URL(c.req.url).pathname;
+    const httpMethod = request.method;
+    const pathname = new URL(request.url).pathname;
 
     if (isNoisyRequest(httpMethod, pathname)) {
-      await next();
-      return;
+      return next();
     }
 
-    const requestHeaders: Record<string, string> =
-      level === "trace" ? c.req.header() : {};
+    const requestHeaders: Record<string, string> = {};
+    if (level === "trace") {
+      request.headers.forEach((value, key) => {
+        requestHeaders[key] = value;
+      });
+    }
 
-    // Body: prefer the parsed body the JSON middleware stashed in context
-    // vars (a request body is only readable once); fall back to cloning on
-    // bare apps where that middleware is absent.
     let requestBody: unknown;
     if (httpMethod !== "GET" && httpMethod !== "HEAD") {
-      const parsedBody = (c.var as Record<string, unknown>)["parsedBody"];
+      const parsedBody = getRequestBag(request).parsedBody;
       if (parsedBody !== undefined) {
         requestBody = parsedBody;
       } else {
         try {
-          requestBody = await c.req.raw.clone().json();
+          requestBody = await request.clone().json();
         } catch {
           // Non-JSON body — the summary line logs without MCP detail.
         }
       }
     }
 
-    await next();
+    const response = await next();
 
     const durationMs = Date.now() - startedAt;
     const timestamp = new Date().toISOString().substring(11, 19);
     const mcpRequest = isJSONRPCRequest(requestBody) ? requestBody : undefined;
-
-    // Long-lived streams (subscriptions/listen keeps its SSE stream open
-    // indefinitely) must not be awaited for an outcome — reading the full
-    // body would block the log line, and the middleware chain, forever.
     const isStreamingMethod = mcpRequest?.method === "subscriptions/listen";
 
     const lines: string[] = [
@@ -536,33 +532,25 @@ export function requestLogger(options: LoggingOptions = {}): MiddlewareHandler {
         dim(timestamp),
         bold(httpMethod),
         pathname,
-        styleStatus(c.res.status),
+        styleStatus(response.status),
         dim(`in ${durationMs}ms`),
       ].join(" "),
     ];
 
     if (mcpRequest !== undefined) {
-      // Request-derived strings are sanitized: a hostile method/subject/
-      // error value must not forge log lines or emit terminal escapes.
       const method = sanitize(mcpRequest.method);
       const parts: string[] = [`  ${methodStyle(method)(method)}`];
       const detail = formatDetail(mcpRequest);
       if (detail.subject !== undefined) {
         parts.push(bold(sanitize(detail.subject)));
       }
-      // Inline input/output echoing is debug+ only: tool arguments and
-      // results can carry secrets, so the default info level never prints
-      // request or response payloads.
       const echoPayloads = level !== "info";
       if (echoPayloads && detail.input !== undefined) {
         parts.push(inlineJson(detail.input));
       }
       const outcome: ResponseOutcome = isStreamingMethod
         ? { errorMessage: null }
-        : await extractResponseOutcome(c.res);
-      // Echo tool output inline (truncated): the one result callers reliably
-      // want to glance at. Resource/prompt payloads are bulk content — the
-      // trace dump covers those.
+        : await extractResponseOutcome(response);
       if (
         echoPayloads &&
         mcpRequest.method === "tools/call" &&
@@ -571,24 +559,29 @@ export function requestLogger(options: LoggingOptions = {}): MiddlewareHandler {
       ) {
         parts.push(dim("->"), inlineJson(compactToolResult(outcome.result)));
       }
-      // The initialize subject *is* the client identity — don't repeat it.
       if (mcpRequest.method !== "initialize") {
         const client = formatClientIdentity(mcpRequest);
         if (client !== undefined) parts.push(dim(sanitize(client)));
       }
       if (outcome.errorMessage !== null) {
         parts.push(red(`ERROR ${sanitize(outcome.errorMessage)}`));
-      } else if (c.res.status >= 400) {
-        parts.push(red(`ERROR (HTTP ${c.res.status})`));
+      } else if (response.status >= 400) {
+        parts.push(red(`ERROR (HTTP ${response.status})`));
       }
       lines.push(parts.join(" "));
     }
 
-    // One console.log per request keeps the pair atomic under concurrency.
     console.log(lines.join("\n"));
 
     if (level === "trace") {
-      await printTraceDump(c, requestHeaders, requestBody, !isStreamingMethod);
+      await printTraceDump(
+        response,
+        requestHeaders,
+        requestBody,
+        !isStreamingMethod
+      );
     }
+
+    return response;
   };
 }

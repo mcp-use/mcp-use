@@ -1,23 +1,23 @@
 /**
  * End-to-end smoke test for the v2 scaffold: a real @modelcontextprotocol/client
- * talks over HTTP to a Hono app serving a v2 createMcpHandler endpoint.
+ * talks over HTTP to a fetch-native app serving a v2 createMcpHandler endpoint.
  *
  * This intentionally exercises the full stack (client transport → Node HTTP →
- * Hono routing → SDK handler → per-request McpServer factory → tool handler)
+ * fetch routing → SDK handler → per-request McpServer factory → tool handler)
  * with zero mocks, proving the scaffold's dependency set actually works
  * together under the stateless protocol.
  */
-import { serve, type ServerType } from "@hono/node-server";
 import {
   Client,
   StreamableHTTPClientTransport,
 } from "@modelcontextprotocol/client";
 import { McpServer } from "@modelcontextprotocol/server";
-import { Hono } from "hono";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { composeFetch, jsonBodyMiddleware } from "../src/fetch-app.js";
 import { mountMcp, type MountMcpOptions } from "../src/index.js";
+import { listenFetch } from "./helpers/listen-fetch.js";
 
 function buildTestServer(): McpServer {
   const server = new McpServer({ name: "scaffold-test", version: "0.0.1" });
@@ -34,35 +34,19 @@ function buildTestServer(): McpServer {
   return server;
 }
 
-async function listen(
-  app: Hono
-): Promise<{ server: ServerType; port: number }> {
-  return new Promise((resolve) => {
-    const server = serve(
-      { fetch: app.fetch, port: 0, hostname: "127.0.0.1" },
-      (info) => {
-        resolve({ server, port: info.port });
-      }
-    );
-  });
-}
-
 describe("mountMcp", () => {
-  let httpServer: ServerType;
+  let httpServer: Awaited<ReturnType<typeof listenFetch>>;
   let baseUrl: string;
 
   beforeAll(async () => {
-    const app = new Hono();
-    mountMcp(app, buildTestServer);
-    const started = await listen(app);
-    httpServer = started.server;
-    baseUrl = `http://127.0.0.1:${started.port}`;
+    const { fetch: mcpFetch } = mountMcp(buildTestServer);
+    const fetch = composeFetch(mcpFetch, jsonBodyMiddleware());
+    httpServer = await listenFetch(fetch);
+    baseUrl = httpServer.url;
   });
 
   afterAll(async () => {
-    await new Promise<void>((resolve, reject) => {
-      httpServer.close((err) => (err ? reject(err) : resolve()));
-    });
+    await httpServer.close();
   });
 
   async function connectClient(path = "/mcp"): Promise<Client> {
@@ -111,17 +95,17 @@ describe("mountMcp", () => {
   });
 
   it("mounts on a custom path", async () => {
-    const app = new Hono();
     const options: MountMcpOptions = { path: "/custom/mcp" };
-    const handler = mountMcp(app, buildTestServer, options);
-    const started = await listen(app);
+    const { handler, fetch: mcpFetch } = mountMcp(buildTestServer, options);
+    const fetch = composeFetch(mcpFetch, jsonBodyMiddleware());
+    const started = await listenFetch(fetch);
     try {
       const client = new Client(
         { name: "scaffold-test-client", version: "0.0.1" },
         { versionNegotiation: { mode: { pin: "2026-07-28" } } }
       );
       const transport = new StreamableHTTPClientTransport(
-        new URL(`http://127.0.0.1:${started.port}/custom/mcp`)
+        new URL(`${started.url}/custom/mcp`)
       );
       await client.connect(transport);
       const tools = await client.listTools();
@@ -129,9 +113,7 @@ describe("mountMcp", () => {
       await client.close();
     } finally {
       await handler.close();
-      await new Promise<void>((resolve, reject) => {
-        started.server.close((err) => (err ? reject(err) : resolve()));
-      });
+      await started.close();
     }
   });
 });

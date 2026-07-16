@@ -1,4 +1,3 @@
-import { serve, type ServerType } from "@hono/node-server";
 import {
   Client,
   StreamableHTTPClientTransport,
@@ -8,11 +7,17 @@ import {
   type AuthInfo,
   type ServerContext,
 } from "@modelcontextprotocol/server";
-import { Hono, type Env } from "hono";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { toAuthenticatedRequestContext } from "../src/context.js";
+import {
+  composeFetch,
+  getRequestBag,
+  jsonBodyMiddleware,
+  type FetchMiddleware,
+} from "../src/fetch-app.js";
 import { mountMcp } from "../src/mount-mcp.js";
+import { listenFetch } from "./helpers/listen-fetch.js";
 
 interface TestUser {
   id: string;
@@ -33,17 +38,10 @@ interface CallbackObservation {
   signal: AbortSignal;
 }
 
-const httpServers: ServerType[] = [];
+const httpServers: Array<Awaited<ReturnType<typeof listenFetch>>> = [];
 
 afterEach(async () => {
-  await Promise.all(
-    httpServers.splice(0).map(
-      (server) =>
-        new Promise<void>((resolve, reject) => {
-          server.close((error) => (error ? reject(error) : resolve()));
-        })
-    )
-  );
+  await Promise.all(httpServers.splice(0).map((server) => server.close()));
 });
 
 function createAuthInfo(id: string): AuthInfo {
@@ -61,19 +59,10 @@ function createAuthInfo(id: string): AuthInfo {
   };
 }
 
-async function listen<E extends Env>(app: Hono<E>): Promise<string> {
-  const server = await new Promise<ServerType>((resolve) => {
-    const started = serve(
-      { fetch: app.fetch, port: 0, hostname: "127.0.0.1" },
-      () => resolve(started)
-    );
-  });
-  httpServers.push(server);
-  const address = server.address();
-  if (address === null || typeof address === "string") {
-    throw new Error("Test server did not expose a TCP address");
-  }
-  return `http://127.0.0.1:${address.port}`;
+async function listen(fetch: ReturnType<typeof composeFetch>): Promise<string> {
+  const started = await listenFetch(fetch);
+  httpServers.push(started);
+  return started.url;
 }
 
 async function connectClient(url: string, token?: string): Promise<Client> {
@@ -116,8 +105,29 @@ function observeContext(
   return observation;
 }
 
+function authInfoMiddleware(
+  authByToken: Map<string, AuthInfo>
+): FetchMiddleware {
+  return async (request, next) => {
+    const token = request.headers.get("authorization")?.replace(/^Bearer /, "");
+    const authInfo = token === undefined ? undefined : authByToken.get(token);
+    if (authInfo !== undefined) {
+      // Models custom host middleware — no request-global state carries identity.
+      getRequestBag(request).authInfo = authInfo;
+    }
+    return next();
+  };
+}
+
+function buildMcpFetch(
+  factory: Parameters<typeof mountMcp>[0],
+  options: Parameters<typeof mountMcp>[1] = {}
+) {
+  return mountMcp(factory, options).fetch;
+}
+
 describe("mountMcp OAuth request context", () => {
-  it("forwards Hono AuthInfo exactly, projects it in tool/resource callbacks, and isolates concurrent requests", async () => {
+  it("forwards request-bag AuthInfo exactly, projects it in tool/resource callbacks, and isolates concurrent requests", async () => {
     const alice = createAuthInfo("alice");
     const bob = createAuthInfo("bob");
     const authByToken = new Map([
@@ -128,56 +138,22 @@ describe("mountMcp OAuth request context", () => {
     const observations: CallbackObservation[] = [];
     let factoryInstances = 0;
 
-    const app = new Hono<{ Variables: { authInfo?: AuthInfo } }>();
-    app.use("/mcp", async (context, next) => {
-      const token = context.req
-        .header("authorization")
-        ?.replace(/^Bearer /, "");
-      const authInfo = token === undefined ? undefined : authByToken.get(token);
-      if (authInfo !== undefined) {
-        // This intentionally models custom host middleware. No request-global
-        // state participates in carrying identity to mountMcp.
-        context.set("authInfo", authInfo);
-      }
-      await next();
-    });
-
-    mountMcp(
-      app,
-      ({ authInfo }) => {
-        const factoryInstance = ++factoryInstances;
-        forwardedToFactories.push(authInfo);
-        const server = new McpServer({
-          name: "oauth-context-test",
-          version: "0.0.1",
-        });
-        server.registerTool("whoami", {}, async (context) => {
-          const observation = observeContext(factoryInstance, context);
-          observations.push(observation);
-          return {
-            content: [
-              {
-                type: "text",
-                text: JSON.stringify({
-                  user: observation.user.id,
-                  token: observation.accessToken,
-                  factoryInstance,
-                }),
-              },
-            ],
-          };
-        });
-        server.registerResource(
-          "identity",
-          "test://identity",
-          {},
-          async (_uri, context) => {
+    const fetch = composeFetch(
+      buildMcpFetch(
+        ({ authInfo }) => {
+          const factoryInstance = ++factoryInstances;
+          forwardedToFactories.push(authInfo);
+          const server = new McpServer({
+            name: "oauth-context-test",
+            version: "0.0.1",
+          });
+          server.registerTool("whoami", {}, async (context) => {
             const observation = observeContext(factoryInstance, context);
             observations.push(observation);
             return {
-              contents: [
+              content: [
                 {
-                  uri: "test://identity",
+                  type: "text",
                   text: JSON.stringify({
                     user: observation.user.id,
                     token: observation.accessToken,
@@ -186,14 +162,37 @@ describe("mountMcp OAuth request context", () => {
                 },
               ],
             };
-          }
-        );
-        return server;
-      },
-      { authInfo: (context) => context.get("authInfo") }
+          });
+          server.registerResource(
+            "identity",
+            "test://identity",
+            {},
+            async (_uri, context) => {
+              const observation = observeContext(factoryInstance, context);
+              observations.push(observation);
+              return {
+                contents: [
+                  {
+                    uri: "test://identity",
+                    text: JSON.stringify({
+                      user: observation.user.id,
+                      token: observation.accessToken,
+                      factoryInstance,
+                    }),
+                  },
+                ],
+              };
+            }
+          );
+          return server;
+        },
+        { authInfo: (request) => getRequestBag(request).authInfo }
+      ),
+      authInfoMiddleware(authByToken),
+      jsonBodyMiddleware()
     );
 
-    const url = await listen(app);
+    const url = await listen(fetch);
     const [aliceClient, bobClient] = await Promise.all([
       connectClient(url, alice.token),
       connectClient(url, bob.token),
@@ -224,7 +223,7 @@ describe("mountMcp OAuth request context", () => {
         token: alice.token,
       });
 
-      // The same object placed in Hono variables is supplied to both the SDK
+      // The same object placed in the request bag is supplied to both the SDK
       // factory and the live SDK callback context; it is never reconstructed.
       expect(forwardedToFactories).toContain(alice);
       expect(forwardedToFactories).toContain(bob);
@@ -267,28 +266,30 @@ describe("mountMcp OAuth request context", () => {
 
   it("preserves unauthenticated mount behavior when no authInfo resolver is supplied", async () => {
     const callbackAuthInfo: Array<AuthInfo | undefined> = [];
-    const app = new Hono();
-    mountMcp(app, ({ authInfo }) => {
-      callbackAuthInfo.push(authInfo);
-      const server = new McpServer({
-        name: "unauthenticated-context-test",
-        version: "0.0.1",
-      });
-      server.registerTool("anonymous", {}, async (context) => ({
-        content: [
-          {
-            type: "text",
-            text:
-              context.http?.authInfo === undefined
-                ? "anonymous"
-                : "unexpected-auth",
-          },
-        ],
-      }));
-      return server;
-    });
+    const fetch = composeFetch(
+      buildMcpFetch(({ authInfo }) => {
+        callbackAuthInfo.push(authInfo);
+        const server = new McpServer({
+          name: "unauthenticated-context-test",
+          version: "0.0.1",
+        });
+        server.registerTool("anonymous", {}, async (context) => ({
+          content: [
+            {
+              type: "text",
+              text:
+                context.http?.authInfo === undefined
+                  ? "anonymous"
+                  : "unexpected-auth",
+            },
+          ],
+        }));
+        return server;
+      }),
+      jsonBodyMiddleware()
+    );
 
-    const client = await connectClient(await listen(app));
+    const client = await connectClient(await listen(fetch));
     try {
       const result = await client.callTool({ name: "anonymous" });
       expect(result.content).toEqual([{ type: "text", text: "anonymous" }]);
@@ -306,33 +307,35 @@ describe("mountMcp OAuth request context", () => {
       expiresAt: 4_102_444_800,
     };
     let callbackError: unknown;
-    const app = new Hono<{ Variables: { authInfo: AuthInfo } }>();
-    app.use("/mcp", async (context, next) => {
-      context.set("authInfo", incompleteAuthInfo);
-      await next();
-    });
-    mountMcp(
-      app,
-      () => {
-        const server = new McpServer({
-          name: "missing-mapped-auth-info",
-          version: "0.0.1",
-        });
-        server.registerTool("must-have-mapped-auth", {}, async (context) => {
-          try {
-            toAuthenticatedRequestContext<TestUser>(context);
-          } catch (error) {
-            callbackError = error;
-            throw error;
-          }
-          return { content: [] };
-        });
-        return server;
+
+    const fetch = composeFetch(
+      buildMcpFetch(
+        () => {
+          const server = new McpServer({
+            name: "missing-mapped-auth-info",
+            version: "0.0.1",
+          });
+          server.registerTool("must-have-mapped-auth", {}, async (context) => {
+            try {
+              toAuthenticatedRequestContext<TestUser>(context);
+            } catch (error) {
+              callbackError = error;
+              throw error;
+            }
+            return { content: [] };
+          });
+          return server;
+        },
+        { authInfo: (request) => getRequestBag(request).authInfo }
+      ),
+      async (request, next) => {
+        getRequestBag(request).authInfo = incompleteAuthInfo;
+        return next();
       },
-      { authInfo: (context) => context.get("authInfo") }
+      jsonBodyMiddleware()
     );
 
-    const client = await connectClient(await listen(app));
+    const client = await connectClient(await listen(fetch));
     try {
       const result = await client.callTool({ name: "must-have-mapped-auth" });
       expect(result).toMatchObject({

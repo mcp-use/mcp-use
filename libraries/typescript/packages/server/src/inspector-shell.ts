@@ -9,9 +9,8 @@
  * in the browser from the page's own origin, so the server never guesses its
  * public hostname.
  */
-import type { Env, Hono } from "hono";
-
 import type { InspectorOptions } from "./config.js";
+import type { FetchHandler } from "./fetch-app.js";
 
 /**
  * Exact version of the `@mcp-use/inspector` CDN bundle the default URL pins
@@ -159,32 +158,25 @@ export function renderInspectorShell(options: InspectorShellOptions): string {
 }
 
 /**
- * Mount the inspector shell on a Hono app at `${basePath}/inspector`.
+ * Fetch handler for `${basePath}/inspector` (GET and HEAD).
  *
- * Registers GET for both the bare and trailing-slash paths (Hono answers
- * HEAD from GET handlers automatically) and serves the pre-rendered shell as
- * `text/html; charset=utf-8`. No-op when `inspector.enabled` is `false`;
- * `undefined` and `{}` mean enabled.
+ * No-op when `inspector.enabled` is `false`; `undefined` and `{}` mean enabled.
  *
- * @internal Wiring for `MCPServer` — mounted on the same app as the MCP
- * endpoint, so any configured Host/Origin validation middleware applies to
- * this route too.
+ * @internal Wiring for `MCPServer`.
  */
-export function mountInspectorShell<E extends Env>(
-  app: Hono<E>,
+export function createInspectorHandler(
   inspector: InspectorOptions | undefined,
   options: { serverName: string; basePath: string }
-): void {
+): FetchHandler | undefined {
   if (inspector?.enabled === false) {
-    return;
+    return undefined;
   }
   const { assetsUrl: configAssetsUrl, manufactChatUrl: configManufactChatUrl } =
     inspector ?? {};
   const assetsUrl =
-    configAssetsUrl ?? process.env.MCP_USE_INSPECTOR_ASSETS_URL ?? undefined;
+    configAssetsUrl ?? process.env["MCP_USE_INSPECTOR_ASSETS_URL"] ?? undefined;
   const manufactChatUrl =
-    configManufactChatUrl ?? process.env.MANUFACT_CHAT_URL ?? undefined;
-  // Config is fixed at mount time, so the page renders once, not per request.
+    configManufactChatUrl ?? process.env["MANUFACT_CHAT_URL"] ?? undefined;
   const html = renderInspectorShell({
     serverName: options.serverName,
     basePath: options.basePath,
@@ -192,5 +184,30 @@ export function mountInspectorShell<E extends Env>(
     manufactChatUrl,
   });
   const path = `${options.basePath}/inspector`;
-  app.on("GET", [path, `${path}/`], (c) => c.html(html));
+  const slashPath = `${path}/`;
+
+  return async (request) => {
+    if (request.method !== "GET" && request.method !== "HEAD") {
+      return new Response("Method Not Allowed", { status: 405 });
+    }
+    const pathname = new URL(request.url).pathname;
+    if (pathname !== path && pathname !== slashPath) {
+      return new Response("Not Found", { status: 404 });
+    }
+    return new Response(request.method === "HEAD" ? null : html, {
+      status: 200,
+      headers: { "content-type": "text/html; charset=utf-8" },
+    });
+  };
+}
+
+/**
+ * @deprecated Use {@link createInspectorHandler}.
+ *
+ * @internal
+ */
+export function mountInspectorShell(): void {
+  throw new Error(
+    "mountInspectorShell(app) was removed — use createInspectorHandler"
+  );
 }

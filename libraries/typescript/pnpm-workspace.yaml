@@ -36,9 +36,6 @@ minimumReleaseAgeExclude:
   - js-yaml@4.1.2
   - "@babel/core@7.29.1"
 
-patchedDependencies:
-  "@modelcontextprotocol/sdk": patches/@modelcontextprotocol__sdk.patch
-
 overrides:
   mcp-use: workspace:*
   "@mcp-use/inspector": workspace:*

@@ -5,15 +5,15 @@ import {
   type McpHttpHandler,
   type McpServerFactory,
 } from "@modelcontextprotocol/server";
-import type { Context, Env, Hono } from "hono";
 
+import { getRequestBag, matchesPath, type FetchHandler } from "./fetch-app.js";
 import {
   extractClientCapabilitiesFromBody,
   stashClientCapabilities,
 } from "./views/capabilities.js";
 
-/** Options for {@link mountMcp}. */
-export interface MountMcpOptions<E extends Env = Env> {
+/** Options for {@link createMcpMount}. */
+export interface MountMcpOptions {
   /** Route path the MCP endpoint is served on. Defaults to `/mcp`. */
   path?: string;
   /**
@@ -25,28 +25,42 @@ export interface MountMcpOptions<E extends Env = Env> {
    * legacy-classified requests get the unsupported-protocol-version error.
    */
   handler?: CreateMcpHandlerOptions;
-  /** AuthInfo produced by host middleware and forwarded to the SDK request. */
-  authInfo?: (context: Context<E>) => AuthInfo | undefined;
+  /**
+   * Produce verified {@link AuthInfo} for the request before the SDK handler
+   * runs. When omitted, requests are served without authenticated identity.
+   */
+  authInfo?: (request: Request) => AuthInfo | undefined;
+}
+
+/** Result of {@link createMcpMount}. */
+export interface McpMount {
+  /** Underlying SDK handler (`close`, `notify`, `bus`). */
+  handler: McpHttpHandler;
+  /** Fetch handler for the MCP path only (compose into a larger app). */
+  fetch: FetchHandler;
 }
 
 /**
- * Mount the MCP Streamable HTTP endpoint onto a Hono app.
+ * Create the MCP Streamable HTTP endpoint as a fetch handler.
  *
  * Returns the underlying `McpHttpHandler` so callers can call `close()` on
  * shutdown to abort in-flight exchanges, and use `notify`/`bus` for
  * list-changed notifications.
  *
- * Prefer apps wired like `MCPServer` (JSON body parsing stashed in context
- * vars plus Host/Origin validation when Host validation applies).
- * On a bare Hono app this mount performs no such validation itself — compose
- * the `@modelcontextprotocol/hono` middleware in front, only bind to
- * localhost, or serve behind a platform edge that routes by hostname.
+ * Compose the returned `fetch` into a larger app with {@link composeFetch}
+ * from `mcp-use`, and put Host/Origin validation in front when binding
+ * locally or exposing the process directly.
+ *
+ * @example
+ * ```ts
+ * const { handler, fetch: mcpFetch } = createMcpMount(factory);
+ * const app = composeFetch(mcpFetch, jsonBodyMiddleware(), hostValidationMiddleware(hosts));
+ * ```
  */
-export function mountMcp<E extends Env>(
-  app: Hono<E>,
+export function createMcpMount(
   factory: McpServerFactory,
-  options: MountMcpOptions<E> = {}
-): McpHttpHandler {
+  options: MountMcpOptions = {}
+): McpMount {
   const {
     path = "/mcp",
     handler: handlerOptions,
@@ -56,27 +70,43 @@ export function mountMcp<E extends Env>(
     legacy: "stateless",
     ...handlerOptions,
   });
-  app.all(path, async (c) => {
-    // JSON body parsing middleware stashes the parsed body in context vars
-    // (a request body is only readable once); on bare apps it is absent and
-    // the SDK handler parses the body itself.
-    let parsedBody = (c.var as Record<string, unknown>)["parsedBody"];
+
+  const fetch: FetchHandler = async (request) => {
+    if (!matchesPath(request, path)) {
+      return new Response("Not Found", { status: 404 });
+    }
+
+    const bag = getRequestBag(request);
+    let parsedBody = bag.parsedBody;
     if (parsedBody === undefined) {
       try {
-        parsedBody = await c.req.raw.clone().json();
+        parsedBody = await request.clone().json();
       } catch {
         // Non-JSON or empty body — the SDK handler will surface the error.
       }
     }
+
     const capabilities = extractClientCapabilitiesFromBody(parsedBody);
     if (capabilities !== undefined) {
-      stashClientCapabilities(c.req.raw, capabilities);
+      stashClientCapabilities(request, capabilities);
     }
-    const authInfo = getAuthInfo?.(c);
-    return handler.fetch(c.req.raw, {
+
+    const authInfo = getAuthInfo?.(request) ?? bag.authInfo;
+    return handler.fetch(request, {
       ...(parsedBody !== undefined && { parsedBody }),
       ...(authInfo !== undefined && { authInfo }),
     });
-  });
-  return handler;
+  };
+
+  return { handler, fetch };
+}
+
+/**
+ * @deprecated Use {@link createMcpMount} — returns the same mount without Hono.
+ */
+export function mountMcp(
+  factory: McpServerFactory,
+  options: MountMcpOptions = {}
+): McpMount {
+  return createMcpMount(factory, options);
 }

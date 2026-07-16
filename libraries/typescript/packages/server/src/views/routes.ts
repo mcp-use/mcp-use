@@ -1,24 +1,22 @@
-import { join } from "node:path";
-
-import type { Hono } from "hono";
-
+import {
+  matchesPathPrefix,
+  pathnameOf,
+  type FetchHandler,
+} from "../fetch-app.js";
 import type { ViewManifestEntry } from "./types.js";
-import { resolvePublicFilePath, servePublicFile } from "./public-route.js";
 
 const PUBLIC_BUILD_DIR = ".mcp-use/build/views/public";
 const PUBLIC_DEV_DIR = "public";
 
 /**
- * Mount the public-asset route under `${basePath}/_mcp-use/public/`.
+ * Fetch handler for public view assets under `${basePath}/_mcp-use/public/`.
  *
  * Public responses include `Access-Control-Allow-Origin: *` for
  * cross-origin sandboxed view iframes.
  *
- * Hosts obtain view documents only through `resources/read`; there is no
- * HTTP document or bundle-asset route. Routes exist only when views are
- * primed; a tool-only server is unchanged.
+ * Node filesystem modules load only on the first public-asset request so the
+ * library entry stays edge-safe for `getHandler()`-only deployments.
  *
- * @param app - Hono app that already mounts the MCP endpoint.
  * @param basePath - MCP mount prefix (e.g. `/mcp`).
  * @param views - Primed view registry; empty skips mounting.
  * @param options - When `dev` is true, the public route reads from
@@ -27,28 +25,51 @@ const PUBLIC_DEV_DIR = "public";
  *
  * @internal
  */
-export function mountViewRoutes(
-  app: Hono,
+export function createViewPublicHandler(
   basePath: string,
   views: ReadonlyMap<string, ViewManifestEntry>,
   options?: { dev?: boolean; projectRoot?: string }
-): void {
+): FetchHandler | undefined {
   if (views.size === 0) {
-    return;
+    return undefined;
   }
 
   const publicPrefix = `${basePath}/_mcp-use/public`;
-  const publicRoot = join(
-    options?.projectRoot ?? process.cwd(),
-    options?.dev === true ? PUBLIC_DEV_DIR : PUBLIC_BUILD_DIR
-  );
+  const subdir = options?.dev === true ? PUBLIC_DEV_DIR : PUBLIC_BUILD_DIR;
+  const projectRoot = options?.projectRoot ?? process.cwd();
 
-  app.get(`${publicPrefix}/:path{.+}`, (c) => {
-    const subpath = c.req.param("path") ?? "";
-    const diskPath = resolvePublicFilePath(publicRoot, subpath);
-    if (diskPath === null) {
-      return c.text("Not Found", 404);
+  return async (request) => {
+    if (request.method !== "GET" && request.method !== "HEAD") {
+      return new Response("Method Not Allowed", { status: 405 });
     }
-    return servePublicFile(diskPath);
-  });
+    if (!matchesPathPrefix(request, publicPrefix)) {
+      return new Response("Not Found", { status: 404 });
+    }
+
+    const pathname = pathnameOf(request);
+    const subpath = pathname.slice(publicPrefix.length + 1);
+    if (subpath.length === 0) {
+      return new Response("Not Found", { status: 404 });
+    }
+
+    const [{ join }, { resolvePublicFilePath, servePublicFile }] =
+      await Promise.all([import("node:path"), import("./public-route.js")]);
+    const publicRoot = join(projectRoot, subdir);
+    const diskPath = await resolvePublicFilePath(publicRoot, subpath);
+    if (diskPath === null) {
+      return new Response("Not Found", { status: 404 });
+    }
+    return await servePublicFile(diskPath);
+  };
+}
+
+/**
+ * @deprecated Use {@link createViewPublicHandler}.
+ *
+ * @internal
+ */
+export function mountViewRoutes(): void {
+  throw new Error(
+    "mountViewRoutes(app) was removed — use createViewPublicHandler"
+  );
 }

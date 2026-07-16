@@ -1,7 +1,3 @@
-import { createReadStream, existsSync } from "node:fs";
-import { extname, resolve, sep } from "node:path";
-import { Readable } from "node:stream";
-
 const PUBLIC_CONTENT_TYPES: Record<string, string> = {
   ".css": "text/css",
   ".gif": "image/gif",
@@ -30,10 +26,13 @@ const PUBLIC_CONTENT_TYPES: Record<string, string> = {
  *
  * @internal
  */
-export function resolvePublicFilePath(
+export async function resolvePublicFilePath(
   publicRoot: string,
   subpath: string
-): string | null {
+): Promise<string | null> {
+  const { existsSync } = await import("node:fs");
+  const { resolve, sep } = await import("node:path");
+
   if (subpath === "" || subpath.includes("..") || subpath.includes("\\")) {
     return null;
   }
@@ -62,7 +61,11 @@ export function resolvePublicFilePath(
  *
  * @internal
  */
-export function servePublicFile(diskPath: string): Response {
+export async function servePublicFile(diskPath: string): Promise<Response> {
+  const { createReadStream } = await import("node:fs");
+  const { extname } = await import("node:path");
+  const { Readable } = await import("node:stream");
+
   const ext = extname(diskPath);
   const contentType = PUBLIC_CONTENT_TYPES[ext] ?? "application/octet-stream";
   const nodeStream = createReadStream(diskPath);

@@ -18,14 +18,14 @@
  * Docs: https://supabase.com/docs/guides/auth/oauth-server/mcp-authentication
  */
 
-import type { Hono } from "hono";
+import type { FetchHandler } from "mcp-use";
 import {
   createClient,
   type OAuthAuthorizationDetails,
   type SupabaseClient,
 } from "@supabase/supabase-js";
 
-export interface MountAuthRoutesOptions {
+export interface CreateAuthHandlerOptions {
   supabaseUrl: string;
   publishableKey: string;
 }
@@ -141,148 +141,163 @@ async function restoreSession(
   return { ok: true };
 }
 
-export function mountAuthRoutes(
-  app: Hono,
-  { supabaseUrl, publishableKey }: MountAuthRoutesOptions
-): void {
-  // -------------------------------------------------------------------------
-  // GET /auth/consent?authorization_id=<id>
-  //
-  // This is the URL to configure as the consent screen in the Supabase
-  // dashboard. Supabase redirects the browser here with only
-  // `authorization_id`; we load the authorization details from Supabase
-  // before rendering the consent page.
-  // -------------------------------------------------------------------------
-  app.get("/auth/consent", async (c) => {
-    const authorizationId = new URL(c.req.url).searchParams.get(
-      "authorization_id"
-    );
-    if (!authorizationId) {
-      return c.text("Missing authorization_id", 400);
-    }
-
-    const session = parseSessionCookie(c.req.header("Cookie"));
-    const host = c.req.header("Host");
-
-    // Not signed in yet — show the sign-in prompt. After sign-in the page
-    // reloads and falls through to the authenticated branch below.
-    if (!session) {
-      return c.html(renderSignInPage());
-    }
-
-    const supabase = createServerClient(supabaseUrl, publishableKey);
-    const restored = await restoreSession(supabase, session, host);
-    if (restored.setCookie !== undefined) {
-      c.header("Set-Cookie", restored.setCookie);
-    }
-    if (!restored.ok) {
-      return c.html(renderSignInPage());
-    }
-
-    const { data, error } =
-      await supabase.auth.oauth.getAuthorizationDetails(authorizationId);
-
-    if (error || !data) {
-      return c.text(
-        `Failed to fetch authorization details: ${error?.message ?? "unknown error"}`,
-        500
-      );
-    }
-
-    // If the user has already consented to these scopes, Supabase short-
-    // circuits and returns a redirect URL — honor it immediately.
-    if ("redirect_url" in data) {
-      return c.redirect(data.redirect_url, 302);
-    }
-
-    return c.html(renderConsentPage(data));
-  });
-
-  // -------------------------------------------------------------------------
-  // POST /auth/signin — anonymous sign-in, stash session in cookie
-  // -------------------------------------------------------------------------
-  app.post("/auth/signin", async (c) => {
-    const supabase = createServerClient(supabaseUrl, publishableKey);
-    const { data, error } = await supabase.auth.signInAnonymously();
-
-    if (error || !data.session) {
-      return c.json({ error: error?.message ?? "Sign-in failed" }, 500);
-    }
-
-    // Short-lived cookie carries the Supabase session to the consent POST.
-    // Production: replace with signed/encrypted session storage.
-    c.header(
-      "Set-Cookie",
-      serializeSessionCookie(
-        {
-          access_token: data.session.access_token,
-          refresh_token: data.session.refresh_token,
-        },
-        c.req.header("Host")
-      )
-    );
-    return c.json({ ok: true });
-  });
-
-  // -------------------------------------------------------------------------
-  // POST /auth/consent?authorization_id=<id>
-  //   body: { approve: boolean }
-  // Forwards the decision to Supabase, which responds with a redirect_url
-  // pointing back to the MCP client (with `code` & `state`, or an error).
-  // -------------------------------------------------------------------------
-  app.post("/auth/consent", async (c) => {
-    const authorizationId = new URL(c.req.url).searchParams.get(
-      "authorization_id"
-    );
-    if (!authorizationId) {
-      return c.json({ error: "Missing authorization_id" }, 400);
-    }
-
-    let approve: unknown;
-    try {
-      const body = await c.req.json<{ approve: unknown }>();
-      approve = body.approve;
-    } catch {
-      return c.json({ error: "invalid_json" }, 400);
-    }
-    if (typeof approve !== "boolean") {
-      return c.json({ error: "approve must be a boolean" }, 400);
-    }
-
-    const session = parseSessionCookie(c.req.header("Cookie"));
-    if (!session) {
-      return c.json({ error: "not_authenticated" }, 401);
-    }
-
-    const host = c.req.header("Host");
-    const supabase = createServerClient(supabaseUrl, publishableKey);
-    const restored = await restoreSession(supabase, session, host);
-    if (restored.setCookie !== undefined) {
-      c.header("Set-Cookie", restored.setCookie);
-    }
-    if (!restored.ok) {
-      return c.json({ error: "not_authenticated" }, 401);
-    }
-
-    // `skipBrowserRedirect: true` keeps the SDK from trying to redirect the
-    // (nonexistent) browser window on the server — we hand the URL back to
-    // the client-side consent page, which performs the navigation.
-    const { data, error } = approve
-      ? await supabase.auth.oauth.approveAuthorization(authorizationId, {
-          skipBrowserRedirect: true,
-        })
-      : await supabase.auth.oauth.denyAuthorization(authorizationId, {
-          skipBrowserRedirect: true,
-        });
-
-    if (error || !data) {
-      return c.json({ error: error?.message ?? "Consent failed" }, 500);
-    }
-
-    return c.json({ redirect_url: data.redirect_url });
+function withSetCookie(response: Response, cookie: string): Response {
+  const headers = new Headers(response.headers);
+  headers.append("Set-Cookie", cookie);
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
   });
 }
 
+export function createAuthHandler({
+  supabaseUrl,
+  publishableKey,
+}: CreateAuthHandlerOptions): FetchHandler {
+  return async (request) => {
+    const url = new URL(request.url);
+    const pathname = url.pathname;
+    const method = request.method;
+    const host = request.headers.get("Host") ?? undefined;
+    const cookieHeader = request.headers.get("Cookie") ?? undefined;
+
+    if (pathname === "/auth/consent" && method === "GET") {
+      const authorizationId = url.searchParams.get("authorization_id");
+      if (!authorizationId) {
+        return new Response("Missing authorization_id", { status: 400 });
+      }
+
+      const session = parseSessionCookie(cookieHeader);
+      if (!session) {
+        return new Response(renderSignInPage(), {
+          headers: { "content-type": "text/html; charset=utf-8" },
+        });
+      }
+
+      const supabase = createServerClient(supabaseUrl, publishableKey);
+      const restored = await restoreSession(supabase, session, host);
+      if (!restored.ok) {
+        return withSetCookie(
+          new Response(renderSignInPage(), {
+            headers: { "content-type": "text/html; charset=utf-8" },
+          }),
+          restored.setCookie
+        );
+      }
+
+      const { data, error } =
+        await supabase.auth.oauth.getAuthorizationDetails(authorizationId);
+
+      if (error || !data) {
+        return new Response(
+          `Failed to fetch authorization details: ${error?.message ?? "unknown error"}`,
+          { status: 500 }
+        );
+      }
+
+      if ("redirect_url" in data) {
+        const response = Response.redirect(data.redirect_url, 302);
+        return restored.setCookie === undefined
+          ? response
+          : withSetCookie(response, restored.setCookie);
+      }
+
+      const response = new Response(renderConsentPage(data), {
+        headers: { "content-type": "text/html; charset=utf-8" },
+      });
+      return restored.setCookie === undefined
+        ? response
+        : withSetCookie(response, restored.setCookie);
+    }
+
+    if (pathname === "/auth/signin" && method === "POST") {
+      const supabase = createServerClient(supabaseUrl, publishableKey);
+      const { data, error } = await supabase.auth.signInAnonymously();
+
+      if (error || !data.session) {
+        return Response.json(
+          { error: error?.message ?? "Sign-in failed" },
+          { status: 500 }
+        );
+      }
+
+      return withSetCookie(
+        Response.json({ ok: true }),
+        serializeSessionCookie(
+          {
+            access_token: data.session.access_token,
+            refresh_token: data.session.refresh_token,
+          },
+          host
+        )
+      );
+    }
+
+    if (pathname === "/auth/consent" && method === "POST") {
+      const authorizationId = url.searchParams.get("authorization_id");
+      if (!authorizationId) {
+        return Response.json(
+          { error: "Missing authorization_id" },
+          { status: 400 }
+        );
+      }
+
+      let approve: unknown;
+      try {
+        const body = (await request.json()) as { approve: unknown };
+        approve = body.approve;
+      } catch {
+        return Response.json({ error: "invalid_json" }, { status: 400 });
+      }
+      if (typeof approve !== "boolean") {
+        return Response.json(
+          { error: "approve must be a boolean" },
+          { status: 400 }
+        );
+      }
+
+      const session = parseSessionCookie(cookieHeader);
+      if (!session) {
+        return Response.json({ error: "not_authenticated" }, { status: 401 });
+      }
+
+      const supabase = createServerClient(supabaseUrl, publishableKey);
+      const restored = await restoreSession(supabase, session, host);
+      if (!restored.ok) {
+        return withSetCookie(
+          Response.json({ error: "not_authenticated" }, { status: 401 }),
+          restored.setCookie
+        );
+      }
+
+      const { data, error } = approve
+        ? await supabase.auth.oauth.approveAuthorization(authorizationId, {
+            skipBrowserRedirect: true,
+          })
+        : await supabase.auth.oauth.denyAuthorization(authorizationId, {
+            skipBrowserRedirect: true,
+          });
+
+      if (error || !data) {
+        const response = Response.json(
+          { error: error?.message ?? "Consent failed" },
+          { status: 500 }
+        );
+        return restored.setCookie === undefined
+          ? response
+          : withSetCookie(response, restored.setCookie);
+      }
+
+      const response = Response.json({ redirect_url: data.redirect_url });
+      return restored.setCookie === undefined
+        ? response
+        : withSetCookie(response, restored.setCookie);
+    }
+
+    return new Response("Not Found", { status: 404 });
+  };
+}
 // ---------------------------------------------------------------------------
 // HTML renderers
 // ---------------------------------------------------------------------------

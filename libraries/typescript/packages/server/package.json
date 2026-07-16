@@ -18,7 +18,6 @@
     "mcp",
     "model-context-protocol",
     "server",
-    "hono",
     "typescript"
   ],
   "exports": {
@@ -53,6 +52,10 @@
     "./oauth/keycloak": {
       "types": "./dist/oauth/keycloak.d.ts",
       "import": "./dist/oauth/keycloak.js"
+    },
+    "./node": {
+      "types": "./dist/node-bridge.d.ts",
+      "import": "./dist/node-bridge.js"
     }
   },
   "module": "./dist/index.js",
@@ -75,23 +78,23 @@
     "doctor": "npx react-doctor@latest"
   },
   "dependencies": {
-    "@hono/node-server": "^2.0.6",
-    "@mcp-use/client": "workspace:*",
     "@modelcontextprotocol/ext-apps": "https://pkg.pr.new/@modelcontextprotocol/ext-apps@712",
-    "@modelcontextprotocol/hono": "2.0.0-beta.4",
     "@modelcontextprotocol/server": "https://pkg.pr.new/@modelcontextprotocol/server@2501",
     "@tailwindcss/vite": "^4.2.0",
     "@vitejs/plugin-react": "^6.0.3",
-    "hono": "^4.12.27",
     "jose": "^6.1.3",
     "tailwindcss": "^4.2.0",
     "vite": "^8.0.16"
   },
   "peerDependencies": {
+    "@mcp-use/client": "^2.0.0-alpha.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "peerDependenciesMeta": {
+    "@mcp-use/client": {
+      "optional": true
+    },
     "react": {
       "optional": true
     },
@@ -100,6 +103,7 @@
     }
   },
   "devDependencies": {
+    "@mcp-use/client": "workspace:*",
     "@modelcontextprotocol/client": "https://pkg.pr.new/@modelcontextprotocol/client@2501",
     "@modelcontextprotocol/core": "https://pkg.pr.new/@modelcontextprotocol/core@2501",
     "@testing-library/react": "^16.3.2",

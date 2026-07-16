@@ -3,12 +3,9 @@ import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 
-import {
-  createOAuthProvider,
-  MCPClient,
-  type MCPConnection,
-} from "@mcp-use/client";
+import type { MCPConnection } from "@mcp-use/client";
 
+import { loadClientPackage } from "./load-client.js";
 import {
   confirm,
   GLOBAL_STATE_DIR,
@@ -333,6 +330,7 @@ async function openConnection(
   credentials: SavedCredentials,
   authTimeoutMs: number
 ): Promise<MCPConnection> {
+  const { createOAuthProvider, MCPClient } = await loadClientPackage();
   const oauthBase = oauthDirectory(name);
   const authProvider = definition.oauth
     ? await createOAuthProvider(definition.url, {

@@ -13,10 +13,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@hono/node-server": "^2.0.6",
     "mcp-use": "workspace:*",
     "@supabase/supabase-js": "^2.104.0",
-    "hono": "^4.12.27",
     "zod": "^4.4.3"
   },
   "devDependencies": {

@@ -446,7 +446,7 @@ describe("MCPServer (phase 1, e2e over HTTP)", () => {
     }
   });
 
-  // DNS-rebinding protection from @modelcontextprotocol/hono. Uses node:http
+  // DNS-rebinding protection from SDK host/origin validation helpers. Uses node:http
   // directly because fetch() sanitizes Host/Origin headers.
   it("rejects requests with a non-localhost Host header (DNS rebinding)", async () => {
     const status = await rawStatus(url, { host: "evil.example.com" });

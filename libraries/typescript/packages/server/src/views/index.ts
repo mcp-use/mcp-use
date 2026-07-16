@@ -18,7 +18,7 @@ export type {
 } from "./types.js";
 export { synthesizeViewDocument, resolveAssetUrl } from "./document.js";
 export { resolveRequestOrigin } from "./origin.js";
-export { mountViewRoutes } from "./routes.js";
+export { createViewPublicHandler } from "./routes.js";
 export {
   extractClientCapabilitiesFromBody,
   getStashedClientCapabilities,

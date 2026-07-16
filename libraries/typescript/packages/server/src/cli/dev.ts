@@ -26,7 +26,6 @@ import { join } from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { createServer, createServerModuleRunner } from "vite";
-import { getRequestListener } from "@hono/node-server";
 import {
   InMemoryServerEventBus,
   localhostAllowedHostnames,
@@ -295,13 +294,11 @@ export async function runDev(options: DevOptions): Promise<void> {
 
   // Resolve the listener before importing the entry so module-scope OAuth
   // configuration observes the canonical port that this CLI will own.
-  // The HTTP listener is a raw node:http server rather than
-  // @hono/node-server's serve() wrapper — deliberately, and only one level
-  // lower: serve() is itself createServer(getRequestListener(fetch)), and we
-  // use the same getRequestListener below, so MCP traffic behaves
-  // identically. Unwrapping is required because Vite's dev middleware is
+  // The HTTP listener is a raw node:http server with the vendored
+  // toNodeHandler bridge — same role as the old @hono/node-server
+  // getRequestListener, without a hono dependency.
   // Connect-style ((req, res, next)) with no fetch-shaped equivalent, so
-  // splicing it in front of the swappable Hono handler needs the raw Node
+  // splicing it in front of the swappable fetch handler needs the raw Node
   // request boundary. Creating the (not-yet-listening) server up front also
   // lets Vite attach its HMR websocket to this same socket (`hmr.server`
   // below) — one port total, so several `mcp-use dev` processes coexist
@@ -607,10 +604,9 @@ export async function runDev(options: DevOptions): Promise<void> {
     (request) => currentHandler(request)
   );
 
-  // Same adapter serve() uses internally — the handler sees identical
-  // requests (see the comment where httpServer is created). devFetch wraps
-  // the swappable Hono handler with the dev API (tunnel control) routes.
-  const honoListener = getRequestListener(devFetch);
+  // Vendored Node bridge — same adapter serve() used internally.
+  const { toNodeHandler } = await import("../node-bridge.js");
+  const nodeListener = toNodeHandler({ fetch: devFetch });
 
   const onRequest = (req: IncomingMessage, res: ServerResponse): void => {
     if (localhostBind && rejectDisallowedRequest(req, res)) {
@@ -642,10 +638,10 @@ export async function runDev(options: DevOptions): Promise<void> {
         localhostBind,
       });
       vite.middlewares(req, res, () => {
-        void honoListener(req, res);
+        void nodeListener(req, res);
       });
     } else {
-      void honoListener(req, res);
+      void nodeListener(req, res);
     }
   };
   httpServer.on("request", onRequest);

@@ -2,17 +2,16 @@
  * Direct OAuth resource-server acceptance coverage using the official
  * @modelcontextprotocol/client transport against real local HTTP listeners.
  */
-import { serve, type ServerType } from "@hono/node-server";
 import {
   Client,
   StreamableHTTPClientTransport,
 } from "@modelcontextprotocol/client";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
-import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 
 import { MCPServer } from "../src/index.js";
 import { oauthWorkOSProvider } from "../src/oauth/workos.js";
+import { listenFetch } from "./helpers/listen-fetch.js";
 
 describe("direct OAuth authorization (official client e2e)", () => {
   it("completes WorkOS-style resource authorization and rejects its default audience", async () => {
@@ -25,63 +24,68 @@ describe("direct OAuth authorization (official client e2e)", () => {
     let tokenRequest: URLSearchParams | undefined;
     const authorizationCode = "deterministic-authorization-code";
     const clientRedirectUrl = "http://client.localhost/callback";
+    let resourceUrl = "";
+    let authorizationIssuer = "";
 
-    const authorizationApp = new Hono();
-    authorizationApp.get("/oauth2/jwks", (c) => c.json({ keys: [jwk] }));
-    authorizationApp.get("/oauth2/authorize", (c) => {
-      authorizationRequest = new URL(c.req.url);
-      if (
-        authorizationRequest.searchParams.get("client_id") !==
-          "official-client" ||
-        authorizationRequest.searchParams.get("resource") !== resourceUrl
-      ) {
-        return c.json({ error: "invalid_request" }, 400);
+    const authorizationFetch = async (request: Request): Promise<Response> => {
+      const url = new URL(request.url);
+      if (url.pathname === "/oauth2/jwks" && request.method === "GET") {
+        return Response.json({ keys: [jwk] });
       }
-      const redirect = new URL(
-        authorizationRequest.searchParams.get("redirect_uri") ??
-          clientRedirectUrl
-      );
-      redirect.searchParams.set("code", authorizationCode);
-      return c.redirect(redirect.toString());
-    });
-    authorizationApp.post("/oauth2/token", async (c) => {
-      tokenRequest = new URLSearchParams(await c.req.text());
-      if (
-        tokenRequest.get("grant_type") !== "authorization_code" ||
-        tokenRequest.get("code") !== authorizationCode ||
-        tokenRequest.get("client_id") !== "official-client" ||
-        tokenRequest.get("resource") !== resourceUrl
-      ) {
-        return c.json({ error: "invalid_grant" }, 400);
+      if (url.pathname === "/oauth2/authorize" && request.method === "GET") {
+        authorizationRequest = url;
+        if (
+          authorizationRequest.searchParams.get("client_id") !==
+            "official-client" ||
+          authorizationRequest.searchParams.get("resource") !== resourceUrl
+        ) {
+          return Response.json({ error: "invalid_request" }, { status: 400 });
+        }
+        const redirect = new URL(
+          authorizationRequest.searchParams.get("redirect_uri") ??
+            clientRedirectUrl
+        );
+        redirect.searchParams.set("code", authorizationCode);
+        return Response.redirect(redirect.toString(), 302);
       }
-      const token = await new SignJWT({
-        sub: "user_ada",
-        client_id: "official-client",
-        scope: "mcp tools:call",
-      })
-        .setProtectedHeader({ alg: "RS256", kid: keyId })
-        .setIssuer(authorizationIssuer)
-        .setAudience(resourceUrl!)
-        .setIssuedAt()
-        .setExpirationTime("5m")
-        .sign(privateKey);
-      return c.json({
-        access_token: token,
-        token_type: "Bearer",
-        expires_in: 300,
-      });
-    });
-    const authorizationServer = await listen(authorizationApp);
+      if (url.pathname === "/oauth2/token" && request.method === "POST") {
+        tokenRequest = new URLSearchParams(await request.text());
+        if (
+          tokenRequest.get("grant_type") !== "authorization_code" ||
+          tokenRequest.get("code") !== authorizationCode ||
+          tokenRequest.get("client_id") !== "official-client" ||
+          tokenRequest.get("resource") !== resourceUrl
+        ) {
+          return Response.json({ error: "invalid_grant" }, { status: 400 });
+        }
+        const token = await new SignJWT({
+          sub: "user_ada",
+          client_id: "official-client",
+          scope: "mcp tools:call",
+        })
+          .setProtectedHeader({ alg: "RS256", kid: keyId })
+          .setIssuer(authorizationIssuer)
+          .setAudience(resourceUrl)
+          .setIssuedAt()
+          .setExpirationTime("5m")
+          .sign(privateKey);
+        return Response.json({
+          access_token: token,
+          token_type: "Bearer",
+          expires_in: 300,
+        });
+      }
+      return new Response("Not Found", { status: 404 });
+    };
+
+    const authorizationServer = await listenFetch(authorizationFetch);
     const authorizationUrl = authorizationServer.url;
-    const authorizationIssuer = new URL(authorizationUrl).href.replace(
-      /\/$/,
-      ""
-    );
+    authorizationIssuer = new URL(authorizationUrl).href.replace(/\/$/, "");
 
-    const mcpApp = new Hono();
-    mcpApp.all("*", (c) => mcpHandler(c.req.raw));
-    const mcpHost = await listen(mcpApp);
-    const resourceUrl = `${mcpHost.url}/mcp`;
+    let mcpHandler: (request: Request) => Promise<Response> = async () =>
+      new Response("starting", { status: 503 });
+    const mcpHost = await listenFetch((request) => mcpHandler(request));
+    resourceUrl = `${mcpHost.url}/mcp`;
 
     const server = new MCPServer({
       name: "direct-oauth-test",
@@ -101,12 +105,10 @@ describe("direct OAuth authorization (official client e2e)", () => {
         },
       ],
     }));
-    const mcpHandler = server.getHandler();
+    mcpHandler = server.getHandler();
 
     let client: Client | undefined;
     try {
-      // This first request is deliberately unauthenticated: it captures the
-      // resource-server challenge before any authorization credentials exist.
       const challenge = await fetch(resourceUrl, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -134,10 +136,6 @@ describe("direct OAuth authorization (official client e2e)", () => {
       expect(metadata.resource).toBe(resourceUrl);
       expect(metadata.authorization_servers).toEqual([authorizationIssuer]);
 
-      // beta.3 exposes transport auth-provider hooks, but does not provide a
-      // deterministic Node browser driver. This test explicitly performs the
-      // browser-facing authorization-code redirect and token exchange, then
-      // uses the official client transport for the authenticated MCP retry.
       const authorize = new URL("/oauth2/authorize", authorizationUrl);
       authorize.search = new URLSearchParams({
         response_type: "code",
@@ -227,27 +225,3 @@ describe("direct OAuth authorization (official client e2e)", () => {
     }
   });
 });
-
-async function listen(app: Hono): Promise<{
-  url: string;
-  close(): Promise<void>;
-}> {
-  return new Promise((resolve, reject) => {
-    const server = serve(
-      { fetch: app.fetch, hostname: "127.0.0.1", port: 0 },
-      ({ port }) => {
-        resolve({
-          url: `http://localhost:${port}`,
-          close: () => closeServer(server),
-        });
-      }
-    );
-    server.once("error", reject);
-  });
-}
-
-function closeServer(server: ServerType): Promise<void> {
-  return new Promise((resolve, reject) => {
-    server.close((error) => (error === undefined ? resolve() : reject(error)));
-  });
-}

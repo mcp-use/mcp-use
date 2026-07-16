@@ -1,13 +1,25 @@
 /**
- * `mcp-use` — MCP server framework on the official v2 SDK and Hono.
+ * `mcp-use` — MCP server framework on the official v2 SDK (fetch-native).
  *
  * Greenfield rebuild of the mcp-use server package against the stateless
  * 2026-07-28 MCP protocol. See specs/SPEC.md for the phase plan and API contract.
  */
 
 export { MCPServer } from "./server.js";
-export { mountMcp } from "./mount-mcp.js";
-export type { MountMcpOptions } from "./mount-mcp.js";
+export { createMcpMount, mountMcp } from "./mount-mcp.js";
+export type { MountMcpOptions, McpMount } from "./mount-mcp.js";
+export {
+  composeFetch,
+  getRequestBag,
+  hostValidationMiddleware,
+  jsonBodyMiddleware,
+  matchesPath,
+  matchesPathPrefix,
+  originValidationMiddleware,
+  pathnameOf,
+  routeFetch,
+} from "./fetch-app.js";
+export type { FetchHandler, FetchMiddleware, RequestBag } from "./fetch-app.js";
 export { registerViews } from "./views/index.js";
 export { requestLogger } from "./logging.js";
 export type { LoggingOptions, LogLevel } from "./logging.js";

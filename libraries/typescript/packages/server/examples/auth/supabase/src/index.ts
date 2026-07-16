@@ -1,10 +1,18 @@
+import { createServer } from "node:http";
 import { existsSync } from "node:fs";
-import { serve } from "@hono/node-server";
-import { MCPServer } from "mcp-use";
+
+import {
+  composeFetch,
+  jsonBodyMiddleware,
+  matchesPathPrefix,
+  MCPServer,
+  routeFetch,
+} from "mcp-use";
 import { oauthSupabaseProvider } from "mcp-use/oauth/supabase";
-import { Hono } from "hono";
+import { toNodeHandler } from "mcp-use/node";
 import { z } from "zod";
-import { mountAuthRoutes } from "./auth-routes.js";
+
+import { createAuthHandler } from "./auth-routes.js";
 
 if (existsSync(".env")) {
   process.loadEnvFile(".env");
@@ -109,14 +117,26 @@ server.tool(
   }
 );
 
-const app = new Hono();
-mountAuthRoutes(app, { supabaseUrl, publishableKey });
-const handler = server.getHandler();
-app.all("*", (c) => handler(c.req.raw));
+const authHandler = createAuthHandler({ supabaseUrl, publishableKey });
+const fetch = composeFetch(
+  routeFetch(
+    [{ match: (r) => matchesPathPrefix(r, "/auth"), handler: authHandler }],
+    server.getHandler()
+  ),
+  jsonBodyMiddleware()
+);
 
-serve({ fetch: app.fetch, port, hostname: "127.0.0.1" }, (info) => {
-  console.log(`MCP endpoint: http://localhost:${info.port}/mcp`);
-  console.log(`Consent UI:   http://localhost:${info.port}/auth/consent`);
+const listener = toNodeHandler({ fetch });
+const httpServer = createServer((req, res) => {
+  void listener(req, res);
+});
+
+httpServer.listen(port, "127.0.0.1", () => {
+  const address = httpServer.address();
+  const boundPort =
+    address !== null && typeof address !== "string" ? address.port : port;
+  console.log(`MCP endpoint: http://localhost:${boundPort}/mcp`);
+  console.log(`Consent UI:   http://localhost:${boundPort}/auth/consent`);
 });
 
 function environmentValue(name: string): string | undefined {
