@@ -32,6 +32,8 @@ import {
 import { createInspectorHandler } from "./inspector-shell.js";
 import { requestLogger } from "./logging.js";
 import { createMcpMount } from "./mount-mcp.js";
+import { registerOpenAPITools } from "./openapi/index.js";
+import type { FromOpenAPIOptions } from "./openapi/types.js";
 import {
   getOAuthProtectedResourceMetadataUrl,
   requireBearerAuth,
@@ -192,6 +194,35 @@ export class MCPServer<TUser = never> {
   #oauthResourceConfigurationAbsent = false;
   /** Whether the mounted app validates Host headers (fixed at first mount). */
   #hostValidated = false;
+
+  /**
+   * Create an MCP server from a parsed, bundled OpenAPI document.
+   *
+   * Each included OpenAPI operation becomes a tool that validates its input,
+   * calls the matching upstream HTTP endpoint, and returns the response using
+   * the SDK's raw tool-result shape. External `$ref` values are not fetched;
+   * bundle the document before passing it in.
+   *
+   * @param options - OpenAPI document, operation filters, upstream URL, and
+   * request authentication options.
+   * @returns An unauthenticated MCP server populated with generated tools.
+   *
+   * @example
+   * ```ts
+   * const spec = await fetch("https://api.example.com/openapi.json")
+   *   .then((response) => response.json());
+   * const server = MCPServer.fromOpenAPI({ spec });
+   * await server.listen(3000);
+   * ```
+   */
+  static fromOpenAPI(options: FromOpenAPIOptions): MCPServer {
+    const server = new MCPServer({
+      name: options.name ?? options.spec.info.title,
+      version: options.version ?? options.spec.info.version ?? "1.0.0",
+    });
+    registerOpenAPITools(server, options);
+    return server;
+  }
 
   /**
    * Create a server. `config.name` and `config.version` identify the server
