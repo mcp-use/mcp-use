@@ -40,7 +40,9 @@ export interface RequestClientContext {
 export type ElicitationResult<T = never> =
   | { status: "required"; result: InputRequiredResult }
   | { status: "decline" | "cancel" }
-  | ([T] extends [never] ? { status: "accept" } : { status: "accept"; data: T });
+  | ([T] extends [never]
+      ? { status: "accept" }
+      : { status: "accept"; data: T });
 
 /**
  * Requests or reads one keyed elicitation in a multi-round-trip tool callback.

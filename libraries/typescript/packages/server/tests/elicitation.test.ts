@@ -99,9 +99,7 @@ describe("elicitation and input_required", () => {
               : "Account not linked",
         },
       ],
-      ...(authorization.status !== "accept"
-        ? { isError: true as const }
-        : {}),
+      ...(authorization.status !== "accept" ? { isError: true as const } : {}),
     };
   });
 
