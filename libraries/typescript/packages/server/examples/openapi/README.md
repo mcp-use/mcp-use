@@ -5,7 +5,12 @@ creates an MCP server from a small read-only subset of its operations:
 
 ```ts
 const openapiSpec = await fetch("https://api.weather.gov/openapi.json").then(
-  (response) => response.json()
+  (response) => {
+    if (!response.ok) {
+      throw new Error(`Failed to fetch https://api.weather.gov/openapi.json: ${response.status} ${response.statusText}`);
+    }
+    return response.json();
+  }
 );
 
 const server = MCPServer.fromOpenAPI({
