@@ -50,6 +50,16 @@ to build MCP Apps for ChatGPT / Claude & MCP Servers for AI Agents.
 
 Visit our [docs](https://mcp-use.com/docs) or jump to a quickstart ([TypeScript](https://mcp-use.com/docs/typescript/getting-started/quickstart) | [Python](https://mcp-use.com/docs/python/getting-started/quickstart))
 
+### V2 TypeScript beta
+
+V2 prereleases are published from reviewed pull requests merged into the `beta` branch, using GitHub OIDC trusted publishing. They use npm's `beta` dist tag and do not change `latest` or `canary`.
+
+```bash
+npm install mcp-use@beta @mcp-use/client@beta @mcp-use/agent@beta
+npm install @mcp-use/cli@beta @mcp-use/inspector@beta
+npm create mcp-use-app@beta
+```
+
 ### Skills for Coding Agents
 
 > **Using Claude Code, Codex, Cursor or other AI coding agents?**
