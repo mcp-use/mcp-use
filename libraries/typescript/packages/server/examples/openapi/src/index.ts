@@ -66,6 +66,4 @@ function pickPaths(
   };
 }
 
-// The v2 CLI owns the socket and shutdown lifecycle. The entry module only
-// constructs and exports the server.
 export default server;
