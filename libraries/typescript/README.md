@@ -590,20 +590,6 @@ git commit -m "feat: your feature description"
 - Merge the Version PR to publish stable versions
 - Packages published with `latest` tag on npm
 
-#### V2 Beta Prereleases (beta branch)
-
-- Merge a reviewed PR into `beta` to trigger the V2 beta release workflow
-- CI publishes only the versioned beta packages with GitHub OIDC trusted publishing
-- Versions use the `x.y.z-beta.N` form and are published with the `beta` dist tag
-- The workflow verifies that `latest`, `canary`, and every other non-beta dist tag are unchanged
-
-```bash
-# Install V2 beta packages
-npm install mcp-use@beta @mcp-use/client@beta @mcp-use/agent@beta
-npm install @mcp-use/cli@beta @mcp-use/inspector@beta
-npm create mcp-use-app@beta
-```
-
 #### Canary Prereleases (canary branch)
 
 - Push changes with changesets to `canary` branch
