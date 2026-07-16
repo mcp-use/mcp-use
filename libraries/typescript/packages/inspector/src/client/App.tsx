@@ -6,10 +6,7 @@ import { ManufactOAuthCallback } from "@/client/components/ManufactOAuthCallback
 import { OAuthCallback } from "@/client/components/OAuthCallback";
 import { ViewPreview } from "@/client/components/ViewPreview";
 import { Toaster } from "@/client/components/ui/sonner";
-import {
-  McpClientProvider,
-  type McpServer,
-} from "@mcp-use/client/react";
+import { McpClientProvider, type McpServer } from "@mcp-use/client/react";
 import { useEffect, useMemo, useRef } from "react";
 import { Route, BrowserRouter as Router, Routes } from "react-router";
 import { toast } from "sonner";
@@ -19,7 +16,10 @@ import { ShapeProvider } from "@/client/lib/shape-context";
 import { WidgetDebugProvider } from "./context/WidgetDebugContext";
 import { getPackageVersion, initInspectorTelemetry } from "@/client/telemetry";
 import { getInspectorBase } from "./utils/basePath";
-import { getDefaultInspectorProxyAddress, InspectorConnectionStorageProvider } from "./utils/connectionUpdates";
+import {
+  getDefaultInspectorProxyAddress,
+  InspectorConnectionStorageProvider,
+} from "./utils/connectionUpdates";
 
 /**
  * Syncs the active tab from InspectorContext into a ref readable by
@@ -105,178 +105,181 @@ function App() {
   return (
     <ThemeProvider forcedTheme={forcedTheme || undefined}>
       <ShapeProvider defaultShape="pill">
-      <WidgetDebugProvider>
-        <McpClientProvider
-          storageProvider={storageProvider}
-          enableRpcLogging={true}
-          defaultCallbackUrl={`${window.location.origin}${inspectorBase}/oauth/callback`}
-          defaultOAuthProxyUrl={oauthProxyUrl}
-          defaultAutoProxyFallback={
-            proxyAddress ? { enabled: true, proxyAddress } : false
-          }
-          defaultServerConfig={{
-            preventAutoAuth: true,
-            useRedirectFlow: true,
-          }}
-          clientInfo={{
-            name: "mcp-use Inspector",
-            version: getPackageVersion(),
-            websiteUrl: "https://mcp-use.com",
-            icons: [{ src: "https://mcp-use.com/logo.png" }],
-            capabilities: {
-              extensions: {
-                "io.modelcontextprotocol/ui": {
-                  mimeTypes: ["text/html;profile=mcp-app"],
+        <WidgetDebugProvider>
+          <McpClientProvider
+            storageProvider={storageProvider}
+            enableRpcLogging={true}
+            defaultCallbackUrl={`${window.location.origin}${inspectorBase}/oauth/callback`}
+            defaultOAuthProxyUrl={oauthProxyUrl}
+            defaultAutoProxyFallback={
+              proxyAddress ? { enabled: true, proxyAddress } : false
+            }
+            defaultServerConfig={{
+              preventAutoAuth: true,
+              useRedirectFlow: true,
+            }}
+            clientInfo={{
+              name: "mcp-use Inspector",
+              version: getPackageVersion(),
+              websiteUrl: "https://mcp-use.com",
+              icons: [{ src: "https://mcp-use.com/logo.png" }],
+              capabilities: {
+                extensions: {
+                  "io.modelcontextprotocol/ui": {
+                    mimeTypes: ["text/html;profile=mcp-app"],
+                  },
                 },
               },
-            },
-          }}
-          onServerAdded={(id: string, server: McpServer) => {
-            console.log("[Inspector] Server added:", id, server.state);
-          }}
-          onServerRemoved={(id: string) => {
-            console.log("[Inspector] Server removed:", id);
-          }}
-          onServerStateChange={(id: string, state: McpServer["state"]) => {
-            console.log("[Inspector] Server state changed:", id, state);
-          }}
-          onSamplingRequest={(
-            request,
-            _serverId,
-            serverName,
-            approve,
-            reject
-          ) => {
-            const toastId = toast(
-              <RequestActionToast
-                title="Sampling Request Received"
-                description={`New request from ${serverName}`}
-                actions={[
-                  {
-                    label: "View Details",
-                    testId: "sampling-toast-view-details",
-                    onClick: () => {
-                      const event = new CustomEvent("navigate-to-sampling", {
-                        detail: { requestId: request.id },
-                      });
-                      window.dispatchEvent(event);
-                      toast.dismiss(toastId);
+            }}
+            onServerAdded={(id: string, server: McpServer) => {
+              console.log("[Inspector] Server added:", id, server.state);
+            }}
+            onServerRemoved={(id: string) => {
+              console.log("[Inspector] Server removed:", id);
+            }}
+            onServerStateChange={(id: string, state: McpServer["state"]) => {
+              console.log("[Inspector] Server state changed:", id, state);
+            }}
+            onSamplingRequest={(
+              request,
+              _serverId,
+              serverName,
+              approve,
+              reject
+            ) => {
+              const toastId = toast(
+                <RequestActionToast
+                  title="Sampling Request Received"
+                  description={`New request from ${serverName}`}
+                  actions={[
+                    {
+                      label: "View Details",
+                      testId: "sampling-toast-view-details",
+                      onClick: () => {
+                        const event = new CustomEvent("navigate-to-sampling", {
+                          detail: { requestId: request.id },
+                        });
+                        window.dispatchEvent(event);
+                        toast.dismiss(toastId);
+                      },
                     },
-                  },
-                  {
-                    label: "Approve",
-                    testId: "sampling-toast-approve",
-                    onClick: () => {
-                      approve(request.id, DEFAULT_SAMPLING_RESPONSE);
-                      toast.success("Sampling request approved");
-                      toast.dismiss(toastId);
+                    {
+                      label: "Approve",
+                      testId: "sampling-toast-approve",
+                      onClick: () => {
+                        approve(request.id, DEFAULT_SAMPLING_RESPONSE);
+                        toast.success("Sampling request approved");
+                        toast.dismiss(toastId);
+                      },
                     },
-                  },
-                  {
-                    label: "Deny",
-                    testId: "sampling-toast-deny",
-                    onClick: () => {
-                      reject(request.id, "User denied from toast");
-                      toast.dismiss(toastId);
+                    {
+                      label: "Deny",
+                      testId: "sampling-toast-deny",
+                      onClick: () => {
+                        reject(request.id, "User denied from toast");
+                        toast.dismiss(toastId);
+                      },
                     },
-                  },
-                ]}
-              />,
-              { duration: Infinity }
-            );
-          }}
-          onElicitationRequest={(
-            request,
-            _serverId,
-            serverName,
-            _approve,
-            reject
-          ) => {
-            // When the chat tab is active, elicitation is rendered inline — no toast needed.
-            if (activeTabRef.current === "chat") {
-              return;
-            }
+                  ]}
+                />,
+                { duration: Infinity }
+              );
+            }}
+            onElicitationRequest={(
+              request,
+              _serverId,
+              serverName,
+              _approve,
+              reject
+            ) => {
+              // When the chat tab is active, elicitation is rendered inline — no toast needed.
+              if (activeTabRef.current === "chat") {
+                return;
+              }
 
-            const mode = request.request.mode || "form";
-            const message = request.request.message;
-            const url =
-              mode === "url" && "url" in request.request
-                ? request.request.url
-                : undefined;
+              const mode = request.request.mode || "form";
+              const message = request.request.message;
+              const url =
+                mode === "url" && "url" in request.request
+                  ? request.request.url
+                  : undefined;
 
-            const toastId = toast(
-              <RequestActionToast
-                title="Elicitation Request Received"
-                description={`From ${serverName}: ${message}`}
-                extra={
-                  mode === "url" && url ? (
-                    <p className="text-xs text-muted-foreground mt-1 font-mono">
-                      {url}
-                    </p>
-                  ) : undefined
-                }
-                actions={[
-                  {
-                    label: "View Details",
-                    testId: "elicitation-toast-view-details",
-                    onClick: () => {
-                      const event = new CustomEvent("navigate-to-elicitation", {
-                        detail: { requestId: request.id },
-                      });
-                      window.dispatchEvent(event);
-                      toast.dismiss(toastId);
-                    },
-                  },
-                  ...(mode === "url" && url
-                    ? [
-                        {
-                          label: "Open URL",
-                          testId: "elicitation-toast-open-url",
-                          onClick: () => {
-                            window.open(url, "_blank");
-                            toast.dismiss(toastId);
-                          },
-                        },
-                      ]
-                    : []),
-                  {
-                    label: "Cancel",
-                    testId: "elicitation-toast-cancel",
-                    onClick: () => {
-                      reject(request.id, "User cancelled from toast");
-                      toast.dismiss(toastId);
-                    },
-                  },
-                ]}
-              />,
-              { duration: Infinity }
-            );
-          }}
-        >
-          <InspectorProvider>
-            <InspectorTabSync activeTabRef={activeTabRef} />
-            <Router basename={inspectorBase}>
-              <Routes>
-                <Route path="/oauth/callback" element={<OAuthCallback />} />
-                <Route
-                  path="/auth/callback"
-                  element={<ManufactOAuthCallback />}
-                />
-                <Route path="/preview/:view" element={<ViewPreview />} />
-                <Route
-                  path="/"
-                  element={
-                    <Layout>
-                      <InspectorDashboard />
-                    </Layout>
+              const toastId = toast(
+                <RequestActionToast
+                  title="Elicitation Request Received"
+                  description={`From ${serverName}: ${message}`}
+                  extra={
+                    mode === "url" && url ? (
+                      <p className="text-xs text-muted-foreground mt-1 font-mono">
+                        {url}
+                      </p>
+                    ) : undefined
                   }
-                />
-              </Routes>
-            </Router>
-            <Toaster position="top-center" />
-          </InspectorProvider>
-        </McpClientProvider>
-      </WidgetDebugProvider>
+                  actions={[
+                    {
+                      label: "View Details",
+                      testId: "elicitation-toast-view-details",
+                      onClick: () => {
+                        const event = new CustomEvent(
+                          "navigate-to-elicitation",
+                          {
+                            detail: { requestId: request.id },
+                          }
+                        );
+                        window.dispatchEvent(event);
+                        toast.dismiss(toastId);
+                      },
+                    },
+                    ...(mode === "url" && url
+                      ? [
+                          {
+                            label: "Open URL",
+                            testId: "elicitation-toast-open-url",
+                            onClick: () => {
+                              window.open(url, "_blank");
+                              toast.dismiss(toastId);
+                            },
+                          },
+                        ]
+                      : []),
+                    {
+                      label: "Cancel",
+                      testId: "elicitation-toast-cancel",
+                      onClick: () => {
+                        reject(request.id, "User cancelled from toast");
+                        toast.dismiss(toastId);
+                      },
+                    },
+                  ]}
+                />,
+                { duration: Infinity }
+              );
+            }}
+          >
+            <InspectorProvider>
+              <InspectorTabSync activeTabRef={activeTabRef} />
+              <Router basename={inspectorBase}>
+                <Routes>
+                  <Route path="/oauth/callback" element={<OAuthCallback />} />
+                  <Route
+                    path="/auth/callback"
+                    element={<ManufactOAuthCallback />}
+                  />
+                  <Route path="/preview/:view" element={<ViewPreview />} />
+                  <Route
+                    path="/"
+                    element={
+                      <Layout>
+                        <InspectorDashboard />
+                      </Layout>
+                    }
+                  />
+                </Routes>
+              </Router>
+              <Toaster position="top-center" />
+            </InspectorProvider>
+          </McpClientProvider>
+        </WidgetDebugProvider>
       </ShapeProvider>
     </ThemeProvider>
   );

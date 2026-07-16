@@ -16,9 +16,7 @@ export function writeStoredSystemPrompt(
   localStorage.setItem(getSystemPromptStorageKey(serverId), prompt);
 }
 
-export function resolveSystemPrompt(
-  stored: string | null | undefined
-): string {
+export function resolveSystemPrompt(stored: string | null | undefined): string {
   const trimmed = stored?.trim();
   return trimmed || DEFAULT_CHAT_SYSTEM_PROMPT;
 }

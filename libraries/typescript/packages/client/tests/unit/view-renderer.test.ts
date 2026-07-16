@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { resolveViewResource } from "../../src/react/view/resolve-view-resource.js";
-import { buildViewSandboxBlobUrl, buildSandboxProxyBlobHtml } from "../../src/react/view/sandbox-blob-url.js";
-import { getViewResourceUri, isViewTool } from "../../src/react/view/view-detection.js";
+import {
+  buildViewSandboxBlobUrl,
+  buildSandboxProxyBlobHtml,
+} from "../../src/react/view/sandbox-blob-url.js";
+import {
+  getViewResourceUri,
+  isViewTool,
+} from "../../src/react/view/view-detection.js";
 
 describe("buildViewSandboxBlobUrl", () => {
   it("returns blob: URLs and stable sandbox search params", () => {
@@ -11,7 +17,14 @@ describe("buildViewSandboxBlobUrl", () => {
     expect(url.protocol).toBe("blob:");
 
     const params = new URLSearchParams();
-    params.set("v", JSON.stringify({ cspMode: options.cspMode, permissions: undefined, widgetCsp: undefined }));
+    params.set(
+      "v",
+      JSON.stringify({
+        cspMode: options.cspMode,
+        permissions: undefined,
+        widgetCsp: undefined,
+      })
+    );
     params.set("csp_mode", options.cspMode);
     const search = `?${params.toString()}`;
     expect(buildSandboxProxyBlobHtml(search)).toBe(
@@ -53,9 +66,9 @@ describe("resolveViewResource", () => {
 
 describe("view detection", () => {
   it("detects view tools by _meta.ui.resourceUri", () => {
-    expect(
-      isViewTool({ ui: { resourceUri: "ui://app/widget.html" } })
-    ).toBe(true);
+    expect(isViewTool({ ui: { resourceUri: "ui://app/widget.html" } })).toBe(
+      true
+    );
     expect(getViewResourceUri({ ui: { resourceUri: "ui://x" } })).toBe(
       "ui://x"
     );

@@ -45,7 +45,8 @@ const SelectContext = createContext<SelectContextValue | null>(null);
 
 function useSelectContext() {
   const ctx = useContext(SelectContext);
-  if (!ctx) throw new Error("Select compound components must be inside <Select>");
+  if (!ctx)
+    throw new Error("Select compound components must be inside <Select>");
   return ctx;
 }
 
@@ -56,8 +57,9 @@ interface SelectContentContextValue {
   checkedIndex?: number;
 }
 
-const SelectContentContext =
-  createContext<SelectContentContextValue | null>(null);
+const SelectContentContext = createContext<SelectContentContextValue | null>(
+  null
+);
 
 // ---------------------------------------------------------------------------
 // Select (root)
@@ -188,7 +190,8 @@ const triggerVariants = cva(
 );
 
 interface SelectTriggerProps
-  extends Omit<HTMLAttributes<HTMLButtonElement>, "children">,
+  extends
+    Omit<HTMLAttributes<HTMLButtonElement>, "children">,
     VariantProps<typeof triggerVariants> {
   icon?: IconComponent;
   /** Non-lucide adornment (e.g. provider logo) shown before the value. */
@@ -596,7 +599,9 @@ const SelectItemBase = forwardRef<HTMLDivElement, SelectItemProps>(
         <SelectPrimitive.ItemText
           // py-1/-my-1 keeps truncate's overflow:hidden from clipping
           // ascenders/descenders outside the trimmed box.
-          render={<span className="flex-1 min-w-0 truncate [text-box:trim-both_cap_alphabetic] py-1 -my-1" />}
+          render={
+            <span className="flex-1 min-w-0 truncate [text-box:trim-both_cap_alphabetic] py-1 -my-1" />
+          }
         >
           {children}
         </SelectPrimitive.ItemText>
@@ -662,10 +667,7 @@ const SelectLabel = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn(
-        "px-2 py-1.5 text-[11px] text-muted-foreground",
-        className
-      )}
+      className={cn("px-2 py-1.5 text-[11px] text-muted-foreground", className)}
       {...props}
     />
   )
@@ -702,10 +704,7 @@ function SelectValue({ placeholder: _placeholder }: { placeholder?: string }) {
 }
 SelectValue.displayName = "SelectValue";
 
-function SelectContentShadcn({
-  children,
-  ...props
-}: SelectContentProps) {
+function SelectContentShadcn({ children, ...props }: SelectContentProps) {
   const indexRef = useRef(0);
   const indexApi = useMemo(
     () => ({

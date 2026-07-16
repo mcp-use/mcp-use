@@ -14,12 +14,13 @@ describe("openai-chat-completions credentials", () => {
           loginRequired: true,
           loginUrl: "https://manufact.com/login",
         }),
-        { status: 429, headers: { "Content-Type": "application/json" } },
-      ),
+        { status: 429, headers: { "Content-Type": "application/json" } }
+      )
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const { streamChat } = await import("../providers/openai-chat-completions.js");
+    const { streamChat } =
+      await import("../providers/openai-chat-completions.js");
 
     await expect(async () => {
       for await (const _event of streamChat({

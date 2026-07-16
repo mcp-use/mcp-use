@@ -16,10 +16,7 @@ import { useInspector } from "@/client/context/InspectorContext";
 import { useTheme } from "@/client/context/ThemeContext";
 import { useHostedSession } from "@/client/hooks/useHostedSession";
 import { cn } from "@/client/lib/utils";
-import {
-  MCPDeployClickEvent,
-  captureInspectorEvent,
-} from "@/client/telemetry";
+import { MCPDeployClickEvent, captureInspectorEvent } from "@/client/telemetry";
 import { ArrowUpRight, Command, Monitor, Moon, SunDim } from "lucide-react";
 
 function DiscordIcon({ className }: { className?: string }) {

@@ -22,7 +22,10 @@ async function loadPdfjs(): Promise<PdfjsModule> {
   return pdfjsPromise;
 }
 
-async function renderPdfFirstPage(file: File, targetWidth: number): Promise<string> {
+async function renderPdfFirstPage(
+  file: File,
+  targetWidth: number
+): Promise<string> {
   const pdfjs = await loadPdfjs();
   const buffer = await file.arrayBuffer();
   const pdf = await pdfjs.getDocument({ data: buffer }).promise;

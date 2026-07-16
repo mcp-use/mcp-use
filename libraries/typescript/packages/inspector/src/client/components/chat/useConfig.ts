@@ -1,4 +1,7 @@
-import { MCPChatConfiguredEvent, captureInspectorEvent } from "@/client/telemetry";
+import {
+  MCPChatConfiguredEvent,
+  captureInspectorEvent,
+} from "@/client/telemetry";
 import { useCallback, useEffect, useState } from "react";
 import type { ProviderName } from "@mcp-use/agent";
 import type { AuthConfig, LLMConfig } from "./types";
@@ -222,12 +225,11 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
     // Track chat configuration (no API key)
     try {
       captureInspectorEvent(
-          new MCPChatConfiguredEvent({
-            provider: tempProvider,
-            model: tempModel,
-          })
-        )
-        .catch(() => {});
+        new MCPChatConfiguredEvent({
+          provider: tempProvider,
+          model: tempModel,
+        })
+      ).catch(() => {});
     } catch {
       // ignore telemetry errors
     }

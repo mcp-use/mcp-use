@@ -626,8 +626,9 @@ function DiagramView({
     if (isFinal) {
       // Final input — parse complete JSON, render ALL elements
       const parsed = parsePartialElements(str);
-      let { viewport, drawElements, restoreId, deleteIds } =
-        extractViewportAndElements(parsed);
+      const extracted = extractViewportAndElements(parsed);
+      let { viewport } = extracted;
+      const { drawElements, restoreId, deleteIds } = extracted;
 
       // Load checkpoint base if restoring (async — from server)
       let base: any[] | undefined;
@@ -688,7 +689,9 @@ function DiagramView({
     }
 
     const safe = excludeIncompleteLastItem(parsed);
-    let { viewport, drawElements } = extractViewportAndElements(safe);
+    const streamExtracted = extractViewportAndElements(safe);
+    let { viewport } = streamExtracted;
+    const { drawElements } = streamExtracted;
 
     const doStream = async () => {
       // Load checkpoint base (once per restoreId) — from server via callServerTool
@@ -807,7 +810,9 @@ function DiagramView({
             applyZoom();
           }
         }
-      } catch {}
+      } catch {
+        // ponytail: viewBox parse is best-effort; skip zoom if SVG attrs are missing
+      }
     })();
   }, [editedElements, applyZoom]);
 

@@ -61,64 +61,100 @@ export interface IconComponentProps {
 export type IconComponent = ComponentType<IconComponentProps>;
 
 type IconName =
-  | "chevron-right" | "chevron-down" | "x" | "copy" | "menu" | "dot"
-  | "monitor" | "sun" | "moon" | "rectangle-horizontal" | "circle"
-  | "square-library" | "clock" | "star" | "settings"
-  | "plus" | "arrow-left" | "arrow-right" | "arrow-up" | "search" | "loader"
-  | "users" | "lock" | "mail" | "bell" | "shield" | "palette"
-  | "lightbulb" | "rocket" | "heart" | "paintbrush" | "brain"
-  | "globe" | "user"
-  | "image" | "link" | "check" | "rotate-ccw"
-  | "play" | "pause" | "pipette"
-  | "home" | "message-circle" | "inbox"
-  | "pencil" | "skip-forward" | "corner-down-right";
+  | "chevron-right"
+  | "chevron-down"
+  | "x"
+  | "copy"
+  | "menu"
+  | "dot"
+  | "monitor"
+  | "sun"
+  | "moon"
+  | "rectangle-horizontal"
+  | "circle"
+  | "square-library"
+  | "clock"
+  | "star"
+  | "settings"
+  | "plus"
+  | "arrow-left"
+  | "arrow-right"
+  | "arrow-up"
+  | "search"
+  | "loader"
+  | "users"
+  | "lock"
+  | "mail"
+  | "bell"
+  | "shield"
+  | "palette"
+  | "lightbulb"
+  | "rocket"
+  | "heart"
+  | "paintbrush"
+  | "brain"
+  | "globe"
+  | "user"
+  | "image"
+  | "link"
+  | "check"
+  | "rotate-ccw"
+  | "play"
+  | "pause"
+  | "pipette"
+  | "home"
+  | "message-circle"
+  | "inbox"
+  | "pencil"
+  | "skip-forward"
+  | "corner-down-right";
 
 const defaultIcons: Record<IconName, IconComponent> = {
   "chevron-right": ChevronRight,
   "chevron-down": ChevronDown,
-  "pipette": Pipette,
-  "x": X,
-  "copy": Copy,
-  "menu": Menu,
-  "dot": Dot,
-  "monitor": Monitor,
-  "sun": Sun,
-  "moon": Moon,
+  pipette: Pipette,
+  x: X,
+  copy: Copy,
+  menu: Menu,
+  dot: Dot,
+  monitor: Monitor,
+  sun: Sun,
+  moon: Moon,
   "rectangle-horizontal": RectangleHorizontal,
-  "circle": Circle,
+  circle: Circle,
   "square-library": SquareLibrary,
-  "clock": Clock,
-  "star": Star,
-  "settings": Settings,
-  "plus": Plus,
+  clock: Clock,
+  star: Star,
+  settings: Settings,
+  plus: Plus,
   "arrow-left": ArrowLeft,
   "arrow-right": ArrowRight,
   "arrow-up": ArrowUp,
-  "search": Search,
-  "loader": Loader,
-  "users": Users,
-  "lock": Lock,
-  "mail": Mail,
-  "bell": Bell,
-  "shield": Shield,
-  "palette": Palette,
-  "lightbulb": Lightbulb,
-  "rocket": Rocket,
-  "heart": Heart,
-  "paintbrush": Paintbrush,
-  "brain": Brain,
-  "globe": Globe,
-  "user": User,
-  "image": ImageIcon,
-  "link": Link,
-  "check": Check,
+  search: Search,
+  loader: Loader,
+  users: Users,
+  lock: Lock,
+  mail: Mail,
+  bell: Bell,
+  shield: Shield,
+  palette: Palette,
+  lightbulb: Lightbulb,
+  rocket: Rocket,
+  heart: Heart,
+  paintbrush: Paintbrush,
+  brain: Brain,
+  globe: Globe,
+  user: User,
+  image: ImageIcon,
+  link: Link,
+  check: Check,
   "rotate-ccw": RotateCcw,
-  "play": Play,
-  "pause": Pause,
-  "home": Home,
+  play: Play,
+  pause: Pause,
+  home: Home,
   "message-circle": MessageCircle,
-  "inbox": Inbox,
-  "pencil": Pencil,
+  inbox: Inbox,
+  pencil: Pencil,
   "skip-forward": SkipForward,
   "corner-down-right": CornerDownRight,
 };

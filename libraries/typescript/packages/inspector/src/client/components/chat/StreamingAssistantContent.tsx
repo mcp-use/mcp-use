@@ -19,26 +19,28 @@ interface StreamingAssistantContentProps {
   isStreaming?: boolean;
 }
 
-export const StreamingAssistantContent = memo(function StreamingAssistantContent({
-  content,
-  isStreaming = false,
-}: StreamingAssistantContentProps) {
-  return (
-    <Streamdown
-      key={isStreaming ? "streaming" : "static"}
-      className={cn(
-        "text-[14px] leading-relaxed text-foreground",
-        "[&_p]:mb-2 [&_p:last-child]:mb-0",
-        "[&_pre]:my-3 [&_ul]:mb-2 [&_ol]:mb-2"
-      )}
-      plugins={streamdownPlugins}
-      animated={streamdownAnimated}
-      isAnimating={isStreaming}
-      parseIncompleteMarkdown={isStreaming}
-      lineNumbers={false}
-      mode={isStreaming ? "streaming" : "static"}
-    >
-      {content}
-    </Streamdown>
-  );
-});
+export const StreamingAssistantContent = memo(
+  function StreamingAssistantContent({
+    content,
+    isStreaming = false,
+  }: StreamingAssistantContentProps) {
+    return (
+      <Streamdown
+        key={isStreaming ? "streaming" : "static"}
+        className={cn(
+          "text-[14px] leading-relaxed text-foreground",
+          "[&_p]:mb-2 [&_p:last-child]:mb-0",
+          "[&_pre]:my-3 [&_ul]:mb-2 [&_ol]:mb-2"
+        )}
+        plugins={streamdownPlugins}
+        animated={streamdownAnimated}
+        isAnimating={isStreaming}
+        parseIncompleteMarkdown={isStreaming}
+        lineNumbers={false}
+        mode={isStreaming ? "streaming" : "static"}
+      >
+        {content}
+      </Streamdown>
+    );
+  }
+);

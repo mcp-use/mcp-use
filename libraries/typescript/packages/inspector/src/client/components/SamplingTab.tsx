@@ -9,7 +9,10 @@ import {
 } from "@/client/components/ui/resizable";
 import { SamplingRequestsList } from "./sampling/SamplingRequestsList";
 import { SamplingRequestDisplay } from "./sampling/SamplingRequestDisplay";
-import { InspectorScrollArea, SearchTabHeader } from "@/client/components/shared";
+import {
+  InspectorScrollArea,
+  SearchTabHeader,
+} from "@/client/components/shared";
 import { useInspector } from "@/client/context/InspectorContext";
 import { copyToClipboard, formatRelativeTime } from "@/client/utils/browser";
 import { useConfig } from "./chat/useConfig";
@@ -350,7 +353,11 @@ export function SamplingTab({
           orientation="vertical"
           className="h-full border-r dark:border-zinc-700"
         >
-          <ResizablePanel defaultSize={75} minSize={30} className="h-full overflow-hidden">
+          <ResizablePanel
+            defaultSize={75}
+            minSize={30}
+            className="h-full overflow-hidden"
+          >
             <InspectorScrollArea scrollRef={listRef}>
               {(isScrolled) => (
                 <>

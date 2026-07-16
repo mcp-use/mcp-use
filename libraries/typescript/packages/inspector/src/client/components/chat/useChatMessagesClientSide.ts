@@ -22,7 +22,8 @@ function rateLimitFromLlmError(error: unknown): {
   creditsExhausted?: boolean;
   billingUrl?: string;
 } | null {
-  if (!(error instanceof Error) || error.name !== "LlmRequestError") return null;
+  if (!(error instanceof Error) || error.name !== "LlmRequestError")
+    return null;
   const status = (error as { status?: number }).status;
   const body = (error as { body?: Record<string, unknown> }).body;
   if (status !== 429 || !body) return null;
@@ -80,17 +81,14 @@ export function useChatMessagesClientSide({
   const abortControllerRef = useRef<AbortController | null>(null);
   const traceIdRef = useRef(0);
 
-  const recordTrace = useCallback(
-    (event: InspectorTraceEventInput) => {
-      const next = {
-        ...event,
-        id: `trace-${++traceIdRef.current}`,
-        timestamp: Date.now(),
-      } as InspectorTraceEvent;
-      setTraceState((state) => appendTraceEvent(state, next));
-    },
-    []
-  );
+  const recordTrace = useCallback((event: InspectorTraceEventInput) => {
+    const next = {
+      ...event,
+      id: `trace-${++traceIdRef.current}`,
+      timestamp: Date.now(),
+    } as InspectorTraceEvent;
+    setTraceState((state) => appendTraceEvent(state, next));
+  }, []);
 
   useEffect(() => {
     if (initialMessages !== undefined) {
@@ -220,16 +218,12 @@ export function useChatMessagesClientSide({
         });
 
         const agent = new MCPAgent({
-          llm: providerConfigFromOptions(
-            llmConfig.provider,
-            llmConfig.model,
-            {
-              apiKey: llmConfig.apiKey,
-              temperature: llmConfig.temperature,
-              baseUrl: llmConfig.baseUrl,
-              credentials: llmConfig.credentials,
-            }
-          ),
+          llm: providerConfigFromOptions(llmConfig.provider, llmConfig.model, {
+            apiKey: llmConfig.apiKey,
+            temperature: llmConfig.temperature,
+            baseUrl: llmConfig.baseUrl,
+            credentials: llmConfig.credentials,
+          }),
           mcpServers: [connection],
           systemPrompt,
           disallowedTools: disabledTools ? [...disabledTools] : undefined,
@@ -464,20 +458,19 @@ export function useChatMessagesClientSide({
 
         if (llmConfig) {
           captureInspectorEvent(
-              new MCPChatMessageEvent({
-                serverId: connection.url,
-                provider: llmConfig.provider,
-                model: llmConfig.model,
-                messageCount: messages.length + 1,
-                toolCallsCount,
-                success: true,
-                executionMode: "client-side",
-                duration: Date.now() - startTime,
-              })
-            )
-            .catch(() => {
-              // Silently fail - telemetry should not break the application
-            });
+            new MCPChatMessageEvent({
+              serverId: connection.url,
+              provider: llmConfig.provider,
+              model: llmConfig.model,
+              messageCount: messages.length + 1,
+              toolCallsCount,
+              success: true,
+              executionMode: "client-side",
+              duration: Date.now() - startTime,
+            })
+          ).catch(() => {
+            // Silently fail - telemetry should not break the application
+          });
         }
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
@@ -513,21 +506,20 @@ export function useChatMessagesClientSide({
 
         if (llmConfig) {
           captureInspectorEvent(
-              new MCPChatMessageEvent({
-                serverId: connection.url,
-                provider: llmConfig.provider,
-                model: llmConfig.model,
-                messageCount: messages.length + 1,
-                toolCallsCount,
-                success: false,
-                executionMode: "client-side",
-                duration: Date.now() - startTime,
-                error: errorDetail,
-              })
-            )
-            .catch(() => {
-              // Silently fail - telemetry should not break the application
-            });
+            new MCPChatMessageEvent({
+              serverId: connection.url,
+              provider: llmConfig.provider,
+              model: llmConfig.model,
+              messageCount: messages.length + 1,
+              toolCallsCount,
+              success: false,
+              executionMode: "client-side",
+              duration: Date.now() - startTime,
+              error: errorDetail,
+            })
+          ).catch(() => {
+            // Silently fail - telemetry should not break the application
+          });
         }
 
         const errorMessage: Message = {

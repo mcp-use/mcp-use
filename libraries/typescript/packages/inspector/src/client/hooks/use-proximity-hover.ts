@@ -55,8 +55,7 @@ function measureRectsInContainer(
   items.forEach((element, index) => {
     const elementRect = element.getBoundingClientRect();
     rects[index] = {
-      top:
-        (elementRect.top - containerRect.top) / scaleY + container.scrollTop,
+      top: (elementRect.top - containerRect.top) / scaleY + container.scrollTop,
       left:
         (elementRect.left - containerRect.left) / scaleX + container.scrollLeft,
       width: element.offsetWidth,
@@ -144,12 +143,7 @@ export function useProximityHover<T extends HTMLElement>(
   const updateActiveFromPointer = useCallback(
     (clientX: number, clientY: number) => {
       setActiveIndex(
-        resolveActiveIndexFromPointer(
-          itemsRef.current,
-          clientX,
-          clientY,
-          axis
-        )
+        resolveActiveIndexFromPointer(itemsRef.current, clientX, clientY, axis)
       );
     },
     [axis]
@@ -266,4 +260,3 @@ export function useProximityHover<T extends HTMLElement>(
     measureItems,
   };
 }
-

@@ -1,8 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import {
-  buildManagedAuthHeaders,
-  FALLBACK_MANAGED_MODEL_ID,
-} from "./freeTier";
+import { buildManagedAuthHeaders, FALLBACK_MANAGED_MODEL_ID } from "./freeTier";
 
 export interface CloudModel {
   id: string;
@@ -32,9 +29,13 @@ export function useManagedCloudModel(
 ) {
   const origin = chatApiUrl ? new URL(chatApiUrl).origin : null;
   const [models, setModels] = useState<CloudModel[]>([]);
-  const [defaultModelId, setDefaultModelId] = useState(FALLBACK_MANAGED_MODEL_ID);
+  const [defaultModelId, setDefaultModelId] = useState(
+    FALLBACK_MANAGED_MODEL_ID
+  );
   const [selectedModelId, setSelectedModelIdState] = useState(() =>
-    origin ? (readStoredModel(origin) ?? FALLBACK_MANAGED_MODEL_ID) : FALLBACK_MANAGED_MODEL_ID
+    origin
+      ? (readStoredModel(origin) ?? FALLBACK_MANAGED_MODEL_ID)
+      : FALLBACK_MANAGED_MODEL_ID
   );
   const [isLoading, setIsLoading] = useState(false);
 
@@ -54,7 +55,27 @@ export function useManagedCloudModel(
 
   useEffect(() => {
     // #region agent log
-    fetch('http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'243e61'},body:JSON.stringify({sessionId:'243e61',location:'useManagedCloudModel.ts:effect',message:'models fetch gate',data:{enabled,origin,authMode,hasAccessToken:!!accessToken,chatApiUrl:chatApiUrl??null},timestamp:Date.now(),hypothesisId:'H-B'})}).catch(()=>{});
+    fetch("http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "243e61",
+      },
+      body: JSON.stringify({
+        sessionId: "243e61",
+        location: "useManagedCloudModel.ts:effect",
+        message: "models fetch gate",
+        data: {
+          enabled,
+          origin,
+          authMode,
+          hasAccessToken: !!accessToken,
+          chatApiUrl: chatApiUrl ?? null,
+        },
+        timestamp: Date.now(),
+        hypothesisId: "H-B",
+      }),
+    }).catch(() => {});
     // #endregion
     if (!enabled || !origin) return;
     let cancelled = false;
@@ -67,7 +88,30 @@ export function useManagedCloudModel(
           credentials: authMode === "session" ? "include" : "same-origin",
         });
         // #region agent log
-        fetch('http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'243e61'},body:JSON.stringify({sessionId:'243e61',location:'useManagedCloudModel.ts:fetch',message:'models fetch result',data:{status:response.status,ok:response.ok,origin,authMode,hasAuthHeader:!!headers?.Authorization},timestamp:Date.now(),hypothesisId:'H-A'})}).catch(()=>{});
+        fetch(
+          "http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Debug-Session-Id": "243e61",
+            },
+            body: JSON.stringify({
+              sessionId: "243e61",
+              location: "useManagedCloudModel.ts:fetch",
+              message: "models fetch result",
+              data: {
+                status: response.status,
+                ok: response.ok,
+                origin,
+                authMode,
+                hasAuthHeader: !!headers?.Authorization,
+              },
+              timestamp: Date.now(),
+              hypothesisId: "H-A",
+            }),
+          }
+        ).catch(() => {});
         // #endregion
         if (!response.ok) return;
         const data = (await response.json()) as {
@@ -75,7 +119,27 @@ export function useManagedCloudModel(
           defaultModelId?: string;
         };
         // #region agent log
-        fetch('http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'243e61'},body:JSON.stringify({sessionId:'243e61',location:'useManagedCloudModel.ts:parse',message:'models payload',data:{modelCount:(data.models??[]).length,defaultModelId:data.defaultModelId??null},timestamp:Date.now(),hypothesisId:'H-D'})}).catch(()=>{});
+        fetch(
+          "http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Debug-Session-Id": "243e61",
+            },
+            body: JSON.stringify({
+              sessionId: "243e61",
+              location: "useManagedCloudModel.ts:parse",
+              message: "models payload",
+              data: {
+                modelCount: (data.models ?? []).length,
+                defaultModelId: data.defaultModelId ?? null,
+              },
+              timestamp: Date.now(),
+              hypothesisId: "H-D",
+            }),
+          }
+        ).catch(() => {});
         // #endregion
         if (cancelled) return;
         const list = data.models ?? [];

@@ -19,7 +19,11 @@ export {
 
 // Chat tool result rendering (MCP Apps views)
 export { ToolResultRenderer } from "./components/chat/ToolResultRenderer.js";
-export { ViewRenderer, isViewTool, getViewResourceUri } from "@mcp-use/client/react";
+export {
+  ViewRenderer,
+  isViewTool,
+  getViewResourceUri,
+} from "@mcp-use/client/react";
 
 // Context providers
 export { ThemeProvider } from "./context/ThemeContext.js";

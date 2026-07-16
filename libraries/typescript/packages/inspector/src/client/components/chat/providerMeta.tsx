@@ -4,8 +4,7 @@ import { ChevronDown, Key } from "lucide-react";
 import { cn } from "@/client/lib/utils";
 import { useTheme } from "@/client/context/ThemeContext";
 
-const MANUFACT_LOGO_URL =
-  "https://cdn.mcp-use.com/mcpuse_logo_circle_dark.svg";
+const MANUFACT_LOGO_URL = "https://cdn.mcp-use.com/mcpuse_logo_circle_dark.svg";
 
 // OpenRouter doesn't ship a logo on our provider CDN yet, so inline the
 // official mark as a data URL with a neutral gray fill.

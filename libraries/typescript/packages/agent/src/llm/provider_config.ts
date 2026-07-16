@@ -32,10 +32,9 @@ function resolveApiKey(provider: string, config?: NativeLLMConfig): string {
     }
   }
   if (provider === "ollama") return "";
-  const hint = envVars.length > 0 ? envVars.join(" or ") : "apiKey in llmConfig";
-  throw new Error(
-    `API key not found for provider '${provider}'. Set ${hint}.`
-  );
+  const hint =
+    envVars.length > 0 ? envVars.join(" or ") : "apiKey in llmConfig";
+  throw new Error(`API key not found for provider '${provider}'. Set ${hint}.`);
 }
 
 /** Parse "provider/model" into native ProviderConfig (no LangChain). */

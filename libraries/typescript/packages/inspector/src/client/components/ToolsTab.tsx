@@ -649,7 +649,9 @@ export function ToolsTab({
                         onSearchChange={setSearchQuery}
                         onSearchBlur={handleSearchBlur}
                         onTabSwitch={() =>
-                          setActiveTab(activeTab === "tools" ? "saved" : "tools")
+                          setActiveTab(
+                            activeTab === "tools" ? "saved" : "tools"
+                          )
                         }
                         searchInputRef={
                           searchInputRef as React.RefObject<HTMLInputElement>
@@ -839,7 +841,9 @@ export function ToolsTab({
                   onTabSwitch={() =>
                     setActiveTab(activeTab === "tools" ? "saved" : "tools")
                   }
-                  searchInputRef={searchInputRef as React.RefObject<HTMLInputElement>}
+                  searchInputRef={
+                    searchInputRef as React.RefObject<HTMLInputElement>
+                  }
                   onRefresh={refreshTools ? handleRefresh : undefined}
                   isRefreshing={isRefreshing}
                 />

@@ -1,10 +1,5 @@
 import { TextShimmer } from "@/client/components/ui/text-shimmer";
-import {
-  memo,
-  useCallback,
-  useMemo,
-  type RefObject,
-} from "react";
+import { memo, useCallback, useMemo, type RefObject } from "react";
 import type { MessageContentBlock } from "@/client/types/message-content-block";
 import { AssistantMessage } from "./AssistantMessage";
 import { ToolCallDisplay } from "./ToolCallDisplay";
@@ -12,10 +7,7 @@ import { ToolResultRenderer } from "./ToolResultRenderer";
 import { UserMessage } from "./UserMessage";
 import type { MessageAttachment } from "./types";
 import { isViewTool } from "@mcp-use/client/react";
-import {
-  buildMessageTokenMap,
-  type InspectorTraceEvent,
-} from "./trace";
+import { buildMessageTokenMap, type InspectorTraceEvent } from "./trace";
 
 interface Message {
   id: string;
@@ -159,8 +151,7 @@ export const MessageList = memo(
     // Determine if a message is currently streaming
     const lastMessage = messages[messages.length - 1];
     const isLastAssistantStreaming =
-      isLoading &&
-      lastMessage?.role === "assistant";
+      isLoading && lastMessage?.role === "assistant";
 
     const getLastTextPartIndex = (parts: NonNullable<Message["parts"]>) => {
       for (let i = parts.length - 1; i >= 0; i--) {
@@ -210,8 +201,7 @@ export const MessageList = memo(
           }
 
           if (message.role === "assistant") {
-            const outputTokens =
-              messageTokenMap.get(message.id)?.outputTokens;
+            const outputTokens = messageTokenMap.get(message.id)?.outputTokens;
             const lastTextPartIndex =
               message.parts && message.parts.length > 0
                 ? getLastTextPartIndex(message.parts)

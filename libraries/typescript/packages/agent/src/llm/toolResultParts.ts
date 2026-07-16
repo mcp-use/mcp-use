@@ -1,4 +1,8 @@
-import type { ContentPart, ImageContentPart, TextContentPart } from "./types.js";
+import type {
+  ContentPart,
+  ImageContentPart,
+  TextContentPart,
+} from "./types.js";
 
 /**
  * Convert an MCP tool result into a provider-neutral `ContentPart[]` (or a

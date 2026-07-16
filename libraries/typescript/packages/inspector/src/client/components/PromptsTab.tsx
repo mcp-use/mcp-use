@@ -501,7 +501,9 @@ export function PromptsTab({
                         onSearchChange={setSearchQuery}
                         onSearchBlur={handleSearchBlur}
                         onTabSwitch={() =>
-                          setActiveTab(activeTab === "prompts" ? "saved" : "prompts")
+                          setActiveTab(
+                            activeTab === "prompts" ? "saved" : "prompts"
+                          )
                         }
                         searchInputRef={
                           searchInputRef as React.RefObject<HTMLInputElement>
@@ -609,7 +611,9 @@ export function PromptsTab({
                   onTabSwitch={() =>
                     setActiveTab(activeTab === "prompts" ? "saved" : "prompts")
                   }
-                  searchInputRef={searchInputRef as React.RefObject<HTMLInputElement>}
+                  searchInputRef={
+                    searchInputRef as React.RefObject<HTMLInputElement>
+                  }
                   onRefresh={refreshPrompts ? handleRefresh : undefined}
                   isRefreshing={isRefreshing}
                 />

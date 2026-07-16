@@ -1,9 +1,6 @@
 import type { Express, NextFunction, Request, Response } from "express";
 import { Hono } from "hono";
-import {
-  registerInspectorCdnShell,
-  type InspectorMode,
-} from "./cdn-shell.js";
+import { registerInspectorCdnShell, type InspectorMode } from "./cdn-shell.js";
 import {
   registerInspectorProxyRoutes,
   type InspectorProxyRoutesConfig,

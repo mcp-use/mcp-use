@@ -17,12 +17,12 @@ import {
 import type { ProviderName } from "@mcp-use/agent";
 import { ChatTitleReveal } from "@/client/chat-history/ChatTitleReveal";
 import { CHAT_TITLE_SIMPLE } from "@/client/chat-history/chat-title";
-import { inspectorTabHeaderPadding, inspectorTabTitleClass } from "@/client/lib/font-weight";
-import { cn } from "@/client/lib/utils";
 import {
-  TabsSubtle,
-  TabsSubtleItem,
-} from "@/client/components/ui/tabs-subtle";
+  inspectorTabHeaderPadding,
+  inspectorTabTitleClass,
+} from "@/client/lib/font-weight";
+import { cn } from "@/client/lib/utils";
+import { TabsSubtle, TabsSubtleItem } from "@/client/components/ui/tabs-subtle";
 import {
   chatBarActionButtonClass,
   chatBarTitleFrostedClass,
@@ -244,18 +244,18 @@ export function ChatHeader({
                     className={`p-2 cursor-pointer ${clearButtonHideShortcut ? "sm:px-3" : "sm:pr-1 sm:pl-3"}`}
                     onClick={onClearChat}
                   >
-                  {!clearButtonHideIcon && (
-                    <SquarePen className="h-4 w-4 sm:mr-2" />
-                  )}
-                  <span className="hidden sm:inline">
-                    {clearButtonLabel ?? "New Chat"}
-                  </span>
-                  {!clearButtonHideShortcut && (
-                    <span className="hidden sm:inline text-[12px] border text-zinc-300 p-1 rounded-full border-zinc-300 dark:text-zinc-600 dark:border-zinc-500 ml-2">
-                      ⌘O
+                    {!clearButtonHideIcon && (
+                      <SquarePen className="h-4 w-4 sm:mr-2" />
+                    )}
+                    <span className="hidden sm:inline">
+                      {clearButtonLabel ?? "New Chat"}
                     </span>
-                  )}
-                </Button>
+                    {!clearButtonHideShortcut && (
+                      <span className="hidden sm:inline text-[12px] border text-zinc-300 p-1 rounded-full border-zinc-300 dark:text-zinc-600 dark:border-zinc-500 ml-2">
+                        ⌘O
+                      </span>
+                    )}
+                  </Button>
                 }
                 nativeButton
               />

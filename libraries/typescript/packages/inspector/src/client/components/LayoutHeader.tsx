@@ -10,10 +10,7 @@ import type { McpServer } from "@mcp-use/client/react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { HostedUserMenu } from "@/client/components/HostedUserMenu";
-import {
-  MCPDeployClickEvent,
-  captureInspectorEvent,
-} from "@/client/telemetry";
+import { MCPDeployClickEvent, captureInspectorEvent } from "@/client/telemetry";
 import { TabCountBadge } from "./shared/TabCountBadge";
 import { AddToClientDropdown } from "./AddToClientDropdown";
 import LogoAnimated from "./LogoAnimated";
@@ -203,16 +200,16 @@ export function LayoutHeader({
                   state={sidebarCollapsed ? "collapsed" : "expanded"}
                 />
               </div>
-              <span className="text-sm text-muted-foreground/60 shrink-0 [text-box:trim-both_cap_alphabetic]">/</span>
+              <span className="text-sm text-muted-foreground/60 shrink-0 [text-box:trim-both_cap_alphabetic]">
+                /
+              </span>
               <ServerDropdown
                 connections={connections}
                 selectedServer={selectedServer}
                 onServerSelect={onServerSelect}
                 variant="header"
               />
-              {selectedServer && serverUrl && (
-                <ServerUrlChip url={serverUrl} />
-              )}
+              {selectedServer && serverUrl && <ServerUrlChip url={serverUrl} />}
             </>
           )}
         </div>
@@ -234,7 +231,9 @@ export function LayoutHeader({
               <div className="flex-shrink-0 flex justify-center">
                 <LogoAnimated state="collapsed" showLabel />
               </div>
-              <div className="flex-1 flex justify-end">{renderActionButtons()}</div>
+              <div className="flex-1 flex justify-end">
+                {renderActionButtons()}
+              </div>
             </>
           )}
         </div>

@@ -140,7 +140,10 @@ export function saveStoredConnectionConfig(
       ...allServers[id],
       ...config,
     };
-    localStorage.setItem("mcp-inspector-connections", JSON.stringify(allServers));
+    localStorage.setItem(
+      "mcp-inspector-connections",
+      JSON.stringify(allServers)
+    );
   } catch {
     // ignore storage errors
   }
@@ -218,9 +221,7 @@ function normalizeStoredServerConfig(
 
   return {
     ...(rest as McpServerConfig),
-    ...(headers && !normalizedProxyConfig?.proxyAddress
-      ? { headers }
-      : {}),
+    ...(headers && !normalizedProxyConfig?.proxyAddress ? { headers } : {}),
     ...(normalizedProxyConfig ? { proxyConfig: normalizedProxyConfig } : {}),
     connectionMode: normalizeConnectionMode(
       stored.connectionMode as string | undefined,
@@ -289,8 +290,7 @@ export function toEditableConnectionConfig(
       undefined,
       !!proxyAddress
     ),
-    connectionType:
-      config.connectionMode === "proxy" ? "Via Proxy" : "Direct",
+    connectionType: config.connectionMode === "proxy" ? "Via Proxy" : "Direct",
     proxyConfig:
       config.connectionMode === "proxy" && proxyAddress
         ? {

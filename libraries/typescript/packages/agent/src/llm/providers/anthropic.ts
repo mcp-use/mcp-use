@@ -271,8 +271,7 @@ export async function* streamChat(
       if (usage) {
         const totalTokens =
           usage.totalTokens ??
-          (usage.inputTokens !== undefined &&
-          usage.outputTokens !== undefined
+          (usage.inputTokens !== undefined && usage.outputTokens !== undefined
             ? usage.inputTokens + usage.outputTokens
             : undefined);
         yield { type: "usage", usage: { ...usage, totalTokens } };

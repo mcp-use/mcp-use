@@ -18,10 +18,7 @@ import type {
   PendingElicitationRequest,
   PendingSamplingRequest,
 } from "./types.js";
-import {
-  pickPersistedServerConfig,
-  toPersistedServerConfig,
-} from "./types.js";
+import { pickPersistedServerConfig, toPersistedServerConfig } from "./types.js";
 import { useMcp } from "./useMcp.js";
 import { useMcpServerQueues } from "./useMcpServerQueues.js";
 
@@ -1035,24 +1032,27 @@ export function McpClientProvider({
     [serverConfigs]
   );
 
-  const reconnectServer = useCallback(async (id: string) => {
-    const currentConfig = serverConfigs.find((s) => s.id === id);
-    if (!currentConfig) {
-      providerLogger.warn(
-        `[McpClientProvider] Cannot reconnect server "${id}" - not found`
-      );
-      return;
-    }
+  const reconnectServer = useCallback(
+    async (id: string) => {
+      const currentConfig = serverConfigs.find((s) => s.id === id);
+      if (!currentConfig) {
+        providerLogger.warn(
+          `[McpClientProvider] Cannot reconnect server "${id}" - not found`
+        );
+        return;
+      }
 
-    const captured = serversRef.current.find((s) => s.id === id);
-    await captured?.disconnect();
+      const captured = serversRef.current.find((s) => s.id === id);
+      await captured?.disconnect();
 
-    setServers((prev) => prev.filter((s) => s.id !== id));
-    setServerRevisions((prev) => ({
-      ...prev,
-      [id]: (prev[id] ?? 0) + 1,
-    }));
-  }, [serverConfigs]);
+      setServers((prev) => prev.filter((s) => s.id !== id));
+      setServerRevisions((prev) => ({
+        ...prev,
+        [id]: (prev[id] ?? 0) + 1,
+      }));
+    },
+    [serverConfigs]
+  );
 
   const updateServerMetadata = useCallback(
     async (id: string, metadata: { name: string }) => {

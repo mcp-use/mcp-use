@@ -10,12 +10,14 @@ export function ServerCapabilitiesList({
   connection,
 }: ServerCapabilitiesListProps) {
   const capabilities = connection.capabilities;
-  const hasCapabilities =
-    capabilities && Object.keys(capabilities).length > 0;
+  const hasCapabilities = capabilities && Object.keys(capabilities).length > 0;
 
   if (!hasCapabilities) {
     return (
-      <p className="text-sm text-muted-foreground" data-testid="server-info-capabilities">
+      <p
+        className="text-sm text-muted-foreground"
+        data-testid="server-info-capabilities"
+      >
         No capabilities reported.
       </p>
     );

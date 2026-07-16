@@ -17,6 +17,8 @@ onlyBuiltDependencies:
 # blunt supply-chain attacks where a malicious version is yanked within
 # hours of publish. Workspace-published names are exempted.
 minimumReleaseAge: 4320
+# pkg.pr.new pre-release tarballs are intentional direct + transitive deps during v2 migration.
+blockExoticSubdeps: false
 minimumReleaseAgeExclude:
   - mcp-use
   - "@mcp-use/*"
@@ -25,6 +27,14 @@ minimumReleaseAgeExclude:
   # exact versions in package.json, so bumps are always an explicit, reviewed
   # change rather than an automatic resolution.
   - "@modelcontextprotocol/*"
+  - nanoid@3.3.8 || 5.0.9
+  - lodash-es@4.17.23 || 4.17.24
+  - brace-expansion@5.0.6
+  - joi@18.2.1
+  - form-data@4.0.6
+  - dompurify@3.4.8 || 3.4.9 || 3.4.11
+  - js-yaml@4.1.2
+  - "@babel/core@7.29.1"
 
 patchedDependencies:
   "@modelcontextprotocol/sdk": patches/@modelcontextprotocol__sdk.patch
@@ -51,12 +61,12 @@ overrides:
   vite: ">=8.0.5"
   prismjs: ">=1.30.0"
   glob: ">=10.5.0"
-  js-yaml: ">=3.14.2 || >=4.1.1"
+  js-yaml: ">=4.1.2"
   flatted: ">=3.4.2"
   tar: ">=7.5.11"
   hono: ">=4.12.27"
   express-rate-limit: ">=8.2.2"
-  dompurify: ">=3.4.0"
+  dompurify: ">=3.4.11"
   minimatch: ">=10.2.1"
   rollup: ">=4.59.0"
   "@modelcontextprotocol/sdk": ">=1.25.2"
@@ -64,10 +74,13 @@ overrides:
   axios: ">=1.16.0"
   body-parser: ">=2.2.1"
   brace-expansion: ">=2.0.3"
-  "@isaacs/brace-expansion": ">=5.0.1"
+  "@isaacs/brace-expansion": ">=5.0.6"
   picomatch: ">=4.0.4"
-  form-data: ">=4.0.4"
+  form-data: ">=4.0.6"
   lodash: ">=4.18.0"
+  lodash-es: ">=4.17.24"
+  joi: ">=18.2.1"
+  "@babel/core": ">=7.29.1"
   path-to-regexp: ">=8.4.0"
   yaml: ">=2.8.3"
   "@eslint/plugin-kit": ">=0.3.4"
@@ -82,3 +95,11 @@ overrides:
   langsmith: ">=0.6.0"
   follow-redirects: ">=1.16.0"
   better-auth: ">=1.6.2"
+  brace-expansion@>=5.0.0 <5.0.6: ^5.0.6
+  nanoid@<3.3.8: ^3.3.8
+  nanoid@>=4.0.0 <5.0.9: ^5.0.9
+
+allowBuilds:
+  "@tailwindcss/oxide": true
+  esbuild: true
+  unrs-resolver: true

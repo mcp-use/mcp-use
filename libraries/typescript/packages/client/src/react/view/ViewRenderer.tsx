@@ -659,7 +659,9 @@ function ViewRendererBase({
               ? "debugger-exit-fullscreen-button"
               : "debugger-exit-pip-button"
           }
-          aria-label={isFullscreen ? "Exit fullscreen" : "Exit picture-in-picture"}
+          aria-label={
+            isFullscreen ? "Exit fullscreen" : "Exit picture-in-picture"
+          }
           className="absolute right-3 top-3 z-[110] flex size-8 items-center justify-center rounded-full border border-border bg-background/90 text-lg leading-none text-foreground shadow-sm backdrop-blur-sm hover:bg-background"
           style={{ zIndex: 110 }}
           onClick={() => void handleDisplayModeChange("inline")}

@@ -1,5 +1,8 @@
 import type { Tool } from "@modelcontextprotocol/client";
-import { MCPToolExecutionEvent, captureInspectorEvent } from "@/client/telemetry";
+import {
+  MCPToolExecutionEvent,
+  captureInspectorEvent,
+} from "@/client/telemetry";
 import { copyToClipboard } from "@/client/utils/browser";
 import { useCallback, useMemo, useState } from "react";
 import type { ToolResult } from "./ToolResultDisplay";
@@ -75,14 +78,13 @@ export function useToolExecution({
       const updatedToolMeta = (result as any)?._meta ?? toolMeta;
 
       captureInspectorEvent(
-          new MCPToolExecutionEvent({
-            toolName: selectedTool.name,
-            serverId,
-            success: true,
-            duration,
-          })
-        )
-        .catch(() => {});
+        new MCPToolExecutionEvent({
+          toolName: selectedTool.name,
+          serverId,
+          success: true,
+          duration,
+        })
+      ).catch(() => {});
       window.dispatchEvent(new Event("mcp-tool-executed"));
 
       if (widgetResourceUri && typeof widgetResourceUri === "string") {
@@ -109,15 +111,14 @@ export function useToolExecution({
     } catch (error) {
       const duration = Date.now() - startTime;
       captureInspectorEvent(
-          new MCPToolExecutionEvent({
-            toolName: selectedTool.name,
-            serverId,
-            success: false,
-            duration,
-            error: error instanceof Error ? error.message : String(error),
-          })
-        )
-        .catch(() => {});
+        new MCPToolExecutionEvent({
+          toolName: selectedTool.name,
+          serverId,
+          success: false,
+          duration,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      ).catch(() => {});
       window.dispatchEvent(new Event("mcp-tool-executed"));
 
       const toolMeta =

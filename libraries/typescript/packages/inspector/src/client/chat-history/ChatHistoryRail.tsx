@@ -27,9 +27,7 @@ export function ChatHistoryRail({ onCollapse }: { onCollapse: () => void }) {
         }
         nativeButton
       />
-      <TooltipContent side="right">
-        Collapse
-      </TooltipContent>
+      <TooltipContent side="right">Collapse</TooltipContent>
     </Tooltip>
   );
 }

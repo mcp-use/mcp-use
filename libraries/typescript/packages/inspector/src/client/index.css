@@ -168,18 +168,20 @@
   --color-active: var(--active);
   --duration-80: 80ms;
   @keyframes spinner-move {
-  to {
-    stroke-dashoffset: -100;
+    to {
+      stroke-dashoffset: -100;
     }
   }
   @keyframes spinner-dash {
-  0%, 100% {
-    stroke-dasharray: 15 85;
+    0%,
+    100% {
+      stroke-dasharray: 15 85;
     }
-  50% {
-    stroke-dasharray: 40 60;
+    50% {
+      stroke-dasharray: 40 60;
     }
-  }}
+  }
+}
 
 :root {
   --radius: 0.625rem;
@@ -248,23 +250,42 @@
   --hover: color-mix(in oklch, var(--foreground) 6%, transparent);
   --active: color-mix(in oklch, var(--foreground) 10%, transparent);
   --focus-ring: #6b97ff;
-  --surface-1: #FAFAFA;
-  --surface-2: #FCFCFC;
-  --surface-3: #FFFFFF;
-  --surface-4: #FFFFFF;
-  --surface-5: #FFFFFF;
-  --surface-6: #FFFFFF;
-  --surface-7: #FFFFFF;
-  --surface-8: #FFFFFF;
+  --surface-1: #fafafa;
+  --surface-2: #fcfcfc;
+  --surface-3: #ffffff;
+  --surface-4: #ffffff;
+  --surface-5: #ffffff;
+  --surface-6: #ffffff;
+  --surface-7: #ffffff;
+  --surface-8: #ffffff;
   --shadow-color: rgb(0 0 0 / 0.06);
   --shadow-1: 0 0 0 1px var(--shadow-color);
-  --shadow-2: 0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color);
-  --shadow-3: 0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color), 0 3px 3px -1.5px var(--shadow-color);
-  --shadow-4: 0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color), 0 3px 3px -1.5px var(--shadow-color), 0 6px 6px -3px var(--shadow-color);
-  --shadow-5: 0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color), 0 3px 3px -1.5px var(--shadow-color), 0 6px 6px -3px var(--shadow-color), 0 12px 12px -6px var(--shadow-color);
-  --shadow-6: 0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color), 0 3px 3px -1.5px var(--shadow-color), 0 6px 6px -3px var(--shadow-color), 0 12px 12px -6px var(--shadow-color), 0 24px 24px -12px var(--shadow-color);
-  --shadow-7: 0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color), 0 3px 3px -1.5px var(--shadow-color), 0 6px 6px -3px var(--shadow-color), 0 12px 12px -6px var(--shadow-color), 0 24px 24px -12px var(--shadow-color), 0 48px 48px -24px var(--shadow-color);
-  --shadow-8: 0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color), 0 3px 3px -1.5px var(--shadow-color), 0 6px 6px -3px var(--shadow-color), 0 12px 12px -6px var(--shadow-color), 0 24px 24px -12px var(--shadow-color), 0 48px 48px -24px var(--shadow-color), 0 96px 96px -48px var(--shadow-color);
+  --shadow-2:
+    0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color);
+  --shadow-3:
+    0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color),
+    0 3px 3px -1.5px var(--shadow-color);
+  --shadow-4:
+    0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color),
+    0 3px 3px -1.5px var(--shadow-color), 0 6px 6px -3px var(--shadow-color);
+  --shadow-5:
+    0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color),
+    0 3px 3px -1.5px var(--shadow-color), 0 6px 6px -3px var(--shadow-color),
+    0 12px 12px -6px var(--shadow-color);
+  --shadow-6:
+    0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color),
+    0 3px 3px -1.5px var(--shadow-color), 0 6px 6px -3px var(--shadow-color),
+    0 12px 12px -6px var(--shadow-color), 0 24px 24px -12px var(--shadow-color);
+  --shadow-7:
+    0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color),
+    0 3px 3px -1.5px var(--shadow-color), 0 6px 6px -3px var(--shadow-color),
+    0 12px 12px -6px var(--shadow-color), 0 24px 24px -12px var(--shadow-color),
+    0 48px 48px -24px var(--shadow-color);
+  --shadow-8:
+    0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color),
+    0 3px 3px -1.5px var(--shadow-color), 0 6px 6px -3px var(--shadow-color),
+    0 12px 12px -6px var(--shadow-color), 0 24px 24px -12px var(--shadow-color),
+    0 48px 48px -24px var(--shadow-color), 0 96px 96px -48px var(--shadow-color);
 }
 
 .dark {
@@ -304,29 +325,55 @@
   --active: color-mix(in oklch, var(--foreground) 12%, transparent);
   --focus-ring: #6b97ff;
   --surface-1: #171717;
-  --surface-2: #1E1E1E;
+  --surface-2: #1e1e1e;
   --surface-3: #252525;
-  --surface-4: #2C2C2C;
+  --surface-4: #2c2c2c;
   --surface-5: #333333;
-  --surface-6: #3A3A3A;
+  --surface-6: #3a3a3a;
   --surface-7: #414141;
   --surface-8: #484848;
-  --dm-hi-base: rgba(255,255,255,0.01);
-  --dm-hi-mid: rgba(255,255,255,0.02);
-  --dm-hi-high: rgba(255,255,255,0.04);
-  --dm-hi-peak: rgba(255,255,255,0.06);
-  --dm-ring-base: rgba(255,255,255,0.02);
-  --dm-ring-mid: rgba(255,255,255,0.04);
-  --dm-ring-high: rgba(255,255,255,0.06);
-  --dm-drop: rgba(0,0,0,0.18);
+  --dm-hi-base: rgba(255, 255, 255, 0.01);
+  --dm-hi-mid: rgba(255, 255, 255, 0.02);
+  --dm-hi-high: rgba(255, 255, 255, 0.04);
+  --dm-hi-peak: rgba(255, 255, 255, 0.06);
+  --dm-ring-base: rgba(255, 255, 255, 0.02);
+  --dm-ring-mid: rgba(255, 255, 255, 0.04);
+  --dm-ring-high: rgba(255, 255, 255, 0.06);
+  --dm-drop: rgba(0, 0, 0, 0.18);
   --shadow-1: inset 0 0 0 1px var(--dm-ring-base);
-  --shadow-2: inset 0 1px 0 0 var(--dm-hi-base), inset 0 0 0 1px var(--dm-ring-base), 0 1px 1px -0.5px var(--dm-drop);
-  --shadow-3: inset 0 1px 0 0 var(--dm-hi-mid), inset 0 0 0 1px var(--dm-ring-base), 0 0 0 1px rgba(0,0,0,0.12), 0 1px 1px -0.5px var(--dm-drop), 0 3px 3px -1.5px var(--dm-drop);
-  --shadow-4: inset 0 1px 0 0 var(--dm-hi-mid), inset 0 0 0 1px var(--dm-ring-mid), 0 0 0 1px rgba(0,0,0,0.14), 0 1px 1px -0.5px var(--dm-drop), 0 3px 3px -1.5px var(--dm-drop), 0 6px 6px -3px var(--dm-drop);
-  --shadow-5: inset 0 1px 0 0 var(--dm-hi-high), inset 0 0 0 1px var(--dm-ring-mid), 0 0 0 1px rgba(0,0,0,0.16), 0 1px 1px -0.5px var(--dm-drop), 0 3px 3px -1.5px var(--dm-drop), 0 6px 6px -3px var(--dm-drop), 0 12px 12px -6px var(--dm-drop);
-  --shadow-6: inset 0 1px 0 0 var(--dm-hi-high), inset 0 0 0 1px var(--dm-ring-high), 0 0 0 1px rgba(0,0,0,0.18), 0 1px 1px -0.5px var(--dm-drop), 0 3px 3px -1.5px var(--dm-drop), 0 6px 6px -3px var(--dm-drop), 0 12px 12px -6px var(--dm-drop), 0 24px 24px -12px var(--dm-drop);
-  --shadow-7: inset 0 1px 0 0 var(--dm-hi-peak), inset 0 0 0 1px var(--dm-ring-high), 0 0 0 1px rgba(0,0,0,0.20), 0 1px 1px -0.5px var(--dm-drop), 0 3px 3px -1.5px var(--dm-drop), 0 6px 6px -3px var(--dm-drop), 0 12px 12px -6px var(--dm-drop), 0 24px 24px -12px var(--dm-drop), 0 48px 48px -24px var(--dm-drop);
-  --shadow-8: inset 0 1px 0 0 var(--dm-hi-peak), inset 0 0 0 1px var(--dm-ring-high), 0 0 0 1px rgba(0,0,0,0.22), 0 1px 1px -0.5px var(--dm-drop), 0 3px 3px -1.5px var(--dm-drop), 0 6px 6px -3px var(--dm-drop), 0 12px 12px -6px var(--dm-drop), 0 24px 24px -12px var(--dm-drop), 0 48px 48px -24px var(--dm-drop), 0 96px 96px -48px var(--dm-drop);
+  --shadow-2:
+    inset 0 1px 0 0 var(--dm-hi-base), inset 0 0 0 1px var(--dm-ring-base),
+    0 1px 1px -0.5px var(--dm-drop);
+  --shadow-3:
+    inset 0 1px 0 0 var(--dm-hi-mid), inset 0 0 0 1px var(--dm-ring-base),
+    0 0 0 1px rgba(0, 0, 0, 0.12), 0 1px 1px -0.5px var(--dm-drop),
+    0 3px 3px -1.5px var(--dm-drop);
+  --shadow-4:
+    inset 0 1px 0 0 var(--dm-hi-mid), inset 0 0 0 1px var(--dm-ring-mid),
+    0 0 0 1px rgba(0, 0, 0, 0.14), 0 1px 1px -0.5px var(--dm-drop),
+    0 3px 3px -1.5px var(--dm-drop), 0 6px 6px -3px var(--dm-drop);
+  --shadow-5:
+    inset 0 1px 0 0 var(--dm-hi-high), inset 0 0 0 1px var(--dm-ring-mid),
+    0 0 0 1px rgba(0, 0, 0, 0.16), 0 1px 1px -0.5px var(--dm-drop),
+    0 3px 3px -1.5px var(--dm-drop), 0 6px 6px -3px var(--dm-drop),
+    0 12px 12px -6px var(--dm-drop);
+  --shadow-6:
+    inset 0 1px 0 0 var(--dm-hi-high), inset 0 0 0 1px var(--dm-ring-high),
+    0 0 0 1px rgba(0, 0, 0, 0.18), 0 1px 1px -0.5px var(--dm-drop),
+    0 3px 3px -1.5px var(--dm-drop), 0 6px 6px -3px var(--dm-drop),
+    0 12px 12px -6px var(--dm-drop), 0 24px 24px -12px var(--dm-drop);
+  --shadow-7:
+    inset 0 1px 0 0 var(--dm-hi-peak), inset 0 0 0 1px var(--dm-ring-high),
+    0 0 0 1px rgba(0, 0, 0, 0.2), 0 1px 1px -0.5px var(--dm-drop),
+    0 3px 3px -1.5px var(--dm-drop), 0 6px 6px -3px var(--dm-drop),
+    0 12px 12px -6px var(--dm-drop), 0 24px 24px -12px var(--dm-drop),
+    0 48px 48px -24px var(--dm-drop);
+  --shadow-8:
+    inset 0 1px 0 0 var(--dm-hi-peak), inset 0 0 0 1px var(--dm-ring-high),
+    0 0 0 1px rgba(0, 0, 0, 0.22), 0 1px 1px -0.5px var(--dm-drop),
+    0 3px 3px -1.5px var(--dm-drop), 0 6px 6px -3px var(--dm-drop),
+    0 12px 12px -6px var(--dm-drop), 0 24px 24px -12px var(--dm-drop),
+    0 48px 48px -24px var(--dm-drop), 0 96px 96px -48px var(--dm-drop);
 }
 
 @layer base {
@@ -379,7 +426,8 @@
     margin-right: calc(
       -1 *
         (
-          var(--sidebar-nav-pill-bleed) + var(--sidebar-nav-scrollbar-width, 0px) +
+          var(--sidebar-nav-pill-bleed) +
+            var(--sidebar-nav-scrollbar-width, 0px) +
             var(--sidebar-nav-pill-outer-trim-right, 0px)
         )
     );

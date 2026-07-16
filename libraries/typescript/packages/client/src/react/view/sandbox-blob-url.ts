@@ -42,9 +42,7 @@ export function buildViewSandboxBlobUrl(
   const searchUrl = new URL("https://sandbox.invalid/");
   applySandboxSearchParams(searchUrl, options);
   const html = buildSandboxProxyBlobHtml(searchUrl.search);
-  return new URL(
-    URL.createObjectURL(new Blob([html], { type: "text/html" }))
-  );
+  return new URL(URL.createObjectURL(new Blob([html], { type: "text/html" })));
 }
 
 /** Raw sandbox-proxy document (query config via location.search or __SANDBOX_SEARCH__). */

@@ -1,7 +1,12 @@
 import type { Prompt } from "@modelcontextprotocol/client";
 import { Play, Save } from "lucide-react";
 import { useEffect } from "react";
-import { Button, buttonExecuteClass, buttonShortcutClass, buttonToolbarClass } from "@/client/components/ui/button";
+import {
+  Button,
+  buttonExecuteClass,
+  buttonShortcutClass,
+  buttonToolbarClass,
+} from "@/client/components/ui/button";
 import { Spinner } from "@/client/components/ui/spinner";
 import { cn } from "@/client/lib/utils";
 import { PromptInputForm } from "./PromptInputForm";

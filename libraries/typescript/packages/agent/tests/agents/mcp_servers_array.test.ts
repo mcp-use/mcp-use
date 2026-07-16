@@ -4,10 +4,7 @@ import type { McpConnectionLike } from "../../src/agents/agent_options.js";
 
 type AgentInternals = {
   providerTools: Array<{ name: string }>;
-  callTool: (
-    name: string,
-    args: Record<string, unknown>
-  ) => Promise<unknown>;
+  callTool: (name: string, args: Record<string, unknown>) => Promise<unknown>;
   initialized: boolean;
 };
 
@@ -66,7 +63,10 @@ describe("MCPAgent mcpServers live connections", () => {
     });
 
     const inner = internals(agent);
-    expect(inner.providerTools.map((t) => t.name)).toEqual(["search", "search_2"]);
+    expect(inner.providerTools.map((t) => t.name)).toEqual([
+      "search",
+      "search_2",
+    ]);
 
     await inner.callTool("search", {});
     expect(serverA.callTool).toHaveBeenCalledWith("search", {});
@@ -94,7 +94,9 @@ describe("MCPAgent mcpServers live connections", () => {
       disallowedTools: ["blocked"],
     });
 
-    expect(internals(agent).providerTools.map((t) => t.name)).toEqual(["allowed"]);
+    expect(internals(agent).providerTools.map((t) => t.name)).toEqual([
+      "allowed",
+    ]);
   });
 
   it("requires mcpServers or client in simplified mode", () => {

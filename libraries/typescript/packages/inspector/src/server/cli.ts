@@ -5,10 +5,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import open from "open";
-import {
-  registerInspectorCdnShell,
-  type InspectorMode,
-} from "./cdn-shell.js";
+import { registerInspectorCdnShell, type InspectorMode } from "./cdn-shell.js";
 import { registerInspectorProxyRoutes } from "./proxy-routes.js";
 import { findAvailablePort, isValidUrl } from "./utils.js";
 import { getInspectorVersion } from "./version.js";

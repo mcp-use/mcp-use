@@ -65,7 +65,7 @@ export function ToolResultRenderer({
 
   const isMcpAppsTool = isViewTool(toolMeta);
   const resourceUri = isMcpAppsTool
-    ? (toolMeta?.ui?.resourceUri as string | undefined) ?? null
+    ? ((toolMeta?.ui?.resourceUri as string | undefined) ?? null)
     : null;
 
   const memoizedToolArgs = useMemo(() => toolArgs, [toolName, parsedResult]);
@@ -117,7 +117,8 @@ export function ToolResultRenderer({
     return (
       <div className="my-4 p-4 bg-red-50/30 dark:bg-red-950/20 border border-red-200/50 dark:border-red-800/50 rounded-lg">
         <p className="text-sm text-red-600 dark:text-red-400">
-          Cannot render widget: Missing required props (serverId or readResource)
+          Cannot render widget: Missing required props (serverId or
+          readResource)
         </p>
       </div>
     );

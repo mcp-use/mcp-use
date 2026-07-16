@@ -36,8 +36,7 @@ export default function LogoAnimated({
   const isExpanded = state === "expanded";
   const showLabelNow = isExpanded && showLabel;
   const symbolSize =
-    size ??
-    (pinSymbolInIconColumn ? 20 : state === "expanded" ? 40 : 20);
+    size ?? (pinSymbolInIconColumn ? 20 : state === "expanded" ? 40 : 20);
 
   const symbolSvg = (
     <div className="relative">
@@ -129,7 +128,9 @@ export default function LogoAnimated({
     <div
       className={cn(
         "relative flex shrink-0 items-center",
-        showLabelNow ? "min-w-(--sidebar-width-icon)" : "w-(--sidebar-width-icon)"
+        showLabelNow
+          ? "min-w-(--sidebar-width-icon)"
+          : "w-(--sidebar-width-icon)"
       )}
     >
       <div className="pointer-events-none absolute inset-y-0 left-0 flex w-(--sidebar-width-icon) items-center justify-center">

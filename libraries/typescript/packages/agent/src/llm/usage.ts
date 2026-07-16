@@ -14,9 +14,7 @@ function numberAt(
 }
 
 /** Normalize exact provider-reported token counters. Never estimates usage. */
-export function tokenUsageFromRecord(
-  raw: unknown
-): TokenUsage | undefined {
+export function tokenUsageFromRecord(raw: unknown): TokenUsage | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const usage = raw as Record<string, unknown>;
   const inputTokens = numberAt(
@@ -42,8 +40,7 @@ export function tokenUsageFromRecord(
       : undefined);
 
   const inputDetails =
-    usage.input_tokens_details &&
-    typeof usage.input_tokens_details === "object"
+    usage.input_tokens_details && typeof usage.input_tokens_details === "object"
       ? (usage.input_tokens_details as Record<string, unknown>)
       : undefined;
   const outputDetails =

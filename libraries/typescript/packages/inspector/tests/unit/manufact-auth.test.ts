@@ -28,9 +28,12 @@ const popup = { closed: false, close: vi.fn(), location: { href: "" } };
 const opener = { postMessage: vi.fn() };
 
 vi.stubGlobal("crypto", webcrypto);
-vi.stubGlobal("CustomEvent", class {
-  constructor(public type: string) {}
-});
+vi.stubGlobal(
+  "CustomEvent",
+  class {
+    constructor(public type: string) {}
+  }
+);
 vi.stubGlobal("window", {
   location: {
     origin: "http://localhost:3005",
@@ -73,43 +76,48 @@ describe("Manufact Inspector OAuth", () => {
   });
 
   it("registers a public client, uses PKCE, and completes the code flow", async () => {
-    const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-      const url = String(input);
-      if (url.endsWith("/api/auth/get-session")) {
-        return Response.json(null);
+    const fetchMock = vi.fn(
+      async (input: string | URL | Request, init?: RequestInit) => {
+        const url = String(input);
+        if (url.endsWith("/api/auth/get-session")) {
+          return Response.json(null);
+        }
+        if (url.endsWith("openid-configuration")) {
+          return Response.json(metadata);
+        }
+        if (url === metadata.registration_endpoint) {
+          expect(JSON.parse(String(init?.body))).toMatchObject({
+            token_endpoint_auth_method: "none",
+            grant_types: ["authorization_code", "refresh_token"],
+          });
+          return Response.json(
+            { client_id: "inspector-client" },
+            { status: 201 }
+          );
+        }
+        if (url === metadata.token_endpoint) {
+          const body = new URLSearchParams(String(init?.body));
+          expect(body.get("grant_type")).toBe("authorization_code");
+          expect(body.get("code_verifier")).toBeTruthy();
+          return Response.json({
+            access_token: "access-token",
+            refresh_token: "refresh-token",
+            expires_in: 3600,
+          });
+        }
+        if (url === metadata.userinfo_endpoint) {
+          expect(new Headers(init?.headers).get("Authorization")).toBe(
+            "Bearer access-token"
+          );
+          return Response.json({
+            sub: "user-1",
+            name: "Inspector User",
+            email: "user@example.com",
+          });
+        }
+        throw new Error(`Unexpected request: ${url}`);
       }
-      if (url.endsWith("openid-configuration")) {
-        return Response.json(metadata);
-      }
-      if (url === metadata.registration_endpoint) {
-        expect(JSON.parse(String(init?.body))).toMatchObject({
-          token_endpoint_auth_method: "none",
-          grant_types: ["authorization_code", "refresh_token"],
-        });
-        return Response.json({ client_id: "inspector-client" }, { status: 201 });
-      }
-      if (url === metadata.token_endpoint) {
-        const body = new URLSearchParams(String(init?.body));
-        expect(body.get("grant_type")).toBe("authorization_code");
-        expect(body.get("code_verifier")).toBeTruthy();
-        return Response.json({
-          access_token: "access-token",
-          refresh_token: "refresh-token",
-          expires_in: 3600,
-        });
-      }
-      if (url === metadata.userinfo_endpoint) {
-        expect(new Headers(init?.headers).get("Authorization")).toBe(
-          "Bearer access-token"
-        );
-        return Response.json({
-          sub: "user-1",
-          name: "Inspector User",
-          email: "user@example.com",
-        });
-      }
-      throw new Error(`Unexpected request: ${url}`);
-    });
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     await authorizeManufact(
@@ -184,16 +192,18 @@ describe("Manufact Inspector OAuth", () => {
   });
 
   it("reuses a shared Manufact cookie session before OAuth", async () => {
-    const fetchMock = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
-      expect(init?.credentials).toBe("include");
-      return Response.json({
-        user: {
-          id: "shared-user",
-          name: "Shared Session",
-          email: "shared@example.com",
-        },
-      });
-    });
+    const fetchMock = vi.fn(
+      async (_input: string | URL | Request, init?: RequestInit) => {
+        expect(init?.credentials).toBe("include");
+        return Response.json({
+          user: {
+            id: "shared-user",
+            name: "Shared Session",
+            email: "shared@example.com",
+          },
+        });
+      }
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
@@ -221,19 +231,22 @@ describe("Manufact Inspector OAuth", () => {
         expires_at: Date.now() - 1,
       })
     );
-    const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-      const url = String(input);
-      if (url.endsWith("openid-configuration")) return Response.json(metadata);
-      if (url === metadata.token_endpoint) {
-        const body = new URLSearchParams(String(init?.body));
-        expect(body.get("grant_type")).toBe("refresh_token");
-        return Response.json({
-          access_token: "refreshed-token",
-          expires_in: 3600,
-        });
+    const fetchMock = vi.fn(
+      async (input: string | URL | Request, init?: RequestInit) => {
+        const url = String(input);
+        if (url.endsWith("openid-configuration"))
+          return Response.json(metadata);
+        if (url === metadata.token_endpoint) {
+          const body = new URLSearchParams(String(init?.body));
+          expect(body.get("grant_type")).toBe("refresh_token");
+          return Response.json({
+            access_token: "refreshed-token",
+            expires_in: 3600,
+          });
+        }
+        throw new Error(`Unexpected request: ${url}`);
       }
-      throw new Error(`Unexpected request: ${url}`);
-    });
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
@@ -256,23 +269,26 @@ describe("Manufact Inspector OAuth", () => {
         expires_at: Date.now() + 3600_000,
       })
     );
-    const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-      const url = String(input);
-      if (url.endsWith("openid-configuration")) return Response.json(metadata);
-      if (url.endsWith("/oauth2/revoke")) {
-        const body = new URLSearchParams(String(init?.body));
-        expect(body.get("client_id")).toBe("inspector-client");
-        expect(body.get("token")).toBe("refresh-token");
-        expect(body.get("token_type_hint")).toBe("refresh_token");
-        return new Response(null, { status: 200 });
+    const fetchMock = vi.fn(
+      async (input: string | URL | Request, init?: RequestInit) => {
+        const url = String(input);
+        if (url.endsWith("openid-configuration"))
+          return Response.json(metadata);
+        if (url.endsWith("/oauth2/revoke")) {
+          const body = new URLSearchParams(String(init?.body));
+          expect(body.get("client_id")).toBe("inspector-client");
+          expect(body.get("token")).toBe("refresh-token");
+          expect(body.get("token_type_hint")).toBe("refresh_token");
+          return new Response(null, { status: 200 });
+        }
+        if (url.endsWith("/api/auth/get-session")) {
+          return Response.json({
+            user: { id: "still-there", email: "user@example.com" },
+          });
+        }
+        throw new Error(`Unexpected request: ${url}`);
       }
-      if (url.endsWith("/api/auth/get-session")) {
-        return Response.json({
-          user: { id: "still-there", email: "user@example.com" },
-        });
-      }
-      throw new Error(`Unexpected request: ${url}`);
-    });
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     await logoutManufact(
@@ -297,9 +313,7 @@ describe("Manufact Inspector OAuth", () => {
 
   it("signs out the shared Manufact session via the trusted website origin", async () => {
     const popup = { closed: true };
-    vi.mocked(window.open).mockReturnValueOnce(
-      popup as unknown as Window
-    );
+    vi.mocked(window.open).mockReturnValueOnce(popup as unknown as Window);
     vi.mocked(window.setInterval).mockImplementation((fn: TimerHandler) => {
       if (typeof fn === "function") fn();
       return 1;

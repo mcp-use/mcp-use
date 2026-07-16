@@ -35,8 +35,10 @@ interface FluidSwitchProps extends HTMLAttributes<HTMLDivElement> {
   uncheckedTrackColorHovered?: string;
 }
 
-interface ShadcnSwitchProps
-  extends Omit<HTMLAttributes<HTMLButtonElement>, "onChange"> {
+interface ShadcnSwitchProps extends Omit<
+  HTMLAttributes<HTMLButtonElement>,
+  "onChange"
+> {
   checked?: boolean;
   defaultChecked?: boolean;
   onCheckedChange?: (checked: boolean) => void;
@@ -51,7 +53,17 @@ function isFluidSwitchProps(props: SwitchProps): props is FluidSwitchProps {
 
 const FluidSwitch = forwardRef<HTMLDivElement, FluidSwitchProps>(
   (
-    { label, checked, onToggle, disabled = false, thumbTransition, uncheckedTrackColor, uncheckedTrackColorHovered, className, ...props },
+    {
+      label,
+      checked,
+      onToggle,
+      disabled = false,
+      thumbTransition,
+      uncheckedTrackColor,
+      uncheckedTrackColorHovered,
+      className,
+      ...props
+    },
     ref
   ) => {
     const labelId = useId();
@@ -255,7 +267,9 @@ const FluidSwitch = forwardRef<HTMLDivElement, FluidSwitchProps>(
                     height: thumbHeight,
                   }}
                   transition={
-                    hasMounted.current ? (thumbTransition ?? spring.moderate) : { duration: 0 }
+                    hasMounted.current
+                      ? (thumbTransition ?? spring.moderate)
+                      : { duration: 0 }
                   }
                 />
               );

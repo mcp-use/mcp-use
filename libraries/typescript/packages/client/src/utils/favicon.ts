@@ -66,7 +66,9 @@ export async function detectFavicon(serverUrl: string): Promise<string | null> {
         if (data.source === "default") continue;
 
         const imageUrl = data.url.replace(/^http:\/\//, "https://");
-        const img = await fetch(imageUrl, { signal: AbortSignal.timeout(2000) });
+        const img = await fetch(imageUrl, {
+          signal: AbortSignal.timeout(2000),
+        });
         if (!img.ok) continue;
 
         return await blobToDataUrl(await img.blob());

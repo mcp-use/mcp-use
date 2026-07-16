@@ -124,16 +124,16 @@ const CommandGroup = React.forwardRef<
     )}
     {...props}
   >
-    {heading ? (
-      <div data-command-group-heading="">{heading}</div>
-    ) : null}
+    {heading ? <div data-command-group-heading="">{heading}</div> : null}
     {children}
   </div>
 ));
 CommandGroup.displayName = "CommandGroup";
 
-interface CommandItemProps
-  extends Omit<React.HTMLAttributes<HTMLDivElement>, "onSelect"> {
+interface CommandItemProps extends Omit<
+  React.HTMLAttributes<HTMLDivElement>,
+  "onSelect"
+> {
   value: string;
   keywords?: string | readonly string[];
   onSelect?: (value: string) => void;

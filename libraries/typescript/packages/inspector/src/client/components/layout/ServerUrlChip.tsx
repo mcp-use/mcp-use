@@ -56,7 +56,9 @@ export function ServerUrlChip({ url, className }: ServerUrlChipProps) {
             )}
           >
             <Globe className="size-3.5 shrink-0" />
-            <span className="truncate max-w-[min(24rem,30vw)]">{chipLabel}</span>
+            <span className="truncate max-w-[min(24rem,30vw)]">
+              {chipLabel}
+            </span>
           </button>
         }
         nativeButton

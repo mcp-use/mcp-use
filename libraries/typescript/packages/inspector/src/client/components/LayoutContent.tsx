@@ -51,9 +51,11 @@ export function LayoutContent({
   children,
 }: LayoutContentProps) {
   const { embeddedConfig } = useInspector();
-  const { accessToken, mode: manufactAuthMode, user } = useManufactAuth(
-    embeddedConfig.chatApiUrl
-  );
+  const {
+    accessToken,
+    mode: manufactAuthMode,
+    user,
+  } = useManufactAuth(embeddedConfig.chatApiUrl);
   const managedAuthHeaders = buildManagedAuthHeaders(accessToken);
   const managedCredentials =
     manufactAuthMode === "session" ? ("include" as const) : undefined;
@@ -152,7 +154,31 @@ export function LayoutContent({
     !!chatApiUrl && isManufactAuthenticated
   );
   // #region agent log
-  fetch('http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'243e61'},body:JSON.stringify({sessionId:'243e61',location:'LayoutContent.tsx:managedCloud',message:'layout managed cloud state',data:{useManagedClientSide,isLoopbackServer,isManufactAuthenticated,hasAccessToken:!!accessToken,authMode:manufactAuthMode,modelsEnabled:useManagedClientSide&&isManufactAuthenticated,modelCount:managedCloudModel.models.length,isLoading:managedCloudModel.isLoading,serverUrl:selectedServer?.url??null},timestamp:Date.now(),hypothesisId:'H-B'})}).catch(()=>{});
+  fetch("http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Debug-Session-Id": "243e61",
+    },
+    body: JSON.stringify({
+      sessionId: "243e61",
+      location: "LayoutContent.tsx:managedCloud",
+      message: "layout managed cloud state",
+      data: {
+        useManagedClientSide,
+        isLoopbackServer,
+        isManufactAuthenticated,
+        hasAccessToken: !!accessToken,
+        authMode: manufactAuthMode,
+        modelsEnabled: useManagedClientSide && isManufactAuthenticated,
+        modelCount: managedCloudModel.models.length,
+        isLoading: managedCloudModel.isLoading,
+        serverUrl: selectedServer?.url ?? null,
+      },
+      timestamp: Date.now(),
+      hypothesisId: "H-B",
+    }),
+  }).catch(() => {});
   // #endregion
   const managedLlmConfig = useManagedClientSide
     ? buildManagedLlmProxyConfig(

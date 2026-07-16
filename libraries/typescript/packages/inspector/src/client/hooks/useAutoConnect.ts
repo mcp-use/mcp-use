@@ -372,8 +372,7 @@ export function useAutoConnect({
           name,
           transportType,
           connectionMode,
-          connectionType:
-            connectionMode === "proxy" ? "Via Proxy" : "Direct",
+          connectionType: connectionMode === "proxy" ? "Via Proxy" : "Direct",
           proxyConfig,
           headers: finalCustomHeaders,
           autoProxyFallback,

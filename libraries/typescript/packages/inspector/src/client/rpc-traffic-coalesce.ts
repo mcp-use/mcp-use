@@ -3,8 +3,7 @@ import type { RpcTrafficEntry, RpcTrafficInput } from "./rpc-traffic-store";
 /** ponytail: fixed window; raise if resize bursts still feel noisy. */
 const RPC_COALESCE_WINDOW_MS = 300;
 
-const COALESCE_METHOD =
-  /(?:^|\/)notifications\//;
+const COALESCE_METHOD = /(?:^|\/)notifications\//;
 
 export function getRpcTrafficMethod(message: unknown): string | null {
   const record = message as { method?: unknown };
@@ -21,7 +20,8 @@ export function getRpcCoalesceKey(entry: RpcTrafficInput): string | null {
   };
 
   if (message?.id !== undefined && message.id !== null) return null;
-  if (message?.result !== undefined || message?.error !== undefined) return null;
+  if (message?.result !== undefined || message?.error !== undefined)
+    return null;
 
   const method = getRpcTrafficMethod(entry.message);
   if (!method || !COALESCE_METHOD.test(method)) return null;

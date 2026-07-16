@@ -13,8 +13,7 @@ export async function telFetch(url: string, init?: RequestInit): Promise<void> {
 export const POSTHOG_HOST = "https://eu.i.posthog.com";
 export const POSTHOG_API_KEY =
   "phc_lyTtbYwvkdSbrcMQNPiKiiRWrrM1seyKIMjycSvItEI";
-export const SCARF_GATEWAY_URL =
-  "https://mcpuse.gateway.scarf.sh/events-ts";
+export const SCARF_GATEWAY_URL = "https://mcpuse.gateway.scarf.sh/events-ts";
 export const SCARF_GATEWAY_BEACON_URL =
   "https://mcpuse.gateway.scarf.sh/simple/";
 

@@ -44,7 +44,11 @@ import {
   providerRequiresApiKey,
   providerSupportsBaseUrl,
 } from "./types";
-import { getProviderLabel, ProviderIcon, formatManagedModelName } from "./providerMeta";
+import {
+  getProviderLabel,
+  ProviderIcon,
+  formatManagedModelName,
+} from "./providerMeta";
 import type { CloudModel } from "./useManagedCloudModel";
 
 interface ModelOption {
@@ -423,11 +427,14 @@ export function ConfigurationDialog({
       : "Your API key is stored locally and never sent to our servers.";
 
   const cloudModelsByProvider = managedCloudInfo
-    ? managedCloudInfo.models.reduce<Record<string, CloudModel[]>>((acc, model) => {
-        if (!acc[model.provider]) acc[model.provider] = [];
-        acc[model.provider].push(model);
-        return acc;
-      }, {})
+    ? managedCloudInfo.models.reduce<Record<string, CloudModel[]>>(
+        (acc, model) => {
+          if (!acc[model.provider]) acc[model.provider] = [];
+          acc[model.provider].push(model);
+          return acc;
+        },
+        {}
+      )
     : {};
 
   const selectedCloudModel = managedCloudInfo?.models.find(
@@ -506,15 +513,15 @@ export function ConfigurationDialog({
                   />
                   <PopoverContent className="w-full p-0" align="start">
                     <Command>
-                      <CommandInput placeholder="Search models…" className="h-9" />
+                      <CommandInput
+                        placeholder="Search models…"
+                        className="h-9"
+                      />
                       <CommandList>
                         <CommandEmpty>No model found.</CommandEmpty>
                         {Object.entries(cloudModelsByProvider).map(
                           ([provider, providerModels]) => (
-                            <CommandGroup
-                              key={provider}
-                              heading={provider}
-                            >
+                            <CommandGroup key={provider} heading={provider}>
                               {providerModels.map((model) => (
                                 <CommandItem
                                   key={model.id}
@@ -525,7 +532,9 @@ export function ConfigurationDialog({
                                     model.provider,
                                   ]}
                                   onSelect={(currentValue) => {
-                                    managedCloudInfo.onModelChange(currentValue);
+                                    managedCloudInfo.onModelChange(
+                                      currentValue
+                                    );
                                     setCloudComboboxOpen(false);
                                   }}
                                 >
@@ -539,11 +548,15 @@ export function ConfigurationDialog({
                                     }
                                     className="shrink-0"
                                   />
-                                  {formatManagedModelName(model.name, model.provider)}
+                                  {formatManagedModelName(
+                                    model.name,
+                                    model.provider
+                                  )}
                                   <Check
                                     className={cn(
                                       "ml-auto h-4 w-4",
-                                      managedCloudInfo.selectedModelId === model.id
+                                      managedCloudInfo.selectedModelId ===
+                                        model.id
                                         ? "opacity-100"
                                         : "opacity-0"
                                     )}

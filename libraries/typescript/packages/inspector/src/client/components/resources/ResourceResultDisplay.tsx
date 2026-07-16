@@ -15,7 +15,11 @@ import {
   Zap,
 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
-import { ViewRenderer, isViewResource, isViewTool } from "@mcp-use/client/react";
+import {
+  ViewRenderer,
+  isViewResource,
+  isViewTool,
+} from "@mcp-use/client/react";
 import { useViewHostProps } from "@/client/hooks/useViewHostProps";
 import type { LLMConfig } from "../chat/types";
 import { MCPAppsDebugControls } from "../MCPAppsDebugControls";
@@ -203,7 +207,9 @@ export function ResourceResultDisplay({
   }, [combinedAnnotations]);
 
   // Detect widget protocol (MCP Apps only)
-  const widgetProtocol = isViewTool(combinedAnnotations as Record<string, unknown>)
+  const widgetProtocol = isViewTool(
+    combinedAnnotations as Record<string, unknown>
+  )
     ? "mcp-apps"
     : null;
 

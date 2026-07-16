@@ -66,7 +66,11 @@ describe("managed model chrome visibility", () => {
   });
 
   it("keeps model chrome visible for signed-in hosted users (hideModelBadge defaults false)", () => {
-    const managedLlmConfig = { provider: "openai-compatible" as const, model: "m", apiKey: "k" };
+    const managedLlmConfig = {
+      provider: "openai-compatible" as const,
+      model: "m",
+      apiKey: "k",
+    };
     const hideModelBadge: boolean | undefined = undefined;
     const effectiveHideModelBadge = hideModelBadge ?? false;
     const suppressInspectorModelChrome =

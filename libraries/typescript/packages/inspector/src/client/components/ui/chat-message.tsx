@@ -8,8 +8,7 @@ import { useShape } from "@/client/lib/shape-context";
 import { useTouchPrimary } from "@/client/hooks/use-touch-primary";
 import { FileThumbnail } from "@/client/components/ui/file-thumbnail";
 
-interface ChatMessageProps
-  extends Omit<HTMLMotionProps<"div">, "children"> {
+interface ChatMessageProps extends Omit<HTMLMotionProps<"div">, "children"> {
   /** Who sent the message. Drives alignment and bubble colour:
    *  `user` → right-aligned accent bubble, `assistant` → left-aligned plain text. */
   from: "user" | "assistant";
@@ -34,7 +33,16 @@ interface ChatMessageProps
 // lets earlier messages slide up smoothly when a new one is appended.
 const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(
   (
-    { from, files, thumbnailSize = 64, time, actions, children, className, ...props },
+    {
+      from,
+      files,
+      thumbnailSize = 64,
+      time,
+      actions,
+      children,
+      className,
+      ...props
+    },
     ref
   ) => {
     const shape = useShape();

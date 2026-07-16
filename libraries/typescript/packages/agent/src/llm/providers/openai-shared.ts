@@ -2,10 +2,7 @@ import type { ProviderConfig } from "../types.js";
 
 export const OPENAI_BASE_URL = "https://api.openai.com/v1";
 
-export function buildEndpoint(
-  config: ProviderConfig,
-  path: string
-): string {
+export function buildEndpoint(config: ProviderConfig, path: string): string {
   const base = config.baseUrl ?? OPENAI_BASE_URL;
   return `${base.replace(/\/$/, "")}${path}`;
 }

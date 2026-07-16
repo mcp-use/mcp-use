@@ -58,7 +58,8 @@ export function ElicitationAskUserPanel({
     if (responded) return;
 
     if (isUrlMode) {
-      const confirmed = answers.__url_confirm__?.selectedIds.includes("confirmed");
+      const confirmed =
+        answers.__url_confirm__?.selectedIds.includes("confirmed");
       if (!confirmed) {
         toast.error("Confirm you've completed the external action");
         return;
@@ -91,7 +92,10 @@ export function ElicitationAskUserPanel({
 
   if (responded) {
     return (
-      <p className="text-sm text-muted-foreground" data-testid={`${testId}-responded`}>
+      <p
+        className="text-sm text-muted-foreground"
+        data-testid={`${testId}-responded`}
+      >
         Elicitation {responseLabel} — the tool will continue executing.
       </p>
     );

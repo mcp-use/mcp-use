@@ -212,9 +212,7 @@ export function ChatInputArea({
                 value={systemPromptProvider.prompt}
                 onSave={systemPromptProvider.savePrompt}
                 disabled={
-                  !isConnected ||
-                  isLoading ||
-                  systemPromptProvider.disabled
+                  !isConnected || isLoading || systemPromptProvider.disabled
                 }
                 isSaving={systemPromptProvider.isSaving}
               />
@@ -231,7 +229,10 @@ export function ChatInputArea({
                   isLoading && "animate-spin",
                   !canSend && !isLoading && "bg-zinc-400"
                 )}
-                disabled={!isLoading && (!canSend || !isConnected || hasPendingElicitation)}
+                disabled={
+                  !isLoading &&
+                  (!canSend || !isConnected || hasPendingElicitation)
+                }
                 title={isLoading ? "Stop streaming" : "Send"}
                 onClick={isLoading ? onStopStreaming : onSendMessage}
                 data-testid="chat-send-button"

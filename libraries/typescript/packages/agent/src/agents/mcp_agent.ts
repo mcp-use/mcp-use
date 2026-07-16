@@ -22,7 +22,11 @@ import type {
   TokenUsage,
 } from "../llm/types.js";
 import { getPackageVersion } from "../version.js";
-import type { MCPAgentOptions, McpConnectionLike, McpServersInput } from "./agent_options.js";
+import type {
+  MCPAgentOptions,
+  McpConnectionLike,
+  McpServersInput,
+} from "./agent_options.js";
 import { normalizeRunOptions } from "./normalize_run_options.js";
 import type { RunOptions } from "./run_options.js";
 import { RemoteAgent } from "./remote.js";
@@ -35,7 +39,11 @@ export type {
   LlmStreamEvent,
   TokenUsage,
 };
-export type { MCPAgentOptions, McpConnectionLike, McpServersInput } from "./agent_options.js";
+export type {
+  MCPAgentOptions,
+  McpConnectionLike,
+  McpServersInput,
+} from "./agent_options.js";
 export type { RunOptions } from "./run_options.js";
 
 export interface AgentStep {
@@ -130,7 +138,7 @@ export class MCPAgent {
         (!this.mcpServersConfig ||
           Object.keys(this.mcpServersConfig).length === 0) &&
         !options.client &&
-        !(options.connectors?.length)
+        !options.connectors?.length
       ) {
         throw new Error(
           "Simplified mode requires mcpServers, or an existing client/connectors."
@@ -233,7 +241,9 @@ export class MCPAgent {
       );
       if (this.exposeResourcesAsTools) {
         entries.push(
-          ...(await this.nativeAdapter.createResourcesFromConnectors(connectors))
+          ...(await this.nativeAdapter.createResourcesFromConnectors(
+            connectors
+          ))
         );
       }
       if (this.exposePromptsAsTools) {
@@ -439,9 +449,7 @@ export class MCPAgent {
   }
 
   public stream(options: RunOptions): AsyncGenerator<AgentStep, string, void>;
-  public stream<T>(
-    options: RunOptions<T>
-  ): AsyncGenerator<AgentStep, T, void>;
+  public stream<T>(options: RunOptions<T>): AsyncGenerator<AgentStep, T, void>;
   /** @deprecated Use stream({ prompt, maxSteps, ... }) */
   public stream<T = string>(
     query: string,

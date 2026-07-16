@@ -38,9 +38,7 @@ export function SidebarRail({
         }
         nativeButton
       />
-      <TooltipContent side="right">
-        {label}
-      </TooltipContent>
+      <TooltipContent side="right">{label}</TooltipContent>
     </Tooltip>
   );
 }

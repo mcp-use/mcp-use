@@ -107,11 +107,17 @@ function gapMidpoint(gap: ItemRect, axis: MergeSplitAxis): number {
   return axis === "y" ? gap.top + gap.height / 2 : gap.left + gap.width / 2;
 }
 
-function startHalfRadii(R: number, axis: MergeSplitAxis): [number, number, number, number] {
+function startHalfRadii(
+  R: number,
+  axis: MergeSplitAxis
+): [number, number, number, number] {
   return axis === "y" ? [R, R, 0, 0] : [R, 0, 0, R];
 }
 
-function endHalfRadii(R: number, axis: MergeSplitAxis): [number, number, number, number] {
+function endHalfRadii(
+  R: number,
+  axis: MergeSplitAxis
+): [number, number, number, number] {
   return axis === "y" ? [0, 0, R, R] : [0, R, R, 0];
 }
 
@@ -223,20 +229,23 @@ export function useMergeSplitBlocks(
     for (const b of found) {
       timersRef.current.set(
         b.tid,
-        setTimeout(() => {
-          timersRef.current.delete(b.tid);
-          setBoundaries((bs) =>
-            bs.some((x) => x.tid === b.tid)
-              ? bs.flatMap((x) =>
-                  x.tid !== b.tid
-                    ? [x]
-                    : x.kind === "merge"
-                    ? [{ ...x, phase: "commit" as const }]
-                    : []
-                )
-              : bs
-          );
-        }, b.kind === "merge" ? convergeMs : splitMs)
+        setTimeout(
+          () => {
+            timersRef.current.delete(b.tid);
+            setBoundaries((bs) =>
+              bs.some((x) => x.tid === b.tid)
+                ? bs.flatMap((x) =>
+                    x.tid !== b.tid
+                      ? [x]
+                      : x.kind === "merge"
+                        ? [{ ...x, phase: "commit" as const }]
+                        : []
+                  )
+                : bs
+            );
+          },
+          b.kind === "merge" ? convergeMs : splitMs
+        )
       );
     }
     const stillValid = (b: Boundary) =>
@@ -470,7 +479,10 @@ export function SelectionBackgrounds({
               borderBottomLeftRadius: b.radii[3],
               opacity,
             }}
-            exit={{ opacity: 0, transition: b.exitInstant ? { duration: 0 } : mergeSpring.exit }}
+            exit={{
+              opacity: 0,
+              transition: b.exitInstant ? { duration: 0 } : mergeSpring.exit,
+            }}
             transition={
               b.instant
                 ? { duration: 0 }

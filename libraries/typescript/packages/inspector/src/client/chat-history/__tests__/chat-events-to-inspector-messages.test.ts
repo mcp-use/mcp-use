@@ -24,7 +24,10 @@ describe("chatEventsToInspectorMessages", () => {
 
     expect(messages).toHaveLength(2);
     expect(messages[0]).toMatchObject({ role: "user", content: "Hello" });
-    expect(messages[1]).toMatchObject({ role: "assistant", content: "Hi there" });
+    expect(messages[1]).toMatchObject({
+      role: "assistant",
+      content: "Hi there",
+    });
   });
 
   it("pairs tool calls with tool results", () => {

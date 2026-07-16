@@ -1,7 +1,10 @@
 import { useCallback, useRef, useState } from "react";
 import { inspectorApi } from "@/client/utils/basePath";
 import type { PromptResult } from "../../hooks/useMCPPrompts";
-import { convertMessagesToProvider, convertPromptResultsToMessages } from "./conversion";
+import {
+  convertMessagesToProvider,
+  convertPromptResultsToMessages,
+} from "./conversion";
 import type {
   AuthConfig,
   LLMConfig,
@@ -90,17 +93,14 @@ export function useChatMessages({
   const abortControllerRef = useRef<AbortController | null>(null);
   const traceIdRef = useRef(0);
 
-  const recordTrace = useCallback(
-    (event: InspectorTraceEventInput) => {
-      const next = {
-        ...event,
-        id: `trace-${++traceIdRef.current}`,
-        timestamp: Date.now(),
-      } as InspectorTraceEvent;
-      setTraceState((state) => appendTraceEvent(state, next));
-    },
-    []
-  );
+  const recordTrace = useCallback((event: InspectorTraceEventInput) => {
+    const next = {
+      ...event,
+      id: `trace-${++traceIdRef.current}`,
+      timestamp: Date.now(),
+    } as InspectorTraceEvent;
+    setTraceState((state) => appendTraceEvent(state, next));
+  }, []);
 
   const sendMessage = useCallback(
     async (
@@ -429,8 +429,7 @@ export function useChatMessages({
 
                 switch (code) {
                   case "0": {
-                    const delta =
-                      typeof val === "string" ? val : String(val);
+                    const delta = typeof val === "string" ? val : String(val);
                     recordTrace({ type: "text-delta", delta, raw: val });
                     appendText(delta);
                     break;
@@ -505,12 +504,11 @@ export function useChatMessages({
                         toolName:
                           parts[idx]?.toolInvocation?.toolName ?? "Tool",
                         result,
-                        isError:
-                          Boolean(
-                            result &&
-                              typeof result === "object" &&
-                              (result as Record<string, unknown>).isError
-                          ),
+                        isError: Boolean(
+                          result &&
+                          typeof result === "object" &&
+                          (result as Record<string, unknown>).isError
+                        ),
                         raw: val,
                       });
                       resolveToolResult({ by: "index", index: idx }, result);
@@ -536,9 +534,7 @@ export function useChatMessages({
                     recordTrace({
                       type: "error",
                       message:
-                        typeof val === "string"
-                          ? val
-                          : JSON.stringify(val),
+                        typeof val === "string" ? val : JSON.stringify(val),
                       raw: val,
                     });
                     throw new Error(
@@ -563,8 +559,7 @@ export function useChatMessages({
                   });
                   appendText(event.content);
                 } else if (event.type === "tool-call") {
-                  const toolCallId =
-                    event.toolCallId ?? `tool-${parts.length}`;
+                  const toolCallId = event.toolCallId ?? `tool-${parts.length}`;
                   recordTrace({
                     type: "tool-call-start",
                     toolCallId,

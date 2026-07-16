@@ -64,7 +64,9 @@ export function ChatHistoryPanel({
     enabled: open,
     agentId,
     refetchKey,
-    refetchInterval: agentDisplayNameFallback ? (refetchInterval || 3000) : refetchInterval,
+    refetchInterval: agentDisplayNameFallback
+      ? refetchInterval || 3000
+      : refetchInterval,
   });
 
   useEffect(() => {
@@ -157,9 +159,7 @@ export function ChatHistoryPanel({
 
   if (variant === "inline") {
     return (
-      <div
-        className={cn("flex h-full min-h-0 flex-col", containerClassName)}
-      >
+      <div className={cn("flex h-full min-h-0 flex-col", containerClassName)}>
         {panelContent}
       </div>
     );

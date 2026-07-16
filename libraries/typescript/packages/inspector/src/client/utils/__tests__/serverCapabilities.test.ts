@@ -15,7 +15,9 @@ describe("buildServerCapabilityRows", () => {
 
     const tools = rows.find((row) => row.id === "tools");
     expect(tools?.supported).toBe(true);
-    expect(tools?.features).toEqual([{ id: "listChanged", label: "listChanged" }]);
+    expect(tools?.features).toEqual([
+      { id: "listChanged", label: "listChanged" },
+    ]);
 
     const resources = rows.find((row) => row.id === "resources");
     expect(resources?.supported).toBe(true);
@@ -64,7 +66,9 @@ describe("buildServerCapabilityRows", () => {
         },
       },
       {
-        "io.modelcontextprotocol/ui": { mimeTypes: ["text/html;profile=mcp-app"] },
+        "io.modelcontextprotocol/ui": {
+          mimeTypes: ["text/html;profile=mcp-app"],
+        },
       }
     );
 
@@ -117,9 +121,13 @@ describe("buildServerCapabilityRows", () => {
   });
 
   it("infers MCP Apps from mcp-app resource templates", () => {
-    const rows = buildServerCapabilityRows(conformanceCaps, {}, {
-      resourceTemplates: [{ mimeType: "text/html;profile=mcp-app" }],
-    });
+    const rows = buildServerCapabilityRows(
+      conformanceCaps,
+      {},
+      {
+        resourceTemplates: [{ mimeType: "text/html;profile=mcp-app" }],
+      }
+    );
 
     const extensions = rows.find((row) => row.id === "extensions");
     expect(extensions?.supported).toBe(true);

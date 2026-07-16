@@ -5,4 +5,11 @@ export {
   setTelemetrySource,
   setProductVersion,
 } from "./telemetry-node.js";
-export { telFetch, capturePostHog, captureScarf, POSTHOG_HOST, POSTHOG_API_KEY, SCARF_GATEWAY_URL } from "./tel-fetch.js";
+export {
+  telFetch,
+  capturePostHog,
+  captureScarf,
+  POSTHOG_HOST,
+  POSTHOG_API_KEY,
+  SCARF_GATEWAY_URL,
+} from "./tel-fetch.js";

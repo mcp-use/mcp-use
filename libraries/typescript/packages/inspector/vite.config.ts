@@ -15,8 +15,7 @@ const clientPackageJson = JSON.parse(
 );
 
 const devPort =
-  parsePortFromArgs() ??
-  (Number(process.env.INSPECTOR_PORT) || 3000);
+  parsePortFromArgs() ?? (Number(process.env.INSPECTOR_PORT) || 3000);
 
 export default defineConfig({
   base: "/inspector",
@@ -29,8 +28,7 @@ export default defineConfig({
       configureServer(server) {
         server.httpServer?.once("listening", () => {
           const addr = server.httpServer?.address();
-          const port =
-            typeof addr === "object" && addr ? addr.port : devPort;
+          const port = typeof addr === "object" && addr ? addr.port : devPort;
           console.log(
             `\n🚀 MCP Inspector running on http://localhost:${port}/inspector`
           );
@@ -72,8 +70,7 @@ export default defineConfig({
       name: "inject-manufact-chat-url",
       transformIndexHtml() {
         const url =
-          process.env.MANUFACT_CHAT_URL ??
-          process.env.VITE_MANUFACT_CHAT_URL;
+          process.env.MANUFACT_CHAT_URL ?? process.env.VITE_MANUFACT_CHAT_URL;
         if (!url) return [];
         return [
           {

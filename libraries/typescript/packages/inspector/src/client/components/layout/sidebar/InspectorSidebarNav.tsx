@@ -96,10 +96,7 @@ export function InspectorSidebarNav({
         return (
           <li
             key={tab.id}
-            className={cn(
-              "group/menu-item relative",
-              index === 0 && "mt-4"
-            )}
+            className={cn("group/menu-item relative", index === 0 && "mt-4")}
           >
             {collapsed ? (
               <Tooltip delayDuration={0}>

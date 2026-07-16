@@ -37,7 +37,10 @@ function useTabsSubtle() {
   return ctx;
 }
 
-interface TabsSubtleProps extends Omit<HTMLAttributes<HTMLDivElement>, "onSelect"> {
+interface TabsSubtleProps extends Omit<
+  HTMLAttributes<HTMLDivElement>,
+  "onSelect"
+> {
   children: ReactNode;
   selectedIndex: number;
   onSelect: (index: number) => void;
@@ -119,7 +122,13 @@ const TabsSubtle = forwardRef<HTMLDivElement, TabsSubtleProps>(
 
     return (
       <TabsSubtleContext.Provider
-        value={{ registerTab, hoveredIndex, selectedIndex, idPrefix, activeLabel }}
+        value={{
+          registerTab,
+          hoveredIndex,
+          selectedIndex,
+          idPrefix,
+          activeLabel,
+        }}
       >
         <Tabs.Root
           value={selectedIndex}

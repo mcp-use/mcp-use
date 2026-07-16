@@ -88,7 +88,17 @@ interface DialogContentProps extends HTMLAttributes<HTMLDivElement> {
 }
 
 const DialogContent = forwardRef<HTMLDivElement, DialogContentProps>(
-  ({ className, children, size = "sm", scrollable = false, container, ...props }, ref) => {
+  (
+    {
+      className,
+      children,
+      size = "sm",
+      scrollable = false,
+      container,
+      ...props
+    },
+    ref
+  ) => {
     const shape = useShape();
     const substrate = useSurface();
     const dialogLevel = Math.min(substrate + DIALOG_OFFSET, 8);
@@ -207,7 +217,12 @@ interface DialogHeaderProps extends HTMLAttributes<HTMLDivElement> {
   sticky?: boolean;
 }
 
-function DialogHeader({ className, sticky, children, ...props }: DialogHeaderProps) {
+function DialogHeader({
+  className,
+  sticky,
+  children,
+  ...props
+}: DialogHeaderProps) {
   const chrome = useContext(DialogChromeContext);
 
   useLayoutEffect(() => {
@@ -302,11 +317,7 @@ function DialogJsonSection({
             onClick={handleCopy}
             title="Copy"
           >
-            {copied ? (
-              <CheckIcon className="text-green-600" />
-            ) : (
-              <CopyIcon />
-            )}
+            {copied ? <CheckIcon className="text-green-600" /> : <CopyIcon />}
           </Button>
         </div>
       ) : null}
@@ -356,6 +367,13 @@ const DialogDescription = forwardRef<
 DialogDescription.displayName = "DialogDescription";
 
 export {
-  Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogJsonSection, DialogTitle, DialogTrigger
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogJsonSection,
+  DialogTitle,
+  DialogTrigger,
 };
-

@@ -58,9 +58,12 @@ const buttonVariants = cva(
 );
 
 interface ButtonProps
-  extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "color">,
+  extends
+    Omit<ButtonHTMLAttributes<HTMLButtonElement>, "color">,
     Omit<VariantProps<typeof buttonVariants>, "variant" | "size"> {
-  variant?: VariantProps<typeof buttonVariants>["variant"] | LegacyButtonVariant;
+  variant?:
+    | VariantProps<typeof buttonVariants>["variant"]
+    | LegacyButtonVariant;
   size?: VariantProps<typeof buttonVariants>["size"] | LegacyButtonSize;
   /** Render a different element (e.g. anchor) with button styling via Base UI `render`. */
   render?: ReactElement;
@@ -75,7 +78,8 @@ interface ButtonProps
 }
 
 const bgVariants: Record<string, string> = {
-  primary: "bg-foreground group-hover:bg-foreground/90 group-active:bg-foreground/80",
+  primary:
+    "bg-foreground group-hover:bg-foreground/90 group-active:bg-foreground/80",
   secondary: "bg-accent group-hover:bg-accent/80 group-active:bg-accent",
   tertiary: "bg-transparent group-hover:bg-hover group-active:bg-active",
   ghost: "bg-transparent group-hover:bg-hover group-active:bg-active",
@@ -117,17 +121,19 @@ const legacyVariantMap: Record<LegacyButtonVariant, keyof typeof bgVariants> = {
   link: "ghost",
 };
 
-const legacySizeMap: Record<LegacyButtonSize, NonNullable<ButtonProps["size"]>> =
-  {
-    default: "md",
-    xs: "sm",
-    sm: "sm",
-    lg: "lg",
-    icon: "icon",
-    "icon-xs": "icon-sm",
-    "icon-sm": "icon-sm",
-    "icon-lg": "icon-lg",
-  };
+const legacySizeMap: Record<
+  LegacyButtonSize,
+  NonNullable<ButtonProps["size"]>
+> = {
+  default: "md",
+  xs: "sm",
+  sm: "sm",
+  lg: "lg",
+  icon: "icon",
+  "icon-xs": "icon-sm",
+  "icon-sm": "icon-sm",
+  "icon-lg": "icon-lg",
+};
 
 function isPlainLabel(value: ReactNode): value is string | number {
   return typeof value === "string" || typeof value === "number";
@@ -140,9 +146,7 @@ function ButtonLabel({ children }: { children: ReactNode }) {
     );
   }
 
-  return (
-    <span className="inline-flex items-center gap-1">{children}</span>
-  );
+  return <span className="inline-flex items-center gap-1">{children}</span>;
 }
 
 /** Compact on xs; md height from sm+. Replaces dead `lg:size-default`. */
@@ -223,7 +227,8 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       renderElement && renderElement.props.children != null
         ? renderElement.props.children
         : children;
-    const isIconOnly = size === "icon" || size === "icon-sm" || size === "icon-lg";
+    const isIconOnly =
+      size === "icon" || size === "icon-sm" || size === "icon-lg";
     const iconSize = size === "sm" ? 14 : size === "lg" ? 20 : 16;
     // Spinner box tracks the button height (sm is h-7, lg/icon are h-9, …) so
     // the loading glyph stays proportionate across sizes.
@@ -275,7 +280,8 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
                     pathLength="100"
                     style={{
                       strokeDasharray: "15 85",
-                      animation: "spinner-move 2s linear infinite, spinner-dash 4s ease-in-out infinite",
+                      animation:
+                        "spinner-move 2s linear infinite, spinner-dash 4s ease-in-out infinite",
                     }}
                   />
                 </svg>

@@ -37,12 +37,11 @@ export type InspectorTraceEvent =
   | (TraceEventBase & { type: "error"; message: string })
   | (TraceEventBase & { type: "done" });
 
-export type InspectorTraceEventInput =
-  InspectorTraceEvent extends infer Event
-    ? Event extends InspectorTraceEvent
-      ? Omit<Event, "id" | "timestamp">
-      : never
-    : never;
+export type InspectorTraceEventInput = InspectorTraceEvent extends infer Event
+  ? Event extends InspectorTraceEvent
+    ? Omit<Event, "id" | "timestamp">
+    : never
+  : never;
 
 export interface InspectorTraceSpan {
   id: string;
@@ -169,10 +168,7 @@ function addUsage(
     inputTokens: sum(current?.inputTokens, next.inputTokens),
     outputTokens: sum(current?.outputTokens, next.outputTokens),
     totalTokens: sum(current?.totalTokens, next.totalTokens),
-    cachedInputTokens: sum(
-      current?.cachedInputTokens,
-      next.cachedInputTokens
-    ),
+    cachedInputTokens: sum(current?.cachedInputTokens, next.cachedInputTokens),
     reasoningTokens: sum(current?.reasoningTokens, next.reasoningTokens),
   };
 }
@@ -183,9 +179,9 @@ export function appendTraceEvent(
 ): InspectorTraceState {
   const spans = state.spans.map((span) => ({ ...span }));
   let usage = state.usage;
-  let activeLlm = [...spans].reverse().find(
-    (span) => span.kind === "llm" && span.status === "running"
-  );
+  let activeLlm = [...spans]
+    .reverse()
+    .find((span) => span.kind === "llm" && span.status === "running");
 
   if (event.type === "request") {
     spans.push({
@@ -206,7 +202,8 @@ export function appendTraceEvent(
       name: "LLM",
       status: "running",
       startedAt: event.timestamp,
-      preview: event.type === "text-delta" ? traceEventPreview(event) : "LLM response",
+      preview:
+        event.type === "text-delta" ? traceEventPreview(event) : "LLM response",
     };
     spans.push(activeLlm);
     if (event.type === "tool-call-start") {

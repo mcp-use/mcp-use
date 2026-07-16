@@ -191,7 +191,6 @@ function isTelemetryDisabled(): boolean {
   return false;
 }
 
-
 function sessionId(): string {
   try {
     return `session-${generateUUID()}`;

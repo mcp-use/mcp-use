@@ -36,7 +36,10 @@ export class RpcTrafficStore {
 
   publish(entry: RpcTrafficInput): void {
     const last = this.entries[this.entries.length - 1];
-    if (last && shouldCoalesceWithLast(last, entry, Date.parse(entry.timestamp))) {
+    if (
+      last &&
+      shouldCoalesceWithLast(last, entry, Date.parse(entry.timestamp))
+    ) {
       this.entries[this.entries.length - 1] = mergeRpcTrafficEntry(last, entry);
       this.scheduleEmit();
       return;

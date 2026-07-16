@@ -2,7 +2,11 @@ export { PROMPTS } from "./prompts/index.js";
 export { BaseAgent } from "./base.js";
 export { MCPAgent } from "./mcp_agent.js";
 export { RemoteAgent } from "./remote.js";
-export type { MCPAgentOptions, McpConnectionLike, McpServersInput } from "./agent_options.js";
+export type {
+  MCPAgentOptions,
+  McpConnectionLike,
+  McpServersInput,
+} from "./agent_options.js";
 export type {
   BaseMessage,
   ExplicitModeOptions,

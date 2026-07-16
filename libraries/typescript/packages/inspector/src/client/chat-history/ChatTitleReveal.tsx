@@ -91,7 +91,10 @@ export function ChatTitleReveal({
 
   return (
     <span
-      className={cn("block truncate transition-[filter,opacity] duration-75", className)}
+      className={cn(
+        "block truncate transition-[filter,opacity] duration-75",
+        className
+      )}
       style={{
         filter: blurPx > 0 ? `blur(${blurPx}px)` : undefined,
         opacity,

@@ -4,12 +4,7 @@
  * Follows the CLI entry contract: default-export the MCPServer instance;
  * `mcp-use dev` / `build` / `start` own the socket and view priming.
  */
-import {
-  completable,
-  inputRequired,
-  inputResponse,
-  MCPServer,
-} from "mcp-use";
+import { completable, inputRequired, inputResponse, MCPServer } from "mcp-use";
 import { z } from "zod";
 
 const BASE_PATH = "/mcp";

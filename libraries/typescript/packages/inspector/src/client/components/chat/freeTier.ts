@@ -61,7 +61,5 @@ export function buildManagedLlmProxyConfig(
 export function buildManagedAuthHeaders(
   accessToken?: string | null
 ): Record<string, string> | undefined {
-  return accessToken
-    ? { Authorization: `Bearer ${accessToken}` }
-    : undefined;
+  return accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined;
 }

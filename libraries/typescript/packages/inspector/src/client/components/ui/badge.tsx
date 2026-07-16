@@ -61,7 +61,8 @@ const legacyBadgeVariantMap: Record<
 };
 
 interface BadgeProps
-  extends Omit<HTMLAttributes<HTMLSpanElement>, "color">,
+  extends
+    Omit<HTMLAttributes<HTMLSpanElement>, "color">,
     Omit<VariantProps<typeof badgeVariants>, "variant"> {
   color?: BadgeColor;
   variant?: VariantProps<typeof badgeVariants>["variant"] | LegacyBadgeVariant;
@@ -78,9 +79,7 @@ function BadgeContent({ children }: { children: ReactNode }) {
     );
   }
 
-  return (
-    <span className="inline-flex items-center gap-1">{children}</span>
-  );
+  return <span className="inline-flex items-center gap-1">{children}</span>;
 }
 
 const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
@@ -100,8 +99,9 @@ const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
       variantProp && variantProp in legacyBadgeVariantMap
         ? legacyBadgeVariantMap[variantProp as LegacyBadgeVariant]
         : null;
-    const variant = (legacy?.variant ??
-      variantProp) as VariantProps<typeof badgeVariants>["variant"];
+    const variant = (legacy?.variant ?? variantProp) as VariantProps<
+      typeof badgeVariants
+    >["variant"];
     const color = colorProp ?? legacy?.color ?? "gray";
     const shape = useShape();
     const colorValue = badgeColors[color];

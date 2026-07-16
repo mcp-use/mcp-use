@@ -1,7 +1,4 @@
-import {
-  completeChat,
-  providerConfigFromOptions,
-} from "@mcp-use/agent";
+import { completeChat, providerConfigFromOptions } from "@mcp-use/agent";
 import type { Message, LLMConfig } from "@/client/components/chat/types";
 
 /** Placeholder title for new chats; must match storage default and cloud DB default. */
@@ -38,7 +35,9 @@ function messageText(message: Message): string {
   return String(message.content ?? "").trim();
 }
 
-export function firstUserMessageFromMessages(messages: Message[]): string | null {
+export function firstUserMessageFromMessages(
+  messages: Message[]
+): string | null {
   for (const message of messages) {
     if (message.role !== "user") continue;
     const text = messageText(message);

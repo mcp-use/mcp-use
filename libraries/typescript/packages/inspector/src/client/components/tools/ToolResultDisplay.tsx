@@ -23,7 +23,11 @@ import React, {
 } from "react";
 import { toast } from "sonner";
 import type { MessageContentBlock } from "@/client/types/message-content-block";
-import { ViewRenderer, getViewResourceUri, isViewTool } from "@mcp-use/client/react";
+import {
+  ViewRenderer,
+  getViewResourceUri,
+  isViewTool,
+} from "@mcp-use/client/react";
 import { useViewHostProps } from "@/client/hooks/useViewHostProps";
 import { MCPAppsDebugControls } from "../MCPAppsDebugControls";
 import { JSONDisplay } from "../shared/JSONDisplay";
@@ -566,8 +570,7 @@ export function ToolResultDisplay({
   // Detect widget protocol (MCP Apps only)
   // IMPORTANT: These hooks must be called before any early returns
   const widgetProtocol = useMemo(
-    () =>
-      result ? (isViewTool(result.toolMeta) ? "mcp-apps" : null) : null,
+    () => (result ? (isViewTool(result.toolMeta) ? "mcp-apps" : null) : null),
     [result]
   );
 

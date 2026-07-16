@@ -732,48 +732,48 @@ export function CommandPalette({
         </div>
 
         {/* Keyboard Shortcuts Footer */}
-      <div className="border-t border-border px-4 py-3 pb-1 flex items-center justify-between text-xs text-muted-foreground ">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5">
-            <span className="inline-flex items-center justify-center w-5 h-5 font-mono font-medium rounded shadow-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-foreground leading-none">
-              t
-            </span>
-            <span>Tools</span>
+        <div className="border-t border-border px-4 py-3 pb-1 flex items-center justify-between text-xs text-muted-foreground ">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <span className="inline-flex items-center justify-center w-5 h-5 font-mono font-medium rounded shadow-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-foreground leading-none">
+                t
+              </span>
+              <span>Tools</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="inline-flex items-center justify-center w-5 h-5 font-mono font-medium rounded shadow-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-foreground leading-none">
+                p
+              </span>
+              <span>Prompts</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="inline-flex items-center justify-center w-5 h-5 font-mono font-medium rounded shadow-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-foreground leading-none">
+                r
+              </span>
+              <span>Resources</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="inline-flex items-center justify-center w-5 h-5 font-mono font-medium rounded shadow-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-foreground leading-none">
+                c
+              </span>
+              <span>Chat</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="inline-flex items-center justify-center w-5 h-5 font-mono font-medium rounded shadow-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-foreground leading-none">
-              p
-            </span>
-            <span>Prompts</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="inline-flex items-center justify-center w-5 h-5 font-mono font-medium rounded shadow-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-foreground leading-none">
-              r
-            </span>
-            <span>Resources</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="inline-flex items-center justify-center w-5 h-5 font-mono font-medium rounded shadow-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-foreground leading-none">
-              c
-            </span>
-            <span>Chat</span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <span className="inline-flex items-center justify-center w-5 h-5 font-mono font-medium rounded shadow-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-foreground leading-none">
+                h
+              </span>
+              <span>Home</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="inline-flex items-center justify-center px-2 h-5 font-mono text-[10px] font-medium rounded shadow-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-foreground leading-none">
+                esc
+              </span>
+              <span>Close</span>
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5">
-            <span className="inline-flex items-center justify-center w-5 h-5 font-mono font-medium rounded shadow-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-foreground leading-none">
-              h
-            </span>
-            <span>Home</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="inline-flex items-center justify-center px-2 h-5 font-mono text-[10px] font-medium rounded shadow-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-foreground leading-none">
-              esc
-            </span>
-            <span>Close</span>
-          </div>
-        </div>
-      </div>
       </div>
     </>
   );

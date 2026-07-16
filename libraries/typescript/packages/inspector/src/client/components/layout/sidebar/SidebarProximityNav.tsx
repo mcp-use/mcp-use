@@ -41,7 +41,8 @@ function readSidebarPillBleed(el: HTMLElement | null): PillBleed {
   const bleed =
     Number.parseFloat(cs.getPropertyValue("--sidebar-nav-pill-bleed")) || 0;
   const scrollbarW =
-    Number.parseFloat(cs.getPropertyValue("--sidebar-nav-scrollbar-width")) || 0;
+    Number.parseFloat(cs.getPropertyValue("--sidebar-nav-scrollbar-width")) ||
+    0;
   const trimRight =
     Number.parseFloat(
       cs.getPropertyValue("--sidebar-nav-pill-outer-trim-right")
@@ -96,8 +97,14 @@ export function SidebarProximityNav({
   className?: string;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const { activeKey, itemRects, sessionRef, handlers, registerItem, measureItems } =
-    useProximityHoverKeys(containerRef);
+  const {
+    activeKey,
+    itemRects,
+    sessionRef,
+    handlers,
+    registerItem,
+    measureItems,
+  } = useProximityHoverKeys(containerRef);
 
   const ctxValue = useMemo<ProximityContextValue>(
     () => ({ registerItem }),

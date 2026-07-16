@@ -16,11 +16,7 @@ function formatPrimitive(value: unknown): ReactNode {
     return <span className={VALUE_CLASS.null}>null</span>;
   }
   if (typeof value === "string") {
-    return (
-      <span className={VALUE_CLASS.string}>
-        {JSON.stringify(value)}
-      </span>
-    );
+    return <span className={VALUE_CLASS.string}>{JSON.stringify(value)}</span>;
   }
   if (typeof value === "number") {
     return <span className={VALUE_CLASS.number}>{String(value)}</span>;

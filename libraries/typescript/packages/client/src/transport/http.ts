@@ -503,9 +503,7 @@ export class HttpConnector extends BaseConnector {
             connectTimeout = setTimeout(
               () =>
                 reject(
-                  new Error(
-                    `MCP connection timed out after ${this.timeout}ms`
-                  )
+                  new Error(`MCP connection timed out after ${this.timeout}ms`)
                 ),
               this.timeout
             );

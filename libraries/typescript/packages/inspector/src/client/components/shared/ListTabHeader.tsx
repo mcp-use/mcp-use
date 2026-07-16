@@ -15,8 +15,7 @@ import {
 } from "@/client/lib/font-weight";
 import { Kbd } from "../ui/kbd";
 
-export const tabHeaderIconClass =
-  "h-3.5 w-3.5 shrink-0 text-muted-foreground";
+export const tabHeaderIconClass = "h-3.5 w-3.5 shrink-0 text-muted-foreground";
 
 interface ListTabHeaderProps {
   /** Current active tab name */
@@ -93,7 +92,9 @@ export function ListTabHeader({
       <div className="flex items-center gap-2 flex-1 min-w-0">
         {!isSearchExpanded ? (
           <>
-            <h2 className={`${inspectorTabTitleClass} flex items-center gap-1.5`}>
+            <h2
+              className={`${inspectorTabTitleClass} flex items-center gap-1.5`}
+            >
               <ActiveIcon className={tabHeaderIconClass} aria-hidden />
               {activeTitle}
             </h2>

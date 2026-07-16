@@ -1,5 +1,9 @@
 import { Button } from "@/client/components/ui/button";
-import { analyzeJSON, downloadJSON, getJsonDisplayData } from "@/client/utils/jsonUtils";
+import {
+  analyzeJSON,
+  downloadJSON,
+  getJsonDisplayData,
+} from "@/client/utils/jsonUtils";
 import { highlightJson } from "@/client/utils/highlightJson";
 import { Download } from "lucide-react";
 import { CollapsibleJSON } from "./CollapsibleJSON";
@@ -61,10 +65,7 @@ export function JSONDisplay({
     return (
       <div className={className} {...props}>
         {largeBanner}
-        <CollapsibleJSON
-          data={displayData}
-          defaultExpanded={defaultExpanded}
-        />
+        <CollapsibleJSON data={displayData} defaultExpanded={defaultExpanded} />
       </div>
     );
   }

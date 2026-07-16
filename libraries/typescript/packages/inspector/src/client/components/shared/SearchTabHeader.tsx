@@ -59,8 +59,7 @@ export function SearchTabHeader({
   isScrolled = false,
 }: SearchTabHeaderProps) {
   const BulkIcon = bulkAction?.icon;
-  const tabHeaderIconClass =
-    "h-3.5 w-3.5 shrink-0 text-muted-foreground";
+  const tabHeaderIconClass = "h-3.5 w-3.5 shrink-0 text-muted-foreground";
 
   return (
     <div

@@ -166,4 +166,3 @@ export function buildAgentCspPrompt(
 
   return lines.join("\n");
 }
-

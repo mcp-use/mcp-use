@@ -9,10 +9,12 @@ import {
 } from "@/client/components/ui/tabs-subtle";
 import { JSONDisplay } from "./shared/JSONDisplay";
 import { tabHeaderIconClass } from "./shared/ListTabHeader";
-import { inspectorTabTitleClass, inspectorTabHeaderPadding, inspectorStickyTabHeaderClass } from "@/client/lib/font-weight";
 import {
-  inspectorSettingsContentClass,
-} from "@/client/lib/inspector-settings-layout";
+  inspectorTabTitleClass,
+  inspectorTabHeaderPadding,
+  inspectorStickyTabHeaderClass,
+} from "@/client/lib/font-weight";
+import { inspectorSettingsContentClass } from "@/client/lib/inspector-settings-layout";
 import { ServerMetadataPanel } from "./ServerMetadataPanel";
 import { Info } from "lucide-react";
 

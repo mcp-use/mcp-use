@@ -106,8 +106,9 @@ export function AddToClientDropdown({
 
   const trackAddToClient = (client: string) => {
     try {
-      captureInspectorEvent(new MCPAddToClientEvent({ client }))
-        .catch(() => {});
+      captureInspectorEvent(new MCPAddToClientEvent({ client })).catch(
+        () => {}
+      );
     } catch {
       // ignore telemetry errors
     }
@@ -438,7 +439,9 @@ export function AddToClientDropdown({
         })
       : trigger
     : defaultTrigger;
-  const triggerElement = isValidElement(rawTrigger) ? rawTrigger : defaultTrigger;
+  const triggerElement = isValidElement(rawTrigger)
+    ? rawTrigger
+    : defaultTrigger;
 
   return (
     <>

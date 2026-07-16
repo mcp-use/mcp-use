@@ -66,7 +66,9 @@ export function MeshTabBackground({
   const showShaderLayer = shaderPhase !== "hidden";
   const shaderVisible = shaderPhase === "visible" && shaderReady;
 
-  const handleShaderTransitionEnd = (event: TransitionEvent<HTMLDivElement>) => {
+  const handleShaderTransitionEnd = (
+    event: TransitionEvent<HTMLDivElement>
+  ) => {
     if (event.propertyName !== "opacity") return;
     if (shaderPhase === "fading") {
       onShaderFadeComplete?.();
@@ -114,7 +116,9 @@ export function MeshTabBackground({
           <div className="absolute inset-0 bg-gradient-to-t from-white/0 via-white/70 to-white dark:from-black/0 dark:via-black/70 dark:to-black" />
         </div>
       )}
-      <div className="relative z-10 flex min-h-0 flex-1 flex-col">{children}</div>
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col">
+        {children}
+      </div>
     </div>
   );
 }

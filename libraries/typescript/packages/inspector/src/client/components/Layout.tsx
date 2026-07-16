@@ -126,10 +126,7 @@ export function Layout({ children }: LayoutProps) {
   }, [sidebarCollapsed]);
   useEffect(() => {
     try {
-      localStorage.setItem(
-        "inspector-rpc-logger-open",
-        String(rpcLoggerOpen)
-      );
+      localStorage.setItem("inspector-rpc-logger-open", String(rpcLoggerOpen));
     } catch {
       // Storage is optional.
     }
@@ -213,13 +210,12 @@ export function Layout({ children }: LayoutProps) {
           (Date.now() - sessionStartRef.current) / 1000
         );
         captureInspectorEvent(
-            new MCPSessionDurationEvent({
-              durationSeconds,
-              tabsVisited: tabsVisitedRef.current.size,
-              toolsExecuted: toolsExecutedRef.current,
-            })
-          )
-          .catch(() => {});
+          new MCPSessionDurationEvent({
+            durationSeconds,
+            tabsVisited: tabsVisitedRef.current.size,
+            toolsExecuted: toolsExecutedRef.current,
+          })
+        ).catch(() => {});
       } catch {
         // ignore telemetry errors
       }
@@ -233,12 +229,11 @@ export function Layout({ children }: LayoutProps) {
     (tab: TabType) => {
       try {
         captureInspectorEvent(
-            new MCPTabNavigationEvent({
-              tab,
-              previousTab: previousTabRef.current,
-            })
-          )
-          .catch(() => {});
+          new MCPTabNavigationEvent({
+            tab,
+            previousTab: previousTabRef.current,
+          })
+        ).catch(() => {});
       } catch {
         // ignore telemetry errors
       }
@@ -347,13 +342,12 @@ export function Layout({ children }: LayoutProps) {
   const handleCommandPaletteOpen = useCallback(
     (trigger: "keyboard" | "button") => {
       captureInspectorEvent(
-          new MCPCommandPaletteOpenEvent({
-            trigger,
-          })
-        )
-        .catch(() => {
-          // Silently fail - telemetry should not break the application
-        });
+        new MCPCommandPaletteOpenEvent({
+          trigger,
+        })
+      ).catch(() => {
+        // Silently fail - telemetry should not break the application
+      });
       setIsCommandPaletteOpen(true);
     },
     []
@@ -622,8 +616,7 @@ export function Layout({ children }: LayoutProps) {
           name,
           transportType: "http",
           connectionMode,
-          connectionType:
-            connectionMode === "proxy" ? "Via Proxy" : "Direct",
+          connectionType: connectionMode === "proxy" ? "Via Proxy" : "Direct",
           proxyConfig:
             connectionMode === "proxy" && proxyAddress
               ? {
@@ -841,7 +834,6 @@ export function Layout({ children }: LayoutProps) {
           onNavigate={handleCommandPaletteNavigate}
           onServerSelect={handleServerSelect}
         />
-
       </div>
     </TooltipProvider>
   );

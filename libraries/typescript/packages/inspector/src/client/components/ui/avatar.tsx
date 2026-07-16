@@ -1,15 +1,15 @@
-"use client"
+"use client";
 
-import { Avatar as AvatarPrimitive } from "@base-ui/react/avatar"
+import { Avatar as AvatarPrimitive } from "@base-ui/react/avatar";
 
-import { cn } from "@/client/lib/utils"
+import { cn } from "@/client/lib/utils";
 
 function Avatar({
   className,
   size = "default",
   ...props
 }: AvatarPrimitive.Root.Props & {
-  size?: "default" | "sm" | "lg"
+  size?: "default" | "sm" | "lg";
 }) {
   return (
     <AvatarPrimitive.Root
@@ -21,7 +21,7 @@ function Avatar({
       )}
       {...props}
     />
-  )
+  );
 }
 
 function AvatarImage({ className, ...props }: AvatarPrimitive.Image.Props) {
@@ -34,7 +34,7 @@ function AvatarImage({ className, ...props }: AvatarPrimitive.Image.Props) {
       )}
       {...props}
     />
-  )
+  );
 }
 
 function AvatarFallback({
@@ -50,11 +50,7 @@ function AvatarFallback({
       )}
       {...props}
     />
-  )
+  );
 }
 
-export {
-  Avatar,
-  AvatarImage,
-  AvatarFallback,
-}
+export { Avatar, AvatarImage, AvatarFallback };

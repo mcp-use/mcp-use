@@ -23,7 +23,10 @@ import {
 import type { ResourceResult } from "./resources/ResourceResultDisplay";
 import { ResourceResultDisplay } from "./resources/ResourceResultDisplay";
 import { ResourcesList } from "./resources/ResourcesList";
-import { InspectorScrollArea, SearchTabHeader } from "@/client/components/shared";
+import {
+  InspectorScrollArea,
+  SearchTabHeader,
+} from "@/client/components/shared";
 import { useConfig } from "./chat/useConfig";
 import { copyToClipboard } from "@/client/utils/browser";
 
@@ -501,7 +504,9 @@ export function ResourcesTab({
                   onSearchExpand={() => setIsSearchExpanded(true)}
                   onSearchChange={setSearchQuery}
                   onSearchBlur={handleSearchBlur}
-                  searchInputRef={searchInputRef as React.RefObject<HTMLInputElement>}
+                  searchInputRef={
+                    searchInputRef as React.RefObject<HTMLInputElement>
+                  }
                   onRefresh={refreshResources ? handleRefresh : undefined}
                   isRefreshing={isRefreshing}
                 />

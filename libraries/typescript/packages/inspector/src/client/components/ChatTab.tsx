@@ -29,11 +29,7 @@ import {
   type ShaderPhase,
 } from "@/client/components/ui/mesh-tab-background";
 import { Button } from "./ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "./ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { copyToClipboard } from "@/client/utils/browser";
 import { getServerDisplayName } from "@/client/utils/servers";
 import { downloadJSON } from "../utils/jsonUtils";
@@ -57,10 +53,7 @@ import { useChatMessagesClientSide } from "./chat/useChatMessagesClientSide";
 import { useConfig } from "./chat/useConfig";
 import { useHostedChatMode } from "./chat/useHostedChatMode";
 import { McpReconnectBanner } from "./chat/McpReconnectBanner";
-import {
-  ChatRawView,
-  type ChatView,
-} from "./chat/ChatTraceView";
+import { ChatRawView, type ChatView } from "./chat/ChatTraceView";
 import { useLocalSystemPrompt } from "./chat/system-prompt/useLocalSystemPrompt";
 import { resolveSystemPrompt } from "./chat/system-prompt/local-storage";
 import type { ChatSystemPromptProvider } from "./chat/system-prompt/types";
@@ -243,7 +236,9 @@ export function ChatTab({
 
   const [showHistoryPanel, setShowHistoryPanel] = useState(false);
   const [historyRefetchKey, setHistoryRefetchKey] = useState(0);
-  const [internalChatTitle, setInternalChatTitle] = useState<string | undefined>();
+  const [internalChatTitle, setInternalChatTitle] = useState<
+    string | undefined
+  >();
   const [restoredMessages, setRestoredMessages] = useState<
     import("./chat/types").Message[] | undefined
   >(undefined);
@@ -287,16 +282,12 @@ export function ChatTab({
     clearConfig,
   } = useConfig({ mcpServerUrl: connection.url ?? "" });
 
-  const {
-    setForceClientSide,
-    effectiveClientSide,
-    llmConfig,
-    isManaged,
-  } = useHostedChatMode({
-    useClientSide,
-    managedLlmConfig,
-    localLlmConfig,
-  });
+  const { setForceClientSide, effectiveClientSide, llmConfig, isManaged } =
+    useHostedChatMode({
+      useClientSide,
+      managedLlmConfig,
+      localLlmConfig,
+    });
 
   const { getAllModelContexts } = useWidgetDebug();
 
@@ -450,8 +441,7 @@ export function ChatTab({
 
   const effectiveActiveChatTitle = activeChatTitle ?? internalChatTitle;
   const headerDisplayTitle =
-    effectiveActiveChatTitle &&
-    !isPlaceholderTitle(effectiveActiveChatTitle)
+    effectiveActiveChatTitle && !isPlaceholderTitle(effectiveActiveChatTitle)
       ? effectiveActiveChatTitle
       : CHAT_TITLE_SIMPLE;
 
@@ -468,17 +458,19 @@ export function ChatTab({
     onHistoryRefetch: bumpHistoryRefetch,
   });
 
-  const rateLimitInfo = effectiveClientSide && isManaged
-    ? (clientSideChat.rateLimitInfo ?? null)
-    : effectiveClientSide
-      ? null
-      : (serverSideChat.rateLimitInfo ?? null);
+  const rateLimitInfo =
+    effectiveClientSide && isManaged
+      ? (clientSideChat.rateLimitInfo ?? null)
+      : effectiveClientSide
+        ? null
+        : (serverSideChat.rateLimitInfo ?? null);
 
-  const clearRateLimitInfo = effectiveClientSide && isManaged
-    ? clientSideChat.clearRateLimitInfo
-    : effectiveClientSide
-      ? undefined
-      : serverSideChat.clearRateLimitInfo;
+  const clearRateLimitInfo =
+    effectiveClientSide && isManaged
+      ? clientSideChat.clearRateLimitInfo
+      : effectiveClientSide
+        ? undefined
+        : serverSideChat.clearRateLimitInfo;
 
   const mcpServerAuthRequired = effectiveClientSide
     ? null
@@ -572,7 +564,29 @@ export function ChatTab({
       : undefined;
 
   // #region agent log
-  fetch('http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'243e61'},body:JSON.stringify({sessionId:'243e61',location:'ChatTab.tsx:managedCloudInfo',message:'chat managed cloud info',data:{isManaged,isHostedAuthenticated,hasManagedCloudModel:!!managedCloudModel,showManagedCloudInfo:!!managedCloudInfo,modelCount:managedCloudModel?.models.length??0,isLoading:managedCloudModel?.isLoading??false,hostedUserId:hostedUser?.id??null},timestamp:Date.now(),hypothesisId:'H-C'})}).catch(()=>{});
+  fetch("http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Debug-Session-Id": "243e61",
+    },
+    body: JSON.stringify({
+      sessionId: "243e61",
+      location: "ChatTab.tsx:managedCloudInfo",
+      message: "chat managed cloud info",
+      data: {
+        isManaged,
+        isHostedAuthenticated,
+        hasManagedCloudModel: !!managedCloudModel,
+        showManagedCloudInfo: !!managedCloudInfo,
+        modelCount: managedCloudModel?.models.length ?? 0,
+        isLoading: managedCloudModel?.isLoading ?? false,
+        hostedUserId: hostedUser?.id ?? null,
+      },
+      timestamp: Date.now(),
+      hypothesisId: "H-C",
+    }),
+  }).catch(() => {});
   // #endregion
 
   const modelBadgeMode = isManaged ? ("managed" as const) : ("byok" as const);
@@ -1428,7 +1442,9 @@ export function ChatTab({
             freeTierInfo={freeTierInfo}
             managedCloudInfo={managedCloudInfo}
             onUseManagedCloud={
-              !isManaged && managedCloudModel ? handleUseManagedCloud : undefined
+              !isManaged && managedCloudModel
+                ? handleUseManagedCloud
+                : undefined
             }
           />
         </div>
@@ -1436,9 +1452,7 @@ export function ChatTab({
         <ChatLandingForm
           serverDisplayName={getServerDisplayName(connection)}
           inputValue={inputValue}
-          isConnected={
-            isConnected && !rateLimitInfo && !mcpServerAuthRequired
-          }
+          isConnected={isConnected && !rateLimitInfo && !mcpServerAuthRequired}
           isLoading={isLoading}
           textareaRef={textareaRef}
           llmConfig={llmConfig}
@@ -1571,45 +1585,47 @@ export function ChatTab({
       {llmConfig && (
         <div className="relative shrink-0">
           <ChatInputArea
-          inputValue={inputValue}
-          isConnected={isConnected && !rateLimitInfo && !mcpServerAuthRequired}
-          isLoading={isLoading}
-          textareaRef={textareaRef}
-          llmConfig={llmConfig}
-          promptsDropdownOpen={promptsDropdownOpen}
-          promptFocusedIndex={promptFocusedIndex}
-          prompts={filteredPrompts}
-          promptResults={results}
-          selectedPrompt={selectedPrompt}
-          attachments={attachments}
-          tools={hideToolSelector ? undefined : toolInfos}
-          disabledTools={hideToolSelector ? undefined : disabledTools}
-          onDisabledToolsChange={
-            hideToolSelector ? undefined : setDisabledTools
-          }
-          onDeletePromptResult={handleDeleteResult}
-          onPromptSelect={handlePromptSelect}
-          onInputChange={setInputValue}
-          onKeyDown={handleKeyDown}
-          onKeyUp={handleKeyUp}
-          onClick={updatePromptsDropdownState}
-          onSendMessage={handleSendMessage}
-          onStopStreaming={stop}
-          onConfigDialogOpenChange={setConfigDialogOpen}
-          onAttachmentAdd={addAttachment}
-          onAttachmentRemove={removeAttachment}
-          hideModelBadge={hideInputModelBadge}
-          freeTierInfo={freeTierInfo}
-          managedCloudInfo={managedCloudInfo}
-          modelBadgeMode={modelBadgeMode}
-          modelDisplayName={modelDisplayName}
-          followups={followups}
-          onFollowupSelect={handleFollowupSelect}
-          pendingElicitationRequests={connection.pendingElicitationRequests}
-          onApproveElicitation={connection.approveElicitation}
-          onRejectElicitation={connection.rejectElicitation}
-          systemPromptProvider={effectiveSystemPromptProvider}
-        />
+            inputValue={inputValue}
+            isConnected={
+              isConnected && !rateLimitInfo && !mcpServerAuthRequired
+            }
+            isLoading={isLoading}
+            textareaRef={textareaRef}
+            llmConfig={llmConfig}
+            promptsDropdownOpen={promptsDropdownOpen}
+            promptFocusedIndex={promptFocusedIndex}
+            prompts={filteredPrompts}
+            promptResults={results}
+            selectedPrompt={selectedPrompt}
+            attachments={attachments}
+            tools={hideToolSelector ? undefined : toolInfos}
+            disabledTools={hideToolSelector ? undefined : disabledTools}
+            onDisabledToolsChange={
+              hideToolSelector ? undefined : setDisabledTools
+            }
+            onDeletePromptResult={handleDeleteResult}
+            onPromptSelect={handlePromptSelect}
+            onInputChange={setInputValue}
+            onKeyDown={handleKeyDown}
+            onKeyUp={handleKeyUp}
+            onClick={updatePromptsDropdownState}
+            onSendMessage={handleSendMessage}
+            onStopStreaming={stop}
+            onConfigDialogOpenChange={setConfigDialogOpen}
+            onAttachmentAdd={addAttachment}
+            onAttachmentRemove={removeAttachment}
+            hideModelBadge={hideInputModelBadge}
+            freeTierInfo={freeTierInfo}
+            managedCloudInfo={managedCloudInfo}
+            modelBadgeMode={modelBadgeMode}
+            modelDisplayName={modelDisplayName}
+            followups={followups}
+            onFollowupSelect={handleFollowupSelect}
+            pendingElicitationRequests={connection.pendingElicitationRequests}
+            onApproveElicitation={connection.approveElicitation}
+            onRejectElicitation={connection.rejectElicitation}
+            systemPromptProvider={effectiveSystemPromptProvider}
+          />
         </div>
       )}
     </div>

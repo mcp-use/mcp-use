@@ -21,7 +21,9 @@ function resolveFaviconDir(): string {
       return dir;
     }
   }
-  throw new Error("Inspector favicon assets not found (expected dist/cdn or public/)");
+  throw new Error(
+    "Inspector favicon assets not found (expected dist/cdn or public/)"
+  );
 }
 
 /** Serve favicon assets from the local package (not inspector-cdn). */

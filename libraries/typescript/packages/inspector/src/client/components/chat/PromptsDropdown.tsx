@@ -63,12 +63,12 @@ export function PromptsDropdown({
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                       {prompt.name}
-                    {selectedPrompt?.name === prompt.name && (
-                      <Spinner className="size-3 text-zinc-600 dark:text-zinc-400" />
-                    )}
+                      {selectedPrompt?.name === prompt.name && (
+                        <Spinner className="size-3 text-zinc-600 dark:text-zinc-400" />
+                      )}
+                    </div>
                   </div>
-                </div>
-              </Button>
+                </Button>
               }
               nativeButton
             />

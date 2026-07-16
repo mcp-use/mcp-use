@@ -78,7 +78,9 @@ function ShapeProvider({
   defaultShape?: ShapeVariant;
 }) {
   const [shape, setShapeState] = useState<ShapeVariant>(defaultShape);
-  const transitionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const transitionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
 
   // Run a state change under the `.transitioning` guard (added + reflow-flushed
   // first so the 180ms border-radius cross-fade applies). Clearing the previous
@@ -88,7 +90,8 @@ function ShapeProvider({
     root.classList.add("transitioning");
     void root.offsetHeight;
     callback();
-    if (transitionTimeoutRef.current) clearTimeout(transitionTimeoutRef.current);
+    if (transitionTimeoutRef.current)
+      clearTimeout(transitionTimeoutRef.current);
     transitionTimeoutRef.current = setTimeout(
       () => root.classList.remove("transitioning"),
       200
@@ -119,9 +122,7 @@ function ShapeProvider({
   );
 
   return (
-    <ShapeContext.Provider value={value}>
-      {children}
-    </ShapeContext.Provider>
+    <ShapeContext.Provider value={value}>{children}</ShapeContext.Provider>
   );
 }
 

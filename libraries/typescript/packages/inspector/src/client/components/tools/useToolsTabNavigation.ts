@@ -46,7 +46,9 @@ export function useToolsTabNavigation({
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [isMobile, setIsMobile] = useState(false);
-  const [mobileView, setMobileView] = useState<"list" | "detail" | "response">("list");
+  const [mobileView, setMobileView] = useState<"list" | "detail" | "response">(
+    "list"
+  );
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
@@ -133,7 +135,14 @@ export function useToolsTabNavigation({
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [focusedIndex, filteredTools, savedRequests, activeTab, handleToolSelect, loadSavedRequest]);
+  }, [
+    focusedIndex,
+    filteredTools,
+    savedRequests,
+    activeTab,
+    handleToolSelect,
+    loadSavedRequest,
+  ]);
 
   useEffect(() => {
     if (focusedIndex >= 0) {
@@ -141,7 +150,9 @@ export function useToolsTabNavigation({
         activeTab === "tools"
           ? `tool-${filteredTools[focusedIndex]?.name}`
           : `saved-${savedRequests[focusedIndex]?.id}`;
-      document.getElementById(itemId)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      document
+        .getElementById(itemId)
+        ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   }, [focusedIndex, filteredTools, savedRequests, activeTab]);
 
@@ -152,7 +163,9 @@ export function useToolsTabNavigation({
       setSelectedToolName(null);
       const timeoutId = setTimeout(() => {
         handleToolSelect(tool);
-        document.getElementById(`tool-${tool.name}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        document
+          .getElementById(`tool-${tool.name}`)
+          ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
       }, 100);
       return () => clearTimeout(timeoutId);
     }

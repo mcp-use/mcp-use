@@ -30,10 +30,7 @@ export interface ChatStorageProvider {
     title?: string;
     agentName?: string;
   }): Promise<ChatSession>;
-  updateChat(
-    chatId: string,
-    patch: { title?: string }
-  ): Promise<ChatSession>;
+  updateChat(chatId: string, patch: { title?: string }): Promise<ChatSession>;
   deleteChat(chatId: string): Promise<void>;
   /** Optional — local provider implements; cloud relies on /stream event writes */
   saveMessages?(chatId: string, messages: Message[]): Promise<void>;

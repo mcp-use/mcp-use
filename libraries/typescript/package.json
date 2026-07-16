@@ -31,7 +31,7 @@
     "knip:deps": "knip --dependencies --no-exit-code",
     "knip:production": "knip --production",
     "dev": "pnpm run -r --parallel dev",
-    "prepare": "husky",
+    "prepare": "cd ../.. && husky libraries/typescript/.husky",
     "changeset": "changeset",
     "version": "changeset version && pnpm install --no-frozen-lockfile",
     "release": "pnpm build && changeset publish",
@@ -62,7 +62,7 @@
     "tsup": "^8.5.1",
     "typescript": "^5.9.3"
   },
-  "packageManager": "pnpm@10.30.0+sha512.2b5753de015d480eeb88f5b5b61e0051f05b4301808a82ec8b840c9d2adf7748eb352c83f5c1593ca703ff1017295bc3fdd3119abb9686efc96b9fcb18200937",
+  "packageManager": "pnpm@11.13.1+sha512.b2fc7683b8a6525414e7d13e1ba28caaddde96bf66ec540bfaeb7e702b81f3e0be4d1f295edf7f9fe0396740a8dce4509c582ddf79891f4543fea32d37645f25",
   "dependencies": {
     "@eslint/js": "^9.39.4"
   },

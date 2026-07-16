@@ -1,11 +1,6 @@
-import { chat, streamChat } from "./providers/index.js";
 import { isToolResultError, toolResultToContent } from "./toolResultParts.js";
 import type { LlmDriver } from "./driver.js";
-import type {
-  LlmStreamEvent,
-  ProviderMessage,
-  ProviderTool,
-} from "./types.js";
+import type { LlmStreamEvent, ProviderMessage, ProviderTool } from "./types.js";
 
 interface ToolCallFn {
   (name: string, args: Record<string, unknown>): Promise<unknown>;
@@ -157,7 +152,11 @@ export async function runToolLoopNonStreaming(params: ToolLoopParams): Promise<{
 
   for (let step = 0; step < maxSteps; step++) {
     if (signal?.aborted) break;
-    const { text, toolCalls } = await driver.complete({ messages, tools, signal });
+    const { text, toolCalls } = await driver.complete({
+      messages,
+      tools,
+      signal,
+    });
     if (toolCalls.length === 0) {
       finalText = text;
       break;

@@ -76,21 +76,26 @@ const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
     const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
 
     const activeRect = activeIndex !== null ? itemRects[activeIndex] : null;
-    const checkedRect =
-      checkedIndex != null ? itemRects[checkedIndex] : null;
+    const checkedRect = checkedIndex != null ? itemRects[checkedIndex] : null;
     const focusRect = focusedIndex !== null ? itemRects[focusedIndex] : null;
     const isHoveringOther =
       activeIndex !== null && activeIndex !== checkedIndex;
 
     return (
-      <DropdownContext.Provider value={{ registerItem, activeIndex, checkedIndex }}>
+      <DropdownContext.Provider
+        value={{ registerItem, activeIndex, checkedIndex }}
+      >
         <Elevated
           offset={2}
           shadowLevel={3}
           ref={(node) => {
-            (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+            (
+              containerRef as React.MutableRefObject<HTMLDivElement | null>
+            ).current = node;
             if (typeof ref === "function") ref(node);
-            else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
+            else if (ref)
+              (ref as React.MutableRefObject<HTMLDivElement | null>).current =
+                node;
           }}
           onMouseEnter={handlers.onMouseEnter}
           onMouseMove={handlers.onMouseMove}
@@ -121,7 +126,11 @@ const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
             const currentIdx = items.indexOf(e.target as HTMLElement);
             if (currentIdx === -1) return;
 
-            if (["ArrowDown", "ArrowUp", "ArrowRight", "ArrowLeft"].includes(e.key)) {
+            if (
+              ["ArrowDown", "ArrowUp", "ArrowRight", "ArrowLeft"].includes(
+                e.key
+              )
+            ) {
               e.preventDefault();
               const next = ["ArrowDown", "ArrowRight"].includes(e.key)
                 ? (currentIdx + 1) % items.length
@@ -244,7 +253,9 @@ interface DropdownMenuContextValue {
   actionsRef: React.RefObject<DropdownMenuActions | null>;
 }
 
-const DropdownMenuContext = createContext<DropdownMenuContextValue | null>(null);
+const DropdownMenuContext = createContext<DropdownMenuContextValue | null>(
+  null
+);
 
 function useDropdownMenuContext() {
   const ctx = useContext(DropdownMenuContext);
@@ -599,10 +610,7 @@ const DropdownContent = forwardRef<HTMLDivElement, DropdownContentProps>(
                     popup so proximity measurement and gap layout still work,
                     while the group provides the radio value context. */}
                 {checkedIndex != null ? (
-                  <Menu.RadioGroup
-                    value={checkedIndex}
-                    className="contents"
-                  >
+                  <Menu.RadioGroup value={checkedIndex} className="contents">
                     {children}
                   </Menu.RadioGroup>
                 ) : (
@@ -623,18 +631,16 @@ DropdownContent.displayName = "DropdownContent";
 // DropdownLabel
 // ---------------------------------------------------------------------------
 
-const DropdownLabel = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
-    <div
-      ref={ref}
-      className={cn(
-        "px-2 py-1.5 text-[11px] text-muted-foreground",
-        className
-      )}
-      {...props}
-    />
-  )
-);
+const DropdownLabel = forwardRef<
+  HTMLDivElement,
+  HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn("px-2 py-1.5 text-[11px] text-muted-foreground", className)}
+    {...props}
+  />
+));
 
 DropdownLabel.displayName = "DropdownLabel";
 

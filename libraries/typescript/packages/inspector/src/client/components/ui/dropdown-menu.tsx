@@ -41,16 +41,12 @@ function extractMenuLabel(children: React.ReactNode): string {
   return "Menu item";
 }
 
-function DropdownMenu(
-  props: React.ComponentProps<typeof FluidDropdownMenu>
-) {
+function DropdownMenu(props: React.ComponentProps<typeof FluidDropdownMenu>) {
   return <FluidDropdownMenu data-slot="dropdown-menu" {...props} />;
 }
 
 function DropdownMenuTrigger(props: MenuPrimitive.Trigger.Props) {
-  return (
-    <DropdownTrigger data-slot="dropdown-menu-trigger" {...props} />
-  );
+  return <DropdownTrigger data-slot="dropdown-menu-trigger" {...props} />;
 }
 
 function DropdownMenuContent({

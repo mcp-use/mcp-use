@@ -12,7 +12,10 @@ import {
 import { NotificationsList } from "./notifications/NotificationsList";
 import { NotificationResultDisplay } from "./notifications/NotificationResultDisplay";
 import type { NotificationResult } from "./notifications/NotificationResultDisplay";
-import { InspectorScrollArea, SearchTabHeader } from "@/client/components/shared";
+import {
+  InspectorScrollArea,
+  SearchTabHeader,
+} from "@/client/components/shared";
 import { copyToClipboard, formatRelativeTime } from "@/client/utils/browser";
 
 interface NotificationsTabProps {
@@ -292,7 +295,11 @@ export function NotificationsTab({
           orientation="vertical"
           className="h-full border-r dark:border-zinc-700"
         >
-          <ResizablePanel defaultSize={75} minSize={30} className="h-full overflow-hidden">
+          <ResizablePanel
+            defaultSize={75}
+            minSize={30}
+            className="h-full overflow-hidden"
+          >
             <InspectorScrollArea scrollRef={listRef}>
               {(isScrolled) => (
                 <>

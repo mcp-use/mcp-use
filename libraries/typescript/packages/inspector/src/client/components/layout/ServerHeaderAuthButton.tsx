@@ -14,7 +14,8 @@ function storeReconnectSession(server: McpServer) {
       JSON.stringify({
         url: server.url,
         name: server.name || "Auto-connected Server",
-        transportType: (server as { transportType?: string }).transportType || "http",
+        transportType:
+          (server as { transportType?: string }).transportType || "http",
         connectionMode: "auto",
       })
     );

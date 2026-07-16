@@ -297,9 +297,7 @@ const ConditionalTooltip = ({
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger
-          render={
-            <span className="contents">{children}</span>
-          }
+          render={<span className="contents">{children}</span>}
           nativeButton={false}
         />
         <TooltipContent>{title}</TooltipContent>

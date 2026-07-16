@@ -20,7 +20,14 @@ import {
   Tablet,
   Trash2,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { toast } from "sonner";
 import { LOCALE_OPTIONS, TIMEZONE_OPTIONS } from "../constants/debug-options";
 import { useWidgetDebug } from "../context/WidgetDebugContext";
@@ -443,7 +450,8 @@ export function MCPAppsDebugControls({
               data-testid={`debugger-device-option-${device.value}`}
               onSelect={() =>
                 updatePlaygroundSettings({
-                  deviceType: device.value as (typeof DEVICE_OPTIONS)[number]["value"],
+                  deviceType:
+                    device.value as (typeof DEVICE_OPTIONS)[number]["value"],
                 })
               }
             />
@@ -500,7 +508,9 @@ export function MCPAppsDebugControls({
                       size="sm"
                       className="h-8 min-w-[50px] px-2 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
                     >
-                      <span className="text-xs font-mono">{playground.locale}</span>
+                      <span className="text-xs font-mono">
+                        {playground.locale}
+                      </span>
                     </Button>
                   }
                   nativeButton
@@ -575,7 +585,9 @@ export function MCPAppsDebugControls({
                             : "bg-red-500"
                         }`}
                       >
-                        {cspViolations.length > 99 ? "99+" : cspViolations.length}
+                        {cspViolations.length > 99
+                          ? "99+"
+                          : cspViolations.length}
                       </span>
                     )}
                   </Button>

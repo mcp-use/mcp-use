@@ -123,9 +123,11 @@ const MenuItem = forwardRef<HTMLDivElement, MenuItemProps>(
     const skipAnimation = !hasMounted.current;
 
     const mergeRef = (node: HTMLDivElement | null) => {
-      (internalRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+      (internalRef as React.MutableRefObject<HTMLDivElement | null>).current =
+        node;
       if (typeof ref === "function") ref(node);
-      else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
+      else if (ref)
+        (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
     };
 
     const handleActivate = disabled
@@ -179,9 +181,7 @@ const MenuItem = forwardRef<HTMLDivElement, MenuItemProps>(
           <span
             className={cn(
               "col-start-1 row-start-1 transition-[color,font-variation-settings] duration-80 [text-box:trim-both_cap_alphabetic]",
-              isActive || checked
-                ? "text-foreground"
-                : "text-muted-foreground"
+              isActive || checked ? "text-foreground" : "text-muted-foreground"
             )}
             style={{
               fontVariationSettings: checked

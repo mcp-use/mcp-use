@@ -77,15 +77,14 @@ export function useMCPPrompts({
 
         // Track successful prompt call
         captureInspectorEvent(
-            new MCPPromptCallEvent({
-              promptName: prompt.name,
-              serverId,
-              success: true,
-            })
-          )
-          .catch(() => {
-            // Silently fail - telemetry should not break the application
-          });
+          new MCPPromptCallEvent({
+            promptName: prompt.name,
+            serverId,
+            success: true,
+          })
+        ).catch(() => {
+          // Silently fail - telemetry should not break the application
+        });
 
         setResults((prev) => [
           {
@@ -100,16 +99,15 @@ export function useMCPPrompts({
       } catch (error) {
         // Track failed prompt call
         captureInspectorEvent(
-            new MCPPromptCallEvent({
-              promptName: prompt.name,
-              serverId,
-              success: false,
-              error: error instanceof Error ? error.message : "Unknown error",
-            })
-          )
-          .catch(() => {
-            // Silently fail - telemetry should not break the application
-          });
+          new MCPPromptCallEvent({
+            promptName: prompt.name,
+            serverId,
+            success: false,
+            error: error instanceof Error ? error.message : "Unknown error",
+          })
+        ).catch(() => {
+          // Silently fail - telemetry should not break the application
+        });
 
         const errorMessage =
           error instanceof Error ? error.message : String(error);

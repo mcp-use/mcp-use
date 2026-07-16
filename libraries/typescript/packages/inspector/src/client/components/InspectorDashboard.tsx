@@ -48,9 +48,7 @@ import {
   type ConnectionMode,
   type EditableConnectionConfig,
 } from "@/client/utils/connectionUpdates";
-import {
-  getServerDisplayName,
-} from "@/client/utils/servers";
+import { getServerDisplayName } from "@/client/utils/servers";
 import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 import { INSPECTOR_RECONNECT_STORAGE_KEY } from "@/client/hooks/useAutoConnect";
@@ -102,14 +100,13 @@ export function InspectorDashboard() {
         reportedConnectionsRef.current.add(connection.id);
         try {
           captureInspectorEvent(
-              new MCPServerConnectionEvent({
-                serverId: connection.id,
-                serverUrl: connection.url ?? "",
-                success: true,
-                connectionType: "http",
-              })
-            )
-            .catch(() => {});
+            new MCPServerConnectionEvent({
+              serverId: connection.id,
+              serverUrl: connection.url ?? "",
+              success: true,
+              connectionType: "http",
+            })
+          ).catch(() => {});
         } catch {
           // ignore telemetry errors
         }
@@ -126,8 +123,9 @@ export function InspectorDashboard() {
   const handleRemoveConnection = useCallback(
     (connectionId: string) => {
       try {
-        captureInspectorEvent(new MCPServerRemovedEvent({ serverId: connectionId }))
-          .catch(() => {});
+        captureInspectorEvent(
+          new MCPServerRemovedEvent({ serverId: connectionId })
+        ).catch(() => {});
       } catch {
         // ignore telemetry errors
       }
@@ -196,11 +194,10 @@ export function InspectorDashboard() {
   // Track inspector open on mount
   useEffect(() => {
     trackInspectorOpen({
-        connectionCount: connections.length,
-      })
-      .catch(() => {
-        // Silently fail - telemetry should not break the application
-      });
+      connectionCount: connections.length,
+    }).catch(() => {
+      // Silently fail - telemetry should not break the application
+    });
   }, []); // Only run once on mount
 
   // Form state
@@ -326,16 +323,15 @@ export function InspectorDashboard() {
 
     // Track server added
     captureInspectorEvent(
-        new MCPServerAddedEvent({
-          serverId: url.trim(),
-          serverUrl: url.trim(),
-          connectionType: "http",
-          viaProxy: !!proxyConfig?.proxyAddress,
-        })
-      )
-      .catch(() => {
-        // Silently fail - telemetry should not break the application
-      });
+      new MCPServerAddedEvent({
+        serverId: url.trim(),
+        serverUrl: url.trim(),
+        connectionType: "http",
+        viaProxy: !!proxyConfig?.proxyAddress,
+      })
+    ).catch(() => {
+      // Silently fail - telemetry should not break the application
+    });
 
     // Reset form
     setAlias("");
@@ -808,7 +804,10 @@ export function InspectorDashboard() {
                           <DropdownMenuItem
                             onClick={(e) => {
                               e.stopPropagation();
-                              navigateToServerTab(connection, "server-metadata");
+                              navigateToServerTab(
+                                connection,
+                                "server-metadata"
+                              );
                             }}
                           >
                             <Info className="h-4 w-4 mr-2" />

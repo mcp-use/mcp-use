@@ -1,18 +1,11 @@
 import type { LlmDriver } from "./driver.js";
 import { runToolLoop, runToolLoopNonStreaming } from "./toolLoop.js";
-import type {
-  LlmStreamEvent,
-  ProviderMessage,
-  ProviderTool,
-} from "./types.js";
+import type { LlmStreamEvent, ProviderMessage, ProviderTool } from "./types.js";
 
 export interface NativeRunOptions {
   messages: ProviderMessage[];
   tools: ProviderTool[];
-  callTool: (
-    name: string,
-    args: Record<string, unknown>
-  ) => Promise<unknown>;
+  callTool: (name: string, args: Record<string, unknown>) => Promise<unknown>;
   maxSteps?: number;
   signal?: AbortSignal;
 }

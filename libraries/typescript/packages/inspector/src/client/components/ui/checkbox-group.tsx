@@ -74,8 +74,9 @@ const CheckboxGroup = forwardRef<HTMLDivElement, CheckboxGroupProps>(
       <CheckboxGroupContext.Provider value={{ registerItem, activeIndex }}>
         <div
           ref={(node) => {
-            (containerRef as React.MutableRefObject<HTMLDivElement | null>).current =
-              node;
+            (
+              containerRef as React.MutableRefObject<HTMLDivElement | null>
+            ).current = node;
             if (typeof ref === "function") ref(node);
             else if (ref) {
               (ref as React.MutableRefObject<HTMLDivElement | null>).current =
@@ -99,8 +100,9 @@ const CheckboxGroup = forwardRef<HTMLDivElement, CheckboxGroupProps>(
           }}
           onKeyDown={(e) => {
             const items = Array.from(
-              containerRef.current?.querySelectorAll("[data-proximity-index]") ??
-                []
+              containerRef.current?.querySelectorAll(
+                "[data-proximity-index]"
+              ) ?? []
             ) as HTMLElement[];
             const currentIdx = items.indexOf(e.target as HTMLElement);
             if (currentIdx === -1) return;
@@ -171,11 +173,13 @@ const CheckboxItem = forwardRef<HTMLDivElement, CheckboxItemProps>(
     return (
       <div
         ref={(node) => {
-          (internalRef as React.MutableRefObject<HTMLDivElement | null>).current =
-            node;
+          (
+            internalRef as React.MutableRefObject<HTMLDivElement | null>
+          ).current = node;
           if (typeof ref === "function") ref(node);
           else if (ref) {
-            (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
+            (ref as React.MutableRefObject<HTMLDivElement | null>).current =
+              node;
           }
         }}
         data-proximity-index={index}

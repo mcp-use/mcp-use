@@ -11,10 +11,7 @@ import {
   type InspectorTraceEventInput,
 } from "../trace";
 
-const event = (
-  value: InspectorTraceEventInput,
-  index: number
-) =>
+const event = (value: InspectorTraceEventInput, index: number) =>
   ({
     ...value,
     id: `event-${index}`,

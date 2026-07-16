@@ -217,8 +217,7 @@ export function extractFunctionCalls(output: unknown[]): FunctionCallItem[] {
     calls.push({
       call_id: row.call_id,
       name: row.name,
-      arguments:
-        typeof row.arguments === "string" ? row.arguments : "{}",
+      arguments: typeof row.arguments === "string" ? row.arguments : "{}",
     });
   }
   return calls;
@@ -297,9 +296,7 @@ export async function* streamResponsesTurn(
       const item = parsed.item as Record<string, unknown> | undefined;
       if (item?.type === "function_call") {
         const callId =
-          typeof item.call_id === "string"
-            ? item.call_id
-            : `call_${nextIndex}`;
+          typeof item.call_id === "string" ? item.call_id : `call_${nextIndex}`;
         const name = typeof item.name === "string" ? item.name : "";
         const idx = nextIndex++;
         callBuffers.set(callId, {
@@ -319,10 +316,8 @@ export async function* streamResponsesTurn(
     }
 
     if (type === "response.function_call_arguments.delta") {
-      const callId =
-        typeof parsed.call_id === "string" ? parsed.call_id : "";
-      const delta =
-        typeof parsed.delta === "string" ? parsed.delta : "";
+      const callId = typeof parsed.call_id === "string" ? parsed.call_id : "";
+      const delta = typeof parsed.delta === "string" ? parsed.delta : "";
       const buf = callBuffers.get(callId);
       if (buf && delta.length > 0) {
         buf.argsJson += delta;
@@ -338,8 +333,7 @@ export async function* streamResponsesTurn(
     }
 
     if (type === "response.function_call_arguments.done") {
-      const callId =
-        typeof parsed.call_id === "string" ? parsed.call_id : "";
+      const callId = typeof parsed.call_id === "string" ? parsed.call_id : "";
       const argsRaw =
         typeof parsed.arguments === "string" ? parsed.arguments : "";
       const buf = callBuffers.get(callId);
@@ -403,9 +397,7 @@ export async function completeResponsesTurn(
   const json = (await res.json()) as Record<string, unknown>;
   const status = json.status;
   if (status !== "completed" && status !== undefined) {
-    throw new Error(
-      `OpenAI response ended with status ${String(status)}`
-    );
+    throw new Error(`OpenAI response ended with status ${String(status)}`);
   }
 
   const output = Array.isArray(json.output) ? json.output : [];

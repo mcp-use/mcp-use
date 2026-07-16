@@ -1,8 +1,5 @@
 import { JSONDisplay } from "../shared/JSONDisplay";
-import type {
-  InspectorTokenUsage,
-  InspectorTraceEvent,
-} from "./trace";
+import type { InspectorTokenUsage, InspectorTraceEvent } from "./trace";
 import { buildRawChatPayload } from "./trace";
 
 export type ChatView = "conv" | "raw";

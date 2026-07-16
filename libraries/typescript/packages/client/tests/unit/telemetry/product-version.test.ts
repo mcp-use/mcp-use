@@ -37,9 +37,8 @@ describe("setProductVersion", () => {
   });
 
   it("should use setProductVersion override in capture()", async () => {
-    const { Tel, setProductVersion } = await import(
-      "../../../src/telemetry/telemetry.js"
-    );
+    const { Tel, setProductVersion } =
+      await import("../../../src/telemetry/telemetry.js");
 
     setProductVersion("9.9.9-custom");
     await Tel.getInstance().capture({

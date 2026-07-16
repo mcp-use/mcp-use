@@ -1,12 +1,7 @@
 "use client";
 
 import * as React from "react";
-import {
-  createContext,
-  useContext,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip";
 import { motion } from "motion/react";
 import { cn } from "@/client/lib/utils";
@@ -281,8 +276,4 @@ function TooltipCompound({
   );
 }
 
-export {
-  TooltipCompound as Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-};
+export { TooltipCompound as Tooltip, TooltipTrigger, TooltipContent };

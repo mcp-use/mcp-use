@@ -371,9 +371,7 @@ export function ConnectionSettingsForm({
         <Label className="text-sm">Connection Mode</Label>
         <Select
           value={connectionMode}
-          onValueChange={(value) =>
-            setConnectionMode(value as ConnectionMode)
-          }
+          onValueChange={(value) => setConnectionMode(value as ConnectionMode)}
         >
           <SelectTrigger
             className="w-full"
@@ -506,10 +504,7 @@ export function ConnectionSettingsForm({
 
   if (inlineSections && cardSections) {
     return (
-      <div
-        className="relative space-y-6 @container"
-        {...formShellProps}
-      >
+      <div className="relative space-y-6 @container" {...formShellProps}>
         {copyConfigButton}
         <Card className="border">
           <CardHeader>
@@ -588,105 +583,110 @@ export function ConnectionSettingsForm({
       {/* Configuration Buttons Row */}
       {!inlineSections && (
         <div className="flex flex-row gap-3 @lg:flex-col">
-        {/* Authentication Button */}
-        <Dialog open={authDialogOpen} onOpenChange={setAuthDialogOpen}>
-          <DialogTrigger
-            render={
-              <div className="relative flex-1 ">
+          {/* Authentication Button */}
+          <Dialog open={authDialogOpen} onOpenChange={setAuthDialogOpen}>
+            <DialogTrigger
+              render={
+                <div className="relative flex-1 ">
+                  <Button
+                    data-testid="connection-form-auth-button"
+                    variant="outline"
+                    className={cn(
+                      (clientId || clientSecret || scope) && "border-2",
+                      "w-full justify-center hover:text-white cursor-pointer",
+                      buttonClassName
+                    )}
+                  >
+                    <Shield className="w-4 h-4 mr-0" />
+                    Authentication
+                  </Button>
+                </div>
+              }
+              nativeButton={false}
+            />
+            <DialogContent
+              scrollable
+              className="w-[calc(100vw-2rem)] sm:w-full max-w-2xl max-h-[80vh]"
+            >
+              <DialogHeader>
+                <DialogTitle>Authentication</DialogTitle>
+              </DialogHeader>
+              <DialogBody className="space-y-4">
+                {authenticationFields}
+                <div className="flex justify-end">
+                  <Button onClick={() => setAuthDialogOpen(false)}>Save</Button>
+                </div>
+              </DialogBody>
+            </DialogContent>
+          </Dialog>
+
+          {/* Custom Headers Button */}
+          <Dialog open={headersDialogOpen} onOpenChange={setHeadersDialogOpen}>
+            <DialogTrigger
+              render={
+                <div className="relative flex-1 ">
+                  <Button
+                    data-testid="connection-form-headers-button"
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-center hover:text-white cursor-pointer",
+                      buttonClassName
+                    )}
+                  >
+                    <FileText className="w-4 h-4" />
+                    Custom Headers
+                  </Button>
+                </div>
+              }
+              nativeButton={false}
+            />
+            <DialogContent scrollable className="w-full max-w-2xl max-h-[80vh]">
+              <DialogHeader>
+                <DialogTitle>Custom Headers</DialogTitle>
+              </DialogHeader>
+              <DialogBody>
+                <CustomHeadersEditor
+                  title={<></>}
+                  headers={customHeaders}
+                  onChange={setCustomHeaders}
+                  onSave={() => setHeadersDialogOpen(false)}
+                />
+              </DialogBody>
+            </DialogContent>
+          </Dialog>
+
+          {/* Configuration Button */}
+          <Dialog open={configDialogOpen} onOpenChange={setConfigDialogOpen}>
+            <DialogTrigger
+              render={
                 <Button
-                  data-testid="connection-form-auth-button"
+                  data-testid="connection-form-config-button"
                   variant="outline"
                   className={cn(
-                    (clientId || clientSecret || scope) && "border-2",
-                    "w-full justify-center hover:text-white cursor-pointer",
+                    "flex-1  justify-center hover:text-white cursor-pointer",
                     buttonClassName
                   )}
                 >
-                  <Shield className="w-4 h-4 mr-0" />
-                  Authentication
+                  <Cog className="w-4 h-4" />
+                  Configuration
                 </Button>
-              </div>
-            }
-            nativeButton={false}
-          />
-          <DialogContent scrollable className="w-[calc(100vw-2rem)] sm:w-full max-w-2xl max-h-[80vh]">
-            <DialogHeader>
-              <DialogTitle>Authentication</DialogTitle>
-            </DialogHeader>
-            <DialogBody className="space-y-4">
-              {authenticationFields}
-              <div className="flex justify-end">
-                <Button onClick={() => setAuthDialogOpen(false)}>Save</Button>
-              </div>
-            </DialogBody>
-          </DialogContent>
-        </Dialog>
-
-        {/* Custom Headers Button */}
-        <Dialog open={headersDialogOpen} onOpenChange={setHeadersDialogOpen}>
-          <DialogTrigger
-            render={
-              <div className="relative flex-1 ">
-                <Button
-                  data-testid="connection-form-headers-button"
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-center hover:text-white cursor-pointer",
-                    buttonClassName
-                  )}
-                >
-                  <FileText className="w-4 h-4" />
-                  Custom Headers
-                </Button>
-              </div>
-            }
-            nativeButton={false}
-          />
-          <DialogContent scrollable className="w-full max-w-2xl max-h-[80vh]">
-            <DialogHeader>
-              <DialogTitle>Custom Headers</DialogTitle>
-            </DialogHeader>
-            <DialogBody>
-              <CustomHeadersEditor
-                title={<></>}
-                headers={customHeaders}
-                onChange={setCustomHeaders}
-                onSave={() => setHeadersDialogOpen(false)}
-              />
-            </DialogBody>
-          </DialogContent>
-        </Dialog>
-
-        {/* Configuration Button */}
-        <Dialog open={configDialogOpen} onOpenChange={setConfigDialogOpen}>
-          <DialogTrigger
-            render={
-              <Button
-                data-testid="connection-form-config-button"
-                variant="outline"
-                className={cn(
-                  "flex-1  justify-center hover:text-white cursor-pointer",
-                  buttonClassName
-                )}
-              >
-                <Cog className="w-4 h-4" />
-                Configuration
-              </Button>
-            }
-            nativeButton
-          />
-          <DialogContent scrollable className="w-full max-w-2xl max-h-[80vh]">
-            <DialogHeader>
-              <DialogTitle>Configuration</DialogTitle>
-            </DialogHeader>
-            <DialogBody className="space-y-4">
-              {configurationFields}
-              <div className="flex justify-end">
-                <Button onClick={() => setConfigDialogOpen(false)}>Save</Button>
-              </div>
-            </DialogBody>
-          </DialogContent>
-        </Dialog>
+              }
+              nativeButton
+            />
+            <DialogContent scrollable className="w-full max-w-2xl max-h-[80vh]">
+              <DialogHeader>
+                <DialogTitle>Configuration</DialogTitle>
+              </DialogHeader>
+              <DialogBody className="space-y-4">
+                {configurationFields}
+                <div className="flex justify-end">
+                  <Button onClick={() => setConfigDialogOpen(false)}>
+                    Save
+                  </Button>
+                </div>
+              </DialogBody>
+            </DialogContent>
+          </Dialog>
         </div>
       )}
 

@@ -114,7 +114,9 @@ export function createOAuthMcpServer(providerKey: string) {
         return {
           token,
           clientId:
-            typeof payload.client_id === "string" ? payload.client_id : "test-client",
+            typeof payload.client_id === "string"
+              ? payload.client_id
+              : "test-client",
           scopes:
             typeof payload.scope === "string"
               ? payload.scope.split(" ").filter(Boolean)

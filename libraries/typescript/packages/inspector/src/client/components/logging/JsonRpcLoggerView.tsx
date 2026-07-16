@@ -292,10 +292,7 @@ export function JsonRpcLoggerView({
             </div>
           </div>
         ) : (
-          <div
-            className="relative w-full"
-            style={{ height: totalHeight }}
-          >
+          <div className="relative w-full" style={{ height: totalHeight }}>
             {visibleItems.map(({ item, top, height }) => (
               <RpcLogRow
                 key={item.id}

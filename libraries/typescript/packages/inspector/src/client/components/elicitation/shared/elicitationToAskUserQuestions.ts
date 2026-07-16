@@ -6,10 +6,7 @@ import type {
   ElicitRequestFormParams,
   ElicitRequestURLParams,
 } from "@modelcontextprotocol/client";
-import {
-  getMultiSelectChoices,
-  getSingleSelectChoices,
-} from "./schemaHelpers";
+import { getMultiSelectChoices, getSingleSelectChoices } from "./schemaHelpers";
 
 type ElicitParams = ElicitRequestFormParams | ElicitRequestURLParams;
 
@@ -49,7 +46,10 @@ export function elicitationToAskUserQuestions(
     ];
   }
 
-  const properties = schema.properties as Record<string, Record<string, unknown>>;
+  const properties = schema.properties as Record<
+    string,
+    Record<string, unknown>
+  >;
   const required = (schema.required as string[] | undefined) ?? [];
 
   return Object.entries(properties).map(([fieldName, fieldSchema]) => {
@@ -132,7 +132,9 @@ export function elicitationToAskUserQuestions(
         freeText: true,
         freeTextMultiline: false,
         freeTextPlaceholder:
-          field.default !== undefined ? String(field.default) : "Enter a number…",
+          field.default !== undefined
+            ? String(field.default)
+            : "Enter a number…",
         freeTextValidate: (value: string) => {
           const trimmed = value.trim();
           if (!trimmed) return isRequired ? "Required" : null;
@@ -154,7 +156,8 @@ export function elicitationToAskUserQuestions(
       return {
         ...base,
         freeText: true,
-        freeTextPlaceholder: (field.default as string | undefined) || "Type your answer…",
+        freeTextPlaceholder:
+          (field.default as string | undefined) || "Type your answer…",
       };
     }
 
@@ -163,7 +166,9 @@ export function elicitationToAskUserQuestions(
       freeText: true,
       freeTextMultiline: false,
       freeTextPlaceholder:
-        field.default !== undefined ? String(field.default) : "Type your answer…",
+        field.default !== undefined
+          ? String(field.default)
+          : "Type your answer…",
       freeTextValidate: (value: string) => {
         const trimmed = value.trim();
         if (!trimmed && isRequired) return "Required";

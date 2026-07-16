@@ -40,18 +40,11 @@ export function UserMessage({
   }
 
   return (
-    <div
-      data-testid="chat-message-user"
-      className="flex flex-col items-end"
-    >
+    <div data-testid="chat-message-user" className="flex flex-col items-end">
       <ChatMessage
         from="user"
         files={files}
-        time={
-          timestamp
-            ? new Date(timestamp).toLocaleTimeString()
-            : undefined
-        }
+        time={timestamp ? new Date(timestamp).toLocaleTimeString() : undefined}
         actions={
           content || inputTokens != null ? (
             <MessageMetaActions

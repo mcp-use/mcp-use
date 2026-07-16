@@ -95,7 +95,10 @@ export function ServerMetadataPanel({
               </MetadataField>
             )}
             {connection.serverInfo?.websiteUrl && (
-              <MetadataField label="Website" className={`${metadataCell} w-full`}>
+              <MetadataField
+                label="Website"
+                className={`${metadataCell} w-full`}
+              >
                 <a
                   href={connection.serverInfo.websiteUrl}
                   target="_blank"
@@ -113,7 +116,9 @@ export function ServerMetadataPanel({
       {connection.instructions && (
         <Card className="border">
           <CardHeader>
-            <CardTitle className="text-base font-medium">Instructions</CardTitle>
+            <CardTitle className="text-base font-medium">
+              Instructions
+            </CardTitle>
             <CardDescription>
               Server guidance for clients and agents
             </CardDescription>
@@ -131,7 +136,9 @@ export function ServerMetadataPanel({
           <Card className="border">
             <CardHeader>
               <CardTitle className="text-base font-medium">Icons</CardTitle>
-              <CardDescription>Server icon assets from initialize</CardDescription>
+              <CardDescription>
+                Server icon assets from initialize
+              </CardDescription>
             </CardHeader>
             <CardContent className="pt-0">
               <div className="flex flex-col gap-2 font-sans">

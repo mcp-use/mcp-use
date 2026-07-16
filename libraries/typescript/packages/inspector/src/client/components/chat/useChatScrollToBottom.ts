@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 
 interface UseChatScrollToBottomOptions {
   messageCount: number;
@@ -78,13 +84,7 @@ export function useChatScrollToBottom(
     if (!lengthChanged && !loadingChanged) return;
 
     scrollToBottom(isLoading ? "auto" : "smooth");
-  }, [
-    enabled,
-    hasMessages,
-    isLoading,
-    messageCount,
-    scrollToBottom,
-  ]);
+  }, [enabled, hasMessages, isLoading, messageCount, scrollToBottom]);
 
   return { messagesEndRef, showScrollToBottom, scrollToBottom };
 }
