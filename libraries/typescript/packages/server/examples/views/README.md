@@ -10,6 +10,3 @@ Sibling examples for MCP Apps views with `@mcp-use/server`:
   [`excalidraw/excalidraw-mcp`](https://github.com/excalidraw/excalidraw-mcp)
   app with `viewConfig.autoResize` / `displayModes`, safe partial parsing until
   the structured result latch, fullscreen editing, and checkpoints
-- [`view-tool-debugger/`](./view-tool-debugger/) — deliberately verbose
-  `useViewTool` diagnostic view with schema-backed and schema-less commands,
-  live registration controls, latest-closure tests, and an event log

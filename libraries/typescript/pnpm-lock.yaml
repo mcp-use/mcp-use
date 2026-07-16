@@ -1905,52 +1905,6 @@ importers:
         specifier: '>=8.0.5'
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.1)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.3)
 
-  packages/server/examples/views/view-tool-debugger:
-    dependencies:
-      '@mcp-use/server':
-        specifier: workspace:*
-        version: link:../../..
-      '@modelcontextprotocol/client':
-        specifier: https://pkg.pr.new/@modelcontextprotocol/client@2501
-        version: https://pkg.pr.new/@modelcontextprotocol/client@2501
-      '@modelcontextprotocol/core':
-        specifier: https://pkg.pr.new/@modelcontextprotocol/core@2501
-        version: https://pkg.pr.new/@modelcontextprotocol/core@2501
-      '@modelcontextprotocol/ext-apps':
-        specifier: https://pkg.pr.new/@modelcontextprotocol/ext-apps@712
-        version: https://pkg.pr.new/@modelcontextprotocol/ext-apps@712(@modelcontextprotocol/client@https://pkg.pr.new/@modelcontextprotocol/client@2501)(@modelcontextprotocol/core@https://pkg.pr.new/@modelcontextprotocol/core@2501)(@modelcontextprotocol/server@https://pkg.pr.new/@modelcontextprotocol/server@2501)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.4.3)
-      '@modelcontextprotocol/server':
-        specifier: https://pkg.pr.new/@modelcontextprotocol/server@2501
-        version: https://pkg.pr.new/@modelcontextprotocol/server@2501
-      react:
-        specifier: ^19.2.0
-        version: 19.2.4
-      react-dom:
-        specifier: ^19.2.0
-        version: 19.2.4(react@19.2.4)
-      zod:
-        specifier: 4.4.3
-        version: 4.4.3
-    devDependencies:
-      '@types/node':
-        specifier: ^24.13.2
-        version: 24.13.2
-      '@types/react':
-        specifier: 19.2.17
-        version: 19.2.17
-      '@types/react-dom':
-        specifier: 19.2.3
-        version: 19.2.3(@types/react@19.2.17)
-      '@vitejs/plugin-react':
-        specifier: ^6.0.3
-        version: 6.0.3(vite@8.0.16(@types/node@24.13.2)(esbuild@0.27.1)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.3))
-      typescript:
-        specifier: 7.0.1-rc
-        version: 7.0.1-rc
-      vite:
-        specifier: '>=8.0.5'
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.1)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.3)
-
 packages:
 
   '@acemir/cssom@0.9.31':
