@@ -54,6 +54,25 @@ describe("tool registration return-position checks", () => {
       content: [{ type: "text", text: "boom" }],
       isError: true,
     }));
+    server.tool({ name: "interactive", outputSchema }, async (_params, ctx) => {
+      const answer = await ctx.elicit(
+        "answer",
+        "Provide an answer",
+        z.object({ answer: z.number() })
+      );
+      if (answer.status === "required") return answer.result;
+      if (answer.status !== "accept") {
+        return {
+          content: [{ type: "text", text: answer.status }],
+          isError: true,
+        };
+      }
+      expectTypeOf(answer.data).toEqualTypeOf<{ answer: number }>();
+      return {
+        content: [{ type: "text", text: String(answer.data.answer) }],
+        structuredContent: answer.data,
+      };
+    });
     expect(true).toBe(true); // assertions above are compile-time
   });
 
@@ -107,6 +126,32 @@ describe("tool registration return-position checks", () => {
       isError: true,
     }));
     expect(true).toBe(true); // assertions above are compile-time
+  });
+});
+
+describe("elicitation context", () => {
+  it("infers form data and supports URL mode", () => {
+    const server = new MCPServer({ name: "types", version: "0.0.0" });
+    server.tool({ name: "elicit-types" }, async (_params, ctx) => {
+      const form = await ctx.elicit(
+        "profile",
+        "Your profile",
+        z.object({ name: z.string() })
+      );
+      const url = await ctx.elicit(
+        "signin",
+        "Sign in",
+        "https://example.com/sign-in"
+      );
+      if (form.status === "accept") {
+        expectTypeOf(form.data).toEqualTypeOf<{ name: string }>();
+      }
+      expect(url).toBeDefined();
+      return form.status === "required"
+        ? form.result
+        : { content: [{ type: "text", text: form.status }] };
+    });
+    expect(true).toBe(true);
   });
 });
 

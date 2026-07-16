@@ -274,24 +274,24 @@ export const collectUserInfo = server.tool(
     outputSchema: z.object({ name: z.string(), age: z.number() }),
   },
   async (_input, ctx) => {
-    const form = await ctx.input.form({
-      key: "profile",
-      message: "Provide a profile for the client example",
-      schema: z.object({
+    const form = await ctx.elicit(
+      "profile",
+      "Provide a profile for the client example",
+      z.object({
         name: z.string().default("Anonymous"),
         age: z.number().default(0),
-      }),
-    });
+      })
+    );
     if (form.status === "required") return form.result;
-    if (form.status === "accepted") {
+    if (form.status === "accept") {
       return {
         content: [
           {
             type: "text",
-            text: `Received ${form.value.name}, age ${form.value.age}`,
+            text: `Received ${form.data.name}, age ${form.data.age}`,
           },
         ],
-        structuredContent: form.value,
+        structuredContent: form.data,
       };
     }
     return {

@@ -117,7 +117,8 @@ export interface ToolRef<
 
 /**
  * Result a tool callback may return, keyed by the tool's inferred output
- * type. The shape is the SDK's raw {@link CallToolResult} — there is no
+ * type. Completed calls use the SDK's raw {@link CallToolResult}; interactive
+ * calls may return an {@link InputRequiredResult}. There is no
  * framework-specific result layer.
  *
  * Without an `outputSchema` (`TOutput = never`) any `CallToolResult` is

@@ -3,6 +3,7 @@ import {
   localhostAllowedOrigins,
   McpServer as SdkMcpServer,
   ResourceTemplate,
+  isInputRequiredResult,
   type McpHttpHandler,
   type McpRequestContext,
   type PromptCallback as SdkPromptCallback,
@@ -875,6 +876,9 @@ export class MCPServer<TUser = never> {
         },
         ...(instructions !== undefined && { instructions }),
         ...(authInfo !== undefined && { authInfo }),
+        ...(this.#config.requestState !== undefined && {
+          requestState: this.#config.requestState,
+        }),
       }
     );
 
@@ -940,7 +944,11 @@ export class MCPServer<TUser = never> {
           // The SDK has already validated `args` against the input schema.
           const params = args as Record<string, unknown>;
           const result = await callback(params, this.#toRequestContext(ctx));
-          if (wireResultMeta === undefined || result.isError === true) {
+          if (
+            isInputRequiredResult(result) ||
+            wireResultMeta === undefined ||
+            result.isError === true
+          ) {
             return result;
           }
           return {
@@ -952,7 +960,11 @@ export class MCPServer<TUser = never> {
     } else {
       server.registerTool(definition.name, config, async (ctx) => {
         const result = await callback({}, this.#toRequestContext(ctx));
-        if (wireResultMeta === undefined || result.isError === true) {
+        if (
+          isInputRequiredResult(result) ||
+          wireResultMeta === undefined ||
+          result.isError === true
+        ) {
           return result;
         }
         return {

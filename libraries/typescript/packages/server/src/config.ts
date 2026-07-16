@@ -1,3 +1,5 @@
+import type { ServerOptions } from "@modelcontextprotocol/server";
+
 import type { LoggingOptions } from "./logging.js";
 import type { OAuthProvider } from "./oauth/index.js";
 
@@ -154,6 +156,18 @@ interface BaseServerConfig {
    * configured level.
    */
   logging?: LoggingOptions;
+  /**
+   * Integrity verification for `requestState` echoed across
+   * `input_required` rounds.
+   *
+   * Use the SDK's `createRequestStateCodec(...).verify` here when state
+   * affects authorization, resource access, or business logic. Without a
+   * verifier, {@link RequestContext.requestState} returns the raw,
+   * attacker-controlled wire string.
+   *
+   * @defaultValue `undefined`
+   */
+  requestState?: ServerOptions["requestState"];
 }
 
 /**

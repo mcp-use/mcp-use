@@ -3,7 +3,9 @@ import {
   inputRequired,
   inputResponse,
   type AuthInfo,
+  type InputRequest,
   type InputRequiredResult,
+  type RequestStateAccessor,
   type ServerContext,
   type StandardSchemaWithJSON,
 } from "@modelcontextprotocol/server";
@@ -27,37 +29,50 @@ export interface RequestClientContext {
   supportsViews(): boolean;
 }
 
-/** Options for a typed v2 form elicitation round. */
-export interface FormInputOptions<
-  TSchema extends StandardSchemaWithJSON = StandardSchemaWithJSON,
-> {
-  /** Stable key used to correlate this form across request rounds. */
-  key: string;
-  /** Human-readable question shown by the client. */
-  message: string;
-  /** Synchronously or asynchronously validating Standard Schema. */
-  schema: TSchema;
-  /** Optional opaque state echoed on the next round. Integrity-protect it if load-bearing. */
-  requestState?: string;
-}
-
-/** Result of resolving a typed form elicitation round. */
-export type FormInputResult<TValue> =
+/**
+ * Result of a {@link Elicit} call.
+ *
+ * `required` means the callback must return `result`; the client then gathers
+ * input and retries the tool. Accepted form results carry schema-validated,
+ * inferred `data`. URL acceptances and declined/cancelled results carry no
+ * data.
+ */
+export type ElicitationResult<T = never> =
   | { status: "required"; result: InputRequiredResult }
-  | { status: "accepted"; value: TValue }
-  | { status: "declined" }
-  | { status: "cancelled" }
-  | { status: "invalid"; issues: readonly unknown[] };
+  | { status: "decline" | "cancel" }
+  | ([T] extends [never] ? { status: "accept" } : { status: "accept"; data: T });
 
-/** High-level typed input helpers for v2 multi-round-trip requests. */
-export interface RequestInputContext {
-  /**
-   * Resolve a form response or return the `input_required` result the handler
-   * should return directly.
-   */
-  form<TSchema extends StandardSchemaWithJSON>(
-    options: FormInputOptions<TSchema>
-  ): Promise<FormInputResult<StandardSchemaWithJSON.InferOutput<TSchema>>>;
+/**
+ * Requests or reads one keyed elicitation in a multi-round-trip tool callback.
+ *
+ * The explicit key correlates the request with the client's response on
+ * re-entry. On the first entry, or after an invalid form response, this returns
+ * `{ status: "required", result }`; return that result from the tool. On
+ * re-entry it returns `accept`, `decline`, or `cancel` and validates accepted
+ * Standard Schema form data before exposing it. Validation may be synchronous
+ * or asynchronous.
+ *
+ * @example
+ * ```ts
+ * const confirmation = await ctx.elicit(
+ *   "confirm",
+ *   "Deploy to production?",
+ *   schema,
+ * );
+ * if (confirmation.status === "required") {
+ *   return confirmation.result;
+ * }
+ * ```
+ */
+export interface Elicit {
+  /** Request or read a typed form-mode elicitation. */
+  <S extends StandardSchemaWithJSON>(
+    key: string,
+    message: string,
+    schema: S
+  ): Promise<ElicitationResult<StandardSchemaWithJSON.InferOutput<S>>>;
+  /** Request or read a URL-mode elicitation. */
+  (key: string, message: string, url: string): Promise<ElicitationResult>;
 }
 
 /**
@@ -86,12 +101,19 @@ type RequestContextBase = {
   request?: Request;
   /** Per-request client capability queries. */
   client: RequestClientContext;
-  /** Typed v2 multi-round-trip input helpers. */
-  input: RequestInputContext;
-  /** Responses supplied by the client during a v2 multi-round-trip request. */
+  /** Request or read a keyed form- or URL-mode elicitation. */
+  elicit: Elicit;
+  /**
+   * Bare responses supplied when the client retries an `input_required`
+   * round. Values are client input; validate them before use.
+   */
   inputResponses?: ServerContext["mcpReq"]["inputResponses"];
-  /** Opaque state echoed by the client during a v2 multi-round-trip request. */
-  requestState?: ServerContext["mcpReq"]["requestState"];
+  /**
+   * Read opaque state echoed by the client for this `input_required` round.
+   * The generic is only a type assertion. Configure `requestState.verify`
+   * when state affects authorization or business logic.
+   */
+  requestState: RequestStateAccessor;
   /**
    * Report request-scoped progress when the caller supplied a progress token.
    *
@@ -155,53 +177,57 @@ function toClientContext(ctx: ServerContext): RequestClientContext {
   };
 }
 
-function toInputContext(ctx: ServerContext): RequestInputContext {
-  return {
-    async form<TSchema extends StandardSchemaWithJSON>(
-      options: FormInputOptions<TSchema>
-    ): Promise<FormInputResult<StandardSchemaWithJSON.InferOutput<TSchema>>> {
-      const response = inputResponse(ctx.mcpReq.inputResponses, options.key);
-      if (response.kind === "missing") {
-        return {
-          status: "required",
-          result: inputRequired({
-            inputRequests: {
-              [options.key]: inputRequired.elicit({
-                message: options.message,
-                requestedSchema: options.schema,
-              }),
-            },
-            ...(options.requestState !== undefined && {
-              requestState: options.requestState,
-            }),
-          }),
-        };
-      }
-      if (response.kind !== "elicit") {
-        return {
-          status: "invalid",
-          issues: [{ message: `Unexpected ${response.kind} input response` }],
-        };
-      }
-      if (response.action === "decline") return { status: "declined" };
-      if (response.action === "cancel") return { status: "cancelled" };
-      if (response.content === undefined) {
-        return {
-          status: "invalid",
-          issues: [{ message: "Accepted form response has no content" }],
-        };
-      }
-      const outcome = await options.schema["~standard"].validate(
-        response.content
+function createElicit(
+  inputResponses: ServerContext["mcpReq"]["inputResponses"]
+): Elicit {
+  return async function elicit(
+    key: string,
+    message: string,
+    schemaOrUrl?: StandardSchemaWithJSON | string
+  ): Promise<ElicitationResult<unknown> | ElicitationResult> {
+    let request: InputRequest;
+    let formSchema: StandardSchemaWithJSON | undefined;
+
+    if (typeof schemaOrUrl === "string") {
+      request = inputRequired.elicitUrl({
+        message,
+        url: schemaOrUrl,
+      });
+    } else if (schemaOrUrl !== undefined) {
+      formSchema = schemaOrUrl;
+      request = inputRequired.elicit({
+        message,
+        requestedSchema: schemaOrUrl,
+      });
+    } else {
+      throw new TypeError(
+        "ctx.elicit(key, message, value) requires a form schema or URL string"
       );
-      return outcome.issues === undefined
-        ? {
-            status: "accepted",
-            value: outcome.value as StandardSchemaWithJSON.InferOutput<TSchema>,
-          }
-        : { status: "invalid", issues: outcome.issues };
-    },
-  };
+    }
+
+    const response = inputResponse(inputResponses, key);
+    if (response.kind === "elicit") {
+      if (response.action !== "accept") {
+        return { status: response.action };
+      }
+      if (formSchema === undefined) {
+        return { status: "accept" };
+      }
+      if (response.content !== undefined) {
+        const outcome = await formSchema["~standard"].validate(
+          response.content
+        );
+        if (outcome.issues === undefined) {
+          return { status: "accept", data: outcome.value };
+        }
+      }
+    }
+
+    return {
+      status: "required",
+      result: inputRequired({ inputRequests: { [key]: request } }),
+    };
+  } as Elicit;
 }
 
 /**
@@ -220,11 +246,9 @@ export function toRequestContext(
     ...(ctx.mcpReq.inputResponses !== undefined && {
       inputResponses: ctx.mcpReq.inputResponses,
     }),
-    ...(ctx.mcpReq.requestState !== undefined && {
-      requestState: ctx.mcpReq.requestState,
-    }),
     client: toClientContext(ctx),
-    input: toInputContext(ctx),
+    elicit: createElicit(ctx.mcpReq.inputResponses),
+    requestState: <T = unknown>() => ctx.mcpReq.requestState<T>(),
     async reportProgress(progress, total, message): Promise<boolean> {
       const progressToken = ctx.mcpReq._meta?.progressToken;
       if (progressToken === undefined) return false;
