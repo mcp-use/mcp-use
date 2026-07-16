@@ -46,7 +46,7 @@
       "ignoreDependencies": ["@scarf/scarf", "tailwindcss", "tw-animate-css"]
     },
     "packages/create-mcp-use-app": {
-      "entry": ["scripts/**/*.{js,mjs,ts}"],
+      "entry": ["scripts/**/*.{js,mjs,ts}", "src/index.ts"],
       "project": ["src/**/*.{ts,tsx}"]
     }
   }
