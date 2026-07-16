@@ -9,5 +9,11 @@
     "@mcp-use/inspector": "19.0.0",
     "mcp-use": "1.34.3"
   },
-  "changesets": []
+  "changesets": [
+    "client-sdk-v2-migration",
+    "dialect-json-schema-validator",
+    "localhost-managed-inspector-chat",
+    "strip-tools-list-schema-dialect",
+    "v2-server-scaffold"
+  ]
 }
