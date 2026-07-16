@@ -771,6 +771,31 @@ describe("MCPServer app", () => {
     }
   });
 
+  it("freezes routes on basePath children after listen", async () => {
+    const server = new MCPServer({
+      name: "app-base-path-freeze-test",
+      version: "1.0.0",
+    });
+    const api = server.app.basePath("/api");
+    const nested = api.basePath("/v1");
+    api.get("/health", (c) => c.text("healthy"));
+
+    const started = await server.listen(0);
+    try {
+      const origin = new URL(started.url).origin;
+      const health = await fetch(`${origin}/api/health`);
+      expect(await health.text()).toBe("healthy");
+      expect(() => api.get("/late", (c) => c.text("late"))).toThrow(
+        /Hono routes or middleware after the server has started/
+      );
+      expect(() => nested.get("/late", (c) => c.text("late"))).toThrow(
+        /Hono routes or middleware after the server has started/
+      );
+    } finally {
+      await server.close();
+    }
+  });
+
   it("runs framework parsing and security middleware before custom routes", async () => {
     const customHandler = vi.fn((method: string) => method);
     const server = new MCPServer({

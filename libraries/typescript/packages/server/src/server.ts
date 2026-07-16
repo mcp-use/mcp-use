@@ -574,7 +574,7 @@ export class MCPServer<TUser = never> {
   }
 
   /** Guard Hono's registration surface once framework mounting completes. */
-  #guardAppRegistrationMethods(): void {
+  #guardAppRegistrationMethods(app: Hono = this.app): Hono {
     const guard = <T>(registrationMethod: T): T => {
       if (typeof registrationMethod !== "function") {
         return registrationMethod;
@@ -587,24 +587,29 @@ export class MCPServer<TUser = never> {
               "direct app dispatch."
           );
         }
-        return Reflect.apply(registrationMethod, this.app, args) as unknown;
+        return Reflect.apply(registrationMethod, app, args) as unknown;
       }) as unknown as T;
     };
 
-    this.app.get = guard(this.app.get);
-    this.app.post = guard(this.app.post);
-    this.app.put = guard(this.app.put);
-    this.app.delete = guard(this.app.delete);
-    this.app.options = guard(this.app.options);
-    this.app.patch = guard(this.app.patch);
-    this.app.all = guard(this.app.all);
-    this.app.on = guard(this.app.on);
-    this.app.use = guard(this.app.use);
-    this.app.route = guard(this.app.route);
-    this.app.mount = guard(this.app.mount);
-    this.app.basePath = guard(this.app.basePath);
-    this.app.onError = guard(this.app.onError);
-    this.app.notFound = guard(this.app.notFound);
+    app.get = guard(app.get);
+    app.post = guard(app.post);
+    app.put = guard(app.put);
+    app.delete = guard(app.delete);
+    app.options = guard(app.options);
+    app.patch = guard(app.patch);
+    app.all = guard(app.all);
+    app.on = guard(app.on);
+    app.use = guard(app.use);
+    app.route = guard(app.route);
+    app.mount = guard(app.mount);
+    const basePath = guard(app.basePath);
+    app.basePath = ((...args: Parameters<typeof basePath>) =>
+      this.#guardAppRegistrationMethods(
+        basePath(...args)
+      )) as typeof app.basePath;
+    app.onError = guard(app.onError);
+    app.notFound = guard(app.notFound);
+    return app;
   }
 
   /** Install framework-wide middleware before consumers can add routes. */
