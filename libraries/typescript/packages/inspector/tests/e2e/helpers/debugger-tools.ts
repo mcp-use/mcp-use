@@ -6,6 +6,26 @@ const WIDGET_LOAD_TIMEOUT = 8000 * CI_MULTIPLIER;
 const TOGGLE_UPDATE_TIMEOUT = 5000 * CI_MULTIPLIER;
 
 /**
+ * Outer AppFrame iframe inside the MCP Apps host container.
+ * DOM: [data-testid="mcp-app-frame"][data-mcp-app-tool] > div > iframe
+ */
+function mcpAppOuterFrame(page: Page, toolName: string): FrameLocator {
+  return page
+    .locator(`[data-testid="mcp-app-frame"][data-mcp-app-tool="${toolName}"]`)
+    .frameLocator("iframe");
+}
+
+/**
+ * Guest (inner) iframe for an MCP Apps widget by tool name.
+ */
+export function getMcpAppsGuestFrame(
+  page: Page,
+  toolName: string
+): FrameLocator {
+  return mcpAppOuterFrame(page, toolName).frameLocator("iframe");
+}
+
+/**
  * Execute get-weather-delayed tool and wait for execution to start.
  */
 export async function executeWeatherTool(
@@ -23,25 +43,15 @@ export async function executeWeatherTool(
 }
 
 /**
- * Wait for weather widget to load (spinner gone, content visible) in Apps SDK tab.
- */
-export async function waitForWeatherWidgetAppsSdk(page: Page): Promise<void> {
-  await expect(page.getByTestId("tool-result-view-chatgpt-app")).toBeVisible({
-    timeout: 2000 * CI_MULTIPLIER,
-  });
-  await page.getByTestId("tool-result-view-chatgpt-app").click();
-  const appsSdkFrame = getAppsSdkWeatherFrame(page);
-  await expect(appsSdkFrame.getByText("Host Context Settings")).toBeVisible({
-    timeout: TOGGLE_UPDATE_TIMEOUT,
-  });
-}
-
-/**
- * Wait for weather widget to load in MCP Apps tab.
+ * Wait for weather widget to load in MCP Apps (spinner gone / host context visible).
  */
 export async function waitForWeatherWidgetMcpApps(page: Page): Promise<void> {
-  await expect(page.getByTestId("tool-result-view-mcp-apps")).toBeVisible();
-  await page.getByTestId("tool-result-view-mcp-apps").click();
+  await expect(page.getByTestId("tool-result-view-mcp-apps")).toBeVisible({
+    timeout: 2000 * CI_MULTIPLIER,
+  });
+  await expect(page.getByTestId("mcp-app-frame")).toBeVisible({
+    timeout: WIDGET_LOAD_TIMEOUT,
+  });
   const mcpAppsGuest = getMcpAppsWeatherFrame(page);
   await expect(mcpAppsGuest.getByText("Host Context Settings")).toBeVisible({
     timeout: WIDGET_LOAD_TIMEOUT,
@@ -49,41 +59,22 @@ export async function waitForWeatherWidgetMcpApps(page: Page): Promise<void> {
 }
 
 /**
- * Get Apps SDK iframe locator for get-weather-delayed widget.
- */
-export function getAppsSdkWeatherFrame(page: Page): FrameLocator {
-  return page.frameLocator(
-    'iframe[title^="OpenAI Component: get-weather-delayed"]'
-  );
-}
-
-/**
  * Get MCP Apps inner (guest) iframe locator for get-weather-delayed widget.
  */
 export function getMcpAppsWeatherFrame(page: Page): FrameLocator {
-  const mcpAppsOuter = page.frameLocator(
-    'iframe[title^="MCP App: get-weather-delayed"]'
-  );
-  return mcpAppsOuter.frameLocator("iframe");
+  return getMcpAppsGuestFrame(page, "get-weather-delayed");
 }
 
 /**
- * Switch to Apps SDK tab and return its frame.
- */
-export async function switchToAppsSdkAndGetFrame(
-  page: Page
-): Promise<FrameLocator> {
-  await page.getByTestId("tool-result-view-chatgpt-app").click();
-  return getAppsSdkWeatherFrame(page);
-}
-
-/**
- * Switch to MCP Apps tab and return guest frame.
+ * Ensure MCP Apps view is selected and return guest frame.
  */
 export async function switchToMcpAppsAndGetFrame(
   page: Page
 ): Promise<FrameLocator> {
-  await page.getByTestId("tool-result-view-mcp-apps").click();
+  const mcpAppsTab = page.getByTestId("tool-result-view-mcp-apps");
+  if (await mcpAppsTab.isVisible().catch(() => false)) {
+    await mcpAppsTab.click();
+  }
   return getMcpAppsWeatherFrame(page);
 }
 
@@ -118,7 +109,7 @@ export async function changeLocale(
 }
 
 /**
- * Change timezone via debugger controls (MCP Apps only).
+ * Change timezone via debugger controls (MCP Apps).
  * timezoneValue is e.g. "America/New_York"; testid uses dashes: "America-New_York".
  */
 export async function changeTimezone(
@@ -181,7 +172,7 @@ export async function updateSafeAreaInsets(
 }
 
 /**
- * Change CSP mode (MCP Apps only).
+ * Change CSP mode (MCP Apps).
  */
 export async function changeCspMode(
   page: Page,
@@ -275,14 +266,15 @@ export async function navigateToResourcesAndSelectWeather(
 }
 
 /**
- * Get weather-display resource widget frame (works for both MCP Apps and Apps SDK).
+ * Get weather-display resource widget guest frame (MCP Apps double-iframe).
+ * Uses page-level mcp-app-frame so PiP/fullscreen portals (document.body) still resolve.
  */
 export function getWeatherResourceFrame(page: Page): FrameLocator {
-  // Try MCP Apps first (nested iframe)
-  const mcpAppsOuter = page.frameLocator('iframe[title*="weather-display"]');
-  const innerFrames = mcpAppsOuter.frameLocator("iframe");
-  // If no inner frame, it's Apps SDK (single iframe)
-  return innerFrames;
+  return page
+    .locator('[data-testid="mcp-app-frame"]')
+    .last()
+    .frameLocator("iframe")
+    .frameLocator("iframe");
 }
 
 /**

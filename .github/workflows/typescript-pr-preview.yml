@@ -68,7 +68,7 @@ jobs:
           deno-version: v2.x
 
       - name: Create temporary deno.json with PR preview imports
-        working-directory: libraries/typescript/packages/mcp-use/tests/deno
+        working-directory: libraries/typescript/packages/server/tests/deno
         env:
           PR_NUMBER: ${{ needs.preview.outputs.pr-number }}
         # Note: Hybrid mapping to satisfy conflicting Zod requirements:
@@ -80,8 +80,7 @@ jobs:
           cat > deno.json << EOF
           {
             "imports": {
-              "mcp-use/server": "https://esm.sh/pr/mcp-use/mcp-use@$PR_NUMBER/server?no-dts&external=zod",
-              "mcp-use/client": "https://esm.sh/pr/mcp-use/mcp-use@$PR_NUMBER/client?no-dts&external=zod",
+              "mcp-use": "https://esm.sh/pr/mcp-use/mcp-use@$PR_NUMBER?no-dts&external=zod",
               "zod": "https://esm.sh/zod@3.24.4",
               "zod/v3": "https://esm.sh/zod@3.24.4",
               "zod/v4": "https://esm.sh/zod@4.2.0",
@@ -105,8 +104,8 @@ jobs:
           MAX_RETRIES=10
           RETRY_DELAY=30
           
-          PR_URL="https://esm.sh/pr/mcp-use/mcp-use@${PR_NUMBER}/server"
-          COMMIT_URL="https://esm.sh/pr/mcp-use/mcp-use@${SHORT_SHA}/server"
+          PR_URL="https://esm.sh/pr/mcp-use/mcp-use@${PR_NUMBER}"
+          COMMIT_URL="https://esm.sh/pr/mcp-use/mcp-use@${SHORT_SHA}"
           
           echo "Checking URLs:"
           echo "  PR URL: $PR_URL"
@@ -152,7 +151,7 @@ jobs:
           done
 
       - name: Cache Deno Dependencies
-        working-directory: libraries/typescript/packages/mcp-use/tests/deno
+        working-directory: libraries/typescript/packages/server/tests/deno
         env:
           DENO_DOWNLOAD_TIMEOUT: "300000"  # 5 minutes in milliseconds
         run: |
@@ -177,7 +176,7 @@ jobs:
           done
 
       - name: Run Deno Tests
-        working-directory: libraries/typescript/packages/mcp-use/tests/deno
+        working-directory: libraries/typescript/packages/server/tests/deno
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
           DENO_DOWNLOAD_TIMEOUT: "300000"  # 5 minutes in milliseconds

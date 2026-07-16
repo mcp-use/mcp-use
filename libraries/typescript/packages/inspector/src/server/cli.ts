@@ -5,14 +5,11 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import open from "open";
-import { registerInspectorRoutes } from "./shared-routes.js";
-import type { InspectorMode } from "./shared-static.js";
-import { registerStaticRoutes } from "./shared-static.js";
-import { setServerPort } from "./tunnel.js";
+import { registerInspectorCdnShell, type InspectorMode } from "./cdn-shell.js";
+import { registerInspectorProxyRoutes } from "./proxy-routes.js";
 import { findAvailablePort, isValidUrl } from "./utils.js";
 import { getInspectorVersion } from "./version.js";
 
-// Parse command line arguments
 const args = process.argv.slice(2);
 let mcpUrl: string | undefined;
 let startPort = 8080;
@@ -66,13 +63,8 @@ Options:
   --help, -h     Show this help message
 
 Examples:
-  # Run inspector with auto-connect
   npx @mcp-use/inspector --url http://localhost:3000/mcp
-
-  # Run starting from custom port
   npx @mcp-use/inspector --url http://localhost:3000/mcp --port 9000
-
-  # Run without auto-connect
   npx @mcp-use/inspector
 `);
     process.exit(0);
@@ -85,37 +77,30 @@ Examples:
 
 const app = new Hono();
 
-// Middleware - expose mcp-session-id for cross-origin requests (FastMCP session management)
 app.use(
   "*",
   cors({
     origin: "*",
-    exposeHeaders: ["*"], // Expose all headers since this is a proxy
+    exposeHeaders: ["*"],
   })
 );
-// Apply logger middleware only to proxy routes
 app.use("/inspector/api/proxy/*", logger());
 
-registerInspectorRoutes(app, { autoConnectUrl: mcpUrl });
-
-// Detect the deployment mode. The same CLI binary powers both local standalone
-// usage (`npx @mcp-use/inspector`) and the cloud-hosted Railway deployment at
-// inspector.mcpus.com — Railway sets RAILWAY_ENVIRONMENT_NAME, so we use that
-// as the primary cloud signal, with an explicit MCP_INSPECTOR_MODE override
-// for other hosted environments.
 const inspectorMode: InspectorMode =
   (process.env.MCP_INSPECTOR_MODE as InspectorMode | undefined) ??
   (process.env.RAILWAY_ENVIRONMENT_NAME ? "cloud" : "standalone");
 
-// Register static file serving (must be last as it includes catch-all route).
-// Runtime env vars here override what was baked in at `vite build` time — this
-// lets a single pre-built npm tarball be configured per deploy.
-registerStaticRoutes(app, undefined, {
+registerInspectorProxyRoutes(app, {
+  autoConnectUrl: mcpUrl,
+  oauthProxyAllowedOrigins: [],
+  oauthProxyAllowLoopback: inspectorMode === "standalone",
+});
+
+registerInspectorCdnShell(app, {
   inspectorMode,
   manufactChatUrl: process.env.MANUFACT_CHAT_URL,
 });
 
-// Start the server with automatic port selection
 async function startServer() {
   try {
     const port = await findAvailablePort(startPort);
@@ -123,20 +108,20 @@ async function startServer() {
       fetch: app.fetch,
       port,
     });
-    setServerPort(port);
     console.log(`🚀 MCP Inspector running on http://localhost:${port}`);
     if (mcpUrl) {
       console.log(`📡 Auto-connecting to: ${mcpUrl}`);
     }
-    // Auto-open browser (unless --no-open flag is present)
     if (!noOpen) {
+      const openUrl = new URL(`http://localhost:${port}/inspector`);
+      if (mcpUrl) {
+        openUrl.searchParams.set("autoConnect", mcpUrl);
+      }
       try {
-        await open(`http://localhost:${port}/inspector`);
+        await open(openUrl.toString());
         console.log(`🌐 Browser opened`);
       } catch {
-        console.log(
-          `🌐 Please open http://localhost:${port}/inspector in your browser`
-        );
+        console.log(`🌐 Please open ${openUrl} in your browser`);
       }
     }
     return { port, fetch: app.fetch };
@@ -146,5 +131,4 @@ async function startServer() {
   }
 }
 
-// Start the server
 startServer();

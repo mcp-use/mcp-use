@@ -1,0 +1,25 @@
+{
+  "name": "mcp-use-example-auth-supabase",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Example: mcp-use with Supabase direct access-token verification.",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "mcp-use": "workspace:*",
+    "@supabase/supabase-js": "^2.104.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "tsx": "^4.21.0",
+    "typescript": "7.0.1-rc"
+  }
+}

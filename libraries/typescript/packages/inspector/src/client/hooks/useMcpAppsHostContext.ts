@@ -3,8 +3,8 @@
  */
 
 import { useMemo } from "react";
-import type { McpUiHostContext } from "@modelcontextprotocol/ext-apps/app-bridge";
-import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { McpUiHostContext } from "@mcp-use/client/react";
+import type { Tool } from "@mcp-use/client/react";
 import type { PlaygroundSettings } from "../context/WidgetDebugContext";
 
 type DisplayMode = "inline" | "pip" | "fullscreen";
@@ -115,7 +115,11 @@ export function useMcpAppsHostContext({
       toolInfo: tool
         ? {
             id: toolCallId,
-            tool: tool,
+            // ponytail: v2 Tool.inputSchema.properties values are JSONValue
+            // (nullable) while @modelcontextprotocol/ext-apps still types them
+            // as `object`. The runtime shape (JSON Schema) is identical, so
+            // cast across the two SDK type worlds at this boundary.
+            tool: tool as NonNullable<McpUiHostContext["toolInfo"]>["tool"],
           }
         : undefined,
     }),

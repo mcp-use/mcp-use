@@ -1,0 +1,87 @@
+{
+  "name": "@mcp-use/client",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "MCP client for connecting to Model Context Protocol servers — sessions, connectors, and OAuth. Part of the mcp-use v2 framework.",
+  "author": "mcp-use, Inc.",
+  "license": "MIT",
+  "homepage": "https://github.com/mcp-use/mcp-use#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mcp-use/mcp-use.git",
+    "directory": "libraries/typescript/packages/client"
+  },
+  "bugs": {
+    "url": "https://github.com/mcp-use/mcp-use/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "client",
+    "oauth",
+    "typescript"
+  ],
+  "exports": {
+    ".": {
+      "node": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "browser": {
+        "types": "./dist/index-browser.d.ts",
+        "import": "./dist/index-browser.js"
+      },
+      "default": {
+        "types": "./dist/index-browser.d.ts",
+        "import": "./dist/index-browser.js"
+      }
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.js"
+    }
+  },
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "rimraf dist && tsup && tsc --emitDeclarationOnly --declaration",
+    "dev": "tsc --watch",
+    "test": "vitest",
+    "test:run": "vitest run"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/client": "https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee",
+    "@modelcontextprotocol/ext-apps": "https://pkg.pr.new/@modelcontextprotocol/ext-apps@432d42bb02a569078ab31ab6458428df6027809d"
+  },
+  "peerDependencies": {
+    "@e2b/code-interpreter": "^2.6.1",
+    "react": "^18.0.0 || ^19.0.0",
+    "zod": "^4.2.0"
+  },
+  "peerDependenciesMeta": {
+    "@e2b/code-interpreter": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@e2b/code-interpreter": "^2.6.1",
+    "@types/react": "^19.2.14",
+    "jsdom": "^27.0.0",
+    "react": "^19.2.3",
+    "react-test-renderer": "^19.2.4",
+    "vitest": "^4.1.0",
+    "zod": "^4.2.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

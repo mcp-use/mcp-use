@@ -1,24 +1,18 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
+    "target": "ES2024",
     "jsx": "react-jsx",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "allowJs": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
     "strict": true,
-    "outDir": "./dist",
-    "sourceMap": true,
-    "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "incremental": true,
-    "tsBuildInfoFile": "./dist/.tsbuildinfo",
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"]
-    }
+    "noEmit": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true
   },
-  "include": ["index.ts", "src/**/*", "resources/**/*", "server.ts", ".mcp-use/**/*.d.ts"],
+  "include": ["index.ts", "src/**/*", "resources/**/*"],
   "exclude": ["node_modules", "dist"]
 }

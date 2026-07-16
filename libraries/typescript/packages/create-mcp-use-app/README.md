@@ -314,7 +314,8 @@ export default function MyWidget() {
 Use the MCP server with any MCP-compatible client:
 
 ```typescript
-import { MCPClient, MCPAgent } from "mcp-use";
+import { MCPClient } from "@mcp-use/client";
+import { MCPAgent } from "@mcp-use/agent";
 import { ChatOpenAI } from "@langchain/openai";
 
 const client = new MCPClient({
@@ -341,13 +342,6 @@ The created project includes a `.env.example` file:
 # Server Configuration
 PORT=3000
 NODE_ENV=development
-
-# OAuth (if using authentication)
-OAUTH_CLIENT_ID=your_client_id
-OAUTH_CLIENT_SECRET=your_client_secret
-
-# Database (if using database)
-DATABASE_URL=postgresql://localhost/myapp
 
 # Observability (optional)
 LANGFUSE_PUBLIC_KEY=your_public_key

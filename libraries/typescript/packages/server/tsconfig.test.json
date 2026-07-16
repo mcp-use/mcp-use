@@ -1,0 +1,18 @@
+{
+  // Typechecks src + tests together (the build tsconfig excludes tests).
+  // Run via `pnpm typecheck`; the type-level contract tests in
+  // tests/type-level.test.ts rely on this (vitest itself does not typecheck).
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "noEmit": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./node_modules/.cache/tsconfig.test.tsbuildinfo",
+    "rootDir": "."
+  },
+  "include": ["src/**/*", "tests/**/*"],
+  "exclude": ["node_modules", "dist", "tests/cli/.tmp"]
+}

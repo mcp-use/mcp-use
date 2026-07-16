@@ -43,8 +43,7 @@ For detailed usage instructions and guides, visit [mcp-use.com/docs/inspector](h
 
 | Package                                                                                                             | Description             | Version                                                                                                         |
 | ------------------------------------------------------------------------------------------------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------- |
-| [mcp-use](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use)                       | Core MCP framework      | [![npm](https://img.shields.io/npm/v/mcp-use.svg)](https://www.npmjs.com/package/mcp-use)                       |
-| [@mcp-use/cli](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/cli)                      | Build tool for MCP apps | [![npm](https://img.shields.io/npm/v/@mcp-use/cli.svg)](https://www.npmjs.com/package/@mcp-use/cli)             |
+| [mcp-use](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server)                        | MCP framework and CLI   | [![npm](https://img.shields.io/npm/v/mcp-use.svg)](https://www.npmjs.com/package/mcp-use)                       |
 | [create-mcp-use-app](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/create-mcp-use-app) | Create MCP apps         | [![npm](https://img.shields.io/npm/v/create-mcp-use-app.svg)](https://www.npmjs.com/package/create-mcp-use-app) |
 
 ---
@@ -95,7 +94,7 @@ Opens the inspector in your browser at `http://localhost:8080`
 When you create an MCP server with `mcp-use`, the inspector is automatically available at `/inspector`:
 
 ```typescript
-import { MCPServer } from "mcp-use/server";
+import { MCPServer } from "mcp-use";
 
 const server = new MCPServer({
   name: "my-server",
@@ -103,10 +102,41 @@ const server = new MCPServer({
 });
 
 // Add your tools, resources, prompts...
-
-server.listen(3000);
-// 🎉 Inspector automatically available at http://localhost:3000/inspector
+export default server;
 ```
+
+Run `mcp-use dev`; the inspector is available at
+`http://localhost:3000/mcp/inspector`.
+
+#### Test the local CDN bundle with an mcp-use server
+
+From the TypeScript workspace, build and serve the current inspector source:
+
+```bash
+pnpm --filter @mcp-use/inspector serve:cdn -- --port 4173
+```
+
+In another terminal, rebuild mcp-use and start the app with the local asset
+override:
+
+```bash
+pnpm --filter mcp-use build
+cd test_app
+MCP_USE_INSPECTOR_ASSETS_URL=http://127.0.0.1:4173/inspector.js pnpm dev
+```
+
+Open `http://localhost:3000/mcp/inspector`. The served shell should reference
+the local bundle:
+
+```bash
+curl -s http://127.0.0.1:3000/mcp/inspector | rg '127.0.0.1:4173/inspector.js'
+```
+
+`serve:cdn` rebuilds `dist/cdn`, then runs Vite Preview with a watch rebuild
+loop — refresh the browser after source changes land. Restart the mcp-use dev
+process after changing `MCP_USE_INSPECTOR_ASSETS_URL`, because the shell HTML
+is generated when the server mounts. An explicit `inspector.assetsUrl`
+constructor option takes precedence over the environment variable.
 
 ---
 
@@ -379,8 +409,10 @@ export MCP_USE_ANONYMIZED_TELEMETRY=false
 
 ```javascript
 // In browser console
-localStorage.setItem("mcp_inspector_telemetry_disabled", "true");
+localStorage.setItem("MCP_USE_ANONYMIZED_TELEMETRY", "false");
 ```
+
+> **Note:** If you previously opted out with `mcp_inspector_telemetry_disabled`, the inspector automatically migrates that setting to `MCP_USE_ANONYMIZED_TELEMETRY=false` on startup.
 
 **Option 3: Package-level**
 

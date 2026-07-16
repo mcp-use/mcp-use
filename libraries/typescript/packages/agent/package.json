@@ -1,0 +1,119 @@
+{
+  "name": "@mcp-use/agent",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Native cross-platform MCP agent. Inspector → MCPAgent → loop → fetch + @mcp-use/client. LangChain bridge at @mcp-use/agent/langchain.",
+  "author": "mcp-use, Inc.",
+  "license": "MIT",
+  "homepage": "https://github.com/mcp-use/mcp-use#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mcp-use/mcp-use.git",
+    "directory": "libraries/typescript/packages/agent"
+  },
+  "bugs": {
+    "url": "https://github.com/mcp-use/mcp-use/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "agent",
+    "langchain",
+    "ai",
+    "typescript"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./browser": {
+      "types": "./dist/browser-agent.d.ts",
+      "import": "./dist/browser-agent.js",
+      "require": "./dist/browser-agent.cjs"
+    },
+    "./langchain": {
+      "types": "./dist/langchain.d.ts",
+      "import": "./dist/langchain.js",
+      "require": "./dist/langchain.cjs"
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "rimraf dist && tsup && tsc --emitDeclarationOnly --declaration",
+    "dev": "tsc --watch",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:unit": "vitest run --exclude 'tests/integration/**'",
+    "test:integration": "vitest run tests/integration",
+    "test:integration:agent": "vitest run tests/integration/agent",
+    "test:integration:run": "vitest run tests/integration/agent/test_agent_run.test.ts",
+    "test:integration:stream": "vitest run tests/integration/agent/test_agent_stream.test.ts",
+    "test:integration:streamevents": "vitest run tests/integration/agent/test_agent_stream_events.test.ts",
+    "test:integration:structured": "vitest run tests/integration/agent/test_agent_structured_output.test.ts",
+    "test:integration:manager": "vitest run tests/integration/agent/test_server_manager.test.ts",
+    "test:integration:observability": "vitest run tests/integration/agent/test_agent_observability.test.ts",
+    "test:integration:codemode": "vitest run tests/integration/agent/test_code_mode.test.ts"
+  },
+  "dependencies": {
+    "@mcp-use/client": "workspace:*",
+    "@modelcontextprotocol/client": "2.0.0-beta.3",
+    "chalk": "4.1.2"
+  },
+  "optionalDependencies": {
+    "cli-highlight": "2.1.11"
+  },
+  "peerDependencies": {
+    "@langchain/anthropic": "^1.3.0",
+    "@langchain/core": "^1.1.0",
+    "@langchain/openai": "^1.2.0",
+    "langchain": "^1.2.10",
+    "langfuse": "^3.38.6",
+    "langfuse-langchain": "^3.38.6",
+    "zod": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@langchain/anthropic": {
+      "optional": true
+    },
+    "@langchain/core": {
+      "optional": true
+    },
+    "@langchain/openai": {
+      "optional": true
+    },
+    "langchain": {
+      "optional": true
+    },
+    "langfuse": {
+      "optional": true
+    },
+    "langfuse-langchain": {
+      "optional": true
+    },
+    "zod": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@langchain/openai": "^1.2.8",
+    "ai": "^6.0.116",
+    "rimraf": "^6.1.3",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.0",
+    "zod": "4.3.5"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

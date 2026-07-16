@@ -1,0 +1,160 @@
+/**
+ * Hand-rolled argv parsing for the `mcp-use` bin.
+ *
+ * Deliberately dependency-free (no commander): the bin must add zero runtime
+ * dependencies to the package (see specs/CLI_SPEC.md, dependency rules).
+ */
+
+/**
+ * Result of parsing the `mcp-use` command line.
+ *
+ * @internal
+ */
+export interface ParsedArgs {
+  /** First positional argument — the subcommand — or `undefined` if none was given. */
+  command: string | undefined;
+  /** Value of `--port`/`-p`, or `undefined` if the flag was not passed. */
+  port: number | undefined;
+  /** Value of `--entry`, or `undefined` if the flag was not passed. */
+  entry: string | undefined;
+  /** Value of `--host`, or `undefined` if the flag was not passed. */
+  host: string | undefined;
+  /** Whether `--tunnel` was passed (dev only). */
+  tunnel: boolean;
+  /** `false` when `--no-open` was passed (dev only); `true` otherwise. */
+  open: boolean;
+  /** Whether `--help`/`-h` was passed. */
+  help: boolean;
+  /** Whether `--version`/`-v` was passed. */
+  version: boolean;
+}
+
+/**
+ * Parse the `mcp-use` argv (everything after the node binary and script path).
+ *
+ * Supports `--flag value` and `--flag=value` forms. The first bare token is
+ * taken as the subcommand.
+ *
+ * @param argv - Raw arguments, typically `process.argv.slice(2)`.
+ * @throws Error on an unknown flag, a missing flag value, an out-of-range
+ * port, or a second positional argument.
+ *
+ * @internal
+ */
+export function parseArgs(argv: readonly string[]): ParsedArgs {
+  const args: ParsedArgs = {
+    command: undefined,
+    port: undefined,
+    entry: undefined,
+    host: undefined,
+    tunnel: false,
+    open: true,
+    help: false,
+    version: false,
+  };
+
+  for (let i = 0; i < argv.length; i++) {
+    const token = argv[i];
+    if (token === undefined) continue;
+
+    // Split `--flag=value` into flag + inline value.
+    let flag = token;
+    let inline: string | undefined;
+    if (token.startsWith("--")) {
+      const eq = token.indexOf("=");
+      if (eq !== -1) {
+        flag = token.slice(0, eq);
+        inline = token.slice(eq + 1);
+      }
+    }
+
+    /** Consume the flag's value: inline (`=`) or the next argv token. */
+    const takeValue = (): string => {
+      if (inline !== undefined) return inline;
+      const next = argv[++i];
+      if (next === undefined || next.startsWith("-")) {
+        throw new Error(`Missing value for ${flag}`);
+      }
+      return next;
+    };
+
+    switch (flag) {
+      case "-h":
+      case "--help":
+        args.help = true;
+        break;
+      case "-v":
+      case "--version":
+        args.version = true;
+        break;
+      case "-p":
+      case "--port":
+        args.port = parsePort(takeValue());
+        break;
+      case "--entry":
+        args.entry = takeValue();
+        break;
+      case "--host":
+        args.host = takeValue();
+        break;
+      case "--tunnel":
+        args.tunnel = true;
+        break;
+      case "--no-open":
+        args.open = false;
+        break;
+      default:
+        if (flag.startsWith("-")) {
+          throw new Error(`Unknown option: ${flag}`);
+        }
+        if (args.command !== undefined) {
+          throw new Error(`Unexpected argument: ${flag}`);
+        }
+        args.command = flag;
+    }
+  }
+
+  return args;
+}
+
+/**
+ * Resolve the preferred port for `mcp-use start` and `mcp-use dev` (`dev`
+ * additionally probes upward from this value when it is taken).
+ *
+ * Precedence: `--port` flag, then the `PORT` environment variable, then
+ * `3000`. A `PORT` value that is not a valid port number is ignored (the
+ * default applies); an invalid `--port` flag has already been rejected by
+ * {@link parseArgs}.
+ *
+ * @param flagPort - Port from the `--port`/`-p` flag, if given.
+ * @param env - Environment to read `PORT` from.
+ * @defaultValue `env` defaults to `process.env`.
+ *
+ * @internal
+ */
+export function resolvePort(
+  flagPort: number | undefined,
+  env: Readonly<Record<string, string | undefined>> = process.env
+): number {
+  if (flagPort !== undefined) return flagPort;
+  const raw = env.PORT;
+  if (raw !== undefined && raw.trim() !== "") {
+    const port = Number(raw);
+    if (isValidPort(port)) return port;
+  }
+  return 3000;
+}
+
+/** Parse a `--port` value, rejecting anything that is not a valid port. */
+function parsePort(value: string): number {
+  const port = Number(value);
+  if (!isValidPort(port)) {
+    throw new Error(`Invalid port: ${value}`);
+  }
+  return port;
+}
+
+/** Whether a number is a bindable TCP port (0 = ephemeral). */
+function isValidPort(port: number): boolean {
+  return Number.isInteger(port) && port >= 0 && port <= 65535;
+}

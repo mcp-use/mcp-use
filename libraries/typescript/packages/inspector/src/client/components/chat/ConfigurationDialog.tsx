@@ -33,19 +33,23 @@ import {
 } from "@/client/components/ui/select";
 
 import { cn } from "@/client/lib/utils";
-import type { ProviderName } from "@/llm/types";
+import {
+  buildOllamaApiUrl,
+  normalizeOllamaBaseUrl,
+  OllamaCorsError,
+  type ProviderName,
+} from "@mcp-use/agent";
 import {
   getDefaultBaseUrl,
   providerRequiresApiKey,
   providerSupportsBaseUrl,
 } from "./types";
-import { getProviderLabel, ProviderIcon } from "./providerMeta";
-
 import {
-  buildOllamaApiUrl,
-  normalizeOllamaBaseUrl,
-  OllamaCorsError,
-} from "@/llm/providers/ollama/utils";
+  getProviderLabel,
+  ProviderIcon,
+  formatManagedModelName,
+} from "./providerMeta";
+import type { CloudModel } from "./useManagedCloudModel";
 
 interface ModelOption {
   id: string;
@@ -145,6 +149,15 @@ interface ConfigurationDialogProps {
   freeTierInfo?: {
     onLoginClick: () => void;
   };
+  /** Authenticated Manufact cloud tier — curated model picker. */
+  managedCloudInfo?: {
+    models: CloudModel[];
+    selectedModelId: string;
+    onModelChange: (modelId: string) => void;
+    isLoading?: boolean;
+  };
+  /** Switch from BYOK back to Manufact cloud (when logged in). */
+  onUseManagedCloud?: () => void;
 }
 
 async function fetchOpenAICompatibleModels(
@@ -302,11 +315,14 @@ export function ConfigurationDialog({
   showClearButton = false,
   buttonLabel: _buttonLabel = "Configure API Key",
   freeTierInfo,
+  managedCloudInfo,
+  onUseManagedCloud,
 }: ConfigurationDialogProps) {
   const [models, setModels] = useState<ModelOption[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [modelError, setModelError] = useState<string | null>(null);
   const [comboboxOpen, setComboboxOpen] = useState(false);
+  const [cloudComboboxOpen, setCloudComboboxOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const modelsCacheKey = getModelsCacheKey(tempProvider, tempBaseUrl);
 
@@ -410,20 +426,168 @@ export function ConfigurationDialog({
       ? "Optional for local Ollama. Stored locally and never sent to our servers."
       : "Your API key is stored locally and never sent to our servers.";
 
+  const cloudModelsByProvider = managedCloudInfo
+    ? managedCloudInfo.models.reduce<Record<string, CloudModel[]>>(
+        (acc, model) => {
+          if (!acc[model.provider]) acc[model.provider] = [];
+          acc[model.provider].push(model);
+          return acc;
+        },
+        {}
+      )
+    : {};
+
+  const selectedCloudModel = managedCloudInfo?.models.find(
+    (m) => m.id === managedCloudInfo.selectedModelId
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md" data-testid="chat-config-dialog">
         <DialogHeader>
           <DialogTitle>
-            {freeTierInfo ? "Model & usage" : "LLM Provider Configuration"}
+            {freeTierInfo || managedCloudInfo
+              ? "Model & usage"
+              : "LLM Provider Configuration"}
           </DialogTitle>
           <DialogDescription>
-            {freeTierInfo
-              ? "You're using Manufact's free tier. Sign in to increase your limits, or bring your own key to pick any model."
-              : "Configure your LLM provider and API key to start chatting with the MCP server"}
+            {managedCloudInfo
+              ? "Pick a Manufact cloud model or bring your own API key."
+              : freeTierInfo
+                ? "You're using Manufact's free tier. Sign in to increase your limits, or bring your own key to pick any model."
+                : "Configure your LLM provider and API key to start chatting with the MCP server"}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
+          {managedCloudInfo && (
+            <div className="space-y-2">
+              <Label>Manufact cloud model</Label>
+              {managedCloudInfo.isLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Loading models…</span>
+                </div>
+              ) : managedCloudInfo.models.length > 0 ? (
+                <Popover
+                  open={cloudComboboxOpen}
+                  modal={true}
+                  onOpenChange={setCloudComboboxOpen}
+                >
+                  <PopoverTrigger
+                    render={
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={cloudComboboxOpen}
+                        className="w-full justify-between rounded-md"
+                        data-testid="chat-config-cloud-model-select"
+                      >
+                        <span className="inline-flex min-w-0 items-center gap-2 truncate">
+                          {selectedCloudModel ? (
+                            <>
+                              <ProviderIcon
+                                provider={
+                                  selectedCloudModel.provider === "anthropic" ||
+                                  selectedCloudModel.provider === "openai" ||
+                                  selectedCloudModel.provider === "google"
+                                    ? selectedCloudModel.provider
+                                    : "openrouter"
+                                }
+                                className="shrink-0"
+                              />
+                              <span className="truncate">
+                                {formatManagedModelName(
+                                  selectedCloudModel.name,
+                                  selectedCloudModel.provider
+                                )}
+                              </span>
+                            </>
+                          ) : (
+                            "Select a model…"
+                          )}
+                        </span>
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    }
+                    nativeButton
+                  />
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <CommandInput
+                        placeholder="Search models…"
+                        className="h-9"
+                      />
+                      <CommandList>
+                        <CommandEmpty>No model found.</CommandEmpty>
+                        {Object.entries(cloudModelsByProvider).map(
+                          ([provider, providerModels]) => (
+                            <CommandGroup key={provider} heading={provider}>
+                              {providerModels.map((model) => (
+                                <CommandItem
+                                  key={model.id}
+                                  value={model.id}
+                                  keywords={[
+                                    model.name,
+                                    model.id,
+                                    model.provider,
+                                  ]}
+                                  onSelect={(currentValue) => {
+                                    managedCloudInfo.onModelChange(
+                                      currentValue
+                                    );
+                                    setCloudComboboxOpen(false);
+                                  }}
+                                >
+                                  <ProviderIcon
+                                    provider={
+                                      provider === "anthropic" ||
+                                      provider === "openai" ||
+                                      provider === "google"
+                                        ? provider
+                                        : "openrouter"
+                                    }
+                                    className="shrink-0"
+                                  />
+                                  {formatManagedModelName(
+                                    model.name,
+                                    model.provider
+                                  )}
+                                  <Check
+                                    className={cn(
+                                      "ml-auto h-4 w-4",
+                                      managedCloudInfo.selectedModelId ===
+                                        model.id
+                                        ? "opacity-100"
+                                        : "opacity-0"
+                                    )}
+                                  />
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          )
+                        )}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Cloud models unavailable — sign in again or use your own key.
+                </p>
+              )}
+            </div>
+          )}
+          {onUseManagedCloud && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-full"
+              onClick={onUseManagedCloud}
+            >
+              Use Manufact cloud
+            </Button>
+          )}
           {freeTierInfo && (
             <div className="rounded-md border bg-muted/40 p-3 space-y-2">
               <div className="flex items-center justify-between gap-3">
@@ -439,7 +603,7 @@ export function ConfigurationDialog({
               </div>
             </div>
           )}
-          {freeTierInfo && (
+          {(freeTierInfo || managedCloudInfo) && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <div className="h-px flex-1 bg-border" />
               <span>or use your own API key</span>
@@ -452,41 +616,55 @@ export function ConfigurationDialog({
               value={tempProvider}
               onValueChange={(v: any) => onProviderChange(v)}
             >
-              <SelectTrigger className="flex items-center gap-2">
+              <SelectTrigger
+                className="rounded-md"
+                leading={
+                  <ProviderIcon provider={tempProvider} className="shrink-0" />
+                }
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="openai">
+                <SelectItem value="openai" label={getProviderLabel("openai")}>
                   <div className="flex items-center gap-2">
                     <ProviderIcon provider="openai" />
                     <span>{getProviderLabel("openai")}</span>
                   </div>
                 </SelectItem>
-                <SelectItem value="anthropic">
+                <SelectItem
+                  value="anthropic"
+                  label={getProviderLabel("anthropic")}
+                >
                   <div className="flex items-center gap-2">
                     <ProviderIcon provider="anthropic" />
                     <span>{getProviderLabel("anthropic")}</span>
                   </div>
                 </SelectItem>
-                <SelectItem value="google">
+                <SelectItem value="google" label={getProviderLabel("google")}>
                   <div className="flex items-center gap-2">
                     <ProviderIcon provider="google" />
                     <span>{getProviderLabel("google")}</span>
                   </div>
                 </SelectItem>
-                <SelectItem value="ollama">
+                <SelectItem value="ollama" label={getProviderLabel("ollama")}>
                   <div className="flex items-center gap-2">
                     <ProviderIcon provider="ollama" />
                     <span>{getProviderLabel("ollama")}</span>
                   </div>
                 </SelectItem>
-                <SelectItem value="openrouter">
+                <SelectItem
+                  value="openrouter"
+                  label={getProviderLabel("openrouter")}
+                >
                   <div className="flex items-center gap-2">
                     <ProviderIcon provider="openrouter" />
                     <span>{getProviderLabel("openrouter")}</span>
                   </div>
                 </SelectItem>
-                <SelectItem value="openai-compatible">
+                <SelectItem
+                  value="openai-compatible"
+                  label={getProviderLabel("openai-compatible")}
+                >
                   <div className="flex items-center gap-2">
                     <span>{getProviderLabel("openai-compatible")}</span>
                   </div>
@@ -554,23 +732,29 @@ export function ConfigurationDialog({
                   modal={true}
                   onOpenChange={setComboboxOpen}
                 >
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={comboboxOpen}
-                      className="w-full justify-between rounded-md"
-                      data-testid="chat-config-model-select"
-                    >
-                      {tempModel
-                        ? models.find((model) => model.id === tempModel)
-                            ?.displayName ||
-                          models.find((model) => model.id === tempModel)?.id ||
-                          "Select a model..."
-                        : "Select a model..."}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
+                  <PopoverTrigger
+                    render={
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={comboboxOpen}
+                        className="w-full justify-between rounded-md"
+                        data-testid="chat-config-model-select"
+                      >
+                        <span className="truncate">
+                          {tempModel
+                            ? models.find((model) => model.id === tempModel)
+                                ?.displayName ||
+                              models.find((model) => model.id === tempModel)
+                                ?.id ||
+                              "Select a model..."
+                            : "Select a model..."}
+                        </span>
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    }
+                    nativeButton
+                  />
                   <PopoverContent className="w-full p-0" align="start">
                     <Command>
                       <CommandInput
@@ -584,6 +768,7 @@ export function ConfigurationDialog({
                             <CommandItem
                               key={model.id}
                               value={model.id}
+                              keywords={model.displayName}
                               onSelect={(currentValue) => {
                                 onModelChange(
                                   currentValue === tempModel ? "" : currentValue
