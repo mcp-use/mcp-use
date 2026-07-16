@@ -13,6 +13,7 @@
     "client-sdk-v2-migration",
     "dialect-json-schema-validator",
     "follow-inspector-beta-cdn",
+    "inspector-standalone-oauth",
     "localhost-managed-inspector-chat",
     "openapi-server-tools-v2",
     "strip-tools-list-schema-dialect",
