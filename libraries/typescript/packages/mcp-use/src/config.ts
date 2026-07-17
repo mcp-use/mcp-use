@@ -6,6 +6,7 @@ import type {
   ElicitResult,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Notification } from "@modelcontextprotocol/sdk/types.js";
+import type { Writable } from "node:stream";
 import type { BaseConnector, ConnectorInitOptions } from "./connectors/base.js";
 import type { ClientInfo } from "./connectors/http.js";
 import { HttpConnector } from "./connectors/http.js";
@@ -95,6 +96,8 @@ export interface StdioServerConfig extends BaseServerConfig {
   args: string[];
   env?: Record<string, string>;
   cwd?: string;
+  /** Stream that receives stderr from the spawned MCP server. */
+  errlog?: Writable;
 }
 
 /**

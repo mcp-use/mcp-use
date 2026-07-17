@@ -26,6 +26,7 @@ import {
   type MCPClientConfigShape,
   type ServerConfig,
 } from "./config.js";
+import type { Writable } from "node:stream";
 import { loadConfigFile } from "./config-file.js";
 import type { BaseConnector } from "./connectors/base.js";
 import { logger } from "./logging.js";
@@ -529,12 +530,14 @@ export class MCPClient extends BaseMCPClient {
         args: string[];
         env?: Record<string, string>;
         cwd?: string;
+        errlog?: Writable;
       };
       return new StdioConnector({
         command: stdioConfig.command,
         args: stdioConfig.args,
         env: stdioConfig.env,
         cwd: stdioConfig.cwd,
+        errlog: stdioConfig.errlog,
         clientInfo: normalizeClientInfo(merged.clientInfo),
         onSampling: resolved.onSampling,
         onElicitation: resolved.onElicitation,
