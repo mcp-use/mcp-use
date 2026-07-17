@@ -83,7 +83,6 @@ import type {
 import type {
   ProxyConnection,
   ProxyMountHost,
-  ProxyOptions,
   ProxyServerConfig,
 } from "./proxy.js";
 import type {
@@ -230,6 +229,10 @@ export class MCPServer<TUser = never> {
   readonly #mcpEventListeners: McpEventListenerEntry[] = [];
   /** Client instances created by {@link MCPServer.proxy} and owned by this server. */
   readonly #proxyOwners: Array<{ close(): Promise<void> }> = [];
+  /** Proxy registrations that {@link close} must let finish before cleanup. */
+  readonly #proxyOperations = new Set<Promise<void>>();
+  /** Whether terminal shutdown has begun. */
+  #closed = false;
 
   /**
    * Create an MCP server from a parsed, bundled OpenAPI document.
@@ -447,20 +450,26 @@ export class MCPServer<TUser = never> {
   /**
    * Compose upstream MCP servers into this server.
    *
-   * A namespace-keyed config creates all upstream connections through the
-   * optional `@mcp-use/client` v2 peer. The namespace prefixes every mounted
-   * tool, resource, and prompt name. You may instead pass an existing ready
-   * {@link ProxyConnection}; that connection remains caller-owned.
+   * A name-keyed HTTP config creates upstream connections through the optional
+   * `@mcp-use/client` v2 peer. Each key automatically namespaces its mounted
+   * tools, resources, and prompts. You may instead pass an existing ready
+   * {@link ProxyConnection}; its negotiated server name becomes the namespace
+   * and the connection remains caller-owned.
    *
-   * @param servers - Namespace-keyed upstream connection settings.
-   * @throws If `@mcp-use/client` is not installed, an upstream cannot connect
-   * or be introspected, a mounted name collides, or the server already started.
+   * Connection, introspection, and collision failures are diagnosed and
+   * skipped without discarding capabilities that can be mounted.
+   *
+   * @param servers - Namespace-keyed upstream HTTP connection settings.
+   * @throws If `@mcp-use/client` is not installed or the server already started
+   * or closed.
    *
    * @example
    * ```ts
    * await server.proxy({
-   *   database: { command: "node", args: ["./database.mjs"] },
-   *   weather: { url: "https://weather.example.com/mcp" },
+   *   weather: {
+   *     url: "https://weather.example.com/mcp",
+   *     authToken: process.env.WEATHER_MCP_TOKEN,
+   *   },
    * });
    * ```
    */
@@ -469,32 +478,40 @@ export class MCPServer<TUser = never> {
    * Mount an existing ready `@mcp-use/client` v2 connection.
    *
    * @param connection - Ready connection to introspect and forward through.
-   * @param options - Optional namespace. Without one, upstream names and URIs
-   * are preserved.
-   * @throws If introspection fails, a mounted name collides, or the server
-   * already started.
+   * The connection's negotiated server name automatically namespaces every
+   * mounted capability. Introspection and collision failures are diagnosed and
+   * skipped without discarding capabilities that can be mounted.
+   *
+   * @throws If the server already started or closed.
    *
    * @example
    * ```ts
    * const connection = await client.connect("database");
-   * await server.proxy(connection, { namespace: "database" });
+   * await server.proxy(connection);
    * ```
    */
+  async proxy(connection: ProxyConnection): Promise<void>;
   async proxy(
-    connection: ProxyConnection,
-    options?: ProxyOptions
-  ): Promise<void>;
-  async proxy(
-    input: Record<string, ProxyServerConfig> | ProxyConnection,
-    options?: ProxyOptions
+    input: Record<string, ProxyServerConfig> | ProxyConnection
   ): Promise<void> {
-    const { isProxyConnection, mountProxyConnection, mountProxyServers } =
-      await import("./proxy.js");
-    if (isProxyConnection(input)) {
-      await mountProxyConnection(this.#proxyHost(), input, options);
-      return;
+    if (this.#closed) {
+      throw new Error("Cannot call proxy() after the server has closed.");
     }
-    await mountProxyServers(this.#proxyHost(), input);
+    const operation = (async (): Promise<void> => {
+      const { isProxyConnection, mountProxyConnection, mountProxyServers } =
+        await import("./proxy.js");
+      if (isProxyConnection(input)) {
+        await mountProxyConnection(this.#proxyHost(), input);
+        return;
+      }
+      await mountProxyServers(this.#proxyHost(), input);
+    })();
+    this.#proxyOperations.add(operation);
+    try {
+      await operation;
+    } finally {
+      this.#proxyOperations.delete(operation);
+    }
   }
 
   /**
@@ -744,15 +761,36 @@ export class MCPServer<TUser = never> {
    * instance to serve again.
    */
   async close(): Promise<void> {
+    this.#closed = true;
+    await Promise.allSettled([...this.#proxyOperations]);
+
+    const errors: unknown[] = [];
     const proxyOwners = this.#proxyOwners.splice(0);
-    await Promise.all(proxyOwners.map((owner) => owner.close()));
-    await this.#handler?.close();
+    const ownerResults = await Promise.allSettled(
+      proxyOwners.map((owner) => owner.close())
+    );
+    for (const result of ownerResults) {
+      if (result.status === "rejected") errors.push(result.reason);
+    }
+
+    try {
+      await this.#handler?.close();
+    } catch (error) {
+      errors.push(error);
+    }
     const httpServer = this.#httpServer;
     if (httpServer !== undefined) {
-      await new Promise<void>((resolve, reject) => {
-        httpServer.close((err) => (err ? reject(err) : resolve()));
-      });
-      this.#httpServer = undefined;
+      try {
+        await new Promise<void>((resolve, reject) => {
+          httpServer.close((err) => (err ? reject(err) : resolve()));
+        });
+        this.#httpServer = undefined;
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    if (errors.length > 0) {
+      throw new AggregateError(errors, "Failed to close MCP server cleanly");
     }
   }
 

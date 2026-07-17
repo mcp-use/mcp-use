@@ -155,13 +155,10 @@ export type {
 export type {
   ProxyConnection,
   ProxyHttpConfig,
-  ProxyOAuthOptions,
-  ProxyOptions,
   ProxyProgress,
   ProxyPrompt,
   ProxyRequestOptions,
   ProxyResource,
   ProxyServerConfig,
-  ProxyStdioConfig,
   ProxyTool,
 } from "./proxy.js";

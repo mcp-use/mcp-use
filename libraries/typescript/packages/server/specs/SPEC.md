@@ -197,25 +197,30 @@ Calls use `options.baseUrl`, then the first `spec.servers` URL; constructing a g
 
 ## Upstream server composition
 
-`await server.proxy(servers)` composes namespace-keyed upstream MCP servers into the static parent registry before `listen()` or `getHandler()`. The server dynamically imports the optional `@mcp-use/client` v2 peer, creates one `MCPClient` for the supplied configuration, calls `connectAll()`, introspects every ready `MCPConnection`, and mounts forwarders only after every namespace has been introspected and checked for collisions. A failed connection, introspection, or collision leaves the parent registry unchanged and closes every connection created by that call.
+`await server.proxy(servers)` composes name-keyed upstream HTTP MCP servers into the static parent registry before `listen()` or `getHandler()`. The server dynamically imports the optional `@mcp-use/client` v2 peer, creates one `MCPClient`, and connects to each configured server independently. Config-map keys automatically namespace capabilities. Connection failures skip that upstream, introspection failures skip only the affected capability kind, and name collisions skip only the colliding capability; every skipped item emits a diagnostic while successfully mountable upstreams and capabilities remain registered.
 
 ```ts
 await server.proxy({
-  database: { command: "node", args: ["./database.mjs"] },
-  weather: { url: "https://weather.example.com/mcp", oauth: false },
+  weather: { url: "https://weather.example.com/mcp" },
+  database: {
+    url: "https://database.example.com/mcp",
+    authToken: process.env.DATABASE_MCP_TOKEN,
+  },
 });
 ```
 
-The namespace prefixes tool, resource, and prompt names with `<namespace>_`. Static resource listing URIs use `mcp-use-proxy:///<encoded namespace>/<encoded upstream URI>` so any namespace is valid and upstream URI schemes cannot collide. Reads forward the original URI. Tool calls preserve raw results (including `isError`, `structuredContent`, `_meta`, and `input_required` where the client supports it), downstream cancellation is passed upstream, and upstream progress is reported through the active downstream request context. Input/output JSON Schemas, annotations, titles, and descriptions are advertised from the introspected upstream metadata; validation remains authoritative upstream.
+The automatic namespace prefixes tool, resource, and prompt names with `<namespace>_`. Static resource listing URIs use `mcp-use-proxy:///<encoded namespace>/<encoded upstream URI>` so any namespace is valid and upstream URI schemes cannot collide. Reads forward the original URI. Tool calls preserve raw results (including `isError`, `structuredContent`, `_meta`, and `input_required` where the client supports it), downstream cancellation is passed upstream, and upstream progress is reported through the active downstream request context. A failed downstream progress notification is diagnosed without rejecting the upstream tool call. Input/output JSON Schemas, annotations, titles, and descriptions are advertised from the introspected upstream metadata; validation remains authoritative upstream.
 
 The low-level overload accepts an existing ready connection:
 
 ```ts
 const connection = await client.connect("database");
-await server.proxy(connection, { namespace: "database" });
+await server.proxy(connection);
 ```
 
-Connections created from a config map are owned by the parent and closed by `server.close()`. An explicitly supplied connection remains caller-owned. Calling `proxy()` after the parent starts throws before loading the optional peer. If `@mcp-use/client` is absent, config-map proxying throws with an unversioned npm install command; importing and running a server that never calls `proxy()` does not evaluate or require the client package.
+An existing connection's negotiated server name supplies its automatic namespace. Connections created from a config map are owned by the parent and closed by `server.close()`, including when shutdown overlaps an in-flight `proxy()` call. Cleanup waits for every owned client even if one close fails. An explicitly supplied connection remains caller-owned. Calling `proxy()` after the parent starts or closes throws before mounting capabilities. If `@mcp-use/client` is absent, config-map proxying throws with an unversioned npm install command; importing and running a server that never calls `proxy()` does not evaluate or require the client package.
+
+Proxy configuration is HTTP-only and accepts explicit bearer tokens or authentication headers. The public proxy API has no stdio or OAuth options. Internally the server forces client auto-OAuth off, so proxy setup and server startup never open a browser or acquire tokens; applications own credential acquisition and refresh.
 
 The initial v2 surface proxies tools, static resources, and prompts. It does not proxy resource templates, completions, subscriptions, upstream list-change re-synchronization, or legacy push-style sampling/elicitation callbacks.
 

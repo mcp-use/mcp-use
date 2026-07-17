@@ -9,49 +9,15 @@ import type {
   ToolAnnotations,
 } from "@modelcontextprotocol/server";
 import type {
+  HttpServerConfig as ClientHttpServerConfig,
   MCPClient as ClientMCPClient,
   MCPConnection as ClientMCPConnection,
-  ServerConfig as ClientServerConfig,
 } from "@mcp-use/client";
 
 import type { RequestContext } from "./context.js";
 import type { PromptCallback, PromptDefinition } from "./prompts.js";
 import type { ResourceCallback, ResourceDefinition } from "./resources.js";
 import type { ToolCallback, ToolDefinition } from "./tools.js";
-
-/** Automatic OAuth settings forwarded to `@mcp-use/client` v2. */
-export interface ProxyOAuthOptions {
-  /** Prefix used when persisting OAuth state. */
-  storageKeyPrefix?: string;
-  /** OAuth client display name. */
-  clientName?: string;
-  /** OAuth client website URL. */
-  clientUri?: string;
-  /** OAuth client logo URL. */
-  logoUri?: string;
-  /** OAuth callback URL override. */
-  callbackUrl?: string;
-  /** OAuth Client ID Metadata Document URL. */
-  clientMetadataUrl?: string;
-  /** Space-delimited scopes requested during authorization. */
-  scope?: string;
-  /** Preferred loopback callback port in Node.js. */
-  preferredPort?: number;
-  /** Number of additional loopback ports tried after the preferred port. */
-  portRange?: number;
-  /** Maximum time to wait for OAuth completion in milliseconds. */
-  authTimeoutMs?: number;
-  /** Browser-opening callback used by Node.js OAuth flows. */
-  openBrowser?: (url: string) => void | Promise<void>;
-  /** Wait for explicit authentication instead of opening OAuth automatically. */
-  preventAutoAuth?: boolean;
-  /** Use a full-page redirect instead of a popup in browser environments. */
-  useRedirectFlow?: boolean;
-  /** Same-origin OAuth proxy base URL for browser environments. */
-  oauthProxyUrl?: string;
-  /** Route OAuth HTTP requests through `oauthProxyUrl`. */
-  proxyOAuthRequests?: boolean;
-}
 
 /** HTTP connection settings accepted by {@link MCPServer.proxy}. */
 export interface ProxyHttpConfig {
@@ -65,34 +31,12 @@ export interface ProxyHttpConfig {
   timeout?: number;
   /** Fetch implementation used for upstream HTTP requests. */
   fetch?: typeof fetch;
-  /** Disable automatic OAuth, or configure the client's automatic OAuth flow. */
-  oauth?: false | ProxyOAuthOptions;
-  /** Protocol negotiation mode forwarded to `@mcp-use/client`. */
-  protocolNegotiation?: "auto" | "legacy" | { pin: string };
-}
-
-/** Node stdio connection settings accepted by {@link MCPServer.proxy}. */
-export interface ProxyStdioConfig {
-  /** Executable that starts the upstream MCP server. */
-  command: string;
-  /** Command-line arguments passed to the executable. */
-  args: string[];
-  /** Environment passed to the child process. */
-  env?: Record<string, string>;
-  /** Working directory for the child process. */
-  cwd?: string;
   /** Protocol negotiation mode forwarded to `@mcp-use/client`. */
   protocolNegotiation?: "auto" | "legacy" | { pin: string };
 }
 
 /** Connection settings for one upstream server. */
-export type ProxyServerConfig = ProxyHttpConfig | ProxyStdioConfig;
-
-/** Options for mounting an existing {@link ProxyConnection}. */
-export interface ProxyOptions {
-  /** Prefix applied to mounted capability names. Omit to preserve names. */
-  namespace?: string;
-}
+export type ProxyServerConfig = ProxyHttpConfig;
 
 /** Progress payload received while a proxied tool is running. */
 export interface ProxyProgress {
@@ -114,6 +58,8 @@ export interface ProxyRequestOptions {
 
 /** Structural connection contract accepted by the low-level proxy overload. */
 export interface ProxyConnection {
+  /** Negotiated metadata used to derive the automatic capability namespace. */
+  readonly info: { server: { name: string } };
   /** Whether the upstream advertised a named MCP capability. */
   supports?(capability: string): boolean;
   /** List upstream tools. */
@@ -208,7 +154,7 @@ export interface ProxyMountHost {
 }
 
 interface ProxyNamespacePlan {
-  namespace: string | undefined;
+  namespace: string;
   connection: ProxyConnection;
   tools: ProxyTool[];
   resources: ProxyResource[];
@@ -221,7 +167,7 @@ interface ProxyClientPackage {
 
 type Assert<T extends true> = T;
 type _ProxyConfigMatchesClient = Assert<
-  ProxyServerConfig extends ClientServerConfig ? true : false
+  ProxyServerConfig extends ClientHttpServerConfig ? true : false
 >;
 type _ClientConnectionMatchesProxy = Assert<
   ClientMCPConnection extends ProxyConnection ? true : false
@@ -255,7 +201,7 @@ function passthroughJsonSchema(
 function promptArgsToJsonSchema(
   args: PromptArgument[] | undefined
 ): JsonSchemaType {
-  const properties: Record<string, JsonSchemaType> = {};
+  const properties = Object.create(null) as Record<string, JsonSchemaType>;
   const required: string[] = [];
   for (const arg of args ?? []) {
     properties[arg.name] = {
@@ -271,15 +217,11 @@ function promptArgsToJsonSchema(
   };
 }
 
-function prefixedName(namespace: string | undefined, name: string): string {
-  return namespace === undefined ? name : `${namespace}_${name}`;
+function prefixedName(namespace: string, name: string): string {
+  return `${namespace}_${name}`;
 }
 
-function proxiedResourceUri(
-  namespace: string | undefined,
-  uri: string
-): string {
-  if (namespace === undefined) return uri;
+function proxiedResourceUri(namespace: string, uri: string): string {
   return `mcp-use-proxy:///${encodeURIComponent(namespace)}/${encodeURIComponent(uri)}`;
 }
 
@@ -302,6 +244,15 @@ function isClientPackageMissing(error: unknown): boolean {
     (code === "ERR_MODULE_NOT_FOUND" || code === "MODULE_NOT_FOUND") &&
     error.message.includes("@mcp-use/client")
   );
+}
+
+function proxyDiagnostic(message: string, error?: unknown): void {
+  if (error === undefined) {
+    console.error(`[mcp-use] ${message}`);
+    return;
+  }
+  const detail = error instanceof Error ? error.message : String(error);
+  console.error(`[mcp-use] ${message}: ${detail}`);
 }
 
 /** Convert a missing optional-client import into the proxy install error. @internal */
@@ -331,94 +282,63 @@ function supports(
 }
 
 async function introspect(
-  namespace: string | undefined,
+  namespace: string,
   connection: ProxyConnection
 ): Promise<ProxyNamespacePlan> {
-  try {
-    const tools = supports(connection, "tools")
-      ? await connection.listTools()
-      : [];
-    let resources: ProxyResource[] = [];
-    if (supports(connection, "resources")) {
+  let tools: ProxyTool[] = [];
+  if (supports(connection, "tools")) {
+    try {
+      tools = await connection.listTools();
+    } catch (error) {
+      proxyDiagnostic(
+        `Failed to introspect tools from upstream MCP server "${namespace}"`,
+        error
+      );
+    }
+  }
+
+  let resources: ProxyResource[] = [];
+  if (supports(connection, "resources")) {
+    try {
       if (connection.listAllResources !== undefined) {
         resources = (await connection.listAllResources()).resources;
       } else if (connection.listResources !== undefined) {
         resources = (await connection.listResources()).resources;
       }
-    }
-    const prompts = supports(connection, "prompts")
-      ? (await connection.listPrompts()).prompts
-      : [];
-    return { namespace, connection, tools, resources, prompts };
-  } catch (error) {
-    const label = namespace ?? "unnamed";
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(
-      `Failed to introspect upstream MCP server "${label}": ${message}`,
-      { cause: error }
-    );
-  }
-}
-
-function assertMountable(
-  host: ProxyMountHost,
-  plans: ProxyNamespacePlan[]
-): void {
-  const planned = {
-    tool: new Set<string>(),
-    resource: new Set<string>(),
-    prompt: new Set<string>(),
-  };
-
-  const assertFree = (
-    kind: "tool" | "resource" | "prompt",
-    name: string,
-    namespace: string | undefined
-  ): void => {
-    const exists =
-      kind === "tool"
-        ? host.hasTool(name)
-        : kind === "resource"
-          ? host.hasResource(name)
-          : host.hasPrompt(name);
-    if (exists || planned[kind].has(name)) {
-      throw new Error(
-        `Cannot proxy ${kind} "${name}" from namespace "${namespace ?? "unnamed"}": ` +
-          `a ${kind} with that name is already registered.`
-      );
-    }
-    planned[kind].add(name);
-  };
-
-  for (const plan of plans) {
-    for (const tool of plan.tools) {
-      assertFree(
-        "tool",
-        prefixedName(plan.namespace, tool.name),
-        plan.namespace
-      );
-    }
-    for (const resource of plan.resources) {
-      assertFree(
-        "resource",
-        prefixedName(plan.namespace, resource.name),
-        plan.namespace
-      );
-    }
-    for (const prompt of plan.prompts) {
-      assertFree(
-        "prompt",
-        prefixedName(plan.namespace, prompt.name),
-        plan.namespace
+    } catch (error) {
+      proxyDiagnostic(
+        `Failed to introspect resources from upstream MCP server "${namespace}"`,
+        error
       );
     }
   }
+
+  let prompts: ProxyPrompt[] = [];
+  if (supports(connection, "prompts")) {
+    try {
+      prompts = (await connection.listPrompts()).prompts;
+    } catch (error) {
+      proxyDiagnostic(
+        `Failed to introspect prompts from upstream MCP server "${namespace}"`,
+        error
+      );
+    }
+  }
+
+  return { namespace, connection, tools, resources, prompts };
 }
 
 function mountPlan(host: ProxyMountHost, plan: ProxyNamespacePlan): void {
   for (const tool of plan.tools) {
+    const name = prefixedName(plan.namespace, tool.name);
+    if (host.hasTool(name)) {
+      proxyDiagnostic(
+        `Skipping proxied tool "${name}" from upstream "${plan.namespace}" because that name is already registered`
+      );
+      continue;
+    }
     const definition: ToolDefinition = {
-      name: prefixedName(plan.namespace, tool.name),
+      name,
       ...(tool.title !== undefined && { title: tool.title }),
       ...(tool.description !== undefined && { description: tool.description }),
       ...(tool.annotations !== undefined && { annotations: tool.annotations }),
@@ -436,22 +356,32 @@ function mountPlan(host: ProxyMountHost, plan: ProxyNamespacePlan): void {
     ) =>
       plan.connection.callTool(upstreamName, params, {
         signal: ctx.signal,
-        onprogress: async (progress) => {
-          await ctx.reportProgress(
-            progress.progress,
-            progress.total,
-            progress.message
-          );
+        onprogress: (progress) => {
+          void ctx
+            .reportProgress(progress.progress, progress.total, progress.message)
+            .catch((error: unknown) => {
+              proxyDiagnostic(
+                `Failed to forward progress for proxied tool "${definition.name}"`,
+                error
+              );
+            });
         },
       });
     host.registerTool(definition, callback as ToolCallback);
   }
 
   for (const resource of plan.resources) {
+    const name = prefixedName(plan.namespace, resource.name);
+    if (host.hasResource(name)) {
+      proxyDiagnostic(
+        `Skipping proxied resource "${name}" from upstream "${plan.namespace}" because that name is already registered`
+      );
+      continue;
+    }
     const upstreamUri = resource.uri;
     host.registerResource(
       {
-        name: prefixedName(plan.namespace, resource.name),
+        name,
         uri: proxiedResourceUri(plan.namespace, upstreamUri),
         ...(resource.title !== undefined && { title: resource.title }),
         ...(resource.description !== undefined && {
@@ -467,10 +397,17 @@ function mountPlan(host: ProxyMountHost, plan: ProxyNamespacePlan): void {
   }
 
   for (const prompt of plan.prompts) {
+    const name = prefixedName(plan.namespace, prompt.name);
+    if (host.hasPrompt(name)) {
+      proxyDiagnostic(
+        `Skipping proxied prompt "${name}" from upstream "${plan.namespace}" because that name is already registered`
+      );
+      continue;
+    }
     const upstreamName = prompt.name;
     host.registerPrompt(
       {
-        name: prefixedName(plan.namespace, prompt.name),
+        name,
         ...(prompt.title !== undefined && { title: prompt.title }),
         ...(prompt.description !== undefined && {
           description: prompt.description,
@@ -487,23 +424,34 @@ function mountPlan(host: ProxyMountHost, plan: ProxyNamespacePlan): void {
  *
  * @param host - Parent server registration surface.
  * @param connection - Ready `@mcp-use/client` v2 connection.
- * @param options - Optional namespace applied to mounted names.
- *
  * @internal
  */
 export async function mountProxyConnection(
   host: ProxyMountHost,
-  connection: ProxyConnection,
-  options: ProxyOptions = {}
+  connection: ProxyConnection
 ): Promise<void> {
   if (host.isStarted()) {
     throw new Error(
       "Cannot call proxy() after the server has started: register upstream servers before listen()/getHandler()."
     );
   }
-  const plan = await introspect(options.namespace, connection);
-  assertMountable(host, [plan]);
+  const namespace = connection.info.server.name;
+  const plan = await introspect(namespace, connection);
   mountPlan(host, plan);
+}
+
+function toClientConfig(config: ProxyServerConfig): ClientHttpServerConfig {
+  return {
+    url: config.url,
+    ...(config.headers !== undefined && { headers: config.headers }),
+    ...(config.authToken !== undefined && { authToken: config.authToken }),
+    ...(config.timeout !== undefined && { timeout: config.timeout }),
+    ...(config.fetch !== undefined && { fetch: config.fetch }),
+    ...(config.protocolNegotiation !== undefined && {
+      protocolNegotiation: config.protocolNegotiation,
+    }),
+    oauth: false,
+  };
 }
 
 /**
@@ -526,15 +474,28 @@ export async function mountProxyServers(
   }
 
   const { MCPClient } = await loadProxyClient();
-  const owner = new MCPClient({ mcpServers: servers });
+  const clientServers = Object.fromEntries(
+    Object.entries(servers).map(([name, config]) => [
+      name,
+      toClientConfig(config),
+    ])
+  );
+  const owner = new MCPClient({ mcpServers: clientServers });
   try {
-    const connected: Record<string, ClientMCPConnection> =
-      await owner.connectAll();
     const plans: ProxyNamespacePlan[] = [];
-    for (const [namespace, connection] of Object.entries(connected)) {
+    for (const namespace of Object.keys(clientServers)) {
+      let connection: ClientMCPConnection;
+      try {
+        connection = await owner.connect(namespace);
+      } catch (error) {
+        proxyDiagnostic(
+          `Failed to connect to upstream MCP server "${namespace}"`,
+          error
+        );
+        continue;
+      }
       plans.push(await introspect(namespace, connection));
     }
-    assertMountable(host, plans);
     for (const plan of plans) mountPlan(host, plan);
     host.trackOwner(owner);
   } catch (error) {

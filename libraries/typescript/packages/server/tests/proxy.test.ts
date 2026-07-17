@@ -3,10 +3,13 @@ import {
   StreamableHTTPClientTransport,
 } from "@modelcontextprotocol/client";
 import { MCPClient } from "@mcp-use/client";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { MCPServer } from "../src/index.js";
+import type { ProxyConnection } from "../src/index.js";
+import { mountProxyConnection } from "../src/proxy.js";
+import type { ProxyMountHost } from "../src/proxy.js";
 
 async function connectClient(url: string): Promise<Client> {
   const client = new Client(
@@ -90,6 +93,7 @@ describe("MCPServer.proxy", () => {
   const clients: Array<{ close(): Promise<void> }> = [];
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await Promise.all(clients.splice(0).map((client) => client.close()));
     await Promise.all(servers.splice(0).map((server) => server.close()));
   });
@@ -109,8 +113,8 @@ describe("MCPServer.proxy", () => {
       content: [{ type: "text", text: "local" }],
     }));
     await parent.proxy({
-      alpha: { url: alphaUrl, oauth: false },
-      beta: { url: betaUrl, oauth: false },
+      alpha: { url: alphaUrl },
+      beta: { url: betaUrl },
     });
     const { url: parentUrl } = await parent.listen(0);
 
@@ -199,13 +203,13 @@ describe("MCPServer.proxy", () => {
 
     const parent = new MCPServer({ name: "parent", version: "1.0.0" });
     servers.push(parent);
-    await parent.proxy(connection, { namespace: "custom" });
+    await parent.proxy(connection);
     const { url: parentUrl } = await parent.listen(0);
 
     const client = await connectClient(parentUrl);
     clients.push(client);
     const { tools } = await client.listTools();
-    expect(tools.map((tool) => tool.name)).toContain("custom_greet");
+    expect(tools.map((tool) => tool.name)).toContain("direct_greet");
 
     await parent.close();
     expect(connection.isConnected).toBe(true);
@@ -218,12 +222,12 @@ describe("MCPServer.proxy", () => {
     const { url } = await upstream.listen(0);
     await parent.listen(0);
 
-    await expect(parent.proxy({ late: { url, oauth: false } })).rejects.toThrow(
+    await expect(parent.proxy({ late: { url } })).rejects.toThrow(
       /proxy\(\) after the server has started/i
     );
   });
 
-  it("rejects collisions without partially mounting a namespace", async () => {
+  it("skips collisions while mounting the remaining capabilities", async () => {
     const upstream = buildUpstream("collision");
     const parent = new MCPServer({ name: "parent", version: "1.0.0" });
     servers.push(upstream, parent);
@@ -232,14 +236,177 @@ describe("MCPServer.proxy", () => {
       content: [{ type: "text", text: "local" }],
     }));
 
-    await expect(parent.proxy({ up: { url, oauth: false } })).rejects.toThrow(
-      /Cannot proxy tool "up_greet"/
-    );
+    const diagnostics = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(parent.proxy({ up: { url } })).resolves.toBeUndefined();
 
     const { url: parentUrl } = await parent.listen(0);
     const client = await connectClient(parentUrl);
     clients.push(client);
     const { tools } = await client.listTools();
-    expect(tools.map((tool) => tool.name)).toEqual(["up_greet"]);
+    expect(tools.map((tool) => tool.name).sort()).toEqual([
+      "up_fail",
+      "up_greet",
+    ]);
+    expect(diagnostics).toHaveBeenCalledWith(
+      expect.stringContaining('Skipping proxied tool "up_greet"')
+    );
+  });
+
+  it("continues after a configured upstream fails to connect", async () => {
+    const upstream = buildUpstream("healthy");
+    const parent = new MCPServer({ name: "parent", version: "1.0.0" });
+    servers.push(upstream, parent);
+    const { url } = await upstream.listen(0);
+    const diagnostics = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await expect(
+      parent.proxy({
+        offline: {
+          url: "https://offline.example/mcp",
+          fetch: async () => {
+            throw new Error("upstream unavailable");
+          },
+        },
+        healthy: { url },
+      })
+    ).resolves.toBeUndefined();
+
+    const { url: parentUrl } = await parent.listen(0);
+    const client = await connectClient(parentUrl);
+    clients.push(client);
+    const { tools } = await client.listTools();
+    expect(tools.map((tool) => tool.name)).toContain("healthy_greet");
+    expect(diagnostics).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Failed to connect to upstream MCP server "offline"'
+      )
+    );
+  });
+
+  it("keeps other capability kinds when one introspection request fails", async () => {
+    const parent = new MCPServer({ name: "parent", version: "1.0.0" });
+    servers.push(parent);
+    const diagnostics = vi.spyOn(console, "error").mockImplementation(() => {});
+    const connection: ProxyConnection = {
+      info: { server: { name: "partial" } },
+      async listTools() {
+        throw new Error("tools unavailable");
+      },
+      async callTool() {
+        return { content: [] };
+      },
+      async listAllResources() {
+        return {
+          resources: [
+            {
+              name: "notes",
+              uri: "notes://partial",
+              mimeType: "text/plain",
+            },
+          ],
+        };
+      },
+      async readResource(uri) {
+        return { contents: [{ uri, text: "partial notes" }] };
+      },
+      async listPrompts() {
+        return {
+          prompts: [
+            {
+              name: "special",
+              arguments: [{ name: "__proto__", required: true }],
+            },
+          ],
+        };
+      },
+      async getPrompt() {
+        return { messages: [] };
+      },
+    };
+
+    await expect(parent.proxy(connection)).resolves.toBeUndefined();
+    const { url: parentUrl } = await parent.listen(0);
+    const client = await connectClient(parentUrl);
+    clients.push(client);
+
+    expect((await client.listTools()).tools).toEqual([]);
+    expect((await client.listResources()).resources).toEqual([
+      expect.objectContaining({ name: "partial_notes" }),
+    ]);
+    expect((await client.listPrompts()).prompts).toEqual([
+      expect.objectContaining({
+        name: "partial_special",
+        arguments: [expect.objectContaining({ name: "__proto__" })],
+      }),
+    ]);
+    expect(diagnostics).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Failed to introspect tools from upstream MCP server "partial"'
+      )
+    );
+  });
+
+  it("contains rejected downstream progress notifications", async () => {
+    const diagnostics = vi.spyOn(console, "error").mockImplementation(() => {});
+    let mountedTool:
+      | ((params: Record<string, unknown>, ctx: unknown) => Promise<unknown>)
+      | undefined;
+    const host: ProxyMountHost = {
+      isStarted: () => false,
+      hasTool: () => false,
+      hasResource: () => false,
+      hasPrompt: () => false,
+      registerTool: (_definition, callback) => {
+        mountedTool = callback as unknown as typeof mountedTool;
+      },
+      registerResource: () => {
+        throw new Error("unexpected resource registration");
+      },
+      registerPrompt: () => {
+        throw new Error("unexpected prompt registration");
+      },
+      trackOwner: () => {},
+    };
+    const connection: ProxyConnection = {
+      info: { server: { name: "progress" } },
+      supports: (capability) => capability === "tools",
+      async listTools() {
+        return [{ name: "stream" }];
+      },
+      async callTool(_name, _args, options) {
+        expect(
+          options?.onprogress?.({ progress: 1, total: 2, message: "half" })
+        ).toBeUndefined();
+        return { content: [] };
+      },
+      async readResource() {
+        return { contents: [] };
+      },
+      async listPrompts() {
+        return { prompts: [] };
+      },
+      async getPrompt() {
+        return { messages: [] };
+      },
+    };
+
+    await mountProxyConnection(host, connection);
+    expect(mountedTool).toBeDefined();
+    await mountedTool?.(
+      {},
+      {
+        signal: new AbortController().signal,
+        reportProgress: async () => {
+          throw new Error("downstream disconnected");
+        },
+      }
+    );
+    await vi.waitFor(() =>
+      expect(diagnostics).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'Failed to forward progress for proxied tool "progress_stream"'
+        )
+      )
+    );
   });
 });

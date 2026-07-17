@@ -43,11 +43,9 @@ export async function createProxyExample(): Promise<ProxyExample> {
     await gateway.proxy({
       weather: {
         url: weatherAddress.url,
-        oauth: false,
       },
       inventory: {
         url: inventoryAddress.url,
-        oauth: false,
       },
     });
   } catch (error) {

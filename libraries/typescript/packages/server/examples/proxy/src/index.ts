@@ -2,7 +2,7 @@ import { createProxyExample } from "./server.js";
 
 function getPort(): number {
   const value = process.env["PORT"] ?? "3000";
-  const port = Number(value);
+  const port = value.trim() === "" ? Number.NaN : Number(value);
   if (!Number.isInteger(port) || port < 0 || port > 65_535) {
     throw new Error(
       `PORT must be an integer from 0 to 65535; received ${value}`
@@ -21,8 +21,13 @@ try {
   );
 
   await new Promise<void>((resolve) => {
-    process.once("SIGINT", resolve);
-    process.once("SIGTERM", resolve);
+    const shutdown = (): void => {
+      process.off("SIGINT", shutdown);
+      process.off("SIGTERM", shutdown);
+      resolve();
+    };
+    process.once("SIGINT", shutdown);
+    process.once("SIGTERM", shutdown);
   });
 } finally {
   await example.close();

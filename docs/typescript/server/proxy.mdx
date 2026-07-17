@@ -4,7 +4,7 @@ description: "Proxy multiple MCP servers through one TypeScript MCP endpoint wit
 icon: "git-merge"
 ---
 
-`server.proxy()` connects to multiple upstream MCP servers and exposes their tools, static resources, and prompts through one endpoint. Each upstream server gets a namespace so capability names do not collide.
+`server.proxy()` connects to multiple upstream HTTP MCP servers and exposes their tools, static resources, and prompts through one endpoint. Config-map keys and negotiated server names automatically namespace proxied capabilities.
 
 ## Install the optional client
 
@@ -18,7 +18,7 @@ If you call `server.proxy()` without the client installed, mcp-use throws an err
 
 ## Proxy multiple servers
 
-Pass an object whose keys are namespaces and whose values are `@mcp-use/client` connection settings. You can mix HTTP and stdio servers.
+Pass an object whose keys identify upstreams and whose values contain HTTP connection settings. The keys automatically become capability namespaces.
 
 ```typescript
 import { MCPServer } from "mcp-use";
@@ -29,19 +29,12 @@ const server = new MCPServer({
 });
 
 await server.proxy({
-  database: {
-    command: "node",
-    args: ["./database-server.mjs"],
-  },
   weather: {
     url: "https://weather.example.com/mcp",
-    oauth: false,
   },
   internal: {
     url: "https://internal.example.com/mcp",
-    headers: {
-      Authorization: `Bearer ${process.env.INTERNAL_MCP_TOKEN}`,
-    },
+    authToken: process.env.INTERNAL_MCP_TOKEN,
   },
 });
 
@@ -56,17 +49,18 @@ The gateway exposes upstream names with a `<namespace>_` prefix:
 
 | Upstream capability            | Gateway capability  |
 | ------------------------------ | ------------------- |
-| `database` tool `query`        | `database_query`    |
 | `weather` prompt `forecast`    | `weather_forecast`  |
 | `internal` resource `handbook` | `internal_handbook` |
 
 Static resource URIs use the `mcp-use-proxy` scheme. The gateway maps each proxy URI back to the original upstream URI when a client reads it.
 
-Call `proxy()` before `listen()` or `getHandler()`. The server connects and introspects every upstream first, then registers the complete set. A connection, introspection, or name-collision error leaves the parent registry unchanged.
+Call `proxy()` before `listen()` or `getHandler()`. Registration is best-effort: a connection failure skips that upstream, an introspection failure skips only the affected capability kind, and a name collision skips only the colliding capability. Each failure is written to the server's diagnostics while other upstreams and capabilities remain available.
+
+Proxy config deliberately supports bearer tokens and explicit authentication headers, but not automatic OAuth. `server.proxy()` disables the client's browser-based OAuth flow, so starting the gateway never opens a browser. Obtain and refresh credentials in your application, then pass them with `authToken` or `headers`.
 
 ## Mount an existing connection
 
-Pass a ready `MCPConnection` when your application needs to create the client itself, such as for custom OAuth setup.
+Pass a ready `MCPConnection` when your application creates the client itself. The upstream's negotiated server name automatically becomes the namespace.
 
 ```typescript
 import { MCPClient } from "@mcp-use/client";
@@ -76,6 +70,8 @@ const client = new MCPClient({
   mcpServers: {
     secure_database: {
       url: "https://database.example.com/mcp",
+      authToken: process.env.DATABASE_MCP_TOKEN,
+      oauth: false,
     },
   },
 });
@@ -87,7 +83,7 @@ const server = new MCPServer({
   version: "1.0.0",
 });
 
-await server.proxy(connection, { namespace: "database" });
+await server.proxy(connection);
 await server.listen(3000);
 ```
 
