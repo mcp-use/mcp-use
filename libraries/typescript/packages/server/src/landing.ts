@@ -47,7 +47,7 @@ function generateCursorDeepLink(url: string, name: string): string {
       : btoa(configJson);
 
   const sanitizedName = sanitizeServerName(name);
-  return `cursor://anysphere.cursor-deeplink/mcp/install?config=${base64Config}&name=${encodeURIComponent(sanitizedName)}`;
+  return `cursor://anysphere.cursor-deeplink/mcp/install?config=${encodeURIComponent(base64Config)}&name=${encodeURIComponent(sanitizedName)}`;
 }
 
 /**
@@ -85,7 +85,8 @@ function generateVSCodeInsidersDeepLink(url: string, name: string): string {
  */
 function generateClaudeCommand(url: string, name: string): string {
   const sanitizedName = sanitizeServerName(name);
-  return `claude mcp add --transport http "${sanitizedName}" ${url}`;
+  const quotedUrl = `'${url.replace(/'/g, "'\\''")}'`;
+  return `claude mcp add --transport http "${sanitizedName}" ${quotedUrl}`;
 }
 
 /** Hosted Manufact Inspector base (same as cloud deploy “Open in new tab”). */
@@ -359,9 +360,10 @@ export function generateLandingPage(options: LandingPageOptions): string {
 
   const safeName = escapeHtml(name);
   const safeDescription = description ? escapeHtml(description) : "";
-  const metaDescription =
-    safeDescription ||
-    `${safeName} MCP Server — Connect with Claude Code, Cursor, and VS Code. Model Context Protocol server.`;
+  const rawMetaDescription =
+    description ||
+    `${name} MCP Server — Connect with Claude Code, Cursor, and VS Code. Model Context Protocol server.`;
+  const metaDescription = escapeHtml(rawMetaDescription);
   const pageTitle = `${safeName} MCP Server — Connect with Claude Code, Cursor & VS Code`;
 
   const jsonLd = serializeScriptJson({
@@ -369,7 +371,7 @@ export function generateLandingPage(options: LandingPageOptions): string {
     "@type": "SoftwareApplication",
     name: name,
     softwareVersion: version,
-    description: metaDescription,
+    description: rawMetaDescription,
     applicationCategory: "DeveloperApplication",
   });
 

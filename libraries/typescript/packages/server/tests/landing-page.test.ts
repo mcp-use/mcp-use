@@ -100,6 +100,47 @@ describe("generateLandingPage", () => {
     expect(html).toContain("\\u003c/script\\u003e");
     expect(html).not.toContain("</script><script>alert(1)</script>");
     expect(html).not.toContain("<img src=x");
+
+    const jsonLd = html.match(
+      /<script type="application\/ld\+json">(.*?)<\/script>/s
+    )?.[1];
+    expect(jsonLd).toBeDefined();
+    expect(JSON.parse(jsonLd!)).toMatchObject({
+      name: "Weather </script><script>alert(1)</script>",
+      description: "Forecasts <b>without markup</b>",
+    });
+  });
+
+  it("encodes client install values for their destination contexts", () => {
+    const cursorUrl = "https://api.example.test/mcp?x=🔥a";
+    const cursorHtml = generateLandingPage({
+      name: "install-test",
+      version: "1.0.0",
+      url: cursorUrl,
+    });
+
+    const cursorDeepLink = cursorHtml.match(
+      /href="(cursor:\/\/anysphere\.cursor-deeplink\/mcp\/install\?[^"]+)"/
+    )?.[1];
+    expect(cursorDeepLink).toBeDefined();
+    expect(cursorDeepLink).toContain("%2B");
+    expect(cursorDeepLink).toContain("%3D");
+
+    const cursorConfig = new URL(cursorDeepLink!).searchParams.get("config");
+    expect(cursorConfig).not.toBeNull();
+    expect(
+      JSON.parse(Buffer.from(cursorConfig!, "base64").toString("utf8"))
+    ).toEqual({ url: cursorUrl });
+
+    const shellUrl = "https://api.example.test/mcp?run=$(touch /tmp/pwned)'";
+    const shellHtml = generateLandingPage({
+      name: "install-test",
+      version: "1.0.0",
+      url: shellUrl,
+    });
+    expect(shellHtml).toContain(
+      "claude mcp add --transport http &quot;install-test&quot; &#39;https://api.example.test/mcp?run=$(touch /tmp/pwned)&#39;\\&#39;&#39;&#39;"
+    );
   });
 });
 
