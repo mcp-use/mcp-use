@@ -30,8 +30,15 @@ export class StdioConnectionManager extends ConnectionManager<StdioClientTranspo
    * the SDK's transport. Returns the live `StdioClientTransport` instance.
    */
   protected async establishConnection(): Promise<StdioClientTransport> {
-    // Instantiate and start the transport
-    this._transport = new StdioClientTransport(this.serverParams);
+    // Instantiate and start the transport.
+    // Default stderr to "pipe" so the forwarding block below can deliver the
+    // child's stderr to `errlog`; the SDK's own default ("inherit") makes
+    // `transport.stderr` null and would leave `errlog` without any input.
+    // An explicit stderr mode in serverParams still wins.
+    this._transport = new StdioClientTransport({
+      stderr: "pipe",
+      ...this.serverParams,
+    });
 
     // If stderr was piped, forward it to `errlog` for visibility
     if (
