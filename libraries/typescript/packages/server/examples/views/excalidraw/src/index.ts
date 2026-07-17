@@ -210,7 +210,7 @@ export const exportToExcalidraw = server.tool(
     inputSchema: z.object({
       json: z.string().describe("Serialized Excalidraw JSON"),
     }),
-    _meta: { ui: { visibility: ["app"] } },
+    visibility: "app",
   },
   async ({ json }) => {
     if (json.length > MAX_INPUT_BYTES) {
@@ -304,7 +304,7 @@ export const saveCheckpoint = server.tool(
       id: z.string(),
       data: z.string(),
     }),
-    _meta: { ui: { visibility: ["app"] } },
+    visibility: "app",
   },
   async ({ id, data }) => {
     if (data.length > MAX_INPUT_BYTES) {
@@ -343,7 +343,7 @@ export const readCheckpoint = server.tool(
     inputSchema: z.object({
       id: z.string(),
     }),
-    _meta: { ui: { visibility: ["app"] } },
+    visibility: "app",
   },
   async ({ id }) => {
     try {

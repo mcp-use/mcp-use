@@ -25,12 +25,6 @@ export interface ToolViewConfig {
   /** View directory / manifest name, e.g. `"product-search-result"`. */
   name: string;
   /**
-   * Declares who may call or see the tool. Emitted as `_meta.ui.visibility`
-   * on `tools/list`. Omitted = host default (callable by the model, visible
-   * to the app). The server always lists the tool; hosts filter by this hint.
-   */
-  visibility?: "model" | "app";
-  /**
    * Human-readable description of the view resource → the resource's
    * `description` on `resources/list` and `resources/read`.
    */
@@ -90,11 +84,21 @@ export interface ToolDefinition {
    *
    * Use vendor-namespaced keys for custom data. This definition metadata is
    * distinct from a tool callback result's `_meta`: it describes the tool,
-   * while result `_meta` belongs to one invocation. For view-bound tools,
-   * framework-owned MCP Apps keys are derived from {@link ToolDefinition.view};
-   * generated values take precedence over colliding entries here.
+   * while result `_meta` belongs to one invocation. For view-bound or
+   * visibility-restricted tools, framework-owned MCP Apps keys are derived
+   * from {@link ToolDefinition.view} and {@link ToolDefinition.visibility};
+   * those derived values take precedence over colliding entries here.
    */
   _meta?: MetaObject;
+  /**
+   * Declares who may call or see the tool. Emitted as `_meta.ui.visibility`
+   * on `tools/list`. Omitted = host default (callable by the model, visible
+   * to the app). The server always lists every registered tool — hosts
+   * filter by this declaration; the server never omits tools from
+   * `tools/list`. `"app"` marks app-private helper tools callable from
+   * views via `useCallTool` while the host hides them from the model.
+   */
+  visibility?: "model" | "app";
   /**
    * Bind this tool to a view for MCP Apps rendering. Requires
    * {@link ToolDefinition.outputSchema} — the view reads the result's

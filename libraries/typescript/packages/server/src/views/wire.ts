@@ -20,16 +20,17 @@ import {
  *
  * When `viewName` is set, emits `ui.resourceUri` plus the legacy flat
  * {@link UI_RESOURCE_URI_META_KEY} key. When `visibility` is set, emits
- * `ui.visibility: [visibility]`. Returns `undefined` only when no generated
- * view metadata or existing metadata is provided.
+ * `ui.visibility: [visibility]`. Either may be set independently — a
+ * view-less tool can still declare app-only visibility. Returns `undefined`
+ * only when no view, visibility, or existing metadata is provided.
  *
  * @param viewName - Bound view directory / manifest key, or `undefined` when
  * the tool has no view.
- * @param visibility - Optional model/app visibility narrowing from the tool's
- * view configuration.
+ * @param visibility - Optional model/app visibility narrowing from the tool
+ * definition's top-level `visibility` field.
  * @param existingMetadata - Optional author-supplied definition metadata. Other
  * keys pass through, while framework-owned resource URI and visibility keys
- * generated from `viewName` and `visibility` take precedence on collision.
+ * are derived exclusively from `viewName` and `visibility`.
  * @returns Wire metadata for the tool listing, or `undefined` when there is
  * nothing to emit.
  */
@@ -58,10 +59,18 @@ export function buildToolUiMeta(
     const resourceUri = viewResourceUri(viewName);
     ui["resourceUri"] = resourceUri;
     meta[UI_RESOURCE_URI_META_KEY] = resourceUri;
+  } else {
+    // These keys describe the top-level view contract. Do not advertise an
+    // author-supplied URI when the tool has no declared view.
+    delete ui["resourceUri"];
+    delete meta[UI_RESOURCE_URI_META_KEY];
   }
 
   if (visibility !== undefined) {
     ui["visibility"] = [visibility];
+  } else {
+    // Visibility is likewise derived exclusively from the top-level field.
+    delete ui["visibility"];
   }
 
   if (
