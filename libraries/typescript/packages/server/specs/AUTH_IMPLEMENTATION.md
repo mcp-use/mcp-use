@@ -142,7 +142,7 @@ succeeds when the token carries an RFC 8707 `resource` claim matching
 `expectedResource`, or when `authInfo.resource` is absent but audience
 validation was proven (an internal marker set by `createJwtVerifier`).
 Therefore every successful bearer-gate result has the typed mcp-use values
-before it reaches Hono, `mountMcp`, or the SDK callback. Custom providers use
+before it reaches fetch middleware, `createMcpMount`, or the SDK callback. Custom providers use
 this same wrapper; they cannot omit the public `mapAuthInfo` callback or rely
 on an optional `extra` value.
 
@@ -218,10 +218,10 @@ With `oauth`, `ctx.auth` is present and non-optional. OAuth callbacks are regist
 
 ## Keep SDK AuthInfo on the wire
 
-SDK `AuthInfo` remains the wire carrier. The provider wrapper produces the final `AuthInfo`, including typed mcp-use values under `extra`, before `requireBearerAuth` receives it. The gate returns that final value and `mountMcp` forwards it unchanged:
+SDK `AuthInfo` remains the wire carrier. The provider wrapper produces the final `AuthInfo`, including typed mcp-use values under `extra`, before `requireBearerAuth` receives it. The gate returns that final value and `createMcpMount` forwards it unchanged:
 
 ```ts
-handler.fetch(c.req.raw, {
+handler.fetch(request, {
   parsedBody,
   authInfo,
 });
@@ -321,66 +321,46 @@ Route and request ordering is exact:
 
 1. Register public OAuth discovery and protected-resource metadata routes with `oauthMetadataResponse`.
 2. Register the exact MCP endpoint bearer gate. Do not protect a broad prefix that unintentionally covers metadata routes or unrelated routes.
-3. The gate calls `requireBearerAuth(...)` and stores a successful `AuthInfo` in Hono variables.
-4. `mountMcp` reads the Hono variable and forwards it as `MountMcpOptions.authInfo` to `handler.fetch`.
+3. The gate calls `requireBearerAuth(...)` and stores a successful `AuthInfo` in the request bag.
+4. `createMcpMount` resolves the request's verified identity through `MountMcpOptions.authInfo` and forwards it to `handler.fetch`.
 5. The MCP route creates the SDK server factory for this request with the forwarded `authInfo`.
 6. Callback execution receives SDK `ctx.http.authInfo`; `toAuthenticatedRequestContext` (or `toRequestContext` when OAuth is not configured) projects it once to mcp-use callback context.
 
 ```ts
 const provider = config.oauth!;
-const providerOptions = getOAuthProviderOptions(provider);
-
-app.use("*", async (c, next) => {
-  const response = oauthMetadataResponse(c.req.raw, {
-    oauthMetadata: providerOptions.oauthMetadata,
-    resourceServerUrl: resource,
-    ...(providerOptions.scopesSupported !== undefined && {
-      scopesSupported: providerOptions.scopesSupported,
-    }),
-    ...(providerOptions.resourceName !== undefined && {
-      resourceName: providerOptions.resourceName,
-    }),
-    ...(providerOptions.serviceDocumentationUrl !== undefined && {
-      serviceDocumentationUrl: providerOptions.serviceDocumentationUrl,
-    }),
-  });
-
-  if (response !== undefined) return response;
-  await next();
-});
-
-const gate = requireBearerAuth({
-  verifier: wrapOAuthTokenVerifier(provider, resource),
-  resourceMetadataUrl: getOAuthProtectedResourceMetadataUrl(resource),
-  ...(providerOptions.requiredScopes !== undefined && {
-    requiredScopes: providerOptions.requiredScopes,
-  }),
-});
-
-app.use(basePath, async (c, next) => {
-  const result = await gate(c.req.raw);
-  if (result instanceof Response) return result;
-  c.set("authInfo", result);
-  await next();
-});
-
-mountMcp(app, createServerForRequest, {
+const { fetch: mcpFetch } = createMcpMount(createServerForRequest, {
   path: basePath,
-  authInfo: (c) => c.get("authInfo"),
+  authInfo: (request) => getRequestBag(request).authInfo,
 });
+
+const mcpRoute = composeFetch(
+  mcpFetch,
+  bearerAuth(provider, resource),
+  jsonBodyMiddleware(),
+);
+
+const fetch = composeFetch(
+  routeFetch([
+    {
+      match: (request) => matchesPath(request, basePath),
+      handler: mcpRoute,
+    },
+  ]),
+  oauthMetadata(provider, resource),
+);
 ```
 
-`mountMcp` adds this composition seam:
+`createMcpMount` exposes this composition seam:
 
 ```ts
-export interface MountMcpOptions<E extends Env = Env> {
+export interface MountMcpOptions {
   path?: string;
   handler?: CreateMcpHandlerOptions;
-  authInfo?: (context: Context<E>) => AuthInfo | undefined;
+  authInfo?: (request: Request) => AuthInfo | undefined;
 }
 ```
 
-It combines the resolved `authInfo` with `parsedBody` in the same `handler.fetch` options object. When `authInfo` is absent, `mountMcp` keeps its current unauthenticated behavior.
+It combines the resolved `authInfo` with `parsedBody` in the same `handler.fetch` options object. When `authInfo` is absent, `createMcpMount` keeps its current unauthenticated behavior.
 
 The SDK factory receives the same value before registrations run:
 
@@ -418,17 +398,17 @@ Beta.3 authorization-server helpers are out of scope for this phase. Do not reus
 
 For direct providers, `oauthMetadataResponse` serves path-aware protected-resource metadata at `/.well-known/oauth-protected-resource/<resource path>` and authorization-server metadata at `/.well-known/oauth-authorization-server`. It supports `GET`, `HEAD`, and `OPTIONS` with CORS, and falls through for unmatched paths.
 
-## Use Hono as the host adapter
+## Use fetch middleware as the host adapter
 
-No upstream `@modelcontextprotocol/hono` auth feature is required. Beta.3 deliberately places web-standard authorization helpers in server core so they work in Hono, Workers, Deno, Bun, and other `Request`/`Response` hosts.
+No framework-specific auth adapter is required. Beta.3 deliberately places web-standard authorization helpers in server core so they work in Workers, Deno, Bun, Node, and other `Request`/`Response` hosts.
 
-Hono handles body parsing, configured host validation, and origin validation. mcp-use exports thin ergonomic adapters from `mcp-use/oauth`:
+mcp-use's fetch middleware handles body parsing, configured host validation, and origin validation. The package exports thin ergonomic adapters from `mcp-use/oauth`:
 
-- `bearerAuth(provider, resource)` invokes `requireBearerAuth` and stores `authInfo` in Hono variables.
+- `bearerAuth(provider, resource)` invokes `requireBearerAuth` and stores `authInfo` in the request bag.
 - `oauthMetadata(provider, resource)` serves direct-provider `oauthMetadataResponse` and falls through on unrelated routes.
-- `MountMcpOptions.authInfo` forwards custom middleware results through `mountMcp`.
+- `MountMcpOptions.authInfo` forwards custom middleware results through `createMcpMount`.
 
-Those adapters are conveniences for normal and custom composition. An upstream Hono convenience wrapper is optional and not a blocker.
+Those adapters are conveniences for normal and custom composition. A framework-specific convenience wrapper is optional and not a blocker.
 
 ## Port provider adapters after the seam
 
@@ -459,7 +439,7 @@ Acceptance coverage must include:
 - An official client e2e direct flow: unauthenticated MCP request, `401` challenge, protected-resource metadata retrieval, external OAuth authorization and token acquisition, retry, then an authorized `tools/call`.
 - Missing and malformed token `401 invalid_token`; expired token `401 invalid_token`; endpoint scope failure `403 insufficient_scope`; expected `WWW-Authenticate` `resource_metadata`.
 - Exact-route protection: public discovery routes work without bearer auth, while only the configured MCP endpoint is gated.
-- A custom Hono composition that stores `authInfo` and forwards it through `mountMcp`.
+- A custom fetch composition that stores `authInfo` and forwards it through `createMcpMount`.
 - Canonical URL, `basePath`, MCP path, `MCP_URL`, path-aware metadata, and unsafe-derivation configuration tests.
 - URL validation tests for HTTPS, localhost exceptions, path matching, queries, fragments, and trailing slashes.
 - Context parity: `user`, `payload`, `accessToken`, `scopes`, and `permissions`, plus `clientId`, `expiresAt`, and `resource`.

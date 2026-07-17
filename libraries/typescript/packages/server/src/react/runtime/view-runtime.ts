@@ -10,6 +10,7 @@ import type {
 } from "@modelcontextprotocol/server";
 
 import type { DisplayMode } from "../types/host-types.js";
+import type { FileMetadata } from "../types/file-types.js";
 import { ToolError, type ToolContextError } from "../types/result-types.js";
 import { ModelContextStore } from "./model-context-store.js";
 import type { NormalizedViewConfig } from "./view-config.js";
@@ -77,6 +78,24 @@ export interface DisplaySnapshot {
    * only `"inline"`.
    */
   availableDisplayModes: readonly DisplayMode[];
+}
+
+/**
+ * ChatGPT file-extension channel snapshot.
+ *
+ * This channel deliberately represents only the optional file APIs used by
+ * `useFiles`; the runtime does not mirror other `window.openai` globals.
+ *
+ * @internal
+ */
+export interface FilesSnapshot {
+  /** Whether both upload and temporary-download-url helpers are available. */
+  isSupported: boolean;
+}
+
+interface ChatGptFilesApi {
+  uploadFile?: (file: File) => Promise<FileMetadata>;
+  getFileDownloadUrl?: (file: FileMetadata) => Promise<{ downloadUrl: string }>;
 }
 
 /**
@@ -186,6 +205,11 @@ export interface McpAppRuntime {
    */
   getDisplaySnapshot(): DisplaySnapshot;
 
+  /** Subscribe to ChatGPT file-extension availability changes. */
+  subscribeFiles(listener: Listener): () => void;
+  /** Current ChatGPT file-extension snapshot. */
+  getFilesSnapshot(): FilesSnapshot;
+
   /** Runtime-owned guest {@link App}, or `null` after disposal. */
   getApp(): App | null;
 
@@ -199,6 +223,10 @@ export interface McpAppRuntime {
   requestDisplayMode(params: RequestDisplayModeParams): Promise<void>;
   /** Notify the host of a size change. */
   sendSizeChanged(params: SizeChangedParams): Promise<void>;
+  /** Upload a file through ChatGPT's optional file extension. */
+  uploadFile(file: File): Promise<FileMetadata>;
+  /** Request a temporary download URL through ChatGPT's file extension. */
+  getFileDownloadUrl(file: FileMetadata): Promise<{ downloadUrl: string }>;
 
   /**
    * Register a view tool, performing the empty-handler → registry handoff on
@@ -227,6 +255,24 @@ const defaultHostSnapshot: HostSnapshot = {
   isConnected: false,
   connectionError: undefined,
 };
+
+const defaultFilesSnapshot: FilesSnapshot = {
+  isSupported: false,
+};
+
+function getChatGptFilesApi(): ChatGptFilesApi | undefined {
+  if (typeof window === "undefined") return undefined;
+  return (window as unknown as { openai?: ChatGptFilesApi }).openai;
+}
+
+function resolveFilesSnapshot(): FilesSnapshot {
+  const api = getChatGptFilesApi();
+  return {
+    isSupported:
+      typeof api?.uploadFile === "function" &&
+      typeof api.getFileDownloadUrl === "function",
+  };
+}
 
 function resolveDisplayMode(
   hostContext: McpUiHostContext | undefined
@@ -365,11 +411,13 @@ export function createMcpAppRuntime(
     displayMode: "inline",
     availableDisplayModes: ["inline"],
   };
+  let filesSnapshot: FilesSnapshot = resolveFilesSnapshot();
 
   const toolChannel = createChannelStore();
   const hostChannel = createChannelStore();
   const themeChannel = createChannelStore();
   const displayChannel = createChannelStore();
+  const filesChannel = createChannelStore();
 
   function patchTool(patch: Partial<ToolSnapshot>): void {
     if (!toolSnapshotChanged(toolSnapshot, patch)) {
@@ -603,6 +651,7 @@ export function createMcpAppRuntime(
     hostChannel.clear();
     themeChannel.clear();
     displayChannel.clear();
+    filesChannel.clear();
     toolSnapshot = { ...defaultToolSnapshot };
     hostSnapshot = { ...defaultHostSnapshot };
     themeSnapshot = "light";
@@ -610,6 +659,7 @@ export function createMcpAppRuntime(
       displayMode: "inline",
       availableDisplayModes: ["inline"],
     };
+    filesSnapshot = { ...defaultFilesSnapshot };
     if (activeRuntime === runtime) {
       activeRuntime = null;
     }
@@ -671,6 +721,44 @@ export function createMcpAppRuntime(
     await app.sendSizeChanged(params);
   }
 
+  async function uploadFile(file: File): Promise<FileMetadata> {
+    if (disposed) {
+      throw new Error("View runtime has been disposed");
+    }
+
+    const api = getChatGptFilesApi();
+    if (!filesSnapshot.isSupported || typeof api?.uploadFile !== "function") {
+      throw new Error(
+        "[useFiles] File upload is not supported in this host. " +
+          "Check `isSupported` before calling `upload`. " +
+          "File operations are only available in the ChatGPT Apps SDK environment."
+      );
+    }
+
+    return api.uploadFile(file);
+  }
+
+  async function getFileDownloadUrl(
+    file: FileMetadata
+  ): Promise<{ downloadUrl: string }> {
+    if (disposed) {
+      throw new Error("View runtime has been disposed");
+    }
+
+    const api = getChatGptFilesApi();
+    if (
+      !filesSnapshot.isSupported ||
+      typeof api?.getFileDownloadUrl !== "function"
+    ) {
+      throw new Error(
+        "[useFiles] File download is not supported in this host. " +
+          "Check `isSupported` before calling `getDownloadUrl`. " +
+          "File operations are only available in the ChatGPT Apps SDK environment."
+      );
+    }
+    return api.getFileDownloadUrl(file);
+  }
+
   const runtime: McpAppRuntime = {
     config,
     modelContextStore,
@@ -684,12 +772,16 @@ export function createMcpAppRuntime(
     getThemeSnapshot: () => themeSnapshot,
     subscribeDisplay: displayChannel.subscribe,
     getDisplaySnapshot: () => displaySnapshot,
+    subscribeFiles: filesChannel.subscribe,
+    getFilesSnapshot: () => filesSnapshot,
     getApp: () => (disposed ? null : app),
     callServerTool,
     sendMessage,
     openLink,
     requestDisplayMode,
     sendSizeChanged,
+    uploadFile,
+    getFileDownloadUrl,
     registerViewTool,
   };
 

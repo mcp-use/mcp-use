@@ -6,7 +6,7 @@
  */
 
 export { MCPServer } from "./server.js";
-export { createMcpMount, mountMcp } from "./mount-mcp.js";
+export { createMcpMount } from "./mount-mcp.js";
 export type { MountMcpOptions, McpMount } from "./mount-mcp.js";
 export {
   composeFetch,

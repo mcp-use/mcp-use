@@ -25,6 +25,7 @@ import type {
   ToolDefinition,
   ToolResult,
 } from "../src/index.js";
+import type { FileMetadata, UseFilesResult } from "../src/react/index.js";
 
 const outputSchema = z.object({ answer: z.number() });
 
@@ -87,6 +88,19 @@ describe("definition metadata types", () => {
       _meta: [],
     };
     expect([tool, resource, template]).toBeDefined();
+  });
+});
+
+describe("useFiles public types", () => {
+  it("exposes the narrow file upload and download contract", () => {
+    expectTypeOf<FileMetadata>().toEqualTypeOf<{ fileId: string }>();
+    expectTypeOf<UseFilesResult["upload"]>().toEqualTypeOf<
+      (file: File) => Promise<FileMetadata>
+    >();
+    expectTypeOf<UseFilesResult["getDownloadUrl"]>().toEqualTypeOf<
+      (file: FileMetadata) => Promise<{ downloadUrl: string }>
+    >();
+    expect(true).toBe(true);
   });
 });
 

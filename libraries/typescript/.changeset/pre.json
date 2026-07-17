@@ -11,6 +11,7 @@
   },
   "changesets": [
     "build-v2-external-view-assets",
+    "chatgpt-files-hook",
     "client-sdk-v2-migration",
     "dialect-json-schema-validator",
     "fix-beta-scaffold-templates",
