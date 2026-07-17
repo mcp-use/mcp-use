@@ -53,7 +53,7 @@ export interface ProxyRequestOptions {
   /** Aborts the upstream request when the downstream request is cancelled. */
   signal?: AbortSignal;
   /** Receives upstream progress notifications. */
-  onprogress?: (progress: ProxyProgress) => void | Promise<void>;
+  onprogress?: (progress: ProxyProgress) => void;
 }
 
 /** Structural connection contract accepted by the low-level proxy overload. */
@@ -353,20 +353,32 @@ function mountPlan(host: ProxyMountHost, plan: ProxyNamespacePlan): void {
     const callback = async (
       params: Record<string, unknown>,
       ctx: RequestContext
-    ) =>
-      plan.connection.callTool(upstreamName, params, {
-        signal: ctx.signal,
-        onprogress: (progress) => {
-          void ctx
-            .reportProgress(progress.progress, progress.total, progress.message)
-            .catch((error: unknown) => {
-              proxyDiagnostic(
-                `Failed to forward progress for proxied tool "${definition.name}"`,
-                error
-              );
+    ) => {
+      let progressForwarding = Promise.resolve();
+      try {
+        return await plan.connection.callTool(upstreamName, params, {
+          signal: ctx.signal,
+          onprogress: (progress) => {
+            progressForwarding = progressForwarding.then(async () => {
+              try {
+                await ctx.reportProgress(
+                  progress.progress,
+                  progress.total,
+                  progress.message
+                );
+              } catch (error) {
+                proxyDiagnostic(
+                  `Failed to forward progress for proxied tool "${definition.name}"`,
+                  error
+                );
+              }
             });
-        },
-      });
+          },
+        });
+      } finally {
+        await progressForwarding;
+      }
+    };
     host.registerTool(definition, callback as ToolCallback);
   }
 

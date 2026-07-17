@@ -401,12 +401,81 @@ describe("MCPServer.proxy", () => {
         },
       }
     );
-    await vi.waitFor(() =>
-      expect(diagnostics).toHaveBeenCalledWith(
-        expect.stringContaining(
-          'Failed to forward progress for proxied tool "progress_stream"'
-        )
+    expect(diagnostics).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Failed to forward progress for proxied tool "progress_stream"'
       )
     );
+  });
+
+  it("delivers progress in order before settling the proxied tool call", async () => {
+    let mountedTool:
+      | ((params: Record<string, unknown>, ctx: unknown) => Promise<unknown>)
+      | undefined;
+    const host: ProxyMountHost = {
+      isStarted: () => false,
+      hasTool: () => false,
+      hasResource: () => false,
+      hasPrompt: () => false,
+      registerTool: (_definition, callback) => {
+        mountedTool = callback as unknown as typeof mountedTool;
+      },
+      registerResource: () => {
+        throw new Error("unexpected resource registration");
+      },
+      registerPrompt: () => {
+        throw new Error("unexpected prompt registration");
+      },
+      trackOwner: () => {},
+    };
+    const connection: ProxyConnection = {
+      info: { server: { name: "ordered-progress" } },
+      supports: (capability) => capability === "tools",
+      async listTools() {
+        return [{ name: "stream" }];
+      },
+      async callTool(_name, _args, options) {
+        options?.onprogress?.({ progress: 1 });
+        options?.onprogress?.({ progress: 2 });
+        return { content: [] };
+      },
+      async readResource() {
+        return { contents: [] };
+      },
+      async listPrompts() {
+        return { prompts: [] };
+      },
+      async getPrompt() {
+        return { messages: [] };
+      },
+    };
+
+    await mountProxyConnection(host, connection);
+    expect(mountedTool).toBeDefined();
+
+    let releaseFirstProgress: (() => void) | undefined;
+    const firstProgressBlocked = new Promise<void>((resolve) => {
+      releaseFirstProgress = resolve;
+    });
+    const forwarded: number[] = [];
+    let settled = false;
+    const call = mountedTool!(
+      {},
+      {
+        signal: new AbortController().signal,
+        reportProgress: async (progress: number) => {
+          forwarded.push(progress);
+          if (progress === 1) await firstProgressBlocked;
+        },
+      }
+    ).then(() => {
+      settled = true;
+    });
+
+    await vi.waitFor(() => expect(forwarded).toEqual([1]));
+    expect(settled).toBe(false);
+    releaseFirstProgress?.();
+    await call;
+    expect(forwarded).toEqual([1, 2]);
   });
 });

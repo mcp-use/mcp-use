@@ -494,9 +494,7 @@ export class MCPServer<TUser = never> {
   async proxy(
     input: Record<string, ProxyServerConfig> | ProxyConnection
   ): Promise<void> {
-    if (this.#closed) {
-      throw new Error("Cannot call proxy() after the server has closed.");
-    }
+    this.#assertOpen("proxy()");
     const operation = (async (): Promise<void> => {
       const { isProxyConnection, mountProxyConnection, mountProxyServers } =
         await import("./proxy.js");
@@ -537,6 +535,7 @@ export class MCPServer<TUser = never> {
    * ```
    */
   getHandler(options: { bus?: ServerEventBus } = {}): FrameworkHandler {
+    this.#assertOpen("getHandler()");
     const { fetch } = this.#ensureMounted("handler", undefined, options.bus);
     return toFrameworkHandler(fetch);
   }
@@ -687,6 +686,7 @@ export class MCPServer<TUser = never> {
    * already mounted the app without Host validation.
    */
   async listen(port = 3000): Promise<{ port: number; url: string }> {
+    this.#assertOpen("listen()");
     this.#assertListenOAuthConfiguration();
     const { createServer } = await import("node:http");
     const { toNodeHandler } = await import("./node-bridge.js");
@@ -792,6 +792,14 @@ export class MCPServer<TUser = never> {
     if (errors.length > 0) {
       throw new AggregateError(errors, "Failed to close MCP server cleanly");
     }
+  }
+
+  #assertOpen(operation?: string): void {
+    if (!this.#closed) return;
+    if (operation !== undefined) {
+      throw new Error(`Cannot call ${operation} after the server has closed.`);
+    }
+    throw new Error("Cannot use the server after it has closed.");
   }
 
   #basePath(): string {
@@ -936,6 +944,7 @@ export class MCPServer<TUser = never> {
     fetch: FetchHandler;
     handler: McpHttpHandler;
   } {
+    this.#assertOpen();
     if (this.#fetchHandler === undefined || this.#handler === undefined) {
       const { hosts, origins } = this.#validationPolicy(mode);
       const basePath = this.#basePath();
