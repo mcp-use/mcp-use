@@ -29,7 +29,10 @@ import {
   routeFetch,
   type FetchHandler,
 } from "./fetch-app.js";
-import { createInspectorHandler } from "./inspector-shell.js";
+import {
+  createInspectorHandler,
+  matchesInspectorShellPath,
+} from "./inspector-shell.js";
 import { requestLogger } from "./logging.js";
 import { createMcpMount } from "./mount-mcp.js";
 import { registerOpenAPITools } from "./openapi/index.js";
@@ -812,10 +815,7 @@ export class MCPServer<TUser = never> {
               return false;
             }
             const pathname = new URL(request.url).pathname;
-            return (
-              pathname === `${basePath}/inspector` ||
-              pathname === `${basePath}/inspector/`
-            );
+            return matchesInspectorShellPath(pathname, basePath);
           },
           handler: inspectorHandler,
         });

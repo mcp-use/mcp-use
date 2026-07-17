@@ -439,28 +439,6 @@ export function Layout({ children }: LayoutProps) {
     itemName?: string,
     serverId?: string
   ) => {
-    // #region agent log
-    fetch("http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Debug-Session-Id": "831b88",
-      },
-      body: JSON.stringify({
-        sessionId: "831b88",
-        location: "Layout.tsx:handleCommandPaletteNavigate",
-        message: "layout navigate entry",
-        data: {
-          tab,
-          itemName: itemName ?? null,
-          serverId: serverId ?? null,
-          hasServerId: !!serverId,
-        },
-        timestamp: Date.now(),
-        hypothesisId: "H1",
-      }),
-    }).catch(() => {});
-    // #endregion
     console.warn("[Layout] handleCommandPaletteNavigate called:", {
       tab,
       itemName,
@@ -487,31 +465,6 @@ export function Layout({ children }: LayoutProps) {
         tab,
         itemName,
       });
-      // #region agent log
-      fetch(
-        "http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Session-Id": "831b88",
-          },
-          body: JSON.stringify({
-            sessionId: "831b88",
-            location: "Layout.tsx:navigateToItem-call",
-            message: "calling navigateToItem",
-            data: {
-              serverId,
-              tab,
-              itemName: itemName ?? null,
-              serverState: server?.state ?? null,
-            },
-            timestamp: Date.now(),
-            hypothesisId: "H1",
-          }),
-        }
-      ).catch(() => {});
-      // #endregion
       // Use the context's navigateToItem to set all state atomically
       navigateToItem(serverId, tab, itemName);
       // Navigate using query params

@@ -1,6 +1,5 @@
 "use client";
 
-import { MeshGradient } from "@paper-design/shaders-react";
 import {
   useEffect,
   useRef,
@@ -10,10 +9,11 @@ import {
   type TransitionEvent,
 } from "react";
 import { cn } from "@/client/lib/utils";
+import { MeshGradientCanvas } from "@/client/components/ui/MeshGradientCanvas";
 
 const MESH_COLORS = ["#e0eaff", "#f9ffbd", "#dedede", "#ffffff"] as const;
 /** Share of tab height used for the bottom mesh glow. */
-const BOTTOM_MESH_RATIO = 0.5;
+const BOTTOM_MESH_RATIO = 0.54;
 
 export type ShaderPhase = "visible" | "fading" | "hidden";
 
@@ -21,6 +21,8 @@ interface MeshTabBackgroundProps extends HTMLAttributes<HTMLDivElement> {
   children: ReactNode;
   shaderPhase?: ShaderPhase;
   onShaderFadeComplete?: () => void;
+  /** Pause shader motion (e.g. while a modal is open over the chat tab). */
+  meshAnimationPaused?: boolean;
 }
 
 export function MeshTabBackground({
@@ -28,33 +30,15 @@ export function MeshTabBackground({
   children,
   shaderPhase = "hidden",
   onShaderFadeComplete,
+  meshAnimationPaused = false,
   ...props
 }: MeshTabBackgroundProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ width: 800, height: 400 });
   const [shaderReady, setShaderReady] = useState(false);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => setShaderReady(true));
     return () => window.cancelAnimationFrame(frame);
-  }, []);
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-
-    const ro = new ResizeObserver(([entry]) => {
-      if (!entry) return;
-      const { width, height } = entry.contentRect;
-      if (width > 0 && height > 0) {
-        setSize({
-          width: Math.ceil(width),
-          height: Math.ceil(height * BOTTOM_MESH_RATIO),
-        });
-      }
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
   }, []);
 
   useEffect(() => {
@@ -98,22 +82,21 @@ export function MeshTabBackground({
           <div
             className={cn(
               "absolute inset-0",
-              shaderReady ? "opacity-70 dark:opacity-40" : "opacity-0"
+              shaderReady ? "opacity-75 dark:opacity-45" : "opacity-0"
             )}
           >
-            <MeshGradient
-              width={size.width}
-              height={size.height}
+            <MeshGradientCanvas
+              className="absolute inset-0 h-full w-full"
               colors={[...MESH_COLORS]}
               distortion={0.8}
               swirl={0.1}
               grainMixer={0}
               grainOverlay={0.3}
-              speed={1}
+              speed={meshAnimationPaused ? 0 : 1}
             />
           </div>
-          {/* Fade mesh into the tab background above */}
-          <div className="absolute inset-0 bg-gradient-to-t from-white/0 via-white/70 to-white dark:from-black/0 dark:via-black/70 dark:to-black" />
+          {/* Fade mesh into the tab background */}
+          <div className="absolute inset-0 bg-gradient-to-t from-white/0 from-[12%] via-white/60 via-[38%] to-white dark:from-black/0 dark:from-[12%] dark:via-black/60 dark:via-[38%] dark:to-black" />
         </div>
       )}
       <div className="relative z-10 flex min-h-0 flex-1 flex-col">

@@ -33,7 +33,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { copyToClipboard } from "@/client/utils/browser";
 import { getServerDisplayName } from "@/client/utils/servers";
 import { downloadJSON } from "../utils/jsonUtils";
-import { shouldShowFreeTierUpgrade } from "./chat/freeTier";
+import { isCloudFetchFailure } from "./chat/managedChatNotice";
 import { formatManagedModelName } from "./chat/providerMeta";
 import type { useManagedCloudModel } from "./chat/useManagedCloudModel";
 import { useHostedSession } from "../hooks/useHostedSession";
@@ -53,6 +53,7 @@ import { useChatMessagesClientSide } from "./chat/useChatMessagesClientSide";
 import { useConfig } from "./chat/useConfig";
 import { useHostedChatMode } from "./chat/useHostedChatMode";
 import { McpReconnectBanner } from "./chat/McpReconnectBanner";
+import { ChatManagedNotice } from "./chat/ChatManagedNotice";
 import { ChatRawView, type ChatView } from "./chat/ChatTraceView";
 import { useLocalSystemPrompt } from "./chat/system-prompt/useLocalSystemPrompt";
 import { resolveSystemPrompt } from "./chat/system-prompt/local-storage";
@@ -124,13 +125,6 @@ export interface ChatTabProps {
   /** Extra headers to send with every streaming request. */
   extraHeaders?: Record<string, string>;
   /**
-   * True when the hosted inspector's managed key isn't usable because the
-   * selected server is on localhost (the managed backend can't reach it).
-   * Surfaces an explanatory notice on the configure-key empty state so the
-   * BYOK fallback is explained rather than silent. Default: false.
-   */
-  managedKeyUnavailable?: boolean;
-  /**
    * Custom body builder for the streaming request.
    * Use to send only `{ messages }` to a server-managed backend.
    */
@@ -192,7 +186,6 @@ export function ChatTab({
   credentials,
   extraHeaders,
   body,
-  managedKeyUnavailable = false,
   chatStorageProvider,
   enableChatHistory,
   activeChatId: controlledActiveChatId,
@@ -458,19 +451,32 @@ export function ChatTab({
     onHistoryRefetch: bumpHistoryRefetch,
   });
 
-  const rateLimitInfo =
-    effectiveClientSide && isManaged
-      ? (clientSideChat.rateLimitInfo ?? null)
-      : effectiveClientSide
-        ? null
-        : (serverSideChat.rateLimitInfo ?? null);
+  const managedChatNotice =
+    clientSideChat.managedChatNotice ??
+    serverSideChat.managedChatNotice ??
+    null;
 
-  const clearRateLimitInfo =
-    effectiveClientSide && isManaged
-      ? clientSideChat.clearRateLimitInfo
-      : effectiveClientSide
-        ? undefined
-        : serverSideChat.clearRateLimitInfo;
+  const clearManagedChatNotice = useCallback(() => {
+    clientSideChat.clearManagedChatNotice();
+    serverSideChat.clearManagedChatNotice();
+  }, [
+    clientSideChat.clearManagedChatNotice,
+    serverSideChat.clearManagedChatNotice,
+  ]);
+
+  const showManagedChatNotice = useCallback(
+    (notice: NonNullable<typeof managedChatNotice>) => {
+      clientSideChat.showManagedChatNotice(notice);
+      serverSideChat.showManagedChatNotice(notice);
+    },
+    [clientSideChat.showManagedChatNotice, serverSideChat.showManagedChatNotice]
+  );
+
+  const handleSaveLLMConfig = useCallback(() => {
+    if (!saveLLMConfig()) return;
+    setForceClientSide(true);
+    clearManagedChatNotice();
+  }, [saveLLMConfig, setForceClientSide, clearManagedChatNotice]);
 
   const mcpServerAuthRequired = effectiveClientSide
     ? null
@@ -505,12 +511,9 @@ export function ChatTab({
     />
   ) : null;
 
-  // Called when user clicks "Use your own API key" in the rate-limit modal.
-  const handleUseApiKey = useCallback(() => {
-    clearRateLimitInfo?.();
-    setForceClientSide(true);
+  const handleConfigureFromNotice = useCallback(() => {
     setConfigDialogOpen(true);
-  }, [clearRateLimitInfo, setConfigDialogOpen]);
+  }, [setConfigDialogOpen]);
 
   const {
     user: hostedUser,
@@ -519,12 +522,16 @@ export function ChatTab({
   } = useHostedSession(enableFreeTierUpgrade ? chatApiUrl : undefined);
   const handleOpenLogin = useCallback(() => {
     setConfigDialogOpen(false);
-    void authorize().catch((error) =>
+    void authorize().catch((error) => {
+      if (chatApiUrl && isCloudFetchFailure(error)) {
+        showManagedChatNotice({ kind: "cloud_unavailable" });
+        return;
+      }
       toast.error(
         error instanceof Error ? error.message : "Authorization failed"
-      )
-    );
-  }, [authorize, setConfigDialogOpen]);
+      );
+    });
+  }, [authorize, chatApiUrl, setConfigDialogOpen, showManagedChatNotice]);
 
   // Whether the visitor is signed in to Manufact (hosted free-tier only). Used
   // to suppress the "Sign in to increase your limits" prompt once authenticated
@@ -532,16 +539,15 @@ export function ChatTab({
   const isHostedAuthenticated = hostedUser != null;
 
   useEffect(() => {
-    if (isHostedAuthenticated) clearRateLimitInfo?.();
-  }, [clearRateLimitInfo, isHostedAuthenticated]);
+    if (isHostedAuthenticated && managedChatNotice?.kind === "login_required") {
+      clearManagedChatNotice();
+    }
+  }, [clearManagedChatNotice, isHostedAuthenticated, managedChatNotice?.kind]);
 
-  const freeTierInfo = shouldShowFreeTierUpgrade({
-    isManaged,
-    enableFreeTierUpgrade,
-    isAuthenticated: isHostedAuthenticated,
-  })
-    ? { onLoginClick: handleOpenLogin }
-    : undefined;
+  const freeTierInfo =
+    enableFreeTierUpgrade && !isHostedAuthenticated
+      ? { onLoginClick: handleOpenLogin }
+      : undefined;
 
   // Host embed (e.g. cloud dashboard) passes `managedLlmConfig` + `hideModelBadge`
   // because it renders its own model row (`ServerChatHeader`). Suppress inspector
@@ -554,7 +560,7 @@ export function ChatTab({
   const hideInputModelBadge = suppressInspectorModelChrome;
 
   const managedCloudInfo =
-    isManaged && isHostedAuthenticated && managedCloudModel
+    enableFreeTierUpgrade && isHostedAuthenticated && managedCloudModel
       ? {
           models: managedCloudModel.models,
           selectedModelId: managedCloudModel.selectedModelId,
@@ -572,10 +578,11 @@ export function ChatTab({
         )
       : undefined;
 
-  const handleUseManagedCloud = useCallback(() => {
+  const handleSaveManagedCloud = useCallback(() => {
     setForceClientSide(false);
+    clearManagedChatNotice();
     setConfigDialogOpen(false);
-  }, [setConfigDialogOpen, setForceClientSide]);
+  }, [clearManagedChatNotice, setConfigDialogOpen, setForceClientSide]);
 
   const {
     filteredPrompts,
@@ -1029,6 +1036,7 @@ export function ChatTab({
       <MeshTabBackground
         className="h-full w-full"
         shaderPhase={shaderPhase}
+        meshAnimationPaused={configDialogOpen}
         onShaderFadeComplete={() => setShaderPhase("hidden")}
       >
         {content}
@@ -1376,22 +1384,22 @@ export function ChatTab({
     [postBridgeEvent, sendMessage, llmConfig, isConnected]
   );
 
-  const loginRequiredNode =
-    rateLimitInfo && chatApiUrl ? (
-      <div className="absolute inset-x-4 top-4 z-20 mx-auto flex max-w-xl items-center justify-between gap-4 rounded-xl border bg-background/95 p-4 shadow-lg backdrop-blur">
-        <p className="text-sm text-muted-foreground">
-          Sign in through Manufact Cloud to continue with managed chat.
-        </p>
-        <div className="flex shrink-0 gap-2">
-          <Button variant="outline" size="sm" onClick={handleUseApiKey}>
-            Use API key
-          </Button>
-          <Button size="sm" disabled={authorizing} onClick={handleOpenLogin}>
-            {authorizing ? "Authorizing…" : "Sign in"}
-          </Button>
-        </div>
-      </div>
-    ) : null;
+  const managedChatNoticeNode = managedChatNotice ? (
+    <ChatManagedNotice
+      notice={managedChatNotice}
+      onConfigureApiKey={handleConfigureFromNotice}
+      onSignIn={
+        managedChatNotice.kind === "login_required"
+          ? chatApiUrl
+            ? handleOpenLogin
+            : () => {
+                window.location.href = managedChatNotice.loginUrl;
+              }
+          : undefined
+      }
+      authorizing={authorizing}
+    />
+  ) : null;
 
   // Show landing form when there are no messages and LLM is configured
   if (llmConfig && messages.length === 0) {
@@ -1409,24 +1417,27 @@ export function ChatTab({
             onModelChange={setTempModel}
             onApiKeyChange={setTempApiKey}
             onBaseUrlChange={setTempBaseUrl}
-            onSave={saveLLMConfig}
+            onSave={handleSaveLLMConfig}
             onClear={handleClearConfig}
-            showClearButton={!isManaged}
+            showClearButton={Boolean(localLlmConfig)}
             buttonLabel="Change API Key"
+            hostedInspector={enableFreeTierUpgrade}
             freeTierInfo={freeTierInfo}
             managedCloudInfo={managedCloudInfo}
-            onUseManagedCloud={
-              !isManaged && managedCloudModel
-                ? handleUseManagedCloud
-                : undefined
+            useManagedCloud={isManaged}
+            onSaveManagedCloud={
+              managedCloudInfo ? handleSaveManagedCloud : undefined
             }
           />
         </div>
 
         <ChatLandingForm
           serverDisplayName={getServerDisplayName(connection)}
+          composerNotice={managedChatNoticeNode}
           inputValue={inputValue}
-          isConnected={isConnected && !rateLimitInfo && !mcpServerAuthRequired}
+          isConnected={
+            isConnected && !managedChatNotice && !mcpServerAuthRequired
+          }
           isLoading={isLoading}
           textareaRef={textareaRef}
           llmConfig={llmConfig}
@@ -1465,7 +1476,6 @@ export function ChatTab({
           systemPromptProvider={effectiveSystemPromptProvider}
         />
         {reconnectBannerNode}
-        {loginRequiredNode}
       </div>
     );
   }
@@ -1488,13 +1498,16 @@ export function ChatTab({
         onModelChange={setTempModel}
         onApiKeyChange={setTempApiKey}
         onBaseUrlChange={setTempBaseUrl}
-        onSaveConfig={saveLLMConfig}
+        onSaveConfig={handleSaveLLMConfig}
         onClearConfig={handleClearConfig}
+        showClearButton={Boolean(localLlmConfig)}
         hideConfigButton={suppressInspectorModelChrome}
+        hostedInspector={enableFreeTierUpgrade}
         freeTierInfo={freeTierInfo}
         managedCloudInfo={managedCloudInfo}
-        onUseManagedCloud={
-          !isManaged && managedCloudModel ? handleUseManagedCloud : undefined
+        useManagedCloud={isManaged}
+        onSaveManagedCloud={
+          managedCloudInfo ? handleSaveManagedCloud : undefined
         }
         onCopyChat={handleCopyChat}
         onExportChat={handleExportChat}
@@ -1524,7 +1537,6 @@ export function ChatTab({
           {!llmConfig ? (
             <ConfigureEmptyState
               onConfigureClick={() => setConfigDialogOpen(true)}
-              managedKeyUnavailable={managedKeyUnavailable}
             />
           ) : activeView === "conv" ? (
             <MessageList
@@ -1551,17 +1563,13 @@ export function ChatTab({
         )}
       </div>
 
-      {loginRequiredNode}
-
-      {reconnectBannerNode}
-
-      {/* Input Area */}
       {llmConfig && (
         <div className="relative shrink-0">
+          {managedChatNoticeNode}
           <ChatInputArea
             inputValue={inputValue}
             isConnected={
-              isConnected && !rateLimitInfo && !mcpServerAuthRequired
+              isConnected && !managedChatNotice && !mcpServerAuthRequired
             }
             isLoading={isLoading}
             textareaRef={textareaRef}
@@ -1602,6 +1610,8 @@ export function ChatTab({
           />
         </div>
       )}
+
+      {reconnectBannerNode}
     </div>
   );
 }

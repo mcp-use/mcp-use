@@ -108,7 +108,7 @@ export function LayoutHeader({
       row === "desktop" ? tunnelPopover.isLgUp : !tunnelPopover.isLgUp;
 
     return (
-      <>
+      <div className="flex items-center gap-1 min-w-0">
         <ServerUrlChip
           url={serverUrl}
           className={chipClassName}
@@ -132,7 +132,7 @@ export function LayoutHeader({
             onStart={tunnel.handleStartTunnel}
           />
         )}
-      </>
+      </div>
     );
   };
 

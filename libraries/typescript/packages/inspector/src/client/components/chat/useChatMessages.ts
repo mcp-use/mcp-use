@@ -21,6 +21,11 @@ import {
   type InspectorTraceEvent,
   type InspectorTraceEventInput,
 } from "./trace";
+import {
+  isCloudFetchFailure,
+  managedNoticeFromHttpResponse,
+  type ManagedChatNotice,
+} from "./managedChatNotice";
 
 interface WidgetModelContext {
   content?: Array<{ type: string; text: string }>;
@@ -83,9 +88,8 @@ export function useChatMessages({
   const [isLoading, setIsLoading] = useState(false);
   const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
   const [traceState, setTraceState] = useState(EMPTY_TRACE_STATE);
-  const [rateLimitInfo, setRateLimitInfo] = useState<{
-    loginUrl: string;
-  } | null>(null);
+  const [managedChatNotice, setManagedChatNotice] =
+    useState<ManagedChatNotice | null>(null);
   const [mcpServerAuthRequired, setMcpServerAuthRequired] = useState<{
     mcpServerUrl: string;
     message?: string;
@@ -268,19 +272,18 @@ export function useChatMessages({
         });
 
         if (!response.ok) {
-          if (response.status === 429) {
-            const errBody = await response.json().catch(() => null);
-            if (errBody?.loginRequired && errBody?.loginUrl) {
-              setRateLimitInfo({ loginUrl: errBody.loginUrl as string });
-            }
-            // Remove the empty assistant message added optimistically
-            setMessages((prev) =>
-              prev.filter((m) => m.id !== `assistant-${Date.now()}`)
+          const errBody = await response.json().catch(() => null);
+          if (chatApiUrl) {
+            const notice = managedNoticeFromHttpResponse(
+              response.status,
+              errBody
             );
-            return;
+            if (notice) {
+              setManagedChatNotice(notice);
+              return;
+            }
           }
           if (response.status === 401) {
-            const errBody = await response.json().catch(() => null);
             if (errBody?.error === "mcp_auth_required") {
               setMcpServerAuthRequired({
                 mcpServerUrl:
@@ -658,6 +661,11 @@ export function useChatMessages({
           return;
         }
 
+        if (chatApiUrl && isCloudFetchFailure(error)) {
+          setManagedChatNotice({ kind: "cloud_unavailable" });
+          return;
+        }
+
         // Extract detailed error message with HTTP status
         let errorDetail = "Unknown error occurred";
         if (error instanceof Error) {
@@ -708,14 +716,19 @@ export function useChatMessages({
 
   const clearMessages = useCallback(() => {
     setMessages([]);
-    setRateLimitInfo(null);
+    setManagedChatNotice(null);
     setMcpServerAuthRequired(null);
     setTraceState(EMPTY_TRACE_STATE);
   }, []);
 
-  const clearRateLimitInfo = useCallback(() => {
-    setRateLimitInfo(null);
+  const clearManagedChatNotice = useCallback(() => {
+    setManagedChatNotice(null);
   }, []);
+
+  const showManagedChatNotice = useCallback((notice: ManagedChatNotice) => {
+    setManagedChatNotice(notice);
+  }, []);
+
   const clearTrace = useCallback(() => setTraceState(EMPTY_TRACE_STATE), []);
 
   const clearMcpServerAuthRequired = useCallback(() => {
@@ -764,11 +777,12 @@ export function useChatMessages({
     messages,
     isLoading,
     attachments,
-    rateLimitInfo,
+    managedChatNotice,
     mcpServerAuthRequired,
     sendMessage,
     clearMessages,
-    clearRateLimitInfo,
+    clearManagedChatNotice,
+    showManagedChatNotice,
     clearMcpServerAuthRequired,
     setMessages,
     stop,

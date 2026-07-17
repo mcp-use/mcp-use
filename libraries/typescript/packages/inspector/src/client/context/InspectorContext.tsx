@@ -242,34 +242,6 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
 
   const navigateToItem = useCallback(
     (serverId: string, tab: TabType, itemIdentifier?: string) => {
-      // #region agent log
-      fetch(
-        "http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Session-Id": "831b88",
-          },
-          body: JSON.stringify({
-            sessionId: "831b88",
-            location: "InspectorContext.tsx:navigateToItem",
-            message: "context navigateToItem",
-            data: {
-              serverId,
-              tab,
-              itemIdentifier: itemIdentifier ?? null,
-              selectedToolName:
-                tab === "tools" ? (itemIdentifier ?? null) : null,
-              selectedResourceUri:
-                tab === "resources" ? (itemIdentifier ?? null) : null,
-            },
-            timestamp: Date.now(),
-            hypothesisId: "H5",
-          }),
-        }
-      ).catch(() => {});
-      // #endregion
       console.warn("[InspectorContext] navigateToItem called:", {
         serverId,
         tab,

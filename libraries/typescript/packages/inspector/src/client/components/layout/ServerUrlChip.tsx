@@ -53,7 +53,7 @@ function UrlCopyButton({
       }}
       aria-label={copied ? "URL copied" : "Copy URL"}
       className={cn(
-        "shrink-0 p-0.5 rounded-sm text-muted-foreground hover:text-foreground transition-opacity opacity-0 group-hover:opacity-100",
+        "shrink-0 cursor-pointer p-0.5 rounded-sm text-muted-foreground hover:text-foreground transition-opacity opacity-0 group-hover:opacity-100",
         className
       )}
     >

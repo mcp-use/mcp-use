@@ -134,7 +134,7 @@ export function ServerDropdown({
                     className="!size-5 shrink-0"
                   />
                 )}
-                <span className="truncate text-sm leading-none [text-box:trim-both_cap_alphabetic]">
+                <span className="truncate text-sm">
                   {selectedServer
                     ? getServerDisplayName(selectedServer)
                     : "Select server"}

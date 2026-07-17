@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef, type ReactNode } from "react";
-import { motion, type HTMLMotionProps } from "framer-motion";
+import { motion, type HTMLMotionProps } from "motion/react";
 import { cn } from "@/client/lib/utils";
 import { spring } from "@/client/lib/springs";
 import { useShape } from "@/client/lib/shape-context";

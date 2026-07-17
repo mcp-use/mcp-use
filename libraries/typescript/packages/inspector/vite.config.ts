@@ -86,11 +86,20 @@ export default defineConfig({
       name: "oauth-callback-redirect",
       configureServer(server) {
         server.middlewares.use((req, res, next) => {
-          if (req.url?.startsWith("/oauth/callback")) {
-            const url = new URL(req.url, "http://localhost");
-            const queryString = url.search;
+          const url = req.url ?? "";
+          const queryIndex = url.indexOf("?");
+          const path = queryIndex === -1 ? url : url.slice(0, queryIndex);
+          const queryString = queryIndex === -1 ? "" : url.slice(queryIndex);
+          if (path === "/oauth/callback" || path.endsWith("/oauth/callback")) {
             res.writeHead(302, {
               Location: `/inspector/oauth/callback${queryString}`,
+            });
+            res.end();
+            return;
+          }
+          if (path === "/auth/callback" || path.endsWith("/auth/callback")) {
+            res.writeHead(302, {
+              Location: `/inspector/auth/callback${queryString}`,
             });
             res.end();
             return;

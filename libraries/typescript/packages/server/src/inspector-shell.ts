@@ -40,6 +40,19 @@ export function inspectorStylesUrl(assetsUrl: string): string {
   return assetsUrl.replace(/\.js(?=$|[?#])/, ".css");
 }
 
+/** True for inspector UI shell routes (SPA), excluding `/inspector/api/*`. */
+export function matchesInspectorShellPath(
+  pathname: string,
+  basePath: string
+): boolean {
+  const prefix = `${basePath}/inspector`;
+  if (pathname !== prefix && !pathname.startsWith(`${prefix}/`)) {
+    return false;
+  }
+  const suffix = pathname.slice(prefix.length);
+  return suffix !== "/api" && !suffix.startsWith("/api/");
+}
+
 /** Inputs for {@link renderInspectorShell}. */
 export interface InspectorShellOptions {
   /** Server display name, used in the page title. */
@@ -180,15 +193,13 @@ export function createInspectorHandler(
     assetsUrl,
     manufactChatUrl,
   });
-  const path = `${options.basePath}/inspector`;
-  const slashPath = `${path}/`;
 
   return async (request) => {
     if (request.method !== "GET" && request.method !== "HEAD") {
       return new Response("Method Not Allowed", { status: 405 });
     }
     const pathname = new URL(request.url).pathname;
-    if (pathname !== path && pathname !== slashPath) {
+    if (!matchesInspectorShellPath(pathname, options.basePath)) {
       return new Response("Not Found", { status: 404 });
     }
     return new Response(request.method === "HEAD" ? null : html, {

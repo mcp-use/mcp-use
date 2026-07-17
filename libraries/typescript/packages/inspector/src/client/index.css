@@ -1,14 +1,12 @@
-@import url("https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700&family=Ubuntu:wght@400;500;700&display=swap");
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "streamdown/styles.css";
-
-@source "../../node_modules/streamdown/dist/*.js";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme {
   --font-family-ubuntu: Ubuntu, sans-serif;
+  --font-family-outfit: Outfit, sans-serif;
 
   --animate-pulse: pulse var(--duration) ease-out infinite;
 

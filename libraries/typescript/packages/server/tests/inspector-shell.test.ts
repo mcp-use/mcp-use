@@ -201,6 +201,24 @@ describe("inspector shell route", () => {
     await server.close();
   });
 
+  it("serves the SPA shell for client-side routes like Manufact auth callback", async () => {
+    const server = makeServer();
+    const response = await get(
+      server,
+      "/mcp/inspector/auth/callback?code=test&state=abc"
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toMatch(/text\/html/i);
+    expect(await response.text()).toContain("window.__MCP_USE_INSPECTOR__");
+    await server.close();
+  });
+
+  it("does not capture inspector API paths", async () => {
+    const server = makeServer();
+    expect((await get(server, "/mcp/inspector/api/dev/info")).status).toBe(404);
+    await server.close();
+  });
+
   it("keeps the MCP endpoint working with the shell enabled", async () => {
     const server = makeServer();
     const handler = server.getHandler();
