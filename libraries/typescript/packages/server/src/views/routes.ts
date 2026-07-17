@@ -24,7 +24,7 @@ const VIEW_ASSETS_BUILD_ROOT = ".mcp-use/build/views";
 export function createViewAssetsHandler(
   basePath: string,
   views: ReadonlyMap<string, ViewManifestEntry>,
-  options?: { projectRoot?: string }
+  options?: { projectRoot?: string; deferCors?: boolean }
 ): FetchHandler | undefined {
   if (views.size === 0) {
     return undefined;
@@ -62,7 +62,10 @@ export function createViewAssetsHandler(
     if (diskPath === null) {
       return new Response("Not Found", { status: 404 });
     }
-    return await servePublicFile(diskPath);
+    return await servePublicFile(
+      diskPath,
+      options?.deferCors === true ? { deferCors: true } : {}
+    );
   };
 }
 
@@ -86,7 +89,7 @@ export function createViewAssetsHandler(
 export function createViewPublicHandler(
   basePath: string,
   views: ReadonlyMap<string, ViewManifestEntry>,
-  options?: { dev?: boolean; projectRoot?: string }
+  options?: { dev?: boolean; projectRoot?: string; deferCors?: boolean }
 ): FetchHandler | undefined {
   if (views.size === 0) {
     return undefined;
@@ -117,7 +120,10 @@ export function createViewPublicHandler(
     if (diskPath === null) {
       return new Response("Not Found", { status: 404 });
     }
-    return await servePublicFile(diskPath);
+    return await servePublicFile(
+      diskPath,
+      options?.deferCors === true ? { deferCors: true } : {}
+    );
   };
 }
 
