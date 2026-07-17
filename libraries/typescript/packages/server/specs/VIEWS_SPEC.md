@@ -450,7 +450,13 @@ Public responses include `Access-Control-Allow-Origin: *`. Hosts render views in
 - **`inline` (production):** emit `<style>` with the CSS (escaping `</style`) and `<script type="module">` with the JS (escaping `</script` → `<\/script` and `<!--` → `\x3C!--`). Keep the `__mcpUseViewConfig` config script (`publicBase` still origin-resolved per request) and `<div id="root">`.
 - **`external` (dev):** `<link>` / `<script type="module" src>` tags for Vite module URLs (current HMR path).
 
-**Origin resolution is request-scoped** — the same posture as capability gating, and the piece v1 got structurally wrong (origin computed once at boot from `MCP_URL`/host:port, then string-patched into HTML). The synthesized document's `publicBase` (and any residual absolute URLs) resolve per request to `<origin>${basePath}/_mcp-use/` where `<origin>` comes from, in order: an explicit override (for deployments whose edge doesn't forward — **shape deliberately unresolved**: whether this is a `publicUrl` config field or v1's `MCP_URL` environment variable is a pending separate discussion, see Open questions), standard `Forwarded`/`X-Forwarded-Proto`+`X-Forwarded-Host` headers, the request URL itself. The v1 mistake was *when* the override was read (boot-time baking), not the override existing; whatever its spelling, it is applied at emission time. No boot-time state — correct behind tunnels/proxies/preview deployments without restarts.
+**Origin resolution is request-scoped** — applied at `resources/read` emission time:
+
+- **`MCP_URL`** — server public origin (`.origin` only): OAuth resource URL, CSP `connectDomains`, dev HMR websocket host.
+- **`MCP_ASSETS_URL`** — assets URL prefix (origin + optional path): view JS/CSS hrefs and `__mcpUseViewConfig.publicBase`. Falls back to `MCP_URL` origin, then `Forwarded` / request origin.
+- **CSP env** — `CSP_URLS` (shortcut for all four MCP Apps categories) and `CSP_*_DOMAINS` per-category overrides merge with author `view.csp` before MCP auto-append. Env vars rank above MCP auto-append.
+
+Build-time: when `MCP_ASSETS_URL` is set, manifest asset paths are rewritten to full CDN URLs; upload `.mcp-use/build/views/` to the asset host.
 
 **srcdoc iframes have no document base URL.** Hosts render view documents via `srcdoc`, so every URL the view still loads over the network (public assets; in **dev**, Vite modules) must be absolute — root-relative paths resolve against the *host page* origin, not the MCP server. Production view JS/CSS need no network URLs (inlined). Dev sets Vite `server.origin` to the dev server's browsable origin so imported assets emit absolute `http://…` URLs. Public assets resolve through a request-scoped config global injected into the synthesized document.
 
@@ -1181,7 +1187,6 @@ The full build/serve contract is "Build system & serving", above; it extends the
 ## Open questions
 
 - Stable `ui://views/<name>.html` vs content-hashed URIs: revisit only with evidence that a target host over-caches by URI (v1's `buildId` existed for ChatGPT; ChatGPT's MCP Apps path may not need it). External evidence: Skybridge appends `?v=<content-hash>` to view URIs in production — a second framework independently concluding hosts over-cache by URI. Expectation is this resolves toward a manifest-driven hash suffix once tested against ChatGPT; still deferred to that test, not decided here.
-- **Origin override: `MCP_URL` vs `publicUrl`.** The request-scoped resolution order is decided (override → forwarded headers → request URL, applied at emission time); the override's surface is not — v1 shipped `MCP_URL` as an environment variable, and what of its v1 role carries into v2 deserves its own discussion. Until then this spec names it only "the override".
 - `ui/download-file` (draft) exposure — as a standalone hook — once a target host ships it.
 - Partial/streamed **tool results**: not in the 2026-07-28 protocol or the apps spec today (see Streaming). When a partial-result channel lands upstream, deliver it as ordinary `useToolContext` re-renders; until then, progressive UIs pull via `useCallTool`.
 - **Vite dev `script-src` / eval:** Vite HMR and some dev transforms use `eval`, which strict host `script-src` policies may block. The MCP Apps CSP shape is origin-lists only — no `'unsafe-eval'` or nonce slot — so this cannot be declared in `view.csp`. If it bites in practice, the fix is Vite-side (jitless deps, no eval-based sourcemaps); dev already auto-appends the HMR websocket origin to `connectDomains` (Serving).

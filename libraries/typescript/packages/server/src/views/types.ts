@@ -58,13 +58,16 @@ export interface InlineViewManifestEntry {
 /**
  * Dev manifest entry: Vite client-environment module URLs loaded by the
  * synthesized document (HMR / Fast Refresh).
+ *
+ * Production builds emit the same shape with view-relative asset paths
+ * (`assets/…`) served from `${basePath}/_mcp-use/views/<name>/`.
  */
 export interface ExternalViewManifestEntry {
   /** Discriminant for the dev external-module shape. */
   kind: "external";
   /**
-   * Origin-absolute URL path starting with `/` — the Vite client-env module
-   * URL for the view's virtual entry.
+   * Module entry path. Dev: origin-absolute Vite URL (`/…`). Production:
+   * view-relative path under `.mcp-use/build/views/<name>/` (`assets/…`).
    */
   entry: string;
   /**
@@ -84,8 +87,8 @@ export interface ExternalViewManifestEntry {
 /**
  * One entry in the primed views manifest.
  *
- * Production builds emit {@link InlineViewManifestEntry}; `mcp-use dev` emits
- * {@link ExternalViewManifestEntry}.
+ * Production builds emit {@link ExternalViewManifestEntry} with view-relative
+ * asset paths; `mcp-use dev` emits origin-absolute Vite URLs.
  */
 export type ViewManifestEntry =
   | InlineViewManifestEntry

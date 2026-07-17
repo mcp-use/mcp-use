@@ -29,8 +29,6 @@
 
 import { join } from "node:path";
 
-import type { ViewsManifest } from "../views/types.js";
-
 /**
  * Fixed name of the per-project workspace directory.
  *
@@ -63,17 +61,10 @@ export interface BuildManifest {
   /** ISO-8601 timestamp of when the build finished. */
   createdAt: string;
   /**
-   * Whether the built server mounts the inspector shell route. Currently
-   * always written as `true` (not introspected from the server config) and
-   * consumed by nothing — the built server's own `MCPServer` config governs
-   * the route at runtime. Recorded as a known gap in CLI_SPEC.md § build.
+   * Whether the build was created with `mcp-use build --with-inspector`.
+   * Consumed by `mcp-use start` to decide whether to mount the inspector shell.
    */
   inspector: boolean;
-  /**
-   * Built views map (VIEWS_SPEC.md § Manifest). Present only when the project
-   * has view entries under `resources/<name>/view.tsx`.
-   */
-  views?: ViewsManifest;
 }
 
 /**

@@ -3,7 +3,7 @@
  * `.mcp-use/build/` workspace directory (CLI_SPEC.md § Commands → build).
  *
  * When views exist (under `resources/<name>/view.tsx`), also runs a client-environment
- * build per view (self-contained inline bundles), validates bindings, and emits a
+ * build per view (hashed assets on disk), validates bindings, and emits a
  * wrapper entry that primes views before re-exporting the server (VIEWS_SPEC.md §
  * Build system).
  *
@@ -16,7 +16,7 @@
 
 import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
-import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
@@ -24,7 +24,10 @@ import { build } from "vite";
 
 import { discoverEntry } from "./entry.js";
 import { mcpUseViewsPlugin } from "./views-plugin.js";
-import { validateViewBindingsAtBuild } from "./views-bindings.js";
+import {
+  resolveBuildBasePath,
+  validateViewBindingsAtBuild,
+} from "./views-bindings.js";
 import {
   createBindingValidationServer,
   discoverViews,
@@ -33,6 +36,8 @@ import {
 } from "./views.js";
 import { resolveTailwindCss, resolveUserViteConfig } from "./vite-config.js";
 import { resolveWorkspacePaths, type BuildManifest } from "./workspace.js";
+import { normalizeAssetsBaseUrl } from "../views/origin.js";
+import { viewAssetsBasePath } from "../views/document.js";
 import type { ViewsManifest } from "../views/types.js";
 
 /** Fixed filename of the emitted server entry inside `.mcp-use/build/`. */
@@ -58,15 +63,16 @@ export interface BuildOptions {
    * `index.ts`, `server.ts` — first hit wins.
    */
   entry?: string;
+  /**
+   * When true (`mcp-use build --with-inspector`), record `inspector: true`
+   * in the build manifest.
+   */
+  withInspector?: boolean;
 }
 
 /**
  * Emit a short-lived wrapper module under `.mcp-use/cache/` that primes views
  * before re-exporting the user's entry (VIEWS_SPEC.md § Registration mechanism).
- *
- * Production manifests carry full JS/CSS source strings; `JSON.stringify`
- * embeds them as escaped string literals in the generated module (large
- * payloads are accepted — matches the no-fs-on-MCP-path rule).
  */
 async function writeWrapperEntry(
   cacheDir: string,
@@ -89,15 +95,57 @@ async function writeWrapperEntry(
   return wrapperPath;
 }
 
+function readBuildAssetsBase(): string | undefined {
+  const raw = process.env["MCP_ASSETS_URL"];
+  if (raw === undefined || raw.trim() === "") {
+    return undefined;
+  }
+  try {
+    return normalizeAssetsBaseUrl(new URL(raw).href.replace(/\/$/, ""));
+  } catch {
+    return undefined;
+  }
+}
+
+/** Rewrite a view-relative manifest path to a full CDN URL at build time. */
+function toCdnAssetUrl(
+  relativePath: string,
+  viewName: string,
+  assetsBase: string,
+  basePath: string
+): string {
+  const clean = relativePath.replace(/^\/+/, "");
+  return `${assetsBase}${viewAssetsBasePath(basePath, viewName)}${clean}`;
+}
+
+function applyBuildAssetsPrefix(
+  entry: ViewsManifest[string],
+  viewName: string,
+  assetsBase: string,
+  basePath: string
+): ViewsManifest[string] {
+  if (entry.kind !== "external") {
+    return entry;
+  }
+  return {
+    ...entry,
+    entry: toCdnAssetUrl(entry.entry, viewName, assetsBase, basePath),
+    css: entry.css.map((path) =>
+      toCdnAssetUrl(path, viewName, assetsBase, basePath)
+    ),
+    ...(entry.scripts !== undefined && {
+      scripts: entry.scripts.map((path) =>
+        toCdnAssetUrl(path, viewName, assetsBase, basePath)
+      ),
+    }),
+  };
+}
+
 /**
- * Build one view into a self-contained ES module + CSS, then read the emitted
- * text into an inline manifest entry.
- *
- * @param view - Discovered view to build.
- * @param options - Project paths and Vite config.
- * @param emptyOutDir - Whether to wipe the views output directory first.
+ * Build one view into hashed assets on disk, then record view-relative paths
+ * in the manifest (served over HTTP at runtime).
  */
-async function buildInlineView(
+async function buildExternalView(
   view: DiscoveredView,
   options: {
     cwd: string;
@@ -131,7 +179,6 @@ async function buildInlineView(
         input: { [view.name]: virtualViewId(view.name) },
         output: {
           format: "es",
-          // Rolldown: prefer codeSplitting:false over deprecated inlineDynamicImports.
           codeSplitting: false,
           entryFileNames: "assets/[name]-[hash].js",
           assetFileNames: "assets/[name]-[hash][extname]",
@@ -180,13 +227,11 @@ async function buildInlineView(
     );
   }
 
-  const js = await readFile(join(viewOutDir, jsFileName), "utf8");
-  const css =
-    cssFileName !== undefined
-      ? await readFile(join(viewOutDir, cssFileName), "utf8")
-      : "";
-
-  return { kind: "inline", js, css };
+  return {
+    kind: "external",
+    entry: jsFileName.replace(/^\/+/, ""),
+    css: cssFileName !== undefined ? [cssFileName.replace(/^\/+/, "")] : [],
+  };
 }
 
 /**
@@ -218,6 +263,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
   const paths = resolveWorkspacePaths(options.cwd);
   const views = discoverViews(options.cwd);
   const userViteConfig = resolveUserViteConfig(options.cwd);
+  const inspector = options.withInspector === true;
 
   if (views.length === 0) {
     await build({
@@ -250,7 +296,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
       buildId: randomBytes(8).toString("hex"),
       entryPoint: BUILD_ENTRY_NAME,
       createdAt: new Date().toISOString(),
-      inspector: true,
+      inspector,
     };
     await mkdir(paths.build, { recursive: true });
     await writeFile(
@@ -266,20 +312,57 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     return;
   }
 
-  // Views build: wipe output, one self-contained client build per view, then SSR wrapper.
   await rm(paths.build, { recursive: true, force: true });
 
   const viewsOutDir = join(paths.build, "views");
   await mkdir(viewsOutDir, { recursive: true });
 
+  const bindingServer = await createBindingValidationServer(
+    options.cwd,
+    paths.cache,
+    false
+  );
+  let buildBasePath: string;
+  try {
+    buildBasePath = await resolveBuildBasePath(
+      bindingServer.environments.ssr,
+      entry
+    );
+  } catch (error) {
+    await bindingServer.close();
+    throw error;
+  }
+
   const viewsManifest: ViewsManifest = {};
+  const buildAssetsBase = readBuildAssetsBase();
   for (const view of views) {
-    viewsManifest[view.name] = await buildInlineView(view, {
+    let manifestEntry = await buildExternalView(view, {
       cwd: options.cwd,
       cacheDir: paths.cache,
       viewsOutDir,
       userViteConfig,
     });
+    if (buildAssetsBase !== undefined) {
+      manifestEntry = applyBuildAssetsPrefix(
+        manifestEntry,
+        view.name,
+        buildAssetsBase,
+        buildBasePath
+      );
+    }
+    viewsManifest[view.name] = manifestEntry;
+  }
+
+  if (buildAssetsBase !== undefined) {
+    console.log(
+      `[mcp-use] MCP_ASSETS_URL set — manifest uses CDN URLs; upload ` +
+        `${relative(options.cwd, viewsOutDir)}/ to your asset host.`
+    );
+    if (buildBasePath !== "/mcp") {
+      console.log(
+        `[mcp-use] CDN manifest uses basePath ${buildBasePath} from server entry`
+      );
+    }
   }
 
   const publicSrc = join(options.cwd, "public");
@@ -287,11 +370,6 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     await cp(publicSrc, join(viewsOutDir, "public"), { recursive: true });
   }
 
-  const bindingServer = await createBindingValidationServer(
-    options.cwd,
-    paths.cache,
-    false
-  );
   try {
     await validateViewBindingsAtBuild(
       bindingServer.environments.ssr,
@@ -338,8 +416,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     buildId: randomBytes(8).toString("hex"),
     entryPoint: BUILD_ENTRY_NAME,
     createdAt: new Date().toISOString(),
-    inspector: true,
-    views: viewsManifest,
+    inspector,
   };
   await mkdir(paths.build, { recursive: true });
   await writeFile(
