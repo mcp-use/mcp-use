@@ -4,6 +4,8 @@ Sibling examples for MCP Apps views with `mcp-use`:
 
 - [`basic/`](./basic/) — fruit store: default `viewConfig`, `ThemeProvider` /
   `ViewControls`, typed hooks, `useCallTool` error narrowing, `useViewTool`
+- [`file-upload/`](./file-upload/) — ChatGPT-only file upload and temporary
+  download URLs with `useFiles`
 - [`story-writer/`](./story-writer/) — progressive pending tool input into a
   live view (default `viewConfig`, terminal result latch)
 - [`excalidraw/`](./excalidraw/) — port of the original

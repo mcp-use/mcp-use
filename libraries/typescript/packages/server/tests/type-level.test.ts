@@ -14,8 +14,22 @@ import type {
   InputRequiredResult,
   ToolResult,
 } from "../src/index.js";
+import type { FileMetadata, UseFilesResult } from "../src/react/index.js";
 
 const outputSchema = z.object({ answer: z.number() });
+
+describe("useFiles public types", () => {
+  it("exposes the narrow file upload and download contract", () => {
+    expectTypeOf<FileMetadata>().toEqualTypeOf<{ fileId: string }>();
+    expectTypeOf<UseFilesResult["upload"]>().toEqualTypeOf<
+      (file: File) => Promise<FileMetadata>
+    >();
+    expectTypeOf<UseFilesResult["getDownloadUrl"]>().toEqualTypeOf<
+      (file: FileMetadata) => Promise<{ downloadUrl: string }>
+    >();
+    expect(true).toBe(true);
+  });
+});
 
 describe("ToolResult resolution", () => {
   it("accepts regular and input-required results without an output type", () => {
