@@ -16,7 +16,7 @@ import {
   jsonBodyMiddleware,
   type FetchMiddleware,
 } from "../src/fetch-app.js";
-import { mountMcp } from "../src/mount-mcp.js";
+import { createMcpMount } from "../src/mount-mcp.js";
 import { listenFetch } from "./helpers/listen-fetch.js";
 
 interface TestUser {
@@ -120,13 +120,13 @@ function authInfoMiddleware(
 }
 
 function buildMcpFetch(
-  factory: Parameters<typeof mountMcp>[0],
-  options: Parameters<typeof mountMcp>[1] = {}
+  factory: Parameters<typeof createMcpMount>[0],
+  options: Parameters<typeof createMcpMount>[1] = {}
 ) {
-  return mountMcp(factory, options).fetch;
+  return createMcpMount(factory, options).fetch;
 }
 
-describe("mountMcp OAuth request context", () => {
+describe("createMcpMount OAuth request context", () => {
   it("forwards request-bag AuthInfo exactly, projects it in tool/resource callbacks, and isolates concurrent requests", async () => {
     const alice = createAuthInfo("alice");
     const bob = createAuthInfo("bob");

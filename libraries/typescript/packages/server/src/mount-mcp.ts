@@ -110,13 +110,3 @@ export function createMcpMount(
 
   return { handler, fetch };
 }
-
-/**
- * @deprecated Use {@link createMcpMount} — returns the same mount without Hono.
- */
-export function mountMcp(
-  factory: McpServerFactory,
-  options: MountMcpOptions = {}
-): McpMount {
-  return createMcpMount(factory, options);
-}

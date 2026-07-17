@@ -16,7 +16,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { composeFetch, jsonBodyMiddleware } from "../src/fetch-app.js";
-import { mountMcp, type MountMcpOptions } from "../src/index.js";
+import { createMcpMount, type MountMcpOptions } from "../src/index.js";
 import { listenFetch } from "./helpers/listen-fetch.js";
 
 function buildTestServer(): McpServer {
@@ -34,12 +34,12 @@ function buildTestServer(): McpServer {
   return server;
 }
 
-describe("mountMcp", () => {
+describe("createMcpMount", () => {
   let httpServer: Awaited<ReturnType<typeof listenFetch>>;
   let baseUrl: string;
 
   beforeAll(async () => {
-    const { fetch: mcpFetch } = mountMcp(buildTestServer);
+    const { fetch: mcpFetch } = createMcpMount(buildTestServer);
     const fetch = composeFetch(mcpFetch, jsonBodyMiddleware());
     httpServer = await listenFetch(fetch);
     baseUrl = httpServer.url;
@@ -53,7 +53,7 @@ describe("mountMcp", () => {
     const client = new Client(
       { name: "scaffold-test-client", version: "0.0.1" },
       // The client's default posture is the legacy 2025 handshake, which the
-      // mount rejects (2026-07-28 only) — pin the modern revision.
+      // endpoint rejects (2026-07-28 only) — pin the modern revision.
       { versionNegotiation: { mode: { pin: "2026-07-28" } } }
     );
     const transport = new StreamableHTTPClientTransport(new URL(path, baseUrl));
@@ -109,7 +109,10 @@ describe("mountMcp", () => {
 
   it("mounts on a custom path", async () => {
     const options: MountMcpOptions = { path: "/custom/mcp" };
-    const { handler, fetch: mcpFetch } = mountMcp(buildTestServer, options);
+    const { handler, fetch: mcpFetch } = createMcpMount(
+      buildTestServer,
+      options
+    );
     const fetch = composeFetch(mcpFetch, jsonBodyMiddleware());
     const started = await listenFetch(fetch);
     try {
