@@ -40,6 +40,7 @@ describe("definition metadata types", () => {
       name: "metadata-tool",
       annotations: { readOnlyHint: true, openWorldHint: false },
       _meta: { "example.com/tool": { enabled: true } },
+      view: { name: "metadata-view", visibility: "app" },
     };
     const resource: ResourceDefinition = {
       name: "metadata-resource",
@@ -57,7 +58,12 @@ describe("definition metadata types", () => {
       annotations: { audience: ["assistant"] },
       _meta: { "example.com/template": { version: 1 } },
     };
-    expect([tool, resource, template]).toBeDefined();
+    const misplacedVisibility: ToolDefinition = {
+      name: "misplaced-visibility",
+      // @ts-expect-error — framework visibility belongs inside view
+      visibility: "app",
+    };
+    expect([tool, resource, template, misplacedVisibility]).toBeDefined();
   });
 
   it("rejects shapes excluded by the official SDK contracts", () => {

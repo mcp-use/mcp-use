@@ -973,7 +973,7 @@ export class MCPServer<TUser = never> {
 
     const toolMeta = buildToolUiMeta(
       view?.name,
-      definition.visibility,
+      view?.visibility,
       definition._meta
     );
     const config = {

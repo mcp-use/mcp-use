@@ -15,8 +15,8 @@ and the per-action hooks).
   facts (description, CSP, permissions, domain, prefersBorder) are declared on
   that binder's `view:` config. A second tool cannot bind the same view —
   use a separate view resource, or call helpers from the view with
-  `useCallTool`. Tool `visibility` is a top-level tool field, not inside
-  `view:`.
+  `useCallTool`. A bound tool declares UI visibility inside `view:`; a
+  viewless helper may use raw `_meta.ui.visibility`.
 - **Default `viewConfig`** — this view exports no `viewConfig`, so the runtime
   defaults apply (`autoResize: true`, display modes `inline` / `fullscreen` /
   `pip`).
@@ -140,8 +140,8 @@ resource or resource-template definition appear in `resources/list` or
 returned `contents[]` entry. General resource annotations use the exported
 `Annotations` type, while tools use `ToolAnnotations`. For view-bound tools,
 the framework derives `ui.resourceUri`, `ui.visibility`, and the legacy flat
-`ui/resourceUri`; those keys follow the declared `view`/`visibility` fields on
-collision, while unrelated custom keys are preserved.
+`ui/resourceUri`; generated values follow `view.name` and `view.visibility` on
+collision, while all other custom metadata passes through unchanged.
 
 ## Images and CSP
 

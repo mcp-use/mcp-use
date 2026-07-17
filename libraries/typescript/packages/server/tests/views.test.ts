@@ -42,7 +42,7 @@ const searchDefinitionMeta = JSON.parse(`{
   "ui": {
     "customField": {"preserved": true},
     "resourceUri": "ui://views/spoofed.html",
-    "visibility": ["app"]
+    "visibility": ["model"]
   },
   "ui/resourceUri": "ui://views/spoofed.html",
   "__proto__": {"polluted": true}
@@ -114,7 +114,6 @@ function buildViewsServer(): MCPServer {
   server.tool(
     {
       name: "app-only-action",
-      visibility: "app",
       _meta: {
         "example.com/tool": { kind: "app-action" },
         ui: {
@@ -125,7 +124,7 @@ function buildViewsServer(): MCPServer {
         "ui/resourceUri": "ui://views/spoofed.html",
       },
       outputSchema: z.object({ ok: z.boolean() }),
-      view: { name: "app-only-view" },
+      view: { name: "app-only-view", visibility: "app" },
     },
     async () => ({
       structuredContent: { ok: true },
@@ -136,7 +135,7 @@ function buildViewsServer(): MCPServer {
   server.tool(
     {
       name: "app-only-helper",
-      visibility: "app",
+      _meta: { ui: { visibility: ["app"] } },
       inputSchema: z.object({ n: z.number().optional() }),
       outputSchema: z.object({ ok: z.boolean() }),
     },
@@ -175,10 +174,28 @@ describe("tool definition metadata merge", () => {
     expect(
       Object.prototype.hasOwnProperty.call(merged ?? {}, "__proto__")
     ).toBe(true);
+    expect(merged?.["ui"]).toMatchObject({ visibility: ["model"] });
     expect(Object.prototype).not.toHaveProperty("polluted");
     expect(JSON.stringify(searchDefinitionMeta)).toBe(
       searchDefinitionMetaSnapshot
     );
+  });
+
+  it("passes through ui keys that view configuration does not generate", () => {
+    const existingMetadata: MetaObject = {
+      ui: {
+        resourceUri: "ui://external/custom.html",
+        visibility: ["app"],
+        customField: true,
+      },
+      "ui/resourceUri": "ui://external/custom.html",
+    };
+
+    const merged = buildToolUiMeta(undefined, undefined, existingMetadata);
+
+    expect(merged).toEqual(existingMetadata);
+    expect(merged).not.toBe(existingMetadata);
+    expect(merged?.["ui"]).not.toBe(existingMetadata["ui"]);
   });
 });
 
@@ -222,10 +239,10 @@ describe("views server core (e2e over HTTP)", () => {
       ui: {
         customField: { preserved: true },
         resourceUri: "ui://views/product-search-result.html",
+        visibility: ["model"],
       },
       "ui/resourceUri": "ui://views/product-search-result.html",
     });
-    expect(search?._meta?.["ui"]).not.toHaveProperty("visibility");
     expect(Object.prototype).not.toHaveProperty("polluted");
     expect(JSON.stringify(searchDefinitionMeta)).toBe(
       searchDefinitionMetaSnapshot
@@ -241,7 +258,7 @@ describe("views server core (e2e over HTTP)", () => {
     });
   });
 
-  it("lists visibility:app tools for plain clients with ui.visibility", async () => {
+  it("lists view.visibility:app tools with generated ui.visibility", async () => {
     const { tools } = await plainClient.listTools();
     const appOnly = tools.find((t) => t.name === "app-only-action");
     expect(appOnly).toBeDefined();
@@ -292,7 +309,7 @@ describe("views server core (e2e over HTTP)", () => {
     );
   });
 
-  it("emits ui.visibility without resourceUri for view-less visibility:app tools", async () => {
+  it("passes through raw ui.visibility for view-less app helpers", async () => {
     const { tools } = await plainClient.listTools();
     const helper = tools.find((t) => t.name === "app-only-helper");
     expect(helper).toBeDefined();
@@ -308,7 +325,7 @@ describe("views server core (e2e over HTTP)", () => {
     expect(result.structuredContent).toEqual({ ok: true });
   });
 
-  it("emits no _meta.ui keys for tools with neither view nor visibility", async () => {
+  it("emits no _meta.ui keys for tools with neither view nor metadata", async () => {
     const { tools } = await plainClient.listTools();
     const plain = tools.find((t) => t.name === "plain-tool");
     expect(plain).toBeDefined();

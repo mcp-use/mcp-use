@@ -14,10 +14,11 @@ export to excalidraw.com.
 - **View-bound tool** — `view: { name: "excalidraw", prefersBorder, csp, permissions }`
   on `create_view` (one tool per view).
 - **App-private tools** — `export_to_excalidraw`, `save_checkpoint`, and
-  `read_checkpoint` use `visibility: "app"` and are called from the view via
-  `useCallTool`. They declare no `outputSchema`, so their successes are
-  content-only results — `callTool` resolves them and the view reads
-  `result.content`; tool errors and transport failures reject.
+  `read_checkpoint` use raw `_meta.ui.visibility: ["app"]` because they are
+  viewless helpers, and are called from the view via `useCallTool`. They declare
+  no `outputSchema`, so their successes are content-only results — `callTool`
+  resolves them and the view reads `result.content`; tool errors and transport
+  failures reject.
 - **Latched tool lifecycle** — every pending `toolInput` update is treated as
   progressive; only the first structured result finalizes the diagram and
   checkpoint. `create_view` can return `isError: true` for oversized or
