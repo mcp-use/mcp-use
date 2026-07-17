@@ -1,6 +1,6 @@
 import type { ToolRef } from "../../tools.js";
 
-/** Augmented by the project's `register.d.ts`; empty by default. */
+/** Augmented by the project's `tools.d.ts`; empty by default. */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- intentional augmentation target
 export interface Register {}
 

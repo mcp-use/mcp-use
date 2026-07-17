@@ -726,10 +726,6 @@ jobs:
           cache-dependency-path: libraries/typescript/pnpm-lock.yaml
       - name: Install Dependencies
         run: pnpm install --no-frozen-lockfile
-      - name: Generate version file
-        # src/version.ts is gitignored and produced at build time; knip needs it
-        # to resolve the `./version.js` imports in packages/mcp-use.
-        run: pnpm --filter mcp-use generate:version
       - name: Run Knip
         run: |
           set -o pipefail
@@ -812,7 +808,7 @@ jobs:
 
   typescript-changeset-check:
     needs: detect-changes
-    if: ${{ (github.event_name == 'workflow_call' && inputs.run_changeset_check) || (github.event_name == 'pull_request' && github.base_ref != 'canary' && github.base_ref != 'beta' && needs.detect-changes.outputs.typescript == 'true') }}
+    if: ${{ (github.event_name == 'workflow_call' && inputs.run_changeset_check) || (github.event_name == 'pull_request' && github.head_ref != 'beta' && github.base_ref != 'canary' && github.base_ref != 'beta' && needs.detect-changes.outputs.typescript == 'true') }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -887,7 +883,7 @@ jobs:
         working-directory: libraries/typescript/packages/inspector
         run: npm pack
       - name: Pack mcp-use
-        working-directory: libraries/typescript/packages/mcp-use
+        working-directory: libraries/typescript/packages/server
         run: npm pack
       - name: Upload All Package Artifacts
         uses: actions/upload-artifact@v4
@@ -895,7 +891,7 @@ jobs:
           name: workspace-packages
           path: |
             libraries/typescript/packages/create-mcp-use-app/create-mcp-use-app-*.tgz
-            libraries/typescript/packages/mcp-use/mcp-use-*.tgz
+            libraries/typescript/packages/server/mcp-use-*.tgz
             libraries/typescript/packages/cli/mcp-use-cli-*.tgz
             libraries/typescript/packages/inspector/mcp-use-inspector-*.tgz
           retention-days: 1
