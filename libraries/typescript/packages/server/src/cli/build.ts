@@ -24,6 +24,7 @@ import { build } from "vite";
 
 import { discoverEntry } from "./entry.js";
 import { mcpUseViewsPlugin } from "./views-plugin.js";
+import { ensureToolsDeclaration } from "./tools-declaration.js";
 import {
   resolveBuildBasePath,
   validateViewBindingsAtBuild,
@@ -260,6 +261,9 @@ async function buildExternalView(
 export async function runBuild(options: BuildOptions): Promise<void> {
   const startedAt = performance.now();
   const entry = discoverEntry(options.cwd, options.entry);
+  if (await ensureToolsDeclaration(options.cwd, entry)) {
+    console.log("[mcp-use] created tools.d.ts");
+  }
   const paths = resolveWorkspacePaths(options.cwd);
   const views = discoverViews(options.cwd);
   const userViteConfig = resolveUserViteConfig(options.cwd);

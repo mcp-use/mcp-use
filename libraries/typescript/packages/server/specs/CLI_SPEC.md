@@ -246,7 +246,7 @@ Target user `package.json` shape:
 └─ cloud/        ← deploy linkage (link.json)
 ```
 
-This contract writes `build/` (using `cache/` as Vite's `cacheDir`), `state/tunnel.json` during tunneled dev, and `cloud/link.json` after deploy. `generated/` is reserved for the explicit typegen escape hatch. `build/` contains no mutable runtime state, so build output stays reproducible and disposable. Because everything under `.mcp-use/` is gitignored and `rm -rf`-safe, nothing committed ever lives here — scaffolded, committed files (e.g. the `src/register.d.ts` typing shim, `VIEWS_SPEC.md` § Typing) belong in the project source tree instead.
+This contract writes `build/` (using `cache/` as Vite's `cacheDir`), `state/tunnel.json` during tunneled dev, and `cloud/link.json` after deploy. `generated/` is reserved for the explicit typegen escape hatch. `build/` contains no mutable runtime state, so build output stays reproducible and disposable. Because everything under `.mcp-use/` is gitignored and `rm -rf`-safe, nothing committed ever lives here. The root-level `tools.d.ts` typing shim belongs in the project source tree; templates scaffold it, and `dev`/`build` recreate it from the discovered entry path when missing without overwriting an existing file (`VIEWS_SPEC.md` § Typing).
 
 Rules, all inherited from v1 and locked:
 

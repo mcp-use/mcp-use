@@ -498,7 +498,7 @@ v1 parity: authors drop static files in a project-root `public/` directory and r
 
 ## Typing: `ToolRef` + `Register` (zero codegen)
 
-Exports-based inference is the primary mode; typegen is an explicit escape hatch only, never on the dev/build hot path. The full option space behind this choice (including the rejected alternatives) is preserved in `type_proposals.md`.
+Exports-based inference is the primary mode; tool typegen is an explicit escape hatch only, never on the dev/build hot path. `dev` and `build` only ensure that the constant root `tools.d.ts` shim exists; they do not inspect tools or generate a registry. The full option space behind this choice (including the rejected alternatives) is preserved in `type_proposals.md`.
 
 ### `tool()` return-type change
 
@@ -511,7 +511,7 @@ This ends `server.tool(…).tool(…)` chaining — an acceptable break: nothing
 View bundles must never contain server code, so the ref **value** is never imported by a view. The type crosses in type space only:
 
 ```ts
-// src/register.d.ts — scaffolded once, committed, never regenerated
+// tools.d.ts — scaffolded at the project root; dev/build recreate it if missing
 // (the vite-env.d.ts pattern: configuration, not codegen — it lives in the
 // source tree because .mcp-use/ is gitignored and rm -rf-safe, CLI_SPEC.md)
 declare module "mcp-use/react" {
@@ -523,7 +523,7 @@ declare module "mcp-use/react" {
 
 ```ts
 // in /react
-export interface Register {}  // filled (or not) by the project's register.d.ts
+export interface Register {}  // filled (or not) by the project's tools.d.ts
 
 type RegisteredToolsModule = Register extends { tools: infer M } ? M : Record<never, never>;
 
@@ -584,18 +584,18 @@ Keying by tool name (not view directory name) is deliberate: view names exist on
 
 ### Fallback ladder
 
-1. `useCallTool("name")` — primary; typed via `Register` when the project has `register.d.ts` and the ref is exported.
+1. `useCallTool("name")` — primary; typed via `Register` when the project has `tools.d.ts` and the ref is exported.
 2. `useCallTool(toolRef)` — for contexts where the ref value is legitimately in scope (the inline-JSX stretch path); not for file-based views (value import = server code in the bundle).
 3. `useCallTool<Args, Result>("name")` — explicit generics for dynamically registered tools (statically untypeable in any framework) and unexported refs.
-4. Empty `Register` (no `register.d.ts`) degrades to `(name: string)` — non-scaffolded projects compile untouched.
+4. Empty `Register` (no `tools.d.ts`) degrades to `(name: string)` — non-scaffolded projects compile untouched until `dev` or `build` creates the shim.
 
 A forgotten `export const` silently drops that one tool to rung 3/4 — documented habit; a lint rule is a possible follow-up, not alpha scope.
 
 ### Typegen, demoted
 
-Nothing generates types during `dev`, `build`, or `start` — v1's run-the-server generator (`tool-registry-generator.ts`, `zod-to-ts.ts`) is not ported, and the implemented CLI has no typegen hooks to remove. `mcp-use typegen` (+ `mcp-use check` for CI freshness) is the explicit secondary mode, for consumers with no compile-time path to the server source; if/when built, it is a TS-checker-based static extractor (reads resolved `ToolRef` types; never executes user code), defaulting output to `.mcp-use/generated/`. Not an alpha deliverable.
+No command generates tool-specific types during `dev`, `build`, or `start` — v1's run-the-server generator (`tool-registry-generator.ts`, `zod-to-ts.ts`) is not ported. `dev` and `build` perform one constant-file check: if root `tools.d.ts` is absent, they create it with a type-only import of the discovered server entry; an existing file is never overwritten. `mcp-use typegen` (+ `mcp-use check` for CI freshness) remains the explicit secondary mode, for consumers with no compile-time path to the server source; if/when built, it is a TS-checker-based static extractor (reads resolved `ToolRef` types; never executes user code), defaulting output to `.mcp-use/generated/`. Not an alpha deliverable.
 
-Since v2 `create-mcp-use-app` templates don't exist yet, the handwritten example in this package (planned `examples/views/basic`) is the reference for the `register.d.ts` + exported-refs pattern.
+The v2 `create-mcp-use-app` MCP Apps template is the reference for the root `tools.d.ts` + exported-refs pattern.
 
 ---
 
@@ -766,7 +766,7 @@ The complete alpha surface. Everything here is exported from `mcp-use/react`; ty
 **Types.**
 
 ```ts
-/** Augmented by the project's register.d.ts; empty by default. */
+/** Augmented by the project's tools.d.ts; empty by default. */
 interface Register {}
 
 /** Pre-render runtime configuration — optional named export from a view module. */
@@ -1157,8 +1157,8 @@ Everything result-shaped enters through `useToolContext` (typed by the server's 
 
 The full build/serve contract is "Build system & serving", above; it extends the **implemented** `CLI_SPEC.md` (which scoped views out) and its ground rules hold — reload-not-HMR for the server entry, `start` pays zero toolchain cost, vite reachable only through the lazy `dev`/`build` chunk. Command summary:
 
-- **`mcp-use dev`:** adds the Vite client environment to the existing dev server; public assets and Vite module graph serve through its middleware at `${basePath}/_mcp-use/`. View-file edits get Vite's own HMR (pure client code, sharing the one Vite dev server); server-entry edits follow the existing reload contract and invalidate all three primitive lists over the shared SDK event bus (decision 12). No typegen hooks anywhere.
-- **`mcp-use build`:** one client-environment build over all views into `.mcp-use/build/views/`; writes the manifest `views` map (tooling copy) and bakes it into the generated wrapper entry (runtime copy — Registration mechanism); runs the binding checks (missing view, missing `outputSchema`, duplicate view binding → errors naming both tools; unbound view → warning).
+- **`mcp-use dev`:** ensures root `tools.d.ts` exists without overwriting it, then adds the Vite client environment to the existing dev server; public assets and Vite module graph serve through its middleware at `${basePath}/_mcp-use/`. View-file edits get Vite's own HMR (pure client code, sharing the one Vite dev server); server-entry edits follow the existing reload contract and invalidate all three primitive lists over the shared SDK event bus (decision 12). No tool-inspecting typegen hook runs.
+- **`mcp-use build`:** ensures root `tools.d.ts` exists without overwriting it, then runs one client-environment build over all views into `.mcp-use/build/views/`; writes the manifest `views` map (tooling copy) and bakes it into the generated wrapper entry (runtime copy — Registration mechanism); runs the binding checks (missing view, missing `outputSchema`, duplicate view binding → errors naming both tools; unbound view → warning).
 - **`mcp-use start`:** imports the built wrapper entry (views arrive primed) and serves public assets; no vite, no discovery, no runtime manifest read. View documents are obtained only through `resources/read`.
 
 ## Testing

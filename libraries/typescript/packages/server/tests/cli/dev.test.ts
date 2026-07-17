@@ -2,7 +2,7 @@
  * e2e tests for runDev: a real Vite dev server + module runner serving the
  * fixture over HTTP, including edit-triggered reload and error resilience.
  */
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   Client,
@@ -153,6 +153,20 @@ export default new MCPServer({
 }
 
 describe("runDev", () => {
+  it("creates a missing root tools.d.ts", async () => {
+    const cwd = copyFixture("dev-tools-declaration");
+    cleanups.push(() => removeDir(cwd));
+
+    const port = await getFreePort();
+    const dev = await startDev(cwd, port);
+    cleanups.push(dev.stop);
+
+    expect(existsSync(join(cwd, "tools.d.ts"))).toBe(true);
+    expect(readFileSync(join(cwd, "tools.d.ts"), "utf8")).toContain(
+      'tools: typeof import("./src/index.js")'
+    );
+  });
+
   it("serves the MCP endpoint and reloads on file change", async () => {
     const cwd = copyFixture("dev");
     cleanups.push(() => removeDir(cwd));
