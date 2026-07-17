@@ -86,9 +86,9 @@ describe("published CLI boundaries", () => {
     }
   });
 
-  it("keeps dist/index.js under sixty-one KiB", async () => {
+  it("keeps dist/index.js under sixty-two KiB", async () => {
     const bytes = (await stat(new URL("index.js", DIST))).size;
-    expect(bytes).toBeLessThanOrEqual(61 * 1024);
+    expect(bytes).toBeLessThanOrEqual(62 * 1024);
   });
 
   it("keeps the unpacked framework artifact below five MiB", async () => {

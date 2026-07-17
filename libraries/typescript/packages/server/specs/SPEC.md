@@ -61,6 +61,7 @@ server.tool(
     inputSchema: z.object({ city: z.string().describe("…") }),
     outputSchema: z.object({ city: z.string(), temperature: z.string() }),
     annotations: { readOnlyHint: true },
+    _meta: { "weather.example/version": 2 },
   },
   async ({ city }, ctx) => {
     const data = { city, temperature: "22°C" };
@@ -71,14 +72,27 @@ server.tool(
   }
 );
 
-server.resource({ name: "config", uri: "config://settings" }, async (uri) => ({
-  contents: [
-    { uri: uri.href, mimeType: "application/json", text: `{"theme":"dark"}` },
-  ],
-}));
+server.resource(
+  {
+    name: "config",
+    uri: "config://settings",
+    annotations: { audience: ["assistant"], priority: 0.8 },
+    _meta: { "config.example/category": "settings" },
+  },
+  async (uri) => ({
+    contents: [
+      { uri: uri.href, mimeType: "application/json", text: `{"theme":"dark"}` },
+    ],
+  }),
+);
 
 server.resourceTemplate(
-  { name: "users", uriTemplate: "db://users/{id}" },
+  {
+    name: "users",
+    uriTemplate: "db://users/{id}",
+    annotations: { audience: ["assistant"] },
+    _meta: { "db.example/entity": "user" },
+  },
   async (uri, params, ctx) => ({
     contents: [{ uri: uri.href, text: String(params.id) }], // params typed from the template
   })
@@ -106,6 +120,10 @@ await server.listen(3000); // Node HTTP
 const fetch = server.getHandler(); // web-standard handler (edge/tests)
 server.basePath; // readonly accessor (default "/mcp") — lets tooling introspect the mount point
 ```
+
+Definition descriptors use the official SDK contracts directly. `ToolDefinition.annotations` is `ToolAnnotations`; `ResourceDefinition.annotations` and `ResourceTemplateDefinition.annotations` are the general `Annotations` type; all three definitions accept `_meta: MetaObject`. `Annotations`, `ToolAnnotations`, and `MetaObject` are re-exported from `mcp-use`. Annotations are standardized MCP hints with defined fields and semantics. `_meta` is the extension bag: custom keys should be vendor-namespaced so they do not collide with protocol or MCP Apps keys. The registry passes annotations and metadata to the official SDK registration config without changing their values; shallow copies made during per-request replay prevent SDK registration from mutating caller-owned metadata.
+
+Definition `_meta` is advertised only on the corresponding list descriptor: `tools/list`, `resources/list`, or `resources/templates/list`. It is not a result channel. A tool callback's result `_meta` describes one invocation, and a `resources/read` content item's `_meta` describes that content item; neither is populated from definition metadata. View/visibility tools have one registration-boundary exception: framework-owned MCP Apps keys are derived from the declared `view` and `visibility` fields and merged with custom tool definition metadata under the precedence rules in `VIEWS_SPEC.md`; unrelated vendor keys remain intact.
 
 Result model (raw wire shapes; see the no-response-helpers ground rule): tool callbacks return the SDK's `CallToolResult`, resource callbacks `ReadResourceResult` (each `contents` entry addresses itself with the read `uri` and carries its own `mimeType`; the definition's `mimeType` is listing metadata only), prompt callbacks `GetPromptResult` (`description` passes through verbatim — the definition's is not injected). `ToolResult<TOutput>` in `src/tools.ts` encodes the SDK's runtime rule at compile time: tools **without** an `outputSchema` accept any `CallToolResult`; tools **with** one must return `structuredContent` matching the schema's inferred type — any JSON root, per the 2026 wire — or set `isError: true` (the SDK exempts `isError` results from output validation; anything else without `structuredContent` throws at call time).
 

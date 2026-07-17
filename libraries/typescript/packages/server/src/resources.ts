@@ -1,4 +1,8 @@
-import type { ReadResourceResult } from "@modelcontextprotocol/server";
+import type {
+  Annotations,
+  MetaObject,
+  ReadResourceResult,
+} from "@modelcontextprotocol/server";
 
 import type { RequestContext } from "./context.js";
 
@@ -17,6 +21,16 @@ export interface ResourceDefinition {
    * own `mimeType` on the wire — set it in the callback's result.
    */
   mimeType?: string;
+  /** Standard MCP hints describing the resource's audience and presentation. */
+  annotations?: Annotations;
+  /**
+   * Extension metadata advertised on this resource's `resources/list`
+   * descriptor. Use vendor-namespaced keys for custom data.
+   *
+   * This value is not copied into `resources/read` content entries; content
+   * metadata must be returned by the callback on each entry's own `_meta`.
+   */
+  _meta?: MetaObject;
 }
 
 /**
@@ -50,6 +64,17 @@ export interface ResourceTemplateDefinition {
   description?: string;
   /** MIME type of the content. */
   mimeType?: string;
+  /** Standard MCP hints describing resources produced by this template. */
+  annotations?: Annotations;
+  /**
+   * Extension metadata advertised on this template's
+   * `resources/templates/list` descriptor. Use vendor-namespaced keys for
+   * custom data.
+   *
+   * This value is not copied into `resources/read` content entries; content
+   * metadata must be returned by the callback on each entry's own `_meta`.
+   */
+  _meta?: MetaObject;
 }
 
 /** Strip a leading RFC 6570 operator (`+`, `#`, `.`, `/`, `;`, `?`, `&`) from a template expression. */

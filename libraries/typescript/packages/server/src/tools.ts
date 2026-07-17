@@ -1,6 +1,7 @@
 import type {
   CallToolResult,
   InputRequiredResult,
+  MetaObject,
   StandardSchemaWithJSON,
   ToolAnnotations,
 } from "@modelcontextprotocol/server";
@@ -78,6 +79,17 @@ export interface ToolDefinition {
   outputSchema?: StandardSchemaWithJSON;
   /** Behavioral hints for clients (readOnlyHint, destructiveHint, …). */
   annotations?: ToolAnnotations;
+  /**
+   * Extension metadata advertised on this tool's `tools/list` descriptor.
+   *
+   * Use vendor-namespaced keys for custom data. This definition metadata is
+   * distinct from a tool callback result's `_meta`: it describes the tool,
+   * while result `_meta` belongs to one invocation. For view-bound or
+   * visibility-restricted tools, framework-owned MCP Apps keys are derived
+   * from {@link ToolDefinition.view} and {@link ToolDefinition.visibility};
+   * those derived values take precedence over colliding entries here.
+   */
+  _meta?: MetaObject;
   /**
    * Declares who may call or see the tool. Emitted as `_meta.ui.visibility`
    * on `tools/list`. Omitted = host default (callable by the model, visible

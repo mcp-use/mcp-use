@@ -11,7 +11,26 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { MCPServer, completable } from "../src/index.js";
-import type { ServerConfig, StandardSchemaWithJSON } from "../src/index.js";
+import type {
+  MetaObject,
+  ServerConfig,
+  StandardSchemaWithJSON,
+} from "../src/index.js";
+
+const toolDefinitionMeta: MetaObject = {
+  "example.com/tool": {
+    enabled: true,
+    exactValues: [null, false, 0, "", { nested: [1, 2, 3] }],
+  },
+};
+
+const resourceDefinitionMeta: MetaObject = {
+  "example.com/resource": { category: "configuration" },
+};
+
+const templateDefinitionMeta: MetaObject = {
+  "example.com/resource-template": { category: "generated" },
+};
 
 /**
  * Hand-rolled Standard Schema (validate + JSON Schema converter, no zod):
@@ -74,12 +93,14 @@ function buildServer(): MCPServer {
         temperature: z.string(),
       }),
       annotations: { readOnlyHint: true },
+      _meta: toolDefinitionMeta,
     },
     async ({ city }) => {
       const data = { city, conditions: "sunny", temperature: "22°C" };
       return {
         content: [{ type: "text", text: JSON.stringify(data) }],
         structuredContent: data,
+        _meta: { "example.com/result": { scope: "tool-call" } },
       };
     }
   );
@@ -131,6 +152,12 @@ function buildServer(): MCPServer {
       name: "config",
       uri: "config://settings",
       description: "Server configuration",
+      annotations: {
+        audience: ["assistant"],
+        priority: 0.8,
+        lastModified: "2026-07-17T12:00:00Z",
+      },
+      _meta: resourceDefinitionMeta,
     },
     async (uri) => ({
       contents: [
@@ -138,6 +165,7 @@ function buildServer(): MCPServer {
           uri: uri.href,
           mimeType: "application/json",
           text: JSON.stringify({ theme: "dark", language: "en" }),
+          _meta: { "example.com/content": { scope: "read-result" } },
         },
       ],
     })
@@ -161,6 +189,8 @@ function buildServer(): MCPServer {
       uriTemplate: "greeting://{name}",
       description: "Personalized greeting",
       mimeType: "text/plain",
+      annotations: { audience: ["user"], priority: 0.5 },
+      _meta: templateDefinitionMeta,
     },
     async (uri, params) => ({
       contents: [
@@ -168,6 +198,7 @@ function buildServer(): MCPServer {
           uri: uri.href,
           mimeType: "text/plain",
           text: `Hello, ${String(params.name)}!`,
+          _meta: { "example.com/content": { scope: "template-read" } },
         },
       ],
     })
@@ -249,6 +280,7 @@ describe("MCPServer (phase 1, e2e over HTTP)", () => {
     expect(weather?.title).toBe("Fetch weather");
     expect(weather?.description).toBe("Fetch the weather for a city");
     expect(weather?.annotations?.readOnlyHint).toBe(true);
+    expect(weather?._meta).toEqual(toolDefinitionMeta);
     expect(weather?.inputSchema).toMatchObject({
       type: "object",
       required: ["city"],
@@ -267,6 +299,10 @@ describe("MCPServer (phase 1, e2e over HTTP)", () => {
       conditions: "sunny",
       temperature: "22°C",
     });
+    expect(result._meta).toEqual({
+      "example.com/result": { scope: "tool-call" },
+    });
+    expect(result._meta).not.toHaveProperty("example.com/tool");
   });
 
   it("supports non-object structuredContent roots (2026-07-28 wire)", async () => {
@@ -344,7 +380,15 @@ describe("MCPServer (phase 1, e2e over HTTP)", () => {
 
   it("lists and reads a static resource as JSON", async () => {
     const { resources } = await client.listResources();
-    expect(resources.map((r) => r.uri)).toContain("config://settings");
+    const config = resources.find(
+      (resource) => resource.uri === "config://settings"
+    );
+    expect(config?.annotations).toEqual({
+      audience: ["assistant"],
+      priority: 0.8,
+      lastModified: "2026-07-17T12:00:00Z",
+    });
+    expect(config?._meta).toEqual(resourceDefinitionMeta);
 
     const result = await client.readResource({ uri: "config://settings" });
     const [content] = result.contents;
@@ -357,13 +401,22 @@ describe("MCPServer (phase 1, e2e over HTTP)", () => {
       theme: "dark",
       language: "en",
     });
+    expect(content._meta).toEqual({
+      "example.com/content": { scope: "read-result" },
+    });
+    expect(content._meta).not.toHaveProperty("example.com/resource");
   });
 
   it("reads a templated resource with extracted variables", async () => {
     const { resourceTemplates } = await client.listResourceTemplates();
-    expect(resourceTemplates.map((t) => t.uriTemplate)).toContain(
-      "greeting://{name}"
+    const greeting = resourceTemplates.find(
+      (template) => template.uriTemplate === "greeting://{name}"
     );
+    expect(greeting?.annotations).toEqual({
+      audience: ["user"],
+      priority: 0.5,
+    });
+    expect(greeting?._meta).toEqual(templateDefinitionMeta);
 
     const result = await client.readResource({ uri: "greeting://world" });
     const [content] = result.contents;
@@ -372,6 +425,53 @@ describe("MCPServer (phase 1, e2e over HTTP)", () => {
     }
     expect(content.mimeType).toBe("text/plain");
     expect(content.text).toBe("Hello, world!");
+    expect(content._meta).toEqual({
+      "example.com/content": { scope: "template-read" },
+    });
+    expect(content._meta).not.toHaveProperty("example.com/resource-template");
+  });
+
+  it("replays definition metadata independently across concurrent requests", async () => {
+    const originalToolMeta = JSON.stringify(toolDefinitionMeta);
+    const originalResourceMeta = JSON.stringify(resourceDefinitionMeta);
+    const originalTemplateMeta = JSON.stringify(templateDefinitionMeta);
+
+    const [toolsA, toolsB, resourcesA, resourcesB, templatesA, templatesB] =
+      await Promise.all([
+        client.listTools(),
+        client.listTools(),
+        client.listResources(),
+        client.listResources(),
+        client.listResourceTemplates(),
+        client.listResourceTemplates(),
+      ]);
+
+    expect(
+      toolsA.tools.find((tool) => tool.name === "fetch-weather")?._meta
+    ).toEqual(toolDefinitionMeta);
+    expect(
+      toolsB.tools.find((tool) => tool.name === "fetch-weather")?._meta
+    ).toEqual(toolDefinitionMeta);
+    expect(
+      resourcesA.resources.find((resource) => resource.name === "config")?._meta
+    ).toEqual(resourceDefinitionMeta);
+    expect(
+      resourcesB.resources.find((resource) => resource.name === "config")?._meta
+    ).toEqual(resourceDefinitionMeta);
+    expect(
+      templatesA.resourceTemplates.find(
+        (template) => template.name === "greeting"
+      )?._meta
+    ).toEqual(templateDefinitionMeta);
+    expect(
+      templatesB.resourceTemplates.find(
+        (template) => template.name === "greeting"
+      )?._meta
+    ).toEqual(templateDefinitionMeta);
+
+    expect(JSON.stringify(toolDefinitionMeta)).toBe(originalToolMeta);
+    expect(JSON.stringify(resourceDefinitionMeta)).toBe(originalResourceMeta);
+    expect(JSON.stringify(templateDefinitionMeta)).toBe(originalTemplateMeta);
   });
 
   it("lists prompts and renders one with arguments", async () => {

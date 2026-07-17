@@ -41,6 +41,17 @@ export type {
   ReadResourceResult,
 } from "@modelcontextprotocol/server";
 /**
+ * Official SDK descriptor metadata contracts. Tools use
+ * {@link ToolAnnotations}; resources and resource templates use
+ * {@link Annotations}; every descriptor's extension `_meta` uses
+ * {@link MetaObject}.
+ */
+export type {
+  Annotations,
+  MetaObject,
+  ToolAnnotations,
+} from "@modelcontextprotocol/server";
+/**
  * Official SDK helpers for authoring and reading multi-round-trip
  * `input_required` results.
  */

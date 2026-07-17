@@ -971,7 +971,11 @@ export class MCPServer<TUser = never> {
   ): void {
     const view = definition.view;
 
-    const toolUiMeta = buildToolUiMeta(view?.name, definition.visibility);
+    const toolMeta = buildToolUiMeta(
+      view?.name,
+      definition.visibility,
+      definition._meta
+    );
     const config = {
       ...(definition.title !== undefined && { title: definition.title }),
       ...(definition.description !== undefined && {
@@ -983,7 +987,7 @@ export class MCPServer<TUser = never> {
       ...(definition.outputSchema !== undefined && {
         outputSchema: definition.outputSchema,
       }),
-      ...(toolUiMeta !== undefined && { _meta: toolUiMeta }),
+      ...(toolMeta !== undefined && { _meta: toolMeta }),
     };
     const wireResultMeta =
       view !== undefined ? buildToolResultUiMeta(view.name) : undefined;
@@ -1102,6 +1106,12 @@ export class MCPServer<TUser = never> {
         ...(definition.mimeType !== undefined && {
           mimeType: definition.mimeType,
         }),
+        ...(definition.annotations !== undefined && {
+          annotations: definition.annotations,
+        }),
+        ...(definition._meta !== undefined && {
+          _meta: { ...definition._meta },
+        }),
       },
       async (uri, ctx) => callback(uri, this.#toRequestContext(ctx))
     );
@@ -1124,6 +1134,12 @@ export class MCPServer<TUser = never> {
         }),
         ...(definition.mimeType !== undefined && {
           mimeType: definition.mimeType,
+        }),
+        ...(definition.annotations !== undefined && {
+          annotations: definition.annotations,
+        }),
+        ...(definition._meta !== undefined && {
+          _meta: { ...definition._meta },
         }),
       },
       async (uri, variables, ctx) =>
