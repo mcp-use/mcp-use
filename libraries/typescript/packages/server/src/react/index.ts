@@ -21,6 +21,7 @@ export { ThemeProvider } from "./components/theme-provider.js";
 export { ViewControls } from "./components/view-controls.js";
 export { useCallTool, type CallToolHandle } from "./hooks/use-call-tool.js";
 export { useDisplayMode } from "./hooks/use-display-mode.js";
+export { useFiles } from "./hooks/use-files.js";
 export {
   useHostContext,
   type HostContextHandle,
@@ -39,6 +40,7 @@ export {
   type Register,
   type RegisteredTools,
 } from "./types/register.js";
+export type { FileMetadata, UseFilesResult } from "./types/file-types.js";
 export type {
   DisplayMode,
   HostCapabilities,
