@@ -52,6 +52,7 @@ import {
 } from "./inspector-shell.js";
 import { requestLogger } from "./logging.js";
 import { createMcpMount } from "./mount-mcp.js";
+import { normalizeCompletions } from "./resource-completion.js";
 import type { NodeRequestHandler } from "./node-bridge.js";
 import { registerOpenAPITools } from "./openapi/index.js";
 import type { FromOpenAPIOptions } from "./openapi/types.js";
@@ -145,6 +146,8 @@ interface ResourceTemplateEntry<TUser> {
     TUser,
     HasOAuth<TUser>
   >;
+  /** SDK callback map normalized once at author-time registration. */
+  complete?: ReturnType<typeof normalizeCompletions>;
 }
 
 /** Prompt definition and type-erased callback retained for request-time replay. */
@@ -388,17 +391,22 @@ export class MCPServer<TUser = never> {
    * `string`), which is what lets `InferTemplateParams` type the callback's
    * `params` from the template's variables.
    */
-  resourceTemplate<const T extends ResourceTemplateDefinition>(
-    definition: T,
+  resourceTemplate<const TUriTemplate extends string>(
+    definition: ResourceTemplateDefinition<TUriTemplate>,
     callback: ResourceTemplateCallback<
-      InferTemplateParams<T>,
+      InferTemplateParams<{ uriTemplate: TUriTemplate }>,
       TUser,
       HasOAuth<TUser>
     >
   ): this {
     this.#assertNotStarted("resourceTemplate", definition.name);
+    const complete =
+      definition.complete === undefined
+        ? undefined
+        : normalizeCompletions(definition.complete);
     this.#resourceTemplates.set(definition.name, {
       definition,
+      ...(complete !== undefined && { complete }),
       callback: callback as ResourceTemplateCallback<
         Record<string, TemplateVariableValue>,
         TUser,
@@ -1362,10 +1370,11 @@ export class MCPServer<TUser = never> {
 
   #registerResourceTemplate(
     server: SdkMcpServer,
-    { definition, callback }: ResourceTemplateEntry<TUser>
+    { definition, callback, complete }: ResourceTemplateEntry<TUser>
   ): void {
     const template = new ResourceTemplate(definition.uriTemplate, {
       list: undefined,
+      ...(complete !== undefined && { complete }),
     });
     server.registerResource(
       definition.name,

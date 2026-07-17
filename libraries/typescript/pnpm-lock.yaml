@@ -706,6 +706,22 @@ importers:
         specifier: 7.0.1-rc
         version: 7.0.1-rc
 
+  packages/server/examples/resource-template-completion:
+    dependencies:
+      mcp-use:
+        specifier: workspace:*
+        version: link:../..
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.2
+        version: 24.13.2
+      typescript:
+        specifier: 7.0.1-rc
+        version: 7.0.1-rc
+      vite:
+        specifier: '>=8.0.5'
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.1)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.3)
+
   packages/server/examples/vercel:
     dependencies:
       mcp-use:

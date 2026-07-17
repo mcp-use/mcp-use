@@ -16,6 +16,26 @@ export type CompletionCallback = (
 ) => string[] | Promise<string[]>;
 
 /**
+ * Build the shared case-insensitive prefix completer used by static values.
+ *
+ * @param values - Values retained in declaration order and stringified once.
+ * @returns A callback that filters the values against an untrimmed prefix.
+ *
+ * @internal
+ */
+export function createPrefixCompletion(
+  values: ReadonlyArray<string | number | boolean>
+): (value: unknown) => string[] {
+  const strings = values.map(String);
+  return (value) => {
+    const prefix = String(value ?? "").toLowerCase();
+    return strings.filter((candidate) =>
+      candidate.toLowerCase().startsWith(prefix)
+    );
+  };
+}
+
+/**
  * Make a schema field completable so clients can request autocomplete
  * suggestions via `completion/complete`.
  *
@@ -47,9 +67,5 @@ export function completable<T extends StandardSchemaV1>(
       complete(String(value ?? ""), context)
     );
   }
-  const values = complete.map(String);
-  return sdkCompletable(schema, (value) => {
-    const prefix = String(value ?? "").toLowerCase();
-    return values.filter((v) => v.toLowerCase().startsWith(prefix));
-  });
+  return sdkCompletable(schema, createPrefixCompletion(complete));
 }

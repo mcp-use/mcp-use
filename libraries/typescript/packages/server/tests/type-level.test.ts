@@ -285,6 +285,45 @@ describe("template variable inference", () => {
     );
     expect(true).toBe(true); // assertions above are compile-time
   });
+
+  it("infers completion keys and the official callback context", () => {
+    const server = new MCPServer({ name: "types", version: "0.0.0" });
+    server.resourceTemplate(
+      {
+        name: "completed",
+        uriTemplate: "repo://{owner}/{repo}{?ref}",
+        complete: {
+          owner: ["modelcontextprotocol"] as const,
+          repo: async (value, context) => {
+            expectTypeOf(value).toEqualTypeOf<string>();
+            expectTypeOf(context?.arguments).toEqualTypeOf<
+              Record<string, string> | undefined
+            >();
+            // @ts-expect-error The pinned SDK does not expose cancellation here.
+            void context?.signal;
+            // @ts-expect-error The pinned SDK does not expose request auth here.
+            void context?.auth;
+            return [value];
+          },
+          ref: (value) => [value],
+        },
+      },
+      async (uri) => ({ contents: [{ uri: uri.href, text: "ok" }] })
+    );
+
+    server.resourceTemplate(
+      {
+        name: "invalid-completion-key",
+        uriTemplate: "repo://{owner}/{repo}",
+        complete: {
+          // @ts-expect-error "branch" is not a variable in the literal template.
+          branch: ["main"],
+        },
+      },
+      async (uri) => ({ contents: [{ uri: uri.href, text: "ok" }] })
+    );
+    expect(true).toBe(true);
+  });
 });
 
 describe("ToolRef inference", () => {

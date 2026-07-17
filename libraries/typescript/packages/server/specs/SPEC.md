@@ -90,9 +90,16 @@ server.resource(
 server.resourceTemplate(
   {
     name: "users",
-    uriTemplate: "db://users/{id}",
+    uriTemplate: "db://users/{region}/{id}",
     annotations: { audience: ["assistant"] },
     _meta: { "db.example/entity": "user" },
+    complete: {
+      region: ["us-east", "us-west"],
+      id: async (value, context) =>
+        listUserIds(context?.arguments?.region).then((ids) =>
+          ids.filter((id) => id.startsWith(value))
+        ),
+    },
   },
   async (uri, params, ctx) => ({
     contents: [{ uri: uri.href, text: String(params.id) }], // params typed from the template
@@ -157,7 +164,8 @@ For the common human-input path, `await ctx.elicit(key, message, schemaOrUrl)` c
 6. `inputSchema`/`outputSchema` accept any Standard Schema validator with JSON Schema support (`StandardSchemaWithJSON`), not just zod (old package: zod peer dep). Tool definitions also accept `schema` as an alias for `inputSchema`. Zod v4 schemas work unchanged; zod is no longer a dependency of this package.
 7. Tools declaring an `outputSchema` must return matching `structuredContent` or an `isError: true` result — content-only returns are a **compile-time** error (old package: compiled, then failed at call time in output validation). Not protocol-forced, but the protocol rule made real in types (`ToolResult<TOutput>` over raw `CallToolResult`); `tests/type-level.test.ts` pins it, including non-object schema roots (`z.array(…)`, `z.number()`).
 8. `resourceTemplate()` uses a `const` type parameter so `uriTemplate` stays a string literal through inference — without it TS widens object-literal properties to `string` and template-param typing silently degrades to `Record<string, string | string[]>` (it had, undetected, before the type-level tests). Template inference handles RFC 6570 operators, comma-separated variable lists, and `*`/`:n` modifiers.
-9. The modern wire is the per-request `_meta` envelope, not a handshake (see the 2026-07-28-first ground rule; 2025-era clients are served through the stateless legacy fallback by default, or rejected under `legacy: "reject"`). The official client connects modern with `versionNegotiation: { mode: { pin: "2026-07-28" } }` (or `'auto'`) — its default is the legacy handshake. Hand-rolled modern requests carry the per-request `_meta` envelope (`protocolVersion`/`clientInfo`/`clientCapabilities` keys) plus `mcp-protocol-version`/`mcp-method` headers, and `mcp-name` mirroring `params.name` on name-addressed methods; modern exchanges answer with a single JSON body (`responseMode: 'auto'`), not SSE framing.
+9. Resource-template completions live in the definition's `complete` map. Literal `uriTemplate` values restrict keys to variables extracted by the same RFC 6570-aware inference used for read params; widened string templates fall back to string keys. A value is either a readonly string array or the official SDK `CompleteResourceTemplateCallback`, so dynamic completion may be synchronous or asynchronous and receives `(currentValue, { arguments?: Record<string, string> })`. Static arrays preserve declaration order and use case-insensitive, untrimmed prefix matching. The SDK owns the protocol result: it truncates `values` to 100, sets `total` to the callback array length, and sets `hasMore` when that length exceeds 100. Missing variable completers return an empty completion, an unknown resource-template URI is an invalid-params error, and callback errors propagate as protocol errors. The SDK does not provide request `ServerContext`, auth, progress, or cancellation to resource-template completion callbacks, so this API does not claim those capabilities. Completions are replayed through the ordinary per-request resource-template registry for both modern and stateless legacy traffic; duplicate names retain the registry's last-registration-wins behavior and registration remains frozen after `listen()`/`getHandler()`.
+10. The modern wire is the per-request `_meta` envelope, not a handshake (see the 2026-07-28-first ground rule; 2025-era clients are served through the stateless legacy fallback by default, or rejected under `legacy: "reject"`). The official client connects modern with `versionNegotiation: { mode: { pin: "2026-07-28" } }` (or `'auto'`) — its default is the legacy handshake. Hand-rolled modern requests carry the per-request `_meta` envelope (`protocolVersion`/`clientInfo`/`clientCapabilities` keys) plus `mcp-protocol-version`/`mcp-method` headers, and `mcp-name` mirroring `params.name` on name-addressed methods; modern exchanges answer with a single JSON body (`responseMode: 'auto'`), not SSE framing.
 
 ### Browser landing page
 
