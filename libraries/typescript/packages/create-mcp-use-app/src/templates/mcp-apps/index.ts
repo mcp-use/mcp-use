@@ -15,7 +15,7 @@ const server = new MCPServer({
   description: "An MCP Apps server built with mcp-use",
 });
 
-server.tool(
+export const searchFruits = server.tool(
   {
     name: "search-fruits",
     description: "Search the fruit catalog",

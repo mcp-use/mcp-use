@@ -33,7 +33,8 @@
     "clean": "rimraf dist tsconfig.tsbuildinfo",
     "copy-templates": "node scripts/copy-templates.js",
     "dev": "tsc --build --watch",
-    "test": "vitest --run --passWithNoTests",
+    "test": "vitest --run --passWithNoTests && pnpm run test:templates",
+    "test:templates": "pnpm --filter @mcp-use/client build && pnpm --filter mcp-use build && node scripts/test-templates.js",
     "test:cli": "./test-cli.sh",
     "test:cli:full": "RUN_INSTALL_TESTS=yes ./test-cli.sh",
     "lint": "eslint ."

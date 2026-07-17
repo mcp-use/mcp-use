@@ -19,7 +19,8 @@
     "build": "mcp-use build",
     "dev": "mcp-use dev",
     "start": "mcp-use start",
-    "deploy": "mcp-use deploy"
+    "deploy": "mcp-use deploy",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "mcp-use": "workspace:*",
