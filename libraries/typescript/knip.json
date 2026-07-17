@@ -1,10 +1,14 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "rules": {
-    "optionalPeerDependencies": "off"
+    "optionalPeerDependencies": "off",
+    "exports": "warn",
+    "types": "warn"
   },
   "ignoreWorkspaces": [
+    "packages/client/examples/**",
     "packages/create-mcp-use-app/src/templates/**",
+    "packages/server/examples/**",
     "test_app"
   ],
   "workspaces": {
@@ -22,6 +26,15 @@
       "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"],
       "ignoreBinaries": ["npx"],
       "ignoreDependencies": ["mcp-use"]
+    },
+    "packages/agent": {
+      "entry": [
+        "src/index.ts",
+        "src/browser-agent.ts",
+        "src/langchain.ts",
+        "tests/**/*.ts"
+      ],
+      "project": ["src/**/*.ts", "tests/**/*.ts"]
     },
     "packages/cli": {
       "entry": ["src/index.ts", "tests/**/*.mjs"],

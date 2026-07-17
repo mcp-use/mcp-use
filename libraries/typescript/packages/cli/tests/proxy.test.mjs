@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
 
@@ -15,8 +16,8 @@ test("delegates the compatibility binary to mcp-use", async () => {
   );
   const { stdout, stderr } = await execFileAsync(
     process.execPath,
-    [new URL("../dist/index.js", import.meta.url).pathname, "--version"],
-    { cwd: new URL("..", import.meta.url) }
+    [fileURLToPath(new URL("../dist/index.js", import.meta.url)), "--version"],
+    { cwd: fileURLToPath(new URL("..", import.meta.url)) }
   );
 
   assert.equal(stderr, "");
