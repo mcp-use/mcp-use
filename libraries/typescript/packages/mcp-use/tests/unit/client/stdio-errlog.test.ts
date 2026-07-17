@@ -43,10 +43,10 @@ describe("StdioConnectionManager errlog", () => {
     await transport.start();
     try {
       await new Promise<void>((resolve, reject) => {
-        const deadline = setTimeout(
-          () => reject(new Error(`errlog never received marker; got: "${data()}"`)),
-          3000
-        );
+        const deadline = setTimeout(() => {
+          clearInterval(poll);
+          reject(new Error(`errlog never received marker; got: "${data()}"`));
+        }, 3000);
         const poll = setInterval(() => {
           if (data().includes("ERR_MARKER_1899")) {
             clearTimeout(deadline);

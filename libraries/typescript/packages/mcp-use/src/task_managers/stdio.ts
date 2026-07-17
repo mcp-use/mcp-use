@@ -45,8 +45,12 @@ export class StdioConnectionManager extends ConnectionManager<StdioClientTranspo
       this._transport.stderr &&
       typeof (this._transport.stderr as any).pipe === "function"
     ) {
+      // end: false — errlog is caller-owned (and may be shared or process
+      // stderr); the child exiting must not close it, or a reconnect could
+      // never forward stderr again.
       (this._transport.stderr as unknown as NodeJS.ReadableStream).pipe(
-        this.errlog
+        this.errlog,
+        { end: false }
       );
     }
 
