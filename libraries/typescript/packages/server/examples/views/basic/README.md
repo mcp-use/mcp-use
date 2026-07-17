@@ -112,6 +112,37 @@ the initial View context. Host environment comes from `useHostContext()` /
 `useOpenExternal()`, and `useDisplayMode()`. See
 [Views spec — Channel visibility](../../../specs/VIEWS_SPEC.md#channel-visibility-what-the-model-sees-vs-what-the-view-sees).
 
+## Definition metadata versus result metadata
+
+`_meta` on a tool definition is advertised by `tools/list`; `_meta` returned by
+its callback belongs only to that invocation. They are not copied into one
+another. Use vendor-namespaced keys for custom definition metadata:
+
+```ts
+server.tool(
+  {
+    name: "search-fruits",
+    _meta: { "fruit.example/catalog-version": 3 },
+    view: { name: "product-search-result" },
+    outputSchema: resultsSchema,
+  },
+  async () => ({
+    content: [{ type: "text", text: "Found fruits" }],
+    structuredContent: { query: "", items: [] },
+    _meta: { "fruit.example/request-cache": "hit" },
+  })
+);
+```
+
+The same distinction applies to resources: `annotations` and `_meta` on a
+resource or resource-template definition appear in `resources/list` or
+`resources/templates/list`; metadata for `resources/read` is authored on each
+returned `contents[]` entry. General resource annotations use the exported
+`Annotations` type, while tools use `ToolAnnotations`. For view-bound tools,
+the framework derives `ui.resourceUri`, `ui.visibility`, and the legacy flat
+`ui/resourceUri`; those keys follow the declared `view`/`visibility` fields on
+collision, while unrelated custom keys are preserved.
+
 ## Images and CSP
 
 Static files in the project-root `public/` folder are served under

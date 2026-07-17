@@ -7,15 +7,88 @@
  */
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { z } from "zod";
+import type {
+  Annotations as SdkAnnotations,
+  MetaObject as SdkMetaObject,
+  ToolAnnotations as SdkToolAnnotations,
+} from "@modelcontextprotocol/server";
 
 import { MCPServer } from "../src/index.js";
 import type {
+  Annotations,
   CallToolResult,
   InputRequiredResult,
+  MetaObject,
+  ResourceDefinition,
+  ResourceTemplateDefinition,
+  ToolAnnotations,
+  ToolDefinition,
   ToolResult,
 } from "../src/index.js";
 
 const outputSchema = z.object({ answer: z.number() });
+
+describe("definition metadata types", () => {
+  it("re-exports the official SDK annotation and metadata contracts", () => {
+    expectTypeOf<Annotations>().toEqualTypeOf<SdkAnnotations>();
+    expectTypeOf<ToolAnnotations>().toEqualTypeOf<SdkToolAnnotations>();
+    expectTypeOf<MetaObject>().toEqualTypeOf<SdkMetaObject>();
+  });
+
+  it("accepts official metadata shapes on all public descriptors", () => {
+    const tool: ToolDefinition = {
+      name: "metadata-tool",
+      annotations: { readOnlyHint: true, openWorldHint: false },
+      _meta: { "example.com/tool": { enabled: true } },
+    };
+    const resource: ResourceDefinition = {
+      name: "metadata-resource",
+      uri: "metadata://resource",
+      annotations: {
+        audience: ["user", "assistant"],
+        priority: 0.5,
+        lastModified: "2026-07-17T12:00:00Z",
+      },
+      _meta: { "example.com/resource": [null, false, 0, ""] },
+    };
+    const template: ResourceTemplateDefinition = {
+      name: "metadata-template",
+      uriTemplate: "metadata://{id}",
+      annotations: { audience: ["assistant"] },
+      _meta: { "example.com/template": { version: 1 } },
+    };
+    expect([tool, resource, template]).toBeDefined();
+  });
+
+  it("rejects shapes excluded by the official SDK contracts", () => {
+    const tool: ToolDefinition = {
+      name: "invalid-tool",
+      annotations: {
+        // @ts-expect-error — resource priority is not a ToolAnnotations field
+        priority: 0.5,
+      },
+      // @ts-expect-error — descriptor _meta must be a string-keyed object
+      _meta: "not-an-object",
+    };
+    const resource: ResourceDefinition = {
+      name: "invalid-resource",
+      uri: "invalid://resource",
+      annotations: {
+        // @ts-expect-error — general Annotations audience uses MCP roles
+        audience: ["model"],
+        // @ts-expect-error — lastModified is an RFC 3339 string
+        lastModified: 123,
+      },
+    };
+    const template: ResourceTemplateDefinition = {
+      name: "invalid-template",
+      uriTemplate: "invalid://{id}",
+      // @ts-expect-error — arrays are not MetaObject records
+      _meta: [],
+    };
+    expect([tool, resource, template]).toBeDefined();
+  });
+});
 
 describe("ToolResult resolution", () => {
   it("accepts regular and input-required results without an output type", () => {

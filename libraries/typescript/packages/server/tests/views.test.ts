@@ -20,7 +20,9 @@ import {
 import { z } from "zod";
 
 import { MCPServer, registerViews } from "../src/index.js";
+import type { MetaObject } from "../src/index.js";
 import { synthesizeViewDocument } from "../src/views/document.js";
+import { buildToolUiMeta } from "../src/views/wire.js";
 
 const UI_CAPABILITIES = {
   extensions: {
@@ -34,6 +36,18 @@ const resultsSchema = z.object({
   query: z.string(),
   items: z.array(z.object({ id: z.string(), name: z.string() })),
 });
+
+const searchDefinitionMeta = JSON.parse(`{
+  "example.com/tool": {"enabled": true},
+  "ui": {
+    "customField": {"preserved": true},
+    "resourceUri": "ui://views/spoofed.html",
+    "visibility": ["app"]
+  },
+  "ui/resourceUri": "ui://views/spoofed.html",
+  "__proto__": {"polluted": true}
+}`) as MetaObject;
+const searchDefinitionMetaSnapshot = JSON.stringify(searchDefinitionMeta);
 
 function primeViews(server: MCPServer): void {
   server[registerViews]({
@@ -72,6 +86,7 @@ function buildViewsServer(): MCPServer {
         fail: z.boolean().optional(),
       }),
       outputSchema: resultsSchema,
+      _meta: searchDefinitionMeta,
       view: {
         name: "product-search-result",
         description: "Product search results grid",
@@ -100,6 +115,15 @@ function buildViewsServer(): MCPServer {
     {
       name: "app-only-action",
       visibility: "app",
+      _meta: {
+        "example.com/tool": { kind: "app-action" },
+        ui: {
+          customField: "preserved",
+          resourceUri: "ui://views/spoofed.html",
+          visibility: ["model"],
+        },
+        "ui/resourceUri": "ui://views/spoofed.html",
+      },
       outputSchema: z.object({ ok: z.boolean() }),
       view: { name: "app-only-view" },
     },
@@ -140,6 +164,24 @@ function buildViewsServer(): MCPServer {
   return server;
 }
 
+describe("tool definition metadata merge", () => {
+  it("treats prototype-like keys as data without mutating the source", () => {
+    const merged = buildToolUiMeta(
+      "product-search-result",
+      undefined,
+      searchDefinitionMeta
+    );
+    expect(merged?.["__proto__"]).toEqual({ polluted: true });
+    expect(
+      Object.prototype.hasOwnProperty.call(merged ?? {}, "__proto__")
+    ).toBe(true);
+    expect(Object.prototype).not.toHaveProperty("polluted");
+    expect(JSON.stringify(searchDefinitionMeta)).toBe(
+      searchDefinitionMetaSnapshot
+    );
+  });
+});
+
 describe("views server core (e2e over HTTP)", () => {
   const server = buildViewsServer();
   let url: string;
@@ -176,10 +218,18 @@ describe("views server core (e2e over HTTP)", () => {
     const { tools } = await uiClient.listTools();
     const search = tools.find((t) => t.name === "search-fruits");
     expect(search?._meta).toMatchObject({
-      ui: { resourceUri: "ui://views/product-search-result.html" },
+      "example.com/tool": { enabled: true },
+      ui: {
+        customField: { preserved: true },
+        resourceUri: "ui://views/product-search-result.html",
+      },
       "ui/resourceUri": "ui://views/product-search-result.html",
     });
     expect(search?._meta?.["ui"]).not.toHaveProperty("visibility");
+    expect(Object.prototype).not.toHaveProperty("polluted");
+    expect(JSON.stringify(searchDefinitionMeta)).toBe(
+      searchDefinitionMetaSnapshot
+    );
   });
 
   it("emits ui meta on tools/list for plain clients too", async () => {
@@ -198,7 +248,48 @@ describe("views server core (e2e over HTTP)", () => {
     expect(appOnly?._meta?.["ui"]).toMatchObject({
       visibility: ["app"],
       resourceUri: "ui://views/app-only-view.html",
+      customField: "preserved",
     });
+    expect(appOnly?._meta?.["example.com/tool"]).toEqual({
+      kind: "app-action",
+    });
+    expect(appOnly?._meta?.["ui/resourceUri"]).toBe(
+      "ui://views/app-only-view.html"
+    );
+  });
+
+  it("isolates merged tool metadata across per-request reconstruction", async () => {
+    const [first, concurrent] = await Promise.all([
+      uiClient.listTools(),
+      plainClient.listTools(),
+    ]);
+    const firstSearch = first.tools.find(
+      (tool) => tool.name === "search-fruits"
+    );
+    const concurrentSearch = concurrent.tools.find(
+      (tool) => tool.name === "search-fruits"
+    );
+    expect(firstSearch?._meta).toEqual(concurrentSearch?._meta);
+
+    const firstUi = firstSearch?._meta?.["ui"] as
+      | Record<string, unknown>
+      | undefined;
+    if (firstUi !== undefined) {
+      firstUi["resourceUri"] = "ui://views/client-mutated.html";
+    }
+
+    const replayed = await uiClient.listTools();
+    expect(
+      replayed.tools.find((tool) => tool.name === "search-fruits")?._meta?.[
+        "ui"
+      ]
+    ).toMatchObject({
+      customField: { preserved: true },
+      resourceUri: "ui://views/product-search-result.html",
+    });
+    expect(JSON.stringify(searchDefinitionMeta)).toBe(
+      searchDefinitionMetaSnapshot
+    );
   });
 
   it("emits ui.visibility without resourceUri for view-less visibility:app tools", async () => {

@@ -1,3 +1,5 @@
+import type { MetaObject } from "@modelcontextprotocol/server";
+
 import type { ViewManifestEntry, ViewResourceFacts } from "./types.js";
 import {
   UI_META_KEY,
@@ -19,34 +21,64 @@ import {
  * When `viewName` is set, emits `ui.resourceUri` plus the legacy flat
  * {@link UI_RESOURCE_URI_META_KEY} key. When `visibility` is set, emits
  * `ui.visibility: [visibility]`. Either may be set independently — a
- * view-less tool can still declare app-only visibility. Returns
- * `undefined` when both are unset so the caller omits `_meta`.
+ * view-less tool can still declare app-only visibility. Returns `undefined`
+ * only when no view, visibility, or existing metadata is provided.
  *
  * @param viewName - Bound view directory / manifest key, or `undefined` when
  * the tool has no view.
  * @param visibility - Optional model/app visibility narrowing from the tool
  * definition's top-level `visibility` field.
+ * @param existingMetadata - Optional author-supplied definition metadata. Other
+ * keys pass through, while framework-owned resource URI and visibility keys
+ * are derived exclusively from `viewName` and `visibility`.
  * @returns Wire metadata for the tool listing, or `undefined` when there is
  * nothing to emit.
  */
 export function buildToolUiMeta(
   viewName: string | undefined,
-  visibility: "model" | "app" | undefined
-): Record<string, unknown> | undefined {
-  if (viewName === undefined && visibility === undefined) {
+  visibility: "model" | "app" | undefined,
+  existingMetadata?: MetaObject
+): MetaObject | undefined {
+  if (
+    viewName === undefined &&
+    visibility === undefined &&
+    existingMetadata === undefined
+  ) {
     return undefined;
   }
 
-  const ui: Record<string, unknown> = {};
-  const meta: Record<string, unknown> = { [UI_META_KEY]: ui };
+  const meta: MetaObject = { ...existingMetadata };
+  const existingUi = existingMetadata?.[UI_META_KEY];
+  const existingUiIsObject =
+    typeof existingUi === "object" &&
+    existingUi !== null &&
+    !Array.isArray(existingUi);
+  const ui: MetaObject = existingUiIsObject ? { ...existingUi } : {};
 
   if (viewName !== undefined) {
     const resourceUri = viewResourceUri(viewName);
     ui["resourceUri"] = resourceUri;
     meta[UI_RESOURCE_URI_META_KEY] = resourceUri;
+  } else {
+    // These keys describe the top-level view contract. Do not advertise an
+    // author-supplied URI when the tool has no declared view.
+    delete ui["resourceUri"];
+    delete meta[UI_RESOURCE_URI_META_KEY];
   }
+
   if (visibility !== undefined) {
     ui["visibility"] = [visibility];
+  } else {
+    // Visibility is likewise derived exclusively from the top-level field.
+    delete ui["visibility"];
+  }
+
+  if (
+    viewName !== undefined ||
+    visibility !== undefined ||
+    existingUiIsObject
+  ) {
+    meta[UI_META_KEY] = ui;
   }
 
   return meta;

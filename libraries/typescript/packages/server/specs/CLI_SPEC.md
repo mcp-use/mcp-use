@@ -354,6 +354,7 @@ Budgets are measured on Linux x64 in the CI-pinned Node 24 container image; the 
 | packed `.tgz` bytes | 2 MiB |
 | package `unpackedSize` from `npm pack --json` | 5 MiB |
 | clean-install `node_modules` bytes (including Vite/platform optional deps) | 100 MiB |
+| edge-safe `dist/index.js` bytes | 62 KiB |
 | tool-only `.mcp-use/build/` fixture | 1 MiB |
 | committed basic-view fixture output (self-contained JS + CSS before compression) | 2.5 MiB |
 
