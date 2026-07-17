@@ -14,5 +14,6 @@
     "rootDir": "."
   },
   "include": ["src/**/*", "tests/**/*"],
-  "exclude": ["node_modules", "dist", "tests/cli/.tmp"]
+  // Deno URL imports and globals are validated by the dedicated Deno workflow.
+  "exclude": ["node_modules", "dist", "tests/cli/.tmp", "tests/deno"]
 }
