@@ -250,32 +250,31 @@ supabase storage cp -r dist/resources/widgets ss://widgets/ --experimental
 and then set the environment variables for Supabase deployments:
 
 ```bash
-# MCP_URL: Where widget assets (JS/CSS) are stored
-export MCP_URL="https://YOUR_PROJECT_REF.supabase.co/storage/v1/object/public/widgets"
+# MCP_URL: Where the MCP server runs (OAuth resource, API calls, connectDomains CSP)
+export MCP_URL="https://YOUR_PROJECT_REF.supabase.co/functions/v1/YOUR_FUNCTION_NAME"
 
-# MCP_SERVER_URL: Where the MCP server runs (for API calls in widgets)
-export MCP_SERVER_URL="https://YOUR_PROJECT_REF.supabase.co/functions/v1/YOUR_FUNCTION_NAME"
+# MCP_ASSETS_URL: Where view assets (JS/CSS) and public/ files are stored
+export MCP_ASSETS_URL="https://YOUR_PROJECT_REF.supabase.co/storage/v1/object/public/widgets"
 
 # CSP_URLS: Supabase project URL (for Content Security Policy). See [Content Security Policy](/typescript/mcp-apps/content-security-policy) for full CSP docs.
 export CSP_URLS="https://YOUR_PROJECT_REF.supabase.co"
 ```
 
 <Note>
-  **URLs Required**: Supabase deployments need these URLs because widget files
-  are served from static storage while API calls go to the edge function: -
-  `MCP_URL`: Where widget assets are stored - `MCP_SERVER_URL`: Enables
-  build-time URL injection for static deployments - `CSP_URLS`: Whitelists the
-  Supabase project domain in the Content Security Policy (use base URL without
-  path)
+  **URLs Required**: Supabase deployments split server and assets because view files
+  are served from static storage while the MCP server runs on the edge function:
+  - `MCP_URL`: Server origin (edge function)
+  - `MCP_ASSETS_URL`: Asset CDN prefix (Storage bucket); also set at **build** time to rewrite manifest paths
+  - `CSP_URLS`: Whitelists the Supabase project domain in CSP (base URL without path)
 </Note>
 
 ### 5. Build the mcp-use app
 
 ```bash
 echo $MCP_URL
-# should output: https://YOUR_PROJECT_REF.supabase.co/storage/v1/object/public/widgets
-echo $MCP_SERVER_URL
 # should output: https://YOUR_PROJECT_REF.supabase.co/functions/v1/YOUR_FUNCTION_NAME
+echo $MCP_ASSETS_URL
+# should output: https://YOUR_PROJECT_REF.supabase.co/storage/v1/object/public/widgets
 ```
 
 <CodeGroup>
@@ -303,8 +302,11 @@ static_files = [ "./functions/mcp-server/dist/**/*.html", "./functions/mcp-serve
 Set environment variables **before deploying** so the MCP server can configure Content Security Policy (CSP) to allow widgets to make API calls and load assets:
 
 ```bash
-# MCP_URL: Server URL for API calls
+# MCP_URL: Server origin for OAuth/API/CSP connectDomains
 supabase secrets set MCP_URL="https://YOUR_PROJECT_REF.supabase.co/functions/v1/mcp-server" --project-ref YOUR_PROJECT_REF
+
+# MCP_ASSETS_URL: Asset CDN prefix (runtime + must match build-time value)
+supabase secrets set MCP_ASSETS_URL="https://YOUR_PROJECT_REF.supabase.co/storage/v1/object/public/widgets" --project-ref YOUR_PROJECT_REF
 
 # CSP_URLS: Supabase project URL (without path) to allow storage and function access
 supabase secrets set CSP_URLS="https://YOUR_PROJECT_REF.supabase.co" --project-ref YOUR_PROJECT_REF
@@ -312,8 +314,9 @@ supabase secrets set CSP_URLS="https://YOUR_PROJECT_REF.supabase.co" --project-r
 
 <Note>
 **Environment Variables:**
-- `MCP_URL`: Whitelists the edge function domain for API calls from widgets
-- `CSP_URLS`: Whitelists the Supabase project URL (without path) for widget assets (JS/CSS) and storage access. Use the base project URL like `https://nnpumlykjksvxivhywwo.supabase.co` (no `/storage/*` or other paths needed). Supports comma-separated values for multiple domains.
+- `MCP_URL`: Server origin (edge function) — OAuth resource URL and `connectDomains` CSP
+- `MCP_ASSETS_URL`: Asset CDN prefix for view JS/CSS and `public/` URLs
+- `CSP_URLS`: Whitelists the Supabase project URL (without path). Supports comma-separated values.
 
 **Important**: Set these before deploying the function. If you set them after deployment, you must redeploy for the changes to take effect.
 

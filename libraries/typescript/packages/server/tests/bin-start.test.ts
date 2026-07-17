@@ -107,6 +107,11 @@ describe("parseArgs", () => {
     expect(parseArgs(["dev"]).open).toBe(true);
   });
 
+  it("parses --with-inspector for build", () => {
+    expect(parseArgs(["build", "--with-inspector"]).withInspector).toBe(true);
+    expect(parseArgs(["build"]).withInspector).toBe(false);
+  });
+
   it("parses help and version flags", () => {
     expect(parseArgs(["--help"]).help).toBe(true);
     expect(parseArgs(["-h"]).help).toBe(true);

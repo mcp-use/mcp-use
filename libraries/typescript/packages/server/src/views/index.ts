@@ -17,8 +17,15 @@ export type {
   ViewsManifest,
 } from "./types.js";
 export { synthesizeViewDocument, resolveAssetUrl } from "./document.js";
-export { resolveRequestOrigin } from "./origin.js";
-export { createViewPublicHandler } from "./routes.js";
+export {
+  resolveRequestOrigin,
+  resolveServerOrigin,
+  resolveAssetsBase,
+  originFromAssetsBase,
+  hasExplicitAssetsBase,
+} from "./origin.js";
+export { parseDomainList, buildMergedResourceCsp } from "./csp-env.js";
+export { createViewPublicHandler, createViewAssetsHandler } from "./routes.js";
 export {
   extractClientCapabilitiesFromBody,
   getStashedClientCapabilities,
@@ -30,4 +37,5 @@ export {
   buildToolResultUiMeta,
   buildToolUiMeta,
   viewResourceConfig,
+  type BuildResourceUiMetaOptions,
 } from "./wire.js";

@@ -497,6 +497,9 @@ importers:
 
   packages/server:
     dependencies:
+      '@modelcontextprotocol/client':
+        specifier: https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee
+        version: https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee
       '@modelcontextprotocol/ext-apps':
         specifier: https://pkg.pr.new/@modelcontextprotocol/ext-apps@432d42bb02a569078ab31ab6458428df6027809d
         version: https://pkg.pr.new/@modelcontextprotocol/ext-apps@432d42bb02a569078ab31ab6458428df6027809d(@modelcontextprotocol/client@https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee)(@modelcontextprotocol/core@https://pkg.pr.new/@modelcontextprotocol/core@f60b40179b0f090f6d64248be1312245a160b5ee)(@modelcontextprotocol/server@https://pkg.pr.new/@modelcontextprotocol/server@f60b40179b0f090f6d64248be1312245a160b5ee)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.4.3)
@@ -522,9 +525,6 @@ importers:
       '@mcp-use/client':
         specifier: workspace:*
         version: link:../client
-      '@modelcontextprotocol/client':
-        specifier: https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee
-        version: https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee
       '@modelcontextprotocol/core':
         specifier: https://pkg.pr.new/@modelcontextprotocol/core@f60b40179b0f090f6d64248be1312245a160b5ee
         version: https://pkg.pr.new/@modelcontextprotocol/core@f60b40179b0f090f6d64248be1312245a160b5ee

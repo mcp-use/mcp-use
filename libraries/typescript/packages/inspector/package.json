@@ -1,7 +1,7 @@
 {
   "name": "@mcp-use/inspector",
   "type": "module",
-  "version": "20.0.0-beta.0",
+  "version": "20.0.0-beta.1",
   "description": "MCP Inspector - A tool for inspecting and debugging MCP servers",
   "author": "",
   "license": "MIT",
@@ -58,7 +58,7 @@
     "build:server": "tsup 'src/server/**/*.ts' --format esm --out-dir dist/server && tsc -p tsconfig.server.json --emitDeclarationOnly --declaration",
     "build:cli": "tsup src/server/cli.ts --format esm --out-dir dist/",
     "prepublishOnly": "pnpm --filter @mcp-use/client build && pnpm build",
-    "start": "node dist/server/server.js",
+    "start": "node dist/cli.js --port 3000",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
     "lint": "eslint .",

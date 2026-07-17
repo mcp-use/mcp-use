@@ -31,9 +31,9 @@ export const DEFAULT_INSPECTOR_ASSETS_URL = `https://cdn.jsdelivr.net/npm/@mcp-u
 /**
  * Derive the stylesheet URL that accompanies an inspector bundle URL.
  *
- * The CDN build ships as `inspector@{version}.js` + `inspector@{version}.css`
+ * The CDN build ships as dist/cdn/inspector.js + dist/cdn/inspector.css
  * plus sibling lazy chunks referenced by the entry script. The stylesheet URL
- * URL is the script URL with its `.js` suffix swapped for `.css`. Query
+ * is the script URL with its `.js` suffix swapped for `.css`. Query
  * strings and fragments are preserved.
  */
 export function inspectorStylesUrl(assetsUrl: string): string {

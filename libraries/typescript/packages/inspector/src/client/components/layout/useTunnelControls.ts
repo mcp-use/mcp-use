@@ -24,6 +24,15 @@ async function fetchDevInfo(): Promise<DevInfo | null> {
   }
 }
 
+/** `dev/info` exists only under `mcp-use dev`; standalone `pnpm start` has no route. */
+function hasDevCliApi(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    (window as { __MCP_INSPECTOR_MODE__?: string }).__MCP_INSPECTOR_MODE__ !==
+    "standalone"
+  );
+}
+
 export function useTunnelControls({
   tunnelUrl,
   setTunnelUrl,
@@ -78,6 +87,10 @@ export function useTunnelControls({
 
   useEffect(() => {
     let cancelled = false;
+    if (!hasDevCliApi()) {
+      setDevFromCli(false);
+      return;
+    }
     (async () => {
       const info = await fetchDevInfo();
       if (cancelled) return;

@@ -8,7 +8,15 @@ import {
 } from "@modelcontextprotocol/client";
 import { mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { z } from "zod";
 
 import { MCPServer, registerViews } from "../src/index.js";
@@ -226,7 +234,9 @@ describe("views server core (e2e over HTTP)", () => {
     expect(view?.description).toBe("Product search results grid");
     expect(view?._meta?.["ui"]).toMatchObject({
       csp: {
-        connectDomains: [],
+        connectDomains: expect.arrayContaining([
+          expect.stringMatching(/^https?:\/\//),
+        ]),
         resourceDomains: [
           "https://images.example.com",
           expect.stringMatching(/^https?:\/\//),
@@ -247,7 +257,9 @@ describe("views server core (e2e over HTTP)", () => {
     expect(view?.description).toBe("Product search results grid");
     expect(view?._meta?.["ui"]).toMatchObject({
       csp: {
-        connectDomains: [],
+        connectDomains: expect.arrayContaining([
+          expect.stringMatching(/^https?:\/\//),
+        ]),
         resourceDomains: [
           "https://images.example.com",
           expect.stringMatching(/^https?:\/\//),
@@ -276,7 +288,9 @@ describe("views server core (e2e over HTTP)", () => {
     expect(content.text).toContain("/mcp/_mcp-use/public/");
     expect(content._meta?.["ui"]).toMatchObject({
       csp: {
-        connectDomains: [],
+        connectDomains: expect.arrayContaining([
+          expect.stringMatching(/^https?:\/\//),
+        ]),
         resourceDomains: [
           "https://images.example.com",
           expect.stringMatching(/^https?:\/\//),
@@ -295,7 +309,9 @@ describe("views server core (e2e over HTTP)", () => {
     const content = read.contents[0];
     expect(content?._meta?.["ui"]).toMatchObject({
       csp: {
-        connectDomains: [],
+        connectDomains: expect.arrayContaining([
+          expect.stringMatching(/^https?:\/\//),
+        ]),
         resourceDomains: [
           "https://images.example.com",
           expect.stringMatching(/^https?:\/\//),
@@ -329,7 +345,9 @@ describe("views server core (e2e over HTTP)", () => {
       | undefined;
     expect(ui).toMatchObject({
       csp: {
-        connectDomains: [],
+        connectDomains: expect.arrayContaining([
+          expect.stringMatching(/^https?:\/\//),
+        ]),
         resourceDomains: [expect.stringMatching(/^https?:\/\//)],
       },
     });
@@ -344,7 +362,9 @@ describe("views server core (e2e over HTTP)", () => {
     });
     expect(read.contents[0]?._meta?.["ui"]).toMatchObject({
       csp: {
-        connectDomains: [],
+        connectDomains: expect.arrayContaining([
+          expect.stringMatching(/^https?:\/\//),
+        ]),
         resourceDomains: [expect.stringMatching(/^https?:\/\//)],
       },
     });
@@ -379,7 +399,9 @@ describe("views server core (e2e over HTTP)", () => {
     const ui = appOnly?._meta?.["ui"] as Record<string, unknown> | undefined;
     expect(ui).toMatchObject({
       csp: {
-        connectDomains: [],
+        connectDomains: expect.arrayContaining([
+          expect.stringMatching(/^https?:\/\//),
+        ]),
         resourceDomains: [expect.stringMatching(/^https?:\/\//)],
       },
     });
@@ -396,7 +418,9 @@ describe("views server core (e2e over HTTP)", () => {
     expect(orphan?.description).toBeUndefined();
     expect(orphan?._meta?.["ui"]).toMatchObject({
       csp: {
-        connectDomains: [],
+        connectDomains: expect.arrayContaining([
+          expect.stringMatching(/^https?:\/\//),
+        ]),
         resourceDomains: [expect.stringMatching(/^https?:\/\//)],
       },
     });
@@ -839,7 +863,8 @@ describe("views document synthesis", () => {
         scripts: ["/@vite/client"],
       },
       "http://localhost:3000",
-      "/mcp"
+      "/mcp",
+      "demo"
     );
     expect(html).toContain(
       'src="http://localhost:3000/@id/__x00__virtual:mcp-use/views/demo"'
@@ -847,18 +872,34 @@ describe("views document synthesis", () => {
     expect(html).toContain('src="http://localhost:3000/@vite/client"');
   });
 
-  it("rejects non-origin-absolute external manifest paths", () => {
+  it("resolves view-relative production asset paths", () => {
+    const html = synthesizeViewDocument(
+      {
+        kind: "external",
+        entry: "assets/entry.js",
+        css: [],
+      },
+      "http://localhost:3000",
+      "/mcp",
+      "demo-view"
+    );
+    expect(html).toContain(
+      'src="http://localhost:3000/mcp/_mcp-use/views/demo-view/assets/entry.js"'
+    );
+  });
+
+  it("requires viewName for external entries without origin-absolute paths", () => {
     expect(() =>
       synthesizeViewDocument(
         {
           kind: "external",
-          entry: "views/demo/assets/entry.js",
+          entry: "assets/entry.js",
           css: [],
         },
         "http://localhost:3000",
         "/mcp"
       )
-    ).toThrow(/origin-absolute/);
+    ).toThrow(/viewName is required/);
   });
 });
 
@@ -1001,9 +1042,158 @@ describe("views prod CSP (e2e over HTTP)", () => {
     const connectDomains = (
       view?._meta?.["ui"] as { csp?: { connectDomains?: string[] } } | undefined
     )?.csp?.connectDomains;
-    expect(connectDomains).toEqual(["https://api.example.com"]);
+    expect(connectDomains).toEqual(
+      expect.arrayContaining(["https://api.example.com"])
+    );
+    expect(
+      connectDomains?.some(
+        (d) => d.includes("localhost") || d.includes("127.0.0.1")
+      )
+    ).toBe(true);
 
     await client.close();
     await server.close();
+  });
+});
+
+describe("views env URL / CSP (e2e)", () => {
+  const env = process.env;
+
+  const UI_META_ENVELOPE = {
+    "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+    "io.modelcontextprotocol/clientInfo": {
+      name: "env-test",
+      version: "0.0.0",
+    },
+    "io.modelcontextprotocol/clientCapabilities": UI_CAPABILITIES,
+  };
+
+  async function handlerMcp(
+    handler: (request: Request) => Promise<Response>,
+    method: string,
+    params: Record<string, unknown> = {}
+  ): Promise<Record<string, unknown>> {
+    const headers: Record<string, string> = {
+      "content-type": "application/json",
+      accept: "application/json, text/event-stream",
+      "mcp-protocol-version": "2026-07-28",
+      "mcp-method": method,
+    };
+    if (typeof params["uri"] === "string") {
+      headers["mcp-name"] = params["uri"];
+    }
+    const response = await handler(
+      new Request("http://127.0.0.1:3000/mcp", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method,
+          params: { ...params, _meta: UI_META_ENVELOPE },
+        }),
+      })
+    );
+    return (await response.json()) as Record<string, unknown>;
+  }
+
+  afterEach(() => {
+    process.env = env;
+  });
+
+  it("uses MCP_ASSETS_URL for asset hrefs and MCP_URL for connect CSP", async () => {
+    process.env.MCP_URL = "https://server.example.com/mcp";
+    process.env.MCP_ASSETS_URL =
+      "https://cdn.example.com/storage/v1/object/public/widgets";
+    delete process.env.CSP_URLS;
+
+    const server = new MCPServer({
+      name: "env-split-test",
+      version: "1.0.0",
+      basePath: "/mcp",
+    });
+    server[registerViews]({
+      "product-search-result": {
+        kind: "external",
+        entry: "assets/demo.js",
+        css: ["assets/demo.css"],
+      },
+    });
+    server.tool(
+      {
+        name: "search",
+        inputSchema: z.object({}),
+        outputSchema: z.object({ ok: z.boolean() }),
+        view: { name: "product-search-result" },
+      },
+      async () => ({
+        structuredContent: { ok: true },
+        content: [{ type: "text", text: "ok" }],
+      })
+    );
+
+    const handler = server.getHandler();
+    const readBody = await handlerMcp(handler, "resources/read", {
+      uri: "ui://views/product-search-result.html",
+    });
+    const content = (
+      readBody["result"] as {
+        contents: {
+          text: string;
+          _meta?: { ui?: { csp?: Record<string, string[]> } };
+        }[];
+      }
+    ).contents[0]!;
+    expect(content.text).toContain(
+      "https://cdn.example.com/storage/v1/object/public/widgets/mcp/_mcp-use/views/product-search-result/assets/demo.js"
+    );
+    const csp = content._meta?.ui?.csp;
+    expect(csp?.connectDomains).toContain("https://server.example.com");
+    expect(csp?.resourceDomains).toContain("https://cdn.example.com");
+    expect(csp?.resourceDomains).not.toContain("https://server.example.com");
+  });
+
+  it("applies CSP_URLS to all four categories before MCP auto-append", async () => {
+    process.env.MCP_URL = "https://server.example.com";
+    process.env.CSP_URLS = "https://platform.example.com";
+    delete process.env.MCP_ASSETS_URL;
+
+    const server = new MCPServer({
+      name: "csp-urls-test",
+      version: "1.0.0",
+    });
+    server[registerViews]({
+      demo: { kind: "inline", js: "export {};", css: "" },
+    });
+    server.tool(
+      {
+        name: "t",
+        inputSchema: z.object({}),
+        outputSchema: z.object({ ok: z.boolean() }),
+        view: { name: "demo" },
+      },
+      async () => ({
+        structuredContent: { ok: true },
+        content: [{ type: "text", text: "ok" }],
+      })
+    );
+
+    const handler = server.getHandler();
+    const listBody = await handlerMcp(handler, "resources/list");
+    const view = (
+      listBody["result"] as {
+        resources: {
+          uri: string;
+          _meta?: { ui?: { csp?: Record<string, string[]> } };
+        }[];
+      }
+    ).resources.find((r) => r.uri === "ui://views/demo.html");
+    const viewCsp = view?._meta?.ui?.csp;
+    expect(viewCsp?.connectDomains?.[0]).toBe("https://platform.example.com");
+    expect(viewCsp?.connectDomains).toContain("https://server.example.com");
+    expect(viewCsp?.resourceDomains?.[0]).toBe("https://platform.example.com");
+    expect(viewCsp?.resourceDomains).toContain("https://server.example.com");
+    expect(viewCsp?.frameDomains).toEqual(["https://platform.example.com"]);
+    expect(viewCsp?.baseUriDomains).toEqual(["https://platform.example.com"]);
   });
 });

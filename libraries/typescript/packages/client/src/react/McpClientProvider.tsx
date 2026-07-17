@@ -1159,31 +1159,38 @@ export function McpClientProvider({
     [serverConfigs, defaultCapabilities, defaultServerConfig]
   );
 
+  // ponytail: OAuth callback must not auto-connect saved servers — a 401 on that
+  // page runs SDK auth() and overwrites the in-flight PKCE verifier before finishAuth.
+  const skipServerConnections =
+    typeof window !== "undefined" &&
+    /\/oauth\/callback\/?$/.test(window.location.pathname);
+
   return (
     <McpClientContext.Provider value={contextValue}>
       {children}
-      {mergedServerConfigs.map((config) => (
-        <McpServerWrapper
-          key={`${config.id}-v${serverRevisions[config.id] ?? 0}`}
-          id={config.id}
-          options={config.options}
-          defaultCallbackUrl={defaultCallbackUrl}
-          defaultOAuthProxyUrl={defaultOAuthProxyUrl}
-          defaultProxyConfig={defaultProxyConfig}
-          defaultAutoProxyFallback={defaultAutoProxyFallback}
-          clientInfo={clientInfoForWrapper}
-          cachedMetadata={cachedMetadataRef.current[config.id]}
-          onUpdate={handleServerUpdate}
-          onUpdateConfig={updateServer}
-          onUpdateDisplayName={(id, displayName) =>
-            updateServerMetadata(id, { name: displayName })
-          }
-          onReconnect={reconnectServer}
-          rpcWrapTransport={rpcWrapTransport}
-          onGlobalSamplingRequest={onSamplingRequest}
-          onGlobalElicitationRequest={onElicitationRequest}
-        />
-      ))}
+      {!skipServerConnections &&
+        mergedServerConfigs.map((config) => (
+          <McpServerWrapper
+            key={`${config.id}-v${serverRevisions[config.id] ?? 0}`}
+            id={config.id}
+            options={config.options}
+            defaultCallbackUrl={defaultCallbackUrl}
+            defaultOAuthProxyUrl={defaultOAuthProxyUrl}
+            defaultProxyConfig={defaultProxyConfig}
+            defaultAutoProxyFallback={defaultAutoProxyFallback}
+            clientInfo={clientInfoForWrapper}
+            cachedMetadata={cachedMetadataRef.current[config.id]}
+            onUpdate={handleServerUpdate}
+            onUpdateConfig={updateServer}
+            onUpdateDisplayName={(id, displayName) =>
+              updateServerMetadata(id, { name: displayName })
+            }
+            onReconnect={reconnectServer}
+            rpcWrapTransport={rpcWrapTransport}
+            onGlobalSamplingRequest={onSamplingRequest}
+            onGlobalElicitationRequest={onElicitationRequest}
+          />
+        ))}
     </McpClientContext.Provider>
   );
 }
