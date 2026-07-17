@@ -29,6 +29,7 @@ try {
   for (const name of packages) {
     const packed = JSON.parse(
       run("pnpm", [
+        "--config.node-linker=hoisted",
         "--filter",
         name,
         "pack",
@@ -54,6 +55,13 @@ try {
         );
     }
     const files = new Set(packed.files.map(({ path }) => path));
+    for (const dependency of manifest.bundledDependencies ?? []) {
+      const prefix = `node_modules/${dependency}/`;
+      if (![...files].some((file) => file.startsWith(prefix)))
+        throw new Error(
+          `${name} is missing bundled dependency ${dependency} from its tarball`
+        );
+    }
     for (const bin of Object.values(manifest.bin ?? {})) {
       const target = bin.replace(/^\.\//, "");
       if (!files.has(target))
