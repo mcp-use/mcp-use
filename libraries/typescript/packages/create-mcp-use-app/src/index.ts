@@ -1105,7 +1105,7 @@ async function main(): Promise<void> {
     console.log("   ├── resources/");
     console.log("   │   └── product-search-result/");
     console.log("   │       └── view.tsx");
-    console.log("   ├── src/register.d.ts");
+    console.log("   ├── tools.d.ts");
     console.log("   ├── index.ts (server entry point)");
     console.log("   ├── package.json");
     console.log("   ├── tsconfig.json");

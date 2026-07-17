@@ -98,6 +98,11 @@ describe("runBuild", () => {
 
     await runBuild({ cwd });
 
+    const toolsDeclaration = readFileSync(join(cwd, "tools.d.ts"), "utf8");
+    expect(toolsDeclaration).toContain(
+      'tools: typeof import("./src/index.js")'
+    );
+
     const buildDir = join(cwd, WORKSPACE_DIR_NAME, "build");
     const entryFile = join(buildDir, "index.js");
     expect(existsSync(entryFile)).toBe(true);
@@ -170,6 +175,18 @@ describe("runBuild", () => {
     expect(existsSync(join(cwd, WORKSPACE_DIR_NAME, "build", "index.js"))).toBe(
       true
     );
+  });
+
+  it("does not overwrite an existing tools.d.ts", async () => {
+    const cwd = copyFixture("build-existing-tools");
+    dirs.push(cwd);
+    const declarationPath = join(cwd, "tools.d.ts");
+    const existing = "// user-owned tool registry\nexport {};\n";
+    writeFileSync(declarationPath, existing);
+
+    await runBuild({ cwd });
+
+    expect(readFileSync(declarationPath, "utf8")).toBe(existing);
   });
 
   it("fails with the candidate list when no entry exists", async () => {
