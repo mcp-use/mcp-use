@@ -1,7 +1,8 @@
 import { Check, ChevronsUpDown, Eye, EyeOff, Key, Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/client/components/ui/button";
+import { TabsSubtle, TabsSubtleItem } from "@/client/components/ui/tabs-subtle";
 import {
   Command,
   CommandEmpty,
@@ -33,6 +34,7 @@ import {
 } from "@/client/components/ui/select";
 
 import { cn } from "@/client/lib/utils";
+import { MeshGradientCanvas } from "@/client/components/ui/MeshGradientCanvas";
 import {
   buildOllamaApiUrl,
   normalizeOllamaBaseUrl,
@@ -46,6 +48,7 @@ import {
 } from "./types";
 import {
   getProviderLabel,
+  ManufactWordmark,
   ProviderIcon,
   formatManagedModelName,
 } from "./providerMeta";
@@ -139,25 +142,40 @@ interface ConfigurationDialogProps {
   onClear?: () => void;
   showClearButton?: boolean;
   buttonLabel?: string;
+  /** Hosted inspector — use unified Configure Chat layout. */
+  hostedInspector?: boolean;
   /**
-   * When present, the dialog renders a "Manufact free tier" banner above the
-   * provider/api-key form, with a Login button that increases the tier.
-   * Used in hosted inspector mode (inspector.manufact.com) where the default
-   * LLM is provided server-side. Below the banner the user can still paste
-   * their own API key to switch to client-side mode + pick another model.
+   * When present, the dialog renders a mesh-gradient sign-in card above the
+   * provider/api-key form. Used in hosted inspector mode where the default
+   * LLM is provided server-side.
    */
   freeTierInfo?: {
     onLoginClick: () => void;
   };
-  /** Authenticated Manufact cloud tier — curated model picker. */
+  /** Authenticated hosted tier — Manufact cloud models + source tabs. */
   managedCloudInfo?: {
     models: CloudModel[];
     selectedModelId: string;
     onModelChange: (modelId: string) => void;
     isLoading?: boolean;
   };
-  /** Switch from BYOK back to Manufact cloud (when logged in). */
-  onUseManagedCloud?: () => void;
+  /** When true, chat uses Manufact cloud; drives the default config tab. */
+  useManagedCloud?: boolean;
+  /** Persist Manufact cloud selection and switch chat to managed mode. */
+  onSaveManagedCloud?: () => void;
+}
+
+const CHAT_CONFIG_TABS_ID = "chat-config-source";
+
+function cloudProviderToName(provider: string): ProviderName {
+  if (
+    provider === "openai" ||
+    provider === "anthropic" ||
+    provider === "google"
+  ) {
+    return provider;
+  }
+  return "openrouter";
 }
 
 async function fetchOpenAICompatibleModels(
@@ -314,9 +332,11 @@ export function ConfigurationDialog({
   onClear,
   showClearButton = false,
   buttonLabel: _buttonLabel = "Configure API Key",
+  hostedInspector = false,
   freeTierInfo,
   managedCloudInfo,
-  onUseManagedCloud,
+  useManagedCloud = false,
+  onSaveManagedCloud,
 }: ConfigurationDialogProps) {
   const [models, setModels] = useState<ModelOption[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
@@ -324,7 +344,18 @@ export function ConfigurationDialog({
   const [comboboxOpen, setComboboxOpen] = useState(false);
   const [cloudComboboxOpen, setCloudComboboxOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [configTabIndex, setConfigTabIndex] = useState(useManagedCloud ? 0 : 1);
   const modelsCacheKey = getModelsCacheKey(tempProvider, tempBaseUrl);
+  const isHostedLayout = Boolean(
+    hostedInspector || freeTierInfo || managedCloudInfo
+  );
+  const isCloudTab = Boolean(managedCloudInfo && configTabIndex === 0);
+
+  useEffect(() => {
+    if (open) {
+      setConfigTabIndex(useManagedCloud ? 0 : 1);
+    }
+  }, [open, useManagedCloud]);
 
   // Fetch models when API key / base URL is set and provider is selected
   useEffect(() => {
@@ -332,6 +363,7 @@ export function ConfigurationDialog({
     const needsBaseUrl = providerSupportsBaseUrl(tempProvider);
 
     if (
+      isCloudTab ||
       !open ||
       !tempProvider ||
       (needsApiKey && !tempApiKey.trim()) ||
@@ -392,14 +424,21 @@ export function ConfigurationDialog({
     // Debounce the API call
     const timeoutId = setTimeout(loadModels, 500);
     return () => clearTimeout(timeoutId);
-  }, [tempApiKey, tempBaseUrl, tempProvider, open, modelsCacheKey]);
+  }, [tempApiKey, tempBaseUrl, tempProvider, open, modelsCacheKey, isCloudTab]);
 
-  // Reset model when provider changes
+  // Reset model only when BYOK provider changes while dialog is open — not on open.
+  const prevByokProviderRef = useRef<ProviderName | null>(null);
   useEffect(() => {
-    if (open) {
+    if (!open || isCloudTab) {
+      if (!open) prevByokProviderRef.current = null;
+      return;
+    }
+    const prev = prevByokProviderRef.current;
+    if (prev !== null && prev !== tempProvider) {
       onModelChange("");
     }
-  }, [tempProvider, open, onModelChange]);
+    prevByokProviderRef.current = tempProvider;
+  }, [tempProvider, open, onModelChange, isCloudTab]);
 
   const showBaseUrlField = providerSupportsBaseUrl(tempProvider);
   const apiKeyOptional = !providerRequiresApiKey(tempProvider);
@@ -440,34 +479,262 @@ export function ConfigurationDialog({
   const selectedCloudModel = managedCloudInfo?.models.find(
     (m) => m.id === managedCloudInfo.selectedModelId
   );
+  const cloudProviders = Object.keys(cloudModelsByProvider);
+  const activeCloudProvider =
+    selectedCloudModel?.provider ?? cloudProviders[0] ?? "";
+  const cloudModelsForProvider = activeCloudProvider
+    ? (cloudModelsByProvider[activeCloudProvider] ?? [])
+    : [];
+  const showClear =
+    Boolean(onClear) &&
+    showClearButton &&
+    (!managedCloudInfo || configTabIndex === 1);
+
+  const handleSaveClick = () => {
+    if (isCloudTab && onSaveManagedCloud) {
+      onSaveManagedCloud();
+      return;
+    }
+    onSave();
+  };
+
+  const saveDisabled = isCloudTab
+    ? Boolean(
+        managedCloudInfo?.isLoading ||
+        !managedCloudInfo?.selectedModelId ||
+        managedCloudInfo?.models.length === 0
+      )
+    : (providerRequiresApiKey(tempProvider) && !tempApiKey.trim()) ||
+      (showBaseUrlField && !tempBaseUrl.trim()) ||
+      !tempModel.trim();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md" data-testid="chat-config-dialog">
         <DialogHeader>
           <DialogTitle>
-            {freeTierInfo || managedCloudInfo
-              ? "Model & usage"
-              : "LLM Provider Configuration"}
+            {isHostedLayout ? "Configure Chat" : "LLM Provider Configuration"}
           </DialogTitle>
           <DialogDescription>
             {managedCloudInfo
               ? "Pick a Manufact cloud model or bring your own API key."
               : freeTierInfo
-                ? "You're using Manufact's free tier. Sign in to increase your limits, or bring your own key to pick any model."
+                ? "Chat requires an LLM. You can chat for free if you have a Manufact account, or you can use your own API key (not sent to Manufact)."
                 : "Configure your LLM provider and API key to start chatting with the MCP server"}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
+          {freeTierInfo && (
+            <button
+              type="button"
+              onClick={freeTierInfo.onLoginClick}
+              data-testid="chat-config-sign-in-card"
+              className="relative w-full cursor-pointer overflow-hidden rounded-2xl text-left transition-opacity hover:opacity-95 active:opacity-90"
+            >
+              <div className="absolute inset-0 bg-[#edf2ff]" aria-hidden />
+              <MeshGradientCanvas
+                className="absolute inset-0 h-full w-full"
+                grainOverlay={0.15}
+              />
+              <div className="relative flex items-center justify-between gap-4 px-4 py-3.5">
+                <div className="text-sm font-medium text-black">
+                  <p>Chat for free with a</p>
+                  <p className="mt-1 flex items-center gap-1.5">
+                    <ManufactWordmark symbolSize={14} textClassName="text-sm" />
+                    account
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  render={<span aria-hidden="true" />}
+                  nativeButton={false}
+                  tabIndex={-1}
+                  className="pointer-events-none shrink-0"
+                >
+                  Sign in
+                </Button>
+              </div>
+            </button>
+          )}
           {managedCloudInfo && (
+            <div className="flex justify-center">
+              <TabsSubtle
+                selectedIndex={configTabIndex}
+                onSelect={setConfigTabIndex}
+                idPrefix={CHAT_CONFIG_TABS_ID}
+                className="w-fit"
+              >
+                <TabsSubtleItem index={0} label="Manufact cloud" />
+                <TabsSubtleItem index={1} label="API key" />
+              </TabsSubtle>
+            </div>
+          )}
+          <div className={cn("space-y-2", managedCloudInfo && "!mt-2")}>
+            <Label>Provider</Label>
+            {isCloudTab ? (
+              <Select
+                value={activeCloudProvider}
+                onValueChange={(provider) => {
+                  const nextModel = managedCloudInfo?.models.find(
+                    (model) => model.provider === provider
+                  );
+                  if (nextModel) {
+                    managedCloudInfo?.onModelChange(nextModel.id);
+                  }
+                }}
+              >
+                <SelectTrigger
+                  className="rounded-md"
+                  leading={
+                    activeCloudProvider ? (
+                      <ProviderIcon
+                        provider={cloudProviderToName(activeCloudProvider)}
+                        className="shrink-0"
+                      />
+                    ) : undefined
+                  }
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {cloudProviders.map((provider) => (
+                    <SelectItem
+                      key={provider}
+                      value={provider}
+                      label={getProviderLabel(cloudProviderToName(provider))}
+                    >
+                      <div className="flex items-center gap-2">
+                        <ProviderIcon
+                          provider={cloudProviderToName(provider)}
+                        />
+                        <span>
+                          {getProviderLabel(cloudProviderToName(provider))}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Select
+                value={tempProvider}
+                onValueChange={(v) => onProviderChange(v as ProviderName)}
+              >
+                <SelectTrigger
+                  className="rounded-md"
+                  leading={
+                    <ProviderIcon
+                      provider={tempProvider}
+                      className="shrink-0"
+                    />
+                  }
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="openai" label={getProviderLabel("openai")}>
+                    <div className="flex items-center gap-2">
+                      <ProviderIcon provider="openai" />
+                      <span>{getProviderLabel("openai")}</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem
+                    value="anthropic"
+                    label={getProviderLabel("anthropic")}
+                  >
+                    <div className="flex items-center gap-2">
+                      <ProviderIcon provider="anthropic" />
+                      <span>{getProviderLabel("anthropic")}</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="google" label={getProviderLabel("google")}>
+                    <div className="flex items-center gap-2">
+                      <ProviderIcon provider="google" />
+                      <span>{getProviderLabel("google")}</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="ollama" label={getProviderLabel("ollama")}>
+                    <div className="flex items-center gap-2">
+                      <ProviderIcon provider="ollama" />
+                      <span>{getProviderLabel("ollama")}</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem
+                    value="openrouter"
+                    label={getProviderLabel("openrouter")}
+                  >
+                    <div className="flex items-center gap-2">
+                      <ProviderIcon provider="openrouter" />
+                      <span>{getProviderLabel("openrouter")}</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem
+                    value="openai-compatible"
+                    label={getProviderLabel("openai-compatible")}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span>{getProviderLabel("openai-compatible")}</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          {!isCloudTab && showBaseUrlField && (
             <div className="space-y-2">
-              <Label>Manufact cloud model</Label>
-              {managedCloudInfo.isLoading ? (
+              <Label>Base URL</Label>
+              <Input
+                value={tempBaseUrl}
+                onChange={(e) => onBaseUrlChange(e.target.value)}
+                placeholder={baseUrlPlaceholder}
+                data-testid="chat-config-base-url-input"
+              />
+              {baseUrlHelp && (
+                <p className="text-xs text-muted-foreground">{baseUrlHelp}</p>
+              )}
+            </div>
+          )}
+
+          {!isCloudTab && (
+            <div className="space-y-2">
+              <Label>{apiKeyLabel}</Label>
+              <div className="relative">
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  value={tempApiKey}
+                  onChange={(e) => onApiKeyChange(e.target.value)}
+                  placeholder={apiKeyPlaceholder}
+                  className="pr-10"
+                  data-testid="chat-config-api-key-input"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">{apiKeyHelp}</p>
+            </div>
+          )}
+
+          {isCloudTab ? (
+            <div className="space-y-2">
+              <Label>Model</Label>
+              {managedCloudInfo?.isLoading ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span>Loading models…</span>
                 </div>
-              ) : managedCloudInfo.models.length > 0 ? (
+              ) : cloudModelsForProvider.length > 0 ? (
                 <Popover
                   open={cloudComboboxOpen}
                   modal={true}
@@ -486,13 +753,9 @@ export function ConfigurationDialog({
                           {selectedCloudModel ? (
                             <>
                               <ProviderIcon
-                                provider={
-                                  selectedCloudModel.provider === "anthropic" ||
-                                  selectedCloudModel.provider === "openai" ||
-                                  selectedCloudModel.provider === "google"
-                                    ? selectedCloudModel.provider
-                                    : "openrouter"
-                                }
+                                provider={cloudProviderToName(
+                                  selectedCloudModel.provider
+                                )}
                                 className="shrink-0"
                               />
                               <span className="truncate">
@@ -519,268 +782,25 @@ export function ConfigurationDialog({
                       />
                       <CommandList>
                         <CommandEmpty>No model found.</CommandEmpty>
-                        {Object.entries(cloudModelsByProvider).map(
-                          ([provider, providerModels]) => (
-                            <CommandGroup key={provider} heading={provider}>
-                              {providerModels.map((model) => (
-                                <CommandItem
-                                  key={model.id}
-                                  value={model.id}
-                                  keywords={[
-                                    model.name,
-                                    model.id,
-                                    model.provider,
-                                  ]}
-                                  onSelect={(currentValue) => {
-                                    managedCloudInfo.onModelChange(
-                                      currentValue
-                                    );
-                                    setCloudComboboxOpen(false);
-                                  }}
-                                >
-                                  <ProviderIcon
-                                    provider={
-                                      provider === "anthropic" ||
-                                      provider === "openai" ||
-                                      provider === "google"
-                                        ? provider
-                                        : "openrouter"
-                                    }
-                                    className="shrink-0"
-                                  />
-                                  {formatManagedModelName(
-                                    model.name,
-                                    model.provider
-                                  )}
-                                  <Check
-                                    className={cn(
-                                      "ml-auto h-4 w-4",
-                                      managedCloudInfo.selectedModelId ===
-                                        model.id
-                                        ? "opacity-100"
-                                        : "opacity-0"
-                                    )}
-                                  />
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          )
-                        )}
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Cloud models unavailable — sign in again or use your own key.
-                </p>
-              )}
-            </div>
-          )}
-          {onUseManagedCloud && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="w-full"
-              onClick={onUseManagedCloud}
-            >
-              Use Manufact cloud
-            </Button>
-          )}
-          {freeTierInfo && (
-            <div className="rounded-md border bg-muted/40 p-3 space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-sm">
-                  <div className="font-medium">Manufact free tier</div>
-                  <div className="text-xs text-muted-foreground">
-                    Sign in for increased generous limits.
-                  </div>
-                </div>
-                <Button size="sm" onClick={freeTierInfo.onLoginClick}>
-                  Sign in
-                </Button>
-              </div>
-            </div>
-          )}
-          {(freeTierInfo || managedCloudInfo) && (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <div className="h-px flex-1 bg-border" />
-              <span>or use your own API key</span>
-              <div className="h-px flex-1 bg-border" />
-            </div>
-          )}
-          <div className="space-y-2">
-            <Label>Provider</Label>
-            <Select
-              value={tempProvider}
-              onValueChange={(v: any) => onProviderChange(v)}
-            >
-              <SelectTrigger
-                className="rounded-md"
-                leading={
-                  <ProviderIcon provider={tempProvider} className="shrink-0" />
-                }
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="openai" label={getProviderLabel("openai")}>
-                  <div className="flex items-center gap-2">
-                    <ProviderIcon provider="openai" />
-                    <span>{getProviderLabel("openai")}</span>
-                  </div>
-                </SelectItem>
-                <SelectItem
-                  value="anthropic"
-                  label={getProviderLabel("anthropic")}
-                >
-                  <div className="flex items-center gap-2">
-                    <ProviderIcon provider="anthropic" />
-                    <span>{getProviderLabel("anthropic")}</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="google" label={getProviderLabel("google")}>
-                  <div className="flex items-center gap-2">
-                    <ProviderIcon provider="google" />
-                    <span>{getProviderLabel("google")}</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="ollama" label={getProviderLabel("ollama")}>
-                  <div className="flex items-center gap-2">
-                    <ProviderIcon provider="ollama" />
-                    <span>{getProviderLabel("ollama")}</span>
-                  </div>
-                </SelectItem>
-                <SelectItem
-                  value="openrouter"
-                  label={getProviderLabel("openrouter")}
-                >
-                  <div className="flex items-center gap-2">
-                    <ProviderIcon provider="openrouter" />
-                    <span>{getProviderLabel("openrouter")}</span>
-                  </div>
-                </SelectItem>
-                <SelectItem
-                  value="openai-compatible"
-                  label={getProviderLabel("openai-compatible")}
-                >
-                  <div className="flex items-center gap-2">
-                    <span>{getProviderLabel("openai-compatible")}</span>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {showBaseUrlField && (
-            <div className="space-y-2">
-              <Label>Base URL</Label>
-              <Input
-                value={tempBaseUrl}
-                onChange={(e) => onBaseUrlChange(e.target.value)}
-                placeholder={baseUrlPlaceholder}
-                data-testid="chat-config-base-url-input"
-              />
-              {baseUrlHelp && (
-                <p className="text-xs text-muted-foreground">{baseUrlHelp}</p>
-              )}
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <Label>{apiKeyLabel}</Label>
-            <div className="relative">
-              <Input
-                type={showPassword ? "text" : "password"}
-                value={tempApiKey}
-                onChange={(e) => onApiKeyChange(e.target.value)}
-                placeholder={apiKeyPlaceholder}
-                className="pr-10"
-                data-testid="chat-config-api-key-input"
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                onClick={() => setShowPassword(!showPassword)}
-              >
-                {showPassword ? (
-                  <EyeOff className="h-4 w-4 text-muted-foreground" />
-                ) : (
-                  <Eye className="h-4 w-4 text-muted-foreground" />
-                )}
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">{apiKeyHelp}</p>
-          </div>
-
-          {showModelSection && (
-            <div className="space-y-2">
-              <Label>Model</Label>
-              {isLoadingModels ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Loading models...</span>
-                </div>
-              ) : modelError ? (
-                <div className="text-sm text-destructive">{modelError}</div>
-              ) : models.length > 0 ? (
-                <Popover
-                  open={comboboxOpen}
-                  modal={true}
-                  onOpenChange={setComboboxOpen}
-                >
-                  <PopoverTrigger
-                    render={
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={comboboxOpen}
-                        className="w-full justify-between rounded-md"
-                        data-testid="chat-config-model-select"
-                      >
-                        <span className="truncate">
-                          {tempModel
-                            ? models.find((model) => model.id === tempModel)
-                                ?.displayName ||
-                              models.find((model) => model.id === tempModel)
-                                ?.id ||
-                              "Select a model..."
-                            : "Select a model..."}
-                        </span>
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    }
-                    nativeButton
-                  />
-                  <PopoverContent className="w-full p-0" align="start">
-                    <Command>
-                      <CommandInput
-                        placeholder="Search models..."
-                        className="h-9"
-                      />
-                      <CommandList>
-                        <CommandEmpty>No model found.</CommandEmpty>
                         <CommandGroup>
-                          {models.map((model) => (
+                          {cloudModelsForProvider.map((model) => (
                             <CommandItem
                               key={model.id}
                               value={model.id}
-                              keywords={model.displayName}
+                              keywords={[model.name, model.id, model.provider]}
                               onSelect={(currentValue) => {
-                                onModelChange(
-                                  currentValue === tempModel ? "" : currentValue
-                                );
-                                setComboboxOpen(false);
+                                managedCloudInfo?.onModelChange(currentValue);
+                                setCloudComboboxOpen(false);
                               }}
                             >
-                              {model.displayName || model.id}
+                              {formatManagedModelName(
+                                model.name,
+                                model.provider
+                              )}
                               <Check
                                 className={cn(
                                   "ml-auto h-4 w-4",
-                                  tempModel === model.id
+                                  managedCloudInfo?.selectedModelId === model.id
                                     ? "opacity-100"
                                     : "opacity-0"
                                 )}
@@ -793,30 +813,112 @@ export function ConfigurationDialog({
                   </PopoverContent>
                 </Popover>
               ) : (
-                <Input
-                  value={tempModel}
-                  onChange={(e) => onModelChange(e.target.value)}
-                  placeholder="Enter model name manually"
-                  data-testid="chat-config-model-input"
-                />
+                <p className="text-sm text-muted-foreground">
+                  Cloud models unavailable — try again or use your own key.
+                </p>
               )}
             </div>
+          ) : (
+            showModelSection && (
+              <div className="space-y-2">
+                <Label>Model</Label>
+                {isLoadingModels ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Loading models...</span>
+                  </div>
+                ) : modelError ? (
+                  <div className="text-sm text-destructive">{modelError}</div>
+                ) : models.length > 0 ? (
+                  <Popover
+                    open={comboboxOpen}
+                    modal={true}
+                    onOpenChange={setComboboxOpen}
+                  >
+                    <PopoverTrigger
+                      render={
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={comboboxOpen}
+                          className="w-full justify-between rounded-md"
+                          data-testid="chat-config-model-select"
+                        >
+                          <span className="truncate">
+                            {tempModel
+                              ? models.find((model) => model.id === tempModel)
+                                  ?.displayName ||
+                                models.find((model) => model.id === tempModel)
+                                  ?.id ||
+                                "Select a model..."
+                              : "Select a model..."}
+                          </span>
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      }
+                      nativeButton
+                    />
+                    <PopoverContent className="w-full p-0" align="start">
+                      <Command>
+                        <CommandInput
+                          placeholder="Search models..."
+                          className="h-9"
+                        />
+                        <CommandList>
+                          <CommandEmpty>No model found.</CommandEmpty>
+                          <CommandGroup>
+                            {models.map((model) => (
+                              <CommandItem
+                                key={model.id}
+                                value={model.id}
+                                keywords={model.displayName}
+                                onSelect={(currentValue) => {
+                                  onModelChange(
+                                    currentValue === tempModel
+                                      ? ""
+                                      : currentValue
+                                  );
+                                  setComboboxOpen(false);
+                                }}
+                              >
+                                {model.displayName || model.id}
+                                <Check
+                                  className={cn(
+                                    "ml-auto h-4 w-4",
+                                    tempModel === model.id
+                                      ? "opacity-100"
+                                      : "opacity-0"
+                                  )}
+                                />
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                ) : (
+                  <Input
+                    value={tempModel}
+                    onChange={(e) => onModelChange(e.target.value)}
+                    placeholder="Enter model name manually"
+                    data-testid="chat-config-model-input"
+                  />
+                )}
+              </div>
+            )
           )}
 
           <div className="flex justify-between">
-            {showClearButton && onClear && (
+            {showClear && (
               <Button variant="outline" onClick={onClear}>
                 Clear Config
               </Button>
             )}
             <Button
-              onClick={onSave}
-              disabled={
-                (providerRequiresApiKey(tempProvider) && !tempApiKey.trim()) ||
-                (showBaseUrlField && !tempBaseUrl.trim()) ||
-                !tempModel.trim()
-              }
-              className={showClearButton ? "ml-auto" : ""}
+              onClick={handleSaveClick}
+              disabled={saveDisabled}
+              className={showClear ? "ml-auto" : ""}
               data-testid="chat-config-save-button"
             >
               <Key className="h-4 w-4 mr-2" />

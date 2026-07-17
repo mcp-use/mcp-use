@@ -59,6 +59,8 @@ export function ConnectionSettingsTab({
           setUrl={form.setUrl}
           connectionMode={form.connectionMode}
           setConnectionMode={form.setConnectionMode}
+          protocolMode={form.protocolMode}
+          setProtocolMode={form.setProtocolMode}
           customHeaders={form.customHeaders}
           setCustomHeaders={form.setCustomHeaders}
           requestTimeout={form.requestTimeout}

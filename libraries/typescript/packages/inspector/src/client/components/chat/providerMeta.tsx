@@ -6,6 +6,57 @@ import { useTheme } from "@/client/context/ThemeContext";
 
 const MANUFACT_LOGO_URL = "https://cdn.mcp-use.com/mcpuse_logo_circle_dark.svg";
 
+/** Manufact logomark + wordmark (matches manufact.com marketing). */
+export function ManufactWordmark({
+  symbolSize = 14,
+  className,
+  textClassName,
+}: {
+  symbolSize?: number;
+  className?: string;
+  textClassName?: string;
+}) {
+  return (
+    <span className={cn("inline-flex items-center gap-1.5", className)}>
+      <ManufactLogomark size={symbolSize} />
+      <span
+        className={cn(
+          "font-medium leading-none text-black [font-family:var(--font-family-outfit)]",
+          textClassName
+        )}
+      >
+        Manufact
+      </span>
+    </span>
+  );
+}
+
+/** Manufact logomark glyph (matches manufact.com marketing). */
+export function ManufactLogomark({
+  size = 14,
+  className,
+}: {
+  size?: number;
+  className?: string;
+}) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 480 480"
+      aria-hidden
+      className={cn("block shrink-0", className)}
+    >
+      <path
+        d="M101.7 0 C157.9 0 203.4 45.7 203.4 102.1 C203.4 126.6 202.1 152.1 212.2 174.3 L219.8 191 C233.8 221.8 258.5 246.4 289.2 260.5 L303.5 267 C326.5 277.5 353 275.8 378.3 275.8 C434.5 275.8 480 321.5 480 377.9 C480 434.3 434.5 480 378.3 480 C322.1 480 276.6 434.3 276.6 377.9 C276.6 354.2 277.7 329.6 267.8 308 L259.8 290.3 C245.7 259.5 221 234.8 190.2 220.7 L173 212.9 C151 202.9 125.8 204.2 101.7 204.2 C45.5 204.2 0 158.5 0 102.1 C0 45.7 45.5 0 101.7 0 Z"
+        fill="currentColor"
+      />
+      <circle cx="96.4" cy="383.6" r="96.4" fill="currentColor" />
+      <circle cx="383.6" cy="96.4" r="96.4" fill="currentColor" />
+    </svg>
+  );
+}
+
 // OpenRouter doesn't ship a logo on our provider CDN yet, so inline the
 // official mark as a data URL with a neutral gray fill.
 const OPENROUTER_ICON_SVG = `<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" fill="#94A3B8" stroke="#94A3B8"><g><path fill="none" d="M3 248.945C18 248.945 76 236 106 219C136 202 136 202 198 158C276.497 102.293 332 120.945 423 120.945" stroke-width="90"/><path d="M511 121.5L357.25 210.268L357.25 32.7324L511 121.5Z"/><path fill="none" d="M0 249C15 249 73 261.945 103 278.945C133 295.945 133 295.945 195 339.945C273.497 395.652 329 377 420 377" stroke-width="90"/><path d="M508 376.445L354.25 287.678L354.25 465.213L508 376.445Z"/></g></svg>`;

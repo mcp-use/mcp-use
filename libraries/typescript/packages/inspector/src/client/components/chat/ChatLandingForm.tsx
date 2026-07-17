@@ -1,12 +1,14 @@
 import { BlurFade } from "@/client/components/ui/blur-fade";
 import { Button } from "@/client/components/ui/button";
-import React from "react";
+import React, { type ReactNode } from "react";
 import { ChatInputArea } from "./ChatInputArea";
 
 type ChatInputAreaProps = React.ComponentProps<typeof ChatInputArea>;
 
 interface ChatLandingFormProps extends ChatInputAreaProps {
   serverDisplayName: string;
+  /** Inline notice rendered above the composer (e.g. managed chat errors). */
+  composerNotice?: ReactNode;
   /** Optional quick question suggestions displayed below the landing input. */
   quickQuestions?: string[];
   /** Called when a quick question is selected. */
@@ -15,6 +17,7 @@ interface ChatLandingFormProps extends ChatInputAreaProps {
 
 export function ChatLandingForm({
   serverDisplayName,
+  composerNotice,
   quickQuestions = [],
   onQuickQuestionSelect,
   ...inputAreaProps
@@ -29,9 +32,16 @@ export function ChatLandingForm({
           >
             Chat with {serverDisplayName}
           </h1>
+          <p
+            className="mx-auto max-w-xl text-sm text-muted-foreground sm:text-base"
+            data-testid="chat-landing-description"
+          >
+            Chat, inspect traces, preview widgets, and more.
+          </p>
         </div>
 
         <div className="space-y-6">
+          {composerNotice}
           <ChatInputArea {...inputAreaProps} />
 
           {quickQuestions.length > 0 && (

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { spring } from "@/client/lib/springs";
 import type { ItemRect } from "@/client/hooks/use-proximity-hover";
 

@@ -62,4 +62,22 @@ describe("shouldReplaceAutoConnectConnection", () => {
       )
     ).toBe(false);
   });
+
+  it("replaces a non-ready connection when the requested protocol mode changes", () => {
+    expect(
+      shouldReplaceAutoConnectConnection(
+        {
+          url: "http://localhost:3002/mcp",
+          state: "failed",
+          transportType: "http",
+          protocolNegotiation: "auto",
+        },
+        {
+          url: "http://localhost:3002/mcp",
+          transportType: "http",
+          protocolNegotiation: "legacy",
+        }
+      )
+    ).toBe(true);
+  });
 });

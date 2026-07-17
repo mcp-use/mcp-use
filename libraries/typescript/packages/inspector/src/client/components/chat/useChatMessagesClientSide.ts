@@ -16,29 +16,11 @@ import {
   type InspectorTraceEventInput,
 } from "./trace";
 import { DEFAULT_CHAT_SYSTEM_PROMPT } from "./system-prompt-default";
-
-function rateLimitFromLlmError(error: unknown): {
-  loginUrl: string;
-  creditsExhausted?: boolean;
-  billingUrl?: string;
-} | null {
-  if (!(error instanceof Error) || error.name !== "LlmRequestError")
-    return null;
-  const status = (error as { status?: number }).status;
-  const body = (error as { body?: Record<string, unknown> }).body;
-  if (status !== 429 || !body) return null;
-  if (body.loginRequired && body.loginUrl) {
-    return { loginUrl: String(body.loginUrl) };
-  }
-  if (body.creditsExhausted) {
-    return {
-      loginUrl: String(body.billingUrl ?? ""),
-      creditsExhausted: true,
-      billingUrl: body.billingUrl ? String(body.billingUrl) : undefined,
-    };
-  }
-  return null;
-}
+import {
+  isManagedLlmConfig,
+  managedNoticeFromLlmError,
+  type ManagedChatNotice,
+} from "./managedChatNotice";
 
 // Type alias for backward compatibility
 type MCPConnection = McpServer;
@@ -73,11 +55,8 @@ export function useChatMessagesClientSide({
   const [isLoading, setIsLoading] = useState(false);
   const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
   const [traceState, setTraceState] = useState(EMPTY_TRACE_STATE);
-  const [rateLimitInfo, setRateLimitInfo] = useState<{
-    loginUrl: string;
-    creditsExhausted?: boolean;
-    billingUrl?: string;
-  } | null>(null);
+  const [managedChatNotice, setManagedChatNotice] =
+    useState<ManagedChatNotice | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const traceIdRef = useRef(0);
 
@@ -477,9 +456,11 @@ export function useChatMessagesClientSide({
           return;
         }
 
-        const rateLimit = rateLimitFromLlmError(error);
-        if (rateLimit) {
-          setRateLimitInfo(rateLimit);
+        const notice = isManagedLlmConfig(llmConfig)
+          ? managedNoticeFromLlmError(error)
+          : null;
+        if (notice) {
+          setManagedChatNotice(notice);
           setMessages((prev) =>
             prev.filter((m) => m.id !== assistantMessageId)
           );
@@ -551,6 +532,7 @@ export function useChatMessagesClientSide({
   const clearMessages = useCallback(() => {
     setMessages([]);
     setTraceState(EMPTY_TRACE_STATE);
+    setManagedChatNotice(null);
   }, []);
   const clearTrace = useCallback(() => setTraceState(EMPTY_TRACE_STATE), []);
 
@@ -589,18 +571,23 @@ export function useChatMessagesClientSide({
     setAttachments([]);
   }, []);
 
-  const clearRateLimitInfo = useCallback(() => {
-    setRateLimitInfo(null);
+  const clearManagedChatNotice = useCallback(() => {
+    setManagedChatNotice(null);
+  }, []);
+
+  const showManagedChatNotice = useCallback((notice: ManagedChatNotice) => {
+    setManagedChatNotice(notice);
   }, []);
 
   return {
     messages,
     isLoading,
     attachments,
-    rateLimitInfo,
+    managedChatNotice,
     sendMessage,
     clearMessages,
-    clearRateLimitInfo,
+    clearManagedChatNotice,
+    showManagedChatNotice,
     setMessages,
     stop,
     addAttachment,

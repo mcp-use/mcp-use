@@ -284,35 +284,6 @@ export function ResourcesTab({
     if (selectedResourceUri && resources.length > 0) {
       const resource = resources.find((r) => r.uri === selectedResourceUri);
 
-      // #region agent log
-      fetch(
-        "http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Session-Id": "831b88",
-          },
-          body: JSON.stringify({
-            sessionId: "831b88",
-            location: "ResourcesTab.tsx:auto-select",
-            message: "resources auto-select effect",
-            data: {
-              selectedResourceUri,
-              resourcesCount: resources.length,
-              resourceFound: !!resource,
-              willSelect: !!(
-                resource && selectedResource?.uri !== resource.uri
-              ),
-              currentSelected: selectedResource?.uri ?? null,
-            },
-            timestamp: Date.now(),
-            hypothesisId: "H2-compare",
-          }),
-        }
-      ).catch(() => {});
-      // #endregion
-
       if (resource && selectedResource?.uri !== resource.uri) {
         setSelectedResourceUri(null);
         setTimeout(() => {

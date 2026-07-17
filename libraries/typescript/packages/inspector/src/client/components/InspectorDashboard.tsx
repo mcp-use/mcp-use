@@ -44,9 +44,11 @@ import {
   buildOAuthStaticConfig,
   getDefaultInspectorProxyAddress,
   getStoredConnectionConfig,
+  protocolNegotiationForMode,
   toEditableConnectionConfig,
   type ConnectionMode,
   type EditableConnectionConfig,
+  type InspectorProtocolMode,
 } from "@/client/utils/connectionUpdates";
 import { getServerDisplayName } from "@/client/utils/servers";
 import { useLocation, useNavigate } from "react-router";
@@ -204,6 +206,8 @@ export function InspectorDashboard() {
   const [alias, setAlias] = useState("");
   const [url, setUrl] = useState("");
   const [connectionMode, setConnectionMode] = useState<ConnectionMode>("auto");
+  const [protocolMode, setProtocolMode] =
+    useState<InspectorProtocolMode>("auto");
   const [customHeaders, setCustomHeaders] = useState<CustomHeader[]>([]);
   const [requestTimeout, setRequestTimeout] = useState("10000");
   const [resetTimeoutOnProgress, setResetTimeoutOnProgress] = useState("True");
@@ -310,6 +314,7 @@ export function InspectorDashboard() {
       url: normalizedUrl,
       displayName: alias.trim() || normalizedUrl,
       connectionMode,
+      protocolNegotiation: protocolNegotiationForMode(protocolMode),
       autoProxyFallback,
       ...(proxyConfig ? { proxyConfig } : {}),
       ...(Object.keys(headersObject).length > 0 && !proxyConfig
@@ -338,6 +343,7 @@ export function InspectorDashboard() {
     setUrl("");
     setCustomHeaders([]);
     setConnectionMode("auto");
+    setProtocolMode("auto");
     setClientId("");
     setClientSecret("");
     setScope("");
@@ -347,6 +353,7 @@ export function InspectorDashboard() {
     url,
     alias,
     connectionMode,
+    protocolMode,
     proxyAddress,
     customHeaders,
     clientId,
@@ -990,6 +997,8 @@ export function InspectorDashboard() {
             setUrl={setUrl}
             connectionMode={connectionMode}
             setConnectionMode={setConnectionMode}
+            protocolMode={protocolMode}
+            setProtocolMode={setProtocolMode}
             customHeaders={customHeaders}
             setCustomHeaders={setCustomHeaders}
             requestTimeout={requestTimeout}

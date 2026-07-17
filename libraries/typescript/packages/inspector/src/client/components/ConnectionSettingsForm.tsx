@@ -32,7 +32,10 @@ import type { CustomHeader } from "./CustomHeadersEditor";
 import { CustomHeadersEditor } from "./CustomHeadersEditor";
 import {
   normalizeConnectionMode,
+  protocolModeFromNegotiation,
+  protocolNegotiationForMode,
   type ConnectionMode,
+  type InspectorProtocolMode,
 } from "@/client/utils/connectionUpdates";
 
 interface ConnectionSettingsFormProps {
@@ -43,6 +46,8 @@ interface ConnectionSettingsFormProps {
   setUrl: (value: string) => void;
   connectionMode: ConnectionMode;
   setConnectionMode: (value: ConnectionMode) => void;
+  protocolMode: InspectorProtocolMode;
+  setProtocolMode: (value: InspectorProtocolMode) => void;
   customHeaders: CustomHeader[];
   setCustomHeaders: (headers: CustomHeader[]) => void;
   requestTimeout: string;
@@ -101,6 +106,8 @@ export function ConnectionSettingsForm({
   setUrl,
   connectionMode,
   setConnectionMode,
+  protocolMode,
+  setProtocolMode,
   customHeaders,
   setCustomHeaders,
   requestTimeout,
@@ -148,6 +155,7 @@ export function ConnectionSettingsForm({
       ...(alias.trim() ? { name: alias.trim() } : {}),
       transportType: "http", // HTTP only - SSE is deprecated
       connectionMode,
+      protocolNegotiation: protocolNegotiationForMode(protocolMode),
       connectionType: connectionMode === "proxy" ? "Via Proxy" : "Direct",
       proxyConfig:
         connectionMode === "proxy" && proxyAddress.trim()
@@ -244,6 +252,9 @@ export function ConnectionSettingsForm({
             config.connectionType,
             !!pastedProxyAddress
           )
+        );
+        setProtocolMode(
+          protocolModeFromNegotiation(config.protocolNegotiation)
         );
 
         if (pastedProxyAddress) {
@@ -385,6 +396,35 @@ export function ConnectionSettingsForm({
             <SelectItem value="proxy">Proxy</SelectItem>
           </SelectContent>
         </Select>
+        <p className="text-xs text-muted-foreground">
+          Auto tries a direct connection first and falls back to the proxy.
+          Direct bypasses the proxy; Proxy always routes through it.
+        </p>
+      </div>
+      <div className="space-y-2">
+        <Label className="text-sm">Protocol</Label>
+        <Select
+          value={protocolMode}
+          onValueChange={(value) =>
+            setProtocolMode(value as InspectorProtocolMode)
+          }
+        >
+          <SelectTrigger
+            className="w-full"
+            data-testid="config-dialog-protocol-mode-select"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="auto">Auto (recommended)</SelectItem>
+            <SelectItem value="v1">Force v1 (2024/2025)</SelectItem>
+            <SelectItem value="v2">Force v2 (2026-07-28)</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          Auto probes for v2 and falls back to the legacy v1 initialize flow.
+          Forced modes fail when the server is incompatible.
+        </p>
       </div>
       <div className="space-y-2">
         <Label className="text-sm">Proxy Endpoint</Label>

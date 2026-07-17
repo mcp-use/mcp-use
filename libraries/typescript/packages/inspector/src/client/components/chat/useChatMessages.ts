@@ -21,6 +21,11 @@ import {
   type InspectorTraceEvent,
   type InspectorTraceEventInput,
 } from "./trace";
+import {
+  isCloudFetchFailure,
+  managedNoticeFromHttpResponse,
+  type ManagedChatNotice,
+} from "./managedChatNotice";
 
 interface WidgetModelContext {
   content?: Array<{ type: string; text: string }>;
@@ -31,6 +36,8 @@ interface UseChatMessagesProps {
   mcpServerUrl: string;
   llmConfig: LLMConfig | null;
   authConfig: AuthConfig | null;
+  /** Live OAuth tokens from the active MCP connection (preferred over saved authConfig). */
+  mcpAuthTokens?: AuthConfig["oauthTokens"];
   isConnected: boolean;
   /** Custom API endpoint URL for chat streaming. Defaults to "/inspector/api/chat/stream". */
   chatApiUrl?: string;
@@ -68,6 +75,7 @@ export function useChatMessages({
   mcpServerUrl,
   llmConfig,
   authConfig,
+  mcpAuthTokens,
   isConnected,
   chatApiUrl,
   waitForChatApiUrl,
@@ -83,9 +91,8 @@ export function useChatMessages({
   const [isLoading, setIsLoading] = useState(false);
   const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
   const [traceState, setTraceState] = useState(EMPTY_TRACE_STATE);
-  const [rateLimitInfo, setRateLimitInfo] = useState<{
-    loginUrl: string;
-  } | null>(null);
+  const [managedChatNotice, setManagedChatNotice] =
+    useState<ManagedChatNotice | null>(null);
   const [mcpServerAuthRequired, setMcpServerAuthRequired] = useState<{
     mcpServerUrl: string;
     message?: string;
@@ -146,30 +153,38 @@ export function useChatMessages({
       abortControllerRef.current = new AbortController();
 
       try {
-        // If using OAuth, retrieve tokens from localStorage
+        // Server-side chat must forward the same OAuth credentials as the browser
+        // MCP connection. Saved authConfig often stays "none" after BYOK setup.
         let authConfigWithTokens = authConfig;
-        if (authConfig?.type === "oauth") {
-          try {
-            // Get OAuth tokens from localStorage (same pattern as BrowserOAuthClientProvider)
-            // The key format is: `${storageKeyPrefix}_${serverUrlHash}_tokens`
-            const storageKeyPrefix = "mcp:auth";
-            const serverUrlHash = hashString(mcpServerUrl);
-            const storageKey = `${storageKeyPrefix}_${serverUrlHash}_tokens`;
-            const tokensStr = localStorage.getItem(storageKey);
-            if (tokensStr) {
-              const tokens = JSON.parse(tokensStr);
-              authConfigWithTokens = {
-                ...authConfig,
-                oauthTokens: tokens,
-              };
-            } else {
-              console.warn(
-                "No OAuth tokens found in localStorage for key:",
-                storageKey
-              );
+        const hasExplicitBearer =
+          authConfig?.type === "bearer" && Boolean(authConfig.token);
+        const hasExplicitBasic =
+          authConfig?.type === "basic" &&
+          Boolean(authConfig.username || authConfig.password);
+
+        if (!hasExplicitBearer && !hasExplicitBasic) {
+          if (mcpAuthTokens?.access_token) {
+            authConfigWithTokens = {
+              type: "oauth",
+              oauthTokens: mcpAuthTokens,
+            };
+          } else {
+            try {
+              const storageKeyPrefix = "mcp:auth";
+              const serverUrlHash = hashString(mcpServerUrl);
+              const storageKey = `${storageKeyPrefix}_${serverUrlHash}_tokens`;
+              const tokensStr = localStorage.getItem(storageKey);
+              if (tokensStr) {
+                const tokens = JSON.parse(
+                  tokensStr
+                ) as AuthConfig["oauthTokens"];
+                if (tokens?.access_token) {
+                  authConfigWithTokens = { type: "oauth", oauthTokens: tokens };
+                }
+              }
+            } catch (error) {
+              console.warn("Failed to retrieve OAuth tokens:", error);
             }
-          } catch (error) {
-            console.warn("Failed to retrieve OAuth tokens:", error);
           }
         }
 
@@ -268,19 +283,18 @@ export function useChatMessages({
         });
 
         if (!response.ok) {
-          if (response.status === 429) {
-            const errBody = await response.json().catch(() => null);
-            if (errBody?.loginRequired && errBody?.loginUrl) {
-              setRateLimitInfo({ loginUrl: errBody.loginUrl as string });
-            }
-            // Remove the empty assistant message added optimistically
-            setMessages((prev) =>
-              prev.filter((m) => m.id !== `assistant-${Date.now()}`)
+          const errBody = await response.json().catch(() => null);
+          if (chatApiUrl) {
+            const notice = managedNoticeFromHttpResponse(
+              response.status,
+              errBody
             );
-            return;
+            if (notice) {
+              setManagedChatNotice(notice);
+              return;
+            }
           }
           if (response.status === 401) {
-            const errBody = await response.json().catch(() => null);
             if (errBody?.error === "mcp_auth_required") {
               setMcpServerAuthRequired({
                 mcpServerUrl:
@@ -658,6 +672,11 @@ export function useChatMessages({
           return;
         }
 
+        if (chatApiUrl && isCloudFetchFailure(error)) {
+          setManagedChatNotice({ kind: "cloud_unavailable" });
+          return;
+        }
+
         // Extract detailed error message with HTTP status
         let errorDetail = "Unknown error occurred";
         if (error instanceof Error) {
@@ -693,6 +712,7 @@ export function useChatMessages({
       mcpServerUrl,
       messages,
       authConfig,
+      mcpAuthTokens,
       attachments,
       chatApiUrl,
       waitForChatApiUrl,
@@ -708,14 +728,19 @@ export function useChatMessages({
 
   const clearMessages = useCallback(() => {
     setMessages([]);
-    setRateLimitInfo(null);
+    setManagedChatNotice(null);
     setMcpServerAuthRequired(null);
     setTraceState(EMPTY_TRACE_STATE);
   }, []);
 
-  const clearRateLimitInfo = useCallback(() => {
-    setRateLimitInfo(null);
+  const clearManagedChatNotice = useCallback(() => {
+    setManagedChatNotice(null);
   }, []);
+
+  const showManagedChatNotice = useCallback((notice: ManagedChatNotice) => {
+    setManagedChatNotice(notice);
+  }, []);
+
   const clearTrace = useCallback(() => setTraceState(EMPTY_TRACE_STATE), []);
 
   const clearMcpServerAuthRequired = useCallback(() => {
@@ -764,11 +789,12 @@ export function useChatMessages({
     messages,
     isLoading,
     attachments,
-    rateLimitInfo,
+    managedChatNotice,
     mcpServerAuthRequired,
     sendMessage,
     clearMessages,
-    clearRateLimitInfo,
+    clearManagedChatNotice,
+    showManagedChatNotice,
     clearMcpServerAuthRequired,
     setMessages,
     stop,

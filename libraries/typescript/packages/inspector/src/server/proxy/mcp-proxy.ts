@@ -65,6 +65,14 @@ interface McpProxyOptions {
   enableLogging?: boolean;
 }
 
+/** Whether an MCP response must remain streaming instead of being buffered. */
+export function isOpenEndedSseResponse(
+  contentType: string,
+  contentLength: string | null
+): boolean {
+  return contentType.includes("text/event-stream") && !contentLength;
+}
+
 /**
  * Mount MCP proxy middleware on a Hono app
  *
@@ -324,13 +332,16 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
 
       const contentType = response.headers.get("content-type") || "";
 
-      // For streaming SSE responses (GET without content-length), pass through the body stream.
-      // For all other responses, buffer the body and set Content-Length so browsers
-      // don't hang waiting for a ReadableStream that may not signal EOF promptly.
-      const isSSE = contentType.includes("text/event-stream");
-      const isGetRequest = c.req.method === "GET";
+      // Pass through open-ended SSE bodies. Legacy servers use GET for their
+      // event stream, while modern servers use a POST `subscriptions/listen`
+      // request, so the streaming decision must be method-agnostic.
+      // Buffer all finite responses and set Content-Length so browsers don't
+      // hang waiting for a ReadableStream that may not signal EOF promptly.
       const upstreamContentLength = response.headers.get("content-length");
-      const isTrueStream = isSSE && isGetRequest && !upstreamContentLength;
+      const isTrueStream = isOpenEndedSseResponse(
+        contentType,
+        upstreamContentLength
+      );
 
       if (isTrueStream) {
         return new Response(response.body, {

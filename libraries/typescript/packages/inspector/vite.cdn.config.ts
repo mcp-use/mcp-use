@@ -6,14 +6,14 @@ import { visualizer } from "rollup-plugin-visualizer";
 import { defineConfig } from "vite";
 import { INSPECTOR_FAVICON_ASSETS } from "./src/server/favicon-links";
 
-const clientPackageJson = JSON.parse(
-  readFileSync(path.resolve(__dirname, "../client/package.json"), "utf-8")
+const inspectorPackageJson = JSON.parse(
+  readFileSync(path.resolve(__dirname, "package.json"), "utf-8")
 );
 
 /**
  * CDN bundle build config.
  *
- * Produces dist/cdn/inspector.js plus lazy chunks (Shiki grammars, pdfjs, etc.).
+ * Produces dist/cdn/inspector.js plus lazy tab chunks.
  * Shipped in the npm package and consumed three ways:
  * - Standalone (npx / pnpm start): served locally at /dist/cdn/*
  * - Embedded (mountInspector / mcp-use server): jsDelivr npm mirror by default
@@ -52,7 +52,7 @@ export default defineConfig({
   define: {
     "process.env": "{}",
     "process.platform": '"browser"',
-    __MCP_USE_PACKAGE_VERSION__: JSON.stringify(clientPackageJson.version),
+    __MCP_USE_PACKAGE_VERSION__: JSON.stringify(inspectorPackageJson.version),
     global: "globalThis",
   },
   optimizeDeps: {

@@ -1,5 +1,10 @@
 import type { Context, Hono } from "hono";
-import { resolveInspectorAssetUrls, type InspectorMode } from "./asset-urls.js";
+import {
+  inspectorStylesUrl,
+  resolveInspectorAssetUrls,
+  withInspectorCacheBust,
+  type InspectorMode,
+} from "./asset-urls.js";
 import { renderInspectorFaviconLinks } from "./favicon-links.js";
 import { registerInspectorFaviconStatic } from "./favicon-static.js";
 import { registerInspectorStaticAssets } from "./static-assets.js";
@@ -124,8 +129,16 @@ export function registerInspectorCdnShell(
       process.env.MCP_USE_ANONYMIZED_TELEMETRY === "false",
   };
 
-  const serveShell = (c: Context) =>
-    c.html(generateCdnShellHtml(effectiveConfig, basePath, assets));
+  const serveShell = (c: Context) => {
+    const base = resolveInspectorAssetUrls(config?.inspectorMode, basePath);
+    const jsUrl = withInspectorCacheBust(base.jsUrl);
+    return c.html(
+      generateCdnShellHtml(effectiveConfig, basePath, {
+        jsUrl,
+        cssUrl: inspectorStylesUrl(jsUrl),
+      })
+    );
+  };
 
   registerInspectorFaviconStatic(app, basePath);
 

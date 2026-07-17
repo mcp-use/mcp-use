@@ -40,6 +40,31 @@ export function inspectorStylesUrl(assetsUrl: string): string {
   return assetsUrl.replace(/\.js(?=$|[?#])/, ".css");
 }
 
+/** True for the default jsDelivr `@mcp-use/inspector@*` CDN bundle URL. */
+export function isDefaultJsdelivrInspectorUrl(url: string): boolean {
+  return url.startsWith("https://cdn.jsdelivr.net/npm/@mcp-use/inspector@");
+}
+
+/** Append a per-request cache-bust query param for the default jsDelivr CDN URL. */
+export function withInspectorCacheBust(assetsUrl: string): string {
+  if (!isDefaultJsdelivrInspectorUrl(assetsUrl)) return assetsUrl;
+  const sep = assetsUrl.includes("?") ? "&" : "?";
+  return `${assetsUrl}${sep}cb=${crypto.randomUUID()}`;
+}
+
+/** True for inspector UI shell routes (SPA), excluding `/inspector/api/*`. */
+export function matchesInspectorShellPath(
+  pathname: string,
+  basePath: string
+): boolean {
+  const prefix = `${basePath}/inspector`;
+  if (pathname !== prefix && !pathname.startsWith(`${prefix}/`)) {
+    return false;
+  }
+  const suffix = pathname.slice(prefix.length);
+  return suffix !== "/api" && !suffix.startsWith("/api/");
+}
+
 /** Inputs for {@link renderInspectorShell}. */
 export interface InspectorShellOptions {
   /** Server display name, used in the page title. */
@@ -94,7 +119,8 @@ export function renderInspectorShell(options: InspectorShellOptions): string {
   const serializedManufactChatUrl = manufactChatUrl
     ? serializeForInlineScript(manufactChatUrl)
     : null;
-  const bundleUrl = assetsUrl ?? DEFAULT_INSPECTOR_ASSETS_URL;
+  const rawUrl = assetsUrl ?? DEFAULT_INSPECTOR_ASSETS_URL;
+  const bundleUrl = withInspectorCacheBust(rawUrl);
   const scriptSrc = escapeHtml(bundleUrl);
   const stylesHref = escapeHtml(inspectorStylesUrl(bundleUrl));
   return `<!doctype html>
@@ -174,23 +200,22 @@ export function createInspectorHandler(
     configAssetsUrl ?? process.env["MCP_USE_INSPECTOR_ASSETS_URL"] ?? undefined;
   const manufactChatUrl =
     configManufactChatUrl ?? process.env["MANUFACT_CHAT_URL"] ?? undefined;
-  const html = renderInspectorShell({
+  const shellOptions: InspectorShellOptions = {
     serverName: options.serverName,
     basePath: options.basePath,
     assetsUrl,
     manufactChatUrl,
-  });
-  const path = `${options.basePath}/inspector`;
-  const slashPath = `${path}/`;
+  };
 
   return async (request) => {
     if (request.method !== "GET" && request.method !== "HEAD") {
       return new Response("Method Not Allowed", { status: 405 });
     }
     const pathname = new URL(request.url).pathname;
-    if (pathname !== path && pathname !== slashPath) {
+    if (!matchesInspectorShellPath(pathname, options.basePath)) {
       return new Response("Not Found", { status: 404 });
     }
+    const html = renderInspectorShell(shellOptions);
     return new Response(request.method === "HEAD" ? null : html, {
       status: 200,
       headers: { "content-type": "text/html; charset=utf-8" },
