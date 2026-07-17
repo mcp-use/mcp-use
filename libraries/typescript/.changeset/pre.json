@@ -19,6 +19,7 @@
     "inspector-chat-oauth-and-ui",
     "inspector-standalone-oauth",
     "localhost-managed-inspector-chat",
+    "mcp-middleware-cors-mounting",
     "openapi-server-tools-v2",
     "strip-tools-list-schema-dialect",
     "v2-server-scaffold"
