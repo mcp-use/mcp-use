@@ -11,6 +11,18 @@ export function inspectorStylesUrl(assetsUrl: string): string {
   return assetsUrl.replace(/\.js(?=$|[?#])/, ".css");
 }
 
+/** True for the default jsDelivr `@mcp-use/inspector@*` CDN bundle URL. */
+export function isDefaultJsdelivrInspectorUrl(url: string): boolean {
+  return url.startsWith("https://cdn.jsdelivr.net/npm/@mcp-use/inspector@");
+}
+
+/** Append a per-request cache-bust query param for the default jsDelivr CDN URL. */
+export function withInspectorCacheBust(assetsUrl: string): string {
+  if (!isDefaultJsdelivrInspectorUrl(assetsUrl)) return assetsUrl;
+  const sep = assetsUrl.includes("?") ? "&" : "?";
+  return `${assetsUrl}${sep}cb=${crypto.randomUUID()}`;
+}
+
 export type InspectorAssetUrls = {
   jsUrl: string;
   cssUrl: string;

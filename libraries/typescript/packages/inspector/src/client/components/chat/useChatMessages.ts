@@ -36,6 +36,8 @@ interface UseChatMessagesProps {
   mcpServerUrl: string;
   llmConfig: LLMConfig | null;
   authConfig: AuthConfig | null;
+  /** Live OAuth tokens from the active MCP connection (preferred over saved authConfig). */
+  mcpAuthTokens?: AuthConfig["oauthTokens"];
   isConnected: boolean;
   /** Custom API endpoint URL for chat streaming. Defaults to "/inspector/api/chat/stream". */
   chatApiUrl?: string;
@@ -73,6 +75,7 @@ export function useChatMessages({
   mcpServerUrl,
   llmConfig,
   authConfig,
+  mcpAuthTokens,
   isConnected,
   chatApiUrl,
   waitForChatApiUrl,
@@ -150,30 +153,38 @@ export function useChatMessages({
       abortControllerRef.current = new AbortController();
 
       try {
-        // If using OAuth, retrieve tokens from localStorage
+        // Server-side chat must forward the same OAuth credentials as the browser
+        // MCP connection. Saved authConfig often stays "none" after BYOK setup.
         let authConfigWithTokens = authConfig;
-        if (authConfig?.type === "oauth") {
-          try {
-            // Get OAuth tokens from localStorage (same pattern as BrowserOAuthClientProvider)
-            // The key format is: `${storageKeyPrefix}_${serverUrlHash}_tokens`
-            const storageKeyPrefix = "mcp:auth";
-            const serverUrlHash = hashString(mcpServerUrl);
-            const storageKey = `${storageKeyPrefix}_${serverUrlHash}_tokens`;
-            const tokensStr = localStorage.getItem(storageKey);
-            if (tokensStr) {
-              const tokens = JSON.parse(tokensStr);
-              authConfigWithTokens = {
-                ...authConfig,
-                oauthTokens: tokens,
-              };
-            } else {
-              console.warn(
-                "No OAuth tokens found in localStorage for key:",
-                storageKey
-              );
+        const hasExplicitBearer =
+          authConfig?.type === "bearer" && Boolean(authConfig.token);
+        const hasExplicitBasic =
+          authConfig?.type === "basic" &&
+          Boolean(authConfig.username || authConfig.password);
+
+        if (!hasExplicitBearer && !hasExplicitBasic) {
+          if (mcpAuthTokens?.access_token) {
+            authConfigWithTokens = {
+              type: "oauth",
+              oauthTokens: mcpAuthTokens,
+            };
+          } else {
+            try {
+              const storageKeyPrefix = "mcp:auth";
+              const serverUrlHash = hashString(mcpServerUrl);
+              const storageKey = `${storageKeyPrefix}_${serverUrlHash}_tokens`;
+              const tokensStr = localStorage.getItem(storageKey);
+              if (tokensStr) {
+                const tokens = JSON.parse(
+                  tokensStr
+                ) as AuthConfig["oauthTokens"];
+                if (tokens?.access_token) {
+                  authConfigWithTokens = { type: "oauth", oauthTokens: tokens };
+                }
+              }
+            } catch (error) {
+              console.warn("Failed to retrieve OAuth tokens:", error);
             }
-          } catch (error) {
-            console.warn("Failed to retrieve OAuth tokens:", error);
           }
         }
 
@@ -701,6 +712,7 @@ export function useChatMessages({
       mcpServerUrl,
       messages,
       authConfig,
+      mcpAuthTokens,
       attachments,
       chatApiUrl,
       waitForChatApiUrl,

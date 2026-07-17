@@ -8,6 +8,8 @@ export default function LogoAnimated({
   state = "collapsed",
   to = "/",
   showLabel = state === "expanded",
+  /** Which label parts to render when `showLabel` is true. */
+  labelParts = "full",
   /** Keep the symbol centered in `--sidebar-width-icon`; label uses `--sidebar-nav-text-pl-absolute`. */
   pinSymbolInIconColumn = false,
   /** Symbol size in px; defaults to 20 in header icon column, else 20/40 by state. */
@@ -17,6 +19,7 @@ export default function LogoAnimated({
   state?: "expanded" | "collapsed";
   to?: string;
   showLabel?: boolean;
+  labelParts?: "full" | "inspector";
   pinSymbolInIconColumn?: boolean;
   size?: number;
 }) {
@@ -34,7 +37,7 @@ export default function LogoAnimated({
   const T3 = 1;
 
   const isExpanded = state === "expanded";
-  const showLabelNow = isExpanded && showLabel;
+  const showLabelNow = showLabel && (isExpanded || labelParts === "inspector");
   const symbolSize =
     size ?? (pinSymbolInIconColumn ? 20 : state === "expanded" ? 40 : 20);
 
@@ -111,15 +114,25 @@ export default function LogoAnimated({
                 ? "relative opacity-100 blur-0"
                 : "pointer-events-none absolute left-0 top-1/2 w-0 -translate-y-1/2 overflow-hidden opacity-0 blur-[3px]"
             )
-          : "mr-3"
+          : labelParts === "inspector"
+            ? "mr-0"
+            : "mr-3"
       )}
     >
-      <span className="text-xl font-bold leading-none text-foreground [text-box:trim-both_cap_alphabetic]">
-        mcp-use
-      </span>
-      <span className="text-lg font-sans font-light leading-none tracking-wide text-muted-foreground [text-box:trim-both_cap_alphabetic]">
-        Inspector
-      </span>
+      {labelParts === "full" ? (
+        <>
+          <span className="text-xl font-bold leading-none text-foreground [text-box:trim-both_cap_alphabetic]">
+            mcp-use
+          </span>
+          <span className="text-lg font-sans font-light leading-none tracking-wide text-muted-foreground [text-box:trim-both_cap_alphabetic]">
+            Inspector
+          </span>
+        </>
+      ) : (
+        <span className="text-base font-medium leading-none text-foreground [text-box:trim-both_cap_alphabetic]">
+          Inspector
+        </span>
+      )}
     </span>
   ) : null;
 
@@ -137,6 +150,11 @@ export default function LogoAnimated({
       </div>
       {labelEl}
     </div>
+  ) : labelParts === "inspector" ? (
+    <span className="flex items-center gap-2.5">
+      {symbolSvg}
+      {labelEl}
+    </span>
   ) : (
     <>
       {symbolSvg}
@@ -149,7 +167,7 @@ export default function LogoAnimated({
       to={to}
       className={cn(
         "flex items-center transition-opacity",
-        !pinSymbolInIconColumn && "-my-3",
+        !pinSymbolInIconColumn && labelParts !== "inspector" && "-my-3",
         className
       )}
       onMouseEnter={() => setIsHovered(true)}

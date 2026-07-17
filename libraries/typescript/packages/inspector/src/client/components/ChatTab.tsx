@@ -46,6 +46,7 @@ import { ConfigurationDialog } from "./chat/ConfigurationDialog";
 import { ConfigureEmptyState } from "./chat/ConfigureEmptyState";
 import { MessageList } from "./chat/MessageList";
 import { ChatScrollToBottomButton } from "./chat/ChatScrollToBottomButton";
+import { ChatScrollTopFade } from "./chat/ChatScrollTopFade";
 import { useChatScrollToBottom } from "./chat/useChatScrollToBottom";
 import type { ToolInfo } from "./chat/ToolSelector";
 import { useChatMessages } from "./chat/useChatMessages";
@@ -300,6 +301,7 @@ export function ChatTab({
     mcpServerUrl: connection.url ?? "",
     llmConfig,
     authConfig: userAuthConfig,
+    mcpAuthTokens: connection.authTokens,
     isConnected,
     chatApiUrl,
     waitForChatApiUrl,
@@ -345,7 +347,7 @@ export function ChatTab({
     setShaderPhase("visible");
   }, [clearMessages]);
 
-  const { messagesEndRef, showScrollToBottom, scrollToBottom } =
+  const { messagesEndRef, showScrollToBottom, showTopFade, scrollToBottom } =
     useChatScrollToBottom(messagesAreaRef, {
       messageCount: messages.length,
       isLoading,
@@ -1048,7 +1050,7 @@ export function ChatTab({
     return (
       <div className="flex h-full flex-row overflow-hidden">
         <div
-          className="group/chat-history relative flex shrink-0 flex-col overflow-visible transition-[width] duration-200"
+          className="group/chat-history relative hidden shrink-0 flex-col overflow-visible transition-[width] duration-200 lg:flex"
           style={{ width: showHistoryPanel ? 320 : 0 }}
         >
           {showHistoryPanel && (
@@ -1077,7 +1079,7 @@ export function ChatTab({
 
         <div className="relative min-w-0 flex-1 overflow-hidden">
           {!showHistoryPanel && (
-            <div className="absolute top-1/2 left-4 z-50 -translate-y-1/2">
+            <div className="absolute top-1/2 left-4 z-50 hidden -translate-y-1/2 lg:block">
               <Tooltip>
                 <TooltipTrigger
                   render={
@@ -1529,6 +1531,7 @@ export function ChatTab({
 
       {/* Messages Area */}
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+        <ChatScrollTopFade visible={showTopFade && Boolean(llmConfig)} />
         <div
           ref={messagesAreaRef}
           data-testid="chat-messages-scroll-container"

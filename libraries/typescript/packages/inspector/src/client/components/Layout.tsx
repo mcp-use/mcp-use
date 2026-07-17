@@ -20,6 +20,8 @@ import {
   getStoredConnectionConfig,
   isAliasOnlyConnectionUpdate,
   normalizeConnectionMode,
+  protocolModeFromNegotiation,
+  protocolNegotiationForMode,
   saveStoredConnectionConfig,
   toMcpServerConfig,
   type EditableConnectionConfig,
@@ -42,6 +44,7 @@ import { LayoutContent } from "./LayoutContent";
 import { LayoutHeader } from "./LayoutHeader";
 import { InspectorSidebar } from "./layout/sidebar/InspectorSidebar";
 import { SidebarRpcPanel } from "./layout/sidebar/SidebarRpcPanel";
+import { MobileInspectorToolbar } from "./layout/mobile/MobileInspectorToolbar";
 import { useTunnelConnectionSync } from "./layout/useTunnelConnectionSync";
 
 interface LayoutProps {
@@ -660,6 +663,9 @@ export function Layout({ children }: LayoutProps) {
           name,
           transportType: "http",
           connectionMode,
+          protocolNegotiation: protocolNegotiationForMode(
+            protocolModeFromNegotiation(srv.protocolNegotiation)
+          ),
           connectionType: connectionMode === "proxy" ? "Via Proxy" : "Direct",
           proxyConfig:
             connectionMode === "proxy" && proxyAddress
@@ -819,19 +825,19 @@ export function Layout({ children }: LayoutProps) {
     ? isSingleTab
       ? "h-screen flex flex-col"
       : "h-screen flex flex-col gap-2 sm:gap-4"
-    : "h-screen bg-[#f3f3f3] dark:bg-black flex flex-col px-4 lg:px-0 pb-4";
+    : "h-screen bg-[#f3f3f3] dark:bg-black flex flex-col overflow-x-hidden px-4 lg:px-0 pb-[calc(var(--mobile-toolbar-height)+env(safe-area-inset-bottom))] lg:pb-4";
 
   const mainClassName = isSingleTab
     ? "flex-1 w-full bg-white dark:bg-black p-0 overflow-auto"
     : cn(
-        "flex-1 min-h-0 w-full bg-white dark:bg-black rounded-2xl border border-zinc-200 dark:border-zinc-700 overflow-auto",
+        "flex-1 min-h-0 min-w-0 max-w-full w-full bg-white dark:bg-black rounded-2xl border border-zinc-200 dark:border-zinc-700 overflow-x-hidden overflow-y-auto",
         !displayServer && "lg:mx-4",
         displayServer && "lg:mr-4"
       );
 
   const bodyClassName = isSingleTab
     ? "flex-1 min-h-0"
-    : "flex flex-1 min-h-0 min-w-0";
+    : "flex min-w-0 flex-1 min-h-0 overflow-hidden";
 
   const headerProps = {
     connections,
@@ -845,7 +851,7 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <TooltipProvider>
-      <div className="inspector-view-transition h-screen bg-[#f3f3f3] dark:bg-black">
+      <div className="inspector-view-transition h-screen overflow-x-hidden bg-[#f3f3f3] dark:bg-black">
         {showDisplayBoot ? (
           <div className="flex h-full items-center justify-center bg-[#f3f3f3] dark:bg-black">
             <div className="flex flex-col items-center gap-4">
@@ -898,6 +904,14 @@ export function Layout({ children }: LayoutProps) {
           </div>
         )}
       </div>
+
+      {!isSingleTab && !showDisplayBoot && (
+        <MobileInspectorToolbar
+          serverId={displayServer?.id}
+          rpcLoggerOpen={rpcLoggerOpen}
+          onRpcLoggerOpenChange={setRpcLoggerOpen}
+        />
+      )}
 
       {/* Command Palette */}
       <CommandPalette

@@ -18,9 +18,11 @@ export function useChatScrollToBottom(
 ) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isNearBottom, setIsNearBottom] = useState(true);
+  const [showTopFade, setShowTopFade] = useState(false);
   const isNearBottomRef = useRef(true);
   const prevScrollTriggerRef = useRef({ length: 0, loading: false });
   const bottomThresholdPx = 64;
+  const topFadeThresholdPx = 8;
 
   const hasMessages = messageCount > 0;
   const showScrollToBottom = enabled && hasMessages && !isNearBottom;
@@ -33,6 +35,7 @@ export function useChatScrollToBottom(
     const near = distanceFromBottom <= bottomThresholdPx;
     isNearBottomRef.current = near;
     setIsNearBottom(near);
+    setShowTopFade(el.scrollTop > topFadeThresholdPx);
   }, [scrollContainerRef]);
 
   const scrollToBottom = useCallback(
@@ -86,5 +89,5 @@ export function useChatScrollToBottom(
     scrollToBottom(isLoading ? "auto" : "smooth");
   }, [enabled, hasMessages, isLoading, messageCount, scrollToBottom]);
 
-  return { messagesEndRef, showScrollToBottom, scrollToBottom };
+  return { messagesEndRef, showScrollToBottom, showTopFade, scrollToBottom };
 }

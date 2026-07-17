@@ -5,6 +5,7 @@ import path from "node:path";
 import { defineConfig } from "vite";
 import { hasNoOpenFlag, parsePortFromArgs } from "./src/server/utils.js";
 import { inspectorDevApiPlugin } from "./src/server/vite-dev-api-plugin.js";
+import { getDevCallbackRedirect } from "./src/server/dev-callback-redirect.js";
 
 // Read version from package.json
 const packageJson = JSON.parse(
@@ -86,21 +87,9 @@ export default defineConfig({
       name: "oauth-callback-redirect",
       configureServer(server) {
         server.middlewares.use((req, res, next) => {
-          const url = req.url ?? "";
-          const queryIndex = url.indexOf("?");
-          const path = queryIndex === -1 ? url : url.slice(0, queryIndex);
-          const queryString = queryIndex === -1 ? "" : url.slice(queryIndex);
-          if (path === "/oauth/callback" || path.endsWith("/oauth/callback")) {
-            res.writeHead(302, {
-              Location: `/inspector/oauth/callback${queryString}`,
-            });
-            res.end();
-            return;
-          }
-          if (path === "/auth/callback" || path.endsWith("/auth/callback")) {
-            res.writeHead(302, {
-              Location: `/inspector/auth/callback${queryString}`,
-            });
+          const redirect = getDevCallbackRedirect(req.url ?? "");
+          if (redirect) {
+            res.writeHead(302, { Location: redirect });
             res.end();
             return;
           }

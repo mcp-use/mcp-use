@@ -216,6 +216,11 @@
   --sidebar-border: oklch(0.92 0.004 286.32);
   --sidebar-ring: oklch(0.705 0.015 286.067);
   --header-height: 4rem;
+  --mobile-chrome-gap: 0.75rem;
+  --mobile-toolbar-icon-size: 1rem;
+  --mobile-toolbar-height: calc(
+    var(--mobile-chrome-gap) * 2 + var(--mobile-toolbar-icon-size)
+  );
   --sidebar-width: 250px;
   --rpc-panel-width: 250px;
   --sidebar-width-icon: var(--header-height);

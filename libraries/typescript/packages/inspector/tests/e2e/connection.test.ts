@@ -289,6 +289,49 @@ test.describe("Inspector MCP Server Connections", () => {
     await expect(textContent).toContainText("Echo: After settings update");
   });
 
+  test("should persist force-v1 protocol mode and reconnect", async ({
+    page,
+  }) => {
+    await page.goto("http://localhost:3000/inspector");
+
+    await page.getByTestId("server-tile-settings").click();
+    await page.getByTestId("connection-form-config-button").click();
+    await page.getByTestId("config-dialog-protocol-mode-select").click();
+    await page.getByRole("option", { name: "Force v1 (2024/2025)" }).click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Save" })
+      .click();
+    await page.getByTestId("connection-form-save-button").click();
+
+    await expect(
+      page.getByText("Connection settings updated").first()
+    ).toBeVisible({ timeout: 3000 });
+
+    await page.goto("http://localhost:3000/inspector");
+    await expect(page.getByTestId("server-tile-status-ready")).toBeVisible({
+      timeout: 10000,
+    });
+
+    const storedProtocol = await page.evaluate(() => {
+      const stored = JSON.parse(
+        localStorage.getItem("mcp-inspector-connections") || "{}"
+      );
+      return stored["http://localhost:3002/mcp"]?.protocolNegotiation;
+    });
+    expect(storedProtocol).toBe("legacy");
+
+    await page.reload();
+    await expect(page.getByTestId("server-tile-status-ready")).toBeVisible({
+      timeout: 10000,
+    });
+    await page.getByTestId("server-tile-settings").click();
+    await page.getByTestId("connection-form-config-button").click();
+    await expect(
+      page.getByTestId("config-dialog-protocol-mode-select")
+    ).toContainText("Force v1 (2024/2025)");
+  });
+
   test("should show red when URL is invalid, then green after reconnecting from connection settings tab", async ({
     page,
   }) => {

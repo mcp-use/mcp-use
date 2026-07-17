@@ -557,16 +557,19 @@ export function ConfigurationDialog({
             </button>
           )}
           {managedCloudInfo && (
-            <TabsSubtle
-              selectedIndex={configTabIndex}
-              onSelect={setConfigTabIndex}
-              idPrefix={CHAT_CONFIG_TABS_ID}
-            >
-              <TabsSubtleItem index={0} label="Manufact cloud" />
-              <TabsSubtleItem index={1} label="API key" />
-            </TabsSubtle>
+            <div className="flex justify-center">
+              <TabsSubtle
+                selectedIndex={configTabIndex}
+                onSelect={setConfigTabIndex}
+                idPrefix={CHAT_CONFIG_TABS_ID}
+                className="w-fit"
+              >
+                <TabsSubtleItem index={0} label="Manufact cloud" />
+                <TabsSubtleItem index={1} label="API key" />
+              </TabsSubtle>
+            </div>
           )}
-          <div className="space-y-2">
+          <div className={cn("space-y-2", managedCloudInfo && "!mt-2")}>
             <Label>Provider</Label>
             {isCloudTab ? (
               <Select

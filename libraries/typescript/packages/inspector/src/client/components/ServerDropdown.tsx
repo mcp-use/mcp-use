@@ -31,6 +31,8 @@ interface ServerDropdownProps {
   mobileMode?: boolean;
   /** Minimal inline style for breadcrumb headers (cloud-style). */
   variant?: "default" | "header";
+  /** Hide auth affordance and tighten truncation for narrow mobile headers. */
+  compactHeader?: boolean;
 }
 
 export function ServerDropdown({
@@ -39,6 +41,7 @@ export function ServerDropdown({
   onServerSelect,
   mobileMode = false,
   variant = "default",
+  compactHeader = false,
 }: ServerDropdownProps) {
   const navigate = useNavigate();
 
@@ -119,13 +122,13 @@ export function ServerDropdown({
 
   if (variant === "header") {
     return (
-      <div className="flex items-center gap-2 min-w-0">
+      <div className="flex min-w-0 items-center gap-2">
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
               <button
                 type="button"
-                className="inline-flex items-center gap-2 min-w-0 border-0 bg-transparent p-0 cursor-pointer text-foreground transition-opacity hover:opacity-80"
+                className="inline-flex max-w-full min-w-0 items-center gap-1.5 border-0 bg-transparent p-0 cursor-pointer text-foreground transition-opacity hover:opacity-80"
               >
                 {selectedServer && (
                   <ServerIcon
@@ -142,7 +145,9 @@ export function ServerDropdown({
                 {selectedServer && (
                   <>
                     <StatusDot status={selectedServer.state} />
-                    <ServerHeaderAuthButton server={selectedServer} />
+                    {!compactHeader && (
+                      <ServerHeaderAuthButton server={selectedServer} />
+                    )}
                   </>
                 )}
                 <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />

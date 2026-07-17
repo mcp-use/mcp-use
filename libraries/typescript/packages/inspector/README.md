@@ -138,6 +138,11 @@ process after changing `MCP_USE_INSPECTOR_ASSETS_URL`, because the shell HTML
 is generated when the server mounts. An explicit `inspector.assetsUrl`
 constructor option takes precedence over the environment variable.
 
+When the shell loads the default jsDelivr `@beta` CDN bundle, each page
+response appends a random `?cb=` query param to the script and stylesheet URLs
+so browsers fetch a fresh entry after a new Inspector publish. Self-hosted and
+env overrides are not cache-busted.
+
 ---
 
 ## 📖 Usage Guide

@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import {
   getDefaultInspectorProxyAddress,
   normalizeConnectionMode,
+  protocolModeFromNegotiation,
+  protocolNegotiationForMode,
   toMcpServerConfig,
   type ConnectionMode,
 } from "@/client/utils/connectionUpdates";
@@ -60,6 +62,7 @@ interface ConnectionConfig {
         enabled?: boolean;
         proxyAddress?: string;
       };
+  protocolNegotiation?: McpServerConfig["protocolNegotiation"];
   customHeaders?: Record<string, string>;
   requestTimeout?: number;
   resetTimeoutOnProgress?: boolean;
@@ -78,13 +81,19 @@ export function shouldReplaceAutoConnectConnection(
     url?: string;
     state?: string;
     transportType?: "http" | "sse";
+    protocolNegotiation?: McpServerConfig["protocolNegotiation"];
   },
-  config: Pick<ConnectionConfig, "url" | "transportType">
+  config: Pick<
+    ConnectionConfig,
+    "url" | "transportType" | "protocolNegotiation"
+  >
 ): boolean {
   return (
     existing.url === config.url &&
     existing.state !== "ready" &&
-    (existing.transportType ?? "http") !== config.transportType
+    ((existing.transportType ?? "http") !== config.transportType ||
+      protocolModeFromNegotiation(existing.protocolNegotiation) !==
+        protocolModeFromNegotiation(config.protocolNegotiation))
   );
 }
 
@@ -208,6 +217,9 @@ function parseAutoConnectParam(param: string): ConnectionConfig | null {
           connectionType:
             parsed.connectionType === "Via Proxy" ? "Via Proxy" : "Direct",
           autoProxyFallback: parsed.autoProxyFallback,
+          protocolNegotiation: protocolNegotiationForMode(
+            protocolModeFromNegotiation(parsed.protocolNegotiation)
+          ),
           customHeaders: parsed.customHeaders || {},
           requestTimeout: parsed.requestTimeout,
           resetTimeoutOnProgress: parsed.resetTimeoutOnProgress,
@@ -290,8 +302,15 @@ export function useAutoConnect({
   // Unified connection attempt function
   const attemptConnection = useCallback(
     (config: ConnectionConfig) => {
-      const { url, name, transportType, connectionMode, customHeaders, auth } =
-        config;
+      const {
+        url,
+        name,
+        transportType,
+        connectionMode,
+        protocolNegotiation,
+        customHeaders,
+        auth,
+      } = config;
 
       console.log("[useAutoConnect] Config received:", config);
       console.log(
@@ -396,6 +415,7 @@ export function useAutoConnect({
           name,
           transportType,
           connectionMode,
+          protocolNegotiation: protocolNegotiation ?? "auto",
           connectionType: connectionMode === "proxy" ? "Via Proxy" : "Direct",
           proxyConfig,
           headers: finalCustomHeaders,
