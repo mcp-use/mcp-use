@@ -16,6 +16,9 @@ export default defineConfig([
       // it synchronously so `fromOpenAPI()` stays a synchronous constructor,
       // while the root entry retains its independently enforced size budget.
       "openapi/index": "src/openapi/index.ts",
+      // Landing markup stays lazy on the MCP path and directly importable
+      // from `mcp-use/landing` without inflating the root runtime entry.
+      landing: "src/landing.ts",
       // The `mcp-use` bin (package.json "bin"). Its source shebang is
       // preserved by esbuild, so dist/bin.js stays directly executable.
       bin: "src/bin.ts",

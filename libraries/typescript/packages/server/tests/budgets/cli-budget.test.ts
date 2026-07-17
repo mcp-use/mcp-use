@@ -88,6 +88,8 @@ describe("published CLI boundaries", () => {
 
   it("keeps dist/index.js under sixty-two KiB", async () => {
     const bytes = (await stat(new URL("index.js", DIST))).size;
+    // The landing renderer is a lazy sibling entry; the root pays only for
+    // HTML negotiation and auth-aware route dispatch.
     expect(bytes).toBeLessThanOrEqual(62 * 1024);
   });
 
