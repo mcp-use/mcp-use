@@ -16,8 +16,10 @@ RUN npm install -g @mcp-use/inspector@${VERSION}
 ENV NODE_ENV=production
 
 # Expose 8080 (standard alternative HTTP port for production)
-# Note: The actual port is controlled by $PORT env var
+# The actual listen port is controlled by the $PORT env var (defaults to 8080),
+# so PaaS platforms that inject PORT (Cloud Run, Railway, Heroku, Render, etc.)
+# route to the correct port without extra port-mapping layers.
 EXPOSE 8080
 
-# Start the inspector
-CMD ["npx", "@mcp-use/inspector", "--port", "8080"]
+# Start the inspector — shell-form so $PORT expansion works.
+CMD ["sh", "-c", "npx @mcp-use/inspector --port ${PORT:-8080}"]
