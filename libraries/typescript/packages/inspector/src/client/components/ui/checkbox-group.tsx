@@ -9,7 +9,7 @@ import {
   type ReactNode,
   type HTMLAttributes,
 } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 import { Checkbox as CheckboxPrimitive } from "@base-ui/react/checkbox";
 import { cn } from "@/client/lib/utils";
 import { fontWeights } from "@/client/lib/font-weight";

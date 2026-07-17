@@ -51,6 +51,8 @@ interface ChatHeaderProps {
   onClearConfig: () => void;
   /** When true, hides the API key config badge/button and dialog. */
   hideConfigButton?: boolean;
+  /** Hosted inspector — unified Configure Chat dialog layout. */
+  hostedInspector?: boolean;
   /**
    * When set, the header shows a "Free tier" badge (instead of the local
    * provider/model badge) and passes this info down to the ConfigurationDialog
@@ -66,7 +68,10 @@ interface ChatHeaderProps {
     onModelChange: (modelId: string) => void;
     isLoading?: boolean;
   };
-  onUseManagedCloud?: () => void;
+  useManagedCloud?: boolean;
+  onSaveManagedCloud?: () => void;
+  /** When true, shows Clear Config in the BYOK tab of the config dialog. */
+  showClearButton?: boolean;
   /** Label for the clear/new-chat button. Default: "New Chat". */
   clearButtonLabel?: string;
   /** When true, hides the "Chat" title in the header. */
@@ -109,9 +114,12 @@ export function ChatHeader({
   onSaveConfig,
   onClearConfig,
   hideConfigButton,
+  hostedInspector,
   freeTierInfo,
   managedCloudInfo,
-  onUseManagedCloud,
+  useManagedCloud,
+  onSaveManagedCloud,
+  showClearButton,
   clearButtonLabel,
   hideTitle,
   clearButtonHideIcon,
@@ -268,7 +276,10 @@ export function ChatHeader({
         {/* Always render the dialog for when it's opened. In hosted-managed mode
             `freeTierInfo` is set and the dialog renders a Sign-in CTA above the
             bring-your-own-key form. */}
-        {(!hideConfigButton || freeTierInfo || managedCloudInfo) && (
+        {(!hideConfigButton ||
+          hostedInspector ||
+          freeTierInfo ||
+          managedCloudInfo) && (
           <ConfigurationDialog
             open={configDialogOpen}
             onOpenChange={onConfigDialogOpenChange}
@@ -282,11 +293,16 @@ export function ChatHeader({
             onBaseUrlChange={onBaseUrlChange}
             onSave={onSaveConfig}
             onClear={onClearConfig}
-            showClearButton={!!llmConfig && !freeTierInfo && !managedCloudInfo}
+            showClearButton={
+              showClearButton ??
+              (!!llmConfig && !freeTierInfo && !managedCloudInfo)
+            }
             buttonLabel={llmConfig ? "Change API Key" : "Configure API Key"}
+            hostedInspector={hostedInspector}
             freeTierInfo={freeTierInfo}
             managedCloudInfo={managedCloudInfo}
-            onUseManagedCloud={onUseManagedCloud}
+            useManagedCloud={useManagedCloud}
+            onSaveManagedCloud={onSaveManagedCloud}
           />
         )}
       </div>

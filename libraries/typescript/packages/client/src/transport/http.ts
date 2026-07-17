@@ -53,12 +53,12 @@ interface HttpConnectorOptions extends ConnectorInitOptions {
   clientInfo?: ClientInfo;
   /**
    * Protocol version negotiation mode passed to the SDK `Client`.
-   * - `"legacy"` (default): classic 2025 `initialize` handshake, no probe —
-   *   matches the SDK's own default. Still connects to both v1 and v2 servers
-   *   (v2 servers serve 2025-era traffic).
-   * - `"auto"`: probe with `server/discover`, falling back to the 2025
-   *   handshake against legacy servers. Opt-in: the probe performs OAuth
-   *   discovery on auth-required servers and can fail on servers whose
+   * - `"auto"` (mcp-use HTTP default): probe with `server/discover`, falling
+   *   back to the 2025 handshake against legacy servers.
+   * - `"legacy"`: classic 2025 `initialize` handshake, no probe. This matches
+   *   the official SDK's default when used directly.
+   * - In auto mode, the probe performs OAuth discovery on auth-required
+   *   servers and can fail on servers whose
    *   authorization-server issuer differs from the server URL (RFC 8414 §3.3),
    *   which would otherwise mask the normal 401 → auth flow.
    * - `{ pin: "2026-07-28" }`: modern era only, no fallback.

@@ -46,6 +46,7 @@ try {
   for (const { name, version } of releases) {
     const packed = JSON.parse(
       run("pnpm", [
+        "--config.node-linker=hoisted",
         "--filter",
         name,
         "pack",

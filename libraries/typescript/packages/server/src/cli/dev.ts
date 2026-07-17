@@ -41,6 +41,7 @@ import { resolvePort } from "./port.js";
 import { resolveTailwindCss, resolveUserViteConfig } from "./vite-config.js";
 import { createDevApiHandler } from "./dev-api.js";
 import { createTunnelManager } from "./tunnel.js";
+import { ensureToolsDeclaration } from "./tools-declaration.js";
 import { resolveWorkspacePaths } from "./workspace.js";
 import { mcpUseViewsPlugin } from "./views-plugin.js";
 import {
@@ -326,6 +327,9 @@ export async function runDev(options: DevOptions): Promise<void> {
       : undefined;
 
   const entry = discoverEntry(options.cwd, options.entry);
+  if (await ensureToolsDeclaration(options.cwd, entry)) {
+    console.log("[mcp-use] created tools.d.ts");
+  }
   let currentViews: DiscoveredView[] = discoverViews(options.cwd);
   // The Vite client environment (views plugin, Fast Refresh, HMR socket,
   // asset origin) is configured once, from this snapshot. `currentViews`

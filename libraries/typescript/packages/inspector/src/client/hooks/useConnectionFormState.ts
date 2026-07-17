@@ -3,9 +3,12 @@ import {
   buildOAuthStaticConfig,
   getDefaultInspectorProxyAddress,
   getStoredConnectionConfig,
+  protocolModeFromNegotiation,
+  protocolNegotiationForMode,
   toEditableConnectionConfig,
   type ConnectionMode,
   type EditableConnectionConfig,
+  type InspectorProtocolMode,
 } from "@/client/utils/connectionUpdates";
 import type { McpServer } from "@mcp-use/client/react";
 import { useEffect, useState } from "react";
@@ -18,6 +21,8 @@ export function useConnectionFormState(
   const [alias, setAlias] = useState("");
   const [url, setUrl] = useState("");
   const [connectionMode, setConnectionMode] = useState<ConnectionMode>("auto");
+  const [protocolMode, setProtocolMode] =
+    useState<InspectorProtocolMode>("auto");
   const [customHeaders, setCustomHeaders] = useState<CustomHeader[]>([]);
   const [requestTimeout, setRequestTimeout] = useState("10000");
   const [resetTimeoutOnProgress, setResetTimeoutOnProgress] = useState("True");
@@ -46,6 +51,7 @@ export function useConnectionFormState(
         ? editable.autoProxyFallback.proxyAddress
         : undefined);
     setConnectionMode(editable.connectionMode || "auto");
+    setProtocolMode(protocolModeFromNegotiation(editable.protocolNegotiation));
     setProxyAddress(resolvedProxyAddress || getDefaultInspectorProxyAddress());
 
     const headersToConvert = editable.headers || {};
@@ -140,6 +146,7 @@ export function useConnectionFormState(
       name: alias.trim() || normalizedUrl,
       transportType: "http",
       connectionMode,
+      protocolNegotiation: protocolNegotiationForMode(protocolMode),
       proxyConfig,
       headers: Object.keys(headers).length > 0 ? headers : undefined,
       autoProxyFallback,
@@ -161,6 +168,8 @@ export function useConnectionFormState(
     setUrl,
     connectionMode,
     setConnectionMode,
+    protocolMode,
+    setProtocolMode,
     customHeaders,
     setCustomHeaders,
     requestTimeout,

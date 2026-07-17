@@ -157,54 +157,9 @@ export function useToolsTabNavigation({
   }, [focusedIndex, filteredTools, savedRequests, activeTab]);
 
   useEffect(() => {
-    // #region agent log
-    fetch("http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Debug-Session-Id": "831b88",
-      },
-      body: JSON.stringify({
-        sessionId: "831b88",
-        location: "useToolsTabNavigation.ts:auto-select",
-        message: "tools auto-select effect",
-        data: {
-          selectedToolName,
-          toolsCount: tools.length,
-          toolNames: tools.slice(0, 5).map((t) => t.name),
-          toolFound: selectedToolName
-            ? !!tools.find((t) => t.name === selectedToolName)
-            : false,
-          currentSelected: selectedTool?.name ?? null,
-        },
-        timestamp: Date.now(),
-        hypothesisId: "H2",
-      }),
-    }).catch(() => {});
-    // #endregion
     if (!selectedToolName || tools.length === 0) return;
     const tool = tools.find((t) => t.name === selectedToolName);
     if (tool) {
-      // #region agent log
-      fetch(
-        "http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Session-Id": "831b88",
-          },
-          body: JSON.stringify({
-            sessionId: "831b88",
-            location: "useToolsTabNavigation.ts:auto-select-apply",
-            message: "scheduling handleToolSelect",
-            data: { toolName: tool.name },
-            timestamp: Date.now(),
-            hypothesisId: "H4",
-          }),
-        }
-      ).catch(() => {});
-      // #endregion
       setSelectedToolName(null);
       const timeoutId = setTimeout(() => {
         handleToolSelect(tool);

@@ -17,6 +17,33 @@ export interface OAuthStaticConfig {
 
 export type ConnectionMode = "auto" | "direct" | "proxy";
 
+export const MODERN_MCP_PROTOCOL_VERSION = "2026-07-28";
+
+export type InspectorProtocolMode = "auto" | "v1" | "v2";
+
+type ProtocolNegotiation = NonNullable<McpServerConfig["protocolNegotiation"]>;
+
+export function protocolNegotiationForMode(
+  mode: InspectorProtocolMode
+): ProtocolNegotiation {
+  switch (mode) {
+    case "v1":
+      return "legacy";
+    case "v2":
+      return { pin: MODERN_MCP_PROTOCOL_VERSION };
+    default:
+      return "auto";
+  }
+}
+
+export function protocolModeFromNegotiation(
+  negotiation?: McpServerConfig["protocolNegotiation"]
+): InspectorProtocolMode {
+  if (negotiation === "legacy") return "v1";
+  if (typeof negotiation === "object" && negotiation?.pin) return "v2";
+  return "auto";
+}
+
 type InspectorWindow = Window & { __MCP_PROXY_URL__?: string | null };
 
 export function getDefaultInspectorProxyAddress(): string {
@@ -81,6 +108,7 @@ interface ConnectionLike {
   customHeaders?: Record<string, string>;
   oauth?: OAuthStaticConfig;
   autoProxyFallback?: AutoProxyFallbackConfig;
+  protocolNegotiation?: McpServerConfig["protocolNegotiation"];
 }
 
 export interface EditableConnectionConfig {
@@ -98,6 +126,7 @@ export interface EditableConnectionConfig {
   customHeaders?: Record<string, string>;
   oauth?: OAuthStaticConfig;
   autoProxyFallback?: AutoProxyFallbackConfig;
+  protocolNegotiation?: McpServerConfig["protocolNegotiation"];
   /** Inspector UI: default tool-call request timeout (ms). */
   requestTimeout?: number;
   resetTimeoutOnProgress?: boolean;
@@ -252,6 +281,7 @@ export function toMcpServerConfig(
     url: config.url,
     displayName: config.name?.trim() || config.url,
     connectionMode,
+    protocolNegotiation: config.protocolNegotiation ?? "auto",
     ...(config.oauth ? { oauth: config.oauth } : {}),
   };
 
@@ -305,6 +335,7 @@ export function toEditableConnectionConfig(
     headers,
     oauth: config.oauth,
     autoProxyFallback: config.autoProxyFallback,
+    protocolNegotiation: config.protocolNegotiation ?? "auto",
     ...pickInspectorConnectionExtras(
       stored as unknown as Record<string, unknown> | null | undefined
     ),
@@ -358,6 +389,7 @@ function normalizeConnection(
   requestTimeout: number | undefined;
   resetTimeoutOnProgress: boolean | undefined;
   maxTotalTimeout: number | undefined;
+  protocolMode: InspectorProtocolMode;
 } {
   const normalizedUrl = connection.url?.trim() || "";
   const proxyAddress =
@@ -386,6 +418,7 @@ function normalizeConnection(
         : undefined,
     maxTotalTimeout:
       "maxTotalTimeout" in connection ? connection.maxTotalTimeout : undefined,
+    protocolMode: protocolModeFromNegotiation(connection.protocolNegotiation),
   };
 }
 
@@ -410,6 +443,7 @@ export function isAliasOnlyConnectionUpdate(
     currentConnection.resetTimeoutOnProgress ===
       nextConnection.resetTimeoutOnProgress &&
     currentConnection.maxTotalTimeout === nextConnection.maxTotalTimeout &&
+    currentConnection.protocolMode === nextConnection.protocolMode &&
     currentConnection.name !== nextConnection.name
   );
 }

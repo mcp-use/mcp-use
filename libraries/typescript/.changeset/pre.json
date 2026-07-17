@@ -10,9 +10,13 @@
     "mcp-use": "1.34.3"
   },
   "changesets": [
+    "build-v2-external-view-assets",
     "client-sdk-v2-migration",
     "dialect-json-schema-validator",
+    "fix-beta-scaffold-templates",
     "follow-inspector-beta-cdn",
+    "inspector-chat-oauth-and-ui",
+    "inspector-standalone-oauth",
     "localhost-managed-inspector-chat",
     "openapi-server-tools-v2",
     "strip-tools-list-schema-dialect",

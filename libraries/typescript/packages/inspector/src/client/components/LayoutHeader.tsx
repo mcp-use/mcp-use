@@ -19,11 +19,7 @@ import { TabCountBadge } from "./shared/TabCountBadge";
 import { AddToClientDropdown } from "./AddToClientDropdown";
 import LogoAnimated from "./LogoAnimated";
 import { ServerDropdown } from "./ServerDropdown";
-import {
-  getTabCount,
-  isMcpUseTunnelUrl,
-  shouldShowDot,
-} from "./layout/layoutHeaderUtils";
+import { getTabCount, isMcpUseTunnelUrl } from "./layout/layoutHeaderUtils";
 import { LAYOUT_TABS } from "./layout/layoutTabs";
 import { ServerUrlChip } from "./layout/ServerUrlChip";
 import { TunnelStartButton } from "./layout/TunnelBadge";
@@ -108,7 +104,7 @@ export function LayoutHeader({
       row === "desktop" ? tunnelPopover.isLgUp : !tunnelPopover.isLgUp;
 
     return (
-      <>
+      <div className="flex items-center gap-1 min-w-0">
         <ServerUrlChip
           url={serverUrl}
           className={chipClassName}
@@ -132,7 +128,7 @@ export function LayoutHeader({
             onStart={tunnel.handleStartTunnel}
           />
         )}
-      </>
+      </div>
     );
   };
 
@@ -200,18 +196,22 @@ export function LayoutHeader({
         >
           <span className="[text-box:trim-both_cap_alphabetic]">Deploy</span>
         </a>
-        {embeddedConfig.chatApiUrl ? (
-          <HostedUserMenu
-            chatApiUrl={embeddedConfig.chatApiUrl}
-            onUserResolved={(u) => setIsLoggedIn(!!u)}
-          />
-        ) : null}
+        {renderLoginButton()}
       </div>
     );
   };
 
+  const renderLoginButton = (compact = false) =>
+    embeddedConfig.chatApiUrl ? (
+      <HostedUserMenu
+        chatApiUrl={embeddedConfig.chatApiUrl}
+        onUserResolved={(u) => setIsLoggedIn(!!u)}
+        compact={compact}
+      />
+    ) : null;
+
   return (
-    <header className="w-full shrink-0">
+    <header className="w-full min-w-0 shrink-0 overflow-hidden">
       <div className="hidden lg:flex h-(--header-height) items-center justify-between gap-3 px-4 md:pl-0 md:pr-6">
         <div className="flex items-center gap-3 min-w-0 flex-1">
           {!embedded && (
@@ -248,84 +248,72 @@ export function LayoutHeader({
         {renderActionButtons()}
       </div>
 
-      <div className="flex lg:hidden flex-col gap-3">
-        <div className="flex items-center justify-between w-full">
+      <div className="flex lg:hidden min-w-0 w-full flex-col overflow-hidden pt-(--mobile-chrome-gap)">
+        <div className="flex min-h-0 items-center gap-2 pb-(--mobile-chrome-gap)">
           {!embedded && (
             <>
-              <div className="flex-1 flex justify-start">
-                <ServerDropdown
-                  connections={connections}
-                  selectedServer={selectedServer}
-                  onServerSelect={onServerSelect}
-                  mobileMode
+              <div className="flex min-w-0 flex-1 items-center gap-2.5 overflow-hidden">
+                <LogoAnimated
+                  state="collapsed"
+                  showLabel
+                  labelParts="inspector"
+                  className="shrink-0"
                 />
+                <span className="shrink-0 px-0.5 text-sm text-muted-foreground/60 [text-box:trim-both_cap_alphabetic]">
+                  /
+                </span>
+                <div className="min-w-0 flex-1">
+                  <ServerDropdown
+                    connections={connections}
+                    selectedServer={selectedServer}
+                    onServerSelect={onServerSelect}
+                    variant="header"
+                    compactHeader
+                  />
+                </div>
               </div>
-              <div className="flex-shrink-0 flex justify-center">
-                <LogoAnimated state="collapsed" showLabel />
-              </div>
-              <div className="flex-1 flex justify-end">
-                {renderActionButtons()}
-              </div>
+              <div className="shrink-0">{renderLoginButton(true)}</div>
             </>
           )}
         </div>
 
-        {selectedServer && serverUrl && !embedded && (
-          <div className="flex items-center gap-2 px-1 min-w-0">
-            {renderUrlCluster("mobile", "min-w-0")}
-          </div>
-        )}
-
         {selectedServer && (
-          <div className="w-full lg:hidden">
+          <div className="w-full min-w-0 pb-(--mobile-chrome-gap) lg:hidden">
             <Tabs
               value={activeTab}
               onValueChange={(tab) => onTabChange(tab as TabType)}
               collapsed={mobileTabsCollapsed}
+              className="w-full"
             >
-              <TabsList className="w-full justify-center border-0 bg-transparent p-0">
-                {filteredTabs.map((tab, index) => {
-                  if (tab.id === "separator") {
-                    return (
-                      <div
-                        key={`separator-${index}`}
-                        className="h-5 w-px bg-zinc-300 dark:bg-zinc-600 mx-1 shrink-0"
-                      />
-                    );
-                  }
-                  const count = getTabCount(tab.id, selectedServer);
-                  const showDot = shouldShowDot(
-                    tab.id,
-                    count,
-                    mobileTabsCollapsed
-                  );
+              <TabsList className="w-full gap-0 border-0 bg-transparent p-0 [&_[role=tablist]]:justify-between">
+                {filteredTabs
+                  .filter((tab) => tab.id !== "separator")
+                  .map((tab) => {
+                    const count = getTabCount(tab.id, selectedServer);
 
-                  return (
-                    <TabsTrigger
-                      key={tab.id}
-                      value={tab.id}
-                      data-testid={`tab-${tab.id}`}
-                      icon={tab.icon}
-                      showDot={showDot}
-                      badge={
-                        <TabCountBadge
-                          count={count}
-                          isActive={activeTab === tab.id}
-                          size="sm"
-                        />
-                      }
-                      alwaysExpanded={
-                        "alwaysExpanded" in tab && tab.alwaysExpanded
-                      }
-                      className={cn(
-                        "[&>svg]:mr-0 flex-1 flex-row gap-2 relative",
-                        mobileTabsCollapsed && "pl-2"
-                      )}
-                    >
-                      <span className="sr-only">{tab.label}</span>
-                    </TabsTrigger>
-                  );
-                })}
+                    return (
+                      <TabsTrigger
+                        key={tab.id}
+                        value={tab.id}
+                        data-testid={`tab-${tab.id}`}
+                        icon={tab.icon}
+                        iconOnly
+                        title={tab.label}
+                        badge={
+                          count > 0 ? (
+                            <TabCountBadge
+                              count={count}
+                              isActive={activeTab === tab.id}
+                              overlay
+                            />
+                          ) : undefined
+                        }
+                        className="size-9 shrink-0 rounded-full p-0"
+                      >
+                        <span className="sr-only">{tab.label}</span>
+                      </TabsTrigger>
+                    );
+                  })}
               </TabsList>
             </Tabs>
           </div>

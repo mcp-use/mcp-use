@@ -246,7 +246,7 @@ Target user `package.json` shape:
 └─ cloud/        ← deploy linkage (link.json)
 ```
 
-This contract writes `build/` (using `cache/` as Vite's `cacheDir`), `state/tunnel.json` during tunneled dev, and `cloud/link.json` after deploy. `generated/` is reserved for the explicit typegen escape hatch. `build/` contains no mutable runtime state, so build output stays reproducible and disposable. Because everything under `.mcp-use/` is gitignored and `rm -rf`-safe, nothing committed ever lives here — scaffolded, committed files (e.g. the `src/register.d.ts` typing shim, `VIEWS_SPEC.md` § Typing) belong in the project source tree instead.
+This contract writes `build/` (using `cache/` as Vite's `cacheDir`), `state/tunnel.json` during tunneled dev, and `cloud/link.json` after deploy. `generated/` is reserved for the explicit typegen escape hatch. `build/` contains no mutable runtime state, so build output stays reproducible and disposable. Because everything under `.mcp-use/` is gitignored and `rm -rf`-safe, nothing committed ever lives here. The root-level `tools.d.ts` typing shim belongs in the project source tree; templates scaffold it, and `dev`/`build` recreate it from the discovered entry path when missing without overwriting an existing file (`VIEWS_SPEC.md` § Typing).
 
 Rules, all inherited from v1 and locked:
 
@@ -267,6 +267,8 @@ Writes `.mcp-use/build/manifest.json`:
 ```
 
 `buildId` is a random hex id and `createdAt` an ISO timestamp. `start` consumes `entryPoint`; inspector enablement remains solely in the built server's `ServerConfig` and is not duplicated in the manifest. Views extend this manifest with a `views` map (`VIEWS_SPEC.md` § Manifest) and copy the project-root `public/` directory into `build/views/public/` when present.
+
+When `MCP_ASSETS_URL` is set, view manifest asset paths are rewritten to full CDN URLs at build time using `basePath` from the server entry (upload `build/views/` separately). Runtime env: `MCP_URL` (server origin), `MCP_ASSETS_URL` (assets prefix), `CSP_URLS` / `CSP_*_DOMAINS` (global CSP — see `VIEWS_SPEC.md`).
 
 The build is transpile-only and does not run a typecheck. Projects own their `tsc --noEmit` script.
 
@@ -327,6 +329,7 @@ Default **enabled**, mounted in both dev and production; users set `inspector: {
 
 - `inspector.assetsUrl` overrides the CDN base (FastAPI's `swagger_js_url` analog) — point it at a self-hosted copy of the bundle for air-gapped environments.
 - `MCP_USE_INSPECTOR_ASSETS_URL` supplies the same override for local `dev`/`start` runs without modifying server code; explicit constructor config wins.
+- The default jsDelivr `@beta` bundle URL gets a per-request `?cb=<uuid>` cache-bust query param so browsers do not serve a stale entry script after a new Inspector publish; custom `assetsUrl` overrides are unchanged.
 - Browsers will serve the CDN bundle from HTTP cache after first load; that's best-effort, not the offline story.
 - The framework never discovers or serves a local `@mcp-use/inspector` package. Standalone/offline inspector use remains the independently installed inspector's responsibility.
 

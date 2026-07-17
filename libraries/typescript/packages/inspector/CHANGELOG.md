@@ -1,5 +1,37 @@
 # @mcp-use/inspector
 
+## 20.0.0-beta.2
+
+### Patch Changes
+
+- e497782: Fix managed chat OAuth forwarding and polish chat UI.
+
+  **@mcp-use/inspector**
+  - Fix server-side chat for OAuth MCP servers (e.g. Linear): forward live connection tokens when saved auth config is `none`, so hosted chat no longer 401s while Tools stay connected.
+  - Add a top scroll fade on the chat message list so content softens under the floating header when scrolling.
+  - Center the Manufact cloud / API key tabs in Configure Chat and tighten spacing below them.
+
+## 20.0.0-beta.1
+
+### Patch Changes
+
+- c7accd6: Fix standalone Inspector OAuth and CDN delivery.
+
+  **@mcp-use/inspector**
+  - Serve the built UI from `dist/cdn/` locally in standalone mode (`pnpm start` / `npx`); embedded mounts still default to jsDelivr `@beta`.
+  - Point `pnpm start` at `dist/cli.js` so standalone runs the full proxy + OAuth BFF shell.
+  - Skip `dev/info` tunnel probes in standalone mode (route exists only under `mcp-use dev`).
+  - Simplify e2e matrix: builtin/prod modes rely on in-process static assets instead of a separate CDN fixture server.
+  - Document jsDelivr-first embedding vs local standalone in `docs/inspector/integration.mdx`.
+
+  **@mcp-use/client**
+  - Fix Linear (and other OAuth) redirect flows: do not auto-connect saved MCP servers on `/oauth/callback`, which overwrote the PKCE verifier before token exchange.
+  - Stop HEAD health-check polling after a 405/404 from servers that only accept POST (reduces console noise for providers like Linear).
+
+- Updated dependencies [c7accd6]
+  - @mcp-use/client@2.0.0-beta.1
+  - @mcp-use/agent@2.0.0-beta.1
+
 ## 20.0.0-beta.0
 
 ### Major Changes

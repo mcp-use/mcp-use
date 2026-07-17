@@ -227,10 +227,15 @@ export function startConnectionHealthMonitoring(params: {
 }): () => void {
   let healthCheckInterval: ReturnType<typeof setInterval> | null = null;
   let lastSuccessfulCheck = Date.now();
+  // ponytail: many MCP servers only accept POST; one 405/404 disables HEAD polling.
+  let headProbeUnsupported = false;
   const healthCheckIntervalMs = params.healthCheckIntervalMs ?? 10000;
   const healthCheckTimeoutMs = params.healthCheckTimeoutMs ?? 30000;
 
   const checkConnectionHealth = async () => {
+    if (headProbeUnsupported) {
+      return;
+    }
     if (!params.isMountedRef.current || params.stateRef.current !== "ready") {
       if (healthCheckInterval) {
         clearInterval(healthCheckInterval);
@@ -253,6 +258,16 @@ export function startConnectionHealthMonitoring(params: {
         headers: { ...params.allHeaders, ...authHeaders },
         signal: AbortSignal.timeout(5000),
       });
+
+      if (response.status === 405 || response.status === 404) {
+        headProbeUnsupported = true;
+        lastSuccessfulCheck = Date.now();
+        if (healthCheckInterval) {
+          clearInterval(healthCheckInterval);
+          healthCheckInterval = null;
+        }
+        return;
+      }
 
       if (response.ok || response.status < 500) {
         lastSuccessfulCheck = Date.now();

@@ -27,6 +27,8 @@ export interface CliCommandOptions {
   tunnel?: boolean;
   /** Auto-open the inspector in a browser at dev startup (`--no-open` disables). */
   open?: boolean;
+  /** Record inspector availability in the build manifest (`--with-inspector`). */
+  withInspector?: boolean;
 }
 
 const HELP = `mcp-use — run MCP servers built with mcp-use
@@ -52,6 +54,7 @@ Options:
   -p, --port <n>     Port to serve on (default: $PORT or 3000)
   --host <host>      Host to bind (dev only)
   --entry <path>     Server entry module (dev/build only)
+  --with-inspector   Record inspector availability in the build manifest (build only)
   --tunnel           Expose the dev server through a public tunnel (dev only)
   --no-open          Do not auto-open the inspector in a browser (dev only)
   -h, --help         Show this help
@@ -181,6 +184,7 @@ async function cliCommand(
     ...(args.host !== undefined && { host: args.host }),
     ...(args.tunnel && { tunnel: true }),
     ...(!args.open && { open: false }),
+    ...(args.withInspector && { withInspector: true }),
   };
 
   try {

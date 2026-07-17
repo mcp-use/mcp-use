@@ -181,6 +181,103 @@ describe("Manufact Inspector OAuth", () => {
     ).toBe(false);
   });
 
+  it("skips cached OAuth clients on loopback dev (fresh DCR every sign-in)", async () => {
+    localStorage.setItem(
+      "mcp-inspector:manufact-auth:client:http://localhost:8000",
+      JSON.stringify({
+        client_id: "stale-local-client",
+        redirect_uri: "http://localhost:3005/inspector/auth/callback",
+      })
+    );
+
+    const fetchMock = vi.fn(
+      async (input: string | URL | Request, init?: RequestInit) => {
+        const url = String(input);
+        if (url.endsWith("/api/auth/get-session")) {
+          return Response.json(null);
+        }
+        if (url.endsWith("openid-configuration")) {
+          return Response.json({
+            ...metadata,
+            authorization_endpoint:
+              "http://localhost:8000/api/auth/oauth2/authorize",
+            registration_endpoint:
+              "http://localhost:8000/api/auth/oauth2/register",
+          });
+        }
+        if (url === "http://localhost:8000/api/auth/oauth2/register") {
+          return Response.json(
+            { client_id: "fresh-local-client" },
+            { status: 201 }
+          );
+        }
+        throw new Error(`Unexpected request: ${url}`);
+      }
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await authorizeManufact(
+      "http://localhost:8000/api/v1/inspector/chat/stream"
+    );
+
+    const authorizationUrl = new URL(popup.location.href);
+    expect(authorizationUrl.searchParams.get("client_id")).toBe(
+      "fresh-local-client"
+    );
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.stringContaining("/api/auth/oauth2/authorize"),
+      expect.objectContaining({ redirect: "manual" })
+    );
+  });
+
+  it("re-registers when a cached OAuth client no longer exists on the server", async () => {
+    localStorage.setItem(
+      "mcp-inspector:manufact-auth:client:https://cloud.example",
+      JSON.stringify({
+        client_id: "stale-client",
+        redirect_uri: "http://localhost:3005/inspector/auth/callback",
+      })
+    );
+
+    const fetchMock = vi.fn(
+      async (input: string | URL | Request, init?: RequestInit) => {
+        const url = String(input);
+        if (url.endsWith("/api/auth/get-session")) {
+          return Response.json(null);
+        }
+        if (url.endsWith("openid-configuration")) {
+          return Response.json(metadata);
+        }
+        if (url.includes("/api/auth/oauth2/authorize")) {
+          return Response.redirect(
+            "https://cloud.example/auth/error?error=invalid_client&error_description=client_id+is+required",
+            302
+          );
+        }
+        if (url === metadata.registration_endpoint) {
+          return Response.json({ client_id: "fresh-client" }, { status: 201 });
+        }
+        throw new Error(`Unexpected request: ${url}`);
+      }
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await authorizeManufact(
+      "https://cloud.example/api/v1/inspector/chat/stream"
+    );
+
+    const authorizationUrl = new URL(popup.location.href);
+    expect(authorizationUrl.searchParams.get("client_id")).toBe("fresh-client");
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/api/auth/oauth2/authorize"),
+      expect.objectContaining({ redirect: "manual" })
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      metadata.registration_endpoint,
+      expect.anything()
+    );
+  });
+
   it("rejects callbacks without a matching state", async () => {
     await expect(
       completeManufactAuthorization(

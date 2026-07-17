@@ -587,7 +587,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [20, 22]
+        node-version: [24.15.0]
     name: typescript-lint (node-${{ matrix.node-version }})
     defaults:
       run:
@@ -599,9 +599,9 @@ jobs:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v4
         with:
-          version: 10.6.1
+          version: 11.13.1
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -612,6 +612,9 @@ jobs:
 
       - name: Install Dependencies
         run: pnpm install --no-frozen-lockfile
+
+      - name: Build Client Types
+        run: pnpm build:client
 
       - name: Check Formatting
         run: pnpm format:check
@@ -624,7 +627,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [20, 22]
+        node-version: [24.15.0]
     name: typescript-build (node-${{ matrix.node-version }})
     defaults:
       run:
@@ -636,9 +639,9 @@ jobs:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v4
         with:
-          version: 10.6.1
+          version: 11.13.1
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -664,7 +667,7 @@ jobs:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     strategy:
       matrix:
-        node-version: [20, 22]
+        node-version: [24.15.0]
     defaults:
       run:
         working-directory: libraries/typescript
@@ -672,9 +675,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
-      - uses: pnpm/action-setup@v3
+      - uses: pnpm/action-setup@v4
         with:
-          version: 10.6.1
+          version: 11.13.1
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
@@ -713,20 +716,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
-      - uses: pnpm/action-setup@v3
+      - uses: pnpm/action-setup@v4
         with:
-          version: 10.6.1
+          version: 11.13.1
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24.15.0
           cache: "pnpm"
           cache-dependency-path: libraries/typescript/pnpm-lock.yaml
       - name: Install Dependencies
         run: pnpm install --no-frozen-lockfile
-      - name: Generate version file
-        # src/version.ts is gitignored and produced at build time; knip needs it
-        # to resolve the `./version.js` imports in packages/mcp-use.
-        run: pnpm --filter mcp-use generate:version
       - name: Run Knip
         run: |
           set -o pipefail
@@ -747,7 +746,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [20, 22]
+        node-version: [24.15.0]
     defaults:
       run:
         working-directory: libraries/typescript
@@ -755,9 +754,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
-      - uses: pnpm/action-setup@v3
+      - uses: pnpm/action-setup@v4
         with:
-          version: 10.6.1
+          version: 11.13.1
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
@@ -779,7 +778,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
-        node-version: [20, 22]
+        node-version: [24.15.0]
     defaults:
       run:
         working-directory: libraries/typescript
@@ -787,9 +786,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
-      - uses: pnpm/action-setup@v3
+      - uses: pnpm/action-setup@v4
         with:
-          version: 10.6.1
+          version: 11.13.1
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
@@ -809,7 +808,7 @@ jobs:
 
   typescript-changeset-check:
     needs: detect-changes
-    if: ${{ (github.event_name == 'workflow_call' && inputs.run_changeset_check) || (github.event_name == 'pull_request' && github.base_ref != 'canary' && github.base_ref != 'beta' && needs.detect-changes.outputs.typescript == 'true') }}
+    if: ${{ (github.event_name == 'workflow_call' && inputs.run_changeset_check) || (github.event_name == 'pull_request' && github.head_ref != 'beta' && github.base_ref != 'canary' && github.base_ref != 'beta' && needs.detect-changes.outputs.typescript == 'true') }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -822,14 +821,14 @@ jobs:
           fetch-depth: 0
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v4
         with:
-          version: 10.6.1
+          version: 11.13.1
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24.15.0
           cache: "pnpm"
           cache-dependency-path: libraries/typescript/pnpm-lock.yaml
 
@@ -860,12 +859,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
-      - uses: pnpm/action-setup@v3
+      - uses: pnpm/action-setup@v4
         with:
-          version: 10.6.1
+          version: 11.13.1
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24.15.0
           cache: "pnpm"
           cache-dependency-path: libraries/typescript/pnpm-lock.yaml
       - name: Install Dependencies
@@ -884,7 +883,7 @@ jobs:
         working-directory: libraries/typescript/packages/inspector
         run: npm pack
       - name: Pack mcp-use
-        working-directory: libraries/typescript/packages/mcp-use
+        working-directory: libraries/typescript/packages/server
         run: npm pack
       - name: Upload All Package Artifacts
         uses: actions/upload-artifact@v4
@@ -892,7 +891,7 @@ jobs:
           name: workspace-packages
           path: |
             libraries/typescript/packages/create-mcp-use-app/create-mcp-use-app-*.tgz
-            libraries/typescript/packages/mcp-use/mcp-use-*.tgz
+            libraries/typescript/packages/server/mcp-use-*.tgz
             libraries/typescript/packages/cli/mcp-use-cli-*.tgz
             libraries/typescript/packages/inspector/mcp-use-inspector-*.tgz
           retention-days: 1
@@ -922,13 +921,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
-      - uses: pnpm/action-setup@v3
+      - uses: pnpm/action-setup@v4
         if: matrix.pm == 'pnpm'
         with:
-          version: 10.6.1
+          version: 11.13.1
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24.15.0
       - name: Setup Yarn
         if: matrix.pm == 'yarn'
         run: corepack enable

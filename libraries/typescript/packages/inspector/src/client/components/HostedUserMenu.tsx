@@ -21,6 +21,7 @@ import {
   AvatarFallback,
   AvatarImage,
 } from "@/client/components/ui/avatar";
+import { cn } from "@/client/lib/utils";
 
 function getInitial(
   name: string | null | undefined,
@@ -40,6 +41,8 @@ interface HostedUserMenuProps {
   fallback?: React.ReactNode;
   /** Called once the session check resolves with the authenticated user or null. */
   onUserResolved?: (user: HostedUser | null) => void;
+  /** Tighter sign-in button for mobile headers. */
+  compact?: boolean;
 }
 
 /**
@@ -53,6 +56,7 @@ export function HostedUserMenu({
   dashboardUrl = "https://manufact.com/cloud",
   fallback = null,
   onUserResolved,
+  compact = false,
 }: HostedUserMenuProps) {
   const { user, loaded, authorizing, authorize, logout, mode } =
     useHostedSession(chatApiUrl);
@@ -77,7 +81,10 @@ export function HostedUserMenu({
         <Button
           variant="ghost"
           size="sm"
-          className="rounded-full px-4 text-[13px]"
+          className={cn(
+            "shrink-0 rounded-full text-[13px]",
+            compact ? "px-2.5 text-xs" : "px-4"
+          )}
           disabled={authorizing}
           onClick={() => {
             void authorize().catch((error) =>

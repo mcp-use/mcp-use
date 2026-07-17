@@ -13,6 +13,6 @@
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true
   },
-  "include": ["index.ts", "src/**/*", "resources/**/*"],
+  "include": ["index.ts", "tools.d.ts", "resources/**/*"],
   "exclude": ["node_modules", "dist"]
 }

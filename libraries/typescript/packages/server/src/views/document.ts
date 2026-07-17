@@ -23,14 +23,55 @@ export function resolveAssetUrl(assetPath: string, origin: string): string {
 }
 
 /**
+ * Build the HTTP path prefix for a view's built assets (no origin).
+ *
+ * @param basePath - MCP mount prefix (e.g. `/mcp`).
+ * @param viewName - View directory / manifest key.
+ */
+export function viewAssetsBasePath(basePath: string, viewName: string): string {
+  return `${basePath}/_mcp-use/views/${viewName}/`;
+}
+
+/**
+ * Resolve a production or dev external asset path to an absolute URL.
+ *
+ * @param assetPath - Full CDN URL, origin-absolute dev path (`/…`), or
+ *   view-relative production path (`assets/…`).
+ * @param assetsBase - Assets URL prefix (origin + optional path).
+ * @param basePath - MCP mount prefix.
+ * @param viewName - View directory / manifest key (required for view-relative paths).
+ */
+export function resolveExternalAssetUrl(
+  assetPath: string,
+  assetsBase: string,
+  basePath: string,
+  viewName: string
+): string {
+  if (
+    assetPath.startsWith("http://") ||
+    assetPath.startsWith("https://") ||
+    assetPath.startsWith("data:")
+  ) {
+    return assetPath;
+  }
+  if (assetPath.startsWith("/")) {
+    return resolveAssetUrl(assetPath, assetsBase);
+  }
+  return `${assetsBase}${viewAssetsBasePath(basePath, viewName)}${assetPath.replace(/^\/+/, "")}`;
+}
+
+/**
  * Resolve the absolute URL prefix for the project's `public/` directory.
  *
- * @param origin - Request-resolved public origin.
+ * @param assetsBase - Assets URL prefix (origin + optional path).
  * @param basePath - MCP mount prefix (e.g. `/mcp`).
  * @returns Absolute prefix with trailing slash.
  */
-export function resolvePublicBase(origin: string, basePath: string): string {
-  return `${origin}${basePath}/_mcp-use/public/`;
+export function resolvePublicBase(
+  assetsBase: string,
+  basePath: string
+): string {
+  return `${assetsBase}${basePath}/_mcp-use/public/`;
 }
 
 /**
@@ -66,21 +107,23 @@ function escapeHtml(value: string): string {
 /**
  * Synthesize a complete HTML document for a view from manifest data.
  *
- * Production (`kind: "inline"`) embeds JS and CSS directly so a srcdoc iframe
- * boots with zero network fetches for the view bundle. Dev
- * (`kind: "external"`) loads Vite module URLs for HMR.
+ * Production (`kind: "external"`) loads built assets over HTTP with absolute
+ * URLs. Legacy `kind: "inline"` embeds JS/CSS directly. Dev uses Vite module
+ * URLs (`kind: "external"` with origin-absolute paths).
  *
  * @param entry - Primed manifest entry for the view.
- * @param origin - Request-resolved public origin for absolute asset URLs.
+ * @param assetsBase - Request-resolved assets URL prefix for absolute asset URLs.
  * @param basePath - MCP mount prefix (e.g. `/mcp`).
+ * @param viewName - View directory / manifest key (required for production external paths).
  */
 export function synthesizeViewDocument(
   entry: ViewManifestEntry,
-  origin: string,
-  basePath: string
+  assetsBase: string,
+  basePath: string,
+  viewName?: string
 ): string {
   const viewConfig: McpUseViewConfig = {
-    publicBase: resolvePublicBase(origin, basePath),
+    publicBase: resolvePublicBase(assetsBase, basePath),
   };
   const configScript = `<script>globalThis.__mcpUseViewConfig=${JSON.stringify(viewConfig)};</script>`;
 
@@ -104,21 +147,32 @@ ${moduleScript}
 </html>`;
   }
 
+  if (viewName === undefined) {
+    throw new Error(
+      "viewName is required when synthesizing an external view document."
+    );
+  }
+
   const cssLinks = entry.css
     .map(
       (path) =>
-        `<link rel="stylesheet" href="${escapeHtml(resolveAssetUrl(path, origin))}">`
+        `<link rel="stylesheet" href="${escapeHtml(resolveExternalAssetUrl(path, assetsBase, basePath, viewName))}">`
     )
     .join("\n");
 
   const scriptTags = (entry.scripts ?? [])
     .map(
       (path) =>
-        `<script type="module" src="${escapeHtml(resolveAssetUrl(path, origin))}"></script>`
+        `<script type="module" src="${escapeHtml(resolveExternalAssetUrl(path, assetsBase, basePath, viewName))}"></script>`
     )
     .join("\n");
 
-  const entryUrl = resolveAssetUrl(entry.entry, origin);
+  const entryUrl = resolveExternalAssetUrl(
+    entry.entry,
+    assetsBase,
+    basePath,
+    viewName
+  );
 
   return `<!doctype html>
 <html>

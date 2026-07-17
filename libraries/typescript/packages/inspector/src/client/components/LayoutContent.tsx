@@ -301,9 +301,6 @@ export function LayoutContent({
             hideClearButton={embeddedConfig.chatHideClearButton}
             hideToolSelector={embeddedConfig.chatHideToolSelector}
             streamProtocol={embeddedConfig.chatStreamProtocol}
-            managedKeyUnavailable={
-              isLoopbackServer && !chatApiUrl && !useManagedClientSide
-            }
           />
         </div>
       )}

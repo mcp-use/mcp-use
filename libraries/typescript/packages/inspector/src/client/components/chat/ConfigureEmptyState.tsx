@@ -1,35 +1,16 @@
-import { AlertCircle, Key, Settings } from "lucide-react";
+import { Key, Settings } from "lucide-react";
 
 import { Button } from "@/client/components/ui/button";
 
 interface ConfigureEmptyStateProps {
   onConfigureClick: () => void;
-  /**
-   * True when the hosted inspector's managed key cannot be used because there
-   * is no cloud chat URL (BYOK is required). Omitted on the local inspector.
-   */
-  managedKeyUnavailable?: boolean;
 }
 
 export function ConfigureEmptyState({
   onConfigureClick,
-  managedKeyUnavailable = false,
 }: ConfigureEmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center h-full text-center">
-      {managedKeyUnavailable && (
-        <div
-          role="status"
-          data-testid="chat-localhost-managed-key-notice"
-          className="mb-6 w-full max-w-md flex items-start gap-3 rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-sm text-left text-amber-900 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-100"
-        >
-          <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
-          <span>
-            Managed inspector chat is not configured for this deployment. Add
-            your own API key below to chat with this server.
-          </span>
-        </div>
-      )}
       <Key className="h-12 w-12 text-muted-foreground mb-4" />
       <h3 className="text-lg font-semibold mb-2">
         Configure Your LLM Provider

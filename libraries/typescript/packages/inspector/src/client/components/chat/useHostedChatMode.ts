@@ -1,5 +1,9 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import type { LLMConfig } from "./types";
+import {
+  resolveInitialForceClientSide,
+  writeStoredChatMode,
+} from "./chatModeStorage";
 
 export function useHostedChatMode({
   useClientSide,
@@ -12,9 +16,18 @@ export function useHostedChatMode({
 }) {
   const hostUsesServerManagedStream =
     !useClientSide && managedLlmConfig != null;
-  const [forceClientSide, setForceClientSide] = useState(() =>
-    hostUsesServerManagedStream ? false : !!localLlmConfig
-  );
+  const [forceClientSide, setForceClientSideState] = useState(() => {
+    return resolveInitialForceClientSide(
+      hostUsesServerManagedStream,
+      localLlmConfig
+    );
+  });
+
+  const setForceClientSide = useCallback((value: boolean) => {
+    writeStoredChatMode(value ? "byok" : "managed");
+    setForceClientSideState(value);
+  }, []);
+
   const effectiveClientSide = hostUsesServerManagedStream
     ? forceClientSide
     : useClientSide || forceClientSide || !!localLlmConfig;

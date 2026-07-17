@@ -481,33 +481,6 @@ export function CommandPalette({
                 ? "tools" // Navigate to tools tab for saved requests
                 : ("resources" as const);
 
-        // #region agent log
-        fetch(
-          "http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Debug-Session-Id": "831b88",
-            },
-            body: JSON.stringify({
-              sessionId: "831b88",
-              location: "CommandPalette.tsx:handleSelect",
-              message: "palette navigate item",
-              data: {
-                itemType: item.type,
-                itemName: item.name,
-                itemIdentifier,
-                tabName,
-                serverId: item.metadata?.serverId ?? null,
-              },
-              timestamp: Date.now(),
-              hypothesisId: "H1",
-            }),
-          }
-        ).catch(() => {});
-        // #endregion
-
         console.warn("[CommandPalette] Navigating to item:", {
           tab: tabName,
           itemIdentifier,

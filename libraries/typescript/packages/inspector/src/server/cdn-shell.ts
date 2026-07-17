@@ -1,17 +1,18 @@
 import type { Context, Hono } from "hono";
+import {
+  inspectorStylesUrl,
+  resolveInspectorAssetUrls,
+  withInspectorCacheBust,
+  type InspectorMode,
+} from "./asset-urls.js";
 import { renderInspectorFaviconLinks } from "./favicon-links.js";
 import { registerInspectorFaviconStatic } from "./favicon-static.js";
+import { registerInspectorStaticAssets } from "./static-assets.js";
 import { getInspectorVersion } from "./version.js";
 
 const INSPECTOR_VERSION = getInspectorVersion();
 
-const CDN_BASE =
-  process.env.INSPECTOR_CDN_BASE ?? "https://inspector-cdn.mcp-use.com";
-const CDN_JS_URL = `${CDN_BASE}/inspector@${INSPECTOR_VERSION}.js`;
-const CDN_CSS_URL = `${CDN_BASE}/inspector@${INSPECTOR_VERSION}.css`;
-
-/** How the inspector is being served (telemetry + hosted UI behavior). */
-export type InspectorMode = "standalone" | "embedded" | "cloud";
+export type { InspectorMode } from "./asset-urls.js";
 
 export type CdnShellConfig = {
   basePath?: string;
@@ -30,7 +31,11 @@ const OAUTH_POPUP_CLOSED_HTML = `<!doctype html>
 <script>try{if(window.opener&&!window.opener.closed)window.opener.postMessage({type:"manufact:oauth-complete"},"*")}catch(e){}try{window.close()}catch(e){}</script>
 </body></html>`;
 
-function generateCdnShellHtml(config?: CdnShellConfig, basePath = ""): string {
+function generateCdnShellHtml(
+  config: CdnShellConfig | undefined,
+  basePath: string,
+  assets: { jsUrl: string; cssUrl: string }
+): string {
   const scripts: string[] = [];
   if (config?.basePath !== undefined) {
     scripts.push(
@@ -76,7 +81,7 @@ function generateCdnShellHtml(config?: CdnShellConfig, basePath = ""): string {
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="${CDN_CSS_URL}" />
+    <link rel="stylesheet" href="${assets.cssUrl}" />
     <title>Inspector | mcp-use</title>
     <meta name="description" content="Free, open-source MCP Inspector by mcp-use. Connect to any MCP server, test tools, prompts, and resources, inspect RPC logs, and debug MCP apps — all in your browser." />
     <script>window.__INSPECTOR_VERSION__ = ${JSON.stringify(INSPECTOR_VERSION)};</script>
@@ -97,19 +102,20 @@ function generateCdnShellHtml(config?: CdnShellConfig, basePath = ""): string {
       }
     </script>
     <div id="root"></div>
-    <script type="module" src="${CDN_JS_URL}"></script>
+    <script type="module" src="${assets.jsUrl}"></script>
   </body>
 </html>`;
 }
 
 /**
- * Serve the inspector UI from CDN at `${basePath}/inspector`.
+ * Serve the inspector UI at `${basePath}/inspector`.
  */
 export function registerInspectorCdnShell(
   app: Hono,
   config?: CdnShellConfig,
   basePath: string = ""
 ) {
+  const assets = resolveInspectorAssetUrls(config?.inspectorMode, basePath);
   const p = (suffix: string) => `${basePath}${suffix}`;
   const effectiveConfig: CdnShellConfig = {
     ...config,
@@ -123,8 +129,16 @@ export function registerInspectorCdnShell(
       process.env.MCP_USE_ANONYMIZED_TELEMETRY === "false",
   };
 
-  const serveShell = (c: Context) =>
-    c.html(generateCdnShellHtml(effectiveConfig, basePath));
+  const serveShell = (c: Context) => {
+    const base = resolveInspectorAssetUrls(config?.inspectorMode, basePath);
+    const jsUrl = withInspectorCacheBust(base.jsUrl);
+    return c.html(
+      generateCdnShellHtml(effectiveConfig, basePath, {
+        jsUrl,
+        cssUrl: inspectorStylesUrl(jsUrl),
+      })
+    );
+  };
 
   registerInspectorFaviconStatic(app, basePath);
 
@@ -153,5 +167,9 @@ export function registerInspectorCdnShell(
       const url = new URL(c.req.url);
       return c.redirect(`${p("/inspector")}${url.search}`);
     });
+  }
+
+  if (assets.useLocal) {
+    registerInspectorStaticAssets(app, basePath);
   }
 }

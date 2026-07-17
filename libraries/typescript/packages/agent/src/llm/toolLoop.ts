@@ -1,5 +1,6 @@
 import { isToolResultError, toolResultToContent } from "./toolResultParts.js";
 import type { LlmDriver } from "./driver.js";
+import { LlmRequestError } from "./providers/openai-chat-completions.js";
 import type { LlmStreamEvent, ProviderMessage, ProviderTool } from "./types.js";
 
 interface ToolCallFn {
@@ -69,6 +70,12 @@ export async function* runToolLoop(
         yield ev;
       }
     } catch (err) {
+      // Preserve structured HTTP errors (429 loginRequired, 402 credits, …) so
+      // hosted-inspector UI can show the managed-chat notice instead of a raw
+      // "OpenAI request failed …" bubble.
+      if (err instanceof LlmRequestError) {
+        throw err;
+      }
       yield {
         type: "error",
         message: err instanceof Error ? err.message : String(err),

@@ -59,6 +59,23 @@ const snapshots = new Map<string, ManufactAuthSnapshot>();
 const listeners = new Set<() => void>();
 const loading = new Map<string, Promise<void>>();
 const refreshes = new Map<string, Promise<TokenSet | null>>();
+let pendingAuthorizeChatApiUrl: string | null = null;
+let authorizeRetryInFlight = false;
+
+if (typeof window !== "undefined") {
+  window.addEventListener("message", (event) => {
+    if (event.data?.type !== "manufact:invalidate-oauth-client") return;
+    for (const origin of snapshots.keys()) {
+      browserStorage()?.removeItem(storageKey(origin, "client"));
+    }
+    const chatApiUrl = pendingAuthorizeChatApiUrl;
+    if (!chatApiUrl || authorizeRetryInFlight) return;
+    authorizeRetryInFlight = true;
+    void authorizeManufact(chatApiUrl, { isRetry: true }).finally(() => {
+      authorizeRetryInFlight = false;
+    });
+  });
+}
 
 function snapshotFor(origin: string): ManufactAuthSnapshot {
   const existing = snapshots.get(origin);
@@ -197,6 +214,65 @@ function callbackUri(): string {
   return `${window.location.origin}${getInspectorBase()}/auth/callback`;
 }
 
+function isLocalLoopbackHost(hostname: string): boolean {
+  return hostname === "localhost" || hostname === "127.0.0.1";
+}
+
+/** Local dev recreates Postgres often; skip cached DCR clients on loopback. */
+function shouldBypassCachedOAuthClient(origin: string): boolean {
+  try {
+    const cloudHost = new URL(origin).hostname;
+    const inspectorHost =
+      typeof window !== "undefined"
+        ? new URL(window.location.href).hostname
+        : "";
+    return isLocalLoopbackHost(cloudHost) && isLocalLoopbackHost(inspectorHost);
+  } catch {
+    return false;
+  }
+}
+
+/** Probe whether a cached DCR client id still exists (e.g. after a local DB reset). */
+async function clientStillRegistered(
+  origin: string,
+  clientId: string,
+  redirectUri: string
+): Promise<boolean> {
+  const url = new URL(`${origin}/api/auth/oauth2/authorize`);
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("client_id", clientId);
+  url.searchParams.set("redirect_uri", redirectUri);
+  url.searchParams.set("scope", SCOPES);
+  url.searchParams.set("code_challenge", await codeChallenge(randomValue(32)));
+  url.searchParams.set("code_challenge_method", "S256");
+  url.searchParams.set("state", "client-probe");
+  url.searchParams.set("prompt", "none");
+  try {
+    const res = await fetch(url.toString(), {
+      method: "GET",
+      redirect: "manual",
+      credentials: "include",
+    });
+    const location = res.headers.get("location") ?? "";
+    if (
+      location.includes("/auth/error") &&
+      location.includes("invalid_client")
+    ) {
+      return false;
+    }
+    // Cross-origin authorize redirects hide Location from fetch(); don't trust cache.
+    if (
+      (res.status >= 300 && res.status < 400) ||
+      res.type === "opaqueredirect"
+    ) {
+      return Boolean(location) && !location.includes("/auth/error");
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function getClient(
   origin: string,
   metadata: OAuthMetadata
@@ -204,7 +280,19 @@ async function getClient(
   const redirectUri = callbackUri();
   const key = storageKey(origin, "client");
   const stored = readJson<ClientRegistration & { redirect_uri?: string }>(key);
-  if (stored?.client_id && stored.redirect_uri === redirectUri) return stored;
+  const bypassCache = shouldBypassCachedOAuthClient(origin);
+  if (
+    !bypassCache &&
+    stored?.client_id &&
+    stored.redirect_uri === redirectUri
+  ) {
+    if (await clientStillRegistered(origin, stored.client_id, redirectUri)) {
+      return stored;
+    }
+    browserStorage()?.removeItem(key);
+  } else if (bypassCache && stored?.client_id) {
+    browserStorage()?.removeItem(key);
+  }
   if (!metadata.registration_endpoint) {
     throw new Error("Manufact OAuth registration is unavailable");
   }
@@ -412,8 +500,12 @@ async function load(origin: string): Promise<void> {
   return promise;
 }
 
-export async function authorizeManufact(chatApiUrl: string): Promise<void> {
+export async function authorizeManufact(
+  chatApiUrl: string,
+  options?: { isRetry?: boolean }
+): Promise<void> {
   const origin = authOrigin(chatApiUrl);
+  pendingAuthorizeChatApiUrl = chatApiUrl;
   setSkipSharedSession(origin, false);
   const popup = window.open(
     "",

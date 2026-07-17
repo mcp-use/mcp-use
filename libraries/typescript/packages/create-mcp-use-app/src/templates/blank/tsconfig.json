@@ -13,11 +13,7 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "incremental": true,
-    "tsBuildInfoFile": "./dist/.tsbuildinfo",
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"]
-    }
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
   },
   "include": ["index.ts", "src/**/*", "resources/**/*", "server.ts", ".mcp-use/**/*.d.ts"],
   "exclude": ["node_modules", "dist"]

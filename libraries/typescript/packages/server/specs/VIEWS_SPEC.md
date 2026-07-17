@@ -450,7 +450,13 @@ Public responses include `Access-Control-Allow-Origin: *`. Hosts render views in
 - **`inline` (production):** emit `<style>` with the CSS (escaping `</style`) and `<script type="module">` with the JS (escaping `</script` → `<\/script` and `<!--` → `\x3C!--`). Keep the `__mcpUseViewConfig` config script (`publicBase` still origin-resolved per request) and `<div id="root">`.
 - **`external` (dev):** `<link>` / `<script type="module" src>` tags for Vite module URLs (current HMR path).
 
-**Origin resolution is request-scoped** — the same posture as capability gating, and the piece v1 got structurally wrong (origin computed once at boot from `MCP_URL`/host:port, then string-patched into HTML). The synthesized document's `publicBase` (and any residual absolute URLs) resolve per request to `<origin>${basePath}/_mcp-use/` where `<origin>` comes from, in order: an explicit override (for deployments whose edge doesn't forward — **shape deliberately unresolved**: whether this is a `publicUrl` config field or v1's `MCP_URL` environment variable is a pending separate discussion, see Open questions), standard `Forwarded`/`X-Forwarded-Proto`+`X-Forwarded-Host` headers, the request URL itself. The v1 mistake was *when* the override was read (boot-time baking), not the override existing; whatever its spelling, it is applied at emission time. No boot-time state — correct behind tunnels/proxies/preview deployments without restarts.
+**Origin resolution is request-scoped** — applied at `resources/read` emission time:
+
+- **`MCP_URL`** — server public origin (`.origin` only): OAuth resource URL, CSP `connectDomains`, dev HMR websocket host.
+- **`MCP_ASSETS_URL`** — assets URL prefix (origin + optional path): view JS/CSS hrefs and `__mcpUseViewConfig.publicBase`. Falls back to `MCP_URL` origin, then `Forwarded` / request origin.
+- **CSP env** — `CSP_URLS` (shortcut for all four MCP Apps categories) and `CSP_*_DOMAINS` per-category overrides merge with author `view.csp` before MCP auto-append. Env vars rank above MCP auto-append.
+
+Build-time: when `MCP_ASSETS_URL` is set, manifest asset paths are rewritten to full CDN URLs; upload `.mcp-use/build/views/` to the asset host.
 
 **srcdoc iframes have no document base URL.** Hosts render view documents via `srcdoc`, so every URL the view still loads over the network (public assets; in **dev**, Vite modules) must be absolute — root-relative paths resolve against the *host page* origin, not the MCP server. Production view JS/CSS need no network URLs (inlined). Dev sets Vite `server.origin` to the dev server's browsable origin so imported assets emit absolute `http://…` URLs. Public assets resolve through a request-scoped config global injected into the synthesized document.
 
@@ -492,7 +498,7 @@ v1 parity: authors drop static files in a project-root `public/` directory and r
 
 ## Typing: `ToolRef` + `Register` (zero codegen)
 
-Exports-based inference is the primary mode; typegen is an explicit escape hatch only, never on the dev/build hot path. The full option space behind this choice (including the rejected alternatives) is preserved in `type_proposals.md`.
+Exports-based inference is the primary mode; tool typegen is an explicit escape hatch only, never on the dev/build hot path. `dev` and `build` only ensure that the constant root `tools.d.ts` shim exists; they do not inspect tools or generate a registry. The full option space behind this choice (including the rejected alternatives) is preserved in `type_proposals.md`.
 
 ### `tool()` return-type change
 
@@ -505,7 +511,7 @@ This ends `server.tool(…).tool(…)` chaining — an acceptable break: nothing
 View bundles must never contain server code, so the ref **value** is never imported by a view. The type crosses in type space only:
 
 ```ts
-// src/register.d.ts — scaffolded once, committed, never regenerated
+// tools.d.ts — scaffolded at the project root; dev/build recreate it if missing
 // (the vite-env.d.ts pattern: configuration, not codegen — it lives in the
 // source tree because .mcp-use/ is gitignored and rm -rf-safe, CLI_SPEC.md)
 declare module "mcp-use/react" {
@@ -517,7 +523,7 @@ declare module "mcp-use/react" {
 
 ```ts
 // in /react
-export interface Register {}  // filled (or not) by the project's register.d.ts
+export interface Register {}  // filled (or not) by the project's tools.d.ts
 
 type RegisteredToolsModule = Register extends { tools: infer M } ? M : Record<never, never>;
 
@@ -578,18 +584,18 @@ Keying by tool name (not view directory name) is deliberate: view names exist on
 
 ### Fallback ladder
 
-1. `useCallTool("name")` — primary; typed via `Register` when the project has `register.d.ts` and the ref is exported.
+1. `useCallTool("name")` — primary; typed via `Register` when the project has `tools.d.ts` and the ref is exported.
 2. `useCallTool(toolRef)` — for contexts where the ref value is legitimately in scope (the inline-JSX stretch path); not for file-based views (value import = server code in the bundle).
 3. `useCallTool<Args, Result>("name")` — explicit generics for dynamically registered tools (statically untypeable in any framework) and unexported refs.
-4. Empty `Register` (no `register.d.ts`) degrades to `(name: string)` — non-scaffolded projects compile untouched.
+4. Empty `Register` (no `tools.d.ts`) degrades to `(name: string)` — non-scaffolded projects compile untouched until `dev` or `build` creates the shim.
 
 A forgotten `export const` silently drops that one tool to rung 3/4 — documented habit; a lint rule is a possible follow-up, not alpha scope.
 
 ### Typegen, demoted
 
-Nothing generates types during `dev`, `build`, or `start` — v1's run-the-server generator (`tool-registry-generator.ts`, `zod-to-ts.ts`) is not ported, and the implemented CLI has no typegen hooks to remove. `mcp-use typegen` (+ `mcp-use check` for CI freshness) is the explicit secondary mode, for consumers with no compile-time path to the server source; if/when built, it is a TS-checker-based static extractor (reads resolved `ToolRef` types; never executes user code), defaulting output to `.mcp-use/generated/`. Not an alpha deliverable.
+No command generates tool-specific types during `dev`, `build`, or `start` — v1's run-the-server generator (`tool-registry-generator.ts`, `zod-to-ts.ts`) is not ported. `dev` and `build` perform one constant-file check: if root `tools.d.ts` is absent, they create it with a type-only import of the discovered server entry; an existing file is never overwritten. `mcp-use typegen` (+ `mcp-use check` for CI freshness) remains the explicit secondary mode, for consumers with no compile-time path to the server source; if/when built, it is a TS-checker-based static extractor (reads resolved `ToolRef` types; never executes user code), defaulting output to `.mcp-use/generated/`. Not an alpha deliverable.
 
-Since v2 `create-mcp-use-app` templates don't exist yet, the handwritten example in this package (planned `examples/views/basic`) is the reference for the `register.d.ts` + exported-refs pattern.
+The v2 `create-mcp-use-app` MCP Apps template is the reference for the root `tools.d.ts` + exported-refs pattern.
 
 ---
 
@@ -762,7 +768,7 @@ The complete alpha surface. Everything here is exported from `mcp-use/react`; ty
 **Types.**
 
 ```ts
-/** Augmented by the project's register.d.ts; empty by default. */
+/** Augmented by the project's tools.d.ts; empty by default. */
 interface Register {}
 
 /** Pre-render runtime configuration — optional named export from a view module. */
@@ -1153,8 +1159,8 @@ Everything result-shaped enters through `useToolContext` (typed by the server's 
 
 The full build/serve contract is "Build system & serving", above; it extends the **implemented** `CLI_SPEC.md` (which scoped views out) and its ground rules hold — reload-not-HMR for the server entry, `start` pays zero toolchain cost, vite reachable only through the lazy `dev`/`build` chunk. Command summary:
 
-- **`mcp-use dev`:** adds the Vite client environment to the existing dev server; public assets and Vite module graph serve through its middleware at `${basePath}/_mcp-use/`. View-file edits get Vite's own HMR (pure client code, sharing the one Vite dev server); server-entry edits follow the existing reload contract and invalidate all three primitive lists over the shared SDK event bus (decision 12). No typegen hooks anywhere.
-- **`mcp-use build`:** one client-environment build over all views into `.mcp-use/build/views/`; writes the manifest `views` map (tooling copy) and bakes it into the generated wrapper entry (runtime copy — Registration mechanism); runs the binding checks (missing view, missing `outputSchema`, duplicate view binding → errors naming both tools; unbound view → warning).
+- **`mcp-use dev`:** ensures root `tools.d.ts` exists without overwriting it, then adds the Vite client environment to the existing dev server; public assets and Vite module graph serve through its middleware at `${basePath}/_mcp-use/`. View-file edits get Vite's own HMR (pure client code, sharing the one Vite dev server); server-entry edits follow the existing reload contract and invalidate all three primitive lists over the shared SDK event bus (decision 12). No tool-inspecting typegen hook runs.
+- **`mcp-use build`:** ensures root `tools.d.ts` exists without overwriting it, then runs one client-environment build over all views into `.mcp-use/build/views/`; writes the manifest `views` map (tooling copy) and bakes it into the generated wrapper entry (runtime copy — Registration mechanism); runs the binding checks (missing view, missing `outputSchema`, duplicate view binding → errors naming both tools; unbound view → warning).
 - **`mcp-use start`:** imports the built wrapper entry (views arrive primed) and serves public assets; no vite, no discovery, no runtime manifest read. View documents are obtained only through `resources/read`.
 
 ## Testing
@@ -1183,7 +1189,6 @@ The full build/serve contract is "Build system & serving", above; it extends the
 ## Open questions
 
 - Stable `ui://views/<name>.html` vs content-hashed URIs: revisit only with evidence that a target host over-caches by URI (v1's `buildId` existed for ChatGPT; ChatGPT's MCP Apps path may not need it). External evidence: Skybridge appends `?v=<content-hash>` to view URIs in production — a second framework independently concluding hosts over-cache by URI. Expectation is this resolves toward a manifest-driven hash suffix once tested against ChatGPT; still deferred to that test, not decided here.
-- **Origin override: `MCP_URL` vs `publicUrl`.** The request-scoped resolution order is decided (override → forwarded headers → request URL, applied at emission time); the override's surface is not — v1 shipped `MCP_URL` as an environment variable, and what of its v1 role carries into v2 deserves its own discussion. Until then this spec names it only "the override".
 - `ui/download-file` (draft) exposure — as a standalone hook — once a target host ships it.
 - Partial/streamed **tool results**: not in the 2026-07-28 protocol or the apps spec today (see Streaming). When a partial-result channel lands upstream, deliver it as ordinary `useToolContext` re-renders; until then, progressive UIs pull via `useCallTool`.
 - **Vite dev `script-src` / eval:** Vite HMR and some dev transforms use `eval`, which strict host `script-src` policies may block. The MCP Apps CSP shape is origin-lists only — no `'unsafe-eval'` or nonce slot — so this cannot be declared in `view.csp`. If it bites in practice, the fix is Vite-side (jitless deps, no eval-based sourcemaps); dev already auto-appends the HMR websocket origin to `connectDomains` (Serving).

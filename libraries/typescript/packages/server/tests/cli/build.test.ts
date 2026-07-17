@@ -2,8 +2,8 @@
 import {
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
-  renameSync,
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
@@ -71,12 +71,37 @@ afterAll(() => {
   for (const dir of dirs) removeDir(dir);
 });
 
+function listViewAssets(
+  buildDir: string,
+  viewName: string
+): { entry: string; css: string[] } {
+  const assetsDir = join(buildDir, "views", viewName, "assets");
+  const files = readdirSync(assetsDir);
+  const js = files.find(
+    (file) => file.endsWith(".js") && !file.endsWith(".map.js")
+  );
+  if (js === undefined) {
+    throw new Error(`expected JS asset for view ${viewName}`);
+  }
+  return {
+    entry: `assets/${js}`,
+    css: files
+      .filter((file) => file.endsWith(".css"))
+      .map((file) => `assets/${file}`),
+  };
+}
+
 describe("runBuild", () => {
   it("emits an ESM bundle + manifest to .mcp-use/build and preserves the default export", async () => {
     const cwd = copyFixture("build");
     dirs.push(cwd);
 
     await runBuild({ cwd });
+
+    const toolsDeclaration = readFileSync(join(cwd, "tools.d.ts"), "utf8");
+    expect(toolsDeclaration).toContain(
+      'tools: typeof import("./src/index.js")'
+    );
 
     const buildDir = join(cwd, WORKSPACE_DIR_NAME, "build");
     const entryFile = join(buildDir, "index.js");
@@ -90,7 +115,8 @@ describe("runBuild", () => {
     expect(manifest.entryPoint).toBe("index.js");
     expect(manifest.buildId).toMatch(/^[0-9a-f]{16}$/);
     expect(new Date(manifest.createdAt).getTime()).not.toBeNaN();
-    expect(manifest.inspector).toBe(true);
+    expect(manifest.inspector).toBe(false);
+    expect("views" in manifest).toBe(false);
 
     // packages:"external" semantics — bare imports stay external, only the
     // user's source is bundled.
@@ -151,6 +177,18 @@ describe("runBuild", () => {
     );
   });
 
+  it("does not overwrite an existing tools.d.ts", async () => {
+    const cwd = copyFixture("build-existing-tools");
+    dirs.push(cwd);
+    const declarationPath = join(cwd, "tools.d.ts");
+    const existing = "// user-owned tool registry\nexport {};\n";
+    writeFileSync(declarationPath, existing);
+
+    await runBuild({ cwd });
+
+    expect(readFileSync(declarationPath, "utf8")).toBe(existing);
+  });
+
   it("fails with the candidate list when no entry exists", async () => {
     const cwd = copyFixture("build-noentry");
     dirs.push(cwd);
@@ -199,25 +237,33 @@ describe("runBuild (views)", () => {
       readFileSync(join(buildDir, BUILD_MANIFEST_NAME), "utf8")
     ) as BuildManifest;
 
-    expect(manifest.views).toBeDefined();
-    const views = manifest.views!;
-    const product = views["product-search-result"];
-    expect(product).toBeDefined();
-    if (product === undefined) {
-      throw new Error("expected product-search-result manifest entry");
+    expect("views" in manifest).toBe(false);
+    const product = listViewAssets(buildDir, "product-search-result");
+    expect(product.entry).toMatch(/^assets\/.+\.js$/);
+    expect(product.css).toEqual(
+      expect.arrayContaining([expect.stringMatching(/^assets\/.+\.css$/)])
+    );
+    expect(product.entry.length).toBeGreaterThan(0);
+
+    const assetPath = join(
+      buildDir,
+      "views",
+      "product-search-result",
+      product.entry
+    );
+    expect(existsSync(assetPath)).toBe(true);
+    const assetJs = readFileSync(assetPath, "utf8");
+    expect(assetJs).toMatch(/bootstrapView|createElement|react/i);
+    if (product.css[0] !== undefined) {
+      const cssPath = join(
+        buildDir,
+        "views",
+        "product-search-result",
+        product.css[0]
+      );
+      expect(existsSync(cssPath)).toBe(true);
+      expect(readFileSync(cssPath, "utf8")).toContain("tailwindcss");
     }
-    expect(product).toMatchObject({
-      kind: "inline",
-      js: expect.any(String),
-      css: expect.any(String),
-    });
-    if (product.kind !== "inline") {
-      throw new Error("expected inline manifest entry");
-    }
-    expect(product.js.length).toBeGreaterThan(0);
-    expect(product.js).toMatch(/bootstrapView|createElement|react/i);
-    expect(product.css).toContain("tailwindcss");
-    expect(product.css).toMatch(/\.grid\{display:grid\}/);
 
     const publicFile = join(buildDir, "views", "public", "test.txt");
     expect(existsSync(publicFile)).toBe(true);
@@ -225,10 +271,9 @@ describe("runBuild (views)", () => {
 
     const entryCode = readFileSync(join(buildDir, "index.js"), "utf8");
     expect(entryCode).toMatch(/registerViews/);
-    // Wrapper bakes the inline JS/CSS strings into the module (no fs on MCP path).
-    // The SSR bundler may reformat the object literal (spaces after `:`).
-    expect(entryCode).toMatch(/"kind"\s*:\s*"inline"/);
-    expect(entryCode).toContain(product.js.slice(0, 40));
+    expect(entryCode).toMatch(/"kind"\s*:\s*"external"/);
+    expect(entryCode.length).toBeLessThan(100_000);
+    expect(entryCode).not.toContain(assetJs.slice(0, 40));
 
     const previousCwd = process.cwd();
     process.chdir(cwd);
@@ -239,9 +284,6 @@ describe("runBuild (views)", () => {
         default: { getHandler(): (request: Request) => Promise<Response> };
       };
       const handler = mod.default.getHandler();
-
-      const assetsBackup = join(buildDir, "views-assets-backup");
-      renameSync(join(buildDir, "views"), assetsBackup);
 
       const listBody = await handlerMcp(handler, "resources/list");
       const resources = (listBody["result"] as { resources: { uri: string }[] })
@@ -256,16 +298,22 @@ describe("runBuild (views)", () => {
       const text = (readBody["result"] as { contents: { text: string }[] })
         .contents[0]!.text;
       expect(text).toContain('id="root"');
-      expect(text).toContain('<script type="module">');
-      expect(text).toContain(product.js.slice(0, 80));
-      expect(text).not.toMatch(/<script[^>]+src=["'][^"']*\/assets\//);
+      expect(text).toMatch(/<script type="module" src="/);
+      expect(text).toContain("/mcp/_mcp-use/views/product-search-result/");
+      expect(text).toContain(product.entry);
+      expect(text).not.toMatch(/<script type="module">[\s\S]{80,}/);
       if (product.css.length > 0) {
-        expect(text).toContain("<style>");
+        expect(text).toMatch(/<link rel="stylesheet" href="/);
       }
 
-      // Public route needs the views/public tree on disk; restore after the
-      // MCP-path-without-fs check above.
-      renameSync(assetsBackup, join(buildDir, "views"));
+      const assetUrlMatch = text.match(/<script type="module" src="([^"]+)"/);
+      expect(assetUrlMatch).not.toBeNull();
+      const assetResponse = await handler(new Request(assetUrlMatch![1]!));
+      expect(assetResponse.status).toBe(200);
+      expect(assetResponse.headers.get("content-type")).toContain("javascript");
+      expect(await assetResponse.text()).toMatch(
+        /bootstrapView|createElement|react/i
+      );
 
       const publicOk = await handler(
         new Request("http://localhost/mcp/_mcp-use/public/test.txt")
@@ -301,9 +349,9 @@ describe("runBuild (views)", () => {
       expect(proxiedReadContent.text).toContain(
         "https://fruit.example.com/mcp/_mcp-use/public/"
       );
-      expect(proxiedReadContent.text).toContain('<script type="module">');
-      expect(proxiedReadContent.text).not.toMatch(
-        /<script[^>]+src=["'][^"']*\/assets\//
+      expect(proxiedReadContent.text).toMatch(/<script type="module" src="/);
+      expect(proxiedReadContent.text).toContain(
+        "https://fruit.example.com/mcp/_mcp-use/views/product-search-result/"
       );
       const readResourceDomains =
         proxiedReadContent._meta?.ui?.csp?.resourceDomains;
@@ -333,7 +381,26 @@ describe("runBuild (views)", () => {
     }
   }, 60_000);
 
-  it("escapes </script> in view source when inlining into the synthesized document", async () => {
+  it("escapes </script> in legacy inline module source", () => {
+    const html = synthesizeViewDocument(
+      {
+        kind: "inline",
+        js: 'const s = "</script>"; console.log(s);',
+        css: "",
+      },
+      "https://example.com",
+      "/mcp"
+    );
+    const moduleMatch = html.match(
+      /<script type="module">([\s\S]*?)<\/script>\s*<\/body>/
+    );
+    expect(moduleMatch).not.toBeNull();
+    const body = moduleMatch![1]!;
+    expect(body).not.toContain("</script>");
+    expect(body).toContain("<\\/script>");
+  });
+
+  it("builds a view that contains </script> in source as external assets", async () => {
     const cwd = copyFixture("build-views-escape", "views");
     dirs.push(cwd);
     mkdirSync(join(cwd, "resources", "escape-view"), { recursive: true });
@@ -347,7 +414,6 @@ describe("runBuild (views)", () => {
         ``,
       ].join("\n")
     );
-    // Bind the escape view so build validation passes (replace product binding).
     const entry = join(cwd, "src", "index.ts");
     const source = readFileSync(entry, "utf8");
     writeFileSync(
@@ -358,35 +424,26 @@ describe("runBuild (views)", () => {
     await runBuild({ cwd });
 
     const buildDir = join(cwd, WORKSPACE_DIR_NAME, "build");
-    const manifest = JSON.parse(
-      readFileSync(join(buildDir, BUILD_MANIFEST_NAME), "utf8")
-    ) as BuildManifest;
-    const escapeEntry = manifest.views?.["escape-view"];
-    expect(escapeEntry?.kind).toBe("inline");
-    if (escapeEntry?.kind !== "inline") {
-      throw new Error("expected inline escape-view entry");
-    }
-    // Bundlers may rewrite the string literal; the synthesized document must
-    // still escape any raw `</script>` sequence that survives into `js`.
-    const html = synthesizeViewDocument(
-      escapeEntry,
-      "http://localhost",
-      "/mcp"
+    expect(listViewAssets(buildDir, "escape-view").entry).toMatch(
+      /^assets\/.+\.js$/
     );
-    const moduleMatch = html.match(
-      /<script type="module">([\s\S]*?)<\/script>\s*<\/body>/
-    );
-    expect(moduleMatch).not.toBeNull();
-    const body = moduleMatch![1]!;
-    expect(body).not.toContain("</script>");
-    // If the bundle retained the closing-tag sequence, it must be escaped.
-    if (
-      escapeEntry.js.includes("</script>") ||
-      escapeEntry.js.includes("<\\/script>")
-    ) {
-      expect(body).toContain("<\\/script>");
-    }
   }, 60_000);
+
+  it("records inspector: true when built with --with-inspector", async () => {
+    const cwd = copyFixture("build");
+    dirs.push(cwd);
+
+    await runBuild({ cwd, withInspector: true });
+
+    const manifest = JSON.parse(
+      readFileSync(
+        join(cwd, WORKSPACE_DIR_NAME, "build", BUILD_MANIFEST_NAME),
+        "utf8"
+      )
+    ) as BuildManifest;
+    expect(manifest.inspector).toBe(true);
+    expect("views" in manifest).toBe(false);
+  });
 
   it("builds a view module that uses browser globals at module scope", async () => {
     const cwd = copyFixture("build-views-browser", "views");
@@ -422,5 +479,61 @@ describe("runBuild (views)", () => {
       )
     ).toBe(true);
     warnSpy.mockRestore();
+  }, 60_000);
+
+  it("rewrites manifest asset paths when MCP_ASSETS_URL is set", async () => {
+    const cwd = copyFixture("build-views-cdn", "views");
+    dirs.push(cwd);
+    const previous = process.env.MCP_ASSETS_URL;
+    process.env.MCP_ASSETS_URL =
+      "https://cdn.example.com/storage/v1/object/public/widgets";
+    try {
+      await runBuild({ cwd });
+      const buildDir = join(cwd, WORKSPACE_DIR_NAME, "build");
+      const entryCode = readFileSync(join(buildDir, "index.js"), "utf8");
+      expect(entryCode).toContain("https://cdn.example.com");
+      expect(entryCode).toContain(
+        "/mcp/_mcp-use/views/product-search-result/assets/"
+      );
+    } finally {
+      if (previous === undefined) {
+        delete process.env.MCP_ASSETS_URL;
+      } else {
+        process.env.MCP_ASSETS_URL = previous;
+      }
+    }
+  }, 60_000);
+
+  it("uses server basePath in CDN manifest when MCP_ASSETS_URL is set", async () => {
+    const cwd = copyFixture("build-views-cdn-basepath", "views");
+    dirs.push(cwd);
+    const indexPath = join(cwd, "src/index.ts");
+    writeFileSync(
+      indexPath,
+      readFileSync(indexPath, "utf8").replace(
+        'new MCPServer({ name: "fixture-views", version: "1.0.0" })',
+        'new MCPServer({ name: "fixture-views", version: "1.0.0", basePath: "/api/mcp" })'
+      )
+    );
+    const previous = process.env.MCP_ASSETS_URL;
+    process.env.MCP_ASSETS_URL =
+      "https://cdn.example.com/storage/v1/object/public/widgets";
+    try {
+      await runBuild({ cwd });
+      const buildDir = join(cwd, WORKSPACE_DIR_NAME, "build");
+      const entryCode = readFileSync(join(buildDir, "index.js"), "utf8");
+      expect(entryCode).toContain(
+        "https://cdn.example.com/storage/v1/object/public/widgets/api/mcp/_mcp-use/views/product-search-result/assets/"
+      );
+      expect(entryCode).not.toContain(
+        "https://cdn.example.com/storage/v1/object/public/widgets/mcp/_mcp-use/"
+      );
+    } finally {
+      if (previous === undefined) {
+        delete process.env.MCP_ASSETS_URL;
+      } else {
+        process.env.MCP_ASSETS_URL = previous;
+      }
+    }
   }, 60_000);
 });

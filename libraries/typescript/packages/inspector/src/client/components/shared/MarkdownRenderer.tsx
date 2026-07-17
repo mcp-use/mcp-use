@@ -164,6 +164,7 @@ function ListItem({ children }: { children: React.ReactNode }) {
 
 interface MarkdownRendererProps {
   content: string;
+  className?: string;
 }
 
 /**
@@ -174,8 +175,11 @@ interface MarkdownRendererProps {
  * @param content - The Markdown source to render
  * @returns The rendered React element tree representing the parsed Markdown content
  */
-export function MarkdownRenderer({ content }: MarkdownRendererProps) {
-  return (
+export function MarkdownRenderer({
+  content,
+  className,
+}: MarkdownRendererProps) {
+  const rendered = (
     <Markdown
       options={{
         overrides: {
@@ -289,4 +293,9 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
       {content}
     </Markdown>
   );
+
+  if (className) {
+    return <div className={className}>{rendered}</div>;
+  }
+  return rendered;
 }

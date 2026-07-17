@@ -29,7 +29,10 @@ import {
   routeFetch,
   type FetchHandler,
 } from "./fetch-app.js";
-import { createInspectorHandler } from "./inspector-shell.js";
+import {
+  createInspectorHandler,
+  matchesInspectorShellPath,
+} from "./inspector-shell.js";
 import { requestLogger } from "./logging.js";
 import { createMcpMount } from "./mount-mcp.js";
 import { registerOpenAPITools } from "./openapi/index.js";
@@ -71,14 +74,16 @@ import { resolveToolInputSchema } from "./tools.js";
 import type { ViewResourceFacts } from "./views/types.js";
 import {
   createViewPublicHandler,
+  createViewAssetsHandler,
   registerViews,
-  resolveRequestOrigin,
+  resolveAssetsBase,
   synthesizeViewDocument,
   viewResourceConfig,
   viewResourceUri,
   buildResourceUiMeta,
   buildToolResultUiMeta,
   buildToolUiMeta,
+  type BuildResourceUiMetaOptions,
   type ViewManifestEntry,
   type ViewsManifest,
 } from "./views/index.js";
@@ -780,6 +785,25 @@ export class MCPServer<TUser = never> {
         });
       }
 
+      if (!this.#viewsDevMode) {
+        const viewAssetsHandler = createViewAssetsHandler(
+          basePath,
+          this.#views,
+          { projectRoot: this.#viewsProjectRoot }
+        );
+        if (viewAssetsHandler !== undefined) {
+          routes.push({
+            match: (request) =>
+              request.method === "GET" || request.method === "HEAD"
+                ? new URL(request.url).pathname.startsWith(
+                    `${basePath}/_mcp-use/views/`
+                  )
+                : false,
+            handler: viewAssetsHandler,
+          });
+        }
+      }
+
       const inspectorHandler = createInspectorHandler(this.#config.inspector, {
         serverName: this.#config.name,
         basePath,
@@ -791,10 +815,7 @@ export class MCPServer<TUser = never> {
               return false;
             }
             const pathname = new URL(request.url).pathname;
-            return (
-              pathname === `${basePath}/inspector` ||
-              pathname === `${basePath}/inspector/`
-            );
+            return matchesInspectorShellPath(pathname, basePath);
           },
           handler: inspectorHandler,
         });
@@ -914,8 +935,10 @@ export class MCPServer<TUser = never> {
     );
 
     const request = ctx.requestInfo;
-    const servingOrigin =
-      request !== undefined ? resolveRequestOrigin(request) : "";
+    const viewMetaOptions =
+      request !== undefined
+        ? { request, hmrWs: this.#viewsDevMode }
+        : { hmrWs: this.#viewsDevMode };
     const basePath = this.#basePath();
 
     for (const entry of this.#tools.values()) {
@@ -935,7 +958,7 @@ export class MCPServer<TUser = never> {
         server,
         viewName,
         viewEntry,
-        servingOrigin,
+        viewMetaOptions,
         basePath
       );
     }
@@ -1010,20 +1033,18 @@ export class MCPServer<TUser = never> {
     server: SdkMcpServer,
     viewName: string,
     entry: ViewManifestEntry,
-    servingOrigin: string,
+    metaOptions: { request?: Request; hmrWs?: boolean },
     basePath: string
   ): void {
     const uri = viewResourceUri(viewName);
     const authorFacts = this.#viewResourceFacts(
       this.#viewBindings.get(viewName)?.config
     );
-    const hmrWs = this.#viewsDevMode;
     const resourceConfig = viewResourceConfig(
       viewName,
       entry,
       authorFacts,
-      servingOrigin,
-      { hmrWs }
+      metaOptions
     );
     server.registerResource(
       viewName,
@@ -1031,16 +1052,34 @@ export class MCPServer<TUser = never> {
       resourceConfig,
       async (readUri, ctx) => {
         const req = ctx.http?.req;
-        const origin =
-          req !== undefined ? resolveRequestOrigin(req) : servingOrigin;
-        const html = synthesizeViewDocument(entry, origin, basePath);
+        const readOptions: BuildResourceUiMetaOptions =
+          req !== undefined
+            ? {
+                request: req,
+                ...(metaOptions.hmrWs === true ? { hmrWs: true } : {}),
+              }
+            : metaOptions.hmrWs === true
+              ? { hmrWs: true }
+              : {};
+        const assetsBase =
+          req !== undefined
+            ? resolveAssetsBase(req)
+            : metaOptions.request !== undefined
+              ? resolveAssetsBase(metaOptions.request)
+              : "";
+        const html = synthesizeViewDocument(
+          entry,
+          assetsBase,
+          basePath,
+          viewName
+        );
         return {
           contents: [
             {
               uri: readUri.href,
               mimeType: resourceConfig.mimeType,
               text: html,
-              _meta: buildResourceUiMeta(authorFacts, origin, { hmrWs }),
+              _meta: buildResourceUiMeta(authorFacts, readOptions),
             },
           ],
         };

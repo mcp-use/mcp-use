@@ -279,6 +279,8 @@ interface TabsTriggerProps {
   showDot?: boolean;
   /** When true, the label stays visible even when the tab bar is collapsed */
   alwaysExpanded?: boolean;
+  /** Icon-only trigger; badge overlays the icon when provided */
+  iconOnly?: boolean;
   badge?: React.ReactNode;
 }
 
@@ -332,6 +334,7 @@ const TabsTrigger = React.forwardRef<
       title: titleProp,
       showDot = false,
       alwaysExpanded = false,
+      iconOnly = false,
       badge,
       ...props
     },
@@ -343,7 +346,8 @@ const TabsTrigger = React.forwardRef<
     const isActive = activeValue === value;
 
     // A tab's label is visible when: not collapsed, or it's the active tab, or alwaysExpanded
-    const showLabel = !collapsed || isActive || alwaysExpanded;
+    const showLabel = !iconOnly && (!collapsed || isActive || alwaysExpanded);
+    const badgeOnIcon = iconOnly || (collapsed && !showLabel);
 
     // Use title prop when provided (for collapsed mode tooltips)
     const title = collapsed && !showLabel && titleProp ? titleProp : undefined;
@@ -363,9 +367,10 @@ const TabsTrigger = React.forwardRef<
           aria-selected={isActive ? "true" : "false"}
           title={title}
           className={cn(
-            "relative z-10 flex-1 inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-all duration-[250ms] ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
-            variant === "default" && "py-2.5",
-            variant === "default" && "rounded-md px-4",
+            "relative z-10 inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-all duration-[250ms] ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
+            iconOnly ? "size-9 shrink-0 flex-none rounded-full p-0" : "flex-1",
+            variant === "default" && !iconOnly && "py-2.5",
+            variant === "default" && !iconOnly && "rounded-md px-4",
             variant === "underline" &&
               "px-6 py-3 border-b-2 border-transparent",
             isActive && "text-foreground",
@@ -375,13 +380,20 @@ const TabsTrigger = React.forwardRef<
           {...props}
         >
           {Icon && (
-            <Icon
+            <span
               className={cn(
-                "h-4 w-4 shrink-0 transition-all duration-[250ms] ease-in-out",
-                showLabel && "mr-2",
-                !showLabel && "mr-0!"
+                "relative inline-flex shrink-0 items-center justify-center",
+                iconOnly ? "size-5" : showLabel && "mr-2"
               )}
-            />
+            >
+              <Icon
+                className={cn(
+                  "h-4 w-4 shrink-0 transition-all duration-[250ms] ease-in-out",
+                  !showLabel && !iconOnly && "mr-0!"
+                )}
+              />
+              {badge && badgeOnIcon ? badge : null}
+            </span>
           )}
           {showDot && (
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-orange-500 dark:bg-orange-400 border-2 border-white dark:border-zinc-900 rounded-full transition-opacity duration-300 z-10 animate-status-pulse-orange" />
@@ -394,7 +406,7 @@ const TabsTrigger = React.forwardRef<
           >
             {children}
           </span>
-          {badge}
+          {badge && !badgeOnIcon ? badge : null}
         </button>
       </ConditionalTooltip>
     );
