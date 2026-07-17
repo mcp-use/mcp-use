@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 2.0.0-beta.1
+
+### Patch Changes
+
+- afdd5e8: Fix all bundled beta templates for the current TypeScript and MCP Apps view-state APIs.
+
 ## 2.0.0-beta.0
 
 ### Major Changes

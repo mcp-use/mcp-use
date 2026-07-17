@@ -13,6 +13,7 @@
     "build-v2-external-view-assets",
     "client-sdk-v2-migration",
     "dialect-json-schema-validator",
+    "fix-beta-scaffold-templates",
     "follow-inspector-beta-cdn",
     "inspector-chat-oauth-and-ui",
     "inspector-standalone-oauth",
