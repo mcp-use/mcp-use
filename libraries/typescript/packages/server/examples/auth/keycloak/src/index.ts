@@ -29,6 +29,7 @@ const server = new MCPServer({
   title: "Keycloak Direct Auth Example",
   description:
     "An MCP resource server that verifies Keycloak access tokens directly.",
+  publicLandingPage: true,
   oauth: oauthKeycloakProvider({
     serverUrl: keycloakServerUrl,
     realm: keycloakRealm,

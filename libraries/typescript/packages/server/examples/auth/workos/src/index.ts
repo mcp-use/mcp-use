@@ -39,6 +39,7 @@ const server = new MCPServer({
   title: "WorkOS AuthKit example",
   description:
     "An MCP server secured by verified WorkOS AuthKit access tokens.",
+  publicLandingPage: true,
   oauth: oauthWorkOSProvider({
     subdomain: requireEnv("WORKOS_SUBDOMAIN"),
   }),

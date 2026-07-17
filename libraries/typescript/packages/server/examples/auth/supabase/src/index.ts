@@ -72,6 +72,7 @@ const server = new MCPServer({
   title: "Supabase User Info",
   description:
     "Returns verified Supabase identity and authorization metadata for the caller.",
+  publicLandingPage: true,
   oauth: oauthSupabaseProvider({
     ...(projectId !== undefined && { projectId }),
     ...(supabaseUrlEnv !== undefined && { supabaseUrl: supabaseUrlEnv }),

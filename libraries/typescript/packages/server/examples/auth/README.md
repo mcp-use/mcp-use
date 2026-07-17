@@ -12,11 +12,10 @@ Each server exposes only the `get-user-info` tool. It never issues, proxies, or
 forwards access tokens. For public deployments, set `MCP_URL` to the server
 origin (for example, `https://mcp.example.com`), not the `/mcp` endpoint.
 
-OAuth protects the browser landing page at `/mcp` by default. Add
-`publicLandingPage: true` to the server config when people should be able to
-open the HTML connection guide without a bearer token. This exception applies
-only to GET and HEAD requests that explicitly accept `text/html`; MCP protocol
-traffic remains protected.
+OAuth protects the browser landing page at `/mcp` by default. These examples
+set `publicLandingPage: true` so people can open the HTML connection guide
+without a bearer token. This exception applies only to GET and HEAD requests
+that explicitly accept `text/html`; MCP protocol traffic remains protected.
 
 ## Commands
 
