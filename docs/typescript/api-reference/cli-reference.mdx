@@ -136,7 +136,7 @@ mcp-use build -p ./my-server
 - The command generates `.mcp-use/tool-registry.d.ts` when it can load the server entry. Type generation errors during `build` are non-blocking.
 - Without `--mcp-dir`, TypeScript is transpiled with esbuild and typechecked with the local `typescript` binary unless `--no-typecheck` is set.
 - With `--mcp-dir`, the host app owns its build. The CLI skips full-project transpilation and records the TypeScript source entry in the manifest.
-- If `MCP_SERVER_URL` is set, widget builds receive that value for server URL and asset path generation.
+- If `MCP_ASSETS_URL` is set at build, manifest asset paths are rewritten to full CDN URLs using `basePath` from the server entry.
 - The `public/` directory is copied to `dist/public/` when it exists.
 
 ## `start`
@@ -626,8 +626,13 @@ mcp-use generate-types --server src/server.ts
 | --- | --- | --- | --- |
 | `PORT` | `start`, server runtime | Server port when `--port` is not provided. `dev` and `start` also set this for the child process. | `3000` |
 | `NODE_ENV` | `dev`, `start`, widget builds | Runtime environment. `dev` sets `development`; `start` sets `production`. | Command-specific |
-| `MCP_URL` | `dev`, `start`, server runtime | Public or local base URL exposed to the server. Preserved when already set. | Local server URL or tunnel URL |
-| `MCP_SERVER_URL` | `build` | Build-time server URL injected into widget assets. | None |
+| `MCP_URL` | `dev`, `start`, server runtime | **Server public origin** (`.origin` only). OAuth resource URL, CSP `connectDomains`, dev HMR websocket. Lower priority than `CSP_URLS`. Preserved when already set. | Local server URL or tunnel URL |
+| `MCP_ASSETS_URL` | `build`, server runtime | **Assets URL prefix** (origin + optional path) for view JS/CSS and `public/`. Falls back to `MCP_URL` origin. When set at build, manifest paths become full CDN URLs (path segment from server `basePath`). | None (falls back to server origin) |
+| `CSP_URLS` | server runtime | Comma-separated CSP domain shortcut — applied to all four MCP Apps categories when per-category vars are unset. Higher priority than `MCP_URL` auto-append. | None |
+| `CSP_CONNECT_DOMAINS` | server runtime | Overrides `CSP_URLS` for `connectDomains` | None |
+| `CSP_RESOURCE_DOMAINS` | server runtime | Overrides `CSP_URLS` for `resourceDomains` | None |
+| `CSP_FRAME_DOMAINS` | server runtime | Overrides `CSP_URLS` for `frameDomains` | None |
+| `CSP_BASE_URI_DOMAINS` | server runtime | Overrides `CSP_URLS` for `baseUriDomains` | None |
 | `MCP_WEB_URL` | `login`, cloud auth | Manufact web URL for auth pages. | `https://manufact.com` |
 | `MCP_API_URL` | `login`, cloud API config | Manufact API URL. The CLI normalizes it to include `/api/v1`. | `https://cloud.manufact.com/api/v1` |
 | `MCP_USE_API_KEY` | `login` | API key for non-interactive login. | None |
@@ -641,7 +646,7 @@ mcp-use generate-types --server src/server.ts
 
 ```bash
 PORT=8080 mcp-use start
-MCP_SERVER_URL=https://my-server.example.com mcp-use build
+MCP_URL=https://my-server.example.com MCP_ASSETS_URL=https://cdn.example.com/bucket mcp-use build
 MCP_USE_API_KEY=mcp_... mcp-use login --org my-org
 MCP_USE_CHROME_PATH=/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
   mcp-use client local screenshot --tool show-board

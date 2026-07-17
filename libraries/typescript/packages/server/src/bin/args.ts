@@ -23,6 +23,8 @@ export interface ParsedArgs {
   tunnel: boolean;
   /** `false` when `--no-open` was passed (dev only); `true` otherwise. */
   open: boolean;
+  /** Whether `--with-inspector` was passed (build only). */
+  withInspector: boolean;
   /** Whether `--help`/`-h` was passed. */
   help: boolean;
   /** Whether `--version`/`-v` was passed. */
@@ -49,6 +51,7 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
     host: undefined,
     tunnel: false,
     open: true,
+    withInspector: false,
     help: false,
     version: false,
   };
@@ -102,6 +105,9 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
         break;
       case "--no-open":
         args.open = false;
+        break;
+      case "--with-inspector":
+        args.withInspector = true;
         break;
       default:
         if (flag.startsWith("-")) {

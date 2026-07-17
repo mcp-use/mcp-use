@@ -497,6 +497,9 @@ importers:
 
   packages/server:
     dependencies:
+      '@modelcontextprotocol/client':
+        specifier: https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee
+        version: https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee
       '@modelcontextprotocol/ext-apps':
         specifier: https://pkg.pr.new/@modelcontextprotocol/ext-apps@432d42bb02a569078ab31ab6458428df6027809d
         version: https://pkg.pr.new/@modelcontextprotocol/ext-apps@432d42bb02a569078ab31ab6458428df6027809d(@modelcontextprotocol/client@https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee)(@modelcontextprotocol/core@https://pkg.pr.new/@modelcontextprotocol/core@f60b40179b0f090f6d64248be1312245a160b5ee)(@modelcontextprotocol/server@https://pkg.pr.new/@modelcontextprotocol/server@f60b40179b0f090f6d64248be1312245a160b5ee)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.4.3)
@@ -522,9 +525,6 @@ importers:
       '@mcp-use/client':
         specifier: workspace:*
         version: link:../client
-      '@modelcontextprotocol/client':
-        specifier: https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee
-        version: https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee
       '@modelcontextprotocol/core':
         specifier: https://pkg.pr.new/@modelcontextprotocol/core@f60b40179b0f090f6d64248be1312245a160b5ee
         version: https://pkg.pr.new/@modelcontextprotocol/core@f60b40179b0f090f6d64248be1312245a160b5ee
@@ -835,6 +835,34 @@ importers:
       mcp-use:
         specifier: workspace:*
         version: link:../../..
+      react:
+        specifier: ^19.2.0
+        version: 19.2.4
+      react-dom:
+        specifier: ^19.2.0
+        version: 19.2.4(react@19.2.4)
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.2
+        version: 24.13.2
+      '@types/react':
+        specifier: ^19.2.7
+        version: 19.2.17
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.3(@types/react@19.2.17)
+      typescript:
+        specifier: 7.0.1-rc
+        version: 7.0.1-rc
+
+  test_app:
+    dependencies:
+      mcp-use:
+        specifier: workspace:*
+        version: link:../packages/server
       react:
         specifier: ^19.2.0
         version: 19.2.4

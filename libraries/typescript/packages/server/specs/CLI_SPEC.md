@@ -268,6 +268,8 @@ Writes `.mcp-use/build/manifest.json`:
 
 `buildId` is a random hex id and `createdAt` an ISO timestamp. `start` consumes `entryPoint`; inspector enablement remains solely in the built server's `ServerConfig` and is not duplicated in the manifest. Views extend this manifest with a `views` map (`VIEWS_SPEC.md` § Manifest) and copy the project-root `public/` directory into `build/views/public/` when present.
 
+When `MCP_ASSETS_URL` is set, view manifest asset paths are rewritten to full CDN URLs at build time using `basePath` from the server entry (upload `build/views/` separately). Runtime env: `MCP_URL` (server origin), `MCP_ASSETS_URL` (assets prefix), `CSP_URLS` / `CSP_*_DOMAINS` (global CSP — see `VIEWS_SPEC.md`).
+
 The build is transpile-only and does not run a typecheck. Projects own their `tsc --noEmit` script.
 
 ### `mcp-use dev` (in `src/cli/dev.ts`, dispatched from the bin)
