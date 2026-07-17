@@ -328,3 +328,26 @@ describe("view-bound tool return-position checks", () => {
     expect(true).toBe(true);
   });
 });
+
+describe("MCP middleware type narrowing", () => {
+  it("narrows ctx.params for tools/call middleware", () => {
+    const server = new MCPServer({ name: "types", version: "0.0.0" });
+    server.use("mcp:tools/call", async (ctx, next) => {
+      expectTypeOf(ctx.params.name).toBeString();
+      expectTypeOf(ctx.params.arguments).toEqualTypeOf<
+        Record<string, unknown> | undefined
+      >();
+      return next();
+    });
+    expect(server).toBeDefined();
+  });
+
+  it("falls back to base MiddlewareContext for wildcard patterns", () => {
+    const server = new MCPServer({ name: "types", version: "0.0.0" });
+    server.use("mcp:*", async (ctx, next) => {
+      expectTypeOf(ctx.params).toEqualTypeOf<Record<string, unknown>>();
+      return next();
+    });
+    expect(server).toBeDefined();
+  });
+});

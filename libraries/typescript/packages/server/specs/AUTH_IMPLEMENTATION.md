@@ -57,7 +57,7 @@ export type {
 } from "@modelcontextprotocol/server";
 ```
 
-Re-exporting preserves the upstream runtime identity and type identity. In particular, `OAuthError` remains the same class for `instanceof` checks. mcp-use owns only its higher-level provider, context, and Hono composition APIs.
+Re-exporting preserves the upstream runtime identity and type identity. In particular, `OAuthError` remains the same class for `instanceof` checks. mcp-use owns only its higher-level provider, context, and fetch-native composition APIs.
 
 Public documentation and examples never import from `@modelcontextprotocol/server`:
 
@@ -163,7 +163,7 @@ Resolution order:
 3. Otherwise derive from the trusted local `listen()` URL only. Append `basePath` exactly once.
 4. `getHandler()` and public or wildcard deployments without an explicit provider `resource` or a valid `MCP_URL` fail configuration. They must not derive a security identity from request headers.
 
-Never derive the security identity, metadata URL, or resource-binding target from an untrusted request `Host` header. Hono remains responsible for configured host and origin validation.
+Never derive the security identity, metadata URL, or resource-binding target from an untrusted request `Host` header. `hostValidationMiddleware` / `originValidationMiddleware` (or configured `allowedHosts` / `allowedOrigins`) remain responsible for DNS-rebinding protection.
 
 `basePath` is the MCP endpoint route, not a prefix. Its default is `/mcp`. For `basePath: "/api/mcp"`, the resource is `https://api.example.com/api/mcp` and metadata is `https://api.example.com/.well-known/oauth-protected-resource/api/mcp`. For `basePath: "/api"`, the resource is `https://api.example.com/api`. With `MCP_URL=https://api.example.com`, each resolves by appending its `basePath` once.
 
@@ -385,7 +385,7 @@ Package internals use the official Beta.3 implementations. The public OAuth entr
 - `OAuthAuthInfo`, aliased directly from SDK `AuthInfo`
 - `OAuthMetadata`, `OAuthProtectedResourceMetadata`, and the corresponding option types
 
-Do not fork these declarations or copy their implementations into mcp-use. Thin Hono adapters may call them, but resource-server protocol behavior remains owned by the official SDK.
+Do not fork these declarations or copy their implementations into mcp-use. Thin fetch adapters may call them, but resource-server protocol behavior remains owned by the official SDK.
 
 Beta.3 authorization-server helpers are out of scope for this phase. Do not reuse frozen helpers from `server-legacy`.
 
@@ -459,4 +459,4 @@ Migrate provider concepts and public context compatibility, not deferred behavio
 - Do not port `verifyJwt: false` or any decode-only authentication path.
 - Do not port v1's unauthenticated `HEAD` bypass on the MCP endpoint. Beta.3 bearer authentication gates every method on that route; metadata routes retain public `HEAD` support.
 - Replace v1 context storage with explicit `handler.fetch(..., { authInfo })` forwarding and `toRequestContext` / `toAuthenticatedRequestContext` projection.
-- Do not claim beta.3 helpers are pending, Express-only, or supplied by an upstream Hono auth feature. Use only beta.3 resource-server helpers.
+- Do not claim beta.3 helpers are pending, Express-only, or supplied by an upstream auth feature. Use only beta.3 resource-server helpers and mcp-use fetch-native wiring (`oauthMetadata`, `requireBearerAuth`, `getRequestBag`).

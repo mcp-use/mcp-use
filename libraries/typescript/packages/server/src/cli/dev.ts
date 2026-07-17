@@ -52,8 +52,10 @@ import {
 } from "./views.js";
 import type { ViewsManifest } from "../views/types.js";
 
-/** Web-standard request handler, as returned by `MCPServer.getHandler()`. */
-type FetchHandler = (request: Request) => Promise<Response>;
+/** Universal web handler returned by `MCPServer.getHandler()`. */
+type FrameworkHandler = (
+  input: Request | { req: { raw: Request } }
+) => Promise<Response>;
 
 /**
  * The duck-typed shape the entry's default export must satisfy: an
@@ -61,7 +63,7 @@ type FetchHandler = (request: Request) => Promise<Response>;
  * copy of `mcp-use`).
  */
 interface ServerLike {
-  getHandler(options?: { bus?: ServerEventBus }): FetchHandler;
+  getHandler(options?: { bus?: ServerEventBus }): FrameworkHandler;
   /** URL path prefix the MCP endpoint is mounted at (default `"/mcp"`). */
   readonly basePath?: string;
   __primeViews(
@@ -438,7 +440,7 @@ export async function runDev(options: DevOptions): Promise<void> {
     }
   };
 
-  let currentHandler: FetchHandler;
+  let currentHandler: FrameworkHandler;
   let basePath: string;
   try {
     const server = await importServer();
@@ -642,7 +644,7 @@ export async function runDev(options: DevOptions): Promise<void> {
     // Vite sees module-graph URLs (/@vite/client, /@id/virtual:…,
     // /.mcp-use/cache/deps/…, view files under /resources/…) plus standard
     // node_modules pre-bundles; everything else — the MCP endpoint included —
-    // goes straight to the Hono handler.
+    // goes straight to the fetch handler.
     const isViteRequest =
       req.method === "GET" &&
       (pathname.startsWith("/@") ||

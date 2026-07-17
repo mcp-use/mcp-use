@@ -7,6 +7,29 @@ import {
 /** Web-standard request handler. */
 export type FetchHandler = (request: Request) => Promise<Response>;
 
+/** Request shapes accepted by {@link toFrameworkHandler}. */
+export type FrameworkRequestLike = Request | { req: { raw: Request } };
+
+/**
+ * Universal web handler mountable in Vercel, Hono, TanStack, and other
+ * fetch-native frameworks without `c.req.raw` boilerplate.
+ */
+export type FrameworkHandler = (
+  input: FrameworkRequestLike
+) => Promise<Response>;
+
+/**
+ * Wrap a {@link FetchHandler} for framework duck-typing (Hono `Context`, etc.).
+ *
+ * @param fetch - Inner fetch handler produced by {@link MCPServer.getHandler}.
+ */
+export function toFrameworkHandler(fetch: FetchHandler): FrameworkHandler {
+  return (input) => {
+    const request = input instanceof Request ? input : input.req.raw;
+    return fetch(request);
+  };
+}
+
 /** Onion middleware over a {@link FetchHandler} terminal. */
 export type FetchMiddleware = (
   request: Request,

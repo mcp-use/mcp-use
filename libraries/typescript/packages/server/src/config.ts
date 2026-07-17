@@ -168,6 +168,48 @@ interface BaseServerConfig {
    * @defaultValue `undefined`
    */
   requestState?: ServerOptions["requestState"];
+  /**
+   * Optional CORS headers on every route served by `getHandler()` / `listen()`
+   * (MCP endpoint, view assets, inspector, OAuth metadata). Off when omitted.
+   *
+   * Pair with {@link BaseServerConfig.allowedOrigins | allowedOrigins} for
+   * browser clients: CORS tells the browser it may read the response; Origin
+   * validation decides whether the server accepts the request.
+   *
+   * @example
+   * ```ts
+   * new MCPServer({
+   *   name: "api",
+   *   version: "1.0.0",
+   *   allowedOrigins: ["app.example.com"],
+   *   cors: {
+   *     origin: "https://app.example.com",
+   *     credentials: true,
+   *   },
+   * });
+   * ```
+   */
+  cors?: CorsOptions;
+}
+
+/**
+ * CORS configuration for routes owned by mcp-use (`getHandler()` / `listen()`).
+ *
+ * Omit `cors` entirely for the current no-CORS behavior. Pass `cors: {}` to
+ * enable with defaults (reflects the request `Origin` when present; wildcard
+ * `origin: "*"` requires an explicit opt-in).
+ */
+export interface CorsOptions {
+  /** @defaultValue `true` when `cors` is set; ignored when `cors` is omitted */
+  enabled?: boolean;
+  /** Allowed Origin(s). Reflect matching `Origin` header, or `"*"` when set. */
+  origin?: string | string[] | ((origin: string | null) => string | null);
+  /** @defaultValue `["GET", "HEAD", "POST", "OPTIONS"]` */
+  methods?: string[];
+  /** @defaultValue common MCP + JSON headers */
+  allowedHeaders?: string[];
+  /** @defaultValue `false` */
+  credentials?: boolean;
 }
 
 /**

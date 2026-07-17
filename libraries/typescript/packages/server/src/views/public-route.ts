@@ -55,13 +55,18 @@ export async function resolvePublicFilePath(
  * Serve one file from the project's `public/` directory.
  *
  * @param diskPath - Absolute path resolved by {@link resolvePublicFilePath}.
+ * @param options - When `deferCors` is true, omit hardcoded `ACAO: *` so global
+ *   {@link ServerConfig.cors} middleware owns CORS headers.
  * @returns A `Response` with `Cache-Control: public, max-age=0, must-revalidate`
- * and `Access-Control-Allow-Origin: *` so cross-origin sandboxed view iframes
- * can load public files (module scripts and fetches use CORS mode).
+ * and optionally `Access-Control-Allow-Origin: *` so cross-origin sandboxed
+ * view iframes can load public files (module scripts and fetches use CORS mode).
  *
  * @internal
  */
-export async function servePublicFile(diskPath: string): Promise<Response> {
+export async function servePublicFile(
+  diskPath: string,
+  options: { deferCors?: boolean } = {}
+): Promise<Response> {
   const { createReadStream } = await import("node:fs");
   const { extname } = await import("node:path");
   const { Readable } = await import("node:stream");
@@ -75,7 +80,9 @@ export async function servePublicFile(diskPath: string): Promise<Response> {
     headers: {
       "Content-Type": contentType,
       "Cache-Control": "public, max-age=0, must-revalidate",
-      "Access-Control-Allow-Origin": "*",
+      ...(options.deferCors !== true && {
+        "Access-Control-Allow-Origin": "*",
+      }),
     },
   });
 }

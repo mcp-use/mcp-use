@@ -18,8 +18,15 @@ export {
   originValidationMiddleware,
   pathnameOf,
   routeFetch,
+  toFrameworkHandler,
 } from "./fetch-app.js";
-export type { FetchHandler, FetchMiddleware, RequestBag } from "./fetch-app.js";
+export type {
+  FetchHandler,
+  FetchMiddleware,
+  FrameworkHandler,
+  FrameworkRequestLike,
+  RequestBag,
+} from "./fetch-app.js";
 export { registerViews } from "./views/index.js";
 export { requestLogger } from "./logging.js";
 export type { LoggingOptions, LogLevel } from "./logging.js";
@@ -77,7 +84,23 @@ export type {
   StandardSchemaWithJSON,
 } from "@modelcontextprotocol/server";
 
-export type { InspectorOptions, ServerConfig } from "./config.js";
+export type { InspectorOptions, ServerConfig, CorsOptions } from "./config.js";
+export type {
+  MiddlewareContext,
+  McpCompleteEventListenerFn,
+  McpEventListenerFn,
+  McpMiddlewareFn,
+  McpMiddlewareFnFor,
+  McpMiddlewarePatternMap,
+  PromptsGetMiddlewareContext,
+  ResourcesReadMiddlewareContext,
+  ToolsCallMiddlewareContext,
+} from "./middleware/mcp-middleware.js";
+export {
+  composeMiddleware,
+  matchesPattern,
+} from "./middleware/mcp-middleware.js";
+export type { NodeRequestHandler } from "./node-bridge.js";
 export type {
   FromOpenAPIOptions,
   OpenAPIAuth,

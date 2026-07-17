@@ -12,6 +12,7 @@ import {
   type StandardSchemaWithJSON,
 } from "@modelcontextprotocol/server";
 import type { Server as NodeHttpServer } from "node:http";
+import type { AuthInfo } from "@modelcontextprotocol/server";
 
 import { assertServerConfig, type ServerConfig } from "./config.js";
 import {
@@ -27,14 +28,30 @@ import {
   matchesPath,
   originValidationMiddleware,
   routeFetch,
+  toFrameworkHandler,
   type FetchHandler,
+  type FrameworkHandler,
 } from "./fetch-app.js";
+import { corsFetchMiddleware, isGlobalCorsEnabled } from "./middleware/cors.js";
+import {
+  normalizeMcpMiddlewarePattern,
+  parseMcpPattern,
+  runMcpOperation,
+  type McpCompleteEventListenerFn,
+  type McpEventListenerEntry,
+  type McpEventListenerFn,
+  type McpMiddlewareEntry,
+  type McpMiddlewareFn,
+  type McpMiddlewareFnFor,
+  type MiddlewareContext,
+} from "./middleware/mcp-middleware.js";
 import {
   createInspectorHandler,
   matchesInspectorShellPath,
 } from "./inspector-shell.js";
 import { requestLogger } from "./logging.js";
 import { createMcpMount } from "./mount-mcp.js";
+import type { NodeRequestHandler } from "./node-bridge.js";
 import { registerOpenAPITools } from "./openapi/index.js";
 import type { FromOpenAPIOptions } from "./openapi/types.js";
 import {
@@ -199,6 +216,8 @@ export class MCPServer<TUser = never> {
   #oauthResourceConfigurationAbsent = false;
   /** Whether the mounted app validates Host headers (fixed at first mount). */
   #hostValidated = false;
+  readonly #mcpMiddlewares: McpMiddlewareEntry[] = [];
+  readonly #mcpEventListeners: McpEventListenerEntry[] = [];
 
   /**
    * Create an MCP server from a parsed, bundled OpenAPI document.
@@ -430,11 +449,85 @@ export class MCPServer<TUser = never> {
    * export default { fetch: handler };
    * ```
    */
-  getHandler(
-    options: { bus?: ServerEventBus } = {}
-  ): (request: Request) => Promise<Response> {
+  getHandler(options: { bus?: ServerEventBus } = {}): FrameworkHandler {
     const { fetch } = this.#ensureMounted("handler", undefined, options.bus);
-    return fetch;
+    return toFrameworkHandler(fetch);
+  }
+
+  /**
+   * Node `(req, res) => void` handler for composing with an existing
+   * `http.Server`. Uses the same internal `toNodeHandler` bridge as
+   * {@link MCPServer.listen}; MCPServer users do not need to import
+   * `mcp-use/node`.
+   *
+   * @example
+   * ```ts
+   * import { createServer } from "node:http";
+   * const httpServer = createServer(await server.getNodeHandler());
+   * httpServer.listen(3000);
+   * ```
+   */
+  async getNodeHandler(): Promise<NodeRequestHandler> {
+    const { fetch } = this.#ensureMounted("handler");
+    const { toNodeHandler } = await import("./node-bridge.js");
+    return toNodeHandler({ fetch });
+  }
+
+  /**
+   * Register MCP operation middleware that intercepts JSON-RPC dispatch.
+   *
+   * Patterns use an `mcp:` prefix (for example `mcp:tools/call`, `mcp:*`).
+   * Middleware runs in registration order; call `next()` to continue the chain.
+   *
+   * @example
+   * ```ts
+   * server.use("mcp:tools/call", async (ctx, next) => {
+   *   console.log(`Calling tool: ${ctx.params.name}`);
+   *   return next();
+   * });
+   * ```
+   */
+  use<P extends string>(
+    pattern: `mcp:${P}` | P,
+    handler: McpMiddlewareFnFor<P>
+  ): this {
+    this.#assertNotStarted("middleware", pattern);
+    this.#mcpMiddlewares.push({
+      pattern: normalizeMcpMiddlewarePattern(pattern),
+      handler: handler as McpMiddlewareFn,
+    });
+    return this;
+  }
+
+  /**
+   * Register a read-only MCP observer. Unlike {@link MCPServer.use}, listeners
+   * cannot block, override, or mutate params. Throwing is logged and does not
+   * fail the request.
+   *
+   * Append `:complete` to run after the handler (for example
+   * `mcp:tools/call:complete`).
+   *
+   * @example
+   * ```ts
+   * server.on("mcp:tools/call", (ctx) => {
+   *   metrics.increment("tools.call", { tool: ctx.params.name });
+   * });
+   * ```
+   */
+  on<P extends string>(
+    pattern: `mcp:${P}` | P,
+    handler: P extends `${string}:complete`
+      ? McpCompleteEventListenerFn
+      : McpEventListenerFn
+  ): this {
+    this.#assertNotStarted("event listener", pattern);
+    const { pattern: stripped, phase } = parseMcpPattern(pattern);
+    this.#mcpEventListeners.push({
+      pattern: stripped,
+      phase,
+      handler: handler as McpEventListenerFn | McpCompleteEventListenerFn,
+    });
+    return this;
   }
 
   /**
@@ -699,6 +792,12 @@ export class MCPServer<TUser = never> {
         requestLogger(this.#config.logging),
       ];
 
+      const corsConfig = this.#config.cors;
+      if (corsConfig !== undefined) {
+        middlewares.unshift(corsFetchMiddleware(corsConfig));
+      }
+      const deferViewCors = isGlobalCorsEnabled(corsConfig);
+
       if (hosts !== undefined) {
         middlewares.unshift(hostValidationMiddleware(hosts));
         middlewares.push(originValidationMiddleware(origins ?? hosts));
@@ -772,6 +871,7 @@ export class MCPServer<TUser = never> {
       const viewHandler = createViewPublicHandler(basePath, this.#views, {
         dev: this.#viewsDevMode,
         projectRoot: this.#viewsProjectRoot,
+        deferCors: deferViewCors,
       });
       if (viewHandler !== undefined) {
         routes.push({
@@ -789,7 +889,7 @@ export class MCPServer<TUser = never> {
         const viewAssetsHandler = createViewAssetsHandler(
           basePath,
           this.#views,
-          { projectRoot: this.#viewsProjectRoot }
+          { projectRoot: this.#viewsProjectRoot, deferCors: deferViewCors }
         );
         if (viewAssetsHandler !== undefined) {
           routes.push({
@@ -962,7 +1062,100 @@ export class MCPServer<TUser = never> {
         basePath
       );
     }
+    this.#wrapListHandlers(server);
     return server;
+  }
+
+  #createMiddlewareContext(
+    method: string,
+    params: Record<string, unknown>,
+    ctx: ServerContext
+  ): MiddlewareContext {
+    return {
+      method,
+      params,
+      ...(ctx.http?.authInfo !== undefined && { auth: ctx.http.authInfo }),
+      state: new Map(),
+    };
+  }
+
+  #runMcpHook(
+    method: string,
+    ctx: MiddlewareContext,
+    innerFn: () => Promise<unknown>
+  ): Promise<unknown> {
+    return runMcpOperation(
+      this.#mcpMiddlewares,
+      this.#mcpEventListeners,
+      method,
+      ctx,
+      innerFn
+    );
+  }
+
+  /**
+   * Wrap native SDK list handlers with the MCP middleware chain.
+   *
+   * ponytail: uses SDK-private `_requestHandlers`; pin compile-time test.
+   *
+   * @internal
+   */
+  #wrapListHandlers(server: SdkMcpServer): void {
+    type RequestHandler = (
+      request: unknown,
+      extra: unknown
+    ) => Promise<unknown>;
+    const handlers = (
+      server.server as unknown as {
+        _requestHandlers?: Map<string, RequestHandler>;
+      }
+    )._requestHandlers;
+    if (handlers === undefined) {
+      return;
+    }
+
+    const wrapListMethod = (
+      method: "tools/list" | "resources/list" | "prompts/list",
+      resultKey: "tools" | "resources" | "prompts"
+    ) => {
+      const original = handlers.get(method);
+      if (original === undefined) {
+        return;
+      }
+      if ((original as { __mcpListWrapped?: boolean }).__mcpListWrapped) {
+        return;
+      }
+
+      const wrapped = async (request: unknown, extra: unknown) => {
+        const authInfo = (
+          extra as { http?: { authInfo?: AuthInfo } } | undefined
+        )?.http?.authInfo;
+        const mwCtx: MiddlewareContext = {
+          method,
+          params: {},
+          ...(authInfo !== undefined && { auth: authInfo }),
+          state: new Map(),
+        };
+        const innerFn = async () => {
+          const result = (await original(request, extra)) as Record<
+            string,
+            unknown
+          >;
+          return result[resultKey] ?? result;
+        };
+        const filtered = await this.#runMcpHook(method, mwCtx, innerFn);
+        if (Array.isArray(filtered)) {
+          return { [resultKey]: filtered };
+        }
+        return filtered;
+      };
+      (wrapped as { __mcpListWrapped?: boolean }).__mcpListWrapped = true;
+      handlers.set(method, wrapped);
+    };
+
+    wrapListMethod("tools/list", "tools");
+    wrapListMethod("resources/list", "resources");
+    wrapListMethod("prompts/list", "prompts");
   }
 
   #registerTool(
@@ -994,30 +1187,24 @@ export class MCPServer<TUser = never> {
 
     const inputSchema = resolveToolInputSchema(definition);
 
-    if (inputSchema !== undefined) {
-      server.registerTool(
-        definition.name,
-        { ...config, inputSchema },
-        async (args, ctx) => {
-          // The SDK has already validated `args` against the input schema.
-          const params = args as Record<string, unknown>;
-          const result = await callback(params, this.#toRequestContext(ctx));
-          if (
-            isInputRequiredResult(result) ||
-            wireResultMeta === undefined ||
-            result.isError === true
-          ) {
-            return result;
-          }
-          return {
-            ...result,
-            _meta: { ...result._meta, ...wireResultMeta },
-          };
-        }
+    const invokeTool = async (
+      args: Record<string, unknown>,
+      ctx: ServerContext
+    ) => {
+      const mwCtx = this.#createMiddlewareContext(
+        "tools/call",
+        { name: definition.name, arguments: args },
+        ctx
       );
-    } else {
-      server.registerTool(definition.name, config, async (ctx) => {
-        const result = await callback({}, this.#toRequestContext(ctx));
+      const innerFn = async () => {
+        const effectiveArgs = (mwCtx.params.arguments ?? {}) as Record<
+          string,
+          unknown
+        >;
+        const result = await callback(
+          effectiveArgs,
+          this.#toRequestContext(ctx)
+        );
         if (
           isInputRequiredResult(result) ||
           wireResultMeta === undefined ||
@@ -1029,7 +1216,22 @@ export class MCPServer<TUser = never> {
           ...result,
           _meta: { ...result._meta, ...wireResultMeta },
         };
-      });
+      };
+      return (await this.#runMcpHook("tools/call", mwCtx, innerFn)) as Awaited<
+        ReturnType<typeof callback>
+      >;
+    };
+
+    if (inputSchema !== undefined) {
+      server.registerTool(
+        definition.name,
+        { ...config, inputSchema },
+        async (args, ctx) => invokeTool(args as Record<string, unknown>, ctx)
+      );
+    } else {
+      server.registerTool(definition.name, config, async (ctx) =>
+        invokeTool({}, ctx)
+      );
     }
   }
 
@@ -1113,7 +1315,19 @@ export class MCPServer<TUser = never> {
           _meta: { ...definition._meta },
         }),
       },
-      async (uri, ctx) => callback(uri, this.#toRequestContext(ctx))
+      async (uri, ctx) => {
+        const mwCtx = this.#createMiddlewareContext(
+          "resources/read",
+          { uri: uri.href },
+          ctx
+        );
+        const innerFn = async () => callback(uri, this.#toRequestContext(ctx));
+        return (await this.#runMcpHook(
+          "resources/read",
+          mwCtx,
+          innerFn
+        )) as Awaited<ReturnType<typeof callback>>;
+      }
     );
   }
 
@@ -1142,12 +1356,24 @@ export class MCPServer<TUser = never> {
           _meta: { ...definition._meta },
         }),
       },
-      async (uri, variables, ctx) =>
-        callback(
-          uri,
-          variables as Record<string, TemplateVariableValue>,
-          this.#toRequestContext(ctx)
-        )
+      async (uri, variables, ctx) => {
+        const mwCtx = this.#createMiddlewareContext(
+          "resources/read",
+          { uri: uri.href },
+          ctx
+        );
+        const innerFn = async () =>
+          callback(
+            uri,
+            variables as Record<string, TemplateVariableValue>,
+            this.#toRequestContext(ctx)
+          );
+        return (await this.#runMcpHook(
+          "resources/read",
+          mwCtx,
+          innerFn
+        )) as Awaited<ReturnType<typeof callback>>;
+      }
     );
   }
 
@@ -1182,23 +1408,35 @@ export class MCPServer<TUser = never> {
         description: definition.description,
       }),
     };
+    const invokePrompt = async (
+      args: Record<string, unknown>,
+      ctx: ServerContext
+    ) => {
+      const mwCtx = this.#createMiddlewareContext(
+        "prompts/get",
+        { name: definition.name, arguments: args as Record<string, string> },
+        ctx
+      );
+      const innerFn = async () => {
+        const effectiveArgs = (mwCtx.params.arguments ?? {}) as Record<
+          string,
+          unknown
+        >;
+        return callback(effectiveArgs, this.#toRequestContext(ctx));
+      };
+      return (await this.#runMcpHook("prompts/get", mwCtx, innerFn)) as Awaited<
+        ReturnType<typeof callback>
+      >;
+    };
+
     if (definition.schema !== undefined) {
       server.registerPrompt(
         definition.name,
         { ...config, argsSchema: definition.schema },
-        async (args, ctx) => {
-          // The SDK has already validated `args` against `definition.schema`.
-          const params = args as Record<string, unknown>;
-          return callback(params, this.#toRequestContext(ctx));
-        }
+        async (args, ctx) => invokePrompt(args as Record<string, unknown>, ctx)
       );
     } else {
-      // Without argsSchema the SDK invokes the callback as `(ctx)`, but its
-      // published overloads only type the `(args, ctx)` shape — adapt with an
-      // explicit, contained cast (verified against the SDK's
-      // createPromptHandler implementation, 2.0.0-beta.1).
-      const handler = async (ctx: ServerContext) =>
-        callback({}, this.#toRequestContext(ctx));
+      const handler = async (ctx: ServerContext) => invokePrompt({}, ctx);
       server.registerPrompt(
         definition.name,
         config,

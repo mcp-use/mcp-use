@@ -57,7 +57,7 @@ export type {
 } from "@modelcontextprotocol/server";
 ```
 
-Re-exporting preserves the upstream runtime identity and type identity. In particular, `OAuthError` remains the same class for `instanceof` checks. mcp-use owns only its higher-level provider, context, and Hono composition APIs.
+Re-exporting preserves the upstream runtime identity and type identity. In particular, `OAuthError` remains the same class for `instanceof` checks. mcp-use owns only its higher-level provider, context, and fetch-native composition APIs.
 
 Public documentation and examples never import from `@modelcontextprotocol/server`:
 
@@ -462,7 +462,7 @@ Resolution order:
 3. Otherwise derive from the trusted local `listen()` URL only. Append `basePath` exactly once.
 4. `getHandler()` and public or wildcard deployments without an explicit provider `resource` or a valid `MCP_URL` fail configuration. They must not derive a security identity from request headers.
 
-Never derive the security identity, metadata URL, or resource-binding target from an untrusted request `Host` header. Hono remains responsible for configured host and origin validation.
+Never derive the security identity, metadata URL, or resource-binding target from an untrusted request `Host` header. `hostValidationMiddleware` / `originValidationMiddleware` remain responsible for configured host and origin validation.
 
 `basePath` is the MCP endpoint route, not a prefix. Its default is `/mcp`. For `basePath: "/api/mcp"`, the resource is `https://api.example.com/api/mcp` and metadata is `https://api.example.com/.well-known/oauth-protected-resource/api/mcp`. For `basePath: "/api"`, the resource is `https://api.example.com/api`. With `MCP_URL=https://api.example.com`, each resolves by appending its `basePath` once.
 
