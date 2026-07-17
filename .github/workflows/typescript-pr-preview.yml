@@ -45,6 +45,8 @@ jobs:
         run: pnpm build
 
       - name: Publish Preview Packages
+        env:
+          PNPM_CONFIG_NODE_LINKER: hoisted
         run: pnpm dlx pkg-pr-new publish './libraries/typescript/packages/*' --pnpm
 
       - name: Get PR Number
