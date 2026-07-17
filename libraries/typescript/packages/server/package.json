@@ -29,6 +29,10 @@
       "types": "./dist/react/index.d.ts",
       "import": "./dist/react/index.js"
     },
+    "./landing": {
+      "types": "./dist/landing.d.ts",
+      "import": "./dist/landing.js"
+    },
     "./oauth": {
       "types": "./dist/oauth/index.d.ts",
       "import": "./dist/oauth/index.js"

@@ -10,7 +10,7 @@
  * public hostname.
  */
 import type { InspectorOptions } from "./config.js";
-import type { FetchHandler } from "./fetch-app.js";
+import { pathUnderBase, type FetchHandler } from "./fetch-app.js";
 
 /**
  * npm dist-tag of the `@mcp-use/inspector` CDN bundle the default URL follows.
@@ -57,7 +57,7 @@ export function matchesInspectorShellPath(
   pathname: string,
   basePath: string
 ): boolean {
-  const prefix = `${basePath}/inspector`;
+  const prefix = pathUnderBase(basePath, "inspector");
   if (pathname !== prefix && !pathname.startsWith(`${prefix}/`)) {
     return false;
   }

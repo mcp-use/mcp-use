@@ -30,6 +30,12 @@ export type {
 export { registerViews } from "./views/index.js";
 export { requestLogger } from "./logging.js";
 export type { LoggingOptions, LogLevel } from "./logging.js";
+export type {
+  LandingPageOptions,
+  LandingPagePrompt,
+  LandingPageResource,
+  LandingPageTool,
+} from "./landing.js";
 
 /**
  * Wire result shapes (re-exported from the SDK): callbacks return these raw

@@ -1,6 +1,6 @@
 # mcp-use v2 — server framework contract
 
-**Status:** Core MCP primitives, request logging, direct resource-server auth, views, and the complete CLI are implemented.
+**Status:** Core MCP primitives, request logging, landing page, direct resource-server auth, views, and the complete CLI are implemented.
 **Package:** `mcp-use@2`, published from `packages/server`.
 **Branch target:** `v2`.
 
@@ -49,6 +49,7 @@ const server = new MCPServer({
   allowedHosts: undefined, // optional, e.g. ["api.example.com"]; additive to localhost
   allowedOrigins: undefined, // optional origin hostnames; defaults to the Host allowlist
   legacy: "stateless", // optional; "reject" for modern-only strict (see ground rules)
+  publicLandingPage: false, // optional; OAuth-only public HTML opt-in
   inspector: { enabled: true, assetsUrl: undefined }, // optional; see CLI_SPEC.md
   logging: { enabled: true, level: "info" }, // optional; see § Request logging
 });
@@ -158,7 +159,19 @@ For the common human-input path, `await ctx.elicit(key, message, schemaOrUrl)` c
 8. `resourceTemplate()` uses a `const` type parameter so `uriTemplate` stays a string literal through inference — without it TS widens object-literal properties to `string` and template-param typing silently degrades to `Record<string, string | string[]>` (it had, undetected, before the type-level tests). Template inference handles RFC 6570 operators, comma-separated variable lists, and `*`/`:n` modifiers.
 9. The modern wire is the per-request `_meta` envelope, not a handshake (see the 2026-07-28-first ground rule; 2025-era clients are served through the stateless legacy fallback by default, or rejected under `legacy: "reject"`). The official client connects modern with `versionNegotiation: { mode: { pin: "2026-07-28" } }` (or `'auto'`) — its default is the legacy handshake. Hand-rolled modern requests carry the per-request `_meta` envelope (`protocolVersion`/`clientInfo`/`clientCapabilities` keys) plus `mcp-protocol-version`/`mcp-method` headers, and `mcp-name` mirroring `params.name` on name-addressed methods; modern exchanges answer with a single JSON body (`responseMode: 'auto'`), not SSE framing.
 
-**Intentionally absent from the core primitive layer:** legacy push-style sampling/roots APIs, landing page, telemetry, typegen, and stdio serving. MCP operation middleware (`server.use('mcp:…')`) and observer events (`server.on('mcp:…')`) are implemented; HTTP middleware adapters and custom first-class HTTP routes are not — use your fetch-native framework. OpenAPI import is an integration built on top of `tool()`, described below; it does not add a second registration path. Views are governed by `VIEWS_SPEC.md`. Typed `ctx.elicit` and the raw v2 MRTR primitives (`inputRequired`, `inputResponse`, `acceptedContent`) operate through explicit `input_required` returns without introducing session state.
+### Browser landing page
+
+The exact MCP `basePath` also serves a generated HTML landing page for browser navigation. A request is a landing-page request only when its method is `GET` or `HEAD` and an `Accept` media range explicitly names `text/html` with a non-zero quality value. `HEAD` returns the same status and headers as `GET` with no body. Requests with JSON, event-stream, wildcard-only, missing, or other Accept values continue to the MCP mount unchanged; in particular, legacy stateless GET/HEAD probes retain their existing `204`, DELETE retains its existing behavior, and every POST remains MCP protocol traffic.
+
+The document preserves the authoritative v1 landing frontend: the WebGL mesh-gradient hero, rail/card layout, Outfit branding, endpoint copy control, hosted Manufact Inspector deep link, GitHub badge, Claude Code/Cursor/VS Code/VS Code Insiders/ChatGPT tabs, optional Primitives card, and Manufact footer. Its automatic server inputs are `title ?? name`, `version`, `description`, the request-resolved public origin plus `basePath`, and the registered tools, prompts, and static resources. CSS, WebGL, tabs, and copy behavior are inline; the v1 Google Fonts stylesheet and GitHub shields image remain external. Every caller-controlled value is encoded for its destination context: HTML text and attributes are entity-escaped, inline JSON preserves raw metadata while escaping HTML end-tag characters, deep-link query values are URL-encoded, and the copyable Claude Code endpoint is a quoted POSIX shell argument. v1-only `favicon`, `icons`, and `websiteUrl` are not added to `ServerConfig`.
+
+Registration data comes from the same registry that `listen()` or `getHandler()` freezes when it first mounts the app. Late registrations throw, so a page can never advertise primitives that the per-request SDK factory cannot replay.
+
+Without OAuth, the landing page is public. With OAuth, it passes through the exact endpoint bearer gate by default. `ServerConfig.publicLandingPage: true` bypasses bearer authentication only for the classified HTML GET/HEAD request; every protocol-shaped request remains protected. The complete auth interaction is specified in `AUTH_SPEC.md`.
+
+`generateLandingPage(options)` is exported from `mcp-use/landing` for applications that need the same document outside `MCPServer`. It takes one `LandingPageOptions` object instead of v1's positional argument list; the object form keeps optional v2 inputs explicit and extensible, and additionally permits an `iconUrl` for direct rendering. `MCPServer` dynamically imports this sibling entry only for classified HTML navigation, so ordinary MCP requests do not evaluate or inflate the page renderer.
+
+**Intentionally absent from the core primitive layer:** legacy push-style sampling/roots APIs, telemetry, typegen, and stdio serving. MCP operation middleware (`server.use('mcp:…')`) and observer events (`server.on('mcp:…')`) are implemented; HTTP middleware adapters and custom first-class HTTP routes are not — use your fetch-native framework. OpenAPI import is an integration built on top of `tool()`, described below; it does not add a second registration path. Views are governed by `VIEWS_SPEC.md`. Typed `ctx.elicit` and the raw v2 MRTR primitives (`inputRequired`, `inputResponse`, `acceptedContent`) operate through explicit `input_required` returns without introducing session state.
 
 **Examples** (`examples/vercel`, `examples/railway`): the two deployment doors, each verified end-to-end. Vercel = serverless via `getHandler()` exported as `export default { fetch }` from an `api/` function — zero host config (delta 5). Railway = the CLI entry contract (`CLI_SPEC.md`): the entry default-exports the server and never calls `listen()` itself; `mcp-use build` + `mcp-use start` own the socket (host selection via `RAILWAY_PUBLIC_DOMAIN` stays constructor config, which `start`'s `listen()` honors), and the bin handles SIGINT/SIGTERM → `close()`.
 
@@ -212,7 +225,7 @@ server.tool(
     const confirmation = await ctx.elicit(
       "confirm",
       `Deploy to ${environment}?`,
-      z.object({ confirm: z.boolean() }),
+      z.object({ confirm: z.boolean() })
     );
     if (confirmation.status === "required") {
       return confirmation.result;
@@ -240,7 +253,7 @@ server.tool(
 - **Views (MCP Apps): implemented** — contract in **`VIEWS_SPEC.md`** (single-protocol MCP Apps with no adapter system, `ToolRef`-based zero-codegen typing, `mcp-use/react` runtime, view naming throughout; extends the CLI contract with a client Vite environment).
 - **Serving hardening:** composing into a user's existing fetch-native app (validation middleware guidance) — `createMcpMount` itself is implemented; stdio serving decision (`serveStdio` works off the same factory); expose the underlying `McpServerFactory` (`server.factory()`) so any official adapter can consume it. Plus DX debts found building the examples: (1) `listen()`'s returned `url` is hardcoded to `localhost` — wrong for public binds; (2) no diagnostic when `basePath` drifts from where the handler is actually mounted (silent 404) — warn at `getHandler()` time.
 - **Auth: direct resource-server mode implemented; proxy mode deferred.** Contract in **`AUTH_SPEC.md`** / **`AUTH_IMPLEMENTATION.md`** (resource-server posture, `ctx.auth`, `bearerAuth`/`oauthMetadata`, provider adapters, RFC 9728 metadata). OAuth proxy mode (local authorization server) remains deferred.
-- **Product shell:** OAuth providers + scope guards + `.well-known` (with auth, above), operation middleware (`server.use("mcp:*")`) and observer events (`server.on("mcp:*")`), optional `ServerConfig.cors`, landing page, and resource-subscription ergonomics. Cross-request v2 list/resource notifications are implemented through `MCPServer.notify*`, backed by the SDK handler bus. Every per-request SDK server advertises tool/prompt/resource `listChanged` (and resource `subscribe`) even while a registry is empty, so a client connected before the first primitive is added can subscribe. `getHandler({ bus })` accepts an SDK `ServerEventBus` for entries that need several handler instances to share open subscriptions; `mcp-use dev` uses one process-scoped bus across every reload generation and publishes all three list invalidations after a successful handler swap.
+- **Product shell:** OAuth providers + scope guards + `.well-known` (with auth, above), operation middleware (`server.use("mcp:*")`) and observer events (`server.on("mcp:*")`), optional `ServerConfig.cors`, the browser landing page, and resource-subscription ergonomics are implemented. Cross-request v2 list/resource notifications are implemented through `MCPServer.notify*`, backed by the SDK handler bus. Every per-request SDK server advertises tool/prompt/resource `listChanged` (and resource `subscribe`) even while a registry is empty, so a client connected before the first primitive is added can subscribe. `getHandler({ bus })` accepts an SDK `ServerEventBus` for entries that need several handler instances to share open subscriptions; `mcp-use dev` uses one process-scoped bus across every reload generation and publishes all three list invalidations after a successful handler swap.
 - **Elicitation & context:** MRTR state, typed form and URL elicitation, progress, and logging helpers are implemented. Push-style sampling/roots remain legacy-only and are deprecated in the 2026-07-28 spec.
 - **Integration:** OpenAPI import is implemented. Telemetry (posthog-node, opt-out) remains deferred. The independently published `@mcp-use/client` remains the SDK boundary; the framework consumes it for `mcp-use client` rather than folding or re-exporting the SDK from the server runtime.
 

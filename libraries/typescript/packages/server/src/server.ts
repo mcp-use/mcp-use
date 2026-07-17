@@ -24,6 +24,7 @@ import {
   composeFetch,
   getRequestBag,
   hostValidationMiddleware,
+  isHtmlNavigationRequest,
   jsonBodyMiddleware,
   matchesPath,
   originValidationMiddleware,
@@ -787,6 +788,7 @@ export class MCPServer<TUser = never> {
     if (this.#fetchHandler === undefined || this.#handler === undefined) {
       const { hosts, origins } = this.#validationPolicy(mode);
       const basePath = this.#basePath();
+      const nestedBasePath = basePath === "/" ? "" : basePath;
       const middlewares = [
         jsonBodyMiddleware(),
         requestLogger(this.#config.logging),
@@ -841,7 +843,10 @@ export class MCPServer<TUser = never> {
         }
       );
 
-      let mcpRouteHandler = mcpFetch;
+      let protectWithBearer: (
+        request: Request,
+        next: () => Promise<Response>
+      ) => Promise<Response> = async (_request, next) => next();
       if (resource !== undefined) {
         const provider = this.#config.oauth!;
         const providerOptions = getOAuthProviderOptions(provider);
@@ -852,16 +857,40 @@ export class MCPServer<TUser = never> {
             requiredScopes: providerOptions.requiredScopes,
           }),
         });
-        mcpRouteHandler = async (request) => {
+        protectWithBearer = async (request, next) => {
           const result = await gate(request);
           if (result instanceof Response) {
             return result;
           }
           const bag = getRequestBag(request);
           bag.authInfo = result;
-          return mcpFetch(request);
+          return next();
         };
       }
+
+      const mcpRouteHandler: FetchHandler = (request) =>
+        protectWithBearer(request, () => mcpFetch(request));
+      const endpointHandler: FetchHandler = async (request) => {
+        if (!isHtmlNavigationRequest(request)) {
+          return mcpRouteHandler(request);
+        }
+        const respond = async (): Promise<Response> => {
+          const { createLandingPageResponse } =
+            await import("./landing-handler.js");
+          return createLandingPageResponse(
+            request,
+            basePath,
+            this.#config,
+            this.#tools.values(),
+            this.#prompts.values(),
+            this.#resources.values()
+          );
+        };
+        if (resource !== undefined && this.#config.publicLandingPage !== true) {
+          return protectWithBearer(request, respond);
+        }
+        return respond();
+      };
 
       const routes: Array<{
         match: (request: Request) => boolean;
@@ -878,7 +907,7 @@ export class MCPServer<TUser = never> {
           match: (request) =>
             request.method === "GET" || request.method === "HEAD"
               ? new URL(request.url).pathname.startsWith(
-                  `${basePath}/_mcp-use/public/`
+                  `${nestedBasePath}/_mcp-use/public/`
                 )
               : false,
           handler: viewHandler,
@@ -896,7 +925,7 @@ export class MCPServer<TUser = never> {
             match: (request) =>
               request.method === "GET" || request.method === "HEAD"
                 ? new URL(request.url).pathname.startsWith(
-                    `${basePath}/_mcp-use/views/`
+                    `${nestedBasePath}/_mcp-use/views/`
                   )
                 : false,
             handler: viewAssetsHandler,
@@ -923,7 +952,7 @@ export class MCPServer<TUser = never> {
 
       routes.push({
         match: (request) => matchesPath(request, basePath),
-        handler: mcpRouteHandler,
+        handler: endpointHandler,
       });
 
       const terminal = routeFetch(routes);

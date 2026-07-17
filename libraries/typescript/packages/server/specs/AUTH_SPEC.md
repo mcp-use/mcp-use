@@ -618,6 +618,8 @@ All providers supply typed mcp-use additions through `mapAuthInfo`. The wrapper 
 
 The MCP request path creates a fresh SDK server per request. Direct providers are otherwise stateless. Proxy providers require durable shared storage and shared signing and consent-cookie key material. Route and request ordering is exact:
 
+The generated landing page shares the exact MCP endpoint path but is selected only for `GET` or `HEAD` requests that explicitly accept `text/html`. `publicLandingPage` defaults to `false`: with OAuth, those browser requests pass through the same bearer gate as MCP traffic. When it is `true`, only that classified HTML request bypasses the gate. JSON, event-stream, wildcard-only, missing-Accept, DELETE, and POST requests remain protected. A valid bearer token with `publicLandingPage: false` reaches the landing page after the gate; it does not fall through to the stateless probe response.
+
 1. Register public OAuth discovery and protected-resource metadata routes. For a direct provider this is the existing `oauthMetadataResponse` composition. For a proxy provider, call `internal.localAuthServer.mount(app, context)` first; it registers the local metadata, register, authorize, consent, callback, and token routes using the trusted `OAuthLocalRouteContext`, never a request `Host` header.
 2. Register the exact MCP endpoint bearer gate. Do not protect a broad prefix that unintentionally covers the routes from step 1 or unrelated routes.
 3. The gate calls `requireBearerAuth(...)` and stores a successful `AuthInfo` in the request bag.
@@ -902,7 +904,7 @@ Acceptance coverage must include:
 
 - An official client e2e flow: unauthenticated MCP request, `401` challenge, protected-resource metadata retrieval, OAuth authorization and token acquisition, retry, then an authorized `tools/call`.
 - Missing and malformed token `401 invalid_token`; expired token `401 invalid_token`; endpoint scope failure `403 insufficient_scope`; expected `WWW-Authenticate` `resource_metadata`.
-- Exact-route protection: public discovery routes work without bearer auth, while only the configured MCP endpoint is gated.
+- Exact-route protection: public discovery routes work without bearer auth, while only the configured MCP endpoint is gated. On that endpoint, OAuth plus omitted/false `publicLandingPage` rejects unauthenticated HTML GET/HEAD; `true` permits only unauthenticated HTML GET/HEAD while protocol-shaped GET/HEAD/DELETE/POST remains gated; authenticated HTML requests render the page in either mode.
 - A custom fetch composition that stores `authInfo` and forwards it through `createMcpMount`.
 - Canonical URL, `basePath`, MCP path, `MCP_URL`, path-aware metadata, and unsafe-derivation configuration tests.
 - URL validation tests for HTTPS, localhost exceptions, path matching, queries, fragments, and trailing slashes.
@@ -934,6 +936,6 @@ Migrate provider concepts and public context compatibility, not proxy behavior:
 - Preserve `user`, `payload`, `accessToken`, `scopes`, and `permissions` on `ctx.auth`.
 - In direct mode, `accessToken` aliases verified SDK `AuthInfo.token`. In proxy mode, it is the signed local MCP JWT and never an upstream token.
 - Do not port `verifyJwt: false` or any decode-only authentication path.
-- Do not port v1's unauthenticated `HEAD` bypass on the MCP endpoint. Beta.3 bearer authentication gates every method on that route; metadata routes retain public `HEAD` support.
+- Do not port v1's general unauthenticated `HEAD` bypass on the MCP endpoint. Bearer authentication gates every method on that route unless the request is the explicitly negotiated HTML landing-page HEAD and `publicLandingPage` is `true`; metadata routes retain public `HEAD` support.
 - Replace v1 context storage with explicit `handler.fetch(..., { authInfo })` forwarding and `toRequestContext` / `toAuthenticatedRequestContext` projection.
 - Do not claim beta.3 helpers are pending, Express-only, supplied by an upstream Hono auth feature, or sufficient to implement the local authorization server. Use only beta.3 resource-server helpers and new mcp-use Hono/web-standard proxy routes.

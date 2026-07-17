@@ -24,6 +24,7 @@ const server = new MCPServer({
   name: "clerk-direct-auth-example",
   version: "1.0.0",
   description: "An MCP server that verifies Clerk-issued access tokens.",
+  publicLandingPage: true,
   oauth: oauthClerkProvider({
     frontendApiUrl: requireEnv("CLERK_FRONTEND_API_URL"),
   }),

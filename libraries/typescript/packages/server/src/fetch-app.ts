@@ -115,6 +115,55 @@ export function matchesPathPrefix(request: Request, prefix: string): boolean {
 }
 
 /**
+ * Append a framework-owned child path beneath an MCP base path.
+ *
+ * Unlike string interpolation, this keeps the root base path from producing
+ * a double slash: `pathUnderBase("/", "inspector")` is `"/inspector"`.
+ *
+ * @param basePath - Valid MCP base path, including the root path `/`.
+ * @param childPath - Relative child path, with or without a leading slash.
+ * @returns Absolute pathname beneath `basePath`.
+ *
+ * @internal
+ */
+export function pathUnderBase(basePath: string, childPath: string): string {
+  const child = childPath.replace(/^\/+/, "");
+  return basePath === "/" ? `/${child}` : `${basePath}/${child}`;
+}
+
+/**
+ * Classify a request as explicit browser HTML navigation.
+ *
+ * Only GET and HEAD requests whose Accept header names `text/html` with a
+ * non-zero quality value qualify. Wildcard-only and missing Accept headers
+ * remain available to protocol and health probes.
+ *
+ * @param request - Incoming request to classify.
+ * @returns Whether the request explicitly accepts HTML.
+ *
+ * @internal
+ */
+export function isHtmlNavigationRequest(request: Request): boolean {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return false;
+  }
+  const accept = request.headers.get("accept");
+  if (accept === null) {
+    return false;
+  }
+  return accept.split(",").some((range) => {
+    const [mediaType, ...parameters] = range.split(";");
+    if (mediaType?.trim().toLowerCase() !== "text/html") {
+      return false;
+    }
+    return !parameters.some((parameter) => {
+      const [name, value] = parameter.trim().toLowerCase().split("=");
+      return name === "q" && Number(value) === 0;
+    });
+  });
+}
+
+/**
  * Dispatch to the first matching route handler.
  *
  * @param routes - Ordered route table; first match wins.

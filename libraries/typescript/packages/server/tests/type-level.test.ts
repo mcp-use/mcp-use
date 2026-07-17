@@ -18,9 +18,11 @@ import type {
   Annotations,
   CallToolResult,
   InputRequiredResult,
+  LandingPageOptions,
   MetaObject,
   ResourceDefinition,
   ResourceTemplateDefinition,
+  ServerConfig,
   ToolAnnotations,
   ToolDefinition,
   ToolResult,
@@ -101,6 +103,29 @@ describe("useFiles public types", () => {
       (file: FileMetadata) => Promise<{ downloadUrl: string }>
     >();
     expect(true).toBe(true);
+  });
+});
+
+describe("landing page public types", () => {
+  it("accepts the boolean ServerConfig option and object generator options", () => {
+    const config: ServerConfig = {
+      name: "types",
+      version: "0.0.0",
+      publicLandingPage: true,
+    };
+    const page: LandingPageOptions = {
+      name: "types",
+      version: "0.0.0",
+      url: "https://example.test/mcp",
+      tools: [{ name: "ping", description: "Return pong." }],
+    };
+    const invalid: ServerConfig = {
+      name: "types",
+      version: "0.0.0",
+      // @ts-expect-error — publicLandingPage is a boolean option
+      publicLandingPage: "yes",
+    };
+    expect([config, page, invalid]).toBeDefined();
   });
 });
 

@@ -1,4 +1,5 @@
 import type { McpUseViewConfig } from "../react/public-assets.js";
+import { pathUnderBase } from "../fetch-app.js";
 import type { ViewManifestEntry } from "./types.js";
 
 /**
@@ -29,7 +30,7 @@ export function resolveAssetUrl(assetPath: string, origin: string): string {
  * @param viewName - View directory / manifest key.
  */
 export function viewAssetsBasePath(basePath: string, viewName: string): string {
-  return `${basePath}/_mcp-use/views/${viewName}/`;
+  return `${pathUnderBase(basePath, `_mcp-use/views/${viewName}`)}/`;
 }
 
 /**
@@ -71,7 +72,7 @@ export function resolvePublicBase(
   assetsBase: string,
   basePath: string
 ): string {
-  return `${assetsBase}${basePath}/_mcp-use/public/`;
+  return `${assetsBase}${pathUnderBase(basePath, "_mcp-use/public")}/`;
 }
 
 /**

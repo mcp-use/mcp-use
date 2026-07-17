@@ -1,5 +1,6 @@
 import {
   matchesPathPrefix,
+  pathUnderBase,
   pathnameOf,
   type FetchHandler,
 } from "../fetch-app.js";
@@ -30,7 +31,7 @@ export function createViewAssetsHandler(
     return undefined;
   }
 
-  const assetsPrefix = `${basePath}/_mcp-use/views`;
+  const assetsPrefix = pathUnderBase(basePath, "_mcp-use/views");
   const projectRoot = options?.projectRoot ?? process.cwd();
 
   return async (request) => {
@@ -95,7 +96,7 @@ export function createViewPublicHandler(
     return undefined;
   }
 
-  const publicPrefix = `${basePath}/_mcp-use/public`;
+  const publicPrefix = pathUnderBase(basePath, "_mcp-use/public");
   const subdir = options?.dev === true ? PUBLIC_DEV_DIR : PUBLIC_BUILD_DIR;
   const projectRoot = options?.projectRoot ?? process.cwd();
 

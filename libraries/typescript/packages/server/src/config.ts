@@ -103,6 +103,18 @@ interface BaseServerConfig {
    */
   legacy?: "stateless" | "reject";
   /**
+   * Expose the HTML landing page without bearer authentication when OAuth is
+   * configured.
+   *
+   * The landing page itself is always mounted at `basePath` for browser GET
+   * and HEAD requests that explicitly accept `text/html`. Without OAuth it is
+   * public. With OAuth, it requires a valid bearer token unless this option is
+   * `true`. MCP protocol requests remain protected in either case.
+   *
+   * @defaultValue `false`
+   */
+  publicLandingPage?: boolean;
+  /**
    * Inspector shell route at `${basePath}/inspector` — a browser UI for
    * exploring and calling the server's tools, resources, and prompts.
    *
