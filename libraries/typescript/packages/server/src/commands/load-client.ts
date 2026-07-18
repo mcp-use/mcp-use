@@ -47,6 +47,12 @@ export async function findProjectRoot(
   }
 }
 
+/** Where `@mcp-use/client` was auto-installed. */
+interface InstallLocation {
+  location: "project" | "sandbox";
+  projectRoot?: string;
+}
+
 /**
  * Load `@mcp-use/client` on demand so the framework library entry does not
  * pull the client SDK (or legacy v1 transitive deps) into every install.
@@ -60,11 +66,11 @@ export async function loadClientPackage(): Promise<ClientPackage> {
   } catch (error) {
     if (!isClientPackageMissing(error)) throw error;
 
-    const location = await installClientPackage();
+    const installed = await installClientPackage();
     try {
-      return location === "sandbox"
+      return installed.location === "sandbox"
         ? await importSandboxClientModule()
-        : await importClientModule();
+        : await importProjectClientModule(installed.projectRoot!);
     } catch (retryError) {
       if (isClientPackageMissing(retryError)) {
         throw new UsageError(INSTALL_HINT);
@@ -74,7 +80,7 @@ export async function loadClientPackage(): Promise<ClientPackage> {
   }
 }
 
-async function installClientPackage(): Promise<"project" | "sandbox"> {
+async function installClientPackage(): Promise<InstallLocation> {
   const versionSpec = readClientPeerRange();
   const dependency = `${CLIENT_PACKAGE}@${versionSpec}`;
   const projectRoot = await findProjectRoot(process.cwd());
@@ -90,7 +96,7 @@ async function installClientPackage(): Promise<"project" | "sandbox"> {
         `Failed to install ${CLIENT_PACKAGE}.`
       );
     }
-    return "project";
+    return { location: "project", projectRoot };
   }
 
   await mkdir(CLIENT_SDK_DIR, { recursive: true, mode: 0o700 });
@@ -115,7 +121,7 @@ async function installClientPackage(): Promise<"project" | "sandbox"> {
       `Failed to install ${CLIENT_PACKAGE}.`
     );
   }
-  return "sandbox";
+  return { location: "sandbox" };
 }
 
 function packageManagerInstallArgs(dependency: string): [string, string[]] {
@@ -149,6 +155,15 @@ function readClientPeerRange(): string {
 
 async function importClientModule(): Promise<ClientPackage> {
   return import("@mcp-use/client");
+}
+
+/** @internal Imported from project `node_modules` after auto-install. */
+export async function importProjectClientModule(
+  projectRoot: string
+): Promise<ClientPackage> {
+  const parent = pathToFileURL(join(projectRoot, "package.json")).href;
+  const resolved = await import.meta.resolve(CLIENT_PACKAGE, parent);
+  return import(resolved) as Promise<ClientPackage>;
 }
 
 async function importSandboxClientModule(): Promise<ClientPackage> {

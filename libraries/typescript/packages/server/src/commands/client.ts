@@ -36,8 +36,42 @@ interface SavedCredentials {
 const CLIENT_DIR = join(GLOBAL_STATE_DIR, "client");
 const SERVERS_PATH = join(CLIENT_DIR, "servers.json");
 
+const CLIENT_HELP = `Usage: mcp-use client <command> [options]
+
+Commands:
+  connect <name> <url>   Connect and save an HTTP(S) MCP server
+  list                   List saved servers
+  remove <name>          Remove a saved server
+  <name>                 Invoke tools/resources/prompts on a saved server
+
+Connect options:
+  -H, --header <"Key: Value">   Static header (repeatable)
+  --no-oauth                    Skip OAuth on authorization challenges
+  --auth-timeout <ms>           OAuth wait timeout (default: 300000)
+  --protocol <auto|2026-07-28|2025-11-25>
+  --open                        Open the OAuth URL in a browser without prompting
+  --no-open                     Print the OAuth URL only
+  --json                        Emit machine-readable output
+
+Saved server commands:
+  mcp-use client <name> tools list|describe|call ...
+  mcp-use client <name> resources list|read ...
+  mcp-use client <name> prompts list|get ...
+  mcp-use client <name> auth status|logout
+
+Examples:
+  mcp-use client connect linear https://mcp.linear.app/mcp
+  mcp-use client linear tools list
+  mcp-use client linear tools call search_issues query="open bugs"`;
+
+type BrowserMode = "ask" | "always" | "never";
+
 /** Run the `mcp-use client` command family. */
 export async function runClient(argv: readonly string[]): Promise<number> {
+  if (argv.includes("--help") || argv.includes("-h")) {
+    console.log(CLIENT_HELP);
+    return 0;
+  }
   const json = wantsJson(argv);
   try {
     const first = argv[0];
@@ -69,9 +103,14 @@ async function connect(
       "no-oauth": { type: "boolean" },
       "auth-timeout": { type: "string" },
       protocol: { type: "string", default: "auto" },
+      open: { type: "boolean" },
+      "no-open": { type: "boolean" },
       json: { type: "boolean" },
     },
   });
+  if (values.open === true && values["no-open"] === true) {
+    throw new UsageError("Cannot combine --open and --no-open.");
+  }
   if (positionals.length !== 2) {
     throw new UsageError("Usage: mcp-use client connect <name> <url>");
   }
@@ -100,7 +139,12 @@ async function connect(
     name,
     definition,
     credentials,
-    timeout
+    timeout,
+    resolveBrowserMode({
+      open: values.open === true,
+      noOpen: values["no-open"] === true,
+      json,
+    })
   );
   await connection.disconnect();
   saved.servers[name] = definition;
@@ -328,7 +372,8 @@ async function openConnection(
   name: string,
   definition: SavedServer,
   credentials: SavedCredentials,
-  authTimeoutMs: number
+  authTimeoutMs: number,
+  browserMode: BrowserMode = process.stdin.isTTY ? "ask" : "never"
 ): Promise<MCPConnection> {
   const { createOAuthProvider, MCPClient } = await loadClientPackage();
   const oauthBase = oauthDirectory(name);
@@ -337,8 +382,16 @@ async function openConnection(
         baseDir: oauthBase,
         authTimeoutMs,
         storageKeyPrefix: `mcp-use-cli:${name}`,
-        openBrowser: (url: string) => {
+        openBrowser: async (url: string) => {
           process.stderr.write(`Open this URL to authenticate:\n${url}\n`);
+          if (browserMode === "never") return;
+          if (browserMode === "ask") {
+            const accepted = await confirm("Open in browser?", {
+              yes: false,
+              json: false,
+            });
+            if (!accepted) return;
+          }
           openBrowser(url);
         },
         // Conditional exports select NodeOAuthOptions at runtime. TypeScript
@@ -432,6 +485,16 @@ export function parseMcpArguments(
     result[key] = typed >= 0 ? (JSON.parse(raw) as unknown) : raw;
   }
   return result;
+}
+
+function resolveBrowserMode(options: {
+  open: boolean;
+  noOpen: boolean;
+  json: boolean;
+}): BrowserMode {
+  if (options.json || options.noOpen || !process.stdin.isTTY) return "never";
+  if (options.open) return "always";
+  return "ask";
 }
 
 function parseHeaders(values: readonly string[]): Record<string, string> {

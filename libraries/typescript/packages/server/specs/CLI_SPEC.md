@@ -58,7 +58,7 @@ There are no `ls`, `rm`, `switch`, or `install` aliases in v2 alpha. The accepte
 
 ### Cross-command conventions
 
-- `--help` and `--version` write to stdout and exit `0`. Unknown commands/options, missing arguments, invalid enum/numeric values, mutually exclusive options, and a destructive command without confirmation in a non-TTY write one concise error plus a usage hint to stderr and exit `2`.
+- `--help` and `--version` write to stdout and exit `0`. Bare `mcp-use --help` prints the top-level command summary; `mcp-use <command> --help` prints that command's usage. Unknown commands/options, missing arguments, invalid enum/numeric values, mutually exclusive options, and a destructive command without confirmation in a non-TTY write one concise error plus a usage hint to stderr and exit `2`.
 - Successful finite commands exit `0`; empty lists and idempotent `logout`/`remove` operations are successful. Authentication, authorization, network, API, filesystem, build, MCP, browser, and remote-operation failures exit `1`. SIGINT exits `130`.
 - Human output is concise UTF-8 text on stdout. Errors and warnings go to stderr. ANSI styling is used only for a TTY and honors `NO_COLOR`; machine-readable output never contains ANSI.
 - Every finite data-returning command accepts `--json`. It emits exactly one JSON value followed by `\n`; errors emit `{"error":{"code":"...","message":"...","details":...}}` to stderr. Streaming `deployments logs --follow` emits JSON Lines when `--json` is set. Prompts are disabled under `--json` and whenever stdin is not a TTY.
@@ -141,7 +141,7 @@ mcp-use deploy [path] [--org <id-or-slug>] [--name <name>]
 ```text
 mcp-use client connect <name> <url> [-H, --header <"Key: Value">...]
   [--no-oauth] [--auth-timeout <ms>] [--protocol <auto|2026-07-28|2025-11-25>]
-  [--json]
+  [--open] [--no-open] [--json]
 mcp-use client list [--json]
 mcp-use client remove <name> [--yes]
 mcp-use client <name> tools list [--json]
@@ -156,8 +156,8 @@ mcp-use client <name> auth logout [--yes]
 ```
 
 - v2 alpha client commands support HTTP(S) MCP servers; stdio, interactive REPL, resource subscriptions, implicit active sessions, and forced OAuth refresh are omitted. Every operation names a saved server.
-- `connect` validates a unique filesystem-safe name, connects before saving, and attempts OAuth on an authorization challenge unless `--no-oauth`. Repeated headers are stored as credentials, not metadata. Reusing a name requires removing it first.
-- `client` and `screenshot` dynamic-import `@mcp-use/client`. When it is missing, the CLI installs it automatically: into the nearest project `package.json` when one exists, otherwise into `~/.mcp-use/client-sdk/`.
+- `connect` validates a unique filesystem-safe name, connects before saving, and attempts OAuth on an authorization challenge unless `--no-oauth`. On OAuth, the CLI prints the authorization URL; in a TTY it prompts before opening the browser unless `--open` or `--no-open` is set. `--open` auto-opens without prompting; `--no-open`, non-TTY, and `--json` print the URL only while the loopback callback still waits. Repeated headers are stored as credentials, not metadata. Reusing a name requires removing it first.
+- `client` and `screenshot` dynamic-import `@mcp-use/client`. When it is missing, the CLI installs it automatically: into the nearest project `package.json` when one exists, otherwise into `~/.mcp-use/client-sdk/`. Auto-install continues the current command in-process and imports from the install location.
 - Tool/prompt arguments accept either one JSON object or `key=value` pairs; `key:=<json>` supplies typed JSON values. Mixing the full-object and pair forms is usage error `2`. Calls time out with exit `1`; tool `isError` results are operation failures and retain their protocol content in JSON error details.
 - Default human output renders borderless terminal lists and readable MCP content. `--json` emits the raw protocol result envelope for calls, reads, and prompts, and arrays for lists.
 
