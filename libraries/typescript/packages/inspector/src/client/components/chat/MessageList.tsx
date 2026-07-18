@@ -19,6 +19,7 @@ interface Message {
     type: "text" | "tool-invocation";
     text?: string;
     toolInvocation?: {
+      toolCallId?: string;
       toolName: string;
       args: Record<string, unknown>;
       result?: any;
@@ -215,7 +216,7 @@ export const MessageList = memo(
                     const partKey =
                       part.type === "text"
                         ? `${message.id}-text-${partIndex}`
-                        : `${message.id}-tool-${part.toolInvocation?.toolName}-${partIndex}`;
+                        : `${message.id}-tool-${part.toolInvocation?.toolCallId ?? `${part.toolInvocation?.toolName}-${partIndex}`}`;
 
                     if (part.type === "text") {
                       return (

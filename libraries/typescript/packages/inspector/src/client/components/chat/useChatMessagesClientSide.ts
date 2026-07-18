@@ -21,6 +21,7 @@ import {
   managedNoticeFromLlmError,
   type ManagedChatNotice,
 } from "./managedChatNotice";
+import { parsePartialToolArgs } from "./partialToolArgs";
 
 // Type alias for backward compatibility
 type MCPConnection = McpServer;
@@ -121,6 +122,7 @@ export function useChatMessagesClientSide({
           type: "text" | "tool-invocation";
           text?: string;
           toolInvocation?: {
+            toolCallId: string;
             toolName: string;
             args: Record<string, unknown>;
             result?: any;
@@ -132,7 +134,7 @@ export function useChatMessagesClientSide({
         // Per-tool-call accumulated JSON for partial-args rendering.
         const toolCallArgBuffers = new Map<
           string,
-          { name: string; accumulatedJson: string }
+          { accumulatedJson: string }
         >();
 
         // Throttled yield: allows React to flush re-renders during streaming.
@@ -210,54 +212,6 @@ export function useChatMessagesClientSide({
           autoInitialize: true,
         });
 
-        // Helper: best-effort parse of accumulated tool-args JSON so the UI
-        // can render the tool input progressively before the call completes.
-        const tryParseArgs = (
-          raw: string
-        ): Record<string, unknown> | undefined => {
-          try {
-            return JSON.parse(raw);
-          } catch {
-            // Try to close unclosed strings/brackets/braces.
-            const strategies: Array<() => unknown> = [
-              () => {
-                let r = raw;
-                const quotes = (r.match(/(?<!\\)"/g) || []).length;
-                if (quotes % 2 !== 0) r += '"';
-                const ob =
-                  (r.match(/{/g) || []).length - (r.match(/}/g) || []).length;
-                const oq =
-                  (r.match(/\[/g) || []).length - (r.match(/]/g) || []).length;
-                for (let i = 0; i < oq; i++) r += "]";
-                for (let i = 0; i < ob; i++) r += "}";
-                return JSON.parse(r);
-              },
-              () => {
-                let r = raw;
-                r = r.replace(/,\s*"[^"]*"?\s*:\s*("([^"\\]|\\.)*)?$/, "");
-                r = r.replace(/,\s*"[^"]*$/, "");
-                const quotes = (r.match(/(?<!\\)"/g) || []).length;
-                if (quotes % 2 !== 0) r += '"';
-                const ob =
-                  (r.match(/{/g) || []).length - (r.match(/}/g) || []).length;
-                const oq =
-                  (r.match(/\[/g) || []).length - (r.match(/]/g) || []).length;
-                for (let i = 0; i < oq; i++) r += "]";
-                for (let i = 0; i < ob; i++) r += "}";
-                return JSON.parse(r);
-              },
-            ];
-            for (const strat of strategies) {
-              try {
-                return strat() as Record<string, unknown>;
-              } catch {
-                // next
-              }
-            }
-            return undefined;
-          }
-        };
-
         const commitMessageParts = () => {
           setMessages((prev) =>
             prev.map((msg) =>
@@ -308,12 +262,12 @@ export function useChatMessagesClientSide({
             });
             if (currentTextPart) currentTextPart = "";
             toolCallArgBuffers.set(ev.toolCallId, {
-              name: ev.toolName,
               accumulatedJson: "",
             });
             parts.push({
               type: "tool-invocation",
               toolInvocation: {
+                toolCallId: ev.toolCallId,
                 toolName: ev.toolName,
                 args: {},
                 state: "streaming",
@@ -325,32 +279,16 @@ export function useChatMessagesClientSide({
             const buf = toolCallArgBuffers.get(ev.toolCallId);
             if (buf) {
               buf.accumulatedJson += ev.argsDelta;
-              const partial = tryParseArgs(buf.accumulatedJson);
+              const partial = parsePartialToolArgs(buf.accumulatedJson);
               if (partial) {
                 const toolPart = parts.find(
                   (p) =>
                     p.type === "tool-invocation" &&
                     p.toolInvocation?.state === "streaming" &&
-                    p.toolInvocation?.toolName === buf.name
+                    p.toolInvocation?.toolCallId === ev.toolCallId
                 );
                 if (toolPart && toolPart.toolInvocation) {
-                  const prev = toolPart.toolInvocation.partialArgs;
-                  const prevKeys = prev ? Object.keys(prev) : [];
-                  const newKeys = Object.keys(partial);
-                  const prevTotal = prevKeys.reduce(
-                    (s, k) => s + String(prev![k] ?? "").length,
-                    0
-                  );
-                  const newTotal = newKeys.reduce(
-                    (s, k) => s + String(partial[k] ?? "").length,
-                    0
-                  );
-                  if (
-                    newKeys.length > prevKeys.length ||
-                    newTotal >= prevTotal
-                  ) {
-                    toolPart.toolInvocation.partialArgs = partial;
-                  }
+                  toolPart.toolInvocation.partialArgs = partial;
                   commitMessageParts();
                   await maybeYield();
                 }
@@ -370,15 +308,17 @@ export function useChatMessagesClientSide({
               (p) =>
                 p.type === "tool-invocation" &&
                 p.toolInvocation?.state === "streaming" &&
-                p.toolInvocation?.toolName === ev.toolName
+                p.toolInvocation?.toolCallId === ev.toolCallId
             );
             if (streamingPart && streamingPart.toolInvocation) {
               streamingPart.toolInvocation.args = ev.args;
               streamingPart.toolInvocation.state = "pending";
+              streamingPart.toolInvocation.partialArgs = undefined;
             } else {
               parts.push({
                 type: "tool-invocation",
                 toolInvocation: {
+                  toolCallId: ev.toolCallId,
                   toolName: ev.toolName,
                   args: ev.args,
                   state: "pending",
@@ -398,7 +338,7 @@ export function useChatMessagesClientSide({
             const toolPart = parts.find(
               (p) =>
                 p.type === "tool-invocation" &&
-                p.toolInvocation?.toolName === ev.toolName &&
+                p.toolInvocation?.toolCallId === ev.toolCallId &&
                 !p.toolInvocation?.result
             );
             if (toolPart && toolPart.toolInvocation) {
@@ -419,7 +359,8 @@ export function useChatMessagesClientSide({
           for (const part of parts) {
             if (
               part.type === "tool-invocation" &&
-              part.toolInvocation?.state === "pending"
+              (part.toolInvocation?.state === "pending" ||
+                part.toolInvocation?.state === "streaming")
             ) {
               part.toolInvocation.state = "error";
               part.toolInvocation.result = "Cancelled by user";

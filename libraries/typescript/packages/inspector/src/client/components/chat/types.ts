@@ -18,6 +18,7 @@ export interface Message {
     type: "text" | "tool-invocation";
     text?: string;
     toolInvocation?: {
+      toolCallId?: string;
       toolName: string;
       args: Record<string, unknown>;
       result?: any;

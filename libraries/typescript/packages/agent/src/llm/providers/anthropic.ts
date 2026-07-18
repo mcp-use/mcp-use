@@ -147,6 +147,12 @@ function buildBody(params: ChatParams, stream: boolean) {
       name: t.name,
       description: t.description,
       input_schema: t.inputSchema,
+      // Anthropic buffers each parameter value by default. That makes a tool
+      // with one large string argument (code, SVG, a document, etc.) appear to
+      // have no input until the whole value has finished generating. Request
+      // eager input only for streaming calls so input_json_delta events arrive
+      // while the model is still writing the value.
+      ...(stream ? { eager_input_streaming: true } : {}),
     }));
   }
   return body;
