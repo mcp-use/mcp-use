@@ -73,6 +73,7 @@ All global CLI state lives under `~/.mcp-use/`; project state lives under the pr
 - `~/.mcp-use/config.json` is owned by cloud commands and contains only the cloud API key plus active organization id/name/slug. `MCP_USE_CLOUD_API_URL` and `MCP_USE_CLOUD_WEB_URL` override endpoints for the process and are never persisted.
 - `~/.mcp-use/client/servers.json` is owned by `client` and stores non-secret connection metadata keyed by explicit server name. There is no active/default client.
 - `~/.mcp-use/client/credentials/<sha256-of-server-name>.json` stores static headers or OAuth material used by `@mcp-use/client`. Removing a saved server removes its credential file; `client <name> auth logout` removes only the OAuth material while retaining non-OAuth connection metadata.
+- `~/.mcp-use/client-sdk/` is owned by `client` and `screenshot` when `@mcp-use/client` is auto-installed outside a project (for example `npx mcp-use client connect …` from a directory with no `package.json`). It holds a private `package.json` and `node_modules` for the client SDK only.
 - `.mcp-use/cloud/link.json` is owned by `deploy` and contains non-secret organization/server linkage for the current project. It is the only project-local cloud state.
 - Directories are created with mode `0700`, secret-bearing files with `0600`, and writes use temp-file-plus-rename. Commands never print API keys, bearer tokens, OAuth tokens, cookies, or secret environment values, including under `--json`.
 
@@ -156,6 +157,7 @@ mcp-use client <name> auth logout [--yes]
 
 - v2 alpha client commands support HTTP(S) MCP servers; stdio, interactive REPL, resource subscriptions, implicit active sessions, and forced OAuth refresh are omitted. Every operation names a saved server.
 - `connect` validates a unique filesystem-safe name, connects before saving, and attempts OAuth on an authorization challenge unless `--no-oauth`. Repeated headers are stored as credentials, not metadata. Reusing a name requires removing it first.
+- `client` and `screenshot` dynamic-import `@mcp-use/client`. When it is missing, the CLI installs it automatically: into the nearest project `package.json` when one exists, otherwise into `~/.mcp-use/client-sdk/`.
 - Tool/prompt arguments accept either one JSON object or `key=value` pairs; `key:=<json>` supplies typed JSON values. Mixing the full-object and pair forms is usage error `2`. Calls time out with exit `1`; tool `isError` results are operation failures and retain their protocol content in JSON error details.
 - Default human output renders borderless terminal lists and readable MCP content. `--json` emits the raw protocol result envelope for calls, reads, and prompts, and arrays for lists.
 
