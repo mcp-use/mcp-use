@@ -433,7 +433,7 @@ server.prompt("code_review", {
 **Command not found:**
 
 ```bash
-# Make sure you have Node.js 22.13+ installed
+# Make sure you have Node.js 22.22.2+ installed
 node --version
 
 # Try with npx

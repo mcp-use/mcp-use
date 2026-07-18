@@ -2,7 +2,7 @@
   "name": "mcp-use server",
   "type": "module",
   "engines": {
-    "node": ">=22.13.0"
+    "node": ">=22.22.2"
   },
   "version": "1.0.0",
   "description": "Blank mcp-use server",
@@ -26,7 +26,7 @@
     "mcp-use": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^22.13.0",
+    "@types/node": "^22.20.0",
     "typescript": "^7.0.2"
   }
 }

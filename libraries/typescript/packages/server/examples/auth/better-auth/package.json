@@ -5,7 +5,7 @@
   "private": true,
   "description": "Example: a mcp-use server authenticated by a standalone Hono and Better Auth OAuth server.",
   "engines": {
-    "node": ">=22.13.0"
+    "node": ">=22.22.2"
   },
   "scripts": {
     "dev": "mcp-use dev --port 43127",
@@ -23,7 +23,7 @@
     "mcp-use": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^22.13.0",
+    "@types/node": "^22.20.0",
     "tsx": "^4.21.0",
     "typescript": "^7.0.2"
   }

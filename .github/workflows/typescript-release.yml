@@ -590,7 +590,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22.13.0
+          node-version: 22.23.1
           cache: "pnpm"
           cache-dependency-path: libraries/typescript/pnpm-lock.yaml
           registry-url: "https://registry.npmjs.org"
