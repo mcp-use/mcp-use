@@ -2,13 +2,13 @@
 
 Reference MCP Apps views server for `mcp-use`. It follows the
 [Views spec](../../../specs/VIEWS_SPEC.md) fruit-store shape: view-bound tools,
-view components under `resources/`, typed tool I/O via exported tool refs, and
+view components under `views/`, typed tool I/O via exported tool refs, and
 the full React runtime surface (`useToolContext`, `useCallTool`, `useViewTool`,
 and the per-action hooks).
 
 ## What this demonstrates
 
-- **File-based views** under `resources/<name>/view.tsx`, discovered by
+- **File-based views** under `views/<name>/view.tsx`, discovered by
   `mcp-use dev` / `build` / `start`.
 - **One tool ↔ one view** via `view: { name, description, prefersBorder, … }` on
   `search-fruits`, with output typed from the tool's `outputSchema`. Resource
@@ -22,7 +22,7 @@ and the per-action hooks).
   `pip`).
 - **Explicit presentation composition** — the default export wraps content in
   `ThemeProvider` and `ViewControls` directly (there is no `McpUseProvider`).
-- **Zero-codegen typing** via `src/tools.d.ts` and exported tool refs
+- **Zero-codegen typing** via `src/mcp-env.d.ts` and exported tool refs
   (`searchFruits`, `getFruitDetails`).
 - **Capability gating** — `search-fruits` returns a markdown table fallback when
   the client does not advertise MCP Apps support.
@@ -58,12 +58,14 @@ Production path:
 pnpm build && pnpm start
 ```
 
-## Typing (`tools.d.ts`)
+## Typing (`mcp-env.d.ts`)
 
 View bundles never import server code. Types cross in type-space only:
 
 ```ts
-// src/tools.d.ts
+// src/mcp-env.d.ts
+declare module "*.css";
+
 declare module "mcp-use/react" {
   interface Register {
     tools: typeof import("./index.js");
@@ -146,14 +148,14 @@ collision, while unrelated custom keys are preserved.
 ## Images and CSP
 
 Static files in the project-root `public/` folder are served under
-`${basePath}/_mcp-use/public/` (e.g. `/fruits/apple.png` in a view resolves to
-`http://127.0.0.1:3000/mcp/_mcp-use/public/fruits/apple.png`). Use the
+`${basePath}/_mcp-use/public/` (e.g. `/fruits/apple.webp` in a view resolves to
+`http://127.0.0.1:3000/mcp/_mcp-use/public/fruits/apple.webp`). Use the
 `<Image>` component for root-relative paths — the
 synthesized view document injects the request-resolved public base so URLs stay
 absolute inside `srcdoc` iframes (which have no document base URL).
 
-This example keeps fruit PNGs in `public/fruits/` and references them as
-`<Image src={`/fruits/${id}.png`} …>`. Same-origin public assets are
+This example keeps fruit WebP images in `public/fruits/` and references them as
+`<Image src={`/fruits/${id}.webp`} …>`. Same-origin public assets are
 automatically covered by the framework's serving-origin CSP entry on view
 resources. This example does not declare `view.csp` because it has no external
 image or fetch domains. To load assets from another origin, add

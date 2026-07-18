@@ -2,7 +2,7 @@
  * `mcp-use build` — Vite SSR/node build of the user's server entry into the
  * `.mcp-use/build/` workspace directory (CLI_SPEC.md § Commands → build).
  *
- * When views exist (under `resources/<name>/view.tsx`), also runs a client-environment
+ * When views exist (under `views/<name>/view.tsx`), also runs a client-environment
  * build per view (hashed assets on disk), validates bindings, and emits a
  * wrapper entry that primes views before re-exporting the server (VIEWS_SPEC.md §
  * Build system).
@@ -24,7 +24,7 @@ import { build } from "vite";
 
 import { discoverEntry } from "./entry.js";
 import { mcpUseViewsPlugin } from "./views-plugin.js";
-import { ensureToolsDeclaration } from "./tools-declaration.js";
+import { ensureMcpEnvDeclaration } from "./mcp-env-declaration.js";
 import {
   resolveBuildBasePath,
   validateViewBindingsAtBuild,
@@ -268,8 +268,8 @@ async function buildExternalView(
 export async function runBuild(options: BuildOptions): Promise<void> {
   const startedAt = performance.now();
   const entry = discoverEntry(options.cwd, options.entry);
-  if (await ensureToolsDeclaration(options.cwd, entry)) {
-    console.log("[mcp-use] created tools.d.ts");
+  if (await ensureMcpEnvDeclaration(options.cwd, entry)) {
+    console.log("[mcp-use] created mcp-env.d.ts");
   }
   const paths = resolveWorkspacePaths(options.cwd);
   const views = discoverViews(options.cwd);

@@ -109,6 +109,8 @@ export interface ViewRendererProps {
   onResourceResolved?: (resolved: ResolvedViewResource) => void;
   wrapTransport?: (transport: Transport, viewId: string) => Transport;
   toolCallTimeout?: number;
+  /** Dev mock of ChatGPT file APIs for local hosts (inspector). Default false. */
+  mockOpenAiFileApis?: boolean;
   className?: string;
   testId?: string;
   invoking?: string;

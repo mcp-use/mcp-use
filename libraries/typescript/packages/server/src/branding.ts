@@ -14,17 +14,15 @@ const FAVICON_REDIRECT_CACHE_CONTROL = "public, max-age=300";
 export interface ServerBranding {
   /**
    * Source selected for `/favicon.ico`, after applying explicit-favicon and
-   * icon-ranking precedence.
+   * first-icon inference.
    */
   readonly favicon?: string;
+  /** MIME type of the selected favicon when known. */
+  readonly faviconMimeType?: string;
   /** Icons reported in MCP implementation metadata, in author order. */
   readonly icons?: readonly Icon[];
   /** Server website reported in MCP implementation metadata. */
   readonly websiteUrl?: string;
-}
-
-interface NormalizedServerBranding extends ServerBranding {
-  readonly faviconMimeType?: string;
 }
 
 function protocolOf(value: string): string | undefined {
@@ -44,55 +42,11 @@ function isLocalPublicSource(source: string): boolean {
   return protocolOf(source) === undefined;
 }
 
-function extensionPath(source: string): string {
-  const protocol = protocolOf(source);
-  if (protocol === "data") {
-    return "";
-  }
-  if (protocol === "http" || protocol === "https") {
-    return new URL(source).pathname.toLowerCase();
-  }
-  return source.toLowerCase();
-}
-
-function dataUrlMimeType(source: string): string | undefined {
-  if (protocolOf(source) !== "data") {
-    return undefined;
-  }
-  const comma = source.indexOf(",");
-  if (comma < 0) {
-    return undefined;
-  }
-  const mimeType = source.slice(5, comma).split(";", 1)[0]?.toLowerCase();
-  return mimeType === "" ? undefined : mimeType;
-}
-
-function iconMimeType(icon: Icon): string | undefined {
-  return icon.mimeType?.toLowerCase() ?? dataUrlMimeType(icon.src);
-}
-
-function isIco(icon: Icon): boolean {
-  const mimeType = iconMimeType(icon);
-  return (
-    mimeType === "image/x-icon" ||
-    mimeType === "image/vnd.microsoft.icon" ||
-    extensionPath(icon.src).endsWith(".ico")
-  );
-}
-
-function isPng(icon: Icon): boolean {
-  return (
-    iconMimeType(icon) === "image/png" ||
-    extensionPath(icon.src).endsWith(".png")
-  );
-}
-
 /**
  * Select the browser favicon from an ordered set of MCP icons.
  *
- * Ranking is deterministic: ICO, 16x16/32x32 PNG, any PNG, then the first
- * icon. MIME declarations and URL pathnames participate alongside filename
- * suffixes, so absolute URLs with queries and data URLs rank correctly.
+ * Uses the first icon in author order. Put the preferred browser favicon
+ * first, or set {@link ServerConfig.favicon} explicitly.
  *
  * @param icons - Validated, non-empty icon list.
  * @returns The selected icon.
@@ -102,16 +56,7 @@ function isPng(icon: Icon): boolean {
 export function selectFaviconFromIcons(
   icons: readonly Icon[]
 ): Icon | undefined {
-  return (
-    icons.find(isIco) ??
-    icons.find(
-      (icon) =>
-        isPng(icon) &&
-        icon.sizes?.some((size) => size === "16x16" || size === "32x32")
-    ) ??
-    icons.find(isPng) ??
-    icons[0]
-  );
+  return icons[0];
 }
 
 function assertLocalPublicSource(source: string, field: string): void {
@@ -200,7 +145,7 @@ export function normalizeServerBranding(config: {
   favicon?: unknown;
   icons?: unknown;
   websiteUrl?: unknown;
-}): NormalizedServerBranding {
+}): ServerBranding {
   let websiteUrl: string | undefined;
   if (config.websiteUrl !== undefined) {
     if (
@@ -361,7 +306,7 @@ export function hasLocalBrandingAsset(branding: ServerBranding): boolean {
  * @internal
  */
 export function createFaviconHandler(
-  branding: NormalizedServerBranding,
+  branding: ServerBranding,
   options: { dev: boolean; projectRoot: string; deferCors?: boolean }
 ): FetchHandler | undefined {
   const source = branding.favicon;

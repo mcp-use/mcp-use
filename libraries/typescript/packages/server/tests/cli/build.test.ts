@@ -103,10 +103,9 @@ describe("runBuild", () => {
 
     await runBuild({ cwd });
 
-    const toolsDeclaration = readFileSync(join(cwd, "tools.d.ts"), "utf8");
-    expect(toolsDeclaration).toContain(
-      'tools: typeof import("./src/index.js")'
-    );
+    const envDeclaration = readFileSync(join(cwd, "mcp-env.d.ts"), "utf8");
+    expect(envDeclaration).toContain('tools: typeof import("./src/index.js")');
+    expect(envDeclaration).toContain('declare module "*.css"');
 
     const buildDir = join(cwd, WORKSPACE_DIR_NAME, "build");
     const entryFile = join(buildDir, "index.js");
@@ -185,11 +184,11 @@ describe("runBuild", () => {
     );
   });
 
-  it("does not overwrite an existing tools.d.ts", async () => {
+  it("does not overwrite an existing mcp-env.d.ts", async () => {
     const cwd = copyFixture("build-existing-tools");
     dirs.push(cwd);
-    const declarationPath = join(cwd, "tools.d.ts");
-    const existing = "// user-owned tool registry\nexport {};\n";
+    const declarationPath = join(cwd, "mcp-env.d.ts");
+    const existing = "// user-owned env declaration\nexport {};\n";
     writeFileSync(declarationPath, existing);
 
     await runBuild({ cwd });
@@ -211,7 +210,7 @@ describe("runBuild (views)", () => {
       getViews: () => [
         {
           name: "demo",
-          entryPath: "/abs/resources/demo/view.tsx",
+          entryPath: "/abs/views/demo/view.tsx",
         },
       ],
     });
@@ -221,7 +220,7 @@ describe("runBuild (views)", () => {
       `${VIRTUAL_VIEW_RESOLVED_PREFIX}demo`
     );
     expect(source).toContain(
-      'import * as viewModule from "/abs/resources/demo/view.tsx"'
+      'import * as viewModule from "/abs/views/demo/view.tsx"'
     );
     expect(source).toContain("bootstrapView(viewModule)");
     expect(source).not.toMatch(/bootstrapView\(\s*viewModule\.default\s*\)/);
@@ -411,9 +410,9 @@ describe("runBuild (views)", () => {
   it("builds a view that contains </script> in source as external assets", async () => {
     const cwd = copyFixture("build-views-escape", "views");
     dirs.push(cwd);
-    mkdirSync(join(cwd, "resources", "escape-view"), { recursive: true });
+    mkdirSync(join(cwd, "views", "escape-view"), { recursive: true });
     writeFileSync(
-      join(cwd, "resources", "escape-view", "view.tsx"),
+      join(cwd, "views", "escape-view", "view.tsx"),
       [
         `const marker = "</script>";`,
         `export default function EscapeView() {`,
@@ -456,9 +455,9 @@ describe("runBuild (views)", () => {
   it("builds a view module that uses browser globals at module scope", async () => {
     const cwd = copyFixture("build-views-browser", "views");
     dirs.push(cwd);
-    mkdirSync(join(cwd, "resources", "browser-view"), { recursive: true });
+    mkdirSync(join(cwd, "views", "browser-view"), { recursive: true });
     writeFileSync(
-      join(cwd, "resources", "browser-view", "view.tsx"),
+      join(cwd, "views", "browser-view", "view.tsx"),
       `const x = window.location.href;\nexport default function B() { return null; }\n`
     );
     await expect(runBuild({ cwd })).resolves.toBeUndefined();

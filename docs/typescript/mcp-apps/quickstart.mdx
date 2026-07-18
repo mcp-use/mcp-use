@@ -1,12 +1,12 @@
 ---
 title: "Build your first MCP App"
-description: "Create, run, and verify a TypeScript MCP App with a widget-returning tool."
+description: "Create, run, and verify a TypeScript MCP App with a view-bound tool."
 icon: "rocket"
 ---
 
-Create a TypeScript MCP App, run it locally, and verify that a tool returns a React widget in the Inspector.
+Create a TypeScript MCP App, run it locally, and verify that a tool returns a React view in the Inspector.
 
-If you want a plain MCP server without widgets, use the [TypeScript quickstart](/typescript/getting-started/quickstart) instead.
+If you want a plain MCP server without views, use the [TypeScript quickstart](/typescript/getting-started/quickstart) instead.
 
 ## What you'll build
 
@@ -14,8 +14,8 @@ This guide creates a local server with:
 
 - an MCP endpoint at `http://localhost:3000/mcp`
 - an Inspector at `http://localhost:3000/inspector`
-- a `search-tools` tool that returns a widget
-- a React widget at `resources/product-search-result/widget.tsx`
+- a `search-fruits` tool that returns a view
+- a React view at `views/product-search-result/view.tsx`
 
 ## Prerequisites
 
@@ -32,17 +32,22 @@ cd my-widget-server
 npm install
 ```
 
-The template creates more files for assets, generated widget entries, and local tooling. These are the files you edit most often:
+The template creates more files for assets, view components, and local tooling. These are the files you edit most often:
 
 ```text
 my-widget-server/
 ├── index.ts
-├── resources/
-│   ├── product-search-result/
-│   │   └── widget.tsx
-│   └── styles.css
+├── mcp-env.d.ts
+├── views/
+│   └── product-search-result/
+│       ├── view.tsx
+│       ├── view.css
+│       ├── components/
+│       └── hooks/
 ├── public/
-├── ...
+│   ├── favicon.ico
+│   ├── icon.svg
+│   └── fruits/
 ├── package.json
 └── tsconfig.json
 ```
@@ -55,19 +60,20 @@ Start the development server:
 npm run dev
 ```
 
-This starts the MCP server, widget development server, and Inspector. Keep the process running while you test the app.
+This starts the MCP server, view build pipeline, and Inspector. Keep the process running while you test the app.
 
-## Inspect the widget tool
+## Inspect the view tool
 
-Open `index.ts` and find the `search-tools` tool. The template includes extra server metadata, fruit data, and a second `get-fruit-details` tool. This excerpt shows the widget-returning path you need to understand first.
+Open `index.ts` and find the `search-fruits` tool. The template includes server branding, 16 fruits, a loading delay demo, and a second `get-fruit-details` tool. This excerpt shows the view-bound path you need to understand first.
 
 ```typescript
-// index.ts excerpt; server, fruits, z, text, and widget are defined above.
-server.tool(
+// index.ts excerpt; server, fruits, and z are defined above.
+export const searchFruits = server.tool(
   {
-    name: "search-tools",
-    description: "Search for fruits and display the results in a widget",
-    schema: z.object({
+    name: "search-fruits",
+    title: "Search fruits",
+    description: "Search for fruits and display the results in a view",
+    inputSchema: z.object({
       query: z.string().optional().describe("Search query to filter fruits"),
     }),
     outputSchema: z.object({
@@ -84,84 +90,98 @@ server.tool(
       destructiveHint: false,
       openWorldHint: false,
     },
-    widget: {
+    view: {
       name: "product-search-result",
-      invoking: "Searching...",
-      invoked: "Results loaded",
+      description: "Product search results with carousel and details",
+      prefersBorder: true,
     },
   },
-  async ({ query }) => {
+  async ({ query = "" }, ctx) => {
     const results = fruits.filter(
       (fruit) =>
-        !query || fruit.fruit.toLowerCase().includes(query.toLowerCase()),
+        query === "" ||
+        fruit.fruit.toLowerCase().includes(query.toLowerCase()),
     );
 
-    return widget({
-      props: { query: query ?? "", results },
-      output: text(`Found ${results.length} fruits matching "${query ?? "all"}".`),
-    });
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    const data = { query, results };
+
+    if (!ctx.client.supportsViews()) {
+      return {
+        content: [{ type: "text", text: renderAsMarkdownTable(results) }],
+        structuredContent: data,
+      };
+    }
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Found ${results.length} fruits matching "${query || "all"}"`,
+        },
+      ],
+      structuredContent: data,
+    };
   },
 );
 
-await server.listen();
+export default server;
 ```
 
-`widget.name` must match the folder under `resources/`. In this template, `product-search-result` maps to `resources/product-search-result/widget.tsx`.
+`view.name` must match the folder under `views/`. In this template, `product-search-result` maps to `views/product-search-result/view.tsx`.
 
-The `props` object becomes widget rendering data. The `output` value is the short text result the model can read.
+The `structuredContent` object becomes view rendering data via `useToolContext()`. The `content` array is the short text result the model can read.
 
-## Inspect the React widget
+## Inspect the React view
 
-Open `resources/product-search-result/widget.tsx`. The widget reads the tool result with `useWidget()`.
+Open `views/product-search-result/view.tsx`. The view reads the tool result with `useToolContext()`.
 
-The generated widget includes metadata, layout components, display-mode controls, state, and tool calls. This excerpt shows the core data access pattern.
+The generated view includes a carousel, detail panel, display-mode controls, favorites, and tool calls. This excerpt shows the core data access pattern.
 
 ```tsx
-import { useWidget } from "mcp-use/react";
-
-type ProductSearchResultProps = {
-  query: string;
-  results: { fruit: string; color: string }[];
-};
+import { useToolContext } from "mcp-use/react";
 
 export default function ProductSearchResult() {
-  const { props, isPending } = useWidget<ProductSearchResultProps>();
+  const view = useToolContext<"search-fruits">();
 
-  if (isPending) {
-    return <div className="p-4">Loading...</div>;
+  if (view.status === "pending") {
+    return <div className="p-4">Searching…</div>;
   }
+
+  if (view.status === "error") {
+    return <div className="p-4">{view.error.message}</div>;
+  }
+
+  const { query, results } = view.toolOutput;
 
   return (
     <div className="p-4">
       <h2>
-        Results for "{props.query || "all"}" ({props.results.length})
+        Results for "{query || "all"}" ({results.length})
       </h2>
-      <ul>
-        {props.results.map((result) => (
-          <li key={result.fruit}>{result.fruit}</li>
-        ))}
-      </ul>
+      {/* carousel, details, accordion … */}
     </div>
   );
 }
 ```
 
-Widgets can render before the tool finishes. Check `isPending` before reading required fields from `props`.
+Views can render before the tool finishes. Check `view.status === "pending"` before reading `view.toolOutput`.
 
 ## Verify in the Inspector
 
-Use the Inspector to confirm that the server and widget work.
+Use the Inspector to confirm that the server and view work.
 
 1. Open `http://localhost:3000/inspector`.
 2. Go to the **Tools** tab.
-3. Select `search-tools`.
+3. Select `search-fruits`.
 4. Run the tool with `{ "query": "a" }` or `{}`.
-5. Confirm that the widget renders below the tool result.
+5. Confirm that the view renders below the tool result after the loading skeleton.
 
-If the tool runs but no widget appears, check that `widget.name` exactly matches the folder under `resources/` and that the handler returns `widget(...)`.
+If the tool runs but no view appears, check that `view.name` exactly matches the folder under `views/` and that the handler returns `structuredContent`.
 
 ## Next steps
 
-- Use [`useWidget()`](/typescript/api-reference/react/usewidget) to read props, state, host context, and display mode.
-- Use [`useCallTool()`](/typescript/api-reference/react/usecalltool) when a widget needs to call another MCP tool.
+- Use [`useToolContext()`](/typescript/api-reference/react/usetoolcontext) to read tool input, output, and lifecycle status.
+- Use [`useCallTool()`](/typescript/api-reference/react/usecalltool) when a view needs to call another MCP tool.
 - Configure [Content Security Policy](/typescript/mcp-apps/content-security-policy) before loading external APIs, images, scripts, embeds, or static assets.

@@ -24,6 +24,7 @@ import React, {
   type CSSProperties,
 } from "react";
 import { parseCustomProps } from "./parse-custom-props.js";
+import { injectOpenAiFileApis } from "./inject-openai-file-apis.js";
 import { resolveViewResource } from "./resolve-view-resource.js";
 import { buildViewSandboxBlobUrl } from "./sandbox-blob-url.js";
 import type {
@@ -45,6 +46,8 @@ const DEFAULT_HOST_CAPABILITIES: McpUiHostCapabilities = {
   serverResources: {},
   logging: {},
   updateModelContext: { text: {} },
+  // ponytail: always advertised; bridge.onmessage no-ops when onMessage unset
+  message: { text: {} },
 };
 
 function waitForSandboxProxyReady(iframe: HTMLIFrameElement): Promise<void> {
@@ -118,6 +121,7 @@ function ViewRendererBase({
   onResourceResolved,
   wrapTransport,
   toolCallTimeout = DEFAULT_TOOL_CALL_TIMEOUT,
+  mockOpenAiFileApis = false,
   className,
   testId = "mcp-app-frame",
   invoking,
@@ -170,6 +174,8 @@ function ViewRendererBase({
   sandboxUrlRef.current = sandboxUrl;
   const cspModeRef = useRef(cspMode);
   cspModeRef.current = cspMode;
+  const mockOpenAiFileApisRef = useRef(mockOpenAiFileApis);
+  mockOpenAiFileApisRef.current = mockOpenAiFileApis;
 
   const resolveSandboxUrl = useCallback((next: ResolvedViewResource): URL => {
     const custom = sandboxUrlRef.current;
@@ -488,7 +494,9 @@ function ViewRendererBase({
         if (disposed) return;
 
         await bridge.sendSandboxResourceReady({
-          html: resolved.html,
+          html: mockOpenAiFileApisRef.current
+            ? injectOpenAiFileApis(resolved.html)
+            : resolved.html,
           csp: resolved.csp,
           permissions: resolved.permissions,
         });
@@ -556,6 +564,7 @@ function ViewRendererBase({
     viewId,
     wrapTransport,
     toolCallTimeout,
+    mockOpenAiFileApis,
   ]);
 
   // Host context updates after init
@@ -742,6 +751,7 @@ function viewRendererAreEqual(
   if (prev.hostContext !== next.hostContext) return false;
   if (prev.hostCapabilities !== next.hostCapabilities) return false;
   if (prev.cspMode !== next.cspMode) return false;
+  if (prev.mockOpenAiFileApis !== next.mockOpenAiFileApis) return false;
   if (prev.className !== next.className) return false;
   if (prev.onReady !== next.onReady) return false;
   if (prev.onLifecycleChange !== next.onLifecycleChange) return false;
@@ -759,6 +769,7 @@ export {
 } from "./view-detection.js";
 export { parseCustomProps } from "./parse-custom-props.js";
 export { buildViewSandboxBlobUrl } from "./sandbox-blob-url.js";
+export { injectOpenAiFileApis } from "./inject-openai-file-apis.js";
 export type {
   ViewConnection,
   ViewDisplayMode,

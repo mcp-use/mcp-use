@@ -29,7 +29,7 @@ export function createLandingPageResponse(
     LandingPageOptions,
     "name" | "title" | "version" | "description"
   >,
-  branding: Pick<ServerBranding, "favicon">,
+  branding: Pick<ServerBranding, "favicon" | "faviconMimeType">,
   tools: Iterable<{ definition: LandingPageTool }>,
   prompts: Iterable<{ definition: LandingPagePrompt }>,
   resources: Iterable<{ definition: LandingPageResource }>
@@ -41,6 +41,9 @@ export function createLandingPageResponse(
     url,
     ...(branding.favicon !== undefined && {
       iconUrl: new URL("/favicon.ico", `${origin}/`).href,
+      ...(branding.faviconMimeType !== undefined && {
+        iconType: branding.faviconMimeType,
+      }),
     }),
     tools: Array.from(tools, (entry) => entry.definition),
     prompts: Array.from(prompts, (entry) => entry.definition),

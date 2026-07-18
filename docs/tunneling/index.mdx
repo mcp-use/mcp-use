@@ -14,6 +14,8 @@ https://<subdomain>.local.mcp-use.run/mcp
 
 Keep the terminal process running while you test. The public URL stops working when the process exits.
 
+With `mcp-use dev --tunnel` or `mcp-use start --tunnel`, if the tunnel relay drops the registration while dev is still running, the tunnel is restarted automatically and the same subdomain is reused when possible.
+
 ## Start a tunnel with mcp-use
 
 Use `mcp-use dev --tunnel` while you are developing:
@@ -90,6 +92,7 @@ When you started the tunnel with `mcp-use dev --tunnel` or `mcp-use start --tunn
 Tunnels are for local testing before deployment:
 
 - The tunnel is active only while the command is running.
+- With `mcp-use dev --tunnel` or `mcp-use start --tunnel`, a dropped tunnel registration is re-established automatically while dev runs.
 - Tunnels expire after 24 hours.
 - Inactive tunnels are cleaned up after 1 hour without activity.
 - Each IP address can create up to 10 tunnels per hour.

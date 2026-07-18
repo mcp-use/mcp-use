@@ -156,8 +156,8 @@ Perfect for getting started with all available features or building full-feature
 The mcp-apps template includes:
 
 - MCP server setup focused on OpenAI Apps SDK integration
-- OpenAI Apps SDK compatible widgets
-- Example display-weather widget
+- OpenAI Apps SDK compatible views under `views/<name>/view.tsx`
+- Example `product-search-result` view with carousel UI
 - Optimized for OpenAI assistant integration
 
 Ideal for building MCP servers that integrate with OpenAI's Apps SDK.

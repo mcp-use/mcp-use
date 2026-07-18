@@ -330,6 +330,8 @@ export interface LandingPageOptions {
 
   /** Optional absolute URL for the icon displayed above the server heading. */
   iconUrl?: string;
+  /** MIME type for the favicon link tag when known. */
+  iconType?: string;
 }
 
 /**
@@ -350,6 +352,7 @@ export function generateLandingPage(options: LandingPageOptions): string {
     prompts,
     resources,
     iconUrl,
+    iconType,
   } = options;
   const name = title ?? protocolName;
   const cursorDeepLink = generateCursorDeepLink(url, name);
@@ -428,7 +431,7 @@ export function generateLandingPage(options: LandingPageOptions): string {
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="${pageTitle}">
 <meta name="twitter:description" content="${metaDescription}">
-${iconUrl ? `<link rel="icon" href="${escapeHtml(iconUrl)}">` : ""}
+${iconUrl ? `<link rel="icon"${iconType ? ` type="${escapeHtml(iconType)}"` : ""} href="${escapeHtml(iconUrl)}">` : ""}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
