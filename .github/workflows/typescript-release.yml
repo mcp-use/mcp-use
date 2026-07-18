@@ -685,25 +685,51 @@ jobs:
         run: pnpm publish:beta
 
       - name: Verify npm versions and dist-tags
+        if: steps.publication.outputs.needed == 'true'
         working-directory: libraries/typescript
+        env:
+          VERIFY_ATTEMPTS: 12
+          VERIFY_DELAY_SECONDS: 10
         run: |
-          pnpm verify:beta-plan --output beta-release-after.json
-          node - <<'NODE'
-          const fs = require('fs')
+          set -euo pipefail
+          verify_release() {
+            pnpm verify:beta-plan --output beta-release-after.json
+            node - <<'NODE'
+          const fs = require('node:fs')
           const before = JSON.parse(fs.readFileSync('beta-release-plan.json', 'utf8'))
           const after = JSON.parse(fs.readFileSync('beta-release-after.json', 'utf8'))
           for (const release of after.releases) {
             const previous = before.releases.find((item) => item.name === release.name)
-            if (!release.published) throw new Error(`${release.name}@${release.version} is missing from npm`)
-            if (release.betaBefore !== release.version) throw new Error(`${release.name} beta tag is ${release.betaBefore}, expected ${release.version}`)
-            if (release.latestBefore !== previous.latestBefore) throw new Error(`${release.name} latest tag changed`)
+            if (!release.published) {
+              throw new Error(`${release.name}@${release.version} is missing from npm`)
+            }
+            if (release.betaBefore !== release.version) {
+              throw new Error(`${release.name} beta tag is ${release.betaBefore}, expected ${release.version}`)
+            }
+            if (release.latestBefore !== previous.latestBefore) {
+              throw new Error(`${release.name} latest tag changed`)
+            }
             if (JSON.stringify(release.nonBetaTagsBefore) !== JSON.stringify(previous.nonBetaTagsBefore)) {
               throw new Error(`${release.name} non-beta dist-tags changed: ${JSON.stringify({ before: previous.nonBetaTagsBefore, after: release.nonBetaTagsBefore })}`)
             }
           }
           NODE
+          }
+          for attempt in $(seq 1 "$VERIFY_ATTEMPTS"); do
+            if verify_release; then
+              echo "npm registry verified on attempt ${attempt}/${VERIFY_ATTEMPTS}"
+              exit 0
+            fi
+            if [ "$attempt" -eq "$VERIFY_ATTEMPTS" ]; then
+              echo "npm registry never caught up after ${VERIFY_ATTEMPTS} attempts"
+              exit 1
+            fi
+            echo "npm registry not ready (attempt ${attempt}/${VERIFY_ATTEMPTS}), retrying in ${VERIFY_DELAY_SECONDS}s..."
+            sleep "$VERIFY_DELAY_SECONDS"
+          done
 
       - name: Create and push package tags
+        if: steps.publication.outputs.needed == 'true'
         working-directory: libraries/typescript
         run: |
           pnpm changeset tag
