@@ -255,4 +255,28 @@ describe("MCPServer.fromOpenAPI", () => {
     );
     expect(result?.content).toEqual([{ type: "text", text: "updated" }]);
   });
+
+  it("handles empty JSON success responses", async () => {
+    const fetchMock = vi.fn(async () => {
+      return new Response(null, {
+        status: 204,
+        headers: { "content-type": "application/json" },
+      });
+    });
+    const server = MCPServer.fromOpenAPI({ spec, fetch: fetchMock });
+    const getTodo = server.registrations.tools.get("getTodo");
+
+    const result = await getTodo?.handler({ id: "todo_123" });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.com/v1/todos/todo_123",
+      {
+        method: "GET",
+        headers: {},
+        body: undefined,
+      }
+    );
+    expect(result?.structuredContent).toEqual({});
+    expect(result?.content).toEqual([{ type: "text", text: "{}" }]);
+  });
 });
