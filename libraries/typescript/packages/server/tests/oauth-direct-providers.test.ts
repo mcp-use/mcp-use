@@ -2,6 +2,7 @@ import { exportJWK, generateKeyPair, SignJWT } from "jose";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { oauthAuth0Provider } from "../src/oauth/auth0.js";
+import { oauthBetterAuthProvider } from "../src/oauth/better-auth.js";
 import { oauthClerkProvider } from "../src/oauth/clerk.js";
 import { wrapOAuthTokenVerifier } from "../src/oauth/internal.js";
 import { oauthKeycloakProvider } from "../src/oauth/keycloak.js";
@@ -17,6 +18,83 @@ afterEach(() => {
 });
 
 describe("direct OAuth providers", () => {
+  it("verifies Better Auth JWTs and preserves issuer path prefixes", async () => {
+    const { privateKey, publicKey } = await generateKeyPair("EdDSA");
+    const jwk = await exportJWK(publicKey);
+    jwk.kid = "better-auth-key";
+    globalThis.fetch = jwksFixture(jwk);
+
+    const issuer = "https://auth.example.test/platform/api/auth";
+    const provider = oauthBetterAuthProvider({ authURL: `${issuer}/` });
+    expect(provider.oauthMetadata).toMatchObject({
+      issuer,
+      authorization_endpoint: `${issuer}/oauth2/authorize`,
+      token_endpoint: `${issuer}/oauth2/token`,
+      registration_endpoint: `${issuer}/oauth2/register`,
+      jwks_uri: `${issuer}/jwks`,
+      code_challenge_methods_supported: ["S256"],
+    });
+
+    await expect(
+      wrapOAuthTokenVerifier(provider, protectedResource).verifyAccessToken(
+        await signedToken(
+          privateKey,
+          "better-auth-key",
+          issuer,
+          protectedResource.href,
+          {
+            sub: "anonymous-user-1",
+            azp: "mcp-client-1",
+            scope: "openid tools:read",
+            name: "Anonymous",
+            is_anonymous: true,
+            roles: ["guest"],
+            permissions: ["tools:read"],
+            sid: "session-1",
+          },
+          "EdDSA"
+        )
+      )
+    ).resolves.toMatchObject({
+      clientId: "mcp-client-1",
+      scopes: ["openid", "tools:read"],
+      extra: {
+        user: {
+          id: "anonymous-user-1",
+          name: "Anonymous",
+          isAnonymous: true,
+          roles: ["guest"],
+          sessionId: "session-1",
+        },
+        permissions: ["tools:read"],
+      },
+    });
+  });
+
+  it("validates Better Auth authURL and token audience", async () => {
+    expect(() =>
+      oauthBetterAuthProvider({ authURL: "http://auth.example.test/api/auth" })
+    ).toThrow(/HTTPS|localhost/);
+
+    const { privateKey, publicKey } = await generateKeyPair("RS256");
+    const jwk = await exportJWK(publicKey);
+    jwk.kid = "better-auth-key";
+    globalThis.fetch = jwksFixture(jwk);
+    const issuer = "http://localhost:3000/api/auth";
+    const provider = oauthBetterAuthProvider({ authURL: issuer });
+    const token = await signedToken(
+      privateKey,
+      "better-auth-key",
+      issuer,
+      "http://localhost:3000/other",
+      { sub: "user-1", azp: "client-1" }
+    );
+
+    await expect(
+      provider.createTokenVerifier(protectedResource).verifyAccessToken(token)
+    ).rejects.toMatchObject({ code: "invalid_token" });
+  });
+
   it("verifies Auth0 JWTs with cached remote JWKS and maps claims", async () => {
     const { privateKey, publicKey } = await generateKeyPair("RS256");
     const jwk = await exportJWK(publicKey);
@@ -414,10 +492,11 @@ function signedToken(
   kid: string,
   issuer: string,
   audience: string | undefined,
-  claims: Record<string, unknown>
+  claims: Record<string, unknown>,
+  algorithm = "RS256"
 ): Promise<string> {
   const token = new SignJWT(claims)
-    .setProtectedHeader({ alg: "RS256", kid })
+    .setProtectedHeader({ alg: algorithm, kid })
     .setIssuer(issuer)
     .setIssuedAt(now())
     .setExpirationTime(now() + 60);

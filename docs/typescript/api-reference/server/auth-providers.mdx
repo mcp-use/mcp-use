@@ -97,46 +97,43 @@ server.listen();
 Create a Better Auth OAuth provider for an MCP server.
 
 ```ts
-import { oauthBetterAuthProvider } from "mcp-use/server";
+import { oauthBetterAuthProvider } from "mcp-use/oauth/better-auth";
 ```
 
-Builds an `OAuthProvider` backed by Better Auth's OAuth Provider plugin. The MCP server only verifies tokens and serves metadata; clients discover Better Auth's endpoints via `.well-known` passthrough (`/oauth2/authorize`, `/oauth2/token`, `/oauth2/register`, `/jwks`) and talk to Better Auth directly. `authURL` falls back to `MCP_USE_OAUTH_BETTER_AUTH_URL`. Throws `Error` if `authURL` is missing (`"Better Auth authURL is required."`). The `config` argument is `Partial<BetterAuthProviderConfig>` and defaults to an empty object.
+Builds an `OAuthProvider` backed by Better Auth's OAuth Provider plugin. The MCP server advertises Better Auth's `/oauth2/authorize`, `/oauth2/token`, and `/oauth2/register` endpoints and verifies access-token JWTs against `/jwks`. Your application creates and mounts Better Auth separately.
 
 **Parameters**
 
-> <ParamField
->   body="config"
->   type="Partial<BetterAuthProviderConfig>"
->   default="{}"
-> >
+> <ParamField body="options" type="BetterAuthOAuthProviderOptions">
 >   {" "}
->   Optional Better Auth configuration. Values passed here override the
->   corresponding environment variables.{" "}
+>   Better Auth issuer URL and optional MCP resource metadata.{" "}
 > </ParamField>
 
 **Returns**
 
-> <ResponseField name="returns" type="OAuthProvider" />
+> <ResponseField name="returns" type="OAuthProvider<BetterAuthOAuthUser>" />
 
 **Signature**
 
 ```ts wrap
 function oauthBetterAuthProvider(
-  config?: Partial<BetterAuthProviderConfig>,
-): OAuthProvider;
+  options: BetterAuthOAuthProviderOptions,
+): OAuthProvider<BetterAuthOAuthUser>;
 ```
 
 **Example**
 
 ```ts wrap
-import { MCPServer, oauthBetterAuthProvider, object } from "mcp-use/server";
+import { MCPServer } from "mcp-use";
+import { oauthBetterAuthProvider } from "mcp-use/oauth/better-auth";
 
 const server = new MCPServer({
   name: "better-auth-oauth-example",
   version: "1.0.0",
   description: "MCP server with Better Auth OAuth authentication",
   oauth: oauthBetterAuthProvider({
-    authURL: "http://localhost:3000/api/auth",
+    authURL: "http://localhost:61843/api/auth",
+    resource: "http://localhost:43127/mcp",
   }),
 });
 ```
@@ -563,49 +560,33 @@ interface Auth0ProviderConfig {
 }
 ```
 
-### BetterAuthProviderConfig
+### BetterAuthOAuthProviderOptions
 
 Configuration for `oauthBetterAuthProvider`.
 
 ```ts
-import type { BetterAuthProviderConfig } from "mcp-use/server";
+import type { BetterAuthOAuthProviderOptions } from "mcp-use/oauth/better-auth";
 ```
 
-Configuration for the Better Auth provider. `authURL` falls back to `MCP_USE_OAUTH_BETTER_AUTH_URL`. The optional `getUserInfo` callback maps the verified JWT payload to a `UserInfo` object (sync or async). Note the `getUserInfo` parameter is typed `Record<string, unknown>`, which contains a curly brace; see the signature fence below.
+Configuration for the Better Auth provider. It includes the shared OAuth resource options (`resource`, `requiredScopes`, `scopesSupported`, `resourceName`, and `serviceDocumentationUrl`).
 
 **Properties**
 
 > <ParamField body="authURL" type="string" required="True">
 >   {" "}
 >   Base URL of the Better Auth OAuth server, e.g.
->   `http://localhost:3000/api/auth`.{" "}
-> </ParamField>
-> <ParamField body="verifyJwt" type="boolean">
->   {" "}
->   Whether to verify the JWT signature.{" "}
+>   `http://localhost:61843/api/auth`. This may be a different origin from the
+>   MCP resource server.{" "}
 > </ParamField>
 > <ParamField body="scopesSupported" type="string[]">
 >   {" "}
 >   Scopes advertised in metadata.{" "}
 > </ParamField>
-> <ParamField
->   body="getUserInfo"
->   type="(payload) => UserInfo | Promise<UserInfo>"
-> >
->   {" "}
->   Optional callback mapping a verified payload to user info.{" "}
-> </ParamField>
-
-**Signature**
+> **Signature**
 
 ```ts wrap
-interface BetterAuthProviderConfig {
-  authURL: string;
-  verifyJwt?: boolean;
-  scopesSupported?: string[];
-  getUserInfo?: (
-    payload: Record<string, unknown>,
-  ) => UserInfo | Promise<UserInfo>;
+interface BetterAuthOAuthProviderOptions extends OAuthResourceOptions {
+  authURL: URL | string;
 }
 ```
 

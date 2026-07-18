@@ -421,6 +421,7 @@ oauthAuth0Provider(...)
 oauthWorkOSProvider(...)
 oauthSupabaseProvider(...)
 oauthKeycloakProvider(...)
+oauthBetterAuthProvider(...)
 oauthCustomProvider(...)
 ```
 
@@ -735,13 +736,14 @@ Those adapters are conveniences for normal and custom composition. A framework-s
 
 ## Port provider adapters after the seam
 
-The first implementation phase supplies only the resource-server seam. The next phase ports five v1 provider adapters:
+The first implementation phase supplies only the resource-server seam. Provider adapters are:
 
 1. Clerk with `oauthClerkProvider`
 2. Auth0 with `oauthAuth0Provider`
 3. WorkOS with `oauthWorkOSProvider`
 4. Supabase with `oauthSupabaseProvider`
 5. Keycloak with `oauthKeycloakProvider`
+6. Better Auth with `oauthBetterAuthProvider`
 
 Each adapter verifies tokens, maps verified claims to a typed `user`, preserves the verified payload, provides normalized permissions, and advertises its authorization-server metadata. Each adapter must map claims rather than cast decoded payloads. No adapter offers `verifyJwt: false`.
 
@@ -749,7 +751,7 @@ JWT adapters share a `jose` implementation for remote JWKS caching and signature
 
 In direct mode, clients use the external authorization server's registration, authorization, and token endpoints. mcp-use serves protected-resource metadata, advertises the external authorization server, and verifies the resulting access token. The external authorization server must be advertised for the canonical resource and issue a token specifically bound to that resource, including the RFC 8707 `resource` indicator when applicable. mcp-use never handles authorization codes or client secrets in direct mode.
 
-Better Auth is explicitly deferred. Do not port `oauthBetterAuthProvider` as part of the resource-server adapter phase. Its v2 integration will be designed separately so a Better Auth instance can compose with `MCPServer` more directly than the v1 provider wrapper. The custom provider escape hatch remains available in the meantime, but its shape does not constrain the future first-class Better Auth API.
+Better Auth is integrated as a resource-server adapter via `oauthBetterAuthProvider({ authURL })`. The application owns the Better Auth instance and mounts its routes; the adapter advertises its OAuth endpoints and verifies its access-token JWTs.
 
 ## Use proxy mode as a local authorization server
 
@@ -931,7 +933,7 @@ Acceptance coverage must include:
 Migrate provider concepts and public context compatibility, not proxy behavior:
 
 - Port the Clerk, Auth0, WorkOS, Supabase, and Keycloak provider concepts and their typed user mappings.
-- Defer Better Auth to a separate integration design; do not carry the v1 provider API forward by default.
+- Keep Better Auth instance creation and route mounting application-owned; the provider accepts only the external `authURL` plus shared resource options.
 - Do not port or preserve v1 proxy behavior. Implement the explicit local authorization-server proxy design in this document.
 - Preserve `user`, `payload`, `accessToken`, `scopes`, and `permissions` on `ctx.auth`.
 - In direct mode, `accessToken` aliases verified SDK `AuthInfo.token`. In proxy mode, it is the signed local MCP JWT and never an upstream token.

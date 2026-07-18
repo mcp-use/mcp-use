@@ -1,0 +1,30 @@
+{
+  "name": "mcp-use-example-auth-better-auth",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Example: a mcp-use server authenticated by a standalone Hono and Better Auth OAuth server.",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "dev": "mcp-use dev --port 43127",
+    "dev:auth": "tsx watch src/auth-server.ts",
+    "build": "mcp-use build",
+    "start": "mcp-use start --port 43127",
+    "start:auth": "tsx src/auth-server.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@better-auth/oauth-provider": "^1.6.2",
+    "@hono/node-server": "^1.19.13",
+    "better-auth": "^1.6.2",
+    "hono": "^4.12.27",
+    "mcp-use": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "tsx": "^4.21.0",
+    "typescript": "7.0.1-rc"
+  }
+}

@@ -7,6 +7,7 @@ These examples use direct external authorization servers:
 - [WorkOS](./workos/)
 - [Supabase](./supabase/)
 - [Keycloak](./keycloak/)
+- [Better Auth](./better-auth/)
 
 Each server exposes only the `get-user-info` tool. It never issues, proxies, or
 forwards access tokens. For public deployments, set `MCP_URL` to the server
@@ -32,6 +33,7 @@ canonical origin. The shared handler uses `legacy: "stateless"`. Public and
 tunnel deployments must set `MCP_URL` to the server origin. Copy the provider
 `.env.example` to `.env` and configure it before starting the server.
 
-The Supabase example is an exception: it runs a standalone Hono app (via
-`tsx`) because it hosts Supabase's consent UI alongside the MCP endpoint, and
-therefore cannot use the `mcp-use` CLI.
+The Supabase example is an exception: it runs one standalone Hono app because
+it hosts auth routes alongside the MCP endpoint. The Better Auth example keeps
+the regular `mcp-use` server and runs its Hono authorization server as a second
+process.

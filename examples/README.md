@@ -84,7 +84,7 @@ When you clone this repository locally, you'll find `python/` and `typescript/` 
   - [DNS Rebinding](../libraries/typescript/packages/mcp-use/examples/server/features/dns-rebinding/) - DNS rebinding protection
 - **[OAuth Examples](../libraries/typescript/packages/mcp-use/examples/server/oauth/)** - OAuth implementations
   - [Auth0](../libraries/typescript/packages/mcp-use/examples/server/oauth/auth0/)
-  - [Better Auth](../libraries/typescript/packages/mcp-use/examples/server/oauth/better-auth/)
+  - [Better Auth (v2 + Hono)](../libraries/typescript/packages/server/examples/auth/better-auth/)
   - [Supabase](../libraries/typescript/packages/mcp-use/examples/server/oauth/supabase/)
   - [WorkOS](../libraries/typescript/packages/mcp-use/examples/server/oauth/workos/)
 - **[Deployment](../libraries/typescript/packages/mcp-use/examples/server/deployment/)** - Deployment examples
