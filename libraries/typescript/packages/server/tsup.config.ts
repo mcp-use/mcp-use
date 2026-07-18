@@ -20,6 +20,9 @@ export default defineConfig([
       // Landing markup stays lazy on the MCP path and directly importable
       // from `mcp-use/landing` without inflating the root runtime entry.
       landing: "src/landing.ts",
+      // Completion normalization is a synchronous internal dependency kept
+      // outside the root entry's independently enforced size budget.
+      "internal/resource-completion": "src/resource-completion.ts",
       // The `mcp-use` bin (package.json "bin"). Its source shebang is
       // preserved by esbuild, so dist/bin.js stays directly executable.
       bin: "src/bin.ts",

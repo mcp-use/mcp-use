@@ -1,5 +1,6 @@
 import type {
   Annotations,
+  CompleteResourceTemplateCallback,
   MetaObject,
   ReadResourceResult,
 } from "@modelcontextprotocol/server";
@@ -52,12 +53,52 @@ export type ResourceCallback<
   ctx: RequestContext<TUser, HasOAuth>
 ) => ReadResourceResult | Promise<ReadResourceResult>;
 
-/** Declares a parameterized resource matched by URI template. First argument to {@link MCPServer.resourceTemplate}. */
-export interface ResourceTemplateDefinition {
+/**
+ * A resource-template variable completer accepted by
+ * {@link MCPServer.resourceTemplate}.
+ *
+ * Static values are matched case-insensitively against the beginning of the
+ * current value. Callback completions use the official SDK callback shape and
+ * may inspect the other resolved string arguments in its optional context.
+ * The SDK limits wire results to 100 values and derives `total` and `hasMore`
+ * from the returned array.
+ */
+export type ResourceTemplateCompleter =
+  | readonly string[]
+  | CompleteResourceTemplateCallback;
+
+/**
+ * Per-variable completion map inferred from an RFC 6570 URI template.
+ *
+ * Literal templates accept only variables declared by the template. A
+ * widened `string` template accepts arbitrary string keys because its
+ * variables cannot be known at compile time.
+ *
+ * @typeParam TUriTemplate - URI template whose variables become map keys.
+ */
+export type ResourceTemplateCompletions<TUriTemplate extends string> =
+  string extends TUriTemplate
+    ? Partial<Record<string, ResourceTemplateCompleter>>
+    : Partial<
+        Record<
+          ExtractTemplateVariables<TUriTemplate>,
+          ResourceTemplateCompleter
+        >
+      >;
+
+/**
+ * Declares a parameterized resource matched by URI template.
+ *
+ * @typeParam TUriTemplate - Literal URI template used to infer read variables
+ * and completion keys.
+ */
+export interface ResourceTemplateDefinition<
+  TUriTemplate extends string = string,
+> {
   /** Template display name. */
   name: string;
   /** RFC 6570 URI template with variables, e.g. `"db://users/{id}"`. */
-  uriTemplate: string;
+  uriTemplate: TUriTemplate;
   /** Human-readable title (falls back to `name`). */
   title?: string;
   /** Human-readable description. */
@@ -75,6 +116,14 @@ export interface ResourceTemplateDefinition {
    * metadata must be returned by the callback on each entry's own `_meta`.
    */
   _meta?: MetaObject;
+  /**
+   * Optional completion providers keyed by URI-template variable.
+   *
+   * Static arrays use case-insensitive prefix matching. Dynamic callbacks may
+   * be synchronous or asynchronous and receive the current value plus the
+   * official completion context containing already-resolved arguments.
+   */
+  complete?: ResourceTemplateCompletions<TUriTemplate>;
 }
 
 /** Strip a leading RFC 6570 operator (`+`, `#`, `.`, `/`, `;`, `?`, `&`) from a template expression. */

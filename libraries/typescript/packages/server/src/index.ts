@@ -142,6 +142,8 @@ export type {
   ResourceCallback,
   ResourceDefinition,
   ResourceTemplateCallback,
+  ResourceTemplateCompleter,
+  ResourceTemplateCompletions,
   ResourceTemplateDefinition,
   TemplateVariableValue,
 } from "./resources.js";

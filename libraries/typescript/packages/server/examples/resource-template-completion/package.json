@@ -1,0 +1,24 @@
+{
+  "name": "mcp-use-example-resource-template-completion",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Example: static and contextual resource-template completion with mcp-use.",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "dev": "mcp-use dev",
+    "build": "mcp-use build",
+    "start": "mcp-use start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "mcp-use": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "typescript": "7.0.1-rc",
+    "vite": "^8.0.16"
+  }
+}
