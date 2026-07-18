@@ -99,9 +99,9 @@ cat package.json | grep "mcp-use"
 # Should show: "mcp-use": "workspace:*"
 ```
 
-**Test --canary flag:**
+**Test --sdk-version flag:**
 ```bash
-npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-canary --template ui --canary
+npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-canary --template ui --sdk-version canary
 cd test-canary
 cat package.json | grep "mcp-use"
 # Should show: "mcp-use": "canary"
@@ -149,12 +149,12 @@ The project includes a comprehensive GitHub Actions workflow (`.github/workflows
 - **Operating Systems:** Ubuntu, macOS, Windows
 - **Package Managers:** npm, yarn, pnpm
 - **Templates:** ui, uiresource, apps_sdk
-- **Flags:** default, --yarn, --npm, --pnpm, --dev, --canary
+- **Flags:** default, --yarn, --npm, --pnpm, --dev, --sdk-version
 
 **Test Types:**
 1. **Basic Tests** - Create project without installing dependencies
 2. **Package Manager Flag Tests** - Verify package manager detection and flags work correctly
-3. **Version Flag Tests** - Verify --dev, --canary flags set correct package versions
+3. **Version Flag Tests** - Verify --dev, --sdk-version flags set correct package versions
 4. **Full Installation Tests** - Create and install dependencies (slower, runs on subset of matrix)
 5. **Build Tests** - Verify the created project can be built
 
@@ -189,7 +189,7 @@ You can also manually trigger the workflow from the GitHub Actions tab.
 ### Package Version Management
 
 - ✅ `--dev` flag creates projects with `workspace:*` versions
-- ✅ `--canary` flag creates projects with `canary` versions
+- ✅ `--sdk-version <version>` flag pins `mcp-use` to the given npm version or dist-tag
 - ✅ Default (no flag) creates projects with `latest` or specific versions
 - ✅ All package dependencies use correct version format
 

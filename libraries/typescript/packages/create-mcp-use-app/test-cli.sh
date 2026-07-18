@@ -149,15 +149,23 @@ run_test() {
                     return 1
                 fi
                 echo -e "${GREEN}   ✓ Verified workspace:* versions${NC}"
-            elif grep -q "\-\-canary" <<< "$flag"; then
-                # Check for canary versions
+            elif grep -q "\-\-sdk-version" <<< "$flag"; then
+                # Check for pinned sdk version (e.g. canary from --sdk-version canary)
+                local expected_version
+                if grep -q "\-\-sdk-version canary" <<< "$flag"; then
+                    expected_version="canary"
+                elif grep -q "\-\-sdk-version 1.0.0" <<< "$flag"; then
+                    expected_version="1.0.0"
+                else
+                    expected_version=""
+                fi
                 local mcp_use_version=$(jq -r '.dependencies."mcp-use"' "$package_json")
-                if [[ "$mcp_use_version" != "canary" ]]; then
-                    echo -e "${RED}❌ FAILED: Expected canary version with --canary, got: $mcp_use_version${NC}"
+                if [[ -n "$expected_version" && "$mcp_use_version" != "$expected_version" ]]; then
+                    echo -e "${RED}❌ FAILED: Expected $expected_version with $flag, got: $mcp_use_version${NC}"
                     TESTS_FAILED=$((TESTS_FAILED + 1))
                     return 1
                 fi
-                echo -e "${GREEN}   ✓ Verified canary versions${NC}"
+                echo -e "${GREEN}   ✓ Verified sdk version: $mcp_use_version${NC}"
             else
                 # Check for latest or specific versions (not workspace:* or canary)
                 local mcp_use_version=$(jq -r '.dependencies."mcp-use"' "$package_json")
@@ -204,7 +212,9 @@ echo ""
 # Test version flags
 run_test "Version-Dev" npm starter "--dev" ""
 echo ""
-run_test "Version-Canary" npm starter "--canary" ""
+run_test "Version-Sdk-Canary" npm starter "--sdk-version canary" ""
+echo ""
+run_test "Version-Sdk-Semver" npm starter "--sdk-version 1.0.0" ""
 echo ""
 run_test "Version-Latest" npm starter "" ""
 echo ""

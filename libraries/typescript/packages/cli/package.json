@@ -26,10 +26,10 @@
     "dist"
   ],
   "engines": {
-    "node": ">=24.0.0"
+    "node": ">=20.19.0"
   },
   "scripts": {
-    "build": "rimraf dist && tsup src/index.ts --format esm --target node24 && tsc --emitDeclarationOnly --declaration",
+    "build": "rimraf dist && tsup src/index.ts --format esm --target node20 && tsc --emitDeclarationOnly --declaration",
     "test": "node --test tests/proxy.test.mjs"
   },
   "dependencies": {

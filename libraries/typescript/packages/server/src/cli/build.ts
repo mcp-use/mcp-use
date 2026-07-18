@@ -287,7 +287,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
         ssr: entry,
         outDir: paths.build,
         emptyOutDir: true,
-        target: "node24",
+        target: "node20",
         sourcemap: true,
         minify: false,
         rollupOptions: {
@@ -409,7 +409,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
       ssr: wrapperEntry,
       outDir: paths.build,
       emptyOutDir: false,
-      target: "node24",
+      target: "node20",
       sourcemap: true,
       minify: false,
       rollupOptions: {

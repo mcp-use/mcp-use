@@ -1,6 +1,9 @@
 {
   "name": "mcp-use server",
   "type": "module",
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "version": "1.0.0",
   "description": "MCP server with starter tools, resources, and prompts",
   "author": "",
@@ -27,7 +30,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "^24.13.2",
-    "typescript": "7.0.1-rc"
+    "@types/node": "^20.19.43",
+    "typescript": "^7.0.2"
   }
 }

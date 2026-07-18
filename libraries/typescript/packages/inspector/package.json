@@ -84,7 +84,7 @@
     "lint:pnpm": "pnpm lint:fix"
   },
   "engines": {
-    "node": "^20.19.0 || >=22.12.0"
+    "node": ">=20.19.0"
   },
   "peerDependencies": {
     "@mcp-use/client": "^2.0.0-alpha.0",
