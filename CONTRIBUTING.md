@@ -180,7 +180,7 @@ def function_name(param1: str, param2: int) -> bool:
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) 20 or higher (22 recommended)
+- [Node.js](https://nodejs.org/) 22 or higher
 - [pnpm](https://pnpm.io/installation) 10 or higher
 
 ### Monorepo Structure

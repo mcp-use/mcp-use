@@ -5,7 +5,7 @@
   "private": true,
   "description": "Example: generate an MCP server from the National Weather Service OpenAPI document.",
   "engines": {
-    "node": ">=20.19.0"
+    "node": ">=22.13.0"
   },
   "scripts": {
     "dev": "mcp-use dev",
@@ -17,7 +17,7 @@
     "mcp-use": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^20.19.43",
+    "@types/node": "^22.13.0",
     "typescript": "^7.0.2"
   }
 }
