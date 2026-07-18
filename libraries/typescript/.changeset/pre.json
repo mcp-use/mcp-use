@@ -11,6 +11,7 @@
   },
   "changesets": [
     "better-auth-v2-provider",
+    "bright-icons-smile",
     "build-v2-external-view-assets",
     "chatgpt-files-hook",
     "client-sdk-v2-migration",
@@ -22,6 +23,7 @@
     "localhost-managed-inspector-chat",
     "mcp-middleware-cors-mounting",
     "openapi-server-tools-v2",
+    "resource-template-completion",
     "strip-tools-list-schema-dialect",
     "v2-server-scaffold"
   ]

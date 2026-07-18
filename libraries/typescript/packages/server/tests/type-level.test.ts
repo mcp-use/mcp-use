@@ -17,6 +17,7 @@ import { MCPServer } from "../src/index.js";
 import type {
   Annotations,
   CallToolResult,
+  Icon,
   InputRequiredResult,
   LandingPageOptions,
   MetaObject,
@@ -30,6 +31,38 @@ import type {
   ToolResult,
 } from "../src/index.js";
 import type { FileMetadata, UseFilesResult } from "../src/react/index.js";
+
+describe("server branding config", () => {
+  it("uses the official MCP Icon shape", () => {
+    const icon: Icon = {
+      src: "brand/icon.svg",
+      mimeType: "image/svg+xml",
+      sizes: ["any"],
+      theme: "dark",
+    };
+    const config: ServerConfig = {
+      name: "branding-types",
+      version: "1.0.0",
+      websiteUrl: "https://example.com",
+      favicon: "brand/favicon.ico",
+      icons: [icon],
+    };
+    expectTypeOf(config.icons).toEqualTypeOf<Icon[] | undefined>();
+
+    const invalid: ServerConfig = {
+      name: "invalid-branding-types",
+      version: "1.0.0",
+      icons: [
+        {
+          src: "icon.svg",
+          // @ts-expect-error — theme is the official light/dark union
+          theme: "auto",
+        },
+      ],
+    };
+    expect([config, invalid]).toBeDefined();
+  });
+});
 
 const outputSchema = z.object({ answer: z.number() });
 

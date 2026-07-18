@@ -239,7 +239,7 @@ Target user `package.json` shape:
 
 ```
 .mcp-use/
-├─ build/        ← compiled server + manifest.json (this spec); views add build/views/ (assets + public/, VIEWS_SPEC.md)
+├─ build/        ← compiled server + manifest.json; build/views/public/ carries public assets used by views or branding
 ├─ generated/    ← output of the typegen escape-hatch command — reserved (VIEWS_SPEC.md § Typegen, demoted)
 ├─ cache/        ← disposable dev/build scratch (vite cacheDir)
 ├─ state/        ← mutable runtime state (e.g. tunnel.json)
@@ -266,7 +266,7 @@ Writes `.mcp-use/build/manifest.json`:
 { "buildId": "…", "entryPoint": "index.js", "createdAt": "…" }
 ```
 
-`buildId` is a random hex id and `createdAt` an ISO timestamp. `start` consumes `entryPoint`; inspector enablement remains solely in the built server's `ServerConfig` and is not duplicated in the manifest. Views extend this manifest with a `views` map (`VIEWS_SPEC.md` § Manifest) and copy the project-root `public/` directory into `build/views/public/` when present.
+`buildId` is a random hex id and `createdAt` an ISO timestamp. `start` consumes `entryPoint`; inspector enablement remains solely in the built server's `ServerConfig` and is not duplicated in the manifest. Views extend this manifest with a `views` map (`VIEWS_SPEC.md` § Manifest). Every build copies the project-root `public/` directory into `build/views/public/` when present, including tool-only servers whose favicon or MCP icons reference local public files.
 
 When `MCP_ASSETS_URL` is set, view manifest asset paths are rewritten to full CDN URLs at build time using `basePath` from the server entry (upload `build/views/` separately). Runtime env: `MCP_URL` (server origin), `MCP_ASSETS_URL` (assets prefix), `CSP_URLS` / `CSP_*_DOMAINS` (global CSP — see `VIEWS_SPEC.md`).
 

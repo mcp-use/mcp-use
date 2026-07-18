@@ -5,6 +5,7 @@ import {
   type LandingPageResource,
   type LandingPageTool,
 } from "./landing.js";
+import type { ServerBranding } from "./branding.js";
 import { resolveServerOrigin } from "./views/origin.js";
 
 /**
@@ -13,6 +14,7 @@ import { resolveServerOrigin } from "./views/origin.js";
  * @param request - Classified HTML GET or HEAD request.
  * @param basePath - Exact MCP endpoint path.
  * @param config - Server identity and description.
+ * @param branding - Normalized browser and MCP identity branding.
  * @param tools - Frozen tool registry values.
  * @param prompts - Frozen prompt registry values.
  * @param resources - Frozen static-resource registry values.
@@ -27,6 +29,7 @@ export function createLandingPageResponse(
     LandingPageOptions,
     "name" | "title" | "version" | "description"
   >,
+  branding: Pick<ServerBranding, "favicon">,
   tools: Iterable<{ definition: LandingPageTool }>,
   prompts: Iterable<{ definition: LandingPagePrompt }>,
   resources: Iterable<{ definition: LandingPageResource }>
@@ -36,6 +39,9 @@ export function createLandingPageResponse(
   const html = generateLandingPage({
     ...config,
     url,
+    ...(branding.favicon !== undefined && {
+      iconUrl: new URL("/favicon.ico", `${origin}/`).href,
+    }),
     tools: Array.from(tools, (entry) => entry.definition),
     prompts: Array.from(prompts, (entry) => entry.definition),
     resources: Array.from(resources, (entry) => entry.definition),

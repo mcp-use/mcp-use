@@ -43,6 +43,9 @@ const server = new MCPServer({
   version: "1.0.0",
   title: "My Server", // optional
   description: "…", // optional; forwarded as implementation metadata
+  websiteUrl: "https://example.com/my-server", // optional implementation metadata
+  favicon: "brand/favicon.ico", // optional; public/ path, http(s), or image data URL
+  icons: [{ src: "brand/icon.svg", mimeType: "image/svg+xml" }], // optional official Icon[]
   instructions: "…", // optional
   basePath: "/mcp", // optional, default "/mcp"
   host: "127.0.0.1", // optional; "0.0.0.0" for public listen()
@@ -128,6 +131,7 @@ await server.listen(3000); // Node HTTP (default)
 const handler = server.getHandler(); // universal web handler (Vercel, Hono, Workers)
 await server.getNodeHandler(); // Node (req, res) for custom http.Server composition
 server.basePath; // readonly accessor (default "/mcp") — lets tooling introspect the mount point
+server.branding; // immutable normalized favicon/icons/websiteUrl
 ```
 
 ### Mounting in your framework
@@ -154,6 +158,18 @@ Callback context (`ctx`, second parameter): `{ signal, request?, client, elicit,
 
 For the common human-input path, `await ctx.elicit(key, message, schemaOrUrl)` combines correlation and Standard Schema validation. Return `result` when `status === "required"`; accepted form values are inferred from the schema, while decline and cancel remain explicit. Invalid accepted form content produces another `required` result. `ctx.reportProgress(...)` is request-scoped and returns `false` when the caller supplied no progress token.
 
+### Server identity and browser branding
+
+`ServerConfig.websiteUrl?: string` and `ServerConfig.icons?: Icon[]` use the official SDK `Implementation` and `Icon` fields without private `_meta`. `Icon` is re-exported from `mcp-use` and has the canonical shape `{ src: string; mimeType?: string; sizes?: string[]; theme?: "light" | "dark" }`. `websiteUrl` must be a non-empty absolute HTTP(S) URL. `icons` preserves author order on the wire; an empty array is valid and emits `icons: []` while selecting no favicon.
+
+Icon and favicon sources accept exactly three forms: a safe path relative to project `public/`, an absolute HTTP(S) URL, or an `image/*` data URL. Local paths must not start with `/`, contain `..` segments, backslashes, a query, a fragment, or empty path segments. Local icon sources become request-scoped absolute implementation URLs under `<assets-base><basePath>/_mcp-use/public/<encoded-path>` (`basePath: "/"` produces `/_mcp-use/public/…`); HTTP(S) and data sources pass through unchanged. `MCP_ASSETS_URL` and the existing request/proxy origin resolution govern `<assets-base>`, keeping identity metadata aligned with view public assets. Invalid values fail at `MCPServer` construction.
+
+`ServerConfig.favicon?: string` controls the conventional browser route. A present, valid `favicon` always wins. Otherwise a non-empty `icons` list selects the first match in this order: ICO (MIME or URL pathname), PNG declaring `16x16` or `32x32`, any PNG (MIME or URL pathname), then the first icon. URL pathnames are inspected without query strings and MIME declarations participate, a deliberate hardening over v1's case-sensitive `src.endsWith(...)` checks. An empty `icons` array selects nothing. An explicitly empty `favicon` is invalid rather than silently treated as absent.
+
+`GET` and `HEAD /favicon.ico` remain root-level regardless of `basePath`, matching browser discovery and v1. A local source streams the selected file from `public/` in dev/direct use or `.mcp-use/build/views/public/` in production; `mcp-use build` copies `public/` there even for servers without views. An image data URL is decoded and served directly. An HTTP(S) source returns `307` with `Location` and is never fetched server-side. Local/data success uses the selected or extension-derived image MIME, `Cache-Control: public, max-age=31536000, immutable`, and `X-Content-Type-Options: nosniff`; redirects use `public, max-age=300`. Missing local files return `404` with `Cache-Control: no-store`. Unsupported methods return `405` with `Allow: GET, HEAD`. Public-file resolution verifies containment and a regular file after decoding the URL path, rejecting traversal and malformed encodings.
+
+Route order is favicon, public assets, built view assets, inspector, then the exact MCP route; OAuth discovery middleware remains outside this table and the bearer gate still wraps only the exact MCP endpoint. Thus favicon/public assets and `${basePath}/inspector` stay public alongside OAuth metadata. `listen()` and `getHandler()` use the same composed fetch handler. When configured, global `cors` middleware owns the branding responses' CORS headers; otherwise shared view/public assets retain their existing wildcard header. The inspector shell emits `<link rel="icon" href="/favicon.ico">` only when a favicon is selected. The landing page uses the request-resolved absolute `/favicon.ico` URL for both its browser favicon and hero icon. Views obtain server icons and `websiteUrl` through standard MCP initialization metadata; view documents do not invent another branding channel. `MCPServer.branding` exposes the frozen normalized `{ favicon?, icons?, websiteUrl? }` so browser integrations do not duplicate selection or file handling.
+
 **Deltas vs the old package (protocol- or SDK-forced):**
 
 1. `completable(...)` must wrap the _outer_ schema: `.describe()` etc. go on the schema argument (`completable(z.string().describe("…"), values)`), because zod refinements clone the schema and drop the SDK's completion marker. `.optional()` after `completable()` still works (the SDK unwraps optionals).
@@ -171,13 +187,13 @@ For the common human-input path, `await ctx.elicit(key, message, schemaOrUrl)` c
 
 The exact MCP `basePath` also serves a generated HTML landing page for browser navigation. A request is a landing-page request only when its method is `GET` or `HEAD` and an `Accept` media range explicitly names `text/html` with a non-zero quality value. `HEAD` returns the same status and headers as `GET` with no body. Requests with JSON, event-stream, wildcard-only, missing, or other Accept values continue to the MCP mount unchanged; in particular, legacy stateless GET/HEAD probes retain their existing `204`, DELETE retains its existing behavior, and every POST remains MCP protocol traffic.
 
-The document preserves the authoritative v1 landing frontend: the WebGL mesh-gradient hero, rail/card layout, Outfit branding, endpoint copy control, hosted Manufact Inspector deep link, GitHub badge, Claude Code/Cursor/VS Code/VS Code Insiders/ChatGPT tabs, optional Primitives card, and Manufact footer. Its automatic server inputs are `title ?? name`, `version`, `description`, the request-resolved public origin plus `basePath`, and the registered tools, prompts, and static resources. CSS, WebGL, tabs, and copy behavior are inline; the v1 Google Fonts stylesheet and GitHub shields image remain external. Every caller-controlled value is encoded for its destination context: HTML text and attributes are entity-escaped, inline JSON preserves raw metadata while escaping HTML end-tag characters, deep-link query values are URL-encoded, and the copyable Claude Code endpoint is a quoted POSIX shell argument. v1-only `favicon`, `icons`, and `websiteUrl` are not added to `ServerConfig`.
+The document preserves the authoritative v1 landing frontend: the WebGL mesh-gradient hero, rail/card layout, Outfit branding, endpoint copy control, hosted Manufact Inspector deep link, GitHub badge, Claude Code/Cursor/VS Code/VS Code Insiders/ChatGPT tabs, optional Primitives card, and Manufact footer. Its automatic server inputs are `title ?? name`, `version`, `description`, the request-resolved public origin plus `basePath`, the normalized selected favicon when present, and the registered tools, prompts, and static resources. CSS, WebGL, tabs, and copy behavior are inline; the v1 Google Fonts stylesheet and GitHub shields image remain external. Every caller-controlled value is encoded for its destination context: HTML text and attributes are entity-escaped, inline JSON preserves raw metadata while escaping HTML end-tag characters, deep-link query values are URL-encoded, and the copyable Claude Code endpoint is a quoted POSIX shell argument. `favicon`, `icons`, and `websiteUrl` follow the server-identity and browser-branding contract above.
 
 Registration data comes from the same registry that `listen()` or `getHandler()` freezes when it first mounts the app. Late registrations throw, so a page can never advertise primitives that the per-request SDK factory cannot replay.
 
 Without OAuth, the landing page is public. With OAuth, it passes through the exact endpoint bearer gate by default. `ServerConfig.publicLandingPage: true` bypasses bearer authentication only for the classified HTML GET/HEAD request; every protocol-shaped request remains protected. The complete auth interaction is specified in `AUTH_SPEC.md`.
 
-`generateLandingPage(options)` is exported from `mcp-use/landing` for applications that need the same document outside `MCPServer`. It takes one `LandingPageOptions` object instead of v1's positional argument list; the object form keeps optional v2 inputs explicit and extensible, and additionally permits an `iconUrl` for direct rendering. `MCPServer` dynamically imports this sibling entry only for classified HTML navigation, so ordinary MCP requests do not evaluate or inflate the page renderer.
+`generateLandingPage(options)` is exported from `mcp-use/landing` for applications that need the same document outside `MCPServer`. It takes one `LandingPageOptions` object instead of v1's positional argument list; the object form keeps optional v2 inputs explicit and extensible, and additionally permits an `iconUrl` for its favicon link and hero image. The built-in handler supplies the request-resolved absolute `/favicon.ico` URL whenever normalized branding selected a favicon. `MCPServer` dynamically imports this sibling entry only for classified HTML navigation, so ordinary MCP requests do not evaluate or inflate the page renderer.
 
 **Intentionally absent from the core primitive layer:** legacy push-style sampling/roots APIs, telemetry, typegen, and stdio serving. MCP operation middleware (`server.use('mcp:…')`) and observer events (`server.on('mcp:…')`) are implemented; HTTP middleware adapters and custom first-class HTTP routes are not — use your fetch-native framework. OpenAPI import is an integration built on top of `tool()`, described below; it does not add a second registration path. Views are governed by `VIEWS_SPEC.md`. Typed `ctx.elicit` and the raw v2 MRTR primitives (`inputRequired`, `inputResponse`, `acceptedContent`) operate through explicit `input_required` returns without introducing session state.
 
@@ -298,4 +314,3 @@ server.tool(
 
 - Sampling/roots: omit at v2.0 vs `@deprecated` legacy support (elicitation & context phase).
 - `posthog-node`: hard dep with opt-out vs optional (cutover phase).
-- Old `ServerConfig` fields not yet carried (`favicon`, `icons`, `websiteUrl`, OAuth): added with the features that read them.

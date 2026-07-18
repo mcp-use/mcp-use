@@ -95,6 +95,11 @@ describe("runBuild", () => {
   it("emits an ESM bundle + manifest to .mcp-use/build and preserves the default export", async () => {
     const cwd = copyFixture("build");
     dirs.push(cwd);
+    mkdirSync(join(cwd, "public"), { recursive: true });
+    writeFileSync(
+      join(cwd, "public", "icon.svg"),
+      '<svg xmlns="http://www.w3.org/2000/svg"></svg>'
+    );
 
     await runBuild({ cwd });
 
@@ -117,6 +122,9 @@ describe("runBuild", () => {
     expect(new Date(manifest.createdAt).getTime()).not.toBeNaN();
     expect(manifest.inspector).toBe(false);
     expect("views" in manifest).toBe(false);
+    expect(
+      readFileSync(join(buildDir, "views", "public", "icon.svg"), "utf8")
+    ).toContain("<svg");
 
     // packages:"external" semantics — bare imports stay external, only the
     // user's source is bundled.
