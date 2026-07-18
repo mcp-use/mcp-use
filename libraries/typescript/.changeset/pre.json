@@ -22,6 +22,7 @@
     "localhost-managed-inspector-chat",
     "mcp-middleware-cors-mounting",
     "openapi-server-tools-v2",
+    "resource-template-completion",
     "strip-tools-list-schema-dialect",
     "v2-server-scaffold"
   ]
