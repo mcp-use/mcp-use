@@ -21,6 +21,7 @@ import {
   isStdoutTty,
 } from "../utils/format.js";
 import { parsePromptArgs, parseToolArgs } from "../utils/parse-args.js";
+import { parseStdioTarget } from "../utils/stdio-target.js";
 import {
   buildOAuthProvider,
   isUnauthorized,
@@ -171,9 +172,7 @@ async function connectCommand(
     const cliClientInfo = getCliClientInfo();
 
     if (options.stdio) {
-      const parts = target.split(" ");
-      const command = parts[0];
-      const args = parts.slice(1);
+      const { command, args } = parseStdioTarget(target);
 
       console.error(
         formatInfo(`Connecting to stdio server: ${command} ${args.join(" ")}`)
