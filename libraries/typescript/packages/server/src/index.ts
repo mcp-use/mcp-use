@@ -91,6 +91,9 @@ export type {
 } from "@modelcontextprotocol/server";
 
 export type { InspectorOptions, ServerConfig, CorsOptions } from "./config.js";
+export type { ServerBranding } from "./branding.js";
+/** Official MCP icon shape used by {@link ServerConfig.icons}. */
+export type { Icon } from "@modelcontextprotocol/server";
 export type {
   MiddlewareContext,
   McpCompleteEventListenerFn,

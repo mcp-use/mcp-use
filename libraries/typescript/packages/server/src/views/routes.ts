@@ -63,10 +63,10 @@ export function createViewAssetsHandler(
     if (diskPath === null) {
       return new Response("Not Found", { status: 404 });
     }
-    return await servePublicFile(
-      diskPath,
-      options?.deferCors === true ? { deferCors: true } : {}
-    );
+    return await servePublicFile(diskPath, {
+      ...(options?.deferCors === true && { deferCors: true }),
+      ...(request.method === "HEAD" && { head: true }),
+    });
   };
 }
 
@@ -83,16 +83,22 @@ export function createViewAssetsHandler(
  * @param views - Primed view registry; empty skips mounting.
  * @param options - When `dev` is true, the public route reads from
  *   `<projectRoot>/public` instead of `.mcp-use/build/views/public/`.
- *   `projectRoot` defaults to `process.cwd()`.
+ *   `projectRoot` defaults to `process.cwd()`. `enabled` mounts the shared
+ *   public route for local server branding even when no views are registered.
  *
  * @internal
  */
 export function createViewPublicHandler(
   basePath: string,
   views: ReadonlyMap<string, ViewManifestEntry>,
-  options?: { dev?: boolean; projectRoot?: string; deferCors?: boolean }
+  options?: {
+    dev?: boolean;
+    projectRoot?: string;
+    deferCors?: boolean;
+    enabled?: boolean;
+  }
 ): FetchHandler | undefined {
-  if (views.size === 0) {
+  if (views.size === 0 && options?.enabled !== true) {
     return undefined;
   }
 
@@ -109,7 +115,13 @@ export function createViewPublicHandler(
     }
 
     const pathname = pathnameOf(request);
-    const subpath = pathname.slice(publicPrefix.length + 1);
+    const encodedSubpath = pathname.slice(publicPrefix.length + 1);
+    let subpath: string;
+    try {
+      subpath = decodeURIComponent(encodedSubpath);
+    } catch {
+      return new Response("Not Found", { status: 404 });
+    }
     if (subpath.length === 0) {
       return new Response("Not Found", { status: 404 });
     }
@@ -121,10 +133,10 @@ export function createViewPublicHandler(
     if (diskPath === null) {
       return new Response("Not Found", { status: 404 });
     }
-    return await servePublicFile(
-      diskPath,
-      options?.deferCors === true ? { deferCors: true } : {}
-    );
+    return await servePublicFile(diskPath, {
+      ...(options?.deferCors === true && { deferCors: true }),
+      ...(request.method === "HEAD" && { head: true }),
+    });
   };
 }
 

@@ -14,6 +14,13 @@ import {
 import type { Server as NodeHttpServer } from "node:http";
 import type { AuthInfo } from "@modelcontextprotocol/server";
 
+import {
+  createFaviconHandler,
+  hasLocalBrandingAsset,
+  normalizeServerBranding,
+  resolveImplementationIcons,
+  type ServerBranding,
+} from "./branding.js";
 import { assertServerConfig, type ServerConfig } from "./config.js";
 import {
   toAuthenticatedRequestContext,
@@ -186,6 +193,7 @@ interface NodeHttpListener {
  */
 export class MCPServer<TUser = never> {
   readonly #config: ServerConfig<TUser>;
+  readonly #branding: ReturnType<typeof normalizeServerBranding>;
   readonly #tools = new Map<string, ToolEntry<TUser>>();
   readonly #resources = new Map<string, ResourceEntry<TUser>>();
   readonly #resourceTemplates = new Map<string, ResourceTemplateEntry<TUser>>();
@@ -260,6 +268,7 @@ export class MCPServer<TUser = never> {
   constructor(config: ServerConfig<TUser>) {
     assertServerConfig(config);
     this.#config = config;
+    this.#branding = normalizeServerBranding(config);
     if (config.oauth !== undefined) {
       const mcpUrl =
         typeof process === "undefined" ? undefined : process.env["MCP_URL"];
@@ -283,6 +292,25 @@ export class MCPServer<TUser = never> {
    */
   get basePath(): string {
     return this.#basePath();
+  }
+
+  /**
+   * Immutable normalized branding shared by MCP identity and browser pages.
+   *
+   * `favicon` is the final source after explicit-favicon and icon-selection
+   * precedence. Landing-page integrations can use this accessor and link to
+   * the server's root-level `/favicon.ico` route without reading private
+   * configuration or depending on the inspector/view layers.
+   *
+   * @example
+   * ```ts
+   * if (server.branding.favicon) {
+   *   console.log("Browser favicon: /favicon.ico");
+   * }
+   * ```
+   */
+  get branding(): ServerBranding {
+    return this.#branding;
   }
 
   /**
@@ -881,6 +909,7 @@ export class MCPServer<TUser = never> {
             request,
             basePath,
             this.#config,
+            this.#branding,
             this.#tools.values(),
             this.#prompts.values(),
             this.#resources.values()
@@ -897,9 +926,25 @@ export class MCPServer<TUser = never> {
         handler: FetchHandler;
       }> = [];
 
-      const viewHandler = createViewPublicHandler(basePath, this.#views, {
-        dev: this.#viewsDevMode,
+      const brandingDevMode = this.#viewsPrimed
+        ? this.#viewsDevMode
+        : process.env["NODE_ENV"] !== "production";
+      const faviconHandler = createFaviconHandler(this.#branding, {
+        dev: brandingDevMode,
         projectRoot: this.#viewsProjectRoot,
+        deferCors: deferViewCors,
+      });
+      if (faviconHandler !== undefined) {
+        routes.push({
+          match: (request) => new URL(request.url).pathname === "/favicon.ico",
+          handler: faviconHandler,
+        });
+      }
+
+      const viewHandler = createViewPublicHandler(basePath, this.#views, {
+        dev: this.#viewsPrimed ? this.#viewsDevMode : brandingDevMode,
+        projectRoot: this.#viewsProjectRoot,
+        enabled: hasLocalBrandingAsset(this.#branding),
         deferCors: deferViewCors,
       });
       if (viewHandler !== undefined) {
@@ -936,6 +981,7 @@ export class MCPServer<TUser = never> {
       const inspectorHandler = createInspectorHandler(this.#config.inspector, {
         serverName: this.#config.name,
         basePath,
+        ...(faviconHandler !== undefined && { faviconHref: "/favicon.ico" }),
       });
       if (inspectorHandler !== undefined) {
         routes.push({
@@ -1048,6 +1094,16 @@ export class MCPServer<TUser = never> {
         version,
         ...(title !== undefined && { title }),
         ...(description !== undefined && { description }),
+        ...(this.#branding.websiteUrl !== undefined && {
+          websiteUrl: this.#branding.websiteUrl,
+        }),
+        ...(this.#branding.icons !== undefined && {
+          icons: resolveImplementationIcons(
+            this.#branding.icons,
+            ctx.requestInfo,
+            this.#basePath()
+          ),
+        }),
       },
       {
         capabilities: {

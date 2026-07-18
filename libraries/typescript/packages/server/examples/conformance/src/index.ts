@@ -33,6 +33,14 @@ const server = new MCPServer({
   version: "1.0.0",
   description:
     "MCP Conformance Test Server implementing all supported features.",
+  websiteUrl: "https://mcp-use.com",
+  icons: [
+    {
+      src: "icon.svg",
+      mimeType: "image/svg+xml",
+      sizes: ["any"],
+    },
+  ],
   logging: { level: "debug" },
   ...(process.env.INSPECTOR_CDN_BASE && {
     inspector: {

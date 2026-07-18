@@ -296,6 +296,16 @@ export async function runBuild(options: BuildOptions): Promise<void> {
       },
     });
 
+    // Branding may reference project-public icon files even when the server
+    // has no views. Keep the runtime public-asset location identical in both
+    // shapes so `mcp-use start` and serverless built entries behave alike.
+    const publicSrc = join(options.cwd, "public");
+    if (existsSync(publicSrc)) {
+      await cp(publicSrc, join(paths.build, "views/public"), {
+        recursive: true,
+      });
+    }
+
     const manifest: BuildManifest = {
       buildId: randomBytes(8).toString("hex"),
       entryPoint: BUILD_ENTRY_NAME,

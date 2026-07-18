@@ -1,4 +1,4 @@
-import type { ServerOptions } from "@modelcontextprotocol/server";
+import type { Icon, ServerOptions } from "@modelcontextprotocol/server";
 
 import type { LoggingOptions } from "./logging.js";
 import type { OAuthProvider } from "./oauth/index.js";
@@ -50,6 +50,74 @@ interface BaseServerConfig {
    * implementation metadata during negotiation.
    */
   description?: string;
+  /**
+   * Browser favicon source.
+   *
+   * Accepts a safe path relative to the project `public/` directory, an
+   * absolute HTTP(S) URL, or an image data URL. The selected image is served
+   * at the root-level `/favicon.ico` route. When omitted, the `icons` field
+   * selects the favicon using ICO, small PNG, any PNG, then first-icon order.
+   * An explicit value always wins; an empty string is invalid.
+   *
+   * @defaultValue Inferred from `icons`, or no favicon when `icons` is absent
+   * or empty.
+   * @throws TypeError When the value is empty, uses an unsupported URL scheme,
+   * or is an unsafe local path.
+   *
+   * @example
+   * ```ts
+   * new MCPServer({
+   *   name: "my-server",
+   *   version: "1.0.0",
+   *   favicon: "brand/favicon.svg",
+   * });
+   * ```
+   */
+  favicon?: string;
+  /**
+   * Server icons reported to clients in MCP implementation metadata.
+   *
+   * Uses the official SDK {@link Icon} shape. Each `src` accepts a safe path
+   * relative to `public/`, an absolute HTTP(S) URL, or an image data URL.
+   * Local paths become request-scoped absolute URLs under
+   * `${basePath}/_mcp-use/public/`; author order is preserved on the wire.
+   * When `favicon` is omitted, these icons also select `/favicon.ico`.
+   * An empty array is valid and selects no favicon.
+   *
+   * @defaultValue `undefined`
+   * @throws TypeError When an icon has an invalid source, MIME type, sizes,
+   * or theme.
+   *
+   * @example
+   * ```ts
+   * new MCPServer({
+   *   name: "my-server",
+   *   version: "1.0.0",
+   *   icons: [
+   *     { src: "brand/icon.svg", mimeType: "image/svg+xml" },
+   *     { src: "brand/icon-32.png", mimeType: "image/png", sizes: ["32x32"] },
+   *   ],
+   * });
+   * ```
+   */
+  icons?: Icon[];
+  /**
+   * Absolute HTTP(S) URL for the server's website or documentation, reported
+   * to clients in MCP implementation metadata.
+   *
+   * @defaultValue `undefined`
+   * @throws TypeError When the value is empty, relative, or not HTTP(S).
+   *
+   * @example
+   * ```ts
+   * new MCPServer({
+   *   name: "my-server",
+   *   version: "1.0.0",
+   *   websiteUrl: "https://example.com/my-server",
+   * });
+   * ```
+   */
+  websiteUrl?: string;
   /** Usage instructions surfaced to the model by clients. */
   instructions?: string;
   /**
