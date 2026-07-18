@@ -16,7 +16,7 @@ The v2 server is fetch-native. mcp-use provides **MCP operation middleware** (`s
 | | **Handlers** `server.tool()` | **Middleware** `server.use('mcp:…')` | **Events** `server.on('mcp:…')` |
 |---|---|---|---|
 | Purpose | Implement the operation | Intercept: auth, rate-limit, mutate params | Observe: logging, metrics, audit |
-| Control flow | Returns result | Must call `next()`; can short-circuit | No `next()`; cannot block |
+| Control flow | Returns result | Calls `next()` or returns a method-valid short circuit | No `next()`; cannot block |
 | Mutate `ctx.params` | N/A | Yes | No (read-only snapshot) |
 
 ## Mounting
@@ -54,17 +54,17 @@ Custom HTTP routes mount in your framework **before** or **alongside** the MCP h
 Register with `server.use('mcp:…', handler)`. Patterns:
 
 - `mcp:*` — every MCP operation
-- `mcp:tools/*` — prefix match
 - `mcp:tools/call` — exact match
 
 Middleware runs in FIFO order (first registered = outermost). `ctx.params` is mutable before `next()`. Throwing rejects the request (surfaced as an MCP error result).
 
+Exact patterns correlate `ctx.params`, `next()`, and the middleware return type with the selected MCP method. The global `mcp:*` pattern is pass-through middleware: it must call `next()`, cannot access its result, and cannot replace the response. Use an exact pattern for method-specific transformations.
+
 ```ts
 server.use("mcp:*", async (ctx, next) => {
   console.log(`→ ${ctx.method}`, ctx.params);
-  const result = await next();
+  await next();
   console.log(`← ${ctx.method}`);
-  return result;
 });
 
 server.use("mcp:tools/call", async (ctx, next) => {
@@ -75,7 +75,7 @@ server.use("mcp:tools/call", async (ctx, next) => {
 });
 
 server.use("mcp:tools/list", async (_ctx, next) => {
-  const tools = (await next()) as Array<{ name: string }>;
+  const tools = await next(); // Tool[]
   return tools.filter((tool) => !tool.name.startsWith("_"));
 });
 ```
@@ -86,13 +86,18 @@ Hook points: `tools/call`, `resources/read`, `prompts/get`, and `tools/list` / `
 
 Read-only telemetry — cannot block or mutate params. Append `:complete` for after-handler:
 
+Observers support `mcp:*` and category patterns such as `mcp:tools/*`, in addition to exact methods.
+
 ```ts
 server.on("mcp:tools/call", (ctx) => {
-  metrics.increment("tools.call", { tool: ctx.params.name as string });
+  metrics.increment("tools.call", { tool: ctx.params.name });
 });
 
 server.on("mcp:tools/call:complete", (ctx, result) => {
-  audit.log({ tool: ctx.params.name, isError: (result as { isError?: boolean }).isError });
+  audit.log({
+    tool: ctx.params.name,
+    isError: "isError" in result ? result.isError : false,
+  });
 });
 ```
 
@@ -128,6 +133,9 @@ OAuth `.well-known` responses already set `Access-Control-Allow-Origin: *` from 
 ```ts
 import type {
   MiddlewareContext,
+  McpMiddlewareContext,
+  McpMiddlewareMethod,
+  McpMiddlewareResult,
   McpMiddlewareFn,
   McpMiddlewareFnFor,
   ToolsCallMiddlewareContext,

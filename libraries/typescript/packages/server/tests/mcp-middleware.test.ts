@@ -2,21 +2,28 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   composeMiddleware,
+  createMcpMiddlewareEntry,
   matchesPattern,
   normalizeMcpMiddlewarePattern,
   parseMcpPattern,
   runMcpOperation,
   type McpEventListenerEntry,
   type McpMiddlewareEntry,
+  type McpMiddlewareMethod,
+  type McpMiddlewarePattern,
   type MiddlewareContext,
 } from "../src/middleware/mcp-middleware.js";
 
-function ctx(
-  method: string,
-  params: Record<string, unknown> = {}
-): MiddlewareContext {
-  return { method, params, state: new Map() };
+function ctx<M extends McpMiddlewareMethod>(
+  method: M,
+  params: MiddlewareContext<M>["params"] = {} as MiddlewareContext<M>["params"]
+): MiddlewareContext<M> {
+  return { method, params, state: new Map() } as MiddlewareContext<M>;
 }
+
+const toolResult = {
+  content: [{ type: "text" as const, text: "ok" }],
+};
 
 describe("matchesPattern", () => {
   it("matches wildcard", () => {
@@ -40,28 +47,21 @@ describe("composeMiddleware", () => {
   it("runs middleware in registration order", async () => {
     const log: string[] = [];
     const entries: McpMiddlewareEntry[] = [
-      {
-        pattern: "*",
-        handler: async (mwCtx, next) => {
-          log.push(`outer:${mwCtx.method}`);
-          const result = await next();
-          log.push(`outer-after:${mwCtx.method}`);
-          return result;
-        },
-      },
-      {
-        pattern: "tools/call",
-        handler: async (_mwCtx, next) => {
-          log.push("inner");
-          return next();
-        },
-      },
+      createMcpMiddlewareEntry("mcp:*", async (mwCtx, next) => {
+        log.push(`outer:${mwCtx.method}`);
+        await next();
+        log.push(`outer-after:${mwCtx.method}`);
+      }),
+      createMcpMiddlewareEntry("mcp:tools/call", async (_mwCtx, next) => {
+        log.push("inner");
+        return next();
+      }),
     ];
 
     await composeMiddleware(
       entries,
       "tools/call",
-      async () => "ok"
+      async () => toolResult
     )(ctx("tools/call"));
     expect(log).toEqual([
       "outer:tools/call",
@@ -72,38 +72,46 @@ describe("composeMiddleware", () => {
 
   it("rejects double next()", async () => {
     const entries: McpMiddlewareEntry[] = [
-      {
-        pattern: "*",
-        handler: async (_mwCtx, next) => {
-          await next();
-          return next();
-        },
-      },
+      createMcpMiddlewareEntry("mcp:*", async (_mwCtx, next) => {
+        await next();
+        return next();
+      }),
     ];
 
     await expect(
       composeMiddleware(
         entries,
         "tools/call",
-        async () => "ok"
+        async () => toolResult
       )(ctx("tools/call"))
     ).rejects.toThrow("next() called multiple times");
   });
 
+  it("requires wildcard middleware to preserve the downstream result", async () => {
+    const entries: McpMiddlewareEntry[] = [
+      createMcpMiddlewareEntry("mcp:*", async () => undefined),
+    ];
+
+    await expect(
+      composeMiddleware(
+        entries,
+        "tools/call",
+        async () => toolResult
+      )(ctx("tools/call"))
+    ).rejects.toThrow('Wildcard MCP middleware "*" must call next()');
+  });
+
   it("skips middleware when no patterns match", async () => {
     const entries: McpMiddlewareEntry[] = [
-      {
-        pattern: "tools/call",
-        handler: async () => "blocked",
-      },
+      createMcpMiddlewareEntry("mcp:tools/call", async () => toolResult),
     ];
 
     const result = await composeMiddleware(
       entries,
       "prompts/get",
-      async () => "handler"
+      async () => ({ messages: [] })
     )(ctx("prompts/get"));
-    expect(result).toBe("handler");
+    expect(result).toEqual({ messages: [] });
   });
 });
 
@@ -114,7 +122,7 @@ describe("runMcpOperation", () => {
       {
         pattern: "tools/call",
         phase: "before",
-        handler: (mwCtx: Readonly<MiddlewareContext>) => {
+        handler: (mwCtx) => {
           log.push(`before:${mwCtx.method}`);
         },
       },
@@ -132,10 +140,13 @@ describe("runMcpOperation", () => {
       events,
       "tools/call",
       ctx("tools/call"),
-      async () => "done"
+      async () => toolResult
     );
-    expect(result).toBe("done");
-    expect(log).toEqual(["before:tools/call", "complete:tools/call:done"]);
+    expect(result).toBe(toolResult);
+    expect(log).toEqual([
+      "before:tools/call",
+      "complete:tools/call:[object Object]",
+    ]);
   });
 
   it("logs event listener throws without failing the request", async () => {
@@ -157,15 +168,24 @@ describe("runMcpOperation", () => {
       events,
       "tools/call",
       ctx("tools/call"),
-      async () => "ok"
+      async () => toolResult
     );
-    expect(result).toBe("ok");
+    expect(result).toBe(toolResult);
     expect(errorSpy).toHaveBeenCalled();
     errorSpy.mockRestore();
   });
 });
 
 describe("pattern helpers", () => {
+  it("rejects category wildcard middleware at runtime", () => {
+    expect(() =>
+      createMcpMiddlewareEntry(
+        "mcp:tools/*" as McpMiddlewarePattern,
+        async () => undefined
+      )
+    ).toThrow('Use an exact MCP method or "mcp:*"');
+  });
+
   it("normalizes middleware patterns", () => {
     expect(normalizeMcpMiddlewarePattern("mcp:tools/call")).toBe("tools/call");
     expect(normalizeMcpMiddlewarePattern("tools/call")).toBe("tools/call");

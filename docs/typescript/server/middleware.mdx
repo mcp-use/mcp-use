@@ -20,7 +20,7 @@ Use MCP middleware when the logic depends on the parsed MCP operation. Use HTTP 
 | Add CORS, request logging, or HTTP headers | HTTP middleware |
 | Mount Express or Hono middleware | HTTP middleware |
 
-MCP middleware patterns use the `mcp:` prefix. HTTP middleware uses normal Hono-style `server.use(...)` calls.
+MCP middleware patterns use the `mcp:` prefix. Mount `server.getHandler()` in your framework when you need HTTP middleware around the MCP endpoint.
 
 ## Wrap MCP tool calls
 
@@ -51,24 +51,25 @@ server.tool(
 await server.listen();
 ```
 
-Call `next()` to continue to the next middleware or the final operation handler. Return the result from `next()` unless you intentionally want to replace the response.
+Call `next()` to continue to the next middleware or the final operation handler. Its result and the middleware return are typed for the selected MCP method. A replacement must therefore remain valid for that method.
 
 ## Match the right operation
 
 The pattern after `mcp:` controls which MCP operations run through the middleware.
 
-| Pattern | Use it for |
-| --- | --- |
-| `mcp:tools/call` | Tool execution |
-| `mcp:tools/list` | Tool discovery |
-| `mcp:resources/read` | Resource reads |
-| `mcp:resources/list` | Resource discovery |
-| `mcp:prompts/get` | Prompt requests |
-| `mcp:prompts/list` | Prompt discovery |
-| `mcp:tools/*`, `mcp:resources/*`, `mcp:prompts/*` | The wrapped operations in one MCP area |
-| `mcp:*` | Every operation currently wrapped by MCP middleware |
+| Pattern              | Use it for                                          |
+| -------------------- | --------------------------------------------------- |
+| `mcp:tools/call`     | Tool execution                                      |
+| `mcp:tools/list`     | Tool discovery                                      |
+| `mcp:resources/read` | Resource reads                                      |
+| `mcp:resources/list` | Resource discovery                                  |
+| `mcp:prompts/get`    | Prompt requests                                     |
+| `mcp:prompts/list`   | Prompt discovery                                    |
+| `mcp:*`              | Every operation currently wrapped by MCP middleware |
 
 Use the narrowest pattern that covers the behavior. A narrow pattern keeps middleware easier to reason about and avoids accidental changes to unrelated operations.
+
+Exact patterns may transform their method-specific result. The global `mcp:*` pattern is a pass-through wrapper: use it for authentication, rate limiting, logging, timing, or shared state. It must call `next()` and cannot inspect or replace the downstream result. Register an exact pattern for result transformations.
 
 MCP middleware currently wraps tool calls, prompt gets, resource reads, and tool/resource/prompt list operations. It does not wrap protocol setup, completion, logging level changes, resource subscribe/unsubscribe requests, or every MCP method.
 
@@ -78,7 +79,7 @@ When OAuth is configured, MCP middleware can read verified auth information from
 
 ```typescript
 server.use("mcp:tools/call", async (ctx, next) => {
-  const toolName = String(ctx.params.name ?? "");
+  const toolName = ctx.params.name;
   const requiredScope = `tools:call:${toolName}`;
 
   if (
@@ -126,11 +127,8 @@ Middleware can also wrap list operations. Use this when different clients or use
 
 ```typescript
 server.use("mcp:tools/list", async (_ctx, next) => {
-  const result = (await next()) as Array<{ name: string }> | { tools?: Array<{ name: string }> };
-  const tools = Array.isArray(result) ? result : result.tools ?? [];
-  const visible = tools.filter((tool) => !tool.name.startsWith("_"));
-
-  return Array.isArray(result) ? visible : { ...result, tools: visible };
+  const tools = await next(); // Tool[]
+  return tools.filter((tool) => !tool.name.startsWith("_"));
 });
 ```
 
@@ -150,15 +148,19 @@ A practical order is logging, then authentication, then rate limiting, then oper
 
 ## Use HTTP middleware for request-level behavior
 
-Use normal `server.use(...)` calls for Hono middleware that should run at the HTTP layer.
+Mount the MCP handler inside Hono when middleware should run at the HTTP layer.
 
 ```typescript
-server.use("/api/*", async (c, next) => {
+import { Hono } from "hono";
+
+const app = new Hono();
+app.use("/mcp", async (c, next) => {
   const startedAt = Date.now();
   c.header("x-server", "mcp-use");
   await next();
   console.log(`${c.req.method} ${c.req.path} finished in ${Date.now() - startedAt}ms`);
 });
+app.all("/mcp", server.getHandler());
 ```
 
 HTTP middleware runs before MCP parses the request. Use it for CORS, headers, raw request logging, and non-MCP routes. Use MCP middleware when you need `ctx.method`, `ctx.params`, `ctx.auth`, or MCP session information.
