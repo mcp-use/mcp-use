@@ -118,6 +118,57 @@ describe("parseToolArgs", () => {
     });
   });
 
+  it("coerces values from nullable anyOf/oneOf schemas", () => {
+    const schema = {
+      type: "object",
+      properties: {
+        count: {
+          anyOf: [{ type: "integer" }, { type: "null" }],
+        },
+        enabled: {
+          oneOf: [{ type: "boolean" }, { type: "null" }],
+        },
+      },
+    };
+
+    expect(parseToolArgs(["count=42", "enabled=false"], schema)).toEqual({
+      count: 42,
+      enabled: false,
+    });
+    expect(parseToolArgs(["count=null", "enabled=null"], schema)).toEqual({
+      count: null,
+      enabled: null,
+    });
+  });
+
+  it("preserves string fallback for mixed anyOf schemas", () => {
+    const schema = {
+      type: "object",
+      properties: {
+        value: {
+          anyOf: [{ type: "integer" }, { type: "string" }, { type: "null" }],
+        },
+      },
+    };
+
+    expect(parseToolArgs(["value=abc"], schema)).toEqual({ value: "abc" });
+    expect(parseToolArgs(["value=null"], schema)).toEqual({ value: null });
+  });
+
+  it("preserves string fallback when nullable unions include opaque variants", () => {
+    const schema = {
+      type: "object",
+      properties: {
+        mode: {
+          anyOf: [{ type: "integer" }, { const: "auto" }, { type: "null" }],
+        },
+      },
+    };
+
+    expect(parseToolArgs(["mode=auto"], schema)).toEqual({ mode: "auto" });
+    expect(parseToolArgs(["mode=null"], schema)).toEqual({ mode: null });
+  });
+
   it("keeps unknown-key values as strings (schema only constrains known keys)", () => {
     const schema = {
       type: "object",
