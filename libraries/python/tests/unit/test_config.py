@@ -95,6 +95,7 @@ class TestConnectorCreation(unittest.TestCase):
         self.assertEqual(connector.base_url, "http://test.com")
         self.assertEqual(connector.headers, {})
         self.assertIsNone(connector._auth)
+        self.assertIsNone(connector._oauth)
 
     def test_create_websocket_connector(self):
         """Test creating a WebSocket connector from config."""
@@ -143,6 +144,15 @@ class TestConnectorCreation(unittest.TestCase):
         self.assertIsInstance(connector, WebSocketConnector)
         self.assertEqual(connector.url, "ws://test.com")
         self.assertEqual(connector.headers, {})
+
+    @patch("mcp_use.client.connectors.websocket.logger.warning")
+    def test_create_websocket_connector_minimal_does_not_warn_about_auth(self, mock_warning):
+        """Test minimal WebSocket config is treated as unauthenticated."""
+        server_config = {"ws_url": "ws://test.com"}
+
+        create_connector_from_config(server_config)
+
+        mock_warning.assert_not_called()
 
     def test_create_stdio_connector(self):
         """Test creating a stdio connector from config."""
