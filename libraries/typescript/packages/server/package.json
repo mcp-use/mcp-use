@@ -75,7 +75,7 @@
     "dist"
   ],
   "engines": {
-    "node": ">=22.13.0"
+    "node": ">=22.22.2"
   },
   "scripts": {
     "build": "rimraf dist && tsup && tsc --emitDeclarationOnly --declaration",
@@ -118,7 +118,7 @@
     "@mcp-use/client": "workspace:*",
     "@modelcontextprotocol/core": "https://pkg.pr.new/@modelcontextprotocol/core@f60b40179b0f090f6d64248be1312245a160b5ee",
     "@testing-library/react": "^16.3.2",
-    "@types/node": "^22.13.0",
+    "@types/node": "^22.20.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "happy-dom": "^20.10.6",

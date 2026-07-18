@@ -5,7 +5,7 @@
   "private": true,
   "description": "Example: mcp-use direct Keycloak OAuth resource server.",
   "engines": {
-    "node": ">=22.13.0"
+    "node": ">=22.22.2"
   },
   "scripts": {
     "dev": "mcp-use dev",
@@ -18,7 +18,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "^22.13.0",
+    "@types/node": "^22.20.0",
     "typescript": "^7.0.2"
   }
 }

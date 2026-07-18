@@ -96,7 +96,7 @@ pnpm test tests/integration/agent --reporter=verbose
 
 ## Requirements
 
-- Node.js >= 22.13.0
+- Node.js >= 22.22.2
 - OpenAI API key set in environment (`OPENAI_API_KEY`)
 - All dependencies installed (`pnpm install`)
 

@@ -26,7 +26,7 @@
     "dist"
   ],
   "engines": {
-    "node": ">=22.13.0"
+    "node": ">=22.22.2"
   },
   "scripts": {
     "build": "rimraf dist && tsup src/index.ts --format esm --target node22 && tsc --emitDeclarationOnly --declaration",
