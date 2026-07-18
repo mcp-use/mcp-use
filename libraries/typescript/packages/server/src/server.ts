@@ -88,6 +88,11 @@ import type {
   TemplateVariableValue,
 } from "./resources.js";
 import type {
+  ProxyConnection,
+  ProxyMountHost,
+  ProxyServerConfig,
+} from "./proxy.js";
+import type {
   InferToolInput,
   InferToolName,
   InferToolOutput,
@@ -230,6 +235,12 @@ export class MCPServer<TUser = never> {
   #hostValidated = false;
   readonly #mcpMiddlewares: McpMiddlewareEntry[] = [];
   readonly #mcpEventListeners: McpEventListenerEntry[] = [];
+  /** Client instances created by {@link MCPServer.proxy} and owned by this server. */
+  readonly #proxyOwners: Array<{ close(): Promise<void> }> = [];
+  /** Proxy registrations that {@link close} must let finish before cleanup. */
+  readonly #proxyOperations = new Set<Promise<void>>();
+  /** Whether terminal shutdown has begun. */
+  #closed = false;
 
   /**
    * Create an MCP server from a parsed, bundled OpenAPI document.
@@ -465,6 +476,71 @@ export class MCPServer<TUser = never> {
   }
 
   /**
+   * Compose upstream MCP servers into this server.
+   *
+   * A name-keyed HTTP config creates upstream connections through the optional
+   * `@mcp-use/client` v2 peer. Each key automatically namespaces its mounted
+   * tools, resources, and prompts. You may instead pass an existing ready
+   * {@link ProxyConnection}; its negotiated server name becomes the namespace
+   * and the connection remains caller-owned.
+   *
+   * Connection, introspection, and collision failures are diagnosed and
+   * skipped without discarding capabilities that can be mounted.
+   *
+   * @param servers - Namespace-keyed upstream HTTP connection settings.
+   * @throws If `@mcp-use/client` is not installed or the server already started
+   * or closed.
+   *
+   * @example
+   * ```ts
+   * await server.proxy({
+   *   weather: {
+   *     url: "https://weather.example.com/mcp",
+   *     authToken: process.env.WEATHER_MCP_TOKEN,
+   *   },
+   * });
+   * ```
+   */
+  async proxy(servers: Record<string, ProxyServerConfig>): Promise<void>;
+  /**
+   * Mount an existing ready `@mcp-use/client` v2 connection.
+   *
+   * @param connection - Ready connection to introspect and forward through.
+   * The connection's negotiated server name automatically namespaces every
+   * mounted capability. Introspection and collision failures are diagnosed and
+   * skipped without discarding capabilities that can be mounted.
+   *
+   * @throws If the server already started or closed.
+   *
+   * @example
+   * ```ts
+   * const connection = await client.connect("database");
+   * await server.proxy(connection);
+   * ```
+   */
+  async proxy(connection: ProxyConnection): Promise<void>;
+  async proxy(
+    input: Record<string, ProxyServerConfig> | ProxyConnection
+  ): Promise<void> {
+    this.#assertOpen("proxy()");
+    const operation = (async (): Promise<void> => {
+      const { isProxyConnection, mountProxyConnection, mountProxyServers } =
+        await import("./proxy.js");
+      if (isProxyConnection(input)) {
+        await mountProxyConnection(this.#proxyHost(), input);
+        return;
+      }
+      await mountProxyServers(this.#proxyHost(), input);
+    })();
+    this.#proxyOperations.add(operation);
+    try {
+      await operation;
+    } finally {
+      this.#proxyOperations.delete(operation);
+    }
+  }
+
+  /**
    * Web-standard request handler for the whole app (MCP endpoint included) —
    * usable directly on serverless/edge runtimes or in tests.
    *
@@ -487,6 +563,7 @@ export class MCPServer<TUser = never> {
    * ```
    */
   getHandler(options: { bus?: ServerEventBus } = {}): FrameworkHandler {
+    this.#assertOpen("getHandler()");
     const { fetch } = this.#ensureMounted("handler", undefined, options.bus);
     return toFrameworkHandler(fetch);
   }
@@ -637,6 +714,7 @@ export class MCPServer<TUser = never> {
    * already mounted the app without Host validation.
    */
   async listen(port = 3000): Promise<{ port: number; url: string }> {
+    this.#assertOpen("listen()");
     this.#assertListenOAuthConfiguration();
     const { createServer } = await import("node:http");
     const { toNodeHandler } = await import("./node-bridge.js");
@@ -711,14 +789,45 @@ export class MCPServer<TUser = never> {
    * instance to serve again.
    */
   async close(): Promise<void> {
-    await this.#handler?.close();
+    this.#closed = true;
+    await Promise.allSettled([...this.#proxyOperations]);
+
+    const errors: unknown[] = [];
+    const proxyOwners = this.#proxyOwners.splice(0);
+    const ownerResults = await Promise.allSettled(
+      proxyOwners.map((owner) => owner.close())
+    );
+    for (const result of ownerResults) {
+      if (result.status === "rejected") errors.push(result.reason);
+    }
+
+    try {
+      await this.#handler?.close();
+    } catch (error) {
+      errors.push(error);
+    }
     const httpServer = this.#httpServer;
     if (httpServer !== undefined) {
-      await new Promise<void>((resolve, reject) => {
-        httpServer.close((err) => (err ? reject(err) : resolve()));
-      });
-      this.#httpServer = undefined;
+      try {
+        await new Promise<void>((resolve, reject) => {
+          httpServer.close((err) => (err ? reject(err) : resolve()));
+        });
+        this.#httpServer = undefined;
+      } catch (error) {
+        errors.push(error);
+      }
     }
+    if (errors.length > 0) {
+      throw new AggregateError(errors, "Failed to close MCP server cleanly");
+    }
+  }
+
+  #assertOpen(operation?: string): void {
+    if (!this.#closed) return;
+    if (operation !== undefined) {
+      throw new Error(`Cannot call ${operation} after the server has closed.`);
+    }
+    throw new Error("Cannot use the server after it has closed.");
   }
 
   #basePath(): string {
@@ -782,6 +891,48 @@ export class MCPServer<TUser = never> {
     }
   }
 
+  #proxyHost(): ProxyMountHost {
+    return {
+      isStarted: () => this.#handler !== undefined,
+      hasTool: (name) => this.#tools.has(name),
+      hasResource: (name) => this.#resources.has(name),
+      hasPrompt: (name) => this.#prompts.has(name),
+      registerTool: (definition, callback) => {
+        this.#assertNotStarted("tool", definition.name);
+        this.#tools.set(definition.name, {
+          definition,
+          callback: callback as ToolCallback<
+            Record<string, unknown>,
+            never,
+            TUser,
+            HasOAuth<TUser>
+          >,
+        });
+      },
+      registerResource: (definition, callback) => {
+        this.#assertNotStarted("resource", definition.name);
+        this.#resources.set(definition.name, {
+          definition,
+          callback: callback as ResourceCallback<TUser, HasOAuth<TUser>>,
+        });
+      },
+      registerPrompt: (definition, callback) => {
+        this.#assertNotStarted("prompt", definition.name);
+        this.#prompts.set(definition.name, {
+          definition,
+          callback: callback as PromptCallback<
+            Record<string, unknown>,
+            TUser,
+            HasOAuth<TUser>
+          >,
+        });
+      },
+      trackOwner: (owner) => {
+        this.#proxyOwners.push(owner);
+      },
+    };
+  }
+
   /**
    * Effective Host/Origin allowlists for a mount mode; `undefined` means the
    * corresponding validation is off.
@@ -821,6 +972,7 @@ export class MCPServer<TUser = never> {
     fetch: FetchHandler;
     handler: McpHttpHandler;
   } {
+    this.#assertOpen();
     if (this.#fetchHandler === undefined || this.#handler === undefined) {
       const { hosts, origins } = this.#validationPolicy(mode);
       const basePath = this.#basePath();

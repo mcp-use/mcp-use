@@ -718,6 +718,28 @@ importers:
         specifier: 7.0.1-rc
         version: 7.0.1-rc
 
+  packages/server/examples/proxy:
+    dependencies:
+      '@mcp-use/client':
+        specifier: workspace:*
+        version: link:../../../client
+      mcp-use:
+        specifier: workspace:*
+        version: link:../..
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.2
+        version: 24.13.2
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: 7.0.1-rc
+        version: 7.0.1-rc
+
   packages/server/examples/railway:
     dependencies:
       mcp-use:

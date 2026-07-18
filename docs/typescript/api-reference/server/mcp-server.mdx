@@ -281,29 +281,33 @@ listen(port?: number): Promise<void>
 
 ### proxy
 
-Mounts one or more remote MCP servers onto this server. It introspects each remote server's tools, resources, and prompts and registers them natively, so this server acts as a gateway. Pass a map of namespace to connection config, or pass a single `MCPSession` plus a `namespace` option. Sampling and elicitation requests from proxied tools are forwarded to the active client session when request context is available. Resolves once mounting is complete.
+Mounts one or more remote HTTP MCP servers onto this server. It introspects each remote server's tools, static resources, and prompts and registers them natively, so this server acts as a gateway. Config-map keys automatically namespace capabilities; an existing `MCPConnection` uses its negotiated server name. Connection, introspection, and collision failures are reported diagnostically while successfully mountable capabilities remain available.
+
+Proxy config accepts caller-managed bearer tokens and authentication headers. It does not expose stdio or automatic OAuth options, and it disables client auto-OAuth internally so proxy setup and server startup never open a browser.
 
 **Parameters**
-><ParamField body="config" type="Record<string, any> | MCPSession" required="true" >   A map of namespace to server connection config, or a single `MCPSession`. </ParamField>
-><ParamField body="options" type="{ namespace?: string } | undefined" default="undefined" >   Additional options. Provide `namespace` when passing a single `MCPSession`. </ParamField>
+><ParamField body="config" type="Record<string, ProxyServerConfig> | ProxyConnection" required="true" >   A name-keyed map of HTTP server connection config, or one ready caller-owned connection. </ParamField>
 
 **Returns**
 ><ResponseField name="returns" type="Promise<void>" />
 
 **Example**
 ```ts wrap
-// Using a config map of namespaces
+// Config keys become namespaces automatically
 await server.proxy({
-  db: { command: "node", args: ["db.js"] },
+  db: {
+    url: "https://database.example.com/mcp",
+    authToken: process.env.DATABASE_MCP_TOKEN,
+  },
 });
 
-// Using an explicit session
-await server.proxy(mySession, { namespace: "db" });
+// The connection's negotiated server name becomes its namespace
+await server.proxy(connection);
 ```
 
 **Signature**
 ```ts wrap
-proxy(config: Record<string, any> | MCPSession, options?: { namespace?: string }): Promise<void>
+proxy(config: Record<string, ProxyServerConfig> | ProxyConnection): Promise<void>
 ```
 
 ## Static methods

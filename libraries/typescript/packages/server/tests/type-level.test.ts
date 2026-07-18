@@ -21,6 +21,8 @@ import type {
   InputRequiredResult,
   LandingPageOptions,
   MetaObject,
+  ProxyHttpConfig,
+  ProxyServerConfig,
   ResourceDefinition,
   ResourceTemplateDefinition,
   ServerConfig,
@@ -185,6 +187,32 @@ describe("ToolResult resolution", () => {
       content: [{ type: "text", text: "hi" }],
     };
     expect([structured, error, contentOnly]).toBeDefined(); // compile-time only
+  });
+});
+
+describe("proxy public types", () => {
+  it("exposes only caller-authenticated HTTP config", () => {
+    const config: ProxyHttpConfig = {
+      url: "https://example.com/mcp",
+      authToken: "caller-managed-token",
+    };
+    expectTypeOf(config).toMatchTypeOf<ProxyServerConfig>();
+    expectTypeOf<
+      "command" extends keyof ProxyServerConfig ? true : false
+    >().toEqualTypeOf<false>();
+    expectTypeOf<
+      "oauth" extends keyof ProxyServerConfig ? true : false
+    >().toEqualTypeOf<false>();
+
+    if (false) {
+      const server = new MCPServer({ name: "types", version: "0.0.0" });
+      // @ts-expect-error — stdio is not part of the proxy surface
+      void server.proxy({ local: { command: "node", args: ["server.mjs"] } });
+      // @ts-expect-error — proxy OAuth/browser acquisition is intentionally absent
+      void server.proxy({ remote: { url: config.url, oauth: false } });
+    }
+
+    expect(config.url).toBe("https://example.com/mcp");
   });
 });
 

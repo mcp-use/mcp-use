@@ -155,3 +155,13 @@ export type {
   PromptCallback,
   PromptDefinition,
 } from "./prompts.js";
+export type {
+  ProxyConnection,
+  ProxyHttpConfig,
+  ProxyProgress,
+  ProxyPrompt,
+  ProxyRequestOptions,
+  ProxyResource,
+  ProxyServerConfig,
+  ProxyTool,
+} from "./proxy.js";

@@ -912,4 +912,29 @@ describe("MCPServer validation policy", () => {
     await expect(server.listen(0)).rejects.toThrow(/after getHandler/);
     await server.close();
   });
+
+  it("keeps a server closed before its first mount", async () => {
+    const server = minimalServer();
+    await server.close();
+
+    expect(() => server.getHandler()).toThrow(
+      "Cannot call getHandler() after the server has closed."
+    );
+    await expect(server.listen(0)).rejects.toThrow(
+      "Cannot call listen() after the server has closed."
+    );
+  });
+
+  it("keeps a previously mounted server closed", async () => {
+    const server = minimalServer();
+    server.getHandler();
+    await server.close();
+
+    expect(() => server.getHandler()).toThrow(
+      "Cannot call getHandler() after the server has closed."
+    );
+    await expect(server.listen(0)).rejects.toThrow(
+      "Cannot call listen() after the server has closed."
+    );
+  });
 });

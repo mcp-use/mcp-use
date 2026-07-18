@@ -18,7 +18,7 @@ Greenfield framework on the official v2 SDK (`@modelcontextprotocol/server`, sta
 - No feature may require session state; cross-request continuity uses explicit handles in results.
 - One framework package. `mcp-use` ships the server runtime and the complete first-party CLI: `dev`, `build`, `start`, cloud auth, organizations, servers, deployments, deploy, client, screenshot, and skills (`CLI_SPEC.md`). Each substantial command is a genuine lazy chunk; `dev` and `build` are separate chunks, and neither `start` nor a library export may statically evaluate Vite or unrelated command code.
 - Vite is a regular dependency so `npm install mcp-use` is sufficient for `mcp-use dev` and `mcp-use build`. `@vitejs/plugin-react` becomes a regular dependency when views land. `react` and `react-dom` remain optional peers owned by view applications.
-- `mcp-use` has no npm dependency edge of any kind to `@mcp-use/inspector`; embedded inspector integration is HTTP/CDN only. `@mcp-use/client` remains an independently published SDK and an **optional peer** — `mcp-use client` and `mcp-use screenshot` load it on demand and print install instructions when it is missing; the library entry and `start` never evaluate it.
+- `mcp-use` has no npm dependency edge of any kind to `@mcp-use/inspector`; embedded inspector integration is HTTP/CDN only. `@mcp-use/client` remains an independently published SDK and an **optional peer** — `server.proxy()`, `mcp-use client`, and `mcp-use screenshot` load it on demand and print install instructions when it is missing; the library entry and `start` never evaluate it.
 - `create-mcp-use-app` remains a separately published, zero-runtime-dependency scaffolder. There is no `@mcp-use/config` package.
 - ESM-only (forced by the SDK). Node ≥ 24 (current LTS) — this package tracks the latest runtime, not the SDK's `>=20` floor.
 - Dependencies track latest releases: caret ranges at current latest; TypeScript is a package-local devDep pinned to the TS 7 RC (native compiler; exact pin while pre-release — caret ranges don't traverse pre-releases; workspace root still pins 5.9 for the old packages). Watch the root `pnpm.overrides`: they _replace_ this package's specifiers, so v1-era audit floors/pins there must be raised or removed when they'd hold this package back (zod/vitest raised).
@@ -211,6 +211,35 @@ Calls use `options.baseUrl`, then the first `spec.servers` URL; constructing a g
 
 `examples/openapi` is the runnable reference: it fetches the National Weather Service document at entry load, selects four read-only weather operations, and default-exports the generated server for the standard `mcp-use dev` / `build` / `start` lifecycle.
 
+## Upstream server composition
+
+`await server.proxy(servers)` composes name-keyed upstream HTTP MCP servers into the static parent registry before `listen()` or `getHandler()`. The server dynamically imports the optional `@mcp-use/client` v2 peer, creates one `MCPClient`, and connects to each configured server independently. Config-map keys automatically namespace capabilities. Connection failures skip that upstream, introspection failures skip only the affected capability kind, and name collisions skip only the colliding capability; every skipped item emits a diagnostic while successfully mountable upstreams and capabilities remain registered.
+
+```ts
+await server.proxy({
+  weather: { url: "https://weather.example.com/mcp" },
+  database: {
+    url: "https://database.example.com/mcp",
+    authToken: process.env.DATABASE_MCP_TOKEN,
+  },
+});
+```
+
+The automatic namespace prefixes tool, resource, and prompt names with `<namespace>_`. Static resource listing URIs use `mcp-use-proxy:///<encoded namespace>/<encoded upstream URI>` so any namespace is valid and upstream URI schemes cannot collide. Reads forward the original URI. Tool calls preserve raw results (including `isError`, `structuredContent`, `_meta`, and `input_required` where the client supports it), downstream cancellation is passed upstream, and upstream progress is reported through the active downstream request context. A failed downstream progress notification is diagnosed without rejecting the upstream tool call. Input/output JSON Schemas, annotations, titles, and descriptions are advertised from the introspected upstream metadata; validation remains authoritative upstream.
+
+The low-level overload accepts an existing ready connection:
+
+```ts
+const connection = await client.connect("database");
+await server.proxy(connection);
+```
+
+An existing connection's negotiated server name supplies its automatic namespace. Connections created from a config map are owned by the parent and closed by `server.close()`, including when shutdown overlaps an in-flight `proxy()` call. Cleanup waits for every owned client even if one close fails. An explicitly supplied connection remains caller-owned. Calling `proxy()` after the parent starts or closes throws before mounting capabilities. If `@mcp-use/client` is absent, config-map proxying throws with an unversioned npm install command; importing and running a server that never calls `proxy()` does not evaluate or require the client package.
+
+Proxy configuration is HTTP-only and accepts explicit bearer tokens or authentication headers. The public proxy API has no stdio or OAuth options. Internally the server forces client auto-OAuth off, so proxy setup and server startup never open a browser or acquire tokens; applications own credential acquisition and refresh.
+
+The initial v2 surface proxies tools, static resources, and prompts. It does not proxy resource templates, completions, subscriptions, upstream list-change re-synchronization, or legacy push-style sampling/elicitation callbacks.
+
 ## Request logging
 
 Built-in HTTP/MCP request logging (`src/logging.ts`), on by default. One summary line per HTTP request plus an indented detail line for MCP requests:
@@ -279,7 +308,7 @@ server.tool(
 - **Auth: direct resource-server mode implemented; proxy mode deferred.** Contract in **`AUTH_SPEC.md`** / **`AUTH_IMPLEMENTATION.md`** (resource-server posture, `ctx.auth`, `bearerAuth`/`oauthMetadata`, provider adapters, RFC 9728 metadata). OAuth proxy mode (local authorization server) remains deferred.
 - **Product shell:** OAuth providers + scope guards + `.well-known` (with auth, above), operation middleware (`server.use("mcp:*")`) and observer events (`server.on("mcp:*")`), optional `ServerConfig.cors`, the browser landing page, and resource-subscription ergonomics are implemented. Cross-request v2 list/resource notifications are implemented through `MCPServer.notify*`, backed by the SDK handler bus. Every per-request SDK server advertises tool/prompt/resource `listChanged` (and resource `subscribe`) even while a registry is empty, so a client connected before the first primitive is added can subscribe. `getHandler({ bus })` accepts an SDK `ServerEventBus` for entries that need several handler instances to share open subscriptions; `mcp-use dev` uses one process-scoped bus across every reload generation and publishes all three list invalidations after a successful handler swap.
 - **Elicitation & context:** MRTR state, typed form and URL elicitation, progress, and logging helpers are implemented. Push-style sampling/roots remain legacy-only and are deprecated in the 2026-07-28 spec.
-- **Integration:** OpenAPI import is implemented. Telemetry (posthog-node, opt-out) remains deferred. The independently published `@mcp-use/client` remains the SDK boundary; the framework consumes it for `mcp-use client` rather than folding or re-exporting the SDK from the server runtime.
+- **Integration:** OpenAPI import and upstream server composition are implemented. Telemetry (posthog-node, opt-out) remains deferred. The independently published `@mcp-use/client` remains the SDK boundary; the framework consumes it on demand for `server.proxy()` and `mcp-use client` rather than folding or re-exporting the SDK from the server runtime.
 
 ## Open questions (answered per phase, not up front)
 
