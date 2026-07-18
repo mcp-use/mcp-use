@@ -179,6 +179,33 @@ interface NodeHttpListener {
   address(): { port: number } | string | null;
 }
 
+function omitRootSchemaDialect<T>(schema: T): T {
+  if (
+    typeof schema !== "object" ||
+    schema === null ||
+    Array.isArray(schema) ||
+    !("$schema" in schema)
+  ) {
+    return schema;
+  }
+
+  const emittedSchema = { ...schema } as T & Record<string, unknown>;
+  delete emittedSchema["$schema"];
+  return emittedSchema;
+}
+
+function omitToolSchemaDialects(
+  tools: McpMiddlewareResult<"tools/list">
+): McpMiddlewareResult<"tools/list"> {
+  return tools.map((tool) => ({
+    ...tool,
+    inputSchema: omitRootSchemaDialect(tool.inputSchema),
+    ...(tool.outputSchema === undefined
+      ? {}
+      : { outputSchema: omitRootSchemaDialect(tool.outputSchema) }),
+  }));
+}
+
 /**
  * MCP server with declarative tool/resource/prompt registration, served
  * statelessly over a composed fetch handler.
@@ -1359,11 +1386,19 @@ export class MCPServer<TUser = never> {
       return;
     }
 
-    const wrapListMethod = <
-      M extends "tools/list" | "resources/list" | "prompts/list",
-    >(
+    type ListMethod = "tools/list" | "resources/list" | "prompts/list";
+    type ListResultKey<M extends ListMethod> = M extends "tools/list"
+      ? "tools"
+      : M extends "resources/list"
+        ? "resources"
+        : "prompts";
+
+    const wrapListMethod = <M extends ListMethod>(
       method: M,
-      resultKey: "tools" | "resources" | "prompts"
+      resultKey: ListResultKey<NoInfer<M>>,
+      transform?: (
+        items: McpMiddlewareResult<NoInfer<M>>
+      ) => McpMiddlewareResult<NoInfer<M>>
     ) => {
       const original = handlers.get(method);
       if (original === undefined) {
@@ -1406,16 +1441,17 @@ export class MCPServer<TUser = never> {
             `[mcp-use] ${method} middleware must return a ${resultKey} array`
           );
         }
+        const emitted = transform?.(filtered) ?? filtered;
         return {
           ...originalEnvelope,
-          [resultKey]: filtered,
+          [resultKey]: emitted,
         };
       };
       (wrapped as { __mcpListWrapped?: boolean }).__mcpListWrapped = true;
       handlers.set(method, wrapped);
     };
 
-    wrapListMethod("tools/list", "tools");
+    wrapListMethod("tools/list", "tools", omitToolSchemaDialects);
     wrapListMethod("resources/list", "resources");
     wrapListMethod("prompts/list", "prompts");
   }
