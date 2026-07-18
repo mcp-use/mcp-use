@@ -40,7 +40,7 @@ type CliOptions = {
   install?: boolean;
   skills?: boolean;
   dev?: boolean;
-  canary?: boolean;
+  sdkVersion?: string;
   yarn?: boolean;
   npm?: boolean;
   pnpm?: boolean;
@@ -58,7 +58,7 @@ function parseCli(argv: string[]): {
       install: { type: "boolean" },
       skills: { type: "boolean" },
       dev: { type: "boolean" },
-      canary: { type: "boolean" },
+      "sdk-version": { type: "string" },
       yarn: { type: "boolean" },
       npm: { type: "boolean" },
       pnpm: { type: "boolean" },
@@ -89,7 +89,7 @@ function parseCli(argv: string[]): {
       install,
       skills,
       dev: values.dev as boolean | undefined,
-      canary: values.canary as boolean | undefined,
+      sdkVersion: values["sdk-version"] as string | undefined,
       yarn: values.yarn as boolean | undefined,
       npm: values.npm as boolean | undefined,
       pnpm: values.pnpm as boolean | undefined,
@@ -302,40 +302,18 @@ const packageJson = JSON.parse(
 
 function getCurrentPackageVersions(
   isDevelopment: boolean = false,
-  useCanary: boolean = false
-) {
-  const versions: Record<string, string> = {};
-
-  try {
-    if (isDevelopment) {
-      versions["mcp-use"] = "workspace:*";
-    } else if (useCanary) {
-      versions["mcp-use"] = "canary";
-    } else {
-      versions["mcp-use"] = "latest";
-    }
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.warn(
-        "⚠️  Could not read workspace package versions, using defaults"
-      );
-      console.warn(
-        `   Error: ${error instanceof Error ? error.message : String(error)}`
-      );
-      if (error instanceof Error && error.stack) {
-        console.warn(`   Stack: ${error.stack}`);
-      }
-    }
+  sdkVersion?: string
+): Record<string, string> {
+  if (isDevelopment) {
+    return { "mcp-use": "workspace:*" };
   }
-
-  return versions;
+  return { "mcp-use": sdkVersion ?? "latest" };
 }
 
 function processTemplateFile(
   filePath: string,
   versions: Record<string, string>,
-  isDevelopment: boolean = false,
-  useCanary: boolean = false
+  isDevelopment: boolean = false
 ) {
   const content = readFileSync(filePath, "utf-8");
   let processedContent = content;
@@ -348,24 +326,23 @@ function processTemplateFile(
     );
   }
 
+  const mcpUseVersion = isDevelopment
+    ? "workspace:*"
+    : versions["mcp-use"] || "latest";
+
   if (isDevelopment) {
     processedContent = processedContent.replace(
       /"mcp-use": "\^[^"]+"/,
       '"mcp-use": "workspace:*"'
     );
-  } else if (useCanary) {
-    processedContent = processedContent.replace(
-      /"mcp-use": "workspace:\*"/,
-      `"mcp-use": "canary"`
-    );
-    processedContent = processedContent.replace(
-      /"mcp-use": "\^[^"]+"/,
-      `"mcp-use": "canary"`
-    );
   } else {
     processedContent = processedContent.replace(
       /"mcp-use": "workspace:\*"/,
-      `"mcp-use": "${versions["mcp-use"] || "latest"}"`
+      `"mcp-use": "${mcpUseVersion}"`
+    );
+    processedContent = processedContent.replace(
+      /"mcp-use": "\^[^"]+"/,
+      `"mcp-use": "${mcpUseVersion}"`
     );
   }
 
@@ -617,8 +594,7 @@ async function copyTemplate(
   projectPath: string,
   template: string,
   versions: Record<string, string>,
-  isDevelopment: boolean = false,
-  useCanary: boolean = false
+  isDevelopment: boolean = false
 ) {
   const repoInfo = parseGitHubRepoUrl(template);
   if (repoInfo) {
@@ -630,8 +606,7 @@ async function copyTemplate(
         tempDir,
         projectPath,
         versions,
-        isDevelopment,
-        useCanary
+        isDevelopment
       );
     } finally {
       try {
@@ -682,8 +657,7 @@ async function copyTemplate(
     templatePath,
     projectPath,
     versions,
-    isDevelopment,
-    useCanary
+    isDevelopment
   );
 }
 
@@ -691,8 +665,7 @@ function copyDirectoryWithProcessing(
   src: string,
   dest: string,
   versions: Record<string, string>,
-  isDevelopment: boolean,
-  useCanary: boolean = false
+  isDevelopment: boolean
 ) {
   const entries = readdirSync(src, { withFileTypes: true });
 
@@ -707,19 +680,12 @@ function copyDirectoryWithProcessing(
 
     if (entry.isDirectory()) {
       mkdirSync(destPath, { recursive: true });
-      copyDirectoryWithProcessing(
-        srcPath,
-        destPath,
-        versions,
-        isDevelopment,
-        useCanary
-      );
+      copyDirectoryWithProcessing(srcPath, destPath, versions, isDevelopment);
     } else if (entry.name === "package.json" || entry.name.endsWith(".json")) {
       const processedContent = processTemplateFile(
         srcPath,
         versions,
-        isDevelopment,
-        useCanary
+        isDevelopment
       );
       writeFileSync(destPath, processedContent);
     } else {
@@ -813,7 +779,7 @@ Options:
   --no-skills               Skip installing skills
   --no-git                  Skip initializing a git repository
   --dev                     Use workspace dependencies for development
-  --canary                  Use canary versions of packages
+  --sdk-version <version>   Pin mcp-use to an npm version or dist-tag (e.g. canary, 1.34.0)
   --yarn                    Use yarn as package manager
   --npm                     Use npm as package manager
   --pnpm                    Use pnpm as package manager
@@ -840,9 +806,14 @@ async function main(): Promise<void> {
     return;
   }
 
-  if (options.dev && options.canary) {
-    console.error(ansi.red("❌ Cannot use --dev and --canary together"));
+  if (options.dev && options.sdkVersion) {
+    console.error(ansi.red("❌ Cannot use --dev and --sdk-version together"));
     console.error(ansi.yellow("   Please choose only one dependency mode"));
+    process.exit(1);
+  }
+
+  if (options.sdkVersion !== undefined && !options.sdkVersion.trim()) {
+    console.error(ansi.red("❌ --sdk-version requires a non-empty value"));
     process.exit(1);
   }
 
@@ -948,15 +919,9 @@ async function main(): Promise<void> {
   console.log(ansi.cyan(`🚀 Creating MCP server "${displayName}"...`));
 
   const validatedTemplate = validateTemplateName(selectedTemplate);
-  const versions = getCurrentPackageVersions(options.dev, options.canary);
+  const versions = getCurrentPackageVersions(options.dev, options.sdkVersion);
 
-  await copyTemplate(
-    projectPath,
-    validatedTemplate,
-    versions,
-    options.dev,
-    options.canary
-  );
+  await copyTemplate(projectPath, validatedTemplate, versions, options.dev);
 
   updatePackageJson(projectPath, packageName);
   updateIndexTs(projectPath, packageName);
@@ -1084,8 +1049,8 @@ async function main(): Promise<void> {
     console.log(
       ansi.yellow("🔧 Development mode: Using workspace dependencies")
     );
-  } else if (options.canary) {
-    console.log(ansi.cyan("🚀 Canary mode: Using canary versions of packages"));
+  } else if (options.sdkVersion) {
+    console.log(ansi.cyan(`📌 Using mcp-use@${options.sdkVersion}`));
   }
   console.log("");
   console.log(ansi.bold("📁 Project structure:"));
