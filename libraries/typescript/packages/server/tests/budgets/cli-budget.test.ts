@@ -89,11 +89,13 @@ describe("published CLI boundaries", () => {
     }
   });
 
-  it("keeps dist/index.js under seventy-three KiB", async () => {
+  it("keeps dist/index.js under eighty-five KiB", async () => {
     const bytes = (await stat(new URL("index.js", DIST))).size;
     // The landing renderer is a lazy sibling entry; the root pays only for
-    // HTML negotiation and auth-aware route dispatch.
-    expect(bytes).toBeLessThanOrEqual(73 * 1024);
+    // HTML negotiation and auth-aware route dispatch. Branding adds strict
+    // constructor validation, MCP identity URL normalization, and favicon /
+    // public-asset routing; keep the allowance close to the measured bundle.
+    expect(bytes).toBeLessThanOrEqual(85 * 1024);
   });
 
   it("keeps the unpacked framework artifact below five MiB", async () => {

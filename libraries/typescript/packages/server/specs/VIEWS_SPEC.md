@@ -469,7 +469,7 @@ Build-time: when `MCP_ASSETS_URL` is set, manifest asset paths are rewritten to 
 v1 parity: authors drop static files in a project-root `public/` directory and reference them from views with root-relative paths (`/fruits/apple.png`). Two mechanisms coexist:
 
 1. **Imported assets** — `import url from "./file.png"` in a view module. Vite inlines them as data URLs in the self-contained production bundle (`assetsInlineLimit`); in dev they resolve through Vite with absolute URLs via `server.origin`.
-2. **Public folder** — files under `public/` served at `GET ${basePath}/_mcp-use/public/<path…>`. **Build** copies `public/` → `.mcp-use/build/views/public/`. **Dev** and **start** read from `<projectRoot>/public` (dev) or `.mcp-use/build/views/public/` (production). Missing `public/` → route 404s; nothing breaks. Path traversal (`..`, backslashes) is rejected.
+2. **Public folder** — files under `public/` served at `GET ${basePath}/_mcp-use/public/<path…>`. **Build** copies `public/` → `.mcp-use/build/views/public/`, including tool-only builds because server icons use the same route. **Dev** and **start** read from `<projectRoot>/public` (dev) or `.mcp-use/build/views/public/` (production). Missing `public/` → route 404s; nothing breaks. Percent-decoding happens before containment checks; malformed encodings, path traversal (`..`), backslashes, directories, and missing files return `404`. `HEAD` returns the same status and headers as `GET` with no body.
 
 **Runtime resolution.** The synthesized document injects one inline `<script>` before the view module script:
 

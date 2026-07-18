@@ -428,6 +428,7 @@ export function generateLandingPage(options: LandingPageOptions): string {
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="${pageTitle}">
 <meta name="twitter:description" content="${metaDescription}">
+${iconUrl ? `<link rel="icon" href="${escapeHtml(iconUrl)}">` : ""}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">

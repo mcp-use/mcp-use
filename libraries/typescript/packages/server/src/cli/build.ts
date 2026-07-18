@@ -49,6 +49,13 @@ const WRAPPER_BASENAME = "entry-wrapper.ts";
 /** Inline imported assets as data URLs up to this byte size (effectively all). */
 const ASSETS_INLINE_LIMIT = 100 * 1024 * 1024;
 
+async function copyPublicAssets(cwd: string, outputDir: string): Promise<void> {
+  const publicSrc = join(cwd, "public");
+  if (existsSync(publicSrc)) {
+    await cp(publicSrc, outputDir, { recursive: true });
+  }
+}
+
 /**
  * Options for {@link runBuild}.
  *
@@ -296,6 +303,11 @@ export async function runBuild(options: BuildOptions): Promise<void> {
       },
     });
 
+    // Branding may reference project-public icon files even when the server
+    // has no views. Keep the runtime public-asset location identical in both
+    // shapes so `mcp-use start` and serverless built entries behave alike.
+    await copyPublicAssets(options.cwd, join(paths.build, "views/public"));
+
     const manifest: BuildManifest = {
       buildId: randomBytes(8).toString("hex"),
       entryPoint: BUILD_ENTRY_NAME,
@@ -369,10 +381,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     }
   }
 
-  const publicSrc = join(options.cwd, "public");
-  if (existsSync(publicSrc)) {
-    await cp(publicSrc, join(viewsOutDir, "public"), { recursive: true });
-  }
+  await copyPublicAssets(options.cwd, join(viewsOutDir, "public"));
 
   try {
     await validateViewBindingsAtBuild(

@@ -1,128 +1,132 @@
 ---
 title: "ServerConfig"
-description: "ServerConfig API Documentation"
+description: "Configure mcp-use v2 server identity, branding, HTTP routing, inspection, logging, and OAuth."
 icon: "settings"
-github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/types/common.ts"
+github: "https://github.com/mcp-use/mcp-use/blob/beta/libraries/typescript/packages/server/src/config.ts"
 ---
 
-<Callout type="info" title="Source Code">
-View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/types/common.ts' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/types/common.ts</a>
-</Callout>
+`ServerConfig` is the object you pass to `new MCPServer(...)`. `name` and `version` are required. The v2 server is stateless and fetch-native; there are no Hono or session-store fields on this type.
 
-`ServerConfig` is the configuration object passed to the `new MCPServer({ ... })` constructor. It controls server identity (name, version, title, icons), networking (host, base URL, CORS, DNS rebinding protection), session and stream persistence, OAuth authentication, and the public landing page. `name` and `version` are the only required fields; every other field is optional.
-
-```ts wrap
-import { MCPServer } from "mcp-use/server";
+```ts
+import { MCPServer } from "mcp-use";
 
 const server = new MCPServer({
-  name: "everything-server",
-  title: "Everything Server",
+  name: "catalog-server",
+  title: "Catalog Server",
   version: "1.0.0",
-  baseUrl: process.env.MCP_URL || "http://localhost:3000",
+  description: "Search the product catalog.",
+  websiteUrl: "https://example.com/catalog",
+  icons: [
+    { src: "brand/icon.svg", mimeType: "image/svg+xml" },
+    {
+      src: "brand/icon-32.png",
+      mimeType: "image/png",
+      sizes: ["32x32"],
+    },
+  ],
 });
 ```
 
-## ServerConfig
+## Configuration fields
 
-Configuration for an MCP server. Pass this object to the `new MCPServer({ ... })` constructor.
+> <ParamField body="name" type="string" required={true}>
+>   Machine-readable server name reported during MCP initialization.
+> </ParamField>
 
-```ts
-import { MCPServer } from "mcp-use/server";
+<ParamField body="version" type="string" required={true}>Server version reported during MCP initialization.</ParamField>
+<ParamField body="title" type="string">Human-readable display name. Clients can fall back to `name` when omitted.</ParamField>
+<ParamField body="description" type="string">Human-readable description reported in MCP implementation metadata.</ParamField>
+<ParamField body="websiteUrl" type="string">Absolute HTTP(S) website or documentation URL reported in MCP implementation metadata. Relative, empty, and non-HTTP(S) values throw at construction.</ParamField>
+<ParamField body="icons" type="Icon[]">Official MCP implementation icons. A source can be a path relative to `public/`, an absolute HTTP(S) URL, or an `image/*` data URL. Local paths become request-scoped absolute URLs under `${basePath}/_mcp-use/public/`. An empty array is valid.</ParamField>
+<ParamField body="favicon" type="string">Explicit browser favicon source. It accepts the same source forms as `icons` and overrides favicon inference. The server exposes the selected image at the root-level `/favicon.ico` route.</ParamField>
+<ParamField body="instructions" type="string">Server-wide guidance surfaced to models by MCP clients.</ParamField>
+<ParamField body="basePath" type="string" default="/mcp">Exact MCP endpoint pathname. It must start with `/` and cannot contain whitespace, `//`, a query, a fragment, or a trailing slash except for `/` itself.</ParamField>
+<ParamField body="host" type="string" default="127.0.0.1">Hostname used by `listen()`. Set `"0.0.0.0"` for a public bind. `getHandler()` does not bind a socket.</ParamField>
+<ParamField body="allowedHosts" type="string[]">Additional Host-header allowlist entries. Values are additive to localhost names and enable Host validation for `getHandler()`.</ParamField>
+<ParamField body="allowedOrigins" type="string[]">Additional Origin-header allowlist entries. Values are additive to localhost origins. When omitted, the effective Host allowlist is used. GET and HEAD skip Origin validation.</ParamField>
+<ParamField body="legacy" type='"stateless" | "reject"' default="stateless">Serve 2025-era clients through the stateless compatibility path, or reject them for a modern-only server.</ParamField>
+<ParamField body="publicLandingPage" type="boolean" default="false">Expose the HTML landing page without bearer authentication when OAuth is configured. The page remains available for explicit HTML GET/HEAD navigation and MCP protocol requests stay protected.</ParamField>
+<ParamField body="cors" type="CorsOptions">Add CORS headers to every mcp-use-owned route. Omit it for no CORS headers; use this alongside `allowedOrigins` when serving browser clients.</ParamField>
+<ParamField body="inspector" type="InspectorOptions">Configure the `${basePath}/inspector` shell. It is enabled by default. Use `{ enabled: false }` to disable it or `{ assetsUrl }` to load a self-hosted inspector bundle.</ParamField>
+<ParamField body="logging" type="LoggingOptions">Configure request logging. Logging is enabled at `info` by default; use `{ enabled: false }`, `debug`, or `trace` as needed.</ParamField>
+<ParamField body="requestState" type="ServerOptions['requestState']">Configure integrity verification for `requestState` echoed across `input_required` rounds.</ParamField>
+<ParamField body="oauth" type="OAuthProvider<TUser>">OAuth resource-server provider. When you supply a non-`never` `TUser`, this field becomes required and authenticated callbacks receive `ctx.auth.user`.</ParamField>
+
+## Icon and favicon behavior
+
+When `favicon` is omitted, `icons` selects the browser favicon in this order:
+
+1. ICO by MIME type or URL pathname.
+2. PNG with a declared `16x16` or `32x32` size.
+3. Any PNG by MIME type or URL pathname.
+4. The first icon.
+
+An empty `icons` array selects no favicon. An explicit empty `favicon` is invalid.
+
+`GET /favicon.ico` and `HEAD /favicon.ico` stay at the domain root even when `basePath` is custom or `/`. Local files and data URLs are served directly. HTTP(S) favicon sources return a `307` redirect; mcp-use never fetches the remote image server-side. Missing local files return `404`.
+
+Local files belong under the project `public/` directory:
+
+```text
+public/
+└── brand/
+    ├── favicon.ico
+    ├── icon.svg
+    └── icon-32.png
 ```
 
-The complete set of options accepted by the `MCPServer` constructor. The constructor stores this object on `server.config` and applies the defaults described below. The `new MCPServer(config)` path takes a `ServerConfig` with `name` and `version` required; everything else is optional.
+`mcp-use build` copies `public/` into the production output even when the server has no views. Local paths cannot start with `/` or contain traversal segments, backslashes, queries, fragments, or empty path segments.
 
-**Properties**
+## Type definition
 
-><ParamField body="name" type="string" required={true}>Unique identifier for the MCP server (for example `"my-mcp-server"` or `"product-search-api"`). Required.</ParamField>
-><ParamField body="version" type="string" required={true}>Semantic version of the server (for example `"1.0.0"`). Required.</ParamField>
-><ParamField body="description" type="string">Human-readable description of what the server does. Shown to clients during discovery. Optional, no default.</ParamField>
-><ParamField body="instructions" type="string">Instructions for AI models using this server. Use this for server-wide guidance such as cross-tool workflows, ordering constraints, or safety requirements. Do not repeat individual tool descriptions here. Optional, no default.</ParamField>
-><ParamField body="host" type="string" default="localhost">Hostname for widget URLs and server endpoints. When omitted, the constructor falls back to `"localhost"` (`config.host || "localhost"`).</ParamField>
-><ParamField body="baseUrl" type="string">Full base URL that overrides `host:port` for widget URLs (for example `"https://myserver.com"`). Use when deploying behind a reverse proxy or to a known public URL. Optional, no default.</ParamField>
-><ParamField body="cors" type="Partial<Parameters<typeof cors>[0]>">Custom CORS options for the server, typed against Hono's `cors` middleware options. By default mcp-use enables permissive CORS (`origin: "*"`) for development ergonomics. Set this to customize allowed origins, headers, methods, credentials, etc. Optional, no default.</ParamField>
-><ParamField body="allowedOrigins" type="string[]">Allowed origins for DNS rebinding protection. If not set, protection is disabled (all `Host` values accepted). If set to an empty array, protection is also disabled. If set with one or more origins, `Host` validation is enabled globally for the server. Optional, no default (disabled).</ParamField>
-><ParamField body="sessionIdleTimeoutMs" type="number" default="86400000">Idle timeout for sessions in milliseconds. Defaults to `86400000` (1 day).</ParamField>
-><ParamField body="autoCreateSessionOnInvalidId" type="boolean">Deprecated and slated for removal in a future version. Modern MCP clients send a new `InitializeRequest` after receiving a 404 for a stale session, and the server now follows the spec strictly by returning 404 for invalid session IDs. For session persistence across restarts, use `sessionStore` with a persistent backend instead. Optional, no default.</ParamField>
-><ParamField body="stateless" type="boolean">Enable stateless mode (no session tracking). When left `undefined`, the constructor auto-detects: `true` for Deno (edge runtimes) and `false` for Node.js. In Node.js, mode is further auto-detected per request from the client `Accept` header (`application/json, text/event-stream` selects stateful; `application/json` only selects stateless). Setting `stateless: true` forces stateless mode and ignores the `Accept` header. Stateless mode is required for edge functions where instances do not persist; stateful mode supports sessions, resumability, and notifications.</ParamField>
-><ParamField body="sessionStore" type="SessionStore">Custom session metadata storage backend. Stores serializable session metadata (client capabilities, log level, timestamps); for active SSE stream management use `streamManager` instead. Enables pluggable persistence for metadata survival across restarts, distributed deployments, and horizontal scaling. Defaults to `FileSystemSessionStore` when `NODE_ENV !== "production"` and `InMemorySessionStore` in production mode. Imported as `import("../sessions/stores/index.js").SessionStore`.</ParamField>
-><ParamField body="streamManager" type="StreamManager">Custom stream manager for active SSE connections, separate from `sessionStore` to enable distributed notifications via Redis Pub/Sub. Manages active SSE stream controllers for server-to-client push notifications. Defaults to an in-memory `InMemoryStreamManager` (streams on this server only). Use `RedisStreamManager` for distributed notifications and sampling across multiple instances. Imported as `import("../sessions/streams/index.js").StreamManager`.</ParamField>
-><ParamField body="oauth" type="OAuthProvider">OAuth authentication configuration. When provided, automatically sets up OAuth routes (`/authorize`, `/token`, `.well-known/*`), JWT verification middleware, bearer token authentication on all `/mcp` routes, and user information extraction with context attachment. Build with the provider factory functions `oauthSupabaseProvider()`, `oauthAuth0Provider()`, `oauthKeycloakProvider()`, or `oauthCustomProvider()`. Optional, no default.</ParamField>
-><ParamField body="publicLandingPage" type="boolean" default="false">Expose the HTML MCP landing page without bearer authentication when OAuth is configured. The page is always available at `basePath` for GET/HEAD requests that explicitly accept `text/html`; without OAuth it is public. With OAuth, it requires a token unless this option is `true`. MCP protocol requests remain protected.</ParamField>
-><ParamField body="favicon" type="string">Path to a favicon file relative to the `public/` directory (for example `"favicon.ico"` or `"icons/app-icon.png"`). The favicon is automatically included in all widget pages. If omitted but `icons` is provided, the constructor auto-selects a favicon from `icons`. Optional, no default.</ParamField>
-><ParamField body="title" type="string">Display name for the server, shown in MCP clients and the inspector UI. If not provided, the `name` field is used as the display name. Optional, no default.</ParamField>
-><ParamField body="websiteUrl" type="string">Website URL for the server (for example `"https://myserver.com"`), included in the server info displayed to clients. Optional, no default.</ParamField>
-><ParamField body="icons" type="Array<{ src: string; mimeType?: string; sizes?: string[]; theme?: light | dark }>">Array of server icons in various sizes and formats, used by MCP clients and the inspector UI for server branding. Each entry requires `src` and may include `mimeType`, `sizes`, and `theme` (`"light"` or `"dark"`). Relative `src` values are rewritten to absolute URLs under `${baseUrl}/mcp-use/public/` when `baseUrl` is set. Optional, no default.</ParamField>
+```ts
+import type { Icon, ServerOptions } from "@modelcontextprotocol/server";
+import type { CorsOptions, InspectorOptions, LoggingOptions } from "mcp-use";
+import type { OAuthProvider } from "mcp-use/oauth";
 
-**Type definition**
-```ts wrap
-interface ServerConfig {
+interface BaseServerConfig {
   name: string;
   version: string;
-  description?: string;
-  instructions?: string;
-  host?: string;
-  baseUrl?: string;
-  cors?: Partial<Parameters<typeof cors>[0]>;
-  allowedOrigins?: string[];
-  sessionIdleTimeoutMs?: number;
-  /** @deprecated removed in a future version */
-  autoCreateSessionOnInvalidId?: boolean;
-  stateless?: boolean;
-  sessionStore?: SessionStore;
-  streamManager?: StreamManager;
-  oauth?: OAuthProvider;
-  publicLandingPage?: boolean;
-  favicon?: string;
   title?: string;
+  description?: string;
   websiteUrl?: string;
-  icons?: Array<{
-    src: string;
-    mimeType?: string;
-    sizes?: string[];
-    theme?: "light" | "dark";
-  }>;
+  icons?: Icon[];
+  favicon?: string;
+  instructions?: string;
+  basePath?: string;
+  host?: string;
+  allowedHosts?: string[];
+  allowedOrigins?: string[];
+  legacy?: "stateless" | "reject";
+  publicLandingPage?: boolean;
+  cors?: CorsOptions;
+  inspector?: InspectorOptions;
+  logging?: LoggingOptions;
+  requestState?: ServerOptions["requestState"];
+}
+
+type ServerConfig<TUser = never> = BaseServerConfig &
+  ([TUser] extends [never]
+    ? { oauth?: undefined }
+    : { oauth: OAuthProvider<TUser> });
+```
+
+`ServerConfig<TUser>` requires `oauth` when `TUser` is not `never` and rejects it when no authenticated user type is declared.
+
+## Use branding in browser pages
+
+`server.branding` exposes the immutable normalized `favicon`, `icons`, and `websiteUrl` values. Browser shells should link to `/favicon.ico` instead of duplicating selection logic.
+
+```ts
+if (server.branding.favicon) {
+  // Render this in the page head.
+  const faviconLink = '<link rel="icon" href="/favicon.ico">';
 }
 ```
 
-## Usage
-
-The `name` and `version` fields are required; everything else is optional. The following example sets a display `title` and a `baseUrl`.
-
-```ts wrap
-import { MCPServer } from "mcp-use/server";
-
-const server = new MCPServer({
-  name: "everything-server",
-  title: "Everything Server",
-  version: "1.0.0",
-  baseUrl: process.env.MCP_URL || "http://localhost:3000",
-});
-```
-
-### DNS rebinding protection
-
-Set `allowedOrigins` to enable global `Host` header validation. Leaving it unset (or passing an empty array) disables protection and accepts all `Host` values.
-
-```ts wrap
-import { MCPServer } from "mcp-use/server";
-
-const resolvedAllowedOrigins = process.env.ALLOWED_ORIGINS?.split(",")
-  .map((value) => value.trim())
-  .filter(Boolean);
-
-const server = new MCPServer({
-  name: "dns-rebinding-example",
-  version: "1.0.0",
-  description:
-    "Example server showing localhost auto-protection and explicit allowedOrigins in production.",
-  allowedOrigins:
-    resolvedAllowedOrigins && resolvedAllowedOrigins.length > 0
-      ? resolvedAllowedOrigins
-      : undefined,
-});
-```
+The built-in landing page and inspector add this link automatically. The landing page also displays the selected favicon as its server icon. MCP clients receive `websiteUrl` and `icons` through standard server implementation metadata.
 
 ## See also
 
-- [MCPServer](/typescript/api-reference/server/mcp-server) for the constructor that consumes `ServerConfig`.
+- [MCPServer](/typescript/api-reference/server/mcp-server) for server lifecycle and registration methods.
+- [Authentication](/typescript/server/authentication) for OAuth provider setup.
