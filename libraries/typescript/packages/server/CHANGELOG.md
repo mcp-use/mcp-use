@@ -1,5 +1,11 @@
 # mcp-use
 
+## 2.0.0-beta.9
+
+### Minor Changes
+
+- fa57403: Add v2 server branding with official MCP `icons` and `websiteUrl` identity metadata, automatic favicon selection, and fetch-native local, data URL, and remote favicon handling.
+
 ## 2.0.0-beta.8
 
 ### Minor Changes

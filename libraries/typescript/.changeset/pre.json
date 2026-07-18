@@ -11,6 +11,7 @@
   },
   "changesets": [
     "better-auth-v2-provider",
+    "bright-icons-smile",
     "build-v2-external-view-assets",
     "chatgpt-files-hook",
     "client-sdk-v2-migration",
