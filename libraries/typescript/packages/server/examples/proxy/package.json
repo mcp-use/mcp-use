@@ -5,7 +5,7 @@
   "private": true,
   "description": "Example: proxy multiple MCP servers through one mcp-use endpoint.",
   "engines": {
-    "node": ">=20.19.0"
+    "node": ">=22.13.0"
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -18,7 +18,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "^20.19.43",
+    "@types/node": "^22.13.0",
     "tsx": "^4.21.0",
     "typescript": "^7.0.2"
   }

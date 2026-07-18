@@ -45,7 +45,7 @@ export default defineConfig([
     // ESM-only: the v2 @modelcontextprotocol/* packages ship no CJS entry, so a
     // CJS build of this package could never load them.
     format: ["esm"],
-    target: "node20",
+    target: "node22",
     dts: false,
     // Splitting on is load-bearing, not a size optimization: without it esbuild
     // inlines the dynamically-`import()`-ed cli module graph directly into

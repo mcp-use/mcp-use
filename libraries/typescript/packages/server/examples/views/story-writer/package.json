@@ -5,7 +5,7 @@
   "private": true,
   "description": "Reference example: streaming tool input into an MCP Apps view.",
   "engines": {
-    "node": ">=20.19.0"
+    "node": ">=22.13.0"
   },
   "scripts": {
     "dev": "mcp-use dev",
@@ -20,7 +20,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "^20.19.43",
+    "@types/node": "^22.13.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "typescript": "^7.0.2"

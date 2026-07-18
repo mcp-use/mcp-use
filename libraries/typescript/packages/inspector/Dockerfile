@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:22-alpine
 
 # Specify the version variable (defaults to latest)
 ARG VERSION=latest

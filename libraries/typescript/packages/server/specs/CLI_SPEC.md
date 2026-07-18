@@ -349,7 +349,7 @@ Two adjacent things are *not* covered by this rationale and have their own postu
 
 ## Verification and budgets
 
-Budgets are measured on Linux x64 in the CI-pinned Node 20.19 container image; the baseline records the exact image digest, Node version, and npm version. The test packs the candidate, installs that tarball with `npm install --omit=dev` in an empty project, and sums logical file bytes without filesystem block rounding.
+Budgets are measured on Linux x64 in the CI-pinned Node 22.13 container image; the baseline records the exact image digest, Node version, and npm version. The test packs the candidate, installs that tarball with `npm install --omit=dev` in an empty project, and sums logical file bytes without filesystem block rounding.
 
 | Dimension | Hard ceiling |
 | --- | ---: |

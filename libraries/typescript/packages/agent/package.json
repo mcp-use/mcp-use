@@ -46,7 +46,7 @@
     "dist"
   ],
   "engines": {
-    "node": ">=20.19.0"
+    "node": ">=22.13.0"
   },
   "scripts": {
     "build": "rimraf dist && tsup && tsc --emitDeclarationOnly --declaration",

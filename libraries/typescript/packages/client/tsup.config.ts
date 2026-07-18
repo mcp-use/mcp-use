@@ -11,7 +11,7 @@ export default defineConfig({
     "index-browser": "src/index-browser.ts",
     "react/index": "src/react/index.ts",
   },
-  // ESM-only: @mcp-use/client targets Node 20+ ESM natively and the package exports
+  // ESM-only: @mcp-use/client targets Node 22+ ESM natively and the package exports
   // map has no "require" condition, so CJS output is unnecessary.
   format: ["esm"],
   dts: false,
