@@ -32,6 +32,7 @@
     "resource-template-completion",
     "strip-tools-list-schema-dialect",
     "ts7-stable-node20-scaffold",
-    "v2-server-scaffold"
+    "v2-server-scaffold",
+    "views-dir-mcp-env-and-dev-host"
   ]
 }
