@@ -594,7 +594,7 @@ export function uiResourceRegistration<T extends UIResourceServer>(
           ? typeof enrichedDefinition.toolOutput === "function"
             ? enrichedDefinition.toolOutput(params)
             : enrichedDefinition.toolOutput
-          : generateToolOutput(enrichedDefinition, params, displayName);
+          : await generateToolOutput(enrichedDefinition, params, displayName);
 
         // Ensure content exists (required by CallToolResult) - text items only
         const content = toolOutputResult?.content || [

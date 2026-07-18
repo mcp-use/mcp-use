@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyClaudeResourceDomain,
   computeClaudeResourceDomain,
+  generateToolOutput,
   isClaudeClient,
 } from "../../../src/server/widgets/protocol-helpers.js";
 
@@ -77,6 +78,31 @@ describe("protocol helpers", () => {
       });
 
       expect(resource._meta.ui.domain).toBe("https://example.com/mcp");
+    });
+  });
+
+  describe("tool output generation", () => {
+    it("awaits async structuredContent callbacks", async () => {
+      const result = await generateToolOutput(
+        {
+          type: "appsSdk",
+          name: "weather-widget",
+          htmlTemplate: "<div></div>",
+          structuredContent: async (params: Record<string, unknown>) => ({
+            city: params.city,
+            temperature: 72,
+          }),
+        } as any,
+        { city: "Berlin" },
+        "Weather"
+      );
+
+      expect(result.content).toEqual([{ type: "text", text: "Weather" }]);
+      expect(result.structuredContent).toEqual({
+        city: "Berlin",
+        temperature: 72,
+      });
+      expect(result.structuredContent).not.toBeInstanceOf(Promise);
     });
   });
 });
