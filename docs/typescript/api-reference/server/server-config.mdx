@@ -81,8 +81,10 @@ public/
 
 ```ts
 import type { Icon, ServerOptions } from "@modelcontextprotocol/server";
+import type { CorsOptions, InspectorOptions, LoggingOptions } from "mcp-use";
+import type { OAuthProvider } from "mcp-use/oauth";
 
-interface ServerConfig<TUser = never> {
+interface BaseServerConfig {
   name: string;
   version: string;
   title?: string;
@@ -101,11 +103,15 @@ interface ServerConfig<TUser = never> {
   inspector?: InspectorOptions;
   logging?: LoggingOptions;
   requestState?: ServerOptions["requestState"];
-  oauth?: OAuthProvider<TUser>;
 }
+
+type ServerConfig<TUser = never> = BaseServerConfig &
+  ([TUser] extends [never]
+    ? { oauth?: undefined }
+    : { oauth: OAuthProvider<TUser> });
 ```
 
-The actual `ServerConfig<TUser>` type conditionally requires `oauth` when `TUser` is not `never`.
+`ServerConfig<TUser>` requires `oauth` when `TUser` is not `never` and rejects it when no authenticated user type is declared.
 
 ## Use branding in browser pages
 

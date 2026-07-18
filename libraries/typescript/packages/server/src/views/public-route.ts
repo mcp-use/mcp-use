@@ -30,10 +30,14 @@ export async function resolvePublicFilePath(
   publicRoot: string,
   subpath: string
 ): Promise<string | null> {
-  const { existsSync, statSync } = await import("node:fs");
+  const { stat } = await import("node:fs/promises");
   const { resolve, sep } = await import("node:path");
 
-  if (subpath === "" || subpath.includes("..") || subpath.includes("\\")) {
+  if (
+    subpath === "" ||
+    subpath.includes("\\") ||
+    subpath.split("/").some((segment) => segment === "..")
+  ) {
     return null;
   }
   const clean = subpath.replace(/^\/+/, "");
@@ -45,7 +49,11 @@ export async function resolvePublicFilePath(
   if (abs !== root && !abs.startsWith(root + sep)) {
     return null;
   }
-  if (!existsSync(abs) || !statSync(abs).isFile()) {
+  try {
+    if (!(await stat(abs)).isFile()) {
+      return null;
+    }
+  } catch {
     return null;
   }
   return abs;

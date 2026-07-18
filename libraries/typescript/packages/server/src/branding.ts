@@ -55,8 +55,24 @@ function extensionPath(source: string): string {
   return source.toLowerCase();
 }
 
+function dataUrlMimeType(source: string): string | undefined {
+  if (protocolOf(source) !== "data") {
+    return undefined;
+  }
+  const comma = source.indexOf(",");
+  if (comma < 0) {
+    return undefined;
+  }
+  const mimeType = source.slice(5, comma).split(";", 1)[0]?.toLowerCase();
+  return mimeType === "" ? undefined : mimeType;
+}
+
+function iconMimeType(icon: Icon): string | undefined {
+  return icon.mimeType?.toLowerCase() ?? dataUrlMimeType(icon.src);
+}
+
 function isIco(icon: Icon): boolean {
-  const mimeType = icon.mimeType?.toLowerCase();
+  const mimeType = iconMimeType(icon);
   return (
     mimeType === "image/x-icon" ||
     mimeType === "image/vnd.microsoft.icon" ||
@@ -66,7 +82,7 @@ function isIco(icon: Icon): boolean {
 
 function isPng(icon: Icon): boolean {
   return (
-    icon.mimeType?.toLowerCase() === "image/png" ||
+    iconMimeType(icon) === "image/png" ||
     extensionPath(icon.src).endsWith(".png")
   );
 }

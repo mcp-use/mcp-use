@@ -188,6 +188,17 @@ describe("server branding", () => {
     expect(queriedIco.branding.favicon).toBe(
       "https://cdn.example.com/favicon.ico?v=2"
     );
+
+    const dataIco = "data:image/x-icon;base64,aWNv";
+    const inferredDataMime = new MCPServer({
+      name: "data-mime-rank-test",
+      version: "1.0.0",
+      icons: [
+        { src: "small.png", mimeType: "image/png", sizes: ["32x32"] },
+        { src: dataIco },
+      ],
+    });
+    expect(inferredDataMime.branding.favicon).toBe(dataIco);
   });
 
   it("serves data favicons and redirects absolute favicons without fetching", async () => {
@@ -253,6 +264,24 @@ describe("server branding", () => {
     expect(missingResponse.status).toBe(404);
     expect(missingResponse.headers.get("cache-control")).toBe("no-store");
     await missing.close();
+  });
+
+  it("serves safe local filenames containing consecutive dots", async () => {
+    const root = project({ "brand/icon..png": "png" });
+    const server = new MCPServer({
+      name: "consecutive-dots",
+      version: "1.0.0",
+      favicon: "brand/icon..png",
+    });
+    primeDev(server, root);
+
+    const response = await server.getHandler()(
+      new Request("http://localhost/favicon.ico")
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("image/png");
+    expect(await response.text()).toBe("png");
+    await server.close();
   });
 
   it("rejects invalid branding values at construction", () => {
