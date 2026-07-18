@@ -241,6 +241,14 @@ describe("main", () => {
     expect(logs.mock.calls.flat().join("\n")).toContain("Usage: mcp-use");
   });
 
+  it("prints client help for client --help", async () => {
+    const logs = vi.spyOn(console, "log").mockImplementation(() => {});
+    await expect(main(["client", "--help"])).resolves.toBe(0);
+    const output = logs.mock.calls.flat().join("\n");
+    expect(output).toContain("mcp-use client connect");
+    expect(output).not.toContain("mcp-use deploy");
+  });
+
   it("dispatches build through its dedicated command module", async () => {
     const errors = vi.spyOn(console, "error").mockImplementation(() => {});
     await expect(main(["build", "--entry", "nope.ts"])).resolves.toBe(1);

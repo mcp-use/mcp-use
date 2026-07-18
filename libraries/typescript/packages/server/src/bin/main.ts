@@ -75,8 +75,11 @@ export async function main(argv: readonly string[]): Promise<number> {
     return 0;
   }
   if (argv.some((token) => token === "--help" || token === "-h")) {
-    console.log(HELP);
-    return 0;
+    const command = argv[0];
+    if (command === undefined || command === "--help" || command === "-h") {
+      console.log(HELP);
+      return 0;
+    }
   }
 
   const command = argv[0];
