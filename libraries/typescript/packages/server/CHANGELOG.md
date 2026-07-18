@@ -1,5 +1,11 @@
 # mcp-use
 
+## 2.0.0-beta.11
+
+### Minor Changes
+
+- 20d8f85: Auto-install `@mcp-use/client` when `mcp-use client` or `mcp-use screenshot` needs it and the package is missing. Installs into the nearest project when a `package.json` exists; otherwise uses a global sandbox at `~/.mcp-use/client-sdk/`. Fixes `npx mcp-use client connect …` without a separate client install step.
+
 ## 2.0.0-beta.10
 
 ### Minor Changes

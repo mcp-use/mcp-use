@@ -15,6 +15,7 @@
     "build-v2-external-view-assets",
     "calm-proxies-compose",
     "chatgpt-files-hook",
+    "client-cli-auto-install",
     "client-sdk-v2-migration",
     "dialect-json-schema-validator",
     "fix-beta-scaffold-templates",
