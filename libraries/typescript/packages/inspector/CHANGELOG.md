@@ -1,5 +1,16 @@
 # @mcp-use/inspector
 
+## 20.0.0-beta.3
+
+### Patch Changes
+
+- b47e268: Raise the Node.js engine floor from `>=20.19.0` to `>=22.13.0` across published packages, scaffolds, examples, CI, Docker, and esbuild/tsup build targets. Use `@types/node` `^22.13.0`. Required for pnpm 11.13 in GitHub Actions and unblocks the beta release workflow.
+- 1579839: Raise the Node.js engine floor to `>=22.22.2` (post–March 2026 security release) and pin CI to Node 22.23.1 so trusted npm 12 publishing works.
+- Updated dependencies [b47e268]
+- Updated dependencies [1579839]
+  - @mcp-use/agent@2.0.0-beta.2
+  - @mcp-use/client@2.0.0-beta.2
+
 ## 20.0.0-beta.2
 
 ### Patch Changes

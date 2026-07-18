@@ -15,8 +15,10 @@
     "build-v2-external-view-assets",
     "calm-proxies-compose",
     "chatgpt-files-hook",
+    "cli-client-ux-fixes",
     "client-cli-auto-install",
     "client-sdk-v2-migration",
+    "create-app-sdk-version",
     "dialect-json-schema-validator",
     "fix-beta-scaffold-templates",
     "follow-inspector-beta-cdn",
@@ -24,9 +26,12 @@
     "inspector-standalone-oauth",
     "localhost-managed-inspector-chat",
     "mcp-middleware-cors-mounting",
+    "node22-engine-floor",
+    "node22-security-patch-floor",
     "openapi-server-tools-v2",
     "resource-template-completion",
     "strip-tools-list-schema-dialect",
+    "ts7-stable-node20-scaffold",
     "v2-server-scaffold"
   ]
 }

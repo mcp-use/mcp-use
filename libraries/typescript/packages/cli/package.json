@@ -1,7 +1,7 @@
 {
   "name": "@mcp-use/cli",
   "type": "module",
-  "version": "4.0.0-beta.0",
+  "version": "4.0.0-beta.1",
   "description": "Compatibility proxy for the CLI included in mcp-use v2",
   "author": "mcp-use, Inc.",
   "license": "MIT",

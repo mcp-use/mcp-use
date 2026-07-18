@@ -1,5 +1,18 @@
 # @mcp-use/cli
 
+## 4.0.0-beta.1
+
+### Patch Changes
+
+- b47e268: Raise the Node.js engine floor from `>=20.19.0` to `>=22.13.0` across published packages, scaffolds, examples, CI, Docker, and esbuild/tsup build targets. Use `@types/node` `^22.13.0`. Required for pnpm 11.13 in GitHub Actions and unblocks the beta release workflow.
+- 1579839: Raise the Node.js engine floor to `>=22.22.2` (post–March 2026 security release) and pin CI to Node 22.23.1 so trusted npm 12 publishing works.
+- 50df3a1: Refresh scaffold and example dependency pins: TypeScript `^7.0.2` (stable, replaces `7.0.1-rc`) and React `^19.2.7`.
+- Updated dependencies [4810321]
+- Updated dependencies [b47e268]
+- Updated dependencies [1579839]
+- Updated dependencies [50df3a1]
+  - mcp-use@2.0.0-beta.12
+
 ## 4.0.0-beta.0
 
 ### Major Changes
