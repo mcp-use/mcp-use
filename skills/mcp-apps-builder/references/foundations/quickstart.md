@@ -56,12 +56,16 @@ my-server/
 **mcp-apps:**
 ```
 my-server/
-├── index.ts              # Server with widget-returning tools
-├── resources/            # Widget directory (product-search-result/ example)
+├── index.ts              # Server with view-bound tools (search-fruits, get-fruit-details)
+├── views/            # View directory (product-search-result/ example)
 │   └── product-search-result/
-│       ├── widget.tsx    # React widget with carousel UI
-│       └── components/   # Reusable widget components
+│       ├── view.tsx      # React view with carousel UI
+│       ├── view.css      # Carousel styles
+│       ├── components/   # Carousel, Accordion, etc.
+│       └── hooks/        # useCarouselAnimation
 ├── public/
+│   └── fruits/           # Fruit PNG assets
+├── mcp-env.d.ts            # Typed useToolContext hooks + CSS imports
 ├── package.json
 └── tsconfig.json
 ```
@@ -81,7 +85,7 @@ After scaffolding:
 
 1. `npm run dev` — starts server with hot reload + inspector
 2. Edit `index.ts` to add tools, resources, prompts
-3. Add widgets as `.tsx` files in `resources/`
+3. Add views as folders under `views/<name>/view.tsx`
 4. Test everything at `http://localhost:3000/inspector`
 5. `npm run build` — production build
 6. `npm run deploy` — deploy to production

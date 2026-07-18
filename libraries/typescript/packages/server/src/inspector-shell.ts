@@ -73,6 +73,8 @@ export interface InspectorShellOptions {
   basePath: string;
   /** Browser favicon URL, normally the server's root-level `/favicon.ico`. */
   faviconHref?: string | undefined;
+  /** MIME type for the favicon link tag when known. */
+  faviconType?: string | undefined;
   /**
    * Full replacement URL for the inspector bundle script. Defaults to
    * {@link DEFAULT_INSPECTOR_ASSETS_URL}.
@@ -116,8 +118,14 @@ function serializeForInlineScript(value: string): string {
  * or JSON-serialized with `<` escaped, so config can't inject markup.
  */
 export function renderInspectorShell(options: InspectorShellOptions): string {
-  const { serverName, basePath, faviconHref, assetsUrl, manufactChatUrl } =
-    options;
+  const {
+    serverName,
+    basePath,
+    faviconHref,
+    faviconType,
+    assetsUrl,
+    manufactChatUrl,
+  } = options;
   const serializedBasePath = serializeForInlineScript(basePath);
   const serializedManufactChatUrl = manufactChatUrl
     ? serializeForInlineScript(manufactChatUrl)
@@ -132,7 +140,7 @@ export function renderInspectorShell(options: InspectorShellOptions): string {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${escapeHtml(serverName)} — MCP Inspector</title>
-    ${faviconHref !== undefined ? `<link rel="icon" href="${escapeHtml(faviconHref)}" />` : ""}
+    ${faviconHref !== undefined ? `<link rel="icon"${faviconType !== undefined ? ` type="${escapeHtml(faviconType)}"` : ""} href="${escapeHtml(faviconHref)}" />` : ""}
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -193,7 +201,12 @@ export function renderInspectorShell(options: InspectorShellOptions): string {
  */
 export function createInspectorHandler(
   inspector: InspectorOptions | undefined,
-  options: { serverName: string; basePath: string; faviconHref?: string }
+  options: {
+    serverName: string;
+    basePath: string;
+    faviconHref?: string;
+    faviconType?: string;
+  }
 ): FetchHandler | undefined {
   if (inspector?.enabled === false) {
     return undefined;
@@ -209,6 +222,9 @@ export function createInspectorHandler(
     basePath: options.basePath,
     ...(options.faviconHref !== undefined && {
       faviconHref: options.faviconHref,
+    }),
+    ...(options.faviconType !== undefined && {
+      faviconType: options.faviconType,
     }),
     assetsUrl,
     manufactChatUrl,

@@ -9,10 +9,15 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "noEmit": true,
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true
+    "noEmit": true
   },
-  "include": ["index.ts", "tools.d.ts", "resources/**/*"],
+  "include": [
+    "index.ts",
+    "mcp-env.d.ts",
+    "src/**/*",
+    "views/**/*",
+    "server.ts",
+    ".mcp-use/**/*.d.ts"
+  ],
   "exclude": ["node_modules", "dist"]
 }

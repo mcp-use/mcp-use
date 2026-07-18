@@ -553,9 +553,11 @@ describe("MCPServer (phase 1, e2e over HTTP)", () => {
     expect(status).toBe(403);
   });
 
-  it("rejects requests from a non-localhost Origin", async () => {
-    const status = await rawStatus(url, { origin: "https://evil.example.com" });
-    expect(status).toBe(403);
+  it("accepts requests from a non-localhost Origin by default", async () => {
+    const status = await rawStatus(url, {
+      origin: "https://inspector.manufact.com",
+    });
+    expect(status).not.toBe(403);
   });
 
   it("accepts requests with a localhost Origin", async () => {
@@ -846,15 +848,19 @@ describe("MCPServer validation policy", () => {
     await server.close();
   });
 
-  it("mirrors allowedHosts into Origin validation when allowedOrigins is unset", async () => {
+  it("getHandler with allowedHosts validates Host but not Origin by default", async () => {
     const server = minimalServer({ allowedHosts: ["api.example.com"] });
     const handler = server.getHandler();
-    const status = async (origin: string) =>
+    const hostStatus = async (host: string) =>
+      (await handler(toolsListRequest({ host }))).status;
+    expect(await hostStatus("api.example.com")).toBe(200);
+    expect(await hostStatus("evil.example.com")).toBe(403);
+
+    const originStatus = async (origin: string) =>
       (await handler(toolsListRequest({ host: "api.example.com", origin })))
         .status;
-    expect(await status("https://api.example.com")).toBe(200);
-    expect(await status("https://evil.example.com")).toBe(403);
-    expect(await status("http://localhost:5173")).toBe(200);
+    expect(await originStatus("https://api.example.com")).toBe(200);
+    expect(await originStatus("https://evil.example.com")).toBe(200);
     await server.close();
   });
 
@@ -889,6 +895,22 @@ describe("MCPServer validation policy", () => {
     } finally {
       await server.close();
     }
+  });
+
+  it("listen rejects foreign Origin when allowedOrigins is set", async () => {
+    const server = minimalServer({ allowedOrigins: ["app.example.com"] });
+    return server.listen(0).then(async ({ url }) => {
+      try {
+        expect(
+          await rawStatus(url, { origin: "https://evil.example.com" })
+        ).toBe(403);
+        expect(
+          await rawStatus(url, { origin: "https://app.example.com" })
+        ).not.toBe(403);
+      } finally {
+        await server.close();
+      }
+    });
   });
 
   it("listen on 0.0.0.0 without allowedHosts serves unvalidated, with a warning", async () => {

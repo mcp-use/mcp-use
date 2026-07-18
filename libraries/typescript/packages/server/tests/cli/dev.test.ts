@@ -153,7 +153,7 @@ export default new MCPServer({
 }
 
 describe("runDev", () => {
-  it("creates a missing root tools.d.ts", async () => {
+  it("creates a missing root mcp-env.d.ts", async () => {
     const cwd = copyFixture("dev-tools-declaration");
     cleanups.push(() => removeDir(cwd));
 
@@ -161,9 +161,12 @@ describe("runDev", () => {
     const dev = await startDev(cwd, port);
     cleanups.push(dev.stop);
 
-    expect(existsSync(join(cwd, "tools.d.ts"))).toBe(true);
-    expect(readFileSync(join(cwd, "tools.d.ts"), "utf8")).toContain(
+    expect(existsSync(join(cwd, "mcp-env.d.ts"))).toBe(true);
+    expect(readFileSync(join(cwd, "mcp-env.d.ts"), "utf8")).toContain(
       'tools: typeof import("./src/index.js")'
+    );
+    expect(readFileSync(join(cwd, "mcp-env.d.ts"), "utf8")).toContain(
+      'declare module "*.css"'
     );
   });
 
@@ -503,11 +506,11 @@ throw new Error("startup failure after MCPServer construction");
     );
   });
 
-  // DNS-rebinding protection: the dev listener validates Host/Origin on
-  // localhost binds before any routing — same posture as MCPServer.listen()
-  // (CLI_SPEC.md § dev). Raw node:http requests because fetch() sanitizes
-  // Host/Origin headers.
-  it("rejects non-localhost Host and Origin headers (DNS rebinding)", async () => {
+  // DNS-rebinding protection: the dev listener validates Host on localhost
+  // binds before any routing — same posture as MCPServer.listen() (CLI_SPEC.md
+  // § dev). Origin is not validated unless the server sets allowedOrigins.
+  // Raw node:http requests because fetch() sanitizes Host/Origin headers.
+  it("rejects non-localhost Host but accepts foreign Origin (DNS rebinding)", async () => {
     const cwd = copyFixture("dev-rebind");
     cleanups.push(() => removeDir(cwd));
 
@@ -515,27 +518,25 @@ throw new Error("startup failure after MCPServer construction");
     const dev = await startDev(cwd, port);
     cleanups.push(dev.stop);
 
-    // MCP endpoint: rebound Host and cross-site Origin are both rejected.
+    // MCP endpoint: rebound Host is rejected; foreign Origin is allowed.
     expect(await rawStatus(dev.url, { host: "evil.example.com" })).toBe(403);
     expect(
-      await rawStatus(dev.url, { origin: "https://evil.example.com" })
-    ).toBe(403);
+      await rawStatus(dev.url, { origin: "https://inspector.manufact.com" })
+    ).not.toBe(403);
     expect(
       await rawStatus(dev.url, { origin: `http://localhost:${port}` })
     ).not.toBe(403);
 
     // Dev API routes sit in front of the MCP handler and must be covered by
-    // the same check (starting a tunnel would expose the server publicly).
+    // the same Host check (starting a tunnel would expose the server publicly).
     const infoUrl = `${dev.url}/inspector/api/dev/info`;
     expect(await rawStatus(infoUrl, { host: "evil.example.com" }, "GET")).toBe(
       403
     );
     expect(await rawStatus(infoUrl, {}, "GET")).toBe(200);
 
-    // GET/HEAD are exempt from the Origin check (Host still validated):
-    // opaque-origin view iframes fetch modules/assets with `Origin: null`.
     expect(await rawStatus(infoUrl, { origin: "null" }, "GET")).toBe(200);
-    expect(await rawStatus(dev.url, { origin: "null" })).toBe(403);
+    expect(await rawStatus(dev.url, { origin: "null" })).not.toBe(403);
   });
 });
 
@@ -667,12 +668,12 @@ describe("runDev (views)", () => {
     );
 
     const viewModuleResponse = await fetch(
-      `${base}/resources/product-search-result/view.tsx`
+      `${base}/views/product-search-result/view.tsx`
     );
     expect(viewModuleResponse.status).toBe(200);
 
     const assetImportResponse = await fetch(
-      `${base}/resources/product-search-result/badge.png?import`
+      `${base}/views/product-search-result/badge.png?import`
     );
     expect(assetImportResponse.status).toBe(200);
     const assetImportJs = await assetImportResponse.text();
@@ -680,7 +681,7 @@ describe("runDev (views)", () => {
     // 127.0.0.1 bind address (VIEWS_SPEC.md § Dev).
     expect(assetImportJs).toMatch(
       new RegExp(
-        `http://localhost:${port}/resources/product-search-result/badge\\.png`
+        `http://localhost:${port}/views/product-search-result/badge\\.png`
       )
     );
 
@@ -731,9 +732,9 @@ describe("runDev (views)", () => {
       expect.arrayContaining([`ws://localhost:${port}`])
     );
 
-    mkdirSync(join(cwd, "resources", "extra-view"), { recursive: true });
+    mkdirSync(join(cwd, "views", "extra-view"), { recursive: true });
     writeFileSync(
-      join(cwd, "resources", "extra-view", "view.tsx"),
+      join(cwd, "views", "extra-view", "view.tsx"),
       `export default function Extra() { return <div>extra</div>; }\n`
     );
 
@@ -800,7 +801,7 @@ describe("runDev (views)", () => {
     };
     await loadModule("/@id/__x00__virtual:mcp-use/views/product-search-result");
     const viewModule = await fetch(
-      `${base}/resources/product-search-result/view.tsx`
+      `${base}/views/product-search-result/view.tsx`
     );
     // Fast Refresh wrapped the view component module.
     expect(await viewModule.text()).toContain("RefreshRuntime");
@@ -825,12 +826,7 @@ describe("runDev (views)", () => {
     await new Promise((r) => setTimeout(r, 1000));
     messages.length = 0;
 
-    const viewPath = join(
-      cwd,
-      "resources",
-      "product-search-result",
-      "view.tsx"
-    );
+    const viewPath = join(cwd, "views", "product-search-result", "view.tsx");
     const viewSource = readFileSync(viewPath, "utf8");
     writeFileSync(viewPath, viewSource.replace("results", "hot-results"));
 

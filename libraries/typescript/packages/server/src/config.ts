@@ -55,9 +55,9 @@ interface BaseServerConfig {
    *
    * Accepts a safe path relative to the project `public/` directory, an
    * absolute HTTP(S) URL, or an image data URL. The selected image is served
-   * at the root-level `/favicon.ico` route. When omitted, the `icons` field
-   * selects the favicon using ICO, small PNG, any PNG, then first-icon order.
-   * An explicit value always wins; an empty string is invalid.
+   * at the root-level `/favicon.ico` route. When omitted, the first entry in
+   * `icons` selects the favicon. An explicit value always wins; an empty
+   * string is invalid.
    *
    * @defaultValue Inferred from `icons`, or no favicon when `icons` is absent
    * or empty.
@@ -81,8 +81,8 @@ interface BaseServerConfig {
    * relative to `public/`, an absolute HTTP(S) URL, or an image data URL.
    * Local paths become request-scoped absolute URLs under
    * `${basePath}/_mcp-use/public/`; author order is preserved on the wire.
-   * When `favicon` is omitted, these icons also select `/favicon.ico`.
-   * An empty array is valid and selects no favicon.
+   * When `favicon` is omitted, the first icon in this array also selects
+   * `/favicon.ico`. An empty array is valid and selects no favicon.
    *
    * @defaultValue `undefined`
    * @throws TypeError When an icon has an invalid source, MIME type, sizes,
@@ -152,9 +152,9 @@ interface BaseServerConfig {
   /**
    * Extra allowed origin hostnames for Origin-header validation
    * (port-agnostic, additive to the localhost-class origins). When unset,
-   * mirrors the effective Host allowlist. Origin is validated only on
-   * non-GET/HEAD requests (sandboxed view iframes send `Origin: null` on
-   * asset GETs; the MCP wire is POST). Requests without an `Origin` header
+   * Origin validation is off (SDK-aligned). When set, Origin is validated
+   * only on non-GET/HEAD requests (sandboxed view iframes send `Origin: null`
+   * on asset GETs; the MCP wire is POST). Requests without an `Origin` header
    * always pass (non-browser MCP clients don't send one).
    */
   allowedOrigins?: string[];

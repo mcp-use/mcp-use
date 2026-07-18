@@ -281,6 +281,7 @@ function ViewPreviewBundle({
         }}
         cspMode="permissive"
         hostInfo={{ name: "mcp-use-inspector", version: "11.0.0" }}
+        mockOpenAiFileApis
       />
     </div>
   );

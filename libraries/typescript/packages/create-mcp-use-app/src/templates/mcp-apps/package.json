@@ -5,19 +5,18 @@
     "node": ">=22.22.2"
   },
   "version": "1.0.0",
-  "description": "MCP server with a standard MCP Apps view",
-  "author": "",
+  "description": "an mcp-use server",
+  "author": "mcp-use",
   "license": "MIT",
+  "homepage": "https://github.com/mcp-use/mcp-use",
   "keywords": [
     "mcp",
-    "server",
-    "starter",
-    "tools",
-    "resources",
-    "prompts",
-    "ui",
-    "react",
-    "mcp-apps"
+    "mcp-server",
+    "chatgpt plugins",
+    "claude connector",
+    "mcp-app",
+    "mcp-use",
+    "manufact"
   ],
   "main": "dist/index.js",
   "scripts": {

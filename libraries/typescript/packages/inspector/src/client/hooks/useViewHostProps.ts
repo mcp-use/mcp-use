@@ -71,6 +71,7 @@ export function useViewHostProps(options: {
   | "inlineMaxWidth"
   | "chromeless"
   | "onReady"
+  | "mockOpenAiFileApis"
 > | null {
   const {
     serverId,
@@ -260,5 +261,6 @@ export function useViewHostProps(options: {
     inlineMaxWidth,
     chromeless,
     onReady,
+    mockOpenAiFileApis: true,
   };
 }

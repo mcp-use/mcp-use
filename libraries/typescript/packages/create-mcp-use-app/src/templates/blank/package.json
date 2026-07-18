@@ -5,14 +5,18 @@
     "node": ">=22.22.2"
   },
   "version": "1.0.0",
-  "description": "Blank mcp-use server",
-  "author": "",
+  "description": "an mcp-use server",
+  "author": "mcp-use",
   "license": "MIT",
+  "homepage": "https://github.com/mcp-use/mcp-use",
   "keywords": [
     "mcp",
-    "server",
-    "blank",
-    "mcp-use"
+    "mcp-server",
+    "chatgpt plugins",
+    "claude connector",
+    "mcp-app",
+    "mcp-use",
+    "manufact"
   ],
   "main": "dist/index.js",
   "scripts": {

@@ -1,7 +1,7 @@
 /**
  * View discovery for `mcp-use build` / `mcp-use dev`.
  *
- * Views live under `resources/<name>/view.tsx` (VIEWS_SPEC.md § File-based views).
+ * Views live under `views/<name>/view.tsx` (VIEWS_SPEC.md § File-based views).
  */
 
 import { existsSync, readdirSync } from "node:fs";
@@ -9,6 +9,9 @@ import { join } from "node:path";
 import type { ViteDevServer } from "vite";
 
 import type { ViewsManifest } from "../views/types.js";
+
+/** Author-facing view source directory at the project root. */
+export const VIEWS_SOURCE_DIR = "views" as const;
 
 /** Prefix for per-view virtual entry modules (`virtual:mcp-use/views/<name>`). */
 export const VIRTUAL_VIEW_PREFIX = "virtual:mcp-use/views/";
@@ -22,16 +25,16 @@ export const VIRTUAL_VIEW_RESOLVED_PREFIX = `\0${VIRTUAL_VIEW_PREFIX}`;
  * @internal
  */
 export interface DiscoveredView {
-  /** View directory name (the `resources/<name>` segment). */
+  /** View directory name (the `views/<name>` segment). */
   name: string;
-  /** Absolute path to `resources/<name>/view.tsx`. */
+  /** Absolute path to `views/<name>/view.tsx`. */
   entryPath: string;
 }
 
 /**
- * Scan `resources/<name>/view.tsx` under the project root.
+ * Scan `views/<name>/view.tsx` under the project root.
  *
- * A missing or empty `resources/` directory yields an empty list — tool-only
+ * A missing or empty `views/` directory yields an empty list — tool-only
  * projects keep byte-identical CLI behavior.
  *
  * @param cwd - Absolute project root.
@@ -40,17 +43,17 @@ export interface DiscoveredView {
  * @internal
  */
 export function discoverViews(cwd: string): DiscoveredView[] {
-  const resourcesDir = join(cwd, "resources");
-  if (!existsSync(resourcesDir)) {
+  const viewsDir = join(cwd, VIEWS_SOURCE_DIR);
+  if (!existsSync(viewsDir)) {
     return [];
   }
 
   const views: DiscoveredView[] = [];
-  for (const entry of readdirSync(resourcesDir, { withFileTypes: true })) {
+  for (const entry of readdirSync(viewsDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) {
       continue;
     }
-    const entryPath = join(resourcesDir, entry.name, "view.tsx");
+    const entryPath = join(viewsDir, entry.name, "view.tsx");
     if (existsSync(entryPath)) {
       views.push({ name: entry.name, entryPath });
     }
@@ -88,9 +91,7 @@ export function devVirtualEntryPath(name: string): string {
  */
 export function isViewPath(file: string, cwd: string): boolean {
   const rel = file.startsWith(cwd) ? file.slice(cwd.length + 1) : file;
-  return (
-    /^resources\/[^/]+\//.test(rel) || /^resources\/[^/]+\/view\.tsx$/.test(rel)
-  );
+  return /^views\/[^/]+\//.test(rel) || /^views\/[^/]+\/view\.tsx$/.test(rel);
 }
 
 /**
@@ -100,7 +101,7 @@ export function isViewPath(file: string, cwd: string): boolean {
  */
 export function isViewEntryPath(file: string, cwd: string): boolean {
   const rel = file.startsWith(cwd) ? file.slice(cwd.length + 1) : file;
-  return /^resources\/[^/]+\/view\.tsx$/.test(rel);
+  return /^views\/[^/]+\/view\.tsx$/.test(rel);
 }
 
 /**

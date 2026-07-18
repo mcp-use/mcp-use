@@ -43,7 +43,7 @@ const server = new MCPServer({
 <ParamField body="basePath" type="string" default="/mcp">Exact MCP endpoint pathname. It must start with `/` and cannot contain whitespace, `//`, a query, a fragment, or a trailing slash except for `/` itself.</ParamField>
 <ParamField body="host" type="string" default="127.0.0.1">Hostname used by `listen()`. Set `"0.0.0.0"` for a public bind. `getHandler()` does not bind a socket.</ParamField>
 <ParamField body="allowedHosts" type="string[]">Additional Host-header allowlist entries. Values are additive to localhost names and enable Host validation for `getHandler()`.</ParamField>
-<ParamField body="allowedOrigins" type="string[]">Additional Origin-header allowlist entries. Values are additive to localhost origins. When omitted, the effective Host allowlist is used. GET and HEAD skip Origin validation.</ParamField>
+<ParamField body="allowedOrigins" type="string[]">Additional Origin-header allowlist entries. Values are additive to localhost origins. When omitted, Origin validation is off (SDK-aligned). GET and HEAD skip Origin validation when enabled.</ParamField>
 <ParamField body="legacy" type='"stateless" | "reject"' default="stateless">Serve 2025-era clients through the stateless compatibility path, or reject them for a modern-only server.</ParamField>
 <ParamField body="publicLandingPage" type="boolean" default="false">Expose the HTML landing page without bearer authentication when OAuth is configured. The page remains available for explicit HTML GET/HEAD navigation and MCP protocol requests stay protected.</ParamField>
 <ParamField body="cors" type="CorsOptions">Add CORS headers to every mcp-use-owned route. Omit it for no CORS headers; use this alongside `allowedOrigins` when serving browser clients.</ParamField>
@@ -54,12 +54,7 @@ const server = new MCPServer({
 
 ## Icon and favicon behavior
 
-When `favicon` is omitted, `icons` selects the browser favicon in this order:
-
-1. ICO by MIME type or URL pathname.
-2. PNG with a declared `16x16` or `32x32` size.
-3. Any PNG by MIME type or URL pathname.
-4. The first icon.
+When `favicon` is omitted, `icons` selects the browser favicon using the **first icon** in author order.
 
 An empty `icons` array selects no favicon. An explicit empty `favicon` is invalid.
 
@@ -70,7 +65,6 @@ Local files belong under the project `public/` directory:
 ```text
 public/
 └── brand/
-    ├── favicon.ico
     ├── icon.svg
     └── icon-32.png
 ```

@@ -11,11 +11,11 @@ they arrive via `useToolContext<"write-story">()`.
   replace the pending `toolInput` snapshot (a `DeepPartial`).
 - **Default `viewConfig`** — no named export; runtime defaults apply
   (`autoResize: true`, all standard display modes).
-- **File-based views** under `resources/<name>/view.tsx`, discovered by
+- **File-based views** under `views/<name>/view.tsx`, discovered by
   `mcp-use dev` / `build` / `start`.
 - **One tool ↔ one view** via `view: { name, description, prefersBorder }` on
   `write-story`.
-- **Zero-codegen typing** via `src/tools.d.ts` and the exported `writeStory`
+- **Zero-codegen typing** via `src/mcp-env.d.ts` and the exported `writeStory`
   tool ref.
 - **Tailwind CSS v4** — `vite.config.ts` (`@tailwindcss/vite`) and
   `@import "tailwindcss"` in `view.css`.
@@ -61,10 +61,12 @@ Production path:
 pnpm build && pnpm start
 ```
 
-## Typing (`tools.d.ts`)
+## Typing (`mcp-env.d.ts`)
 
 ```ts
-// src/tools.d.ts
+// src/mcp-env.d.ts
+declare module "*.css";
+
 declare module "mcp-use/react" {
   interface Register {
     tools: typeof import("./index.js");

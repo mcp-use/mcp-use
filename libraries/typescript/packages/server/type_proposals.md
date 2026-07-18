@@ -15,7 +15,7 @@ todos:
     content: Strip typegen from server startup/HMR/CLI build hot paths; keep `mcp-use typegen` as optional escape hatch; drop generated d.ts from template tsconfig
     status: pending
   - id: templates
-    content: "Update create-mcp-use-app templates: chosen registration style in index.tsx, constant-content tools.d.ts at the project root (committed, in tsconfig include, recreated by dev/build when missing), views import useCallTool from mcp-use/react directly"
+    content: "Update create-mcp-use-app templates: chosen registration style in index.tsx, constant-content mcp-env.d.ts at the project root (committed, in tsconfig include, recreated by dev/build when missing), views import useCallTool from mcp-use/react directly"
     status: pending
   - id: typed-usewidget
     content: Type useView/ViewProps from the same registry via the tool's view binding (contract in specs/VIEWS_SPEC.md § Typing)
@@ -42,10 +42,12 @@ TypeScript physics: without codegen, a type can cross a module boundary through 
 
 ## Shared machinery (identical in both proposals)
 
-**Distribution — constant-content `tools.d.ts` (the `vite-env.d.ts` / `next-env.d.ts` precedent).** The template ships a committed file at the project root (`tools.d.ts` — it cannot live in the gitignored `.mcp-use/`); `dev` and `build` recreate it from the discovered entry path when missing and never overwrite it:
+**Distribution — constant-content `mcp-env.d.ts` (the `vite-env.d.ts` / `next-env.d.ts` precedent).** The template ships a committed file at the project root (`mcp-env.d.ts` — it cannot live in the gitignored `.mcp-use/`); `dev` and `build` recreate it from the discovered entry path when missing and never overwrite it:
 
 ```ts
-// tools.d.ts — content is constant; it names no tools, so it can never go stale
+// mcp-env.d.ts — content is constant; it names no tools, so it can never go stale
+declare module "*.css";
+
 declare module "mcp-use/react" {
   interface Register {
     tools: typeof import("./index.js");
@@ -56,7 +58,7 @@ declare module "mcp-use/react" {
 `typeof import()` is a live edge in TypeScript's type graph (same as `import type`): edit `index.tsx` and every widget's types update instantly in tsserver — no watcher, no dev server, no file writes. This is configuration, not codegen. In `mcp-use/react`:
 
 ```ts
-export interface Register {} // empty; filled by the project's tools.d.ts
+export interface Register {} // empty; filled by the project's mcp-env.d.ts
 
 export type RegisteredTools = Register extends { tools: infer M }
   ? ProjectTools<M>   // thin { input; output } projection per tool (see perf notes)
@@ -177,7 +179,7 @@ server.tool({ name: "get-fruit-details", schema, outputSchema }, handler);
 - Choose **C** if zero user-facing ceremony trumps everything, and a dev/build-integrated generation step (with CI freshness check) is an acceptable cost. It is the only option that types bare statements and, later, filesystem facts like widget names.
 - They compose rather than exclude: A can ship first (pure inference core); B can be added later as sugar returning the same ToolRefs; C's generator can arrive afterwards as an *optional enhancement layer* that fills the same `Register` interface for projects that refuse exports — hooks, fallback, and distribution are identical across all three, so no consumer code ever changes.
 
-**Outcome:** A is the contract's primary mode; C is demoted to the explicit `mcp-use typegen` escape hatch, never on the dev/build hot path; B stays available as future sugar. The normative spelling — including the root-level `tools.d.ts` location (scaffolded and committed, with missing-file recovery in `dev`/`build`, so it cannot live in the gitignored `.mcp-use/`) and the absence of any config file — lives in `specs/VIEWS_SPEC.md` § Typing; where this record's sketches differ (e.g. `.mcp-use/tools.d.ts` paths, `mcp-use.json`, v1 package file paths below), the spec wins.
+**Outcome:** A is the contract's primary mode; C is demoted to the explicit `mcp-use typegen` escape hatch, never on the dev/build hot path; B stays available as future sugar. The normative spelling — including the root-level `mcp-env.d.ts` location (scaffolded and committed, with missing-file recovery in `dev`/`build`, so it cannot live in the gitignored `.mcp-use/`) and the absence of any config file — lives in `specs/VIEWS_SPEC.md` § Typing; where this record's sketches differ (e.g. `.mcp-use/mcp-env.d.ts` paths, `mcp-use.json`, v1 package file paths below), the spec wins.
 
 ---
 
@@ -208,13 +210,13 @@ server.tool({ name: "get-fruit-details", schema, outputSchema }, handler);
 - `libraries/typescript/packages/mcp-use/src/react/createTypedHooks.ts` — rework to module-type input (cross-repo alternative path).
 - `libraries/typescript/packages/mcp-use/src/server/types/tool-ref.ts` + `mcp-server.ts` — ToolRef output inference (outputSchema, handler-return fallback); strip typegen calls; Proposal B adds `server.tools()` + `tool()` builder here.
 - `libraries/typescript/packages/cli/src/index.ts` — strip typegen from build.
-- `libraries/typescript/packages/create-mcp-use-app/src/templates/mcp-apps/*` — chosen registration style in `index.tsx`, committed root-level `tools.d.ts` (in tsconfig `include`, recreated by `dev`/`build` when missing), views importing hooks from `mcp-use/react`.
+- `libraries/typescript/packages/create-mcp-use-app/src/templates/mcp-apps/*` — chosen registration style in `index.tsx`, committed root-level `mcp-env.d.ts` (in tsconfig `include`, recreated by `dev`/`build` when missing), views importing hooks from `mcp-use/react`.
 - Proposal C only: new `libraries/typescript/packages/cli/src/typegen/` — ts-morph-based extractor (find ToolRef-returning calls, print via `typeToString`), Vite-plugin watcher integration, `mcp-use check` freshness command; replaces `tool-registry-generator.ts` + `zod-to-ts.ts` entirely.
 - Type-level tests with vitest `expectTypeOf` (Skybridge has a good reference suite): literal name union, input/output inference, filtering of non-ToolRef exports, composition (re-exports for A, spread for B), empty-Register fallback.
 
 ## Risks / notes
 
 - A only: forgotten `export const` silently untypes that tool (falls back to loose overload) — template habit + optional lint.
-- `tools.d.ts` records the entry path; renaming the entry surfaces immediately in tsserver and is a one-line fix for an existing file (deleting it lets the next `dev`/`build` recreate it from entry discovery; there is no config file to keep in sync — CLI_SPEC.md).
+- `mcp-env.d.ts` records the entry path; renaming the entry surfaces immediately in tsserver and is a one-line fix for an existing file (deleting it lets the next `dev`/`build` recreate it from entry discovery; there is no config file to keep in sync — CLI_SPEC.md).
 - TS perf: bounded by the thin `{ input; output }` projection + lazy object-property evaluation (tRPC lesson); Zod inference is the dominant per-tool cost, acceptable.
-- The server entry must resolve within the view TS program — true in the planned template shape (single tsconfig includes the entry, `resources/**`, and `tools.d.ts`).
+- The server entry must resolve within the view TS program — true in the planned template shape (single tsconfig includes the entry, `views/**`, and `mcp-env.d.ts`).

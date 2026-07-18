@@ -1067,10 +1067,16 @@ async function main(): Promise<void> {
     console.log("   ├── tsconfig.json");
     console.log("   └── README.md");
   } else if (validatedTemplate === "mcp-apps") {
-    console.log("   ├── resources/");
+    console.log("   ├── public/");
+    console.log("   │   ├── icon.svg");
+    console.log("   │   └── fruits/ (16 WebP assets)");
+    console.log("   ├── views/");
     console.log("   │   └── product-search-result/");
-    console.log("   │       └── view.tsx");
-    console.log("   ├── tools.d.ts");
+    console.log("   │       ├── view.tsx");
+    console.log("   │       ├── view.css");
+    console.log("   │       ├── components/");
+    console.log("   │       └── hooks/");
+    console.log("   ├── mcp-env.d.ts");
     console.log("   ├── index.ts (server entry point)");
     console.log("   ├── package.json");
     console.log("   ├── tsconfig.json");

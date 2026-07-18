@@ -698,9 +698,8 @@ export class MCPServer<TUser = never> {
    * Serve over HTTP on Node. Pass port `0` for an ephemeral port.
    *
    * Binds `config.host` (default `127.0.0.1`). Localhost-class binds get
-   * DNS-rebinding protection automatically: `Host` on every request,
-   * `Origin` only on non-GET/HEAD (sandboxed view iframes send
-   * `Origin: null` on asset GETs). To serve publicly set `host: "0.0.0.0"`;
+   * DNS-rebinding Host protection automatically. Origin validation is off
+   * unless `allowedOrigins` is set. To serve publicly set `host: "0.0.0.0"`;
    * behind a platform edge that is all that's needed, and `allowedHosts`
    * restricts direct exposure (additive — localhost-class values stay allowed).
    *
@@ -939,11 +938,11 @@ export class MCPServer<TUser = never> {
    *
    * Configured lists are additive to the localhost-class allowlists, so local
    * runs keep working when a deployment hostname is added. With nothing
-   * configured, `listen()` on a localhost-class bind validates against the
+   * configured, `listen()` on a localhost-class bind validates Host against the
    * localhost lists (the DNS-rebinding threat model), while `getHandler()` —
-   * which never binds — applies no validation. `allowedOrigins` defaults to
-   * mirroring the effective Host allowlist. Origin validation runs only on
-   * non-GET/HEAD requests.
+   * which never binds — applies no validation. Origin validation is off unless
+   * `allowedOrigins` is set explicitly (SDK-aligned: the handler is open by
+   * default). When enabled, Origin is checked only on non-GET/HEAD requests.
    */
   #validationPolicy(mode: "listen" | "handler"): {
     hosts: string[] | undefined;
@@ -960,7 +959,7 @@ export class MCPServer<TUser = never> {
     const origins =
       allowedOrigins !== undefined
         ? [...new Set([...localhostAllowedOrigins(), ...allowedOrigins])]
-        : hosts;
+        : undefined;
     return { hosts, origins };
   }
 
@@ -990,11 +989,11 @@ export class MCPServer<TUser = never> {
 
       if (hosts !== undefined) {
         middlewares.unshift(hostValidationMiddleware(hosts));
-        middlewares.push(originValidationMiddleware(origins ?? hosts));
-      } else {
-        if (origins !== undefined) {
-          middlewares.push(originValidationMiddleware(origins));
-        }
+      }
+      if (origins !== undefined) {
+        middlewares.push(originValidationMiddleware(origins));
+      }
+      if (hosts === undefined) {
         if (mode === "listen") {
           console.warn(
             `[mcp-use] listen() is serving on ${this.#config.host} without ` +
@@ -1141,7 +1140,12 @@ export class MCPServer<TUser = never> {
       const inspectorHandler = createInspectorHandler(this.#config.inspector, {
         serverName: this.#config.name,
         basePath,
-        ...(faviconHandler !== undefined && { faviconHref: "/favicon.ico" }),
+        ...(faviconHandler !== undefined && {
+          faviconHref: "/favicon.ico",
+          ...(this.#branding.faviconMimeType !== undefined && {
+            faviconType: this.#branding.faviconMimeType,
+          }),
+        }),
       });
       if (inspectorHandler !== undefined) {
         routes.push({

@@ -41,7 +41,7 @@ function makeClient(): Client {
 }
 
 describe("server branding", () => {
-  it("reports canonical websiteUrl/icons and selects ICO for the favicon", async () => {
+  it("reports canonical websiteUrl/icons and uses the first icon for the favicon", async () => {
     const root = project({
       "brand/icon.svg": '<svg xmlns="http://www.w3.org/2000/svg"></svg>',
       "brand/icon-32.png": "png-32",
@@ -64,7 +64,7 @@ describe("server branding", () => {
     });
     primeDev(server, root);
 
-    expect(server.branding.favicon).toBe("brand/favicon.ico");
+    expect(server.branding.favicon).toBe("brand/icon.svg");
     const started = await server.listen(0);
     const client = makeClient();
     await client.connect(
@@ -91,20 +91,20 @@ describe("server branding", () => {
 
     const favicon = await fetch(`${new URL(started.url).origin}/favicon.ico`);
     expect(favicon.status).toBe(200);
-    expect(favicon.headers.get("content-type")).toBe("image/x-icon");
+    expect(favicon.headers.get("content-type")).toBe("image/svg+xml");
     expect(favicon.headers.get("cache-control")).toBe(
       "public, max-age=31536000, immutable"
     );
     expect(favicon.headers.get("access-control-allow-origin")).toBe(
       "https://app.example.test"
     );
-    expect(await favicon.text()).toBe("ico");
+    expect(await favicon.text()).toContain("<svg");
 
     const head = await fetch(`${new URL(started.url).origin}/favicon.ico`, {
       method: "HEAD",
     });
     expect(head.status).toBe(200);
-    expect(head.headers.get("content-type")).toBe("image/x-icon");
+    expect(head.headers.get("content-type")).toBe("image/svg+xml");
     expect(await head.text()).toBe("");
 
     const publicIcon = await fetch(identity!.icons![0]!.src);
@@ -119,14 +119,16 @@ describe("server branding", () => {
     });
     const landingHtml = await landing.text();
     const faviconUrl = `${new URL(started.url).origin}/favicon.ico`;
-    expect(landingHtml).toContain(`<link rel="icon" href="${faviconUrl}">`);
+    expect(landingHtml).toContain(
+      `<link rel="icon" type="image/svg+xml" href="${faviconUrl}">`
+    );
     expect(landingHtml).toContain(`<img src="${faviconUrl}"`);
 
     const inspector = await fetch(
       `${new URL(started.url).origin}/mcp/inspector`
     );
     expect(await inspector.text()).toContain(
-      '<link rel="icon" href="/favicon.ico" />'
+      '<link rel="icon" type="image/svg+xml" href="/favicon.ico" />'
     );
 
     await client.close();
@@ -165,7 +167,7 @@ describe("server branding", () => {
     await server.close();
   });
 
-  it("ranks small PNG ahead of other PNG and SVG icons", () => {
+  it("uses the first icon for favicon when favicon is omitted", () => {
     const server = new MCPServer({
       name: "png-rank-test",
       version: "1.0.0",
@@ -175,7 +177,7 @@ describe("server branding", () => {
         { src: "small.png", mimeType: "image/png", sizes: ["32x32"] },
       ],
     });
-    expect(server.branding.favicon).toBe("small.png");
+    expect(server.branding.favicon).toBe("icon.svg");
 
     const queriedIco = new MCPServer({
       name: "queried-ico-rank-test",
@@ -185,9 +187,7 @@ describe("server branding", () => {
         { src: "https://cdn.example.com/favicon.ico?v=2" },
       ],
     });
-    expect(queriedIco.branding.favicon).toBe(
-      "https://cdn.example.com/favicon.ico?v=2"
-    );
+    expect(queriedIco.branding.favicon).toBe("small.png");
 
     const dataIco = "data:image/x-icon;base64,aWNv";
     const inferredDataMime = new MCPServer({
@@ -198,7 +198,7 @@ describe("server branding", () => {
         { src: dataIco },
       ],
     });
-    expect(inferredDataMime.branding.favicon).toBe(dataIco);
+    expect(inferredDataMime.branding.favicon).toBe("small.png");
   });
 
   it("serves data favicons and redirects absolute favicons without fetching", async () => {
@@ -417,7 +417,7 @@ describe("server branding", () => {
     );
     expect(landing.status).toBe(200);
     expect(await landing.text()).toContain(
-      '<link rel="icon" href="https://request.example/favicon.ico">'
+      '<link rel="icon" type="image/svg+xml" href="https://request.example/favicon.ico">'
     );
 
     await server.close();

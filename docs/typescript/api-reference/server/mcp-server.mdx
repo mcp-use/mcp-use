@@ -59,7 +59,7 @@ The most common `ServerConfig` fields:
 ><ParamField body="config.baseUrl" type="string | undefined" default="undefined" >   Full public base URL (overrides `host:port` for widget and OAuth URLs). Use when behind a reverse proxy. </ParamField>
 ><ParamField body="config.oauth" type="OAuthProvider | undefined" default="undefined" >   OAuth provider configuration. When present, the instance is typed as `McpServerInstance<true>`. </ParamField>
 ><ParamField body="config.cors" type="Partial<Parameters<typeof cors>[0]> | undefined" default="undefined" >   CORS overrides, matching the options accepted by Hono's `cors` middleware. Defaults to permissive CORS (`origin: "*"`) for development ergonomics. </ParamField>
-><ParamField body="config.allowedOrigins" type="string[] | undefined" default="undefined" >   Allowed origins for DNS rebinding protection. If unset or empty, host validation is disabled; if set, validation is enabled globally. </ParamField>
+><ParamField body="config.allowedOrigins" type="string[] | undefined" default="undefined" >   Allowed origins for DNS rebinding protection. When unset, Origin validation is off. When set, validation is enabled (additive to localhost origins). </ParamField>
 ><ParamField body="config.stateless" type="boolean | undefined" default="undefined" >   Force stateless (no session tracking) or stateful mode. Auto-detected when omitted: stateless for Deno, stateful for Node.js. </ParamField>
 ><ParamField body="config.sessionIdleTimeoutMs" type="number | undefined" default="86400000" >   Idle timeout for sessions in milliseconds (default: 86400000, one day). </ParamField>
 

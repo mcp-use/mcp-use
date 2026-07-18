@@ -41,7 +41,7 @@ import { resolvePort } from "./port.js";
 import { resolveTailwindCss, resolveUserViteConfig } from "./vite-config.js";
 import { createDevApiHandler } from "./dev-api.js";
 import { createTunnelManager } from "./tunnel.js";
-import { ensureToolsDeclaration } from "./tools-declaration.js";
+import { ensureMcpEnvDeclaration } from "./mcp-env-declaration.js";
 import { resolveWorkspacePaths } from "./workspace.js";
 import { mcpUseViewsPlugin } from "./views-plugin.js";
 import {
@@ -329,8 +329,8 @@ export async function runDev(options: DevOptions): Promise<void> {
       : undefined;
 
   const entry = discoverEntry(options.cwd, options.entry);
-  if (await ensureToolsDeclaration(options.cwd, entry)) {
-    console.log("[mcp-use] created tools.d.ts");
+  if (await ensureMcpEnvDeclaration(options.cwd, entry)) {
+    console.log("[mcp-use] created mcp-env.d.ts");
   }
   let currentViews: DiscoveredView[] = discoverViews(options.cwd);
   // The Vite client environment (views plugin, Fast Refresh, HMR socket,
@@ -525,7 +525,7 @@ export async function runDev(options: DevOptions): Promise<void> {
   };
 
   // A `change` event cannot add or remove a view directory, so only
-  // `add`/`unlink` rescan `resources/` — content edits never pay for the
+  // `add`/`unlink` rescan `views/` — content edits never pay for the
   // synchronous filesystem walk in discoverViews().
   vite.watcher.on("change", onSsrFileEvent);
   vite.watcher.on("add", onFileAddOrUnlink);
@@ -559,17 +559,17 @@ export async function runDev(options: DevOptions): Promise<void> {
   //
   // Host is validated on every request: rebinding works by making the
   // attacker's page same-origin with this server, and the Host header is
-  // where that shows up. Origin is validated only on side-effect-bearing
-  // methods (the MCP wire and the dev API are all POST): sandboxed view
-  // iframes have an opaque origin, so their module/asset GETs legitimately
-  // carry `Origin: null` — and external hosts rendering views through the
-  // tunnel fetch assets with their own origins. Those cross-origin loads also
-  // need CORS: the MCP server's view asset/public routes always emit
-  // `Access-Control-Allow-Origin: *`. Vite-served module URLs (onRequest
-  // below) emit `*` while a tunnel is active; without a tunnel, localhost
-  // binds reflect a validated loopback Origin (exact value + `Vary: Origin`)
-  // so a local MCP host can load the module graph, while foreign / opaque /
-  // missing Origin get no ACAO.
+  // where that shows up. Origin is not validated here (SDK-aligned default);
+  // set `allowedOrigins` on the MCPServer to opt in — the handler middleware
+  // enforces it. Sandboxed view iframes have an opaque origin, so their
+  // module/asset GETs legitimately carry `Origin: null` — and external hosts
+  // rendering views through the tunnel fetch assets with their own origins.
+  // Those cross-origin loads also need CORS: the MCP server's view asset/public
+  // routes always emit `Access-Control-Allow-Origin: *`. Vite-served module
+  // URLs (onRequest below) emit `*` while a tunnel is active; without a tunnel,
+  // localhost binds reflect a validated loopback Origin (exact value +
+  // `Vary: Origin`) so a local MCP host can load the module graph, while
+  // foreign / opaque / missing Origin get no ACAO.
   const localhostBind = ["127.0.0.1", "localhost", "::1"].includes(host);
   const rejectDisallowedRequest = (
     req: IncomingMessage,
@@ -578,18 +578,10 @@ export async function runDev(options: DevOptions): Promise<void> {
     const tunnelUrl = tunnelManager.status().url;
     const tunnelHost = tunnelUrl !== null ? new URL(tunnelUrl).hostname : null;
     const extra = tunnelHost !== null ? [tunnelHost] : [];
-    const readOnly = req.method === "GET" || req.method === "HEAD";
-    const hostResult = validateHostHeader(req.headers.host, [
+    const result = validateHostHeader(req.headers.host, [
       ...localhostAllowedHostnames(),
       ...extra,
     ]);
-    const result =
-      hostResult.ok && !readOnly
-        ? validateOriginHeader(req.headers.origin, [
-            ...localhostAllowedOrigins(),
-            ...extra,
-          ])
-        : hostResult;
     if (result.ok) {
       return false;
     }
@@ -642,7 +634,7 @@ export async function runDev(options: DevOptions): Promise<void> {
     // when views existed at startup) and a currently non-empty registry.
     const viewsEnabled = viewsAtStartup && currentViews.length > 0;
     // Vite sees module-graph URLs (/@vite/client, /@id/virtual:…,
-    // /.mcp-use/cache/deps/…, view files under /resources/…) plus standard
+    // /.mcp-use/cache/deps/…, view files under /views/…) plus standard
     // node_modules pre-bundles; everything else — the MCP endpoint included —
     // goes straight to the fetch handler.
     const isViteRequest =
@@ -650,7 +642,7 @@ export async function runDev(options: DevOptions): Promise<void> {
       (pathname.startsWith("/@") ||
         pathname.startsWith("/node_modules/") ||
         pathname.startsWith("/.mcp-use/") ||
-        (viewsEnabled && pathname.startsWith("/resources/")));
+        (viewsEnabled && pathname.startsWith("/views/")));
 
     if (viewsEnabled && isViteRequest) {
       // CORS for Vite module URLs: tunnel → `*`; else localhost bind with a

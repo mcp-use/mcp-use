@@ -42,6 +42,9 @@ export interface TunnelManager {
   status(): { url: string | null };
 }
 
+const RESPAWN_BACKOFF_INITIAL_MS = 1_000;
+const RESPAWN_BACKOFF_MAX_MS = 30_000;
+
 /**
  * Create a tunnel manager that reads and writes subdomain state at
  * `stateFilePath` (typically `.mcp-use/state/tunnel.json`).
@@ -59,6 +62,15 @@ export function createTunnelManager(stateFilePath: string): TunnelManager {
   let proc: ChildProcess | undefined;
   let currentUrl: string | null = null;
   let currentSubdomain: string | undefined;
+  let activePort: number | undefined;
+  let intentionalStop = false;
+  let respawnInFlight: Promise<void> | undefined;
+  let respawnBackoffMs = RESPAWN_BACKOFF_INITIAL_MS;
+
+  const sleep = (ms: number): Promise<void> =>
+    new Promise((resolve) => {
+      setTimeout(resolve, ms);
+    });
 
   const markShutdown = (): void => {
     if (
@@ -107,6 +119,8 @@ export function createTunnelManager(stateFilePath: string): TunnelManager {
       );
     }
   };
+
+  let scheduleRespawn: () => void = () => {};
 
   const spawnTunnel = (
     port: number,
@@ -203,11 +217,15 @@ export function createTunnelManager(stateFilePath: string): TunnelManager {
         }
         // The tunnel CLI can exit after setup when its bore connection or
         // server-side registration disappears. Do not keep reporting a dead
-        // public URL through dev/info.
+        // public URL through dev/info; respawn while dev is still running.
         if (proc === child) {
           proc = undefined;
           currentUrl = null;
-          currentSubdomain = undefined;
+          if (intentionalStop) {
+            currentSubdomain = undefined;
+          } else {
+            scheduleRespawn();
+          }
         }
       });
 
@@ -219,12 +237,74 @@ export function createTunnelManager(stateFilePath: string): TunnelManager {
       }, 30_000);
     });
 
+  scheduleRespawn = (): void => {
+    if (intentionalStop || activePort === undefined || currentUrl !== null) {
+      return;
+    }
+    if (respawnInFlight !== undefined) {
+      return;
+    }
+
+    respawnInFlight = (async (): Promise<void> => {
+      while (
+        !intentionalStop &&
+        activePort !== undefined &&
+        currentUrl === null
+      ) {
+        console.log("[mcp-use] tunnel disconnected, restarting…");
+        const subdomain = currentSubdomain ?? (await loadSavedSubdomain());
+        try {
+          if (subdomain !== undefined) {
+            await releaseSubdomain(subdomain);
+          }
+
+          let tunnelInfo: Awaited<ReturnType<typeof spawnTunnel>>;
+          try {
+            tunnelInfo = await spawnTunnel(activePort, subdomain);
+          } catch (error) {
+            if (subdomain !== undefined) {
+              console.log(
+                `[mcp-use] subdomain "${subdomain}" unavailable, requesting a new one…`
+              );
+              tunnelInfo = await spawnTunnel(activePort, undefined);
+            } else {
+              throw error;
+            }
+          }
+
+          proc = tunnelInfo.process;
+          currentUrl = tunnelInfo.url;
+          currentSubdomain = tunnelInfo.subdomain;
+          await persistSubdomain(tunnelInfo.subdomain);
+          respawnBackoffMs = RESPAWN_BACKOFF_INITIAL_MS;
+          return;
+        } catch (error) {
+          console.warn(
+            `[mcp-use] tunnel restart failed: ${
+              error instanceof Error ? error.message : String(error)
+            }`
+          );
+          await sleep(respawnBackoffMs);
+          respawnBackoffMs = Math.min(
+            respawnBackoffMs * 2,
+            RESPAWN_BACKOFF_MAX_MS
+          );
+        }
+      }
+    })().finally(() => {
+      respawnInFlight = undefined;
+    });
+  };
+
   return {
     status(): { url: string | null } {
       return { url: currentUrl };
     },
 
     async start(port: number): Promise<{ url: string; subdomain: string }> {
+      intentionalStop = false;
+      activePort = port;
+
       if (currentUrl !== null) {
         return {
           url: currentUrl,
@@ -261,7 +341,12 @@ export function createTunnelManager(stateFilePath: string): TunnelManager {
     },
 
     async stop(): Promise<void> {
+      intentionalStop = true;
       markShutdown();
+
+      if (respawnInFlight !== undefined) {
+        await respawnInFlight;
+      }
 
       if (currentSubdomain !== undefined) {
         await releaseSubdomain(currentSubdomain);
@@ -272,8 +357,10 @@ export function createTunnelManager(stateFilePath: string): TunnelManager {
         proc = undefined;
       }
 
+      activePort = undefined;
       currentUrl = null;
       currentSubdomain = undefined;
+      respawnBackoffMs = RESPAWN_BACKOFF_INITIAL_MS;
     },
   };
 }
