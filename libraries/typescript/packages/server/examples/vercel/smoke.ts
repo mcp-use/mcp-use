@@ -1,7 +1,7 @@
 /**
  * Local smoke test for the Vercel entry point — no network, no `vercel dev`.
  * Invokes the exact handler Vercel would call (`api/mcp.ts`'s default export)
- * with synthetic Requests, performing a real JSON-RPC round trip. Node 24
+ * with synthetic Requests, performing a real JSON-RPC round trip. Node 20.19+
  * runs erasable-syntax TypeScript directly:
  *
  *   node smoke.ts
