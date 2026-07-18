@@ -2,6 +2,10 @@ import { MCPServer } from "../src/index.js";
 import { toAuthenticatedRequestContext } from "../src/context.js";
 import type { OAuthProvider } from "../src/oauth/index.js";
 import { oauthAuth0Provider, type Auth0OAuthUser } from "../src/oauth/auth0.js";
+import {
+  oauthBetterAuthProvider,
+  type BetterAuthOAuthUser,
+} from "../src/oauth/better-auth.js";
 import { oauthClerkProvider, type ClerkOAuthUser } from "../src/oauth/clerk.js";
 import {
   oauthKeycloakProvider,
@@ -103,6 +107,22 @@ function verifyOAuthCallbackTyping(): void {
     name: "clerk",
     version: "1.0.0",
     oauth: oauthClerkProvider({ frontendApiUrl: "https://clerk.example.com" }),
+  });
+
+  const betterAuth = new MCPServer({
+    name: "better-auth",
+    version: "1.0.0",
+    oauth: oauthBetterAuthProvider({
+      authURL: "https://auth.example.com/api/auth",
+    }),
+  });
+  betterAuth.tool({ name: "better-auth-user" }, (_params, ctx) => {
+    const auth: OAuthAuth<BetterAuthOAuthUser> = ctx.auth;
+    const user: BetterAuthOAuthUser = ctx.auth.user;
+    const isAnonymous: boolean | undefined = ctx.auth.user.isAnonymous;
+    assertOAuthAuthFields(auth);
+    void [user, isAnonymous];
+    return { content: [] };
   });
   clerk.tool({ name: "clerk-user" }, (_params, ctx) => {
     const auth: OAuthAuth<ClerkOAuthUser> = ctx.auth;
