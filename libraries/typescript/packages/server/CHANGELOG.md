@@ -1,5 +1,13 @@
 # mcp-use
 
+## 2.0.0-beta.7
+
+### Minor Changes
+
+- eabae55: Add the v2 `oauthBetterAuthProvider({ authURL })` resource-server adapter and a
+  credential-free Hono example using Better Auth anonymous sign-in with stateless
+  cookie sessions.
+
 ## 2.0.0-beta.6
 
 ### Minor Changes
