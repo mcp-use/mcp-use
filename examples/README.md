@@ -88,12 +88,12 @@ When you clone this repository locally, you'll find `python/` and `typescript/` 
   - [Supabase](../libraries/typescript/packages/mcp-use/examples/server/oauth/supabase/)
   - [WorkOS](../libraries/typescript/packages/mcp-use/examples/server/oauth/workos/)
 - **[Deployment](../libraries/typescript/packages/mcp-use/examples/server/deployment/)** - Deployment examples
-- **[UI Examples](../libraries/typescript/packages/mcp-use/examples/server/ui/)** — MCP Apps widgets
-  - **[MCP Apps (recommended)](../libraries/typescript/packages/mcp-use/examples/server/ui/mcp-apps/)** - Dual-protocol widgets with React auto-discovery
-  - [MCP Apps Gallery](../libraries/typescript/packages/mcp-use/examples/server/ui/mcp-ui/) - Three programmatic widgets via `server.uiResource({ type: "mcpApps" })`
-  - [Files](../libraries/typescript/packages/mcp-use/examples/server/ui/files/) - File-manager widget using `useFiles`
-  - [Model Context](../libraries/typescript/packages/mcp-use/examples/server/ui/model-context/) - Widgets reading host context (theme, locale, safe area)
-  - [Apps SDK (legacy)](../libraries/typescript/packages/mcp-use/examples/server/ui/mcp-apps/apps-sdk/) - ChatGPT Apps SDK only — prefer the dual-protocol **MCP Apps** example above
+- **[MCP Apps view examples](../libraries/typescript/packages/server/examples/views/)** — current `view` API and React hooks
+  - **[Basic](../libraries/typescript/packages/server/examples/views/basic/)** - Typed tool output, view tools, host context, and display modes
+  - [File Upload](../libraries/typescript/packages/server/examples/views/file-upload/) - File-manager view using `useFiles`
+  - [Story Writer](../libraries/typescript/packages/server/examples/views/story-writer/) - Interactive story-writing view
+  - [Tic-tac-toe](../libraries/typescript/packages/server/examples/views/tic-tac-toe/) - Stateful game UI
+  - [Excalidraw](../libraries/typescript/packages/server/examples/views/excalidraw/) - Canvas-based view
 
 ### Agent Examples
 - **[Basic Examples](../libraries/typescript/packages/mcp-use/examples/agent/basic/)** - Basic agent patterns

@@ -21,7 +21,7 @@
         <img src="https://dcbadge.limes.pink/api/server/XkNkSkMz3V?style=flat" /></a>
 </p>
 
-🚀 **Create mcp-use App** is the fastest way to scaffold a new MCP (Model Context Protocol) application. With just one command, you get a fully configured TypeScript project with hot reload, automatic inspector, and UI widget support - everything you need to build powerful MCP servers.
+🚀 **Create mcp-use App** scaffolds a TypeScript MCP project with hot reload, the inspector, and MCP Apps view support.
 
 ## 📦 Related Packages
 
@@ -48,22 +48,20 @@ That's it! Your MCP server is running at `http://localhost:3000` with the inspec
 
 ## 🎯 What It Creates
 
-Running `create-mcp-use-app` sets up a complete MCP development environment:
+The `mcp-apps` template creates this MCP development environment:
 
 ### Project Structure
 
 ```
 my-mcp-server/
-├── package.json          # Pre-configured with all scripts
-├── tsconfig.json         # TypeScript configuration
-├── .env.example          # Environment variables template
-├── .gitignore           # Git ignore rules
-├── README.md            # Project documentation
-├── src/
-│   └── index.ts         # MCP server entry point with example tools
-├── resources/           # UI widgets directory
-│   └── example-widget.tsx  # Example React widget
-└── dist/               # Build output (generated)
+├── index.ts                              # MCP server entry point
+├── package.json                          # Scripts and dependencies
+├── tsconfig.json                         # TypeScript configuration
+├── mcp-env.d.ts                          # Generated view typing bridge
+├── public/                               # Static assets
+└── views/                                # Included by the mcp-apps template
+    └── product-search-result/
+        └── view.tsx                      # React view entry point
 ```
 
 ### Pre-configured Features
@@ -73,7 +71,7 @@ my-mcp-server/
 | **📝 TypeScript**       | Full TypeScript setup with proper types           |
 | **🔥 Hot Reload**       | Auto-restart on code changes during development   |
 | **🔍 Auto Inspector**   | Inspector UI opens automatically in dev mode      |
-| **🎨 UI Widgets**       | React components that compile to standalone pages |
+| **🎨 MCP Apps Views**   | React views discovered and bundled by the CLI      |
 | **🛠️ Example Tools**    | Sample MCP tools, resources, and prompts          |
 | **📦 Build Scripts**    | Ready-to-use development and production scripts   |
 | **🚀 Production Ready** | Optimized build configuration                     |
@@ -268,7 +266,7 @@ After creating your app, here's what to do next:
 
 ### 1. Explore the Example Server
 
-Open `src/index.ts` to see how to:
+Open `index.ts` to see how to:
 
 - Define MCP tools with Zod schemas
 - Create resources for data access
@@ -283,28 +281,62 @@ The inspector automatically opens at `http://localhost:3000/inspector` where you
 - Debug tool executions
 - Monitor server status
 
-### 3. Create a UI Widget
+### 3. Create an MCP Apps view
 
-Edit `resources/example-widget.tsx` or create new widgets:
+Bind a tool to a view with the tool definition's `view` field:
+
+```typescript
+server.tool(
+  {
+    name: "show-analytics",
+    description: "Show analytics for a reporting period",
+    inputSchema: z.object({ period: z.string() }),
+    outputSchema: z.object({ period: z.string(), visitors: z.number() }),
+    view: { name: "analytics-dashboard" },
+  },
+  async ({ period }) => {
+    const analytics = { period, visitors: 1_024 };
+    return {
+      content: [{ type: "text", text: JSON.stringify(analytics) }],
+      structuredContent: analytics,
+    };
+  }
+);
+```
+
+Create the component at `views/analytics-dashboard/view.tsx`. Read the bound
+tool result with `useToolContext`; call a server tool with `useCallTool`:
 
 ```tsx
-import React from "react";
-import { useMcp } from "mcp-use/react";
+import { useCallTool, useToolContext } from "mcp-use/react";
 
-export default function MyWidget() {
-  const { callTool } = useMcp();
+interface Analytics {
+  period: string;
+  visitors: number;
+}
 
-  const handleClick = async () => {
-    const result = await callTool("my_tool", {
-      param: "value",
-    });
-    console.log(result);
-  };
+export default function AnalyticsDashboard() {
+  const view = useToolContext();
+  const refresh = useCallTool<{ period: string }, Analytics>(
+    "show-analytics"
+  );
+
+  if (view.status === "pending") return <p>Loading analytics…</p>;
+  if (view.status === "error") return <p>{view.error.message}</p>;
+
+  const analytics =
+    refresh.data?.structuredContent ?? (view.toolOutput as Analytics);
 
   return (
-    <div>
-      <button onClick={handleClick}>Call MCP Tool</button>
-    </div>
+    <main>
+      <h1>{analytics.visitors} visitors</h1>
+      <button
+        disabled={refresh.isPending}
+        onClick={() => void refresh.callTool({ period: analytics.period })}
+      >
+        Refresh
+      </button>
+    </main>
   );
 }
 ```

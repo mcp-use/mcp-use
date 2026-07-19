@@ -6,11 +6,11 @@ import {
   CONFORMANCE_SERVER_PATH,
   CONFORMANCE_WEATHER_VIEW_PATH,
   removeConformancePublicFile,
-  removeConformanceResourceDir,
+  removeConformanceViewDir,
   restoreFile,
   writeConformanceFile,
   writeConformancePublicFile,
-  writeConformanceResourceFile,
+  writeConformanceViewFile,
 } from "./helpers/file-utils";
 import { getMcpAppsGuestFrame } from "./helpers/debugger-tools";
 import { getTestMatrix, skipIfNotSupported } from "./helpers/test-matrix";
@@ -119,7 +119,7 @@ test.describe("v2 server reload propagation", () => {
     await restoreFile(originalServer, CONFORMANCE_SERVER_PATH);
     await restoreFile(originalView, CONFORMANCE_WEATHER_VIEW_PATH);
     await Promise.all([
-      ...dynamicViews.map(removeConformanceResourceDir),
+      ...dynamicViews.map(removeConformanceViewDir),
       removeConformancePublicFile(publicFile),
     ]);
     await expect.poll(() => toolNames(page)).toContain("test_simple_text");
@@ -434,11 +434,7 @@ export default function DynamicView() {
   return <p>Dynamic HMR view</p>;
 }
 `;
-    await writeConformanceResourceFile(
-      "hmr-dynamic-view",
-      "view.tsx",
-      viewSource
-    );
+    await writeConformanceViewFile("hmr-dynamic-view", "view.tsx", viewSource);
     let source = insertBeforeExport(
       originalServer,
       `
@@ -469,12 +465,12 @@ server.tool(
       })
       .toContain("ui://views/hmr-dynamic-view.html");
 
-    await writeConformanceResourceFile(
+    await writeConformanceViewFile(
       "hmr-renamed-view",
       "view.tsx",
       viewSource.replace("Dynamic HMR view", "Renamed HMR view")
     );
-    await removeConformanceResourceDir("hmr-dynamic-view");
+    await removeConformanceViewDir("hmr-dynamic-view");
     source = source.replaceAll("hmr-dynamic-view", "hmr-renamed-view");
     await writeConformanceFile(source);
     await expect
@@ -492,7 +488,7 @@ server.tool(
       "server.tool(",
       "hmr_dynamic_view_tool"
     );
-    await removeConformanceResourceDir("hmr-renamed-view");
+    await removeConformanceViewDir("hmr-renamed-view");
     await writeConformanceFile(source);
     await expect(
       page.getByTestId("tool-item-hmr_dynamic_view_tool")

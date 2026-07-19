@@ -106,12 +106,12 @@ await server.listen(3000);
 
 ## MCP Apps
 
-MCP Apps let you build interactive widgets that work across Claude, ChatGPT, and other MCP clients — write once, run everywhere.
+MCP Apps let you build interactive views that work across Claude, ChatGPT, and other MCP clients.
 
-**Server**: define a tool and point it to a widget:
+**Server**: bind a tool to a view and return its structured output:
 
 ```typescript
-import { MCPServer, widget } from "mcp-use/server";
+import { MCPServer } from "mcp-use";
 import { z } from "zod";
 
 const server = new MCPServer({
@@ -123,42 +123,48 @@ server.tool(
   {
     name: "get-weather",
     description: "Get weather for a city",
-    schema: z.object({ city: z.string() }),
-    widget: "weather-display", // references resources/weather-display/widget.tsx
+    inputSchema: z.object({ city: z.string() }),
+    outputSchema: z.object({
+      city: z.string(),
+      temperature: z.number(),
+      conditions: z.string(),
+    }),
+    view: { name: "weather-display" },
   },
   async ({ city }) => {
-    return widget({
-      props: { city, temperature: 22, conditions: "Sunny" },
-      message: `Weather in ${city}: Sunny, 22°C`,
-    });
-  },
+    const weather = { city, temperature: 22, conditions: "Sunny" };
+    return {
+      content: [
+        { type: "text", text: `Weather in ${city}: Sunny, 22°C` },
+      ],
+      structuredContent: weather,
+    };
+  }
 );
 
-await server.listen(3000);
+export default server;
 ```
 
-**Widget**: create a React component in `resources/weather-display/widget.tsx`:
+**View**: create the React component in `views/weather-display/view.tsx`:
 
 ```tsx
-import { useWidget, type WidgetMetadata } from "mcp-use/react";
-import { z } from "zod";
+import { useToolContext, useViewTheme } from "mcp-use/react";
 
-const propSchema = z.object({
-  city: z.string(),
-  temperature: z.number(),
-  conditions: z.string(),
-});
+interface WeatherOutput {
+  city: string;
+  temperature: number;
+  conditions: string;
+}
 
-export const widgetMetadata: WidgetMetadata = {
-  description: "Display weather information",
-  props: propSchema,
-};
-
-const WeatherDisplay: React.FC = () => {
-  const { props, isPending, theme } = useWidget<z.infer<typeof propSchema>>();
+export default function WeatherDisplay() {
+  const view = useToolContext();
+  const theme = useViewTheme();
   const isDark = theme === "dark";
 
-  if (isPending) return <div>Loading...</div>;
+  if (view.status === "pending") return <div>Loading...</div>;
+  if (view.status === "error") return <div>{view.error.message}</div>;
+
+  const weather = view.toolOutput as WeatherOutput;
 
   return (
     <div
@@ -168,18 +174,17 @@ const WeatherDisplay: React.FC = () => {
         padding: 24,
       }}
     >
-      <h2>{props.city}</h2>
+      <h2>{weather.city}</h2>
       <p>
-        {props.temperature}° — {props.conditions}
+        {weather.temperature}° — {weather.conditions}
       </p>
     </div>
   );
-};
-
-export default WeatherDisplay;
+}
 ```
 
-Widgets in `resources/` are **auto-discovered** — no manual registration needed.
+Views under `views/<name>/view.tsx` are discovered by `mcp-use dev` and
+`mcp-use build`. The tool's `view.name` binds the result to that view.
 
 Visit [**MCP Apps Documentation**](https://mcp-use.com/docs/typescript/server/mcp-apps)
 

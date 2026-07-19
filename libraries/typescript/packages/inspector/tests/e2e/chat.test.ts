@@ -24,7 +24,7 @@ test.describe("Inspector Chat Tests", () => {
     const { usesBuiltinInspector, inspectorUrl } = getTestMatrix();
     if (usesBuiltinInspector) {
       await goToInspectorWithAutoConnectAndOpenTools(page, {
-        waitForWidgets: true,
+        waitForViews: true,
       });
     } else {
       await page.goto(inspectorUrl);
@@ -450,7 +450,7 @@ test.describe("Inspector Chat Tests - hosted mode + localhost server", () => {
     const { usesBuiltinInspector, inspectorUrl } = getTestMatrix();
     if (usesBuiltinInspector) {
       await goToInspectorWithAutoConnectAndOpenTools(page, {
-        waitForWidgets: true,
+        waitForViews: true,
       });
     } else {
       await page.goto(inspectorUrl);

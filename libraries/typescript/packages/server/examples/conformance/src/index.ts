@@ -617,6 +617,62 @@ server.prompt(
 );
 
 // =============================================================================
+// LEGACY APPS SDK FALLBACK
+// =============================================================================
+
+const appsSdkOnlyCardUri = "ui://widget/apps-sdk-only-card.html";
+
+server.resource(
+  {
+    name: "apps-sdk-only-card",
+    uri: appsSdkOnlyCardUri,
+    description: "ChatGPT-only Apps SDK card",
+    mimeType: "text/html+skybridge",
+    _meta: {
+      "openai/widgetDescription":
+        "A card that only works in ChatGPT through the legacy Apps SDK",
+      "openai/widgetPrefersBorder": true,
+    },
+  },
+  async (uri) => ({
+    contents: [
+      {
+        uri: uri.href,
+        mimeType: "text/html+skybridge",
+        text: `<!doctype html>
+<html>
+  <body>
+    <article id="card">ChatGPT-only Apps SDK card</article>
+    <script>
+      const message = window.openai?.toolOutput?.message;
+      if (typeof message === "string") document.querySelector("#card").textContent = message;
+    </script>
+  </body>
+</html>`,
+      },
+    ],
+  })
+);
+
+server.tool(
+  {
+    name: "apps-sdk-only-card",
+    description:
+      "Return a legacy Apps SDK card without advertising MCP Apps UI metadata",
+    inputSchema: z.object({
+      message: z.string().optional().describe("Optional message to display"),
+    }),
+    _meta: {
+      "openai/outputTemplate": appsSdkOnlyCardUri,
+    },
+  },
+  async ({ message = "This card uses the legacy Apps SDK only." }) => ({
+    content: [{ type: "text", text: message }],
+    structuredContent: { message },
+  })
+);
+
+// =============================================================================
 // VIEW: get-weather-delayed
 // =============================================================================
 
@@ -645,11 +701,11 @@ const weatherData: Record<
   paris: { temperature: 17, conditions: "Cloudy", humidity: 70, windSpeed: 15 },
 };
 
-server.tool(
+export const getWeatherDelayed = server.tool(
   {
     name: "get-weather-delayed",
     description:
-      "Get weather with artificial 5-second delay to test widget lifecycle (Issue #930)",
+      "Get weather with artificial 5-second delay to test view lifecycle (Issue #930)",
     inputSchema: z.object({
       city: z.string().describe("City name"),
       delay: z
