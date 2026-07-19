@@ -15,7 +15,7 @@
 6. **No response helpers — views included.** The no-response-helpers ground rule (`SPEC.md`) applies without exception. View-bound tool handlers return a plain `CallToolResult`: `{ content, structuredContent, _meta? }`. `structuredContent` is typed by the tool's `outputSchema` at the return position (existing `ToolResult<TOutput>` machinery).
 7. **React runtime ships as `mcp-use/react`.** `react` and `react-dom` are optional peers owned by the application.
 8. **Parity with v1 hooks, minus two named gaps** (file upload, cross-session view state) that the MCP Apps spec cannot express — see "Dropped from v1".
-9. **Views build into `.mcp-use/build/views/` and serve under `${basePath}/_mcp-use/`.** One self-contained Vite client build per view (JS + CSS inlined into the synthesized document — zero asset fetches at srcdoc boot so the app initializes before/early-into argument streaming; hosts drop pre-`ui/initialize` notifications per ext-apps AppBridge; matches the Excalidraw MCP App reference design; trade-off: no shared chunks across views), a manifest-driven registration path identical for `start` and serverless, request-scoped origin for public assets / CSP. Hosts obtain the view document only through `resources/read`; the only HTTP surfaces are the public-asset route and (in dev) Vite middleware. v1's `mcp-use/widgets` routes are not carried over — see "Build system & serving".
+9. **Views build into `.mcp-use/build/views/` and serve under `${basePath}/_mcp-use/`.** One Vite client build per view (hashed entry + optional split chunks under `views/<name>/assets/`, served over HTTP; manifest records entry + CSS paths only — sibling chunks load via relative imports from the entry module). No shared chunks across views (each view is an independent build; React and the runtime may duplicate per view). Manifest-driven registration identical for `start` and serverless, request-scoped origin for public assets / CSP. Hosts obtain the view document only through `resources/read`; HTTP surfaces are the view-asset route, the public-asset route, and (in dev) Vite middleware. v1's `mcp-use/widgets` routes are not carried over — see "Build system & serving".
 10. **One tool binds one view; every binder declares an `outputSchema`; the binder owns all resource facts.** A view has zero or one bound tool; a bound tool has exactly one view. A second tool declaring `view: { name }` for an already-bound view is a **hard error** at registration naming both tools. Every view-bound tool requires an `outputSchema` (hard error otherwise). The single binder owns all resource facts (`description`, `csp`, `permissions`, `domain`, `prefersBorder`). A `view:` naming a missing view directory is a **hard error** (broken `resourceUri`). A view directory no tool binds is a **warning only** (unused-code class: harmless dead weight, and erroring would break the scaffold-view-first authoring order and make feature-flagging a tool off a deploy-breaking action). App-only helper tools remain viewless (`visibility: "app"`, no `view:`) and are called from the view via `useCallTool`; use a separate view resource when another tool needs a rendered result.
 11. **Views register from the manifest as code — no filesystem on any MCP path.** `mcp-use build` bakes the views manifest into a generated wrapper entry that primes the server instance before anything mounts; `resources/read` synthesizes the HTML from manifest data per request. No runtime `fs` read, and deliberately no fallback — an unprimed `view:` is a loud mount-time error. See "Registration mechanism".
 12. **Dev shares the one Vite dev server `mcp-use dev` already runs.** The views client environment joins that server; view-file edits get real Vite HMR with **React Fast Refresh** through the framework-owned React plugin. Tailwind is also framework-owned and always available. A project `vite.config.*` may add other view-client plugins; it never configures the server environment. The server entry keeps the implemented reload-and-swap contract (`CLI_SPEC.md`). Every server handler generation shares one SDK event bus; successful entry reloads publish tool, prompt, and resource list invalidations so connected modern clients refetch from the new stateless handler.
@@ -266,7 +266,7 @@ Consequences worth spelling out in docs:
 ### URI scheme and serving
 
 - Resource URI: `ui://views/<name>.html` — stable across builds. (v1 embedded a `buildId` for ChatGPT's per-URI caching; that is an overlay concern. If host caching demonstrably requires it, a content-hash suffix comes back via the manifest — deferred to implementation evidence, see Open questions.)
-- The resource body is a complete HTML document (rendered by hosts via `srcdoc` after `resources/read`). In **production** the document is fully self-contained: view JS and CSS are inlined (`<script type="module">` / `<style>`) so the iframe boots with zero network fetches for the view bundle. In **dev** the same shell loads Vite module URLs (`/@vite/client` + the virtual entry) for HMR. The document is **synthesized per request from the manifest entry** — never read from disk (see "Registration mechanism"). Public-folder assets still load over HTTP from `${basePath}/_mcp-use/public/`. Hosts obtain the view document only through `resources/read`; there is no HTTP document or bundle-asset route. The full contract — build pipeline, routes, origin derivation, caching — is "Build system & serving", below.
+- The resource body is a complete HTML document (rendered by hosts via `srcdoc` after `resources/read`). In **production** the document shell loads the view entry script and CSS over HTTP from `${basePath}/_mcp-use/views/<name>/` (absolute URLs); split chunks load via relative imports from the entry module URL. In **dev** the same shell loads Vite module URLs (`/@vite/client` + the virtual entry) for HMR. The document is **synthesized per request from the manifest entry** — never read from disk (see "Registration mechanism"). Public-folder assets still load over HTTP from `${basePath}/_mcp-use/public/`. Hosts obtain the view document only through `resources/read`; there is no HTTP document route. The full contract — build pipeline, routes, origin derivation, caching — is "Build system & serving", below.
 
 ### Wire shape (reference — what our registration layer emits)
 
@@ -322,7 +322,7 @@ and `resources/list` carries:
             "connectDomains": [],
             "resourceDomains": [
               "https://images.example.com",
-              "https://fruit-store.fly.dev"   // ← per-request origin (public assets / CSP; view JS/CSS are inlined)
+              "https://fruit-store.fly.dev"   // ← per-request origin (public assets / CSP; view JS/CSS hrefs)
             ]
           },
           "prefersBorder": true
@@ -341,24 +341,24 @@ Resource `_meta.ui` carries author facts from the bound tool's `view:` config pl
 
 Extends `CLI_SPEC.md`'s implemented workspace and command contract (its ground rules hold: `start` pays zero toolchain cost, vite reachable only through the lazy `dev`/`build` chunk, no config file, fixed `.mcp-use/` layout). v1 reference: `packages/cli` `buildWidgets` + `packages/mcp-use/src/server/widgets/*` define what the pipeline must deliver — built assets, a manifest, HTTP serving for public assets, dev HMR — never how. The v1 mechanics (scratch `entry.tsx`/`index.html` files in `cache/`, boot-time origin baking, regex rewriting of built HTML, `window.__getFile` indirection, auto-injected Tailwind) are **not** carried over.
 
-### One self-contained client build per view
+### One client build per view
 
-`mcp-use build` gains a **client environment** alongside the existing node/SSR build — **one Vite build invocation per discovered view**, each producing a single self-contained ES module. Entries are **virtual modules** (`virtual:mcp-use/views/<name>`, resolved by the views plugin inside `src/cli/`), not scratch files: each imports the runtime's iframe bootstrap from the `/react` runtime and the view module (default export + optional `viewConfig`), and mounts per the Component lifecycle & view data contract (bootstrap creates the runtime, starts connection, mounts React immediately; App tools always advertised). Nothing is written to `cache/` for entries; nothing user-visible is generated.
+`mcp-use build` gains a **client environment** alongside the existing node/SSR build — **one Vite build invocation per discovered view**, each producing hashed assets under `views/<name>/assets/`. Entries are **virtual modules** (`virtual:mcp-use/views/<name>`, resolved by the views plugin inside `src/cli/`), not scratch files: each imports the runtime's iframe bootstrap from the `/react` runtime and the view module (default export + optional `viewConfig`), and mounts per the Component lifecycle & view data contract (bootstrap creates the runtime, starts connection, mounts React immediately; App tools always advertised). Nothing is written to `cache/` for entries; nothing user-visible is generated.
 
-Each per-view build disables code splitting (`codeSplitting: false` / no shared chunks), sets `cssCodeSplit: false` (one CSS asset), and uses a large `assetsInlineLimit` so imported assets become data URLs inside the bundle. After the build, the CLI reads the emitted JS and CSS text (build-time `fs` is fine) and records them in the manifest as **content**, not paths. Rationale: MCP Apps hosts render the view via `resources/read` into a sandboxed `srcdoc` iframe and stream tool arguments with `ui/notifications/tool-input-partial` while the model generates them; ext-apps' AppBridge does **not** buffer or replay notifications sent before the app completes the `ui/initialize` handshake. A self-contained document boots with zero asset fetches, so the app initializes early enough to catch the stream — matching the Excalidraw MCP App reference design. Trade-off accepted: no shared chunks across views; each view is an independent bundle (React and the runtime are duplicated per view).
+Each per-view build enables Vite code splitting (rolldown default), sets `cssCodeSplit: false` (one CSS asset), and uses a large `assetsInlineLimit` so small imported assets become data URLs inside the bundle. After the build, the CLI records the **entry** chunk path and CSS paths in the manifest; additional JS chunks are not listed — the browser loads them via relative imports from the entry module. Trade-off accepted: no shared chunks across views; each view is an independent build (React and the runtime may duplicate per view).
 
-Output layout (intermediate build artifacts under `views/<name>/` may remain on disk for tooling; the runtime never reads them on the MCP path):
+Output layout:
 
 ```
 .mcp-use/build/
-├─ index.js                       ← generated wrapper entry: primes views (inline js/css strings), re-exports the server
+├─ index.js                       ← generated wrapper entry: primes views (external paths), re-exports the server
 ├─ manifest.json
 └─ views/
    ├─ public/                     ← copied project `public/` (served over HTTP)
-   └─ <name>/assets/…             ← per-view build scratch (JS/CSS already inlined into the manifest)
+   └─ <name>/assets/…             ← per-view entry + split chunks + CSS (served over HTTP)
 ```
 
-There are **no HTML files in the build output**: the view document is a pure function of the manifest entry — a minimal shell (`<div id="root">`, inline `<style>` when CSS is present, inline `<script type="module">` with the view JS, plus the request-scoped `__mcpUseViewConfig` config script) — so the runtime synthesizes it per request instead of the build writing it to disk (see "Registration mechanism"). Public-folder assets still need absolute URLs (hosts render via `srcdoc`); those resolve per request. The client build uses Vite's relative `base: "./"` so any residual relative references inside the inlined module resolve from `import.meta.url` if needed. This eliminates v1's entire rewrite layer (three regexes over built HTML + four injected `window.__*` globals) and the document files with it.
+There are **no HTML files in the build output**: the view document is a pure function of the manifest entry — a minimal shell (`<div id="root">`, `<link>` tags for CSS, `<script type="module" src>` for the entry JS, plus the request-scoped `__mcpUseViewConfig` config script) — so the runtime synthesizes it per request instead of the build writing it to disk (see "Registration mechanism"). Public-folder assets still need absolute URLs (hosts render via `srcdoc`); those resolve per request. The client build uses Vite's relative `base: "./"` so split-chunk imports resolve from the entry module URL. This eliminates v1's entire rewrite layer (three regexes over built HTML + four injected `window.__*` globals) and the document files with it.
 
 **Vite configuration:** `mcp-use` owns server compilation and all required view invariants. It always injects Tailwind, React, and views plugins, and every virtual view entry imports a virtual `@import "tailwindcss"` stylesheet. Utility classes therefore work with no author CSS import. Project `vite.config.*` files are loaded only for per-view client builds, where any additional user plugins and aliases are additive.
 
@@ -371,22 +371,22 @@ Extends the `CLI_SPEC.md` manifest (`.mcp-use/build/manifest.json`) with a `view
   "buildId": "…", "entryPoint": "index.js", "createdAt": "…", "inspector": true,
   "views": {
     "product-search-result": {
-      "kind": "inline",
-      "js": "…minified ES module source…",
-      "css": "…aggregated stylesheet text…"
+      "kind": "external",
+      "entry": "assets/product-search-result-abc123.js",
+      "css": ["assets/product-search-result-abc123.css"]
     }
   }
 }
 ```
 
-The `views` map is emitted twice from one build-time source: into `manifest.json` (tooling and introspection — the `CLI_SPEC.md` workspace contract) and **baked into the generated wrapper entry as code** (the runtime's copy — see "Registration mechanism"). The runtime never reads the JSON file. Production entries are `{ kind: "inline", js, css }`; dev priming emits `{ kind: "external", entry, css, scripts? }` (Vite module URL paths). Large inline strings are accepted — that is the cost of the no-fs-on-MCP-path rule.
+The `views` map is emitted twice from one build-time source: into `manifest.json` (tooling and introspection — the `CLI_SPEC.md` workspace contract) and **baked into the generated wrapper entry as code** (the runtime's copy — see "Registration mechanism"). The runtime never reads the JSON file. Production entries are `{ kind: "external", entry, css }`; dev priming emits `{ kind: "external", entry, css, scripts? }` (Vite module URL paths). Split JS chunks are not listed in the manifest — they load via relative imports from the entry module and are served from the same view assets directory.
 
-### Paths: public assets → URL → disk
+### Paths: view bundles and public assets → URL → disk
 
-View JS/CSS do not travel as separate HTTP assets in production (they are inlined). Public-folder files use one path space:
+View JS/CSS travel as HTTP assets in production under `${basePath}/_mcp-use/views/<name>/`. Public-folder files use a separate path space:
 
-- **On disk**, `public/` is copied to `.mcp-use/build/views/public/`.
-- **On the wire**, public files are addressed at `GET ${basePath}/_mcp-use/public/<path…>`. There is no HTTP route for view documents or bundle assets — hosts obtain the document only through `resources/read`.
+- **On disk**, view bundles live at `.mcp-use/build/views/<name>/assets/…`; `public/` is copied to `.mcp-use/build/views/public/`.
+- **On the wire**, view assets are addressed at `GET ${basePath}/_mcp-use/views/<name>/<path…>`; public files at `GET ${basePath}/_mcp-use/public/<path…>`. Hosts obtain the view document only through `resources/read`.
 
 ### Registration mechanism
 
@@ -403,8 +403,8 @@ export const registerViews: unique symbol;
 [registerViews](views: ViewsManifest, options?: { dev?: boolean }): void;   // throws if already primed, or after first mount
 
 type ViewManifestEntry =
-  | { kind: "inline"; js: string; css: string }   // production: self-contained
-  | { kind: "external"; entry: string; css: string[]; scripts?: string[] }; // dev: Vite module URLs
+  | { kind: "inline"; js: string; css: string }   // legacy: self-contained (not emitted by current build)
+  | { kind: "external"; entry: string; css: string[]; scripts?: string[] }; // production + dev: HTTP or Vite module URLs
 
 interface ViewsManifest {
   [viewName: string]: ViewManifestEntry;
@@ -413,14 +413,18 @@ interface ViewsManifest {
 
 The same package's CLI (`src/cli/`) imports the symbol directly; the generated wrapper entry imports it from the package root. View resources are *not* sugar over the public `resource()`: their `_meta.ui.*` emission and body are origin-resolved per request, so the per-request SDK-server build does the emission itself — register each view's resource (mimetype, `_meta`, serving origin auto-appended to `csp.resourceDomains` for public assets/images), synthesize the document from the manifest entry on read, and stamp `_meta.ui.resourceUri` onto the bound tool. The tool-side URI needs no manifest data (deterministic from `view.name`); the primed registry's job at the tool boundary is validation — the binding checks of decision 10. Priming is deliberately an instance method, not a module global: no evaluation-order coupling, composes with several servers in one process, and re-runs naturally in dev's fresh-instance-per-reload loop. (Skybridge, the closest prior art, ships the same manifest-as-code mechanism but delivers it through a process-global `__setBuildManifest()` consumed by the next constructor; the instance API is our correction.)
 
-**Delivery: the manifest travels as code.** `mcp-use build` builds the server bundle from a **generated wrapper entry** — the user's entry plus the views map baked in as inline data (including the full `js`/`css` strings), priming before re-export. The user entry must default-export the `MCPServer` instance — the same entry contract `CLI_SPEC.md` already enforces for `dev` and `start`:
+**Delivery: the manifest travels as code.** `mcp-use build` builds the server bundle from a **generated wrapper entry** — the user's entry plus the views map baked in as inline data (external asset paths, not bundle content), priming before re-export. The user entry must default-export the `MCPServer` instance — the same entry contract `CLI_SPEC.md` already enforces for `dev` and `start`:
 
 ```ts
 // .mcp-use/build/index.js (conceptually; generated, never user-visible)
 import server from "<bundled user entry>";
 import { registerViews } from "mcp-use";
 server[registerViews]({
-  "product-search-result": { kind: "inline", js: "…", css: "…" },
+  "product-search-result": {
+    kind: "external",
+    entry: "assets/product-search-result-abc123.js",
+    css: ["assets/product-search-result-abc123.css"],
+  },
 });
 export default server;
 ```
@@ -428,7 +432,7 @@ export default server;
 Because priming happens during module evaluation of the built entry, it is complete before any downstream `getHandler()`/`listen()` call — and because it is part of the JS module graph, every bundler and file tracer (Vercel's nft, esbuild, Wrangler) carries it automatically. Per mode:
 
 - **`start`:** imports the built entry; views are primed by the wrapper before `listen()`. Nothing new in the `start` contract.
-- **Serverless:** the function entry imports `.mcp-use/build/index.js` (not the TS source — a views deployment necessarily has a build step, since the inline bundles only exist post-build). Identical code path to `start`; the MCP surface (list/read/tool meta) needs **zero filesystem** at runtime.
+- **Serverless:** the function entry imports `.mcp-use/build/index.js` (not the TS source — a views deployment necessarily has a build step). Identical code path to `start`; the MCP surface (list/read/tool meta) needs **zero filesystem** at runtime for manifest data.
 - **Dev:** no wrapper — the CLI calls the same internal API on each freshly loaded instance (the module runner constructs a new `MCPServer` per entry reload) before wiring it into the swappable handler, feeding it the in-memory view registry (`kind: "external"`) and `{ dev: true }` so HMR websocket origins are emitted in resource CSP. View add/remove triggers the existing reload-and-swap; view *code* edits never touch registration (pure client HMR). External manifest entries are origin-absolute `/`-prefixed Vite module paths by contract; non-`/`-prefixed paths are rejected (no synthesized asset-URL fallback).
 
 **No fallback, loud errors.** There is deliberately no `fs` path anywhere on the MCP surface and no degraded mode: a tool declaring `view: { name }` on an instance with no primed views — or a name the primed registry doesn't contain — is a mount-time error naming the view and the fix (`run mcp-use build` / deploy the built entry). Cautionary precedent: Skybridge keeps a `readFileSync(manifest)` fallback for when priming was skipped, and it degrades *silently* in exactly the environments where it can't be debugged — serverless bundles that don't include the JSON, or any process whose cwd differs from the build layout; tools keep working, views render blank. That failure class is not made unlikely here; it is made inexpressible.
@@ -439,18 +443,19 @@ Because priming happens during module evaluation of the built entry, it is compl
 
 All framework HTTP surface lives under **`${basePath}/_mcp-use/`** — a framework-owned namespace inside the one mount point users already expose (underscore prefix = private-by-convention, the `_next` analog; v1's `${basePath}/mcp-use/widgets` naming is dropped). Everything under `basePath` means the existing handler covers MCP + public assets with zero extra routing config on any platform — one Hono app, one serverless function, one exposed path prefix.
 
-Hosts obtain the view document **only** through `resources/read`. Production documents inline the bundle. The MCP Apps spec defines no host flow that navigates an iframe to a server URL; the inspector reads the resource via `resources/read` and renders through `srcdoc`. Unbound views are previewed the same way.
+Hosts obtain the view document **only** through `resources/read`. Production documents load the entry script and CSS over HTTP. The MCP Apps spec defines no host flow that navigates an iframe to a server URL; the inspector reads the resource via `resources/read` and renders through `srcdoc`. Unbound views are previewed the same way.
 
 | Route | Serves | Cache-Control |
 | --- | --- | --- |
+| `GET ${basePath}/_mcp-use/views/<name>/<path…>` | built view bundles (entry + split chunks + CSS) from `.mcp-use/build/views/<name>/` | `public, max-age=0, must-revalidate` |
 | `GET ${basePath}/_mcp-use/public/<path…>` | static files from the project-root `public/` directory (Public assets, below) | `public, max-age=0, must-revalidate` |
 
 Public responses include `Access-Control-Allow-Origin: *`. Hosts render views in sandboxed cross-origin iframes (`srcdoc`); module scripts and other fetches run in CORS mode, so permissive ACAO on these public static files is required when anything still loads over HTTP (public assets; in **dev**, Vite modules). Dev Vite-served module URLs need the same CORS surface for hosts that fetch them cross-origin: while a tunnel is active they emit `*`; without a tunnel on a localhost bind they reflect a validated loopback `Origin` (exact value + `Vary: Origin`) so a local MCP host can load the module graph, while foreign / opaque / missing Origin get no ACAO and the source module graph stays unreadable to arbitrary websites (CLI_SPEC.md § DNS-rebinding protection).
 
 **Document synthesis** (for `resources/read`) branches on the manifest entry kind:
 
-- **`inline` (production):** emit `<style>` with the CSS (escaping `</style`) and `<script type="module">` with the JS (escaping `</script` → `<\/script` and `<!--` → `\x3C!--`). Keep the `__mcpUseViewConfig` config script (`publicBase` still origin-resolved per request) and `<div id="root">`.
-- **`external` (dev):** `<link>` / `<script type="module" src>` tags for Vite module URLs (current HMR path).
+- **`inline` (legacy):** emit `<style>` with the CSS (escaping `</style`) and `<script type="module">` with the JS (escaping `</script` → `<\/script` and `<!--` → `\x3C!--`). Keep the `__mcpUseViewConfig` config script (`publicBase` still origin-resolved per request) and `<div id="root">`.
+- **`external` (production + dev):** `<link>` / `<script type="module" src>` tags for absolute asset URLs. Production resolves paths under `${basePath}/_mcp-use/views/<name>/`; dev uses origin-absolute Vite module paths (HMR).
 
 **Origin resolution is request-scoped** — applied at `resources/read` emission time:
 
@@ -460,15 +465,15 @@ Public responses include `Access-Control-Allow-Origin: *`. Hosts render views in
 
 Build-time: when `MCP_ASSETS_URL` is set, manifest asset paths are rewritten to full CDN URLs; upload `.mcp-use/build/views/` to the asset host.
 
-**srcdoc iframes have no document base URL.** Hosts render view documents via `srcdoc`, so every URL the view still loads over the network (public assets; in **dev**, Vite modules) must be absolute — root-relative paths resolve against the *host page* origin, not the MCP server. Production view JS/CSS need no network URLs (inlined). Dev sets Vite `server.origin` to the dev server's browsable origin so imported assets emit absolute `http://…` URLs. Public assets resolve through a request-scoped config global injected into the synthesized document.
+**srcdoc iframes have no document base URL.** Hosts render view documents via `srcdoc`, so every URL the view loads over the network (view entry/chunks, public assets; in **dev**, Vite modules) must be absolute — root-relative paths resolve against the *host page* origin, not the MCP server. Production view JS/CSS hrefs resolve through the request-scoped assets origin. Dev sets Vite `server.origin` to the dev server's browsable origin so imported assets emit absolute `http://…` URLs. Public assets resolve through a request-scoped config global injected into the synthesized document.
 
-**CSP consequence:** hosts sandbox the view iframe and enforce the resource's `ui.csp` from the `resources/read` content item's `_meta.ui` (content-item value takes precedence; the list entry is a static fallback). Authors declare external domains in the binder's `view.csp`; the registration layer **auto-appends the request-derived serving origin** to `csp.resourceDomains` when emitting resource `_meta` on both `resources/list` and each `resources/read` content item so public assets/images from the serving origin remain loadable (production view JS/CSS are inlined and do not need the origin for script/style fetches, but the origin append stays for public assets). Public assets are same-origin with the serving origin and need no extra CSP declaration beyond that append. In **dev** (views primed with `{ dev: true }`), the registration layer also **auto-appends the serving origin's websocket variant** (`http:` → `ws:`, `https:` → `wss:`) to `csp.connectDomains` on both surfaces so Vite HMR passes host `connect-src` — derived from the same per-request origin as `resourceDomains`, never emitted in production. Vite dev's `eval` usage can violate host `script-src`; the MCP Apps CSP shape is origin-lists only and cannot declare an eval allowance, so if strict hosts block it the fix is Vite-side (e.g. jitless deps, no eval-based sourcemaps) — deferred until it bites in practice (Open questions).
+**CSP consequence:** hosts sandbox the view iframe and enforce the resource's `ui.csp` from the `resources/read` content item's `_meta.ui` (content-item value takes precedence; the list entry is a static fallback). Authors declare external domains in the binder's `view.csp`; the registration layer **auto-appends the request-derived serving origin** to `csp.resourceDomains` when emitting resource `_meta` on both `resources/list` and each `resources/read` content item so public assets/images and view bundle assets from the serving origin remain loadable. Public assets are same-origin with the serving origin and need no extra CSP declaration beyond that append. In **dev** (views primed with `{ dev: true }`), the registration layer also **auto-appends the serving origin's websocket variant** (`http:` → `ws:`, `https:` → `wss:`) to `csp.connectDomains` on both surfaces so Vite HMR passes host `connect-src` — derived from the same per-request origin as `resourceDomains`, never emitted in production. Vite dev's `eval` usage can violate host `script-src`; the MCP Apps CSP shape is origin-lists only and cannot declare an eval allowance, so if strict hosts block it the fix is Vite-side (e.g. jitless deps, no eval-based sourcemaps) — deferred until it bites in practice (Open questions).
 
 ### Public assets
 
 v1 parity: authors drop static files in a project-root `public/` directory and reference them from views with root-relative paths (`/fruits/apple.png`). Two mechanisms coexist:
 
-1. **Imported assets** — `import url from "./file.png"` in a view module. Vite inlines them as data URLs in the self-contained production bundle (`assetsInlineLimit`); in dev they resolve through Vite with absolute URLs via `server.origin`.
+1. **Imported assets** — `import url from "./file.png"` in a view module. Vite inlines small imports as data URLs in the production bundle (`assetsInlineLimit`); in dev they resolve through Vite with absolute URLs via `server.origin`.
 2. **Public folder** — files under `public/` served at `GET ${basePath}/_mcp-use/public/<path…>`. **Build** copies `public/` → `.mcp-use/build/views/public/`, including tool-only builds because server icons use the same route. **Dev** and **start** read from `<projectRoot>/public` (dev) or `.mcp-use/build/views/public/` (production). Missing `public/` → route 404s; nothing breaks. Percent-decoding happens before containment checks; malformed encodings, path traversal (`..`), backslashes, directories, and missing files return `404`. `HEAD` returns the same status and headers as `GET` with no body.
 
 **Runtime resolution.** The synthesized document injects one inline `<script>` before the view module script:
@@ -483,7 +488,7 @@ v1 parity: authors drop static files in a project-root `public/` directory and r
 
 `mcp-use dev` adds the client environment to the **same Vite dev server** the implemented CLI already runs (`CLI_SPEC.md`'s single process — today it runs the node/SSR environment only, with the Vite server in middleware mode), with its middleware mounted at `${basePath}/_mcp-use/` ahead of the MCP handler. When views exist, Vite `server.origin` is set to the dev server's browsable origin — `http://localhost:<port>` for loopback/wildcard binds, `http://<host>:<port>` otherwise (a wildcard bind address like `0.0.0.0` accepts connections but is not itself a valid request host in every browser) — so imported asset URLs are absolute (srcdoc iframes, Public assets).
 
-- View documents are synthesized per `resources/read` (same shell, `@vite/client` + the virtual entry served through the middleware — `kind: "external"`); assets flow through Vite transform — no build step, no manifest file. Dev documents therefore boot via Vite module fetches (HMR); catching the very start of an argument stream is best validated against a production build (self-contained inline documents). The in-memory view registry plays the manifest's role, kept current by Vite's watcher: add/remove view directories trigger the entry's existing reload-and-swap — a fresh `MCPServer`, re-primed via the internal API (Registration mechanism, above) — never mutation of a running instance. The next `tools/list`/`resources/list` reflects it, and subscribed modern clients are prompted to refetch by the dev server's shared event bus. The `public/` route serves `<projectRoot>/public` directly (Public assets).
+- View documents are synthesized per `resources/read` (same shell, `@vite/client` + the virtual entry served through the middleware — `kind: "external"`); assets flow through Vite transform — no build step, no manifest file. Dev documents boot via Vite module fetches (HMR). The in-memory view registry plays the manifest's role, kept current by Vite's watcher: add/remove view directories trigger the entry's existing reload-and-swap — a fresh `MCPServer`, re-primed via the internal API (Registration mechanism, above) — never mutation of a running instance. The next `tools/list`/`resources/list` reflects it, and subscribed modern clients are prompted to refetch by the dev server's shared event bus. The `public/` route serves `<projectRoot>/public` directly (Public assets).
 - **View-file edits get Vite HMR.** This is the client half of the one dev server: view code is pure browser code, so Vite's own HMR channel applies to it. The server entry keeps `CLI_SPEC.md`'s implemented reload-and-swap contract untouched — its reload-not-HMR rule is about the *server* module graph, and views don't change that. Because hosts enforce the resource's `ui.csp.connectDomains` against the HMR websocket, dev priming (`__primeViews(views, { dev: true })`) auto-appends the request-resolved serving origin's websocket variant to `connectDomains` on both `resources/list` and each `resources/read` content item — same origin derivation as `resourceDomains`, production never emits it (Serving, CSP consequence).
 - **HMR means React Fast Refresh, not document reload.** A bare Vite setup has no HMR accept boundary in a view's module graph, so every `view.tsx` edit degrades to `full-reload` — which reloads the srcdoc iframe document and wipes all component state, bridge state, and pending tool results. Three pieces prevent that, all dev-only:
   - **`@vitejs/plugin-react` provides the refresh boundary.** It is a regular framework dependency and is injected exactly once by `mcp-use dev`.
@@ -494,7 +499,7 @@ v1 parity: authors drop static files in a project-root `public/` directory and r
 
 ### `start` and serverless
 
-`mcp-use start` imports the built wrapper entry — views arrive already primed with inline JS/CSS (Registration mechanism, above) — and serves public assets: no vite, no discovery, no cli chunk (the public route, document synthesis for `resources/read`, and origin resolution live in the runtime package). Serverless targets get the identical code path: the function entry imports `.mcp-use/build/index.js` and `getHandler()` serves the same routes. The MCP surface needs zero filesystem; **public assets are the one remaining fs-shaped thing**, handled per platform: node/`start` reads `.mcp-use/build/views/public/` directly; Vercel functions have a real fs and need only file tracing (one `vercel.json` `includeFiles` line — the views variant of `examples/vercel` ships it); Cloudflare Workers use Workers Static Assets on the public route (or the `nodejs_compat` `/bundle` VFS via module rules). And the escape hatch works everywhere: the origin override + any CDN/static host in front of `${basePath}/_mcp-use/public/` works unmodified.
+`mcp-use start` imports the built wrapper entry — views arrive already primed with external asset paths (Registration mechanism, above) — and serves view bundles plus public assets: no vite, no discovery, no cli chunk (the view-asset route, public route, document synthesis for `resources/read`, and origin resolution live in the runtime package). Serverless targets get the identical code path: the function entry imports `.mcp-use/build/index.js` and `getHandler()` serves the same routes. The MCP surface needs zero filesystem for manifest data; **view bundles and public assets are the remaining fs-shaped things**, handled per platform: node/`start` reads `.mcp-use/build/views/` directly; Vercel functions have a real fs and need only file tracing (one `vercel.json` `includeFiles` line — the views variant of `examples/vercel` ships it); Cloudflare Workers use Workers Static Assets on the public route (or the `nodejs_compat` `/bundle` VFS via module rules). And the escape hatch works everywhere: the origin override + any CDN/static host in front of `${basePath}/_mcp-use/` works unmodified.
 
 ---
 

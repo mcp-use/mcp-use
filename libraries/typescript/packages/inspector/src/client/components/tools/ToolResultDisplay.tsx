@@ -768,7 +768,7 @@ export function ToolResultDisplay({
 
             if (errorMessage) {
               return (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-3 mx-4">
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-3 mx-4 mt-4">
                   <p className="text-red-800 dark:text-red-300 font-medium">
                     Error:
                   </p>
