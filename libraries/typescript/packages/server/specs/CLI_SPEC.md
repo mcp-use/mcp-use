@@ -241,7 +241,7 @@ Target user `package.json` shape:
 
 ```
 .mcp-use/
-├─ build/        ← compiled server + manifest.json; build/views/public/ carries public assets used by views or branding
+├─ build/        ← compiled server + start manifest; build/views/ carries production view bundles and public assets
 ├─ generated/    ← output of the typegen escape-hatch command — reserved (VIEWS_SPEC.md § Typegen, demoted)
 ├─ cache/        ← disposable dev/build scratch (vite cacheDir)
 ├─ state/        ← mutable runtime state (e.g. tunnel.json)
@@ -260,17 +260,22 @@ Rules, all inherited from v1 and locked:
 
 ### `mcp-use build` (in `src/cli/build.ts`, dispatched from the bin)
 
-Vite build of the **SSR/node environment only** — no client environment exists yet (`VIEWS_SPEC.md` adds it for views). Rolldown/Vite emits the server bundle to `.mcp-use/build/` (workspace layout above) with `ssr: { external: true }`: every bare import stays external and resolves from `node_modules` at runtime; only the user's own source is bundled. Output is ESM targeting the package's Node floor, with sourcemaps, unminified.
+Vite emits the server bundle to `.mcp-use/build/` with `ssr: { external: true }`: every bare import stays external and resolves from `node_modules` at runtime; only the user's source is bundled. Output is unminified ESM targeting the package's Node floor, with sourcemaps. When views exist, `VIEWS_SPEC.md` adds one client build per view plus a generated server wrapper that embeds the view asset registry.
 
 Writes `.mcp-use/build/manifest.json`:
 
 ```jsonc
-{ "buildId": "…", "entryPoint": "index.js", "createdAt": "…" }
+{
+  "buildId": "…",
+  "entryPoint": "index.js",
+  "createdAt": "…",
+  "inspector": false
+}
 ```
 
-`buildId` is a random hex id and `createdAt` an ISO timestamp. `start` consumes `entryPoint`; inspector enablement remains solely in the built server's `ServerConfig` and is not duplicated in the manifest. Views extend this manifest with a `views` map (`VIEWS_SPEC.md` § Manifest). Every build copies the project-root `public/` directory into `build/views/public/` when present, including tool-only servers whose favicon or MCP icons reference local public files.
+`buildId` is a random hex id, `createdAt` is an ISO timestamp, and `inspector` records whether `--with-inspector` was passed. `start` currently consumes `entryPoint`. The file contains no view registry. When views exist, the generated `index.js` wrapper embeds their external asset paths and primes the server during module evaluation. Every build copies project-root `public/` into `build/views/public/` when present, including tool-only servers whose branding references local files.
 
-When `MCP_ASSETS_URL` is set, view manifest asset paths are rewritten to full CDN URLs at build time using `basePath` from the server entry (upload `build/views/` separately). Runtime env: `MCP_URL` (server origin), `MCP_ASSETS_URL` (assets prefix), `CSP_URLS` / `CSP_*_DOMAINS` (global CSP — see `VIEWS_SPEC.md`).
+When `MCP_ASSETS_URL` is set during a views build, the embedded view asset paths become full CDN URLs containing the server entry's `basePath`. The CLI leaves `build/views/` on disk and prints an upload instruction; it does not upload files. The static host must map the two `_mcp-use/views/` and `_mcp-use/public/` URL spaces described in `VIEWS_SPEC.md`. Runtime env uses `MCP_URL` for the server origin, `MCP_ASSETS_URL` for asset and public-file URLs, and `CSP_URLS` / `CSP_*_DOMAINS` for global CSP.
 
 The build is transpile-only and does not run a typecheck. Projects own their `tsc --noEmit` script.
 
@@ -358,7 +363,7 @@ Budgets are measured on Linux x64 in the CI-pinned Node 22.23 container image; t
 | clean-install `node_modules` bytes (including Vite/platform optional deps) | 100 MiB |
 | edge-safe `dist/index.js` bytes | 73 KiB |
 | tool-only `.mcp-use/build/` fixture | 1 MiB |
-| committed basic-view fixture output (self-contained JS + CSS before compression) | 2.5 MiB |
+| committed basic-view fixture output (external JS + CSS before compression) | 2.5 MiB |
 
 Installed bytes are an on-disk distribution concern; they do not count modules evaluated at runtime. Evaluation has separate tests:
 

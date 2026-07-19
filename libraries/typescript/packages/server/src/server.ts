@@ -251,7 +251,7 @@ export class MCPServer<TUser = never> {
   #viewsPrimed = false;
   /** When true, resource CSP emission includes the HMR websocket origin. */
   #viewsDevMode = false;
-  /** Project root for filesystem-backed view routes (dev `public/`). */
+  /** Project root for filesystem-backed view bundle and public routes. */
   #viewsProjectRoot = process.cwd();
 
   #fetchHandler: FetchHandler | undefined;
@@ -390,9 +390,9 @@ export class MCPServer<TUser = never> {
   }
 
   /**
-   * Prime the views registry from a build/dev manifest.
+   * Prime the views registry from build/dev registry data.
    *
-   * @param views - Manifest map keyed by view directory name.
+   * @param views - Registry map keyed by view directory name.
    * @param options - Priming options. When `dev` is true, resource CSP
    * emission appends the serving origin's websocket variant to
    * `connectDomains` so Vite HMR passes host-enforced CSP. Pass

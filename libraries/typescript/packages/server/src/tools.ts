@@ -14,15 +14,14 @@ import type { UiPermissions } from "./views/types.js";
 /**
  * Binds a tool to a view directory for MCP Apps rendering.
  *
- * Any number of tools may share the same `name`. Resource facts
- * (`description`, `csp`, `permissions`, `domain`, `prefersBorder`) have one
- * authoring point — at most one binder may declare them; others pass only
- * `{ name }`. The view file exports only the component; the framework reads
- * these fields at registration and emits them on the bound view's MCP
- * resource (hosts read resource `_meta.ui`, not tool-level copies).
+ * A view may have at most one bound tool. That tool owns the resource facts
+ * (`description`, `csp`, `permissions`, `domain`, `prefersBorder`); a second
+ * tool that names the same view is rejected. The view file exports the
+ * component, while the framework emits these fields on the view's MCP
+ * resource, where hosts read `_meta.ui`.
  */
 export interface ToolViewConfig {
-  /** View directory / manifest name, e.g. `"product-search-result"`. */
+  /** View directory / registry name, e.g. `"product-search-result"`. */
   name: string;
   /**
    * Human-readable description of the view resource → the resource's
@@ -31,8 +30,9 @@ export interface ToolViewConfig {
   description?: string;
   /**
    * CSP domains the host must allow → resource `_meta.ui.csp`. The framework
-   * auto-appends its serving origin to `resourceDomains` at emission time;
-   * other author-set fields (`frameDomains`, `baseUriDomains`, …) pass through.
+   * appends the server origin to `connectDomains` and the configured assets
+   * origin (or server origin) to `resourceDomains` at emission time. Other
+   * author-set fields (`frameDomains`, `baseUriDomains`, …) pass through.
    */
   csp?: McpUiResourceCsp;
   /** Sandbox permissions the view needs → resource `_meta.ui.permissions`. */

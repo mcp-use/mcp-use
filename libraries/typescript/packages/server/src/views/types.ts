@@ -21,8 +21,9 @@ export interface ViewResourceFacts {
   description?: string;
   /**
    * CSP domains the host must allow → resource `_meta.ui.csp`. The framework
-   * auto-appends its serving origin to `resourceDomains` at emission time;
-   * other author-set fields (`frameDomains`, `baseUriDomains`, …) pass through.
+   * appends the server origin to `connectDomains` and the configured assets
+   * origin (or server origin) to `resourceDomains` at emission time. Other
+   * author-set fields (`frameDomains`, `baseUriDomains`, …) pass through.
    */
   csp?: McpUiResourceCsp;
   /** Sandbox permissions the view needs → `_meta.ui.permissions`. */
@@ -37,11 +38,14 @@ export interface ViewResourceFacts {
 }
 
 /**
- * Production manifest entry: a self-contained view bundle whose JS and CSS are
- * inlined into the synthesized HTML document (zero asset fetches at srcdoc boot).
+ * Compatibility manifest entry whose JS and CSS are embedded in the
+ * synthesized HTML document.
+ *
+ * The production CLI emits {@link ExternalViewManifestEntry}; this shape
+ * remains available to existing internal callers.
  */
 export interface InlineViewManifestEntry {
-  /** Discriminant for the production self-contained bundle shape. */
+  /** Discriminant for the embedded bundle shape. */
   kind: "inline";
   /**
    * Minified ES module source embedded in a `<script type="module">` by
@@ -56,14 +60,15 @@ export interface InlineViewManifestEntry {
 }
 
 /**
- * Dev manifest entry: Vite client-environment module URLs loaded by the
- * synthesized document (HMR / Fast Refresh).
+ * External view entry loaded through stylesheet and module URLs.
  *
- * Production builds emit the same shape with view-relative asset paths
- * (`assets/…`) served from `${basePath}/_mcp-use/views/<name>/`.
+ * Production builds use view-relative asset paths (`assets/…`) served from
+ * `${basePath}/_mcp-use/views/<name>/`, or full URLs after an
+ * `MCP_ASSETS_URL` rewrite. Dev uses origin-absolute Vite paths for HMR and
+ * Fast Refresh.
  */
 export interface ExternalViewManifestEntry {
-  /** Discriminant for the dev external-module shape. */
+  /** Discriminant for the external-module shape. */
   kind: "external";
   /**
    * Module entry path. Dev: origin-absolute Vite URL (`/…`). Production:
@@ -85,16 +90,17 @@ export interface ExternalViewManifestEntry {
 }
 
 /**
- * One entry in the primed views manifest.
+ * One entry in the primed views registry.
  *
  * Production builds emit {@link ExternalViewManifestEntry} with view-relative
- * asset paths; `mcp-use dev` emits origin-absolute Vite URLs.
+ * asset paths or build-time-rewritten CDN URLs; `mcp-use dev` emits
+ * origin-absolute Vite URLs.
  */
 export type ViewManifestEntry =
   | InlineViewManifestEntry
   | ExternalViewManifestEntry;
 
-/** Map of view name → manifest entry, primed via {@link registerViews}. */
+/** Map of view name → registry entry, primed via {@link registerViews}. */
 export interface ViewsManifest {
   [viewName: string]: ViewManifestEntry;
 }

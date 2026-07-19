@@ -16,7 +16,7 @@ export const UI_RESOURCE_URI_META_KEY = "ui/resourceUri" as const;
 /**
  * Build the stable `ui://` resource URI for a view name.
  *
- * @param viewName - View directory / manifest key.
+ * @param viewName - View directory / registry key.
  */
 export function viewResourceUri(viewName: string): string {
   return `${UI_RESOURCE_URI_PREFIX}${viewName}.html`;

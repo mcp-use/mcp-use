@@ -60,7 +60,7 @@ export async function resolvePublicFilePath(
 }
 
 /**
- * Serve one file from the project's `public/` directory.
+ * Serve one static view-bundle or project-public file.
  *
  * @param diskPath - Absolute path resolved by {@link resolvePublicFilePath}.
  * @param options - `head` returns headers without opening a file stream.
@@ -68,7 +68,7 @@ export async function resolvePublicFilePath(
  *   {@link ServerConfig.cors} middleware owns CORS headers.
  * @returns A `Response` with `Cache-Control: public, max-age=0, must-revalidate`
  * and optionally `Access-Control-Allow-Origin: *` so cross-origin sandboxed
- * view iframes can load public files (module scripts and fetches use CORS mode).
+ * view iframes can load static files (module scripts and fetches use CORS mode).
  *
  * @internal
  */

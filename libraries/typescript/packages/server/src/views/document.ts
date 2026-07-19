@@ -3,13 +3,12 @@ import { pathUnderBase } from "../fetch-app.js";
 import type { ViewManifestEntry } from "./types.js";
 
 /**
- * Resolve a manifest asset path to an absolute URL for embedding in the
+ * Resolve a registry asset path to an absolute URL for embedding in the
  * synthesized view document.
  *
- * External manifest entries are origin-absolute `/`-prefixed paths by
- * contract ({@link ExternalViewManifestEntry}).
+ * Dev external registry paths are origin-absolute and `/`-prefixed.
  *
- * @param assetPath - Origin-absolute path starting with `/`.
+ * @param assetPath - Origin-absolute dev path starting with `/`.
  * @param origin - Request-resolved public origin.
  * @returns Absolute URL `${origin}${assetPath}`.
  * @throws When `assetPath` does not start with `/`.
@@ -27,7 +26,7 @@ export function resolveAssetUrl(assetPath: string, origin: string): string {
  * Build the HTTP path prefix for a view's built assets (no origin).
  *
  * @param basePath - MCP mount prefix (e.g. `/mcp`).
- * @param viewName - View directory / manifest key.
+ * @param viewName - View directory / registry key.
  */
 export function viewAssetsBasePath(basePath: string, viewName: string): string {
   return `${pathUnderBase(basePath, `_mcp-use/views/${viewName}`)}/`;
@@ -40,7 +39,7 @@ export function viewAssetsBasePath(basePath: string, viewName: string): string {
  *   view-relative production path (`assets/…`).
  * @param assetsBase - Assets URL prefix (origin + optional path).
  * @param basePath - MCP mount prefix.
- * @param viewName - View directory / manifest key (required for view-relative paths).
+ * @param viewName - View directory / registry key (required for view-relative paths).
  */
 export function resolveExternalAssetUrl(
   assetPath: string,
@@ -106,16 +105,16 @@ function escapeHtml(value: string): string {
 }
 
 /**
- * Synthesize a complete HTML document for a view from manifest data.
+ * Synthesize a complete HTML document for a view from registry data.
  *
  * Production (`kind: "external"`) loads built assets over HTTP with absolute
  * URLs. Legacy `kind: "inline"` embeds JS/CSS directly. Dev uses Vite module
  * URLs (`kind: "external"` with origin-absolute paths).
  *
- * @param entry - Primed manifest entry for the view.
+ * @param entry - Primed registry entry for the view.
  * @param assetsBase - Request-resolved assets URL prefix for absolute asset URLs.
  * @param basePath - MCP mount prefix (e.g. `/mcp`).
- * @param viewName - View directory / manifest key (required for production external paths).
+ * @param viewName - View directory / registry key (required for production external paths).
  */
 export function synthesizeViewDocument(
   entry: ViewManifestEntry,

@@ -2,7 +2,7 @@ import type { ViewsManifest } from "./types.js";
 
 /**
  * Symbol-keyed method on {@link MCPServer} that primes the views registry
- * from a build/dev manifest.
+ * from build/dev registry data.
  *
  * @internal
  */
