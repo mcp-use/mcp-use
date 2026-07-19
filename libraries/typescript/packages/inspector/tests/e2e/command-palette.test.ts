@@ -22,7 +22,7 @@ test.describe("Inspector Command Palette Tests", () => {
     const { usesBuiltinInspector, inspectorUrl } = getTestMatrix();
     if (usesBuiltinInspector) {
       await goToInspectorWithAutoConnectAndOpenTools(page, {
-        waitForWidgets: true,
+        waitForViews: true,
       });
     } else {
       await page.goto(inspectorUrl);

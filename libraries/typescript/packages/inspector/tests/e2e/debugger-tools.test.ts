@@ -41,7 +41,7 @@ test.describe("Debugger Tools - Live Widget Updates", () => {
   test.beforeEach(async ({ page, context }) => {
     await context.clearCookies();
     await goToInspectorWithAutoConnectAndOpenTools(page, {
-      waitForWidgets: true,
+      waitForViews: true,
     });
   });
 
@@ -50,7 +50,7 @@ test.describe("Debugger Tools - Live Widget Updates", () => {
       await executeWeatherTool(page, { city: "tokyo", delay: "2000" });
       await waitForWeatherWidgetMcpApps(page);
       const frame = getMcpAppsWeatherFrame(page);
-      await verifyWidgetDebugInfo(frame, { device: "desktop" });
+      await verifyWidgetDebugInfo(frame, { device: "web" });
 
       await changeDeviceType(page, "mobile");
       const frameAfter = await switchToMcpAppsAndGetFrame(page);
@@ -249,7 +249,7 @@ test.describe("Debugger Tools - Live Widget Updates", () => {
 
       // Wait for reconnection and navigation
       await goToInspectorWithAutoConnectAndOpenTools(page, {
-        waitForWidgets: true,
+        waitForViews: true,
       });
 
       // Navigate back to Resources tab and select weather-display.

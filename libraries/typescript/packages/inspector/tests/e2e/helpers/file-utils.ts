@@ -16,18 +16,11 @@ export const CONFORMANCE_SERVER_PATH = path.join(
   conformanceRoot,
   "src/index.ts"
 );
-export const CONFORMANCE_WEATHER_WIDGET_PATH = path.join(
-  conformanceRoot,
-  "resources/weather-display/widget.tsx"
-);
 export const CONFORMANCE_WEATHER_VIEW_PATH = path.join(
   conformanceRoot,
-  "resources/weather-display/view.tsx"
+  "views/weather-display/view.tsx"
 );
-export const CONFORMANCE_RESOURCES_DIR = path.join(
-  conformanceRoot,
-  "resources"
-);
+export const CONFORMANCE_VIEWS_DIR = path.join(conformanceRoot, "views");
 export const CONFORMANCE_PUBLIC_DIR = path.join(conformanceRoot, "public");
 
 /**
@@ -40,7 +33,7 @@ export async function readConformanceFile(
 }
 
 /**
- * Write content to a conformance file. Triggers HMR when server/widget files change.
+ * Write content to a conformance file. Triggers HMR when server or view files change.
  */
 export async function writeConformanceFile(
   content: string,
@@ -69,29 +62,29 @@ export async function restoreFile(
 }
 
 /**
- * Write a file inside a widget's resource directory.
- * Creates the widget directory if it doesn't exist.
- * Triggers the file watcher to register the widget via HMR.
+ * Write a file inside a view's source directory.
+ * Creates the view directory if it doesn't exist.
+ * Triggers the file watcher to register the view via HMR.
  */
-export async function writeConformanceResourceFile(
-  widgetName: string,
+export async function writeConformanceViewFile(
+  viewName: string,
   fileName: string,
   content: string
 ): Promise<void> {
-  const widgetDir = path.join(CONFORMANCE_RESOURCES_DIR, widgetName);
-  await mkdir(widgetDir, { recursive: true });
-  await writeFile(path.join(widgetDir, fileName), content, "utf-8");
+  const viewDir = path.join(CONFORMANCE_VIEWS_DIR, viewName);
+  await mkdir(viewDir, { recursive: true });
+  await writeFile(path.join(viewDir, fileName), content, "utf-8");
 }
 
 /**
- * Remove a widget's resource directory (and all its contents).
- * Used for cleanup after tests that dynamically create widget files.
+ * Remove a view's source directory (and all its contents).
+ * Used for cleanup after tests that dynamically create views.
  */
-export async function removeConformanceResourceDir(
-  widgetName: string
+export async function removeConformanceViewDir(
+  viewName: string
 ): Promise<void> {
-  const widgetDir = path.join(CONFORMANCE_RESOURCES_DIR, widgetName);
-  await rm(widgetDir, { recursive: true, force: true });
+  const viewDir = path.join(CONFORMANCE_VIEWS_DIR, viewName);
+  await rm(viewDir, { recursive: true, force: true });
 }
 
 /** Write a public asset served by the v2 development server. */

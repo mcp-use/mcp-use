@@ -3,7 +3,6 @@ import {
   connectToConformanceServer,
   goToInspectorWithAutoConnectAndOpenTools,
   navigateToTools,
-  warmWidgets,
 } from "./helpers/connection";
 import { getMcpAppsGuestFrame } from "./helpers/debugger-tools";
 import { getTestMatrix } from "./helpers/test-matrix";
@@ -15,7 +14,7 @@ test.describe("Conformance UI widgets - Tools Tab", () => {
     const { usesBuiltinInspector, inspectorUrl } = getTestMatrix();
     if (usesBuiltinInspector) {
       await goToInspectorWithAutoConnectAndOpenTools(page, {
-        waitForWidgets: true,
+        waitForViews: true,
       });
     } else {
       await page.goto(inspectorUrl);
@@ -23,9 +22,6 @@ test.describe("Conformance UI widgets - Tools Tab", () => {
       await connectToConformanceServer(page);
       await navigateToTools(page);
     }
-
-    // Pre-warm widgets to avoid Vite cold start delays
-    await warmWidgets(page, ["get-weather-delayed", "apps-sdk-only-card"]);
   });
 
   test("get-weather-delayed - should show weather widget via MCP Apps", async ({
@@ -117,7 +113,7 @@ test.describe("Conformance UI widgets - Resources Tab", () => {
     const { usesBuiltinInspector, inspectorUrl } = getTestMatrix();
     if (usesBuiltinInspector) {
       await goToInspectorWithAutoConnectAndOpenTools(page, {
-        waitForWidgets: true,
+        waitForViews: true,
       });
     } else {
       await page.goto(inspectorUrl);
@@ -125,9 +121,6 @@ test.describe("Conformance UI widgets - Resources Tab", () => {
       await connectToConformanceServer(page);
       await navigateToTools(page);
     }
-
-    // Pre-warm widgets to avoid Vite cold start delays
-    await warmWidgets(page, ["weather-display"]);
 
     await page
       .getByRole("tab", { name: /Resources/ })
@@ -218,7 +211,7 @@ test.describe("Conformance UI widgets - Chat Tab", () => {
     const { usesBuiltinInspector, inspectorUrl } = getTestMatrix();
     if (usesBuiltinInspector) {
       await goToInspectorWithAutoConnectAndOpenTools(page, {
-        waitForWidgets: true,
+        waitForViews: true,
       });
     } else {
       await page.goto(inspectorUrl);
@@ -226,9 +219,6 @@ test.describe("Conformance UI widgets - Chat Tab", () => {
       await connectToConformanceServer(page);
       await navigateToTools(page);
     }
-
-    // Pre-warm widgets to avoid Vite cold start delays
-    await warmWidgets(page, ["get-weather-delayed", "apps-sdk-only-card"]);
 
     await configureChatAPI(page);
   });
