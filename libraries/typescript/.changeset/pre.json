@@ -10,6 +10,7 @@
     "mcp-use": "1.34.3"
   },
   "changesets": [
+    "agent-esm-only",
     "better-auth-v2-provider",
     "bright-icons-smile",
     "build-v2-external-view-assets",

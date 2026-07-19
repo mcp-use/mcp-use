@@ -1,5 +1,11 @@
 # @mcp-use/agent
 
+## 2.0.0-beta.4
+
+### Patch Changes
+
+- 3180df7: Make `@mcp-use/agent` ESM-only for v2. The root, browser, and LangChain entry points no longer publish CommonJS builds or advertise `require()` conditions; use ESM `import` or dynamic `import()` from a CommonJS host.
+
 ## 2.0.0-beta.3
 
 ### Patch Changes
