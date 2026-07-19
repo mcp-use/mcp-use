@@ -96,17 +96,36 @@ export type { ServerBranding } from "./branding.js";
 export type { Icon } from "@modelcontextprotocol/server";
 export type {
   MiddlewareContext,
+  McpMiddlewareContext,
   McpCompleteEventListenerFn,
+  McpEventListenerFnFor,
+  McpEventPattern,
+  McpEventPatternBody,
   McpEventListenerFn,
+  McpExactMiddlewareFn,
   McpMiddlewareFn,
   McpMiddlewareFnFor,
+  McpMiddlewareMethod,
+  McpMiddlewareMethodsForPattern,
+  McpMiddlewareNext,
+  McpMiddlewareOperationMap,
+  McpMiddlewareParams,
+  McpMiddlewarePattern,
+  McpMiddlewarePatternBody,
   McpMiddlewarePatternMap,
+  McpMiddlewareResult,
   PromptsGetMiddlewareContext,
+  PromptsListMiddlewareContext,
+  ReadonlyMiddlewareContext,
   ResourcesReadMiddlewareContext,
+  ResourcesListMiddlewareContext,
   ToolsCallMiddlewareContext,
+  ToolsListMiddlewareContext,
 } from "./middleware/mcp-middleware.js";
 export {
   composeMiddleware,
+  createMcpEventListenerEntry,
+  createMcpMiddlewareEntry,
   matchesPattern,
 } from "./middleware/mcp-middleware.js";
 export type { NodeRequestHandler } from "./node-bridge.js";

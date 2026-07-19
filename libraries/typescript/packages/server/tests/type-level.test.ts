@@ -10,10 +10,17 @@ import { z } from "zod";
 import type {
   Annotations as SdkAnnotations,
   MetaObject as SdkMetaObject,
+  Prompt as SdkPrompt,
+  Resource as SdkResource,
+  Tool as SdkTool,
   ToolAnnotations as SdkToolAnnotations,
 } from "@modelcontextprotocol/server";
 
-import { MCPServer } from "../src/index.js";
+import {
+  createMcpEventListenerEntry,
+  createMcpMiddlewareEntry,
+  MCPServer,
+} from "../src/index.js";
 import type {
   Annotations,
   CallToolResult,
@@ -21,8 +28,10 @@ import type {
   InputRequiredResult,
   LandingPageOptions,
   MetaObject,
+  GetPromptResult,
   ProxyHttpConfig,
   ProxyServerConfig,
+  ReadResourceResult,
   ResourceDefinition,
   ResourceTemplateDefinition,
   ServerConfig,
@@ -455,6 +464,33 @@ describe("view-bound tool return-position checks", () => {
 });
 
 describe("MCP middleware type narrowing", () => {
+  it("exports typed entry adapters from the package root", () => {
+    const middleware = createMcpMiddlewareEntry(
+      "mcp:tools/list",
+      async (ctx, next) => {
+        expectTypeOf(ctx.params.cursor).toEqualTypeOf<string | undefined>();
+        const tools = await next();
+        expectTypeOf(tools).toEqualTypeOf<SdkTool[]>();
+        return tools;
+      }
+    );
+    const listener = createMcpEventListenerEntry(
+      "mcp:tools/call:complete",
+      (ctx, result) => {
+        expectTypeOf(ctx.params.name).toBeString();
+        expectTypeOf(result).toEqualTypeOf<
+          CallToolResult | InputRequiredResult
+        >();
+      }
+    );
+
+    expect(middleware.pattern).toBe("tools/list");
+    expect(listener).toMatchObject({
+      pattern: "tools/call",
+      phase: "complete",
+    });
+  });
+
   it("narrows ctx.params for tools/call middleware", () => {
     const server = new MCPServer({ name: "types", version: "0.0.0" });
     server.use("mcp:tools/call", async (ctx, next) => {
@@ -467,11 +503,91 @@ describe("MCP middleware type narrowing", () => {
     expect(server).toBeDefined();
   });
 
-  it("falls back to base MiddlewareContext for wildcard patterns", () => {
+  it("types list middleware as item-array transformations", () => {
+    const server = new MCPServer({ name: "types", version: "0.0.0" });
+    server.use("mcp:tools/list", async (ctx, next) => {
+      expectTypeOf(ctx.params.cursor).toEqualTypeOf<string | undefined>();
+      const tools = await next();
+      expectTypeOf(tools).toEqualTypeOf<SdkTool[]>();
+      return tools.filter((tool) => !tool.name.startsWith("_"));
+    });
+    server.use("mcp:resources/list", async (_ctx, next) => {
+      const resources = await next();
+      expectTypeOf(resources).toEqualTypeOf<SdkResource[]>();
+      return resources;
+    });
+    server.use("mcp:prompts/list", async (_ctx, next) => {
+      const prompts = await next();
+      expectTypeOf(prompts).toEqualTypeOf<SdkPrompt[]>();
+      return prompts;
+    });
+    expect(server).toBeDefined();
+  });
+
+  it("types handler results including input-required results", () => {
+    const server = new MCPServer({ name: "types", version: "0.0.0" });
+    server.use("mcp:resources/read", async (_ctx, next) => {
+      const result = await next();
+      expectTypeOf(result).toEqualTypeOf<
+        ReadResourceResult | InputRequiredResult
+      >();
+      return result;
+    });
+    server.use("mcp:prompts/get", async (_ctx, next) => {
+      const result = await next();
+      expectTypeOf(result).toEqualTypeOf<
+        GetPromptResult | InputRequiredResult
+      >();
+      return result;
+    });
+    expect(server).toBeDefined();
+  });
+
+  it("keeps global middleware type-preserving", () => {
     const server = new MCPServer({ name: "types", version: "0.0.0" });
     server.use("mcp:*", async (ctx, next) => {
-      expectTypeOf(ctx.params).toEqualTypeOf<Record<string, unknown>>();
+      expectTypeOf(ctx.method).toMatchTypeOf<string>();
+      ctx.state.set("observed", true);
       return next();
+    });
+    if (false) {
+      // @ts-expect-error — category wildcards are observer-only patterns
+      server.use("mcp:tools/*", async () => undefined);
+    }
+    server.on("mcp:tools/*", (ctx) => {
+      expectTypeOf(ctx.method).toEqualTypeOf<"tools/call" | "tools/list">();
+    });
+    server.on("mcp:tools/*:complete", (ctx, result) => {
+      expectTypeOf(ctx.method).toMatchTypeOf<"tools/call" | "tools/list">();
+      void result;
+    });
+    expect(server).toBeDefined();
+  });
+
+  it("rejects results belonging to a different method", () => {
+    const server = new MCPServer({ name: "types", version: "0.0.0" });
+    server.use(
+      "mcp:tools/list",
+      // @ts-expect-error — tools/list middleware must return Tool[]
+      async () => ({ content: [] })
+    );
+    server.use(
+      "mcp:*",
+      // @ts-expect-error — a wildcard cannot return one method's result
+      async () => [] as SdkTool[]
+    );
+    expect(server).toBeDefined();
+  });
+
+  it("types complete observer results by method", () => {
+    const server = new MCPServer({ name: "types", version: "0.0.0" });
+    server.on("mcp:tools/list:complete", (_ctx, tools) => {
+      expectTypeOf(tools).toEqualTypeOf<SdkTool[]>();
+    });
+    server.on("mcp:tools/call:complete", (_ctx, result) => {
+      expectTypeOf(result).toEqualTypeOf<
+        CallToolResult | InputRequiredResult
+      >();
     });
     expect(server).toBeDefined();
   });

@@ -45,22 +45,17 @@ describe("MCP middleware — integration", () => {
       return next();
     });
 
-    server.use("mcp:tools/list", async (_ctx, next) => {
-      const result = await next();
-      if (Array.isArray(result)) {
-        return result.filter(
-          (tool) =>
-            typeof tool === "object" &&
-            tool !== null &&
-            !String((tool as { name?: string }).name).startsWith("_")
-        );
+    server.use("mcp:tools/list", async (ctx, next) => {
+      if (ctx.params.cursor !== undefined) {
+        log.push(`tools/list:cursor:${ctx.params.cursor}`);
       }
-      return result;
+      const tools = await next();
+      return tools.filter((tool) => !tool.name.startsWith("_"));
     });
 
     server.on("mcp:tools/call:complete", (ctx, result) => {
       log.push(
-        `event:${ctx.params.name}:${(result as { isError?: boolean }).isError === true ? "error" : "ok"}`
+        `event:${ctx.params.name}:${"isError" in result && result.isError === true ? "error" : "ok"}`
       );
     });
 
@@ -149,6 +144,12 @@ describe("MCP middleware — integration", () => {
     expect(log).toContain("after:tools/list");
   });
 
+  it("tools/list middleware receives the validated request params", async () => {
+    log.length = 0;
+    await client.listTools({ cursor: "page-2" });
+    expect(log).toContain("tools/list:cursor:page-2");
+  });
+
   it("catch-all middleware runs on resources/list and prompts/list", async () => {
     log.length = 0;
     await client.listResources();
@@ -208,6 +209,99 @@ describe("MCP middleware — rejection", () => {
     const result = await client.callTool({ name: "blocked", arguments: {} });
     expect(result.isError).toBe(true);
     expect(textContent(result)).toContain("Rejected by middleware");
+  });
+});
+
+describe("MCP middleware — result validation", () => {
+  it("does not send a malformed exact-method replacement", async () => {
+    const server = new MCPServer({
+      name: "invalid-result-test-server",
+      version: "1.0.0",
+    });
+    server.use(
+      "mcp:tools/call",
+      // Deliberately bypass TypeScript to verify the SDK's runtime wire guard.
+      async () => ({ invalid: true }) as never
+    );
+    server.tool({ name: "invalid", inputSchema: z.object({}) }, async () => ({
+      content: [{ type: "text", text: "unexpected" }],
+    }));
+
+    const { url } = await server.listen(0);
+    const transport = new StreamableHTTPClientTransport(new URL(url));
+    const client = new Client({
+      name: "invalid-result-client",
+      version: "1.0.0",
+    });
+    await client.connect(transport);
+
+    try {
+      const result = await client.callTool({
+        name: "invalid",
+        arguments: {},
+      });
+      expect(result.isError).toBe(true);
+      expect(textContent(result)).toContain(
+        "tools/call middleware returned an invalid result"
+      );
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+});
+
+describe("MCP middleware — tool schema emission", () => {
+  it("strips root schema dialects introduced by tools/list middleware", async () => {
+    const server = new MCPServer({
+      name: "schema-emission-test-server",
+      version: "1.0.0",
+    });
+    const draft07 = "http://json-schema.org/draft-07/schema#";
+
+    server.use("mcp:tools/list", async (_ctx, next) => {
+      const tools = await next();
+      return tools.map((tool) => ({
+        ...tool,
+        inputSchema: { ...tool.inputSchema, $schema: draft07 },
+        ...(tool.outputSchema === undefined
+          ? {}
+          : {
+              outputSchema: { ...tool.outputSchema, $schema: draft07 },
+            }),
+      }));
+    });
+
+    server.tool(
+      {
+        name: "typed-echo",
+        inputSchema: z.object({ message: z.string() }),
+        outputSchema: z.object({ echoed: z.string() }),
+      },
+      async ({ message }) => ({
+        content: [{ type: "text", text: message }],
+        structuredContent: { echoed: message },
+      })
+    );
+
+    const { url } = await server.listen(0);
+    const transport = new StreamableHTTPClientTransport(new URL(url));
+    const client = new Client({
+      name: "schema-emission-test-client",
+      version: "1.0.0",
+    });
+    await client.connect(transport);
+
+    try {
+      const result = await client.listTools();
+      const tool = result.tools.find(({ name }) => name === "typed-echo");
+      expect(tool).toBeDefined();
+      expect(tool?.inputSchema).not.toHaveProperty("$schema");
+      expect(tool?.outputSchema).not.toHaveProperty("$schema");
+    } finally {
+      await client.close();
+      await server.close();
+    }
   });
 });
 

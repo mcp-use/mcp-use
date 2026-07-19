@@ -12,7 +12,6 @@ import {
   type StandardSchemaWithJSON,
 } from "@modelcontextprotocol/server";
 import type { Server as NodeHttpServer } from "node:http";
-import type { AuthInfo } from "@modelcontextprotocol/server";
 
 import {
   createFaviconHandler,
@@ -42,15 +41,18 @@ import {
 } from "./fetch-app.js";
 import { corsFetchMiddleware, isGlobalCorsEnabled } from "./middleware/cors.js";
 import {
-  normalizeMcpMiddlewarePattern,
-  parseMcpPattern,
+  createMcpEventListenerEntry,
+  createMcpMiddlewareEntry,
   runMcpOperation,
-  type McpCompleteEventListenerFn,
+  withMcpMiddlewareParams,
+  type McpEventListenerFnFor,
+  type McpEventPattern,
   type McpEventListenerEntry,
-  type McpEventListenerFn,
   type McpMiddlewareEntry,
-  type McpMiddlewareFn,
   type McpMiddlewareFnFor,
+  type McpMiddlewareMethod,
+  type McpMiddlewarePattern,
+  type McpMiddlewareResult,
   type MiddlewareContext,
 } from "./middleware/mcp-middleware.js";
 import {
@@ -176,6 +178,33 @@ interface NodeHttpListener {
   once(event: "error", listener: (error: unknown) => void): void;
   listen(port: number, hostname: string, callback?: () => void): NodeHttpServer;
   address(): { port: number } | string | null;
+}
+
+function omitRootSchemaDialect<T>(schema: T): T {
+  if (
+    typeof schema !== "object" ||
+    schema === null ||
+    Array.isArray(schema) ||
+    !("$schema" in schema)
+  ) {
+    return schema;
+  }
+
+  const emittedSchema = { ...schema } as T & Record<string, unknown>;
+  delete emittedSchema["$schema"];
+  return emittedSchema;
+}
+
+function omitToolSchemaDialects(
+  tools: McpMiddlewareResult<"tools/list">
+): McpMiddlewareResult<"tools/list"> {
+  return tools.map((tool) => ({
+    ...tool,
+    inputSchema: omitRootSchemaDialect(tool.inputSchema),
+    ...(tool.outputSchema === undefined
+      ? {}
+      : { outputSchema: omitRootSchemaDialect(tool.outputSchema) }),
+  }));
 }
 
 /**
@@ -591,7 +620,9 @@ export class MCPServer<TUser = never> {
    * Register MCP operation middleware that intercepts JSON-RPC dispatch.
    *
    * Patterns use an `mcp:` prefix (for example `mcp:tools/call`, `mcp:*`).
-   * Middleware runs in registration order; call `next()` to continue the chain.
+   * Exact methods may transform their typed result. The global `mcp:*` pattern
+   * is pass-through middleware. Middleware runs in registration order; call
+   * `next()` to continue the chain.
    *
    * @example
    * ```ts
@@ -601,15 +632,12 @@ export class MCPServer<TUser = never> {
    * });
    * ```
    */
-  use<P extends string>(
-    pattern: `mcp:${P}` | P,
+  use<P extends McpMiddlewarePattern>(
+    pattern: P,
     handler: McpMiddlewareFnFor<P>
   ): this {
     this.#assertNotStarted("middleware", pattern);
-    this.#mcpMiddlewares.push({
-      pattern: normalizeMcpMiddlewarePattern(pattern),
-      handler: handler as McpMiddlewareFn,
-    });
+    this.#mcpMiddlewares.push(createMcpMiddlewareEntry(pattern, handler));
     return this;
   }
 
@@ -628,19 +656,12 @@ export class MCPServer<TUser = never> {
    * });
    * ```
    */
-  on<P extends string>(
-    pattern: `mcp:${P}` | P,
-    handler: P extends `${string}:complete`
-      ? McpCompleteEventListenerFn
-      : McpEventListenerFn
+  on<P extends McpEventPattern>(
+    pattern: P,
+    handler: McpEventListenerFnFor<P>
   ): this {
     this.#assertNotStarted("event listener", pattern);
-    const { pattern: stripped, phase } = parseMcpPattern(pattern);
-    this.#mcpEventListeners.push({
-      pattern: stripped,
-      phase,
-      handler: handler as McpEventListenerFn | McpCompleteEventListenerFn,
-    });
+    this.#mcpEventListeners.push(createMcpEventListenerEntry(pattern, handler));
     return this;
   }
 
@@ -1315,24 +1336,27 @@ export class MCPServer<TUser = never> {
     return server;
   }
 
-  #createMiddlewareContext(
-    method: string,
-    params: Record<string, unknown>,
+  #createMiddlewareContext<M extends McpMiddlewareMethod>(
+    method: M,
+    params: MiddlewareContext<M>["params"],
     ctx: ServerContext
-  ): MiddlewareContext {
+  ): MiddlewareContext<M> {
     return {
       method,
       params,
+      ...(ctx.sessionId !== undefined && {
+        session: { sessionId: ctx.sessionId },
+      }),
       ...(ctx.http?.authInfo !== undefined && { auth: ctx.http.authInfo }),
       state: new Map(),
-    };
+    } as MiddlewareContext<M>;
   }
 
-  #runMcpHook(
-    method: string,
-    ctx: MiddlewareContext,
-    innerFn: () => Promise<unknown>
-  ): Promise<unknown> {
+  #runMcpHook<M extends McpMiddlewareMethod>(
+    method: M,
+    ctx: MiddlewareContext<M>,
+    innerFn: () => Promise<McpMiddlewareResult<M>>
+  ): Promise<McpMiddlewareResult<M>> {
     return runMcpOperation(
       this.#mcpMiddlewares,
       this.#mcpEventListeners,
@@ -1363,9 +1387,19 @@ export class MCPServer<TUser = never> {
       return;
     }
 
-    const wrapListMethod = (
-      method: "tools/list" | "resources/list" | "prompts/list",
-      resultKey: "tools" | "resources" | "prompts"
+    type ListMethod = "tools/list" | "resources/list" | "prompts/list";
+    type ListResultKey<M extends ListMethod> = M extends "tools/list"
+      ? "tools"
+      : M extends "resources/list"
+        ? "resources"
+        : "prompts";
+
+    const wrapListMethod = <M extends ListMethod>(
+      method: M,
+      resultKey: ListResultKey<NoInfer<M>>,
+      transform?: (
+        items: McpMiddlewareResult<NoInfer<M>>
+      ) => McpMiddlewareResult<NoInfer<M>>
     ) => {
       const original = handlers.get(method);
       if (original === undefined) {
@@ -1376,33 +1410,53 @@ export class MCPServer<TUser = never> {
       }
 
       const wrapped = async (request: unknown, extra: unknown) => {
-        const authInfo = (
-          extra as { http?: { authInfo?: AuthInfo } } | undefined
-        )?.http?.authInfo;
-        const mwCtx: MiddlewareContext = {
+        const serverContext = extra as ServerContext;
+        const params =
+          (request as { params?: MiddlewareContext<M>["params"] }).params ??
+          ({} as MiddlewareContext<M>["params"]);
+        const mwCtx = this.#createMiddlewareContext(
           method,
-          params: {},
-          ...(authInfo !== undefined && { auth: authInfo }),
-          state: new Map(),
-        };
-        const innerFn = async () => {
-          const result = (await original(request, extra)) as Record<
-            string,
-            unknown
-          >;
-          return result[resultKey] ?? result;
+          params,
+          serverContext
+        );
+        let originalEnvelope: Record<string, unknown> | undefined;
+        const innerFn = async (): Promise<McpMiddlewareResult<M>> => {
+          const downstreamRequest = withMcpMiddlewareParams<M>(
+            request,
+            mwCtx.params
+          );
+          const result = await original(downstreamRequest, extra);
+          if (typeof result !== "object" || result === null) {
+            throw new TypeError(
+              `[mcp-use] ${method} handler returned a non-object result`
+            );
+          }
+          originalEnvelope = result as Record<string, unknown>;
+          const items = originalEnvelope[resultKey];
+          if (!Array.isArray(items)) {
+            throw new TypeError(
+              `[mcp-use] ${method} handler result is missing a ${resultKey} array`
+            );
+          }
+          return items as McpMiddlewareResult<M>;
         };
         const filtered = await this.#runMcpHook(method, mwCtx, innerFn);
-        if (Array.isArray(filtered)) {
-          return { [resultKey]: filtered };
+        if (!Array.isArray(filtered)) {
+          throw new TypeError(
+            `[mcp-use] ${method} middleware must return a ${resultKey} array`
+          );
         }
-        return filtered;
+        const emitted = transform?.(filtered) ?? filtered;
+        return {
+          ...originalEnvelope,
+          [resultKey]: emitted,
+        };
       };
       (wrapped as { __mcpListWrapped?: boolean }).__mcpListWrapped = true;
       handlers.set(method, wrapped);
     };
 
-    wrapListMethod("tools/list", "tools");
+    wrapListMethod("tools/list", "tools", omitToolSchemaDialects);
     wrapListMethod("resources/list", "resources");
     wrapListMethod("prompts/list", "prompts");
   }
@@ -1442,7 +1496,11 @@ export class MCPServer<TUser = never> {
     ) => {
       const mwCtx = this.#createMiddlewareContext(
         "tools/call",
-        { name: definition.name, arguments: args },
+        {
+          name: definition.name,
+          arguments: args,
+          ...(ctx.mcpReq._meta !== undefined && { _meta: ctx.mcpReq._meta }),
+        },
         ctx
       );
       const innerFn = async () => {
@@ -1567,7 +1625,10 @@ export class MCPServer<TUser = never> {
       async (uri, ctx) => {
         const mwCtx = this.#createMiddlewareContext(
           "resources/read",
-          { uri: uri.href },
+          {
+            uri: uri.href,
+            ...(ctx.mcpReq._meta !== undefined && { _meta: ctx.mcpReq._meta }),
+          },
           ctx
         );
         const innerFn = async () => callback(uri, this.#toRequestContext(ctx));
@@ -1609,7 +1670,10 @@ export class MCPServer<TUser = never> {
       async (uri, variables, ctx) => {
         const mwCtx = this.#createMiddlewareContext(
           "resources/read",
-          { uri: uri.href },
+          {
+            uri: uri.href,
+            ...(ctx.mcpReq._meta !== undefined && { _meta: ctx.mcpReq._meta }),
+          },
           ctx
         );
         const innerFn = async () =>
@@ -1664,7 +1728,11 @@ export class MCPServer<TUser = never> {
     ) => {
       const mwCtx = this.#createMiddlewareContext(
         "prompts/get",
-        { name: definition.name, arguments: args as Record<string, string> },
+        {
+          name: definition.name,
+          arguments: args as Record<string, string>,
+          ...(ctx.mcpReq._meta !== undefined && { _meta: ctx.mcpReq._meta }),
+        },
         ctx
       );
       const innerFn = async () => {

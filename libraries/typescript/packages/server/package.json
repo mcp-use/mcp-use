@@ -90,6 +90,7 @@
   ],
   "dependencies": {
     "@modelcontextprotocol/client": "https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee",
+    "@modelcontextprotocol/core": "https://pkg.pr.new/@modelcontextprotocol/core@f60b40179b0f090f6d64248be1312245a160b5ee",
     "@modelcontextprotocol/ext-apps": "https://pkg.pr.new/@modelcontextprotocol/ext-apps@432d42bb02a569078ab31ab6458428df6027809d",
     "@modelcontextprotocol/server": "https://pkg.pr.new/@modelcontextprotocol/server@f60b40179b0f090f6d64248be1312245a160b5ee",
     "@tailwindcss/vite": "^4.2.0",
@@ -116,7 +117,6 @@
   },
   "devDependencies": {
     "@mcp-use/client": "workspace:*",
-    "@modelcontextprotocol/core": "https://pkg.pr.new/@modelcontextprotocol/core@f60b40179b0f090f6d64248be1312245a160b5ee",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^22.20.0",
     "@types/react": "^19.2.17",
