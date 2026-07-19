@@ -56,7 +56,7 @@
         "tests/e2e/**/*.{ts,tsx,mjs}"
       ],
       "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"],
-      "ignoreDependencies": ["@scarf/scarf", "tailwindcss", "tw-animate-css"]
+      "ignoreDependencies": ["tailwindcss", "tw-animate-css"]
     },
     "packages/create-mcp-use-app": {
       "entry": ["scripts/**/*.{js,mjs,ts}", "src/index.ts"],

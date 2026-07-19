@@ -126,6 +126,7 @@ describe("runBuild", () => {
     expect(
       readFileSync(join(buildDir, "views", "public", "icon.svg"), "utf8")
     ).toContain("<svg");
+    expect(existsSync(join(buildDir, "icon.svg"))).toBe(false);
 
     // packages:"external" semantics — bare imports stay external, only the
     // user's source is bundled.
@@ -277,6 +278,10 @@ describe("runBuild (views)", () => {
     const publicFile = join(buildDir, "views", "public", "test.txt");
     expect(existsSync(publicFile)).toBe(true);
     expect(readFileSync(publicFile, "utf8")).toBe("public-fixture\n");
+    expect(existsSync(join(buildDir, "test.txt"))).toBe(false);
+    expect(
+      existsSync(join(buildDir, "views", "product-search-result", "test.txt"))
+    ).toBe(false);
 
     const entryCode = readFileSync(join(buildDir, "index.js"), "utf8");
     expect(entryCode).toMatch(/registerViews/);

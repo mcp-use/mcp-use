@@ -46,14 +46,11 @@ function createFsStorage(): TelemetryStorage {
     return {
       getUserId: () => null,
       setUserId: () => undefined,
-      getDownloadedVersion: () => null,
-      setDownloadedVersion: () => undefined,
     };
   }
 
   const cacheHome = getCacheHome(os, path);
   const userIdPath = path.join(cacheHome, "mcp_use_3", "telemetry_user_id");
-  const versionPath = path.join(cacheHome, "mcp_use", "download_version");
 
   return {
     getUserId() {
@@ -68,22 +65,6 @@ function createFsStorage(): TelemetryStorage {
       try {
         fs.mkdirSync(path.dirname(userIdPath), { recursive: true });
         fs.writeFileSync(userIdPath, id);
-      } catch {
-        // ignore
-      }
-    },
-    getDownloadedVersion() {
-      try {
-        if (!fs.existsSync(versionPath)) return null;
-        return fs.readFileSync(versionPath, "utf-8").trim() || null;
-      } catch {
-        return null;
-      }
-    },
-    setDownloadedVersion(version: string) {
-      try {
-        fs.mkdirSync(path.dirname(versionPath), { recursive: true });
-        fs.writeFileSync(versionPath, version);
       } catch {
         // ignore
       }
