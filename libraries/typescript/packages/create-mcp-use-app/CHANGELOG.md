@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 2.0.0-beta.4
+
+### Minor Changes
+
+- d9c2023: Rename the `starter` scaffold to `mcp-server` (example tool + prompt only; resource example removed). The `starter` template id remains as a deprecated alias.
+
 ## 2.0.0-beta.3
 
 ### Minor Changes
