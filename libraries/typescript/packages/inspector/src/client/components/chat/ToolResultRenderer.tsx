@@ -68,7 +68,6 @@ export function ToolResultRenderer({
     ? ((toolMeta?.ui?.resourceUri as string | undefined) ?? null)
     : null;
 
-  const memoizedToolArgs = useMemo(() => toolArgs, [toolName, parsedResult]);
   const memoizedResult = useMemo(() => parsedResult, [toolName, parsedResult]);
 
   const hostProps = useViewHostProps({
@@ -76,7 +75,7 @@ export function ToolResultRenderer({
     viewId: toolCallId,
     resourceUri: resourceUri ?? "",
     toolName,
-    toolInput: memoizedToolArgs,
+    toolInput: toolArgs,
     toolOutput: memoizedResult,
     toolMetadata: toolMeta,
     readResource: readResource ?? (async () => ({})),
@@ -88,7 +87,7 @@ export function ToolResultRenderer({
         <ViewRenderer
           viewId={toolCallId}
           toolName={toolName}
-          toolInput={memoizedToolArgs}
+          toolInput={toolArgs}
           toolOutput={memoizedResult}
           partialToolInput={partialToolArgs}
           cancelled={cancelled}

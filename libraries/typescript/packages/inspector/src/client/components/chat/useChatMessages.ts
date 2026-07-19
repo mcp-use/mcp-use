@@ -26,6 +26,7 @@ import {
   managedNoticeFromHttpResponse,
   type ManagedChatNotice,
 } from "./managedChatNotice";
+import { parsePartialToolArgs } from "./partialToolArgs";
 
 interface WidgetModelContext {
   content?: Array<{ type: string; text: string }>;
@@ -314,10 +315,12 @@ export function useChatMessages({
           type: "text" | "tool-invocation";
           text?: string;
           toolInvocation?: {
+            toolCallId: string;
             toolName: string;
             args: Record<string, unknown>;
             result?: any;
-            state?: "pending" | "result" | "error";
+            state?: "pending" | "streaming" | "result" | "error";
+            partialArgs?: Record<string, unknown>;
           };
         }> = [];
 
@@ -370,15 +373,68 @@ export function useChatMessages({
           }
           updateParts();
         };
+        // Streaming protocol state shared by data-stream and Inspector SSE.
+        const toolCallIdToIndex = new Map<string, number>();
+        const toolCallArgBuffers = new Map<string, string>();
+
+        const appendToolCallStart = (toolCallId: string, toolName: string) => {
+          if (currentTextPart) currentTextPart = "";
+          if (toolCallIdToIndex.has(toolCallId)) return;
+          parts.push({
+            type: "tool-invocation",
+            toolInvocation: {
+              toolCallId,
+              toolName,
+              args: {},
+              state: "streaming",
+              partialArgs: {},
+            },
+          });
+          toolCallIdToIndex.set(toolCallId, parts.length - 1);
+          toolCallArgBuffers.set(toolCallId, "");
+          updateParts();
+        };
+        const appendToolCallDelta = (toolCallId: string, argsDelta: string) => {
+          const idx = toolCallIdToIndex.get(toolCallId);
+          if (idx === undefined || !argsDelta) return;
+          const accumulated =
+            (toolCallArgBuffers.get(toolCallId) ?? "") + argsDelta;
+          toolCallArgBuffers.set(toolCallId, accumulated);
+          const partialArgs = parsePartialToolArgs(accumulated);
+          const invocation = parts[idx]?.toolInvocation;
+          if (!partialArgs || !invocation) return;
+          invocation.partialArgs = partialArgs;
+          updateParts();
+        };
         const appendToolCall = (
+          toolCallId: string,
           toolName: string,
           args: Record<string, unknown>
         ) => {
           if (currentTextPart) currentTextPart = "";
-          parts.push({
-            type: "tool-invocation",
-            toolInvocation: { toolName, args, state: "pending" },
-          });
+          const existingIndex = toolCallIdToIndex.get(toolCallId);
+          const existingInvocation =
+            existingIndex === undefined
+              ? undefined
+              : parts[existingIndex]?.toolInvocation;
+          if (existingInvocation) {
+            existingInvocation.toolName = toolName;
+            existingInvocation.args = args;
+            existingInvocation.state = "pending";
+            existingInvocation.partialArgs = undefined;
+          } else {
+            parts.push({
+              type: "tool-invocation",
+              toolInvocation: {
+                toolCallId,
+                toolName,
+                args,
+                state: "pending",
+              },
+            });
+            toolCallIdToIndex.set(toolCallId, parts.length - 1);
+          }
+          toolCallArgBuffers.delete(toolCallId);
           updateParts();
         };
         const resolveToolResult = (
@@ -406,9 +462,6 @@ export function useChatMessages({
             updateParts();
           }
         };
-
-        // data-stream protocol state: maps toolCallId → parts array index
-        const toolCallIdToIndex = new Map<string, number>();
 
         let buffer = "";
         while (true) {
@@ -448,6 +501,30 @@ export function useChatMessages({
                     appendText(delta);
                     break;
                   }
+                  case "b": {
+                    const tc = val as Record<string, unknown>;
+                    const toolCallId = String(
+                      tc.toolCallId ?? `tool-${parts.length}`
+                    );
+                    const toolName = String(tc.toolName ?? "");
+                    recordTrace({
+                      type: "tool-call-start",
+                      toolCallId,
+                      toolName,
+                      raw: val,
+                    });
+                    appendToolCallStart(toolCallId, toolName);
+                    break;
+                  }
+                  case "c": {
+                    const tc = val as Record<string, unknown>;
+                    const toolCallId = String(tc.toolCallId ?? "");
+                    const argsDelta = String(
+                      tc.argsTextDelta ?? tc.argsDelta ?? ""
+                    );
+                    appendToolCallDelta(toolCallId, argsDelta);
+                    break;
+                  }
                   case "9": {
                     const tc = val as Record<string, unknown>;
                     // Unwrap LangChain-style { input: "<json>" } args
@@ -468,12 +545,14 @@ export function useChatMessages({
                       tc.toolCallId ?? `tool-${parts.length}`
                     );
                     const toolName = String(tc.toolName ?? "");
-                    recordTrace({
-                      type: "tool-call-start",
-                      toolCallId,
-                      toolName,
-                      raw: val,
-                    });
+                    if (!toolCallIdToIndex.has(toolCallId)) {
+                      recordTrace({
+                        type: "tool-call-start",
+                        toolCallId,
+                        toolName,
+                        raw: val,
+                      });
+                    }
                     recordTrace({
                       type: "tool-call-args",
                       toolCallId,
@@ -481,13 +560,7 @@ export function useChatMessages({
                       args,
                       raw: val,
                     });
-                    appendToolCall(toolName, args);
-                    if (tc.toolCallId) {
-                      toolCallIdToIndex.set(
-                        tc.toolCallId as string,
-                        parts.length - 1
-                      );
-                    }
+                    appendToolCall(toolCallId, toolName, args);
                     break;
                   }
                   case "a": {
@@ -572,7 +645,7 @@ export function useChatMessages({
                     raw: event,
                   });
                   appendText(event.content);
-                } else if (event.type === "tool-call") {
+                } else if (event.type === "tool-call-start") {
                   const toolCallId = event.toolCallId ?? `tool-${parts.length}`;
                   recordTrace({
                     type: "tool-call-start",
@@ -580,6 +653,25 @@ export function useChatMessages({
                     toolName: event.toolName,
                     raw: event,
                   });
+                  appendToolCallStart(toolCallId, event.toolName);
+                } else if (
+                  event.type === "tool-call-delta" ||
+                  event.type === "tool-call-args-delta"
+                ) {
+                  appendToolCallDelta(
+                    event.toolCallId,
+                    event.argsDelta ?? event.argsTextDelta ?? ""
+                  );
+                } else if (event.type === "tool-call") {
+                  const toolCallId = event.toolCallId ?? `tool-${parts.length}`;
+                  if (!toolCallIdToIndex.has(toolCallId)) {
+                    recordTrace({
+                      type: "tool-call-start",
+                      toolCallId,
+                      toolName: event.toolName,
+                      raw: event,
+                    });
+                  }
                   recordTrace({
                     type: "tool-call-args",
                     toolCallId,
@@ -587,7 +679,7 @@ export function useChatMessages({
                     args: event.args,
                     raw: event,
                   });
-                  appendToolCall(event.toolName, event.args);
+                  appendToolCall(toolCallId, event.toolName, event.args);
                 } else if (event.type === "tool-result") {
                   recordTrace({
                     type: "tool-result",
@@ -597,8 +689,11 @@ export function useChatMessages({
                     isError: event.isError ?? event.result?.isError,
                     raw: event,
                   });
+                  const resultIndex = toolCallIdToIndex.get(event.toolCallId);
                   resolveToolResult(
-                    { by: "toolName", toolName: event.toolName },
+                    resultIndex === undefined
+                      ? { by: "toolName", toolName: event.toolName }
+                      : { by: "index", index: resultIndex },
                     event.result
                   );
                 } else if (event.type === "done") {
@@ -646,7 +741,8 @@ export function useChatMessages({
           for (const part of parts) {
             if (
               part.type === "tool-invocation" &&
-              part.toolInvocation?.state === "pending"
+              (part.toolInvocation?.state === "pending" ||
+                part.toolInvocation?.state === "streaming")
             ) {
               part.toolInvocation.state = "error";
               part.toolInvocation.result = "Cancelled by user";

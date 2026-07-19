@@ -152,6 +152,8 @@ function ViewRendererBase({
   onMessageRef.current = onMessage;
   const toolInputRef = useRef(toolInput);
   toolInputRef.current = toolInput;
+  const partialToolInputRef = useRef(partialToolInput);
+  partialToolInputRef.current = partialToolInput;
   const toolOutputRef = useRef(toolOutput);
   toolOutputRef.current = toolOutput;
   const customPropsRef = useRef(customProps);
@@ -507,11 +509,18 @@ function ViewRendererBase({
         setInitCount((c) => c + 1);
         onLifecycleChangeRef.current?.({ status: "initialized" });
 
-        const mergedArgs = {
-          ...toolInputRef.current,
-          ...parseCustomProps(customPropsRef.current),
-        };
-        bridge.sendToolInput({ arguments: mergedArgs });
+        const currentPartialToolInput = partialToolInputRef.current;
+        if (currentPartialToolInput) {
+          bridge.sendToolInputPartial({
+            arguments: currentPartialToolInput,
+          });
+        } else {
+          const mergedArgs = {
+            ...toolInputRef.current,
+            ...parseCustomProps(customPropsRef.current),
+          };
+          bridge.sendToolInput({ arguments: mergedArgs });
+        }
         const toolResultPayload = buildToolResultPayload(
           toolOutputRef.current,
           customPropsRef.current
@@ -584,13 +593,13 @@ function ViewRendererBase({
   // Tool input + custom props
   useEffect(() => {
     const bridge = bridgeRef.current;
-    if (!bridge || initCount === 0) return;
+    if (!bridge || initCount === 0 || partialToolInput) return;
     const mergedArgs = {
       ...toolInput,
       ...parseCustomProps(customProps),
     };
     bridge.sendToolInput({ arguments: mergedArgs });
-  }, [initCount, toolInput, customProps]);
+  }, [initCount, toolInput, partialToolInput, customProps]);
 
   // Tool output
   useEffect(() => {
