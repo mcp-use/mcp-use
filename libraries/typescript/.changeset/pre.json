@@ -31,6 +31,7 @@
     "node22-security-patch-floor",
     "openapi-server-tools-v2",
     "resource-template-completion",
+    "stream-inspector-tool-input",
     "strip-tools-list-schema-dialect",
     "ts7-stable-node20-scaffold",
     "v2-server-scaffold",
