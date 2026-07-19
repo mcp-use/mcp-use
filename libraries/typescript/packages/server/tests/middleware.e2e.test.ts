@@ -251,6 +251,60 @@ describe("MCP middleware — result validation", () => {
   });
 });
 
+describe("MCP middleware — tool schema emission", () => {
+  it("strips root schema dialects introduced by tools/list middleware", async () => {
+    const server = new MCPServer({
+      name: "schema-emission-test-server",
+      version: "1.0.0",
+    });
+    const draft07 = "http://json-schema.org/draft-07/schema#";
+
+    server.use("mcp:tools/list", async (_ctx, next) => {
+      const tools = await next();
+      return tools.map((tool) => ({
+        ...tool,
+        inputSchema: { ...tool.inputSchema, $schema: draft07 },
+        ...(tool.outputSchema === undefined
+          ? {}
+          : {
+              outputSchema: { ...tool.outputSchema, $schema: draft07 },
+            }),
+      }));
+    });
+
+    server.tool(
+      {
+        name: "typed-echo",
+        inputSchema: z.object({ message: z.string() }),
+        outputSchema: z.object({ echoed: z.string() }),
+      },
+      async ({ message }) => ({
+        content: [{ type: "text", text: message }],
+        structuredContent: { echoed: message },
+      })
+    );
+
+    const { url } = await server.listen(0);
+    const transport = new StreamableHTTPClientTransport(new URL(url));
+    const client = new Client({
+      name: "schema-emission-test-client",
+      version: "1.0.0",
+    });
+    await client.connect(transport);
+
+    try {
+      const result = await client.listTools();
+      const tool = result.tools.find(({ name }) => name === "typed-echo");
+      expect(tool).toBeDefined();
+      expect(tool?.inputSchema).not.toHaveProperty("$schema");
+      expect(tool?.outputSchema).not.toHaveProperty("$schema");
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+});
+
 describe("getHandler() framework mounting", () => {
   it("accepts a raw Request", async () => {
     const server = new MCPServer({ name: "handler-test", version: "1.0.0" });
