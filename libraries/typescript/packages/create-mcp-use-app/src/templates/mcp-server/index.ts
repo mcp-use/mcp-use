@@ -29,24 +29,6 @@ server.tool(
   }
 );
 
-server.resource(
-  {
-    name: "settings",
-    uri: "config://settings",
-    description: "Example application settings",
-    mimeType: "application/json",
-  },
-  async (uri) => ({
-    contents: [
-      {
-        uri: uri.href,
-        mimeType: "application/json",
-        text: JSON.stringify({ theme: "dark", language: "en" }),
-      },
-    ],
-  })
-);
-
 server.prompt(
   {
     name: "review-code",

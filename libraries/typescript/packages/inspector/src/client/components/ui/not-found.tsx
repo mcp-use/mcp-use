@@ -24,13 +24,11 @@ export function NotFound({
         )}
       >
         <svg
-          width="40"
-          height="40"
           viewBox="-6 -6 512 512"
           xmlns="http://www.w3.org/2000/svg"
-          className="flex-shrink-0 stroke-black dark:stroke-white"
+          className="size-14 shrink-0 stroke-black dark:stroke-white"
           fill="none"
-          strokeWidth="4"
+          strokeWidth="4.8"
           strokeLinecap="round"
           strokeLinejoin="round"
         >

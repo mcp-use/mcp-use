@@ -74,9 +74,11 @@ export function ToolExecutionPanel({
   const compactLabelClass = "hidden @[700px]/tool-exec:inline";
   const compactShortcutClass =
     "hidden @[700px]/tool-exec:inline shrink-0 text-[10px] leading-none border border-current/30 p-1 rounded-full";
+  // Match label hide to the panel container, not the viewport — otherwise a
+  // narrow split panel on a wide window drops text but keeps pill padding.
   const compactIconOnlyClass =
-    "max-[699px]/tool-exec:size-8 max-[699px]/tool-exec:min-w-8 max-[699px]/tool-exec:shrink-0 max-[699px]/tool-exec:gap-0 max-[699px]/tool-exec:rounded-full max-[699px]/tool-exec:px-0 max-[699px]/tool-exec:py-0";
-  const compactExecuteIconOnlyClass = "max-[699px]/tool-exec:!pr-0";
+    "@max-[699px]/tool-exec:size-8 @max-[699px]/tool-exec:min-w-8 @max-[699px]/tool-exec:shrink-0 @max-[699px]/tool-exec:gap-0 @max-[699px]/tool-exec:rounded-full @max-[699px]/tool-exec:!px-0 @max-[699px]/tool-exec:!py-0";
+  const compactExecuteIconOnlyClass = "@max-[699px]/tool-exec:!pr-0";
   const [showCancelButton, setShowCancelButton] = useState(false);
   const [showMetadata, setShowMetadata] = useState(false);
   const [copiedPayload, setCopiedPayload] = useState(false);

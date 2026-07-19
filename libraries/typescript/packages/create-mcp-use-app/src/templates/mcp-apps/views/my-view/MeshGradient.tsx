@@ -1,5 +1,11 @@
 import { useEffect, useRef } from "react";
 
+// Hero mesh palette (light landing surfaces)
+const MESH_COLORS = ["#e0eaff", "#f9ffbd", "#dedede", "#ffffff"];
+const HERO_MESH_SPEED = 1.15;
+const HERO_MESH_SWIRL = 0.95;
+const ORB_MAX_WIDTH_PX = 800;
+
 const VERT = `#version 300 es
 precision mediump float;
 in vec4 a_position;
@@ -7,8 +13,6 @@ uniform vec2 u_resolution;
 out vec2 v_objectUV;
 void main(){
   gl_Position=a_position;
-  // paper-design object UV: fit=contain, fixedRatio=1, origin=(0.5,0.5)
-  // Keeps the swirl vortex circular on non-square canvases.
   vec2 uv=a_position.xy*0.5;
   float box=min(u_resolution.x,u_resolution.y);
   vec2 scale=box>0.0?u_resolution/box:vec2(1.);
@@ -92,7 +96,16 @@ function hexToRgba(hex: string): [number, number, number, number] {
   ];
 }
 
-interface MeshGradientCanvasProps {
+/** WebGL2 mesh gradient canvas (self-contained; no external deps). */
+function MeshGradientCanvas({
+  className,
+  colors = MESH_COLORS,
+  distortion = 0.8,
+  swirl = 0.1,
+  grainMixer = 0,
+  grainOverlay = 0.2,
+  speed = 1,
+}: {
   className?: string;
   colors?: string[];
   distortion?: number;
@@ -100,18 +113,7 @@ interface MeshGradientCanvasProps {
   grainMixer?: number;
   grainOverlay?: number;
   speed?: number;
-}
-
-/** Inline WebGL2 mesh gradient — port of mcp-use landing.ts getMeshGradientScript(). */
-export function MeshGradientCanvas({
-  className,
-  colors = ["#e0eaff", "#f9ffbd", "#dedede", "#ffffff"],
-  distortion = 0.8,
-  swirl = 0.1,
-  grainMixer = 0,
-  grainOverlay = 0.2,
-  speed = 1,
-}: MeshGradientCanvasProps) {
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const propsRef = useRef({
@@ -188,7 +190,6 @@ export function MeshGradientCanvas({
     const uGrainMixer = gl.getUniformLocation(prog, "u_grainMixer");
     const uGrainOverlay = gl.getUniformLocation(prog, "u_grainOverlay");
 
-    // paper-design ShaderMount: currentFrame in ms, u_time = frame * 1e-3
     let frameMs = 0;
     let lastNow = performance.now();
     let raf = 0;
@@ -247,6 +248,52 @@ export function MeshGradientCanvas({
   return (
     <div ref={wrapRef} className={className}>
       <canvas ref={canvasRef} className="h-full w-full" aria-hidden />
+    </div>
+  );
+}
+
+function MeshOrbContent() {
+  return (
+    <>
+      <div className="absolute inset-0 bg-[#edf2ff]" />
+      <MeshGradientCanvas
+        className="absolute inset-0 h-full w-full"
+        colors={MESH_COLORS}
+        distortion={0.8}
+        swirl={HERO_MESH_SWIRL}
+        grainMixer={0}
+        grainOverlay={0.3}
+        speed={HERO_MESH_SPEED}
+      />
+    </>
+  );
+}
+
+/** Mesh disc peeking from the bottom — 80% of card width, capped at 800px. */
+export function HeroMeshOrb({ flow = false }: { flow?: boolean }) {
+  if (flow) {
+    return (
+      <div
+        className="relative z-0 mt-2 w-full overflow-hidden pb-[22%]"
+        aria-hidden
+      >
+        <div
+          className="absolute bottom-0 left-1/2 aspect-square w-full -translate-x-1/2 translate-y-[78%] overflow-hidden rounded-full opacity-90"
+          style={{ maxWidth: ORB_MAX_WIDTH_PX }}
+        >
+          <MeshOrbContent />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="pointer-events-none absolute bottom-0 left-1/2 z-0 aspect-square w-[80%] -translate-x-1/2 translate-y-[78%] overflow-hidden rounded-full opacity-90"
+      style={{ maxWidth: ORB_MAX_WIDTH_PX }}
+      aria-hidden
+    >
+      <MeshOrbContent />
     </div>
   );
 }

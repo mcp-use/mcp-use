@@ -561,6 +561,7 @@ function validateTemplateName(template: string): string {
 
   const aliases: Record<string, string> = {
     "apps-sdk": "mcp-apps",
+    starter: "mcp-server",
   };
 
   const resolvedTemplate = aliases[sanitized] || sanitized;
@@ -642,7 +643,7 @@ async function copyTemplate(
     }
 
     console.log(
-      '💡 Tip: Use "starter" template for a comprehensive MCP server with all features'
+      '💡 Tip: Use "mcp-server" template for an MCP server with an example tool and prompt'
     );
     console.log(
       '💡 Tip: Use "mcp-apps" template for a MCP server that displays Widgets on ChatGPT, Claude, and other mcp-apps compatible clients'
@@ -840,7 +841,7 @@ async function main(): Promise<void> {
     if (interactive) {
       selectedTemplate = await promptForTemplate();
     } else {
-      selectedTemplate = "starter";
+      selectedTemplate = "mcp-server";
     }
   }
 
@@ -1069,19 +1070,20 @@ async function main(): Promise<void> {
   } else if (validatedTemplate === "mcp-apps") {
     console.log("   ├── public/");
     console.log("   │   ├── icon.svg");
-    console.log("   │   └── fruits/ (16 WebP assets)");
+    console.log("   │   └── logo-mcp-use.svg");
     console.log("   ├── views/");
-    console.log("   │   └── product-search-result/");
+    console.log("   │   └── my-view/");
     console.log("   │       ├── view.tsx");
     console.log("   │       ├── view.css");
-    console.log("   │       ├── components/");
-    console.log("   │       └── hooks/");
+    console.log("   │       ├── icons.tsx");
+    console.log("   │       ├── Tooltip.tsx");
+    console.log("   │       └── MeshGradient.tsx");
     console.log("   ├── mcp-env.d.ts");
     console.log("   ├── index.ts (server entry point)");
     console.log("   ├── package.json");
     console.log("   ├── tsconfig.json");
     console.log("   └── README.md");
-  } else if (validatedTemplate === "starter") {
+  } else if (validatedTemplate === "mcp-server") {
     console.log("   ├── index.ts (server entry point)");
     console.log("   ├── package.json");
     console.log("   ├── tsconfig.json");

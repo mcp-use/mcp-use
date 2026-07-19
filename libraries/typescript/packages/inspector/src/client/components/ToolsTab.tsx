@@ -10,7 +10,7 @@ import { MCPToolSavedEvent, captureInspectorEvent } from "@/client/telemetry";
 import type { Tool } from "@mcp-use/client/react";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronLeft, Database, Wrench } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { InspectorScrollArea, ListTabHeader } from "./shared";
 import type { SavedRequest } from "./tools/SavedRequestsList";
 import { SavedRequestsList } from "./tools/SavedRequestsList";
@@ -37,6 +37,10 @@ import {
 import { useSavedRequests } from "@/client/hooks/useSavedRequests";
 import { useToolExecution } from "./tools/useToolExecution";
 import { useToolsTabNavigation } from "./tools/useToolsTabNavigation";
+
+const TOOL_EXEC_TOP_MIN_PX = 200;
+/** Response header + widget padding + MCPAppsDebugControls row (h-8 + top-2). */
+const TOOL_RESULT_CHROME_PX = 140;
 
 export interface ToolsTabRef {
   focusSearch: () => void;
@@ -124,6 +128,11 @@ export function ToolsTab({
 
   const leftPanelRef = usePanelRef();
   const toolParamsPanelRef = usePanelRef();
+  const resultPanelRef = usePanelRef();
+  const verticalGroupElRef = useRef<HTMLDivElement | null>(null);
+  const userLayoutOverrideRef = useRef(false);
+  const isAutoResizingRef = useRef(false);
+  const skipLayoutChangedRef = useRef(true);
 
   const handleMaximize = useCallback(() => {
     if (!isMaximized) {
@@ -473,6 +482,51 @@ export function ToolsTab({
     serverId,
   });
 
+  const latestResultTimestamp = filteredResults[0]?.timestamp;
+
+  useEffect(() => {
+    userLayoutOverrideRef.current = false;
+    skipLayoutChangedRef.current = true;
+    const id = requestAnimationFrame(() => {
+      skipLayoutChangedRef.current = false;
+    });
+    return () => cancelAnimationFrame(id);
+  }, [latestResultTimestamp]);
+
+  const handleVerticalLayoutChanged = useCallback(() => {
+    if (isAutoResizingRef.current || skipLayoutChangedRef.current) return;
+    userLayoutOverrideRef.current = true;
+  }, []);
+
+  const handleWidgetHeightChange = useCallback(
+    (height: number | null) => {
+      if (height === null) return;
+      if (isMaximized || userLayoutOverrideRef.current) return;
+
+      const panel = resultPanelRef.current;
+      const groupEl = verticalGroupElRef.current;
+      if (!panel || !groupEl) return;
+
+      const groupHeight = groupEl.offsetHeight;
+      if (groupHeight <= 0) return;
+
+      const current = panel.getSize().inPixels;
+      const needed = height + TOOL_RESULT_CHROME_PX;
+      const maxResultHeight = groupHeight - TOOL_EXEC_TOP_MIN_PX;
+      if (needed <= current || maxResultHeight <= current) return;
+
+      const target = Math.min(needed, maxResultHeight);
+      if (target <= current) return;
+
+      isAutoResizingRef.current = true;
+      panel.resize(target);
+      requestAnimationFrame(() => {
+        isAutoResizingRef.current = false;
+      });
+    },
+    [isMaximized, resultPanelRef]
+  );
+
   const {
     isSearchExpanded,
     setIsSearchExpanded,
@@ -817,7 +871,7 @@ export function ToolsTab({
         className="flex flex-col h-full relative"
         panelRef={leftPanelRef}
       >
-        <div className="flex h-full flex-col overflow-hidden border-r dark:border-zinc-700">
+        <div className="flex h-full flex-col overflow-hidden">
           <InspectorScrollArea>
             {(isScrolled) => (
               <>
@@ -873,9 +927,15 @@ export function ToolsTab({
       <ResizableHandle withHandle />
 
       <ResizablePanel defaultSize="67%">
-        <ResizablePanelGroup orientation="vertical">
+        <ResizablePanelGroup
+          orientation="vertical"
+          elementRef={verticalGroupElRef}
+          onLayoutChanged={handleVerticalLayoutChanged}
+        >
           <ResizablePanel
+            id="tool-params"
             defaultSize="40%"
+            minSize={`${TOOL_EXEC_TOP_MIN_PX}px`}
             collapsible
             panelRef={toolParamsPanelRef}
           >
@@ -899,7 +959,11 @@ export function ToolsTab({
 
           <ResizableHandle withHandle />
 
-          <ResizablePanel defaultSize="60%">
+          <ResizablePanel
+            id="tool-result"
+            defaultSize="60%"
+            panelRef={resultPanelRef}
+          >
             <div className="flex flex-col h-full">
               <ToolResultDisplay
                 results={filteredResults}
@@ -912,6 +976,7 @@ export function ToolsTab({
                 onMaximize={handleMaximize}
                 isMaximized={isMaximized}
                 onRerunTool={executeTool}
+                onWidgetHeightChange={handleWidgetHeightChange}
               />
             </div>
           </ResizablePanel>

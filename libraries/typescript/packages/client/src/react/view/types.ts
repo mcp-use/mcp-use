@@ -12,6 +12,7 @@ export type {
   McpUiResourcePermissions,
 };
 import type { Transport } from "@modelcontextprotocol/client";
+import type { ReactNode } from "react";
 
 export type ViewDisplayMode = "inline" | "pip" | "fullscreen";
 
@@ -111,6 +112,19 @@ export interface ViewRendererProps {
   toolCallTimeout?: number;
   /** Dev mock of ChatGPT file APIs for local hosts (inspector). Default false. */
   mockOpenAiFileApis?: boolean;
+  /** Fired when the guest reports inline height via ui/notifications/size-changed. */
+  onInlineHeightChange?: (height: number) => void;
+  /** Inspector-only chrome shown above the iframe in fullscreen display mode. */
+  fullscreenHeader?: {
+    title: string;
+    iconUrl?: string | null;
+  };
+  /** Optional host close control for fullscreen (e.g. shared Button + icon). */
+  renderFullscreenClose?: (props: {
+    onClick: () => void;
+    "data-testid": string;
+    "aria-label": string;
+  }) => ReactNode;
   className?: string;
   testId?: string;
   invoking?: string;

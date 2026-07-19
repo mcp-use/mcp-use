@@ -34,7 +34,9 @@ import {
 } from "@/client/components/ui/select";
 
 import { cn } from "@/client/lib/utils";
+import { useTheme } from "@/client/context/ThemeContext";
 import { MeshGradientCanvas } from "@/client/components/ui/MeshGradientCanvas";
+import { meshColorsForTheme } from "@/client/components/ui/mesh-gradient-colors";
 import {
   buildOllamaApiUrl,
   normalizeOllamaBaseUrl,
@@ -338,6 +340,9 @@ export function ConfigurationDialog({
   useManagedCloud = false,
   onSaveManagedCloud,
 }: ConfigurationDialogProps) {
+  const { resolvedTheme } = useTheme();
+  const meshColors = meshColorsForTheme(resolvedTheme);
+  const isDark = resolvedTheme === "dark";
   const [models, setModels] = useState<ModelOption[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [modelError, setModelError] = useState<string | null>(null);
@@ -531,13 +536,19 @@ export function ConfigurationDialog({
               data-testid="chat-config-sign-in-card"
               className="relative w-full cursor-pointer overflow-hidden rounded-2xl text-left transition-opacity hover:opacity-95 active:opacity-90"
             >
-              <div className="absolute inset-0 bg-[#edf2ff]" aria-hidden />
-              <MeshGradientCanvas
-                className="absolute inset-0 h-full w-full"
-                grainOverlay={0.15}
+              <div
+                className="absolute inset-0 bg-[#edf2ff] dark:bg-background"
+                aria-hidden
               />
+              <div className="absolute inset-0 dark:opacity-90">
+                <MeshGradientCanvas
+                  className="absolute inset-0 h-full w-full"
+                  colors={[...meshColors]}
+                  grainOverlay={isDark ? 0.1 : 0.15}
+                />
+              </div>
               <div className="relative flex items-center justify-between gap-4 px-4 py-3.5">
-                <div className="text-sm font-medium text-black">
+                <div className="text-sm font-medium text-foreground">
                   <p>Chat for free with a</p>
                   <p className="mt-1 flex items-center gap-1.5">
                     <ManufactWordmark symbolSize={14} textClassName="text-sm" />

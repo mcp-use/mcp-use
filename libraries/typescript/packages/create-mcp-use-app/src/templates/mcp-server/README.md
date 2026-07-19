@@ -13,7 +13,7 @@ npm run dev
 
 Open [http://localhost:3000/inspector](http://localhost:3000/inspector) with your browser to test your server.
 
-You can start building by editing the entry file. Add tools, resources, and prompts — the server auto-reloads as you edit.
+You can start building by editing the entry file. Add tools and prompts — the server auto-reloads as you edit.
 
 ## Learn More
 

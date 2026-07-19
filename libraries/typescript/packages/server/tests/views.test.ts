@@ -922,6 +922,9 @@ describe("views document synthesis", () => {
     expect(html).not.toMatch(/<script[^>]+src=/);
     expect(html).not.toMatch(/<link[^>]+stylesheet/);
     expect(html).toContain("__mcpUseViewConfig");
+    expect(html).toContain(
+      "<style>html,body,#root{background:transparent}</style>"
+    );
   });
 
   it("escapes </script> inside inlined module source so the document does not terminate early", () => {

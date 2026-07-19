@@ -23,12 +23,8 @@ import React, {
 } from "react";
 import { toast } from "sonner";
 import type { MessageContentBlock } from "@/client/types/message-content-block";
-import {
-  ViewRenderer,
-  getViewResourceUri,
-  isViewTool,
-} from "@mcp-use/client/react";
-import { useViewHostProps } from "@/client/hooks/useViewHostProps";
+import { getViewResourceUri, isViewTool } from "@mcp-use/client/react";
+import { McpAppsViewPanel } from "../mcp-apps/McpAppsViewPanel";
 import { MCPAppsDebugControls } from "../MCPAppsDebugControls";
 import { JSONDisplay } from "../shared/JSONDisplay";
 import { NotFound } from "../ui/not-found";
@@ -61,6 +57,7 @@ interface ToolResultDisplayProps {
   onMaximize?: () => void;
   isMaximized?: boolean;
   onRerunTool?: () => void;
+  onWidgetHeightChange?: (height: number | null) => void;
 }
 
 // Isolated component so 1s interval doesn't re-render parent (and thus widget iframe)
@@ -385,84 +382,6 @@ function FormattedContentDisplay({ content }: { content: any[] }) {
   );
 }
 
-function ToolResultViewPanel({
-  serverId,
-  viewId,
-  toolName,
-  resourceUri,
-  toolInput,
-  toolOutput,
-  toolMetadata,
-  readResource,
-  customProps,
-  displayMode,
-  onDisplayModeChange,
-  onSendFollowUp,
-}: {
-  serverId: string;
-  viewId: string;
-  toolName: string;
-  resourceUri: string;
-  toolInput?: Record<string, unknown>;
-  toolOutput?: unknown;
-  toolMetadata?: Record<string, unknown>;
-  readResource: (uri: string) => Promise<unknown>;
-  customProps?: Record<string, string>;
-  displayMode: "inline" | "pip" | "fullscreen";
-  onDisplayModeChange: (mode: "inline" | "pip" | "fullscreen") => void;
-  onSendFollowUp?: (content: MessageContentBlock[]) => void;
-}) {
-  const hostProps = useViewHostProps({
-    serverId,
-    viewId,
-    resourceUri,
-    toolName,
-    toolInput,
-    toolOutput,
-    toolMetadata,
-    readResource,
-    displayMode,
-    onDisplayModeChange,
-  });
-
-  if (!hostProps) {
-    return (
-      <WidgetWrapper className="w-full h-full min-h-[240px]">
-        <Spinner className="size-5" />
-      </WidgetWrapper>
-    );
-  }
-
-  const viewRendererClassName =
-    displayMode === "inline"
-      ? "w-full h-full flex items-center justify-center relative p-4 min-h-0"
-      : "w-full h-full relative p-4";
-
-  const propsRenderKey = customProps
-    ? JSON.stringify(customProps)
-    : "no-custom-props";
-
-  return (
-    <WidgetWrapper className="w-full h-full min-h-[240px]">
-      <ViewRenderer
-        key={propsRenderKey}
-        viewId={viewId}
-        toolName={toolName}
-        toolInput={toolInput}
-        toolOutput={toolOutput}
-        customProps={customProps}
-        className={viewRendererClassName}
-        onMessage={(content) => {
-          if (content.length > 0 && onSendFollowUp) {
-            onSendFollowUp(content as MessageContentBlock[]);
-          }
-        }}
-        {...hostProps}
-      />
-    </WidgetWrapper>
-  );
-}
-
 export function ToolResultDisplay({
   results,
   copiedResult,
@@ -472,6 +391,7 @@ export function ToolResultDisplay({
   onMaximize,
   isMaximized = false,
   onRerunTool,
+  onWidgetHeightChange,
 }: ToolResultDisplayProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [formattedMode, setFormattedMode] = useState(true); // true = formatted, false = raw
@@ -658,10 +578,28 @@ export function ToolResultDisplay({
     }
   }, [availableViews, viewMode]);
 
+  useEffect(() => {
+    if (!onWidgetHeightChange) return;
+    if (
+      results.length === 0 ||
+      viewMode !== "mcp-apps" ||
+      mcpAppsDisplayMode !== "inline" ||
+      !hasMcpAppsResource
+    ) {
+      onWidgetHeightChange(null);
+    }
+  }, [
+    onWidgetHeightChange,
+    results.length,
+    viewMode,
+    mcpAppsDisplayMode,
+    hasMcpAppsResource,
+  ]);
+
   // Early return AFTER all hooks are called
   if (results.length === 0) {
     return (
-      <div className="flex flex-col h-full bg-white dark:bg-black border-t dark:border-zinc-700">
+      <div className="flex flex-col h-full bg-white dark:bg-black">
         <div className="flex-1 overflow-y-auto h-full">
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
@@ -674,7 +612,7 @@ export function ToolResultDisplay({
   }
 
   return (
-    <div className="relative flex flex-col h-full bg-white dark:bg-black border-t dark:border-zinc-700">
+    <div className="relative flex flex-col h-full bg-white dark:bg-black">
       <div className="flex-1 overflow-y-auto h-full">
         <div className="space-y-0 flex flex-col flex-1 h-full">
           <div
@@ -868,8 +806,7 @@ export function ToolResultDisplay({
                   }
 
                   return (
-                    <div className="flex flex-1 relative flex-col min-h-0">
-                      {/* Floating controls in top-right */}
+                    <WidgetWrapper className="relative flex flex-1 w-full min-h-[240px] items-stretch">
                       <div className="absolute top-2 right-2 z-30 flex items-center gap-2">
                         <MCPAppsDebugControls
                           toolCallId={`tool-${result.timestamp}`}
@@ -885,22 +822,30 @@ export function ToolResultDisplay({
                         />
                       </div>
 
-                      <ToolResultViewPanel
-                        key={`mcp-apps-${result.timestamp}`}
-                        serverId={serverId}
-                        viewId={`tool-${result.timestamp}`}
-                        toolName={result.toolName}
-                        toolInput={memoizedArgs}
-                        toolOutput={memoizedResult}
-                        toolMetadata={result.toolMeta}
-                        resourceUri={mcpAppsResourceUri}
-                        readResource={memoizedReadResource}
-                        customProps={activeProps || undefined}
-                        displayMode={mcpAppsDisplayMode}
-                        onDisplayModeChange={setMcpAppsDisplayMode}
-                        onSendFollowUp={memoizedOnSendFollowUp}
-                      />
-                    </div>
+                      <div className="flex min-h-0 flex-1 flex-col pt-11">
+                        <McpAppsViewPanel
+                          key={`mcp-apps-${result.timestamp}`}
+                          serverId={serverId}
+                          viewId={`tool-${result.timestamp}`}
+                          toolName={result.toolName}
+                          toolInput={memoizedArgs}
+                          toolOutput={memoizedResult}
+                          toolMetadata={result.toolMeta}
+                          resourceUri={mcpAppsResourceUri}
+                          readResource={memoizedReadResource}
+                          customProps={activeProps || undefined}
+                          displayMode={mcpAppsDisplayMode}
+                          onDisplayModeChange={setMcpAppsDisplayMode}
+                          onSendFollowUp={memoizedOnSendFollowUp}
+                          onWidgetHeightChange={
+                            onWidgetHeightChange
+                              ? (height) => onWidgetHeightChange(height)
+                              : undefined
+                          }
+                          noWrapper
+                        />
+                      </div>
+                    </WidgetWrapper>
                   );
                 }
 

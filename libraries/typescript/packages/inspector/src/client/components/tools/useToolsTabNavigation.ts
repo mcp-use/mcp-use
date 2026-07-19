@@ -63,7 +63,10 @@ export function useToolsTabNavigation({
   }, [selectedTool]);
 
   useEffect(() => {
-    if (isMobile && results.length > 0 && !isExecuting) {
+    if (!isMobile || results.length === 0) return;
+    const latest = results[0] as { result?: unknown } | undefined;
+    // Widget tools push null before callTool resolves; mount response early for pending UI.
+    if (!isExecuting || latest?.result === null) {
       setMobileView("response");
     }
   }, [results, isExecuting, isMobile]);
