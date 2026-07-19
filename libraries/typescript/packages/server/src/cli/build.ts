@@ -187,8 +187,8 @@ async function buildExternalView(
         input: { [view.name]: virtualViewId(view.name) },
         output: {
           format: "es",
-          codeSplitting: false,
           entryFileNames: "assets/[name]-[hash].js",
+          chunkFileNames: "assets/[name]-[hash].js",
           assetFileNames: "assets/[name]-[hash][extname]",
         },
       },

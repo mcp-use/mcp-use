@@ -93,8 +93,11 @@ describe("inspector shell route", () => {
     // Browser polyfill for the bundle's Node-flavored module-scope code.
     expect(html).toContain("window.process = {");
     // Root node for the bundle to mount into, with the inspector's neutral
-    // background applied before the UI paints.
+    // background applied before the UI paints and a boot spinner placeholder.
     expect(html).toContain('<div id="root">');
+    expect(html).toContain('class="mcp-boot"');
+    expect(html).toContain('role="status"');
+    expect(html).toContain("Connecting to MCP server...");
     expect(html).toContain("background-color: #f3f3f3");
     // The server name appears (escaped) in the title.
     expect(html).toContain("<title>shell-test — MCP Inspector</title>");

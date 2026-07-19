@@ -74,20 +74,22 @@ afterAll(() => {
 function listViewAssets(
   buildDir: string,
   viewName: string
-): { entry: string; css: string[] } {
+): { entry: string; css: string[]; js: string[] } {
   const assetsDir = join(buildDir, "views", viewName, "assets");
   const files = readdirSync(assetsDir);
-  const js = files.find(
+  const jsFiles = files.filter(
     (file) => file.endsWith(".js") && !file.endsWith(".map.js")
   );
-  if (js === undefined) {
-    throw new Error(`expected JS asset for view ${viewName}`);
+  const entryBasename = jsFiles.find((file) => file.startsWith(`${viewName}-`));
+  if (entryBasename === undefined) {
+    throw new Error(`expected entry chunk for view ${viewName}`);
   }
   return {
-    entry: `assets/${js}`,
+    entry: `assets/${entryBasename}`,
     css: files
       .filter((file) => file.endsWith(".css"))
       .map((file) => `assets/${file}`),
+    js: jsFiles.map((file) => `assets/${file}`),
   };
 }
 
@@ -321,6 +323,31 @@ describe("runBuild (views)", () => {
       expect(await assetResponse.text()).toMatch(
         /bootstrapView|createElement|react/i
       );
+
+      if (product.js.length > 1) {
+        const entryJs = readFileSync(assetPath, "utf8");
+        const chunkImport = entryJs.match(/from\s*"\.\/([^"]+\.js)"/);
+        expect(chunkImport).not.toBeNull();
+        const chunkRelative = `assets/${chunkImport![1]!}`;
+        expect(product.js).toContain(chunkRelative);
+        const chunkUrl = text.match(
+          new RegExp(
+            `/mcp/_mcp-use/views/product-search-result/${chunkRelative.replace(/\./g, "\\.")}`
+          )
+        );
+        if (chunkUrl === null) {
+          const chunkBasename = chunkImport![1]!;
+          const chunkResponse = await handler(
+            new Request(
+              `http://localhost/mcp/_mcp-use/views/product-search-result/assets/${chunkBasename}`
+            )
+          );
+          expect(chunkResponse.status).toBe(200);
+          expect(chunkResponse.headers.get("content-type")).toContain(
+            "javascript"
+          );
+        }
+      }
 
       const publicOk = await handler(
         new Request("http://localhost/mcp/_mcp-use/public/test.txt")

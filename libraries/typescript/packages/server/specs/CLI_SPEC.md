@@ -317,6 +317,7 @@ Evaluates no Vite, toolchain, or unrelated command chunk. A production image ins
 The inspector UI is **not an npm dependency of `mcp-use`**. The framework owns a tiny dependency-free HTML shell route — the exact analog of FastAPI's `get_swagger_ui_html` for `/docs`:
 
 - `GET ${basePath}/inspector` returns a small HTML page whose `<script type="module">` and stylesheet load the framework-compatible inspector bundle from the configured CDN base, pinned to an exact asset version.
+- The shell paints a centered boot spinner inside `#root` before the CDN bundle mounts, so the page is not blank while the first chunk downloads.
 - Config (autoConnect URL = the MCP endpoint at `basePath`, plus `basePath` itself) is passed via a serialized `window` global read by the bundle.
 
 `ServerConfig` gains:
