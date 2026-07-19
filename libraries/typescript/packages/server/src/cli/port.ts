@@ -3,10 +3,13 @@
  * upward when the requested port is taken.
  */
 
-import { createServer } from "node:net";
+import { connect, createServer } from "node:net";
 
 /** How many consecutive ports to probe before giving up. */
 const MAX_PROBES = 100;
+
+/** Short timeout for loopback connect probes (ms). */
+const CONNECT_PROBE_MS = 300;
 
 /**
  * Outcome of {@link resolvePort}.
@@ -20,6 +23,8 @@ export interface ResolvedPort {
   requested: number;
 }
 
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
+
 /** Check whether `port` is free to bind on `host`. */
 function isPortFree(port: number, host: string): Promise<boolean> {
   return new Promise((resolve) => {
@@ -30,6 +35,37 @@ function isPortFree(port: number, host: string): Promise<boolean> {
       probe.close(() => resolve(true));
     });
   });
+}
+
+/** Whether a TCP connect to `host:port` succeeds within {@link CONNECT_PROBE_MS}. */
+function canConnect(port: number, host: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = connect({ port, host });
+    socket.setTimeout(CONNECT_PROBE_MS);
+    socket.once("connect", () => {
+      socket.destroy();
+      resolve(true);
+    });
+    socket.once("timeout", () => {
+      socket.destroy();
+      resolve(false);
+    });
+    socket.once("error", () => {
+      socket.destroy();
+      resolve(false);
+    });
+  });
+}
+
+/**
+ * On loopback binds, a wildcard listener on `*:port` (IPv6) can still accept
+ * `localhost` traffic while `127.0.0.1:port` bind-probes succeed — macOS dual-stack.
+ * Treat the port as taken when either loopback address already accepts connections.
+ */
+async function loopbackPortInUse(port: number): Promise<boolean> {
+  return (
+    (await canConnect(port, "127.0.0.1")) || (await canConnect(port, "::1"))
+  );
 }
 
 /**
@@ -50,9 +86,9 @@ export async function resolvePort(
   host: string
 ): Promise<ResolvedPort> {
   for (let port = requested; port < requested + MAX_PROBES; port++) {
-    if (await isPortFree(port, host)) {
-      return { port, requested };
-    }
+    if (!(await isPortFree(port, host))) continue;
+    if (LOOPBACK_HOSTS.has(host) && (await loopbackPortInUse(port))) continue;
+    return { port, requested };
   }
   throw new Error(
     `No free port found between ${requested} and ${requested + MAX_PROBES - 1} on ${host}.`

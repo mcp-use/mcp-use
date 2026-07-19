@@ -346,6 +346,22 @@ export default server;`
     expect(await listToolNames(dev.url)).toEqual(["add"]);
   });
 
+  it("probes upward when a wildcard listener already owns the port on loopback", async () => {
+    const cwd = copyFixture("dev-port-wildcard");
+    cleanups.push(() => removeDir(cwd));
+
+    const port = await getFreePort();
+    const blocker = await occupyPort(port, "::");
+    cleanups.push(() => new Promise<void>((r) => blocker.close(() => r())));
+
+    const dev = await startDev(cwd, port);
+    cleanups.push(dev.stop);
+
+    const boundPort = Number(new URL(dev.url).port);
+    expect(boundPort).toBeGreaterThan(port);
+    expect(await listToolNames(dev.url)).toEqual(["add"]);
+  });
+
   it("uses the actual local listener origin for OAuth entries", async () => {
     delete process.env["MCP_URL"];
     const cwd = copyFixture("dev-oauth");
