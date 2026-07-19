@@ -39,6 +39,7 @@
     "ts7-stable-node20-scaffold",
     "typed-mcp-middleware-results",
     "v2-server-scaffold",
+    "view-code-split-inspector-boot",
     "views-dir-mcp-env-and-dev-host"
   ]
 }
