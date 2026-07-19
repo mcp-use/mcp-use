@@ -20,6 +20,7 @@
     "client-cli-auto-install",
     "client-sdk-v2-migration",
     "create-app-sdk-version",
+    "dev-port-probe-envdir",
     "dialect-json-schema-validator",
     "fix-beta-scaffold-templates",
     "follow-inspector-beta-cdn",
