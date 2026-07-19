@@ -25,21 +25,17 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": "./dist/index.js"
     },
     "./browser": {
       "types": "./dist/browser-agent.d.ts",
-      "import": "./dist/browser-agent.js",
-      "require": "./dist/browser-agent.cjs"
+      "import": "./dist/browser-agent.js"
     },
     "./langchain": {
       "types": "./dist/langchain.d.ts",
-      "import": "./dist/langchain.js",
-      "require": "./dist/langchain.cjs"
+      "import": "./dist/langchain.js"
     }
   },
-  "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
