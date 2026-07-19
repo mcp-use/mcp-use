@@ -34,6 +34,7 @@
     "stream-inspector-tool-input",
     "strip-tools-list-schema-dialect",
     "ts7-stable-node20-scaffold",
+    "typed-mcp-middleware-results",
     "v2-server-scaffold",
     "views-dir-mcp-env-and-dev-host"
   ]
