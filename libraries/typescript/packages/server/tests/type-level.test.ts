@@ -16,7 +16,11 @@ import type {
   ToolAnnotations as SdkToolAnnotations,
 } from "@modelcontextprotocol/server";
 
-import { MCPServer } from "../src/index.js";
+import {
+  createMcpEventListenerEntry,
+  createMcpMiddlewareEntry,
+  MCPServer,
+} from "../src/index.js";
 import type {
   Annotations,
   CallToolResult,
@@ -460,6 +464,33 @@ describe("view-bound tool return-position checks", () => {
 });
 
 describe("MCP middleware type narrowing", () => {
+  it("exports typed entry adapters from the package root", () => {
+    const middleware = createMcpMiddlewareEntry(
+      "mcp:tools/list",
+      async (ctx, next) => {
+        expectTypeOf(ctx.params.cursor).toEqualTypeOf<string | undefined>();
+        const tools = await next();
+        expectTypeOf(tools).toEqualTypeOf<SdkTool[]>();
+        return tools;
+      }
+    );
+    const listener = createMcpEventListenerEntry(
+      "mcp:tools/call:complete",
+      (ctx, result) => {
+        expectTypeOf(ctx.params.name).toBeString();
+        expectTypeOf(result).toEqualTypeOf<
+          CallToolResult | InputRequiredResult
+        >();
+      }
+    );
+
+    expect(middleware.pattern).toBe("tools/list");
+    expect(listener).toMatchObject({
+      pattern: "tools/call",
+      phase: "complete",
+    });
+  });
+
   it("narrows ctx.params for tools/call middleware", () => {
     const server = new MCPServer({ name: "types", version: "0.0.0" });
     server.use("mcp:tools/call", async (ctx, next) => {

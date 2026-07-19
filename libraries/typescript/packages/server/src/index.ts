@@ -124,6 +124,8 @@ export type {
 } from "./middleware/mcp-middleware.js";
 export {
   composeMiddleware,
+  createMcpEventListenerEntry,
+  createMcpMiddlewareEntry,
   matchesPattern,
 } from "./middleware/mcp-middleware.js";
 export type { NodeRequestHandler } from "./node-bridge.js";

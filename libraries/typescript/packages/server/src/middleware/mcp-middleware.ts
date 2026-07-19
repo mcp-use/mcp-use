@@ -234,7 +234,6 @@ export interface McpMiddlewareEntry {
  * The overload retains the public pattern/handler correlation. The broad
  * implementation signature is the deliberate erasure boundary, like the
  * official SDK's `setRequestHandler` implementation.
- * @internal
  */
 export function createMcpMiddlewareEntry<P extends McpMiddlewarePattern>(
   pattern: P,
@@ -350,7 +349,7 @@ export interface McpEventListenerEntry {
   handler: (ctx: ReadonlyMiddlewareContext, result?: unknown) => void;
 }
 
-/** Adapt a public method-correlated observer for internal storage. @internal */
+/** Adapt a public method-correlated observer for type-erased storage. */
 export function createMcpEventListenerEntry<P extends McpEventPattern>(
   pattern: P,
   handler: McpEventListenerFnFor<P>
