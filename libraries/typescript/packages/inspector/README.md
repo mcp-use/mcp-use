@@ -419,25 +419,9 @@ localStorage.setItem("MCP_USE_ANONYMIZED_TELEMETRY", "false");
 
 > **Note:** If you previously opted out with `mcp_inspector_telemetry_disabled`, the inspector automatically migrates that setting to `MCP_USE_ANONYMIZED_TELEMETRY=false` on startup.
 
-**Option 3: Package-level**
+### Telemetry Provider
 
-```json
-// Add to your package.json
-{
-  "scarfSettings": {
-    "enabled": false
-  }
-}
-```
-
-### Telemetry Providers
-
-We use:
-
-- **PostHog**: For product analytics and feature usage tracking
-- **Scarf**: For package download analytics and company insights
-
-## Both providers respect your privacy and follow GDPR compliance.
+We use **PostHog** for product analytics and feature usage tracking. PostHog respects your privacy and follows GDPR compliance.
 
 ## 🤝 Contributing
 

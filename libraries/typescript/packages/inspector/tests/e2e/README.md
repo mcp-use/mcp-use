@@ -16,7 +16,7 @@ npx playwright install
 
 These commands automatically build and start the conformance server before running tests.
 
-**Note:** Telemetry (Scarf and PostHog) is automatically disabled during test runs to prevent network errors and tracking.
+**Note:** Telemetry (PostHog) is automatically disabled during test runs to prevent network errors and tracking.
 
 ```bash
 # Built-in mode: Server dev with built-in inspector (port 3000, for HMR testing)
