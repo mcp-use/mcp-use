@@ -7,6 +7,7 @@ import {
   normalizeMcpMiddlewarePattern,
   parseMcpPattern,
   runMcpOperation,
+  withMcpMiddlewareParams,
   type McpEventListenerEntry,
   type McpMiddlewareEntry,
   type McpMiddlewareMethod,
@@ -177,6 +178,28 @@ describe("runMcpOperation", () => {
 });
 
 describe("pattern helpers", () => {
+  it("forwards the current middleware params in the downstream request", () => {
+    const originalRequest = {
+      jsonrpc: "2.0" as const,
+      id: 1,
+      method: "tools/list" as const,
+      params: { cursor: "original" },
+    };
+    const replacement = { cursor: "replacement" };
+
+    const downstreamRequest = withMcpMiddlewareParams<"tools/list">(
+      originalRequest,
+      replacement
+    );
+
+    expect(downstreamRequest).toEqual({
+      ...originalRequest,
+      params: replacement,
+    });
+    expect(downstreamRequest.params).toBe(replacement);
+    expect(originalRequest.params.cursor).toBe("original");
+  });
+
   it("rejects category wildcard middleware at runtime", () => {
     expect(() =>
       createMcpMiddlewareEntry(

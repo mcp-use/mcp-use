@@ -44,6 +44,7 @@ import {
   createMcpEventListenerEntry,
   createMcpMiddlewareEntry,
   runMcpOperation,
+  withMcpMiddlewareParams,
   type McpEventListenerFnFor,
   type McpEventPattern,
   type McpEventListenerEntry,
@@ -1420,7 +1421,11 @@ export class MCPServer<TUser = never> {
         );
         let originalEnvelope: Record<string, unknown> | undefined;
         const innerFn = async (): Promise<McpMiddlewareResult<M>> => {
-          const result = await original(request, extra);
+          const downstreamRequest = withMcpMiddlewareParams<M>(
+            request,
+            mwCtx.params
+          );
+          const result = await original(downstreamRequest, extra);
           if (typeof result !== "object" || result === null) {
             throw new TypeError(
               `[mcp-use] ${method} handler returned a non-object result`

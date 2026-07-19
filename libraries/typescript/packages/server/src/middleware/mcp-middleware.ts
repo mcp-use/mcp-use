@@ -70,6 +70,30 @@ export interface McpMiddlewareOperationMap {
 export type McpMiddlewareResult<M extends McpMiddlewareMethod> =
   McpMiddlewareOperationMap[M]["result"];
 
+/**
+ * Rebuild an SDK request with the params currently held by middleware.
+ *
+ * Middleware may replace `ctx.params`, so forwarding the request object that
+ * was captured before the chain ran would silently discard that replacement.
+ * @internal
+ */
+export function withMcpMiddlewareParams<M extends McpMiddlewareMethod>(
+  request: unknown,
+  params: McpMiddlewareOperationMap[M]["params"]
+): RequestTypeMap[M] {
+  if (
+    typeof request !== "object" ||
+    request === null ||
+    Array.isArray(request)
+  ) {
+    throw new TypeError(
+      "[mcp-use] MCP middleware received an invalid downstream request"
+    );
+  }
+
+  return { ...request, params } as RequestTypeMap[M];
+}
+
 interface MiddlewareContextCommon {
   /** Session info when the underlying transport provides a session ID. */
   session?: { sessionId: string };
