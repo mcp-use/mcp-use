@@ -166,7 +166,7 @@ async function buildExternalView(
   const clientResult = await build({
     root: options.cwd,
     configFile: options.userViteConfig,
-    envFile: false,
+    envDir: false,
     logLevel: "warn",
     cacheDir: options.cacheDir,
     resolve: { alias: { tailwindcss: resolveTailwindCss() } },
@@ -280,7 +280,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     await build({
       root: options.cwd,
       configFile: false,
-      envFile: false,
+      envDir: false,
       logLevel: "warn",
       cacheDir: paths.cache,
       build: {
@@ -402,7 +402,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
   await build({
     root: options.cwd,
     configFile: false,
-    envFile: false,
+    envDir: false,
     logLevel: "warn",
     cacheDir: paths.cache,
     build: {

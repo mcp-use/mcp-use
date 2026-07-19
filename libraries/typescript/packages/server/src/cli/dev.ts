@@ -355,7 +355,7 @@ export async function runDev(options: DevOptions): Promise<void> {
   const vite = await createServer({
     root: options.cwd,
     configFile: viewsAtStartup ? userViteConfig : false,
-    envFile: false,
+    envDir: false,
     logLevel: "warn",
     cacheDir: paths.cache,
     resolve: { alias: { tailwindcss: resolveTailwindCss() } },
