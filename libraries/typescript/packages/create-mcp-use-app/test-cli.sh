@@ -197,11 +197,11 @@ echo -e "${BLUE}═════════════════════�
 echo ""
 
 # Test package manager flags
-run_test "Flag-Yarn" npm starter "--yarn" ""
+run_test "Flag-Yarn" npm mcp-server "--yarn" ""
 echo ""
-run_test "Flag-NPM" npm starter "--npm" ""
+run_test "Flag-NPM" npm mcp-server "--npm" ""
 echo ""
-run_test "Flag-PNPM" npm starter "--pnpm" ""
+run_test "Flag-PNPM" npm mcp-server "--pnpm" ""
 echo ""
 
 echo -e "${BLUE}═══════════════════════════════════════════════${NC}"
@@ -210,13 +210,13 @@ echo -e "${BLUE}═════════════════════�
 echo ""
 
 # Test version flags
-run_test "Version-Dev" npm starter "--dev" ""
+run_test "Version-Dev" npm mcp-server "--dev" ""
 echo ""
-run_test "Version-Sdk-Canary" npm starter "--sdk-version canary" ""
+run_test "Version-Sdk-Canary" npm mcp-server "--sdk-version canary" ""
 echo ""
-run_test "Version-Sdk-Semver" npm starter "--sdk-version 1.0.0" ""
+run_test "Version-Sdk-Semver" npm mcp-server "--sdk-version 1.0.0" ""
 echo ""
-run_test "Version-Latest" npm starter "" ""
+run_test "Version-Latest" npm mcp-server "" ""
 echo ""
 
 # Optional: Test with installation (slower)
@@ -226,9 +226,9 @@ if [ "${RUN_INSTALL_TESTS:-no}" == "yes" ]; then
     echo -e "${BLUE}═══════════════════════════════════════════════${NC}"
     echo ""
     
-    run_test "Install-NPM" npm starter "--npm" "yes"
+    run_test "Install-NPM" npm mcp-server "--npm" "yes"
     echo ""
-    run_test "Install-Yarn" yarn starter "--yarn" "yes"
+    run_test "Install-Yarn" yarn mcp-server "--yarn" "yes"
     echo ""
 fi
 

@@ -69,7 +69,7 @@ npx create-mcp-use-app@latest <project-name> --template mcp-apps
 
 Let the scaffold install dependencies and `git init` — both are useful (`npm install` runs `mcp-use generate-types` postinstall, and a git repo is required by `npm run deploy` later). The skill installs companion coding-agent skills by default too; that's fine.
 
-Verify the template catalog with `npx create-mcp-use-app@latest --list-templates` if it's been a while — the available set is `blank`, `starter`, `mcp-apps` as of this writing. `starter` includes sample tools you'd rip out, so we don't recommend it here.
+Verify the template catalog with `npx create-mcp-use-app@latest --list-templates` if it's been a while — the available set is `blank`, `mcp-server`, `mcp-apps` as of this writing. Use `blank` for OpenAPI-first servers; `mcp-server` includes sample tools you'd rip out.
 
 After scaffolding, add the two extra deps the OpenAPI flow needs:
 

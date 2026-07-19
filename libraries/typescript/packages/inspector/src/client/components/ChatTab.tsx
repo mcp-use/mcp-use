@@ -1079,7 +1079,10 @@ export function ChatTab({
 
         <div className="relative min-w-0 flex-1 overflow-hidden">
           {!showHistoryPanel && (
-            <div className="absolute top-1/2 left-4 z-50 hidden -translate-y-1/2 lg:block">
+            <div
+              data-chat-history-toggle
+              className="absolute top-1/2 left-4 z-50 hidden -translate-y-1/2 lg:block [[data-mcp-widget-fullscreen]_&]:pointer-events-none [[data-mcp-widget-fullscreen]_&]:invisible"
+            >
               <Tooltip>
                 <TooltipTrigger
                   render={

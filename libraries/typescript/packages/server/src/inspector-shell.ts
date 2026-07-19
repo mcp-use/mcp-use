@@ -166,6 +166,7 @@ export function renderInspectorShell(options: InspectorShellOptions): string {
         };
         // Read by the current inspector bundle to derive its own URLs.
         window.__MCP_BASE_PATH__ = basePath;
+        ${process.env.MCP_USE_DEV_CLI === "1" ? "window.__MCP_DEV_CLI__ = true;" : ""}
         ${serializedManufactChatUrl ? `window.__MANUFACT_CHAT_URL__ = ${serializedManufactChatUrl};` : ""}
         // The bundle carries Node-flavored dependencies that touch \`process\`
         // at module scope; give them the same browser polyfill the v1

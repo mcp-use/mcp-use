@@ -10,6 +10,11 @@ import { NotFound } from "@/client/components/ui/not-found";
 import { MESH_PANEL_FINE_OVERLAY_NOISE_DATA_URL } from "@/client/components/ui/random-gradient-background";
 import { MeshGradientCanvas } from "@/client/components/ui/MeshGradientCanvas";
 import {
+  CONNECT_PANEL_MESH_ANIMATION_PAUSED_KEY,
+  MeshAnimationPauseButton,
+  useMeshAnimationPaused,
+} from "@/client/components/ui/mesh-animation-pause";
+import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -28,10 +33,8 @@ import {
   Info,
   Loader2,
   MoreVertical,
-  Play,
   RotateCcw,
   Settings,
-  Square,
 } from "lucide-react";
 import {
   useMcpClient,
@@ -58,9 +61,6 @@ import type { TabType } from "@/client/context/InspectorContext";
 import { ConnectionSettingsForm } from "./ConnectionSettingsForm";
 import type { CustomHeader } from "./CustomHeadersEditor";
 import { ServerIcon } from "./ServerIcon";
-
-const CONNECT_PANEL_MESH_ANIMATION_PAUSED_KEY =
-  "mcp-inspector-connect-panel-mesh-animation-paused";
 
 const CONNECT_PANEL_MESH_COLORS: string[] = [
   "#e0eaff",
@@ -221,31 +221,8 @@ export function InspectorDashboard() {
   const [scope, setScope] = useState("");
 
   const connectFormGradientRef = useRef<HTMLDivElement>(null);
-
-  const [meshAnimationPaused, setMeshAnimationPaused] = useState(() => {
-    try {
-      return (
-        localStorage.getItem(CONNECT_PANEL_MESH_ANIMATION_PAUSED_KEY) === "true"
-      );
-    } catch {
-      return false;
-    }
-  });
-
-  const toggleMeshAnimationPaused = useCallback(() => {
-    setMeshAnimationPaused((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(
-          CONNECT_PANEL_MESH_ANIMATION_PAUSED_KEY,
-          next ? "true" : "false"
-        );
-      } catch {
-        // ignore quota / private mode
-      }
-      return next;
-    });
-  }, []);
+  const { paused: meshAnimationPaused, toggle: toggleMeshAnimationPaused } =
+    useMeshAnimationPaused(CONNECT_PANEL_MESH_ANIMATION_PAUSED_KEY);
 
   const handleAddConnection = useCallback(() => {
     if (!url.trim()) return;
@@ -959,36 +936,11 @@ export function InspectorDashboard() {
             }}
           />
         </div>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <button
-                type="button"
-                onClick={toggleMeshAnimationPaused}
-                aria-label={
-                  meshAnimationPaused
-                    ? "Enable background shader animation"
-                    : "Disable background shader animation"
-                }
-                className="absolute bottom-3 right-3 sm:bottom-5 sm:right-5 z-[8] flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-zinc-500/60 bg-transparent text-zinc-600 transition-colors hover:border-zinc-500 hover:text-zinc-800 dark:border-zinc-500/50 dark:text-zinc-400 dark:hover:border-zinc-400 dark:hover:text-zinc-200"
-              >
-                {meshAnimationPaused ? (
-                  <Play className="h-3 w-3 ml-px" fill="currentColor" />
-                ) : (
-                  <Square className="h-2.5 w-2.5" fill="currentColor" />
-                )}
-              </button>
-            }
-            nativeButton
-          />
-          <TooltipContent side="left">
-            <p>
-              {meshAnimationPaused
-                ? "Enable shader animation"
-                : "Disable shader animation"}
-            </p>
-          </TooltipContent>
-        </Tooltip>
+        <MeshAnimationPauseButton
+          paused={meshAnimationPaused}
+          onToggle={toggleMeshAnimationPaused}
+          className="absolute bottom-3 right-3 sm:bottom-5 sm:right-5"
+        />
         <div className="relative w-full max-w-xl mx-auto z-10 flex flex-col gap-3 rounded-3xl p-4 sm:p-6 bg-black/70 dark:bg-black/90 shadow-2xl shadow-black/50 backdrop-blur-md">
           <ConnectionSettingsForm
             alias={alias}

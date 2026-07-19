@@ -289,6 +289,7 @@ function serverFrom(moduleExports: Record<string, unknown>): ServerLike {
  * re-exported from the package's "." entry.
  */
 export async function runDev(options: DevOptions): Promise<void> {
+  process.env.MCP_USE_DEV_CLI = "1";
   const host = options.host ?? "127.0.0.1";
   const paths = resolveWorkspacePaths(options.cwd);
   const eventBus = new InMemoryServerEventBus((error) => {

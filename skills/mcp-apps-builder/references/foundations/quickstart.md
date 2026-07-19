@@ -20,8 +20,8 @@ Pick the template that matches what the user is building:
 
 | Template | Command | Use When |
 |----------|---------|----------|
-| **starter** (default) | `npx create-mcp-use-app my-server` | Full-featured server with tools, resources, prompts, and widget examples |
-| **mcp-apps** | `npx create-mcp-use-app my-server --template mcp-apps` | Widget-focused for ChatGPT, Claude, and other MCP Apps-compatible clients |
+| **mcp-server** | `npx create-mcp-use-app my-server --template mcp-server` | Server with example tool and prompt (no widgets or resources) |
+| **mcp-apps** (interactive default) | `npx create-mcp-use-app my-server --template mcp-apps` | Widget-focused for ChatGPT, Claude, and other MCP Apps-compatible clients |
 | **blank** | `npx create-mcp-use-app my-server --template blank` | Clean slate — bare server with commented-out examples |
 | **GitHub repo** | `npx create-mcp-use-app my-server --template owner/repo` | Custom or community templates from any GitHub repository |
 
@@ -43,12 +43,11 @@ npx create-mcp-use-app --list-templates
 
 ### What Each Template Produces
 
-**starter:**
+**mcp-server:**
 ```
 my-server/
-├── index.ts              # Server with example tool, resource, and prompt
-├── resources/            # Widget directory (display-weather.tsx example)
-├── public/               # Static assets (favicon, icon)
+├── index.ts              # Server with example tool and prompt
+├── public/               # Static assets (icon)
 ├── package.json          # Pre-configured scripts: dev, build, start, deploy
 └── tsconfig.json
 ```

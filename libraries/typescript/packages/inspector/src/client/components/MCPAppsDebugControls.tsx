@@ -17,7 +17,6 @@ import {
   Smartphone,
   SquareDashedMousePointer,
   Sun,
-  Tablet,
   Trash2,
 } from "lucide-react";
 import {
@@ -92,7 +91,6 @@ const CREATE_PRESET_VALUE = "__create_preset__";
 const DEVICE_OPTIONS = [
   { value: "desktop", label: "Desktop", icon: Monitor },
   { value: "mobile", label: "Mobile", icon: Smartphone },
-  { value: "tablet", label: "Tablet", icon: Tablet },
 ] as const;
 
 type PickerOption = { value: string; label: string };
@@ -361,16 +359,12 @@ export function MCPAppsDebugControls({
     setPropsDialogOpen(true);
   };
 
-  const getDeviceIcon = () => {
-    switch (playground.deviceType) {
-      case "mobile":
-        return <Smartphone className="size-3" />;
-      case "tablet":
-        return <Tablet className="size-3" />;
-      default:
-        return <Monitor className="size-3" />;
-    }
-  };
+  const getDeviceIcon = () =>
+    playground.deviceType === "mobile" ? (
+      <Smartphone className="size-3" />
+    ) : (
+      <Monitor className="size-3" />
+    );
 
   const deviceCheckedIndex = DEVICE_OPTIONS.findIndex(
     (device) => device.value === playground.deviceType

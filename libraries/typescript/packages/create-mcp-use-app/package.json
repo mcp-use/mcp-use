@@ -22,7 +22,7 @@
     "scaffold",
     "cli",
     "init",
-    "starter",
+    "mcp-server",
     "template"
   ],
   "bin": {

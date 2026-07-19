@@ -3,6 +3,7 @@ import {
   captureInspectorEvent,
 } from "@/client/telemetry";
 import { inspectorApi } from "@/client/utils/basePath";
+import { hasDevCliApi } from "@/client/utils/dev-cli";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { tunnelOriginFromMcpUrl } from "./layoutHeaderUtils";
@@ -22,15 +23,6 @@ async function fetchDevInfo(): Promise<DevInfo | null> {
   } catch {
     return null;
   }
-}
-
-/** `dev/info` exists only under `mcp-use dev`; standalone `pnpm start` has no route. */
-function hasDevCliApi(): boolean {
-  if (typeof window === "undefined") return false;
-  return (
-    (window as { __MCP_INSPECTOR_MODE__?: string }).__MCP_INSPECTOR_MODE__ !==
-    "standalone"
-  );
 }
 
 export function useTunnelControls({

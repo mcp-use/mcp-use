@@ -72,7 +72,6 @@ declare module "mcp-use/react" {
   }
 }
 
-// Makes the file a module so the declaration augments (not replaces) package exports.
 export {};
 ```
 

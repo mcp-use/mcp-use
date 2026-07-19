@@ -7,14 +7,17 @@ import type {
 } from "@mcp-use/client/react";
 import { useMcpClient } from "@mcp-use/client/react";
 import type { Tool } from "@mcp-use/client/react";
+import { X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { consoleLogBus } from "@/client/console-log-bus";
+import { Button } from "@/client/components/ui/button";
 import { buildCSPString } from "@/client/mcp-apps/csp";
 import { wrapTransportWithLogging } from "@/client/mcp-apps/logging-transport";
 import { useTheme } from "@/client/context/ThemeContext";
 import { useWidgetDebug } from "@/client/context/WidgetDebugContext";
 import { useDeviceViewport } from "@/client/hooks/useDeviceViewport";
 import { useMcpAppsHostContext } from "@/client/hooks/useMcpAppsHostContext";
+import { getServerDisplayName, getServerIconUrl } from "@/client/utils/servers";
 
 const HOST_INFO = { name: "mcp-use-inspector", version: "11.0.0" } as const;
 
@@ -72,6 +75,8 @@ export function useViewHostProps(options: {
   | "chromeless"
   | "onReady"
   | "mockOpenAiFileApis"
+  | "fullscreenHeader"
+  | "renderFullscreenClose"
 > | null {
   const {
     serverId,
@@ -104,10 +109,7 @@ export function useViewHostProps(options: {
 
   const cspMode: ViewCspMode =
     playground.cspMode === "permissive" ? "permissive" : "widget-declared";
-  const { maxWidth, maxHeight } = useDeviceViewport(
-    playground.deviceType,
-    playground.customViewport
-  );
+  const { maxWidth, maxHeight } = useDeviceViewport(playground.deviceType);
 
   const hostContext = useMcpAppsHostContext({
     theme: resolvedTheme,
@@ -244,7 +246,45 @@ export function useViewHostProps(options: {
     [resourceUri]
   );
 
+  const fullscreenHeader = useMemo(
+    () => ({
+      title: server ? getServerDisplayName(server) : "MCP Server",
+      iconUrl: server ? getServerIconUrl(server) : null,
+    }),
+    [server]
+  );
+
+  const renderFullscreenClose = useCallback(
+    ({
+      onClick,
+      "data-testid": dataTestId,
+      "aria-label": ariaLabel,
+    }: {
+      onClick: () => void;
+      "data-testid": string;
+      "aria-label": string;
+    }) => (
+      <Button
+        type="button"
+        variant="tertiary"
+        size="icon-sm"
+        className="rounded-full shadow-sm"
+        data-testid={dataTestId}
+        aria-label={ariaLabel}
+        onClick={onClick}
+      >
+        <X />
+      </Button>
+    ),
+    []
+  );
+
   if (!source) return null;
+
+  // ponytail: only shrink the iframe for mobile; desktop keeps ViewRenderer default
+  const resolvedInlineMaxWidth =
+    inlineMaxWidth ??
+    (playground.deviceType === "mobile" ? maxWidth : undefined);
 
   return {
     source,
@@ -258,9 +298,11 @@ export function useViewHostProps(options: {
     onResourceResolved,
     displayMode,
     onDisplayModeChange,
-    inlineMaxWidth,
+    inlineMaxWidth: resolvedInlineMaxWidth,
     chromeless,
     onReady,
     mockOpenAiFileApis: true,
+    fullscreenHeader,
+    renderFullscreenClose,
   };
 }

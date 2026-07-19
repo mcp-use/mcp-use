@@ -12,6 +12,7 @@ import {
   ModelContext,
   modelContext,
   ToolError,
+  ThemeProvider,
   toolResultText,
   useCallTool,
   useDisplayMode,
@@ -1112,6 +1113,46 @@ describe("react bridge runtime", () => {
     screen.getByText("expand").click();
     await waitFor(() => {
       expect(requestedMode).toBe("fullscreen");
+    });
+  });
+
+  it("ThemeProvider fills the guest document in fullscreen and restores inline", async () => {
+    resetRuntime();
+    const { bridge, init } = await startHost();
+
+    function View() {
+      return (
+        <ThemeProvider>
+          <div data-testid="content">view content</div>
+        </ThemeProvider>
+      );
+    }
+
+    act(() => {
+      bootstrapView({ default: View as ComponentType });
+    });
+    await init;
+
+    const root = document.getElementById("root");
+    expect(root).not.toBeNull();
+    expect(root!.style.height).toBe("");
+
+    await act(async () => {
+      await bridge.sendHostContextChange({ displayMode: "fullscreen" });
+    });
+    await waitFor(() => {
+      expect(document.documentElement.style.height).toBe("100%");
+      expect(document.body.style.height).toBe("100%");
+      expect(root!.style.height).toBe("100%");
+    });
+
+    await act(async () => {
+      await bridge.sendHostContextChange({ displayMode: "inline" });
+    });
+    await waitFor(() => {
+      expect(document.documentElement.style.height).toBe("");
+      expect(document.body.style.height).toBe("");
+      expect(root!.style.height).toBe("");
     });
   });
 
