@@ -80,51 +80,73 @@ Your MCP server is now running at `http://localhost:3000` with the inspector aut
 
 ## 🎨 MCP Apps
 
-MCP Apps let you build interactive widgets that work across Claude, ChatGPT, and other MCP clients — write once, run everywhere.
+MCP Apps let you build interactive views that work across Claude, ChatGPT, and other MCP clients.
 
 ### Why MCP Apps?
 
 - **🖥️ Interactive Interfaces** - Build rich UIs like dashboards, kanban boards, forms, and visualizations
-- **🔗 Tool Integration** - UI widgets can directly call MCP tools using the `useMcp()` hook
-- **📦 Self-Contained** - Widgets are bundled and served automatically by your MCP server
+- **🔗 Tool Integration** - Views read their rendering result with `useToolContext` and call server tools with `useCallTool`
+- **📦 Self-Contained** - Views are bundled and served automatically by your MCP server
 - **🎯 Framework Agnostic** - Compatible with any MCP client (Claude Desktop, ChatGPT, custom apps, etc.)
 - **⚡ Hot Reload** - Development workflow with instant updates
 
 ### Quick Example
 
 ```tsx
-// resources/analytics-dashboard.tsx
-import { useMcp } from "mcp-use/react";
-import { useState, useEffect } from "react";
+// views/analytics-dashboard/view.tsx
+import { useCallTool, useToolContext } from "mcp-use/react";
+
+interface Analytics {
+  period: string;
+  visitors: number;
+}
 
 export default function AnalyticsDashboard() {
-  const { callTool } = useMcp();
-  const [data, setData] = useState(null);
+  const view = useToolContext();
+  const refresh = useCallTool<{ period: string }, Analytics>(
+    "show-analytics"
+  );
 
-  useEffect(() => {
-    callTool("get_analytics", { period: "7d" }).then(setData);
-  }, []);
+  if (view.status === "pending") return <p>Loading analytics…</p>;
+  if (view.status === "error") return <p>{view.error.message}</p>;
+
+  const analytics =
+    refresh.data?.structuredContent ?? (view.toolOutput as Analytics);
 
   return (
-    <div className="dashboard">
+    <main>
       <h1>Analytics Dashboard</h1>
-      <MetricsGrid data={data} />
-      <Charts data={data} />
-    </div>
+      <p>{analytics.visitors} visitors</p>
+      <button
+        disabled={refresh.isPending}
+        onClick={() => void refresh.callTool({ period: analytics.period })}
+      >
+        Refresh
+      </button>
+    </main>
   );
 }
 ```
 
-Then register it in your server:
+Bind the rendering tool to the view in your server:
 
 ```typescript
-server.uiResource({
-  type: "externalUrl",
-  name: "analytics-dashboard",
-  widget: "analytics-dashboard",
-  title: "Analytics Dashboard",
-  description: "Real-time analytics visualization",
-});
+server.tool(
+  {
+    name: "show-analytics",
+    description: "Show analytics for a reporting period",
+    inputSchema: z.object({ period: z.string() }),
+    outputSchema: z.object({ period: z.string(), visitors: z.number() }),
+    view: { name: "analytics-dashboard" },
+  },
+  async ({ period }) => {
+    const analytics = { period, visitors: 1_024 };
+    return {
+      content: [{ type: "text", text: JSON.stringify(analytics) }],
+      structuredContent: analytics,
+    };
+  }
+);
 ```
 
 **Learn More:**
@@ -251,7 +273,7 @@ server.listen(3000);
 **Key Server Features:**
 
 - 🔍 **Auto Inspector**: Debugging UI automatically mounts at `/inspector`
-- 🎨 **UI Widgets**: Build React components served alongside MCP tools
+- 🎨 **MCP Apps Views**: Build React components served alongside MCP tools
 - 🔐 **OAuth Support**: Built-in authentication flow handling
 - 📡 **Multiple Transports**: HTTP/SSE and WebSocket support
 - 🛠️ **TypeScript First**: Full type safety and inference
@@ -277,24 +299,22 @@ export async function POST(req: Request) {
 }
 ```
 
-**Custom UI Widgets:**
+**Custom MCP Apps views:**
 
 ```tsx
-// resources/analytics-dashboard.tsx
-import { useMcp } from "mcp-use/react";
+// views/analytics-dashboard/view.tsx
+import { useToolContext } from "mcp-use/react";
 
 export default function AnalyticsDashboard() {
-  const { callTool, status } = useMcp();
-  const [data, setData] = useState(null);
+  const view = useToolContext();
 
-  useEffect(() => {
-    callTool("get_analytics", { period: "7d" }).then(setData);
-  }, []);
+  if (view.status === "pending") return <p>Loading analytics…</p>;
+  if (view.status === "error") return <p>{view.error.message}</p>;
 
   return (
     <div>
       <h1>Analytics Dashboard</h1>
-      {/* Your dashboard UI */}
+      <pre>{JSON.stringify(view.toolOutput, null, 2)}</pre>
     </div>
   );
 }
@@ -322,8 +342,8 @@ mcp-use start
 **What it does:**
 
 - 🚀 Auto-opens inspector in development mode
-- ♻️ Hot reload for both server and UI widgets
-- 📦 Bundles React widgets into standalone HTML pages
+- ♻️ Hot reload for both server and MCP Apps views
+- 📦 Bundles React views for MCP resource delivery
 - 🏗️ Optimized production builds with asset hashing
 - 🛠️ TypeScript compilation with watch mode
 
@@ -338,7 +358,7 @@ mcp-use dev
 
 # Make changes to your code
 # Server automatically restarts
-# UI widgets hot reload
+# MCP Apps views hot reload
 # Inspector updates in real-time
 ```
 
@@ -400,7 +420,7 @@ npx create-mcp-use-app my-app --template advanced
 
 - ✅ Complete TypeScript setup
 - ✅ Pre-configured build scripts
-- ✅ Example tools and widgets
+- ✅ Example tools and views
 - ✅ Development environment ready
 - ✅ Docker and CI/CD configs (advanced template)
 
@@ -505,15 +525,18 @@ A typical mcp-use project structure:
 my-mcp-app/
 ├── src/
 │   └── index.ts          # MCP server definition
-├── resources/            # UI widgets (React components)
-│   ├── dashboard.tsx     # Main dashboard widget
-│   └── settings.tsx      # Settings panel widget
+├── views/                # MCP Apps views
+│   ├── dashboard/
+│   │   └── view.tsx      # Dashboard view entry
+│   └── settings/
+│       └── view.tsx      # Settings view entry
 ├── package.json         # Dependencies and scripts
 ├── tsconfig.json        # TypeScript configuration
 ├── .env                 # Environment variables
-└── dist/               # Build output
-    ├── index.js        # Compiled server
-    └── resources/      # Compiled widgets
+└── .mcp-use/           # Generated build output
+    └── build/
+        ├── index.js    # Compiled server
+        └── views/      # Compiled view assets
 ```
 
 ---
