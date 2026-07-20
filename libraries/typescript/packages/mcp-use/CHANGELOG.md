@@ -1,5 +1,16 @@
 # mcp-use
 
+## 1.34.4
+
+### Patch Changes
+
+- f952fe0: Fix `useMcp` auto proxy fallback pointing at a retired host. The default `autoProxyFallback` proxy address was `https://inspector.mcp-use.com/inspector/api/proxy`, which now 301-redirects to `inspector.manufact.com`. Browsers treat a redirect on a CORS preflight as a hard failure, so the automatic direct→proxy fallback could never connect (it would retry through a dead URL and fail). The default now points at the live `https://inspector.manufact.com/inspector/api/proxy`.
+- f952fe0: Fix dead documentation links flagged by the link checker: the CLI client example and inspector README pointed at docs pages that no longer exist.
+- f952fe0: Refresh expiring OAuth access tokens with the discovered protected-resource URL, retain rotated refresh tokens, and never reuse an expired token after refresh fails.
+- Updated dependencies [f952fe0]
+  - @mcp-use/inspector@12.0.4
+  - @mcp-use/cli@3.6.5
+
 ## 1.34.4-canary.1
 
 ### Patch Changes
