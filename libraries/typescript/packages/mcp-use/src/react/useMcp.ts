@@ -1631,6 +1631,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         const parsedUrl = new URL(url);
         const baseUrl =
           parsedUrl.origin + parsedUrl.pathname.replace(/\/+$/, "");
+        let authFlowError: Error | null = null;
         try {
           await auth(freshAuthProvider, {
             serverUrl: baseUrl,
@@ -1638,17 +1639,29 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           });
           addLog("info", "OAuth flow completed (tokens obtained)");
         } catch (err: unknown) {
-          // This is expected when auth opens popup/redirect - the flow continues there
+          // This may be the expected popup/redirect handoff, or a real
+          // discovery/validation failure. The popup handle and stored auth URL
+          // below distinguish the two cases.
+          authFlowError = err instanceof Error ? err : new Error(String(err));
           addLog(
             "info",
             "OAuth flow initiated (popup/redirect):",
-            err instanceof Error ? err.message : "Redirecting..."
+            authFlowError.message
           );
         }
 
         // Update authUrl with the new URL from the fresh provider
         // This is critical for the fallback link when popup is blocked
         const newAuthUrl = freshAuthProvider.getLastAttemptedAuthUrl?.();
+
+        if (authFlowError && !capturedPopup && !newAuthUrl) {
+          failConnection(
+            `Authentication failed: ${authFlowError.message}`,
+            authFlowError
+          );
+          return;
+        }
+
         if (newAuthUrl) {
           setAuthUrl(newAuthUrl);
           addLog("info", "Updated auth URL for fallback:", newAuthUrl);
