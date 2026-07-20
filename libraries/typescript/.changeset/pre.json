@@ -1,0 +1,14 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/cli": "3.6.4",
+    "create-mcp-use-app": "0.14.17",
+    "@mcp-use/inspector": "12.0.3",
+    "mcp-use": "1.34.3"
+  },
+  "changesets": [
+    "fix-auto-proxy-fallback-host",
+    "fix-dead-doc-links"
+  ]
+}

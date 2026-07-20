@@ -400,6 +400,11 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     return this.session.getTokenEndpoint();
   }
 
+  /** Return the canonical protected-resource URL for server-side refresh. */
+  getResource(): Promise<string | null> {
+    return this.session.getResource();
+  }
+
   /**
    * Return the stored OAuth client credentials (DCR or static). Lets consumers
    * persist the `client_id`/`client_secret` for server-side refresh. Returns

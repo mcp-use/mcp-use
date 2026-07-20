@@ -358,8 +358,6 @@ export function registerResourceTemplate(
           | ResourceTemplateDefinitionWithoutCallback
       ).resourceTemplate.callbacks;
 
-  console.log("resourceCallbacks", resourceCallbacks);
-
   // Create ResourceTemplate instance from SDK
   const template = new ResourceTemplate(uriTemplate, {
     complete: toResourceTemplateCompleteCallbacks(resourceCallbacks?.complete), // Optional: callback for auto-completion

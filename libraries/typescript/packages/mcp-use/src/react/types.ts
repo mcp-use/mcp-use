@@ -69,7 +69,7 @@ export type UseMcpOptions = {
    * automatically retries using the proxy configuration
    *
    * Can be:
-   * - `true`: Enable with default proxy (https://inspector.mcp-use.com/inspector/api/proxy)
+   * - `true`: Enable with default proxy (https://inspector.manufact.com/inspector/api/proxy)
    * - `false`: Disable automatic fallback (default)
    * - `{ enabled: boolean, proxyAddress?: string }`: Custom configuration
    *
@@ -359,6 +359,8 @@ export type UseMcpOptions = {
     clientSecret?: string;
     /** OAuth scope string included in the authorize request. */
     scope?: string;
+    /** Canonical protected-resource URL required by some token refresh flows. */
+    resource?: string;
   };
   /**
    * Initial server info to use from cache (internal use).
