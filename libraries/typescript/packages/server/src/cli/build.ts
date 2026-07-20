@@ -7,11 +7,9 @@
  * wrapper entry that primes views before re-exporting the server (VIEWS_SPEC.md §
  * Build system).
  *
- * `vite` is an optional peer dependency of `mcp-use` (never a regular
- * dependency): this module is only ever reached through the bin's dynamic
- * `import("./cli/index.js")`, so a missing install surfaces as a rejected
- * promise there (classified by `bin/main.ts`'s `isViteMissing`), not at
- * package load time.
+ * Vite is regular framework implementation machinery, but this module is
+ * reached only through the bin's lazy build command. Library imports and
+ * `mcp-use start` therefore never evaluate Vite.
  */
 
 import { randomBytes } from "node:crypto";
@@ -245,10 +243,9 @@ async function buildExternalView(
 }
 
 /**
- * Build the project's server for production: a Vite build of the SSR/node
- * environment only (the client environment for views arrives with
- * VIEWS_SPEC.md), emitted as ESM to `.mcp-use/build/` with a `manifest.json`
- * alongside it.
+ * Build the project for production: a Vite SSR/node server bundle plus one
+ * external client build per discovered view, emitted to `.mcp-use/build/`
+ * with a start manifest alongside it.
  *
  * Dependencies stay external (`ssr: { external: true }`): only the
  * user's own source is bundled; every bare import resolves from
@@ -259,10 +256,8 @@ async function buildExternalView(
  * users run `tsc --noEmit` via their own script.
  *
  * @param options - Project root and optional entry override.
- * @throws If no entry is found (see {@link discoverEntry}), or if `vite` is
- * not installed (`mcp-use build` requires it as a devDependency) — the
- * `import("vite")` rejection propagates to the bin's dispatch boundary,
- * which classifies it and prints the install hint.
+ * @throws If no entry is found (see {@link discoverEntry}) or a server/view
+ * build or binding validation step fails.
  *
  * @internal Reached only via the bin's `import("./cli/index.js")`
  * dispatch (`bin/main.ts`) — not re-exported from the package's "." entry.

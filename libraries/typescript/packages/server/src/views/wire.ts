@@ -85,16 +85,17 @@ export function buildToolUiMeta(
 }
 
 /**
- * Tool result `_meta` stamped on every non-error `CallToolResult` from a
- * view-bound tool.
+ * Tool result `_meta` stamped on completed non-error `CallToolResult` values
+ * from a view-bound tool.
  *
  * Emits the nested `ui.resourceUri` key and the legacy flat
  * {@link UI_RESOURCE_URI_META_KEY} key so hosts can open the bound view.
- * Error results (`isError: true`) must not receive this metadata — a
- * stamped URI would create a new rendered view through legacy host
- * behavior. Result `_meta` is view-only and never enters model context.
+ * Error results (`isError: true`) and intermediate `input_required` returns
+ * must not receive this metadata. A stamped error URI would create a new
+ * rendered view through legacy host behavior. Result `_meta` is view-only and
+ * never enters model context.
  *
- * @param viewName - Bound view directory / manifest key.
+ * @param viewName - Bound view directory / registry key.
  * @returns Nested and legacy resource-URI wire keys.
  */
 export function buildToolResultUiMeta(
