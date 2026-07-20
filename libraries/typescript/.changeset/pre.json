@@ -25,6 +25,7 @@
     "dialect-json-schema-validator",
     "fix-beta-scaffold-templates",
     "follow-inspector-beta-cdn",
+    "fresh-oauth-resource-v2",
     "inspector-chat-oauth-and-ui",
     "inspector-standalone-oauth",
     "localhost-managed-inspector-chat",

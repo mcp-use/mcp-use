@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 20.0.0-beta.11
+
+### Patch Changes
+
+- Updated dependencies [bef150a]
+  - @mcp-use/client@2.0.0-beta.7
+  - @mcp-use/agent@2.0.0-beta.8
+
 ## 20.0.0-beta.10
 
 ### Patch Changes

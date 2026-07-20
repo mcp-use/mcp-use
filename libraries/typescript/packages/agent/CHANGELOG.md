@@ -1,5 +1,12 @@
 # @mcp-use/agent
 
+## 2.0.0-beta.8
+
+### Patch Changes
+
+- Updated dependencies [bef150a]
+  - @mcp-use/client@2.0.0-beta.7
+
 ## 2.0.0-beta.7
 
 ### Patch Changes

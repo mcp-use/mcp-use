@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.0.0-beta.7
+
+### Patch Changes
+
+- bef150a: Expose the OAuth protected-resource URL with React auth tokens for consumers that perform server-side token refresh.
+
 ## 2.0.0-beta.6
 
 ### Patch Changes
