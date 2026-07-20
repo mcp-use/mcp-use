@@ -1292,6 +1292,7 @@ export class MCPServer<TUser = never> {
       },
       {
         capabilities: {
+          logging: {},
           tools: { listChanged: true },
           prompts: { listChanged: true },
           resources: { listChanged: true, subscribe: true },
