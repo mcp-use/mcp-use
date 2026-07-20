@@ -47,6 +47,12 @@ function resolveDisplayMode(hostContext: HostContext | undefined): DisplayMode {
     : "inline";
 }
 
+function resolvePlatform(
+  hostContext: HostContext | undefined
+): "web" | "mobile" {
+  return hostContext?.platform === "mobile" ? "mobile" : "web";
+}
+
 /**
  * Host environment and bridge availability for the current view.
  */
@@ -59,6 +65,11 @@ export interface HostContextHandle {
   timeZone: string;
   /** Host application user-agent string. Falls back to the browser's own user agent. */
   userAgent: string;
+  /**
+   * Host-reported platform. `"mobile"` on mobile hosts; otherwise `"web"`.
+   * Inspector maps Desktop → `"web"` and Mobile → `"mobile"`.
+   */
+  platform: "web" | "mobile";
   /** How the host is currently displaying the view. `"inline"` until the host reports otherwise. */
   displayMode: DisplayMode;
   /** Mobile safe area insets in pixels. All zeros when the host reports none. */
@@ -137,6 +148,7 @@ export function useHostContext(): HostContextHandle {
         : typeof navigator !== "undefined"
           ? navigator.userAgent
           : "",
+    platform: resolvePlatform(hostContext),
     displayMode: resolveDisplayMode(hostContext),
     safeArea: hostContext?.safeAreaInsets ?? DEFAULT_SAFE_AREA,
     maxHeight: readMaxHeight(hostContext),

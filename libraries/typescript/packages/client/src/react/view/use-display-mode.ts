@@ -4,9 +4,11 @@ import type { ViewDisplayMode } from "./types.js";
 const SHELL_BASE =
   "w-full h-full min-h-0 bg-background flex flex-col [&:fullscreen]:h-full [&:fullscreen]:w-full [&:fullscreen]:bg-background";
 
-const WIDGET_FULLSCREEN_OVERLAY_CLASSES = `fixed inset-0 z-[100] ${SHELL_BASE}`;
+// High z-index for hosts without a trapping stacking context; chat history
+// toggle also hides via data-mcp-widget-fullscreen on <html>.
+const WIDGET_FULLSCREEN_OVERLAY_CLASSES = `fixed inset-0 z-[200] ${SHELL_BASE}`;
 const WIDGET_PIP_SHELL_CLASSES = [
-  "fixed top-4 left-1/2 -translate-x-1/2 z-[100]",
+  "fixed top-4 left-1/2 -translate-x-1/2 z-[200]",
   "rounded-3xl w-full min-w-[300px] h-[400px]",
   "shadow-2xl border overflow-hidden",
   "bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80",
@@ -80,4 +82,5 @@ export function useViewDisplayModeControls({
 export const VIEW_DIMENSIONS = {
   PIP_MAX_WIDTH: 700,
   DEFAULT_HEIGHT: 400,
+  FULLSCREEN_HEADER_HEIGHT: 50,
 } as const;

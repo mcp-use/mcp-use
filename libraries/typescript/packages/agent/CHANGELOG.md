@@ -1,5 +1,12 @@
 # @mcp-use/agent
 
+## 2.0.0-beta.6
+
+### Patch Changes
+
+- Updated dependencies [c878835]
+  - @mcp-use/client@2.0.0-beta.5
+
 ## 2.0.0-beta.5
 
 ### Patch Changes

@@ -164,7 +164,8 @@ async function buildExternalView(
   const clientResult = await build({
     root: options.cwd,
     configFile: options.userViteConfig,
-    envFile: false,
+    envDir: false,
+    publicDir: false,
     logLevel: "warn",
     cacheDir: options.cacheDir,
     resolve: { alias: { tailwindcss: resolveTailwindCss() } },
@@ -180,13 +181,14 @@ async function buildExternalView(
       sourcemap: false,
       minify: true,
       cssCodeSplit: false,
+      chunkSizeWarningLimit: 1000,
       assetsInlineLimit: ASSETS_INLINE_LIMIT,
       rollupOptions: {
         input: { [view.name]: virtualViewId(view.name) },
         output: {
           format: "es",
-          codeSplitting: false,
           entryFileNames: "assets/[name]-[hash].js",
+          chunkFileNames: "assets/[name]-[hash].js",
           assetFileNames: "assets/[name]-[hash][extname]",
         },
       },
@@ -275,7 +277,8 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     await build({
       root: options.cwd,
       configFile: false,
-      envFile: false,
+      envDir: false,
+      publicDir: false,
       logLevel: "warn",
       cacheDir: paths.cache,
       build: {
@@ -397,7 +400,8 @@ export async function runBuild(options: BuildOptions): Promise<void> {
   await build({
     root: options.cwd,
     configFile: false,
-    envFile: false,
+    envDir: false,
+    publicDir: false,
     logLevel: "warn",
     cacheDir: paths.cache,
     build: {

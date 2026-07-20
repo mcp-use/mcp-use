@@ -1,11 +1,18 @@
 import { useEffect, useRef } from "react";
 
 const VERT = `#version 300 es
+precision mediump float;
 in vec4 a_position;
+uniform vec2 u_resolution;
 out vec2 v_objectUV;
 void main(){
   gl_Position=a_position;
-  v_objectUV=a_position.xy*0.5+0.5;
+  // paper-design object UV: fit=contain, fixedRatio=1, origin=(0.5,0.5)
+  // Keeps the swirl vortex circular on non-square canvases.
+  vec2 uv=a_position.xy*0.5;
+  float box=min(u_resolution.x,u_resolution.y);
+  vec2 scale=box>0.0?u_resolution/box:vec2(1.);
+  v_objectUV=uv*scale;
 }`;
 
 const FRAG = `#version 300 es
@@ -171,6 +178,7 @@ export function MeshGradientCanvas({
     gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
 
     const uTime = gl.getUniformLocation(prog, "u_time");
+    const uResolution = gl.getUniformLocation(prog, "u_resolution");
     const uColors = [0, 1, 2, 3].map((i) =>
       gl.getUniformLocation(prog, `u_colors[${i}]`)
     );
@@ -180,7 +188,9 @@ export function MeshGradientCanvas({
     const uGrainMixer = gl.getUniformLocation(prog, "u_grainMixer");
     const uGrainOverlay = gl.getUniformLocation(prog, "u_grainOverlay");
 
-    let time = 0;
+    // paper-design ShaderMount: currentFrame in ms, u_time = frame * 1e-3
+    let frameMs = 0;
+    let lastNow = performance.now();
     let raf = 0;
 
     const resize = () => {
@@ -190,8 +200,9 @@ export function MeshGradientCanvas({
       gl.viewport(0, 0, canvas.width, canvas.height);
     };
 
-    const draw = () => {
+    const draw = (now: number) => {
       if (document.hidden) {
+        lastNow = now;
         raf = requestAnimationFrame(draw);
         return;
       }
@@ -203,9 +214,12 @@ export function MeshGradientCanvas({
         grainOverlay: currentGrainOverlay,
         speed: currentSpeed,
       } = propsRef.current;
+      const dt = now - lastNow;
+      lastNow = now;
+      frameMs += dt * currentSpeed;
       const rgbaColors = currentColors.map(hexToRgba);
-      time += 0.016 * currentSpeed;
-      gl.uniform1f(uTime, time);
+      gl.uniform1f(uTime, frameMs * 1e-3);
+      gl.uniform2f(uResolution, canvas.width, canvas.height);
       for (let i = 0; i < 4; i++) {
         const loc = uColors[i];
         if (loc) gl.uniform4fv(loc, rgbaColors[i] ?? [1, 1, 1, 1]);
@@ -222,7 +236,7 @@ export function MeshGradientCanvas({
     resize();
     const ro = new ResizeObserver(resize);
     ro.observe(wrap);
-    draw();
+    raf = requestAnimationFrame(draw);
 
     return () => {
       cancelAnimationFrame(raf);

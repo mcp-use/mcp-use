@@ -83,7 +83,7 @@ export async function switchToMcpAppsAndGetFrame(
  */
 export async function changeDeviceType(
   page: Page,
-  device: "desktop" | "mobile" | "tablet"
+  device: "desktop" | "mobile"
 ): Promise<void> {
   await page.getByTestId("debugger-device-button").click();
   await expect(page.getByTestId("debugger-device-dialog")).toBeVisible();
@@ -191,7 +191,7 @@ export async function changeCspMode(
 }
 
 export interface WidgetDebugInfoExpected {
-  device?: "web" | "mobile" | "desktop" | "tablet";
+  device?: "web" | "mobile" | "desktop";
   locale?: string;
   timezone?: string;
   touch?: boolean;

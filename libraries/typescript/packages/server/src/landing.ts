@@ -122,7 +122,7 @@ in vec4 a_position;
 out vec2 v_objectUV;
 void main(){
   gl_Position=a_position;
-  v_objectUV=a_position.xy*0.5+0.5;
+  v_objectUV=a_position.xy*0.5;
 }`;
 
   const FRAG = `#version 300 es

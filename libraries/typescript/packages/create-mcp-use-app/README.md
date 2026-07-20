@@ -137,17 +137,16 @@ npx create-mcp-use-app --list-templates
 
 ## 🎨 Available Templates
 
-### Starter Template (Default)
+### MCP Server Template
 
-The starter template includes:
+The `mcp-server` template includes:
 
-- Comprehensive MCP server setup with all features
-- Example tool, resource, and prompt
-- Both MCP-UI and OpenAI Apps SDK widget examples
-- Full TypeScript configuration
+- MCP server setup with TypeScript configuration
+- Example tool (`fetch-weather`) with structured output
+- Example prompt (`review-code`)
 - Development and production scripts
 
-Perfect for getting started with all available features or building full-featured MCP servers.
+Ideal for building MCP servers with tools and prompts (no widgets or resources).
 
 ### MCP Apps Template
 
@@ -155,7 +154,7 @@ The mcp-apps template includes:
 
 - MCP server setup focused on OpenAI Apps SDK integration
 - OpenAI Apps SDK compatible views under `views/<name>/view.tsx`
-- Example `product-search-result` view with carousel UI
+- Example `my-view` view with mesh gradient card and interactive demo hooks
 - Optimized for OpenAI assistant integration
 
 Ideal for building MCP servers that integrate with OpenAI's Apps SDK.

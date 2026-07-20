@@ -30,6 +30,8 @@ interface ServerNameLike {
   serverInfo?: {
     title?: string;
     name?: string;
+    icon?: string;
+    icons?: Array<{ src: string }>;
   } | null;
 }
 
@@ -53,4 +55,11 @@ export function getServerDisplayName(server: ServerNameLike): string {
     server.url?.trim() ||
     "Unknown server"
   );
+}
+
+export function getServerIconUrl(server: ServerNameLike): string | null {
+  const icons = server.serverInfo?.icons;
+  if (icons && icons.length > 0) return icons[0].src;
+  if (server.serverInfo?.icon) return server.serverInfo.icon;
+  return null;
 }

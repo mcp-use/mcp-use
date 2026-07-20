@@ -1,4 +1,4 @@
-// mcp-use typing shim — dev/build recreate this file if missing.
+// mcp-use auto-generated typing
 declare module "*.css";
 
 declare module "mcp-use/react" {

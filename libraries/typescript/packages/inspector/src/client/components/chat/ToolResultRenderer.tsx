@@ -1,7 +1,8 @@
-import { ViewRenderer, isViewTool } from "@mcp-use/client/react";
-import { useMemo } from "react";
+import { isViewTool } from "@mcp-use/client/react";
+import type { ViewDisplayMode } from "@mcp-use/client/react";
+import { useMemo, useState } from "react";
 import type { MessageContentBlock } from "@/client/types/message-content-block";
-import { useViewHostProps } from "@/client/hooks/useViewHostProps";
+import { McpAppsViewPanel } from "@/client/components/mcp-apps/McpAppsViewPanel";
 import { useWidgetDebug } from "../../context/WidgetDebugContext";
 import { Spinner } from "../ui/spinner";
 
@@ -51,6 +52,8 @@ export function ToolResultRenderer({
     [toolName]
   );
 
+  const [displayMode, setDisplayMode] = useState<ViewDisplayMode>("inline");
+
   const parsedResult = useMemo(() => {
     if (!result) return null;
     if (typeof result === "string") {
@@ -68,36 +71,28 @@ export function ToolResultRenderer({
     ? ((toolMeta?.ui?.resourceUri as string | undefined) ?? null)
     : null;
 
+  const memoizedToolArgs = useMemo(() => toolArgs, [toolName, parsedResult]);
   const memoizedResult = useMemo(() => parsedResult, [toolName, parsedResult]);
 
-  const hostProps = useViewHostProps({
-    serverId: serverId ?? "",
-    viewId: toolCallId,
-    resourceUri: resourceUri ?? "",
-    toolName,
-    toolInput: toolArgs,
-    toolOutput: memoizedResult,
-    toolMetadata: toolMeta,
-    readResource: readResource ?? (async () => ({})),
-  });
-
-  if (isMcpAppsTool && resourceUri && serverId && readResource && hostProps) {
+  if (isMcpAppsTool && resourceUri && serverId && readResource) {
     return (
       <>
-        <ViewRenderer
+        <McpAppsViewPanel
+          serverId={serverId}
           viewId={toolCallId}
           toolName={toolName}
-          toolInput={toolArgs}
+          resourceUri={resourceUri}
+          toolInput={memoizedToolArgs}
           toolOutput={memoizedResult}
+          toolMetadata={toolMeta}
+          readResource={readResource}
+          displayMode={displayMode}
+          onDisplayModeChange={setDisplayMode}
+          onSendFollowUp={onSendFollowUp}
           partialToolInput={partialToolArgs}
           cancelled={cancelled}
+          noWrapper
           className="my-4"
-          onMessage={(content) => {
-            if (content.length > 0 && onSendFollowUp) {
-              onSendFollowUp(content as MessageContentBlock[]);
-            }
-          }}
-          {...hostProps}
         />
         <ModelContextBadge widgetId={toolCallId} />
       </>

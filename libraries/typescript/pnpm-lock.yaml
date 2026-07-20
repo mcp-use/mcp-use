@@ -349,7 +349,7 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
-  packages/create-mcp-use-app/src/templates/starter:
+  packages/create-mcp-use-app/src/templates/mcp-server:
     dependencies:
       mcp-use:
         specifier: workspace:*

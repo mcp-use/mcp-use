@@ -104,6 +104,10 @@ function escapeHtml(value: string): string {
     .replaceAll(">", "&gt;");
 }
 
+/** Transparent iframe canvas before React mounts (rounded views show host bg). */
+const TRANSPARENT_IFRAME_STYLE =
+  "<style>html,body,#root{background:transparent}</style>";
+
 /**
  * Synthesize a complete HTML document for a view from registry data.
  *
@@ -138,6 +142,7 @@ export function synthesizeViewDocument(
 <head>
 <meta charset="utf-8">
 ${configScript}
+${TRANSPARENT_IFRAME_STYLE}
 ${styleTag}
 </head>
 <body>
@@ -179,6 +184,7 @@ ${moduleScript}
 <head>
 <meta charset="utf-8">
 ${configScript}
+${TRANSPARENT_IFRAME_STYLE}
 ${cssLinks}
 </head>
 <body>

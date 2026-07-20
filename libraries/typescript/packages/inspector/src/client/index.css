@@ -557,3 +557,10 @@ body {
     animation: none;
   }
 }
+
+/* MCP Apps fullscreen shell is fixed inside chat's stacking context — hide
+   sibling chrome that would otherwise paint above it. */
+html[data-mcp-widget-fullscreen] [data-chat-history-toggle] {
+  visibility: hidden;
+  pointer-events: none;
+}

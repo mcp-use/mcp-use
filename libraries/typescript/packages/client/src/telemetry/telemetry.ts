@@ -1,7 +1,7 @@
 /**
- * Cross-compatible telemetry: PostHog + Scarf via fetch, Web Crypto, feature-
- * detected opt-out. Optional {@link TelemetryStorage} (fs from node entry,
- * localStorage when available) for durable user ids / package-download dedup.
+ * Cross-compatible telemetry: PostHog via fetch, Web Crypto, feature-detected
+ * opt-out. Optional {@link TelemetryStorage} (fs from node entry, localStorage
+ * when available) for durable user ids.
  */
 import { logger } from "../utils/logging.js";
 import { getPackageVersion } from "../utils/version.js";
@@ -18,7 +18,7 @@ import {
   MCPAgentExecutionEvent,
   MCPClientInitEvent,
 } from "./events.js";
-import { capturePostHog, captureScarf } from "./tel-fetch.js";
+import { capturePostHog } from "./tel-fetch.js";
 
 function generateUUID(): string {
   return globalThis.crypto.randomUUID();
@@ -30,29 +30,9 @@ function secureRandomString(): string {
   return Array.from(array, (v) => v.toString(16).padStart(2, "0")).join("");
 }
 
-/** True when semver `a` is strictly greater than `b` (numeric segments only). */
-export function isVersionGreater(a: string, b: string): boolean {
-  const parse = (v: string) =>
-    v
-      .split("-")[0]
-      .split(".")
-      .map((n) => parseInt(n, 10) || 0);
-  const pa = parse(a);
-  const pb = parse(b);
-  const len = Math.max(pa.length, pb.length);
-  for (let i = 0; i < len; i++) {
-    const da = pa[i] ?? 0;
-    const db = pb[i] ?? 0;
-    if (da !== db) return da > db;
-  }
-  return false;
-}
-
 export type TelemetryStorage = {
   getUserId(): string | null;
   setUserId(id: string): void;
-  getDownloadedVersion(): string | null;
-  setDownloadedVersion(version: string): void;
 };
 
 type RuntimeEnvironment =
@@ -109,9 +89,6 @@ function createLocalStorageBackend(): TelemetryStorage | null {
         // ignore
       }
     },
-    // Package-download dedup is node/Scarf-oriented; localStorage unused.
-    getDownloadedVersion: () => null,
-    setDownloadedVersion: () => undefined,
   };
 }
 
@@ -212,18 +189,14 @@ export class Telemetry {
   private _currUserId: string | null = null;
   private _telemetryEnabled = false;
   private _pending = new Set<Promise<void>>();
-  private _scarfEnabled = false;
   private _runtimeEnvironment: RuntimeEnvironment;
   private _storageCapability: StorageCapability;
   private _storage: TelemetryStorage | null;
-  /** True when node entry installed fs storage (package-download dedup). */
-  private _fsBacked: boolean;
   private _source: string;
   private _productVersion?: string;
 
   private constructor() {
     this._runtimeEnvironment = detectRuntimeEnvironment();
-    this._fsBacked = configuredStorage !== null;
     this._storage = configuredStorage ?? createLocalStorageBackend() ?? null;
     this._storageCapability = this._storage ? "persistent" : "session-only";
     this._source = readSourceHint() || this._runtimeEnvironment;
@@ -244,16 +217,6 @@ export class Telemetry {
         "Anonymized telemetry enabled. Set MCP_USE_ANONYMIZED_TELEMETRY=false to disable."
       );
       this._telemetryEnabled = true;
-      this._scarfEnabled = true;
-
-      // Package-download is Scarf/fs-backed (node entry only).
-      if (this._fsBacked) {
-        setTimeout(() => {
-          this.trackPackageDownload({ triggered_by: "initialization" }).catch(
-            (e) => logger.debug(`Failed to track package download: ${e}`)
-          );
-        }, 0);
-      }
     }
   }
 
@@ -293,7 +256,7 @@ export class Telemetry {
   }
 
   get isEnabled(): boolean {
-    return this._telemetryEnabled || this._scarfEnabled;
+    return this._telemetryEnabled;
   }
 
   get userId(): string {
@@ -319,7 +282,7 @@ export class Telemetry {
   }
 
   async capture(event: BaseTelemetryEvent): Promise<void> {
-    if (!this._telemetryEnabled && !this._scarfEnabled) return;
+    if (!this._telemetryEnabled) return;
 
     const currentUserId = this.userId;
     const properties: Record<string, unknown> = {
@@ -330,61 +293,15 @@ export class Telemetry {
       runtime: this._runtimeEnvironment,
     };
 
-    if (this._telemetryEnabled) {
-      const p = capturePostHog({
-        host: HOST,
-        apiKey: PROJECT_API_KEY,
-        event: event.name,
-        distinctId: currentUserId,
-        properties,
-      });
-      this._pending.add(p);
-      void p.finally(() => this._pending.delete(p));
-    }
-
-    if (this._scarfEnabled) {
-      const p = captureScarf({
-        ...properties,
-        user_id: currentUserId,
-        event: event.name,
-      });
-      this._pending.add(p);
-      void p.finally(() => this._pending.delete(p));
-    }
-  }
-
-  async trackPackageDownload(
-    properties?: Record<string, unknown>
-  ): Promise<void> {
-    // Requires fs-backed storage from the node entry.
-    if (!this._scarfEnabled || !this._fsBacked || !this._storage) return;
-
-    const currentVersion = getPackageVersion();
-    const saved = this._storage.getDownloadedVersion();
-    let firstDownload = false;
-    let shouldTrack = false;
-
-    if (!saved) {
-      shouldTrack = true;
-      firstDownload = true;
-      this._storage.setDownloadedVersion(currentVersion);
-    } else if (isVersionGreater(currentVersion, saved)) {
-      shouldTrack = true;
-      this._storage.setDownloadedVersion(currentVersion);
-    }
-
-    if (!shouldTrack) return;
-
-    await captureScarf({
-      ...(properties || {}),
-      mcp_use_version: currentVersion,
-      user_id: this.userId,
-      event: "package_download",
-      first_download: firstDownload,
-      language: "typescript",
-      source: this._source,
-      runtime: this._runtimeEnvironment,
+    const p = capturePostHog({
+      host: HOST,
+      apiKey: PROJECT_API_KEY,
+      event: event.name,
+      distinctId: currentUserId,
+      properties,
     });
+    this._pending.add(p);
+    void p.finally(() => this._pending.delete(p));
   }
 
   async trackAgentExecution(data: MCPAgentExecutionEventData): Promise<void> {

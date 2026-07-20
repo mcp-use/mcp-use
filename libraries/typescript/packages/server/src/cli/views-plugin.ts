@@ -66,7 +66,12 @@ export function mcpUseViewsPlugin(options: McpUseViewsPluginOptions): Plugin {
     },
     load(id) {
       if (id === VIRTUAL_TAILWIND_RESOLVED_ID) {
-        return `@import "tailwindcss";`;
+        // Host theme is applied via ext-apps applyDocumentTheme (data-theme on
+        // html) and optional .dark wrappers — not OS prefers-color-scheme.
+        return [
+          '@import "tailwindcss";',
+          "@custom-variant dark (&:where(.dark, .dark *, [data-theme=dark], [data-theme=dark] *));",
+        ].join("\n");
       }
       if (!id.startsWith(VIRTUAL_VIEW_RESOLVED_PREFIX)) {
         return undefined;

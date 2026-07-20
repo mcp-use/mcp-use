@@ -1,5 +1,59 @@
 # mcp-use
 
+## 2.0.0-beta.18
+
+### Patch Changes
+
+- c878835: Fix duplicated public assets in production builds and remove Scarf telemetry.
+
+  **mcp-use**
+  - Set `publicDir: false` on all Vite build steps so project `public/` is copied only to `.mcp-use/build/views/public/` (not duplicated at the build root or inside each view outDir).
+  - Raise the view client build `chunkSizeWarningLimit` to reduce noisy warnings for large view bundles.
+
+  **@mcp-use/client**
+  - Remove Scarf download telemetry (`captureScarf`, beacon helpers, and related storage); PostHog remains the sole telemetry provider.
+
+  **@mcp-use/inspector**
+  - Drop inspector package-download Scarf tracking on init; update README and e2e docs to reflect PostHog-only telemetry.
+
+## 2.0.0-beta.17
+
+### Patch Changes
+
+- fe4d3b2: Enable MCP view JS code splitting and polish inspector boot UX.
+
+  **mcp-use**
+  - Enable rolldown code splitting for per-view client builds (`chunkFileNames` alongside the entry chunk); update `VIEWS_SPEC.md` for external assets and split chunks.
+  - Paint a centered boot spinner in the managed inspector shell while the CDN bundle downloads.
+
+  **@mcp-use/inspector**
+  - Match the boot spinner placeholder in the CDN inspector shell.
+  - Add top margin to tool error banners in the result panel.
+
+  **create-mcp-use-app**
+  - Fix scaffold README inspector links to `${basePath}/inspector` (`/mcp/inspector` by default).
+  - Align the mcp-apps `mcp-env.d.ts` template comment with the auto-generated shim.
+
+## 2.0.0-beta.16
+
+### Patch Changes
+
+- 2ee60d0: Fix `mcp-use dev` port auto-find and Vite env deprecation warning.
+  - Replace deprecated Vite `envFile: false` with `envDir: false` in dev/build/view CLI paths.
+  - On localhost-class binds, treat a port as taken when loopback (`127.0.0.1` or `::1`) already accepts connections — restores CLI v1 behavior when another process owns `*:port` (e.g. Next.js on macOS dual-stack).
+
+## 2.0.0-beta.15
+
+### Patch Changes
+
+- d9c2023: Skip `dev/info` tunnel probes unless `mcp-use dev` injects `window.__MCP_DEV_CLI__`.
+
+  **@mcp-use/inspector**
+  - Gate tunnel metadata probes on `window.__MCP_DEV_CLI__ === true` instead of treating a missing `__MCP_INSPECTOR_MODE__` as non-standalone.
+
+  **mcp-use**
+  - Set `MCP_USE_DEV_CLI` in the dev CLI and inject `window.__MCP_DEV_CLI__ = true` into the inspector CDN shell so embedded dev sessions still sync tunnel state.
+
 ## 2.0.0-beta.14
 
 ### Minor Changes

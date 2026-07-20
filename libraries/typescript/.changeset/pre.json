@@ -13,6 +13,7 @@
     "agent-esm-only",
     "better-auth-v2-provider",
     "bright-icons-smile",
+    "build-public-assets-drop-scarf",
     "build-v2-external-view-assets",
     "calm-proxies-compose",
     "chatgpt-files-hook",
@@ -20,6 +21,7 @@
     "client-cli-auto-install",
     "client-sdk-v2-migration",
     "create-app-sdk-version",
+    "dev-port-probe-envdir",
     "dialect-json-schema-validator",
     "fix-beta-scaffold-templates",
     "follow-inspector-beta-cdn",
@@ -30,12 +32,15 @@
     "node22-engine-floor",
     "node22-security-patch-floor",
     "openapi-server-tools-v2",
+    "rename-starter-mcp-server-template",
     "resource-template-completion",
+    "skip-dev-info-standalone-probe",
     "stream-inspector-tool-input",
     "strip-tools-list-schema-dialect",
     "ts7-stable-node20-scaffold",
     "typed-mcp-middleware-results",
     "v2-server-scaffold",
+    "view-code-split-inspector-boot",
     "views-dir-mcp-env-and-dev-host"
   ]
 }

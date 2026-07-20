@@ -51,7 +51,7 @@ interface WidgetInfo {
   widgetState?: any;
 }
 
-export type DeviceType = "mobile" | "tablet" | "desktop" | "custom";
+export type DeviceType = "mobile" | "desktop";
 
 export interface PlaygroundSettings {
   deviceType: DeviceType;
@@ -344,7 +344,5 @@ export function useWidgetDebug() {
  */
 export const DEVICE_VIEWPORT_CONFIGS = {
   mobile: { width: 390, height: 844, name: "iPhone 14" },
-  tablet: { width: 820, height: 1180, name: "iPad Air" },
   desktop: { width: 1440, height: 900, name: "Desktop" },
-  custom: { width: 768, height: 1024, name: "Custom" },
 } as const;

@@ -19,6 +19,7 @@ import React, {
   memo,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -49,6 +50,25 @@ const DEFAULT_HOST_CAPABILITIES: McpUiHostCapabilities = {
   // ponytail: always advertised; bridge.onmessage no-ops when onMessage unset
   message: { text: {} },
 };
+
+function CloseIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </svg>
+  );
+}
 
 function waitForSandboxProxyReady(iframe: HTMLIFrameElement): Promise<void> {
   return new Promise((resolve) => {
@@ -122,6 +142,9 @@ function ViewRendererBase({
   wrapTransport,
   toolCallTimeout = DEFAULT_TOOL_CALL_TIMEOUT,
   mockOpenAiFileApis = false,
+  onInlineHeightChange,
+  fullscreenHeader,
+  renderFullscreenClose,
   className,
   testId = "mcp-app-frame",
   invoking,
@@ -146,8 +169,16 @@ function ViewRendererBase({
     useState<ViewDisplayMode>("inline");
   const displayMode = displayModeProp ?? internalDisplayMode;
 
-  const hostContextRef = useRef(hostContext);
-  hostContextRef.current = hostContext;
+  // Guest hostContext must track the shell's displayMode even when the parent
+  // only uses ViewRenderer's internal state (e.g. inspector chat).
+  const effectiveHostContext = useMemo(() => {
+    if (!hostContext) return hostContext;
+    if (hostContext.displayMode === displayMode) return hostContext;
+    return { ...hostContext, displayMode };
+  }, [hostContext, displayMode]);
+
+  const hostContextRef = useRef(effectiveHostContext);
+  hostContextRef.current = effectiveHostContext;
   const onMessageRef = useRef(onMessage);
   onMessageRef.current = onMessage;
   const toolInputRef = useRef(toolInput);
@@ -172,6 +203,8 @@ function ViewRendererBase({
   onReadyRef.current = onReady;
   const onLifecycleChangeRef = useRef(onLifecycleChange);
   onLifecycleChangeRef.current = onLifecycleChange;
+  const onInlineHeightChangeRef = useRef(onInlineHeightChange);
+  onInlineHeightChangeRef.current = onInlineHeightChange;
   const sandboxUrlRef = useRef(sandboxUrl);
   sandboxUrlRef.current = sandboxUrl;
   const cspModeRef = useRef(cspMode);
@@ -481,7 +514,10 @@ function ViewRendererBase({
           height,
         }: McpUiSizeChangedNotification["params"]) => {
           if (displayModeRef.current !== "inline") return;
-          if (height !== undefined) setInlineHeight(height);
+          if (height !== undefined) {
+            setInlineHeight(height);
+            onInlineHeightChangeRef.current?.(height);
+          }
         };
 
         const initPromise = hookInitialized(bridge);
@@ -579,9 +615,9 @@ function ViewRendererBase({
   // Host context updates after init
   useEffect(() => {
     const bridge = bridgeRef.current;
-    if (!bridge || initCount === 0 || !hostContext) return;
-    bridge.setHostContext(hostContext);
-  }, [hostContext, initCount]);
+    if (!bridge || initCount === 0 || !effectiveHostContext) return;
+    bridge.setHostContext(effectiveHostContext);
+  }, [effectiveHostContext, initCount]);
 
   // Partial tool input
   useEffect(() => {
@@ -630,6 +666,9 @@ function ViewRendererBase({
     return () => clearTimeout(timer);
   }, [initCount, showSpinner]);
 
+  const showHostBorder =
+    resolved !== null && resolved.prefersBorder && displayMode !== "fullscreen";
+
   if (loadError) {
     return (
       <div className={className}>
@@ -667,7 +706,11 @@ function ViewRendererBase({
   const viewShell = (
     <div
       ref={containerRef}
-      className={containerClassName}
+      className={
+        isFullscreen
+          ? `${containerClassName} flex flex-col`
+          : containerClassName
+      }
       style={
         isPip
           ? {
@@ -680,29 +723,76 @@ function ViewRendererBase({
             : undefined
       }
     >
-      {(isFullscreen || isPip) && (
-        <button
-          type="button"
-          data-testid={
-            isFullscreen
-              ? "debugger-exit-fullscreen-button"
-              : "debugger-exit-pip-button"
-          }
-          aria-label={
-            isFullscreen ? "Exit fullscreen" : "Exit picture-in-picture"
-          }
-          className="absolute right-3 top-3 z-[110] flex size-8 items-center justify-center rounded-full border border-border bg-background/90 text-lg leading-none text-foreground shadow-sm backdrop-blur-sm hover:bg-background"
-          style={{ zIndex: 110 }}
-          onClick={() => void handleDisplayModeChange("inline")}
+      {isFullscreen && (
+        // ponytail: inspector Tailwind may not emit client arbitrary classes
+        // (h-[50px], grid-cols-[auto_1fr_auto]) — use inline layout instead.
+        <header
+          className="grid shrink-0 items-center border-b border-zinc-200 bg-background px-3 dark:border-zinc-700"
+          style={{
+            height: VIEW_DIMENSIONS.FULLSCREEN_HEADER_HEIGHT,
+            gridTemplateColumns: "auto 1fr auto",
+          }}
         >
-          ×
-        </button>
+          {renderFullscreenClose ? (
+            renderFullscreenClose({
+              onClick: () => void handleDisplayModeChange("inline"),
+              "data-testid": "debugger-exit-fullscreen-button",
+              "aria-label": "Exit fullscreen",
+            })
+          ) : (
+            <button
+              type="button"
+              data-testid="debugger-exit-fullscreen-button"
+              aria-label="Exit fullscreen"
+              className="flex size-8 cursor-pointer items-center justify-center rounded-full border border-zinc-200 bg-background text-foreground shadow-sm hover:bg-muted dark:border-zinc-700"
+              onClick={() => void handleDisplayModeChange("inline")}
+            >
+              <CloseIcon />
+            </button>
+          )}
+          <div className="flex min-w-0 items-center justify-center gap-2 px-2">
+            {fullscreenHeader?.iconUrl ? (
+              <img
+                src={fullscreenHeader.iconUrl}
+                alt=""
+                className="size-6 shrink-0 rounded-md object-contain"
+              />
+            ) : null}
+            <span className="truncate text-sm font-medium text-foreground">
+              {fullscreenHeader?.title ?? toolName}
+            </span>
+          </div>
+          <div className="size-8 shrink-0" aria-hidden />
+        </header>
       )}
+      {isPip &&
+        (renderFullscreenClose ? (
+          <div className="absolute right-3 top-3" style={{ zIndex: 110 }}>
+            {renderFullscreenClose({
+              onClick: () => void handleDisplayModeChange("inline"),
+              "data-testid": "debugger-exit-pip-button",
+              "aria-label": "Exit picture-in-picture",
+            })}
+          </div>
+        ) : (
+          <button
+            type="button"
+            data-testid="debugger-exit-pip-button"
+            aria-label="Exit picture-in-picture"
+            className="absolute right-3 top-3 z-[110] flex size-8 cursor-pointer items-center justify-center rounded-full border border-border bg-background/90 text-foreground shadow-sm backdrop-blur-sm hover:bg-background"
+            style={{ zIndex: 110 }}
+            onClick={() => void handleDisplayModeChange("inline")}
+          >
+            <CloseIcon />
+          </button>
+        ))}
       <div
         className={
-          isFullscreen || isPip
-            ? "relative w-full h-full min-h-0 flex flex-1 flex-col"
-            : "relative w-full flex flex-1 justify-center items-center"
+          isFullscreen
+            ? "relative flex min-h-0 w-full flex-1 flex-col"
+            : isPip
+              ? "relative w-full h-full min-h-0 flex flex-1 flex-col"
+              : "relative w-full flex flex-1 justify-center items-center"
         }
       >
         {showSpinner && (
@@ -728,19 +818,19 @@ function ViewRendererBase({
           <iframe
             ref={iframeRef}
             title={`MCP App: ${toolName}`}
-            className="w-full h-full border-0 bg-transparent"
-            style={{
-              border:
-                resolved.prefersBorder && displayMode !== "fullscreen"
-                  ? undefined
-                  : "none",
-            }}
+            className={
+              showHostBorder
+                ? "w-full h-full bg-transparent border border-border rounded-xl"
+                : "w-full h-full bg-transparent border-0"
+            }
           />
         </div>
       </div>
     </div>
   );
 
+  // ponytail: do not portal — moving the shell remounts the iframe and wipes
+  // the guest. Chat history chrome hides via data-mcp-widget-fullscreen instead.
   return <div className={className}>{viewShell}</div>;
 }
 
@@ -761,6 +851,9 @@ function viewRendererAreEqual(
   if (prev.hostCapabilities !== next.hostCapabilities) return false;
   if (prev.cspMode !== next.cspMode) return false;
   if (prev.mockOpenAiFileApis !== next.mockOpenAiFileApis) return false;
+  if (prev.onInlineHeightChange !== next.onInlineHeightChange) return false;
+  if (prev.fullscreenHeader !== next.fullscreenHeader) return false;
+  if (prev.renderFullscreenClose !== next.renderFullscreenClose) return false;
   if (prev.className !== next.className) return false;
   if (prev.onReady !== next.onReady) return false;
   if (prev.onLifecycleChange !== next.onLifecycleChange) return false;

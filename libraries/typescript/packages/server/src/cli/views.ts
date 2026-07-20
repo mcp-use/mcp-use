@@ -136,7 +136,7 @@ export async function createBindingValidationServer(
   return createServer({
     root: cwd,
     configFile,
-    envFile: false,
+    envDir: false,
     logLevel: "warn",
     cacheDir,
     server: { middlewareMode: true, hmr: false },

@@ -84,6 +84,45 @@ function generateCdnShellHtml(
     <link rel="stylesheet" href="${assets.cssUrl}" />
     <title>Inspector | mcp-use</title>
     <meta name="description" content="Free, open-source MCP Inspector by mcp-use. Connect to any MCP server, test tools, prompts, and resources, inspect RPC logs, and debug MCP apps — all in your browser." />
+    <style>
+      :root { color-scheme: light dark; }
+      html, body { height: 100%; margin: 0; background-color: #f3f3f3; }
+      #root { height: 100%; }
+      .mcp-boot {
+        display: flex;
+        height: 100%;
+        align-items: center;
+        justify-content: center;
+        background-color: #f3f3f3;
+      }
+      .mcp-boot-inner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+      }
+      .mcp-boot-spinner {
+        width: 32px;
+        height: 32px;
+        color: #52525b;
+        animation: mcp-boot-spin 1s linear infinite;
+      }
+      .mcp-boot-label {
+        margin: 0;
+        font-family: Ubuntu, sans-serif;
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+        color: #52525b;
+      }
+      @keyframes mcp-boot-spin {
+        to { transform: rotate(360deg); }
+      }
+      @media (prefers-color-scheme: dark) {
+        html, body { background-color: #000; }
+        .mcp-boot { background-color: #000; }
+        .mcp-boot-spinner, .mcp-boot-label { color: #a1a1aa; }
+      }
+    </style>
     <script>window.__INSPECTOR_VERSION__ = ${JSON.stringify(INSPECTOR_VERSION)};</script>
     ${runtimeScripts}
   </head>
@@ -101,7 +140,27 @@ function generateCdnShellHtml(
         };
       }
     </script>
-    <div id="root"></div>
+    <div id="root">
+      <div class="mcp-boot">
+        <div class="mcp-boot-inner">
+          <svg
+            class="mcp-boot-spinner"
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            role="status"
+            aria-label="Loading"
+          >
+            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+          </svg>
+          <p class="mcp-boot-label">Connecting to MCP server...</p>
+        </div>
+      </div>
+    </div>
     <script type="module" src="${assets.jsUrl}"></script>
   </body>
 </html>`;

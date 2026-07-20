@@ -87,13 +87,17 @@ describe("inspector shell route", () => {
     // Serialized runtime config: basePath from the server, autoConnectUrl
     // derived client-side from the page's own origin (no host guessing).
     expect(html).toContain("window.__MCP_USE_INSPECTOR__");
+    expect(html).not.toContain("__MCP_DEV_CLI__");
     expect(html).toContain('var basePath = "/mcp";');
     expect(html).toContain("window.location.origin + basePath");
     // Browser polyfill for the bundle's Node-flavored module-scope code.
     expect(html).toContain("window.process = {");
     // Root node for the bundle to mount into, with the inspector's neutral
-    // background applied before the UI paints.
+    // background applied before the UI paints and a boot spinner placeholder.
     expect(html).toContain('<div id="root">');
+    expect(html).toContain('class="mcp-boot"');
+    expect(html).toContain('role="status"');
+    expect(html).toContain("Connecting to MCP server...");
     expect(html).toContain("background-color: #f3f3f3");
     // The server name appears (escaped) in the title.
     expect(html).toContain("<title>shell-test — MCP Inspector</title>");
@@ -239,6 +243,14 @@ describe("inspector shell route", () => {
   it("does not capture inspector API paths", async () => {
     const server = makeServer();
     expect((await get(server, "/mcp/inspector/api/dev/info")).status).toBe(404);
+    await server.close();
+  });
+
+  it("injects __MCP_DEV_CLI__ only when MCP_USE_DEV_CLI is set", async () => {
+    vi.stubEnv("MCP_USE_DEV_CLI", "1");
+    const server = makeServer();
+    const html = await (await get(server, "/mcp/inspector")).text();
+    expect(html).toContain("window.__MCP_DEV_CLI__ = true;");
     await server.close();
   });
 

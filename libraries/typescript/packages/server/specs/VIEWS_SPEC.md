@@ -3,7 +3,7 @@
 **Status:** Implemented alpha contract. Companion to `SPEC.md` (whose views phase points here) and `CLI_SPEC.md` (the implemented `dev`/`build`/`start` base contract this document extends).
 **Scope:** the views runtime in the server package, view resources and protocol metadata, the React view runtime (`/react` subpath), the zero-codegen typing layer (`ToolRef` / `Register`), and the views half of the `dev`/`build`/`start` contract.
 **Tracking:** Linear MCP-2601 (Views & MCP Apps + typing), MCP-2180 (widget→view naming).
-**v1 reference:** `packages/mcp-use` (`src/react/`, `src/server/widgets/`) defines *what* views must be able to do, never how. Parity with v1 is the alpha goal; the architecture is not carried over.
+**v1 reference:** `packages/mcp-use` (`src/react/`, `src/server/widgets/`) defines _what_ views must be able to do, never how. Parity with v1 is the alpha goal; the architecture is not carried over.
 
 ## Decisions at a glance
 
@@ -15,7 +15,7 @@
 6. **No response helpers — views included.** The no-response-helpers ground rule (`SPEC.md`) applies without exception. View-bound tool handlers return a plain `CallToolResult`: `{ content, structuredContent, _meta? }`. `structuredContent` is typed by the tool's `outputSchema` at the return position (existing `ToolResult<TOutput>` machinery).
 7. **React runtime ships as `mcp-use/react`.** `react` and `react-dom` are optional peers owned by the application.
 8. **Parity with v1 hooks, minus two named gaps** (file upload, cross-session view state) that the MCP Apps spec cannot express — see "Dropped from v1".
-9. **Views build into `.mcp-use/build/views/` and serve under `${basePath}/_mcp-use/`.** One Vite client build per view emits hashed JS and CSS under `.mcp-use/build/views/<name>/assets/`; code splitting stays disabled, so views share no chunks. `resources/read` synthesizes the HTML document with absolute asset URLs. Production serves view bundles at `${basePath}/_mcp-use/views/<name>/…` and project-public files at `${basePath}/_mcp-use/public/…`; `MCP_ASSETS_URL` can point both URL spaces at a CDN. Hosts still obtain the HTML document only through `resources/read` — there is no HTTP document route. See "Build system & serving".
+9. **Views build into `.mcp-use/build/views/` and serve under `${basePath}/_mcp-use/`.** One Vite client build per view emits a hashed entry, optional split chunks, and CSS under `.mcp-use/build/views/<name>/assets/`. The embedded registry records the entry and CSS paths; split chunks load through relative imports from the entry module. No chunks are shared across views. `resources/read` synthesizes the HTML document with absolute asset URLs. Production serves view bundles at `${basePath}/_mcp-use/views/<name>/…` and project-public files at `${basePath}/_mcp-use/public/…`; `MCP_ASSETS_URL` can point both URL spaces at a CDN. Hosts still obtain the HTML document only through `resources/read` — there is no HTTP document route. See "Build system & serving".
 10. **One tool binds one view; every binder declares an `outputSchema`; the binder owns all resource facts.** A view has zero or one bound tool; a bound tool has exactly one view. A second tool declaring `view: { name }` for an already-bound view is a **hard error** at registration naming both tools. Every view-bound tool requires an `outputSchema` (hard error otherwise). The single binder owns all resource facts (`description`, `csp`, `permissions`, `domain`, `prefersBorder`). A `view:` naming a missing view directory is a **hard error** (broken `resourceUri`). A view directory no tool binds is a **warning only** (unused-code class: harmless dead weight, and erroring would break the scaffold-view-first authoring order and make feature-flagging a tool off a deploy-breaking action). App-only helper tools remain viewless (`visibility: "app"`, no `view:`) and are called from the view via `useCallTool`; use a separate view resource when another tool needs a rendered result.
 11. **Views register from an embedded registry; assets remain deployment files.** `mcp-use build` bakes the view-name-to-asset-path registry into a generated wrapper entry that primes the server before anything mounts; `.mcp-use/build/manifest.json` does not contain that registry. `resources/list` and `resources/read` need no filesystem access, but a rendered production view loads its JS/CSS from `.mcp-use/build/views/<name>/` through the production asset route or an `MCP_ASSETS_URL` CDN. There is no runtime manifest-file fallback; an unprimed `view:` is a loud mount-time error. See "Registration mechanism".
 12. **Dev shares the one Vite dev server `mcp-use dev` already runs.** The views client environment joins that server; view-file edits get real Vite HMR with **React Fast Refresh** through the framework-owned React plugin. Tailwind is also framework-owned and always available. A project `vite.config.*` may add other view-client plugins; it never configures the server environment. The server entry keeps the implemented reload-and-swap contract (`CLI_SPEC.md`). Every server handler generation shares one SDK event bus; successful entry reloads publish tool, prompt, and resource list invalidations so connected modern clients refetch from the new stateless handler.
@@ -81,7 +81,9 @@ export default function ProductSearchResult() {
     return <SearchSkeleton query={view.toolInput?.query} />;
   }
 
-  return <ResultsGrid query={view.toolOutput.query} items={view.toolOutput.items} />;
+  return (
+    <ResultsGrid query={view.toolOutput.query} items={view.toolOutput.items} />
+  );
 }
 ```
 
@@ -105,25 +107,25 @@ We track the ext-apps **draft** spec (the SDK is beta; the draft adds `ui/downlo
 
 Emitted by this package (constants inlined; names are the spec's):
 
-| Where            | Key                                                         | Value                                                        |
-| ---------------- | ----------------------------------------------------------- | ------------------------------------------------------------ |
-| tool `_meta`     | `ui.resourceUri`                                            | `ui://views/<view-name>.html`                                |
-| tool `_meta`     | `"ui/resourceUri"`                                          | same value (legacy flat key, kept while hosts still read it) |
-| tool `_meta`     | `ui.visibility`                                             | `["model"]` / `["app"]` when the tool's top-level `visibility` is set — any tool, view-bound or not; **omitted entirely when unset** (host default: callable by the model, visible to the app). Declaration only — the server always lists every tool; hosts filter by this key. |
-| tool result `_meta` (view-bound completed `tools/call`, non-error) | `ui.resourceUri` | `ui://views/<view-name>.html` |
-| tool result `_meta` (view-bound completed `tools/call`, non-error) | `"ui/resourceUri"` | same value (legacy flat key) |
-| resource (`resources/list` entry) | `description`                                    | from the bound tool's `view.description`                     |
-| resource (`resources/list` entry) | `mimeType`                                       | `text/html;profile=mcp-app`                                  |
-| resource (`resources/list` entry) `_meta` | `ui.csp`                             | `{ connectDomains, resourceDomains, … }` — author and CSP-environment domains, plus the server origin in `connectDomains` and the assets origin in `resourceDomains`; in dev, the server origin's websocket variant (`ws://`/`wss://`) is also appended to `connectDomains` |
-| resource (`resources/list` entry) `_meta` | `ui.permissions`                     | from the bound tool's `view.permissions` when set            |
-| resource (`resources/list` entry) `_meta` | `ui.domain`                          | from the bound tool's `view.domain` when set                 |
-| resource (`resources/list` entry) `_meta` | `ui.prefersBorder`                   | from the bound tool's `view.prefersBorder` when set          |
-| resource content item (`resources/read` `contents[]`) | `mimeType` | `text/html;profile=mcp-app`                                  |
-| resource content item (`resources/read` `contents[]`) | `text`     | synthesized HTML document (origin-resolved per request)      |
-| resource content item (`resources/read` `contents[]`) `_meta` | `ui.csp` | same shape as the list entry; **content-item value takes precedence** per MCP Apps spec and uses the current request to resolve server/assets origins and the dev HMR websocket origin |
-| resource content item (`resources/read` `contents[]`) `_meta` | `ui.permissions` | same as list entry when set |
-| resource content item (`resources/read` `contents[]`) `_meta` | `ui.domain` | same as list entry when set |
-| resource content item (`resources/read` `contents[]`) `_meta` | `ui.prefersBorder` | same as list entry when set |
+| Where                                                              | Key                | Value                                                                                                                                                                                                                                                                            |
+| ------------------------------------------------------------------ | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| tool `_meta`                                                       | `ui.resourceUri`   | `ui://views/<view-name>.html`                                                                                                                                                                                                                                                    |
+| tool `_meta`                                                       | `"ui/resourceUri"` | same value (legacy flat key, kept while hosts still read it)                                                                                                                                                                                                                     |
+| tool `_meta`                                                       | `ui.visibility`    | `["model"]` / `["app"]` when the tool's top-level `visibility` is set — any tool, view-bound or not; **omitted entirely when unset** (host default: callable by the model, visible to the app). Declaration only — the server always lists every tool; hosts filter by this key. |
+| tool result `_meta` (view-bound completed `tools/call`, non-error) | `ui.resourceUri`   | `ui://views/<view-name>.html`                                                                                                                                                                                                                                                    |
+| tool result `_meta` (view-bound completed `tools/call`, non-error) | `"ui/resourceUri"` | same value (legacy flat key)                                                                                                                                                                                                                                                     |
+| resource (`resources/list` entry)                                  | `description`      | from the bound tool's `view.description`                                                                                                                                                                                                                                         |
+| resource (`resources/list` entry)                                  | `mimeType`         | `text/html;profile=mcp-app`                                                                                                                                                                                                                                                      |
+| resource (`resources/list` entry) `_meta`                          | `ui.csp`           | `{ connectDomains, resourceDomains, … }` — author and CSP-environment domains, plus the server origin in `connectDomains` and the assets origin in `resourceDomains`; in dev, the server origin's websocket variant (`ws://`/`wss://`) is also appended to `connectDomains`      |
+| resource (`resources/list` entry) `_meta`                          | `ui.permissions`   | from the bound tool's `view.permissions` when set                                                                                                                                                                                                                                |
+| resource (`resources/list` entry) `_meta`                          | `ui.domain`        | from the bound tool's `view.domain` when set                                                                                                                                                                                                                                     |
+| resource (`resources/list` entry) `_meta`                          | `ui.prefersBorder` | from the bound tool's `view.prefersBorder` when set                                                                                                                                                                                                                              |
+| resource content item (`resources/read` `contents[]`)              | `mimeType`         | `text/html;profile=mcp-app`                                                                                                                                                                                                                                                      |
+| resource content item (`resources/read` `contents[]`)              | `text`             | synthesized HTML document (origin-resolved per request)                                                                                                                                                                                                                          |
+| resource content item (`resources/read` `contents[]`) `_meta`      | `ui.csp`           | same shape as the list entry; **content-item value takes precedence** per MCP Apps spec and uses the current request to resolve server/assets origins and the dev HMR websocket origin                                                                                           |
+| resource content item (`resources/read` `contents[]`) `_meta`      | `ui.permissions`   | same as list entry when set                                                                                                                                                                                                                                                      |
+| resource content item (`resources/read` `contents[]`) `_meta`      | `ui.domain`        | same as list entry when set                                                                                                                                                                                                                                                      |
+| resource content item (`resources/read` `contents[]`) `_meta`      | `ui.prefersBorder` | same as list entry when set                                                                                                                                                                                                                                                      |
 
 Authors may also provide custom tool definition `_meta`. The registration boundary shallow-copies it and merges the framework-owned tool keys deterministically. The framework owns nested `ui.resourceUri`, nested `ui.visibility`, and legacy flat `"ui/resourceUri"`: a declared `view`/`visibility` supplies the canonical value and wins a collision; when the corresponding field is absent, a user-supplied value for that owned key is removed rather than advertising a contract the tool did not declare. Other top-level vendor keys and other fields of an object-valued `ui` entry are preserved. The merge never mutates the caller's object, never recursively assigns user keys into an existing target, and treats keys such as `__proto__` as data. This definition merge affects only `tools/list`; tool-result `_meta` retains the separate result-stamping rules below.
 
@@ -141,7 +143,12 @@ Per the `SPEC.md` stateless posture, UI support is a **request-scoped** fact: th
 
 ```ts
 export const searchFruits = server.tool(
-  { name: "search-fruits", inputSchema: z.object({ query: z.string().optional() }), outputSchema: resultsSchema, view: { name: "product-search-result" } },
+  {
+    name: "search-fruits",
+    inputSchema: z.object({ query: z.string().optional() }),
+    outputSchema: resultsSchema,
+    view: { name: "product-search-result" },
+  },
   async ({ query = "" }, ctx) => {
     const items = await search(query);
     if (!ctx.client.supportsViews()) {
@@ -159,7 +166,7 @@ export const searchFruits = server.tool(
 );
 ```
 
-Note the branch is *optional*: a plain `CallToolResult` already degrades on text-only hosts (`content` is present; result `_meta.ui.*` is ignored). `ctx.client.supportsViews()` exists for when the two audiences deserve materially different output, not as a required ritual.
+Note the branch is _optional_: a plain `CallToolResult` already degrades on text-only hosts (`content` is present; result `_meta.ui.*` is ignored). `ctx.client.supportsViews()` exists for when the two audiences deserve materially different output, not as a required ritual.
 
 ### ext-apps dependency posture
 
@@ -217,7 +224,7 @@ Authors declare every external domain the view loads in the binder's `view.csp.r
 Binding rules (decision 10), enforced where the wire would lie — at registration in dev, at build in prod:
 
 - `view.name` naming a missing view directory is a **hard error** (broken `resourceUri`).
-- A `view:` tool without an `outputSchema` is a **hard error** — the output contract *is* the `outputSchema` (`useToolContext<"search-fruits">()` reads it). A view that takes no result payload binds to a tool with an empty object schema (`outputSchema: z.object({})`).
+- A `view:` tool without an `outputSchema` is a **hard error** — the output contract _is_ the `outputSchema` (`useToolContext<"search-fruits">()` reads it). A view that takes no result payload binds to a tool with an empty object schema (`outputSchema: z.object({})`).
 - A view has zero or one bound tool; a bound tool has exactly one view. A second tool declaring `view: { name }` for an already-bound view is a **hard error** at registration naming both tools, e.g. `View "canvas" is already bound to tool "draw"; tool "refresh" cannot bind the same view. Each view may be bound to one tool.` Use a separate view resource when another tool needs a rendered result. App-only helper tools remain viewless and are called from the view via `useCallTool`.
 - A view directory no tool binds is a **warning naming the view**, never an error — nothing on the wire is wrong (no host renders a view except through a tool result's `_meta.ui.resourceUri`), and erroring would punish the natural authoring order (view directory first, tool second) and turn feature-flagging a tool off into a build/deploy breaker. Unbound views are still built and registered — `resources/read` staying live is useful for inspector preview of not-yet-wired views.
 
@@ -247,26 +254,26 @@ The handler and the view component are two ends of one call: `structuredContent`
 
 The full `CallToolResult` reaches the view (the host forwards it via `ui/notifications/tool-result`); what reaches the **model** is host policy, but the spec's design assumption — and ChatGPT's behavior — is: `content` and `structuredContent` are model-facing, `_meta` is not. Design for that split; never put secrets in any tool result channel (the view is still client-side).
 
-| Data | Model | View | Text-only host | Carried as |
-| --- | --- | --- | --- | --- |
-| `structuredContent` | ✅ | ✅ (`useToolContext().toolOutput` when `ready`) | host may render raw | `structuredContent`, typed by `outputSchema` |
-| `content` | ✅ | ✅ (`useToolContext().content` when `ready` or `error`) | ✅ (the fallback) | `content` blocks |
-| result `_meta` (handler keys) | ❌ | ✅ (`useToolContext().meta` when `ready` or `error`) | ❌ (ignored) | result `_meta` |
-| tool input | ✅ (it authored it) | ✅ (`useToolContext().toolInput` — latest partial or complete pending snapshot) | ✅ | `tools/call` arguments |
-| view→model context | ✅ (subsequent turns) | source | n/a | `ui/update-model-context` / `ModelContext` |
-| view-tool result | ✅ (it called the tool) | source | n/a | `tools/call` over the bridge → `useViewTool` handler |
+| Data                          | Model                   | View                                                                            | Text-only host      | Carried as                                           |
+| ----------------------------- | ----------------------- | ------------------------------------------------------------------------------- | ------------------- | ---------------------------------------------------- |
+| `structuredContent`           | ✅                      | ✅ (`useToolContext().toolOutput` when `ready`)                                 | host may render raw | `structuredContent`, typed by `outputSchema`         |
+| `content`                     | ✅                      | ✅ (`useToolContext().content` when `ready` or `error`)                         | ✅ (the fallback)   | `content` blocks                                     |
+| result `_meta` (handler keys) | ❌                      | ✅ (`useToolContext().meta` when `ready` or `error`)                            | ❌ (ignored)        | result `_meta`                                       |
+| tool input                    | ✅ (it authored it)     | ✅ (`useToolContext().toolInput` — latest partial or complete pending snapshot) | ✅                  | `tools/call` arguments                               |
+| view→model context            | ✅ (subsequent turns)   | source                                                                          | n/a                 | `ui/update-model-context` / `ModelContext`           |
+| view-tool result              | ✅ (it called the tool) | source                                                                          | n/a                 | `tools/call` over the bridge → `useViewTool` handler |
 
 Consequences worth spelling out in docs:
 
-- **`structuredContent` is model-visible.** That is a feature — the model reasons over exactly what the user is looking at — but it prices structured output in tokens and rules it out for bulk payloads. The dividing question for every field: *should the model see this?* Yes → `structuredContent`; no (bulk, presentation-only, e.g. base64 images, geometry, full result sets beyond what's discussed) → `_meta`.
+- **`structuredContent` is model-visible.** That is a feature — the model reasons over exactly what the user is looking at — but it prices structured output in tokens and rules it out for bulk payloads. The dividing question for every field: _should the model see this?_ Yes → `structuredContent`; no (bulk, presentation-only, e.g. base64 images, geometry, full result sets beyond what's discussed) → `_meta`.
 - **`content` is the model/text-host narrative** ("Found 12 results, top match …"). Handlers should pass a short summary; since `structuredContent` is already model-visible, omitting `content` leaves text-only hosts with only the structured payload.
 - **Result `_meta` is the view-only channel**: handler-supplied keys are preserved on result `_meta`, read via `useToolContext().meta` when `ready` or `error`, never typed by `outputSchema`, never model context. The framework also stamps the wire `ui.*` link keys (`ui.resourceUri`, `"ui/resourceUri"`) onto every completed non-error result from a view-bound tool; it leaves errors and intermediate `input_required` returns unstamped. The reserved namespace is `ui.*`; wire keys win on collision.
-- The reverse direction is explicit, not ambient: nothing a user does *inside* the view reaches the model unless sent via `ModelContext`/`updateModelContext` (model context push, no follow-up turn), `sendFollowUpMessage` (`ui/message`, triggers a turn), or returned from a view tool (*model-initiated*, see View tools).
+- The reverse direction is explicit, not ambient: nothing a user does _inside_ the view reaches the model unless sent via `ModelContext`/`updateModelContext` (model context push, no follow-up turn), `sendFollowUpMessage` (`ui/message`, triggers a turn), or returned from a view tool (_model-initiated_, see View tools).
 
 ### URI scheme and serving
 
 - Resource URI: `ui://views/<name>.html` — stable across builds. (v1 embedded a `buildId` for ChatGPT's per-URI caching; that is an overlay concern. If host caching demonstrably requires it, a content-hash suffix can come from the embedded registry — deferred to implementation evidence, see Open questions.)
-- The resource body is a complete HTML document rendered by hosts via `srcdoc` after `resources/read`. In **production**, the shell contains `<link rel="stylesheet">` and `<script type="module" src>` tags for hashed assets under `${basePath}/_mcp-use/views/<name>/…` or their build-time-rewritten CDN URLs. In **dev**, the same shell loads `/@vite/client` and the virtual view entry for HMR. The document is synthesized per request from the embedded registry entry and is never read from disk. Public-folder assets load from `${basePath}/_mcp-use/public/` or the configured assets CDN. Hosts obtain the document only through `resources/read`; there is no HTTP document route. The full contract — build pipeline, routes, origin derivation, caching — is "Build system & serving", below.
+- The resource body is a complete HTML document rendered by hosts via `srcdoc` after `resources/read`. In **production**, the shell contains `<link rel="stylesheet">` and `<script type="module" src>` tags for hashed assets under `${basePath}/_mcp-use/views/<name>/…` or their build-time-rewritten CDN URLs; split chunks load via relative imports from the entry module URL. In **dev**, the same shell loads `/@vite/client` and the virtual view entry for HMR. The document is synthesized per request from the embedded registry entry and is never read from disk. Public-folder assets load from `${basePath}/_mcp-use/public/` or the configured assets CDN. Hosts obtain the document only through `resources/read`; there is no HTTP document route. The full contract — build pipeline, routes, origin derivation, caching — is "Build system & serving", below.
 
 ### Wire shape (reference — what our registration layer emits)
 
@@ -275,12 +282,16 @@ For the running example, `tools/list` carries:
 ```jsonc
 {
   "name": "search-fruits",
-  "inputSchema": { /* JSON Schema converted from `inputSchema` */ },
-  "outputSchema": { /* converted from `outputSchema` */ },
+  "inputSchema": {
+    /* JSON Schema converted from `inputSchema` */
+  },
+  "outputSchema": {
+    /* converted from `outputSchema` */
+  },
   "_meta": {
     "ui": { "resourceUri": "ui://views/product-search-result.html" },
-    "ui/resourceUri": "ui://views/product-search-result.html"   // legacy flat key, kept while hosts read it
-  }
+    "ui/resourceUri": "ui://views/product-search-result.html", // legacy flat key, kept while hosts read it
+  },
 }
 ```
 
@@ -296,16 +307,16 @@ and `resources/list` carries:
     "ui": {
       "csp": {
         "connectDomains": [
-          "https://fruit-store.fly.dev"   // ← request-resolved server origin
+          "https://fruit-store.fly.dev", // ← request-resolved server origin
         ],
         "resourceDomains": [
-          "https://images.example.com",   // ← author-declared in view.csp.resourceDomains
-          "https://fruit-store.fly.dev"   // ← request-resolved assets origin
-        ]
+          "https://images.example.com", // ← author-declared in view.csp.resourceDomains
+          "https://fruit-store.fly.dev", // ← request-resolved assets origin
+        ],
       },
-      "prefersBorder": true              // ← from view.prefersBorder when set
-    }
-  }
+      "prefersBorder": true, // ← from view.prefersBorder when set
+    },
+  },
 }
 ```
 
@@ -317,23 +328,21 @@ and `resources/list` carries:
     {
       "uri": "ui://views/product-search-result.html",
       "mimeType": "text/html;profile=mcp-app",
-      "text": "<!doctype html>…",        // ← origin-resolved per request
+      "text": "<!doctype html>…", // ← origin-resolved per request
       "_meta": {
         "ui": {
           "csp": {
-            "connectDomains": [
-              "https://fruit-store.fly.dev"
-            ],
+            "connectDomains": ["https://fruit-store.fly.dev"],
             "resourceDomains": [
               "https://images.example.com",
-              "https://fruit-store.fly.dev"   // ← per-request asset origin for view bundles and public assets
-            ]
+              "https://fruit-store.fly.dev", // ← per-request asset origin for view bundles and public assets
+            ],
           },
-          "prefersBorder": true
-        }
-      }
-    }
-  ]
+          "prefersBorder": true,
+        },
+      },
+    },
+  ],
 }
 ```
 
@@ -349,9 +358,9 @@ Extends `CLI_SPEC.md`'s implemented workspace and command contract (its ground r
 
 `mcp-use build` adds a client environment alongside the node/SSR build. It runs **one Vite build per discovered view**. Each virtual entry (`virtual:mcp-use/views/<name>`) imports the `/react` iframe bootstrap and the complete view module, including its default component and optional `viewConfig`.
 
-Each per-view build disables code splitting and sets `cssCodeSplit: false`, producing one hashed ES module and at most one hashed stylesheet under `.mcp-use/build/views/<name>/assets/`. A large `assetsInlineLimit` turns imported images, fonts, and other small assets into data URLs inside the emitted JS/CSS. Views share no chunks; React and the view runtime are present in each view build.
+Each per-view build enables Vite code splitting (rolldown default), sets `cssCodeSplit: false` (one CSS asset), and uses a large `assetsInlineLimit` so imported assets become data URLs inside the bundle. After the build, the CLI records the **entry** chunk path and CSS paths in the embedded registry; additional JS chunks are not listed — the browser loads them via relative imports from the entry module. Trade-off accepted: no shared chunks across views; each view is an independent build (React and the runtime may duplicate per view).
 
-The build records emitted **paths**, not JS/CSS source, in the embedded view registry. The asset files are production artifacts, not scratch. Deploy them with the server build or upload them to the static host selected by `MCP_ASSETS_URL`.
+The build records the entry and CSS **paths**, not JS/CSS source, in the embedded view registry. Additional JS chunks are not listed; the browser loads them through relative imports from the entry module. The asset files are production artifacts, not scratch. Deploy them with the server build or upload them to the static host selected by `MCP_ASSETS_URL`. Views share no chunks; React and the view runtime may be present in each view build.
 
 Output layout:
 
@@ -363,11 +372,11 @@ Output layout:
    ├─ public/                     ← copied project `public/`
    └─ <name>/
       └─ assets/
-         ├─ <name>-<hash>.js
+         ├─ <name>-<hash>.js       ← entry and optional split chunks
          └─ <name>-<hash>.css     ← present when the view emits CSS
 ```
 
-There are **no HTML files** in the build output. `resources/read` synthesizes the document per request with `<link>` and `<script src>` tags pointing at the built asset files, plus the request-scoped `__mcpUseViewConfig` script and `<div id="root">`. The client build uses Vite's relative `base: "./"`; any residual relative references resolve from the loaded module URL.
+There are **no HTML files** in the build output. The view document is a pure function of the embedded registry entry: `resources/read` synthesizes a minimal shell with `<link>` tags for CSS, a `<script type="module" src>` for the entry JS, the request-scoped `__mcpUseViewConfig` script, and `<div id="root">`. Public-folder assets resolve per request. The client build uses Vite's relative `base: "./"` so split-chunk imports resolve from the entry module URL.
 
 **Vite configuration:** `mcp-use` owns server compilation and all required view invariants. It always injects Tailwind, React, and views plugins, and every virtual view entry imports a virtual `@import "tailwindcss"` stylesheet. Utility classes therefore work with no author CSS import. Project `vite.config.*` files are loaded only for per-view client builds, where any additional user plugins and aliases are additive.
 
@@ -380,11 +389,11 @@ There are **no HTML files** in the build output. `resources/read` synthesizes th
   "buildId": "…",
   "entryPoint": "index.js",
   "createdAt": "…",
-  "inspector": false
+  "inspector": false,
 }
 ```
 
-The view registry is a separate in-memory shape baked into `.mcp-use/build/index.js` by the generated wrapper. Production entries use `{ kind: "external", entry, css }`, where `entry` and `css` contain view-relative paths such as `assets/product-search-result-<hash>.js`. When `MCP_ASSETS_URL` is set during the build, those fields contain full CDN URLs instead. Dev primes the same registry with origin-absolute Vite paths and an additional `/@vite/client` script.
+The view registry is a separate in-memory shape baked into `.mcp-use/build/index.js` by the generated wrapper. Production entries use `{ kind: "external", entry, css }`, where `entry` and `css` contain view-relative paths such as `assets/product-search-result-<hash>.js`. Split JS chunks are not listed; they load through relative imports from the entry module. When `MCP_ASSETS_URL` is set during the build, the recorded fields contain full CDN URLs instead. Dev primes the same registry with origin-absolute Vite paths and an additional `/@vite/client` script.
 
 `ViewManifestEntry` still accepts `kind: "inline"` for compatibility with existing internal callers, but `mcp-use build` does not emit inline production entries.
 
@@ -399,7 +408,7 @@ Hosts obtain the HTML document only through `resources/read`; there is no HTTP d
 
 ### Registration mechanism
 
-How build/dev registry data becomes MCP registrations. Two facts about the implemented server shape every design must live under: the registry **freezes at first mount** (registration after `listen()`/`getHandler()` throws — registrations are replayed per request, late ones would be silently inconsistent), and `getHandler()` is **synchronous** and typically called at module scope in serverless entries. So view registration must be complete by the time the entry module finishes evaluating, and it cannot await a filesystem read to get there. v1's trigger — `mountWidgets()` doing async `fs` work *inside* `listen()`/`getHandler()`, then calling `server.uiResource()` — is structurally impossible here and is not wanted back.
+How build/dev registry data becomes MCP registrations. Two facts about the implemented server shape every design must live under: the registry **freezes at first mount** (registration after `listen()`/`getHandler()` throws — registrations are replayed per request, late ones would be silently inconsistent), and `getHandler()` is **synchronous** and typically called at module scope in serverless entries. So view registration must be complete by the time the entry module finishes evaluating, and it cannot await a filesystem read to get there. v1's trigger — `mountWidgets()` doing async `fs` work _inside_ `listen()`/`getHandler()`, then calling `server.uiResource()` — is structurally impossible here and is not wanted back.
 
 **Instance registry, primed via an internal API.** `MCPServer` grows a views registry alongside `#tools`/`#resources`, populated through one symbol-keyed method:
 
@@ -420,7 +429,7 @@ interface ViewsManifest {
 }
 ```
 
-The same package's CLI (`src/cli/`) imports the symbol directly; the generated wrapper entry imports it from the package root. View resources are *not* sugar over the public `resource()`: their `_meta.ui.*` emission and body are origin-resolved per request, so the per-request SDK-server build does the emission itself — register each view's resource, append server/assets origins to CSP, synthesize the document from the registry entry on read, and stamp `_meta.ui.resourceUri` onto the bound tool. The tool-side URI needs no registry data (it is deterministic from `view.name`); the primed registry validates the binding and supplies the asset entry. Priming is an instance method, not a module global, so several servers compose in one process and dev can prime each fresh instance independently.
+The same package's CLI (`src/cli/`) imports the symbol directly; the generated wrapper entry imports it from the package root. View resources are _not_ sugar over the public `resource()`: their `_meta.ui.*` emission and body are origin-resolved per request, so the per-request SDK-server build does the emission itself — register each view's resource, append server/assets origins to CSP, synthesize the document from the registry entry on read, and stamp `_meta.ui.resourceUri` onto the bound tool. The tool-side URI needs no registry data (it is deterministic from `view.name`); the primed registry validates the binding and supplies the asset entry. Priming is an instance method, not a module global, so several servers compose in one process and dev can prime each fresh instance independently.
 
 **Delivery: the registry travels as code.** `mcp-use build` builds the server bundle from a generated wrapper entry. The wrapper embeds the view registry, primes the user's `MCPServer`, and re-exports it. The user entry must default-export the `MCPServer` instance — the same entry contract `CLI_SPEC.md` already enforces for `dev` and `start`:
 
@@ -441,8 +450,8 @@ export default server;
 Because priming happens during module evaluation of the built entry, it is complete before any downstream `getHandler()`/`listen()` call. The registry itself is part of the JS module graph; the referenced asset files remain separate deployment artifacts. Per mode:
 
 - **`start`:** imports the built entry; views are primed by the wrapper before `listen()`. Nothing new in the `start` contract.
-- **Serverless:** the function entry imports `.mcp-use/build/index.js`, not the TypeScript source. The MCP list/read paths use the embedded registry without reading `manifest.json`, while rendered views still require the built view assets through traced filesystem files, platform static assets, or `MCP_ASSETS_URL`.
-- **Dev:** no wrapper — the CLI calls the same internal API on each freshly loaded instance before wiring it into the swappable handler, feeding it the in-memory registry (`kind: "external"`) and `{ dev: true }`. View add/remove triggers the existing reload-and-swap; view-code edits stay on Vite HMR. Dev entry and script paths are origin-absolute `/`-prefixed Vite module paths.
+- **Serverless:** the function entry imports `.mcp-use/build/index.js`, not the TypeScript source. The MCP list/read/tool-metadata paths use the embedded registry with no filesystem access, while rendered views still require the built view assets through traced filesystem files, platform static assets, or `MCP_ASSETS_URL`.
+- **Dev:** no wrapper — the CLI calls the same internal API on each freshly loaded instance before wiring it into the swappable handler, feeding it the in-memory registry (`kind: "external"`) and `{ dev: true }` so HMR websocket origins are emitted in resource CSP. View add/remove triggers the existing reload-and-swap; view-code edits stay on Vite HMR. Dev entry and script paths are origin-absolute `/`-prefixed Vite module paths.
 
 **No registry fallback, loud errors.** The runtime never reads `manifest.json` or reconstructs view registrations from the filesystem. A tool declaring `view: { name }` on an instance with no primed views — or a name the primed registry does not contain — is a mount-time error naming the view and the fix (`run mcp-use build` / deploy the built entry). Asset-file requests are separate from registry priming and return `404` when the deployed file is absent.
 
@@ -454,10 +463,10 @@ All framework HTTP surface lives under **`${basePath}/_mcp-use/`** — a framewo
 
 Hosts obtain the view document **only** through `resources/read`. The MCP Apps spec defines no host flow that navigates an iframe to a server document URL; the inspector reads the resource and renders it through `srcdoc`. Unbound views are previewed the same way. The document then loads its production JS/CSS from the view-assets route or a configured CDN.
 
-| Route | Serves | Cache-Control |
-| --- | --- | --- |
-| `GET/HEAD ${basePath}/_mcp-use/views/<name>/<path…>` | production files under `.mcp-use/build/views/<name>/` for a registered external view | `public, max-age=0, must-revalidate` |
-| `GET/HEAD ${basePath}/_mcp-use/public/<path…>` | project-public files from `public/` in dev or `.mcp-use/build/views/public/` in production | `public, max-age=0, must-revalidate` |
+| Route                                                | Serves                                                                                                      | Cache-Control                        |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| `GET/HEAD ${basePath}/_mcp-use/views/<name>/<path…>` | production entry, split chunks, and CSS under `.mcp-use/build/views/<name>/` for a registered external view | `public, max-age=0, must-revalidate` |
+| `GET/HEAD ${basePath}/_mcp-use/public/<path…>`       | project-public files from `public/` in dev or `.mcp-use/build/views/public/` in production                  | `public, max-age=0, must-revalidate` |
 
 By default, both static routes include `Access-Control-Allow-Origin: *`; an explicit global CORS configuration owns that header instead. Hosts render views in sandboxed cross-origin iframes (`srcdoc`), so module scripts and other fetches need CORS. Dev Vite module URLs use the gated CORS behavior in `CLI_SPEC.md`: a tunnel emits `*`, while localhost reflects a validated loopback `Origin` and adds `Vary: Origin`.
 
@@ -467,7 +476,7 @@ By default, both static routes include `Access-Control-Allow-Origin: *`; an expl
 - **`external` (dev):** resolve origin-absolute Vite paths, including `/@vite/client` and the virtual view entry, against the request-derived assets base. Emit the same external tags.
 - **`inline` (compatibility):** emit `<style>` and inline `<script type="module">` tags with HTML-end-tag escaping. The production CLI does not emit this entry kind.
 
-Every branch includes `__mcpUseViewConfig`, whose `publicBase` is resolved per request, and a `<div id="root">`.
+Every branch includes `__mcpUseViewConfig`, whose `publicBase` is resolved per request, and a `<div id="root">`. Production split chunks are loaded by relative imports from the entry module and require no additional document tags.
 
 **Origin resolution is request-scoped** — applied at `resources/read` emission time:
 
@@ -498,7 +507,11 @@ v1 parity: authors drop static files in a project-root `public/` directory and r
 **Runtime resolution.** The synthesized document injects one inline `<script>` before the view module script:
 
 ```html
-<script>globalThis.__mcpUseViewConfig={"publicBase":"<origin><basePath>/_mcp-use/public/"};</script>
+<script>
+  globalThis.__mcpUseViewConfig = {
+    publicBase: "<origin><basePath>/_mcp-use/public/",
+  };
+</script>
 ```
 
 `publicBase` is request-scoped (computed per request), not boot-time baked — the v1 mistake of baking origin at startup remains dead. `<Image>` reads this global (the one public consumer; the internal `publicAsset()` resolver is not exported — v1 shipped the same posture, an `<Image>` component over injected globals with no standalone resolver): root-relative `src` values resolve to `${publicBase}<path-without-leading-slash>`; absolute `http(s):` and `data:` URLs pass through; fully-relative paths (no leading `/`) are left alone. Non-`<img>` consumers (CSS backgrounds, `<video>`) can be served by exporting the resolver later — additive, deferred until asked for. `import.meta.url` relative resolution was rejected for public assets because the dev virtual entry URL (`/@id/__x00__virtual:mcp-use/views/<name>`) has no stable sibling `public/` segment — the injected config works identically in dev and production.
@@ -508,7 +521,7 @@ v1 parity: authors drop static files in a project-root `public/` directory and r
 `mcp-use dev` adds the client environment to the **same Vite dev server** the implemented CLI already runs (`CLI_SPEC.md`'s single process — today it runs the node/SSR environment only, with the Vite server in middleware mode), with its middleware mounted at `${basePath}/_mcp-use/` ahead of the MCP handler. When views exist, Vite `server.origin` is set to the dev server's browsable origin — `http://localhost:<port>` for loopback/wildcard binds, `http://<host>:<port>` otherwise (a wildcard bind address like `0.0.0.0` accepts connections but is not itself a valid request host in every browser) — so imported asset URLs are absolute (srcdoc iframes, Public assets).
 
 - View documents are synthesized per `resources/read` with `/@vite/client` and the virtual entry served through Vite middleware (`kind: "external"`). Assets flow through Vite transform, with no build step or manifest file. The in-memory view registry stays current through Vite's watcher: adding or removing a view directory triggers the existing reload-and-swap path and primes a fresh `MCPServer`; view-code edits use client HMR. The next `tools/list`/`resources/list` reflects directory changes, and subscribed modern clients are prompted to refetch. The `public/` route serves `<projectRoot>/public` directly.
-- **View-file edits get Vite HMR.** This is the client half of the one dev server: view code is pure browser code, so Vite's own HMR channel applies to it. The server entry keeps `CLI_SPEC.md`'s implemented reload-and-swap contract untouched — its reload-not-HMR rule is about the *server* module graph, and views don't change that. Because hosts enforce the resource's `ui.csp.connectDomains` against the HMR websocket, dev priming (`__primeViews(views, { dev: true })`) appends the request-resolved server origin's websocket variant to `connectDomains` on both `resources/list` and each `resources/read` content item. Production never emits that websocket origin.
+- **View-file edits get Vite HMR.** This is the client half of the one dev server: view code is pure browser code, so Vite's own HMR channel applies to it. The server entry keeps `CLI_SPEC.md`'s implemented reload-and-swap contract untouched — its reload-not-HMR rule is about the _server_ module graph, and views don't change that. Because hosts enforce the resource's `ui.csp.connectDomains` against the HMR websocket, dev priming (`__primeViews(views, { dev: true })`) appends the request-resolved server origin's websocket variant to `connectDomains` on both `resources/list` and each `resources/read` content item. Production never emits that websocket origin.
 - **HMR means React Fast Refresh, not document reload.** A bare Vite setup has no HMR accept boundary in a view's module graph, so every `view.tsx` edit degrades to `full-reload` — which reloads the srcdoc iframe document and wipes all component state, bridge state, and pending tool results. Three pieces prevent that, all dev-only:
   - **`@vitejs/plugin-react` provides the refresh boundary.** It is a regular framework dependency and is injected exactly once by `mcp-use dev`.
   - **The virtual entry imports the refresh preamble.** Fast Refresh needs its runtime hooked into the window before any component module evaluates — the job plugin-react's `transformIndexHtml` does for Vite-served HTML, which the synthesized srcdoc document never passes through. When refresh is active, each virtual entry's **first** import is the plugin's own virtual preamble module (`@vitejs/plugin-react/preamble`), so the hook is installed before react-dom or any refresh-wrapped view module runs.
@@ -553,13 +566,18 @@ declare module "mcp-use/react" {
 
 ```ts
 // in /react
-export interface Register {}  // filled (or not) by the project's mcp-env.d.ts
+export interface Register {} // filled (or not) by the project's mcp-env.d.ts
 
-type RegisteredToolsModule = Register extends { tools: infer M } ? M : Record<never, never>;
+type RegisteredToolsModule = Register extends { tools: infer M }
+  ? M
+  : Record<never, never>;
 
 type ToolsFromModule<M> = {
-  [K in keyof M as M[K] extends ToolRef<infer N, any, any> ? N : never]:
-    M[K] extends ToolRef<any, infer I, infer O> ? { input: I; output: O } : never;
+  [K in keyof M as M[K] extends ToolRef<infer N, any, any>
+    ? N
+    : never]: M[K] extends ToolRef<any, infer I, infer O>
+    ? { input: I; output: O }
+    : never;
 };
 
 type RegisteredTools = ToolsFromModule<RegisteredToolsModule>;
@@ -631,7 +649,7 @@ The v2 `create-mcp-use-app` MCP Apps template is the reference for the root `mcp
 
 ## React runtime (`/react` subpath)
 
-`mcp-use/react` is browser-only code built on the ext-apps guest `App` (one instance per iframe document, connected once via `PostMessageTransport`); `react` and `react-dom` are optional peers; importing the subpath from server code is unsupported. The v1 hook *surface* is kept (renamed); the v1 transport guts (three-provider selection, `window.openai` branch, hand-rolled `McpAppsBridge`) are not.
+`mcp-use/react` is browser-only code built on the ext-apps guest `App` (one instance per iframe document, connected once via `PostMessageTransport`); `react` and `react-dom` are optional peers; importing the subpath from server code is unsupported. The v1 hook _surface_ is kept (renamed); the v1 transport guts (three-provider selection, `window.openai` branch, hand-rolled `McpAppsBridge`) are not.
 
 ### Runtime architecture
 
@@ -704,7 +722,7 @@ Components compose the split hooks they need — no aggregate; rerender isolatio
 
 Two distinct things can stream, and only one of them exists on the wire today:
 
-**1. Tool *arguments* stream — supported** (spec: `ui/notifications/tool-input-partial`). Hosts deliver progressively parsed arguments while the model is still generating the call — the pre-result window. Partials fire 0..n times strictly before the single complete `ui/notifications/tool-input`. The always-mounted component reads this through `useToolContext<Name>()` — both partial and complete args write the same `toolInput` field (last write wins):
+**1. Tool _arguments_ stream — supported** (spec: `ui/notifications/tool-input-partial`). Hosts deliver progressively parsed arguments while the model is still generating the call — the pre-result window. Partials fire 0..n times strictly before the single complete `ui/notifications/tool-input`. The always-mounted component reads this through `useToolContext<Name>()` — both partial and complete args write the same `toolInput` field (last write wins):
 
 ```tsx
 export default function ProductSearchResult() {
@@ -718,13 +736,15 @@ export default function ProductSearchResult() {
     return <SearchSkeleton query={view.toolInput?.query} />;
   }
 
-  return <ResultsGrid query={view.toolOutput.query} items={view.toolOutput.items} />;
+  return (
+    <ResultsGrid query={view.toolOutput.query} items={view.toolOutput.items} />
+  );
 }
 ```
 
 While pending, `toolInput` is `DeepPartial<Input>` because either notification may expose provisional JSON. Each partial or complete notification replaces the previous snapshot. The deliberate type-source split remains: `toolInput` types from the tool's `inputSchema`; `toolOutput` from its `outputSchema`.
 
-**"Streaming tool output" (the generative-UI recipe).** When the thing to render *is* what the model is writing (a drawing, generated UI code, long-form content — the Excalidraw MCP app pattern), put that payload in the tool's **input** schema and render it progressively via `toolInput` inside the single always-mounted component. The final `"ready"` state shows the same visual surface with complete, honestly-typed data from `toolOutput` — no echo-input-into-output workaround is needed for the pre-result window:
+**"Streaming tool output" (the generative-UI recipe).** When the thing to render _is_ what the model is writing (a drawing, generated UI code, long-form content — the Excalidraw MCP app pattern), put that payload in the tool's **input** schema and render it progressively via `toolInput` inside the single always-mounted component. The final `"ready"` state shows the same visual surface with complete, honestly-typed data from `toolOutput` — no echo-input-into-output workaround is needed for the pre-result window:
 
 ```ts
 // server — the model streams `elements` while writing the call
@@ -754,19 +774,19 @@ export default function Draw() {
 }
 ```
 
-Schema guidance that falls out: **declare streamable payloads as structured schema, not JSON-in-a-string.** Hosts heal the *outer* argument JSON, so a `z.array(...)` field arrives as a partial array of typed elements; a stringified payload arrives truncated mid-token and the view must re-heal it by hand (the shipped Excalidraw app pays exactly that cost). Because the component never unmounts across pending → ready, DOM and React state built during progressive input survive the transition.
+Schema guidance that falls out: **declare streamable payloads as structured schema, not JSON-in-a-string.** Hosts heal the _outer_ argument JSON, so a `z.array(...)` field arrives as a partial array of typed elements; a stringified payload arrives truncated mid-token and the view must re-heal it by hand (the shipped Excalidraw app pays exactly that cost). Because the component never unmounts across pending → ready, DOM and React state built during progressive input survive the transition.
 
-**2. Tool *results* do not stream — wire fact, honest alpha posture.** The protocol delivers one `ui/notifications/tool-result` per call. `useCallTool` owns its direct RPC response; the host may also forward that lifecycle result to the displayed View. Content-only ambient results are ignored, and the terminal initial-result latch prevents later structured results from becoming new `toolOutput`.
+**2. Tool _results_ do not stream — wire fact, honest alpha posture.** The protocol delivers one `ui/notifications/tool-result` per call. `useCallTool` owns its direct RPC response; the host may also forward that lifecycle result to the displayed View. Content-only ambient results are ignored, and the terminal initial-result latch prevents later structured results from becoming new `toolOutput`.
 
 ### View tools (`useViewTool`)
 
-The apps spec lets the *view* expose tools the **host/model** calls while the view is displayed (ext-apps `App.registerTool` → `RegisteredAppTool`, WebMCP-style; Linear MCP-2309). This is the third tool flavor — keep the taxonomy straight:
+The apps spec lets the _view_ expose tools the **host/model** calls while the view is displayed (ext-apps `App.registerTool` → `RegisteredAppTool`, WebMCP-style; Linear MCP-2309). This is the third tool flavor — keep the taxonomy straight:
 
-| Flavor | Registered by | Called by | Lifetime |
-| --- | --- | --- | --- |
-| server tool | `server.tool()` | model (via host) | server process |
+| Flavor                   | Registered by                           | Called by                   | Lifetime                                                            |
+| ------------------------ | --------------------------------------- | --------------------------- | ------------------------------------------------------------------- |
+| server tool              | `server.tool()`                         | model (via host)            | server process                                                      |
 | server tool, app-visible | `server.tool({ visibility: "app", … })` | the view, via `useCallTool` | server process; host hides from the model per `_meta.ui.visibility` |
-| **view tool** | `useViewTool` inside the component | host/model over the bridge | while the component is mounted |
+| **view tool**            | `useViewTool` inside the component      | host/model over the bridge  | while the component is mounted                                      |
 
 View tools are ephemeral, conversational UI affordances whose handlers close over live React state ("highlight-fruit", "pan-map"). The hook mirrors `server.tool(definition, callback)` — same config keys (`name`, `title`, `description`, `inputSchema`, `outputSchema`, `annotations`, plus `enabled`; `schema` aliases `inputSchema`), handler args inferred via Standard Schema, return typed by the same `ToolResult<Output>` conditional as server tools (raw `CallToolResult`):
 
@@ -774,7 +794,11 @@ View tools are ephemeral, conversational UI affordances whose handlers close ove
 const [selected, setSelected] = useState<string | null>(null);
 
 useViewTool(
-  { name: "highlight-fruit", description: "Highlight a visible result", inputSchema: z.object({ id: z.string() }) },
+  {
+    name: "highlight-fruit",
+    description: "Highlight a visible result",
+    inputSchema: z.object({ id: z.string() }),
+  },
   async ({ id }) => {
     setSelected(id);
     return { content: [{ type: "text", text: `Highlighted ${id}` }] };
@@ -789,11 +813,11 @@ Contract:
 - **Always-advertised App tools:** every view runtime eagerly creates its App, advertises `tools: { listChanged: true }`, and installs temporary handlers before `connect()` starts or React mounts: `onlisttools` returns `{ tools: [] }`; `oncalltool` throws `View tool "<name>" is not registered`. When `useViewTool` registers the first tool, the runtime synchronously clears the temporary handlers and calls `app.registerTool()` (the clear-and-register handoff is synchronous so the host never observes a handler gap; clearing first avoids ext-apps' "handler replaced" warning), after which ext-apps' registry-backed handlers own the surface and `notifications/tools/list_changed` is emitted once initialized. No `viewTools` opt-in flag exists. Before the first registration, `tools/list` is valid and empty. Because registration never awaits `connect()`, tools are present for initialization-time listing/calls and are not skipped when initialization fails.
 - **Not in `Register`:** view tools never appear on the server's `tools/list` and are never callable from views — typing them into `useCallTool` would advertise calls nobody can make. Their input/output types live and die inside the component.
 - **Progressive enhancement only:** no host capability promises app-tool support; hosts that support it list/call, others ignore. Registration is unconditional and cheap; views must not depend on view tools being invoked.
-- **Channel note:** a view tool's result (`content`/`structuredContent`) flows host→model — the third explicit view→model channel (alongside `updateModelContext` and `ui/message`), distinguished by being *model-initiated*.
+- **Channel note:** a view tool's result (`content`/`structuredContent`) flows host→model — the third explicit view→model channel (alongside `updateModelContext` and `ui/message`), distinguished by being _model-initiated_.
 
 ### `/react` API reference
 
-The complete alpha surface. Everything here is exported from `mcp-use/react`; types marked *vendored* alias the ext-apps `spec.types.ts` definitions (carried with attribution, per the dependency posture).
+The complete alpha surface. Everything here is exported from `mcp-use/react`; types marked _vendored_ alias the ext-apps `spec.types.ts` definitions (carried with attribution, per the dependency posture).
 
 **Types.**
 
@@ -867,22 +891,28 @@ type DeepPartial<T> = T extends (infer E)[]
 
 /** Successful non-error tool result. structuredContent is guaranteed and
  *  typed exactly when the tool declares an outputSchema (Result ≠ never). */
-type CallToolSuccess<Result> = CallToolResult &
-  { isError?: false } &
-  ([Result] extends [never] ? unknown : { structuredContent: Result });
+type CallToolSuccess<Result> = CallToolResult & { isError?: false } & ([
+    Result,
+  ] extends [never]
+    ? unknown
+    : { structuredContent: Result });
 ```
 
 **`useToolContext<Name>()`** — primary data hook. Returns the latched `pending | ready | error` `ToolContextHandle<Name>` (Component lifecycle & view data). Narrow on `status === "ready"` for typed `toolOutput`; `"error"` contains `ToolError`.
 
 ```ts
-function useToolContext<Name extends keyof RegisteredTools>(): ToolContextHandle<Name>;
+function useToolContext<
+  Name extends keyof RegisteredTools,
+>(): ToolContextHandle<Name>;
 ```
 
 **Helpers**
 
 ```ts
 /** Concatenated text content of a tool result, or undefined when it has none. */
-function toolResultText(result: Pick<CallToolResult, "content">): string | undefined;
+function toolResultText(
+  result: Pick<CallToolResult, "content">
+): string | undefined;
 ```
 
 Joins the `text` of every `content` block with `type === "text"` using `"\n"`, then trims. Returns `undefined` when there are no text blocks or the joined result is empty/whitespace — callers choose their fallback. A general data-reading utility for any `CallToolResult`; `ToolError.message` is derived the same way (with a non-empty fallback).
@@ -899,10 +929,10 @@ function useHostContext(): {
   safeArea: SafeAreaInsets;
   maxHeight: number | undefined;
   maxWidth: number | undefined;
-  hostInfo: HostInfo | undefined;         // getHostVersion()
+  hostInfo: HostInfo | undefined; // getHostVersion()
   hostCapabilities: HostCapabilities | undefined; // getHostCapabilities()
-  hostContext: HostContext | undefined;   // the raw object (vendored type)
-  isAvailable: boolean;                   // bridge connected
+  hostContext: HostContext | undefined; // the raw object (vendored type)
+  isAvailable: boolean; // bridge connected
 };
 
 function useViewTheme(): "light" | "dark"; // narrow theme-only subscription
@@ -1066,7 +1096,8 @@ export default function ProductSearchResult() {
 function SearchResultContent() {
   const view = useToolContext<"search-fruits">();
   const { theme } = useHostContext();
-  const { displayMode, availableDisplayModes, requestDisplayMode } = useDisplayMode();
+  const { displayMode, availableDisplayModes, requestDisplayMode } =
+    useDisplayMode();
   const sendFollowUpMessage = useSendFollowUp();
   const openExternal = useOpenExternal();
 
@@ -1079,7 +1110,11 @@ function SearchResultContent() {
 
   // view tool — the model can manipulate this UI while it is on screen
   useViewTool(
-    { name: "highlight-fruit", description: "Highlight a visible result", inputSchema: z.object({ id: z.string() }) },
+    {
+      name: "highlight-fruit",
+      description: "Highlight a visible result",
+      inputSchema: z.object({ id: z.string() }),
+    },
     async ({ id }) => {
       setSelected(id);
       return { content: [{ type: "text", text: `Highlighted ${id}` }] };
@@ -1115,23 +1150,20 @@ function SearchResultContent() {
       />
 
       {details.isPending && <Spinner />}
-      {details.error && (
-        <ErrorBanner message={details.error.message} />
-      )}
-      {details.data && (
-        <DetailsCard data={details.data.structuredContent} />
-      )}
+      {details.error && <ErrorBanner message={details.error.message} />}
+      {details.data && <DetailsCard data={details.data.structuredContent} />}
 
-      {availableDisplayModes.includes("fullscreen") && displayMode === "inline" && (
-        <button
-          type="button"
-          onClick={() => {
-            void requestDisplayMode({ mode: "fullscreen" });
-          }}
-        >
-          Expand
-        </button>
-      )}
+      {availableDisplayModes.includes("fullscreen") &&
+        displayMode === "inline" && (
+          <button
+            type="button"
+            onClick={() => {
+              void requestDisplayMode({ mode: "fullscreen" });
+            }}
+          >
+            Expand
+          </button>
+        )}
       <button
         type="button"
         onClick={() => {
@@ -1149,34 +1181,34 @@ Everything result-shaped enters through `useToolContext` (typed by the server's 
 
 ### Hook surface (v1 → v2 → backing primitive)
 
-| v1                                                                                                      | v2                                                                                        | Backed by                                                                    |
-| ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `useWidget()`                                                                                           | split hooks (no aggregate)                                                                | `App` events + `getHostContext()`                                            |
-| — `props` / `toolInput` / `output`                                                                      | `useToolContext()` primary (`status` discriminant incl. `error`; `output` folds into `toolOutput`; args stream into `toolInput`) | `ontoolinput` / `ontoolinputpartial` / `ontoolresult`                        |
-| — `metadata`                                                                                            | `meta` on `useToolContext` when `ready` or `error` — view-only result channel             | result `_meta` from `ontoolresult`                                           |
-| — `partialToolInput` / `isStreaming`                                                                    | pending `toolInput` on `useToolContext` (`DeepPartial`; last write wins)                  | `ontoolinputpartial` / `ontoolinput`                                         |
-| — `isPending`                                                                                           | `useToolContext().status === "pending"` (or pre-result / error branching)                 | input-received-but-no-result / pre-result state                              |
-| *(no v1 equivalent)*                                                                                    | `useToolContext().status === "error"` + `ToolError`                                       | first `ontoolresult` with `isError: true`                                    |
-| — `theme` / `locale` / … / `isAvailable`                                                                | `useHostContext()`; `useViewTheme()` for theme-only                                       | `hostContext` + `onhostcontextchanged`                                       |
-| — `callTool`                                                                                            | `useCallTool()` (typed; preferred)                                                        | `App.callServerTool`                                                         |
-| — `sendFollowUpMessage`                                                                                 | `useSendFollowUp()`                                                                       | `App.sendMessage` (`ui/message`)                                             |
-| — `openExternal`                                                                                        | `useOpenExternal()` → `Promise<void>`                                                     | `App.openLink`                                                               |
-| — `requestDisplayMode` / `displayMode`                                                                  | `useDisplayMode()` → `{ displayMode, availableDisplayModes, requestDisplayMode }`         | `App.requestDisplayMode` + `hostContext` + `viewConfig.displayModes`         |
-| `<McpUseProvider autoSize>` (v1)                                                                        | `viewConfig.autoResize` + `useSendSizeChanged()`                                          | `App` `autoResize` constructor option + `App.sendSizeChanged`                |
+| v1                                       | v2                                                                                                                               | Backed by                                                            |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `useWidget()`                            | split hooks (no aggregate)                                                                                                       | `App` events + `getHostContext()`                                    |
+| — `props` / `toolInput` / `output`       | `useToolContext()` primary (`status` discriminant incl. `error`; `output` folds into `toolOutput`; args stream into `toolInput`) | `ontoolinput` / `ontoolinputpartial` / `ontoolresult`                |
+| — `metadata`                             | `meta` on `useToolContext` when `ready` or `error` — view-only result channel                                                    | result `_meta` from `ontoolresult`                                   |
+| — `partialToolInput` / `isStreaming`     | pending `toolInput` on `useToolContext` (`DeepPartial`; last write wins)                                                         | `ontoolinputpartial` / `ontoolinput`                                 |
+| — `isPending`                            | `useToolContext().status === "pending"` (or pre-result / error branching)                                                        | input-received-but-no-result / pre-result state                      |
+| _(no v1 equivalent)_                     | `useToolContext().status === "error"` + `ToolError`                                                                              | first `ontoolresult` with `isError: true`                            |
+| — `theme` / `locale` / … / `isAvailable` | `useHostContext()`; `useViewTheme()` for theme-only                                                                              | `hostContext` + `onhostcontextchanged`                               |
+| — `callTool`                             | `useCallTool()` (typed; preferred)                                                                                               | `App.callServerTool`                                                 |
+| — `sendFollowUpMessage`                  | `useSendFollowUp()`                                                                                                              | `App.sendMessage` (`ui/message`)                                     |
+| — `openExternal`                         | `useOpenExternal()` → `Promise<void>`                                                                                            | `App.openLink`                                                       |
+| — `requestDisplayMode` / `displayMode`   | `useDisplayMode()` → `{ displayMode, availableDisplayModes, requestDisplayMode }`                                                | `App.requestDisplayMode` + `hostContext` + `viewConfig.displayModes` |
+| `<McpUseProvider autoSize>` (v1)         | `viewConfig.autoResize` + `useSendSizeChanged()`                                                                                 | `App` `autoResize` constructor option + `App.sendSizeChanged`        |
 
-| `useWidgetProps()`                                                                                      | `useToolContext()` — primary data API                                                       | bridge notifications → discriminated union                                   |
-| `useWidgetState()`                                                                                      | dropped — plain `useState` for local UI state; `ModelContext` for model visibility        | no host store in MCP Apps — see "Dropped from v1"                            |
-| `useWidgetTheme()`                                                                                      | `useViewTheme()`                                                                          | dedicated `hostcontextchanged` subscription                                  |
-| `useCallTool(name \| ref)`                                                                              | kept, typed via `Register`/`ToolRef`; success-only `CallToolSuccess` data (typed `structuredContent` iff `outputSchema`); tool/transport errors reject | `App.callServerTool`                                                         |
-| `useFiles()`                                                                                            | familiar `{ isSupported, upload, getDownloadUrl }` shape; no widget-state/model-visibility side effect | ChatGPT-only `window.openai` file extension                                  |
-| *(no v1 equivalent)*                                                                                    | `useViewTool()` — view-registered tools the host/model calls (see View tools)             | `App.registerTool` + temporary-handler handoff + `tools/list_changed`        |
-| `<McpUseProvider>` (v1)                                                                                 | removed — compose `ThemeProvider` / `ViewControls` / own boundaries; bootstrap owns connection + top-level error boundary | `viewConfig` for auto-resize / display modes                                 |
-| `<ThemeProvider>`                                                                                       | kept                                                                                      | ext-apps `applyDocumentTheme` / `applyHostStyleVariables` / `applyHostFonts` |
-| `<WidgetControls>`                                                                                      | `<ViewControls>`                                                                          | dev-only overlay, ported                                                     |
-| `<ModelContext>` / `modelContext`                                                                       | kept (text-only; `structuredContent` / non-text blocks deferred; runtime-owned store + async flush pump) | `App.updateModelContext` (`ui/update-model-context`)                         |
-| `<ErrorBoundary>`                                                                                       | kept (bootstrap provides the required top-level boundary)                                 | unchanged                                                                    |
-| `<Image>`                                                                                               | kept — resolves root-relative `src` via `__mcpUseViewConfig.publicBase` (Public assets)   | `<img>` with absolute URL                                                    |
-| `generateHelpers()`                                                                                     | dropped                                                                                   | subsumed by `Register` typing                                                |
+| `useWidgetProps()` | `useToolContext()` — primary data API | bridge notifications → discriminated union |
+| `useWidgetState()` | dropped — plain `useState` for local UI state; `ModelContext` for model visibility | no host store in MCP Apps — see "Dropped from v1" |
+| `useWidgetTheme()` | `useViewTheme()` | dedicated `hostcontextchanged` subscription |
+| `useCallTool(name \| ref)` | kept, typed via `Register`/`ToolRef`; success-only `CallToolSuccess` data (typed `structuredContent` iff `outputSchema`); tool/transport errors reject | `App.callServerTool` |
+| `useFiles()` | familiar `{ isSupported, upload, getDownloadUrl }` shape; no widget-state/model-visibility side effect | ChatGPT-only `window.openai` file extension |
+| _(no v1 equivalent)_ | `useViewTool()` — view-registered tools the host/model calls (see View tools) | `App.registerTool` + temporary-handler handoff + `tools/list_changed` |
+| `<McpUseProvider>` (v1) | removed — compose `ThemeProvider` / `ViewControls` / own boundaries; bootstrap owns connection + top-level error boundary | `viewConfig` for auto-resize / display modes |
+| `<ThemeProvider>` | kept | ext-apps `applyDocumentTheme` / `applyHostStyleVariables` / `applyHostFonts` |
+| `<WidgetControls>` | `<ViewControls>` | dev-only overlay, ported |
+| `<ModelContext>` / `modelContext` | kept (text-only; `structuredContent` / non-text blocks deferred; runtime-owned store + async flush pump) | `App.updateModelContext` (`ui/update-model-context`) |
+| `<ErrorBoundary>` | kept (bootstrap provides the required top-level boundary) | unchanged |
+| `<Image>` | kept — resolves root-relative `src` via `__mcpUseViewConfig.publicBase` (Public assets) | `<img>` with absolute URL |
+| `generateHelpers()` | dropped | subsumed by `Register` typing |
 
 ### Dropped from v1 (spec gaps)
 

@@ -15,7 +15,7 @@
 
 ## Non-goals (this contract)
 
-- React/views and the client-side Vite environment (view bundling) — **`VIEWS_SPEC.md`** owns that contract. It extends this one: the views client environment joins the *same* Vite dev server `dev` already runs, and view-file edits get real Vite HMR there. The server-entry contract below is untouched by it.
+- React/views and the client-side Vite environment (view bundling) — **`VIEWS_SPEC.md`** owns that contract. It extends this one: the views client environment joins the _same_ Vite dev server `dev` already runs, and view-file edits get real Vite HMR there. The server-entry contract below is untouched by it.
 - HMR **of the server entry** — permanently. Server-entry reload is **reload, not HMR** (see "Why the server entry reloads instead of HMR" below).
 - Typegen — never part of `dev`/`build`/`start`. If built at all, it is an explicit escape-hatch command (`VIEWS_SPEC.md` § Typegen, demoted), off the hot path by design.
 - Project scaffolding. `create-mcp-use-app` remains a separate zero-runtime-dependency package.
@@ -209,8 +209,8 @@ Vite is a **regular dependency** of `mcp-use`:
 // packages/server/package.json
 {
   "dependencies": {
-    "vite": "^8.0.0"
-  }
+    "vite": "^8.0.0",
+  },
 }
 ```
 
@@ -227,9 +227,9 @@ Target user `package.json` shape:
   "scripts": {
     "dev": "mcp-use dev",
     "build": "mcp-use build",
-    "start": "mcp-use start"
+    "start": "mcp-use start",
   },
-  "dependencies": { "mcp-use": "^2" }
+  "dependencies": { "mcp-use": "^2" },
 }
 ```
 
@@ -269,7 +269,7 @@ Writes `.mcp-use/build/manifest.json`:
   "buildId": "…",
   "entryPoint": "index.js",
   "createdAt": "…",
-  "inspector": false
+  "inspector": false,
 }
 ```
 
@@ -289,23 +289,23 @@ A single long-lived process. It:
 
 On file change (only files in the entry's module graph count): Vite invalidates, dev re-imports the entry through the runner, and swaps the handler reference. There is no registration diffing: the next request hits the new handler, which is correct by construction under the stateless model. Every handler generation shares one process-scoped SDK `ServerEventBus`; after a successful swap, dev publishes `tools/list_changed`, `prompts/list_changed`, and `resources/list_changed`. Modern clients with an open `subscriptions/listen` stream therefore refetch the authoritative lists from the new handler. Publishing all three is deliberate invalidation, not change detection — the protocol carries no delta, and avoiding schema/function comparison keeps server reload independent of registry internals. A failed reload keeps the old handler and publishes nothing. Stateless legacy clients receive no push but remain correct on their next manual list request.
 
-- **Port:** `--port`, else `PORT` env, else `3000`; if taken, probe upward.
+- **Port:** `--port`, else `PORT` env, else `3000`; if the preferred port cannot be bound on the listen host, or (on localhost-class binds) something already accepts connections on loopback, probe upward.
 - **Host:** `127.0.0.1` by default; `--host` to override (matching the server's own localhost-first posture, SPEC.md delta 5). Printed and auto-opened URLs use the browsable equivalent: `localhost` for loopback/wildcard binds, the given host verbatim otherwise; wildcard binds additionally print a `Network:` line with the machine's LAN address.
-- **DNS-rebinding protection:** `getHandler()` deliberately applies no Host/Origin validation (its contract assumes a platform edge in front) — in dev, this process is the edge. On localhost-class binds the listener validates `Host` against the localhost allowlist plus the active tunnel hostname (tunnel traffic arrives with the tunnel's public Host), rejecting with the SDK's JSON-RPC 403 shape *before* any routing, so the MCP endpoint, the dev API routes, and Vite-served module URLs are all covered. Origin is not validated unless the server's `allowedOrigins` is set (SDK-aligned default). Rebinding manifests as a non-localhost `Host`; sandboxed view iframes have an opaque origin, so their module/asset GETs legitimately carry `Origin: null`. Those loads also run in CORS mode, so they need `Access-Control-Allow-Origin`: the MCP server's view asset and public routes (mounted in both dev and production) always emit `*`. Vite-served module URLs (checked per request, so runtime tunnel start/stop takes effect immediately): while a tunnel is active, emit `*` so foreign and opaque-origin hosts can fetch the module graph; without a tunnel on a localhost bind, reflect a validated loopback `Origin` (exact request origin — `localhost` / `127.0.0.1` / `[::1]`, any port/scheme accepted by `validateOriginHeader` against `localhostAllowedOrigins()`) and merge `Vary: Origin`, so a local MCP host (e.g. inspector at `http://localhost:6274`) can load modules while foreign origins, `Origin: null`, and missing Origin get no ACAO and the source module graph stays unreadable to arbitrary websites. Vite's own CORS middleware is disabled (`cors: false`) so its localhost-only default neither blocks tunnel-rendering hosts nor fights the gated header. Non-localhost binds get no validation (the legitimate hostnames are unknowable) and print a warning instead.
+- **DNS-rebinding protection:** `getHandler()` deliberately applies no Host/Origin validation (its contract assumes a platform edge in front) — in dev, this process is the edge. On localhost-class binds the listener validates `Host` against the localhost allowlist plus the active tunnel hostname (tunnel traffic arrives with the tunnel's public Host), rejecting with the SDK's JSON-RPC 403 shape _before_ any routing, so the MCP endpoint, the dev API routes, and Vite-served module URLs are all covered. Origin is not validated unless the server's `allowedOrigins` is set (SDK-aligned default). Rebinding manifests as a non-localhost `Host`; sandboxed view iframes have an opaque origin, so their module/asset GETs legitimately carry `Origin: null`. Those loads also run in CORS mode, so they need `Access-Control-Allow-Origin`: the MCP server's view asset and public routes (mounted in both dev and production) always emit `*`. Vite-served module URLs (checked per request, so runtime tunnel start/stop takes effect immediately): while a tunnel is active, emit `*` so foreign and opaque-origin hosts can fetch the module graph; without a tunnel on a localhost bind, reflect a validated loopback `Origin` (exact request origin — `localhost` / `127.0.0.1` / `[::1]`, any port/scheme accepted by `validateOriginHeader` against `localhostAllowedOrigins()`) and merge `Vary: Origin`, so a local MCP host (e.g. inspector at `http://localhost:6274`) can load modules while foreign origins, `Origin: null`, and missing Origin get no ACAO and the source module graph stays unreadable to arbitrary websites. Vite's own CORS middleware is disabled (`cors: false`) so its localhost-only default neither blocks tunnel-rendering hosts nor fights the gated header. Non-localhost binds get no validation (the legitimate hostnames are unknowable) and print a warning instead.
 - **Tunnel:** `--tunnel` starts a public tunnel as soon as the HTTP listener is bound (via `npx @mcp-use/tunnel`). The inspector UI can also start/stop the tunnel at runtime through dev-only API routes (below) without restarting the dev process.
 - **Auto-open:** once the listener is bound, the inspector URL is opened in the default browser (dependency-free `open`/`start`/`xdg-open` spawn, best-effort). `--no-open` disables it, and it is skipped automatically when stdout is not a TTY, so agents/CI never trigger a browser launch or see a "failed to open" error.
 - **Env:** `.env` loaded via Node's native `process.loadEnvFile()` (guarded by an `existsSync` check, since `loadEnvFile` throws on a missing file) before the entry is imported.
-- **Errors:** a throwing entry module keeps the *previous* handler alive and prints the error — the dev process never crashes on a bad save.
+- **Errors:** a throwing entry module keeps the _previous_ handler alive and prints the error — the dev process never crashes on a bad save.
 
 #### Dev-only inspector API routes (tunnel)
 
 Intercepted by the dev HTTP listener before the MCP handler (exact path match on the introspected `basePath`, default `/mcp`):
 
-| Method | Path | Response |
-|--------|------|----------|
-| `GET` | `{basePath}/inspector/api/dev/info` | `{ mcpUrl, port, fromCli: true, tunnelUrl }` — `mcpUrl` is `{tunnelUrl}{basePath}` when a tunnel is active, else `null`; `tunnelUrl` is the public origin or `null`. |
-| `POST` | `{basePath}/inspector/api/dev/start-tunnel` | `{ ok: true, restarting: false }` on success; `{ error }` with status 500 on failure. |
-| `POST` | `{basePath}/inspector/api/dev/stop-tunnel` | `{ ok: true }`. |
+| Method | Path                                        | Response                                                                                                                                                             |
+| ------ | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`  | `{basePath}/inspector/api/dev/info`         | `{ mcpUrl, port, fromCli: true, tunnelUrl }` — `mcpUrl` is `{tunnelUrl}{basePath}` when a tunnel is active, else `null`; `tunnelUrl` is the public origin or `null`. |
+| `POST` | `{basePath}/inspector/api/dev/start-tunnel` | `{ ok: true, restarting: false }` on success; `{ error }` with status 500 on failure.                                                                                |
+| `POST` | `{basePath}/inspector/api/dev/stop-tunnel`  | `{ ok: true }`.                                                                                                                                                      |
 
 Tunnel subdomain persistence lives at `.mcp-use/state/tunnel.json` (v1-compatible `{ subdomain }` shape). The tunnel release API base URL defaults to `https://local.mcp-use.run` and is overridable via `MCP_USE_TUNNEL_API`.
 
@@ -322,6 +322,7 @@ Evaluates no Vite, toolchain, or unrelated command chunk. A production image ins
 The inspector UI is **not an npm dependency of `mcp-use`**. The framework owns a tiny dependency-free HTML shell route — the exact analog of FastAPI's `get_swagger_ui_html` for `/docs`:
 
 - `GET ${basePath}/inspector` returns a small HTML page whose `<script type="module">` and stylesheet load the framework-compatible inspector bundle from the configured CDN base, pinned to an exact asset version.
+- The shell paints a centered boot spinner inside `#root` before the CDN bundle mounts, so the page is not blank while the first chunk downloads.
 - Config (autoConnect URL = the MCP endpoint at `basePath`, plus `basePath` itself) is passed via a serialized `window` global read by the bundle.
 
 `ServerConfig` gains:
@@ -347,23 +348,23 @@ v1's registration-HMR stack — chokidar + tsx loaders + `syncRegistrationsFrom`
 - **The staleness problem is gone.** Every request builds a fresh server from current code (fresh-server-per-request, SPEC.md ground rules), so the next `tools/list` is always current. There is no long-lived server instance whose registrations could drift from disk.
 - **There is no server state to hot-preserve.** Dev reload (the handler swap above) is reload, not HMR: no state survives a swap because no state exists.
 
-Two adjacent things are *not* covered by this rationale and have their own posture:
+Two adjacent things are _not_ covered by this rationale and have their own posture:
 
-- **View HMR is real HMR and arrives with views** (`VIEWS_SPEC.md` § Dev): view code is pure browser code served by a client environment on this same Vite dev server, so Vite's own HMR channel applies to it. The reload-not-HMR rule is about the *server* module graph only.
+- **View HMR is real HMR and arrives with views** (`VIEWS_SPEC.md` § Dev): view code is pure browser code served by a client environment on this same Vite dev server, so Vite's own HMR channel applies to it. The reload-not-HMR rule is about the _server_ module graph only.
 - **`list_changed` is an invalidation after the swap, not registry HMR.** One SDK event bus is shared by every stateless handler generation, preserving open modern subscriptions across reloads. The three list-change events make long-lived clients such as the inspector refetch from the new handler; they never mutate or synchronize the old server instance.
 
 ## Verification and budgets
 
 Budgets are measured on Linux x64 in the CI-pinned Node 22.23 container image; the baseline records the exact image digest, Node version, and npm version. The test packs the candidate, installs that tarball with `npm install --omit=dev` in an empty project, and sums logical file bytes without filesystem block rounding.
 
-| Dimension | Hard ceiling |
-| --- | ---: |
-| packed `.tgz` bytes | 2 MiB |
-| package `unpackedSize` from `npm pack --json` | 5 MiB |
-| clean-install `node_modules` bytes (including Vite/platform optional deps) | 100 MiB |
-| edge-safe `dist/index.js` bytes | 73 KiB |
-| tool-only `.mcp-use/build/` fixture | 1 MiB |
-| committed basic-view fixture output (external JS + CSS before compression) | 2.5 MiB |
+| Dimension                                                                  | Hard ceiling |
+| -------------------------------------------------------------------------- | -----------: |
+| packed `.tgz` bytes                                                        |        2 MiB |
+| package `unpackedSize` from `npm pack --json`                              |        5 MiB |
+| clean-install `node_modules` bytes (including Vite/platform optional deps) |      100 MiB |
+| edge-safe `dist/index.js` bytes                                            |       73 KiB |
+| tool-only `.mcp-use/build/` fixture                                        |        1 MiB |
+| committed basic-view fixture output (external JS + CSS before compression) |      2.5 MiB |
 
 Installed bytes are an on-disk distribution concern; they do not count modules evaluated at runtime. Evaluation has separate tests:
 

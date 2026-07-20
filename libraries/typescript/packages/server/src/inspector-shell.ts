@@ -109,9 +109,10 @@ function serializeForInlineScript(value: string): string {
  * Render the inspector shell page.
  *
  * A minimal shell document whose background matches the inspector UI
- * with a `#root` mount node, an inline script publishing
- * `window.__MCP_USE_INSPECTOR__ = { autoConnectUrl, basePath }` — where
- * `autoConnectUrl` is computed client-side as
+ * with a `#root` mount node pre-filled by a centered boot spinner so the
+ * page is not blank while the CDN bundle downloads, an inline script
+ * publishing `window.__MCP_USE_INSPECTOR__ = { autoConnectUrl, basePath }`
+ * — where `autoConnectUrl` is computed client-side as
  * `window.location.origin + basePath` — a stylesheet link for the bundle's
  * companion CSS (see {@link inspectorStylesUrl}), and a module script
  * loading the inspector bundle. All server-provided values are HTML-escaped
@@ -151,10 +152,65 @@ export function renderInspectorShell(options: InspectorShellOptions): string {
     <style>
       :root { color-scheme: light dark; }
       html, body { height: 100%; margin: 0; background-color: #f3f3f3; }
+      #root { height: 100%; }
+      .mcp-boot {
+        display: flex;
+        height: 100%;
+        align-items: center;
+        justify-content: center;
+        background-color: #f3f3f3;
+      }
+      .mcp-boot-inner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+      }
+      .mcp-boot-spinner {
+        width: 32px;
+        height: 32px;
+        color: #52525b;
+        animation: mcp-boot-spin 1s linear infinite;
+      }
+      .mcp-boot-label {
+        margin: 0;
+        font-family: Ubuntu, sans-serif;
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+        color: #52525b;
+      }
+      @keyframes mcp-boot-spin {
+        to { transform: rotate(360deg); }
+      }
+      @media (prefers-color-scheme: dark) {
+        html, body { background-color: #000; }
+        .mcp-boot { background-color: #000; }
+        .mcp-boot-spinner, .mcp-boot-label { color: #a1a1aa; }
+      }
     </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="mcp-boot">
+        <div class="mcp-boot-inner">
+          <svg
+            class="mcp-boot-spinner"
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            role="status"
+            aria-label="Loading"
+          >
+            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+          </svg>
+          <p class="mcp-boot-label">Connecting to MCP server...</p>
+        </div>
+      </div>
+    </div>
     <script>
       (function () {
         var basePath = ${serializedBasePath};
@@ -166,6 +222,7 @@ export function renderInspectorShell(options: InspectorShellOptions): string {
         };
         // Read by the current inspector bundle to derive its own URLs.
         window.__MCP_BASE_PATH__ = basePath;
+        ${process.env.MCP_USE_DEV_CLI === "1" ? "window.__MCP_DEV_CLI__ = true;" : ""}
         ${serializedManufactChatUrl ? `window.__MANUFACT_CHAT_URL__ = ${serializedManufactChatUrl};` : ""}
         // The bundle carries Node-flavored dependencies that touch \`process\`
         // at module scope; give them the same browser polyfill the v1
