@@ -21,6 +21,7 @@ import {
 import { Badge } from "@/client/components/ui/badge";
 import { ElicitationFormFields } from "./shared/ElicitationFormFields";
 import { useElicitationForm } from "./shared/useElicitationForm";
+import { createElement } from "react";
 
 interface ElicitationRequestDisplayProps {
   request: PendingElicitationRequest | null;
@@ -81,50 +82,48 @@ export function ElicitationRequestDisplay({
     }
     onClose();
 
-    import("react").then((React) => {
-      const toastId = toast(
-        React.createElement(
+    const toastId = toast(
+      createElement(
+        "div",
+        { className: "space-y-3" },
+        createElement(
           "div",
-          { className: "space-y-3" },
-          React.createElement(
-            "div",
-            null,
-            React.createElement("strong", null, "Elicitation Response Sent"),
-            React.createElement(
-              "p",
-              { className: "text-sm text-muted-foreground mt-1" },
-              "The tool will continue executing."
-            )
-          ),
-          React.createElement(
-            "div",
-            { className: "flex gap-2" },
-            React.createElement(
-              "button",
-              {
-                "data-testid": "elicitation-view-tool-result",
-                className:
-                  "px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90",
-                onClick: () => {
-                  const event = new globalThis.CustomEvent(
-                    "navigate-to-tool-result",
-                    {
-                      detail: { toolName: null },
-                    }
-                  );
-                  window.dispatchEvent(event);
-                  toast.dismiss(toastId);
-                },
-              },
-              "View Tool Result"
-            )
+          null,
+          createElement("strong", null, "Elicitation Response Sent"),
+          createElement(
+            "p",
+            { className: "text-sm text-muted-foreground mt-1" },
+            "The tool will continue executing."
           )
         ),
-        {
-          duration: 5000,
-        }
-      );
-    });
+        createElement(
+          "div",
+          { className: "flex gap-2" },
+          createElement(
+            "button",
+            {
+              "data-testid": "elicitation-view-tool-result",
+              className:
+                "px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90",
+              onClick: () => {
+                const event = new globalThis.CustomEvent(
+                  "navigate-to-tool-result",
+                  {
+                    detail: { toolName: null },
+                  }
+                );
+                window.dispatchEvent(event);
+                toast.dismiss(toastId);
+              },
+            },
+            "View Tool Result"
+          )
+        )
+      ),
+      {
+        duration: 5000,
+      }
+    );
   };
 
   const handleDecline = () => {

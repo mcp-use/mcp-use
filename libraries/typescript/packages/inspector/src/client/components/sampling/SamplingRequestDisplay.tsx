@@ -29,7 +29,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { createElement, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { LLMConfig } from "../chat/types";
 import { useSamplingLLM } from "./useSamplingLLM";
@@ -222,52 +222,50 @@ export function SamplingRequestDisplay({
 
     // Show success toast with navigation back to tools tab
     // Use the same button styling as the approve/deny toast
-    import("react").then((React) => {
-      const toastId = toast(
-        React.createElement(
+    const toastId = toast(
+      createElement(
+        "div",
+        { className: "space-y-3" },
+        createElement(
           "div",
-          { className: "space-y-3" },
-          React.createElement(
-            "div",
-            null,
-            React.createElement("strong", null, "Sampling Response Sent"),
-            React.createElement(
-              "p",
-              { className: "text-sm text-muted-foreground mt-1" },
-              "The tool will continue executing."
-            )
-          ),
-          React.createElement(
-            "div",
-            { className: "flex gap-2" },
-            React.createElement(
-              "button",
-              {
-                "data-testid": "sampling-view-tool-result",
-                className:
-                  "px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90",
-                onClick: () => {
-                  // Dispatch event to navigate to tools tab
-                  const event = new globalThis.CustomEvent(
-                    "navigate-to-tool-result",
-                    {
-                      detail: { toolName: request.toolName },
-                    }
-                  );
-                  window.dispatchEvent(event);
-                  // Dismiss the toast immediately
-                  toast.dismiss(toastId);
-                },
-              },
-              "View Tool Result"
-            )
+          null,
+          createElement("strong", null, "Sampling Response Sent"),
+          createElement(
+            "p",
+            { className: "text-sm text-muted-foreground mt-1" },
+            "The tool will continue executing."
           )
         ),
-        {
-          duration: 5000, // Auto-dismiss after 5 seconds
-        }
-      );
-    });
+        createElement(
+          "div",
+          { className: "flex gap-2" },
+          createElement(
+            "button",
+            {
+              "data-testid": "sampling-view-tool-result",
+              className:
+                "px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90",
+              onClick: () => {
+                // Dispatch event to navigate to tools tab
+                const event = new globalThis.CustomEvent(
+                  "navigate-to-tool-result",
+                  {
+                    detail: { toolName: request.toolName },
+                  }
+                );
+                window.dispatchEvent(event);
+                // Dismiss the toast immediately
+                toast.dismiss(toastId);
+              },
+            },
+            "View Tool Result"
+          )
+        )
+      ),
+      {
+        duration: 5000, // Auto-dismiss after 5 seconds
+      }
+    );
   };
 
   const handleReject = () => {

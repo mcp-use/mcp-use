@@ -13,7 +13,7 @@ const inspectorPackageJson = JSON.parse(
 /**
  * CDN bundle build config.
  *
- * Produces dist/cdn/inspector.js plus lazy tab chunks.
+ * Produces a single dist/cdn/inspector.js application bundle.
  * Shipped in the npm package and consumed three ways:
  * - Standalone (npx / pnpm start): served locally at /dist/cdn/*
  * - Embedded (mountInspector / mcp-use server): jsDelivr npm mirror by default
