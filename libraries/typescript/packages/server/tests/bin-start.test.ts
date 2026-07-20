@@ -97,6 +97,20 @@ describe("parseArgs", () => {
     expect(args.host).toBe("::1");
   });
 
+  it("parses standalone project and source layout options", () => {
+    const args = parseArgs([
+      "dev",
+      "--path",
+      "apps/web",
+      "--mcp-dir=src/mcp",
+      "--views-dir",
+      "../mcp/views",
+    ]);
+    expect(args.path).toBe("apps/web");
+    expect(args.mcpDir).toBe("src/mcp");
+    expect(args.viewsDir).toBe("../mcp/views");
+  });
+
   it("parses --tunnel", () => {
     expect(parseArgs(["dev", "--tunnel"]).tunnel).toBe(true);
     expect(parseArgs(["dev"]).tunnel).toBe(false);

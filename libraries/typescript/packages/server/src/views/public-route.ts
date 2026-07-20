@@ -76,16 +76,13 @@ export async function servePublicFile(
   diskPath: string,
   options: { deferCors?: boolean; head?: boolean } = {}
 ): Promise<Response> {
-  const { createReadStream } = await import("node:fs");
+  const { readFile } = await import("node:fs/promises");
   const { extname } = await import("node:path");
-  const { Readable } = await import("node:stream");
 
   const ext = extname(diskPath).toLowerCase();
   const contentType = PUBLIC_CONTENT_TYPES[ext] ?? "application/octet-stream";
   const body =
-    options.head === true
-      ? null
-      : (Readable.toWeb(createReadStream(diskPath)) as ReadableStream);
+    options.head === true ? null : new Uint8Array(await readFile(diskPath));
   return new Response(body, {
     status: 200,
     headers: {

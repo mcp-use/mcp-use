@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   composeMiddleware,
   createMcpMiddlewareEntry,
+  freezeMiddlewareContext,
   matchesPattern,
   normalizeMcpMiddlewarePattern,
   parseMcpPattern,
@@ -117,6 +118,20 @@ describe("composeMiddleware", () => {
 });
 
 describe("runMcpOperation", () => {
+  it("preserves the HTTP request in the read-only observer context", () => {
+    const request = new Request("https://example.test/mcp", {
+      headers: { "x-request-id": "request-1" },
+    });
+    const frozen = freezeMiddlewareContext({
+      ...ctx("tools/list"),
+      request,
+    });
+
+    expect(frozen.request).toBe(request);
+    expect(frozen.request?.headers.get("x-request-id")).toBe("request-1");
+    expect(Object.isFrozen(frozen)).toBe(true);
+  });
+
   it("invokes before and complete event listeners", async () => {
     const log: string[] = [];
     const events: McpEventListenerEntry[] = [

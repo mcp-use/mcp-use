@@ -15,12 +15,18 @@
 import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { cp, mkdir, rm, writeFile } from "node:fs/promises";
-import { join, relative } from "node:path";
+import { join, relative, resolve } from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { build } from "vite";
 
 import { discoverEntry } from "./entry.js";
+import {
+  loadProjectEnv,
+  nextStandaloneAliases,
+  nextStandaloneCompatPlugin,
+  nextStandaloneSsrOptions,
+} from "./next-compat.js";
 import { mcpUseViewsPlugin } from "./views-plugin.js";
 import { ensureMcpEnvDeclaration } from "./mcp-env-declaration.js";
 import {
@@ -69,6 +75,10 @@ export interface BuildOptions {
    * `index.ts`, `server.ts` — first hit wins.
    */
   entry?: string;
+  /** Directory containing the conventional entry and, by default, views/. */
+  mcpDir?: string;
+  /** Explicit views directory, absolute or relative to `cwd`. */
+  viewsDir?: string;
   /**
    * When true (`mcp-use build --with-inspector`), record `inspector: true`
    * in the build manifest.
@@ -168,7 +178,10 @@ async function buildExternalView(
     publicDir: false,
     logLevel: "warn",
     cacheDir: options.cacheDir,
-    resolve: { alias: { tailwindcss: resolveTailwindCss() } },
+    resolve: {
+      tsconfigPaths: true,
+      alias: { tailwindcss: resolveTailwindCss() },
+    },
     plugins: [
       tailwindcss(),
       react(),
@@ -264,12 +277,23 @@ async function buildExternalView(
  */
 export async function runBuild(options: BuildOptions): Promise<void> {
   const startedAt = performance.now();
-  const entry = discoverEntry(options.cwd, options.entry);
+  loadProjectEnv(options.cwd, "production");
+  const sourceRoot =
+    options.mcpDir === undefined
+      ? options.cwd
+      : resolve(options.cwd, options.mcpDir);
+  const entry =
+    options.entry === undefined
+      ? discoverEntry(sourceRoot)
+      : discoverEntry(options.cwd, options.entry);
   if (await ensureMcpEnvDeclaration(options.cwd, entry)) {
     console.log("[mcp-use] created mcp-env.d.ts");
   }
   const paths = resolveWorkspacePaths(options.cwd);
-  const views = discoverViews(options.cwd);
+  const viewsDirectory =
+    options.viewsDir ??
+    (options.mcpDir === undefined ? undefined : join(options.mcpDir, "views"));
+  const views = discoverViews(options.cwd, viewsDirectory);
   const userViteConfig = resolveUserViteConfig(options.cwd);
   const inspector = options.withInspector === true;
 
@@ -281,6 +305,11 @@ export async function runBuild(options: BuildOptions): Promise<void> {
       publicDir: false,
       logLevel: "warn",
       cacheDir: paths.cache,
+      resolve: {
+        tsconfigPaths: true,
+        alias: nextStandaloneAliases(options.cwd),
+      },
+      plugins: [nextStandaloneCompatPlugin(options.cwd)],
       build: {
         ssr: entry,
         outDir: paths.build,
@@ -296,7 +325,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
         },
       },
       ssr: {
-        external: true,
+        ...nextStandaloneSsrOptions(options.cwd),
         target: "node",
       },
     });
@@ -311,6 +340,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
       entryPoint: BUILD_ENTRY_NAME,
       createdAt: new Date().toISOString(),
       inspector,
+      views: {},
     };
     await mkdir(paths.build, { recursive: true });
     await writeFile(
@@ -404,6 +434,11 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     publicDir: false,
     logLevel: "warn",
     cacheDir: paths.cache,
+    resolve: {
+      tsconfigPaths: true,
+      alias: nextStandaloneAliases(options.cwd),
+    },
+    plugins: [nextStandaloneCompatPlugin(options.cwd)],
     build: {
       ssr: wrapperEntry,
       outDir: paths.build,
@@ -419,7 +454,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
       },
     },
     ssr: {
-      external: true,
+      ...nextStandaloneSsrOptions(options.cwd),
       target: "node",
     },
   });
@@ -429,6 +464,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     entryPoint: BUILD_ENTRY_NAME,
     createdAt: new Date().toISOString(),
     inspector,
+    views: viewsManifest,
   };
   await mkdir(paths.build, { recursive: true });
   await writeFile(

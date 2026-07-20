@@ -64,6 +64,11 @@
     "./node": {
       "types": "./dist/node-bridge.d.ts",
       "import": "./dist/node-bridge.js"
+    },
+    "./next": {
+      "types": "./dist/next/index.d.ts",
+      "import": "./dist/next/index.js",
+      "default": "./dist/next/index.js"
     }
   },
   "module": "./dist/index.js",

@@ -1,0 +1,17 @@
+{
+  "name": "mcp-use-example-basic",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Example: a minimal MCP server with a tool, resource, and prompt.",
+  "engines": { "node": ">=22.22.2" },
+  "scripts": {
+    "dev": "mcp-use dev",
+    "build": "mcp-use build",
+    "start": "mcp-use start",
+    "typecheck": "tsc --noEmit",
+    "verify": "node ../verify-examples.mjs --example=basic"
+  },
+  "dependencies": { "mcp-use": "workspace:*", "zod": "^4.4.3" },
+  "devDependencies": { "@types/node": "^22.20.0", "typescript": "^7.0.2", "vite": "^8.0.16" }
+}

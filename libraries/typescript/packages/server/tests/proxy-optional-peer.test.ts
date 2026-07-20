@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import packageJson from "../package.json";
-import { proxyClientInstallError } from "../src/proxy.js";
+import { proxyClientInstallError } from "../src/mcp-proxy.js";
 
 describe("server.proxy optional peer", () => {
   it("declares @mcp-use/client as an optional peer", () => {

@@ -153,6 +153,9 @@ function ViewRendererBase({
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const bridgeRef = useRef<AppBridge | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const pendingBlobRevocationsRef = useRef(
+    new Map<string, ReturnType<typeof setTimeout>>()
+  );
   const connectionRef = useRef(
     source.kind === "live" ? source.connection : null
   );
@@ -329,13 +332,24 @@ function ViewRendererBase({
     };
   }, [source.kind, liveResourceUri, preloadedHtml, cspMode, resolveSandboxUrl]);
 
-  // Revoke blob sandbox URLs on unmount
+  // Delay revocation so React StrictMode's development-only effect cleanup can
+  // be cancelled by the matching setup before the iframe navigation commits.
   useEffect(() => {
     const url = activeSandboxUrl;
+    if (!url || url.protocol !== "blob:") return;
+
+    const pending = pendingBlobRevocationsRef.current.get(url.href);
+    if (pending) {
+      clearTimeout(pending);
+      pendingBlobRevocationsRef.current.delete(url.href);
+    }
+
     return () => {
-      if (url?.protocol === "blob:") {
+      const timer = setTimeout(() => {
         URL.revokeObjectURL(url.href);
-      }
+        pendingBlobRevocationsRef.current.delete(url.href);
+      }, 1_000);
+      pendingBlobRevocationsRef.current.set(url.href, timer);
     };
   }, [activeSandboxUrl]);
 
@@ -415,7 +429,14 @@ function ViewRendererBase({
         }
 
         const readyPromise = waitForSandboxProxyReady(iframe);
-        iframe.src = activeSandboxUrl.href;
+        if (activeSandboxUrl.protocol === "blob:") {
+          const response = await fetch(activeSandboxUrl.href);
+          const sandboxHtml = await response.text();
+          if (disposed) return;
+          iframe.srcdoc = sandboxHtml;
+        } else {
+          iframe.src = activeSandboxUrl.href;
+        }
         await readyPromise;
         if (disposed) return;
 

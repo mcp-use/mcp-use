@@ -55,6 +55,19 @@ describe("discoverViews", () => {
 
     expect(discoverViews(cwd)).toEqual([]);
   });
+
+  it("discovers an explicit views directory relative to the project root", () => {
+    const cwd = tempProject();
+    mkdirSync(join(cwd, "src", "mcp", "views", "card"), {
+      recursive: true,
+    });
+    const entryPath = join(cwd, "src", "mcp", "views", "card", "view.tsx");
+    writeFileSync(entryPath, "export default () => null;");
+
+    expect(discoverViews(cwd, "src/mcp/views")).toEqual([
+      { name: "card", entryPath },
+    ]);
+  });
 });
 
 describe("isViewPath", () => {
@@ -66,6 +79,19 @@ describe("isViewPath", () => {
     );
     expect(isViewPath("/project/resources/demo/view.tsx", cwd)).toBe(false);
   });
+
+  it("matches paths under a custom views directory", () => {
+    expect(
+      isViewPath(
+        "/project/src/mcp/views/demo/view.tsx",
+        "/project",
+        "src/mcp/views"
+      )
+    ).toBe(true);
+    expect(
+      isViewPath("/project/views/demo/view.tsx", "/project", "src/mcp/views")
+    ).toBe(false);
+  });
 });
 
 describe("isViewEntryPath", () => {
@@ -76,5 +102,15 @@ describe("isViewEntryPath", () => {
     expect(isViewEntryPath("/project/resources/demo/view.tsx", cwd)).toBe(
       false
     );
+  });
+
+  it("matches entries under a custom views directory", () => {
+    expect(
+      isViewEntryPath(
+        "/project/src/mcp/views/demo/view.tsx",
+        "/project",
+        "src/mcp/views"
+      )
+    ).toBe(true);
   });
 });

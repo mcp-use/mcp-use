@@ -10,7 +10,8 @@
   "scripts": {
     "build": "mcp-use build",
     "dev": "mcp-use dev",
-    "start": "mcp-use start"
+    "start": "mcp-use start",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "mcp-use": "workspace:*",

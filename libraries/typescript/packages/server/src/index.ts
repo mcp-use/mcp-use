@@ -183,4 +183,4 @@ export type {
   ProxyResource,
   ProxyServerConfig,
   ProxyTool,
-} from "./proxy.js";
+} from "./mcp-proxy.js";
