@@ -8,6 +8,7 @@ import {
 } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { logger } from "../logging.js";
 import { SseConnectionManager } from "../task_managers/sse.js";
+import { assertValidConnectionUrl } from "../utils/url-sanitize.js";
 import type { ConnectorInitOptions } from "./base.js";
 import { BaseConnector } from "./base.js";
 
@@ -69,6 +70,7 @@ export class HttpConnector extends BaseConnector {
 
     // Store original URL before any gateway transformation
     const originalUrl = baseUrl.replace(/\/$/, "");
+    assertValidConnectionUrl(originalUrl);
 
     // Gateway support: When using gateway, use gateway URL as the primary baseUrl
     // and store original URL in headers for proxy routing
@@ -76,6 +78,7 @@ export class HttpConnector extends BaseConnector {
     this.serverId = opts.serverId;
 
     if (this.gatewayUrl) {
+      assertValidConnectionUrl(this.gatewayUrl);
       // When using gateway, the transport should connect to gateway URL
       // and forward requests to original URL via X-Target-URL header
       this.baseUrl = this.gatewayUrl.replace(/\/$/, "");

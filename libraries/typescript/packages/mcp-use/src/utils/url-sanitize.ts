@@ -8,6 +8,36 @@
  */
 
 /**
+ * Validates a URL used to open an MCP connection.
+ *
+ * The URL must be well formed and use the `http:` or `https:` scheme; anything
+ * else (`file:`, `gopher:`, `data:`, ...) is rejected before a request is ever
+ * made. Unlike {@link sanitizeUrl}, the URL is only validated, never rewritten,
+ * because connection endpoints must be forwarded to the transport unchanged.
+ *
+ * Private and loopback hosts are intentionally allowed: connecting to a local
+ * or LAN MCP server (`http://localhost`, `http://127.0.0.1`, ...) is a primary,
+ * legitimate use case.
+ *
+ * @param raw - The connection URL to validate
+ * @throws Error if the URL is malformed or uses an unsupported protocol
+ */
+export function assertValidConnectionUrl(raw: string): void {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error(`Invalid MCP connection URL: ${raw}`);
+  }
+
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error(
+      `Unsupported protocol "${url.protocol}" for MCP connection URL: ${raw}. Only http and https are allowed.`
+    );
+  }
+}
+
+/**
  * Sanitizes a URL string by encoding all components and validating the protocol.
  *
  * @param raw - The raw URL string to sanitize
