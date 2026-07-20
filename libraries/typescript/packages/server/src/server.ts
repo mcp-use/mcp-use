@@ -93,7 +93,7 @@ import type {
   ProxyConnection,
   ProxyMountHost,
   ProxyServerConfig,
-} from "./proxy.js";
+} from "./mcp-proxy.js";
 import type {
   InferToolInput,
   InferToolName,
@@ -554,7 +554,7 @@ export class MCPServer<TUser = never> {
     this.#assertOpen("proxy()");
     const operation = (async (): Promise<void> => {
       const { isProxyConnection, mountProxyConnection, mountProxyServers } =
-        await import("./proxy.js");
+        await import("./mcp-proxy.js");
       if (isProxyConnection(input)) {
         await mountProxyConnection(this.#proxyHost(), input);
         return;
@@ -1344,6 +1344,7 @@ export class MCPServer<TUser = never> {
     return {
       method,
       params,
+      ...(ctx.http?.req !== undefined && { request: ctx.http.req }),
       ...(ctx.sessionId !== undefined && {
         session: { sessionId: ctx.sessionId },
       }),

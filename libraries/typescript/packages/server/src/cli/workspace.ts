@@ -28,6 +28,7 @@
  */
 
 import { join } from "node:path";
+import type { ViewsManifest } from "../views/types.js";
 
 /**
  * Fixed name of the per-project workspace directory.
@@ -65,6 +66,8 @@ export interface BuildManifest {
    * Consumed by `mcp-use start` to decide whether to mount the inspector shell.
    */
   inspector: boolean;
+  /** Mode-neutral view registration data consumed by runtime adapters. */
+  views: ViewsManifest;
 }
 
 /**

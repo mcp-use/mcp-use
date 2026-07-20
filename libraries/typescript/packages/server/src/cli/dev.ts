@@ -20,9 +20,8 @@
 import { spawn } from "node:child_process";
 import { createServer as createNodeServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { existsSync } from "node:fs";
 import { networkInterfaces } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { createServer, createServerModuleRunner } from "vite";
@@ -37,6 +36,11 @@ import {
 
 import { resolvePort as resolvePreferredPort } from "../bin/args.js";
 import { discoverEntry } from "./entry.js";
+import {
+  loadProjectEnv,
+  nextStandaloneCompatPlugin,
+  nextStandaloneSsrOptions,
+} from "./next-compat.js";
 import { resolvePort } from "./port.js";
 import { resolveTailwindCss, resolveUserViteConfig } from "./vite-config.js";
 import { createDevApiHandler } from "./dev-api.js";
@@ -87,6 +91,10 @@ export interface DevOptions {
    * `index.ts`, `server.ts` — first hit wins.
    */
   entry?: string;
+  /** Directory containing the conventional entry and, by default, views/. */
+  mcpDir?: string;
+  /** Explicit views directory, absolute or relative to `cwd`. */
+  viewsDir?: string;
   /**
    * Preferred port. When taken, the next free port upward is used (and the
    * substitution logged).
@@ -296,10 +304,7 @@ export async function runDev(options: DevOptions): Promise<void> {
     console.error("[mcp-use] notification delivery failed:", error);
   });
 
-  const envPath = join(options.cwd, ".env");
-  if (existsSync(envPath)) {
-    process.loadEnvFile(envPath);
-  }
+  loadProjectEnv(options.cwd, "development");
 
   // Resolve the listener before importing the entry so module-scope OAuth
   // configuration observes the canonical port that this CLI will own.
@@ -329,11 +334,24 @@ export async function runDev(options: DevOptions): Promise<void> {
       ? `http://localhost:${port}`
       : undefined;
 
-  const entry = discoverEntry(options.cwd, options.entry);
+  const sourceRoot =
+    options.mcpDir === undefined
+      ? options.cwd
+      : resolve(options.cwd, options.mcpDir);
+  const entry =
+    options.entry === undefined
+      ? discoverEntry(sourceRoot)
+      : discoverEntry(options.cwd, options.entry);
   if (await ensureMcpEnvDeclaration(options.cwd, entry)) {
     console.log("[mcp-use] created mcp-env.d.ts");
   }
-  let currentViews: DiscoveredView[] = discoverViews(options.cwd);
+  const viewsDirectory =
+    options.viewsDir ??
+    (options.mcpDir === undefined ? undefined : join(options.mcpDir, "views"));
+  let currentViews: DiscoveredView[] = discoverViews(
+    options.cwd,
+    viewsDirectory
+  );
   // The Vite client environment (views plugin, Fast Refresh, HMR socket,
   // asset origin) is configured once, from this snapshot. `currentViews`
   // stays live for request routing and re-priming, but a project that starts
@@ -358,9 +376,13 @@ export async function runDev(options: DevOptions): Promise<void> {
     envDir: false,
     logLevel: "warn",
     cacheDir: paths.cache,
-    resolve: { alias: { tailwindcss: resolveTailwindCss() } },
+    resolve: {
+      tsconfigPaths: true,
+      alias: { tailwindcss: resolveTailwindCss() },
+    },
     plugins: viewsAtStartup
       ? [
+          nextStandaloneCompatPlugin(options.cwd),
           tailwindcss(),
           mcpUseViewsPlugin({
             getViews: () => currentViews,
@@ -368,7 +390,7 @@ export async function runDev(options: DevOptions): Promise<void> {
           }),
           react(),
         ]
-      : [],
+      : [nextStandaloneCompatPlugin(options.cwd)],
     server: {
       middlewareMode: true,
       // Absolute asset URLs in dev: without `origin`, Vite emits root-relative
@@ -385,7 +407,7 @@ export async function runDev(options: DevOptions): Promise<void> {
       hmr: viewsAtStartup ? { server: httpServer } : false,
     },
     ssr: {
-      external: true,
+      ...nextStandaloneSsrOptions(options.cwd),
     },
   });
 
@@ -486,7 +508,7 @@ export async function runDev(options: DevOptions): Promise<void> {
   };
 
   const onSsrFileEvent = (file: string): void => {
-    if (isViewPath(file, options.cwd)) {
+    if (isViewPath(file, options.cwd, viewsDirectory)) {
       return;
     }
     const modules = ssrEnvironment.moduleGraph.getModulesByFile(file);
@@ -500,12 +522,12 @@ export async function runDev(options: DevOptions): Promise<void> {
   };
 
   const onViewFilesystemEvent = (file: string): void => {
-    if (!isViewPath(file, options.cwd)) {
+    if (!isViewPath(file, options.cwd, viewsDirectory)) {
       return;
     }
 
     const previousViews = currentViews;
-    currentViews = discoverViews(options.cwd);
+    currentViews = discoverViews(options.cwd, viewsDirectory);
 
     const viewsChanged =
       previousViews.length !== currentViews.length ||

@@ -6,6 +6,7 @@
  * evaluate Vite or an unrelated command implementation.
  */
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 import { parseArgs, type ParsedArgs } from "./args.js";
 
@@ -19,6 +20,10 @@ export interface CliCommandOptions {
   cwd: string;
   /** Server entry module override (`--entry`). */
   entry?: string;
+  /** MCP source directory (`--mcp-dir`), relative to the project root. */
+  mcpDir?: string;
+  /** View source directory (`--views-dir`), relative to the project root. */
+  viewsDir?: string;
   /** Port override (`--port`/`-p`). */
   port?: number;
   /** Host override (`--host`). */
@@ -54,6 +59,9 @@ Options:
   -p, --port <n>     Port to serve on (default: $PORT or 3000)
   --host <host>      Host to bind (dev only)
   --entry <path>     Server entry module (dev/build only)
+  --path <directory> Project root (default: current directory)
+  --mcp-dir <dir>    Directory containing the MCP entry and views/
+  --views-dir <dir>  Views directory (default: views/ or <mcp-dir>/views/)
   --with-inspector   Record inspector availability in the build manifest (build only)
   --tunnel           Expose the dev server through a public tunnel (dev only)
   --no-open          Do not auto-open the inspector in a browser (dev only)
@@ -153,7 +161,10 @@ async function startCommand(args: ParsedArgs): Promise<number> {
   let started;
   try {
     const { runStart } = await import("../commands/start.js");
-    started = await runStart({ cwd: process.cwd(), port: args.port });
+    started = await runStart({
+      cwd: resolve(process.cwd(), args.path ?? "."),
+      port: args.port,
+    });
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     return 1;
@@ -181,8 +192,10 @@ async function cliCommand(
   args: ParsedArgs
 ): Promise<number> {
   const options: CliCommandOptions = {
-    cwd: process.cwd(),
+    cwd: resolve(process.cwd(), args.path ?? "."),
     ...(args.entry !== undefined && { entry: args.entry }),
+    ...(args.mcpDir !== undefined && { mcpDir: args.mcpDir }),
+    ...(args.viewsDir !== undefined && { viewsDir: args.viewsDir }),
     ...(args.port !== undefined && { port: args.port }),
     ...(args.host !== undefined && { host: args.host }),
     ...(args.tunnel && { tunnel: true }),

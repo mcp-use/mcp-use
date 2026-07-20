@@ -95,6 +95,8 @@ export function withMcpMiddlewareParams<M extends McpMiddlewareMethod>(
 }
 
 interface MiddlewareContextCommon {
+  /** The originating HTTP request, when this operation is served over HTTP. */
+  request?: Request;
   /** Session info when the underlying transport provides a session ID. */
   session?: { sessionId: string };
   /** OAuth info extracted from the validated access token. */
@@ -289,8 +291,10 @@ export type McpEventPhase = "before" | "complete";
 export type ReadonlyMiddlewareContext<
   M extends McpMiddlewareMethod = McpMiddlewareMethod,
 > = M extends McpMiddlewareMethod
-  ? Omit<MiddlewareContext<M>, "params" | "state"> & {
+  ? Omit<MiddlewareContext<M>, "params" | "request" | "state"> & {
       readonly params: Readonly<McpMiddlewareOperationMap[M]["params"]>;
+      /** The originating HTTP request, when this operation is served over HTTP. */
+      readonly request?: Request;
       readonly state: ReadonlyMap<string, unknown>;
     }
   : never;
@@ -427,6 +431,7 @@ export function freezeMiddlewareContext<M extends McpMiddlewareMethod>(
   return Object.freeze({
     method: ctx.method,
     params: Object.freeze({ ...ctx.params }),
+    ...(ctx.request !== undefined && { request: ctx.request }),
     ...(ctx.session !== undefined && {
       session: Object.freeze({ ...ctx.session }),
     }),

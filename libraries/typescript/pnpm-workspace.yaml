@@ -100,4 +100,7 @@ overrides:
 allowBuilds:
   "@tailwindcss/oxide": true
   esbuild: true
+  # The Next.js route example does not use image optimization, so its optional
+  # sharp dependency must not run a native build in CI.
+  sharp: false
   unrs-resolver: true
