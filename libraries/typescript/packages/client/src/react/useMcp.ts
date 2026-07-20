@@ -1499,20 +1499,23 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
         const parsedUrl = new URL(url);
         const baseUrl =
           parsedUrl.origin + parsedUrl.pathname.replace(/\/+$/, "");
-        try {
-          await auth(freshAuthProvider, {
-            serverUrl: baseUrl,
-            fetchFn: freshAuthProvider.getProxyFetch?.(),
-          });
+        const authResult = await auth(freshAuthProvider, {
+          serverUrl: baseUrl,
+          fetchFn: freshAuthProvider.getProxyFetch?.(),
+        });
+
+        if (authResult === "AUTHORIZED") {
           addLog("info", "OAuth flow completed (tokens obtained)");
-        } catch (err: unknown) {
-          // This is expected when auth opens popup/redirect - the flow continues there
-          addLog(
-            "info",
-            "OAuth flow initiated (popup/redirect):",
-            err instanceof Error ? err.message : "Redirecting..."
-          );
+          connectingRef.current = false;
+          connectRef.current?.();
+          return;
         }
+
+        if (authResult !== "REDIRECT") {
+          throw new Error(`Unexpected OAuth auth() result: ${authResult}`);
+        }
+
+        addLog("info", "OAuth authorization redirect initiated");
 
         // Update authUrl with the new URL from the fresh provider
         // This is critical for the fallback link when popup is blocked
@@ -1594,11 +1597,9 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
         }
       } catch (authError) {
         if (!isMountedRef.current) return;
-        setState("pending_auth"); // Go back to pending state on error
-        addLog(
-          "error",
-          `Manual authentication failed: ${authError instanceof Error ? authError.message : String(authError)}`
-        );
+        const error =
+          authError instanceof Error ? authError : new Error(String(authError));
+        failConnection(`Manual authentication failed: ${error.message}`, error);
       }
     } else if (currentState === "authenticating") {
       addLog(
