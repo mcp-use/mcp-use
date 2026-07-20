@@ -1,6 +1,7 @@
 import type { StdioServerParameters } from "@modelcontextprotocol/sdk/client/stdio.js";
 import type { Writable } from "node:stream";
 
+import { getDefaultEnvironment } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import process from "node:process";
 import type { ConnectorInitOptions } from "./base.js";
@@ -12,6 +13,25 @@ import type { ClientInfo } from "./http.js";
 
 interface StdioConnectorOptions extends ConnectorInitOptions {
   clientInfo?: ClientInfo;
+}
+
+/**
+ * Build the environment for the spawned stdio server process.
+ *
+ * Returns `undefined` when no variables are configured, letting the transport
+ * apply its own default. Otherwise the caller's variables are layered on top of
+ * `getDefaultEnvironment()` from the underlying `@modelcontextprotocol/sdk`
+ * transport: a minimal safe allowlist (`HOME`, `PATH`, ...) rather than the full
+ * parent environment. Configuring one server-specific variable therefore no
+ * longer leaks every secret in `process.env` to the spawned server.
+ */
+export function buildStdioEnv(
+  env: Record<string, string> | undefined
+): Record<string, string> | undefined {
+  if (!env) {
+    return undefined;
+  }
+  return { ...getDefaultEnvironment(), ...env };
 }
 
 export class StdioConnector extends BaseConnector {
@@ -58,20 +78,7 @@ export class StdioConnector extends BaseConnector {
     logger.debug(`Connecting to MCP implementation via stdio: ${this.command}`);
     try {
       // 1. Build server parameters for the transport
-
-      // Merge env with process.env, filtering out undefined values
-      let mergedEnv: Record<string, string> | undefined;
-      if (this.env) {
-        mergedEnv = {};
-        // First add process.env values (excluding undefined)
-        for (const [key, value] of Object.entries(process.env)) {
-          if (value !== undefined) {
-            mergedEnv[key] = value;
-          }
-        }
-        // Then override with provided env
-        Object.assign(mergedEnv, this.env);
-      }
+      const mergedEnv = buildStdioEnv(this.env);
 
       const serverParams: StdioServerParameters = {
         command: this.command,
