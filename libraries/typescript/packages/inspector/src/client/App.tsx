@@ -2,10 +2,12 @@ import { RequestActionToast } from "@/client/components/shared/RequestActionToas
 import { DEFAULT_SAMPLING_RESPONSE } from "@/client/types/pending-requests";
 import { InspectorDashboard } from "@/client/components/InspectorDashboard";
 import { Layout } from "@/client/components/Layout";
-import { TabSuspense } from "@/client/components/lazy-tabs";
+import { ManufactOAuthCallback } from "@/client/components/ManufactOAuthCallback";
+import { OAuthCallback } from "@/client/components/OAuthCallback";
 import { Toaster } from "@/client/components/ui/sonner";
+import { ViewPreview } from "@/client/components/ViewPreview";
 import { McpClientProvider, type McpServer } from "@mcp-use/client/react";
-import { lazy, useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Route, BrowserRouter as Router, Routes } from "react-router";
 import { toast } from "sonner";
 import { InspectorProvider, useInspector } from "./context/InspectorContext";
@@ -18,20 +20,6 @@ import {
   getDefaultInspectorProxyAddress,
   InspectorConnectionStorageProvider,
 } from "./utils/connectionUpdates";
-
-const OAuthCallback = lazy(() =>
-  import("./components/OAuthCallback").then((m) => ({
-    default: m.OAuthCallback,
-  }))
-);
-const ManufactOAuthCallback = lazy(() =>
-  import("./components/ManufactOAuthCallback").then((m) => ({
-    default: m.ManufactOAuthCallback,
-  }))
-);
-const ViewPreview = lazy(() =>
-  import("./components/ViewPreview").then((m) => ({ default: m.ViewPreview }))
-);
 
 /**
  * Syncs the active tab from InspectorContext into a ref readable by
@@ -272,30 +260,12 @@ function App() {
               <InspectorTabSync activeTabRef={activeTabRef} />
               <Router basename={inspectorBase}>
                 <Routes>
-                  <Route
-                    path="/oauth/callback"
-                    element={
-                      <TabSuspense>
-                        <OAuthCallback />
-                      </TabSuspense>
-                    }
-                  />
+                  <Route path="/oauth/callback" element={<OAuthCallback />} />
                   <Route
                     path="/auth/callback"
-                    element={
-                      <TabSuspense>
-                        <ManufactOAuthCallback />
-                      </TabSuspense>
-                    }
+                    element={<ManufactOAuthCallback />}
                   />
-                  <Route
-                    path="/preview/:view"
-                    element={
-                      <TabSuspense>
-                        <ViewPreview />
-                      </TabSuspense>
-                    }
-                  />
+                  <Route path="/preview/:view" element={<ViewPreview />} />
                   <Route
                     path="/"
                     element={

@@ -1,21 +1,18 @@
 import type { McpServer } from "@mcp-use/client/react";
 import { useEffect, useState, type ReactNode, type RefObject } from "react";
 import { useManufactAuth } from "@/client/auth/manufact-auth";
+import { ChatTab } from "@/client/components/ChatTab";
+import { ConnectionSettingsTab } from "@/client/components/ConnectionSettingsTab";
+import { ElicitationTab } from "@/client/components/ElicitationTab";
+import { NotificationsTab } from "@/client/components/NotificationsTab";
+import { PromptsTab } from "@/client/components/PromptsTab";
+import { ResourcesTab } from "@/client/components/ResourcesTab";
+import { SamplingTab } from "@/client/components/SamplingTab";
+import { ServerMetadataTab } from "@/client/components/ServerMetadataTab";
+import { ToolsTab } from "@/client/components/ToolsTab";
 import { useInspector } from "@/client/context/InspectorContext";
 import type { TabType } from "@/client/context/InspectorContext";
 import { isLocalhostServerUrl } from "@/client/utils/servers";
-import {
-  ChatTab,
-  ConnectionSettingsTab,
-  ElicitationTab,
-  NotificationsTab,
-  PromptsTab,
-  ResourcesTab,
-  SamplingTab,
-  ServerMetadataTab,
-  TabSuspense,
-  ToolsTab,
-} from "./lazy-tabs";
 import {
   buildManagedAuthHeaders,
   buildManagedLlmProxyConfig,
@@ -140,41 +137,39 @@ export function LayoutContent({
     } as unknown as McpServer;
 
     return (
-      <TabSuspense>
-        <ChatTab
-          key="chat-force-connected"
-          connection={stubConnection}
-          isConnected={true}
-          prompts={[]}
-          serverId="force-connected"
-          callPrompt={async () => ({ messages: [] })}
-          readResource={async () => ({ contents: [] })}
-          useClientSide={false}
-          chatApiUrl={embeddedConfig.chatApiUrl}
-          extraHeaders={managedAuthHeaders}
-          credentials={managedCredentials}
-          managedLlmConfig={
-            embeddedConfig.managedLlmConfig ?? {
-              provider: "anthropic",
-              model: "claude-haiku-4-5",
-              apiKey: "server-managed",
-            }
+      <ChatTab
+        key="chat-force-connected"
+        connection={stubConnection}
+        isConnected={true}
+        prompts={[]}
+        serverId="force-connected"
+        callPrompt={async () => ({ messages: [] })}
+        readResource={async () => ({ contents: [] })}
+        useClientSide={false}
+        chatApiUrl={embeddedConfig.chatApiUrl}
+        extraHeaders={managedAuthHeaders}
+        credentials={managedCredentials}
+        managedLlmConfig={
+          embeddedConfig.managedLlmConfig ?? {
+            provider: "anthropic",
+            model: "claude-haiku-4-5",
+            apiKey: "server-managed",
           }
-          enableFreeTierUpgrade={embeddedConfig.chatEnableFreeTierUpgrade}
-          hideTitle={embeddedConfig.chatHideTitle}
-          hideModelBadge={embeddedConfig.chatHideModelBadge ?? true}
-          hideServerUrl={embeddedConfig.chatHideServerUrl ?? true}
-          clearButtonLabel={embeddedConfig.chatClearButtonLabel}
-          clearButtonHideIcon={embeddedConfig.chatClearButtonHideIcon}
-          clearButtonHideShortcut={embeddedConfig.chatClearButtonHideShortcut}
-          clearButtonVariant={embeddedConfig.chatClearButtonVariant}
-          chatQuickQuestions={embeddedConfig.chatQuickQuestions}
-          chatFollowups={embeddedConfig.chatFollowups}
-          hideClearButton={embeddedConfig.chatHideClearButton}
-          hideToolSelector={embeddedConfig.chatHideToolSelector}
-          enableKeyboardShortcuts={false}
-        />
-      </TabSuspense>
+        }
+        enableFreeTierUpgrade={embeddedConfig.chatEnableFreeTierUpgrade}
+        hideTitle={embeddedConfig.chatHideTitle}
+        hideModelBadge={embeddedConfig.chatHideModelBadge ?? true}
+        hideServerUrl={embeddedConfig.chatHideServerUrl ?? true}
+        clearButtonLabel={embeddedConfig.chatClearButtonLabel}
+        clearButtonHideIcon={embeddedConfig.chatClearButtonHideIcon}
+        clearButtonHideShortcut={embeddedConfig.chatClearButtonHideShortcut}
+        clearButtonVariant={embeddedConfig.chatClearButtonVariant}
+        chatQuickQuestions={embeddedConfig.chatQuickQuestions}
+        chatFollowups={embeddedConfig.chatFollowups}
+        hideClearButton={embeddedConfig.chatHideClearButton}
+        hideToolSelector={embeddedConfig.chatHideToolSelector}
+        enableKeyboardShortcuts={false}
+      />
     );
   }
 
@@ -190,9 +185,9 @@ export function LayoutContent({
 
   const allKnownTabs = ALL_KNOWN_TABS;
 
-  // Load tab chunks on first visit; keep mounted (display:none) to preserve state.
+  // Mount tabs on first visit; keep mounted (display:none) to preserve state.
   return (
-    <TabSuspense>
+    <>
       {isTabVisible("tools") && mountedTabs.has("tools") && (
         <div
           style={{ display: activeTab === "tools" ? "block" : "none" }}
@@ -385,6 +380,6 @@ export function LayoutContent({
           </div>
         )}
       {!allKnownTabs.includes(activeTab as TabType) && <>{children}</>}
-    </TabSuspense>
+    </>
   );
 }
