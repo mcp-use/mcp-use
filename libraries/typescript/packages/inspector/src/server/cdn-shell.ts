@@ -37,7 +37,14 @@ function renderDefaultInspectorAssetLoader(): string {
       const versionPattern = /^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$/;
 
       try {
-        const response = await fetch(resolverUrl, { signal: AbortSignal.timeout(10_000) });
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10_000);
+        let response;
+        try {
+          response = await fetch(resolverUrl, { signal: controller.signal });
+        } finally {
+          clearTimeout(timeout);
+        }
         if (!response.ok) {
           throw new Error(\`Inspector version resolver returned HTTP \${response.status}\`);
         }

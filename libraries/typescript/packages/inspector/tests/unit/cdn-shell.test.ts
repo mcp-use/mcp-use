@@ -26,9 +26,10 @@ describe("inspector CDN shell", () => {
     const html = await inspectorShell();
 
     expect(html).toContain(`const resolverUrl = "${VERSION_RESOLVER_URL}"`);
-    expect(html).toContain(
-      "fetch(resolverUrl, { signal: AbortSignal.timeout(10_000) })"
-    );
+    expect(html).toContain("const controller = new AbortController()");
+    expect(html).toContain("setTimeout(() => controller.abort(), 10_000)");
+    expect(html).toContain("fetch(resolverUrl, { signal: controller.signal })");
+    expect(html).toContain("clearTimeout(timeout)");
     expect(html).toContain('resolved?.name !== "@mcp-use/inspector"');
     expect(html).toMatch(
       /const assetBase = `\$\{packageUrl\}@\$\{version\}\/dist\/cdn`;/
