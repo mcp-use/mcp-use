@@ -1631,6 +1631,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         const parsedUrl = new URL(url);
         const baseUrl =
           parsedUrl.origin + parsedUrl.pathname.replace(/\/+$/, "");
+        let authFlowError: Error | null = null;
         try {
           await auth(freshAuthProvider, {
             serverUrl: baseUrl,
@@ -1638,17 +1639,33 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           });
           addLog("info", "OAuth flow completed (tokens obtained)");
         } catch (err: unknown) {
-          // This is expected when auth opens popup/redirect - the flow continues there
+          // May be the expected popup/redirect handoff (flow continues in the
+          // popup) — or a real discovery/validation failure. Disambiguated
+          // below via the captured popup handle and the stored auth URL.
+          authFlowError = err instanceof Error ? err : new Error(String(err));
           addLog(
             "info",
             "OAuth flow initiated (popup/redirect):",
-            err instanceof Error ? err.message : "Redirecting..."
+            authFlowError.message
           );
         }
 
         // Update authUrl with the new URL from the fresh provider
         // This is critical for the fallback link when popup is blocked
         const newAuthUrl = freshAuthProvider.getLastAttemptedAuthUrl?.();
+
+        // auth() threw without opening a popup or preparing an authorization
+        // URL (clearStorage() above wiped any stale one): this is a real
+        // failure (e.g. OAuth resource mismatch), not a popup handoff.
+        // Surface it instead of waiting for a popup that will never report —
+        // that wait silently loops pending_auth -> authenticating forever.
+        if (authFlowError && !capturedPopup && !newAuthUrl) {
+          failConnection(
+            `Authentication failed: ${authFlowError.message}`,
+            authFlowError
+          );
+          return;
+        }
         if (newAuthUrl) {
           setAuthUrl(newAuthUrl);
           addLog("info", "Updated auth URL for fallback:", newAuthUrl);
