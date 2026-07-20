@@ -1,5 +1,15 @@
 # @mcp-use/inspector
 
+## 12.0.4
+
+### Patch Changes
+
+- f952fe0: Fix dead documentation links flagged by the link checker: the CLI client example and inspector README pointed at docs pages that no longer exist.
+- Updated dependencies [f952fe0]
+- Updated dependencies [f952fe0]
+- Updated dependencies [f952fe0]
+  - mcp-use@1.34.4
+
 ## 12.0.4-canary.1
 
 ### Patch Changes
