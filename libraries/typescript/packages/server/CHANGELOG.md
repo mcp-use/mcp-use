@@ -1,5 +1,11 @@
 # mcp-use
 
+## 2.0.0-beta.22
+
+### Patch Changes
+
+- 6827ab2: Resolve the current Inspector beta once per page load, then load the entry script, stylesheet, and lazy chunks from the same immutable release. This prevents mixed-version CDN 404s while keeping embedded inspectors on the latest beta.
+
 ## 2.0.0-beta.21
 
 ### Patch Changes

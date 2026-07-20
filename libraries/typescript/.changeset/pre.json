@@ -11,6 +11,7 @@
   },
   "changesets": [
     "agent-esm-only",
+    "atomic-inspector-cdn-assets",
     "better-auth-v2-provider",
     "bright-icons-smile",
     "build-public-assets-drop-scarf",
