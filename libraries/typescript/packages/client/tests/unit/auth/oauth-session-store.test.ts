@@ -254,6 +254,23 @@ describe("OAuthSessionStore", () => {
     });
   });
 
+  describe("getResource()", () => {
+    it("returns the protected-resource URL from persisted discovery state", async () => {
+      const { session } = createStore();
+      await session.saveDiscoveryState({
+        authorizationServerUrl: "https://auth.example.com",
+        resourceMetadata: { resource: "https://mcp.example.com" },
+      } as never);
+
+      expect(await session.getResource()).toBe("https://mcp.example.com");
+    });
+
+    it("returns null when discovery has no protected-resource URL", async () => {
+      const { session } = createStore();
+      expect(await session.getResource()).toBeNull();
+    });
+  });
+
   describe("codeVerifier() / saveCodeVerifier()", () => {
     it("round-trips the verifier through KVStore", async () => {
       const { session, kv } = createStore();

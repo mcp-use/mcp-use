@@ -448,6 +448,8 @@ export type UseMcpResult = {
     expires_at?: number;
     refresh_token?: string;
     scope?: string;
+    /** Canonical protected-resource URL required by some token refresh flows. */
+    resource?: string;
     /**
      * OAuth token endpoint resolved during discovery (when available). Lets
      * consumers persist it so a backend can proactively refresh the token.
