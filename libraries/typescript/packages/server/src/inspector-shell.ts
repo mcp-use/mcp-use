@@ -21,10 +21,12 @@ import { pathUnderBase, type FetchHandler } from "./fetch-app.js";
 export const INSPECTOR_TAG = "beta";
 
 /**
- * Default URL the inspector shell loads the UI bundle from: the
- * `@mcp-use/inspector` CDN build (`dist/cdn/inspector.js`) built from this
- * branch and served by jsDelivr from npm's {@link INSPECTOR_TAG} tag.
- * Override per server with {@link InspectorOptions.assetsUrl}.
+ * Legacy direct URL for the mutable `@mcp-use/inspector` beta-tag bundle.
+ * Passing this URL through {@link InspectorOptions.assetsUrl} bypasses the
+ * default loader that resolves the tag to one immutable release.
+ *
+ * @deprecated Leave `assetsUrl` undefined to resolve the latest beta safely,
+ * or provide an exact-version or self-hosted URL as an explicit override.
  */
 export const DEFAULT_INSPECTOR_ASSETS_URL = `https://cdn.jsdelivr.net/npm/@mcp-use/inspector@${INSPECTOR_TAG}/dist/cdn/inspector.js`;
 
@@ -68,8 +70,8 @@ export interface InspectorShellOptions {
   /** MIME type for the favicon link tag when known. */
   faviconType?: string | undefined;
   /**
-   * Full replacement URL for the inspector bundle script. Defaults to
-   * {@link DEFAULT_INSPECTOR_ASSETS_URL}.
+   * Full replacement URL for the inspector bundle script. When omitted, the
+   * shell resolves {@link INSPECTOR_TAG} to one exact release before loading.
    */
   assetsUrl?: string | undefined;
   /** Hosted managed-chat URL (`window.__MANUFACT_CHAT_URL__`). */
@@ -105,7 +107,7 @@ function renderDefaultInspectorAssetLoader(): string {
       const versionPattern = /^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$/;
 
       try {
-        const response = await fetch(resolverUrl);
+        const response = await fetch(resolverUrl, { signal: AbortSignal.timeout(10_000) });
         if (!response.ok) {
           throw new Error(\`Inspector version resolver returned HTTP \${response.status}\`);
         }

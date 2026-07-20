@@ -188,12 +188,12 @@ interface BaseServerConfig {
    *
    * @remarks
    * Follows the FastAPI `/docs` model: the server itself ships only a tiny
-   * dependency-free HTML page whose `<script type="module">` loads the
-   * `@mcp-use/inspector` bundle from a CDN (pinned to the current inspector
-   * version), so the UI updates independently of SDK releases and adds
-   * nothing to the install. The page tells the inspector to connect to this
-   * server's MCP endpoint at `basePath`, deriving the URL from the browser's
-   * own origin.
+   * dependency-free HTML page whose inline module loader resolves the latest
+   * `@mcp-use/inspector` beta to one exact CDN release before loading it, so
+   * the UI updates independently of SDK releases without mixing asset
+   * versions or adding anything to the install. The page tells the inspector
+   * to connect to this server's MCP endpoint at `basePath`, deriving the URL
+   * from the browser's own origin.
    *
    * Enabled by default; set `{ enabled: false }` to disable the route, or
    * pass `{ assetsUrl }` to load the bundle from a self-hosted copy instead
