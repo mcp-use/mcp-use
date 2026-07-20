@@ -1,0 +1,44 @@
+name: Server examples
+
+on:
+  pull_request:
+    paths:
+      - "libraries/typescript/packages/server/**"
+      - "libraries/typescript/packages/client/**"
+      - "libraries/typescript/pnpm-lock.yaml"
+      - ".github/workflows/server-examples.yml"
+  push:
+    branches: [main]
+    paths:
+      - "libraries/typescript/packages/server/**"
+      - "libraries/typescript/packages/client/**"
+      - "libraries/typescript/pnpm-lock.yaml"
+      - ".github/workflows/server-examples.yml"
+
+jobs:
+  verify:
+    name: Client-driven example verification
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: libraries/typescript
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.13.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: libraries/typescript/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @mcp-use/client build && pnpm --filter mcp-use build
+      - run: pnpm verify:examples
+      - name: Upload example verification logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-example-verification
+          path: libraries/typescript/packages/server/examples/.mcp-use/example-verification
+          if-no-files-found: ignore
