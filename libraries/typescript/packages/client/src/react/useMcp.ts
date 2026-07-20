@@ -50,6 +50,7 @@ type UseMcpAuthProvider = OAuthClientProvider & {
   clearStorage?: () => number;
   getLastAttemptedAuthUrl?: () => string | null | undefined;
   getTokenEndpoint?: () => Promise<string | null>;
+  getResource?: () => Promise<string | null>;
   getClientCredentials?: () => Promise<{
     client_id: string;
     client_secret?: string;
@@ -1063,6 +1064,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
             // so consumers can persist them for server-side proactive refresh.
             // Never blocks auth.
             let tokenEndpoint: string | null = null;
+            let resource: string | null = null;
             let clientCreds: {
               client_id: string;
               client_secret?: string;
@@ -1072,6 +1074,12 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
                 (await authProviderRef.current.getTokenEndpoint?.()) ?? null;
             } catch {
               tokenEndpoint = null;
+            }
+            try {
+              resource =
+                (await authProviderRef.current.getResource?.()) ?? null;
+            } catch {
+              resource = null;
             }
             try {
               clientCreds =
@@ -1092,6 +1100,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
               refresh_token: tokens.refresh_token,
               scope: tokens.scope,
               ...(tokenEndpoint ? { token_endpoint: tokenEndpoint } : {}),
+              ...(resource ? { resource } : {}),
               ...(clientCreds?.client_id
                 ? { client_id: clientCreds.client_id }
                 : {}),

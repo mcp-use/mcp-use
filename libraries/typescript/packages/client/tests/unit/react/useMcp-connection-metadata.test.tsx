@@ -150,4 +150,22 @@ describe("useMcp connection metadata", () => {
       })
     );
   });
+
+  it("exposes the discovered OAuth resource with auth tokens", async () => {
+    authProvider.tokens.mockResolvedValue({
+      access_token: "access-token",
+      token_type: "Bearer",
+      refresh_token: "refresh-token",
+    });
+    authProvider.getResource = vi
+      .fn()
+      .mockResolvedValue("https://mcp.example.com");
+
+    const { result } = await renderFor("modern");
+
+    expect(result.authTokens).toMatchObject({
+      access_token: "access-token",
+      resource: "https://mcp.example.com",
+    });
+  });
 });

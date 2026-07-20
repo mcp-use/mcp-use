@@ -418,4 +418,13 @@ export class OAuthSessionStore {
         ?.token_endpoint ?? null
     );
   }
+
+  /**
+   * Return the protected-resource URL selected during OAuth discovery.
+   * Consumers can persist it and reuse it for server-side refresh exchanges.
+   */
+  async getResource(): Promise<string | null> {
+    const resource = (await this.discoveryState())?.resourceMetadata?.resource;
+    return typeof resource === "string" ? resource : null;
+  }
 }
