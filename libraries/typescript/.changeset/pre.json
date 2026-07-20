@@ -25,6 +25,7 @@
     "create-app-sdk-version",
     "dev-port-probe-envdir",
     "dialect-json-schema-validator",
+    "eager-inspector-ui",
     "enable-sdk-logging-capability",
     "fix-beta-scaffold-templates",
     "follow-inspector-beta-cdn",

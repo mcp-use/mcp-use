@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 20.0.0-beta.15
+
+### Patch Changes
+
+- b7ce16f: Bundle Inspector tabs and routes into a single JavaScript entry point so tab navigation does not wait for lazy CDN chunks.
+
 ## 20.0.0-beta.14
 
 ### Patch Changes
