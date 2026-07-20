@@ -29,6 +29,11 @@ describe("elicitation and input_required", () => {
     message: string;
     url?: string | undefined;
   }> = [];
+  const logMessages: Array<{
+    level: string;
+    data: unknown;
+    logger?: string | undefined;
+  }> = [];
   const server = new MCPServer({
     name: "elicitation-test",
     version: "1.0.0",
@@ -103,6 +108,11 @@ describe("elicitation and input_required", () => {
     };
   });
 
+  server.tool({ name: "emit-log" }, async (_params, ctx) => {
+    await ctx.sendLog("info", { operation: "emit-log" }, "elicitation-test");
+    return { content: [{ type: "text", text: "Log sent" }] };
+  });
+
   beforeAll(async () => {
     const started = await server.listen(0);
     client = new Client(
@@ -133,6 +143,9 @@ describe("elicitation and input_required", () => {
           : { action: "accept", content: { confirm: true } };
       }
       return { action: "accept", content: { confirm: true } };
+    });
+    client.setNotificationHandler("notifications/message", (notification) => {
+      logMessages.push(notification.params);
     });
     await client.connect(
       new StreamableHTTPClientTransport(new URL(started.url))
@@ -176,6 +189,17 @@ describe("elicitation and input_required", () => {
         url: "https://example.com/authorize",
       })
     );
+  });
+
+  it("sends request-scoped logging notifications", async () => {
+    const result = await client.callTool({ name: "emit-log" });
+
+    expect(result.content).toContainEqual({ type: "text", text: "Log sent" });
+    expect(logMessages).toContainEqual({
+      level: "info",
+      data: { operation: "emit-log" },
+      logger: "elicitation-test",
+    });
   });
 
   it("surfaces a declined elicitation without re-requesting it", async () => {
