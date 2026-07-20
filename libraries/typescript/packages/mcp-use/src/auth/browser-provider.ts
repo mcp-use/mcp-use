@@ -1,5 +1,9 @@
 // browser-provider.ts
 import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
+import {
+  checkResourceAllowed,
+  resourceUrlFromServerUrl,
+} from "@modelcontextprotocol/sdk/shared/auth-utils.js";
 import type {
   OAuthClientInformation,
   OAuthClientMetadata,
@@ -389,6 +393,60 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     scope: "all" | "client" | "tokens" | "verifier"
   ): Promise<void> {
     return this.session.invalidateCredentials(scope);
+  }
+
+  /**
+   * Validate the protected resource discovered through the OAuth proxy.
+   *
+   * The proxy rewrites protected-resource metadata to the MCP connection URL
+   * so transport-anchored discovery remains valid. Manual authentication is
+   * anchored on the upstream MCP URL instead, so accept that rewrite and
+   * return the original upstream resource that the authorization server
+   * protects.
+   */
+  async validateResourceURL(
+    serverUrl: string | URL,
+    resource?: string
+  ): Promise<URL | undefined> {
+    if (!resource) return undefined;
+
+    const requestedResource = resourceUrlFromServerUrl(serverUrl);
+    if (
+      checkResourceAllowed({
+        requestedResource,
+        configuredResource: resource,
+      })
+    ) {
+      return new URL(resource);
+    }
+
+    const isConnectionResource =
+      this.connectionUrl &&
+      checkResourceAllowed({
+        requestedResource: resourceUrlFromServerUrl(this.connectionUrl),
+        configuredResource: resource,
+      });
+
+    if (isConnectionResource) {
+      const upstreamResource = resourceUrlFromServerUrl(
+        this._lastOriginalResource ?? this.serverUrl
+      );
+
+      // `_original_resource` comes from a proxied response. Never return it
+      // unless it is also valid for the upstream MCP URL supplied to auth().
+      if (
+        checkResourceAllowed({
+          requestedResource,
+          configuredResource: upstreamResource,
+        })
+      ) {
+        return upstreamResource;
+      }
+    }
+
+    throw new Error(
+      `Protected resource ${resource} does not match expected ${requestedResource} (or origin)`
+    );
   }
 
   /**
