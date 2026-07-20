@@ -1,5 +1,11 @@
 # mcp-use
 
+## 2.0.0-beta.21
+
+### Patch Changes
+
+- 686a5e2: Declare the MCP logging capability so `ctx.sendLog()` can deliver request-scoped log notifications.
+
 ## 2.0.0-beta.20
 
 ### Minor Changes

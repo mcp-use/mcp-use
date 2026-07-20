@@ -24,6 +24,7 @@
     "create-app-sdk-version",
     "dev-port-probe-envdir",
     "dialect-json-schema-validator",
+    "enable-sdk-logging-capability",
     "fix-beta-scaffold-templates",
     "follow-inspector-beta-cdn",
     "fresh-oauth-resource-v2",
