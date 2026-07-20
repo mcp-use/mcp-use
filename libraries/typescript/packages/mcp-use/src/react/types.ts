@@ -359,6 +359,8 @@ export type UseMcpOptions = {
     clientSecret?: string;
     /** OAuth scope string included in the authorize request. */
     scope?: string;
+    /** Canonical protected-resource URL required by some token refresh flows. */
+    resource?: string;
   };
   /**
    * Initial server info to use from cache (internal use).
