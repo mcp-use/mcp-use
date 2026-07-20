@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.0.0-beta.9
+
+### Patch Changes
+
+- f3fc8da: Surface manual browser OAuth failures immediately instead of treating them as popup handoffs.
+
 ## 2.0.0-beta.8
 
 ### Patch Changes

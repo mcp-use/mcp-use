@@ -27,6 +27,7 @@
     "fix-beta-scaffold-templates",
     "follow-inspector-beta-cdn",
     "fresh-oauth-resource-v2",
+    "friendly-dots-fail",
     "inspector-chat-oauth-and-ui",
     "inspector-standalone-oauth",
     "localhost-managed-inspector-chat",
