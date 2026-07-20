@@ -7,11 +7,18 @@
  * the child process log in `.mcp-use/example-verification/` for CI artifacts.
  */
 import { spawn } from "node:child_process";
-import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  access,
+  chmod,
+  mkdir,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { createServer } from "node:net";
 import { request as httpRequest } from "node:http";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { delimiter, dirname, join, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { MCPClient } from "@mcp-use/client";
 
@@ -19,6 +26,14 @@ import { examples } from "./registry.mjs";
 
 const examplesRoot = dirname(fileURLToPath(import.meta.url));
 const artifactRoot = join(examplesRoot, ".mcp-use", "example-verification");
+const cliBinRoot = join(artifactRoot, "bin");
+const pathKey =
+  Object.keys(process.env).find((key) => key.toLowerCase() === "path") ??
+  "PATH";
+const exampleEnv = {
+  ...process.env,
+  [pathKey]: `${cliBinRoot}${delimiter}${process.env[pathKey] ?? ""}`,
+};
 const packageManager = process.env.MCP_USE_EXAMPLES_PM ?? "pnpm";
 const selectedIds = new Set(
   process.argv
@@ -37,6 +52,7 @@ if (selected.length === 0) {
 
 await rm(artifactRoot, { recursive: true, force: true });
 await mkdir(artifactRoot, { recursive: true });
+await prepareWorkspaceCli();
 
 let failures = 0;
 for (const example of selected) {
@@ -53,6 +69,32 @@ if (failures > 0) {
   throw new Error(
     `${failures} example verification${failures === 1 ? "" : "s"} failed. Artifacts: ${artifactRoot}`
   );
+}
+
+async function prepareWorkspaceCli() {
+  // A clean pnpm install cannot link this workspace binary before the server
+  // package has been built. Expose the built CLI explicitly to every example.
+  const cliEntry = resolve(examplesRoot, "..", "dist", "bin.js");
+  await assertExists(
+    cliEntry,
+    "Build the mcp-use package before verifying server examples."
+  );
+  await mkdir(cliBinRoot, { recursive: true });
+
+  if (process.platform === "win32") {
+    await writeFile(
+      join(cliBinRoot, "mcp-use.cmd"),
+      `@echo off\r\nnode "${cliEntry}" %*\r\n`
+    );
+    return;
+  }
+
+  const wrapperPath = join(cliBinRoot, "mcp-use");
+  await writeFile(
+    wrapperPath,
+    `#!/usr/bin/env node\nimport ${JSON.stringify(pathToFileURL(cliEntry).href)};\n`
+  );
+  await chmod(wrapperPath, 0o755);
 }
 
 async function verifyExample(example) {
@@ -464,7 +506,7 @@ function startExample(cwd, example, port, logPath) {
   const args = ["run", "start"];
   const child = spawn(packageManager, args, {
     cwd,
-    env: { ...process.env, PORT: String(port), NODE_ENV: "production" },
+    env: { ...exampleEnv, PORT: String(port), NODE_ENV: "production" },
     stdio: ["ignore", "pipe", "pipe"],
     // Package managers launch the actual server as a child process. Give each
     // example its own group so cleanup reaches Next/mcp-use, not only npm/pnpm.
@@ -481,7 +523,7 @@ function startExample(cwd, example, port, logPath) {
 function startPackageScript(cwd, script, port, logPath) {
   const child = spawn(packageManager, ["run", script], {
     cwd,
-    env: { ...process.env, PORT: String(port), NODE_ENV: "production" },
+    env: { ...exampleEnv, PORT: String(port), NODE_ENV: "production" },
     stdio: ["ignore", "pipe", "pipe"],
     detached: process.platform !== "win32",
   });
@@ -506,6 +548,7 @@ async function run(command, args, cwd, logPath) {
   await new Promise((resolvePromise, reject) => {
     const child = spawn(command, args, {
       cwd,
+      env: exampleEnv,
       stdio: ["ignore", "pipe", "pipe"],
     });
     const output = [];
