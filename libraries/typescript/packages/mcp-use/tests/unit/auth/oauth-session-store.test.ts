@@ -175,6 +175,7 @@ describe("OAuthSessionStore", () => {
 
       discoverOAuthProtectedResourceMetadata.mockResolvedValue({
         authorization_servers: ["https://auth.example.com"],
+        resource: "https://mcp.example.com",
       });
       discoverAuthorizationServerMetadata.mockResolvedValue({
         issuer: "https://auth.example.com",
@@ -184,11 +185,17 @@ describe("OAuthSessionStore", () => {
       const result = await session.tokens();
       expect(refreshAuthorization).toHaveBeenCalledTimes(1);
       expect(result).toEqual(refreshed);
+      expect(refreshAuthorization).toHaveBeenCalledWith(
+        "https://auth.example.com",
+        expect.objectContaining({
+          resource: new URL("https://mcp.example.com"),
+        })
+      );
       // Refreshed tokens should be persisted via saveTokens()
       expect(kv.get(session.getKey("tokens"))).toBe(JSON.stringify(refreshed));
     });
 
-    it("returns the original tokens when refresh fails", async () => {
+    it("does not return an expired token when refresh fails", async () => {
       const { session, kv } = createStore();
       const tokens = {
         access_token: buildJwt({ exp: Math.floor(Date.now() / 1000) + 5 }),
@@ -205,9 +212,7 @@ describe("OAuthSessionStore", () => {
       );
 
       const result = await session.tokens();
-      // _refresh swallows errors and returns null, so tokens() falls through
-      // and returns the (still-cached) tokens unchanged.
-      expect(result).toEqual(tokens);
+      expect(result).toBeUndefined();
     });
 
     it("dedupes concurrent refresh calls into a single SDK invocation", async () => {
