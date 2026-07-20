@@ -126,6 +126,11 @@ describe("parseArgs", () => {
     expect(parseArgs(["build"]).withInspector).toBe(false);
   });
 
+  it("parses --source-maps for build", () => {
+    expect(parseArgs(["build", "--source-maps"]).sourceMaps).toBe(true);
+    expect(parseArgs(["build"]).sourceMaps).toBe(false);
+  });
+
   it("parses help and version flags", () => {
     expect(parseArgs(["--help"]).help).toBe(true);
     expect(parseArgs(["-h"]).help).toBe(true);

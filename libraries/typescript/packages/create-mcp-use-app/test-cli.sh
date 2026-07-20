@@ -69,11 +69,11 @@ run_test() {
         npm)
             cmd="npx --yes --package=$PACKAGE_FULL_PATH create-mcp-use-app $app_name --template $template $flag --no-skills"
             ;;
-        yarn)
-            cmd="yarn dlx -p $PACKAGE_FULL_PATH create-mcp-use-app $app_name --template $template $flag --no-skills"
-            ;;
         pnpm)
             cmd="pnpm --package=$PACKAGE_FULL_PATH dlx create-mcp-use-app $app_name --template $template $flag --no-skills"
+            ;;
+        bun)
+            cmd="bunx --package=$PACKAGE_FULL_PATH create-mcp-use-app $app_name --template $template $flag --no-skills"
             ;;
     esac
     
@@ -103,9 +103,9 @@ run_test() {
         # Check expected package manager command in output
         if [ -n "$flag" ]; then
             case "$flag" in
-                --yarn)
-                    if ! grep -q "yarn dev" /tmp/test-output.log; then
-                        echo -e "${RED}❌ FAILED: Expected 'yarn dev' in output${NC}"
+                --bun)
+                    if ! grep -q "bun run dev" /tmp/test-output.log; then
+                        echo -e "${RED}❌ FAILED: Expected 'bun run dev' in output${NC}"
                         TESTS_FAILED=$((TESTS_FAILED + 1))
                         return 1
                     fi
@@ -197,11 +197,19 @@ echo -e "${BLUE}═════════════════════�
 echo ""
 
 # Test package manager flags
-run_test "Flag-Yarn" npm mcp-server "--yarn" ""
-echo ""
 run_test "Flag-NPM" npm mcp-server "--npm" ""
 echo ""
 run_test "Flag-PNPM" npm mcp-server "--pnpm" ""
+echo ""
+run_test "Flag-Bun" npm mcp-server "--bun" ""
+echo ""
+run_test "Removed-Flag-Falls-Back-To-NPM" npm mcp-server "--yarn" ""
+if grep -qi "yarn" /tmp/test-output.log; then
+    echo -e "${RED}❌ FAILED: Removed --yarn option appeared in output${NC}"
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+else
+    echo -e "${GREEN}✅ Removed --yarn option falls back without Yarn instructions${NC}"
+fi
 echo ""
 
 echo -e "${BLUE}═══════════════════════════════════════════════${NC}"
@@ -228,7 +236,7 @@ if [ "${RUN_INSTALL_TESTS:-no}" == "yes" ]; then
     
     run_test "Install-NPM" npm mcp-server "--npm" "yes"
     echo ""
-    run_test "Install-Yarn" yarn mcp-server "--yarn" "yes"
+    run_test "Install-Bun" bun mcp-server "--bun" "yes"
     echo ""
 fi
 
@@ -260,4 +268,3 @@ else
     echo -e "${RED}❌ Some tests failed${NC}"
     exit 1
 fi
-

@@ -84,6 +84,8 @@ export interface BuildOptions {
    * in the build manifest.
    */
   withInspector?: boolean;
+  /** Emit source maps for the server and view bundles. */
+  sourceMaps?: boolean;
 }
 
 /**
@@ -168,6 +170,7 @@ async function buildExternalView(
     cacheDir: string;
     viewsOutDir: string;
     userViteConfig: string | false;
+    sourceMaps: boolean;
   }
 ): Promise<ViewsManifest[string]> {
   const viewOutDir = join(options.viewsOutDir, view.name);
@@ -191,7 +194,7 @@ async function buildExternalView(
       outDir: viewOutDir,
       emptyOutDir: true,
       target: "es2022",
-      sourcemap: false,
+      sourcemap: options.sourceMaps,
       minify: true,
       cssCodeSplit: false,
       chunkSizeWarningLimit: 1000,
@@ -296,6 +299,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
   const views = discoverViews(options.cwd, viewsDirectory);
   const userViteConfig = resolveUserViteConfig(options.cwd);
   const inspector = options.withInspector === true;
+  const sourceMaps = options.sourceMaps === true;
 
   if (views.length === 0) {
     await build({
@@ -315,7 +319,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
         outDir: paths.build,
         emptyOutDir: true,
         target: "node22",
-        sourcemap: true,
+        sourcemap: sourceMaps,
         minify: false,
         rollupOptions: {
           output: {
@@ -385,6 +389,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
       cacheDir: paths.cache,
       viewsOutDir,
       userViteConfig,
+      sourceMaps,
     });
     if (buildAssetsBase !== undefined) {
       manifestEntry = applyBuildAssetsPrefix(
@@ -444,7 +449,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
       outDir: paths.build,
       emptyOutDir: false,
       target: "node22",
-      sourcemap: true,
+      sourcemap: sourceMaps,
       minify: false,
       rollupOptions: {
         output: {
