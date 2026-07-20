@@ -17,7 +17,7 @@
     "@vitejs/plugin-react": "^6.0.0",
     "buffer": "^6.0.3",
     "events": "^3.3.0",
-    "typescript": "^5.9.3",
+    "typescript": "^7.0.2",
     "util": "^0.12.5",
     "vite": "^8.0.16"
   }

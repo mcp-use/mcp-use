@@ -17,9 +17,13 @@ import { isAbsolute, join, resolve } from "node:path";
  */
 export const ENTRY_CANDIDATES = [
   "src/index.ts",
+  "src/index.tsx",
   "src/server.ts",
+  "src/server.tsx",
   "index.ts",
+  "index.tsx",
   "server.ts",
+  "server.tsx",
 ] as const;
 
 /**

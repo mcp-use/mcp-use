@@ -1,7 +1,7 @@
 {
   "name": "mcp-use",
   "type": "module",
-  "version": "2.0.0-beta.18",
+  "version": "2.0.0-beta.20",
   "description": "MCP framework and CLI built on the official v2 SDK",
   "author": "mcp-use, Inc.",
   "license": "MIT",
@@ -64,6 +64,11 @@
     "./node": {
       "types": "./dist/node-bridge.d.ts",
       "import": "./dist/node-bridge.js"
+    },
+    "./next": {
+      "types": "./dist/next/index.d.ts",
+      "import": "./dist/next/index.js",
+      "default": "./dist/next/index.js"
     }
   },
   "module": "./dist/index.js",

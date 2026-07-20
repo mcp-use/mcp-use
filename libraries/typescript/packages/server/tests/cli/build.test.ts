@@ -112,7 +112,7 @@ describe("runBuild", () => {
     const buildDir = join(cwd, WORKSPACE_DIR_NAME, "build");
     const entryFile = join(buildDir, "index.js");
     expect(existsSync(entryFile)).toBe(true);
-    expect(existsSync(`${entryFile}.map`)).toBe(true);
+    expect(existsSync(`${entryFile}.map`)).toBe(false);
 
     // Manifest shape per CLI_SPEC.md § Commands → build.
     const manifest = JSON.parse(
@@ -122,7 +122,7 @@ describe("runBuild", () => {
     expect(manifest.buildId).toMatch(/^[0-9a-f]{16}$/);
     expect(new Date(manifest.createdAt).getTime()).not.toBeNaN();
     expect(manifest.inspector).toBe(false);
-    expect("views" in manifest).toBe(false);
+    expect(manifest.views).toEqual({});
     expect(
       readFileSync(join(buildDir, "views", "public", "icon.svg"), "utf8")
     ).toContain("<svg");
@@ -187,6 +187,87 @@ describe("runBuild", () => {
     );
   });
 
+  it("discovers the entry in --mcp-dir while keeping build output at the project root", async () => {
+    const cwd = copyFixture("build-mcp-dir");
+    dirs.push(cwd);
+    mkdirSync(join(cwd, "src", "mcp"), { recursive: true });
+    writeFileSync(
+      join(cwd, "src", "mcp", "server.ts"),
+      readFileSync(join(cwd, "src", "index.ts"), "utf8")
+    );
+    removeDir(join(cwd, "src", "index.ts"));
+
+    await runBuild({ cwd, mcpDir: "src/mcp" });
+
+    expect(existsSync(join(cwd, WORKSPACE_DIR_NAME, "build", "index.js"))).toBe(
+      true
+    );
+    expect(readFileSync(join(cwd, "mcp-env.d.ts"), "utf8")).toContain(
+      'tools: typeof import("./src/mcp/server.js")'
+    );
+  });
+
+  it("resolves an explicit entry from the project root even with --mcp-dir", async () => {
+    const cwd = copyFixture("build-mcp-dir-entry");
+    dirs.push(cwd);
+
+    await runBuild({
+      cwd,
+      mcpDir: "does-not-need-to-exist",
+      entry: "src/index.ts",
+    });
+
+    expect(existsSync(join(cwd, WORKSPACE_DIR_NAME, "build", "index.js"))).toBe(
+      true
+    );
+  });
+
+  it("builds standalone Next-hosted source with tsconfig aliases and server-runtime imports", async () => {
+    const cwd = copyFixture("build-next-standalone");
+    dirs.push(cwd);
+    const packagePath = join(cwd, "package.json");
+    const packageJson = JSON.parse(readFileSync(packagePath, "utf8")) as {
+      dependencies?: Record<string, string>;
+    };
+    packageJson.dependencies = { ...packageJson.dependencies, next: "16.0.0" };
+    writeFileSync(packagePath, JSON.stringify(packageJson));
+    writeFileSync(
+      join(cwd, "tsconfig.json"),
+      JSON.stringify({
+        compilerOptions: {
+          baseUrl: ".",
+          paths: { "@/*": ["./src/*"] },
+        },
+      })
+    );
+    mkdirSync(join(cwd, "src", "services"), { recursive: true });
+    writeFileSync(
+      join(cwd, "src", "services", "host.ts"),
+      [
+        'import "server-only";',
+        'import { headers } from "next/headers";',
+        "export async function hostValue() {",
+        "  return String((await headers()).get('x-host') ?? 'standalone');",
+        "}",
+      ].join("\n")
+    );
+    const originalEntry = readFileSync(join(cwd, "src", "index.ts"), "utf8");
+    writeFileSync(
+      join(cwd, "src", "index.ts"),
+      `import { hostValue } from "@/services/host";\nvoid hostValue;\n${originalEntry}`
+    );
+
+    await runBuild({ cwd });
+
+    const output = readFileSync(
+      join(cwd, WORKSPACE_DIR_NAME, "build", "index.js"),
+      "utf8"
+    );
+    expect(output).toContain("standalone");
+    expect(output).not.toContain('from "server-only"');
+    expect(output).not.toContain('from "next/headers"');
+  });
+
   it("does not overwrite an existing mcp-env.d.ts", async () => {
     const cwd = copyFixture("build-existing-tools");
     dirs.push(cwd);
@@ -229,6 +310,57 @@ describe("runBuild (views)", () => {
     expect(source).not.toMatch(/bootstrapView\(\s*viewModule\.default\s*\)/);
   });
 
+  it("resolves host tsconfig aliases in standalone view builds", async () => {
+    const cwd = copyFixture("build-view-alias", "views");
+    dirs.push(cwd);
+    writeFileSync(
+      join(cwd, "tsconfig.json"),
+      JSON.stringify({
+        compilerOptions: {
+          baseUrl: ".",
+          paths: { "@/*": ["./src/*"] },
+          jsx: "react-jsx",
+        },
+      })
+    );
+    mkdirSync(join(cwd, "src", "components"), { recursive: true });
+    writeFileSync(
+      join(cwd, "src", "components", "Shared.tsx"),
+      "export function Shared() { return <span>shared-alias-marker</span>; }"
+    );
+    const viewPath = join(cwd, "views", "product-search-result", "view.tsx");
+    const view = readFileSync(viewPath, "utf8");
+    writeFileSync(
+      viewPath,
+      `import { Shared } from "@/components/Shared";\n${view.replace(
+        '<div className="grid gap-2" data-testid="results">',
+        '<div className="grid gap-2" data-testid="results"><Shared />'
+      )}`
+    );
+
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    await runBuild({ cwd });
+
+    const asset = listViewAssets(
+      join(cwd, WORKSPACE_DIR_NAME, "build"),
+      "product-search-result"
+    );
+    expect(
+      readFileSync(
+        join(
+          cwd,
+          WORKSPACE_DIR_NAME,
+          "build",
+          "views",
+          "product-search-result",
+          asset.entry
+        ),
+        "utf8"
+      )
+    ).toContain("shared-alias-marker");
+    vi.restoreAllMocks();
+  });
+
   it("builds views manifest, assets, wrapper entry, and binding checks", async () => {
     const cwd = copyFixture("build-views", "views");
     dirs.push(cwd);
@@ -246,8 +378,9 @@ describe("runBuild (views)", () => {
     const manifest = JSON.parse(
       readFileSync(join(buildDir, BUILD_MANIFEST_NAME), "utf8")
     ) as BuildManifest;
-
-    expect("views" in manifest).toBe(false);
+    expect(manifest.views["product-search-result"]).toEqual(
+      expect.objectContaining({ kind: "external" })
+    );
     const product = listViewAssets(buildDir, "product-search-result");
     expect(product.entry).toMatch(/^assets\/.+\.js$/);
     expect(product.css).toEqual(
@@ -481,7 +614,18 @@ describe("runBuild (views)", () => {
       )
     ) as BuildManifest;
     expect(manifest.inspector).toBe(true);
-    expect("views" in manifest).toBe(false);
+    expect(manifest.views).toEqual({});
+  });
+
+  it("emits source maps only when requested", async () => {
+    const cwd = copyFixture("build-source-maps");
+    dirs.push(cwd);
+
+    await runBuild({ cwd, sourceMaps: true });
+
+    expect(
+      existsSync(join(cwd, WORKSPACE_DIR_NAME, "build", "index.js.map"))
+    ).toBe(true);
   });
 
   it("builds a view module that uses browser globals at module scope", async () => {

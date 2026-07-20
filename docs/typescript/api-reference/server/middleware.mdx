@@ -56,7 +56,7 @@ Register with `server.use('mcp:…', handler)`. Patterns:
 - `mcp:*` — every MCP operation
 - `mcp:tools/call` — exact match
 
-Middleware runs in FIFO order (first registered = outermost). `ctx.params` is mutable before `next()`. Throwing rejects the request (surfaced as an MCP error result).
+Middleware runs in FIFO order (first registered = outermost). `ctx.params` is mutable before `next()`, and `ctx.request` is the originating HTTP `Request` when present. Throwing rejects the request (surfaced as an MCP error result).
 
 Exact patterns correlate `ctx.params`, `next()`, and the middleware return type with the selected MCP method. The global `mcp:*` pattern is pass-through middleware: it must call `next()`, cannot access its result, and cannot replace the response. Use an exact pattern for method-specific transformations.
 
@@ -70,6 +70,13 @@ server.use("mcp:*", async (ctx, next) => {
 server.use("mcp:tools/call", async (ctx, next) => {
   if (ctx.auth && !ctx.auth.scopes.includes("tools:*")) {
     throw new Error("Insufficient scope");
+  }
+  return next();
+});
+
+server.use("mcp:tools/list", async (ctx, next) => {
+  if (ctx.request?.headers.get("x-example-access") !== "allow") {
+    throw new Error("Tool discovery is not allowed");
   }
   return next();
 });

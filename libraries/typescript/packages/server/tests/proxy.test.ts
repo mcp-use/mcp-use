@@ -8,8 +8,8 @@ import { z } from "zod";
 
 import { MCPServer } from "../src/index.js";
 import type { ProxyConnection } from "../src/index.js";
-import { mountProxyConnection } from "../src/proxy.js";
-import type { ProxyMountHost } from "../src/proxy.js";
+import { mountProxyConnection } from "../src/mcp-proxy.js";
+import type { ProxyMountHost } from "../src/mcp-proxy.js";
 
 async function connectClient(url: string): Promise<Client> {
   const client = new Client(

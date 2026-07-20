@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { resolvePort } from "./args.js";
+import { loadProjectEnv } from "../cli/next-compat.js";
 
 /*
  * Workspace constants, re-declared per CLI_SPEC.md ("Same names,
@@ -101,6 +102,7 @@ export async function runStart(options: StartOptions): Promise<StartedServer> {
 
   // Production posture, but never clobber an explicit NODE_ENV.
   process.env.NODE_ENV ??= "production";
+  loadProjectEnv(options.cwd, "production");
 
   const entryPath = join(buildDir, entryPoint);
   const entryUrl = pathToFileURL(entryPath).href;

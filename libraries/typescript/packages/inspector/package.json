@@ -1,7 +1,7 @@
 {
   "name": "@mcp-use/inspector",
   "type": "module",
-  "version": "20.0.0-beta.9",
+  "version": "20.0.0-beta.12",
   "description": "MCP Inspector - A tool for inspecting and debugging MCP servers",
   "author": "",
   "license": "MIT",
@@ -76,10 +76,8 @@
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
     "test:e2e:tunnel": "node tests/e2e/scripts/run-tunnel-test.mjs",
-    "install:yarn": "yarn install",
     "install:pnpm": "pnpm install",
     "install:npm": "npm install",
-    "lint:yarn": "yarn eslint . --fix",
     "lint:npm": "npm run lint:fix",
     "lint:pnpm": "pnpm lint:fix"
   },

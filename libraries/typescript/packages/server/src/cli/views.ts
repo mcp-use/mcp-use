@@ -5,10 +5,15 @@
  */
 
 import { existsSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 import type { ViteDevServer } from "vite";
 
 import type { ViewsManifest } from "../views/types.js";
+import {
+  nextStandaloneAliases,
+  nextStandaloneCompatPlugin,
+  nextStandaloneSsrOptions,
+} from "./next-compat.js";
 
 /** Author-facing view source directory at the project root. */
 export const VIEWS_SOURCE_DIR = "views" as const;
@@ -42,8 +47,28 @@ export interface DiscoveredView {
  *
  * @internal
  */
-export function discoverViews(cwd: string): DiscoveredView[] {
-  const viewsDir = join(cwd, VIEWS_SOURCE_DIR);
+export function resolveViewsDir(cwd: string, override?: string): string {
+  const directory = override ?? VIEWS_SOURCE_DIR;
+  return isAbsolute(directory) ? directory : resolve(cwd, directory);
+}
+
+/**
+ * Scan `views/<name>/view.tsx` under the project root.
+ *
+ * A missing or empty views directory yields an empty list — tool-only
+ * projects keep byte-identical CLI behavior.
+ *
+ * @param cwd - Absolute project root.
+ * @param override - Optional views directory, absolute or relative to `cwd`.
+ * @returns Discovered views sorted by name.
+ *
+ * @internal
+ */
+export function discoverViews(
+  cwd: string,
+  override?: string
+): DiscoveredView[] {
+  const viewsDir = resolveViewsDir(cwd, override);
   if (!existsSync(viewsDir)) {
     return [];
   }
@@ -89,9 +114,13 @@ export function devVirtualEntryPath(name: string): string {
  *
  * @internal
  */
-export function isViewPath(file: string, cwd: string): boolean {
-  const rel = file.startsWith(cwd) ? file.slice(cwd.length + 1) : file;
-  return /^views\/[^/]+\//.test(rel) || /^views\/[^/]+\/view\.tsx$/.test(rel);
+export function isViewPath(
+  file: string,
+  cwd: string,
+  override?: string
+): boolean {
+  const viewsDir = resolveViewsDir(cwd, override);
+  return file === viewsDir || file.startsWith(`${viewsDir}/`);
 }
 
 /**
@@ -99,9 +128,16 @@ export function isViewPath(file: string, cwd: string): boolean {
  *
  * @internal
  */
-export function isViewEntryPath(file: string, cwd: string): boolean {
-  const rel = file.startsWith(cwd) ? file.slice(cwd.length + 1) : file;
-  return /^views\/[^/]+\/view\.tsx$/.test(rel);
+export function isViewEntryPath(
+  file: string,
+  cwd: string,
+  override?: string
+): boolean {
+  const viewsDir = resolveViewsDir(cwd, override);
+  const rel = file.startsWith(`${viewsDir}/`)
+    ? file.slice(viewsDir.length + 1)
+    : file;
+  return /^[^/]+\/view\.tsx$/.test(rel);
 }
 
 /**
@@ -139,7 +175,14 @@ export async function createBindingValidationServer(
     envDir: false,
     logLevel: "warn",
     cacheDir,
+    resolve: {
+      tsconfigPaths: true,
+      alias: nextStandaloneAliases(cwd),
+    },
+    plugins: [nextStandaloneCompatPlugin(cwd)],
     server: { middlewareMode: true, hmr: false },
-    ssr: { external: true },
+    ssr: {
+      ...nextStandaloneSsrOptions(cwd),
+    },
   });
 }

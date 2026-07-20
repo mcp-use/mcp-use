@@ -26,6 +26,7 @@ describe("MCP middleware — integration", () => {
   let client: Client;
   let transport: StreamableHTTPClientTransport;
   const log: string[] = [];
+  const requests = new Map<string, Request | undefined>();
 
   beforeAll(async () => {
     server = new MCPServer({
@@ -46,6 +47,7 @@ describe("MCP middleware — integration", () => {
     });
 
     server.use("mcp:tools/list", async (ctx, next) => {
+      requests.set("middleware", ctx.request);
       if (ctx.params.cursor !== undefined) {
         log.push(`tools/list:cursor:${ctx.params.cursor}`);
       }
@@ -59,14 +61,19 @@ describe("MCP middleware — integration", () => {
       );
     });
 
+    server.on("mcp:tools/list", (ctx) => {
+      requests.set("event", ctx.request);
+    });
+
     server.tool(
       {
         name: "echo",
         inputSchema: z.object({ message: z.string() }),
       },
-      async ({ message }) => ({
-        content: [{ type: "text", text: message }],
-      })
+      async ({ message }, ctx) => {
+        requests.set("tool", ctx.request);
+        return { content: [{ type: "text", text: message }] };
+      }
     );
 
     server.tool(
@@ -95,20 +102,37 @@ describe("MCP middleware — integration", () => {
       })
     );
 
-    server.resource({ name: "greeting", uri: "greet://hello" }, async () => ({
-      contents: [{ uri: "greet://hello", text: "Hello, World!" }],
-    }));
+    server.resource(
+      { name: "greeting", uri: "greet://hello" },
+      async (_uri, ctx) => {
+        requests.set("resource", ctx.request);
+        return {
+          contents: [{ uri: "greet://hello", text: "Hello, World!" }],
+        };
+      }
+    );
+
+    server.resourceTemplate(
+      { name: "templated-greeting", uriTemplate: "greet://{name}" },
+      async (uri, _params, ctx) => {
+        requests.set("resource-template", ctx.request);
+        return { contents: [{ uri: uri.href, text: "Hello from template." }] };
+      }
+    );
 
     server.prompt(
       { name: "introduce", schema: z.object({ name: z.string() }) },
-      async ({ name }) => ({
-        messages: [
-          {
-            role: "user",
-            content: { type: "text", text: `Hi, I'm ${name}!` },
-          },
-        ],
-      })
+      async ({ name }, ctx) => {
+        requests.set("prompt", ctx.request);
+        return {
+          messages: [
+            {
+              role: "user",
+              content: { type: "text", text: `Hi, I'm ${name}!` },
+            },
+          ],
+        };
+      }
     );
 
     const { url } = await server.listen(0);
@@ -148,6 +172,31 @@ describe("MCP middleware — integration", () => {
     log.length = 0;
     await client.listTools({ cursor: "page-2" });
     expect(log).toContain("tools/list:cursor:page-2");
+  });
+
+  it("exposes the originating HTTP request to every operation callback", async () => {
+    requests.clear();
+    await client.listTools();
+    await client.callTool({ name: "echo", arguments: { message: "request" } });
+    await client.readResource({ uri: "greet://hello" });
+    await client.readResource({ uri: "greet://Ada" });
+    await client.getPrompt({ name: "introduce", arguments: { name: "Ada" } });
+
+    for (const context of [
+      "middleware",
+      "event",
+      "tool",
+      "resource",
+      "resource-template",
+      "prompt",
+    ]) {
+      const request = requests.get(context);
+      expect(
+        request,
+        `${context} context did not receive a Request`
+      ).toBeInstanceOf(Request);
+      expect(request?.method).toBe("POST");
+    }
   });
 
   it("catch-all middleware runs on resources/list and prompts/list", async () => {

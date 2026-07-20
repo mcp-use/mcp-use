@@ -27,6 +27,8 @@ export default defineConfig([
       // preserved by esbuild, so dist/bin.js stays directly executable.
       bin: "src/bin.ts",
       "node-bridge": "src/node-bridge.ts",
+      "next-server-shims": "src/cli/next-server-shims.ts",
+      "next/index": "src/next/index.ts",
       // Each substantial command is a real sibling entry reached only through
       // the bin's dynamic imports. `start` therefore cannot evaluate Vite,
       // while `dev` and `build` remain isolated from each other.

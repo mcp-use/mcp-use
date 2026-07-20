@@ -41,9 +41,9 @@ type CliOptions = {
   skills?: boolean;
   dev?: boolean;
   sdkVersion?: string;
-  yarn?: boolean;
   npm?: boolean;
   pnpm?: boolean;
+  bun?: boolean;
 };
 
 function parseCli(argv: string[]): {
@@ -59,9 +59,9 @@ function parseCli(argv: string[]): {
       skills: { type: "boolean" },
       dev: { type: "boolean" },
       "sdk-version": { type: "string" },
-      yarn: { type: "boolean" },
       npm: { type: "boolean" },
       pnpm: { type: "boolean" },
+      bun: { type: "boolean" },
       help: { type: "boolean", short: "h" },
       version: { type: "boolean", short: "V" },
     },
@@ -90,9 +90,9 @@ function parseCli(argv: string[]): {
       skills,
       dev: values.dev as boolean | undefined,
       sdkVersion: values["sdk-version"] as string | undefined,
-      yarn: values.yarn as boolean | undefined,
       npm: values.npm as boolean | undefined,
       pnpm: values.pnpm as boolean | undefined,
+      bun: values.bun as boolean | undefined,
     },
   };
 }
@@ -131,8 +131,8 @@ function runPackageManager(
 function detectPackageManager(): string | null {
   const userAgent = process.env.npm_config_user_agent || "";
 
-  if (userAgent.includes("yarn")) {
-    return "yarn";
+  if (userAgent.includes("bun")) {
+    return "bun";
   }
   if (userAgent.includes("pnpm")) {
     return "pnpm";
@@ -146,10 +146,10 @@ function detectPackageManager(): string | null {
 
 function getDevCommand(packageManager: string): string {
   switch (packageManager) {
-    case "yarn":
-      return "yarn dev";
     case "pnpm":
       return "pnpm dev";
+    case "bun":
+      return "bun run dev";
     default:
       return "npm run dev";
   }
@@ -157,24 +157,17 @@ function getDevCommand(packageManager: string): string {
 
 function getInstallCommand(packageManager: string): string {
   switch (packageManager) {
-    case "yarn":
-      return "yarn";
     case "pnpm":
       return "pnpm install";
+    case "bun":
+      return "bun install";
     default:
       return "npm install";
   }
 }
 
 function getInstallArgs(packageManager: string): string[] {
-  switch (packageManager) {
-    case "yarn":
-      return ["install"];
-    case "pnpm":
-      return ["install"];
-    default:
-      return ["install"];
-  }
+  return ["install"];
 }
 
 interface InstallTelemetryData {
@@ -781,9 +774,9 @@ Options:
   --no-git                  Skip initializing a git repository
   --dev                     Use workspace dependencies for development
   --sdk-version <version>   Pin mcp-use to an npm version or dist-tag (e.g. canary, 1.34.0)
-  --yarn                    Use yarn as package manager
   --npm                     Use npm as package manager
   --pnpm                    Use pnpm as package manager
+  --bun                     Use Bun as package manager
   -h, --help                Display help
   -V, --version             Display version`);
 }
@@ -979,12 +972,12 @@ async function main(): Promise<void> {
 
   let usedPackageManager = "npm";
 
-  if (options.yarn) {
-    usedPackageManager = "yarn";
-  } else if (options.npm) {
+  if (options.npm) {
     usedPackageManager = "npm";
   } else if (options.pnpm) {
     usedPackageManager = "pnpm";
+  } else if (options.bun) {
+    usedPackageManager = "bun";
   } else {
     const detected = detectPackageManager();
     if (detected) {
@@ -1009,10 +1002,10 @@ async function main(): Promise<void> {
     console.log("");
 
     const isKnownManager =
-      options.yarn || options.npm || options.pnpm || detectPackageManager();
+      options.npm || options.pnpm || options.bun || detectPackageManager();
     const managersToTry = isKnownManager
       ? [usedPackageManager]
-      : ["npm", "pnpm", "yarn"];
+      : ["npm", "pnpm", "bun"];
 
     let installed = false;
     for (const pm of managersToTry) {
@@ -1039,7 +1032,7 @@ async function main(): Promise<void> {
 
     if (!installed) {
       console.log(
-        '⚠️  Please run "npm install", "yarn install", or "pnpm install" manually'
+        '⚠️  Please run "npm install", "pnpm install", or "bun install" manually'
       );
     }
   }
@@ -1107,7 +1100,7 @@ async function main(): Promise<void> {
   console.log(ansi.bold("📤 To deploy:"));
   console.log(
     ansi.cyan(
-      `   ${usedPackageManager === "yarn" ? "yarn" : usedPackageManager === "pnpm" ? "pnpm" : "npm run"} deploy`
+      `   ${usedPackageManager === "pnpm" ? "pnpm" : usedPackageManager === "bun" ? "bun run" : "npm run"} deploy`
     )
   );
   console.log("");

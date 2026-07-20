@@ -10,14 +10,14 @@ This guide focuses on where middleware fits and how to apply common patterns. Us
 
 ## Choose MCP middleware or HTTP middleware
 
-Use MCP middleware when the logic depends on the parsed MCP operation. Use HTTP middleware when the logic belongs at the request layer before MCP parsing.
+Use MCP middleware when the logic depends on the parsed MCP operation. Its `ctx.request` also exposes the originating HTTP request, so operation-specific authorization can inspect headers without a custom wrapper. Use HTTP middleware when logic belongs before MCP parsing.
 
 | Need | Use |
 | --- | --- |
 | Check which tool is being called | MCP middleware |
 | Filter tool, resource, or prompt lists | MCP middleware |
 | Require OAuth scopes per MCP operation | MCP middleware |
-| Add CORS, request logging, or HTTP headers | HTTP middleware |
+| Add CORS, request logging, pre-MCP routing, or non-MCP routes | HTTP middleware |
 | Mount Express or Hono middleware | HTTP middleware |
 
 MCP middleware patterns use the `mcp:` prefix. Mount `server.getHandler()` in your framework when you need HTTP middleware around the MCP endpoint.

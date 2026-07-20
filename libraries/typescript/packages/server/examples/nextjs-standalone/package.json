@@ -1,0 +1,29 @@
+{
+  "name": "mcp-use-example-nextjs-standalone",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "mcp-use dev --mcp-dir src/mcp --port 3001",
+    "build": "mcp-use build --mcp-dir src/mcp && next build",
+    "start": "mcp-use start",
+    "next:dev": "next dev --port 3000",
+    "next:build": "next build",
+    "next:start": "next start",
+    "typecheck": "tsc --noEmit",
+    "verify": "node ../verify-examples.mjs --example=nextjs-standalone"
+  },
+  "dependencies": {
+    "mcp-use": "workspace:*",
+    "next": "^16.0.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "server-only": "^0.0.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.17",
+    "typescript": "^7.0.2"
+  }
+}

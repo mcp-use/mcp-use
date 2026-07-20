@@ -417,6 +417,11 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     return this.session.getTokenEndpoint();
   }
 
+  /** Return the protected-resource URL selected during OAuth discovery. */
+  getResource(): Promise<string | null> {
+    return this.session.getResource();
+  }
+
   /**
    * Return the stored public OAuth client ID. Browser providers do not retain
    * client secrets.

@@ -55,25 +55,19 @@ This creates `create-mcp-use-app-X.X.X.tgz`
 npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app my-test-app --template ui
 ```
 
-**Using yarn:**
-```bash
-yarn dlx -p ./create-mcp-use-app-0.4.3.tgz create-mcp-use-app my-test-app --template ui
-```
-
 **Using pnpm:**
 ```bash
 pnpm --package=./create-mcp-use-app-0.4.3.tgz dlx create-mcp-use-app my-test-app --template ui
 ```
 
+**Using Bun:**
+```bash
+bunx --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app my-test-app --template ui
+```
+
 ### 3. Test Package Manager Flags
 
 Test that the correct package manager commands are shown in the output:
-
-**Test --yarn flag:**
-```bash
-npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-yarn --template ui --yarn
-# Should show: "yarn dev" and "yarn" commands
-```
 
 **Test --npm flag:**
 ```bash
@@ -133,10 +127,10 @@ npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-mcp-a
 Test with actual dependency installation (takes longer):
 
 ```bash
-npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-full --template ui --yarn
+npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-full --template ui --bun
 
 cd test-full
-yarn build  # Verify it builds
+bun run build  # Verify it builds
 ```
 
 ## CI Testing
@@ -147,9 +141,9 @@ The project includes a comprehensive GitHub Actions workflow (`.github/workflows
 
 **Test Matrix:**
 - **Operating Systems:** Ubuntu, macOS, Windows
-- **Package Managers:** npm, yarn, pnpm
+- **Package Managers:** npm, pnpm, Bun
 - **Templates:** ui, uiresource, apps_sdk
-- **Flags:** default, --yarn, --npm, --pnpm, --dev, --sdk-version
+- **Flags:** default, --npm, --pnpm, --bun, --dev, --sdk-version
 
 **Test Types:**
 1. **Basic Tests** - Create project without installing dependencies
@@ -179,11 +173,11 @@ You can also manually trigger the workflow from the GitHub Actions tab.
 
 ### Package Manager Detection
 
-- ✅ `--yarn` flag shows "yarn dev" and "yarn" commands
 - ✅ `--npm` flag shows "npm run dev" and "npm install" commands
 - ✅ `--pnpm` flag shows "pnpm dev" and "pnpm install" commands
-- ✅ Auto-detection works when run via npx/yarn/pnpm
-- ✅ No spinner shown for yarn and npm (they have their own progress)
+- ✅ `--bun` flag shows "bun run dev" and "bun install" commands
+- ✅ Auto-detection works when run via npx/pnpm/Bun
+- ✅ No spinner shown for npm and Bun (they have their own progress)
 - ✅ Spinner shown for pnpm
 
 ### Package Version Management
@@ -258,13 +252,12 @@ KEEP_TEST_DIR=yes ./test-cli.sh
 ### Example:
 
 ```bash
-run_test "My-New-Test" npm ui "--yarn" ""
+run_test "My-New-Test" npm ui "--bun" ""
 ```
 
 Parameters:
 1. Test name
-2. Package manager to run with (npm/yarn/pnpm)
+2. Package manager to run with (npm/pnpm/bun)
 3. Template name
 4. Flag (or "" for none)
 5. Whether to install ("yes" or "")
-

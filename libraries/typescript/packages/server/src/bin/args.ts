@@ -17,6 +17,12 @@ export interface ParsedArgs {
   port: number | undefined;
   /** Value of `--entry`, or `undefined` if the flag was not passed. */
   entry: string | undefined;
+  /** Project root selected by `--path`. */
+  path: string | undefined;
+  /** MCP source directory selected by `--mcp-dir`. */
+  mcpDir: string | undefined;
+  /** View source directory selected by `--views-dir`. */
+  viewsDir: string | undefined;
   /** Value of `--host`, or `undefined` if the flag was not passed. */
   host: string | undefined;
   /** Whether `--tunnel` was passed (dev only). */
@@ -25,6 +31,8 @@ export interface ParsedArgs {
   open: boolean;
   /** Whether `--with-inspector` was passed (build only). */
   withInspector: boolean;
+  /** Whether build output should include source maps (build only). */
+  sourceMaps: boolean;
   /** Whether `--help`/`-h` was passed. */
   help: boolean;
   /** Whether `--version`/`-v` was passed. */
@@ -48,10 +56,14 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
     command: undefined,
     port: undefined,
     entry: undefined,
+    path: undefined,
+    mcpDir: undefined,
+    viewsDir: undefined,
     host: undefined,
     tunnel: false,
     open: true,
     withInspector: false,
+    sourceMaps: false,
     help: false,
     version: false,
   };
@@ -97,6 +109,15 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
       case "--entry":
         args.entry = takeValue();
         break;
+      case "--path":
+        args.path = takeValue();
+        break;
+      case "--mcp-dir":
+        args.mcpDir = takeValue();
+        break;
+      case "--views-dir":
+        args.viewsDir = takeValue();
+        break;
       case "--host":
         args.host = takeValue();
         break;
@@ -108,6 +129,9 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
         break;
       case "--with-inspector":
         args.withInspector = true;
+        break;
+      case "--source-maps":
+        args.sourceMaps = true;
         break;
       default:
         if (flag.startsWith("-")) {

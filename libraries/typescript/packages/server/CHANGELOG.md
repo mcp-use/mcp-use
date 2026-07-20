@@ -1,5 +1,38 @@
 # mcp-use
 
+## 2.0.0-beta.20
+
+### Minor Changes
+
+- 3aca19c: Prefer Bun over Yarn in the scaffold CLI and docs, and make production source maps opt-in.
+
+  **mcp-use**
+  - Add `--source-maps` so `mcp-use build` emits source maps only when requested (server and view bundles default to no maps).
+  - Widen `NextConfigLike` with an index signature so `withMcpUse` accepts arbitrary Next.js config fields.
+
+  **create-mcp-use-app**
+  - Replace `--yarn` with `--bun`, detect Bun from the user agent, and install/run with Bun when selected.
+
+  **@mcp-use/agent / @mcp-use/client**
+  - Point missing-optional-dependency errors at npm, pnpm, or Bun instead of Yarn.
+
+  **@mcp-use/inspector**
+  - Drop Yarn-specific install/lint scripts from the package scripts surface.
+
+## 2.0.0-beta.19
+
+### Minor Changes
+
+- 7826695: Ship a Next.js drop-in adapter and harden sandbox view loading in the React client.
+
+  **mcp-use**
+  - Add `mcp-use/next` with `withMcpUse` and `createNextHandler` so MCP servers can mount inside Next.js App Router projects.
+  - Teach `mcp-use dev` / `mcp-use build` to discover `--mcp-dir` / `--views-dir`, load Next-style `.env*` files, and shim Next server-only modules when building standalone from a Next host.
+  - Add Next.js drop-in and standalone examples plus CI verification for the example suite.
+
+  **@mcp-use/client**
+  - Load blob sandboxes via `iframe.srcdoc` and delay blob URL revocation so React StrictMode remounts do not break view rendering.
+
 ## 2.0.0-beta.18
 
 ### Patch Changes
