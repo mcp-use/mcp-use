@@ -13,6 +13,8 @@ interface NextHeaderRule {
 
 /** Minimal structural Next.js config type, avoiding a runtime Next dependency. */
 export interface NextConfigLike {
+  /** Preserve arbitrary Next.js settings while augmenting the fields we use. */
+  [key: string]: unknown;
   headers?: () => NextHeaderRule[] | Promise<NextHeaderRule[]>;
   outputFileTracingIncludes?: Record<string, string[]>;
 }

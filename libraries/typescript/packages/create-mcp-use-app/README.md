@@ -118,8 +118,8 @@ npx create-mcp-use-app my-project --template owner/repo#branch-name
 
 # Use a specific package manager
 npx create-mcp-use-app my-project --npm
-npx create-mcp-use-app my-project --yarn
 npx create-mcp-use-app my-project --pnpm
+npx create-mcp-use-app my-project --bun
 
 # Install deps automatically (or --no-install to skip and skip prompt)
 npx create-mcp-use-app my-project --install
@@ -230,9 +230,9 @@ Once your project is created, you can:
 ```bash
 npm run dev
 # or
-yarn dev
-# or
 pnpm dev
+# or
+bun run dev
 ```
 
 This will:

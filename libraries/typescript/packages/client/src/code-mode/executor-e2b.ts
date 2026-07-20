@@ -37,7 +37,7 @@ export class E2BCodeExecutor extends BaseCodeExecutor {
       throw new Error(
         "@e2b/code-interpreter is not installed. " +
           "The E2B code executor requires this optional dependency. " +
-          "Install it with: yarn add @e2b/code-interpreter"
+          "Install it with: npm install @e2b/code-interpreter, pnpm add @e2b/code-interpreter, or bun add @e2b/code-interpreter"
       );
     }
   }

@@ -169,7 +169,7 @@ export async function createLLMFromString(
     ) {
       throw new Error(
         `Package '${providerConfig.package}' is not installed. ` +
-          `Install it with: npm install ${providerConfig.package} or yarn add ${providerConfig.package}`
+          `Install it with: npm install ${providerConfig.package}, pnpm add ${providerConfig.package}, or bun add ${providerConfig.package}`
       );
     }
     throw new Error(

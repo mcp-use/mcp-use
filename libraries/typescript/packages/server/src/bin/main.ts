@@ -34,6 +34,8 @@ export interface CliCommandOptions {
   open?: boolean;
   /** Record inspector availability in the build manifest (`--with-inspector`). */
   withInspector?: boolean;
+  /** Emit source maps in production build output (`--source-maps`). */
+  sourceMaps?: boolean;
 }
 
 const HELP = `mcp-use — run MCP servers built with mcp-use
@@ -63,6 +65,7 @@ Options:
   --mcp-dir <dir>    Directory containing the MCP entry and views/
   --views-dir <dir>  Views directory (default: views/ or <mcp-dir>/views/)
   --with-inspector   Record inspector availability in the build manifest (build only)
+  --source-maps      Emit source maps in build output (build only)
   --tunnel           Expose the dev server through a public tunnel (dev only)
   --no-open          Do not auto-open the inspector in a browser (dev only)
   -h, --help         Show this help
@@ -201,6 +204,7 @@ async function cliCommand(
     ...(args.tunnel && { tunnel: true }),
     ...(!args.open && { open: false }),
     ...(args.withInspector && { withInspector: true }),
+    ...(args.sourceMaps && { sourceMaps: true }),
   };
 
   try {

@@ -112,7 +112,7 @@ describe("runBuild", () => {
     const buildDir = join(cwd, WORKSPACE_DIR_NAME, "build");
     const entryFile = join(buildDir, "index.js");
     expect(existsSync(entryFile)).toBe(true);
-    expect(existsSync(`${entryFile}.map`)).toBe(true);
+    expect(existsSync(`${entryFile}.map`)).toBe(false);
 
     // Manifest shape per CLI_SPEC.md § Commands → build.
     const manifest = JSON.parse(
@@ -615,6 +615,17 @@ describe("runBuild (views)", () => {
     ) as BuildManifest;
     expect(manifest.inspector).toBe(true);
     expect(manifest.views).toEqual({});
+  });
+
+  it("emits source maps only when requested", async () => {
+    const cwd = copyFixture("build-source-maps");
+    dirs.push(cwd);
+
+    await runBuild({ cwd, sourceMaps: true });
+
+    expect(
+      existsSync(join(cwd, WORKSPACE_DIR_NAME, "build", "index.js.map"))
+    ).toBe(true);
   });
 
   it("builds a view module that uses browser globals at module scope", async () => {
