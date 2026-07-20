@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - canary
+      - beta
       - v2
     paths:
       - "libraries/typescript/**"
