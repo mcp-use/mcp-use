@@ -16,13 +16,13 @@ export interface InspectorOptions {
   enabled?: boolean;
   /**
    * Full replacement URL for the inspector bundle script (FastAPI's
-   * `swagger_js_url` analog). The shell's `<script type="module">` loads
-   * exactly this URL, so it must point at a complete copy of the
+   * `swagger_js_url` analog). When set, the shell's `<script type="module">`
+   * loads exactly this URL, so it must point at a complete copy of the
    * `@mcp-use/inspector` CDN bundle (`dist/cdn/inspector.js`) — self-host it
    * for air-gapped environments where the public CDN is unreachable.
    *
-   * @defaultValue The mcp-use CDN URL for the `@mcp-use/inspector` bundle,
-   * pinned to the current version.
+   * @defaultValue The latest `@mcp-use/inspector` beta, resolved to one exact
+   * asset version in the browser before the bundle loads.
    */
   assetsUrl?: string;
   /**

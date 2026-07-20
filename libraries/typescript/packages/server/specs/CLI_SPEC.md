@@ -321,7 +321,7 @@ Evaluates no Vite, toolchain, or unrelated command chunk. A production image ins
 
 The inspector UI is **not an npm dependency of `mcp-use`**. The framework owns a tiny dependency-free HTML shell route — the exact analog of FastAPI's `get_swagger_ui_html` for `/docs`:
 
-- `GET ${basePath}/inspector` returns a small HTML page whose `<script type="module">` and stylesheet load the framework-compatible inspector bundle from the configured CDN base, pinned to an exact asset version.
+- `GET ${basePath}/inspector` returns a small HTML page. By default, its inline module loader resolves the current `@mcp-use/inspector@beta` tag through the jsDelivr package API, validates the returned semver, then loads the stylesheet and module graph from that one exact CDN version. Each page load follows the current beta without mixing an entry script and lazy chunks from different releases.
 - The shell paints a centered boot spinner inside `#root` before the CDN bundle mounts, so the page is not blank while the first chunk downloads.
 - Config (autoConnect URL = the MCP endpoint at `basePath`, plus `basePath` itself) is passed via a serialized `window` global read by the bundle.
 
@@ -337,8 +337,9 @@ Default **enabled**, mounted in both dev and production; users set `inspector: {
 
 - `inspector.assetsUrl` overrides the CDN base (FastAPI's `swagger_js_url` analog) — point it at a self-hosted copy of the bundle for air-gapped environments.
 - `MCP_USE_INSPECTOR_ASSETS_URL` supplies the same override for local `dev`/`start` runs without modifying server code; explicit constructor config wins.
-- The default jsDelivr `@beta` bundle URL gets a per-request `?cb=<uuid>` cache-bust query param so browsers do not serve a stale entry script after a new Inspector publish; custom `assetsUrl` overrides are unchanged.
-- Browsers will serve the CDN bundle from HTTP cache after first load; that's best-effort, not the offline story.
+- The default shell preconnects to `data.jsdelivr.com` and `cdn.jsdelivr.net`. The version resolver response has a short CDN cache, while the resolved semver asset URLs are immutable and remain browser-cacheable.
+- Custom `assetsUrl` overrides load directly and do not call the version resolver. The same applies to standalone Inspector assets served locally from `dist/cdn/`.
+- Browsers will serve resolved CDN assets from HTTP cache after first load; that's best-effort, not the offline story.
 - The framework never discovers or serves a local `@mcp-use/inspector` package. Standalone/offline inspector use remains the independently installed inspector's responsibility.
 
 ## Why the server entry reloads instead of HMR

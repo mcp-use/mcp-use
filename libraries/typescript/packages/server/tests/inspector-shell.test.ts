@@ -9,11 +9,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { MCPServer } from "../src/index.js";
 import type { ServerConfig } from "../src/index.js";
 
-const DEFAULT_CDN_SCRIPT_RE =
-  /<script type="module" src="https:\/\/cdn\.jsdelivr\.net\/npm\/@mcp-use\/inspector@beta\/dist\/cdn\/inspector\.js\?cb=[0-9a-f-]{36}">/;
-
-const DEFAULT_CDN_STYLES_RE =
-  /<link rel="stylesheet" href="https:\/\/cdn\.jsdelivr\.net\/npm\/@mcp-use\/inspector@beta\/dist\/cdn\/inspector\.css\?cb=[0-9a-f-]{36}" \/>/;
+const DEFAULT_VERSION_RESOLVER_URL =
+  "https://data.jsdelivr.com/v1/packages/npm/@mcp-use/inspector/resolved?specifier=beta";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -81,9 +78,26 @@ describe("inspector shell route", () => {
 
     const html = await response.text();
     expect(html).toContain("<!doctype html>");
-    // The bundle loads from the public CDN with a per-request cache-bust param.
-    expect(html).toMatch(DEFAULT_CDN_SCRIPT_RE);
-    expect(html).toMatch(DEFAULT_CDN_STYLES_RE);
+    // The loader resolves beta once, then uses that exact version for the
+    // entry script, stylesheet, and every relative lazy chunk.
+    expect(html).toContain(
+      `const resolverUrl = "${DEFAULT_VERSION_RESOLVER_URL}"`
+    );
+    expect(html).toContain('resolved?.name !== "@mcp-use/inspector"');
+    expect(html).toMatch(
+      /const assetBase = `\$\{packageUrl\}@\$\{version\}\/dist\/cdn`;/
+    );
+    expect(html).toMatch(
+      /stylesheet\.href = `\$\{assetBase\}\/inspector\.css`;/
+    );
+    expect(html).toMatch(/await import\(`\$\{assetBase\}\/inspector\.js`\);/);
+    expect(html).toContain(
+      '<link rel="preconnect" href="https://data.jsdelivr.com" crossorigin />'
+    );
+    expect(html).toContain(
+      '<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />'
+    );
+    expect(html).not.toContain("?cb=");
     // Serialized runtime config: basePath from the server, autoConnectUrl
     // derived client-side from the page's own origin (no host guessing).
     expect(html).toContain("window.__MCP_USE_INSPECTOR__");
@@ -123,31 +137,28 @@ describe("inspector shell route", () => {
       const server = makeServer({ inspector });
       const response = await get(server, "/mcp/inspector");
       expect(response.status).toBe(200);
-      expect(await response.text()).toMatch(DEFAULT_CDN_SCRIPT_RE);
+      expect(await response.text()).toContain(DEFAULT_VERSION_RESOLVER_URL);
       await server.close();
     }
   });
 
-  it("uses a fresh cache-bust param on each shell response", async () => {
+  it("renders a stable resolver loader on each shell response", async () => {
     const server = makeServer();
     const html1 = await (await get(server, "/mcp/inspector")).text();
     const html2 = await (await get(server, "/mcp/inspector")).text();
-    const match1 = html1.match(/inspector\.js\?cb=([0-9a-f-]{36})/);
-    const match2 = html2.match(/inspector\.js\?cb=([0-9a-f-]{36})/);
-    expect(match1).not.toBeNull();
-    expect(match2).not.toBeNull();
-    expect(match1![1]).not.toBe(match2![1]);
+    expect(html1).toBe(html2);
+    expect(html1).not.toContain("?cb=");
     await server.close();
   });
 
-  it("does not cache-bust custom or local asset URLs", async () => {
+  it("does not resolve custom or local asset URLs", async () => {
     vi.stubEnv(
       "MCP_USE_INSPECTOR_ASSETS_URL",
       "http://127.0.0.1:4173/inspector.js"
     );
     const server = makeServer();
     const html = await (await get(server, "/mcp/inspector")).text();
-    expect(html).not.toContain("cb=");
+    expect(html).not.toContain(DEFAULT_VERSION_RESOLVER_URL);
     await server.close();
   });
 

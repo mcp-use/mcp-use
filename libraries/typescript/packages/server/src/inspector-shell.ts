@@ -2,9 +2,9 @@
  * Inspector CDN shell — the FastAPI `/docs` analog.
  *
  * The server ships no inspector code: it serves a tiny self-contained HTML
- * page whose `<script type="module">` loads the `@mcp-use/inspector` CDN
- * bundle entry (`dist/cdn/inspector.js`) plus lazy chunks, pinned to a major
- * version so the UI updates independently of SDK releases. Runtime configuration crosses to
+ * page whose inline module loader resolves the current `@mcp-use/inspector`
+ * beta and then loads that exact release's CDN bundle entry
+ * (`dist/cdn/inspector.js`) plus lazy chunks. Runtime configuration crosses to
  * the bundle through a serialized `window` global; the connect URL is derived
  * in the browser from the page's own origin, so the server never guesses its
  * public hostname.
@@ -28,6 +28,10 @@ export const INSPECTOR_TAG = "beta";
  */
 export const DEFAULT_INSPECTOR_ASSETS_URL = `https://cdn.jsdelivr.net/npm/@mcp-use/inspector@${INSPECTOR_TAG}/dist/cdn/inspector.js`;
 
+const INSPECTOR_VERSION_RESOLVER_URL = `https://data.jsdelivr.com/v1/packages/npm/@mcp-use/inspector/resolved?specifier=${INSPECTOR_TAG}`;
+const INSPECTOR_CDN_PACKAGE_URL =
+  "https://cdn.jsdelivr.net/npm/@mcp-use/inspector";
+
 /**
  * Derive the stylesheet URL that accompanies an inspector bundle URL.
  *
@@ -38,18 +42,6 @@ export const DEFAULT_INSPECTOR_ASSETS_URL = `https://cdn.jsdelivr.net/npm/@mcp-u
  */
 export function inspectorStylesUrl(assetsUrl: string): string {
   return assetsUrl.replace(/\.js(?=$|[?#])/, ".css");
-}
-
-/** True for the default jsDelivr `@mcp-use/inspector@*` CDN bundle URL. */
-export function isDefaultJsdelivrInspectorUrl(url: string): boolean {
-  return url.startsWith("https://cdn.jsdelivr.net/npm/@mcp-use/inspector@");
-}
-
-/** Append a per-request cache-bust query param for the default jsDelivr CDN URL. */
-export function withInspectorCacheBust(assetsUrl: string): string {
-  if (!isDefaultJsdelivrInspectorUrl(assetsUrl)) return assetsUrl;
-  const sep = assetsUrl.includes("?") ? "&" : "?";
-  return `${assetsUrl}${sep}cb=${crypto.randomUUID()}`;
 }
 
 /** True for inspector UI shell routes (SPA), excluding `/inspector/api/*`. */
@@ -105,6 +97,48 @@ function serializeForInlineScript(value: string): string {
   return JSON.stringify(value).replaceAll("<", "\\u003c");
 }
 
+/** Render the default loader that resolves one immutable Inspector release. */
+function renderDefaultInspectorAssetLoader(): string {
+  return `<script type="module">
+      const resolverUrl = ${serializeForInlineScript(INSPECTOR_VERSION_RESOLVER_URL)};
+      const packageUrl = ${serializeForInlineScript(INSPECTOR_CDN_PACKAGE_URL)};
+      const versionPattern = /^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$/;
+
+      try {
+        const response = await fetch(resolverUrl);
+        if (!response.ok) {
+          throw new Error(\`Inspector version resolver returned HTTP \${response.status}\`);
+        }
+
+        const resolved = await response.json();
+        if (
+          resolved?.name !== "@mcp-use/inspector" ||
+          typeof resolved.version !== "string" ||
+          !versionPattern.test(resolved.version)
+        ) {
+          throw new Error("Inspector version resolver returned an invalid release");
+        }
+
+        const version = resolved.version;
+        const assetBase = \`\${packageUrl}@\${version}/dist/cdn\`;
+        const stylesheet = document.createElement("link");
+        stylesheet.rel = "stylesheet";
+        stylesheet.href = \`\${assetBase}/inspector.css\`;
+        document.head.append(stylesheet);
+
+        window.__INSPECTOR_VERSION__ = version;
+        await import(\`\${assetBase}/inspector.js\`);
+      } catch (error) {
+        console.error("[Inspector] Failed to load the latest Inspector release:", error);
+        document.querySelector(".mcp-boot-spinner")?.remove();
+        const label = document.querySelector(".mcp-boot-label");
+        if (label) {
+          label.textContent = "Unable to load Inspector. Reload to try again.";
+        }
+      }
+    </script>`;
+}
+
 /**
  * Render the inspector shell page.
  *
@@ -113,10 +147,11 @@ function serializeForInlineScript(value: string): string {
  * page is not blank while the CDN bundle downloads, an inline script
  * publishing `window.__MCP_USE_INSPECTOR__ = { autoConnectUrl, basePath }`
  * — where `autoConnectUrl` is computed client-side as
- * `window.location.origin + basePath` — a stylesheet link for the bundle's
- * companion CSS (see {@link inspectorStylesUrl}), and a module script
- * loading the inspector bundle. All server-provided values are HTML-escaped
- * or JSON-serialized with `<` escaped, so config can't inject markup.
+ * `window.location.origin + basePath` — and either a default inline loader
+ * that resolves the latest beta to one immutable asset version or direct
+ * stylesheet and module tags for a custom asset URL. All server-provided
+ * values are HTML-escaped or JSON-serialized with `<` escaped, so config can't
+ * inject markup.
  */
 export function renderInspectorShell(options: InspectorShellOptions): string {
   const {
@@ -131,10 +166,22 @@ export function renderInspectorShell(options: InspectorShellOptions): string {
   const serializedManufactChatUrl = manufactChatUrl
     ? serializeForInlineScript(manufactChatUrl)
     : null;
-  const rawUrl = assetsUrl ?? DEFAULT_INSPECTOR_ASSETS_URL;
-  const bundleUrl = withInspectorCacheBust(rawUrl);
-  const scriptSrc = escapeHtml(bundleUrl);
-  const stylesHref = escapeHtml(inspectorStylesUrl(bundleUrl));
+  const usesDefaultAssets = assetsUrl === undefined;
+  const customScriptSrc =
+    assetsUrl === undefined ? null : escapeHtml(assetsUrl);
+  const customStylesHref =
+    assetsUrl === undefined ? null : escapeHtml(inspectorStylesUrl(assetsUrl));
+  const assetPreconnects = usesDefaultAssets
+    ? `    <link rel="preconnect" href="https://data.jsdelivr.com" crossorigin />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />`
+    : "";
+  const stylesheetTag =
+    customStylesHref !== null
+      ? `    <link rel="stylesheet" href="${customStylesHref}" />`
+      : "";
+  const assetLoader = usesDefaultAssets
+    ? renderDefaultInspectorAssetLoader()
+    : `<script type="module" src="${customScriptSrc}"></script>`;
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -144,11 +191,12 @@ export function renderInspectorShell(options: InspectorShellOptions): string {
     ${faviconHref !== undefined ? `<link rel="icon"${faviconType !== undefined ? ` type="${escapeHtml(faviconType)}"` : ""} href="${escapeHtml(faviconHref)}" />` : ""}
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+${assetPreconnects}
     <link
       href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="${stylesHref}" />
+${stylesheetTag}
     <style>
       :root { color-scheme: light dark; }
       html, body { height: 100%; margin: 0; background-color: #f3f3f3; }
@@ -243,7 +291,7 @@ export function renderInspectorShell(options: InspectorShellOptions): string {
         }
       })();
     </script>
-    <script type="module" src="${scriptSrc}"></script>
+    ${assetLoader}
   </body>
 </html>
 `;

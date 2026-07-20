@@ -11,22 +11,11 @@ export function inspectorStylesUrl(assetsUrl: string): string {
   return assetsUrl.replace(/\.js(?=$|[?#])/, ".css");
 }
 
-/** True for the default jsDelivr `@mcp-use/inspector@*` CDN bundle URL. */
-export function isDefaultJsdelivrInspectorUrl(url: string): boolean {
-  return url.startsWith("https://cdn.jsdelivr.net/npm/@mcp-use/inspector@");
-}
-
-/** Append a per-request cache-bust query param for the default jsDelivr CDN URL. */
-export function withInspectorCacheBust(assetsUrl: string): string {
-  if (!isDefaultJsdelivrInspectorUrl(assetsUrl)) return assetsUrl;
-  const sep = assetsUrl.includes("?") ? "&" : "?";
-  return `${assetsUrl}${sep}cb=${crypto.randomUUID()}`;
-}
-
 export type InspectorAssetUrls = {
   jsUrl: string;
   cssUrl: string;
   useLocal: boolean;
+  resolveLatest: boolean;
 };
 
 export function resolveInspectorAssetUrls(
@@ -41,6 +30,7 @@ export function resolveInspectorAssetUrls(
       jsUrl: envUrl,
       cssUrl: inspectorStylesUrl(envUrl),
       useLocal: false,
+      resolveLatest: false,
     };
   }
 
@@ -53,12 +43,14 @@ export function resolveInspectorAssetUrls(
         jsUrl: base,
         cssUrl: inspectorStylesUrl(base),
         useLocal: false,
+        resolveLatest: false,
       };
     }
     return {
       jsUrl: `${base}/inspector.js`,
       cssUrl: `${base}/inspector.css`,
       useLocal: false,
+      resolveLatest: false,
     };
   }
 
@@ -68,6 +60,7 @@ export function resolveInspectorAssetUrls(
       jsUrl: `${prefix}/dist/cdn/inspector.js`,
       cssUrl: `${prefix}/dist/cdn/inspector.css`,
       useLocal: true,
+      resolveLatest: false,
     };
   }
 
@@ -76,5 +69,6 @@ export function resolveInspectorAssetUrls(
     jsUrl,
     cssUrl: inspectorStylesUrl(jsUrl),
     useLocal: false,
+    resolveLatest: true,
   };
 }

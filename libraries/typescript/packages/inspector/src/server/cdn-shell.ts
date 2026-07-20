@@ -1,16 +1,15 @@
 import type { Context, Hono } from "hono";
-import {
-  inspectorStylesUrl,
-  resolveInspectorAssetUrls,
-  withInspectorCacheBust,
-  type InspectorMode,
-} from "./asset-urls.js";
+import { resolveInspectorAssetUrls, type InspectorMode } from "./asset-urls.js";
 import { renderInspectorFaviconLinks } from "./favicon-links.js";
 import { registerInspectorFaviconStatic } from "./favicon-static.js";
 import { registerInspectorStaticAssets } from "./static-assets.js";
 import { getInspectorVersion } from "./version.js";
 
 const INSPECTOR_VERSION = getInspectorVersion();
+const INSPECTOR_VERSION_RESOLVER_URL =
+  "https://data.jsdelivr.com/v1/packages/npm/@mcp-use/inspector/resolved?specifier=beta";
+const INSPECTOR_CDN_PACKAGE_URL =
+  "https://cdn.jsdelivr.net/npm/@mcp-use/inspector";
 
 export type { InspectorMode } from "./asset-urls.js";
 
@@ -31,10 +30,51 @@ const OAUTH_POPUP_CLOSED_HTML = `<!doctype html>
 <script>try{if(window.opener&&!window.opener.closed)window.opener.postMessage({type:"manufact:oauth-complete"},"*")}catch(e){}try{window.close()}catch(e){}</script>
 </body></html>`;
 
+function renderDefaultInspectorAssetLoader(): string {
+  return `<script type="module">
+      const resolverUrl = ${JSON.stringify(INSPECTOR_VERSION_RESOLVER_URL)};
+      const packageUrl = ${JSON.stringify(INSPECTOR_CDN_PACKAGE_URL)};
+      const versionPattern = /^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$/;
+
+      try {
+        const response = await fetch(resolverUrl);
+        if (!response.ok) {
+          throw new Error(\`Inspector version resolver returned HTTP \${response.status}\`);
+        }
+
+        const resolved = await response.json();
+        if (
+          resolved?.name !== "@mcp-use/inspector" ||
+          typeof resolved.version !== "string" ||
+          !versionPattern.test(resolved.version)
+        ) {
+          throw new Error("Inspector version resolver returned an invalid release");
+        }
+
+        const version = resolved.version;
+        const assetBase = \`\${packageUrl}@\${version}/dist/cdn\`;
+        const stylesheet = document.createElement("link");
+        stylesheet.rel = "stylesheet";
+        stylesheet.href = \`\${assetBase}/inspector.css\`;
+        document.head.append(stylesheet);
+
+        window.__INSPECTOR_VERSION__ = version;
+        await import(\`\${assetBase}/inspector.js\`);
+      } catch (error) {
+        console.error("[Inspector] Failed to load the latest Inspector release:", error);
+        document.querySelector(".mcp-boot-spinner")?.remove();
+        const label = document.querySelector(".mcp-boot-label");
+        if (label) {
+          label.textContent = "Unable to load Inspector. Reload to try again.";
+        }
+      }
+    </script>`;
+}
+
 function generateCdnShellHtml(
   config: CdnShellConfig | undefined,
   basePath: string,
-  assets: { jsUrl: string; cssUrl: string }
+  assets: { jsUrl: string; cssUrl: string; resolveLatest: boolean }
 ): string {
   const scripts: string[] = [];
   if (config?.basePath !== undefined) {
@@ -71,6 +111,16 @@ function generateCdnShellHtml(
     );
   }
   const runtimeScripts = scripts.join("\n    ");
+  const assetPreconnects = assets.resolveLatest
+    ? `    <link rel="preconnect" href="https://data.jsdelivr.com" crossorigin />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />`
+    : "";
+  const stylesheetTag = assets.resolveLatest
+    ? ""
+    : `    <link rel="stylesheet" href="${assets.cssUrl}" />`;
+  const assetLoader = assets.resolveLatest
+    ? renderDefaultInspectorAssetLoader()
+    : `<script type="module" src="${assets.jsUrl}"></script>`;
 
   return `<!doctype html>
 <html lang="en">
@@ -80,8 +130,9 @@ function generateCdnShellHtml(
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+${assetPreconnects}
     <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="${assets.cssUrl}" />
+${stylesheetTag}
     <title>Inspector | mcp-use</title>
     <meta name="description" content="Free, open-source MCP Inspector by mcp-use. Connect to any MCP server, test tools, prompts, and resources, inspect RPC logs, and debug MCP apps — all in your browser." />
     <style>
@@ -161,7 +212,7 @@ function generateCdnShellHtml(
         </div>
       </div>
     </div>
-    <script type="module" src="${assets.jsUrl}"></script>
+    ${assetLoader}
   </body>
 </html>`;
 }
@@ -189,14 +240,8 @@ export function registerInspectorCdnShell(
   };
 
   const serveShell = (c: Context) => {
-    const base = resolveInspectorAssetUrls(config?.inspectorMode, basePath);
-    const jsUrl = withInspectorCacheBust(base.jsUrl);
-    return c.html(
-      generateCdnShellHtml(effectiveConfig, basePath, {
-        jsUrl,
-        cssUrl: inspectorStylesUrl(jsUrl),
-      })
-    );
+    const assets = resolveInspectorAssetUrls(config?.inspectorMode, basePath);
+    return c.html(generateCdnShellHtml(effectiveConfig, basePath, assets));
   };
 
   registerInspectorFaviconStatic(app, basePath);
