@@ -37,9 +37,9 @@ verified Better Auth subject.
 
 `BETTER_AUTH_SECRET` is optional for local use. Copy `.env.example` to `.env`
 and replace the secret before adapting the example for a deployment. Keep
-`BETTER_AUTH_URL` identical in both processes, and set `MCP_URL` to the MCP
-server's public origin. The auth process appends `/mcp` for the token audience,
-matching the `mcp-use` CLI convention.
+`BETTER_AUTH_URL` and `MCP_USE_OAUTH_BETTER_AUTH_URL` identical, and set
+`MCP_URL` to the MCP server's public origin. The auth process appends `/mcp`
+for the token audience, matching the `mcp-use` CLI convention.
 
 ## File layout
 

@@ -7,7 +7,7 @@ It does not send the access token to Auth0 or any other service.
 ## Configure Auth0
 
 1. In Auth0, create an API for this MCP server. Set its API Identifier to the
-   value you will use for `AUTH0_AUDIENCE`, such as
+   value you will use for `MCP_USE_OAUTH_AUTH0_AUDIENCE`, such as
    `https://api.example.com`.
 2. Define the API permissions that your MCP client needs. The client must
    request those scopes during authorization. The example exposes verified
@@ -22,17 +22,17 @@ It does not send the access token to Auth0 or any other service.
    `resource` parameter. The requested scopes must be allowed for the API and
    application.
 
-`AUTH0_AUDIENCE` is the Auth0 API Identifier, not the Auth0 Management API
-audience. The server validates the token issuer, signature, and audience before
-the tool runs.
+`MCP_USE_OAUTH_AUTH0_AUDIENCE` is the Auth0 API Identifier, not the Auth0
+Management API audience. The server validates the token issuer, signature, and
+audience before the tool runs.
 
 ## Configure the server
 
 Copy `.env.example` to `.env` and set the required values:
 
 ```sh
-AUTH0_DOMAIN=https://your-tenant.us.auth0.com
-AUTH0_AUDIENCE=https://api.example.com
+MCP_USE_OAUTH_AUTH0_DOMAIN=https://your-tenant.us.auth0.com
+MCP_USE_OAUTH_AUTH0_AUDIENCE=https://api.example.com
 ```
 
 For a public deployment, also set `MCP_URL` to the public origin only:

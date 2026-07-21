@@ -34,7 +34,7 @@ const server = new MCPServer({
     "Authenticates Auth0 access tokens directly and returns verified token claims.",
   publicLandingPage: true,
   oauth: oauthAuth0Provider({
-    domain: requireEnv("AUTH0_DOMAIN"),
+    domain: requireEnv("MCP_USE_OAUTH_AUTH0_DOMAIN"),
   }),
 });
 

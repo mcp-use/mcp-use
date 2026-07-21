@@ -47,20 +47,22 @@ const getUserInfoOutputSchema = z.object({
   resource: z.string().nullable(),
 });
 
-const projectId = environmentValue("SUPABASE_PROJECT_ID");
-const supabaseUrlEnv = environmentValue("SUPABASE_URL");
-const jwtSecret = environmentValue("SUPABASE_JWT_SECRET");
-const publishableKey = environmentValue("SUPABASE_PUBLISHABLE_KEY");
+const projectId = environmentValue("MCP_USE_OAUTH_SUPABASE_PROJECT_ID");
+const supabaseUrlEnv = environmentValue("MCP_USE_OAUTH_SUPABASE_URL");
+const jwtSecret = environmentValue("MCP_USE_OAUTH_SUPABASE_JWT_SECRET");
+const publishableKey = environmentValue(
+  "MCP_USE_OAUTH_SUPABASE_PUBLISHABLE_KEY"
+);
 
 if (projectId === undefined && supabaseUrlEnv === undefined) {
   throw new Error(
-    "Missing Supabase configuration: set SUPABASE_PROJECT_ID or SUPABASE_URL."
+    "Missing Supabase configuration: set MCP_USE_OAUTH_SUPABASE_PROJECT_ID or MCP_USE_OAUTH_SUPABASE_URL."
   );
 }
 
 if (publishableKey === undefined) {
   throw new Error(
-    "Missing SUPABASE_PUBLISHABLE_KEY environment variable (required for the consent UI)."
+    "Missing MCP_USE_OAUTH_SUPABASE_PUBLISHABLE_KEY environment variable (required for the consent UI)."
   );
 }
 

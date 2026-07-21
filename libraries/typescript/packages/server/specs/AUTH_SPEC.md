@@ -22,7 +22,7 @@ const server = new MCPServer({
   name: "acme-tools",
   version: "1.0.0",
   oauth: oauthClerkProvider({
-    frontendApiUrl: process.env.CLERK_FRONTEND_API_URL!,
+    frontendApiUrl: process.env.MCP_USE_OAUTH_CLERK_FRONTEND_API_URL!,
   }),
 });
 ```

@@ -2,7 +2,8 @@ import { MCPServer } from "mcp-use";
 import { oauthBetterAuthProvider } from "mcp-use/oauth/better-auth";
 
 const authURL =
-  process.env["BETTER_AUTH_URL"] ?? "http://localhost:61843/api/auth";
+  process.env["MCP_USE_OAUTH_BETTER_AUTH_URL"] ??
+  "http://localhost:61843/api/auth";
 
 const server = new MCPServer({
   name: "better-auth-anonymous-example",

@@ -27,16 +27,17 @@ the validated access token.
 
 ### Audience validation
 
-For secure resource-server operation, set `KEYCLOAK_AUDIENCE` to the expected
-audience value (typically the API client ID or resource identifier). The server
-will reject access tokens that do not include this value in their `aud` claim.
+For secure resource-server operation, set
+`MCP_USE_OAUTH_KEYCLOAK_AUDIENCE` to the expected audience value (typically
+the API client ID or resource identifier). The server will reject access
+tokens that do not include this value in their `aud` claim.
 
 To configure Keycloak to include the audience claim:
 
 1. In the Keycloak admin console, navigate to the client scope assigned to
    your MCP client.
 2. Add an Audience protocol mapper with the target audience value matching
-   `KEYCLOAK_AUDIENCE`.
+   `MCP_USE_OAUTH_KEYCLOAK_AUDIENCE`.
 3. Ensure the mapper is included in the issued access tokens.
 
 ## Environment
@@ -44,9 +45,9 @@ To configure Keycloak to include the audience claim:
 Copy `.env.example` to `.env` and configure:
 
 ```sh
-KEYCLOAK_SERVER_URL=https://keycloak.example.com
-KEYCLOAK_REALM=mcp
-KEYCLOAK_AUDIENCE=mcp-api
+MCP_USE_OAUTH_KEYCLOAK_SERVER_URL=https://keycloak.example.com
+MCP_USE_OAUTH_KEYCLOAK_REALM=mcp
+MCP_USE_OAUTH_KEYCLOAK_AUDIENCE=mcp-api
 ```
 
 For deployments, set the same variables in the deployment environment.

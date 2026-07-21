@@ -20,8 +20,8 @@ const getUserInfoOutputSchema = z.object({
   resource: z.string().nullable(),
 });
 
-const keycloakServerUrl = requireEnv("KEYCLOAK_SERVER_URL");
-const keycloakRealm = requireEnv("KEYCLOAK_REALM");
+const keycloakServerUrl = requireEnv("MCP_USE_OAUTH_KEYCLOAK_SERVER_URL");
+const keycloakRealm = requireEnv("MCP_USE_OAUTH_KEYCLOAK_REALM");
 
 const server = new MCPServer({
   name: "keycloak-auth-example",

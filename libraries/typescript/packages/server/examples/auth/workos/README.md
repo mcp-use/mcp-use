@@ -18,14 +18,14 @@ cp .env.example .env
 ```
 
 ```dotenv
-WORKOS_SUBDOMAIN=your-company.authkit.app
-# WORKOS_AUDIENCE=https://api.example.com
+MCP_USE_OAUTH_WORKOS_SUBDOMAIN=your-company.authkit.app
+# MCP_USE_OAUTH_WORKOS_AUDIENCE=https://api.example.com
 ```
 
-`WORKOS_SUBDOMAIN` may be either the AuthKit hostname or its HTTPS origin.
-Set `WORKOS_AUDIENCE` only when your AuthKit access tokens have a required
-audience. For a public deployment, set `MCP_URL` to the public MCP server
-origin as shown in `.env.example`.
+`MCP_USE_OAUTH_WORKOS_SUBDOMAIN` may be either the AuthKit hostname or its
+HTTPS origin. Set `MCP_USE_OAUTH_WORKOS_AUDIENCE` only when your AuthKit access
+tokens have a required audience. For a public deployment, set `MCP_URL` to the
+public MCP server origin as shown in `.env.example`.
 
 ## Run it
 

@@ -18,18 +18,20 @@ It exposes one read-only tool:
 
 Copy `.env.example` to `.env` and configure one of:
 
-- `SUPABASE_PROJECT_ID` — the project reference, such as `abcd1234`
-- `SUPABASE_URL` — the full project URL, such as
+- `MCP_USE_OAUTH_SUPABASE_PROJECT_ID` — the project reference, such as
+  `abcd1234`
+- `MCP_USE_OAUTH_SUPABASE_URL` — the full project URL, such as
   `https://abcd1234.supabase.co`
 
 Also set:
 
-- `SUPABASE_PUBLISHABLE_KEY` — the publishable key (`sb_publishable_...`) from
-  Project Settings → API Keys. Required by the consent UI.
+- `MCP_USE_OAUTH_SUPABASE_PUBLISHABLE_KEY` — the publishable key
+  (`sb_publishable_...`) from Project Settings → API Keys. Required by the
+  consent UI.
 
-`SUPABASE_JWT_SECRET` is optional and only needed for legacy HS256 Supabase
-JWTs. If set, it must be at least 32 bytes. Without it, this example verifies
-ES256 tokens using the project's Supabase JWKS endpoint.
+`MCP_USE_OAUTH_SUPABASE_JWT_SECRET` is optional and only needed for legacy
+HS256 Supabase JWTs. If set, it must be at least 32 bytes. Without it, this
+example verifies ES256 tokens using the project's Supabase JWKS endpoint.
 
 For a deployed server, set `MCP_URL` to its public origin, for example
 `https://mcp.example.com`. The framework derives the protected resource URL as
