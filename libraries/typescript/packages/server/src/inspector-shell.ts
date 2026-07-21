@@ -279,11 +279,6 @@ ${stylesheetTag}
         };
         // Read by the current inspector bundle to derive its own URLs.
         window.__MCP_BASE_PATH__ = basePath;
-        // The built-in server shell has no Inspector proxy/BFF routes. Disable
-        // the Inspector's standalone proxy default so OAuth discovery stays
-        // direct and resolves against the MCP server's origin-level
-        // /.well-known routes instead of ${basePath}/inspector/api/oauth.
-        window.__MCP_PROXY_URL__ = null;
         ${process.env.MCP_USE_DEV_CLI === "1" ? "window.__MCP_DEV_CLI__ = true;" : ""}
         ${serializedManufactChatUrl ? `window.__MANUFACT_CHAT_URL__ = ${serializedManufactChatUrl};` : ""}
         // The bundle carries Node-flavored dependencies that touch \`process\`
