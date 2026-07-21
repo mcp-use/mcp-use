@@ -93,6 +93,7 @@ describe("BrowserOAuthClientProvider — pre-registered client_id", () => {
     expect(await provider.clientInformation()).toEqual({
       client_id: "dcr-public-client",
       token_endpoint_auth_method: "none",
+      redirect_uris: [provider.callbackUrl],
     });
     expect(localStorage.getItem(provider.getKey("client_info"))).not.toContain(
       "must-not-be-persisted"
@@ -106,6 +107,45 @@ describe("BrowserOAuthClientProvider — pre-registered client_id", () => {
 
     const info = await provider.clientInformation();
     expect(info).toBeUndefined();
+  });
+
+  it("clears stale OAuth state when the Inspector callback path changes", () => {
+    const provider = new BrowserOAuthClientProvider(SERVER_URL, {
+      callbackUrl: "https://app.example.com/inspector/oauth/callback",
+    });
+    localStorage.setItem(
+      provider.getKey("last_auth_url"),
+      "https://auth.example.com/authorize?redirect_uri=https%3A%2F%2Fapp.example.com%2Fmcp%2Finspector%2Foauth%2Fcallback"
+    );
+    localStorage.setItem(
+      provider.getKey("last_auth_callback_url"),
+      provider.callbackUrl
+    );
+    localStorage.setItem(provider.getKey("code_verifier"), "stale-verifier");
+    localStorage.setItem(
+      provider.getKey("client_info"),
+      JSON.stringify({ client_id: "stale-client" })
+    );
+
+    expect(provider.getLastAttemptedAuthUrl()).toBeNull();
+    expect(localStorage.getItem(provider.getKey("last_auth_url"))).toBeNull();
+    expect(localStorage.getItem(provider.getKey("code_verifier"))).toBeNull();
+    expect(localStorage.getItem(provider.getKey("client_info"))).toBeNull();
+  });
+
+  it("clears opaque stale authorization URLs without a callback marker", () => {
+    const provider = new BrowserOAuthClientProvider(SERVER_URL, {
+      callbackUrl: "https://app.example.com/inspector/oauth/callback",
+    });
+    localStorage.setItem(
+      provider.getKey("last_auth_url"),
+      "https://auth.example.com/authorize?auth_id=opaque"
+    );
+    localStorage.setItem(provider.getKey("code_verifier"), "stale-verifier");
+
+    expect(provider.getLastAttemptedAuthUrl()).toBeNull();
+    expect(localStorage.getItem(provider.getKey("last_auth_url"))).toBeNull();
+    expect(localStorage.getItem(provider.getKey("code_verifier"))).toBeNull();
   });
 
   it("includes scope in clientMetadata when configured", () => {

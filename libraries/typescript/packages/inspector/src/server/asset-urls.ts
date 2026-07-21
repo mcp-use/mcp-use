@@ -1,3 +1,5 @@
+import { getInspectorVersion } from "./version.js";
+
 /** How the inspector is being served (telemetry + hosted UI behavior). */
 export type InspectorMode = "standalone" | "embedded" | "cloud";
 
@@ -56,9 +58,10 @@ export function resolveInspectorAssetUrls(
 
   if (inspectorMode === "standalone") {
     const prefix = basePath;
+    const version = encodeURIComponent(getInspectorVersion());
     return {
-      jsUrl: `${prefix}/dist/cdn/inspector.js`,
-      cssUrl: `${prefix}/dist/cdn/inspector.css`,
+      jsUrl: `${prefix}/dist/cdn/inspector.js?v=${version}`,
+      cssUrl: `${prefix}/dist/cdn/inspector.css?v=${version}`,
       useLocal: true,
       resolveLatest: false,
     };

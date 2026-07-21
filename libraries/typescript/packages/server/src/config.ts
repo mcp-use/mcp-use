@@ -15,6 +15,25 @@ export interface InspectorOptions {
    */
   enabled?: boolean;
   /**
+   * Mount the same-origin MCP relay and OAuth BFF used by the Inspector.
+   *
+   * The relay accepts only HTTPS targets that resolve to public addresses,
+   * validates every redirect, and binds OAuth endpoints to metadata advertised
+   * by the selected MCP server.
+   *
+   * @defaultValue `true`
+   */
+  proxy?: boolean;
+  /**
+   * Permit the Inspector relay to reach loopback HTTP targets.
+   *
+   * This is useful when the Inspector and target MCP server are separate local
+   * processes. Never enable it on a publicly reachable deployment.
+   *
+   * @defaultValue `true` for localhost `listen()`, otherwise `false`
+   */
+  proxyAllowLoopback?: boolean;
+  /**
    * Full replacement URL for the inspector bundle script (FastAPI's
    * `swagger_js_url` analog). When set, the shell's `<script type="module">`
    * loads exactly this URL, so it must point at a complete copy of the

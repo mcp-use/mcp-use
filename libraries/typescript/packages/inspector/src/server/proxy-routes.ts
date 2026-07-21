@@ -41,6 +41,7 @@ export function registerInspectorProxyRoutes(
   if (mountOAuth) {
     mountOAuthProxy(app, {
       basePath: p("/inspector/api/oauth"),
+      callbackPath: p("/inspector/oauth/callback"),
       enableLogging: true,
       allowedOrigins: config?.oauthProxyAllowedOrigins ?? [],
       allowLoopback,

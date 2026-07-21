@@ -328,10 +328,25 @@ The inspector UI is **not an npm dependency of `mcp-use`**. The framework owns a
 `ServerConfig` gains:
 
 ```ts
-inspector?: { enabled?: boolean; assetsUrl?: string }; // default: enabled
+inspector?: {
+  enabled?: boolean;
+  assetsUrl?: string;
+  proxy?: boolean;
+  proxyAllowLoopback?: boolean;
+}; // inspector and proxy default enabled
 ```
 
-Default **enabled**, mounted in both dev and production; users set `inspector: { enabled: false }` to disable. The config shape is object-only. The embedded shell connects directly to the same-origin MCP endpoint and provides no inspector proxy route. Because it is an HTML string with CDN URLs, it does not create an npm dependency edge.
+Default **enabled**, mounted in both dev and production; users set `inspector: { enabled: false }` to disable. The config shape is object-only. The embedded shell injects `${basePath}/inspector/api/proxy` for the Inspector's Auto and Proxy connection modes. `inspector.proxy: false` removes both relay routes and injects `null`, leaving the embedded Inspector on direct browser connections only. Because the shell is an HTML string with CDN URLs, it does not create an npm dependency edge.
+
+The fetch-native relay is part of the server package and does not import Hono or `@mcp-use/inspector`. It mounts these same-origin routes ahead of the shell:
+
+- `${basePath}/inspector/api/proxy` relays MCP HTTP methods and streaming responses.
+- `${basePath}/inspector/api/oauth/metadata` fetches protected-resource and authorization-server metadata.
+- `${basePath}/inspector/api/oauth/proxy` relays only metadata-bound registration, token, revocation, and introspection requests.
+
+The relay is an SSRF boundary: remote targets require HTTPS and public DNS/IP resolution, redirects are revalidated and bounded, infrastructure/browser-origin/cookie headers are stripped, bearer authorization is removed before a cross-origin redirect, OAuth bodies and responses are capped, and requests time out. Loopback HTTP is allowed by default only when `listen()` binds to a localhost-class host; `proxyAllowLoopback` can override that policy and must not be enabled on a public deployment.
+
+Dynamic registration always uses the callback belonging to the current Inspector mount. When an authorization server returns a confidential client secret, the OAuth BFF retains it in bounded process memory, returns a browser-safe public client record, and restores `client_secret_basic` or `client_secret_post` only for a bound token endpoint. Deployments that can route one OAuth flow across processes must provide instance affinity until durable encrypted BFF storage is specified.
 
 ## Offline & self-hosting
 

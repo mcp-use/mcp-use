@@ -327,25 +327,50 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
         return response;
       }
 
-      const body = init?.body ? await serializeBody(init.body) : undefined;
+      const inputRequest = input instanceof Request ? input : undefined;
+      const method = init?.method ?? inputRequest?.method ?? "POST";
+      const requestHeaders = init?.headers ?? inputRequest?.headers;
+      let body: unknown;
+      if (init?.body !== undefined && init.body !== null) {
+        body = await serializeBody(init.body);
+      } else if (inputRequest?.body && method !== "GET" && method !== "HEAD") {
+        body = await inputRequest.clone().text();
+      }
       const response = await base(proxyEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           serverUrl: this.serverUrl,
           url,
-          method: init?.method || "POST",
-          headers: init?.headers
-            ? Object.fromEntries(new Headers(init.headers as HeadersInit))
+          method,
+          headers: requestHeaders
+            ? Object.fromEntries(new Headers(requestHeaders as HeadersInit))
             : {},
           body,
         }),
       });
-      const data = await response.json();
+      const data = (await response.json()) as {
+        status?: unknown;
+        statusText?: unknown;
+        headers?: unknown;
+        body?: unknown;
+      };
+      if (!response.ok || typeof data.status !== "number") {
+        return new Response(JSON.stringify(data), {
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers,
+        });
+      }
       return new Response(JSON.stringify(data.body), {
         status: data.status,
-        statusText: data.statusText,
-        headers: new Headers(data.headers),
+        statusText:
+          typeof data.statusText === "string" ? data.statusText : undefined,
+        headers: new Headers(
+          data.headers && typeof data.headers === "object"
+            ? (data.headers as HeadersInit)
+            : undefined
+        ),
       });
     };
   }
@@ -551,7 +576,34 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   getLastAttemptedAuthUrl(): string | null {
     const storedUrl = localStorage.getItem(this.getKey("last_auth_url"));
     if (!storedUrl) return null;
-    return sanitizeUrl(storedUrl);
+    const storedCallbackUrl = localStorage.getItem(
+      this.getKey("last_auth_callback_url")
+    );
+    if (storedCallbackUrl !== this.callbackUrl) {
+      console.info(
+        `[${this.storageKeyPrefix}] Recovering stale OAuth state whose callback cannot be verified.`
+      );
+      this.clearStorage();
+      return null;
+    }
+    const sanitized = sanitizeUrl(storedUrl);
+    try {
+      const redirectUri = new URL(sanitized).searchParams.get("redirect_uri");
+      if (
+        redirectUri &&
+        new URL(redirectUri).toString() !== new URL(this.callbackUrl).toString()
+      ) {
+        console.info(
+          `[${this.storageKeyPrefix}] Recovering stale OAuth state after the Inspector callback path changed.`
+        );
+        this.clearStorage();
+        return null;
+      }
+    } catch {
+      this.clearStorage();
+      return null;
+    }
+    return sanitized;
   }
 
   clearStorage(): number {

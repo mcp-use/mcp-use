@@ -34,6 +34,7 @@ import {
   jsonBodyMiddleware,
   matchesPath,
   originValidationMiddleware,
+  pathUnderBase,
   routeFetch,
   toFrameworkHandler,
   type FetchHandler,
@@ -1161,6 +1162,10 @@ export class MCPServer<TUser = never> {
       const inspectorHandler = createInspectorHandler(this.#config.inspector, {
         serverName: this.#config.name,
         basePath,
+        proxyUrl:
+          this.#config.inspector?.proxy === false
+            ? null
+            : pathUnderBase(basePath, "inspector/api/proxy"),
         ...(faviconHandler !== undefined && {
           faviconHref: "/favicon.ico",
           ...(this.#branding.faviconMimeType !== undefined && {
@@ -1169,6 +1174,35 @@ export class MCPServer<TUser = never> {
         }),
       });
       if (inspectorHandler !== undefined) {
+        if (this.#config.inspector?.proxy !== false) {
+          const localhostListen =
+            mode === "listen" &&
+            ["127.0.0.1", "localhost", "::1"].includes(
+              this.#config.host ?? "127.0.0.1"
+            );
+          const proxyPath = pathUnderBase(basePath, "inspector/api/proxy");
+          const oauthPrefix = pathUnderBase(basePath, "inspector/api/oauth/");
+          let loadedProxyHandler: Promise<FetchHandler> | undefined;
+          const inspectorProxyHandler: FetchHandler = async (request) => {
+            loadedProxyHandler ??= import("./inspector-proxy.js").then(
+              ({ createInspectorProxyHandler }) =>
+                createInspectorProxyHandler({
+                  basePath,
+                  allowLoopback:
+                    this.#config.inspector?.proxyAllowLoopback ??
+                    localhostListen,
+                })
+            );
+            return (await loadedProxyHandler)(request);
+          };
+          routes.push({
+            match: (request) => {
+              const pathname = new URL(request.url).pathname;
+              return pathname === proxyPath || pathname.startsWith(oauthPrefix);
+            },
+            handler: inspectorProxyHandler,
+          });
+        }
         routes.push({
           match: (request) => {
             if (request.method !== "GET" && request.method !== "HEAD") {

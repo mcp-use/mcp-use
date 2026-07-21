@@ -1013,12 +1013,29 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
 
         // Get tools, resources, and prompts through the protocol-neutral connection.
         setTools(connection.tools || []);
+        // Capability advertisements in the wild are not always granular: a
+        // server may support resources/list while returning Method not found
+        // for resources/templates/list. Inventory failures must not tear down
+        // an otherwise healthy MCP connection.
         const [resourcesResult, promptsResult, templatesResult] =
           await Promise.all([
-            connection.listAllResources(),
-            connection.listPrompts(),
+            connection.listAllResources().catch((error) => {
+              addLog("warn", "Failed to load initial resources:", error);
+              return { resources: [] };
+            }),
+            connection.listPrompts().catch((error) => {
+              addLog("warn", "Failed to load initial prompts:", error);
+              return { prompts: [] };
+            }),
             connection.supports("resources")
-              ? connection.listResourceTemplates()
+              ? connection.listResourceTemplates().catch((error) => {
+                  addLog(
+                    "warn",
+                    "Failed to load initial resource templates:",
+                    error
+                  );
+                  return { resourceTemplates: [] };
+                })
               : Promise.resolve({ resourceTemplates: [] }),
           ]);
         if (!isMountedRef.current) {

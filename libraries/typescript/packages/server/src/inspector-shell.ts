@@ -76,6 +76,8 @@ export interface InspectorShellOptions {
   assetsUrl?: string | undefined;
   /** Hosted managed-chat URL (`window.__MANUFACT_CHAT_URL__`). */
   manufactChatUrl?: string | undefined;
+  /** Same-origin Inspector MCP relay path, or null when the relay is disabled. */
+  proxyUrl?: string | null | undefined;
 }
 
 /** Escape a string for interpolation into HTML text or attribute values. */
@@ -170,11 +172,18 @@ export function renderInspectorShell(options: InspectorShellOptions): string {
     faviconType,
     assetsUrl,
     manufactChatUrl,
+    proxyUrl,
   } = options;
   const serializedBasePath = serializeForInlineScript(basePath);
   const serializedManufactChatUrl = manufactChatUrl
     ? serializeForInlineScript(manufactChatUrl)
     : null;
+  const serializedProxyUrl =
+    proxyUrl === undefined
+      ? undefined
+      : proxyUrl === null
+        ? "null"
+        : serializeForInlineScript(proxyUrl);
   const usesDefaultAssets = assetsUrl === undefined;
   const customScriptSrc =
     assetsUrl === undefined ? null : escapeHtml(assetsUrl);
@@ -279,6 +288,7 @@ ${stylesheetTag}
         };
         // Read by the current inspector bundle to derive its own URLs.
         window.__MCP_BASE_PATH__ = basePath;
+        ${serializedProxyUrl !== undefined ? `window.__MCP_PROXY_URL__ = ${serializedProxyUrl};` : ""}
         ${process.env.MCP_USE_DEV_CLI === "1" ? "window.__MCP_DEV_CLI__ = true;" : ""}
         ${serializedManufactChatUrl ? `window.__MANUFACT_CHAT_URL__ = ${serializedManufactChatUrl};` : ""}
         // The bundle carries Node-flavored dependencies that touch \`process\`
@@ -320,6 +330,7 @@ export function createInspectorHandler(
     basePath: string;
     faviconHref?: string;
     faviconType?: string;
+    proxyUrl?: string | null;
   }
 ): FetchHandler | undefined {
   if (inspector?.enabled === false) {
@@ -342,6 +353,7 @@ export function createInspectorHandler(
     }),
     assetsUrl,
     manufactChatUrl,
+    ...(options.proxyUrl !== undefined && { proxyUrl: options.proxyUrl }),
   };
 
   return async (request) => {

@@ -49,7 +49,10 @@ export function registerInspectorStaticAssets(
     const ext = path.extname(file);
     return c.body(readFileSync(file), 200, {
       "Content-Type": CONTENT_TYPES[ext] ?? "application/octet-stream",
-      "Cache-Control": "public, max-age=3600",
+      // Standalone assets use stable URLs across CLI restarts. Revalidate them
+      // so a rebuilt or upgraded Inspector cannot keep running an hour-old UI
+      // bundle that predates its storage migrations or proxy contract.
+      "Cache-Control": "no-cache",
     });
   });
 }

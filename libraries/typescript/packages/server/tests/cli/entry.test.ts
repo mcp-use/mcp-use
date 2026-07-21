@@ -61,7 +61,7 @@ describe("discoverEntry", () => {
   it("throws listing every candidate when none is found", () => {
     const dir = makeProject([]);
     expect(() => discoverEntry(dir)).toThrow(
-      /src\/index\.ts, src\/server\.ts, index\.ts, server\.ts/
+      /src\/index\.ts, src\/index\.tsx, src\/server\.ts, src\/server\.tsx, index\.ts, index\.tsx, server\.ts, server\.tsx/
     );
   });
 });

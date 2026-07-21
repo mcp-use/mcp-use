@@ -133,6 +133,54 @@ describe("BrowserOAuthClientProvider — scoped OAuth proxy fetch", () => {
     ).toBe("https://server-a.example.com/mcp");
   });
 
+  it("preserves OAuth method, headers, and body from a Request object", async () => {
+    globalFetchSpy
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            registration_endpoint: "https://auth.example.com/register",
+          }),
+          { headers: { "content-type": "application/json" } }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            status: 201,
+            statusText: "Created",
+            headers: { "content-type": "application/json" },
+            body: { client_id: "registered-client" },
+          })
+        )
+      );
+    const provider = makeProvider({ oauthProxyUrl: PROXY_URL });
+    const scoped = provider.getProxyFetch()!;
+
+    await scoped(
+      "https://server-a.example.com/.well-known/oauth-authorization-server"
+    );
+    const registrationBody = JSON.stringify({
+      client_name: "Inspector",
+      redirect_uris: ["https://app.example.com/oauth/callback"],
+    });
+    await scoped(
+      new Request("https://auth.example.com/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: registrationBody,
+      })
+    );
+
+    const payload = JSON.parse(String(globalFetchSpy.mock.calls[1][1]?.body));
+    expect(payload).toMatchObject({
+      serverUrl: "https://server-a.example.com/mcp",
+      url: "https://auth.example.com/register",
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: registrationBody,
+    });
+  });
+
   it("restores nonstandard OAuth endpoints from persisted discovery state after callback reconstruction", async () => {
     globalFetchSpy.mockResolvedValueOnce(
       new Response(
@@ -173,6 +221,25 @@ describe("BrowserOAuthClientProvider — scoped OAuth proxy fetch", () => {
       scoped("https://auth.example.com/oauth/token", { method: "POST" })
     ).rejects.toBe(proxyError);
     expect(globalFetchSpy).toHaveBeenCalledOnce();
+  });
+
+  it("preserves an OAuth BFF error response instead of returning an empty body", async () => {
+    globalFetchSpy.mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: "Origin not allowed" }), {
+        status: 403,
+        statusText: "Forbidden",
+        headers: { "content-type": "application/json" },
+      })
+    );
+    const provider = makeProvider({ oauthProxyUrl: PROXY_URL });
+
+    const response = await provider.getProxyFetch()!(
+      "https://auth.example.com/oauth/token",
+      { method: "POST" }
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: "Origin not allowed" });
   });
 
   it("Server B (Direct) bypasses metadata cache and never proxies — even while Server A uses a proxy", async () => {

@@ -68,6 +68,38 @@ function toolsListRequest(basePath: string): Request {
 }
 
 describe("inspector shell route", () => {
+  it("mounts the fetch-native proxy routes and injects their path", async () => {
+    const server = new MCPServer({
+      name: "proxy-enabled",
+      version: "1.0.0",
+      inspector: { proxy: true },
+    });
+    const handler = server.getHandler();
+    const shell = await handler(
+      new Request("https://example.test/mcp/inspector", {
+        headers: { Accept: "text/html" },
+      })
+    );
+    expect(await shell.text()).toContain(
+      'window.__MCP_PROXY_URL__ = "/mcp/inspector/api/proxy"'
+    );
+
+    const preflight = await handler(
+      new Request("https://example.test/mcp/inspector/api/proxy", {
+        method: "OPTIONS",
+        headers: {
+          Origin: "https://example.test",
+          "Access-Control-Request-Method": "POST",
+          "Access-Control-Request-Headers": "content-type,x-target-url",
+        },
+      })
+    );
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers.get("access-control-allow-origin")).toBe(
+      "https://example.test"
+    );
+  });
+
   it("serves the CDN shell at basePath + /inspector by default", async () => {
     const server = makeServer();
     const response = await get(server, "/mcp/inspector");

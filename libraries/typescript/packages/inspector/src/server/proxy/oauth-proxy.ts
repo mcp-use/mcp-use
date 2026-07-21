@@ -10,6 +10,7 @@
  */
 
 import { lookup } from "node:dns/promises";
+import { Buffer } from "node:buffer";
 import { isIP } from "node:net";
 import type { Context, Hono } from "hono";
 
@@ -22,7 +23,14 @@ type OAuthEndpointKind =
 type Binding = {
   authorizationServers: Set<string>;
   endpoints: Map<string, OAuthEndpointKind>;
+  tokenEndpointAuthMethods: Set<string>;
   updatedAt: number;
+};
+
+type ConfidentialClient = {
+  clientSecret: string;
+  authMethod: "client_secret_basic" | "client_secret_post";
+  expiresAt: number;
 };
 
 type ProxyRequest = {
@@ -46,6 +54,8 @@ interface OAuthProxyOptions {
   maxRequestBodyBytes?: number;
   /** @default 1048576 */
   maxResponseBodyBytes?: number;
+  /** Exact browser callback path enforced on dynamic registrations. */
+  callbackPath?: string;
   /** @default true */
   enableLogging?: boolean;
   /** Optional authentication applied before any outbound request. */
@@ -80,6 +90,8 @@ const ENDPOINT_FIELDS: ReadonlyArray<readonly [string, OAuthEndpointKind]> = [
 ];
 const BINDING_TTL_MS = 10 * 60 * 1000;
 const MAX_BINDINGS = 100;
+const CONFIDENTIAL_CLIENT_TTL_MS = 24 * 60 * 60 * 1000;
+const MAX_CONFIDENTIAL_CLIENTS = 500;
 
 export function mountOAuthProxy(
   app: Hono,
@@ -92,16 +104,18 @@ export function mountOAuthProxy(
     timeoutMs = 10_000,
     maxRequestBodyBytes = 64 * 1024,
     maxResponseBodyBytes = 1024 * 1024,
+    callbackPath = "/oauth/callback",
     enableLogging = true,
     authenticate,
     validateServerUrl,
   } = options;
   const origins = new Set(allowedOrigins.map(normalizeOrigin));
   const bindings = new Map<string, Binding>();
+  const confidentialClients = new Map<string, ConfidentialClient>();
 
   app.use(`${basePath}/*`, async (c, next) => {
     const origin = c.req.header("Origin");
-    if (origin && !isAllowedOrigin(origin, c.req.url, origins)) {
+    if (origin && !isAllowedOrigin(origin, c, origins)) {
       return c.json({ error: "Origin not allowed" }, 403);
     }
     if (c.req.method === "OPTIONS") {
@@ -282,7 +296,24 @@ export function mountOAuthProxy(
 
     try {
       const headers = filterRequestHeaders(request.headers);
-      const body = serializeBody(request.body, headers);
+      let body = serializeBody(request.body, headers);
+      if (endpointKind === "registration") {
+        const publicOrigin = normalizeOrigin(
+          c.req.header("Origin") ?? new URL(c.req.url).origin
+        );
+        body = enforceRegistrationRedirectUri(
+          body,
+          headers,
+          new URL(callbackPath, publicOrigin).toString()
+        );
+      } else {
+        body = applyConfidentialClientAuthentication({
+          body,
+          headers,
+          bindingKey,
+          clients: confidentialClients,
+        });
+      }
       if (
         new TextEncoder().encode(body ?? "").byteLength > maxRequestBodyBytes
       ) {
@@ -313,6 +344,20 @@ export function mountOAuthProxy(
         } catch {
           // Preserve malformed upstream bodies; the OAuth client will reject them.
         }
+      }
+      if (
+        endpointKind === "registration" &&
+        upstream.ok &&
+        responseBody &&
+        typeof responseBody === "object" &&
+        !Array.isArray(responseBody)
+      ) {
+        responseBody = retainConfidentialClient({
+          responseBody: responseBody as Record<string, unknown>,
+          binding,
+          bindingKey,
+          clients: confidentialClients,
+        });
       }
       return c.json({
         status: upstream.status,
@@ -464,6 +509,7 @@ async function bindProtectedResource(
   }
   binding.authorizationServers = issuers;
   binding.endpoints.clear();
+  binding.tokenEndpointAuthMethods.clear();
 }
 
 async function bindAuthorizationServer(
@@ -481,6 +527,13 @@ async function bindAuthorizationServer(
     );
   }
   binding.endpoints.clear();
+  binding.tokenEndpointAuthMethods = new Set(
+    Array.isArray(metadata.token_endpoint_auth_methods_supported)
+      ? metadata.token_endpoint_auth_methods_supported.filter(
+          (method): method is string => typeof method === "string"
+        )
+      : []
+  );
   for (const [field, kind] of ENDPOINT_FIELDS) {
     const value = metadata[field];
     if (value === undefined) continue;
@@ -589,7 +642,17 @@ function filterResponseHeaders(headers: Headers): Record<string, string> {
 
 function serializeBody(body: unknown, headers: Headers): string | undefined {
   if (body === undefined || body === null) return undefined;
-  if (typeof body === "string") return body;
+  if (typeof body === "string") {
+    if (!headers.has("content-type")) {
+      try {
+        JSON.parse(body);
+        headers.set("content-type", "application/json");
+      } catch {
+        headers.set("content-type", "application/x-www-form-urlencoded");
+      }
+    }
+    return body;
+  }
   const contentType = headers.get("content-type") ?? "";
   if (
     contentType.includes("application/x-www-form-urlencoded") &&
@@ -608,6 +671,114 @@ function serializeBody(body: unknown, headers: Headers): string | undefined {
     headers.set("content-type", "application/json");
   }
   return JSON.stringify(body);
+}
+
+function confidentialClientKey(bindingKey: string, clientId: string): string {
+  return `${bindingKey}\u0000${clientId}`;
+}
+
+function retainConfidentialClient(options: {
+  responseBody: Record<string, unknown>;
+  binding: Binding;
+  bindingKey: string;
+  clients: Map<string, ConfidentialClient>;
+}): Record<string, unknown> {
+  const { responseBody, binding, bindingKey, clients } = options;
+  const clientId = responseBody.client_id;
+  const clientSecret = responseBody.client_secret;
+  if (typeof clientId !== "string" || typeof clientSecret !== "string") {
+    return responseBody;
+  }
+
+  const returnedMethod = responseBody.token_endpoint_auth_method;
+  const authMethod =
+    returnedMethod === "client_secret_post" ||
+    returnedMethod === "client_secret_basic"
+      ? returnedMethod
+      : binding.tokenEndpointAuthMethods.has("client_secret_basic")
+        ? "client_secret_basic"
+        : "client_secret_post";
+  const upstreamExpiry = responseBody.client_secret_expires_at;
+  const expiresAt =
+    upstreamExpiry === 0
+      ? Number.POSITIVE_INFINITY
+      : typeof upstreamExpiry === "number" && upstreamExpiry > 0
+        ? upstreamExpiry * 1000
+        : Date.now() + CONFIDENTIAL_CLIENT_TTL_MS;
+
+  pruneConfidentialClients(clients);
+  clients.set(confidentialClientKey(bindingKey, clientId), {
+    clientSecret,
+    authMethod,
+    expiresAt,
+  });
+  while (clients.size > MAX_CONFIDENTIAL_CLIENTS) {
+    const oldest = clients.keys().next().value as string | undefined;
+    if (!oldest) break;
+    clients.delete(oldest);
+  }
+
+  const browserSafe = { ...responseBody };
+  delete browserSafe.client_secret;
+  delete browserSafe.client_secret_expires_at;
+  browserSafe.token_endpoint_auth_method = "none";
+  return browserSafe;
+}
+
+function applyConfidentialClientAuthentication(options: {
+  body: string | undefined;
+  headers: Headers;
+  bindingKey: string;
+  clients: Map<string, ConfidentialClient>;
+}): string | undefined {
+  const { body, headers, bindingKey, clients } = options;
+  if (
+    !body ||
+    !(headers.get("content-type") ?? "").includes(
+      "application/x-www-form-urlencoded"
+    )
+  ) {
+    return body;
+  }
+
+  const params = new URLSearchParams(body);
+  const clientId = params.get("client_id");
+  if (!clientId) return body;
+
+  const key = confidentialClientKey(bindingKey, clientId);
+  const client = clients.get(key);
+  if (!client) return body;
+  if (client.expiresAt <= Date.now()) {
+    clients.delete(key);
+    return body;
+  }
+
+  params.delete("client_secret");
+  if (client.authMethod === "client_secret_basic") {
+    const encoded = Buffer.from(
+      `${encodeOAuthClientCredential(clientId)}:${encodeOAuthClientCredential(client.clientSecret)}`,
+      "utf8"
+    ).toString("base64");
+    headers.set("authorization", `Basic ${encoded}`);
+  } else {
+    headers.delete("authorization");
+    params.set("client_id", clientId);
+    params.set("client_secret", client.clientSecret);
+  }
+  return params.toString();
+}
+
+function encodeOAuthClientCredential(value: string): string {
+  return new URLSearchParams({ value }).toString().slice("value=".length);
+}
+
+function pruneConfidentialClients(
+  clients: Map<string, ConfidentialClient>
+): void {
+  const now = Date.now();
+  for (const [key, client] of clients) {
+    if (client.expiresAt <= now) clients.delete(key);
+  }
 }
 
 async function readRequestCapped(
@@ -682,6 +853,7 @@ function getBinding(bindings: Map<string, Binding>, key: string): Binding {
   return {
     authorizationServers: new Set(),
     endpoints: new Map(),
+    tokenEndpointAuthMethods: new Set(),
     updatedAt: Date.now(),
   };
 }
@@ -710,6 +882,28 @@ function canonicalUrl(url: URL): string {
   return copy.toString().replace(/\/$/, "");
 }
 
+function enforceRegistrationRedirectUri(
+  body: string | undefined,
+  headers: Headers,
+  callbackUrl: string
+): string | undefined {
+  if (!body) return body;
+  const contentType = headers.get("content-type") ?? "";
+  if (!contentType.includes("json")) return body;
+  try {
+    const parsed = JSON.parse(body) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return body;
+    }
+    return JSON.stringify({
+      ...(parsed as Record<string, unknown>),
+      redirect_uris: [callbackUrl],
+    });
+  } catch {
+    return body;
+  }
+}
+
 function normalizeOrigin(origin: string): string {
   const url = new URL(origin);
   if (url.pathname !== "/" || url.search || url.hash) {
@@ -720,12 +914,28 @@ function normalizeOrigin(origin: string): string {
 
 function isAllowedOrigin(
   origin: string,
-  requestUrl: string,
+  c: Context,
   allowed: Set<string>
 ): boolean {
   try {
     const normalized = normalizeOrigin(origin);
-    return normalized === new URL(requestUrl).origin || allowed.has(normalized);
+    if (normalized === new URL(c.req.url).origin || allowed.has(normalized)) {
+      return true;
+    }
+
+    const originUrl = new URL(normalized);
+    const forwardedHost = c.req
+      .header("x-forwarded-host")
+      ?.split(",")[0]
+      ?.trim();
+    const requestHost = forwardedHost || c.req.header("host");
+    if (!requestHost || originUrl.host !== requestHost) return false;
+
+    const forwardedProto = c.req
+      .header("x-forwarded-proto")
+      ?.split(",")[0]
+      ?.trim();
+    return !forwardedProto || `${forwardedProto}:` === originUrl.protocol;
   } catch {
     return false;
   }

@@ -216,11 +216,25 @@ export class OAuthSessionStore {
     if (ctx) await this.store.set(this.credentialKey("tokens"), serialized);
     await this.store.remove(this.getKey("code_verifier"));
     await this.store.remove(this.getKey("last_auth_url"));
+    await this.store.remove(this.getKey("last_auth_callback_url"));
   }
 
   async clientInformation(
     ctx?: OAuthClientInformationContext
   ): Promise<OAuthClientInformation | undefined> {
+    if (!this.allowClientSecret) {
+      const registeredRedirectUri = await this.store.get(
+        this.getKey("client_info_redirect_uri")
+      );
+      if (registeredRedirectUri !== this.redirectUrl) {
+        await this.invalidateCredentials("registration");
+        console.info(
+          `[${this.storageKeyPrefix}] Re-registering browser OAuth client after its Inspector callback changed or could not be verified.`
+        );
+        return undefined;
+      }
+    }
+
     const stored = await this.readCredential<
       OAuthClientInformation & {
         issuer?: string;
@@ -232,29 +246,27 @@ export class OAuthSessionStore {
     const { key, value: clientInfo } = stored;
     try {
       if (!this.allowClientSecret && clientInfo.client_secret) {
-        await this.store.remove(key);
-        if (ctx) await this.store.remove(this.credentialKey("client_info"));
+        await this.invalidateCredentials("registration");
         console.warn(
-          `[${this.storageKeyPrefix}] Removed OAuth client information containing a browser client_secret.`
+          `[${this.storageKeyPrefix}] Recovered stale browser OAuth credentials containing a client_secret.`
         );
         return undefined;
       }
       const storedRedirectUris = Array.isArray(clientInfo.redirect_uris)
         ? clientInfo.redirect_uris
         : [];
-      // length === 0 means the server didn't include redirect_uris in the
-      // registration response — skip the check rather than invalidating valid creds.
+      // Node clients can retain registrations from servers that omit
+      // redirect_uris. Browser clients cannot: the same origin may serve both
+      // embedded and standalone Inspectors at different callback paths.
       const hasMatchingRedirect =
-        storedRedirectUris.length === 0 ||
+        (storedRedirectUris.length === 0 && this.allowClientSecret) ||
         storedRedirectUris.includes(this.redirectUrl);
 
       if (!hasMatchingRedirect) {
         console.info(
-          `[${this.storageKeyPrefix}] Invalidating cached OAuth client info due to redirect URI mismatch.`
+          `[${this.storageKeyPrefix}] Recovering cached OAuth credentials after a redirect URI change.`
         );
-        await this.store.remove(key);
-        await this.store.remove(this.credentialKey("tokens", ctx));
-        await this.store.remove(this.getKey("last_auth_url"));
+        await this.invalidateCredentials("registration");
         return undefined;
       }
 
@@ -279,10 +291,26 @@ export class OAuthSessionStore {
         "Browser OAuth clients must be public clients; client_secret persistence is not allowed."
       );
     }
-    const serialized = JSON.stringify(clientInformation);
+    const persistedClientInformation =
+      !this.allowClientSecret &&
+      (!("redirect_uris" in clientInformation) ||
+        !Array.isArray(
+          (clientInformation as { redirect_uris?: unknown }).redirect_uris
+        ) ||
+        (clientInformation as { redirect_uris: unknown[] }).redirect_uris
+          .length === 0)
+        ? { ...clientInformation, redirect_uris: [this.redirectUrl] }
+        : clientInformation;
+    const serialized = JSON.stringify(persistedClientInformation);
     await this.store.set(this.credentialKey("client_info", ctx), serialized);
     if (ctx) {
       await this.store.set(this.credentialKey("client_info"), serialized);
+    }
+    if (!this.allowClientSecret) {
+      await this.store.set(
+        this.getKey("client_info_redirect_uri"),
+        this.redirectUrl
+      );
     }
   }
 
@@ -302,7 +330,13 @@ export class OAuthSessionStore {
   }
 
   async invalidateCredentials(
-    scope: "all" | "client" | "tokens" | "verifier" | "discovery"
+    scope:
+      | "all"
+      | "registration"
+      | "client"
+      | "tokens"
+      | "verifier"
+      | "discovery"
   ): Promise<void> {
     const removeCredentialKeys = async (
       kind: "client_info" | "tokens"
@@ -316,11 +350,25 @@ export class OAuthSessionStore {
     };
 
     switch (scope) {
+      case "registration":
+        // The SDK saves freshly discovered issuer metadata before it asks for
+        // client information. Preserve that callback-leg binding while
+        // replacing stale browser registration and authorization artifacts.
+        await removeCredentialKeys("tokens");
+        await removeCredentialKeys("client_info");
+        await this.store.remove(this.getKey("code_verifier"));
+        await this.store.remove(this.getKey("last_auth_url"));
+        await this.store.remove(this.getKey("last_auth_callback_url"));
+        await this.store.remove(this.getKey("client_info_redirect_uri"));
+        await this.store.remove(this.getKey("token_endpoint"));
+        break;
       case "all":
         await removeCredentialKeys("tokens");
         await removeCredentialKeys("client_info");
         await this.store.remove(this.getKey("code_verifier"));
         await this.store.remove(this.getKey("last_auth_url"));
+        await this.store.remove(this.getKey("last_auth_callback_url"));
+        await this.store.remove(this.getKey("client_info_redirect_uri"));
         await this.store.remove(this.getKey("discovery_state"));
         await this.store.remove(this.getKey("token_endpoint"));
         break;
@@ -403,6 +451,10 @@ export class OAuthSessionStore {
     // Persist the state record BEFORE the last_auth_url so a partial failure
     // can't leave behind an auth URL whose state has no backing record.
     await this.store.set(stateKey, JSON.stringify(stateData));
+    await this.store.set(
+      this.getKey("last_auth_callback_url"),
+      this.redirectUrl
+    );
     await this.store.set(this.getKey("last_auth_url"), sanitizedAuthUrl);
 
     return sanitizedAuthUrl;

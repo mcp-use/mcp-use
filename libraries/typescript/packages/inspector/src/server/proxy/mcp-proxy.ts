@@ -13,6 +13,8 @@ import { logger } from "hono/logger";
 // ponytail: vendored from mcp-use/src/server/middleware/mcp-proxy.ts — keep in sync manually.
 import { isSafeProxyTarget } from "./oauth-proxy.js";
 
+const MAX_REDIRECTS = 3;
+
 /**
  * Options for configuring the MCP proxy middleware
  */
@@ -229,8 +231,13 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
           !lowerKey.startsWith("cf-") &&
           lowerKey !== "x-original-host" &&
           lowerKey !== "host" &&
+          lowerKey !== "origin" &&
+          lowerKey !== "referer" &&
+          lowerKey !== "cookie" &&
+          lowerKey !== "proxy-authorization" &&
           lowerKey !== "accept-encoding" &&
-          lowerKey !== "cdn-loop"
+          lowerKey !== "cdn-loop" &&
+          !lowerKey.startsWith("sec-fetch-")
         ) {
           headers[key] = value;
         }
@@ -238,14 +245,6 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
 
       // Explicitly request uncompressed response to avoid encoding issues
       headers["Accept-Encoding"] = "identity";
-
-      // Set the target URL's host as the Host header
-      try {
-        const targetUrlObj = new URL(targetUrl);
-        headers.Host = targetUrlObj.host;
-      } catch {
-        return c.json({ error: "Invalid target URL" }, 400);
-      }
 
       // Get request body for POST/PUT/PATCH methods
       // IMPORTANT: Create a stable copy of the body bytes using .slice() to prevent
@@ -256,108 +255,54 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
           ? new Uint8Array(await c.req.arrayBuffer()).slice()
           : undefined;
 
-      // Forward request to target server
-      // Use redirect: 'manual' to handle redirects ourselves, avoiding undici's
-      // internal body re-use which can trigger detachment errors.
-      const response = await fetch(targetUrl, {
-        method,
-        headers,
-        body,
-        redirect: "manual",
-      });
+      let currentUrl = targetUrl;
+      let currentMethod = method;
+      let currentBody = body;
 
-      // Handle redirects manually to avoid ArrayBuffer detachment issues in Node.js
-      // When undici follows redirects automatically, it tries to re-use the request body,
-      // but by that point the ArrayBuffer may be detached, causing "Cannot perform
-      // ArrayBuffer.prototype.slice on a detached ArrayBuffer" errors.
-      if (response.status >= 300 && response.status < 400) {
-        const location = response.headers.get("location");
-        if (location) {
-          const redirectUrl = new URL(location, targetUrl).toString();
-          if (
-            !(await isSafeProxyTarget(
-              redirectUrl,
-              options.allowLoopback ?? false
-            )) ||
-            (options.validateRequest &&
-              !(await options.validateRequest(redirectUrl, c)))
-          ) {
-            return c.json({ error: "Redirect target is not allowed" }, 403);
-          }
-          // For redirects, make a new fetch to the redirect location
-          // We can reuse `body` since we created a stable copy with .slice()
-          const redirectResponse = await fetch(redirectUrl, {
-            method,
-            headers,
-            body,
-            redirect: "manual",
-          });
-
-          // Return the redirect response (or follow one more level if needed)
-          const redirectHeaders: Record<string, string> = {};
-          redirectResponse.headers.forEach((value, key) => {
-            const lowerKey = key.toLowerCase();
-            if (
-              lowerKey !== "content-encoding" &&
-              lowerKey !== "transfer-encoding" &&
-              lowerKey !== "content-length"
-            ) {
-              redirectHeaders[key] = value;
-            }
-          });
-
-          return new Response(redirectResponse.body, {
-            status: redirectResponse.status,
-            statusText: redirectResponse.statusText,
-            headers: redirectHeaders,
-          });
-        }
-      }
-
-      // Forward response headers, excluding problematic encoding headers
-      // Node.js fetch() auto-decompresses the body but preserves these headers,
-      // which can cause issues when forwarding to the client
-      const responseHeaders: Record<string, string> = {};
-      response.headers.forEach((value, key) => {
-        const lowerKey = key.toLowerCase();
-        // Skip compression-related headers that don't match the actual body state
-        if (
-          lowerKey !== "content-encoding" &&
-          lowerKey !== "transfer-encoding" &&
-          lowerKey !== "content-length"
-        ) {
-          responseHeaders[key] = value;
-        }
-      });
-
-      const contentType = response.headers.get("content-type") || "";
-
-      // Pass through open-ended SSE bodies. Legacy servers use GET for their
-      // event stream, while modern servers use a POST `subscriptions/listen`
-      // request, so the streaming decision must be method-agnostic.
-      // Buffer all finite responses and set Content-Length so browsers don't
-      // hang waiting for a ReadableStream that may not signal EOF promptly.
-      const upstreamContentLength = response.headers.get("content-length");
-      const isTrueStream = isOpenEndedSseResponse(
-        contentType,
-        upstreamContentLength
-      );
-
-      if (isTrueStream) {
-        return new Response(response.body, {
-          status: response.status,
-          statusText: response.statusText,
-          headers: responseHeaders,
+      // Follow a bounded redirect chain manually so every destination passes
+      // the network policy and request bytes are never reused after detachment.
+      for (let redirectCount = 0; ; redirectCount += 1) {
+        const response = await fetch(currentUrl, {
+          method: currentMethod,
+          headers,
+          body: currentBody,
+          redirect: "manual",
         });
-      }
+        const location = response.headers.get("location");
+        if (!(response.status >= 300 && response.status < 400 && location)) {
+          return proxyResponse(response);
+        }
+        if (redirectCount >= MAX_REDIRECTS) {
+          return c.json({ error: "Too many upstream redirects" }, 502);
+        }
 
-      const bodyBuffer = await response.arrayBuffer();
-      responseHeaders["Content-Length"] = String(bodyBuffer.byteLength);
-      return new Response(bodyBuffer, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: responseHeaders,
-      });
+        const redirectUrl = new URL(location, currentUrl);
+        if (
+          !(await isSafeProxyTarget(
+            redirectUrl.toString(),
+            options.allowLoopback ?? false
+          )) ||
+          (options.validateRequest &&
+            !(await options.validateRequest(redirectUrl.toString(), c)))
+        ) {
+          return c.json({ error: "Redirect target is not allowed" }, 403);
+        }
+        if (redirectUrl.origin !== new URL(currentUrl).origin) {
+          deleteHeader(headers, "authorization");
+          deleteHeader(headers, "proxy-authorization");
+        }
+        if (
+          response.status === 303 ||
+          ((response.status === 301 || response.status === 302) &&
+            currentMethod === "POST")
+        ) {
+          currentMethod = "GET";
+          currentBody = undefined;
+          deleteHeader(headers, "content-type");
+          deleteHeader(headers, "content-length");
+        }
+        currentUrl = redirectUrl.toString();
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
 
@@ -397,5 +342,48 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
         500
       );
     }
+  });
+}
+
+function deleteHeader(headers: Record<string, string>, name: string): void {
+  for (const key of Object.keys(headers)) {
+    if (key.toLowerCase() === name) delete headers[key];
+  }
+}
+
+async function proxyResponse(response: Response): Promise<Response> {
+  // Node.js fetch() auto-decompresses the body but preserves these upstream
+  // headers, so they cannot be forwarded with the decoded bytes.
+  const responseHeaders: Record<string, string> = {};
+  response.headers.forEach((value, key) => {
+    const lowerKey = key.toLowerCase();
+    if (
+      lowerKey !== "content-encoding" &&
+      lowerKey !== "transfer-encoding" &&
+      lowerKey !== "content-length" &&
+      lowerKey !== "set-cookie"
+    ) {
+      responseHeaders[key] = value;
+    }
+  });
+
+  const isTrueStream = isOpenEndedSseResponse(
+    response.headers.get("content-type") || "",
+    response.headers.get("content-length")
+  );
+  if (isTrueStream) {
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: responseHeaders,
+    });
+  }
+
+  const bodyBuffer = await response.arrayBuffer();
+  responseHeaders["Content-Length"] = String(bodyBuffer.byteLength);
+  return new Response(bodyBuffer, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: responseHeaders,
   });
 }

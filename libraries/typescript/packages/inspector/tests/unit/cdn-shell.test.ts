@@ -60,8 +60,8 @@ describe("inspector CDN shell", () => {
 
   it("keeps standalone assets local without resolving beta", () => {
     expect(resolveInspectorAssetUrls("standalone", "/mcp")).toEqual({
-      jsUrl: "/mcp/dist/cdn/inspector.js",
-      cssUrl: "/mcp/dist/cdn/inspector.css",
+      jsUrl: expect.stringMatching(/^\/mcp\/dist\/cdn\/inspector\.js\?v=.+$/),
+      cssUrl: expect.stringMatching(/^\/mcp\/dist\/cdn\/inspector\.css\?v=.+$/),
       useLocal: true,
       resolveLatest: false,
     });

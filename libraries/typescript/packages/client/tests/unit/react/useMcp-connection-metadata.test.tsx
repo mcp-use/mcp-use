@@ -67,6 +67,9 @@ function connectionFor(protocolEra: "legacy" | "modern") {
     },
     supports: vi.fn().mockReturnValue(false),
     listAllResources: vi.fn().mockResolvedValue({ resources: [] }),
+    listResourceTemplates: vi.fn().mockResolvedValue({
+      resourceTemplates: [],
+    }),
     listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
   };
 }
@@ -74,9 +77,11 @@ function connectionFor(protocolEra: "legacy" | "modern") {
 async function renderFor(
   protocolEra: "legacy" | "modern",
   views = false,
-  options: Partial<UseMcpOptions> = {}
+  options: Partial<UseMcpOptions> = {},
+  configure?: (connection: ReturnType<typeof connectionFor>) => void
 ) {
   const connection = connectionFor(protocolEra);
+  configure?.(connection);
   connect.mockResolvedValue(connection);
   let result:
     | ReturnType<typeof import("../../../src/react/useMcp.js").useMcp>
@@ -159,6 +164,18 @@ describe("useMcp connection metadata", () => {
         },
       })
     );
+  });
+
+  it("keeps the connection ready when optional template discovery is unsupported", async () => {
+    const { result } = await renderFor("modern", false, {}, (connection) => {
+      connection.supports.mockReturnValue(true);
+      connection.listResourceTemplates.mockRejectedValue(
+        new Error("Method not found")
+      );
+    });
+
+    expect(result.state).toBe("ready");
+    expect(result.resourceTemplates).toEqual([]);
   });
 
   it("exposes the discovered OAuth resource with auth tokens", async () => {

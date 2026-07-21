@@ -28,6 +28,7 @@ import {
   trackInspectorOpen,
 } from "@/client/telemetry";
 import {
+  AlertCircle,
   CircleMinus,
   Copy,
   Info,
@@ -35,6 +36,7 @@ import {
   MoreVertical,
   RotateCcw,
   Settings,
+  Terminal,
 } from "lucide-react";
 import {
   useMcpClient,
@@ -54,6 +56,10 @@ import {
   type InspectorProtocolMode,
 } from "@/client/utils/connectionUpdates";
 import { getServerDisplayName } from "@/client/utils/servers";
+import {
+  buildLocalInspectorCommand,
+  shouldSuggestLocalInspector,
+} from "@/client/utils/localInspectorRecovery";
 import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 import { INSPECTOR_RECONNECT_STORAGE_KEY } from "@/client/hooks/useAutoConnect";
@@ -88,6 +94,8 @@ export function InspectorDashboard() {
     addServer,
     removeServer: removeConnection,
   } = useMcpClient();
+  const inspectorHostname =
+    typeof window === "undefined" ? "" : window.location.hostname;
 
   // Track which server connections have been reported to telemetry (dedup)
   const reportedConnectionsRef = useRef<Set<string>>(new Set());
@@ -471,7 +479,10 @@ export function InspectorDashboard() {
 
   return (
     <div className="flex flex-col lg:flex-row items-start justify-start gap-4 h-auto lg:h-full relative">
-      <div className="w-full px-3 pt-6 sm:px-6 sm:pt-3 overflow-visible lg:overflow-auto">
+      <div
+        data-testid="connected-servers-scroll"
+        className="w-full px-3 pt-6 pb-6 sm:px-6 sm:pt-3 sm:pb-6 overflow-visible lg:overflow-auto"
+      >
         <div className="flex mb-3 md:mb-0 flex-col sm:flex-row items-center sm:items-center gap-3 relative z-10">
           <Tooltip>
             <TooltipTrigger
@@ -525,7 +536,7 @@ export function InspectorDashboard() {
             <NotFound message="No servers connected yet. Add a server above to get started." />
           ) : (
             <div className="grid gap-3">
-              {connections.map((connection) => (
+              {[...connections].reverse().map((connection) => (
                 <div
                   key={connection.id}
                   data-testid={`server-tile-${connection.id}`}
@@ -878,6 +889,9 @@ export function InspectorDashboard() {
                             } catch {
                               /* sessionStorage unavailable — best-effort */
                             }
+                            // Generate a fresh request instead of navigating a
+                            // persisted opaque auth URL whose callback and
+                            // verifier can no longer be proven current.
                             void connection.authenticate();
                           }}
                         >
@@ -894,8 +908,6 @@ export function InspectorDashboard() {
                               href={connection.authUrl}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                // Store connection config so trySessionReconnect() can
-                                // resume after an OAuth redirect (when ?autoConnect is absent).
                                 try {
                                   sessionStorage.setItem(
                                     INSPECTOR_RECONNECT_STORAGE_KEY,
@@ -923,15 +935,92 @@ export function InspectorDashboard() {
                       ) : null}
                     </div>
                   )}
-                  {connection.state === "failed" &&
-                    connection.error &&
-                    (connection.error.includes("401") ||
-                      connection.error.includes("Unauthorized")) &&
-                    connection.error.includes("does not support OAuth") && (
-                      <div className="text-sm mt-2 p-2 bg-yellow-500/10 dark:bg-yellow-400/10 border border-yellow-500/20 dark:border-yellow-400/20 rounded text-yellow-800 dark:text-yellow-400">
-                        {connection.error}
+                  {connection.state === "failed" && connection.error && (
+                    <div
+                      role="alert"
+                      data-testid="server-tile-error"
+                      className="mt-3 rounded-md border border-rose-500/25 bg-rose-500/10 p-3 text-rose-900 dark:border-rose-400/25 dark:bg-rose-400/10 dark:text-rose-300"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <div className="flex items-start gap-2">
+                        <AlertCircle
+                          className="mt-0.5 h-4 w-4 flex-shrink-0"
+                          aria-hidden="true"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs font-semibold">
+                              Connection failed
+                            </p>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 flex-shrink-0 px-2 text-xs hover:bg-rose-500/10"
+                              onClick={() => handleCopyError(connection.error!)}
+                            >
+                              <Copy className="mr-1 h-3 w-3" />
+                              Copy error
+                            </Button>
+                          </div>
+                          <p className="mt-1 max-h-28 overflow-y-auto whitespace-pre-wrap break-words text-xs leading-relaxed">
+                            {connection.error}
+                          </p>
+                          {shouldSuggestLocalInspector(
+                            connection.error,
+                            inspectorHostname
+                          ) && (
+                            <div
+                              data-testid="server-tile-local-recovery"
+                              className="mt-3 rounded border border-rose-500/20 bg-background/60 p-2.5 text-foreground"
+                            >
+                              <div className="flex items-center gap-1.5 text-xs font-semibold">
+                                <Terminal
+                                  className="h-3.5 w-3.5"
+                                  aria-hidden="true"
+                                />
+                                Run the Inspector locally
+                              </div>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                This OAuth server rejected the hosted callback.
+                                Start the Inspector on localhost and retry:
+                              </p>
+                              <div className="mt-2 flex items-start gap-2">
+                                <code className="min-w-0 flex-1 select-all break-all rounded bg-muted px-2 py-1.5 text-[11px] leading-relaxed">
+                                  {buildLocalInspectorCommand(
+                                    connection.url ?? ""
+                                  )}
+                                </code>
+                                <Button
+                                  type="button"
+                                  variant="secondary"
+                                  size="sm"
+                                  className="h-7 flex-shrink-0 px-2 text-xs"
+                                  onClick={async () => {
+                                    try {
+                                      await copyToClipboard(
+                                        buildLocalInspectorCommand(
+                                          connection.url ?? ""
+                                        )
+                                      );
+                                      toast.success(
+                                        "Local Inspector command copied"
+                                      );
+                                    } catch {
+                                      toast.error("Failed to copy command");
+                                    }
+                                  }}
+                                >
+                                  <Copy className="mr-1 h-3 w-3" />
+                                  Copy command
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

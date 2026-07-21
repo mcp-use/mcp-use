@@ -63,6 +63,11 @@ export default defineConfig({
       "react-dom",
     ],
   },
+  preview: {
+    // The production bundle is often previewed from a different origin while
+    // testing embedded Inspector shells (for example through a public tunnel).
+    cors: true,
+  },
   build: {
     lib: {
       entry: "src/client/main.tsx",
