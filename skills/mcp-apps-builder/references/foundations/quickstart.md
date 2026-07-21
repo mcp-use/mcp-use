@@ -12,7 +12,7 @@ cd my-server
 npm run dev
 ```
 
-This installs dependencies, starts the server on port 3000, and opens the inspector at `http://localhost:3000/inspector`.
+This installs dependencies, starts the server on port 3000, and opens the inspector at `http://localhost:3000/mcp/inspector`.
 
 ### Choosing a Template
 
@@ -85,7 +85,7 @@ After scaffolding:
 1. `npm run dev` — starts server with hot reload + inspector
 2. Edit `index.ts` to add tools, resources, prompts
 3. Add views as folders under `views/<name>/view.tsx`
-4. Test everything at `http://localhost:3000/inspector`
+4. Test everything at `http://localhost:3000/mcp/inspector`
 5. `npm run build` — production build
 6. `npm run deploy` — deploy to production
 
@@ -126,7 +126,7 @@ server.listen();
 **Save the file** - the server auto-reloads!
 
 **Test it:**
-1. Open inspector (`http://localhost:3000/inspector`)
+1. Open inspector (`http://localhost:3000/mcp/inspector`)
 2. Click "List Tools"
 3. Find "greet" tool
 4. Click "Call Tool"

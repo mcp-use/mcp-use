@@ -52,7 +52,7 @@ For detailed usage instructions and guides, visit [mcp-use.com/docs/inspector](h
 
 | Feature                    | Description                                                        |
 | -------------------------- | ------------------------------------------------------------------ |
-| **🚀 Auto-Mount**          | Automatically available at `/inspector` for all mcp-use servers    |
+| **🚀 Auto-Mount**          | Automatically available at `/mcp/inspector` for all mcp-use servers    |
 | **🔌 Multi-Connection**    | Connect to and manage multiple MCP servers simultaneously          |
 | **🎯 Interactive Testing** | Test tools with live execution and real-time results               |
 | **📊 Real-time Status**    | Monitor connection states, errors, and server health               |
@@ -91,7 +91,7 @@ Opens the inspector in your browser at `http://localhost:8080`
 
 #### 3. Auto-mounted with mcp-use Servers
 
-When you create an MCP server with `mcp-use`, the inspector is automatically available at `/inspector`:
+When you create an MCP server with `mcp-use`, the inspector is automatically available at `/mcp/inspector`:
 
 ```typescript
 import { MCPServer } from "mcp-use";

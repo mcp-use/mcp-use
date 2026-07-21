@@ -13,7 +13,7 @@ If you want a plain MCP server without views, use the [TypeScript quickstart](/t
 This guide creates a local server with:
 
 - an MCP endpoint at `http://localhost:3000/mcp`
-- an Inspector at `http://localhost:3000/inspector`
+- an Inspector at `http://localhost:3000/mcp/inspector`
 - a `search-fruits` tool that returns a view
 - a React view at `views/product-search-result/view.tsx`
 
@@ -172,7 +172,7 @@ Views can render before the tool finishes. Check `view.status === "pending"` bef
 
 Use the Inspector to confirm that the server and view work.
 
-1. Open `http://localhost:3000/inspector`.
+1. Open `http://localhost:3000/mcp/inspector`.
 2. Go to the **Tools** tab.
 3. Select `search-fruits`.
 4. Run the tool with `{ "query": "a" }` or `{}`.

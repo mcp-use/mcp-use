@@ -89,7 +89,7 @@ mcp-use dev --tunnel
 **Notes and behavior:**
 
 - The MCP endpoint is served at `/mcp`.
-- The Inspector is mounted at `/inspector` and opens automatically unless `--no-open` is set.
+- The Inspector is mounted at `/mcp/inspector` and opens automatically unless `--no-open` is set.
 - The command sets `NODE_ENV=development`, sets `PORT`, and sets `MCP_URL` to the tunnel URL or local server URL when `MCP_URL` is not already set.
 - Source changes reload the exported server without dropping the long-lived HTTP listener. View modules use Vite HMR when views exist at startup.
 - Adding the first view to a project that started with none requires restarting `mcp-use dev`.

@@ -118,10 +118,10 @@ Layer 1 proves the server works. Layer 2 proves the LLM can actually use it. Thi
 ### Open the inspector
 
 ```
-http://localhost:<PORT>/inspector?server=http%3A%2F%2Flocalhost%3A<PORT>%2Fmcp&tab=chat
+http://localhost:<PORT>/mcp/inspector?server=http%3A%2F%2Flocalhost%3A<PORT>%2Fmcp&tab=chat
 ```
 
-The `server` query string is URL-encoded. Without encoding, the inspector connects to nothing and silently shows zero tools. You can also open `http://localhost:<PORT>/inspector` plain and paste the MCP URL into the connection input.
+The `server` query string is URL-encoded. Without encoding, the inspector connects to nothing and silently shows zero tools. You can also open `http://localhost:<PORT>/mcp/inspector` plain and paste the MCP URL into the connection input.
 
 ### Two test phases
 

@@ -273,7 +273,7 @@ Open `index.ts` to see how to:
 
 ### 2. Try the Inspector
 
-The inspector automatically opens at `http://localhost:3000/inspector` where you can:
+The inspector automatically opens at `http://localhost:3000/mcp/inspector` where you can:
 
 - Test your tools interactively
 - View available resources

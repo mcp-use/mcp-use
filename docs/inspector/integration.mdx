@@ -6,11 +6,11 @@ icon: "plug-2"
 
 {/* TODO: Add Inspector media when a screenshot or short clip would clarify the workflow. */}
 
-Mount the Inspector when you want it served from the same app as your MCP server. **Prefer `mcp-use/server`** — it mounts a thin HTML shell at `/inspector` and loads the UI bundle from jsDelivr by default (no npm dependency on `@mcp-use/inspector`).
+Mount the Inspector when you want it served from the same app as your MCP server. **Prefer `mcp-use/server`** — it mounts a thin HTML shell at `/mcp/inspector` and loads the UI bundle from jsDelivr by default (no npm dependency on `@mcp-use/inspector`).
 
 ## Auto-Mounting with mcp-use
 
-When using `mcp-use` to create your MCP server, the Inspector is automatically available at `/inspector`. The shell loads `dist/cdn/inspector.js` from jsDelivr (`@mcp-use/inspector@beta` by default). Override with `inspector.assetsUrl` or `MCP_USE_INSPECTOR_ASSETS_URL`.
+When using `mcp-use` to create your MCP server, the Inspector is automatically available at `/mcp/inspector`. The shell loads `dist/cdn/inspector.js` from jsDelivr (`@mcp-use/inspector@beta` by default). Override with `inspector.assetsUrl` or `MCP_USE_INSPECTOR_ASSETS_URL`.
 
 ### Example
 
@@ -30,7 +30,7 @@ server.tool(/* ... */)
 // Start the server
 server.listen(3000)
 
-// Inspector is available at http://localhost:3000/inspector
+// Inspector is available at http://localhost:3000/mcp/inspector
 ```
 
 ## Manual Integration

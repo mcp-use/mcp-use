@@ -99,7 +99,7 @@ server.tool(
 );
 
 await server.listen(3000);
-// Inspector at http://localhost:3000/inspector
+// Inspector at http://localhost:3000/mcp/inspector
 ```
 
 [**→ Full TypeScript Server Documentation**](https://mcp-use.com/docs/typescript/server)
@@ -253,7 +253,7 @@ The mcp-use Inspector lets you test and debug your MCP servers interactively.
 
 ```typescript
 server.listen(3000);
-// Inspector at http://localhost:3000/inspector
+// Inspector at http://localhost:3000/mcp/inspector
 ```
 
 **Online** when connecting to hosted MCP servers:
