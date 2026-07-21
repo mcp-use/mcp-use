@@ -12,6 +12,7 @@ import {
   stringValue,
 } from "./jwt.js";
 import {
+  oauthEnvironmentValue,
   oauthCustomProvider,
   type OAuthProvider,
   type OAuthResourceOptions,
@@ -32,7 +33,7 @@ export interface BetterAuthOAuthUser {
 /** Configures Better Auth JWT verification and protected-resource metadata. */
 export interface BetterAuthOAuthProviderOptions extends OAuthResourceOptions {
   /** Full Better Auth issuer URL, including its base path. */
-  authURL: URL | string;
+  authURL?: URL | string;
 }
 
 /**
@@ -46,10 +47,17 @@ export interface BetterAuthOAuthProviderOptions extends OAuthResourceOptions {
  * @returns A provider that rejects tokens not issued for the resolved MCP resource.
  */
 export function oauthBetterAuthProvider(
-  options: BetterAuthOAuthProviderOptions
+  options: BetterAuthOAuthProviderOptions = {}
 ): OAuthProvider<BetterAuthOAuthUser> {
+  const authURL =
+    options.authURL ?? oauthEnvironmentValue("MCP_USE_OAUTH_BETTER_AUTH_URL");
+  if (authURL === undefined) {
+    throw new Error(
+      "Better Auth authURL is required. Set MCP_USE_OAUTH_BETTER_AUTH_URL or pass authURL in config."
+    );
+  }
   const issuer = normalizedProviderUrl(
-    options.authURL,
+    authURL,
     "Better Auth authURL"
   ).href.replace(/\/$/, "");
 

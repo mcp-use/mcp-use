@@ -25,9 +25,7 @@ const server = new MCPServer({
   version: "1.0.0",
   description: "An MCP server that verifies Clerk-issued access tokens.",
   publicLandingPage: true,
-  oauth: oauthClerkProvider({
-    frontendApiUrl: requireEnv("MCP_USE_OAUTH_CLERK_FRONTEND_API_URL"),
-  }),
+  oauth: oauthClerkProvider(),
 });
 
 server.tool(
@@ -62,13 +60,5 @@ server.tool(
     };
   }
 );
-
-function requireEnv(name: string): string {
-  const value = process.env[name]?.trim();
-  if (value === undefined || value === "") {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-  return value;
-}
 
 export default server;

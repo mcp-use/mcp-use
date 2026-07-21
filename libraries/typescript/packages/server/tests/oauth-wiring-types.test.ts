@@ -138,6 +138,7 @@ function verifyOAuthCallbackTyping(): void {
     version: "1.0.0",
     oauth: oauthAuth0Provider({
       domain: "https://tenant.auth0.com",
+      audience: "https://api.example.test/mcp",
     }),
   });
   auth0.tool({ name: "auth0-user" }, (_params, ctx) => {

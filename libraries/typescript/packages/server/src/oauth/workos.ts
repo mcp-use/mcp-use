@@ -12,6 +12,7 @@ import {
   stringValue,
 } from "./jwt.js";
 import {
+  oauthEnvironmentValue,
   oauthCustomProvider,
   type OAuthProvider,
   type OAuthResourceOptions,
@@ -34,7 +35,7 @@ export interface WorkOSOAuthUser {
 
 /** Configures WorkOS JWT verification and protected-resource metadata. */
 export interface WorkOSOAuthProviderOptions extends OAuthResourceOptions {
-  subdomain: string;
+  subdomain?: string;
 }
 
 /**
@@ -44,9 +45,17 @@ export interface WorkOSOAuthProviderOptions extends OAuthResourceOptions {
  * @returns A provider that rejects tokens not issued for the resolved MCP resource.
  */
 export function oauthWorkOSProvider(
-  options: WorkOSOAuthProviderOptions
+  options: WorkOSOAuthProviderOptions = {}
 ): OAuthProvider<WorkOSOAuthUser> {
-  const issuer = workosIssuer(options.subdomain);
+  const subdomain =
+    options.subdomain ??
+    oauthEnvironmentValue("MCP_USE_OAUTH_WORKOS_SUBDOMAIN");
+  if (subdomain === undefined) {
+    throw new Error(
+      "WorkOS subdomain is required. Set MCP_USE_OAUTH_WORKOS_SUBDOMAIN or pass subdomain in config."
+    );
+  }
+  const issuer = workosIssuer(subdomain);
   return oauthCustomProvider<WorkOSOAuthUser>({
     ...options,
     createTokenVerifier: (resource) =>

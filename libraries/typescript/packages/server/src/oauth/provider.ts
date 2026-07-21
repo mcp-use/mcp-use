@@ -45,6 +45,12 @@ export interface CustomOAuthProviderOptions<
 /** OAuth resource-server provider accepted by {@link MCPServer}. */
 export type OAuthProvider<TUser> = CustomOAuthProviderOptions<TUser>;
 
+/** @internal Reads a non-empty OAuth environment variable. */
+export function oauthEnvironmentValue(name: string): string | undefined {
+  const value = process.env[name];
+  return value === undefined || value.trim().length === 0 ? undefined : value;
+}
+
 /**
  * Creates an OAuth provider backed by an external authorization server.
  *

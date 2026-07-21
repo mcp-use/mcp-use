@@ -49,7 +49,6 @@ const getUserInfoOutputSchema = z.object({
 
 const projectId = environmentValue("MCP_USE_OAUTH_SUPABASE_PROJECT_ID");
 const supabaseUrlEnv = environmentValue("MCP_USE_OAUTH_SUPABASE_URL");
-const jwtSecret = environmentValue("MCP_USE_OAUTH_SUPABASE_JWT_SECRET");
 const publishableKey = environmentValue(
   "MCP_USE_OAUTH_SUPABASE_PUBLISHABLE_KEY"
 );
@@ -75,11 +74,7 @@ const server = new MCPServer({
   description:
     "Returns verified Supabase identity and authorization metadata for the caller.",
   publicLandingPage: true,
-  oauth: oauthSupabaseProvider({
-    ...(projectId !== undefined && { projectId }),
-    ...(supabaseUrlEnv !== undefined && { supabaseUrl: supabaseUrlEnv }),
-    ...(jwtSecret !== undefined && { jwtSecret }),
-  }),
+  oauth: oauthSupabaseProvider(),
 });
 
 server.tool(

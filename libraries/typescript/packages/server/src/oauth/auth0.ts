@@ -12,6 +12,7 @@ import {
   stringValue,
 } from "./jwt.js";
 import {
+  oauthEnvironmentValue,
   oauthCustomProvider,
   type OAuthProvider,
   type OAuthResourceOptions,
@@ -31,7 +32,8 @@ export interface Auth0OAuthUser {
 
 /** Configures Auth0 JWT verification and protected-resource metadata. */
 export interface Auth0OAuthProviderOptions extends OAuthResourceOptions {
-  domain: URL | string;
+  domain?: URL | string;
+  audience?: string;
 }
 
 /**
@@ -41,9 +43,23 @@ export interface Auth0OAuthProviderOptions extends OAuthResourceOptions {
  * @returns A provider that rejects tokens not issued for the resolved MCP resource.
  */
 export function oauthAuth0Provider(
-  options: Auth0OAuthProviderOptions
+  options: Auth0OAuthProviderOptions = {}
 ): OAuthProvider<Auth0OAuthUser> {
-  const issuer = normalizedProviderUrl(options.domain, "Auth0 domain").href;
+  const domain =
+    options.domain ?? oauthEnvironmentValue("MCP_USE_OAUTH_AUTH0_DOMAIN");
+  if (domain === undefined) {
+    throw new Error(
+      "Auth0 domain is required. Set MCP_USE_OAUTH_AUTH0_DOMAIN or pass domain in config."
+    );
+  }
+  const audience =
+    options.audience ?? oauthEnvironmentValue("MCP_USE_OAUTH_AUTH0_AUDIENCE");
+  if (audience === undefined) {
+    throw new Error(
+      "Auth0 audience is required. Set MCP_USE_OAUTH_AUTH0_AUDIENCE or pass audience in config."
+    );
+  }
+  const issuer = normalizedProviderUrl(domain, "Auth0 domain").href;
   return oauthCustomProvider<Auth0OAuthUser>({
     ...options,
     createTokenVerifier: (resource) =>
@@ -51,6 +67,7 @@ export function oauthAuth0Provider(
         issuer,
         jwksUrl: new URL(providerEndpoint(issuer, ".well-known/jwks.json")),
         resource,
+        audience,
       }),
     oauthMetadata: {
       issuer,

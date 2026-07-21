@@ -1,5 +1,5 @@
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { oauthAuth0Provider } from "../src/oauth/auth0.js";
 import { oauthBetterAuthProvider } from "../src/oauth/better-auth.js";
@@ -12,12 +12,76 @@ import { oauthWorkOSProvider } from "../src/oauth/workos.js";
 const now = () => Math.floor(Date.now() / 1000);
 const originalFetch = globalThis.fetch;
 const protectedResource = new URL("https://api.example.test/mcp");
+const oauthEnvironmentNames = [
+  "MCP_USE_OAUTH_AUTH0_DOMAIN",
+  "MCP_USE_OAUTH_AUTH0_AUDIENCE",
+  "MCP_USE_OAUTH_BETTER_AUTH_URL",
+  "MCP_USE_OAUTH_CLERK_FRONTEND_API_URL",
+  "MCP_USE_OAUTH_KEYCLOAK_SERVER_URL",
+  "MCP_USE_OAUTH_KEYCLOAK_REALM",
+  "MCP_USE_OAUTH_KEYCLOAK_AUDIENCE",
+  "MCP_USE_OAUTH_SUPABASE_PROJECT_ID",
+  "MCP_USE_OAUTH_SUPABASE_URL",
+  "MCP_USE_OAUTH_SUPABASE_JWT_SECRET",
+  "MCP_USE_OAUTH_WORKOS_SUBDOMAIN",
+] as const;
+const originalOAuthEnvironment = new Map(
+  oauthEnvironmentNames.map((name) => [name, process.env[name]])
+);
+
+beforeEach(() => {
+  for (const name of oauthEnvironmentNames) delete process.env[name];
+});
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  for (const name of oauthEnvironmentNames) {
+    const value = originalOAuthEnvironment.get(name);
+    if (value === undefined) delete process.env[name];
+    else process.env[name] = value;
+  }
 });
 
 describe("direct OAuth providers", () => {
+  it("uses v1 OAuth environment variables after explicit options", () => {
+    process.env["MCP_USE_OAUTH_AUTH0_DOMAIN"] = "env-auth0.example.test";
+    process.env["MCP_USE_OAUTH_AUTH0_AUDIENCE"] = "env-auth0-api";
+    process.env["MCP_USE_OAUTH_BETTER_AUTH_URL"] =
+      "https://env-better-auth.example.test/api/auth";
+    process.env["MCP_USE_OAUTH_CLERK_FRONTEND_API_URL"] =
+      "https://env-clerk.example.test";
+    process.env["MCP_USE_OAUTH_KEYCLOAK_SERVER_URL"] =
+      "https://env-keycloak.example.test";
+    process.env["MCP_USE_OAUTH_KEYCLOAK_REALM"] = "env-realm";
+    process.env["MCP_USE_OAUTH_SUPABASE_PROJECT_ID"] = "env-project";
+    process.env["MCP_USE_OAUTH_WORKOS_SUBDOMAIN"] = "env-workos.authkit.app";
+
+    expect(oauthAuth0Provider().oauthMetadata.issuer).toBe(
+      "https://env-auth0.example.test/"
+    );
+    expect(oauthBetterAuthProvider().oauthMetadata.issuer).toBe(
+      "https://env-better-auth.example.test/api/auth"
+    );
+    expect(oauthClerkProvider().oauthMetadata.issuer).toBe(
+      "https://env-clerk.example.test"
+    );
+    expect(oauthKeycloakProvider().oauthMetadata.issuer).toBe(
+      "https://env-keycloak.example.test/realms/env-realm"
+    );
+    expect(oauthSupabaseProvider().oauthMetadata.issuer).toBe(
+      "https://env-project.supabase.co/auth/v1"
+    );
+    expect(oauthWorkOSProvider().oauthMetadata.issuer).toBe(
+      "https://env-workos.authkit.app"
+    );
+
+    expect(
+      oauthClerkProvider({
+        frontendApiUrl: "https://code-clerk.example.test",
+      }).oauthMetadata.issuer
+    ).toBe("https://code-clerk.example.test");
+  });
+
   it("verifies Better Auth JWTs and preserves issuer path prefixes", async () => {
     const { privateKey, publicKey } = await generateKeyPair("EdDSA");
     const jwk = await exportJWK(publicKey);
@@ -109,6 +173,7 @@ describe("direct OAuth providers", () => {
 
     const provider = oauthAuth0Provider({
       domain: "issuer.example.test",
+      audience: "https://api.example.test/mcp",
       resource: "https://api.example.test/mcp",
     });
     const sign = (claims: Record<string, unknown> = {}) =>
@@ -264,6 +329,7 @@ describe("direct OAuth providers", () => {
     expect(() =>
       oauthAuth0Provider({
         domain: "issuer.example.test",
+        audience: protectedResource.href,
         resource: "http://api.example.test/mcp",
       })
     ).toThrow(/HTTPS|localhost/);
@@ -462,6 +528,7 @@ describe("direct OAuth providers", () => {
     };
     const provider = oauthAuth0Provider({
       domain: "issuer.example.test",
+      audience: protectedResource.href,
     });
     await expect(
       provider.createTokenVerifier(protectedResource).verifyAccessToken(

@@ -12,6 +12,7 @@ import {
   stringValue,
 } from "./jwt.js";
 import {
+  oauthEnvironmentValue,
   oauthCustomProvider,
   type OAuthProvider,
   type OAuthResourceOptions,
@@ -51,16 +52,30 @@ export interface SupabaseOAuthProviderOptions extends OAuthResourceOptions {
  * @returns A provider that rejects tokens without a valid configured Supabase signature and issuer.
  */
 export function oauthSupabaseProvider(
-  options: SupabaseOAuthProviderOptions
+  options: SupabaseOAuthProviderOptions = {}
 ): OAuthProvider<SupabaseOAuthUser> {
-  const supabaseUrl = resolveSupabaseUrl(options);
+  const projectId =
+    options.projectId ??
+    oauthEnvironmentValue("MCP_USE_OAUTH_SUPABASE_PROJECT_ID");
+  const configuredUrl =
+    options.supabaseUrl ?? oauthEnvironmentValue("MCP_USE_OAUTH_SUPABASE_URL");
+  const jwtSecret =
+    options.jwtSecret ??
+    oauthEnvironmentValue("MCP_USE_OAUTH_SUPABASE_JWT_SECRET");
+  const resolvedOptions: SupabaseOAuthProviderOptions = {
+    ...options,
+    ...(projectId !== undefined && { projectId }),
+    ...(configuredUrl !== undefined && { supabaseUrl: configuredUrl }),
+    ...(jwtSecret !== undefined && { jwtSecret }),
+  };
+  const supabaseUrl = resolveSupabaseUrl(resolvedOptions);
   const issuer = providerEndpoint(supabaseUrl, "auth/v1").replace(/\/$/, "");
-  const secret = options.jwtSecret;
+  const secret = resolvedOptions.jwtSecret;
   if (secret !== undefined && new TextEncoder().encode(secret).length < 32) {
     throw new TypeError("Supabase jwtSecret must be at least 32 bytes");
   }
   return oauthCustomProvider<SupabaseOAuthUser>({
-    ...options,
+    ...resolvedOptions,
     createTokenVerifier: (resource) =>
       createJwtVerifier({
         issuer,

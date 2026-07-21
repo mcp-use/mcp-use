@@ -18,14 +18,6 @@ const getUserInfoOutputSchema = z.object({
   resource: z.string().nullable(),
 });
 
-function requireEnv(name: string): string {
-  const value = process.env[name]?.trim();
-  if (value === undefined || value === "") {
-    throw new Error(`${name} must be set`);
-  }
-  return value;
-}
-
 const server = new MCPServer({
   name: "auth0-direct-auth-example",
   version: "1.0.0",
@@ -33,9 +25,7 @@ const server = new MCPServer({
   description:
     "Authenticates Auth0 access tokens directly and returns verified token claims.",
   publicLandingPage: true,
-  oauth: oauthAuth0Provider({
-    domain: requireEnv("MCP_USE_OAUTH_AUTH0_DOMAIN"),
-  }),
+  oauth: oauthAuth0Provider(),
 });
 
 server.tool(

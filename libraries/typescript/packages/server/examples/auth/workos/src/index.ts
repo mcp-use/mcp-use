@@ -25,14 +25,6 @@ const getUserInfoOutputSchema = z.object({
   }),
 });
 
-function requireEnv(name: string): string {
-  const value = process.env[name]?.trim();
-  if (value === undefined || value.length === 0) {
-    throw new Error(`${name} is required`);
-  }
-  return value;
-}
-
 const server = new MCPServer({
   name: "workos-auth-example",
   version: "1.0.0",
@@ -40,9 +32,7 @@ const server = new MCPServer({
   description:
     "An MCP server secured by verified WorkOS AuthKit access tokens.",
   publicLandingPage: true,
-  oauth: oauthWorkOSProvider({
-    subdomain: requireEnv("MCP_USE_OAUTH_WORKOS_SUBDOMAIN"),
-  }),
+  oauth: oauthWorkOSProvider(),
 });
 
 server.tool(

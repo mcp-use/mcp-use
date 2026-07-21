@@ -21,6 +21,8 @@ export interface JwtVerifierOptions {
   issuer: string;
   jwksUrl: URL;
   resource: URL;
+  /** Provider-specific JWT audience, when it differs from the canonical MCP resource. */
+  audience?: string;
   algorithms?: readonly string[];
   key?: Uint8Array;
 }
@@ -38,6 +40,9 @@ export function createJwtVerifier(
       try {
         const { payload } = await jwtVerify(token, key as JWTVerifyGetKey, {
           issuer: options.issuer,
+          ...(options.audience !== undefined && {
+            audience: options.audience,
+          }),
           ...(options.algorithms !== undefined && {
             algorithms: [...options.algorithms],
           }),
@@ -51,7 +56,11 @@ export function createJwtVerifier(
         const clientId =
           requiredString(claims, "client_id") ?? requiredString(claims, "azp");
         const expiresAt = requiredFutureNumber(claims, "exp");
-        const resource = verifiedResource(claims, configuredResource);
+        const resource = verifiedResource(
+          claims,
+          configuredResource,
+          options.audience !== undefined
+        );
 
         return {
           token,
@@ -199,7 +208,8 @@ export function invalidToken(message: string, cause?: unknown): OAuthError {
 
 function verifiedResource(
   claims: VerifiedPayload,
-  configuredResource: URL
+  configuredResource: URL,
+  providerAudienceWasValidated: boolean
 ): URL {
   const value = claims["resource"];
   if (value !== undefined) {
@@ -212,6 +222,13 @@ function verifiedResource(
         "Token resource claim does not match protected resource"
       );
     }
+    return configuredResource;
+  }
+
+  // The provider-specific audience was already validated by jose. Preserve
+  // the canonical MCP resource for the outer verifier without requiring the
+  // provider's audience identifier to equal the MCP endpoint URL.
+  if (providerAudienceWasValidated) {
     return configuredResource;
   }
 

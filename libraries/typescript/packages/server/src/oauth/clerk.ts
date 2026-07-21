@@ -12,6 +12,7 @@ import {
   stringValue,
 } from "./jwt.js";
 import {
+  oauthEnvironmentValue,
   oauthCustomProvider,
   type OAuthProvider,
   type OAuthResourceOptions,
@@ -33,7 +34,7 @@ export interface ClerkOAuthUser {
 
 /** Configures Clerk JWT verification and protected-resource metadata. */
 export interface ClerkOAuthProviderOptions extends OAuthResourceOptions {
-  frontendApiUrl: URL | string;
+  frontendApiUrl?: URL | string;
 }
 
 /**
@@ -43,10 +44,18 @@ export interface ClerkOAuthProviderOptions extends OAuthResourceOptions {
  * @returns A provider that rejects tokens not issued for the resolved MCP resource.
  */
 export function oauthClerkProvider(
-  options: ClerkOAuthProviderOptions
+  options: ClerkOAuthProviderOptions = {}
 ): OAuthProvider<ClerkOAuthUser> {
+  const frontendApiUrl =
+    options.frontendApiUrl ??
+    oauthEnvironmentValue("MCP_USE_OAUTH_CLERK_FRONTEND_API_URL");
+  if (frontendApiUrl === undefined) {
+    throw new Error(
+      "Clerk frontendApiUrl is required. Set MCP_USE_OAUTH_CLERK_FRONTEND_API_URL or pass frontendApiUrl in config."
+    );
+  }
   const issuer = normalizedProviderUrl(
-    options.frontendApiUrl,
+    frontendApiUrl,
     "Clerk frontendApiUrl"
   ).href.replace(/\/$/, "");
   return oauthCustomProvider<ClerkOAuthUser>({

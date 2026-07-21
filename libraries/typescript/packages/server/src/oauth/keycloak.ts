@@ -14,6 +14,7 @@ import {
   stringValue,
 } from "./jwt.js";
 import {
+  oauthEnvironmentValue,
   oauthCustomProvider,
   type OAuthProvider,
   type OAuthResourceOptions,
@@ -35,8 +36,9 @@ export interface KeycloakOAuthUser {
 
 /** Configures Keycloak JWT verification and protected-resource metadata. */
 export interface KeycloakOAuthProviderOptions extends OAuthResourceOptions {
-  serverUrl: URL | string;
-  realm: string;
+  serverUrl?: URL | string;
+  realm?: string;
+  audience?: string;
 }
 
 /**
@@ -46,22 +48,34 @@ export interface KeycloakOAuthProviderOptions extends OAuthResourceOptions {
  * @returns A provider that rejects tokens not issued for the resolved MCP resource.
  */
 export function oauthKeycloakProvider(
-  options: KeycloakOAuthProviderOptions
+  options: KeycloakOAuthProviderOptions = {}
 ): OAuthProvider<KeycloakOAuthUser> {
-  if (
-    typeof options.realm !== "string" ||
-    options.realm.trim().length === 0 ||
-    /[/?#]/.test(options.realm)
-  ) {
-    throw new TypeError("Keycloak realm is invalid");
+  const serverUrlValue =
+    options.serverUrl ??
+    oauthEnvironmentValue("MCP_USE_OAUTH_KEYCLOAK_SERVER_URL");
+  if (serverUrlValue === undefined) {
+    throw new Error(
+      "Keycloak serverUrl is required. Set MCP_USE_OAUTH_KEYCLOAK_SERVER_URL or pass serverUrl in config."
+    );
   }
-  const serverUrl = normalizedProviderUrl(
-    options.serverUrl,
-    "Keycloak serverUrl"
-  );
+  const realm =
+    options.realm ?? oauthEnvironmentValue("MCP_USE_OAUTH_KEYCLOAK_REALM");
+  if (
+    typeof realm !== "string" ||
+    realm.trim().length === 0 ||
+    /[/?#]/.test(realm)
+  ) {
+    throw new Error(
+      "Keycloak realm is required and must be valid. Set MCP_USE_OAUTH_KEYCLOAK_REALM or pass realm in config."
+    );
+  }
+  const audience =
+    options.audience ??
+    oauthEnvironmentValue("MCP_USE_OAUTH_KEYCLOAK_AUDIENCE");
+  const serverUrl = normalizedProviderUrl(serverUrlValue, "Keycloak serverUrl");
   const issuer = providerEndpoint(
     serverUrl,
-    `realms/${encodeURIComponent(options.realm)}`
+    `realms/${encodeURIComponent(realm)}`
   ).replace(/\/$/, "");
   return oauthCustomProvider<KeycloakOAuthUser>({
     ...options,
@@ -72,6 +86,7 @@ export function oauthKeycloakProvider(
           providerEndpoint(issuer, "protocol/openid-connect/certs")
         ),
         resource,
+        ...(audience !== undefined && { audience }),
       }),
     oauthMetadata: {
       issuer,
