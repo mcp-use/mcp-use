@@ -1,12 +1,12 @@
 import { MCPServer } from "mcp-use";
 import { oauthBetterAuthProvider } from "mcp-use/oauth/better-auth";
 
-const authURL = requiredEnvironmentValue("MCP_USE_OAUTH_BETTER_AUTH_URL");
-
 const server = new MCPServer({
   name: "better-auth-anonymous-example",
   version: "1.0.0",
-  oauth: oauthBetterAuthProvider({ authURL }),
+  oauth: oauthBetterAuthProvider({
+    authURL: process.env.MCP_USE_OAUTH_BETTER_AUTH_URL!,
+  }),
 });
 
 server.tool(
@@ -32,14 +32,6 @@ server.tool(
     ],
   })
 );
-
-function requiredEnvironmentValue(name: string): string {
-  const value = process.env[name]?.trim();
-  if (value === undefined || value.length === 0) {
-    throw new Error(`${name} is required`);
-  }
-  return value;
-}
 
 // The mcp-use CLI imports this server and owns the MCP socket.
 export default server;

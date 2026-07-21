@@ -20,10 +20,6 @@ const getUserInfoOutputSchema = z.object({
   resource: z.string().nullable(),
 });
 
-const serverUrl = requiredEnvironmentValue("MCP_USE_OAUTH_KEYCLOAK_SERVER_URL");
-const realm = requiredEnvironmentValue("MCP_USE_OAUTH_KEYCLOAK_REALM");
-const audience = requiredEnvironmentValue("MCP_USE_OAUTH_KEYCLOAK_AUDIENCE");
-
 const server = new MCPServer({
   name: "keycloak-auth-example",
   version: "1.0.0",
@@ -31,7 +27,11 @@ const server = new MCPServer({
   description:
     "An MCP resource server that verifies Keycloak access tokens directly.",
   publicLandingPage: true,
-  oauth: oauthKeycloakProvider({ serverUrl, realm, audience }),
+  oauth: oauthKeycloakProvider({
+    serverUrl: process.env.MCP_USE_OAUTH_KEYCLOAK_SERVER_URL!,
+    realm: process.env.MCP_USE_OAUTH_KEYCLOAK_REALM!,
+    audience: process.env.MCP_USE_OAUTH_KEYCLOAK_AUDIENCE!,
+  }),
 });
 
 server.tool(
@@ -67,13 +67,5 @@ server.tool(
     };
   }
 );
-
-function requiredEnvironmentValue(name: string): string {
-  const value = process.env[name]?.trim();
-  if (value === undefined || value.length === 0) {
-    throw new Error(`${name} is required`);
-  }
-  return value;
-}
 
 export default server;

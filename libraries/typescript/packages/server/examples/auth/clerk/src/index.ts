@@ -20,16 +20,14 @@ const getUserInfoOutputSchema = z.object({
   resource: z.string().nullable(),
 });
 
-const frontendApiUrl = requiredEnvironmentValue(
-  "MCP_USE_OAUTH_CLERK_FRONTEND_API_URL"
-);
-
 const server = new MCPServer({
   name: "clerk-direct-auth-example",
   version: "1.0.0",
   description: "An MCP server that verifies Clerk-issued access tokens.",
   publicLandingPage: true,
-  oauth: oauthClerkProvider({ frontendApiUrl }),
+  oauth: oauthClerkProvider({
+    frontendApiUrl: process.env.MCP_USE_OAUTH_CLERK_FRONTEND_API_URL!,
+  }),
 });
 
 server.tool(
@@ -64,13 +62,5 @@ server.tool(
     };
   }
 );
-
-function requiredEnvironmentValue(name: string): string {
-  const value = process.env[name]?.trim();
-  if (value === undefined || value.length === 0) {
-    throw new Error(`${name} is required`);
-  }
-  return value;
-}
 
 export default server;
