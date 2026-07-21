@@ -486,12 +486,13 @@ describe("direct OAuth providers", () => {
     });
   });
 
-  it("accepts Keycloak audience-only tokens when a protected resource is expected", async () => {
+  it("uses the Keycloak audience environment variable for token verification", async () => {
     const { privateKey, publicKey } = await generateKeyPair("RS256");
     const jwk = await exportJWK(publicKey);
     jwk.kid = "keycloak-key";
     globalThis.fetch = jwksFixture(jwk);
     const expectedResource = new URL("https://api.example.test/mcp");
+    process.env["MCP_USE_OAUTH_KEYCLOAK_AUDIENCE"] = "env-mcp-api";
     const provider = oauthKeycloakProvider({
       serverUrl: "https://keycloak.example.test/auth",
       realm: "mcp",
@@ -501,7 +502,7 @@ describe("direct OAuth providers", () => {
       privateKey,
       "keycloak-key",
       "https://keycloak.example.test/auth/realms/mcp",
-      expectedResource.href,
+      "env-mcp-api",
       {
         sub: "keycloak-user",
         client_id: "client",
@@ -519,6 +520,38 @@ describe("direct OAuth providers", () => {
       resource: expectedResource,
       extra: { user: { roles: ["realm-role"] }, permissions: ["api:write"] },
     });
+  });
+
+  it("prefers an explicit Keycloak audience and rejects other audiences", async () => {
+    const { privateKey, publicKey } = await generateKeyPair("RS256");
+    const jwk = await exportJWK(publicKey);
+    jwk.kid = "keycloak-key";
+    globalThis.fetch = jwksFixture(jwk);
+    process.env["MCP_USE_OAUTH_KEYCLOAK_AUDIENCE"] = "env-mcp-api";
+    const issuer = "https://keycloak.example.test/auth/realms/mcp";
+    const provider = oauthKeycloakProvider({
+      serverUrl: "https://keycloak.example.test/auth",
+      realm: "mcp",
+      audience: "explicit-mcp-api",
+    });
+    const verifier = wrapOAuthTokenVerifier(provider, protectedResource);
+    const token = (audience: string) =>
+      signedToken(privateKey, "keycloak-key", issuer, audience, {
+        sub: "keycloak-user",
+        client_id: "client",
+      });
+
+    await expect(
+      verifier.verifyAccessToken(await token("explicit-mcp-api"))
+    ).resolves.toMatchObject({
+      clientId: "client",
+      resource: protectedResource,
+    });
+    for (const audience of ["env-mcp-api", "wrong-mcp-api"]) {
+      await expect(
+        verifier.verifyAccessToken(await token(audience))
+      ).rejects.toMatchObject({ code: "invalid_token" });
+    }
   });
 
   it("leaves unexpected JWKS network errors as ordinary errors", async () => {

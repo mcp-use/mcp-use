@@ -431,10 +431,17 @@ Before calling `requireBearerAuth`, mcp-use wraps the provider with
 `wrapOAuthTokenVerifier(provider, expectedResource?)`. The wrapper calls the
 provider verifier, asserts resource binding against the resolved canonical
 resource URL, then returns the final SDK-compatible `AuthInfo` with `extra`
-merged as `{ ...authInfo.extra, ...provider.mapAuthInfo(authInfo) }`. Binding
-succeeds when the token carries an RFC 8707 `resource` claim matching
-`expectedResource`, or when `authInfo.resource` is absent but audience
-validation was proven (an internal marker set by `createJwtVerifier`).
+merged as `{ ...authInfo.extra, ...provider.mapAuthInfo(authInfo) }`.
+
+JWT providers establish resource binding as follows. A token with an RFC 8707
+`resource` claim must match the canonical MCP resource, even when the provider
+has a separate audience configured. Without a `resource` claim, a configured
+provider audience requires `aud` to include that audience; otherwise, `aud`
+must include the canonical MCP resource. After either audience check succeeds,
+the verifier returns the canonical MCP resource in `AuthInfo.resource`. For
+built-in providers that expose an audience setting, an explicit option takes
+precedence over the corresponding
+`MCP_USE_OAUTH_<PROVIDER>_AUDIENCE` environment variable.
 Therefore every successful bearer-gate result has the typed mcp-use values
 before it reaches fetch middleware, `createMcpMount`, or the SDK callback. Custom providers use
 this same wrapper; they cannot omit the public `mapAuthInfo` callback or rely

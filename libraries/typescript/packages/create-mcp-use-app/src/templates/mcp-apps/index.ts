@@ -20,8 +20,10 @@ const server = new MCPServer({
   // The MCP server is by default served at /mcp, to customise
   // basePath: "/mcp",
 
-  // mcp-use has 1 line adapter for OAuth, import from mcp-use/oauth/*
-  // oauth: oauthClerkProvider(), // zero-config via MCP_USE_OAUTH_CLERK_FRONTEND_API_URL, import from mcp-use/oauth/*
+  // Import oauthClerkProvider from mcp-use/oauth/clerk to enable OAuth.
+  // oauth: oauthClerkProvider({
+  //   frontendApiUrl: process.env.MCP_USE_OAUTH_CLERK_FRONTEND_API_URL!,
+  // }),
 
   // When OAuth is on, the HTML landing page (/mcp) is protected by default, set to true to keep the landing page public while /mcp stays bearer-protected.
   // publicLandingPage: true,

@@ -25,6 +25,10 @@ MCP_USE_OAUTH_WORKOS_SUBDOMAIN=your-company.authkit.app
 HTTPS origin. For a public deployment, set `MCP_URL` to the public MCP server
 origin as shown in `.env.example`.
 
+In WorkOS, register the full public MCP endpoint, such as
+`https://mcp.example.com/mcp`, as the Resource Indicator. Use the actual MCP
+endpoint rather than the AuthKit hostname or another API identifier.
+
 ## Run it
 
 From this directory:
