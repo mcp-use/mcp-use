@@ -1,0 +1,92 @@
+---
+title: "Self-Hosting"
+description: "Deploy your own MCP Inspector instance with Docker."
+icon: "container"
+---
+
+Run the Inspector on your own infrastructure when you need full control over your debugging environment.
+
+The official Docker image is published at [`mcpuse/inspector`](https://hub.docker.com/r/mcpuse/inspector) on Docker Hub.
+
+## Quick start
+
+```bash
+docker run -d -p 127.0.0.1:8080:8080 --name mcp-inspector mcpuse/inspector:latest
+```
+
+Then open `http://localhost:8080` to access your self-hosted Inspector.
+
+<Warning>
+Anyone who can reach the Inspector can use it to connect to and call your MCP servers. The examples bind to `127.0.0.1` so the Inspector is only reachable from the host itself. If you need remote access, put it behind a reverse proxy with authentication and TLS, or restrict access with firewall rules — don't publish port 8080 on all interfaces.
+</Warning>
+
+## Deployment options
+
+<Tabs>
+  <Tab title="Docker Run">
+    ```bash
+    docker run -d \
+      --name mcp-inspector \
+      -p 127.0.0.1:8080:8080 \
+      mcpuse/inspector:latest
+    ```
+  </Tab>
+  <Tab title="Docker Compose">
+    ```yaml
+    services:
+      mcp-inspector:
+        image: mcpuse/inspector:latest
+        ports:
+          - "127.0.0.1:8080:8080"
+        restart: unless-stopped
+        healthcheck:
+          test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/inspector"]
+          interval: 30s
+          timeout: 10s
+          retries: 3
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+The image is based on `node:20-alpine`, which ships `wget` (BusyBox) but not `curl` — use `wget` in healthchecks.
+</Note>
+
+## Ports
+
+The container always listens on port `8080` — the image's start command pins it with `--port 8080`, so a `PORT` environment variable has no effect. To serve on a different host port, remap it with Docker instead:
+
+```bash
+docker run -d -p 127.0.0.1:3001:8080 mcpuse/inspector:latest
+```
+
+`NODE_ENV=production` is already set in the image; no environment variables are required.
+
+## Air-gapped installation
+
+For hosts without registry access, transfer the image as a tarball:
+
+```bash
+# On a connected host
+docker pull mcpuse/inspector:latest
+docker save mcpuse/inspector:latest -o mcp-inspector.tar
+
+# On the air-gapped host
+docker load -i mcp-inspector.tar
+```
+
+<Note>
+When connecting from a self-hosted Inspector to an MCP server on another host, the browser must be able to reach the server directly, or you can use the proxy connection mode. See [Connection settings](/inspector/connection-settings) for when to use each.
+</Note>
+
+## Alternatives
+
+Self-hosting is one of three ways to run the Inspector:
+
+| Option | Command | Best for |
+| --- | --- | --- |
+| Hosted | [inspector.mcp-use.com](https://inspector.mcp-use.com) | Quick testing, no install |
+| Local CLI | `npx @mcp-use/inspector` | Local development |
+| Self-hosted | `docker run mcpuse/inspector:latest` | Production, enterprise, air-gapped |
+
+Servers built with `mcp-use` also auto-mount the Inspector at `/inspector` — see the [Inspector overview](/inspector/index).

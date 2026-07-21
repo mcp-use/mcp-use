@@ -224,6 +224,7 @@
                       "inspector/keyboard-shortcuts",
                       "inspector/command-palette",
                       "inspector/integration",
+                      "inspector/self-hosting",
                       "inspector/debugging-chatgpt-apps"
                     ]
                   },
@@ -705,6 +706,7 @@
               "inspector/keyboard-shortcuts",
               "inspector/command-palette",
               "inspector/integration",
+              "inspector/self-hosting",
               "inspector/debugging-chatgpt-apps"
             ]
           }
