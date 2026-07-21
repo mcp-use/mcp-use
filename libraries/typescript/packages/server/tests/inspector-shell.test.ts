@@ -108,6 +108,9 @@ describe("inspector shell route", () => {
     expect(html).not.toContain("__MCP_DEV_CLI__");
     expect(html).toContain('var basePath = "/mcp";');
     expect(html).toContain("window.location.origin + basePath");
+    // Allow the Inspector to use its default proxy now that the server mounts
+    // the proxy/BFF routes again.
+    expect(html).not.toContain("window.__MCP_PROXY_URL__ = null;");
     // Browser polyfill for the bundle's Node-flavored module-scope code.
     expect(html).toContain("window.process = {");
     // Root node for the bundle to mount into, with the inspector's neutral

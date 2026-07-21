@@ -125,6 +125,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     headers: headersOption,
     proxyConfig,
     oauthProxyUrl: oauthProxyUrlOption,
+    connectionMode,
     autoProxyFallback = false,
     logLevel: logLevelOption = "silent",
     autoRetry = false,
@@ -145,6 +146,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     oauth: oauthOptions,
   } = options;
   const transportType: TransportType = "http";
+  const requestedProxyAddress = proxyConfig?.proxyAddress;
 
   const oauthClientId = oauthOptions?.clientId?.trim() || undefined;
   const oauthClientMetadataUrl =
@@ -211,6 +213,11 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
 
   // Parse autoProxyFallback configuration
   const autoProxyFallbackConfig = useMemo(() => {
+    // Explicit Direct and Proxy modes never fall back. Direct must stay direct,
+    // while Proxy already starts on the configured gateway.
+    if (connectionMode === "direct" || connectionMode === "proxy") {
+      return { enabled: false, proxyAddress: undefined };
+    }
     if (!autoProxyFallback) {
       return { enabled: false, proxyAddress: undefined };
     }
@@ -227,7 +234,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
       enabled: autoProxyFallback.enabled !== false && Boolean(proxyAddress),
       proxyAddress,
     };
-  }, [autoProxyFallback, proxyConfig]);
+  }, [autoProxyFallback, connectionMode, proxyConfig]);
 
   // Normalize autoReconnect into a consistent config object
   const autoReconnectConfig = useMemo(() => {
@@ -271,22 +278,45 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
   // Reset runtime fallback when the requested connection changes.
   useEffect(() => {
     setEffectiveProxyConfig(undefined);
-  }, [url, proxyConfig]);
+  }, [
+    url,
+    requestedProxyAddress,
+    connectionMode,
+    autoProxyFallbackConfig.proxyAddress,
+  ]);
 
   const activeProxyConfig = useMemo(() => {
-    if (!effectiveProxyConfig?.proxyAddress) {
-      return proxyConfig;
+    const hasCurrentAutoFallback =
+      autoProxyFallbackConfig.enabled &&
+      effectiveProxyConfig?.proxyAddress ===
+        autoProxyFallbackConfig.proxyAddress;
+    if (hasCurrentAutoFallback && effectiveProxyConfig) {
+      const latestHeaders = proxyConfig?.headers ?? {};
+      return {
+        ...effectiveProxyConfig,
+        headers: {
+          ...latestHeaders,
+          ...(effectiveProxyConfig.headers ?? {}),
+        },
+      };
     }
 
-    const latestHeaders = proxyConfig?.headers ?? {};
-    return {
-      ...effectiveProxyConfig,
-      headers: {
-        ...latestHeaders,
-        ...(effectiveProxyConfig.headers ?? {}),
-      },
-    };
-  }, [effectiveProxyConfig, proxyConfig]);
+    // Auto always starts direct, even when proxyConfig supplies the fallback
+    // address. Direct also ignores stale proxyConfig left by older persisted
+    // Inspector configurations. Without an explicit mode, preserve the
+    // low-level API's immediate-proxy behavior unless fallback was requested.
+    const startsDirect =
+      connectionMode === "auto" ||
+      connectionMode === "direct" ||
+      (connectionMode === undefined && autoProxyFallbackConfig.enabled);
+    return startsDirect ? undefined : proxyConfig;
+  }, [
+    effectiveProxyConfig,
+    proxyConfig,
+    connectionMode,
+    autoProxyFallbackConfig.enabled,
+    autoProxyFallbackConfig.proxyAddress,
+  ]);
 
   const gatewayUrl = activeProxyConfig?.proxyAddress;
   const proxyHeaders = activeProxyConfig?.headers ?? {};
@@ -788,8 +818,9 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
           clientInfo: mergedClientInfo,
           // Pass a fetch that scopes OAuth-proxy routing to this server's
           // transport/auth calls. getProxyFetch wraps `customFetch` (e.g. the
-          // OAuth retry fetch for scope step-up) when proxying, or returns it
-          // unchanged otherwise. Never mutates the global fetch.
+          // OAuth retry fetch for scope step-up), bypasses the browser cache
+          // for OAuth metadata, and optionally routes OAuth through the BFF.
+          // It never mutates the global fetch.
           ...(() => {
             const scopedFetch =
               authProviderRef.current?.getProxyFetch?.(customFetch) ??
@@ -1897,6 +1928,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     mergedClientInfo,
     effectiveOAuthUrl, // Triggers reconnection when proxy fallback changes OAuth URL
     proxyConfig, // Triggers reconnection when proxy config (including headers) changes
+    autoProxyFallbackConfig.proxyAddress,
     providedAuthProvider,
   ]);
 

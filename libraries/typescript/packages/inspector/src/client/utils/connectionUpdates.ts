@@ -282,6 +282,12 @@ export function toMcpServerConfig(
     displayName: config.name?.trim() || config.url,
     connectionMode,
     protocolNegotiation: config.protocolNegotiation ?? "auto",
+    // These explicit resets matter when McpClientProvider shallow-merges an
+    // edit into an existing connection. Omitting them would preserve a proxy
+    // or fallback setting from the previous mode.
+    proxyConfig: undefined,
+    headers: undefined,
+    autoProxyFallback: false,
     ...(config.oauth ? { oauth: config.oauth } : {}),
   };
 

@@ -3,6 +3,11 @@
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, create } from "react-test-renderer";
+import type { UseMcpOptions } from "../../../src/react/types.js";
+
+(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 const initialize = vi.fn();
 const connect = vi.fn();
@@ -66,7 +71,11 @@ function connectionFor(protocolEra: "legacy" | "modern") {
   };
 }
 
-async function renderFor(protocolEra: "legacy" | "modern", views = false) {
+async function renderFor(
+  protocolEra: "legacy" | "modern",
+  views = false,
+  options: Partial<UseMcpOptions> = {}
+) {
   const connection = connectionFor(protocolEra);
   connect.mockResolvedValue(connection);
   let result:
@@ -84,6 +93,7 @@ async function renderFor(protocolEra: "legacy" | "modern", views = false) {
       ...(views && {
         clientOptions: { capabilities: { views: true } },
       }),
+      ...options,
     });
     return null;
   }
@@ -167,5 +177,170 @@ describe("useMcp connection metadata", () => {
       access_token: "access-token",
       resource: "https://mcp.example.com",
     });
+  });
+
+  it.each(["auto", "direct"] as const)(
+    "starts %s mode without the configured proxy gateway",
+    async (connectionMode) => {
+      const proxyAddress = "https://inspector.example.com/api/proxy";
+
+      await renderFor("modern", false, {
+        connectionMode,
+        proxyConfig: { proxyAddress },
+        autoProxyFallback: { enabled: true, proxyAddress },
+      });
+
+      expect(client.addServer).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.not.objectContaining({ gatewayUrl: expect.anything() })
+      );
+    }
+  );
+
+  it("starts proxy mode on the configured proxy gateway", async () => {
+    const proxyAddress = "https://inspector.example.com/api/proxy";
+
+    await renderFor("modern", false, {
+      connectionMode: "proxy",
+      proxyConfig: { proxyAddress },
+      autoProxyFallback: { enabled: true, proxyAddress },
+    });
+
+    expect(client.addServer).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ gatewayUrl: proxyAddress })
+    );
+  });
+
+  it("falls back from a direct Auto attempt to the proxy gateway", async () => {
+    vi.useFakeTimers();
+    const proxyAddress = "https://inspector.example.com/api/proxy";
+    const proxyConfig = { proxyAddress };
+    const autoProxyFallback = { enabled: true, proxyAddress };
+    const connection = connectionFor("modern");
+    connect
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce(connection);
+
+    const { useMcp } = await import("../../../src/react/useMcp.js");
+    let renderer: ReturnType<typeof create> | undefined;
+
+    function TestComponent() {
+      useMcp({
+        url: "https://example.com/mcp",
+        authProvider,
+        connectionMode: "auto",
+        proxyConfig,
+        autoProxyFallback,
+        autoReconnect: false,
+        logLevel: "silent",
+      });
+      return null;
+    }
+
+    try {
+      await act(async () => {
+        renderer = create(<TestComponent />);
+        await Promise.resolve();
+      });
+
+      expect(client.addServer).toHaveBeenNthCalledWith(
+        1,
+        expect.any(String),
+        expect.not.objectContaining({ gatewayUrl: expect.anything() })
+      );
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(client.addServer).toHaveBeenLastCalledWith(
+        expect.any(String),
+        expect.objectContaining({ gatewayUrl: proxyAddress })
+      );
+      expect(connect).toHaveBeenCalledTimes(2);
+    } finally {
+      await act(async () => {
+        renderer?.unmount();
+      });
+      vi.useRealTimers();
+    }
+  });
+
+  it("clears an active Auto fallback when its configured address changes", async () => {
+    vi.useFakeTimers();
+    const firstProxyAddress = "https://inspector.example.com/api/proxy-one";
+    const secondProxyAddress = "https://inspector.example.com/api/proxy-two";
+    const proxyConfig = { proxyAddress: firstProxyAddress };
+    const connection = connectionFor("modern");
+    connect
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValue(connection);
+
+    const { useMcp } = await import("../../../src/react/useMcp.js");
+    let renderer: ReturnType<typeof create> | undefined;
+
+    function TestComponent({ fallbackAddress }: { fallbackAddress: string }) {
+      const autoProxyFallback = React.useMemo(
+        () => ({ enabled: true, proxyAddress: fallbackAddress }),
+        [fallbackAddress]
+      );
+      useMcp({
+        url: "https://example.com/mcp",
+        authProvider,
+        connectionMode: "auto",
+        proxyConfig,
+        autoProxyFallback,
+        autoReconnect: false,
+        logLevel: "silent",
+      });
+      return null;
+    }
+
+    try {
+      await act(async () => {
+        renderer = create(
+          <TestComponent fallbackAddress={firstProxyAddress} />
+        );
+        await Promise.resolve();
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(client.addServer).toHaveBeenLastCalledWith(
+        expect.any(String),
+        expect.objectContaining({ gatewayUrl: firstProxyAddress })
+      );
+      const callCountBeforeAddressChange = client.addServer.mock.calls.length;
+
+      await act(async () => {
+        renderer!.update(
+          <TestComponent fallbackAddress={secondProxyAddress} />
+        );
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      const gatewayUrlsAfterAddressChange = client.addServer.mock.calls
+        .slice(callCountBeforeAddressChange)
+        .map(([, config]) => config.gatewayUrl);
+      expect(gatewayUrlsAfterAddressChange).toEqual([undefined]);
+    } finally {
+      await act(async () => {
+        renderer?.unmount();
+      });
+      vi.useRealTimers();
+    }
   });
 });

@@ -78,6 +78,10 @@ describe("BrowserOAuthClientProvider — scoped OAuth proxy fetch", () => {
     expect(new URL(proxiedUrl).searchParams.get("serverUrl")).toBe(
       "https://server-a.example.com/mcp"
     );
+    expect(globalFetchSpy.mock.calls[1][1]).toMatchObject({
+      cache: "no-store",
+      method: "GET",
+    });
   });
 
   it("does not intercept browser authorization requests", async () => {
@@ -171,7 +175,7 @@ describe("BrowserOAuthClientProvider — scoped OAuth proxy fetch", () => {
     expect(globalFetchSpy).toHaveBeenCalledOnce();
   });
 
-  it("Server B (Direct) gets a plain fetch and never proxies — even while Server A uses a proxy", async () => {
+  it("Server B (Direct) bypasses metadata cache and never proxies — even while Server A uses a proxy", async () => {
     // Server A: "Via Proxy".
     const serverA = new BrowserOAuthClientProvider(
       "https://server-a.example.com/mcp",
@@ -190,12 +194,13 @@ describe("BrowserOAuthClientProvider — scoped OAuth proxy fetch", () => {
     const fetchA = serverA.getProxyFetch();
     expect(fetchA).toBeTypeOf("function");
 
-    // Server B returns the base fetch as-is (no scoping/proxy wrapper).
+    // Server B gets its own scoped wrapper, but still uses its direct base
+    // fetch rather than Server A's proxy.
     const baseFetchB = vi.fn(
       async () => new Response("{}", { status: 200 })
     ) as unknown as typeof fetch;
     const fetchB = serverB.getProxyFetch(baseFetchB);
-    expect(fetchB).toBe(baseFetchB);
+    expect(fetchB).not.toBe(baseFetchB);
 
     // An OAuth-shaped request through Server B's fetch must go DIRECT, not via
     // Server A's proxy.
@@ -206,27 +211,59 @@ describe("BrowserOAuthClientProvider — scoped OAuth proxy fetch", () => {
     expect(String((baseFetchB as any).mock.calls[0][0])).toBe(
       "https://server-b.example.com/.well-known/oauth-authorization-server"
     );
+    expect((baseFetchB as any).mock.calls[0][1]).toMatchObject({
+      cache: "no-store",
+    });
     // The global fetch was never used for Server B's request.
     expect(globalFetchSpy).not.toHaveBeenCalled();
   });
 
-  it("returns the base fetch unchanged when proxyOAuthRequests is disabled", () => {
+  it("bypasses metadata cache when proxyOAuthRequests is disabled", async () => {
     const provider = makeProvider({
       oauthProxyUrl: PROXY_URL,
       proxyOAuthRequests: false,
     });
 
-    const base = vi.fn() as unknown as typeof fetch;
-    expect(provider.getProxyFetch(base)).toBe(base);
-    expect(provider.getProxyFetch()).toBeUndefined();
+    const base = vi.fn(
+      async () => new Response("{}", { status: 200 })
+    ) as unknown as typeof fetch;
+    const scoped = provider.getProxyFetch(base)!;
+
+    await scoped("https://auth.example.com/.well-known/openid-configuration");
+
+    expect(String((base as any).mock.calls[0][0])).toBe(
+      "https://auth.example.com/.well-known/openid-configuration"
+    );
+    expect((base as any).mock.calls[0][1]).toMatchObject({
+      cache: "no-store",
+    });
   });
 
-  it("returns the base fetch unchanged when no OAuth proxy URL is configured", () => {
+  it("uses global fetch with no-store metadata when no base or proxy is configured", async () => {
     const provider = makeProvider();
+    const scoped = provider.getProxyFetch()!;
 
-    const base = vi.fn() as unknown as typeof fetch;
-    expect(provider.getProxyFetch(base)).toBe(base);
-    expect(provider.getProxyFetch()).toBeUndefined();
+    await scoped(
+      "https://auth.example.com/.well-known/oauth-authorization-server"
+    );
+
+    expect(globalFetchSpy).toHaveBeenCalledOnce();
+    expect(globalFetchSpy.mock.calls[0][1]).toMatchObject({
+      cache: "no-store",
+    });
+  });
+
+  it("does not change cache behavior for direct non-metadata requests", async () => {
+    const provider = makeProvider();
+    const base = vi.fn(
+      async () => new Response("{}", { status: 200 })
+    ) as unknown as typeof fetch;
+    const scoped = provider.getProxyFetch(base)!;
+    const init = { headers: { "X-Test": "value" } };
+
+    await scoped("https://server-a.example.com/mcp", init);
+
+    expect(base).toHaveBeenCalledWith("https://server-a.example.com/mcp", init);
   });
 
   it("wraps a provided base fetch (e.g. scope step-up retry) for non-OAuth requests", async () => {
@@ -284,6 +321,24 @@ describe("BrowserOAuthClientProvider — scoped OAuth proxy fetch", () => {
 
       expect(proxiedMetadataTarget(0)).toBe(
         "https://server-a.example.com/.well-known/oauth-authorization-server"
+      );
+    });
+
+    it("fetches re-anchored metadata directly when OAuth proxying is disabled", async () => {
+      const base = vi.fn(
+        async () => new Response("{}", { status: 200 })
+      ) as unknown as typeof fetch;
+      const scoped = makeProvider({
+        connectionUrl: CONNECTION_URL,
+      }).getProxyFetch(base)!;
+
+      await scoped(
+        "https://inspector.local/.well-known/oauth-protected-resource/inspector/api/proxy"
+      );
+
+      expect(base).toHaveBeenCalledWith(
+        "https://server-a.example.com/.well-known/oauth-protected-resource/mcp",
+        expect.objectContaining({ cache: "no-store" })
       );
     });
 
