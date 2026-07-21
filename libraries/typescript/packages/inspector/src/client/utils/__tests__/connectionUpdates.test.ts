@@ -76,3 +76,51 @@ describe("inspector protocol negotiation", () => {
     expect(isAliasOnlyConnectionUpdate(current, forcedLegacy)).toBe(false);
   });
 });
+
+describe("inspector connection modes", () => {
+  const proxyAddress = "https://inspector.example.com/api/proxy";
+
+  it("clears proxy and fallback state in direct mode", () => {
+    const providerConfig = toMcpServerConfig(
+      editable({
+        connectionMode: "direct",
+        proxyConfig: { proxyAddress },
+        autoProxyFallback: { enabled: true, proxyAddress },
+      })
+    );
+
+    expect(providerConfig).toMatchObject({
+      connectionMode: "direct",
+      autoProxyFallback: false,
+    });
+    expect(providerConfig.proxyConfig).toBeUndefined();
+  });
+
+  it("keeps the proxy inactive and available only as fallback in auto mode", () => {
+    const providerConfig = toMcpServerConfig(
+      editable({
+        connectionMode: "auto",
+        autoProxyFallback: { enabled: true, proxyAddress },
+      })
+    );
+
+    expect(providerConfig.proxyConfig).toBeUndefined();
+    expect(providerConfig.autoProxyFallback).toEqual({
+      enabled: true,
+      proxyAddress,
+    });
+  });
+
+  it("uses only the immediate proxy configuration in proxy mode", () => {
+    const providerConfig = toMcpServerConfig(
+      editable({
+        connectionMode: "proxy",
+        proxyConfig: { proxyAddress },
+        autoProxyFallback: { enabled: true, proxyAddress },
+      })
+    );
+
+    expect(providerConfig.proxyConfig).toEqual({ proxyAddress });
+    expect(providerConfig.autoProxyFallback).toBe(false);
+  });
+});

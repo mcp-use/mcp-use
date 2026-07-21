@@ -71,9 +71,13 @@ export type UseMcpOptions = {
    */
   oauthProxyUrl?: string;
   /**
-   * Connection policy used by higher-level clients such as the Inspector.
-   * Behavior is controlled by `proxyConfig` and `autoProxyFallback`; this field
-   * is persisted so editors can distinguish Auto, forced Direct, and forced Proxy.
+   * Connection policy for proxy routing.
+   * - `auto`: start direct and use `autoProxyFallback` after a qualifying failure
+   * - `direct`: never use `proxyConfig` and never fall back
+   * - `proxy`: use `proxyConfig` immediately and never fall back
+   *
+   * When omitted, `proxyConfig` retains its legacy immediate-proxy behavior,
+   * except when `autoProxyFallback` explicitly requests a direct-first attempt.
    */
   connectionMode?: "auto" | "direct" | "proxy";
   /**

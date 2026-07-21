@@ -198,22 +198,22 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
    * therefore never alters fetch behavior for other servers, other
    * connections, or the rest of the page.
    *
-   * When this provider is not configured to proxy OAuth requests (no
-   * `oauthProxyUrl`, or `proxyOAuthRequests` disabled), the provided
-   * `baseFetch` is returned as-is (or `undefined` when none is given, letting
-   * the SDK fall back to its default `fetch`).
+   * OAuth metadata is always fetched with `cache: "no-store"`, including in
+   * direct mode. Authorization servers commonly vary CORS headers by Origin;
+   * bypassing the browser HTTP cache prevents a revalidated response cached
+   * for another localhost origin from poisoning discovery. When OAuth proxying
+   * is disabled or no `oauthProxyUrl` is configured, all requests still go
+   * directly to their original URLs.
    *
    * @param baseFetch - The fetch used for non-OAuth requests and for the
    *   underlying proxy calls. Defaults to the global `fetch`.
    */
   getProxyFetch(baseFetch?: typeof fetch): typeof fetch | undefined {
-    if (!this.proxyOAuthRequests || !this.oauthProxyUrl) {
-      // Nothing to scope — return the caller's base fetch (possibly undefined).
-      return baseFetch;
-    }
-
     const base: typeof fetch = baseFetch ?? globalThis.fetch.bind(globalThis);
-    const oauthProxyUrl = this.oauthProxyUrl;
+    const oauthProxyUrl =
+      this.proxyOAuthRequests && this.oauthProxyUrl
+        ? this.oauthProxyUrl
+        : undefined;
     const discoveredEndpoints = new Set<string>();
     let restoredDiscovery = false;
 
@@ -240,6 +240,18 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
         return await base(input, init);
       }
       const isMetadata = pathname.includes("/.well-known/");
+
+      // Metadata responses can carry Origin-specific CORS headers. Never let
+      // the browser reuse or revalidate a response cached for another origin.
+      // This is scoped to discovery; MCP traffic and OAuth endpoint POSTs keep
+      // their caller-provided cache behavior.
+      if (!oauthProxyUrl) {
+        return await base(
+          input,
+          isMetadata ? { ...init, cache: "no-store" } : init
+        );
+      }
+
       if (!restoredDiscovery) {
         restoredDiscovery = true;
         const metadata = (await this.discoveryState())
@@ -292,6 +304,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
         const response = await base(proxyEndpoint, {
           ...init,
           method: "GET",
+          cache: "no-store",
         });
         try {
           const metadata = (await response.clone().json()) as Record<
@@ -378,7 +391,25 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     // When a pre-registered client_id is configured, never persist DCR results
     // — the static client_id is the source of truth.
     if (this.staticClientInfo) return;
-    return this.session.saveClientInformation(clientInformation, ctx);
+
+    // Browser clients always register as public clients
+    // (`token_endpoint_auth_method: "none"`). Some authorization servers,
+    // including Auth0 DCR, still include a generated client_secret in the
+    // registration response even though the public client must not use or
+    // retain it. Persist only the public portion of the response. Keep the
+    // session store's secret rejection intact as a defense-in-depth guard for
+    // every other browser persistence path.
+    const { client_secret: discardedClientSecret, ...publicClientInformation } =
+      clientInformation;
+    if (discardedClientSecret) {
+      console.info(
+        `[${this.storageKeyPrefix}] Discarded client_secret returned for a public browser OAuth client.`
+      );
+    }
+    return this.session.saveClientInformation(
+      publicClientInformation as OAuthClientInformation,
+      ctx
+    );
   }
 
   codeVerifier(): Promise<string> {

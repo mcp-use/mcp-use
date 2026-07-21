@@ -853,6 +853,36 @@ export function InspectorDashboard() {
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                           Authenticating...
                         </Button>
+                      ) : connection.authenticate ? (
+                        <Button
+                          data-testid="server-tile-authenticate"
+                          size="sm"
+                          className="bg-yellow-500/20 border-0 dark:bg-yellow-400/10 text-yellow-800 dark:text-yellow-500"
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // Store connection config so trySessionReconnect() can
+                            // resume after an OAuth redirect (when ?autoConnect is absent).
+                            try {
+                              sessionStorage.setItem(
+                                INSPECTOR_RECONNECT_STORAGE_KEY,
+                                JSON.stringify({
+                                  url: connection.url,
+                                  name:
+                                    connection.name || "Auto-connected Server",
+                                  transportType:
+                                    (connection as any).transportType || "http",
+                                  connectionMode: "auto",
+                                })
+                              );
+                            } catch {
+                              /* sessionStorage unavailable — best-effort */
+                            }
+                            void connection.authenticate();
+                          }}
+                        >
+                          Authenticate
+                        </Button>
                       ) : connection.authUrl ? (
                         <Button
                           data-testid="server-tile-authenticate"

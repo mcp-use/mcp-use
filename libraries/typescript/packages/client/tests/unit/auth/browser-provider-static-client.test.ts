@@ -9,6 +9,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { OAuthClientInformation } from "@modelcontextprotocol/client";
 import { BrowserOAuthClientProvider } from "../../../src/auth/browser.js";
 import { installMemoryLocalStorage } from "../../helpers/memory-local-storage.js";
 
@@ -76,6 +77,26 @@ describe("BrowserOAuthClientProvider — pre-registered client_id", () => {
     await provider.saveClientInformation({ client_id: "dcr-registered" });
     const info = await provider.clientInformation();
     expect(info?.client_id).toBe("dcr-registered");
+  });
+
+  it("discards a client secret returned by DCR for a public browser client", async () => {
+    const provider = new BrowserOAuthClientProvider(SERVER_URL, {
+      callbackUrl: "https://app.example.com/oauth/callback",
+    });
+
+    await provider.saveClientInformation({
+      client_id: "dcr-public-client",
+      client_secret: "must-not-be-persisted",
+      token_endpoint_auth_method: "none",
+    } as OAuthClientInformation & { token_endpoint_auth_method: "none" });
+
+    expect(await provider.clientInformation()).toEqual({
+      client_id: "dcr-public-client",
+      token_endpoint_auth_method: "none",
+    });
+    expect(localStorage.getItem(provider.getKey("client_info"))).not.toContain(
+      "must-not-be-persisted"
+    );
   });
 
   it("returns undefined from clientInformation() when neither static nor stored info is present", async () => {
