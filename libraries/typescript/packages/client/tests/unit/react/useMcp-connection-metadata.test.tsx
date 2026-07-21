@@ -5,6 +5,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, create } from "react-test-renderer";
 import type { UseMcpOptions } from "../../../src/react/types.js";
 
+(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
+
 const initialize = vi.fn();
 const connect = vi.fn();
 
@@ -257,6 +261,81 @@ describe("useMcp connection metadata", () => {
         expect.objectContaining({ gatewayUrl: proxyAddress })
       );
       expect(connect).toHaveBeenCalledTimes(2);
+    } finally {
+      await act(async () => {
+        renderer?.unmount();
+      });
+      vi.useRealTimers();
+    }
+  });
+
+  it("clears an active Auto fallback when its configured address changes", async () => {
+    vi.useFakeTimers();
+    const firstProxyAddress = "https://inspector.example.com/api/proxy-one";
+    const secondProxyAddress = "https://inspector.example.com/api/proxy-two";
+    const proxyConfig = { proxyAddress: firstProxyAddress };
+    const connection = connectionFor("modern");
+    connect
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValue(connection);
+
+    const { useMcp } = await import("../../../src/react/useMcp.js");
+    let renderer: ReturnType<typeof create> | undefined;
+
+    function TestComponent({ fallbackAddress }: { fallbackAddress: string }) {
+      const autoProxyFallback = React.useMemo(
+        () => ({ enabled: true, proxyAddress: fallbackAddress }),
+        [fallbackAddress]
+      );
+      useMcp({
+        url: "https://example.com/mcp",
+        authProvider,
+        connectionMode: "auto",
+        proxyConfig,
+        autoProxyFallback,
+        autoReconnect: false,
+        logLevel: "silent",
+      });
+      return null;
+    }
+
+    try {
+      await act(async () => {
+        renderer = create(
+          <TestComponent fallbackAddress={firstProxyAddress} />
+        );
+        await Promise.resolve();
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(client.addServer).toHaveBeenLastCalledWith(
+        expect.any(String),
+        expect.objectContaining({ gatewayUrl: firstProxyAddress })
+      );
+      const callCountBeforeAddressChange = client.addServer.mock.calls.length;
+
+      await act(async () => {
+        renderer!.update(
+          <TestComponent fallbackAddress={secondProxyAddress} />
+        );
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      const gatewayUrlsAfterAddressChange = client.addServer.mock.calls
+        .slice(callCountBeforeAddressChange)
+        .map(([, config]) => config.gatewayUrl);
+      expect(gatewayUrlsAfterAddressChange).toEqual([undefined]);
     } finally {
       await act(async () => {
         renderer?.unmount();

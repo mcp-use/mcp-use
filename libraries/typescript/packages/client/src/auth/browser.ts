@@ -247,7 +247,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       // their caller-provided cache behavior.
       if (!oauthProxyUrl) {
         return await base(
-          input,
+          isMetadata ? url : input,
           isMetadata ? { ...init, cache: "no-store" } : init
         );
       }

@@ -278,10 +278,19 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
   // Reset runtime fallback when the requested connection changes.
   useEffect(() => {
     setEffectiveProxyConfig(undefined);
-  }, [url, requestedProxyAddress, connectionMode]);
+  }, [
+    url,
+    requestedProxyAddress,
+    connectionMode,
+    autoProxyFallbackConfig.proxyAddress,
+  ]);
 
   const activeProxyConfig = useMemo(() => {
-    if (effectiveProxyConfig?.proxyAddress) {
+    const hasCurrentAutoFallback =
+      autoProxyFallbackConfig.enabled &&
+      effectiveProxyConfig?.proxyAddress ===
+        autoProxyFallbackConfig.proxyAddress;
+    if (hasCurrentAutoFallback && effectiveProxyConfig) {
       const latestHeaders = proxyConfig?.headers ?? {};
       return {
         ...effectiveProxyConfig,
@@ -306,6 +315,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     proxyConfig,
     connectionMode,
     autoProxyFallbackConfig.enabled,
+    autoProxyFallbackConfig.proxyAddress,
   ]);
 
   const gatewayUrl = activeProxyConfig?.proxyAddress;
@@ -1918,6 +1928,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     mergedClientInfo,
     effectiveOAuthUrl, // Triggers reconnection when proxy fallback changes OAuth URL
     proxyConfig, // Triggers reconnection when proxy config (including headers) changes
+    autoProxyFallbackConfig.proxyAddress,
     providedAuthProvider,
   ]);
 

@@ -324,6 +324,24 @@ describe("BrowserOAuthClientProvider — scoped OAuth proxy fetch", () => {
       );
     });
 
+    it("fetches re-anchored metadata directly when OAuth proxying is disabled", async () => {
+      const base = vi.fn(
+        async () => new Response("{}", { status: 200 })
+      ) as unknown as typeof fetch;
+      const scoped = makeProvider({
+        connectionUrl: CONNECTION_URL,
+      }).getProxyFetch(base)!;
+
+      await scoped(
+        "https://inspector.local/.well-known/oauth-protected-resource/inspector/api/proxy"
+      );
+
+      expect(base).toHaveBeenCalledWith(
+        "https://server-a.example.com/.well-known/oauth-protected-resource/mcp",
+        expect.objectContaining({ cache: "no-store" })
+      );
+    });
+
     it("leaves .well-known lookups on unrelated origins untouched", async () => {
       const scoped = makeProxiedProvider().getProxyFetch()!;
 
