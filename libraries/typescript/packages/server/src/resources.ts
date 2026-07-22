@@ -1,9 +1,11 @@
 import type {
   Annotations,
+  CallToolResult,
   CompleteResourceTemplateCallback,
   MetaObject,
   ReadResourceResult,
 } from "@modelcontextprotocol/server";
+import type { Env } from "hono";
 
 import type { RequestContext } from "./context.js";
 
@@ -35,8 +37,11 @@ export interface ResourceDefinition {
 }
 
 /**
- * Resource read callback. Returns the SDK's raw {@link ReadResourceResult};
+ * Resource read callback. Prefer the SDK's raw {@link ReadResourceResult};
  * each `contents` entry addresses itself with the read `uri`.
+ *
+ * Deprecated response helpers that return a {@link CallToolResult} are still
+ * accepted and converted at registration time.
  *
  * @example
  * ```ts
@@ -48,10 +53,14 @@ export interface ResourceDefinition {
 export type ResourceCallback<
   TUser = never,
   HasOAuth extends boolean = false,
+  TEnv extends Env = Env,
 > = (
   uri: URL,
-  ctx: RequestContext<TUser, HasOAuth>
-) => ReadResourceResult | Promise<ReadResourceResult>;
+  ctx: RequestContext<TUser, HasOAuth, TEnv>
+) =>
+  | ReadResourceResult
+  | CallToolResult
+  | Promise<ReadResourceResult | CallToolResult>;
 
 /**
  * A resource-template variable completer accepted by
@@ -171,13 +180,22 @@ export type InferTemplateParams<T> = T extends {
     : { [K in ExtractTemplateVariables<U>]: TemplateVariableValue }
   : Record<string, TemplateVariableValue>;
 
-/** Resource template read callback; receives the matched URI and variables. */
+/**
+ * Resource template read callback; receives the matched URI and variables.
+ *
+ * Prefer {@link ReadResourceResult}. Deprecated helper-shaped
+ * {@link CallToolResult} returns are still accepted and converted.
+ */
 export type ResourceTemplateCallback<
   TParams = Record<string, TemplateVariableValue>,
   TUser = never,
   HasOAuth extends boolean = false,
+  TEnv extends Env = Env,
 > = (
   uri: URL,
   params: TParams,
-  ctx: RequestContext<TUser, HasOAuth>
-) => ReadResourceResult | Promise<ReadResourceResult>;
+  ctx: RequestContext<TUser, HasOAuth, TEnv>
+) =>
+  | ReadResourceResult
+  | CallToolResult
+  | Promise<ReadResourceResult | CallToolResult>;

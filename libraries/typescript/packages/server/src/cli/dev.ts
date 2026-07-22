@@ -54,7 +54,7 @@ import {
 } from "./inspector.js";
 import { isInspectorPath, isInspectorRequest } from "./inspector-route.js";
 import { createTunnelManager } from "./tunnel.js";
-import { ensureMcpEnvDeclaration } from "./mcp-env-declaration.js";
+import { syncMcpEnvDeclaration } from "./mcp-env-declaration.js";
 import { resolveWorkspacePaths } from "./workspace.js";
 import { mcpUseViewsPlugin } from "./views-plugin.js";
 import {
@@ -65,10 +65,8 @@ import {
 } from "./views.js";
 import type { ViewsManifest } from "../views/types.js";
 
-/** Universal web handler returned by `MCPServer.getHandler()`. */
-type FrameworkHandler = (
-  input: Request | { req: { raw: Request } }
-) => Promise<Response>;
+/** Canonical Web handler exposed by `MCPServer.fetch`. */
+type WebHandler = (request: Request) => Promise<Response>;
 
 /**
  * The duck-typed shape the entry's default export must satisfy: an
@@ -76,7 +74,9 @@ type FrameworkHandler = (
  * copy of `mcp-use`).
  */
 interface ServerLike {
-  getHandler(options?: { bus?: ServerEventBus }): FrameworkHandler;
+  fetch(request: Request): Response | Promise<Response>;
+  __setEventBus(bus: ServerEventBus): void;
+  __mount(): void;
   /** URL path prefix the MCP endpoint is mounted at (default `"/mcp"`). */
   readonly basePath?: string;
   __primeViews(
@@ -293,9 +293,9 @@ function serverFrom(moduleExports: Record<string, unknown>): ServerLike {
     );
   }
   const candidate = server as Partial<ServerLike>;
-  if (typeof candidate.getHandler !== "function") {
+  if (typeof candidate.fetch !== "function") {
     throw new Error(
-      "The entry's default export has no getHandler() — it must be the " +
+      "The entry's default export has no fetch() — it must be the " +
         "MCPServer instance (`export default server`)."
     );
   }
@@ -304,7 +304,7 @@ function serverFrom(moduleExports: Record<string, unknown>): ServerLike {
 
 /**
  * Run the dev server: import the entry through Vite's module runner (full
- * TS/alias support), serve `server.getHandler()` on one long-lived HTTP
+ * TS/alias support), serve `server.fetch` on one long-lived HTTP
  * listener, and swap the handler on file change.
  *
  * A throwing re-import keeps the previous handler alive and prints the error
@@ -372,8 +372,9 @@ export async function runDev(options: DevOptions): Promise<void> {
     options.entry === undefined
       ? discoverEntry(sourceRoot)
       : discoverEntry(options.cwd, options.entry);
-  if (await ensureMcpEnvDeclaration(options.cwd, entry)) {
-    console.log("[mcp-use] created mcp-env.d.ts");
+  const declarationStatus = await syncMcpEnvDeclaration(options.cwd, entry);
+  if (declarationStatus === "created" || declarationStatus === "updated") {
+    console.log(`[mcp-use] ${declarationStatus} mcp-env.d.ts`);
   }
   const viewsDirectory =
     options.viewsDir ??
@@ -493,11 +494,13 @@ export async function runDev(options: DevOptions): Promise<void> {
     }
   };
 
-  let currentHandler: FrameworkHandler;
+  let currentHandler: WebHandler;
   let basePath: string;
   try {
     const server = await importServer();
-    currentHandler = server.getHandler({ bus: eventBus });
+    server.__setEventBus(eventBus);
+    server.__mount();
+    currentHandler = async (request) => server.fetch(request);
     basePath = server.basePath ?? "/mcp";
   } catch (error) {
     await runner.close();
@@ -557,7 +560,10 @@ export async function runDev(options: DevOptions): Promise<void> {
         try {
           runner.evaluatedModules.clear();
           const server = await importServer();
-          const nextHandler = server.getHandler({ bus: eventBus });
+          server.__setEventBus(eventBus);
+          server.__mount();
+          const nextHandler: WebHandler = async (request) =>
+            server.fetch(request);
           const nextBasePath = server.basePath ?? "/mcp";
           mountDevInspector(nextBasePath);
           currentHandler = nextHandler;
@@ -641,7 +647,7 @@ export async function runDev(options: DevOptions): Promise<void> {
   });
 
   // --- DNS-rebinding protection. --------------------------------------------
-  // getHandler() applies no Host/Origin validation (its contract assumes a
+  // server.fetch applies no Host/Origin validation (its contract assumes a
   // platform edge in front); in dev this process *is* the edge, so
   // localhost-class binds get the same localhost-allowlist checks listen()
   // applies — extended with the active tunnel hostname, since tunnel traffic

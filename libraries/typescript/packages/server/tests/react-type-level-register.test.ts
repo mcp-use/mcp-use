@@ -15,7 +15,11 @@ import type {
   ToolContextError,
   ToolError,
 } from "../src/react/types/result-types.js";
-import type { CallToolHandle } from "../src/react/hooks/use-call-tool.js";
+import type {
+  CallToolHandle,
+  useCallTool,
+  useDynamicTool,
+} from "../src/react/hooks/use-call-tool.js";
 import type { ToolContextHandle } from "../src/react/hooks/use-tool-context.js";
 
 declare module "../src/react/types/register.js" {
@@ -23,6 +27,8 @@ declare module "../src/react/types/register.js" {
     tools: typeof import("./fixtures/react-register-tools.js");
   }
 }
+
+declare const callToolHook: typeof useCallTool;
 
 describe("ToolsFromModule / Register", () => {
   it("filters non-ToolRef exports from the registered tools map", () => {
@@ -119,6 +125,24 @@ describe("ToolsFromModule / Register", () => {
 });
 
 describe("useCallTool augmented Register", () => {
+  it("accepts only exported tool names and keeps dynamic calls explicit", () => {
+    if (false) {
+      const exported = callToolHook("search-fruits");
+      expectTypeOf(exported).toEqualTypeOf<
+        CallToolHandle<
+          RegisteredTools["search-fruits"]["input"],
+          RegisteredTools["search-fruits"]["output"]
+        >
+      >();
+      // @ts-expect-error an unexported ToolRef is rejected with export guidance
+      callToolHook("unexported-tool");
+    }
+    expectTypeOf<
+      ReturnType<typeof useDynamicTool<{ id: string }, { value: string }>>
+    >().toEqualTypeOf<CallToolHandle<{ id: string }, { value: string }>>();
+    expect(true).toBe(true);
+  });
+
   it("types name union and args/result from Register via CallToolSuccess", () => {
     type Output = RegisteredTools["search-fruits"]["output"];
     type Handle = CallToolHandle<

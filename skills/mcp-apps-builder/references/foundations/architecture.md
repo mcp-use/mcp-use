@@ -55,7 +55,7 @@ server.nativeServer.server.setRequestHandler(...);
 High-level methods for defining MCP primitives:
 
 ```typescript
-server.tool({ ... }, async (input) => { ... });
+export const tool = server.tool({ ... }, async (input) => { ... });
 server.resource({ ... }, async () => { ... });
 server.prompt({ ... }, async (input) => { ... });
 server.proxy({ child: { url: "..." } });
@@ -232,7 +232,7 @@ server.app.use(async (c, next) => {
   console.log("5. Middleware end");
 });
 
-server.tool(
+export const greet = server.tool(
   { name: "greet", schema: z.object({ name: z.string() }) },
   async ({ name }) => {
     console.log("3. Tool handler");
@@ -249,7 +249,7 @@ You can mix MCP tools with custom HTTP routes:
 
 ```typescript
 // MCP tool (called via MCP protocol)
-server.tool({ name: "calculate", ... }, async (input) => { ... });
+export const calculate = server.tool({ name: "calculate", ... }, async (input) => { ... });
 
 // Custom HTTP endpoint (called via HTTP)
 server.app.get('/api/status', (c) => {

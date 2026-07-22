@@ -17,7 +17,7 @@ const BUILD_ENTRY_MCP_URL = "http://localhost:3000";
  * @internal
  */
 interface ServerLike {
-  getHandler(): unknown;
+  __mount(): void;
   __primeViews(views: ViewsManifest, options?: { dev?: boolean }): void;
   basePath?: string;
 }
@@ -25,7 +25,7 @@ interface ServerLike {
 /**
  * Import the server entry and read `basePath` from the default export.
  *
- * Does not prime views or call `getHandler()`. Sets a synthetic `MCP_URL` only
+ * Does not prime views or mount the server. Sets a synthetic `MCP_URL` only
  * when unset so OAuth entries can construct during build introspection.
  *
  * @internal
@@ -68,7 +68,7 @@ export async function resolveBuildBasePath(
 
 /**
  * Prime the server with the manifest and run mount-time binding validation
- * by calling `getHandler()`.
+ * by mounting the application.
  *
  * Surfaces the same errors as runtime mount: missing primed view, missing
  * `outputSchema`, double binding. Unbound views emit a warning to stderr.
@@ -107,7 +107,7 @@ export async function validateViewBindingsAtBuild(
       );
     }
     server.__primeViews(viewsManifest);
-    server.getHandler();
+    server.__mount();
   } finally {
     await runner.close();
   }

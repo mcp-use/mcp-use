@@ -106,7 +106,7 @@ export function createNextHandler<TUser>(
     server.__primeViews(parseBuildManifest(raw, manifestPath), {
       projectRoot,
     });
-    return server.getHandler();
+    return async (request) => server.fetch(request);
   };
 
   const handle = async (request: Request): Promise<Response> => {

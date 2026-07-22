@@ -109,8 +109,8 @@ interface BaseServerConfig {
    * binds get DNS-rebinding protection (`Host` on every request; `Origin`
    * only on non-GET/HEAD) automatically. Set `"0.0.0.0"` to serve publicly — behind a platform
    * edge (Railway, Fly, …) nothing more is needed, since the edge only
-   * routes hostnames assigned to the deployment. Ignored by `getHandler()`,
-   * which never binds.
+   * routes hostnames assigned to the deployment. Ignored by `server.fetch`,
+   * which never binds a socket.
    */
   host?: string;
   /**
@@ -125,7 +125,7 @@ interface BaseServerConfig {
    * protection), e.g. `["api.example.com"]`. Port-agnostic and additive:
    * localhost-class hostnames stay allowed, so local runs keep working
    * unmodified. Setting this also turns Host validation on for
-   * `getHandler()`, which otherwise applies none.
+   * `server.fetch`, which otherwise applies none.
    */
   allowedHosts?: string[];
   /**
@@ -188,7 +188,7 @@ interface BaseServerConfig {
    */
   requestState?: ServerOptions["requestState"];
   /**
-   * Optional CORS headers on every route served by `getHandler()` / `listen()`
+   * Optional CORS headers on every route served by `server.fetch` / `listen()`
    * (MCP endpoint, view assets, landing page, OAuth metadata). Off when omitted.
    *
    * Pair with {@link BaseServerConfig.allowedOrigins | allowedOrigins} for
@@ -212,7 +212,7 @@ interface BaseServerConfig {
 }
 
 /**
- * CORS configuration for routes owned by mcp-use (`getHandler()` / `listen()`).
+ * CORS configuration for routes owned by the Hono application.
  *
  * Omit `cors` entirely for the current no-CORS behavior. Pass `cors: {}` to
  * enable with defaults (reflects the request `Origin` when present; wildcard

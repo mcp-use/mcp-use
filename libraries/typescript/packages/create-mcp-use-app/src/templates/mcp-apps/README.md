@@ -15,6 +15,8 @@ Open [http://localhost:3000/mcp/inspector](http://localhost:3000/mcp/inspector) 
 
 You can start building by editing the entry file. Add tools, resources, and prompts — the server auto-reloads as you edit.
 
+Run `npm run typecheck` to refresh MCP view types and check the project with its local TypeScript compiler. Statically declared tools used by views must be assigned to exported constants.
+
 ## Learn More
 
 To learn more about mcp-use and MCP:

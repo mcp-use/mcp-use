@@ -98,8 +98,7 @@ export function createApiKeyServer(port: number = 3003) {
 
     await next();
   });
-  const handler = server.getHandler();
-  app.all("*", (c) => handler(c.req.raw));
+  app.mount("/", server.fetch);
 
   let httpServer: ServerType | undefined;
 

@@ -249,10 +249,10 @@ describe("resource-template completion over HTTP", () => {
   });
 });
 
-describe("getHandler resource-template completion", () => {
+describe("server.fetch resource-template completion", () => {
   it("matches listen() behavior over real HTTP", async () => {
     const mounted = completionServer();
-    const listener = await listenFetch(mounted.getHandler());
+    const listener = await listenFetch(mounted.fetch);
     const client = await connect(`${listener.url}/mcp`, true);
     try {
       const result = await client.complete({

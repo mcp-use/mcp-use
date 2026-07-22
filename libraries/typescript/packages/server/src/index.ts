@@ -1,12 +1,13 @@
 /**
- * `mcp-use` — MCP server framework on the official v2 SDK (fetch-native).
+ * `mcp-use` — MCP server framework on the official v2 SDK, with a Hono HTTP
+ * application and a Web-standard Fetch serving boundary.
  *
  * Greenfield rebuild of the mcp-use server package against the stateless
  * 2026-07-28 MCP protocol. See specs/SPEC.md for the phase plan and API contract.
  */
 
 export { MCPServer } from "./server.js";
-export type { ListenOptions, ListenRoute } from "./server.js";
+export type { ListenOptions } from "./server.js";
 export { createMcpMount } from "./mount-mcp.js";
 export type { MountMcpOptions, McpMount } from "./mount-mcp.js";
 export {
@@ -18,16 +19,8 @@ export {
   matchesPathPrefix,
   originValidationMiddleware,
   pathnameOf,
-  routeFetch,
-  toFrameworkHandler,
 } from "./fetch-app.js";
-export type {
-  FetchHandler,
-  FetchMiddleware,
-  FrameworkHandler,
-  FrameworkRequestLike,
-  RequestBag,
-} from "./fetch-app.js";
+export type { FetchHandler, FetchMiddleware, RequestBag } from "./fetch-app.js";
 export { registerViews } from "./views/index.js";
 export { requestLogger } from "./logging.js";
 export type { LoggingOptions, LogLevel } from "./logging.js";
@@ -39,10 +32,12 @@ export type {
 } from "./landing.js";
 
 /**
- * Wire result shapes (re-exported from the SDK): callbacks return these raw
- * shapes directly — tools return {@link CallToolResult}, resources
- * {@link ReadResourceResult}, prompts {@link GetPromptResult}. There is no
- * framework-specific result layer.
+ * Wire result shapes (re-exported from the SDK): prefer returning these raw
+ * shapes from callbacks — tools {@link CallToolResult}, resources
+ * {@link ReadResourceResult}, prompts {@link GetPromptResult}. Deprecated
+ * response helpers (`text`, `object`, …) are thin shims that produce the same
+ * tool envelope; resource/prompt registration still converts helper-shaped
+ * returns for upgrade compatibility.
  */
 export type {
   CallToolResult,
@@ -175,6 +170,36 @@ export type {
   PromptCallback,
   PromptDefinition,
 } from "./prompts.js";
+/**
+ * @deprecated Prefer raw {@link CallToolResult} / {@link ReadResourceResult} /
+ * {@link GetPromptResult} returns. These helpers remain for upgrade
+ * compatibility and map to the official wire envelopes.
+ */
+export {
+  array,
+  audio,
+  binary,
+  css,
+  error,
+  html,
+  image,
+  javascript,
+  markdown,
+  mix,
+  object,
+  resource,
+  text,
+  widget,
+  xml,
+} from "./response-helpers.js";
+/**
+ * @deprecated Prefer raw wire result types from the package root.
+ */
+export type {
+  ToolContentResult,
+  TypedCallToolResult,
+  WidgetResponseConfig,
+} from "./response-helpers.js";
 export type {
   ProxyConnection,
   ProxyHttpConfig,

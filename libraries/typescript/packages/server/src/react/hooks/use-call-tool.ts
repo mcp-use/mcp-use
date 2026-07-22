@@ -13,7 +13,8 @@ export type { CallToolSuccess } from "../types/result-types.js";
 export { ToolError } from "../types/result-types.js";
 
 /**
- * Typed server-tool call handle returned by {@link useCallTool}.
+ * Typed server-tool call handle returned by {@link useCallTool} and
+ * {@link useDynamicTool}.
  *
  * @typeParam Args - Tool argument object type.
  * @typeParam Result - Expected `structuredContent` type for a successful result.
@@ -49,6 +50,35 @@ export interface CallToolHandle<Args, Result> {
   isPending: boolean;
 }
 
+type ToolNameParameter<Name extends string> =
+  string extends keyof RegisteredTools
+    ? Name
+    : Name extends keyof RegisteredTools
+      ? Name
+      : `Tool "${Name}" is not exported from the server entry. Export the ToolRef returned by server.tool().`;
+
+type RegisteredToolInput<Name extends string> =
+  Name extends keyof RegisteredTools
+    ? RegisteredTools[Name]["input"]
+    : Record<string, unknown>;
+
+type RegisteredToolOutput<Name extends string> =
+  Name extends keyof RegisteredTools
+    ? RegisteredTools[Name]["output"]
+    : unknown;
+
+/**
+ * Call a server tool using a {@link ToolRef} value (inline-JSX stretch path).
+ *
+ * @typeParam R - Tool ref carrying name, input, and output types.
+ */
+export function useCallTool<R extends ToolRef<string, unknown, unknown>>(
+  ref: R
+): CallToolHandle<
+  R extends ToolRef<string, infer I, unknown> ? I : never,
+  R extends ToolRef<string, unknown, infer O> ? O : never
+>;
+
 /**
  * Call a registered server tool from the view with inferred types.
  *
@@ -76,45 +106,55 @@ export interface CallToolHandle<Args, Result> {
  * }
  * ```
  */
-export function useCallTool<Name extends keyof RegisteredTools>(
-  name: Name
-): CallToolHandle<
-  RegisteredTools[Name]["input"],
-  RegisteredTools[Name]["output"]
->;
-
-/**
- * Call a server tool using a {@link ToolRef} value (inline-JSX stretch path).
- *
- * @typeParam R - Tool ref carrying name, input, and output types.
- */
 // eslint-disable-next-line no-redeclare -- overload set
-export function useCallTool<R extends ToolRef<string, unknown, unknown>>(
-  ref: R
-): CallToolHandle<
-  R extends ToolRef<string, infer I, unknown> ? I : never,
-  R extends ToolRef<string, unknown, infer O> ? O : never
->;
-
-/**
- * Call a server tool with explicit argument/result types (escape hatch).
- *
- * @typeParam Args - Explicit argument object type.
- * @typeParam Result - Explicit `structuredContent` type.
- */
-// eslint-disable-next-line no-redeclare -- overload set
-export function useCallTool<
-  Args extends Record<string, unknown>,
-  Result = unknown,
->(name: string): CallToolHandle<Args, Result>;
+export function useCallTool<const Name extends string>(
+  name: ToolNameParameter<Name>
+): CallToolHandle<RegisteredToolInput<Name>, RegisteredToolOutput<Name>>;
 
 // eslint-disable-next-line no-redeclare -- implementation signature
 export function useCallTool(
   nameOrRef: string | ToolRef<string, unknown, unknown>
 ) {
+  return useToolCall(nameOrRef);
+}
+
+/**
+ * Call a tool whose registration cannot be represented by an exported
+ * {@link ToolRef}, such as a tool created from a loop, runtime configuration,
+ * or an OpenAPI document.
+ *
+ * Prefer {@link useCallTool} for statically declared tools. This explicit
+ * escape hatch requires callers to supply the contract because TypeScript
+ * cannot infer runtime-only registrations.
+ *
+ * @example
+ * ```tsx
+ * const lookup = useDynamicTool<{ id: string }, { value: string }>("lookup");
+ * const result = await lookup.callTool({ id: "item-1" });
+ * ```
+ *
+ * @typeParam Args - Explicit tool argument object type.
+ * @typeParam Result - Expected `structuredContent` type for a successful result.
+ * @param name - Runtime-registered tool name.
+ * @returns A call handle using the explicitly supplied contract.
+ */
+export function useDynamicTool<
+  Args extends Record<string, unknown>,
+  Result = unknown,
+>(name: string): CallToolHandle<Args, Result> {
+  return useToolCall<Args, Result>(name);
+}
+
+/** Shared hook implementation for inferred and explicitly typed tool calls. */
+function useToolCall<
+  Args extends Record<string, unknown> = Record<string, unknown>,
+  Result = unknown,
+>(
+  nameOrRef: string | ToolRef<string, unknown, unknown>
+): CallToolHandle<Args, Result> {
   const toolName = typeof nameOrRef === "string" ? nameOrRef : nameOrRef.name;
   const runtime = useViewRuntime();
-  const [data, setData] = useState<CallToolSuccess<unknown> | undefined>(
+  const [data, setData] = useState<CallToolSuccess<Result> | undefined>(
     undefined
   );
   const [error, setError] = useState<Error | undefined>(undefined);
@@ -122,9 +162,7 @@ export function useCallTool(
   const callIdRef = useRef(0);
 
   const callTool = useCallback(
-    async (
-      args: Record<string, unknown>
-    ): Promise<CallToolSuccess<unknown>> => {
+    async (args: Args): Promise<CallToolSuccess<Result>> => {
       const callId = ++callIdRef.current;
       setIsPending(true);
       setError(undefined);
@@ -139,7 +177,7 @@ export function useCallTool(
           throw new ToolError(result as CallToolResult & { isError: true });
         }
 
-        const typed = result as CallToolSuccess<unknown>;
+        const typed = result as CallToolSuccess<Result>;
         if (callId === callIdRef.current) {
           setData(typed);
           setIsPending(false);

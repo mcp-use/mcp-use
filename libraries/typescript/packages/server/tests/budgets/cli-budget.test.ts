@@ -95,6 +95,7 @@ describe("published CLI boundaries", () => {
       "start",
       "dev",
       "build",
+      "typecheck",
       "identity",
       "organizations",
       "servers",

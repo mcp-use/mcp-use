@@ -104,7 +104,7 @@ describe("direct OAuth authorization (official client e2e)", () => {
         },
       ],
     }));
-    mcpHandler = server.getHandler();
+    mcpHandler = server.fetch;
 
     let client: Client | undefined;
     try {

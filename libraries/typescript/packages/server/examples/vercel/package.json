@@ -3,7 +3,7 @@
   "type": "module",
   "version": "0.0.0",
   "private": true,
-  "description": "Example: mcp-use on Vercel (serverless) via the web-standard fetch handler from getHandler().",
+  "description": "Example: mcp-use on Vercel via the server's web-standard fetch handler.",
   "engines": {
     "node": ">=22.22.2"
   },

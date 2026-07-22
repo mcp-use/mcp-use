@@ -1226,7 +1226,7 @@ describe("views env URL / CSP (e2e)", () => {
       })
     );
 
-    const handler = server.getHandler();
+    const handler = server.fetch;
     const readBody = await handlerMcp(handler, "resources/read", {
       uri: "ui://views/product-search-result.html",
     });
@@ -1272,7 +1272,7 @@ describe("views env URL / CSP (e2e)", () => {
       })
     );
 
-    const handler = server.getHandler();
+    const handler = server.fetch;
     const listBody = await handlerMcp(handler, "resources/list");
     const view = (
       listBody["result"] as {

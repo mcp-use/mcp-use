@@ -3,9 +3,9 @@
  * and the local smoke test (`smoke.ts`).
  *
  * `MCPServer` builds a fresh SDK server per HTTP request off this registry
- * (see `getHandler()` in `mcp-use`), so the whole module is stateless
+ * (see `server.fetch` in `mcp-use`), so the whole module is stateless
  * and safe to reuse across warm serverless invocations — register everything
- * once, at import time, and never after `getHandler()` is called.
+ * once, at import time, and never after the first request is served.
  */
 import { MCPServer } from "mcp-use";
 import { z } from "zod";
@@ -21,7 +21,7 @@ export const server = new MCPServer({
   // mounted route is exactly what Vercel routes to it. Getting this out of
   // sync (e.g. leaving the "/mcp" default) is a silent 404 trap.
   //
-  // No allowedHosts needed: `getHandler()` applies no Host validation, and
+  // No allowedHosts needed: `server.fetch` applies no Host validation, and
   // Vercel's edge only routes hostnames assigned to this deployment, so
   // DNS-rebinding-style Hosts never reach the function. Set `allowedHosts`
   // (additive — localhost stays allowed) to opt into stricter validation.

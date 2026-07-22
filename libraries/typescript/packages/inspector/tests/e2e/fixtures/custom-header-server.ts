@@ -78,8 +78,7 @@ export function createCustomHeaderServer(port: number = 3004) {
 
     await next();
   });
-  const handler = server.getHandler();
-  app.all("*", (c) => handler(c.req.raw));
+  app.mount("/", server.fetch);
 
   let httpServer: ServerType | undefined;
 

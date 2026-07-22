@@ -6,6 +6,7 @@ import {
   StreamableHTTPClientTransport,
 } from "@modelcontextprotocol/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { HonoRequest } from "hono";
 import { z } from "zod";
 
 import { MCPServer } from "../src/index.js";
@@ -26,7 +27,7 @@ describe("MCP middleware — integration", () => {
   let client: Client;
   let transport: StreamableHTTPClientTransport;
   const log: string[] = [];
-  const requests = new Map<string, Request | undefined>();
+  const requests = new Map<string, HonoRequest | undefined>();
 
   beforeAll(async () => {
     server = new MCPServer({
@@ -193,8 +194,8 @@ describe("MCP middleware — integration", () => {
       const request = requests.get(context);
       expect(
         request,
-        `${context} context did not receive a Request`
-      ).toBeInstanceOf(Request);
+        `${context} context did not receive a HonoRequest`
+      ).toHaveProperty("raw");
       expect(request?.method).toBe("POST");
     }
   });
@@ -354,14 +355,14 @@ describe("MCP middleware — tool schema emission", () => {
   });
 });
 
-describe("getHandler() framework mounting", () => {
+describe("server.fetch framework mounting", () => {
   it("accepts a raw Request", async () => {
     const server = new MCPServer({ name: "handler-test", version: "1.0.0" });
     server.tool({ name: "ping", inputSchema: z.object({}) }, async () => ({
       content: [{ type: "text", text: "pong" }],
     }));
 
-    const response = await server.getHandler()(
+    const response = await server.fetch(
       new Request("http://127.0.0.1/mcp", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -381,15 +382,15 @@ describe("getHandler() framework mounting", () => {
     expect(response.status).toBeLessThan(500);
   });
 
-  it("duck-types Hono-style context objects", async () => {
+  it("mounts inside another Hono application", async () => {
     const server = new MCPServer({ name: "hono-test", version: "1.0.0" });
     const request = new Request("http://127.0.0.1/mcp", { method: "GET" });
-    const response = await server.getHandler()({ req: { raw: request } });
+    const response = await server.app.request(request);
     expect(response).toBeInstanceOf(Response);
   });
 });
 
-describe("getNodeHandler()", () => {
+describe("toNodeHandler(server.fetch)", () => {
   it("returns a Node handler that serves MCP requests", async () => {
     const server = new MCPServer({ name: "node-test", version: "1.0.0" });
     server.tool({ name: "ping", inputSchema: z.object({}) }, async () => ({
@@ -397,7 +398,10 @@ describe("getNodeHandler()", () => {
     }));
 
     const { createServer } = await import("node:http");
-    const nodeHandler = await server.getNodeHandler();
+    const { toNodeHandler } = await import("../src/node-bridge.js");
+    const nodeHandler = toNodeHandler({
+      fetch: async (request) => server.fetch(request),
+    });
     const httpServer = createServer((req, res) => {
       void nodeHandler(req, res);
     });

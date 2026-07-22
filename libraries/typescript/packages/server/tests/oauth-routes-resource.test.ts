@@ -89,7 +89,7 @@ describe("OAuth HTTP route acceptance", () => {
       basePath: "/api/mcp",
       resource: "https://canonical.example.test/api/mcp",
       requiredScopes: ["tools:read"],
-    }).getHandler();
+    }).fetch;
     const resourceMetadata =
       "https://canonical.example.test/.well-known/oauth-protected-resource/api/mcp";
 
@@ -141,7 +141,7 @@ describe("OAuth HTTP route acceptance", () => {
       basePath: "/api/mcp",
       resource: "https://canonical.example.test/api/mcp",
       scopesSupported: ["tools:read"],
-    }).getHandler();
+    }).fetch;
     const protectedMetadata = "/.well-known/oauth-protected-resource/api/mcp";
     const authorizationMetadata = "/.well-known/oauth-authorization-server";
 
@@ -174,7 +174,7 @@ describe("OAuth HTTP route acceptance", () => {
     process.env["MCP_URL"] = "https://env.example.test";
     const explicitHandler = server({
       resource: "https://explicit.example.test/mcp",
-    }).getHandler();
+    }).fetch;
     const explicitResponse = await explicitHandler(
       request("/mcp", { headers: { host: "attacker.example.test" } })
     );
@@ -185,7 +185,7 @@ describe("OAuth HTTP route acceptance", () => {
     process.env["MCP_URL"] = "https://configured.example.test/";
     const configuredServer = server({ basePath: "/api/mcp" });
     process.env["MCP_URL"] = "https://changed-after-construction.example.test";
-    const configuredHandler = configuredServer.getHandler();
+    const configuredHandler = configuredServer.fetch;
     const configuredResponse = await configuredHandler(
       request("/api/mcp", { headers: { host: "other.example.test" } })
     );
@@ -211,11 +211,11 @@ describe("OAuth HTTP route acceptance", () => {
     }
   });
 
-  it("allows no configured resource for localhost listen but not getHandler", () => {
+  it("allows no configured resource for localhost listen but not server.fetch", async () => {
     delete process.env["MCP_URL"];
-    expect(() => server().getHandler()).toThrow(
-      "OAuth requires an explicit resource or MCP_URL"
-    );
+    await expect(
+      server().fetch(new Request("http://edge.example/mcp"))
+    ).rejects.toThrow("OAuth requires an explicit resource or MCP_URL");
     expect(() => server()).not.toThrow();
   });
 
@@ -236,7 +236,7 @@ describe("OAuth HTTP route acceptance", () => {
       "http://127.0.0.1/mcp/",
       "http://[::1]/mcp/",
     ]) {
-      const handler = server({ resource }).getHandler();
+      const handler = server({ resource }).fetch;
       const response = await handler(request("/mcp"));
       expect(challenge(response)).toContain('resource_metadata="http://');
     }
@@ -244,7 +244,7 @@ describe("OAuth HTTP route acceptance", () => {
     const handler = server({
       basePath: "/api/mcp",
       resource: "https://canonical.example.test/api/mcp/",
-    }).getHandler();
+    }).fetch;
     const metadata = await handler(
       request("/.well-known/oauth-protected-resource/api/mcp")
     );

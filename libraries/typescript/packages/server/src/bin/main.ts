@@ -49,6 +49,7 @@ Usage: mcp-use <command> [options]
 Commands:
   dev      Start the dev server
   build    Build the server into .mcp-use/build
+  typecheck Refresh MCP types and run the project's TypeScript compiler
   start    Serve the production build from .mcp-use/build
   login    Authenticate the cloud CLI
   logout   Delete local cloud credentials
@@ -64,12 +65,13 @@ Commands:
 Options:
   -p, --port <n>     Port to serve on (dev/start; default: $PORT or 3000)
   --host <host>      Host to bind (dev/start; default: $HOST or 127.0.0.1)
-  --entry <path>     Server entry module (dev/build only)
+  --entry <path>     Server entry module (dev/build/typecheck only)
   --path <directory> Project root (default: current directory)
   --mcp-dir <dir>    Directory containing the MCP entry and views/
   --views-dir <dir>  Views directory (default: views/ or <mcp-dir>/views/)
   --source-maps      Emit source maps in build output (build only)
   --inline           Embed view JS and CSS in MCP resources (build only)
+  -- <tsc options>   Forward remaining options to TypeScript (typecheck only)
   --with-inspector   Mount Inspector on the production listener (start only)
   --tunnel           Expose the dev server through a public tunnel (dev only)
   --no-open          Do not auto-open the inspector in a browser (dev only)
@@ -156,12 +158,30 @@ export async function main(argv: readonly string[]): Promise<number> {
     case "dev":
     case "build":
       return cliCommand(args.command, args);
+    case "typecheck":
+      return typecheckCommand(args);
     case undefined:
       console.error(HELP);
       return 2;
     default:
       console.error(`Unknown command: ${args.command}\n\n${HELP}`);
       return 2;
+  }
+}
+
+/** `mcp-use typecheck`: refresh MCP types, then run project-local `tsc`. */
+async function typecheckCommand(args: ParsedArgs): Promise<number> {
+  try {
+    const { runTypecheck } = await import("../commands/typecheck.js");
+    return await runTypecheck({
+      cwd: resolve(process.cwd(), args.path ?? "."),
+      ...(args.entry !== undefined && { entry: args.entry }),
+      ...(args.mcpDir !== undefined && { mcpDir: args.mcpDir }),
+      ...(args.passthrough.length > 0 && { tscArgs: args.passthrough }),
+    });
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    return 1;
   }
 }
 
@@ -174,7 +194,7 @@ async function startCommand(args: ParsedArgs): Promise<number> {
       cwd: resolve(process.cwd(), args.path ?? "."),
       port: args.port,
       host: args.host,
-      ...(args.withInspector && { withInspector: true }),
+      ...(args.inspector === true && { withInspector: true }),
     });
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
@@ -211,7 +231,7 @@ async function cliCommand(
     ...(args.host !== undefined && { host: args.host }),
     ...(args.tunnel && { tunnel: true }),
     ...(!args.open && { open: false }),
-    ...(!args.inspector && { inspector: false }),
+    ...(args.inspector === false && { inspector: false }),
     ...(args.sourceMaps && { sourceMaps: true }),
     ...(args.inline && { inline: true }),
   };

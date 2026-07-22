@@ -77,7 +77,7 @@ export function createViewAssetsHandler(
  * cross-origin sandboxed view iframes.
  *
  * Node filesystem modules load only on the first public-asset request so the
- * library entry stays edge-safe for `getHandler()`-only deployments.
+ * library entry stays edge-safe for `server.fetch` deployments.
  *
  * @param basePath - MCP mount prefix (e.g. `/mcp`).
  * @param views - Primed view registry; empty skips mounting.

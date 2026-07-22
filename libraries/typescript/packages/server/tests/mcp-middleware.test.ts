@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { HonoRequest } from "hono/request";
 
 import {
   composeMiddleware,
@@ -122,13 +123,15 @@ describe("runMcpOperation", () => {
     const request = new Request("https://example.test/mcp", {
       headers: { "x-request-id": "request-1" },
     });
+    const honoRequest = new HonoRequest(request);
     const frozen = freezeMiddlewareContext({
       ...ctx("tools/list"),
-      request,
+      request: honoRequest,
+      req: honoRequest,
     });
 
-    expect(frozen.request).toBe(request);
-    expect(frozen.request?.headers.get("x-request-id")).toBe("request-1");
+    expect(frozen.request).toBe(honoRequest);
+    expect(frozen.request?.header("x-request-id")).toBe("request-1");
     expect(Object.isFrozen(frozen)).toBe(true);
   });
 

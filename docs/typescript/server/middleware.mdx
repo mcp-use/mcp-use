@@ -12,15 +12,15 @@ This guide focuses on where middleware fits and how to apply common patterns. Us
 
 Use MCP middleware when the logic depends on the parsed MCP operation. Its `ctx.request` also exposes the originating HTTP request, so operation-specific authorization can inspect headers without a custom wrapper. Use HTTP middleware when logic belongs before MCP parsing.
 
-| Need | Use |
-| --- | --- |
-| Check which tool is being called | MCP middleware |
-| Filter tool, resource, or prompt lists | MCP middleware |
-| Require OAuth scopes per MCP operation | MCP middleware |
+| Need                                                          | Use             |
+| ------------------------------------------------------------- | --------------- |
+| Check which tool is being called                              | MCP middleware  |
+| Filter tool, resource, or prompt lists                        | MCP middleware  |
+| Require OAuth scopes per MCP operation                        | MCP middleware  |
 | Add CORS, request logging, pre-MCP routing, or non-MCP routes | HTTP middleware |
-| Mount Express or Hono middleware | HTTP middleware |
+| Add Hono middleware                                           | HTTP middleware |
 
-MCP middleware patterns use the `mcp:` prefix. Mount `server.getHandler()` in your framework when you need HTTP middleware around the MCP endpoint.
+MCP middleware patterns use the `mcp:` prefix. Register Hono middleware directly with `server.use()`; both custom routes and the MCP endpoint pass through it.
 
 ## Wrap MCP tool calls
 
@@ -148,22 +148,22 @@ A practical order is logging, then authentication, then rate limiting, then oper
 
 ## Use HTTP middleware for request-level behavior
 
-Mount the MCP handler inside Hono when middleware should run at the HTTP layer.
+Register Hono middleware directly on the server when behavior belongs at the HTTP layer.
 
 ```typescript
-import { Hono } from "hono";
-
-const app = new Hono();
-app.use("/mcp", async (c, next) => {
+server.use("*", async (c, next) => {
   const startedAt = Date.now();
   c.header("x-server", "mcp-use");
   await next();
-  console.log(`${c.req.method} ${c.req.path} finished in ${Date.now() - startedAt}ms`);
+  console.log(
+    `${c.req.method} ${c.req.path} finished in ${Date.now() - startedAt}ms`,
+  );
 });
-app.all("/mcp", server.getHandler());
+
+server.get("/health", (c) => c.json({ ok: true }));
 ```
 
-HTTP middleware runs before MCP parses the request. Use it for CORS, headers, raw request logging, and non-MCP routes. Use MCP middleware when you need `ctx.method`, `ctx.params`, `ctx.auth`, or MCP session information.
+HTTP middleware runs before MCP parses the request. Use it for CORS, headers, raw request logging, and non-MCP routes. Use MCP middleware when you need `ctx.method`, `ctx.params`, `ctx.auth`, or MCP session information. Inside an MCP callback, the same Hono context is available: read middleware variables with `ctx.get()` and the raw Web request with `ctx.request.raw`.
 
 ## Test middleware locally
 
@@ -178,16 +178,30 @@ Use the Inspector at `http://localhost:3000/mcp/inspector` to call tools, list r
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Middleware API reference" icon="terminal" href="/typescript/api-reference/server/middleware">
-    Look up middleware context fields, pattern matching, adapter behavior, and proxy options.
+  <Card
+    title="Middleware API reference"
+    icon="terminal"
+    href="/typescript/api-reference/server/middleware"
+  >
+    Look up middleware context fields, pattern matching, adapter behavior, and
+    proxy options.
   </Card>
-  <Card title="Authentication" icon="shield-check" href="/typescript/server/authentication/index">
+  <Card
+    title="Authentication"
+    icon="shield-check"
+    href="/typescript/server/authentication/index"
+  >
     Configure OAuth before relying on `ctx.auth`.
   </Card>
   <Card title="Tools" icon="wrench" href="/typescript/server/tools">
     Design the tool callbacks that middleware wraps.
   </Card>
-  <Card title="Middleware example" icon="github" href="https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/examples/server/features/middleware/src/server.ts">
-    See a runnable server with logging, scope guard, rate limiting, and filtering.
+  <Card
+    title="Middleware example"
+    icon="github"
+    href="https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/examples/server/features/middleware/src/server.ts"
+  >
+    See a runnable server with logging, scope guard, rate limiting, and
+    filtering.
   </Card>
 </CardGroup>

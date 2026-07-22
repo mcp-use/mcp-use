@@ -18,7 +18,7 @@ const server = new MCPServer({
   baseUrl: process.env.MCP_URL || "http://localhost:3000"
 });
 
-server.tool(
+export const sendEmail = server.tool(
   {
     name: "send-email",
     description: "Send an email to a user",
@@ -42,6 +42,10 @@ server.tool(
 - Second argument: async handler function
 - Handler receives validated input matching schema
 - Must return a response helper (`text()`, `object()`, `widget()`, etc.)
+- Assign every statically declared tool to an exported constant. View typing is
+  derived from exported `ToolRef` values, so `useCallTool("send-email")` is a
+  TypeScript error if `sendEmail` is not exported. Re-export refs from split
+  modules; reserve `useDynamicTool<Args, Result>()` for runtime registrations.
 
 ---
 
@@ -94,7 +98,7 @@ z.object({
 Declare the nature of your tool so clients can warn users:
 
 ```typescript
-server.tool(
+export const deleteUserTool = server.tool(
   {
     name: "delete-user",
     description: "Permanently delete a user account",
@@ -124,7 +128,7 @@ server.tool(
 The second parameter to tool handlers provides advanced capabilities:
 
 ```typescript
-server.tool(
+export const processLargeFile = server.tool(
   {
     name: "process-large-file",
     schema: z.object({ fileUrl: z.string().describe("URL to file") })
@@ -167,7 +171,7 @@ server.tool(
 `ctx.client` also exposes per-invocation caller context from `params._meta`:
 
 ```typescript
-server.tool({ name: "personalise", schema: z.object({}) }, async (_p, ctx) => {
+export const personalise = server.tool({ name: "personalise", schema: z.object({}) }, async (_p, ctx) => {
   // Session-level (stable for the connection lifetime)
   const { name, version } = ctx.client.info();   // "openai-mcp", "1.0.0"
   const isAppsClient = ctx.client.supportsApps(); // true for ChatGPT
@@ -224,7 +228,7 @@ return object({
 ```typescript
 import { text, error } from "mcp-use/server";
 
-server.tool(
+export const fetchUserTool = server.tool(
   { name: "fetch-user", schema: z.object({ id: z.string() }) },
   async ({ id }) => {
     try {
@@ -263,7 +267,7 @@ When your tool returns visual UI:
 ```typescript
 import { widget, text } from "mcp-use/server";
 
-server.tool(
+export const searchProducts = server.tool(
   {
     name: "search-products",
     description: "Search products by keyword",
@@ -306,7 +310,7 @@ See [../widgets/basics.md](../widgets/basics.md) for widget implementation.
 Validate tool output at runtime:
 
 ```typescript
-server.tool(
+export const calculateStats = server.tool(
   {
     name: "calculate-stats",
     schema: z.object({
@@ -348,7 +352,7 @@ Securely handle API keys and configuration:
 // index.ts
 const WEATHER_API_KEY = process.env.WEATHER_API_KEY;
 
-server.tool(
+export const getWeather = server.tool(
   {
     name: "get-weather",
     schema: z.object({ city: z.string() })
@@ -395,7 +399,7 @@ Cache expensive operations:
 ```typescript
 const cache = new Map<string, { data: any; expires: number }>();
 
-server.tool(
+export const fetchWeather = server.tool(
   { name: "fetch-weather", schema: z.object({ city: z.string() }) },
   async ({ city }) => {
     const cacheKey = `weather:${city}`;

@@ -12,6 +12,7 @@ export default defineConfig({
     "commands/start": "../server/src/commands/start.ts",
     "commands/dev": "../server/src/commands/dev.ts",
     "commands/build": "../server/src/commands/build.ts",
+    "commands/typecheck": "../server/src/commands/typecheck.ts",
     "commands/identity": "../server/src/commands/identity.ts",
     "commands/organizations": "../server/src/commands/organizations.ts",
     "commands/servers": "../server/src/commands/servers.ts",

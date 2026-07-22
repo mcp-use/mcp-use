@@ -145,9 +145,8 @@ async function loadHandler() {
   process.chdir(WORK);
   const entry = join(BUILD_DIR, "index.js");
   // Bust ESM import cache between scenario rebuilds (same file path).
-  return (
-    await import(`${pathToFileURL(entry).href}?v=${Date.now()}`)
-  ).default.getHandler();
+  return (await import(`${pathToFileURL(entry).href}?v=${Date.now()}`)).default
+    .fetch;
 }
 
 async function readView(handler, extraHeaders = {}, basePath = "/mcp") {

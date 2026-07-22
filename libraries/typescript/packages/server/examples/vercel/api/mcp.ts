@@ -1,8 +1,8 @@
 /**
  * Vercel Function entry point. Files under `api/` on the Node.js runtime are
  * served at a matching `/api/*` path with zero extra config, as long as they
- * export the web-standard `fetch` handler — which is exactly the shape
- * `server.getHandler()` returns. No adapter layer needed.
+ * export a web-standard `fetch` handler — which `MCPServer` exposes directly.
+ * No adapter layer needed.
  *
  * This file lives at `api/mcp.ts`, so Vercel serves it at `/api/mcp` — matching
  * `basePath: "/api/mcp"` set on the server in `mcp-server.ts`.
@@ -15,4 +15,4 @@
  */
 import { server } from "../mcp-server.ts";
 
-export default { fetch: server.getHandler() };
+export default server;

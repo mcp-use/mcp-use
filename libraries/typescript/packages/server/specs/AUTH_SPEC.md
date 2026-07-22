@@ -100,8 +100,9 @@ export interface OAuthResourceOptions {
   serviceDocumentationUrl?: URL;
 }
 
-export interface CustomOAuthProviderOptions<TUser>
-  extends OAuthResourceOptions {
+export interface CustomOAuthProviderOptions<
+  TUser,
+> extends OAuthResourceOptions {
   /** Verifies or introspects the token and returns SDK-native AuthInfo. */
   tokenVerifier: OAuthTokenVerifier;
 
@@ -112,11 +113,12 @@ export interface CustomOAuthProviderOptions<TUser>
   mapAuthInfo: (authInfo: OAuthAuthInfo) => OAuthExtra<TUser>;
 }
 
-export interface OAuthProvider<TUser>
-  extends CustomOAuthProviderOptions<TUser> {}
+export interface OAuthProvider<
+  TUser,
+> extends CustomOAuthProviderOptions<TUser> {}
 
 export function oauthCustomProvider<TUser>(
-  options: CustomOAuthProviderOptions<TUser>,
+  options: CustomOAuthProviderOptions<TUser>
 ): OAuthProvider<TUser>;
 
 export interface OAuthProxyProviderOptions<TUser> extends OAuthResourceOptions {
@@ -190,7 +192,9 @@ export interface OAuthProxyProviderOptions<TUser> extends OAuthResourceOptions {
  */
 export interface OAuthProxyScopeMapping {
   /** Upstream scopes to request and display on consent for each supported local scope. */
-  readonly upstreamScopesByLocalScope: Readonly<Record<string, readonly string[]>>;
+  readonly upstreamScopesByLocalScope: Readonly<
+    Record<string, readonly string[]>
+  >;
 }
 
 /**
@@ -236,17 +240,27 @@ export interface OAuthProxySigningKey {
 export interface OAuthProxyStorage {
   readonly protection: "encrypted-at-rest" | "development-only";
   get(key: string): Promise<Uint8Array | undefined>;
-  set(key: string, value: Uint8Array, options?: { expiresAt?: number }): Promise<void>;
+  set(
+    key: string,
+    value: Uint8Array,
+    options?: { expiresAt?: number }
+  ): Promise<void>;
   delete(key: string): Promise<void>;
   /** Atomically reads, validates, and consumes a TTL-bound record. */
   consume(key: string): Promise<Uint8Array | undefined>;
   /** Atomically applies a compare-and-swap or transaction callback for consume and rotation flows. */
-  transact<T>(operation: (transaction: OAuthProxyStorageTransaction) => Promise<T>): Promise<T>;
+  transact<T>(
+    operation: (transaction: OAuthProxyStorageTransaction) => Promise<T>
+  ): Promise<T>;
 }
 
 export interface OAuthProxyStorageTransaction {
   get(key: string): Promise<Uint8Array | undefined>;
-  set(key: string, value: Uint8Array, options?: { expiresAt?: number }): Promise<void>;
+  set(
+    key: string,
+    value: Uint8Array,
+    options?: { expiresAt?: number }
+  ): Promise<void>;
   delete(key: string): Promise<void>;
   consume(key: string): Promise<Uint8Array | undefined>;
 }
@@ -293,7 +307,7 @@ export interface OAuthProxyConsent {
   render: (request: OAuthProxyConsentRequest) => Response | Promise<Response>;
   resolveDecision: (
     request: Request,
-    transaction: OAuthProxyTransaction,
+    transaction: OAuthProxyTransaction
   ) => Promise<OAuthProxyConsentDecision>;
   findReusableApproval?: (
     request: Request,
@@ -302,7 +316,7 @@ export interface OAuthProxyConsent {
       redirectUri: string;
       resource: string;
       localScopes: readonly string[];
-    },
+    }
   ) => Promise<{ subject: string } | undefined>;
 }
 
@@ -371,7 +385,7 @@ export interface OAuthProxyLocalOptions {
 
 /** Creates a provider that also owns local OAuth authorization-server routes. */
 export function oauthProxyProvider<TUser>(
-  options: OAuthProxyProviderOptions<TUser>,
+  options: OAuthProxyProviderOptions<TUser>
 ): OAuthProvider<TUser>;
 
 /**
@@ -461,7 +475,7 @@ Resolution order:
 1. Use the provider factory's explicit `resource` option when configured. It is the full canonical MCP endpoint URL, including `basePath`.
 2. Otherwise use `MCP_URL` with the v1 compatibility convention: it is an absolute public origin, optionally ending in `/`, not an endpoint URL or path prefix. Resolve `basePath` against that origin exactly once.
 3. Otherwise derive from the trusted local `listen()` URL only. Append `basePath` exactly once.
-4. `getHandler()` and public or wildcard deployments without an explicit provider `resource` or a valid `MCP_URL` fail configuration. They must not derive a security identity from request headers.
+4. `server.fetch` and public or wildcard deployments without an explicit provider `resource` or a valid `MCP_URL` fail configuration. They must not derive a security identity from request headers.
 
 Never derive the security identity, metadata URL, or resource-binding target from an untrusted request `Host` header. `hostValidationMiddleware` / `originValidationMiddleware` remain responsible for configured host and origin validation.
 
@@ -481,9 +495,9 @@ const server = new MCPServer({
 });
 
 server.tool({ name: "whoami", schema }, async (_params, ctx) => {
-  ctx.auth.user.id;          // Clerk user type
-  ctx.auth.accessToken;      // string
-  ctx.auth.clientId;         // string | undefined
+  ctx.auth.user.id; // Clerk user type
+  ctx.auth.accessToken; // string
+  ctx.auth.clientId; // string | undefined
   return { content: [] };
 });
 ```
@@ -508,10 +522,12 @@ type RequestContextBase = {
   client: RequestClientContext;
 };
 
-export type RequestContext<TUser = never, HasOAuth extends boolean = false> =
-  HasOAuth extends true
-    ? RequestContextBase & { auth: OAuthAuth<TUser> }
-    : RequestContextBase & { auth?: never };
+export type RequestContext<
+  TUser = never,
+  HasOAuth extends boolean = false,
+> = HasOAuth extends true
+  ? RequestContextBase & { auth: OAuthAuth<TUser> }
+  : RequestContextBase & { auth?: never };
 ```
 
 With `oauth`, `ctx.auth` is present and non-optional. OAuth callbacks are registered only through the gated HTTP MCP endpoint, so absence of `ctx.http?.authInfo` is an internal invariant violation. `request` remains optional because `ServerContext.http` is optional in the SDK. Without `oauth`, `ctx.auth` is unavailable by the documented type contract. A fixed construction generic such as `MCPServer<TUser, HasOAuth>` is allowed because the constructor infers it once and it remains unchanged. Forbidden return-type accumulation is different: `tool()` must not return a progressively growing `MCPServer<TTools & ...>` type, because it cannot accurately model loops and conditionals.
@@ -540,7 +556,7 @@ into mcp-use callback context uses two exported helpers:
 
 ```ts
 function requireOAuthAuthInfo<TUser>(
-  authInfo: AuthInfo | undefined,
+  authInfo: AuthInfo | undefined
 ): asserts authInfo is MappedOAuthAuthInfo<TUser> {
   const extra = authInfo?.extra;
   if (
@@ -570,7 +586,7 @@ function requireOAuthAuthInfo<TUser>(
 }
 
 export function toRequestContext(
-  ctx: ServerContext,
+  ctx: ServerContext
 ): RequestContext<never, false> {
   const request = ctx.http?.req;
   return {
@@ -581,7 +597,7 @@ export function toRequestContext(
 }
 
 export function toAuthenticatedRequestContext<TUser>(
-  ctx: ServerContext,
+  ctx: ServerContext
 ): RequestContext<TUser, true> {
   const request = ctx.http?.req;
   const authInfo = ctx.http?.authInfo;
@@ -637,18 +653,13 @@ const { fetch: mcpFetch } = createMcpMount(createServerForRequest, {
 const mcpRoute = composeFetch(
   mcpFetch,
   bearerAuth(provider, resource),
-  jsonBodyMiddleware(),
+  jsonBodyMiddleware()
 );
 
-const fetch = composeFetch(
-  routeFetch([
-    {
-      match: (request) => matchesPath(request, basePath),
-      handler: mcpRoute,
-    },
-  ]),
-  oauthMetadata(provider, resource),
-);
+const app = new Hono();
+registerFetchMiddleware(app, oauthMetadata(provider, resource));
+app.all(basePath, (c) => mcpRoute(c.req.raw));
+const fetch = app.fetch;
 ```
 
 `createMcpMount` exposes this composition seam:

@@ -8,7 +8,7 @@ describe("production server surface", () => {
       name: "production-surface",
       version: "1.0.0",
     });
-    const handler = server.getHandler();
+    const handler = server.fetch;
 
     for (const pathname of [
       "/mcp/inspector",

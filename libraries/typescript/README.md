@@ -103,9 +103,7 @@ interface Analytics {
 
 export default function AnalyticsDashboard() {
   const view = useToolContext();
-  const refresh = useCallTool<{ period: string }, Analytics>(
-    "show-analytics"
-  );
+  const refresh = useCallTool("show-analytics");
 
   if (view.status === "pending") return <p>Loading analytics…</p>;
   if (view.status === "error") return <p>{view.error.message}</p>;
@@ -131,7 +129,7 @@ export default function AnalyticsDashboard() {
 Bind the rendering tool to the view in your server:
 
 ```typescript
-server.tool(
+export const showAnalytics = server.tool(
   {
     name: "show-analytics",
     description: "Show analytics for a reporting period",
@@ -226,7 +224,7 @@ const server = new MCPServer({
 });
 
 // Define tools with Zod schemas
-server.tool(
+export const getWeather = server.tool(
   {
     name: "get_weather",
     description: "Get current weather for a city",
@@ -488,7 +486,7 @@ const server = new MCPServer({
   version: "1.0.0",
 });
 
-server.tool(
+export const executeQuery = server.tool(
   {
     name: "execute_query",
     description: "Execute SQL query safely",

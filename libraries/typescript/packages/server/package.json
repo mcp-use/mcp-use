@@ -97,6 +97,7 @@
     "@modelcontextprotocol/core": "https://pkg.pr.new/@modelcontextprotocol/core@f60b40179b0f090f6d64248be1312245a160b5ee",
     "@modelcontextprotocol/ext-apps": "https://pkg.pr.new/@modelcontextprotocol/ext-apps@432d42bb02a569078ab31ab6458428df6027809d",
     "@modelcontextprotocol/server": "https://pkg.pr.new/@modelcontextprotocol/server@f60b40179b0f090f6d64248be1312245a160b5ee",
+    "hono": "^4.12.27",
     "jose": "^6.1.3"
   },
   "peerDependencies": {

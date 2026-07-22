@@ -50,10 +50,9 @@ describe("createNextHandler", () => {
     vi.spyOn(process, "cwd").mockReturnValue(projectRoot);
     const prime = vi.fn();
     const fetch = vi.fn(async () => new Response("ok"));
-    const getHandler = vi.fn(() => fetch);
     const server = {
       __primeViews: prime,
-      getHandler,
+      fetch,
     } as unknown as MCPServer;
 
     const handlers = createNextHandler(server);
@@ -73,7 +72,6 @@ describe("createNextHandler", () => {
     expect(preflight.headers.get("access-control-allow-origin")).toBe("*");
     expect(prime).toHaveBeenCalledOnce();
     expect(prime).toHaveBeenCalledWith(manifest, { projectRoot });
-    expect(getHandler).toHaveBeenCalledOnce();
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
@@ -82,7 +80,7 @@ describe("createNextHandler", () => {
     vi.spyOn(process, "cwd").mockReturnValue(projectRoot);
     const server = {
       __primeViews: vi.fn(),
-      getHandler: vi.fn(),
+      fetch: vi.fn(),
     } as unknown as MCPServer;
     const { GET } = createNextHandler(server);
 
@@ -94,17 +92,17 @@ describe("createNextHandler", () => {
   it("rejects malformed generated view data before starting the server", async () => {
     const projectRoot = await makeProject({ card: { kind: "external" } });
     vi.spyOn(process, "cwd").mockReturnValue(projectRoot);
-    const getHandler = vi.fn();
+    const fetch = vi.fn();
     const server = {
       __primeViews: vi.fn(),
-      getHandler,
+      fetch,
     } as unknown as MCPServer;
     const { GET } = createNextHandler(server);
 
     await expect(GET(new Request("http://localhost/api/mcp"))).rejects.toThrow(
       /Invalid mcp-use build manifest/
     );
-    expect(getHandler).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
   });
 });
 

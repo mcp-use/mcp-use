@@ -8,7 +8,7 @@ const server = new MCPServer({
   description: "An MCP server built with mcp-use",
 });
 
-server.tool(
+export const fetchWeather = server.tool(
   {
     name: "fetch-weather",
     description: "Return demo weather for a city",

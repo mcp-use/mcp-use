@@ -30,10 +30,13 @@ export interface ParsedArgs {
   tunnel: boolean;
   /** `false` when `--no-open` was passed (dev only); `true` otherwise. */
   open: boolean;
-  /** `false` when `--no-inspector` was passed (dev only); `true` otherwise. */
-  inspector: boolean;
-  /** Whether `start` should mount the Inspector on the production listener. */
-  withInspector: boolean;
+  /**
+   * Explicit Inspector preference from CLI.
+   *
+   * `undefined` when neither `--no-inspector` nor `--with-inspector` was
+   * passed; commands apply their defaults (dev: on, start: off).
+   */
+  inspector: boolean | undefined;
   /** Whether build output should include source maps (build only). */
   sourceMaps: boolean;
   /** Whether production view JS and CSS should be embedded in MCP resources. */
@@ -42,6 +45,8 @@ export interface ParsedArgs {
   help: boolean;
   /** Whether `--version`/`-v` was passed. */
   version: boolean;
+  /** Arguments after `--`, forwarded by `typecheck` to TypeScript. */
+  passthrough: readonly string[];
 }
 
 /**
@@ -67,17 +72,27 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
     host: undefined,
     tunnel: false,
     open: true,
-    inspector: true,
-    withInspector: false,
+    inspector: undefined,
     sourceMaps: false,
     inline: false,
     help: false,
     version: false,
+    passthrough: [],
   };
 
   for (let i = 0; i < argv.length; i++) {
     const token = argv[i];
     if (token === undefined) continue;
+
+    if (token === "--") {
+      if (args.command !== "typecheck") {
+        throw new Error(
+          "TypeScript argument forwarding is only available for typecheck"
+        );
+      }
+      args.passthrough = argv.slice(i + 1);
+      break;
+    }
 
     // Split `--flag=value` into flag + inline value.
     let flag = token;
@@ -138,7 +153,7 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
         args.inspector = false;
         break;
       case "--with-inspector":
-        args.withInspector = true;
+        args.inspector = true;
         break;
       case "--source-maps":
         args.sourceMaps = true;

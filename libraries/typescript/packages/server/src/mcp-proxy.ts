@@ -444,7 +444,7 @@ export async function mountProxyConnection(
 ): Promise<void> {
   if (host.isStarted()) {
     throw new Error(
-      "Cannot call proxy() after the server has started: register upstream servers before listen()/getHandler()."
+      "Cannot call proxy() after the server has started: register upstream servers before listen()/server.fetch."
     );
   }
   const namespace = connection.info.server.name;
@@ -481,7 +481,7 @@ export async function mountProxyServers(
 ): Promise<void> {
   if (host.isStarted()) {
     throw new Error(
-      "Cannot call proxy() after the server has started: register upstream servers before listen()/getHandler()."
+      "Cannot call proxy() after the server has started: register upstream servers before listen()/server.fetch."
     );
   }
 
