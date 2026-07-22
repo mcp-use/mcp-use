@@ -1,5 +1,11 @@
 # @mcp-use/cli
 
+## 4.0.0-beta.3
+
+### Patch Changes
+
+- e451e20: Bundle the Vite and Tailwind build pipeline in the CLI so generated projects do not need build-tool dependencies.
+
 ## 4.0.0-beta.2
 
 ### Patch Changes
