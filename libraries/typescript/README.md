@@ -266,13 +266,12 @@ server.resource(
 
 // Start the server
 server.listen(3000);
-// 🎉 Inspector automatically available at http://localhost:3000/inspector
 // 🚀 MCP endpoint at http://localhost:3000/mcp
 ```
 
 **Key Server Features:**
 
-- 🔍 **Auto Inspector**: Debugging UI automatically mounts at `/inspector`
+- 🔍 **Dev Inspector**: `mcp-use dev` mounts the project-local Inspector at `/mcp/inspector`
 - 🎨 **MCP Apps Views**: Build React components served alongside MCP tools
 - 🔐 **OAuth Support**: Built-in authentication flow handling
 - 📡 **Multiple Transports**: HTTP/SSE and WebSocket support
@@ -353,7 +352,7 @@ mcp-use start
 # Start development
 mcp-use dev
 # Server running at http://localhost:3000
-# Inspector opened at http://localhost:3000/inspector
+# Inspector opened at http://localhost:3000/mcp/inspector
 # Watching for changes...
 
 # Make changes to your code
@@ -380,11 +379,11 @@ Web-based debugging tool for MCP servers - like Swagger UI but for MCP.
 
 **Three ways to use:**
 
-1. **Automatic** (with mcp-use server):
+1. **Automatic in development** (with a generated mcp-use project):
 
-```typescript
-server.listen(3000);
-// Inspector at http://localhost:3000/inspector
+```bash
+npm run dev
+# Inspector at http://localhost:3000/mcp/inspector
 ```
 
 2. **Standalone CLI**:
@@ -397,7 +396,7 @@ npx @mcp-use/inspector --url https://mcp.example.com/sse
 
 ```typescript
 import { mountInspector } from "@mcp-use/inspector";
-mountInspector(app, "/debug");
+mountInspector(app, { basePath: "/debug" });
 ```
 
 [**Full Inspector Documentation →**](./packages/inspector)

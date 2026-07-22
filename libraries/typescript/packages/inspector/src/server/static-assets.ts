@@ -17,6 +17,7 @@ export function resolveDistCdnDir(): string {
   for (const dir of [
     path.resolve(here, "cdn"), // dist/cli.js (bundled)
     path.resolve(here, "../cdn"), // dist/server/*.js
+    path.resolve(here, "../../dist/cdn"), // src/server/*.ts (workspace dev)
   ]) {
     if (existsSync(path.join(dir, "inspector.js"))) {
       return dir;
@@ -27,13 +28,12 @@ export function resolveDistCdnDir(): string {
   );
 }
 
-/** Serve dist/cdn/ at ${basePath}/dist/cdn/* (standalone / npx). */
+/** Serve this package's `dist/cdn` files at a root-relative mount path. */
 export function registerInspectorStaticAssets(
   app: Hono,
-  basePath: string = ""
+  mountPath: string = "/dist/cdn"
 ) {
   const cdnDir = resolveDistCdnDir();
-  const mountPath = `${basePath}/dist/cdn`;
 
   app.get(`${mountPath}/*`, (c) => {
     const subPath = c.req.path.slice(mountPath.length);

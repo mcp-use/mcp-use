@@ -32,8 +32,8 @@ export interface CliCommandOptions {
   tunnel?: boolean;
   /** Auto-open the inspector in a browser at dev startup (`--no-open` disables). */
   open?: boolean;
-  /** Record inspector availability in the build manifest (`--with-inspector`). */
-  withInspector?: boolean;
+  /** Load the project-local Inspector (`--no-inspector` disables). */
+  inspector?: boolean;
   /** Emit source maps in production build output (`--source-maps`). */
   sourceMaps?: boolean;
 }
@@ -64,10 +64,10 @@ Options:
   --path <directory> Project root (default: current directory)
   --mcp-dir <dir>    Directory containing the MCP entry and views/
   --views-dir <dir>  Views directory (default: views/ or <mcp-dir>/views/)
-  --with-inspector   Record inspector availability in the build manifest (build only)
   --source-maps      Emit source maps in build output (build only)
   --tunnel           Expose the dev server through a public tunnel (dev only)
   --no-open          Do not auto-open the inspector in a browser (dev only)
+  --no-inspector     Start dev without loading the optional Inspector
   -h, --help         Show this help
   -v, --version      Print the version`;
 
@@ -203,7 +203,7 @@ async function cliCommand(
     ...(args.host !== undefined && { host: args.host }),
     ...(args.tunnel && { tunnel: true }),
     ...(!args.open && { open: false }),
-    ...(args.withInspector && { withInspector: true }),
+    ...(!args.inspector && { inspector: false }),
     ...(args.sourceMaps && { sourceMaps: true }),
   };
 

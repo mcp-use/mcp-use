@@ -44,6 +44,12 @@ import {
 import { resolvePort } from "./port.js";
 import { resolveTailwindCss, resolveUserViteConfig } from "./vite-config.js";
 import { createDevApiHandler } from "./dev-api.js";
+import {
+  inspectorInstallCommand,
+  loadProjectInspector,
+  type DevInspectorHandler,
+  type ProjectInspectorModule,
+} from "./inspector.js";
 import { createTunnelManager } from "./tunnel.js";
 import { ensureMcpEnvDeclaration } from "./mcp-env-declaration.js";
 import { resolveWorkspacePaths } from "./workspace.js";
@@ -138,6 +144,15 @@ export interface DevOptions {
    * @defaultValue `true`
    */
   open?: boolean;
+  /**
+   * Load and mount the project-local `@mcp-use/inspector` package.
+   *
+   * Missing optional tooling produces an install hint while the MCP endpoint
+   * continues running. Set to `false` with `--no-inspector` for headless work.
+   *
+   * @defaultValue `true`
+   */
+  inspector?: boolean;
 }
 
 /**
@@ -179,6 +194,16 @@ function lanAddress(): string | undefined {
     }
   }
   return undefined;
+}
+
+/** Parse a Host header into a bracket-free hostname for local-route policy. */
+function hostnameFromHostHeader(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  try {
+    return new URL(`http://${value}`).hostname.replace(/^\[|\]$/g, "");
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -299,6 +324,8 @@ function serverFrom(moduleExports: Record<string, unknown>): ServerLike {
 export async function runDev(options: DevOptions): Promise<void> {
   process.env.MCP_USE_DEV_CLI = "1";
   const host = options.host ?? "127.0.0.1";
+  const localhostBind = ["127.0.0.1", "localhost", "::1"].includes(host);
+  const wildcardBind = host === "0.0.0.0" || host === "::";
   const paths = resolveWorkspacePaths(options.cwd);
   const eventBus = new InMemoryServerEventBus((error) => {
     console.error("[mcp-use] notification delivery failed:", error);
@@ -475,6 +502,44 @@ export async function runDev(options: DevOptions): Promise<void> {
     throw error;
   }
 
+  let inspectorModule: ProjectInspectorModule | undefined;
+  let inspectorHandler: DevInspectorHandler | undefined;
+  let inspectorMountPath: string | undefined;
+
+  const mountDevInspector = (nextBasePath: string): void => {
+    if (inspectorModule === undefined || inspectorMountPath === nextBasePath) {
+      return;
+    }
+    const mounted = inspectorModule.mountInspector({
+      basePath: nextBasePath,
+      autoConnectUrl: `${devOrigin}${nextBasePath}`,
+      oauthProxyAllowLoopback: localhostBind || wildcardBind,
+      devMode: true,
+    });
+    if (typeof mounted !== "function") {
+      throw new Error(
+        "The installed @mcp-use/inspector is incompatible: " +
+          "mountInspector() did not return a Fetch handler."
+      );
+    }
+    inspectorHandler = mounted;
+    inspectorMountPath = nextBasePath;
+  };
+
+  try {
+    if (options.inspector !== false) {
+      const loadedInspector = await loadProjectInspector(options.cwd);
+      if (loadedInspector.installed) {
+        inspectorModule = loadedInspector.module;
+        mountDevInspector(basePath);
+      }
+    }
+  } catch (error) {
+    await runner.close();
+    await vite.close();
+    throw error;
+  }
+
   let reloading = false;
   let dirty = false;
   const reload = (): void => {
@@ -490,8 +555,10 @@ export async function runDev(options: DevOptions): Promise<void> {
           runner.evaluatedModules.clear();
           const server = await importServer();
           const nextHandler = server.getHandler({ bus: eventBus });
+          const nextBasePath = server.basePath ?? "/mcp";
+          mountDevInspector(nextBasePath);
           currentHandler = nextHandler;
-          basePath = server.basePath ?? "/mcp";
+          basePath = nextBasePath;
           eventBus.publish({ kind: "tools_list_changed" });
           eventBus.publish({ kind: "prompts_list_changed" });
           eventBus.publish({ kind: "resources_list_changed" });
@@ -593,7 +660,6 @@ export async function runDev(options: DevOptions): Promise<void> {
   // localhost binds reflect a validated loopback Origin (exact value +
   // `Vary: Origin`) so a local MCP host can load the module graph, while
   // foreign / opaque / missing Origin get no ACAO.
-  const localhostBind = ["127.0.0.1", "localhost", "::1"].includes(host);
   const rejectDisallowedRequest = (
     req: IncomingMessage,
     res: ServerResponse
@@ -640,7 +706,17 @@ export async function runDev(options: DevOptions): Promise<void> {
       port,
       tunnel: tunnelManager,
     },
-    (request) => currentHandler(request)
+    (request) => {
+      const pathname = new URL(request.url).pathname;
+      const inspectorPath = `${basePath}/inspector`;
+      if (
+        inspectorHandler !== undefined &&
+        (pathname === inspectorPath || pathname.startsWith(`${inspectorPath}/`))
+      ) {
+        return inspectorHandler(request);
+      }
+      return currentHandler(request);
+    }
   );
 
   // Vendored Node bridge — same adapter serve() used internally.
@@ -653,6 +729,22 @@ export async function runDev(options: DevOptions): Promise<void> {
     }
     const url = req.url ?? "/";
     const pathname = new URL(url, "http://127.0.0.1").pathname;
+    const tunnelUrl = tunnelManager.status().url;
+    const tunnelHostname =
+      tunnelUrl === null ? null : new URL(tunnelUrl).hostname;
+    const requestHostname = hostnameFromHostHeader(req.headers.host);
+    const inspectorPath = `${basePath}/inspector`;
+    if (
+      ((tunnelHostname !== null && requestHostname === tunnelHostname) ||
+        (wildcardBind &&
+          requestHostname !== undefined &&
+          !["localhost", "127.0.0.1", "::1"].includes(requestHostname))) &&
+      (pathname === inspectorPath || pathname.startsWith(`${inspectorPath}/`))
+    ) {
+      res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+      res.end("Not Found");
+      return;
+    }
     // Routing to Vite requires both the client environment (configured only
     // when views existed at startup) and a currently non-empty registry.
     const viewsEnabled = viewsAtStartup && currentViews.length > 0;
@@ -697,7 +789,14 @@ export async function runDev(options: DevOptions): Promise<void> {
     );
   }
   console.log(`  ➜ MCP endpoint:  ${devOrigin}${basePath}`);
-  console.log(`  ➜ Inspector:     ${devOrigin}${basePath}/inspector`);
+  if (inspectorHandler !== undefined) {
+    console.log(`  ➜ Inspector:     ${devOrigin}${basePath}/inspector`);
+  } else if (options.inspector !== false) {
+    console.warn(
+      "[mcp-use] Inspector is not installed; visual testing is disabled.\n" +
+        `  ➜ Install:       ${inspectorInstallCommand()}`
+    );
+  }
   if (host === "0.0.0.0" || host === "::") {
     const lan = lanAddress();
     if (lan !== undefined) {
@@ -724,7 +823,11 @@ export async function runDev(options: DevOptions): Promise<void> {
 
   // Auto-open the inspector — unless disabled (`--no-open`) or stdout is not
   // a TTY (agents/CI: no browser to open, and no error to fail on).
-  if (options.open !== false && process.stdout.isTTY === true) {
+  if (
+    inspectorHandler !== undefined &&
+    options.open !== false &&
+    process.stdout.isTTY === true
+  ) {
     openInBrowser(`${devOrigin}${basePath}/inspector`);
   }
 

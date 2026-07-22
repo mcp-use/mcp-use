@@ -6,76 +6,86 @@ icon: "plug-2"
 
 {/* TODO: Add Inspector media when a screenshot or short clip would clarify the workflow. */}
 
-Mount the Inspector when you want it served from the same app as your MCP server. **Prefer `mcp-use/server`** — it mounts a thin HTML shell at `/mcp/inspector` and loads the UI bundle from jsDelivr by default (no npm dependency on `@mcp-use/inspector`).
+The Inspector is local development tooling. New `mcp-use` projects install it as a dev dependency, and `mcp-use dev` mounts it on the development listener at `/mcp/inspector`.
 
 ## Auto-Mounting with mcp-use
 
-When using `mcp-use` to create your MCP server, the Inspector is automatically available at `/mcp/inspector`. The shell loads `dist/cdn/inspector.js` from jsDelivr (`@mcp-use/inspector@beta` by default). Override with `inspector.assetsUrl` or `MCP_USE_INSPECTOR_ASSETS_URL`.
+When using a generated `mcp-use` project, run `npm run dev`. The CLI resolves the project-pinned `@mcp-use/inspector`, serves its bundled UI locally, and opens `/mcp/inspector`. No CDN is involved, and production `server.listen()` / `mcp-use start` do not expose Inspector routes.
 
 ### Example
 
-The Inspector is automatically mounted when using `mcp-use/server`. No additional configuration is needed.
+Generated projects already include the development dependency. Existing projects install it once:
+
+```bash
+npm install --save-dev @mcp-use/inspector
+```
 
 ```typescript
-import { MCPServer } from 'mcp-use/server'
+import { MCPServer } from "mcp-use/server";
 
 const server = new MCPServer({
-  name: 'my-server',
-  version: '1.0.0',
-})
+  name: "my-server",
+  version: "1.0.0",
+});
 
 // Add your tools, resources, prompts...
-server.tool(/* ... */)
+server.tool(/* ... */);
 
-// Start the server
-server.listen(3000)
-
-// Inspector is available at http://localhost:3000/mcp/inspector
+export default server;
 ```
+
+Then run `mcp-use dev`; the Inspector is available at `http://localhost:3000/mcp/inspector`. Use `--no-inspector` for a headless development run.
 
 ## Manual Integration
 
-For non-`mcp-use` Hono/Express apps, `mountInspector()` from `@mcp-use/inspector` provides the full inspector server (proxy, OAuth BFF, and UI shell). By default the UI bundle loads from jsDelivr; standalone `npx @mcp-use/inspector` serves `dist/cdn/` locally instead.
+For custom development servers, `mountInspector()` from `@mcp-use/inspector` provides the complete local Inspector: packaged UI, proxy, OAuth BFF, and callbacks. It can register on Hono/Express or return a framework-neutral Fetch handler.
+
+```typescript
+import { mountInspector } from "@mcp-use/inspector/dev";
+
+const inspect = mountInspector({
+  basePath: "/mcp",
+  autoConnectUrl: "http://localhost:3000/mcp",
+});
+
+const response = await inspect(request);
+```
 
 ### Hono Integration
 
 Mount the Inspector on a Hono application:
 
 ```typescript
-import { Hono } from 'hono'
-import { mountInspector } from '@mcp-use/inspector'
+import { Hono } from "hono";
+import { mountInspector } from "@mcp-use/inspector";
 
-const app = new Hono()
+const app = new Hono();
 
 // Your Hono routes
-app.get('/api/health', (c) => {
-  return c.json({ status: 'ok' })
-})
+app.get("/api/health", (c) => {
+  return c.json({ status: "ok" });
+});
 
-// Mount inspector at /inspector
-mountInspector(app)
+// Mount inspector at /mcp/inspector
+mountInspector(app, { basePath: "/mcp" });
 
 // Start server with your Hono adapter
-export default app
+export default app;
 ```
 
 ## Path Customization
 
-The Inspector is mounted at `/inspector` by default. To serve it under another prefix, mount it on a sub-app and route that sub-app from your main app.
+`basePath` defaults to `/mcp`, so the Inspector lives at `/mcp/inspector`. Set `basePath: ''` for `/inspector`, or use another MCP prefix.
 
 ### Hono with Custom Path
 
 ```typescript
-import { Hono } from 'hono'
-import { mountInspector } from '@mcp-use/inspector'
+import { Hono } from "hono";
+import { mountInspector } from "@mcp-use/inspector";
 
-const app = new Hono()
+const app = new Hono();
 
-// Create sub-app for inspector
-const inspectorApp = new Hono()
-mountInspector(inspectorApp)
-
-app.route('/debug', inspectorApp)
+mountInspector(app, { basePath: "/debug" });
 // Inspector now available at http://localhost:3000/debug/inspector
 ```
 
@@ -86,23 +96,26 @@ app.route('/debug', inspectorApp)
 Pass options only when the default mount behavior is not enough.
 
 ```typescript
-import { mountInspector } from '@mcp-use/inspector'
+import { mountInspector } from "@mcp-use/inspector";
 
 mountInspector(app, {
-  autoConnectUrl: 'http://localhost:3000/mcp',
-  sandboxOrigin: 'https://sandbox.example.com',
-})
+  basePath: "/mcp",
+  autoConnectUrl: "http://localhost:3000/mcp",
+  sandboxOrigin: "https://sandbox.example.com",
+});
 ```
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `autoConnectUrl` | `string \| null` | `undefined` | MCP server URL to auto-connect on load |
-| `devMode` | `boolean` | `true` if not production | Enables same-origin sandbox for MCP Apps widgets (no subdomain required) |
-| `sandboxOrigin` | `string \| null` | `undefined` | Override the sandbox origin for MCP Apps widgets |
+| Option                    | Type             | Default                             | Description                                             |
+| ------------------------- | ---------------- | ----------------------------------- | ------------------------------------------------------- |
+| `basePath`                | `string`         | `'/mcp'`                            | MCP prefix; Inspector mounts at `${basePath}/inspector` |
+| `autoConnectUrl`          | `string \| null` | Current request origin + `basePath` | MCP server URL to auto-connect on load; `null` disables |
+| `devMode`                 | `boolean`        | `true`                              | Enables same-origin sandbox for MCP Apps widgets        |
+| `sandboxOrigin`           | `string \| null` | `undefined`                         | Override the sandbox origin for MCP Apps widgets        |
+| `oauthProxyAllowLoopback` | `boolean`        | `true`                              | Permit local proxy/OAuth access to loopback targets     |
 
 ## Protect mounted Inspector routes
 
-The Inspector can call tools, read resources, and inspect prompts on any connected server. If you mount it outside local development, put it behind the same access controls you use for internal tools.
+The Inspector can call tools, read resources, and inspect prompts on any connected server. Keep it in local development. If a custom integration exposes it on a network, disable loopback proxying and put it behind the same access controls as other internal tools.
 
 ## Related Documentation
 

@@ -61,11 +61,6 @@ export interface BuildManifest {
   entryPoint: string;
   /** ISO-8601 timestamp of when the build finished. */
   createdAt: string;
-  /**
-   * Whether the build was created with `mcp-use build --with-inspector`.
-   * Consumed by `mcp-use start` to decide whether to mount the inspector shell.
-   */
-  inspector: boolean;
   /** Mode-neutral view registration data consumed by runtime adapters. */
   views: ViewsManifest;
 }

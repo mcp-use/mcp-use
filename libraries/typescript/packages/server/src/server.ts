@@ -34,7 +34,6 @@ import {
   jsonBodyMiddleware,
   matchesPath,
   originValidationMiddleware,
-  pathUnderBase,
   routeFetch,
   toFrameworkHandler,
   type FetchHandler,
@@ -56,10 +55,6 @@ import {
   type McpMiddlewareResult,
   type MiddlewareContext,
 } from "./middleware/mcp-middleware.js";
-import {
-  createInspectorHandler,
-  matchesInspectorShellPath,
-} from "./inspector-shell.js";
 import { requestLogger } from "./logging.js";
 import { createMcpMount } from "./mount-mcp.js";
 import { normalizeCompletions } from "./resource-completion.js";
@@ -332,7 +327,7 @@ export class MCPServer<TUser = never> {
    *
    * Reflects `config.basePath` (default `"/mcp"`). Exposed so tooling that
    * imports the entry module — `mcp-use dev`'s startup log, for example —
-   * can build the endpoint and inspector URLs without assuming the default.
+   * can build endpoint and development-tool URLs without assuming the default.
    */
   get basePath(): string {
     return this.#basePath();
@@ -344,7 +339,7 @@ export class MCPServer<TUser = never> {
    * `favicon` is the final source after explicit-favicon and icon-selection
    * precedence. Landing-page integrations can use this accessor and link to
    * the server's root-level `/favicon.ico` route without reading private
-   * configuration or depending on the inspector/view layers.
+   * configuration or depending on the landing/view layers.
    *
    * @example
    * ```ts
@@ -1157,62 +1152,6 @@ export class MCPServer<TUser = never> {
             handler: viewAssetsHandler,
           });
         }
-      }
-
-      const inspectorHandler = createInspectorHandler(this.#config.inspector, {
-        serverName: this.#config.name,
-        basePath,
-        proxyUrl:
-          this.#config.inspector?.proxy === false
-            ? null
-            : pathUnderBase(basePath, "inspector/api/proxy"),
-        ...(faviconHandler !== undefined && {
-          faviconHref: "/favicon.ico",
-          ...(this.#branding.faviconMimeType !== undefined && {
-            faviconType: this.#branding.faviconMimeType,
-          }),
-        }),
-      });
-      if (inspectorHandler !== undefined) {
-        if (this.#config.inspector?.proxy !== false) {
-          const localhostListen =
-            mode === "listen" &&
-            ["127.0.0.1", "localhost", "::1"].includes(
-              this.#config.host ?? "127.0.0.1"
-            );
-          const proxyPath = pathUnderBase(basePath, "inspector/api/proxy");
-          const oauthPrefix = pathUnderBase(basePath, "inspector/api/oauth/");
-          let loadedProxyHandler: Promise<FetchHandler> | undefined;
-          const inspectorProxyHandler: FetchHandler = async (request) => {
-            loadedProxyHandler ??= import("./inspector-proxy.js").then(
-              ({ createInspectorProxyHandler }) =>
-                createInspectorProxyHandler({
-                  basePath,
-                  allowLoopback:
-                    this.#config.inspector?.proxyAllowLoopback ??
-                    localhostListen,
-                })
-            );
-            return (await loadedProxyHandler)(request);
-          };
-          routes.push({
-            match: (request) => {
-              const pathname = new URL(request.url).pathname;
-              return pathname === proxyPath || pathname.startsWith(oauthPrefix);
-            },
-            handler: inspectorProxyHandler,
-          });
-        }
-        routes.push({
-          match: (request) => {
-            if (request.method !== "GET" && request.method !== "HEAD") {
-              return false;
-            }
-            const pathname = new URL(request.url).pathname;
-            return matchesInspectorShellPath(pathname, basePath);
-          },
-          handler: inspectorHandler,
-        });
       }
 
       routes.push({

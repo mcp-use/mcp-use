@@ -20,10 +20,19 @@ export type InspectorAssetUrls = {
   resolveLatest: boolean;
 };
 
+/** Select the normal configurable source or force this installed package. */
+export type InspectorAssetSource = "auto" | "local";
+
 export function resolveInspectorAssetUrls(
   inspectorMode: InspectorMode | undefined,
-  basePath: string
+  basePath: string,
+  assetSource: InspectorAssetSource = "auto",
+  localAssetsPath: string = `${basePath}/dist/cdn`
 ): InspectorAssetUrls {
+  if (assetSource === "local") {
+    return localInspectorAssetUrls(localAssetsPath);
+  }
+
   const envUrl =
     process.env.INSPECTOR_ASSETS_URL ??
     process.env.MCP_USE_INSPECTOR_ASSETS_URL;
@@ -57,14 +66,7 @@ export function resolveInspectorAssetUrls(
   }
 
   if (inspectorMode === "standalone") {
-    const prefix = basePath;
-    const version = encodeURIComponent(getInspectorVersion());
-    return {
-      jsUrl: `${prefix}/dist/cdn/inspector.js?v=${version}`,
-      cssUrl: `${prefix}/dist/cdn/inspector.css?v=${version}`,
-      useLocal: true,
-      resolveLatest: false,
-    };
+    return localInspectorAssetUrls(localAssetsPath);
   }
 
   const jsUrl = DEFAULT_REMOTE_ASSETS_URL;
@@ -73,5 +75,15 @@ export function resolveInspectorAssetUrls(
     cssUrl: inspectorStylesUrl(jsUrl),
     useLocal: false,
     resolveLatest: true,
+  };
+}
+
+function localInspectorAssetUrls(localAssetsPath: string): InspectorAssetUrls {
+  const version = encodeURIComponent(getInspectorVersion());
+  return {
+    jsUrl: `${localAssetsPath}/inspector.js?v=${version}`,
+    cssUrl: `${localAssetsPath}/inspector.css?v=${version}`,
+    useLocal: true,
+    resolveLatest: false,
   };
 }

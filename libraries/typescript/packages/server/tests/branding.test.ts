@@ -127,9 +127,7 @@ describe("server branding", () => {
     const inspector = await fetch(
       `${new URL(started.url).origin}/mcp/inspector`
     );
-    expect(await inspector.text()).toContain(
-      '<link rel="icon" type="image/svg+xml" href="/favicon.ico" />'
-    );
+    expect(inspector.status).toBe(404);
 
     await client.close();
     await server.close();
@@ -409,7 +407,7 @@ describe("server branding", () => {
     expect(
       (await handler(new Request("https://request.example/api/mcp/inspector")))
         .status
-    ).toBe(200);
+    ).toBe(404);
     const landing = await handler(
       new Request("https://request.example/api/mcp", {
         headers: { Accept: "text/html" },

@@ -72,6 +72,7 @@ mcp-use dev [options]
 | `--port <port>`     | Server port.                                                             | `3000`                         |
 | `--host <host>`     | Bind address. Use `0.0.0.0` to listen on all interfaces.                 | `127.0.0.1`                    |
 | `--no-open`         | Do not open the Inspector automatically.                                 | Opens by default               |
+| `--no-inspector`    | Run without loading the project-local Inspector.                         | Inspector enabled              |
 | `--tunnel`          | Create a public tunnel for the local server.                             | Disabled                       |
 
 **Examples:**
@@ -89,7 +90,8 @@ mcp-use dev --tunnel
 **Notes and behavior:**
 
 - The MCP endpoint is served at `/mcp`.
-- The Inspector is mounted at `/mcp/inspector` and opens automatically unless `--no-open` is set.
+- When `@mcp-use/inspector` is installed in the project, it is mounted at `/mcp/inspector` and opens automatically unless `--no-open` is set. Generated projects include it as a dev dependency. If it is absent, the MCP server still starts and prints an install command.
+- Inspector UI, proxy, and OAuth routes remain local-only. A public tunnel exposes the MCP endpoint but returns `404` for `/mcp/inspector`.
 - The command sets `NODE_ENV=development`, sets `PORT`, and sets `MCP_URL` to the tunnel URL or local server URL when `MCP_URL` is not already set.
 - Source changes reload the exported server without dropping the long-lived HTTP listener. View modules use Vite HMR when views exist at startup.
 - Adding the first view to a project that started with none requires restarting `mcp-use dev`.
@@ -114,13 +116,11 @@ mcp-use build [options]
 | `--entry <file>`    | MCP server entry file, relative to the project.                          | Auto-detected                  |
 | `--mcp-dir <dir>`   | MCP source directory containing the entry and `views/`.                  | None                           |
 | `--views-dir <dir>` | View directory, relative to the project root.                            | `views/` or `<mcp-dir>/views/` |
-| `--with-inspector`  | Include the Inspector in the production build.                           | Disabled                       |
 
 **Examples:**
 
 ```bash
 mcp-use build
-mcp-use build --with-inspector
 mcp-use build --mcp-dir src/mcp
 mcp-use build --entry src/server.ts --views-dir src/views
 mcp-use build --path ./my-server
@@ -167,7 +167,7 @@ mcp-use start --path ./my-server
 - It imports the manifest's built `entryPoint` and requires that module to default-export an `MCPServer`.
 - `start` does not rediscover source entries or views. `--entry`, `--mcp-dir`, and `--views-dir` belong to `dev` and `build`.
 - The command sets `NODE_ENV=production` when it is not already defined and loads the selected project's production `.env` values before importing the built entry.
-- The Inspector is only available when the build was created with `mcp-use build --with-inspector`.
+- Production builds do not include Inspector UI, proxy, or OAuth routes. Use `mcp-use dev` for visual inspection.
 
 ## Tunneling reference
 

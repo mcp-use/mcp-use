@@ -69,7 +69,6 @@ function server(
     name: "oauth-route-test",
     version: "1.0.0",
     ...(options.basePath !== undefined && { basePath: options.basePath }),
-    inspector: { enabled: true },
     oauth: provider(options),
   });
 }
@@ -167,7 +166,7 @@ describe("OAuth HTTP route acceptance", () => {
 
     expect((await handler(request("/unrelated"))).status).toBe(404);
     expect((await handler(request("/api/mcp"))).status).toBe(401);
-    expect((await handler(request("/api/mcp/inspector"))).status).not.toBe(401);
+    expect((await handler(request("/api/mcp/inspector"))).status).toBe(404);
     expect((await handler(request("/api/mcp-sibling"))).status).not.toBe(401);
   });
 

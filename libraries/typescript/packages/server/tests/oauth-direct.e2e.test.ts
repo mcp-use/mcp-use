@@ -90,7 +90,6 @@ describe("direct OAuth authorization (official client e2e)", () => {
     const server = new MCPServer({
       name: "direct-oauth-test",
       version: "1.0.0",
-      inspector: { enabled: false },
       oauth: oauthWorkOSProvider({
         subdomain: authorizationIssuer,
         resource: resourceUrl,

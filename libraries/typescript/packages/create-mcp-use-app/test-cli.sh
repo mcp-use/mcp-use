@@ -24,6 +24,7 @@ echo ""
 echo -e "${YELLOW}📦 Building package...${NC}"
 cd "$SCRIPT_DIR"
 pnpm build
+SCAFFOLDER_VERSION=$(node -p "require('./package.json').version")
 PACKAGE_PATH=$(npm pack --json | jq -r '.[0].filename')
 
 if [ ! -f "$PACKAGE_PATH" ]; then
@@ -139,12 +140,28 @@ run_test() {
         # Verify package versions based on flags
         if command -v jq > /dev/null 2>&1; then
             local package_json="$app_name/package.json"
+            local inspector_version=$(jq -r '.devDependencies."@mcp-use/inspector" // empty' "$package_json")
+            if [[ -z "$inspector_version" ]]; then
+                echo -e "${RED}❌ FAILED: Expected @mcp-use/inspector in devDependencies${NC}"
+                TESTS_FAILED=$((TESTS_FAILED + 1))
+                return 1
+            fi
+            if [[ "$(jq -r '.dependencies."@mcp-use/inspector" // empty' "$package_json")" != "" ]]; then
+                echo -e "${RED}❌ FAILED: Inspector must not be a production dependency${NC}"
+                TESTS_FAILED=$((TESTS_FAILED + 1))
+                return 1
+            fi
             
             if grep -q "\-\-dev" <<< "$flag"; then
                 # Check for workspace:* versions
                 local mcp_use_version=$(jq -r '.dependencies."mcp-use"' "$package_json")
                 if [[ "$mcp_use_version" != "workspace:"* ]]; then
                     echo -e "${RED}❌ FAILED: Expected workspace:* version with --dev, got: $mcp_use_version${NC}"
+                    TESTS_FAILED=$((TESTS_FAILED + 1))
+                    return 1
+                fi
+                if [[ "$inspector_version" != "workspace:"* ]]; then
+                    echo -e "${RED}❌ FAILED: Expected workspace:* Inspector with --dev, got: $inspector_version${NC}"
                     TESTS_FAILED=$((TESTS_FAILED + 1))
                     return 1
                 fi
@@ -175,6 +192,19 @@ run_test() {
                     return 1
                 fi
                 echo -e "${GREEN}   ✓ Verified latest/specific versions${NC}"
+            fi
+
+            if ! grep -q "\-\-dev" <<< "$flag"; then
+                local expected_inspector="latest"
+                if [[ "$SCAFFOLDER_VERSION" == *-* ]] || grep -q "\-\-sdk-version canary" <<< "$flag"; then
+                    expected_inspector="beta"
+                fi
+                if [[ "$inspector_version" != "$expected_inspector" ]]; then
+                    echo -e "${RED}❌ FAILED: Expected Inspector $expected_inspector, got: $inspector_version${NC}"
+                    TESTS_FAILED=$((TESTS_FAILED + 1))
+                    return 1
+                fi
+                echo -e "${GREEN}   ✓ Verified Inspector dev dependency: $inspector_version${NC}"
             fi
         fi
         

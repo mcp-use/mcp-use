@@ -74,11 +74,17 @@ afterEach(async () => {
 async function startDev(
   cwd: string,
   port: number,
-  host?: string
+  host?: string,
+  inspector?: boolean
 ): Promise<DevHandle> {
   const lines: string[] = [];
   const logSpy = vi
     .spyOn(console, "log")
+    .mockImplementation((...args: unknown[]) => {
+      lines.push(args.map(String).join(" "));
+    });
+  const warnSpy = vi
+    .spyOn(console, "warn")
     .mockImplementation((...args: unknown[]) => {
       lines.push(args.map(String).join(" "));
     });
@@ -88,6 +94,7 @@ async function startDev(
     cwd,
     port,
     ...(host !== undefined && { host }),
+    ...(inspector !== undefined && { inspector }),
     signal: controller.signal,
   });
   // Surface startup failures instead of hanging in waitFor.
@@ -108,14 +115,55 @@ async function startDev(
         controller.abort();
         await done;
         logSpy.mockRestore();
+        warnSpy.mockRestore();
       },
     };
   } catch (error) {
     logSpy.mockRestore();
+    warnSpy.mockRestore();
     controller.abort();
     await done.catch(() => {});
     throw error;
   }
+}
+
+function installFakeInspector(cwd: string): void {
+  const projectManifestPath = join(cwd, "package.json");
+  const projectManifest = JSON.parse(readFileSync(projectManifestPath, "utf8"));
+  projectManifest.devDependencies = {
+    ...projectManifest.devDependencies,
+    "@mcp-use/inspector": "test",
+  };
+  writeFileSync(projectManifestPath, JSON.stringify(projectManifest));
+  const packageRoot = join(cwd, "node_modules", "@mcp-use", "inspector");
+  mkdirSync(packageRoot, { recursive: true });
+  writeFileSync(
+    join(packageRoot, "package.json"),
+    JSON.stringify({
+      name: "@mcp-use/inspector",
+      type: "module",
+      exports: { "./dev": "./dev.js" },
+    })
+  );
+  writeFileSync(
+    join(packageRoot, "dev.js"),
+    `export function mountInspector(options) {
+  return async (request) => {
+    const url = new URL(request.url);
+    const prefix = options.basePath + "/inspector";
+    if (url.pathname === prefix + "/config.json") {
+      return Response.json({ autoConnectUrl: options.autoConnectUrl });
+    }
+    if (url.pathname === prefix || url.pathname.startsWith(prefix + "/")) {
+      return new Response("mounted:" + options.basePath, {
+        headers: { "content-type": "text/html" },
+      });
+    }
+    return new Response("Not Found", { status: 404 });
+  };
+}
+`
+  );
 }
 
 function writeOAuthEntry(cwd: string, basePath = "/mcp"): void {
@@ -153,6 +201,75 @@ export default new MCPServer({
 }
 
 describe("runDev", () => {
+  it("mounts the project-local Inspector on the existing dev listener", async () => {
+    const cwd = copyFixture("dev-inspector-installed");
+    cleanups.push(() => removeDir(cwd));
+    installFakeInspector(cwd);
+
+    const port = await getFreePort();
+    const dev = await startDev(cwd, port);
+    cleanups.push(dev.stop);
+
+    const origin = dev.url.replace(/\/mcp$/, "");
+    const shell = await fetch(`${origin}/mcp/inspector`);
+    expect(shell.status).toBe(200);
+    expect(await shell.text()).toBe("mounted:/mcp");
+    expect(
+      await (await fetch(`${origin}/mcp/inspector/config.json`)).json()
+    ).toEqual({ autoConnectUrl: `${origin}/mcp` });
+    expect(dev.logs.some((line) => line.includes("➜ Inspector:"))).toBe(true);
+
+    const entry = join(cwd, "src", "index.ts");
+    writeFileSync(
+      entry,
+      readFileSync(entry, "utf8").replace(
+        'version: "1.0.0"',
+        'version: "1.0.0", basePath: "/api/mcp"'
+      )
+    );
+    await waitFor(async () =>
+      (await fetch(`${origin}/api/mcp/inspector`)).status === 200
+        ? true
+        : undefined
+    );
+    expect((await fetch(`${origin}/mcp/inspector`)).status).toBe(404);
+    expect(
+      await (await fetch(`${origin}/api/mcp/inspector/config.json`)).json()
+    ).toEqual({ autoConnectUrl: `${origin}/api/mcp` });
+  });
+
+  it("keeps serving MCP and prints an install hint when Inspector is absent", async () => {
+    const cwd = copyFixture("dev-inspector-missing");
+    cleanups.push(() => removeDir(cwd));
+
+    const port = await getFreePort();
+    const dev = await startDev(cwd, port);
+    cleanups.push(dev.stop);
+
+    await waitFor(async () =>
+      dev.logs.some((line) => line.includes("Inspector is not installed"))
+        ? true
+        : undefined
+    );
+    expect(await listToolNames(dev.url)).toEqual(["add"]);
+    expect((await fetch(`${dev.url}/inspector`)).status).toBe(404);
+    expect(dev.logs.join("\n")).toContain("@mcp-use/inspector@beta");
+  });
+
+  it("supports an intentional headless dev run", async () => {
+    const cwd = copyFixture("dev-inspector-disabled");
+    cleanups.push(() => removeDir(cwd));
+    installFakeInspector(cwd);
+
+    const port = await getFreePort();
+    const dev = await startDev(cwd, port, undefined, false);
+    cleanups.push(dev.stop);
+
+    expect((await fetch(`${dev.url}/inspector`)).status).toBe(404);
+    expect(dev.logs.join("\n")).not.toContain("Inspector is not installed");
+    expect(dev.logs.some((line) => line.includes("➜ Inspector:"))).toBe(false);
+  });
+
   it("creates a missing root mcp-env.d.ts", async () => {
     const cwd = copyFixture("dev-tools-declaration");
     cleanups.push(() => removeDir(cwd));
@@ -553,6 +670,27 @@ throw new Error("startup failure after MCPServer construction");
 
     expect(await rawStatus(infoUrl, { origin: "null" }, "GET")).toBe(200);
     expect(await rawStatus(dev.url, { origin: "null" })).not.toBe(403);
+  });
+
+  it("keeps the loopback-capable Inspector off the public tunnel host", async () => {
+    const cwd = copyFixture("dev-inspector-tunnel-policy");
+    cleanups.push(() => removeDir(cwd));
+    installFakeInspector(cwd);
+
+    const port = await getFreePort();
+    const dev = await startDev(cwd, port);
+    cleanups.push(dev.stop);
+
+    const startTunnel = await fetch(
+      `${dev.url}/inspector/api/dev/start-tunnel`,
+      { method: "POST" }
+    );
+    expect(startTunnel.status).toBe(200);
+    const tunnelHost = "fake.local.mcp-use.run";
+    expect(await rawStatus(dev.url, { host: tunnelHost })).toBe(200);
+    expect(
+      await rawStatus(`${dev.url}/inspector`, { host: tunnelHost }, "GET")
+    ).toBe(404);
   });
 });
 

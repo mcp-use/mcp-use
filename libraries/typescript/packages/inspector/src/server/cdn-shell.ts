@@ -1,5 +1,9 @@
 import type { Context, Hono } from "hono";
-import { resolveInspectorAssetUrls, type InspectorMode } from "./asset-urls.js";
+import {
+  resolveInspectorAssetUrls,
+  type InspectorAssetSource,
+  type InspectorMode,
+} from "./asset-urls.js";
 import { renderInspectorFaviconLinks } from "./favicon-links.js";
 import { registerInspectorFaviconStatic } from "./favicon-static.js";
 import { registerInspectorStaticAssets } from "./static-assets.js";
@@ -22,6 +26,14 @@ export type CdnShellConfig = {
   inspectorMode?: InspectorMode;
   manufactChatUrl?: string | null;
   disableTelemetry?: boolean;
+  /** Force assets from this installed package, ignoring CDN env overrides. */
+  assetSource?: InspectorAssetSource;
+  /** Root-relative URL where local package assets are mounted. */
+  localAssetsPath?: string;
+  /** Root-relative prefix for locally served favicon files. */
+  faviconBasePath?: string;
+  /** Preserve the standalone CLI's `/` to `/inspector` redirect (default true). */
+  rootRedirect?: boolean;
 };
 
 const OAUTH_POPUP_CLOSED_HTML = `<!doctype html>
@@ -133,7 +145,7 @@ function generateCdnShellHtml(
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    ${renderInspectorFaviconLinks(basePath)}
+    ${renderInspectorFaviconLinks(config?.faviconBasePath ?? basePath)}
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -232,7 +244,12 @@ export function registerInspectorCdnShell(
   config?: CdnShellConfig,
   basePath: string = ""
 ) {
-  const assets = resolveInspectorAssetUrls(config?.inspectorMode, basePath);
+  const assets = resolveInspectorAssetUrls(
+    config?.inspectorMode,
+    basePath,
+    config?.assetSource,
+    config?.localAssetsPath
+  );
   const p = (suffix: string) => `${basePath}${suffix}`;
   const effectiveConfig: CdnShellConfig = {
     ...config,
@@ -247,11 +264,25 @@ export function registerInspectorCdnShell(
   };
 
   const serveShell = (c: Context) => {
-    const assets = resolveInspectorAssetUrls(config?.inspectorMode, basePath);
+    const assets = resolveInspectorAssetUrls(
+      config?.inspectorMode,
+      basePath,
+      config?.assetSource,
+      config?.localAssetsPath
+    );
     return c.html(generateCdnShellHtml(effectiveConfig, basePath, assets));
   };
 
-  registerInspectorFaviconStatic(app, basePath);
+  registerInspectorFaviconStatic(app, config?.faviconBasePath ?? basePath);
+
+  // Scoped local assets must be registered before the Inspector SPA fallback,
+  // otherwise `/inspector/assets/*` would be answered with the HTML shell.
+  if (assets.useLocal) {
+    registerInspectorStaticAssets(
+      app,
+      config?.localAssetsPath ?? `${basePath}/dist/cdn`
+    );
+  }
 
   app.get(p("/inspector/oauth-popup-closed.html"), (c) =>
     c.html(OAUTH_POPUP_CLOSED_HTML)
@@ -273,14 +304,10 @@ export function registerInspectorCdnShell(
     return serveShell(c);
   });
 
-  if (basePath === "") {
+  if (basePath === "" && config?.rootRedirect !== false) {
     app.get("/", (c) => {
       const url = new URL(c.req.url);
       return c.redirect(`${p("/inspector")}${url.search}`);
     });
-  }
-
-  if (assets.useLocal) {
-    registerInspectorStaticAssets(app, basePath);
   }
 }

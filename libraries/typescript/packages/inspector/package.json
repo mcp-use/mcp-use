@@ -23,7 +23,13 @@
   "exports": {
     ".": {
       "types": "./dist/server/index.d.ts",
-      "import": "./dist/server/index.js"
+      "import": "./dist/server/index.js",
+      "default": "./dist/server/index.js"
+    },
+    "./dev": {
+      "types": "./dist/server/index.d.ts",
+      "import": "./dist/server/index.js",
+      "default": "./dist/server/index.js"
     },
     "./proxy": {
       "types": "./dist/server/proxy-routes.d.ts",
@@ -92,7 +98,19 @@
     "react-router": "^7.12.0"
   },
   "peerDependenciesMeta": {
+    "@mcp-use/client": {
+      "optional": true
+    },
     "express": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    },
+    "react-router": {
       "optional": true
     }
   },
