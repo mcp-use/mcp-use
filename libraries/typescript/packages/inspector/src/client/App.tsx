@@ -76,6 +76,9 @@ function App() {
   // `/mcp/inspector`; root-mount `/inspector`). Derived at runtime from
   // `window.__MCP_BASE_PATH__` so a single prebuilt bundle serves any basePath.
   const inspectorBase = getInspectorBase();
+  const isOAuthCallback =
+    window.location.pathname.replace(/\/+$/, "") ===
+    `${inspectorBase}/oauth/callback`;
 
   // App-level so it fires regardless of route, and after <Toaster /> mounts.
   useEffect(() => {
@@ -101,6 +104,21 @@ function App() {
       `${window.location.pathname}${search ? `?${search}` : ""}`
     );
   }, []);
+
+  // Complete the authorization-code exchange before mounting persisted MCP
+  // connections. Background reconnects may legitimately refresh their own
+  // OAuth state, but the callback leg must have exclusive access to the
+  // verifier and discovery record created for this authorization request.
+  if (isOAuthCallback) {
+    return (
+      <ThemeProvider forcedTheme={forcedTheme || undefined}>
+        <ShapeProvider defaultShape="pill">
+          <OAuthCallback />
+          <Toaster position="top-center" />
+        </ShapeProvider>
+      </ThemeProvider>
+    );
+  }
 
   return (
     <ThemeProvider forcedTheme={forcedTheme || undefined}>

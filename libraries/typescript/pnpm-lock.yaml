@@ -314,6 +314,9 @@ importers:
         specifier: workspace:*
         version: link:../../../../server
     devDependencies:
+      '@mcp-use/inspector':
+        specifier: workspace:*
+        version: link:../../../../inspector
       '@types/node':
         specifier: ^22.20.0
         version: 22.20.1
@@ -336,6 +339,9 @@ importers:
         specifier: 4.4.3
         version: 4.4.3
     devDependencies:
+      '@mcp-use/inspector':
+        specifier: workspace:*
+        version: link:../../../../inspector
       '@types/node':
         specifier: ^22.20.0
         version: 22.20.1
@@ -358,6 +364,9 @@ importers:
         specifier: 4.4.3
         version: 4.4.3
     devDependencies:
+      '@mcp-use/inspector':
+        specifier: workspace:*
+        version: link:../../../../inspector
       '@types/node':
         specifier: ^22.20.0
         version: 22.20.1

@@ -23,7 +23,13 @@
   "exports": {
     ".": {
       "types": "./dist/server/index.d.ts",
-      "import": "./dist/server/index.js"
+      "import": "./dist/server/index.js",
+      "default": "./dist/server/index.js"
+    },
+    "./dev": {
+      "types": "./dist/server/index.d.ts",
+      "import": "./dist/server/index.js",
+      "default": "./dist/server/index.js"
     },
     "./proxy": {
       "types": "./dist/server/proxy-routes.d.ts",
@@ -47,12 +53,13 @@
     "dev:client": "pnpm run dev",
     "dev:server": "VITE_DEV=true tsx watch src/server/server.ts",
     "dev:standalone": "tsx watch src/server/server.ts",
-    "build": "npm run build:client && npm run build:client-exports && npm run build:server && npm run build:cli && npm run build:cdn",
-    "build:cdn": "vite build --config vite.cdn.config.ts",
-    "watch:cdn": "vite build --watch --config vite.cdn.config.ts",
-    "preview:cdn": "vite preview --config vite.cdn.config.ts --host 127.0.0.1",
-    "serve:cdn": "pnpm build:cdn && pnpm preview:cdn",
-    "analyze:cdn": "ANALYZE=true vite build --config vite.cdn.config.ts",
+    "clean": "rimraf dist",
+    "build": "npm run clean && npm run build:client && npm run build:client-exports && npm run build:server && npm run build:cli && npm run build:app",
+    "build:app": "vite build --config vite.app.config.ts",
+    "watch:app": "vite build --watch --config vite.app.config.ts",
+    "preview:app": "vite preview --config vite.app.config.ts --host 127.0.0.1",
+    "serve:app": "pnpm build:app && pnpm preview:app",
+    "analyze:app": "ANALYZE=true vite build --config vite.app.config.ts",
     "build:client": "vite build",
     "build:client-exports": "tsup --config tsup.client.ts && tsc -p tsconfig.client.json --emitDeclarationOnly --declaration",
     "build:server": "tsup 'src/server/**/*.ts' --format esm --out-dir dist/server && tsc -p tsconfig.server.json --emitDeclarationOnly --declaration",
@@ -92,7 +99,19 @@
     "react-router": "^7.12.0"
   },
   "peerDependenciesMeta": {
+    "@mcp-use/client": {
+      "optional": true
+    },
     "express": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    },
+    "react-router": {
       "optional": true
     }
   },

@@ -121,7 +121,6 @@ describe("runBuild", () => {
     expect(manifest.entryPoint).toBe("index.js");
     expect(manifest.buildId).toMatch(/^[0-9a-f]{16}$/);
     expect(new Date(manifest.createdAt).getTime()).not.toBeNaN();
-    expect(manifest.inspector).toBe(false);
     expect(manifest.views).toEqual({});
     expect(
       readFileSync(join(buildDir, "views", "public", "icon.svg"), "utf8")
@@ -645,22 +644,6 @@ describe("runBuild (views)", () => {
       /^assets\/.+\.js$/
     );
   }, 60_000);
-
-  it("records inspector: true when built with --with-inspector", async () => {
-    const cwd = copyFixture("build");
-    dirs.push(cwd);
-
-    await runBuild({ cwd, withInspector: true });
-
-    const manifest = JSON.parse(
-      readFileSync(
-        join(cwd, WORKSPACE_DIR_NAME, "build", BUILD_MANIFEST_NAME),
-        "utf8"
-      )
-    ) as BuildManifest;
-    expect(manifest.inspector).toBe(true);
-    expect(manifest.views).toEqual({});
-  });
 
   it("emits source maps only when requested", async () => {
     const cwd = copyFixture("build-source-maps");

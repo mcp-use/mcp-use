@@ -213,7 +213,7 @@ describe("MCPServer landing page routing", () => {
     ).toThrow(/after the server has started/);
   });
 
-  it("keeps inspector precedence and root-base-path URL joining", async () => {
+  it("keeps root-base-path URL joining without mounting dev tooling", async () => {
     const server = track(
       new MCPServer({
         name: "root-landing",
@@ -230,10 +230,7 @@ describe("MCPServer landing page routing", () => {
     const inspector = await handler(
       htmlRequest("https://root.example.test/inspector")
     );
-    expect(inspector.status).toBe(200);
-    const inspectorHtml = await inspector.text();
-    expect(inspectorHtml).toContain("MCP Inspector");
-    expect(inspectorHtml).not.toContain("Connection instructions");
+    expect(inspector.status).toBe(404);
   });
 
   it("does not bypass configured Host validation", async () => {
@@ -260,7 +257,6 @@ describe("publicLandingPage OAuth behavior", () => {
       new MCPServer({
         name: "oauth-landing",
         version: "1.0.0",
-        inspector: { enabled: false },
         ...(publicLandingPage !== undefined && { publicLandingPage }),
         oauth: oauthProvider(resource),
       })

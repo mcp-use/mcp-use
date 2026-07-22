@@ -12,28 +12,28 @@ const CONTENT_TYPES: Record<string, string> = {
   ".webmanifest": "application/manifest+json",
 };
 
-export function resolveDistCdnDir(): string {
+export function resolveInspectorAppDir(): string {
   const here = path.dirname(fileURLToPath(import.meta.url));
   for (const dir of [
-    path.resolve(here, "cdn"), // dist/cli.js (bundled)
-    path.resolve(here, "../cdn"), // dist/server/*.js
+    path.resolve(here, "app"), // dist/cli.js (bundled)
+    path.resolve(here, "../app"), // dist/server/*.js
+    path.resolve(here, "../../dist/app"), // src/server/*.ts (workspace dev)
   ]) {
     if (existsSync(path.join(dir, "inspector.js"))) {
       return dir;
     }
   }
   throw new Error(
-    "Inspector bundle not found (expected dist/cdn/inspector.js)"
+    "Inspector bundle not found (expected dist/app/inspector.js)"
   );
 }
 
-/** Serve dist/cdn/ at ${basePath}/dist/cdn/* (standalone / npx). */
+/** Serve this package's installed browser bundle at a root-relative path. */
 export function registerInspectorStaticAssets(
   app: Hono,
-  basePath: string = ""
+  mountPath: string = "/inspector/assets"
 ) {
-  const cdnDir = resolveDistCdnDir();
-  const mountPath = `${basePath}/dist/cdn`;
+  const appDir = resolveInspectorAppDir();
 
   app.get(`${mountPath}/*`, (c) => {
     const subPath = c.req.path.slice(mountPath.length);
@@ -41,15 +41,18 @@ export function registerInspectorStaticAssets(
     if (!relative || relative.includes("..")) {
       return c.notFound();
     }
-    const file = path.resolve(cdnDir, relative);
-    const root = cdnDir.endsWith(path.sep) ? cdnDir : `${cdnDir}${path.sep}`;
+    const file = path.resolve(appDir, relative);
+    const root = appDir.endsWith(path.sep) ? appDir : `${appDir}${path.sep}`;
     if (!file.startsWith(root) || !existsSync(file)) {
       return c.notFound();
     }
     const ext = path.extname(file);
     return c.body(readFileSync(file), 200, {
       "Content-Type": CONTENT_TYPES[ext] ?? "application/octet-stream",
-      "Cache-Control": "public, max-age=3600",
+      // Standalone assets use stable URLs across CLI restarts. Revalidate them
+      // so a rebuilt or upgraded Inspector cannot keep running an hour-old UI
+      // bundle that predates its storage migrations or proxy contract.
+      "Cache-Control": "no-cache",
     });
   });
 }

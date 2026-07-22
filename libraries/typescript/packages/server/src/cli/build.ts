@@ -79,11 +79,6 @@ export interface BuildOptions {
   mcpDir?: string;
   /** Explicit views directory, absolute or relative to `cwd`. */
   viewsDir?: string;
-  /**
-   * When true (`mcp-use build --with-inspector`), record `inspector: true`
-   * in the build manifest.
-   */
-  withInspector?: boolean;
   /** Emit source maps for the server and view bundles. */
   sourceMaps?: boolean;
   /**
@@ -329,7 +324,6 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     (options.mcpDir === undefined ? undefined : join(options.mcpDir, "views"));
   const views = discoverViews(options.cwd, viewsDirectory);
   const userViteConfig = resolveUserViteConfig(options.cwd);
-  const inspector = options.withInspector === true;
   const sourceMaps = options.sourceMaps === true;
   const inline = options.inline === true;
 
@@ -375,7 +369,6 @@ export async function runBuild(options: BuildOptions): Promise<void> {
       buildId: randomBytes(8).toString("hex"),
       entryPoint: BUILD_ENTRY_NAME,
       createdAt: new Date().toISOString(),
-      inspector,
       views: {},
     };
     await mkdir(paths.build, { recursive: true });
@@ -501,7 +494,6 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     buildId: randomBytes(8).toString("hex"),
     entryPoint: BUILD_ENTRY_NAME,
     createdAt: new Date().toISOString(),
-    inspector,
     views: viewsManifest,
   };
   await mkdir(paths.build, { recursive: true });

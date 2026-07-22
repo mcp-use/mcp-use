@@ -144,12 +144,6 @@ const server = new MCPServer({
   logging: { level: "debug" },
   description: "Search fruits and browse details with an MCP Apps view.",
   basePath: BASE_PATH,
-  // Load the inspector bundle from a local build instead of the public CDN:
-  //   npx serve --cors -p 4173 ../../../inspector/dist/cdn
-  //   INSPECTOR_ASSETS_URL=http://localhost:4173/inspector.js mcp-use dev
-  ...(process.env.INSPECTOR_ASSETS_URL
-    ? { inspector: { assetsUrl: process.env.INSPECTOR_ASSETS_URL } }
-    : {}),
 });
 
 const resultsSchema = z.object({

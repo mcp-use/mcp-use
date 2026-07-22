@@ -257,7 +257,7 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
     await server.close();
   });
 
-  it("skips inspector shell and favicon noise", async () => {
+  it("logs unknown inspector paths and skips favicon noise", async () => {
     const server = buildServer();
     const handler = server.getHandler();
     await handler(
@@ -266,7 +266,10 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
     await handler(
       new Request("http://localhost/favicon.ico", { method: "GET" })
     );
-    expect(logSpy).not.toHaveBeenCalled();
+    expect(loggedLines()).toHaveLength(1);
+    expect(loggedLines()[0]).toMatch(
+      /^\d{2}:\d{2}:\d{2} GET \/mcp\/inspector 404 in \d+ms$/
+    );
     await server.close();
   });
 

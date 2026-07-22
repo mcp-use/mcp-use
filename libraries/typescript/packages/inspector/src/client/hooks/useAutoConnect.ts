@@ -27,6 +27,7 @@ export function detectPendingAutoConnect(search?: string): boolean {
       // sessionStorage unavailable
     }
 
+    // Legacy runtime config injected by older server-managed Inspector shells.
     const shellAutoConnectUrl = (
       window as Window & { __MCP_USE_INSPECTOR__?: { autoConnectUrl?: string } }
     ).__MCP_USE_INSPECTOR__?.autoConnectUrl;
@@ -581,7 +582,7 @@ export function useAutoConnect({
       return;
     }
 
-    // Serialized runtime config injected by the SDK v2 CDN shell
+    // Serialized runtime config injected by the SDK v2 Inspector shell
     // (window.__MCP_USE_INSPECTOR__) — the shell has no inspector backend, so
     // this replaces the config.json fetch below.
     const shellAutoConnectUrl = (

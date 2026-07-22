@@ -1,6 +1,6 @@
 ---
 title: "ServerConfig"
-description: "Configure mcp-use v2 server identity, branding, HTTP routing, inspection, logging, and OAuth."
+description: "Configure mcp-use v2 server identity, branding, HTTP routing, logging, and OAuth."
 icon: "settings"
 github: "https://github.com/mcp-use/mcp-use/blob/beta/libraries/typescript/packages/server/src/config.ts"
 ---
@@ -47,7 +47,6 @@ const server = new MCPServer({
 <ParamField body="legacy" type='"stateless" | "reject"' default="stateless">Serve 2025-era clients through the stateless compatibility path, or reject them for a modern-only server.</ParamField>
 <ParamField body="publicLandingPage" type="boolean" default="false">Expose the HTML landing page without bearer authentication when OAuth is configured. The page remains available for explicit HTML GET/HEAD navigation and MCP protocol requests stay protected.</ParamField>
 <ParamField body="cors" type="CorsOptions">Add CORS headers to every mcp-use-owned route. Omit it for no CORS headers; use this alongside `allowedOrigins` when serving browser clients.</ParamField>
-<ParamField body="inspector" type="InspectorOptions">Configure the `${basePath}/inspector` shell. It is enabled by default. Use `{ enabled: false }` to disable it or `{ assetsUrl }` to load a self-hosted inspector bundle.</ParamField>
 <ParamField body="logging" type="LoggingOptions">Configure request logging. Logging is enabled at `info` by default; use `{ enabled: false }`, `debug`, or `trace` as needed.</ParamField>
 <ParamField body="requestState" type="ServerOptions['requestState']">Configure integrity verification for `requestState` echoed across `input_required` rounds.</ParamField>
 <ParamField body="oauth" type="OAuthProvider<TUser>">OAuth resource-server provider. When you supply a non-`never` `TUser`, this field becomes required and authenticated callbacks receive `ctx.auth.user`.</ParamField>
@@ -75,7 +74,7 @@ public/
 
 ```ts
 import type { Icon, ServerOptions } from "@modelcontextprotocol/server";
-import type { CorsOptions, InspectorOptions, LoggingOptions } from "mcp-use";
+import type { CorsOptions, LoggingOptions } from "mcp-use";
 import type { OAuthProvider } from "mcp-use/oauth";
 
 interface BaseServerConfig {
@@ -94,7 +93,6 @@ interface BaseServerConfig {
   legacy?: "stateless" | "reject";
   publicLandingPage?: boolean;
   cors?: CorsOptions;
-  inspector?: InspectorOptions;
   logging?: LoggingOptions;
   requestState?: ServerOptions["requestState"];
 }
@@ -118,7 +116,7 @@ if (server.branding.favicon) {
 }
 ```
 
-The built-in landing page and inspector add this link automatically. The landing page also displays the selected favicon as its server icon. MCP clients receive `websiteUrl` and `icons` through standard server implementation metadata.
+The built-in landing page adds this link automatically and displays the selected favicon as its server icon. MCP clients receive `websiteUrl` and `icons` through standard server implementation metadata.
 
 ## See also
 

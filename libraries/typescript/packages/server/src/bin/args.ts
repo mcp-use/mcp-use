@@ -29,8 +29,8 @@ export interface ParsedArgs {
   tunnel: boolean;
   /** `false` when `--no-open` was passed (dev only); `true` otherwise. */
   open: boolean;
-  /** Whether `--with-inspector` was passed (build only). */
-  withInspector: boolean;
+  /** `false` when `--no-inspector` was passed (dev only); `true` otherwise. */
+  inspector: boolean;
   /** Whether build output should include source maps (build only). */
   sourceMaps: boolean;
   /** Whether production view JS and CSS should be embedded in MCP resources. */
@@ -64,7 +64,7 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
     host: undefined,
     tunnel: false,
     open: true,
-    withInspector: false,
+    inspector: true,
     sourceMaps: false,
     inline: false,
     help: false,
@@ -130,8 +130,8 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
       case "--no-open":
         args.open = false;
         break;
-      case "--with-inspector":
-        args.withInspector = true;
+      case "--no-inspector":
+        args.inspector = false;
         break;
       case "--source-maps":
         args.sourceMaps = true;

@@ -55,10 +55,6 @@ import {
   type McpMiddlewareResult,
   type MiddlewareContext,
 } from "./middleware/mcp-middleware.js";
-import {
-  createInspectorHandler,
-  matchesInspectorShellPath,
-} from "./inspector-shell.js";
 import { requestLogger } from "./logging.js";
 import { createMcpMount } from "./mount-mcp.js";
 import { normalizeCompletions } from "./resource-completion.js";
@@ -331,7 +327,7 @@ export class MCPServer<TUser = never> {
    *
    * Reflects `config.basePath` (default `"/mcp"`). Exposed so tooling that
    * imports the entry module — `mcp-use dev`'s startup log, for example —
-   * can build the endpoint and inspector URLs without assuming the default.
+   * can build endpoint and development-tool URLs without assuming the default.
    */
   get basePath(): string {
     return this.#basePath();
@@ -343,7 +339,7 @@ export class MCPServer<TUser = never> {
    * `favicon` is the final source after explicit-favicon and icon-selection
    * precedence. Landing-page integrations can use this accessor and link to
    * the server's root-level `/favicon.ico` route without reading private
-   * configuration or depending on the inspector/view layers.
+   * configuration or depending on the landing/view layers.
    *
    * @example
    * ```ts
@@ -1156,29 +1152,6 @@ export class MCPServer<TUser = never> {
             handler: viewAssetsHandler,
           });
         }
-      }
-
-      const inspectorHandler = createInspectorHandler(this.#config.inspector, {
-        serverName: this.#config.name,
-        basePath,
-        ...(faviconHandler !== undefined && {
-          faviconHref: "/favicon.ico",
-          ...(this.#branding.faviconMimeType !== undefined && {
-            faviconType: this.#branding.faviconMimeType,
-          }),
-        }),
-      });
-      if (inspectorHandler !== undefined) {
-        routes.push({
-          match: (request) => {
-            if (request.method !== "GET" && request.method !== "HEAD") {
-              return false;
-            }
-            const pathname = new URL(request.url).pathname;
-            return matchesInspectorShellPath(pathname, basePath);
-          },
-          handler: inspectorHandler,
-        });
       }
 
       routes.push({

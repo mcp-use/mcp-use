@@ -4,35 +4,6 @@ import type { LoggingOptions } from "./logging.js";
 import type { OAuthProvider } from "./oauth/index.js";
 
 /**
- * Options for the inspector shell route — the shape of
- * {@link ServerConfig.inspector}.
- */
-export interface InspectorOptions {
-  /**
-   * Whether the inspector shell route is mounted.
-   *
-   * @defaultValue `true`
-   */
-  enabled?: boolean;
-  /**
-   * Full replacement URL for the inspector bundle script (FastAPI's
-   * `swagger_js_url` analog). When set, the shell's `<script type="module">`
-   * loads exactly this URL, so it must point at a complete copy of the
-   * `@mcp-use/inspector` CDN bundle (`dist/cdn/inspector.js`) — self-host it
-   * for air-gapped environments where the public CDN is unreachable.
-   *
-   * @defaultValue The latest `@mcp-use/inspector` beta, resolved to one exact
-   * asset version in the browser before the bundle loads.
-   */
-  assetsUrl?: string;
-  /**
-   * Hosted managed-chat backend URL (injected as `window.__MANUFACT_CHAT_URL__`).
-   * Defaults to `process.env.MANUFACT_CHAT_URL` when the shell is mounted.
-   */
-  manufactChatUrl?: string;
-}
-
-/**
  * Common server identity and behavior, passed to `new MCPServer(...)`.
  *
  * Includes the fields consumed by the core HTTP and OAuth resource-server
@@ -183,46 +154,6 @@ interface BaseServerConfig {
    */
   publicLandingPage?: boolean;
   /**
-   * Inspector shell route at `${basePath}/inspector` — a browser UI for
-   * exploring and calling the server's tools, resources, and prompts.
-   *
-   * @remarks
-   * Follows the FastAPI `/docs` model: the server itself ships only a tiny
-   * dependency-free HTML page whose inline module loader resolves the latest
-   * `@mcp-use/inspector` beta to one exact CDN release before loading it, so
-   * the UI updates independently of SDK releases without mixing asset
-   * versions or adding anything to the install. The page tells the inspector
-   * to connect to this server's MCP endpoint at `basePath`, deriving the URL
-   * from the browser's own origin.
-   *
-   * Enabled by default; set `{ enabled: false }` to disable the route, or
-   * pass `{ assetsUrl }` to load the bundle from a self-hosted copy instead
-   * of the public CDN (air-gapped environments). For local development,
-   * `MCP_USE_INSPECTOR_ASSETS_URL` provides the same override without changing
-   * application code; an explicit `assetsUrl` takes precedence.
-   *
-   * @example
-   * ```ts
-   * // Default: inspector served at /mcp/inspector from the public CDN.
-   * new MCPServer({ name: "my-server", version: "1.0.0" });
-   *
-   * // Disabled:
-   * new MCPServer({
-   *   name: "my-server",
-   *   version: "1.0.0",
-   *   inspector: { enabled: false },
-   * });
-   *
-   * // Air-gapped: load a self-hosted copy of the inspector bundle.
-   * new MCPServer({
-   *   name: "my-server",
-   *   version: "1.0.0",
-   *   inspector: { assetsUrl: "https://intranet.example.com/inspector.js" },
-   * });
-   * ```
-   */
-  inspector?: InspectorOptions;
-  /**
    * HTTP/MCP request logging: one summary line per request plus an indented
    * detail line naming the MCP method, its subject (tool name, resource URI,
    * prompt name), and the calling client.
@@ -250,7 +181,7 @@ interface BaseServerConfig {
   requestState?: ServerOptions["requestState"];
   /**
    * Optional CORS headers on every route served by `getHandler()` / `listen()`
-   * (MCP endpoint, view assets, inspector, OAuth metadata). Off when omitted.
+   * (MCP endpoint, view assets, landing page, OAuth metadata). Off when omitted.
    *
    * Pair with {@link BaseServerConfig.allowedOrigins | allowedOrigins} for
    * browser clients: CORS tells the browser it may read the response; Origin

@@ -11,13 +11,11 @@ const inspectorPackageJson = JSON.parse(
 );
 
 /**
- * CDN bundle build config.
+ * Packaged Inspector application build config.
  *
- * Produces a single dist/cdn/inspector.js application bundle.
- * Shipped in the npm package and consumed three ways:
- * - Standalone (npx / pnpm start): served locally at /dist/cdn/*
- * - Embedded (mountInspector / mcp-use server): jsDelivr npm mirror by default
- * - Dev: Vite serves source directly (this bundle is production-only)
+ * Produces the `dist/app` browser bundle shipped inside the npm package.
+ * `mountInspector` and the standalone CLI serve these files from their own
+ * listener; no external application asset host is involved.
  */
 export default defineConfig({
   plugins: [
@@ -27,7 +25,7 @@ export default defineConfig({
       name: "copy-favicon-assets",
       closeBundle() {
         const publicDir = path.resolve(__dirname, "public");
-        const outDir = path.resolve(__dirname, "dist/cdn");
+        const outDir = path.resolve(__dirname, "dist/app");
         mkdirSync(outDir, { recursive: true });
         for (const file of INSPECTOR_FAVICON_ASSETS) {
           copyFileSync(path.join(publicDir, file), path.join(outDir, file));
@@ -36,7 +34,7 @@ export default defineConfig({
     },
     process.env.ANALYZE === "true" &&
       visualizer({
-        filename: "dist/cdn/stats.html",
+        filename: "dist/app/stats.html",
         gzipSize: true,
         brotliSize: true,
       }),
@@ -63,6 +61,10 @@ export default defineConfig({
       "react-dom",
     ],
   },
+  preview: {
+    // Permit previewing the package bundle from local integration fixtures.
+    cors: true,
+  },
   build: {
     lib: {
       entry: "src/client/main.tsx",
@@ -71,7 +73,7 @@ export default defineConfig({
       // is a function, so we include it explicitly for browser <script type="module">.
       fileName: () => "inspector.js",
     },
-    outDir: "dist/cdn",
+    outDir: "dist/app",
     minify: true,
     rolldownOptions: {
       external: [

@@ -1,0 +1,90 @@
+import { Hono } from "hono";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { mountMcpProxy } from "../../src/server/proxy/mcp-proxy";
+
+const proxyUrl = "http://localhost/inspector/api/proxy";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe("Inspector MCP proxy request isolation", () => {
+  it("does not forward Inspector cookies or browser-origin headers", async () => {
+    const fetchFn = vi.fn<typeof fetch>(async (_input, init) => {
+      const headers = new Headers(init?.headers);
+      expect(headers.get("authorization")).toBe("Bearer mcp-token");
+      expect(headers.get("cookie")).toBeNull();
+      expect(headers.get("origin")).toBeNull();
+      expect(headers.get("referer")).toBeNull();
+      expect(headers.get("sec-fetch-site")).toBeNull();
+      return new Response("ok", {
+        headers: { "Set-Cookie": "upstream=must-not-reach-browser" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchFn);
+    const app = new Hono();
+    mountMcpProxy(app, {
+      path: "/inspector/api/proxy",
+      enableLogging: false,
+    });
+
+    const response = await app.fetch(
+      new Request(proxyUrl, {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer mcp-token",
+          Cookie: "inspector_session=must-not-leak",
+          Origin: "http://localhost",
+          Referer: "http://localhost/inspector",
+          "Sec-Fetch-Site": "same-origin",
+          "Content-Type": "application/json",
+          "X-Target-URL": "https://93.184.216.34/mcp",
+        },
+        body: "{}",
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("set-cookie")).toBeNull();
+    expect(fetchFn).toHaveBeenCalledOnce();
+  });
+
+  it("removes bearer authorization across a cross-origin redirect", async () => {
+    const fetchFn = vi
+      .fn<typeof fetch>()
+      .mockImplementationOnce(async (_input, init) => {
+        expect(new Headers(init?.headers).get("authorization")).toBe(
+          "Bearer must-not-leak"
+        );
+        return new Response(null, {
+          status: 307,
+          headers: { Location: "https://93.184.216.35/mcp" },
+        });
+      })
+      .mockImplementationOnce(async (_input, init) => {
+        expect(new Headers(init?.headers).get("authorization")).toBeNull();
+        return new Response("ok");
+      });
+    vi.stubGlobal("fetch", fetchFn);
+    const app = new Hono();
+    mountMcpProxy(app, {
+      path: "/inspector/api/proxy",
+      enableLogging: false,
+    });
+
+    const response = await app.fetch(
+      new Request(proxyUrl, {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer must-not-leak",
+          "Content-Type": "application/json",
+          "X-Target-URL": "https://93.184.216.34/mcp",
+        },
+        body: "{}",
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+});

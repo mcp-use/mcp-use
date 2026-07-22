@@ -99,7 +99,7 @@ server.tool(
 );
 
 await server.listen(3000);
-// Inspector at http://localhost:3000/mcp/inspector
+// MCP endpoint at http://localhost:3000/mcp
 ```
 
 [**→ Full TypeScript Server Documentation**](https://mcp-use.com/docs/typescript/server)
@@ -249,12 +249,14 @@ server.run(transport="streamable-http", port=8000)
 
 The mcp-use Inspector lets you test and debug your MCP servers interactively.
 
-**Auto-included** when using `server.listen()`:
+**Auto-mounted in local development** when `@mcp-use/inspector` is installed as a dev dependency:
 
-```typescript
-server.listen(3000);
-// Inspector at http://localhost:3000/mcp/inspector
+```bash
+npm run dev
+# Inspector at http://localhost:3000/mcp/inspector
 ```
+
+Production `server.listen()` and `mcp-use start` expose only the MCP server, not the Inspector.
 
 **Online** when connecting to hosted MCP servers:
 <br>

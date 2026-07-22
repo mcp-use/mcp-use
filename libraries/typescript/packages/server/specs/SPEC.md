@@ -18,7 +18,7 @@ Greenfield framework on the official v2 SDK (`@modelcontextprotocol/server`, sta
 - No feature may require session state; cross-request continuity uses explicit handles in results.
 - One framework package. `mcp-use` ships the server runtime and the complete first-party CLI: `dev`, `build`, `start`, cloud auth, organizations, servers, deployments, deploy, client, screenshot, and skills (`CLI_SPEC.md`). Each substantial command is a genuine lazy chunk; `dev` and `build` are separate chunks, and neither `start` nor a library export may statically evaluate Vite or unrelated command code.
 - Vite is a regular dependency so `npm install mcp-use` is sufficient for `mcp-use dev` and `mcp-use build`. `@vitejs/plugin-react` becomes a regular dependency when views land. `react` and `react-dom` remain optional peers owned by view applications.
-- `mcp-use` has no npm dependency edge of any kind to `@mcp-use/inspector`; embedded inspector integration is HTTP/CDN only. `@mcp-use/client` remains an independently published SDK and an **optional peer** — `server.proxy()`, `mcp-use client`, and `mcp-use screenshot` load it on demand and print install instructions when it is missing; the library entry and `start` never evaluate it.
+- `mcp-use` has no declared npm dependency edge of any kind to `@mcp-use/inspector`. `mcp-use dev` may resolve the user's project-local Inspector dev dependency and mount its Fetch handler on the development listener; library imports, `getHandler()`, `listen()`, `build`, and `start` never evaluate or expose it. `@mcp-use/client` remains an independently published SDK and an **optional peer** — `server.proxy()`, `mcp-use client`, and `mcp-use screenshot` load it on demand and print install instructions when it is missing; the library entry and `start` never evaluate it.
 - `create-mcp-use-app` remains a separately published, zero-runtime-dependency scaffolder. There is no `@mcp-use/config` package.
 - ESM-only (forced by the SDK). Node ≥ 22.22.2 — floor set by bundled Vite 8; matches MCP SDK `>=20` and a single minimum across published packages.
 - Dependencies track latest releases: caret ranges at current latest; TypeScript is a package-local devDep on TS 7 (`^7.0.2`; workspace root still pins 5.9 for the old packages). Watch the root `pnpm.overrides`: they _replace_ this package's specifiers, so v1-era audit floors/pins there must be raised or removed when they'd hold this package back (zod/vitest raised).
@@ -30,7 +30,7 @@ Greenfield framework on the official v2 SDK (`@modelcontextprotocol/server`, sta
 
 ## Phase 1 — basic MCP pieces ✅
 
-Scope: server identity, tools, resources, resource templates, prompts, completion, HTTP serving, inspector shell. Files: `src/server.ts` (MCPServer), `src/mount-mcp.ts` (fetch-native MCP mount), `src/config.ts` (ServerConfig), `src/context.ts` (RequestContext), one file per primitive's types (`src/tools.ts`, `src/resources.ts`, `src/prompts.ts`), `src/completable.ts`, `src/inspector-shell.ts` (CDN shell route — contract in `CLI_SPEC.md`). The bin and toolchain (`src/bin*`, `src/cli/`) are governed by `CLI_SPEC.md`. Callbacks return raw SDK result shapes (see ground rules) — there is no results/conversion layer. Types-plus-tests typecheck runs via `tsconfig.test.json` (`pnpm typecheck`, part of `test:run`); compile-time contracts are pinned by `tests/type-level.test.ts` (`@ts-expect-error` + `expectTypeOf`).
+Scope: server identity, tools, resources, resource templates, prompts, completion, and HTTP serving. Files: `src/server.ts` (MCPServer), `src/mount-mcp.ts` (fetch-native MCP mount), `src/config.ts` (ServerConfig), `src/context.ts` (RequestContext), one file per primitive's types (`src/tools.ts`, `src/resources.ts`, `src/prompts.ts`), and `src/completable.ts`. The bin, toolchain, and optional development Inspector integration (`src/cli/inspector.ts`) are governed by `CLI_SPEC.md`. Callbacks return raw SDK result shapes (see ground rules) — there is no results/conversion layer. Types-plus-tests typecheck runs via `tsconfig.test.json` (`pnpm typecheck`, part of `test:run`); compile-time contracts are pinned by `tests/type-level.test.ts` (`@ts-expect-error` + `expectTypeOf`).
 
 Public API (shape shared with the old package where it happened to be right; deltas noted):
 
@@ -53,7 +53,6 @@ const server = new MCPServer({
   allowedOrigins: undefined, // optional; when set, restricts Origin (additive to localhost)
   legacy: "stateless", // optional; "reject" for modern-only strict (see ground rules)
   publicLandingPage: false, // optional; OAuth-only public HTML opt-in
-  inspector: { enabled: true, assetsUrl: undefined }, // optional; see CLI_SPEC.md
   logging: { enabled: true, level: "info" }, // optional; see § Request logging
 });
 
@@ -87,7 +86,7 @@ server.resource(
     contents: [
       { uri: uri.href, mimeType: "application/json", text: `{"theme":"dark"}` },
     ],
-  }),
+  })
 );
 
 server.resourceTemplate(
@@ -136,13 +135,13 @@ server.branding; // immutable normalized favicon/icons/websiteUrl
 
 ### Mounting in your framework
 
-| Need | API |
-|---|---|
-| Vercel / Workers / TanStack `{ fetch }` | `export default { fetch: server.getHandler() }` |
-| Hono / fetch-native frameworks | `app.all("*", server.getHandler())` — no `c.req.raw` |
-| Node (normal) | `await server.listen(port)` |
-| Custom `http.Server` | `createServer(await server.getNodeHandler())` |
-| Custom HTTP routes | User's framework — not mcp-use |
+| Need                                    | API                                                  |
+| --------------------------------------- | ---------------------------------------------------- |
+| Vercel / Workers / TanStack `{ fetch }` | `export default { fetch: server.getHandler() }`      |
+| Hono / fetch-native frameworks          | `app.all("*", server.getHandler())` — no `c.req.raw` |
+| Node (normal)                           | `await server.listen(port)`                          |
+| Custom `http.Server`                    | `createServer(await server.getNodeHandler())`        |
+| Custom HTTP routes                      | User's framework — not mcp-use                       |
 
 `getHandler()` duck-types Hono-style `{ req: { raw: Request } }` and accepts a raw `Request`. Custom routes and HTTP middleware live in the user's framework; mcp-use covers MCP-owned routes only. Optional `ServerConfig.cors` adds CORS headers on those routes; pair with `allowedOrigins` for browser clients.
 
@@ -168,7 +167,7 @@ Icon and favicon sources accept exactly three forms: a safe path relative to pro
 
 `GET` and `HEAD /favicon.ico` remain root-level regardless of `basePath`, matching browser discovery and v1. A local source streams the selected file from `public/` in dev/direct use or `.mcp-use/build/views/public/` in production; `mcp-use build` copies `public/` there even for servers without views. An image data URL is decoded and served directly. An HTTP(S) source returns `307` with `Location` and is never fetched server-side. Local/data success uses the selected or extension-derived image MIME, `Cache-Control: public, max-age=31536000, immutable`, and `X-Content-Type-Options: nosniff`; redirects use `public, max-age=300`. Missing local files return `404` with `Cache-Control: no-store`. Unsupported methods return `405` with `Allow: GET, HEAD`. Public-file resolution verifies containment and a regular file after decoding the URL path, rejecting traversal and malformed encodings.
 
-Route order is favicon, public assets, built view assets, inspector, then the exact MCP route; OAuth discovery middleware remains outside this table and the bearer gate still wraps only the exact MCP endpoint. Thus favicon/public assets and `${basePath}/inspector` stay public alongside OAuth metadata. `listen()` and `getHandler()` use the same composed fetch handler. When configured, global `cors` middleware owns the branding responses' CORS headers; otherwise shared view/public assets retain their existing wildcard header. The inspector shell emits `<link rel="icon" href="/favicon.ico">` only when a favicon is selected. The landing page uses the request-resolved absolute `/favicon.ico` URL for both its browser favicon and hero icon. Views obtain server icons and `websiteUrl` through standard MCP initialization metadata; view documents do not invent another branding channel. `MCPServer.branding` exposes the frozen normalized `{ favicon?, icons?, websiteUrl? }` so browser integrations do not duplicate selection or file handling.
+Route order is favicon, public assets, built view assets, then the exact MCP route; OAuth discovery middleware remains outside this table and the bearer gate still wraps only the exact MCP endpoint. `listen()` and `getHandler()` use the same composed fetch handler and neither mounts development tooling. When configured, global `cors` middleware owns the branding responses' CORS headers; otherwise shared view/public assets retain their existing wildcard header. The landing page uses the request-resolved absolute `/favicon.ico` URL for both its browser favicon and hero icon. Views obtain server icons and `websiteUrl` through standard MCP initialization metadata; view documents do not invent another branding channel. `MCPServer.branding` exposes the frozen normalized `{ favicon?, icons?, websiteUrl? }` so browser integrations do not duplicate selection or file handling.
 
 **Deltas vs the old package (protocol- or SDK-forced):**
 
@@ -259,7 +258,7 @@ Contract:
 - **Typed against the SDK, exhaustively.** Detail formatting is a table mapped over the SDK's `RequestMethod` union with params typed per method via `RequestTypeMap`; a new protocol method in an SDK bump is a **compile error** here until a formatter is chosen (the v1 logger's silent `[unknown-method]` fallback is the anti-pattern this replaces). Bodies are narrowed with `isJSONRPCRequest`, and the parsed body comes from `getRequestBag(request).parsedBody` when the JSON middleware ran first (no re-parse).
 - **Safety.** Credential headers (`authorization`, `proxy-authorization`, `cookie`, `set-cookie`, `x-api-key`) are `[REDACTED]` in trace dumps; request-derived strings (method/subject/client/error) are stripped of control characters so hostile values cannot forge log lines or emit terminal escapes; `subscriptions/listen` responses are never awaited for an outcome (unbounded SSE stream — reading it would block the middleware chain).
 - **Colors** via a ~10-line internal ANSI helper — **no chalk/picocolors dependency** (dependency-budget ground rule). Honors `NO_COLOR`; plain text when stdout is not a TTY or absent (edge runtimes).
-- **Noise.** Inspector shell page loads and favicon probes (GET/HEAD) are skipped; non-MCP requests log the summary line only.
+- **Noise.** Browser favicon probes (GET/HEAD) are skipped; non-MCP requests log the summary line only. The development Inspector is composed outside the server handler and therefore never reaches the production request logger.
 - **Config & exports.** `logging?: { enabled?: boolean; level?: "info" | "debug" | "trace" }` on `ServerConfig` (default enabled at `info`). On/off-with-options config fields are object-only with an `enabled` flag — no `boolean | object` unions. `requestLogger(options)`, `LoggingOptions`, and `LogLevel` are exported from the package root for hand-composed `createMcpMount` apps.
 
 ## Elicitation and input_required
@@ -302,7 +301,7 @@ server.tool(
 
 ## Later phases (each gets its own scope + delta notes before work starts)
 
-- **Build/dev/start CLI: implemented** — contract in **`CLI_SPEC.md`** (bin + lazily imported toolchain in this package, `.mcp-use/` workspace, inspector CDN shell, entry contract).
+- **Build/dev/start CLI: implemented** — contract in **`CLI_SPEC.md`** (bin + lazily imported toolchain in this package, `.mcp-use/` workspace, project-local development Inspector, entry contract).
 - **Views (MCP Apps): implemented** — contract in **`VIEWS_SPEC.md`** (single-protocol MCP Apps with no adapter system, `ToolRef`-based zero-codegen typing, `mcp-use/react` runtime, view naming throughout; extends the CLI contract with a client Vite environment).
 - **Serving hardening:** composing into a user's existing fetch-native app (validation middleware guidance) — `createMcpMount` itself is implemented; stdio serving decision (`serveStdio` works off the same factory); expose the underlying `McpServerFactory` (`server.factory()`) so any official adapter can consume it. Plus DX debts found building the examples: (1) `listen()`'s returned `url` is hardcoded to `localhost` — wrong for public binds; (2) no diagnostic when `basePath` drifts from where the handler is actually mounted (silent 404) — warn at `getHandler()` time.
 - **Auth: direct resource-server mode implemented; proxy mode deferred.** Contract in **`AUTH_SPEC.md`** / **`AUTH_IMPLEMENTATION.md`** (resource-server posture, `ctx.auth`, `bearerAuth`/`oauthMetadata`, provider adapters, RFC 9728 metadata). OAuth proxy mode (local authorization server) remains deferred.

@@ -42,11 +42,6 @@ const server = new MCPServer({
     },
   ],
   logging: { level: "debug" },
-  ...(process.env.INSPECTOR_CDN_BASE && {
-    inspector: {
-      assetsUrl: `${process.env.INSPECTOR_CDN_BASE}/inspector.js`,
-    },
-  }),
 });
 
 // =============================================================================

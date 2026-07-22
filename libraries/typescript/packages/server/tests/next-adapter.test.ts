@@ -25,7 +25,6 @@ async function makeProject(views?: unknown): Promise<string> {
         buildId: "test",
         entryPoint: "index.js",
         createdAt: new Date(0).toISOString(),
-        inspector: false,
         views,
       })}\n`
     );

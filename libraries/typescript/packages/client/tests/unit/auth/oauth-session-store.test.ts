@@ -118,6 +118,7 @@ describe("OAuthSessionStore", () => {
       const { session, kv } = createStore();
       kv.set(session.getKey("code_verifier"), "verifier");
       kv.set(session.getKey("last_auth_url"), "https://example.com/auth");
+      kv.set(session.getKey("last_auth_callback_url"), session.redirectUrl);
 
       const tokens = { access_token: "abc", refresh_token: "ref" };
       await session.saveTokens(tokens);
@@ -125,6 +126,7 @@ describe("OAuthSessionStore", () => {
       expect(kv.get(session.getKey("tokens"))).toBe(JSON.stringify(tokens));
       expect(kv.get(session.getKey("code_verifier"))).toBeNull();
       expect(kv.get(session.getKey("last_auth_url"))).toBeNull();
+      expect(kv.get(session.getKey("last_auth_callback_url"))).toBeNull();
     });
   });
 
@@ -136,6 +138,72 @@ describe("OAuthSessionStore", () => {
 
       const result = await session.clientInformation();
       expect(result).toEqual(info);
+    });
+
+    it("re-registers browser clients when legacy client info omitted its callback", async () => {
+      const { session, kv } = createStore({
+        ...DEFAULT_OPTS,
+        allowClientSecret: false,
+      });
+      kv.set(
+        session.getKey("client_info"),
+        JSON.stringify({ client_id: "legacy-browser-client" })
+      );
+      kv.set(
+        session.getKey("tokens"),
+        JSON.stringify({ access_token: "stale" })
+      );
+
+      expect(await session.clientInformation()).toBeUndefined();
+      expect(kv.get(session.getKey("client_info"))).toBeNull();
+      expect(kv.get(session.getKey("tokens"))).toBeNull();
+    });
+
+    it("stamps browser registrations with the current callback when upstream omits it", async () => {
+      const { session, kv } = createStore({
+        ...DEFAULT_OPTS,
+        allowClientSecret: false,
+      });
+
+      await session.saveClientInformation({ client_id: "new-browser-client" });
+
+      expect(await session.clientInformation()).toMatchObject({
+        client_id: "new-browser-client",
+        redirect_uris: [session.redirectUrl],
+      });
+      expect(kv.get(session.getKey("client_info_redirect_uri"))).toBe(
+        session.redirectUrl
+      );
+    });
+
+    it("re-registers apparently matching browser clients from pre-marker storage", async () => {
+      const { session, kv } = createStore({
+        ...DEFAULT_OPTS,
+        allowClientSecret: false,
+      });
+      kv.set(
+        session.getKey("client_info"),
+        JSON.stringify({
+          client_id: "poisoned-browser-client",
+          redirect_uris: [session.redirectUrl],
+        })
+      );
+      kv.set(
+        session.getKey("tokens"),
+        JSON.stringify({ access_token: "stale" })
+      );
+      const discoveryState = {
+        authorizationServerUrl: "https://auth.example.com",
+        authorizationServerMetadata: {
+          issuer: "https://auth.example.com",
+        },
+      };
+      await session.saveDiscoveryState(discoveryState);
+
+      expect(await session.clientInformation()).toBeUndefined();
+      expect(kv.get(session.getKey("client_info"))).toBeNull();
+      expect(kv.get(session.getKey("tokens"))).toBeNull();
+      expect(await session.discoveryState()).toEqual(discoveryState);
     });
 
     it("returns stored info when redirect_uris includes the configured redirectUrl", async () => {
@@ -189,6 +257,8 @@ describe("OAuthSessionStore", () => {
       kv.set(session.getKey("client_info"), "client");
       kv.set(session.getKey("code_verifier"), "verifier");
       kv.set(session.getKey("last_auth_url"), "auth");
+      kv.set(session.getKey("last_auth_callback_url"), session.redirectUrl);
+      kv.set(session.getKey("client_info_redirect_uri"), session.redirectUrl);
     }
 
     it("'all' removes tokens, client_info, code_verifier, last_auth_url", async () => {
@@ -199,6 +269,8 @@ describe("OAuthSessionStore", () => {
       expect(kv.get(session.getKey("client_info"))).toBeNull();
       expect(kv.get(session.getKey("code_verifier"))).toBeNull();
       expect(kv.get(session.getKey("last_auth_url"))).toBeNull();
+      expect(kv.get(session.getKey("last_auth_callback_url"))).toBeNull();
+      expect(kv.get(session.getKey("client_info_redirect_uri"))).toBeNull();
     });
 
     it("'client' removes only client_info", async () => {
@@ -310,6 +382,9 @@ describe("OAuthSessionStore", () => {
 
       // last_auth_url persisted
       expect(kv.get(session.getKey("last_auth_url"))).toBe(sanitizedUrl);
+      expect(kv.get(session.getKey("last_auth_callback_url"))).toBe(
+        session.redirectUrl
+      );
 
       // StoredState persisted under `${prefix}:state_${state}`
       const stateKey = `mcp:auth:state_${state}`;
@@ -423,9 +498,18 @@ describe("OAuthSessionStore", () => {
         session.getKey("client_info"),
         JSON.stringify({ client_id: "legacy", client_secret: "secret" })
       );
+      kv.set(
+        session.getKey("tokens"),
+        JSON.stringify({ access_token: "stale" })
+      );
+      kv.set(session.getKey("code_verifier"), "stale-verifier");
+      kv.set(session.getKey("last_auth_url"), "https://old.example/auth");
 
       expect(await session.clientInformation()).toBeUndefined();
       expect(kv.get(session.getKey("client_info"))).toBeNull();
+      expect(kv.get(session.getKey("tokens"))).toBeNull();
+      expect(kv.get(session.getKey("code_verifier"))).toBeNull();
+      expect(kv.get(session.getKey("last_auth_url"))).toBeNull();
       await expect(
         session.saveClientInformation({
           client_id: "new",

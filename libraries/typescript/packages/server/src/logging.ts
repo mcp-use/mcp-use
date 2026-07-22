@@ -471,13 +471,10 @@ function styleStatus(status: number): string {
   return green(text);
 }
 
-/**
- * Cosmetic noise suppression: inspector shell page loads and favicon probes
- * add nothing to a request log.
- */
+/** Cosmetic noise suppression for automatic browser favicon probes. */
 function isNoisyRequest(httpMethod: string, pathname: string): boolean {
   if (httpMethod !== "GET" && httpMethod !== "HEAD") return false;
-  return pathname.includes("/inspector") || pathname.endsWith("/favicon.ico");
+  return pathname.endsWith("/favicon.ico");
 }
 
 /**

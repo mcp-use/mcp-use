@@ -41,33 +41,33 @@ For detailed usage instructions and guides, visit [mcp-use.com/docs/inspector](h
 
 ## 📦 Related Packages
 
-| Package                                                                                                             | Description             | Version                                                                                                         |
-| ------------------------------------------------------------------------------------------------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------- |
-| [mcp-use](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server)                        | MCP framework and CLI   | [![npm](https://img.shields.io/npm/v/mcp-use.svg)](https://www.npmjs.com/package/mcp-use)                       |
-| [create-mcp-use-app](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/create-mcp-use-app) | Create MCP apps         | [![npm](https://img.shields.io/npm/v/create-mcp-use-app.svg)](https://www.npmjs.com/package/create-mcp-use-app) |
+| Package                                                                                                             | Description           | Version                                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------- |
+| [mcp-use](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server)                        | MCP framework and CLI | [![npm](https://img.shields.io/npm/v/mcp-use.svg)](https://www.npmjs.com/package/mcp-use)                       |
+| [create-mcp-use-app](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/create-mcp-use-app) | Create MCP apps       | [![npm](https://img.shields.io/npm/v/create-mcp-use-app.svg)](https://www.npmjs.com/package/create-mcp-use-app) |
 
 ---
 
 ## ✨ Key Features
 
-| Feature                    | Description                                                        |
-| -------------------------- | ------------------------------------------------------------------ |
-| **🚀 Auto-Mount**          | Automatically available at `/mcp/inspector` for all mcp-use servers    |
-| **🔌 Multi-Connection**    | Connect to and manage multiple MCP servers simultaneously          |
-| **🎯 Interactive Testing** | Test tools with live execution and real-time results               |
-| **📊 Real-time Status**    | Monitor connection states, errors, and server health               |
-| **🔐 OAuth Support**       | Built-in OAuth flow handling with popup authentication             |
-| **💾 Persistent Sessions** | Connections saved to localStorage and auto-reconnect               |
-| **🎨 Beautiful UI**        | Modern, responsive interface built with React and Tailwind         |
-| **🔍 Tool Explorer**       | Browse and execute all available tools with schema validation      |
-| **📁 Resource Browser**    | View and copy resource URIs with syntax highlighting               |
-| **💬 Prompt Manager**      | Test and manage prompts with argument templates                    |
-| **🌐 Universal Support**   | Works with HTTP/SSE and WebSocket connections                      |
-| **🎨 Widget Support**      | Full support for MCP-UI and OpenAI Apps SDK widgets                |
-| **🔑 BYOK Chat**           | Bring Your Own Key chat interface for testing conversational flows |
-| **💾 Saved Tool Calls**    | Save and replay tool executions for repeated testing               |
-| **⌨️ Quick Actions**       | Cmd + K keyboard shortcuts for rapid navigation                    |
-| **🐳 Docker Ready**        | Self-host with a single Docker container for production use        |
+| Feature                    | Description                                                             |
+| -------------------------- | ----------------------------------------------------------------------- |
+| **🚀 Dev Auto-Mount**      | Project-pinned Inspector available at `/mcp/inspector` in `mcp-use dev` |
+| **🔌 Multi-Connection**    | Connect to and manage multiple MCP servers simultaneously               |
+| **🎯 Interactive Testing** | Test tools with live execution and real-time results                    |
+| **📊 Real-time Status**    | Monitor connection states, errors, and server health                    |
+| **🔐 OAuth Support**       | Built-in OAuth flow handling with popup authentication                  |
+| **💾 Persistent Sessions** | Connections saved to localStorage and auto-reconnect                    |
+| **🎨 Beautiful UI**        | Modern, responsive interface built with React and Tailwind              |
+| **🔍 Tool Explorer**       | Browse and execute all available tools with schema validation           |
+| **📁 Resource Browser**    | View and copy resource URIs with syntax highlighting                    |
+| **💬 Prompt Manager**      | Test and manage prompts with argument templates                         |
+| **🌐 Universal Support**   | Works with HTTP/SSE and WebSocket connections                           |
+| **🎨 Widget Support**      | Full support for MCP-UI and OpenAI Apps SDK widgets                     |
+| **🔑 BYOK Chat**           | Bring Your Own Key chat interface for testing conversational flows      |
+| **💾 Saved Tool Calls**    | Save and replay tool executions for repeated testing                    |
+| **⌨️ Quick Actions**       | Cmd + K keyboard shortcuts for rapid navigation                         |
+| **🐳 Docker Ready**        | Self-host with a single Docker container for production use             |
 
 ---
 
@@ -89,9 +89,9 @@ npx @mcp-use/inspector
 
 Opens the inspector in your browser at `http://localhost:8080`
 
-#### 3. Auto-mounted with mcp-use Servers
+#### 3. Auto-mounted by `mcp-use dev`
 
-When you create an MCP server with `mcp-use`, the inspector is automatically available at `/mcp/inspector`:
+Generated `mcp-use` projects include the Inspector as a dev dependency. The development CLI mounts that pinned package at `/mcp/inspector`:
 
 ```typescript
 import { MCPServer } from "mcp-use";
@@ -108,40 +108,7 @@ export default server;
 Run `mcp-use dev`; the inspector is available at
 `http://localhost:3000/mcp/inspector`.
 
-#### Test the local CDN bundle with an mcp-use server
-
-From the TypeScript workspace, build and serve the current inspector source:
-
-```bash
-pnpm --filter @mcp-use/inspector serve:cdn -- --port 4173
-```
-
-In another terminal, rebuild mcp-use and start the app with the local asset
-override:
-
-```bash
-pnpm --filter mcp-use build
-cd test_app
-MCP_USE_INSPECTOR_ASSETS_URL=http://127.0.0.1:4173/inspector.js pnpm dev
-```
-
-Open `http://localhost:3000/mcp/inspector`. The served shell should reference
-the local bundle:
-
-```bash
-curl -s http://127.0.0.1:3000/mcp/inspector | rg '127.0.0.1:4173/inspector.js'
-```
-
-`serve:cdn` rebuilds `dist/cdn`, then runs Vite Preview with a watch rebuild
-loop — refresh the browser after source changes land. Restart the mcp-use dev
-process after changing `MCP_USE_INSPECTOR_ASSETS_URL`, because the shell HTML
-is generated when the server mounts. An explicit `inspector.assetsUrl`
-constructor option takes precedence over the environment variable.
-
-When the shell uses the default jsDelivr CDN, each page resolves the current
-`@beta` tag and loads the entry script, stylesheet, and lazy chunks from that
-one exact release. Self-hosted and environment overrides load directly without
-calling the version resolver.
+The UI assets, proxy, and OAuth backend all come from the installed package; no CDN is used. Production `server.listen()` and `mcp-use start` do not mount the Inspector.
 
 ---
 

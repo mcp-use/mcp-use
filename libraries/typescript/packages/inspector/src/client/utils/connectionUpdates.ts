@@ -139,6 +139,30 @@ const INSPECTOR_CONNECTION_EXTRA_KEYS = [
   "maxTotalTimeout",
 ] as const;
 
+const INSPECTOR_CONNECTION_STORAGE_KEY = "mcp-inspector-connections";
+const INSPECTOR_CONNECTION_STORAGE_VERSION = "2";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function stripPersistedClientSecrets(
+  stored: Record<string, unknown>
+): Record<string, unknown> {
+  const sanitized = { ...stored };
+  delete sanitized.clientSecret;
+  delete sanitized.client_secret;
+
+  if (isRecord(sanitized.oauth)) {
+    const oauth = { ...sanitized.oauth };
+    delete oauth.clientSecret;
+    delete oauth.client_secret;
+    sanitized.oauth = oauth;
+  }
+
+  return sanitized;
+}
+
 function pickInspectorConnectionExtras(
   stored: Record<string, unknown> | null | undefined
 ): Pick<
@@ -165,16 +189,16 @@ export function saveStoredConnectionConfig(
   config: EditableConnectionConfig
 ): void {
   try {
-    const stored = localStorage.getItem("mcp-inspector-connections");
+    const stored = localStorage.getItem(INSPECTOR_CONNECTION_STORAGE_KEY);
     const allServers = stored
       ? (JSON.parse(stored) as Record<string, EditableConnectionConfig>)
       : {};
-    allServers[id] = {
+    allServers[id] = stripPersistedClientSecrets({
       ...allServers[id],
       ...config,
-    };
+    }) as unknown as EditableConnectionConfig;
     localStorage.setItem(
-      "mcp-inspector-connections",
+      INSPECTOR_CONNECTION_STORAGE_KEY,
       JSON.stringify(allServers)
     );
   } catch {
@@ -240,15 +264,42 @@ function normalizeStoredServerConfig(
   const normalizedProxyConfig = proxyConfig
     ? {
         ...proxyConfig,
+        ...(proxyConfig.proxyAddress
+          ? {
+              proxyAddress: rebaseStoredInspectorProxyUrl(
+                proxyConfig.proxyAddress
+              ),
+            }
+          : {}),
         ...(proxyHeaders ? { headers: proxyHeaders } : {}),
         customHeaders: undefined,
       }
     : undefined;
 
+  const autoProxyFallback = stored.autoProxyFallback;
+  const normalizedAutoProxyFallback =
+    isRecord(autoProxyFallback) &&
+    typeof autoProxyFallback.proxyAddress === "string"
+      ? {
+          ...autoProxyFallback,
+          proxyAddress: rebaseStoredInspectorProxyUrl(
+            autoProxyFallback.proxyAddress
+          ),
+        }
+      : autoProxyFallback;
+
   const {
     customHeaders: _customHeaders,
     connectionType: _connectionType,
     transportType: _transportType,
+    // These are shell/runtime concerns. Persisting them makes an embedded
+    // `/mcp/inspector` connection poison the standalone `/inspector` mode on
+    // the same hostname.
+    callbackUrl: _callbackUrl,
+    oauthProxyUrl: _oauthProxyUrl,
+    connectionUrl: _connectionUrl,
+    storageKeyPrefix: _storageKeyPrefix,
+    autoProxyFallback: _autoProxyFallback,
     ...rest
   } = stored;
 
@@ -256,12 +307,34 @@ function normalizeStoredServerConfig(
     ...(rest as McpServerConfig),
     ...(headers && !normalizedProxyConfig?.proxyAddress ? { headers } : {}),
     ...(normalizedProxyConfig ? { proxyConfig: normalizedProxyConfig } : {}),
+    ...(normalizedAutoProxyFallback !== undefined
+      ? {
+          autoProxyFallback:
+            normalizedAutoProxyFallback as McpServerConfig["autoProxyFallback"],
+        }
+      : {}),
     connectionMode: normalizeConnectionMode(
       stored.connectionMode as string | undefined,
       stored.connectionType as string | undefined,
       !!normalizedProxyConfig?.proxyAddress
     ),
   };
+}
+
+function rebaseStoredInspectorProxyUrl(value: string): string {
+  if (typeof window === "undefined") return value;
+  try {
+    const parsed = new URL(value, window.location.origin);
+    if (
+      parsed.origin === window.location.origin &&
+      /\/inspector\/api\/proxy\/?$/.test(parsed.pathname)
+    ) {
+      return getDefaultInspectorProxyAddress();
+    }
+  } catch {
+    // Preserve malformed values for the normal connection validation path.
+  }
+  return value;
 }
 
 export function toMcpServerConfig(
@@ -456,12 +529,69 @@ export function isAliasOnlyConnectionUpdate(
 
 /** Keeps inspector-only persisted fields when the client provider rewrites storage. */
 export class InspectorConnectionStorageProvider extends LocalStorageProvider {
+  private readonly inspectorStorageVersionKey: string;
+
+  constructor(
+    private readonly inspectorStorageKey: string = INSPECTOR_CONNECTION_STORAGE_KEY
+  ) {
+    super(inspectorStorageKey);
+    this.inspectorStorageVersionKey = `${inspectorStorageKey}-version`;
+  }
+
+  getServers(): Record<string, McpServerConfig> {
+    const raw = this.readRawStoredServers();
+    const migrated: Record<string, McpServerConfig> = {};
+    let recoveredEntries = 0;
+
+    for (const [id, value] of Object.entries(raw)) {
+      if (!isRecord(value)) {
+        recoveredEntries++;
+        continue;
+      }
+
+      const sanitized = stripPersistedClientSecrets(value);
+      const normalized = normalizeStoredServerConfig(sanitized);
+      const url =
+        typeof normalized.url === "string" ? normalized.url.trim() : id.trim();
+      try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+          recoveredEntries++;
+          continue;
+        }
+      } catch {
+        recoveredEntries++;
+        continue;
+      }
+
+      migrated[id] = { ...normalized, url };
+      if (JSON.stringify(value) !== JSON.stringify(migrated[id])) {
+        recoveredEntries++;
+      }
+    }
+
+    const serialized = JSON.stringify(migrated);
+    if (
+      recoveredEntries > 0 ||
+      this.readStorageVersion() !== INSPECTOR_CONNECTION_STORAGE_VERSION
+    ) {
+      this.writeRecoveredStorage(serialized);
+      if (recoveredEntries > 0) {
+        console.info(
+          `[Inspector] Recovered ${recoveredEntries} stale connection storage entr${recoveredEntries === 1 ? "y" : "ies"}.`
+        );
+      }
+    }
+
+    return migrated;
+  }
+
   setServers(servers: Record<string, McpServerConfig>): void {
     const prev = this.readRawStoredServers();
     const merged = Object.fromEntries(
       Object.entries(servers).map(([id, config]) => [
         id,
-        {
+        stripPersistedClientSecrets({
           ...pickInspectorConnectionExtras(prev[id]),
           ...config,
           // Tunnel switching is a live transport override. Persist the stable
@@ -472,10 +602,11 @@ export class InspectorConnectionStorageProvider extends LocalStorageProvider {
           isMcpUseTunnelUrl(config.url)
             ? { url: id }
             : {}),
-        },
+        }),
       ])
     ) as Record<string, McpServerConfig>;
     super.setServers(merged);
+    this.markStorageVersion();
   }
 
   setServer(id: string, config: McpServerConfig): void {
@@ -490,10 +621,51 @@ export class InspectorConnectionStorageProvider extends LocalStorageProvider {
 
   private readRawStoredServers(): Record<string, Record<string, unknown>> {
     try {
-      const stored = localStorage.getItem("mcp-inspector-connections");
-      return stored ? JSON.parse(stored) : {};
+      const stored = localStorage.getItem(this.inspectorStorageKey);
+      if (!stored) return {};
+      const parsed: unknown = JSON.parse(stored);
+      if (!isRecord(parsed)) {
+        throw new TypeError("Inspector connection storage is not an object");
+      }
+      return parsed as Record<string, Record<string, unknown>>;
     } catch {
+      try {
+        localStorage.removeItem(this.inspectorStorageKey);
+        this.markStorageVersion();
+      } catch {
+        // Storage can be disabled by browser privacy policy. Recovery remains
+        // in-memory so the Inspector itself can still load.
+      }
+      console.info("[Inspector] Removed unreadable connection storage.");
       return {};
+    }
+  }
+
+  private readStorageVersion(): string | null {
+    try {
+      return localStorage.getItem(this.inspectorStorageVersionKey);
+    } catch {
+      return null;
+    }
+  }
+
+  private writeRecoveredStorage(serialized: string): void {
+    try {
+      localStorage.setItem(this.inspectorStorageKey, serialized);
+      this.markStorageVersion();
+    } catch {
+      // Best-effort migration: callers still receive the recovered value.
+    }
+  }
+
+  private markStorageVersion(): void {
+    try {
+      localStorage.setItem(
+        this.inspectorStorageVersionKey,
+        INSPECTOR_CONNECTION_STORAGE_VERSION
+      );
+    } catch {
+      // Best-effort marker when storage is unavailable or full.
     }
   }
 }

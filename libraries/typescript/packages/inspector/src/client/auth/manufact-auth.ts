@@ -502,7 +502,7 @@ async function load(origin: string): Promise<void> {
 
 export async function authorizeManufact(
   chatApiUrl: string,
-  options?: { isRetry?: boolean }
+  _options?: { isRetry?: boolean }
 ): Promise<void> {
   const origin = authOrigin(chatApiUrl);
   pendingAuthorizeChatApiUrl = chatApiUrl;

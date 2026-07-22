@@ -67,6 +67,29 @@ test.describe("Inspector MCP Server Connections", () => {
     await expect(page.getByTestId("server-tile-status-ready")).toBeVisible();
   });
 
+  test("new servers appear first and the scroll area keeps bottom spacing", async ({
+    page,
+  }) => {
+    await page.goto("http://localhost:3000/inspector");
+
+    const scrollArea = page.getByTestId("connected-servers-scroll");
+    await expect(scrollArea).toHaveCSS("padding-bottom", "24px");
+
+    const newestUrl = "https://newest.invalid/mcp";
+    await page.getByTestId("connection-form-url-input").fill(newestUrl);
+    await page.getByTestId("connection-form-connect-button").click();
+
+    const newestTile = page.getByTestId(`server-tile-${newestUrl}`);
+    await expect(newestTile).toBeVisible();
+    const serverTiles = page.locator(
+      '[data-testid^="server-tile-"][data-testid*="//"]'
+    );
+    await expect(serverTiles.first()).toHaveAttribute(
+      "data-testid",
+      `server-tile-${newestUrl}`
+    );
+  });
+
   test("server should not be there after removing it", async ({ page }) => {
     // go to home
     await page.goto("http://localhost:3000/inspector");
@@ -350,6 +373,13 @@ test.describe("Inspector MCP Server Connections", () => {
     await expect(page.getByTestId("server-tile-status-failed")).toBeVisible({
       timeout: 10000,
     });
+    const inlineError = page.getByTestId("server-tile-error");
+    await expect(inlineError).toBeVisible();
+    await expect(inlineError).toContainText("Connection failed");
+    await expect(
+      inlineError.getByRole("button", { name: "Copy error" })
+    ).toBeVisible();
+    await expect(page.getByTestId("server-tile-local-recovery")).toHaveCount(0);
 
     await page.getByTestId("server-tile-settings").click();
     await expect(page.getByTestId("connection-form-url-input")).toBeVisible();

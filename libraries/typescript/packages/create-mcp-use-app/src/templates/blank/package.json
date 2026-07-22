@@ -30,6 +30,7 @@
     "mcp-use": "workspace:*"
   },
   "devDependencies": {
+    "@mcp-use/inspector": "workspace:*",
     "@types/node": "^22.20.0",
     "typescript": "^7.0.2"
   }
