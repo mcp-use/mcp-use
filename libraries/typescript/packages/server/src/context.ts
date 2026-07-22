@@ -181,7 +181,13 @@ function requireOAuthAuthInfo<TUser>(
 }
 
 function toClientContext(ctx: ServerContext): RequestClientContext {
-  const envelopeCaps = ctx.mcpReq.envelope?.[CLIENT_CAPABILITIES_META_KEY];
+  const envelopeCaps = (
+    ctx.mcpReq.envelope as
+      | {
+          [CLIENT_CAPABILITIES_META_KEY]?: Parameters<typeof supportsViews>[0];
+        }
+      | undefined
+  )?.[CLIENT_CAPABILITIES_META_KEY];
   return {
     supportsViews(): boolean {
       return supportsViews(envelopeCaps);

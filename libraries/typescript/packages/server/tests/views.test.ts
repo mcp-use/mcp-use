@@ -532,6 +532,10 @@ describe("views server core (e2e over HTTP)", () => {
     });
     expect(result.content).toEqual([{ type: "text", text: "Found 1 fruit" }]);
     expect(result._meta).toEqual({
+      "io.modelcontextprotocol/serverInfo": {
+        name: "views-test",
+        version: "1.0.0",
+      },
       viewOnly: true,
       ui: { resourceUri: "ui://views/product-search-result.html" },
       "ui/resourceUri": "ui://views/product-search-result.html",

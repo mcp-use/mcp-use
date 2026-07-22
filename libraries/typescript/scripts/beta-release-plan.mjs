@@ -32,13 +32,6 @@ const targets = [
     initial: "2.0.0-beta.0",
   },
 ];
-const pinnedPreviews = new Set([
-  "https://pkg.pr.new/@modelcontextprotocol/ext-apps@432d42bb02a569078ab31ab6458428df6027809d",
-  "https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee",
-  "https://pkg.pr.new/@modelcontextprotocol/core@f60b40179b0f090f6d64248be1312245a160b5ee",
-  "https://pkg.pr.new/@modelcontextprotocol/server@f60b40179b0f090f6d64248be1312245a160b5ee",
-]);
-
 function fail(message) {
   throw new Error(`[beta-release] ${message}`);
 }
@@ -49,11 +42,6 @@ function readJson(file) {
 
 function validateDependency(name, range) {
   if (range.startsWith("workspace:")) return;
-  if (range.startsWith("https://pkg.pr.new/")) {
-    if (!pinnedPreviews.has(range))
-      fail(`${name} uses an unapproved or mutable preview URL: ${range}`);
-    return;
-  }
   if (/^(?:https?:|git(?:\+|:)|github:|file:|link:)/.test(range)) {
     fail(`${name} uses a non-registry dependency: ${range}`);
   }
