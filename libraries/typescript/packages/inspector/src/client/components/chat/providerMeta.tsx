@@ -3,6 +3,7 @@ import type { ComponentProps } from "react";
 import { ChevronDown, Key } from "lucide-react";
 import { cn } from "@/client/lib/utils";
 import { useTheme } from "@/client/context/ThemeContext";
+import { providerAssetUrl } from "@/client/utils/providerAssets";
 
 const MANUFACT_LOGO_URL = "https://cdn.mcp-use.com/mcpuse_logo_circle_dark.svg";
 
@@ -165,10 +166,10 @@ function getProviderIconSrc(
     case "openai":
     case "anthropic":
     case "google":
-      return `https://inspector-cdn.mcp-use.com/providers/${provider}.png`;
+      return providerAssetUrl(`${provider}.png`);
     case "ollama": {
       const variant = resolvedTheme === "dark" ? "ollama_dark" : "ollama_light";
-      return `https://inspector-cdn.mcp-use.com/providers/${variant}.png`;
+      return providerAssetUrl(`${variant}.png`);
     }
     case "openrouter":
       return OPENROUTER_ICON_URL;

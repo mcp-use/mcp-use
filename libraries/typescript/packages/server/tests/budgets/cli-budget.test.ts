@@ -2,6 +2,7 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 const DIST = new URL("../../dist/", import.meta.url);
+const CLI_DIST = new URL("../../../cli/dist/", import.meta.url);
 
 /** Static import patterns that must never appear in edge-safe entrypoints. */
 const EDGE_FORBIDDEN_STATIC = [
@@ -73,7 +74,10 @@ describe("published CLI boundaries", () => {
   });
 
   it("keeps dist/commands/start.js free of toolchain and cross-command leaks", async () => {
-    const start = await readFile(new URL("commands/start.js", DIST), "utf8");
+    const start = await readFile(
+      new URL("commands/start.js", CLI_DIST),
+      "utf8"
+    );
 
     for (const { label, pattern } of START_FORBIDDEN_STATIC) {
       expect(start, `start.js must not statically import ${label}`).not.toMatch(
@@ -83,7 +87,10 @@ describe("published CLI boundaries", () => {
   });
 
   it("dispatches every substantial command through a dynamic chunk", async () => {
-    const bin = await readFile(new URL("bin.js", DIST), "utf8");
+    const frameworkBin = await readFile(new URL("bin.js", DIST), "utf8");
+    expect(frameworkBin).toContain('import("@mcp-use/cli")');
+
+    const bin = await readFile(new URL("bin.js", CLI_DIST), "utf8");
     for (const command of [
       "start",
       "dev",

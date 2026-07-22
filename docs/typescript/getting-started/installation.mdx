@@ -133,10 +133,12 @@ server.tool({
   return { temperature: 72, condition: "sunny", city };
 });
 
-// Start server with auto-inspector
+// Start the MCP server
 server.listen(3000);
-// 🎉 Inspector at http://localhost:3000/mcp/inspector
 ```
+
+For the local Inspector, run `mcp-use dev`; to mount it on a production build
+for internal testing, use `mcp-use start --with-inspector`.
 
 Check out the examples [here](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server).
 

@@ -1,9 +1,10 @@
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { access, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
+import { fileURLToPath } from "node:url";
 
 import type { MCPConnection } from "@mcp-use/client";
 
@@ -33,11 +34,17 @@ interface BrowserHandle {
   close(): Promise<void>;
 }
 
+interface LocalInspectorHandle {
+  origin: string;
+  close(): Promise<void>;
+}
+
 /** Run `mcp-use screenshot`. */
 export async function runScreenshot(argv: readonly string[]): Promise<number> {
   const json = wantsJson(argv);
   let connection: MCPConnection | undefined;
   let browser: BrowserHandle | undefined;
+  let localInspector: LocalInspectorHandle | undefined;
   try {
     const { values, positionals } = parseArgs({
       args: [...argv],
@@ -107,9 +114,14 @@ export async function runScreenshot(argv: readonly string[]): Promise<number> {
     const resource = await connection.readResource(resourceUri);
     resourceText(resource);
 
-    const inspector = (
-      values.inspector ?? "https://inspector.manufact.com"
-    ).replace(/\/+$/, "");
+    localInspector =
+      values.inspector === undefined
+        ? await launchLocalInspector(timeout)
+        : undefined;
+    const inspector = (values.inspector ?? localInspector!.origin).replace(
+      /\/+$/,
+      ""
+    );
     await verifyPreview(inspector, timeout);
     const viewName = viewNameFrom(resourceUri);
     const previewUrl = new URL(
@@ -184,8 +196,71 @@ export async function runScreenshot(argv: readonly string[]): Promise<number> {
     );
   } finally {
     await browser?.close().catch(() => {});
+    await localInspector?.close().catch(() => {});
     await connection?.disconnect().catch(() => {});
   }
+}
+
+async function launchLocalInspector(
+  timeout: number
+): Promise<LocalInspectorHandle> {
+  const port = await freePort();
+  const inspectorEntry = import.meta.resolve("@mcp-use/inspector");
+  const cliPath = fileURLToPath(new URL("../cli.js", inspectorEntry));
+  const child = spawn(
+    process.execPath,
+    [cliPath, "--port", String(port), "--no-open"],
+    { stdio: "ignore" }
+  );
+  const origin = `http://127.0.0.1:${port}`;
+  try {
+    await waitForInspector(origin, child, Math.min(timeout, 10_000));
+  } catch (error) {
+    child.kill("SIGTERM");
+    throw error;
+  }
+  return {
+    origin,
+    async close() {
+      await stopChild(child);
+    },
+  };
+}
+
+async function waitForInspector(
+  origin: string,
+  child: ChildProcess,
+  timeout: number
+): Promise<void> {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    if (child.exitCode !== null) {
+      throw new CommandError(
+        "inspector_start_failed",
+        `Packaged Inspector exited before becoming ready (code ${child.exitCode}).`
+      );
+    }
+    try {
+      await verifyPreview(origin, Math.min(1_000, timeout));
+      return;
+    } catch {
+      await sleep(100);
+    }
+  }
+  throw new CommandError(
+    "inspector_start_failed",
+    "Packaged Inspector did not start in time."
+  );
+}
+
+async function stopChild(child: ChildProcess): Promise<void> {
+  if (child.exitCode !== null) return;
+  child.kill("SIGTERM");
+  await Promise.race([
+    new Promise<void>((resolveExit) => child.once("exit", () => resolveExit())),
+    sleep(2_000),
+  ]);
+  if (child.exitCode === null) child.kill("SIGKILL");
 }
 
 async function verifyPreview(origin: string, timeout: number): Promise<void> {

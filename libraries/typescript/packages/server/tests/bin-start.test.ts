@@ -4,20 +4,39 @@
  * `.mcp-use/build/` workspace containing a manifest and a built entry, with
  * zero mocks of the filesystem or module loader.
  */
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 
-import { parseArgs, resolvePort } from "../src/bin/args.js";
+import { parseArgs, resolveHost, resolvePort } from "../src/bin/args.js";
 import { main } from "../src/bin/main.js";
 import { runStart } from "../src/bin/start.js";
+
+const { mountInspector } = vi.hoisted(() => ({
+  mountInspector: vi.fn(),
+}));
+
+vi.mock("@mcp-use/inspector", () => ({ mountInspector }));
 
 /** An entry that echoes back the port it was asked to listen on (no bind). */
 const ECHO_ENTRY = `
 const server = {
   async listen(port = 3000) {
     return { port, url: \`http://localhost:\${port}/mcp\` };
+  },
+  async close() {},
+};
+export default server;
+`;
+
+/** An entry that exposes configured address defaults without binding. */
+const ADDRESS_ENTRY = `
+const server = {
+  host: "configured-host",
+  port: 4321,
+  async listen(port = 3000, options) {
+    return { port, url: \`http://\${options?.host}:\${port}/mcp\` };
   },
   async close() {},
 };
@@ -38,6 +57,33 @@ const server = {
   async close() {
     await new Promise((resolve) => http.close(resolve));
   },
+};
+export default server;
+`;
+
+/** A built entry that verifies the production Inspector route contract. */
+const INSPECTOR_ENTRY = `
+const server = {
+  basePath: "/api/mcp",
+  async listen(port = 3000, options) {
+    if (!Array.isArray(options?.routes) || options.routes.length !== 1) {
+      throw new Error("expected one Inspector route");
+    }
+    const [route] = options.routes;
+    const inspector = new Request("http://localhost/api/mcp/inspector");
+    if (!route.match(inspector)) {
+      throw new Error("Inspector route did not match");
+    }
+    const inspectorResponse = await route.handler(inspector);
+    if (route.match(new Request("http://localhost/api/mcp"))) {
+      throw new Error("Inspector route intercepted MCP");
+    }
+    if ((await inspectorResponse.text()) !== "inspector") {
+      throw new Error("Inspector route was not dispatched");
+    }
+    return { port, url: \`http://localhost:\${port}/api/mcp\` };
+  },
+  async close() {},
 };
 export default server;
 `;
@@ -77,6 +123,7 @@ afterAll(async () => {
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
+  mountInspector.mockReset();
 });
 
 describe("parseArgs", () => {
@@ -124,6 +171,11 @@ describe("parseArgs", () => {
   it("parses --no-inspector (dev inspector defaults to on)", () => {
     expect(parseArgs(["dev", "--no-inspector"]).inspector).toBe(false);
     expect(parseArgs(["dev"]).inspector).toBe(true);
+  });
+
+  it("parses --with-inspector for production start", () => {
+    expect(parseArgs(["start", "--with-inspector"]).withInspector).toBe(true);
+    expect(parseArgs(["start"]).withInspector).toBe(false);
   });
 
   it("parses --source-maps for build", () => {
@@ -175,15 +227,35 @@ describe("parseArgs", () => {
 });
 
 describe("resolvePort", () => {
-  it("prefers the flag over PORT env over the 3000 default", () => {
+  it("prefers the flag over PORT env over config over the 3000 default", () => {
     expect(resolvePort(8080, { PORT: "4000" })).toBe(8080);
     expect(resolvePort(undefined, { PORT: "4000" })).toBe(4000);
+    expect(resolvePort(undefined, {}, 4100)).toBe(4100);
     expect(resolvePort(undefined, {})).toBe(3000);
   });
 
   it("ignores an unusable PORT env value", () => {
     expect(resolvePort(undefined, { PORT: "not-a-port" })).toBe(3000);
     expect(resolvePort(undefined, { PORT: "" })).toBe(3000);
+  });
+});
+
+describe("resolveHost", () => {
+  it("prefers the flag over HOST env over config over the default", () => {
+    expect(resolveHost("flag-host", { HOST: "env-host" }, "code-host")).toBe(
+      "flag-host"
+    );
+    expect(resolveHost(undefined, { HOST: "env-host" }, "code-host")).toBe(
+      "env-host"
+    );
+    expect(resolveHost(undefined, {}, "code-host")).toBe("code-host");
+    expect(resolveHost(undefined, {})).toBe("127.0.0.1");
+  });
+
+  it("ignores an empty HOST env value", () => {
+    expect(resolveHost(undefined, { HOST: "   " }, "code-host")).toBe(
+      "code-host"
+    );
   });
 });
 
@@ -225,15 +297,43 @@ describe("runStart", () => {
     }
   });
 
-  it("applies port precedence: flag over PORT env over 3000", async () => {
-    const cwd = await makeProject({ entrySource: ECHO_ENTRY });
+  it("mounts Inspector on the existing production listener only when requested", async () => {
+    mountInspector.mockImplementation(
+      () => async () => new Response("inspector")
+    );
+    const cwd = await makeProject({ entrySource: INSPECTOR_ENTRY });
+    const manifestPath = join(cwd, ".mcp-use", "build", "manifest.json");
+    const before = await readFile(manifestPath, "utf8");
+
+    const started = await runStart({ cwd, port: 0, withInspector: true });
+    try {
+      expect(started.url).toBe(`http://localhost:${started.port}/api/mcp`);
+      expect(mountInspector).toHaveBeenCalledWith({
+        basePath: "/api/mcp",
+        devMode: false,
+        oauthProxyAllowLoopback: false,
+      });
+      await expect(readFile(manifestPath, "utf8")).resolves.toBe(before);
+    } finally {
+      await started.close();
+    }
+  });
+
+  it("applies address precedence: flags over env over server config over defaults", async () => {
+    const cwd = await makeProject({ entrySource: ADDRESS_ENTRY });
 
     vi.stubEnv("PORT", "4123");
-    expect((await runStart({ cwd, port: 5001 })).port).toBe(5001);
-    expect((await runStart({ cwd })).port).toBe(4123);
+    vi.stubEnv("HOST", "env-host");
+    expect((await runStart({ cwd, port: 5001, host: "flag-host" })).url).toBe(
+      "http://flag-host:5001/mcp"
+    );
+    expect((await runStart({ cwd })).url).toBe("http://env-host:4123/mcp");
 
     vi.stubEnv("PORT", undefined);
-    expect((await runStart({ cwd })).port).toBe(3000);
+    vi.stubEnv("HOST", undefined);
+    expect((await runStart({ cwd })).url).toBe(
+      "http://configured-host:4321/mcp"
+    );
   });
 
   it("sets NODE_ENV=production only when unset", async () => {

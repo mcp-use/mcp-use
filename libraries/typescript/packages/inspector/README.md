@@ -91,7 +91,7 @@ Opens the inspector in your browser at `http://localhost:8080`
 
 #### 3. Auto-mounted by `mcp-use dev`
 
-Generated `mcp-use` projects include the Inspector as a dev dependency. The development CLI mounts that pinned package at `/mcp/inspector`:
+`mcp-use` includes the prebuilt Inspector package. The development CLI mounts it at `/mcp/inspector` without a separate project dependency:
 
 ```typescript
 import { MCPServer } from "mcp-use";

@@ -4,7 +4,7 @@ description: "Command reference for the @mcp-use/cli package and mcp-use executa
 icon: "terminal"
 ---
 
-The `@mcp-use/cli` package installs the `mcp-use` executable. Use this page as the exhaustive command reference for local development, production builds, cloud deploys, saved MCP client sessions, skills, and CLI environment variables.
+The `mcp-use` package installs the `mcp-use` executable and includes the prebuilt `@mcp-use/cli` implementation. Use this page as the exhaustive command reference for local development, production builds, cloud deploys, saved MCP client sessions, skills, and CLI environment variables.
 
 For hands-on workflows, see the [CLI Client guide](/typescript/tooling/client-cli), [Tunneling guide](/tunneling/index), and [Manufact Cloud deployment guide](/typescript/server/deployment/mcp-use).
 
@@ -37,6 +37,14 @@ For hands-on workflows, see the [CLI Client guide](/typescript/tooling/client-cl
 
 ## Install the CLI
 
+Most projects install the framework, CLI, and Inspector together:
+
+```bash
+npm install mcp-use
+```
+
+The CLI package can also be installed directly:
+
 ```bash
 npm install -g @mcp-use/cli
 ```
@@ -49,7 +57,10 @@ npx @mcp-use/cli dev
 npm install --save-dev @mcp-use/cli
 ```
 
-<Tip>`create-mcp-use-app` installs the CLI as a project dependency.</Tip>
+<Tip>
+  `create-mcp-use-app` installs `mcp-use`, which supplies the CLI and Inspector
+  at matching versions.
+</Tip>
 
 ## `dev`
 
@@ -69,8 +80,8 @@ mcp-use dev [options]
 | `--entry <file>`    | MCP server entry file, relative to the project.                          | Auto-detected                  |
 | `--mcp-dir <dir>`   | MCP source directory containing the entry and `views/`.                  | None                           |
 | `--views-dir <dir>` | View directory, relative to the project root.                            | `views/` or `<mcp-dir>/views/` |
-| `--port <port>`     | Server port.                                                             | `3000`                         |
-| `--host <host>`     | Bind address. Use `0.0.0.0` to listen on all interfaces.                 | `127.0.0.1`                    |
+| `--port <port>`     | Server port.                                                             | `PORT` or `3000`               |
+| `--host <host>`     | Bind address. Use `0.0.0.0` to listen on all interfaces.                 | `HOST` or `127.0.0.1`          |
 | `--no-open`         | Do not open the Inspector automatically.                                 | Opens by default               |
 | `--no-inspector`    | Run without loading the project-local Inspector.                         | Inspector enabled              |
 | `--tunnel`          | Create a public tunnel for the local server.                             | Disabled                       |
@@ -90,7 +101,8 @@ mcp-use dev --tunnel
 **Notes and behavior:**
 
 - The MCP endpoint is served at `/mcp`.
-- When `@mcp-use/inspector` is installed in the project, it is mounted at `/mcp/inspector` and opens automatically unless `--no-open` is set. Generated projects include it as a dev dependency. If it is absent, the MCP server still starts and prints an install command.
+- Address precedence is `--port` / `--host`, then `PORT` / `HOST`, then the defaults. `dev` does not import the server until after its listener is chosen, so it cannot use a server-configured address.
+- The Inspector supplied by `mcp-use` is mounted at `/mcp/inspector` and opens automatically unless `--no-open` is set.
 - Inspector UI, proxy, and OAuth routes remain local-only. A public tunnel exposes the MCP endpoint but returns `404` for `/mcp/inspector`.
 - The command sets `NODE_ENV=development`, sets `PORT`, and sets `MCP_URL` to the tunnel URL or local server URL when `MCP_URL` is not already set.
 - Source changes reload the exported server without dropping the long-lived HTTP listener. View modules use Vite HMR when views exist at startup.
@@ -151,27 +163,32 @@ mcp-use start [options]
 
 **Options:**
 
-| Option          | Description                                | Default           |
-| --------------- | ------------------------------------------ | ----------------- |
-| `--path <path>` | Project root containing `.mcp-use/build/`. | Current directory |
-| `--port <port>` | Server port.                               | `3000`            |
+| Option             | Description                                              | Default                               |
+| ------------------ | -------------------------------------------------------- | ------------------------------------- |
+| `--path <path>`    | Project root containing `.mcp-use/build/`.               | Current directory                     |
+| `--port <port>`    | Server port.                                             | `PORT`, server config, or `3000`      |
+| `--host <host>`    | Bind address. Use `0.0.0.0` to listen on all interfaces. | `HOST`, server config, or `127.0.0.1` |
+| `--with-inspector` | Mount the bundled Inspector at `${basePath}/inspector`.  | Disabled                              |
 
 **Examples:**
 
 ```bash
 mcp-use start
 mcp-use start --port 8080
+mcp-use start --host 0.0.0.0
+mcp-use start --with-inspector
 mcp-use start --path ./my-server
 ```
 
 **Notes and behavior:**
 
-- Port resolution order is `--port`, then `PORT`, then `3000`.
+- Address precedence is CLI flag, environment variable, server configuration, then default: `--port` → `PORT` → `config.port` → `3000`, and `--host` → `HOST` → `config.host` → `127.0.0.1`.
 - The command requires `.mcp-use/build/manifest.json`; run `mcp-use build` first.
 - It imports the manifest's built `entryPoint` and requires that module to default-export an `MCPServer`.
 - `start` does not rediscover source entries or views. `--entry`, `--mcp-dir`, and `--views-dir` belong to `dev` and `build`.
 - The command sets `NODE_ENV=production` when it is not already defined and loads the selected project's production `.env` values before importing the built entry.
-- Production builds do not include Inspector UI, proxy, or OAuth routes. Use `mcp-use dev` for visual inspection.
+- The build manifest never records Inspector state. `--with-inspector` is a runtime-only opt-in that mounts the Inspector on the same listener; it does not rebuild or alter `.mcp-use/build`.
+- The Inspector can call tools and proxy OAuth flows. Keep `--with-inspector` behind access controls when serving beyond localhost.
 
 ## Tunneling reference
 
@@ -621,7 +638,8 @@ mcp-use generate-types --server src/server.ts
 
 | Variable                    | Used by                                   | Description                                                                                                                                                                                                 | Default                             |
 | --------------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| `PORT`                      | `start`, server runtime                   | Server port when `--port` is not provided. `dev` and `start` also set this for the child process.                                                                                                           | `3000`                              |
+| `PORT`                      | `dev`, `start`, server runtime            | Server port when `--port` is not provided. `dev` sets it to the resolved listener port before importing the entry; `start` reads it before importing the built entry.                                       | `3000`                              |
+| `HOST`                      | `dev`, `start`, server runtime            | Bind host when `--host` is not provided. `start` and direct `listen()` fall back to `config.host` before `127.0.0.1`.                                                                                       | `127.0.0.1`                         |
 | `NODE_ENV`                  | `dev`, `start`, widget builds             | Runtime environment. `dev` sets `development`; `start` sets `production`.                                                                                                                                   | Command-specific                    |
 | `MCP_URL`                   | `dev`, `start`, server runtime            | **Server public origin** (`.origin` only). OAuth resource URL, CSP `connectDomains`, dev HMR websocket. Lower priority than `CSP_URLS`. Preserved when already set.                                         | Local server URL or tunnel URL      |
 | `MCP_ASSETS_URL`            | `build`, server runtime                   | **Assets URL prefix** (origin + optional path) for view JS/CSS and `public/`. Falls back to `MCP_URL` origin. When set at build, manifest paths become full CDN URLs (path segment from server `basePath`). | None (falls back to server origin)  |

@@ -379,6 +379,17 @@ async function proxyResponse(response: Response): Promise<Response> {
     });
   }
 
+  // Fetch forbids a body for null-body statuses. Passing even a zero-byte
+  // ArrayBuffer to Response throws, which turns normal MCP 204 polling
+  // responses into proxy 500s.
+  if ([204, 205, 304].includes(response.status)) {
+    return new Response(null, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: responseHeaders,
+    });
+  }
+
   const bodyBuffer = await response.arrayBuffer();
   responseHeaders["Content-Length"] = String(bodyBuffer.byteLength);
   return new Response(bodyBuffer, {

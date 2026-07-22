@@ -9,8 +9,10 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { resolvePort } from "./args.js";
+import { resolveHost, resolvePort } from "./args.js";
+import { isInspectorRequest } from "../cli/inspector-route.js";
 import { loadProjectEnv } from "../cli/next-compat.js";
+import type { FetchHandler } from "../fetch-app.js";
 
 /*
  * Workspace constants, re-declared per CLI_SPEC.md ("Same names,
@@ -27,7 +29,19 @@ const BUILD_MANIFEST_NAME = "manifest.json";
  * still starts.
  */
 interface ListenableServer {
-  listen(port?: number): Promise<unknown>;
+  basePath?: unknown;
+  host?: unknown;
+  port?: unknown;
+  listen(
+    port?: number,
+    options?: {
+      host?: string;
+      routes?: ReadonlyArray<{
+        match: (request: Request) => boolean;
+        handler: FetchHandler;
+      }>;
+    }
+  ): Promise<unknown>;
   close?(): unknown;
 }
 
@@ -39,8 +53,12 @@ interface ListenableServer {
 export interface StartOptions {
   /** Project root containing the `.mcp-use/` workspace. */
   cwd: string;
-  /** Port from the `--port`/`-p` flag; falls back to `PORT` env, then 3000. */
+  /** Port from the `--port`/`-p` flag. */
   port?: number | undefined;
+  /** Host from `--host`. */
+  host?: string | undefined;
+  /** Mount the bundled Inspector on the same production listener. */
+  withInspector?: boolean | undefined;
 }
 
 /**
@@ -123,8 +141,15 @@ export async function runStart(options: StartOptions): Promise<StartedServer> {
     );
   }
 
-  const port = resolvePort(options.port);
-  const result = (await candidate.listen(port)) as
+  const configuredPort =
+    typeof candidate.port === "number" ? candidate.port : undefined;
+  const configuredHost =
+    typeof candidate.host === "string" ? candidate.host : undefined;
+  const port = resolvePort(options.port, process.env, configuredPort);
+  const host = resolveHost(options.host, process.env, configuredHost);
+  const result = (await (options.withInspector === true
+    ? startWithInspector(candidate, port, host)
+    : candidate.listen(port, { host }))) as
     | { port?: unknown; url?: unknown }
     | undefined;
   const boundPort = typeof result?.port === "number" ? result.port : port;
@@ -142,11 +167,79 @@ export async function runStart(options: StartOptions): Promise<StartedServer> {
   };
 }
 
+/** Start through the server's listener so its production security policy stays intact. */
+async function startWithInspector(
+  server: ListenableServer,
+  port: number,
+  host: string
+): Promise<unknown> {
+  const { mountInspector } = await loadBuiltInInspector();
+  const basePath =
+    typeof server.basePath === "string" ? server.basePath : "/mcp";
+  const inspector = mountInspector({
+    basePath,
+    devMode: false,
+    oauthProxyAllowLoopback: false,
+  });
+
+  return server.listen(port, {
+    host,
+    routes: [
+      {
+        match: (request) => isInspectorRequest(request, basePath),
+        handler: inspector,
+      },
+    ],
+  });
+}
+
+async function loadBuiltInInspector(): Promise<{
+  mountInspector(options: {
+    basePath: string;
+    devMode: boolean;
+    oauthProxyAllowLoopback: boolean;
+  }): FetchHandler;
+}> {
+  let loaded: Partial<{
+    mountInspector(options: {
+      basePath: string;
+      devMode: boolean;
+      oauthProxyAllowLoopback: boolean;
+    }): FetchHandler;
+  }>;
+  try {
+    loaded = await import("@mcp-use/inspector");
+  } catch (error) {
+    if (isModuleNotFound(error)) {
+      throw new Error(
+        "Built-in Inspector is unavailable; reinstall mcp-use to restore it."
+      );
+    }
+    throw error;
+  }
+  if (typeof loaded.mountInspector !== "function") {
+    throw new Error(
+      "The installed @mcp-use/inspector is incompatible: its package entry " +
+        "does not export mountInspector(). Reinstall mcp-use."
+    );
+  }
+  return { mountInspector: loaded.mountInspector };
+}
+
 /** Duck-check that a value looks like a server we can `listen()` on. */
 function isListenable(value: unknown): value is ListenableServer {
   return (
     typeof value === "object" &&
     value !== null &&
     typeof (value as { listen?: unknown }).listen === "function"
+  );
+}
+
+function isModuleNotFound(error: unknown): boolean {
+  return (
+    error !== null &&
+    typeof error === "object" &&
+    "code" in error &&
+    (error.code === "ERR_MODULE_NOT_FOUND" || error.code === "MODULE_NOT_FOUND")
   );
 }

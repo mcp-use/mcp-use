@@ -34,7 +34,10 @@ import {
   validateOriginHeader,
 } from "@modelcontextprotocol/server";
 
-import { resolvePort as resolvePreferredPort } from "../bin/args.js";
+import {
+  resolveHost,
+  resolvePort as resolvePreferredPort,
+} from "../bin/args.js";
 import { discoverEntry } from "./entry.js";
 import {
   loadProjectEnv,
@@ -45,11 +48,11 @@ import { resolvePort } from "./port.js";
 import { resolveTailwindCss, resolveUserViteConfig } from "./vite-config.js";
 import { createDevApiHandler } from "./dev-api.js";
 import {
-  inspectorInstallCommand,
   loadProjectInspector,
   type DevInspectorHandler,
   type ProjectInspectorModule,
 } from "./inspector.js";
+import { isInspectorPath, isInspectorRequest } from "./inspector-route.js";
 import { createTunnelManager } from "./tunnel.js";
 import { ensureMcpEnvDeclaration } from "./mcp-env-declaration.js";
 import { resolveWorkspacePaths } from "./workspace.js";
@@ -323,15 +326,15 @@ function serverFrom(moduleExports: Record<string, unknown>): ServerLike {
  */
 export async function runDev(options: DevOptions): Promise<void> {
   process.env.MCP_USE_DEV_CLI = "1";
-  const host = options.host ?? "127.0.0.1";
-  const localhostBind = ["127.0.0.1", "localhost", "::1"].includes(host);
-  const wildcardBind = host === "0.0.0.0" || host === "::";
   const paths = resolveWorkspacePaths(options.cwd);
   const eventBus = new InMemoryServerEventBus((error) => {
     console.error("[mcp-use] notification delivery failed:", error);
   });
 
   loadProjectEnv(options.cwd, "development");
+  const host = resolveHost(options.host);
+  const localhostBind = ["127.0.0.1", "localhost", "::1"].includes(host);
+  const wildcardBind = host === "0.0.0.0" || host === "::";
 
   // Resolve the listener before importing the entry so module-scope OAuth
   // configuration observes the canonical port that this CLI will own.
@@ -707,11 +710,9 @@ export async function runDev(options: DevOptions): Promise<void> {
       tunnel: tunnelManager,
     },
     (request) => {
-      const pathname = new URL(request.url).pathname;
-      const inspectorPath = `${basePath}/inspector`;
       if (
         inspectorHandler !== undefined &&
-        (pathname === inspectorPath || pathname.startsWith(`${inspectorPath}/`))
+        isInspectorRequest(request, basePath)
       ) {
         return inspectorHandler(request);
       }
@@ -733,13 +734,12 @@ export async function runDev(options: DevOptions): Promise<void> {
     const tunnelHostname =
       tunnelUrl === null ? null : new URL(tunnelUrl).hostname;
     const requestHostname = hostnameFromHostHeader(req.headers.host);
-    const inspectorPath = `${basePath}/inspector`;
     if (
       ((tunnelHostname !== null && requestHostname === tunnelHostname) ||
         (wildcardBind &&
           requestHostname !== undefined &&
           !["localhost", "127.0.0.1", "::1"].includes(requestHostname))) &&
-      (pathname === inspectorPath || pathname.startsWith(`${inspectorPath}/`))
+      isInspectorPath(pathname, basePath)
     ) {
       res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
       res.end("Not Found");
@@ -793,8 +793,8 @@ export async function runDev(options: DevOptions): Promise<void> {
     console.log(`  ➜ Inspector:     ${devOrigin}${basePath}/inspector`);
   } else if (options.inspector !== false) {
     console.warn(
-      "[mcp-use] Inspector is not installed; visual testing is disabled.\n" +
-        `  ➜ Install:       ${inspectorInstallCommand()}`
+      "[mcp-use] Built-in Inspector is unavailable; reinstall mcp-use to " +
+        "restore visual testing."
     );
   }
   if (host === "0.0.0.0" || host === "::") {

@@ -1,18 +1,15 @@
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
-import {
-  inspectorInstallCommand,
-  loadProjectInspector,
-} from "../../src/cli/inspector.js";
+import { loadProjectInspector } from "../../src/cli/inspector.js";
 
 const temporaryDirectories: string[] = [];
 
 async function projectWithInspector(
   source?: string,
-  exportsMap = '{".":"./index.js","./dev":"./index.js"}'
+  exportsMap = '{".":"./index.js"}'
 ): Promise<string> {
   const cwd = join(
     tmpdir(),
@@ -39,7 +36,6 @@ async function projectWithInspector(
 }
 
 afterEach(async () => {
-  vi.unstubAllEnvs();
   await Promise.all(
     temporaryDirectories
       .splice(0)
@@ -48,10 +44,10 @@ afterEach(async () => {
 });
 
 describe("loadProjectInspector", () => {
-  it("treats an absent project-local package as optional", async () => {
+  it("loads the framework Inspector when the project has no direct override", async () => {
     const cwd = await projectWithInspector();
-    await expect(loadProjectInspector(cwd)).resolves.toEqual({
-      installed: false,
+    await expect(loadProjectInspector(cwd)).resolves.toMatchObject({
+      installed: true,
     });
   });
 
@@ -75,7 +71,7 @@ describe("loadProjectInspector", () => {
     ).resolves.toMatchObject({ status: 200 });
   });
 
-  it("supports the v1 root export while projects migrate to the dev subpath", async () => {
+  it("supports a root-only project override", async () => {
     const cwd = await projectWithInspector(
       "export const mountInspector = () => async () => new Response('mounted')\n",
       '"./index.js"'
@@ -90,17 +86,5 @@ describe("loadProjectInspector", () => {
     await expect(loadProjectInspector(cwd)).rejects.toThrow(
       "does not export mountInspector"
     );
-  });
-});
-
-describe("inspectorInstallCommand", () => {
-  it.each([
-    ["pnpm/10.0.0", "pnpm add -D"],
-    ["yarn/4.0.0", "yarn add -D"],
-    ["bun/1.0.0", "bun add -d"],
-    ["npm/11.0.0", "npm install --save-dev"],
-  ])("uses the active package manager for %s", (userAgent, prefix) => {
-    vi.stubEnv("npm_config_user_agent", userAgent);
-    expect(inspectorInstallCommand()).toBe(`${prefix} @mcp-use/inspector@beta`);
   });
 });

@@ -396,53 +396,48 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     false
   );
   let buildBasePath: string;
+  const viewsManifest: ViewsManifest = {};
+  const buildAssetsBase = readBuildAssetsBase();
   try {
     buildBasePath = await resolveBuildBasePath(
       bindingServer.environments.ssr,
       entry
     );
-  } catch (error) {
-    await bindingServer.close();
-    throw error;
-  }
 
-  const viewsManifest: ViewsManifest = {};
-  const buildAssetsBase = readBuildAssetsBase();
-  for (const view of views) {
-    let manifestEntry = await buildView(view, {
-      cwd: options.cwd,
-      cacheDir: paths.cache,
-      viewsOutDir,
-      userViteConfig,
-      sourceMaps,
-      inline,
-    });
+    for (const view of views) {
+      let manifestEntry = await buildView(view, {
+        cwd: options.cwd,
+        cacheDir: paths.cache,
+        viewsOutDir,
+        userViteConfig,
+        sourceMaps,
+        inline,
+      });
+      if (buildAssetsBase !== undefined && !inline) {
+        manifestEntry = applyBuildAssetsPrefix(
+          manifestEntry,
+          view.name,
+          buildAssetsBase,
+          buildBasePath
+        );
+      }
+      viewsManifest[view.name] = manifestEntry;
+    }
+
     if (buildAssetsBase !== undefined && !inline) {
-      manifestEntry = applyBuildAssetsPrefix(
-        manifestEntry,
-        view.name,
-        buildAssetsBase,
-        buildBasePath
-      );
-    }
-    viewsManifest[view.name] = manifestEntry;
-  }
-
-  if (buildAssetsBase !== undefined && !inline) {
-    console.log(
-      `[mcp-use] MCP_ASSETS_URL set — manifest uses CDN URLs; upload ` +
-        `${relative(options.cwd, viewsOutDir)}/ to your asset host.`
-    );
-    if (buildBasePath !== "/mcp") {
       console.log(
-        `[mcp-use] CDN manifest uses basePath ${buildBasePath} from server entry`
+        `[mcp-use] MCP_ASSETS_URL set — manifest uses CDN URLs; upload ` +
+          `${relative(options.cwd, viewsOutDir)}/ to your asset host.`
       );
+      if (buildBasePath !== "/mcp") {
+        console.log(
+          `[mcp-use] CDN manifest uses basePath ${buildBasePath} from server entry`
+        );
+      }
     }
-  }
 
-  await copyPublicAssets(options.cwd, join(viewsOutDir, "public"));
+    await copyPublicAssets(options.cwd, join(viewsOutDir, "public"));
 
-  try {
     await validateViewBindingsAtBuild(
       bindingServer.environments.ssr,
       entry,

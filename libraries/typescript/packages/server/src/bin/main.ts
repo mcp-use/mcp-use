@@ -10,6 +10,8 @@ import { resolve } from "node:path";
 
 import { parseArgs, type ParsedArgs } from "./args.js";
 
+declare const __MCP_USE_PACKAGE_VERSION__: string | undefined;
+
 /**
  * Options this bin passes to the cli's `runDev`/`runBuild`.
  *
@@ -60,14 +62,15 @@ Commands:
   screenshot Capture an MCP Apps view
 
 Options:
-  -p, --port <n>     Port to serve on (default: $PORT or 3000)
-  --host <host>      Host to bind (dev only)
+  -p, --port <n>     Port to serve on (dev/start; default: $PORT or 3000)
+  --host <host>      Host to bind (dev/start; default: $HOST or 127.0.0.1)
   --entry <path>     Server entry module (dev/build only)
   --path <directory> Project root (default: current directory)
   --mcp-dir <dir>    Directory containing the MCP entry and views/
   --views-dir <dir>  Views directory (default: views/ or <mcp-dir>/views/)
   --source-maps      Emit source maps in build output (build only)
   --inline           Embed view JS and CSS in MCP resources (build only)
+  --with-inspector   Mount Inspector on the production listener (start only)
   --tunnel           Expose the dev server through a public tunnel (dev only)
   --no-open          Do not auto-open the inspector in a browser (dev only)
   --no-inspector     Start dev without loading the optional Inspector
@@ -170,6 +173,8 @@ async function startCommand(args: ParsedArgs): Promise<number> {
     started = await runStart({
       cwd: resolve(process.cwd(), args.path ?? "."),
       port: args.port,
+      host: args.host,
+      ...(args.withInspector && { withInspector: true }),
     });
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
@@ -234,6 +239,9 @@ async function cliCommand(
  * verifies the manifest's `name` so an unrelated package.json never wins.
  */
 function readOwnVersion(): string {
+  if (typeof __MCP_USE_PACKAGE_VERSION__ !== "undefined") {
+    return __MCP_USE_PACKAGE_VERSION__;
+  }
   for (const relative of ["../package.json", "../../package.json"]) {
     try {
       const raw = readFileSync(new URL(relative, import.meta.url), "utf8");

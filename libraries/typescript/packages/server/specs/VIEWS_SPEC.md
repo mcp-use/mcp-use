@@ -389,7 +389,6 @@ There are **no HTML files** in the build output. The view document is a pure fun
   "buildId": "…",
   "entryPoint": "index.js",
   "createdAt": "…",
-  "inspector": false,
   "views": {},
 }
 ```

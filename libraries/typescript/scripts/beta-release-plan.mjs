@@ -18,13 +18,14 @@ const targets = [
     initial: "2.0.0-beta.0",
     bootstrap: true,
   },
-  { directory: "server", name: "mcp-use", initial: "2.0.0-beta.0" },
-  { directory: "cli", name: "@mcp-use/cli", initial: "4.0.0-beta.0" },
   {
     directory: "inspector",
     name: "@mcp-use/inspector",
     initial: "20.0.0-beta.0",
   },
+  { directory: "cli", name: "@mcp-use/cli", initial: "4.0.0-beta.0" },
+  // Publish the framework only after both regular dependencies are available.
+  { directory: "server", name: "mcp-use", initial: "2.0.0-beta.0" },
   {
     directory: "create-mcp-use-app",
     name: "create-mcp-use-app",

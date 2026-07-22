@@ -256,27 +256,27 @@ notifyResourceUpdated(uri: string): Promise<void>
 
 ### listen
 
-Starts the HTTP server. Mounts MCP protocol endpoints (at `/mcp` and `/sse`), the inspector UI (at `/mcp/inspector`), widget routes, and OAuth routes (if configured), then begins listening. Resolves once the server is listening. During HMR reload (when the CLI manages the lifecycle) this is a no-op.
+Starts the HTTP server. Mounts MCP protocol endpoints, widget routes, and OAuth routes (if configured), then begins listening. The Inspector is mounted by `mcp-use dev`, or explicitly on a built server with `mcp-use start --with-inspector`. Resolves once the server is listening. During HMR reload (when the CLI manages the lifecycle) this is a no-op.
 
-Port resolution, in order of priority: the `port` argument, then the `--port` CLI argument, then the `PORT` environment variable, then the default `3000`. The host comes from `config.host` or the `HOST` environment variable (default `"localhost"`), and the base URL comes from `config.baseUrl` or `MCP_URL`, falling back to `http://${host}:${port}`.
+Address resolution is explicit value, environment variable, server configuration, then default: the `port` argument → `PORT` → `config.port` → `3000`; `options.host` → `HOST` → `config.host` → `127.0.0.1`. The CLI supplies explicit values only when its corresponding flag is present.
 
 **Parameters**
-><ParamField body="port" type="number | undefined" default="3000" >   Port to listen on. When omitted, falls back to the `--port` CLI arg, then `PORT`, then 3000. </ParamField>
+><ParamField body="port" type="number | undefined" default="3000" >Port to listen on. When omitted, falls back to `PORT`, `config.port`, then 3000.</ParamField>
+><ParamField body="options" type="ListenOptions" default="{}">Optional listener settings, including `host`. Host falls back to `HOST`, `config.host`, then `127.0.0.1`.</ParamField>
 
 **Returns**
-><ResponseField name="returns" type="Promise<void>" />
+><ResponseField name="returns" type="Promise<{ port: number; url: string }>" />
 
 **Example**
 ```ts wrap
 await server.listen(3000);
 // Server running at: http://localhost:3000
 // MCP endpoint:      http://localhost:3000/mcp
-// Inspector UI:      http://localhost:3000/mcp/inspector
 ```
 
 **Signature**
 ```ts wrap
-listen(port?: number): Promise<void>
+listen(port?: number, options?: ListenOptions): Promise<{ port: number; url: string }>
 ```
 
 ### proxy

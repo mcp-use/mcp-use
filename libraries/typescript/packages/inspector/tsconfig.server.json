@@ -1,11 +1,12 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "composite": false,
     "rootDir": "src",
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": false,
     "declaration": true,
-    "declarationMap": true,
+    "declarationMap": false,
     "noEmit": false,
     "outDir": "dist",
     "allowSyntheticDefaultImports": true

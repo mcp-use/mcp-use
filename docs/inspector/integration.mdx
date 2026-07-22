@@ -6,19 +6,15 @@ icon: "plug-2"
 
 {/* TODO: Add Inspector media when a screenshot or short clip would clarify the workflow. */}
 
-The Inspector is local development tooling. New `mcp-use` projects install it as a dev dependency, and `mcp-use dev` mounts it on the development listener at `/mcp/inspector`.
+The Inspector is built-in local development tooling. `mcp-use` installs its prebuilt package, and `mcp-use dev` mounts it on the development listener at `/mcp/inspector`.
 
 ## Auto-Mounting with mcp-use
 
-When using a generated `mcp-use` project, run `npm run dev`. The CLI resolves the project-pinned `@mcp-use/inspector`, serves its bundled UI locally, and opens `/mcp/inspector`. No CDN is involved, and production `server.listen()` / `mcp-use start` do not expose Inspector routes.
+When using a generated `mcp-use` project, run `npm run dev`. The CLI loads the Inspector supplied by `mcp-use`, serves its bundled UI locally, and opens `/mcp/inspector`. No extra dependency or CDN is involved. Production stays Inspector-free by default; use `mcp-use start --with-inspector` to mount it on the built server's existing listener.
 
 ### Example
 
-Generated projects already include the development dependency. Existing projects install it once:
-
-```bash
-npm install --save-dev @mcp-use/inspector
-```
+Generated and existing projects receive the Inspector through `mcp-use`. Add `@mcp-use/inspector` directly only when overriding the framework-supplied version or mounting it without `mcp-use`.
 
 ```typescript
 import { MCPServer } from "mcp-use/server";
@@ -36,12 +32,21 @@ export default server;
 
 Then run `mcp-use dev`; the Inspector is available at `http://localhost:3000/mcp/inspector`. Use `--no-inspector` for a headless development run.
 
+To inspect the production build locally, build once and opt in when starting it:
+
+```bash
+mcp-use build
+mcp-use start --with-inspector
+```
+
+This changes neither the build output nor its manifest. Treat a production Inspector as an internal tool: it can invoke MCP tools and proxy OAuth flows.
+
 ## Manual Integration
 
 For custom development servers, `mountInspector()` from `@mcp-use/inspector` provides the complete local Inspector: packaged UI, proxy, OAuth BFF, and callbacks. It can register on Hono/Express or return a framework-neutral Fetch handler.
 
 ```typescript
-import { mountInspector } from "@mcp-use/inspector/dev";
+import { mountInspector } from "@mcp-use/inspector";
 
 const inspect = mountInspector({
   basePath: "/mcp",

@@ -33,7 +33,6 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@mcp-use/inspector": "workspace:*",
     "@types/node": "^22.20.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",

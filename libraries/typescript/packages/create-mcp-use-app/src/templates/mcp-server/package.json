@@ -31,7 +31,6 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@mcp-use/inspector": "workspace:*",
     "@types/node": "^22.20.0",
     "typescript": "^7.0.2"
   }

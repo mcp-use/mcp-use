@@ -26,6 +26,7 @@ import {
   getEnvVarInstructions,
 } from "@/client/utils/mcpClientUtils";
 import { copyToClipboard } from "@/client/utils/browser";
+import { providerAssetUrl } from "@/client/utils/providerAssets";
 import { Check, ChevronDown, Copy, Plus } from "lucide-react";
 import { useState, isValidElement } from "react";
 import { VSCodeIcon } from "./ui/client-icons";
@@ -563,7 +564,7 @@ export function AddToClientDropdown({
               className={clientMenuItemClassName}
             >
               <img
-                src="https://inspector-cdn.mcp-use.com/providers/openai.png"
+                src={providerAssetUrl("openai.png")}
                 alt="Codex"
                 className="h-4 w-4"
               />

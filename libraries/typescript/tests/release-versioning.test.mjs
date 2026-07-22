@@ -157,17 +157,19 @@ test("produces the exact initial beta package versions", () => {
 });
 
 for (const scenario of [
+  // Inspector is now a regular framework dependency, so its patch release
+  // correctly propagates one patch to mcp-use without becoming a false major.
   {
     type: "patch",
     client: "2.0.1-beta.0",
-    server: "2.0.0",
+    server: "2.0.1-beta.0",
     inspector: "20.0.1-beta.0",
     inspectorClientPeer: "^2.0.0-alpha.0 || 2.0.1-beta.0",
   },
   {
     type: "minor",
     client: "2.1.0-beta.0",
-    server: "2.0.0",
+    server: "2.0.1-beta.0",
     inspector: "20.0.1-beta.0",
     inspectorClientPeer: "^2.0.0-alpha.0 || 2.1.0-beta.0",
   },
@@ -207,7 +209,7 @@ for (const scenario of [
           stdio: "ignore",
         });
         assert.equal(manifest(directory, "client").version, "2.1.0");
-        assert.equal(manifest(directory, "server").version, "2.0.0");
+        assert.equal(manifest(directory, "server").version, "2.0.1");
         assert.equal(manifest(directory, "inspector").version, "20.0.1");
         assert.equal(
           manifest(directory, "server").peerDependencies["@mcp-use/client"],

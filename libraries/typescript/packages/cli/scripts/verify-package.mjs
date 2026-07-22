@@ -1,0 +1,21 @@
+import { readdirSync } from "node:fs";
+import { join, relative } from "node:path";
+
+const root = new URL("../", import.meta.url).pathname;
+const files = walk(join(root, "dist"));
+
+if (!files.includes("dist/bin.js")) throw new Error("Missing dist/bin.js");
+if (files.some((file) => file.endsWith(".map"))) {
+  throw new Error("CLI package must not publish source maps");
+}
+
+function walk(directory) {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const absolute = join(directory, entry.name);
+    return entry.isDirectory()
+      ? walk(absolute)
+      : entry.isFile()
+        ? [relative(root, absolute)]
+        : [];
+  });
+}

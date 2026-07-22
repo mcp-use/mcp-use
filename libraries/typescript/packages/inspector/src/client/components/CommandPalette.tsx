@@ -23,6 +23,7 @@ import { useProximityHover } from "@/client/hooks/use-proximity-hover";
 import { spring } from "@/client/lib/springs";
 import { shapeMap } from "@/client/lib/shape-context";
 import { cn } from "@/client/lib/utils";
+import { providerAssetUrl } from "@/client/utils/providerAssets";
 import type { SavedRequest } from "./tools/SavedRequestsList";
 
 import {
@@ -576,7 +577,7 @@ export function CommandPalette({
             return (
               <div className="bg-green-500/20 rounded-full p-2 flex items-center justify-center shrink-0">
                 <img
-                  src="https://inspector-cdn.mcp-use.com/providers/openai.png"
+                  src={providerAssetUrl("openai.png")}
                   alt="Codex"
                   className="h-4 w-4"
                 />
