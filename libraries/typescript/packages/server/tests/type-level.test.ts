@@ -9,6 +9,8 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 import { z } from "zod";
 import type {
   Annotations as SdkAnnotations,
+  ClientCapabilities as SdkClientCapabilities,
+  Implementation as SdkImplementation,
   MetaObject as SdkMetaObject,
   Prompt as SdkPrompt,
   Resource as SdkResource,
@@ -33,12 +35,14 @@ import type {
   ProxyHttpConfig,
   ProxyServerConfig,
   ReadResourceResult,
+  RequestClientContext,
   ResourceDefinition,
   ResourceTemplateDefinition,
   ServerConfig,
   ToolAnnotations,
   ToolDefinition,
   ToolResult,
+  UserContext,
 } from "../src/index.js";
 import type { FileMetadata, UseFilesResult } from "../src/react/index.js";
 
@@ -135,6 +139,44 @@ describe("definition metadata types", () => {
       _meta: [],
     };
     expect([tool, resource, template]).toBeDefined();
+  });
+});
+
+describe("request client metadata types", () => {
+  it("uses the official SDK contracts for per-request metadata", () => {
+    expectTypeOf<
+      ReturnType<RequestClientContext["capabilities"]>
+    >().toEqualTypeOf<SdkClientCapabilities>();
+    expectTypeOf<ReturnType<RequestClientContext["info"]>>().toEqualTypeOf<
+      Partial<SdkImplementation>
+    >();
+    expectTypeOf<Parameters<RequestClientContext["can"]>>().toEqualTypeOf<
+      [capability: string]
+    >();
+    expectTypeOf<
+      ReturnType<RequestClientContext["can"]>
+    >().toEqualTypeOf<boolean>();
+    expectTypeOf<ReturnType<RequestClientContext["extension"]>>().toEqualTypeOf<
+      NonNullable<SdkClientCapabilities["extensions"]>[string] | undefined
+    >();
+    expectTypeOf<ReturnType<RequestClientContext["user"]>>().toEqualTypeOf<
+      UserContext | undefined
+    >();
+    expectTypeOf<UserContext>().toEqualTypeOf<{
+      locale?: string;
+      userAgent?: string;
+      location?: {
+        city?: string;
+        region?: string;
+        country?: string;
+        timezone?: string;
+        latitude?: string | number;
+        longitude?: string | number;
+      };
+      subject?: string;
+      conversationId?: string;
+      organizationId?: string;
+    }>();
   });
 });
 

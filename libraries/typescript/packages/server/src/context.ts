@@ -1,8 +1,11 @@
 import {
   CLIENT_CAPABILITIES_META_KEY,
+  CLIENT_INFO_META_KEY,
   inputRequired,
   inputResponse,
   type AuthInfo,
+  type ClientCapabilities,
+  type Implementation,
   type InputRequest,
   type InputRequiredResult,
   type RequestStateAccessor,
@@ -17,17 +20,130 @@ import type { OAuthExtra } from "./oauth/provider.js";
 import { supportsViews } from "./views/capabilities.js";
 
 /**
- * Per-request client capability queries.
+ * OpenAI-specific end-user hints declared in request metadata.
  *
- * Reads the modern per-request envelope only — never session state.
+ * All fields are optional, client-reported, and unverified. Use
+ * {@link OAuthAuth.user} for an authenticated identity.
+ */
+export interface UserContext {
+  /** Requested BCP 47 locale from `openai/locale` or legacy `webplus/i18n`. */
+  locale?: string;
+  /** Best-effort browser or host identifier from `openai/userAgent`. */
+  userAgent?: string;
+  /** Coarse end-user location from `openai/userLocation`. */
+  location?: {
+    /** City name, when supplied. */
+    city?: string;
+    /** Region or state name, when supplied. */
+    region?: string;
+    /** Country identifier, when supplied. */
+    country?: string;
+    /** IANA timezone identifier, when supplied. */
+    timezone?: string;
+    /** Approximate latitude; clients may encode coordinates as strings or numbers. */
+    latitude?: string | number;
+    /** Approximate longitude; clients may encode coordinates as strings or numbers. */
+    longitude?: string | number;
+  };
+  /** Client-reported subject hint from `openai/subject`. */
+  subject?: string;
+  /** Client-reported conversation hint from `openai/session`. */
+  conversationId?: string;
+  /** Client-reported organization hint from `openai/organization`. */
+  organizationId?: string;
+}
+
+/**
+ * Per-request client metadata and capability queries.
+ *
+ * Reads only the current request's metadata — never session state.
  */
 export interface RequestClientContext {
+  /**
+   * Checks whether this request declares a top-level client capability.
+   *
+   * @param capability - Capability name such as `sampling`, `elicitation`,
+   * `roots`, or `extensions`.
+   * @returns `true` when the current request advertises the capability.
+   *
+   * @example
+   * ```ts
+   * if (ctx.client.can("elicitation")) {
+   *   // Shape the result for an elicitation-capable client.
+   * }
+   * ```
+   */
+  can(capability: string): boolean;
+  /**
+   * Returns the capabilities declared by the client for this request.
+   *
+   * The returned object is a shallow copy. Requests without the modern
+   * metadata envelope return an empty object.
+   *
+   * @example
+   * ```ts
+   * const capabilities = ctx.client.capabilities();
+   * const supportsFormElicitation = capabilities.elicitation?.form !== undefined;
+   * ```
+   */
+  capabilities(): ClientCapabilities;
+  /**
+   * Returns one extension settings object declared for this request.
+   *
+   * @param id - Namespaced extension identifier, such as
+   * `io.modelcontextprotocol/ui`.
+   * @returns A shallow copy of the extension settings, or `undefined` when the
+   * current request does not advertise the extension.
+   *
+   * @example
+   * ```ts
+   * const ui = ctx.client.extension("io.modelcontextprotocol/ui");
+   * ```
+   */
+  extension(
+    id: string
+  ): NonNullable<ClientCapabilities["extensions"]>[string] | undefined;
+  /**
+   * Returns the client implementation metadata declared for this request.
+   *
+   * Valid modern requests include `name` and `version`. The partial return
+   * type preserves v1 ergonomics for legacy requests without an envelope.
+   * The returned object is a shallow copy.
+   *
+   * @example
+   * ```ts
+   * const { name, version } = ctx.client.info();
+   * ```
+   */
+  info(): Partial<Implementation>;
+  /**
+   * Returns normalized OpenAI-specific end-user hints for this request.
+   *
+   * The data comes from ordinary request `_meta`, not the MCP client-info
+   * envelope. It is client-reported and must not be used for authentication
+   * or authorization. Each call returns a fresh object, including a fresh
+   * location object. Requests without recognized metadata return `undefined`.
+   *
+   * @example
+   * ```ts
+   * const caller = ctx.client.user();
+   * const locale = caller?.locale ?? "en";
+   * ```
+   */
+  user(): UserContext | undefined;
   /**
    * Whether this request's client advertises MCP Apps / UI support.
    *
    * True when the client declares the `io.modelcontextprotocol/ui` extension
    * with `text/html;profile=mcp-app` in `mimeTypes`. Legacy (non-envelope)
    * requests always return `false`.
+   *
+   * @example
+   * ```ts
+   * if (ctx.client.supportsViews()) {
+   *   // Return a view-optimized result.
+   * }
+   * ```
    */
   supportsViews(): boolean;
 }
@@ -180,17 +296,119 @@ function requireOAuthAuthInfo<TUser>(
   }
 }
 
-function toClientContext(ctx: ServerContext): RequestClientContext {
-  const envelopeCaps = (
-    ctx.mcpReq.envelope as
-      | {
-          [CLIENT_CAPABILITIES_META_KEY]?: Parameters<typeof supportsViews>[0];
-        }
-      | undefined
-  )?.[CLIENT_CAPABILITIES_META_KEY];
+function stringValue(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function coordinateValue(value: unknown): string | number | undefined {
+  if (typeof value === "string") return value;
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : undefined;
+}
+
+function normalizeUserContext(
+  meta: ServerContext["mcpReq"]["_meta"]
+): UserContext | undefined {
+  if (meta === undefined) return undefined;
+
+  const locale =
+    stringValue(meta["openai/locale"]) ?? stringValue(meta["webplus/i18n"]);
+  const userAgent = stringValue(meta["openai/userAgent"]);
+  const subject = stringValue(meta["openai/subject"]);
+  const conversationId = stringValue(meta["openai/session"]);
+  const organizationId = stringValue(meta["openai/organization"]);
+  const rawLocation = meta["openai/userLocation"];
+  let location: UserContext["location"];
+  if (
+    typeof rawLocation === "object" &&
+    rawLocation !== null &&
+    !Array.isArray(rawLocation)
+  ) {
+    const values = rawLocation as Record<string, unknown>;
+    const normalized = {
+      city: stringValue(values.city),
+      region: stringValue(values.region),
+      country: stringValue(values.country),
+      timezone: stringValue(values.timezone),
+      latitude: coordinateValue(values.latitude),
+      longitude: coordinateValue(values.longitude),
+    };
+    const entries = Object.entries(normalized).filter(
+      (entry): entry is [keyof typeof normalized, string | number] =>
+        entry[1] !== undefined
+    );
+    if (entries.length > 0) {
+      location = Object.fromEntries(entries) as UserContext["location"];
+    }
+  }
+
+  if (
+    locale === undefined &&
+    userAgent === undefined &&
+    location === undefined &&
+    subject === undefined &&
+    conversationId === undefined &&
+    organizationId === undefined
+  ) {
+    return undefined;
+  }
+
   return {
+    ...(locale !== undefined && { locale }),
+    ...(userAgent !== undefined && { userAgent }),
+    ...(location !== undefined && { location }),
+    ...(subject !== undefined && { subject }),
+    ...(conversationId !== undefined && { conversationId }),
+    ...(organizationId !== undefined && { organizationId }),
+  };
+}
+
+function toClientContext(ctx: ServerContext): RequestClientContext {
+  // SDK beta.5 currently emits RequestMetaEnvelope as `{}` even though the
+  // validated runtime envelope carries these required modern fields. Keep the
+  // declaration workaround contained at this projection boundary.
+  const envelope = ctx.mcpReq.envelope as
+    | {
+        [CLIENT_CAPABILITIES_META_KEY]?: ClientCapabilities;
+        [CLIENT_INFO_META_KEY]?: Implementation;
+      }
+    | undefined;
+  const capabilities: ClientCapabilities = {
+    ...(envelope?.[CLIENT_CAPABILITIES_META_KEY] ?? {}),
+  };
+  const info: Partial<Implementation> = {
+    ...(envelope?.[CLIENT_INFO_META_KEY] ?? {}),
+  };
+  const user = normalizeUserContext(ctx.mcpReq._meta);
+  return {
+    can(capability: string): boolean {
+      return Object.hasOwn(capabilities, capability);
+    },
+    capabilities(): ClientCapabilities {
+      return { ...capabilities };
+    },
+    extension(
+      id: string
+    ): NonNullable<ClientCapabilities["extensions"]>[string] | undefined {
+      const settings = capabilities.extensions?.[id];
+      return settings === undefined ? undefined : { ...settings };
+    },
+    info(): Partial<Implementation> {
+      return { ...info };
+    },
+    user(): UserContext | undefined {
+      return user === undefined
+        ? undefined
+        : {
+            ...user,
+            ...(user.location !== undefined && {
+              location: { ...user.location },
+            }),
+          };
+    },
     supportsViews(): boolean {
-      return supportsViews(envelopeCaps);
+      return supportsViews(capabilities);
     },
   };
 }

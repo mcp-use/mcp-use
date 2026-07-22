@@ -104,7 +104,6 @@ Add `idempotentHint` when retry behavior matters. Set it to `true` only when rep
 Prefer raw MCP `CallToolResult` shapes. Deprecated [response helpers](/typescript/server/response-helpers) still work for upgrades, but new code should return the wire envelopes directly.
 
 ```typescript
-
 export const reserveInventory = server.tool(
   {
     name: "reserve_inventory",
@@ -144,13 +143,13 @@ export const reserveInventory = server.tool(
 
 Use:
 
-| Use case | Return |
-| --- | --- |
-| Human-readable output | `{ content: [{ type: "text", text }] }` |
-| Structured JSON | `{ content: [{ type: "text", text: JSON.stringify(data) }], structuredContent: data }` |
-| Error | `{ isError: true, content: [{ type: "text", text: message }] }` |
-| Multiple content blocks | `{ content: [/* ContentBlock… */] }` |
-| View-bound tool | `view: { name }` + `{ content, structuredContent }` |
+| Use case                | Return                                                                                 |
+| ----------------------- | -------------------------------------------------------------------------------------- |
+| Human-readable output   | `{ content: [{ type: "text", text }] }`                                                |
+| Structured JSON         | `{ content: [{ type: "text", text: JSON.stringify(data) }], structuredContent: data }` |
+| Error                   | `{ isError: true, content: [{ type: "text", text: message }] }`                        |
+| Multiple content blocks | `{ content: [/* ContentBlock… */] }`                                                   |
+| View-bound tool         | `view: { name }` + `{ content, structuredContent }`                                    |
 
 See [Response Helpers](/typescript/server/response-helpers) for the deprecated-helper migration table and [Response helpers API reference](/typescript/api-reference/server/response-helpers) for signatures.
 
@@ -202,7 +201,7 @@ The model sees `content`. The view reads `structuredContent` via `useToolContext
 
 ## Use `ctx` for request-aware tools
 
-The second callback argument, usually named `ctx`, exposes per-call capabilities such as authentication, client capability checks, sampling, elicitation, progress, notifications, and logging.
+The second callback argument, usually named `ctx`, exposes per-call authentication, request-scoped client metadata and capability checks, elicitation, progress, and logging.
 
 ```typescript
 export const privateProfile = server.tool(
@@ -235,7 +234,7 @@ export const privateProfile = server.tool(
 );
 ```
 
-Use `ctx.auth` only for verified identity from server authentication. If you need client-reported caller metadata from `ctx.client.user()`, treat it as unverified and never use it for access control.
+Use `ctx.auth` only for verified identity from server authentication. Values returned by `ctx.client.info()`, `ctx.client.capabilities()`, `ctx.client.extension()`, and `ctx.client.user()` are self-reported by the client for the current request. `user()` normalizes optional OpenAI-specific `_meta` hints; even its subject, conversation, and organization identifiers are unverified and must never be used for access control.
 
 See the [Tool context API reference](/typescript/api-reference/server/tool-context) for every `ctx` method, field, capability check, log level, and return type.
 
@@ -290,16 +289,30 @@ Then open `http://localhost:3000/mcp/inspector`, select the tool, enter test arg
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Tools API reference" icon="terminal" href="/typescript/api-reference/server/tools">
-    Look up tool definitions, callback signatures, inferred types, and return shapes.
+  <Card
+    title="Tools API reference"
+    icon="terminal"
+    href="/typescript/api-reference/server/tools"
+  >
+    Look up tool definitions, callback signatures, inferred types, and return
+    shapes.
   </Card>
-  <Card title="Response Helpers" icon="drill" href="/typescript/server/response-helpers">
-    Choose the right helper for text, JSON, errors, resources, media, and widgets.
+  <Card
+    title="Response Helpers"
+    icon="drill"
+    href="/typescript/server/response-helpers"
+  >
+    Choose the right helper for text, JSON, errors, resources, media, and
+    widgets.
   </Card>
   <Card title="MCP Apps" icon="blocks" href="/typescript/mcp-apps">
     Return interactive widgets from tool results.
   </Card>
-  <Card title="Authentication" icon="shield-check" href="/typescript/server/authentication/index">
+  <Card
+    title="Authentication"
+    icon="shield-check"
+    href="/typescript/server/authentication/index"
+  >
     Add verified user identity to protected tools.
   </Card>
 </CardGroup>
