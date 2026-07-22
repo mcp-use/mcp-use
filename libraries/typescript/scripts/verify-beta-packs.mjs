@@ -113,14 +113,13 @@ function verifyCliPack(packed, manifest, files) {
     if (manifest.peerDependenciesMeta?.[dependency]?.optional !== true)
       throw new Error(`@mcp-use/cli peer ${dependency} must be optional`);
   }
-  // The CLI bundles Vite and Tailwind's JavaScript build pipeline. Native
-  // platform bindings remain normal runtime dependencies instead of tarball
-  // contents, so this budget covers only portable CLI code.
-  if (packedBytes > 700_000)
+  // The Vite/Tailwind pipeline is a CLI runtime dependency, keeping its
+  // package-relative native bindings intact and generated app tarballs small.
+  if (packedBytes > 100_000)
     throw new Error(`CLI packed budget exceeded: ${packedBytes} bytes`);
-  if (unpackedBytes > 2_100_000)
+  if (unpackedBytes > 250_000)
     throw new Error(`CLI unpacked budget exceeded: ${unpackedBytes} bytes`);
-  if (files.size > 50)
+  if (files.size > 40)
     throw new Error(`CLI file budget exceeded: ${files.size} files`);
 }
 

@@ -28,17 +28,16 @@ export default defineConfig({
   sourcemap: false,
   minify: true,
   dts: false,
-  // Keep only actual optional integrations external. The Vite/Tailwind build
-  // pipeline is bundled so generated projects need no build-tool dependencies.
+  // The build pipeline is installed with the CLI, not with generated apps.
+  // Preserve its package-relative runtime lookups rather than rebundling it.
   external: [
     "@mcp-use/client",
     "@mcp-use/inspector",
     "@modelcontextprotocol/server",
-    // These packages select a platform-native binary at runtime. npm installs
-    // only the matching optional binary for the host platform.
-    "@tailwindcss/oxide",
-    "lightningcss",
-    "rolldown",
+    "@tailwindcss/vite",
+    "@vitejs/plugin-react",
+    "tailwindcss",
+    "vite",
   ],
   define: {
     __MCP_USE_PACKAGE_VERSION__: JSON.stringify(framework.version),
