@@ -66,7 +66,7 @@ export default defineConfig({
       },
     },
     // Mirror MANUFACT_CHAT_URL / VITE_MANUFACT_CHAT_URL into window for parity
-    // with the CDN shell (cli.ts injects the same flag at runtime).
+    // with the packaged Inspector shell (cli.ts injects the same flag at runtime).
     {
       name: "inject-manufact-chat-url",
       transformIndexHtml() {

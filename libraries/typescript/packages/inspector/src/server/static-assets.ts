@@ -12,28 +12,28 @@ const CONTENT_TYPES: Record<string, string> = {
   ".webmanifest": "application/manifest+json",
 };
 
-export function resolveDistCdnDir(): string {
+export function resolveInspectorAppDir(): string {
   const here = path.dirname(fileURLToPath(import.meta.url));
   for (const dir of [
-    path.resolve(here, "cdn"), // dist/cli.js (bundled)
-    path.resolve(here, "../cdn"), // dist/server/*.js
-    path.resolve(here, "../../dist/cdn"), // src/server/*.ts (workspace dev)
+    path.resolve(here, "app"), // dist/cli.js (bundled)
+    path.resolve(here, "../app"), // dist/server/*.js
+    path.resolve(here, "../../dist/app"), // src/server/*.ts (workspace dev)
   ]) {
     if (existsSync(path.join(dir, "inspector.js"))) {
       return dir;
     }
   }
   throw new Error(
-    "Inspector bundle not found (expected dist/cdn/inspector.js)"
+    "Inspector bundle not found (expected dist/app/inspector.js)"
   );
 }
 
-/** Serve this package's `dist/cdn` files at a root-relative mount path. */
+/** Serve this package's installed browser bundle at a root-relative path. */
 export function registerInspectorStaticAssets(
   app: Hono,
-  mountPath: string = "/dist/cdn"
+  mountPath: string = "/inspector/assets"
 ) {
-  const cdnDir = resolveDistCdnDir();
+  const appDir = resolveInspectorAppDir();
 
   app.get(`${mountPath}/*`, (c) => {
     const subPath = c.req.path.slice(mountPath.length);
@@ -41,8 +41,8 @@ export function registerInspectorStaticAssets(
     if (!relative || relative.includes("..")) {
       return c.notFound();
     }
-    const file = path.resolve(cdnDir, relative);
-    const root = cdnDir.endsWith(path.sep) ? cdnDir : `${cdnDir}${path.sep}`;
+    const file = path.resolve(appDir, relative);
+    const root = appDir.endsWith(path.sep) ? appDir : `${appDir}${path.sep}`;
     if (!file.startsWith(root) || !existsSync(file)) {
       return c.notFound();
     }

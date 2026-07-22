@@ -1,23 +1,18 @@
 import type { Context, Hono } from "hono";
 import {
-  resolveInspectorAssetUrls,
-  type InspectorAssetSource,
+  resolveInspectorBundleAssetUrls,
   type InspectorMode,
-} from "./asset-urls.js";
+} from "./bundle-assets.js";
 import { renderInspectorFaviconLinks } from "./favicon-links.js";
 import { registerInspectorFaviconStatic } from "./favicon-static.js";
 import { registerInspectorStaticAssets } from "./static-assets.js";
 import { getInspectorVersion } from "./version.js";
 
 const INSPECTOR_VERSION = getInspectorVersion();
-const INSPECTOR_VERSION_RESOLVER_URL =
-  "https://data.jsdelivr.com/v1/packages/npm/@mcp-use/inspector/resolved?specifier=beta";
-const INSPECTOR_CDN_PACKAGE_URL =
-  "https://cdn.jsdelivr.net/npm/@mcp-use/inspector";
 
-export type { InspectorMode } from "./asset-urls.js";
+export type { InspectorMode } from "./bundle-assets.js";
 
-export type CdnShellConfig = {
+export type InspectorShellConfig = {
   basePath?: string;
   devMode?: boolean;
   sandboxOrigin?: string | null;
@@ -26,10 +21,8 @@ export type CdnShellConfig = {
   inspectorMode?: InspectorMode;
   manufactChatUrl?: string | null;
   disableTelemetry?: boolean;
-  /** Force assets from this installed package, ignoring CDN env overrides. */
-  assetSource?: InspectorAssetSource;
-  /** Root-relative URL where local package assets are mounted. */
-  localAssetsPath?: string;
+  /** Root-relative URL where the installed package's browser bundle is mounted. */
+  assetsPath?: string;
   /** Root-relative prefix for locally served favicon files. */
   faviconBasePath?: string;
   /** Preserve the standalone CLI's `/` to `/inspector` redirect (default true). */
@@ -42,58 +35,10 @@ const OAUTH_POPUP_CLOSED_HTML = `<!doctype html>
 <script>try{if(window.opener&&!window.opener.closed)window.opener.postMessage({type:"manufact:oauth-complete"},"*")}catch(e){}try{window.close()}catch(e){}</script>
 </body></html>`;
 
-function renderDefaultInspectorAssetLoader(): string {
-  return `<script type="module">
-      const resolverUrl = ${JSON.stringify(INSPECTOR_VERSION_RESOLVER_URL)};
-      const packageUrl = ${JSON.stringify(INSPECTOR_CDN_PACKAGE_URL)};
-      const versionPattern = /^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$/;
-
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10_000);
-        let response;
-        try {
-          response = await fetch(resolverUrl, { signal: controller.signal });
-        } finally {
-          clearTimeout(timeout);
-        }
-        if (!response.ok) {
-          throw new Error(\`Inspector version resolver returned HTTP \${response.status}\`);
-        }
-
-        const resolved = await response.json();
-        if (
-          resolved?.name !== "@mcp-use/inspector" ||
-          typeof resolved.version !== "string" ||
-          !versionPattern.test(resolved.version)
-        ) {
-          throw new Error("Inspector version resolver returned an invalid release");
-        }
-
-        const version = resolved.version;
-        const assetBase = \`\${packageUrl}@\${version}/dist/cdn\`;
-        const stylesheet = document.createElement("link");
-        stylesheet.rel = "stylesheet";
-        stylesheet.href = \`\${assetBase}/inspector.css\`;
-        document.head.append(stylesheet);
-
-        window.__INSPECTOR_VERSION__ = version;
-        await import(\`\${assetBase}/inspector.js\`);
-      } catch (error) {
-        console.error("[Inspector] Failed to load the latest Inspector release:", error);
-        document.querySelector(".mcp-boot-spinner")?.remove();
-        const label = document.querySelector(".mcp-boot-label");
-        if (label) {
-          label.textContent = "Unable to load Inspector. Reload to try again.";
-        }
-      }
-    </script>`;
-}
-
-function generateCdnShellHtml(
-  config: CdnShellConfig | undefined,
+function generateInspectorShellHtml(
+  config: InspectorShellConfig | undefined,
   basePath: string,
-  assets: { jsUrl: string; cssUrl: string; resolveLatest: boolean }
+  assets: { jsUrl: string; cssUrl: string }
 ): string {
   const scripts: string[] = [];
   if (config?.basePath !== undefined) {
@@ -130,16 +75,6 @@ function generateCdnShellHtml(
     );
   }
   const runtimeScripts = scripts.join("\n    ");
-  const assetPreconnects = assets.resolveLatest
-    ? `    <link rel="preconnect" href="https://data.jsdelivr.com" crossorigin />
-    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />`
-    : "";
-  const stylesheetTag = assets.resolveLatest
-    ? ""
-    : `    <link rel="stylesheet" href="${assets.cssUrl}" />`;
-  const assetLoader = assets.resolveLatest
-    ? renderDefaultInspectorAssetLoader()
-    : `<script type="module" src="${assets.jsUrl}"></script>`;
 
   return `<!doctype html>
 <html lang="en">
@@ -149,9 +84,8 @@ function generateCdnShellHtml(
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-${assetPreconnects}
     <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&display=swap" rel="stylesheet" />
-${stylesheetTag}
+    <link rel="stylesheet" href="${assets.cssUrl}" />
     <title>Inspector | mcp-use</title>
     <meta name="description" content="Free, open-source MCP Inspector by mcp-use. Connect to any MCP server, test tools, prompts, and resources, inspect RPC logs, and debug MCP apps — all in your browser." />
     <style>
@@ -231,7 +165,7 @@ ${stylesheetTag}
         </div>
       </div>
     </div>
-    ${assetLoader}
+    <script type="module" src="${assets.jsUrl}"></script>
   </body>
 </html>`;
 }
@@ -239,19 +173,15 @@ ${stylesheetTag}
 /**
  * Serve the inspector UI at `${basePath}/inspector`.
  */
-export function registerInspectorCdnShell(
+export function registerInspectorShell(
   app: Hono,
-  config?: CdnShellConfig,
+  config?: InspectorShellConfig,
   basePath: string = ""
 ) {
-  const assets = resolveInspectorAssetUrls(
-    config?.inspectorMode,
-    basePath,
-    config?.assetSource,
-    config?.localAssetsPath
-  );
+  const assetsPath = config?.assetsPath ?? `${basePath}/inspector/assets`;
+  const assets = resolveInspectorBundleAssetUrls(assetsPath);
   const p = (suffix: string) => `${basePath}${suffix}`;
-  const effectiveConfig: CdnShellConfig = {
+  const effectiveConfig: InspectorShellConfig = {
     ...config,
     basePath: config?.basePath ?? basePath,
     proxyUrl:
@@ -264,25 +194,16 @@ export function registerInspectorCdnShell(
   };
 
   const serveShell = (c: Context) => {
-    const assets = resolveInspectorAssetUrls(
-      config?.inspectorMode,
-      basePath,
-      config?.assetSource,
-      config?.localAssetsPath
+    return c.html(
+      generateInspectorShellHtml(effectiveConfig, basePath, assets)
     );
-    return c.html(generateCdnShellHtml(effectiveConfig, basePath, assets));
   };
 
   registerInspectorFaviconStatic(app, config?.faviconBasePath ?? basePath);
 
   // Scoped local assets must be registered before the Inspector SPA fallback,
   // otherwise `/inspector/assets/*` would be answered with the HTML shell.
-  if (assets.useLocal) {
-    registerInspectorStaticAssets(
-      app,
-      config?.localAssetsPath ?? `${basePath}/dist/cdn`
-    );
-  }
+  registerInspectorStaticAssets(app, assetsPath);
 
   app.get(p("/inspector/oauth-popup-closed.html"), (c) =>
     c.html(OAUTH_POPUP_CLOSED_HTML)

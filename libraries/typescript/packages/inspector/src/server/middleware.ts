@@ -1,7 +1,7 @@
 import type { Express, NextFunction, Request, Response } from "express";
 import { Hono } from "hono";
 import { Readable } from "node:stream";
-import { registerInspectorCdnShell } from "./cdn-shell.js";
+import { registerInspectorShell } from "./inspector-shell.js";
 import {
   registerInspectorProxyRoutes,
   type InspectorProxyRoutesConfig,
@@ -141,14 +141,13 @@ function registerInspectorRoutes(
 
   registerInspectorProxyRoutes(app, routesConfig, basePath);
   const scopedAssetsPath = `${basePath}/inspector/assets`;
-  registerInspectorCdnShell(
+  registerInspectorShell(
     app,
     {
       devMode: options?.devMode ?? true,
       sandboxOrigin: options?.sandboxOrigin,
       inspectorMode: "standalone",
-      assetSource: "local",
-      localAssetsPath: scopedAssetsPath,
+      assetsPath: scopedAssetsPath,
       faviconBasePath: scopedAssetsPath,
       rootRedirect: false,
       basePath,

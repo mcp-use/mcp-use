@@ -1,7 +1,7 @@
 /** Bust Chrome's aggressive favicon cache when the asset changes. */
 export const FAVICON_CACHE_VERSION = "4";
 
-/** Static favicon assets copied to CDN / public alongside the inspector bundle. */
+/** Static favicon assets copied alongside the Inspector browser bundle. */
 export const INSPECTOR_FAVICON_ASSETS = [
   "favicon.svg",
   "favicon-96x96.png",
@@ -18,7 +18,7 @@ export const INSPECTOR_FAVICON_ASSETS = [
  * Render `<link>` tags for inspector favicons.
  *
  * Uses same-origin `favicon-black.svg` (light icon in all color schemes).
- * Do not point at inspector-cdn — production CDN still ships a dark-mode SVG.
+ * Keep favicon URLs on the same package-local asset route as the application.
  */
 export function renderInspectorFaviconLinks(basePath = ""): string {
   const prefix = basePath.replace(/\/$/, "");

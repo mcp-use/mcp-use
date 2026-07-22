@@ -14,8 +14,3 @@ export {
   registerInspectorProxyRoutes,
   type InspectorProxyRoutesConfig,
 } from "./proxy-routes.js";
-export {
-  registerInspectorCdnShell,
-  type CdnShellConfig,
-  type InspectorMode,
-} from "./cdn-shell.js";

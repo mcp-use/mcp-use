@@ -14,8 +14,9 @@ const CONTENT_TYPES: Record<string, string> = {
 function resolveFaviconDir(): string {
   const here = path.dirname(fileURLToPath(import.meta.url));
   for (const dir of [
-    path.resolve(here, "cdn"), // dist/cli.js (bundled)
-    path.resolve(here, "../cdn"), // dist/server/*.js
+    path.resolve(here, "app"), // dist/cli.js (bundled)
+    path.resolve(here, "../app"), // dist/server/*.js
+    path.resolve(here, "../../dist/app"), // src/server/*.ts (workspace build)
     path.resolve(here, "../../public"), // src/server/*.ts (dev)
   ]) {
     if (existsSync(path.join(dir, "favicon-black.svg"))) {
@@ -23,11 +24,11 @@ function resolveFaviconDir(): string {
     }
   }
   throw new Error(
-    "Inspector favicon assets not found (expected dist/cdn or public/)"
+    "Inspector favicon assets not found (expected dist/app or public/)"
   );
 }
 
-/** Serve favicon assets from the local package (not inspector-cdn). */
+/** Serve favicon assets from the installed package. */
 export function registerInspectorFaviconStatic(
   app: Hono,
   basePath: string = ""

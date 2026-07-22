@@ -9,11 +9,11 @@ Enable MCP view JS code splitting and polish inspector boot UX.
 **mcp-use**
 
 - Enable rolldown code splitting for per-view client builds (`chunkFileNames` alongside the entry chunk); update `VIEWS_SPEC.md` for external assets and split chunks.
-- Paint a centered boot spinner in the managed inspector shell while the CDN bundle downloads.
+- Paint a centered boot spinner in the managed Inspector shell while the application bundle loads.
 
 **@mcp-use/inspector**
 
-- Match the boot spinner placeholder in the CDN inspector shell.
+- Match the boot spinner placeholder in the packaged Inspector shell.
 - Add top margin to tool error banners in the result panel.
 
 **create-mcp-use-app**

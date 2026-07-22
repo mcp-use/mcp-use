@@ -1,4 +1,4 @@
-/** Window field injected by `mcp-use dev` via the inspector CDN shell. */
+/** Window field injected by `mcp-use dev` via the Inspector shell. */
 interface DevCliWindow extends Window {
   __MCP_DEV_CLI__?: boolean;
 }

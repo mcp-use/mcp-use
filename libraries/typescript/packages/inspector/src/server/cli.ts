@@ -5,7 +5,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import open from "open";
-import { registerInspectorCdnShell, type InspectorMode } from "./cdn-shell.js";
+import { registerInspectorShell } from "./inspector-shell.js";
 import { registerInspectorProxyRoutes } from "./proxy-routes.js";
 import { findAvailablePort, isValidUrl } from "./utils.js";
 import { getInspectorVersion } from "./version.js";
@@ -86,18 +86,14 @@ app.use(
 );
 app.use("/inspector/api/proxy/*", logger());
 
-const inspectorMode: InspectorMode =
-  (process.env.MCP_INSPECTOR_MODE as InspectorMode | undefined) ??
-  (process.env.RAILWAY_ENVIRONMENT_NAME ? "cloud" : "standalone");
-
 registerInspectorProxyRoutes(app, {
   autoConnectUrl: mcpUrl,
   oauthProxyAllowedOrigins: [],
-  oauthProxyAllowLoopback: inspectorMode === "standalone",
+  oauthProxyAllowLoopback: true,
 });
 
-registerInspectorCdnShell(app, {
-  inspectorMode,
+registerInspectorShell(app, {
+  inspectorMode: "standalone",
   manufactChatUrl: process.env.MANUFACT_CHAT_URL,
 });
 

@@ -1,18 +1,10 @@
 import express from "express";
 import { Hono } from "hono";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { mountInspector } from "../../src/server/index.js";
-
-afterEach(() => {
-  vi.unstubAllEnvs();
-});
 
 describe("mountInspector", () => {
   it("returns a Fetch handler with a fully local, prefix-scoped Inspector", async () => {
-    vi.stubEnv(
-      "MCP_USE_INSPECTOR_ASSETS_URL",
-      "https://cdn.example.test/inspector.js"
-    );
     const inspector = mountInspector({
       basePath: "//tools//mcp/",
       autoConnectUrl: "http://localhost:3000/tools/mcp",
@@ -34,8 +26,6 @@ describe("mountInspector", () => {
       'window.__MCP_PROXY_URL__ = "/tools/mcp/inspector/api/proxy"'
     );
     expect(html).toContain("window.__MCP_DEV_MODE__ = true");
-    expect(html).not.toContain("cdn.example.test");
-    expect(html).not.toContain("cdn.jsdelivr.net");
 
     const config = await inspector(
       new Request("http://localhost/tools/mcp/inspector/config.json")
@@ -76,7 +66,7 @@ describe("mountInspector", () => {
     for (const pathname of [
       "/tools/mcp",
       "/tools/mcp/favicon-black.svg",
-      "/tools/mcp/dist/cdn/inspector.js",
+      "/tools/mcp/dist/app/inspector.js",
       "/unrelated",
     ]) {
       const response = await inspector(
