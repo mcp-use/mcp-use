@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 20.0.0-beta.18
+
+### Patch Changes
+
+- c1c6c2b: Publish the optimized standalone Inspector and CLI packaging: ordinary mcp-use installs avoid the Inspector UI dependency graph, while Inspector, client tooling, and production opt-ins remain available on demand.
+- Updated dependencies [c1c6c2b]
+  - mcp-use@2.0.0-beta.26
+
 ## 20.0.0-beta.17
 
 ### Patch Changes
