@@ -56,8 +56,9 @@
     "test:run": "vitest run"
   },
   "dependencies": {
-    "@modelcontextprotocol/client": "https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee",
-    "@modelcontextprotocol/ext-apps": "https://pkg.pr.new/@modelcontextprotocol/ext-apps@432d42bb02a569078ab31ab6458428df6027809d"
+    "@modelcontextprotocol/client": "2.0.0-beta.5",
+    "@modelcontextprotocol/core": "2.0.0-beta.5",
+    "@modelcontextprotocol/ext-apps": "npm:@mcp-use/ext-apps@1.7.4-pr720.0"
   },
   "peerDependencies": {
     "@e2b/code-interpreter": "^2.6.1",

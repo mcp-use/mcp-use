@@ -301,6 +301,11 @@ describe("MCPServer (phase 1, e2e over HTTP)", () => {
     });
     expect(result._meta).toEqual({
       "example.com/result": { scope: "tool-call" },
+      "io.modelcontextprotocol/serverInfo": {
+        name: "phase1-test",
+        title: "Phase 1 Test Server",
+        version: "1.0.0",
+      },
     });
     expect(result._meta).not.toHaveProperty("example.com/tool");
   });

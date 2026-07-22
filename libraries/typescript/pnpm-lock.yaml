@@ -6,6 +6,7 @@ settings:
 
 overrides:
   mcp-use: workspace:*
+  '@mcp-use/client': workspace:*
   '@mcp-use/inspector': workspace:*
   create-mcp-use-app: workspace:*
   '@langchain/core': ^1.1.8
@@ -146,8 +147,8 @@ importers:
         specifier: workspace:*
         version: link:../client
       '@modelcontextprotocol/client':
-        specifier: 2.0.0-beta.3
-        version: 2.0.0-beta.3
+        specifier: 2.0.0-beta.5
+        version: 2.0.0-beta.5
       chalk:
         specifier: 4.1.2
         version: 4.1.2
@@ -193,8 +194,8 @@ importers:
   packages/cli:
     dependencies:
       '@mcp-use/client':
-        specifier: ^2.0.0-alpha.0
-        version: 2.0.0-beta.11(@e2b/code-interpreter@2.6.1)(@modelcontextprotocol/core@2.0.0-beta.4)(@modelcontextprotocol/server@https://pkg.pr.new/@modelcontextprotocol/server@f60b40179b0f090f6d64248be1312245a160b5ee)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.4.3)
+        specifier: workspace:*
+        version: link:../client
       '@mcp-use/inspector':
         specifier: workspace:*
         version: link:../inspector
@@ -212,8 +213,8 @@ importers:
         version: 8.0.16(@types/node@25.6.0)(esbuild@0.27.1)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.3)
     devDependencies:
       '@modelcontextprotocol/server':
-        specifier: https://pkg.pr.new/@modelcontextprotocol/server@f60b40179b0f090f6d64248be1312245a160b5ee
-        version: https://pkg.pr.new/@modelcontextprotocol/server@f60b40179b0f090f6d64248be1312245a160b5ee
+        specifier: 2.0.0-beta.5
+        version: 2.0.0-beta.5
       rimraf:
         specifier: ^6.1.3
         version: 6.1.3
@@ -227,11 +228,14 @@ importers:
   packages/client:
     dependencies:
       '@modelcontextprotocol/client':
-        specifier: https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee
-        version: https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee
+        specifier: 2.0.0-beta.5
+        version: 2.0.0-beta.5
+      '@modelcontextprotocol/core':
+        specifier: 2.0.0-beta.5
+        version: 2.0.0-beta.5
       '@modelcontextprotocol/ext-apps':
-        specifier: https://pkg.pr.new/@modelcontextprotocol/ext-apps@432d42bb02a569078ab31ab6458428df6027809d
-        version: https://pkg.pr.new/@modelcontextprotocol/ext-apps@432d42bb02a569078ab31ab6458428df6027809d(@modelcontextprotocol/client@https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee)(@modelcontextprotocol/core@2.0.0-beta.4)(@modelcontextprotocol/server@2.0.0-beta.4)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.4.3)
+        specifier: npm:@mcp-use/ext-apps@1.7.4-pr720.0
+        version: '@mcp-use/ext-apps@1.7.4-pr720.0(@modelcontextprotocol/client@2.0.0-beta.5)(@modelcontextprotocol/core@2.0.0-beta.5)(@modelcontextprotocol/server@2.0.0-beta.5)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.4.3)'
     devDependencies:
       '@e2b/code-interpreter':
         specifier: ^2.6.1
@@ -504,17 +508,17 @@ importers:
         specifier: workspace:*
         version: link:../inspector
       '@modelcontextprotocol/client':
-        specifier: https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee
-        version: https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee
+        specifier: 2.0.0-beta.5
+        version: 2.0.0-beta.5
       '@modelcontextprotocol/core':
-        specifier: https://pkg.pr.new/@modelcontextprotocol/core@f60b40179b0f090f6d64248be1312245a160b5ee
-        version: https://pkg.pr.new/@modelcontextprotocol/core@f60b40179b0f090f6d64248be1312245a160b5ee
+        specifier: 2.0.0-beta.5
+        version: 2.0.0-beta.5
       '@modelcontextprotocol/ext-apps':
-        specifier: https://pkg.pr.new/@modelcontextprotocol/ext-apps@432d42bb02a569078ab31ab6458428df6027809d
-        version: https://pkg.pr.new/@modelcontextprotocol/ext-apps@432d42bb02a569078ab31ab6458428df6027809d(@modelcontextprotocol/client@https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee)(@modelcontextprotocol/core@https://pkg.pr.new/@modelcontextprotocol/core@f60b40179b0f090f6d64248be1312245a160b5ee)(@modelcontextprotocol/server@https://pkg.pr.new/@modelcontextprotocol/server@f60b40179b0f090f6d64248be1312245a160b5ee)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.4.3)
+        specifier: npm:@mcp-use/ext-apps@1.7.4-pr720.0
+        version: '@mcp-use/ext-apps@1.7.4-pr720.0(@modelcontextprotocol/client@2.0.0-beta.5)(@modelcontextprotocol/core@2.0.0-beta.5)(@modelcontextprotocol/server@2.0.0-beta.5)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.4.3)'
       '@modelcontextprotocol/server':
-        specifier: https://pkg.pr.new/@modelcontextprotocol/server@f60b40179b0f090f6d64248be1312245a160b5ee
-        version: https://pkg.pr.new/@modelcontextprotocol/server@f60b40179b0f090f6d64248be1312245a160b5ee
+        specifier: 2.0.0-beta.5
+        version: 2.0.0-beta.5
       hono:
         specifier: '>=4.12.27'
         version: 4.12.27
@@ -2129,18 +2133,24 @@ packages:
   '@manypkg/get-packages@1.1.3':
     resolution: {integrity: sha512-fo+QhuU3qE/2TQMQmbVMqaQ6EWbMhi4ABWP+O4AM1NqPBuy0OrApV5LO6BrrgnhtAHS2NH6RrVk9OL181tTi8A==}
 
-  '@mcp-use/client@2.0.0-beta.11':
-    resolution: {integrity: sha512-DF1KiE4CiMrgmP1Ghxm1nqw1qWhR3V//qh7qVKQtTY0TGxKlNPnDARdA2hnSMpc0Es5627zZmPQUrZnEGLFtkg==}
-    version: 2.0.0-beta.11
-    engines: {node: '>=22.22.2'}
+  '@mcp-use/ext-apps@1.7.4-pr720.0':
+    resolution: {integrity: sha512-//hDA4MH8T1TXjItSHlLm8D1o74E6Ur9nFoEDt2oGR65rUS/94Y5XSM0UMkWHkX0BsE/y+gRy/UsA23JHkjy3g==}
+    engines: {node: '>=20'}
     peerDependencies:
-      '@e2b/code-interpreter': ^2.6.1
+      '@modelcontextprotocol/client': 2.0.0-beta.5
+      '@modelcontextprotocol/core': 2.0.0-beta.5
+      '@modelcontextprotocol/server': 2.0.0-beta.5
       react: ^19.2.0
+      react-dom: ^19.2.0
       zod: 4.4.3
     peerDependenciesMeta:
-      '@e2b/code-interpreter':
+      '@modelcontextprotocol/client':
+        optional: true
+      '@modelcontextprotocol/server':
         optional: true
       react:
+        optional: true
+      react-dom:
         optional: true
 
   '@mermaid-js/parser@0.6.3':
@@ -2155,53 +2165,16 @@ packages:
   '@microsoft/tsdoc@0.16.0':
     resolution: {integrity: sha512-xgAyonlVVS+q7Vc7qLW0UrJU7rSFcETRWsqdXZtjzRU8dF+6CkozTK4V4y1LwOX7j8r/vHphjDeMeGI4tNGeGA==}
 
-  '@modelcontextprotocol/client@2.0.0-beta.3':
-    resolution: {integrity: sha512-o9z9YCGNxWNdklPdjcD0tr8pocC9OgjdArqgx3OjPMlTe0M/SSPC2olOJs5ueq77HSpz36mND0f0KteqEhKF3A==}
+  '@modelcontextprotocol/client@2.0.0-beta.5':
+    resolution: {integrity: sha512-YuuNm5f2TMoFQRje1UqVP8TJRjijCXMz4ckvoVpx1cUXuBEmykWQ2d8R536pek6UKcXT41T5nWc4qR1JFIbEmg==}
     engines: {node: '>=20'}
 
-  '@modelcontextprotocol/client@https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee':
-    resolution: {integrity: sha512-5FvmSf2qWlJXlI9ydf8230f1rsDHMEw9Jgcq2ZUGmA3DJShaYV6t49zKJBuawetMcLOzWBGs8+qDzhZOZTk6Fw==, tarball: https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee}
-    version: 2.0.0-beta.4
+  '@modelcontextprotocol/core@2.0.0-beta.5':
+    resolution: {integrity: sha512-HKbY9XTbsDy1Y6r2I55TGE3JEapM0vg96e1MUmBIF9LGjos5gjhcIrTz1yvBPLg2aFKHjwhUAQfRdrCEnPxNew==}
     engines: {node: '>=20'}
 
-  '@modelcontextprotocol/core@2.0.0-beta.4':
-    resolution: {integrity: sha512-nsMXd4wQBKzmph6r+WOhum+mXjDYljTAqwY/XUg3hLtvNOQ8+JVqBSJOVCMJvx9lXhTpTOPrGZ3BuNiaNPjSvg==}
-    engines: {node: '>=20'}
-
-  '@modelcontextprotocol/core@https://pkg.pr.new/@modelcontextprotocol/core@f60b40179b0f090f6d64248be1312245a160b5ee':
-    resolution: {integrity: sha512-nsMXd4wQBKzmph6r+WOhum+mXjDYljTAqwY/XUg3hLtvNOQ8+JVqBSJOVCMJvx9lXhTpTOPrGZ3BuNiaNPjSvg==, tarball: https://pkg.pr.new/@modelcontextprotocol/core@f60b40179b0f090f6d64248be1312245a160b5ee}
-    version: 2.0.0-beta.4
-    engines: {node: '>=20'}
-
-  '@modelcontextprotocol/core@https://pkg.pr.new/modelcontextprotocol/typescript-sdk/@modelcontextprotocol/core@f60b401':
-    resolution: {integrity: sha512-nsMXd4wQBKzmph6r+WOhum+mXjDYljTAqwY/XUg3hLtvNOQ8+JVqBSJOVCMJvx9lXhTpTOPrGZ3BuNiaNPjSvg==, tarball: https://pkg.pr.new/modelcontextprotocol/typescript-sdk/@modelcontextprotocol/core@f60b401}
-    version: 2.0.0-beta.4
-    engines: {node: '>=20'}
-
-  '@modelcontextprotocol/ext-apps@https://pkg.pr.new/@modelcontextprotocol/ext-apps@432d42bb02a569078ab31ab6458428df6027809d':
-    resolution: {integrity: sha512-ZrbpADXYYPsD21SNE/R5iadnZk6Rn8ZS3yVjSq9cDK++H1awsU93n23czZZ+ruYAFunWtJj9RNkXCVfKw4r2ow==, tarball: https://pkg.pr.new/@modelcontextprotocol/ext-apps@432d42bb02a569078ab31ab6458428df6027809d}
-    version: 1.7.4
-    engines: {node: '>=20'}
-    peerDependencies:
-      '@modelcontextprotocol/client': 2.0.0-beta.4
-      '@modelcontextprotocol/core': 2.0.0-beta.4
-      '@modelcontextprotocol/server': 2.0.0-beta.4
-      react: ^19.2.0
-      react-dom: ^19.2.0
-      zod: 4.4.3
-    peerDependenciesMeta:
-      react:
-        optional: true
-      react-dom:
-        optional: true
-
-  '@modelcontextprotocol/server@2.0.0-beta.4':
-    resolution: {integrity: sha512-pjMZcNEt1dOq0aJCcY3b7w1Ayh+qmQN2xlfTELcGV9yiAjEGIczBPBLWWW0k0zzo5T8kiv15jtKPsWeHGxLvLg==}
-    engines: {node: '>=20'}
-
-  '@modelcontextprotocol/server@https://pkg.pr.new/@modelcontextprotocol/server@f60b40179b0f090f6d64248be1312245a160b5ee':
-    resolution: {integrity: sha512-mI+V52bTdSCHDrsrVG3TeOzgy+apDQXz6l1B4KuwKV/8xbRAsV9LZ2Nf67SEoLszuYYH0as4pZQUG4cCMYP5/g==, tarball: https://pkg.pr.new/@modelcontextprotocol/server@f60b40179b0f090f6d64248be1312245a160b5ee}
-    version: 2.0.0-beta.4
+  '@modelcontextprotocol/server@2.0.0-beta.5':
+    resolution: {integrity: sha512-i1E5l75rQKsgY/AKAIspgMBH1vEL7dqiK7tHr0L+raYcb0SWOziqNGJXGIG6NY4AlXDWIKGJQGB7Nqfs3oUi5g==}
     engines: {node: '>=20'}
 
   '@napi-rs/wasm-runtime@1.1.5':
@@ -8697,18 +8670,16 @@ snapshots:
       globby: 11.1.0
       read-yaml-file: 1.1.0
 
-  '@mcp-use/client@2.0.0-beta.11(@e2b/code-interpreter@2.6.1)(@modelcontextprotocol/core@2.0.0-beta.4)(@modelcontextprotocol/server@https://pkg.pr.new/@modelcontextprotocol/server@f60b40179b0f090f6d64248be1312245a160b5ee)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.4.3)':
+  '@mcp-use/ext-apps@1.7.4-pr720.0(@modelcontextprotocol/client@2.0.0-beta.5)(@modelcontextprotocol/core@2.0.0-beta.5)(@modelcontextprotocol/server@2.0.0-beta.5)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.4.3)':
     dependencies:
-      '@modelcontextprotocol/client': https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee
-      '@modelcontextprotocol/ext-apps': https://pkg.pr.new/@modelcontextprotocol/ext-apps@432d42bb02a569078ab31ab6458428df6027809d(@modelcontextprotocol/client@https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee)(@modelcontextprotocol/core@2.0.0-beta.4)(@modelcontextprotocol/server@https://pkg.pr.new/@modelcontextprotocol/server@f60b40179b0f090f6d64248be1312245a160b5ee)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.4.3)
+      '@modelcontextprotocol/core': 2.0.0-beta.5
+      '@standard-schema/spec': 1.1.0
       zod: 4.4.3
     optionalDependencies:
-      '@e2b/code-interpreter': 2.6.1
+      '@modelcontextprotocol/client': 2.0.0-beta.5
+      '@modelcontextprotocol/server': 2.0.0-beta.5
       react: 19.2.4
-    transitivePeerDependencies:
-      - '@modelcontextprotocol/core'
-      - '@modelcontextprotocol/server'
-      - react-dom
+      react-dom: 19.2.4(react@19.2.4)
 
   '@mermaid-js/parser@0.6.3':
     dependencies:
@@ -8727,8 +8698,9 @@ snapshots:
 
   '@microsoft/tsdoc@0.16.0': {}
 
-  '@modelcontextprotocol/client@2.0.0-beta.3':
+  '@modelcontextprotocol/client@2.0.0-beta.5':
     dependencies:
+      '@modelcontextprotocol/core': 2.0.0-beta.5
       cross-spawn: 7.0.6
       eventsource: 3.0.7
       eventsource-parser: 3.0.6
@@ -8736,69 +8708,13 @@ snapshots:
       pkce-challenge: 5.0.1
       zod: 4.4.3
 
-  '@modelcontextprotocol/client@https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee':
-    dependencies:
-      '@modelcontextprotocol/core': https://pkg.pr.new/modelcontextprotocol/typescript-sdk/@modelcontextprotocol/core@f60b401
-      cross-spawn: 7.0.6
-      eventsource: 3.0.7
-      eventsource-parser: 3.0.6
-      jose: 6.1.3
-      pkce-challenge: 5.0.1
-      zod: 4.4.3
-
-  '@modelcontextprotocol/core@2.0.0-beta.4':
+  '@modelcontextprotocol/core@2.0.0-beta.5':
     dependencies:
       zod: 4.4.3
 
-  '@modelcontextprotocol/core@https://pkg.pr.new/@modelcontextprotocol/core@f60b40179b0f090f6d64248be1312245a160b5ee':
+  '@modelcontextprotocol/server@2.0.0-beta.5':
     dependencies:
-      zod: 4.4.3
-
-  '@modelcontextprotocol/core@https://pkg.pr.new/modelcontextprotocol/typescript-sdk/@modelcontextprotocol/core@f60b401':
-    dependencies:
-      zod: 4.4.3
-
-  '@modelcontextprotocol/ext-apps@https://pkg.pr.new/@modelcontextprotocol/ext-apps@432d42bb02a569078ab31ab6458428df6027809d(@modelcontextprotocol/client@https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee)(@modelcontextprotocol/core@2.0.0-beta.4)(@modelcontextprotocol/server@2.0.0-beta.4)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.4.3)':
-    dependencies:
-      '@modelcontextprotocol/client': https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee
-      '@modelcontextprotocol/core': 2.0.0-beta.4
-      '@modelcontextprotocol/server': 2.0.0-beta.4
-      '@standard-schema/spec': 1.1.0
-      zod: 4.4.3
-    optionalDependencies:
-      react: 19.2.4
-      react-dom: 19.2.4(react@19.2.4)
-
-  '@modelcontextprotocol/ext-apps@https://pkg.pr.new/@modelcontextprotocol/ext-apps@432d42bb02a569078ab31ab6458428df6027809d(@modelcontextprotocol/client@https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee)(@modelcontextprotocol/core@2.0.0-beta.4)(@modelcontextprotocol/server@https://pkg.pr.new/@modelcontextprotocol/server@f60b40179b0f090f6d64248be1312245a160b5ee)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.4.3)':
-    dependencies:
-      '@modelcontextprotocol/client': https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee
-      '@modelcontextprotocol/core': 2.0.0-beta.4
-      '@modelcontextprotocol/server': https://pkg.pr.new/@modelcontextprotocol/server@f60b40179b0f090f6d64248be1312245a160b5ee
-      '@standard-schema/spec': 1.1.0
-      zod: 4.4.3
-    optionalDependencies:
-      react: 19.2.4
-      react-dom: 19.2.4(react@19.2.4)
-
-  '@modelcontextprotocol/ext-apps@https://pkg.pr.new/@modelcontextprotocol/ext-apps@432d42bb02a569078ab31ab6458428df6027809d(@modelcontextprotocol/client@https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee)(@modelcontextprotocol/core@https://pkg.pr.new/@modelcontextprotocol/core@f60b40179b0f090f6d64248be1312245a160b5ee)(@modelcontextprotocol/server@https://pkg.pr.new/@modelcontextprotocol/server@f60b40179b0f090f6d64248be1312245a160b5ee)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.4.3)':
-    dependencies:
-      '@modelcontextprotocol/client': https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee
-      '@modelcontextprotocol/core': https://pkg.pr.new/@modelcontextprotocol/core@f60b40179b0f090f6d64248be1312245a160b5ee
-      '@modelcontextprotocol/server': https://pkg.pr.new/@modelcontextprotocol/server@f60b40179b0f090f6d64248be1312245a160b5ee
-      '@standard-schema/spec': 1.1.0
-      zod: 4.4.3
-    optionalDependencies:
-      react: 19.2.4
-      react-dom: 19.2.4(react@19.2.4)
-
-  '@modelcontextprotocol/server@2.0.0-beta.4':
-    dependencies:
-      '@modelcontextprotocol/core': 2.0.0-beta.4
-      zod: 4.4.3
-
-  '@modelcontextprotocol/server@https://pkg.pr.new/@modelcontextprotocol/server@f60b40179b0f090f6d64248be1312245a160b5ee':
-    dependencies:
-      '@modelcontextprotocol/core': https://pkg.pr.new/modelcontextprotocol/typescript-sdk/@modelcontextprotocol/core@f60b401
+      '@modelcontextprotocol/core': 2.0.0-beta.5
       zod: 4.4.3
 
   '@napi-rs/wasm-runtime@1.1.5(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)':

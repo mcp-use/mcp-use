@@ -4,7 +4,7 @@
 
 **Scope:** This phase implements direct external authorization-server and resource-server mode only. mcp-use verifies externally issued access tokens that are bound to the canonical MCP resource. It does not issue, store, refresh, or proxy tokens.
 
-**Protocol basis:** Current [MCP authorization](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization) (revision 2025-11-25) and [MCP security guidance](https://modelcontextprotocol.io/docs/tutorials/security/security_best_practices), OAuth 2.1 resource-server guidance, and `@modelcontextprotocol/server@2.0.0-beta.4`. Beta.4 provides runtime-neutral resource-server helpers in server core.
+**Protocol basis:** Current [MCP authorization](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization) (revision 2025-11-25) and [MCP security guidance](https://modelcontextprotocol.io/docs/tutorials/security/security_best_practices), OAuth 2.1 resource-server guidance, and `@modelcontextprotocol/server@2.0.0-beta.5`. Beta.5 provides runtime-neutral resource-server helpers in server core.
 
 ## OAuth proxy is deferred
 
@@ -431,7 +431,7 @@ Better Auth is integrated as a resource-server adapter via `oauthBetterAuthProvi
 
 ## Meet the SDK dependency prerequisite
 
-`@modelcontextprotocol/server`, `@modelcontextprotocol/hono`, and `@modelcontextprotocol/client` use coordinated `2.0.0-beta.4` pins.
+`@modelcontextprotocol/server`, `@modelcontextprotocol/core`, and `@modelcontextprotocol/client` use coordinated `2.0.0-beta.5` pins.
 
 ## Verify the implementation
 
