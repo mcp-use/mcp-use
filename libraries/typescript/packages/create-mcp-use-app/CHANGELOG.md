@@ -1,5 +1,19 @@
 # create-mcp-use-app
 
+## 2.0.0-beta.9
+
+### Minor Changes
+
+- 192d193: Require `useCallTool("name")` names to resolve to exported server `ToolRef`
+  values once `mcp-env.d.ts` registers the server entry. Add
+  `useDynamicTool<Args, Result>("name")` as the explicit escape hatch for tools
+  registered from runtime data, loops, or OpenAPI documents.
+
+  Add `mcp-use typecheck`, which refreshes the managed `mcp-env.d.ts` entry
+  bridge and then invokes the project's local TypeScript compiler with
+  `--noEmit`. New projects scaffold the declaration and use this command in
+  their `typecheck` script.
+
 ## 2.0.0-beta.8
 
 ### Patch Changes
