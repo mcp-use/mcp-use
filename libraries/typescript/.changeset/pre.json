@@ -29,6 +29,7 @@
     "eager-inspector-ui",
     "enable-sdk-logging-capability",
     "fix-beta-scaffold-templates",
+    "fix-cli-runtime-build-pipeline",
     "follow-inspector-beta-cdn",
     "fresh-oauth-resource-v2",
     "friendly-dots-fail",

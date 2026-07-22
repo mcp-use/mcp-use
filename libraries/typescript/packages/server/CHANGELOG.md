@@ -1,5 +1,14 @@
 # mcp-use
 
+## 2.0.0-beta.28
+
+### Patch Changes
+
+- a4c9c35: Install the Vite and Tailwind build pipeline with the CLI while keeping generated project manifests free of build-tool dependencies.
+- Updated dependencies [a4c9c35]
+  - @mcp-use/cli@4.0.0-beta.4
+  - @mcp-use/inspector@20.0.0-beta.20
+
 ## 2.0.0-beta.27
 
 ### Patch Changes
