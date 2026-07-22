@@ -46,6 +46,7 @@
     "node22-security-patch-floor",
     "openapi-server-tools-v2",
     "optimize-standalone-inspector-package",
+    "registry-mcp-v2-dependencies",
     "rename-starter-mcp-server-template",
     "resource-template-completion",
     "skip-dev-info-standalone-probe",
