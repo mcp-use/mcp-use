@@ -30,7 +30,7 @@ export interface CliCommandOptions {
   port?: number;
   /** Host override (`--host`). */
   host?: string;
-  /** Start a public tunnel at dev startup (`--tunnel`). */
+  /** Start a public tunnel at dev/start startup (`--tunnel`). */
   tunnel?: boolean;
   /** Auto-open the inspector in a browser at dev startup (`--no-open` disables). */
   open?: boolean;
@@ -73,7 +73,7 @@ Options:
   --inline           Embed view JS and CSS in MCP resources (build only)
   -- <tsc options>   Forward remaining options to TypeScript (typecheck only)
   --with-inspector   Mount Inspector on the production listener (start only)
-  --tunnel           Expose the dev server through a public tunnel (dev only)
+  --tunnel           Expose the server through a public tunnel (dev/start only)
   --no-open          Do not auto-open the inspector in a browser (dev only)
   --no-inspector     Start dev without loading the optional Inspector
   -h, --help         Show this help
@@ -195,6 +195,7 @@ async function startCommand(args: ParsedArgs): Promise<number> {
       port: args.port,
       host: args.host,
       ...(args.inspector === true && { withInspector: true }),
+      tunnel: args.tunnel,
     });
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
@@ -202,8 +203,14 @@ async function startCommand(args: ParsedArgs): Promise<number> {
   }
 
   console.log(`mcp-use server running at ${started.url}`);
+  if (started.tunnelUrl !== undefined) {
+    console.log(`mcp-use public MCP URL: ${started.tunnelUrl}`);
+  }
 
+  let closing = false;
   const shutdown = (): void => {
+    if (closing) return;
+    closing = true;
     started.close().then(
       () => process.exit(0),
       (error: unknown) => {

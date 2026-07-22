@@ -84,6 +84,11 @@ describe("published CLI boundaries", () => {
         pattern
       );
     }
+
+    expect(
+      start,
+      "the tunnel manager must stay lazy for start without --tunnel"
+    ).toMatch(/\bimport\s*\(\s*["'][^"']*tunnel[^"']*["']\s*\)/);
   });
 
   it("dispatches every substantial command through a dynamic chunk", async () => {

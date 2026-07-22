@@ -321,8 +321,9 @@ Tunnel subdomain persistence lives at `.mcp-use/state/tunnel.json` (v1-compatibl
 2. Imports the built entry, takes the default export, serves it via `listen()`.
 3. **Address:** CLI flag / environment variable / built server configuration / default: `--port` / integer `PORT` / `config.port` / `3000`, and `--host` / non-empty `HOST` / `config.host` / `127.0.0.1`. There is no upward port probing (a production port conflict should fail, not silently move). Sets `NODE_ENV=production` only when unset.
 4. **Inspector:** `--with-inspector` lazily imports the bundled `@mcp-use/inspector`, mounts it at `${basePath}/inspector` on the same listener, and leaves the build output and manifest unchanged. The default start path neither imports nor exposes Inspector routes. The listener continues through `MCPServer.listen()` so its Host validation and OAuth resource initialization are identical in both modes; production Inspector proxy routes disallow loopback targets.
+5. **Tunnel:** `--tunnel` dynamically loads the shared tunnel manager only after `listen()` binds successfully, including when `--with-inspector` owns additional routes on that listener. It targets the actual bound port, reuses `.mcp-use/state/tunnel.json`, derives the public MCP endpoint from the server's returned endpoint path, and stops/releases the tunnel before closing the server on normal shutdown, SIGINT, or SIGTERM. A tunnel startup failure closes the already-bound server and fails the command.
 
-Evaluates no Vite, toolchain, or unrelated command chunk. A production image installs `mcp-use` and the app's own runtime dependencies; the regular Vite dependency may be present on disk but is outside the `start` evaluation graph.
+Without `--tunnel`, the tunnel module is not evaluated. `start` evaluates no Vite, toolchain, or unrelated command chunk. A production image installs `mcp-use` and the app's own runtime dependencies; the regular Vite dependency may be present on disk but is outside the `start` evaluation graph.
 
 ## Inspector mounting
 
