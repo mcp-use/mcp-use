@@ -1,10 +1,36 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CHAT_MODE_STORAGE_KEY,
   readStoredChatMode,
   resolveInitialForceClientSide,
   writeStoredChatMode,
 } from "../chatModeStorage";
+
+const storedValues = new Map<string, string>();
+vi.stubGlobal("localStorage", {
+  get length() {
+    return storedValues.size;
+  },
+  clear() {
+    storedValues.clear();
+  },
+  getItem(key: string) {
+    return storedValues.get(key) ?? null;
+  },
+  key(index: number) {
+    return [...storedValues.keys()][index] ?? null;
+  },
+  removeItem(key: string) {
+    storedValues.delete(key);
+  },
+  setItem(key: string, value: string) {
+    storedValues.set(key, value);
+  },
+} satisfies Storage);
+
+afterAll(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("chatModeStorage", () => {
   beforeEach(() => {

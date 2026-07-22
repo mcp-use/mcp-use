@@ -142,11 +142,11 @@ function installFakeInspector(cwd: string): void {
     JSON.stringify({
       name: "@mcp-use/inspector",
       type: "module",
-      exports: { "./dev": "./dev.js" },
+      exports: { ".": "./index.js" },
     })
   );
   writeFileSync(
-    join(packageRoot, "dev.js"),
+    join(packageRoot, "index.js"),
     `export function mountInspector(options) {
   return async (request) => {
     const url = new URL(request.url);
@@ -238,7 +238,7 @@ describe("runDev", () => {
     ).toEqual({ autoConnectUrl: `${origin}/api/mcp` });
   });
 
-  it("keeps serving MCP and prints an install hint when Inspector is absent", async () => {
+  it("serves the built-in Inspector without a project dependency", async () => {
     const cwd = copyFixture("dev-inspector-missing");
     cleanups.push(() => removeDir(cwd));
 
@@ -247,13 +247,12 @@ describe("runDev", () => {
     cleanups.push(dev.stop);
 
     await waitFor(async () =>
-      dev.logs.some((line) => line.includes("Inspector is not installed"))
-        ? true
-        : undefined
+      (await fetch(`${dev.url}/inspector`)).status === 200 ? true : undefined
     );
     expect(await listToolNames(dev.url)).toEqual(["add"]);
-    expect((await fetch(`${dev.url}/inspector`)).status).toBe(404);
-    expect(dev.logs.join("\n")).toContain("@mcp-use/inspector@beta");
+    expect(dev.logs.join("\n")).not.toContain(
+      "Built-in Inspector is unavailable"
+    );
   });
 
   it("supports an intentional headless dev run", async () => {

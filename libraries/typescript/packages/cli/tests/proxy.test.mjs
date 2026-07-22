@@ -7,7 +7,7 @@ import test from "node:test";
 
 const execFileAsync = promisify(execFile);
 
-test("delegates the compatibility binary to mcp-use", async () => {
+test("runs the prebuilt CLI with the framework version", async () => {
   const serverPackage = JSON.parse(
     await readFile(
       new URL("../../server/package.json", import.meta.url),
@@ -16,7 +16,7 @@ test("delegates the compatibility binary to mcp-use", async () => {
   );
   const { stdout, stderr } = await execFileAsync(
     process.execPath,
-    [fileURLToPath(new URL("../dist/index.js", import.meta.url)), "--version"],
+    [fileURLToPath(new URL("../dist/bin.js", import.meta.url)), "--version"],
     { cwd: fileURLToPath(new URL("..", import.meta.url)) }
   );
 

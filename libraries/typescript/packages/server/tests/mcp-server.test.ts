@@ -897,6 +897,29 @@ describe("MCPServer validation policy", () => {
     }
   });
 
+  it("protects additional listener routes with the listen Host policy", async () => {
+    const server = minimalServer();
+    const { url } = await server.listen(0, {
+      routes: [
+        {
+          match: (request) =>
+            new URL(request.url).pathname === "/mcp/inspector",
+          handler: async () => new Response("inspector"),
+        },
+      ],
+    });
+    try {
+      await expect(fetch(`${url}/inspector`)).resolves.toMatchObject({
+        status: 200,
+      });
+      expect(
+        await rawStatus(`${url}/inspector`, { host: "evil.example.com" })
+      ).toBe(403);
+    } finally {
+      await server.close();
+    }
+  });
+
   it("listen rejects foreign Origin when allowedOrigins is set", async () => {
     const server = minimalServer({ allowedOrigins: ["app.example.com"] });
     return server.listen(0).then(async ({ url }) => {

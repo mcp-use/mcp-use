@@ -2,7 +2,7 @@
   "name": "@mcp-use/cli",
   "type": "module",
   "version": "4.0.0-beta.1",
-  "description": "Compatibility proxy for the CLI included in mcp-use v2",
+  "description": "Prebuilt CLI, development server, and build pipeline for mcp-use",
   "author": "mcp-use, Inc.",
   "license": "MIT",
   "homepage": "https://github.com/mcp-use/mcp-use#readme",
@@ -20,25 +20,47 @@
     "cli"
   ],
   "bin": {
-    "mcp-use": "./dist/index.js"
+    "mcp-use": "./dist/bin.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "import": "./dist/bin.js"
+    }
   },
   "files": [
-    "dist"
+    "dist",
+    "types"
   ],
   "engines": {
     "node": ">=22.22.2"
   },
   "scripts": {
-    "build": "rimraf dist && tsup src/index.ts --format esm --target node22 && tsc --emitDeclarationOnly --declaration",
+    "build": "rimraf dist && tsup --config tsup.config.ts && node scripts/verify-package.mjs",
     "test": "node --test tests/proxy.test.mjs"
   },
-  "dependencies": {
-    "mcp-use": "workspace:^"
+  "dependencies": {},
+  "peerDependencies": {
+    "@mcp-use/client": "^2.0.0-alpha.0",
+    "@mcp-use/inspector": "^20.0.0-beta.0"
+  },
+  "peerDependenciesMeta": {
+    "@mcp-use/client": {
+      "optional": true
+    },
+    "@mcp-use/inspector": {
+      "optional": true
+    }
   },
   "devDependencies": {
+    "@modelcontextprotocol/server": "https://pkg.pr.new/@modelcontextprotocol/server@f60b40179b0f090f6d64248be1312245a160b5ee",
+    "@tailwindcss/vite": "^4.2.0",
+    "@vitejs/plugin-react": "^6.0.3",
     "rimraf": "^6.1.3",
+    "tailwindcss": "^4.2.0",
     "tsup": "^8.5.1",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vite": "^8.0.16"
   },
   "publishConfig": {
     "access": "public"

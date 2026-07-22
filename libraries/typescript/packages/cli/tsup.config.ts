@@ -1,0 +1,46 @@
+import { readFileSync } from "node:fs";
+import { defineConfig } from "tsup";
+
+const framework = JSON.parse(
+  readFileSync(new URL("../server/package.json", import.meta.url), "utf8")
+) as { version: string };
+
+export default defineConfig({
+  entry: {
+    bin: "src/index.ts",
+    "next-server-shims": "../server/src/cli/next-server-shims.ts",
+    "commands/start": "../server/src/commands/start.ts",
+    "commands/dev": "../server/src/commands/dev.ts",
+    "commands/build": "../server/src/commands/build.ts",
+    "commands/identity": "../server/src/commands/identity.ts",
+    "commands/organizations": "../server/src/commands/organizations.ts",
+    "commands/servers": "../server/src/commands/servers.ts",
+    "commands/deployments": "../server/src/commands/deployments.ts",
+    "commands/deploy": "../server/src/commands/deploy.ts",
+    "commands/client": "../server/src/commands/client.ts",
+    "commands/skills": "../server/src/commands/skills.ts",
+    "commands/screenshot": "../server/src/commands/screenshot.ts",
+  },
+  format: ["esm"],
+  target: "node22",
+  platform: "node",
+  splitting: true,
+  sourcemap: false,
+  minify: true,
+  dts: false,
+  // Vite is loaded only by the dev/build command chunks. Keep that toolchain
+  // external so tsup does not follow Tailwind's platform-native optional
+  // binaries into the published CLI package.
+  external: [
+    "@mcp-use/client",
+    "@mcp-use/inspector",
+    "@modelcontextprotocol/server",
+    "@tailwindcss/vite",
+    "@vitejs/plugin-react",
+    "tailwindcss",
+    "vite",
+  ],
+  define: {
+    __MCP_USE_PACKAGE_VERSION__: JSON.stringify(framework.version),
+  },
+});

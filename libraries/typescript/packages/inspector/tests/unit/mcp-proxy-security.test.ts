@@ -87,4 +87,27 @@ describe("Inspector MCP proxy request isolation", () => {
     expect(response.status).toBe(200);
     expect(fetchFn).toHaveBeenCalledTimes(2);
   });
+
+  it("forwards an empty 204 response without constructing an invalid body", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(async () => new Response(null, { status: 204 }))
+    );
+    const app = new Hono();
+    mountMcpProxy(app, {
+      path: "/inspector/api/proxy",
+      enableLogging: false,
+    });
+
+    const response = await app.fetch(
+      new Request(proxyUrl, {
+        headers: {
+          "X-Target-URL": "https://93.184.216.34/mcp",
+        },
+      })
+    );
+
+    expect(response.status).toBe(204);
+    expect(await response.text()).toBe("");
+  });
 });

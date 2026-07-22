@@ -1,7 +1,7 @@
 # mcp-use v2 — complete CLI contract
 
 **Status:** Implemented.
-**Scope:** the complete first-party `mcp-use` CLI: `dev`, `build`, `start`, cloud auth, organizations, servers, deployments, deploy, client, screenshot, and skills; plus optional project-local Inspector mounting in `dev`.
+**Scope:** the complete first-party `mcp-use` CLI: `dev`, `build`, `start`, cloud auth, organizations, servers, deployments, deploy, client, screenshot, and skills; plus optional Inspector mounting in `dev` and production `start`.
 **Package:** `mcp-use@2`, published from `packages/server`. The package owns the bin, runtime, command chunks, and toolchain. The development Inspector remains independently published. There is no separate CLI implementation, devkit, or config package. `@mcp-use/cli@4` is a compatibility-only proxy for the historical install command.
 
 ## Goals
@@ -197,20 +197,19 @@ mcp-use skills add [--path <directory>]
 { "bin": { "mcp-use": "./dist/bin.js" } }
 ```
 
-The bin contains only top-level argument classification and error presentation. It dispatches every substantial command with `await import(...)` to a real sibling chunk inside this package, built with code splitting enabled. At minimum the output has distinct chunks for `start`, `dev`, `build`, cloud identity, organizations, servers, deployments, deploy, client, screenshot, and skills. A command family may share small dependency-free parsing utilities, but no eager aggregate command module may pull unrelated implementations into `dist/bin.js`.
+The framework bin is a tiny proxy to the prebuilt `@mcp-use/cli` package. The CLI dispatches every substantial command with `await import(...)` to a real sibling chunk built with code splitting enabled. At minimum the CLI output has distinct chunks for `start`, `dev`, `build`, cloud identity, organizations, servers, deployments, deploy, client, screenshot, and skills.
 
-`dist/index.js`, `dist/react/index.js`, `dist/bin.js`, and the `start` chunk have no static import path to Vite. Vite imports live only in the command chunks that use them; `dev` and `build` are separate so loading one does not evaluate the other. Structural build-output tests enforce these boundaries rather than relying on source naming.
+`mcp-use/dist/index.js`, `mcp-use/dist/react/index.js`, and the CLI `start` chunk have no static import path to Vite. Vite imports live only in the CLI command chunks that use them; `dev` and `build` are separate so loading one does not evaluate the other. Structural build-output tests enforce these boundaries rather than relying on source naming.
 
 `mcp-use` owns the server build configuration. When views are present, it loads the project's optional `vite.config.*` for the views client environment only, then injects the framework's built-in Tailwind, React, and views plugins. Every virtual view entry imports the framework's virtual Tailwind stylesheet, so utility classes work without a project CSS import, dependency, or config. A project config is only for additional client plugins and aliases and cannot alter the server build.
 
-Vite is a **regular dependency** of `mcp-use`:
+Vite is a **regular dependency** of `@mcp-use/cli`, which is a regular dependency of `mcp-use`:
 
 ```jsonc
-// packages/server/package.json
+// packages/server/package.json and packages/cli/package.json
 {
-  "dependencies": {
-    "vite": "^8.0.0",
-  },
+  "mcp-use": { "dependencies": { "@mcp-use/cli": "…" } },
+  "@mcp-use/cli": { "dependencies": { "vite": "^8.0.0" } },
 }
 ```
 
@@ -218,7 +217,7 @@ Vite is framework implementation machinery: the package owns the compatible vers
 
 `@mcp-use/client` is an optional peer at a compatible published version (`^2.0.0-alpha.0`). It remains independently published and independently installable; `mcp-use client` and `mcp-use screenshot` dynamic-import it and print install instructions when it is absent. Server library exports do not re-export or absorb the SDK.
 
-**Hard rule:** `mcp-use` declares **no dependency of any kind** — regular, peer, or optional — on `@mcp-use/inspector`. `dev` alone resolves the optional package from the user's project dependency graph and dynamically imports its `@mcp-use/inspector/dev` export. Library imports, `build`, `start`, and production handlers never resolve or expose it.
+`mcp-use` declares `@mcp-use/inspector` as a regular dependency so the local Inspector and screenshot preview always match the framework release. The Inspector package itself has zero regular dependencies and ships its standalone browser application prebuilt and compressed. `@mcp-use/cli` declares both `@mcp-use/client` and `@mcp-use/inspector` as optional peers: the framework satisfies the Inspector peer, while Client-only commands retain their explicit opt-in behavior.
 
 Target user `package.json` shape:
 
@@ -228,9 +227,6 @@ Target user `package.json` shape:
     "dev": "mcp-use dev",
     "build": "mcp-use build",
     "start": "mcp-use start",
-  },
-  "devDependencies": {
-    "@mcp-use/inspector": "<compatible channel>",
   },
   "dependencies": { "mcp-use": "^2" },
 }
@@ -289,12 +285,12 @@ A single long-lived process. It:
 1. Creates a Vite dev server (Environment API, node/SSR environment only) and loads the entry through the module runner.
 2. Grabs the default-exported `MCPServer`, wraps `server.getHandler()` behind an **atomically swappable reference**.
 3. Binds **one** Node HTTP listener (vendored `toNodeHandler` bridge) that delegates every request to the current handler.
-4. Unless `--no-inspector` is set, resolves `@mcp-use/inspector/dev` from the project and calls its framework-neutral `mountInspector()` on that same listener. Missing optional tooling does not stop the MCP server; one package-manager-aware install hint is printed instead.
+4. Unless `--no-inspector` is set, resolves `@mcp-use/inspector` from the project and calls its framework-neutral `mountInspector()` on that same listener. Missing optional tooling does not stop the MCP server; one package-manager-aware install hint is printed instead.
 
 On file change (only files in the entry's module graph count): Vite invalidates, dev re-imports the entry through the runner, and swaps the handler reference. There is no registration diffing: the next request hits the new handler, which is correct by construction under the stateless model. Every handler generation shares one process-scoped SDK `ServerEventBus`; after a successful swap, dev publishes `tools/list_changed`, `prompts/list_changed`, and `resources/list_changed`. Modern clients with an open `subscriptions/listen` stream therefore refetch the authoritative lists from the new handler. Publishing all three is deliberate invalidation, not change detection — the protocol carries no delta, and avoiding schema/function comparison keeps server reload independent of registry internals. A failed reload keeps the old handler and publishes nothing. Stateless legacy clients receive no push but remain correct on their next manual list request.
 
-- **Port:** `--port`, else `PORT` env, else `3000`; if the preferred port cannot be bound on the listen host, or (on localhost-class binds) something already accepts connections on loopback, probe upward.
-- **Host:** `127.0.0.1` by default; `--host` to override (matching the server's own localhost-first posture, SPEC.md delta 5). Printed and auto-opened URLs use the browsable equivalent: `localhost` for loopback/wildcard binds, the given host verbatim otherwise; wildcard binds additionally print a `Network:` line with the machine's LAN address.
+- **Port:** `--port`, else integer `PORT` env, else `3000`; if the preferred port cannot be bound on the listen host, or (on localhost-class binds) something already accepts connections on loopback, probe upward.
+- **Host:** `--host`, else non-empty `HOST` env, else `127.0.0.1` (matching the server's own localhost-first posture, SPEC.md delta 5). Printed and auto-opened URLs use the browsable equivalent: `localhost` for loopback/wildcard binds, the given host verbatim otherwise; wildcard binds additionally print a `Network:` line with the machine's LAN address.
 - **DNS-rebinding protection:** `getHandler()` deliberately applies no Host/Origin validation (its contract assumes a platform edge in front) — in dev, this process is the edge. On localhost-class binds the listener validates `Host` against the localhost allowlist plus the active tunnel hostname (tunnel traffic arrives with the tunnel's public Host), rejecting with the SDK's JSON-RPC 403 shape _before_ any routing, so the MCP endpoint, the dev API routes, and Vite-served module URLs are all covered. Origin is not validated unless the server's `allowedOrigins` is set (SDK-aligned default). Rebinding manifests as a non-localhost `Host`; sandboxed view iframes have an opaque origin, so their module/asset GETs legitimately carry `Origin: null`. Those loads also run in CORS mode, so they need `Access-Control-Allow-Origin`: the MCP server's view asset and public routes (mounted in both dev and production) always emit `*`. Vite-served module URLs (checked per request, so runtime tunnel start/stop takes effect immediately): while a tunnel is active, emit `*` so foreign and opaque-origin hosts can fetch the module graph; without a tunnel on a localhost bind, reflect a validated loopback `Origin` (exact request origin — `localhost` / `127.0.0.1` / `[::1]`, any port/scheme accepted by `validateOriginHeader` against `localhostAllowedOrigins()`) and merge `Vary: Origin`, so a local MCP host (e.g. inspector at `http://localhost:6274`) can load modules while foreign origins, `Origin: null`, and missing Origin get no ACAO and the source module graph stays unreadable to arbitrary websites. Vite's own CORS middleware is disabled (`cors: false`) so its localhost-only default neither blocks tunnel-rendering hosts nor fights the gated header. Non-localhost binds get no validation (the legitimate hostnames are unknowable) and print a warning instead.
 - **Tunnel:** `--tunnel` starts a public tunnel as soon as the HTTP listener is bound (via `npx @mcp-use/tunnel`). The inspector UI can also start/stop the tunnel at runtime through dev-only API routes (below) without restarting the dev process.
 - **Auto-open:** when the project-local Inspector mounted successfully, its URL is opened in the default browser (dependency-free `open`/`start`/`xdg-open` spawn, best-effort). `--no-open` disables it, and it is skipped automatically when stdout is not a TTY, so agents/CI never trigger a browser launch or see a "failed to open" error. A missing or explicitly disabled Inspector is never opened.
@@ -317,21 +313,22 @@ Tunnel subdomain persistence lives at `.mcp-use/state/tunnel.json` (v1-compatibl
 
 1. Reads `.mcp-use/build/manifest.json` (consuming `entryPoint` only); if missing, an actionable error pointing at `mcp-use build`.
 2. Imports the built entry, takes the default export, serves it via `listen()`.
-3. **Port:** `--port` / an integer `PORT` env / `3000` — no upward probing (a production port conflict should fail, not silently move). Sets `NODE_ENV=production` only when unset.
+3. **Address:** CLI flag / environment variable / built server configuration / default: `--port` / integer `PORT` / `config.port` / `3000`, and `--host` / non-empty `HOST` / `config.host` / `127.0.0.1`. There is no upward port probing (a production port conflict should fail, not silently move). Sets `NODE_ENV=production` only when unset.
+4. **Inspector:** `--with-inspector` lazily imports the bundled `@mcp-use/inspector`, mounts it at `${basePath}/inspector` on the same listener, and leaves the build output and manifest unchanged. The default start path neither imports nor exposes Inspector routes. The listener continues through `MCPServer.listen()` so its Host validation and OAuth resource initialization are identical in both modes; production Inspector proxy routes disallow loopback targets.
 
 Evaluates no Vite, toolchain, or unrelated command chunk. A production image installs `mcp-use` and the app's own runtime dependencies; the regular Vite dependency may be present on disk but is outside the `start` evaluation graph.
 
-## Project-local Inspector mounting
+## Inspector mounting
 
-The Inspector is development tooling, never a production server route. `create-mcp-use-app` adds `@mcp-use/inspector` as a dev dependency using the release channel compatible with the scaffolded SDK; the lockfile pins the concrete version. Existing projects add it explicitly or run without the visual debugger.
+The Inspector is development tooling by default. `mcp-use` installs the optimized `@mcp-use/inspector` package directly; generated projects do not need another Inspector declaration. `mcp-use start --with-inspector` is the explicit production-listener opt-in.
 
-`mcp-use dev` resolves `@mcp-use/inspector/dev` relative to the project `package.json`, calls `mountInspector({ basePath, autoConnectUrl, devMode: true, oauthProxyAllowLoopback })`, and dispatches `${basePath}/inspector/**` to the returned Fetch handler before the MCP handler. The handler is rebuilt atomically when a successful entry reload changes `basePath`. The installed Inspector package exclusively owns its bundled UI assets, Hono implementation, MCP relay, OAuth BFF, callback, and health/config routes; `mcp-use` owns only optional loading, route delegation, tunnel controls, and browser lifecycle.
+`mcp-use dev` resolves a project-declared Inspector override first and otherwise loads the framework dependency, calls `mountInspector({ basePath, autoConnectUrl, devMode: true, oauthProxyAllowLoopback })`, and dispatches `${basePath}/inspector/**` to the returned Fetch handler before the MCP handler. The handler is rebuilt atomically when a successful entry reload changes `basePath`. The Inspector package exclusively owns its bundled UI assets, Hono implementation, MCP relay, OAuth BFF, callback, and health/config routes; `mcp-use` owns loading, route delegation, tunnel controls, and browser lifecycle.
 
 The returned mount serves the exact UI bundle shipped in the installed package under `${basePath}/inspector/assets/**`; it never resolves jsDelivr or honors a CDN override. Thus local development works offline after dependency installation and the UI/backend contract cannot drift independently of the lockfile.
 
 The Inspector surface and dev-control routes are not exposed through a public `mcp-use dev` tunnel. A wildcard bind serves them only to loopback Host values; the public tunnel and LAN-facing wildcard hosts expose the MCP endpoint and required view assets, not a loopback-capable proxy into the developer machine. An explicitly selected non-loopback bind may expose the Inspector but disables loopback proxy targets and already carries the CLI's network-exposure warning.
 
-`MCPServer.getHandler()`, `listen()`, `mcp-use build`, and `mcp-use start` do not mount an Inspector shell or proxy. `GET ${basePath}/inspector` therefore returns `404` outside `mcp-use dev`. Standalone inspection of arbitrary endpoints remains explicit: `npx @mcp-use/inspector --url <mcp-url>`.
+`MCPServer.getHandler()`, `listen()`, and `mcp-use build` do not mount an Inspector shell or proxy. Plain `mcp-use start` also returns `404` for `GET ${basePath}/inspector`; only `mcp-use start --with-inspector` mounts it. Standalone inspection of arbitrary endpoints remains explicit: `npx @mcp-use/inspector --url <mcp-url>`.
 
 ## Why the server entry reloads instead of HMR
 
@@ -353,8 +350,8 @@ Budgets are measured on Linux x64 in the CI-pinned Node 22.23 container image; t
 | -------------------------------------------------------------------------- | -----------: |
 | packed `.tgz` bytes                                                        |        2 MiB |
 | package `unpackedSize` from `npm pack --json`                              |        5 MiB |
-| clean-install `node_modules` bytes (including Vite/platform optional deps) |      100 MiB |
-| edge-safe `dist/index.js` bytes                                            |       73 KiB |
+| clean-install `node_modules` bytes (including Vite/platform optional deps) |      110 MiB |
+| edge-safe `dist/index.js` bytes                                            |      100 KiB |
 | tool-only `.mcp-use/build/` fixture                                        |        1 MiB |
 | committed basic-view fixture output (external JS + CSS before compression) |      2.5 MiB |
 

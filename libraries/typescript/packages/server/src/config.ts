@@ -104,7 +104,8 @@ interface BaseServerConfig {
    */
   basePath?: string;
   /**
-   * Hostname `listen()` binds. Defaults to `127.0.0.1`; localhost-class
+   * Hostname `listen()` binds when neither an explicit listener host nor
+   * `HOST` is set. Defaults to `127.0.0.1`; localhost-class
    * binds get DNS-rebinding protection (`Host` on every request; `Origin`
    * only on non-GET/HEAD) automatically. Set `"0.0.0.0"` to serve publicly — behind a platform
    * edge (Railway, Fly, …) nothing more is needed, since the edge only
@@ -112,6 +113,13 @@ interface BaseServerConfig {
    * which never binds.
    */
   host?: string;
+  /**
+   * TCP port `listen()` binds when neither an explicit port nor `PORT` is set.
+   * Use `0` to request an ephemeral port.
+   *
+   * @defaultValue `3000`
+   */
+  port?: number;
   /**
    * Extra allowed hostnames for Host-header validation (DNS-rebinding
    * protection), e.g. `["api.example.com"]`. Port-agnostic and additive:
@@ -231,7 +239,10 @@ export interface CorsOptions {
  * pathname without empty segments, trailing slash, query, fragment, or
  * whitespace.
  */
-export function assertServerConfig(config: { basePath?: unknown }): void {
+export function assertServerConfig(config: {
+  basePath?: unknown;
+  port?: unknown;
+}): void {
   if (config.basePath !== undefined) {
     if (typeof config.basePath !== "string") {
       throw new TypeError(
@@ -251,6 +262,15 @@ export function assertServerConfig(config: { basePath?: unknown }): void {
         "basePath must be an absolute URL pathname without empty segments, trailing slash, query, fragment, or whitespace"
       );
     }
+  }
+  if (
+    config.port !== undefined &&
+    (typeof config.port !== "number" ||
+      !Number.isInteger(config.port) ||
+      config.port < 0 ||
+      config.port > 65535)
+  ) {
+    throw new TypeError("port must be an integer between 0 and 65535");
   }
 }
 

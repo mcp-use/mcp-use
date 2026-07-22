@@ -288,7 +288,8 @@ export default [
       parserOptions: {
         ecmaVersion: 2022,
         sourceType: "module",
-        projectService: true,
+        projectService: false,
+        project: ["./packages/server/tsconfig.test.json"],
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -334,6 +335,20 @@ export default [
         "error",
         { devDependencies: false },
       ],
+    },
+  },
+  // The production declaration build deliberately excludes the Vite-only
+  // dev/build commands. Lint those files against the test config, where their
+  // types are included, and permit their development-only toolchain imports.
+  {
+    files: [
+      "packages/server/src/cli/build.ts",
+      "packages/server/src/cli/dev.ts",
+      "packages/server/src/cli/views-bindings.ts",
+      "packages/server/src/cli/views.ts",
+    ],
+    rules: {
+      "import/no-extraneous-dependencies": ["error", { devDependencies: true }],
     },
   },
   // Test files

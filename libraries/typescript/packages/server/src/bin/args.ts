@@ -4,6 +4,7 @@
  * Deliberately dependency-free (no commander): the bin must add zero runtime
  * dependencies to the package (see specs/CLI_SPEC.md, dependency rules).
  */
+import { resolveListenHost, resolveListenPort } from "../listen-address.js";
 
 /**
  * Result of parsing the `mcp-use` command line.
@@ -31,6 +32,8 @@ export interface ParsedArgs {
   open: boolean;
   /** `false` when `--no-inspector` was passed (dev only); `true` otherwise. */
   inspector: boolean;
+  /** Whether `start` should mount the Inspector on the production listener. */
+  withInspector: boolean;
   /** Whether build output should include source maps (build only). */
   sourceMaps: boolean;
   /** Whether production view JS and CSS should be embedded in MCP resources. */
@@ -65,6 +68,7 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
     tunnel: false,
     open: true,
     inspector: true,
+    withInspector: false,
     sourceMaps: false,
     inline: false,
     help: false,
@@ -133,6 +137,9 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
       case "--no-inspector":
         args.inspector = false;
         break;
+      case "--with-inspector":
+        args.withInspector = true;
+        break;
       case "--source-maps":
         args.sourceMaps = true;
         break;
@@ -154,31 +161,34 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
 }
 
 /**
- * Resolve the preferred port for `mcp-use start` and `mcp-use dev` (`dev`
- * additionally probes upward from this value when it is taken).
+ * Resolve a CLI port with standard precedence: flag, `PORT`, configured value,
+ * then `3000`. `dev` additionally probes upward when the value is taken.
  *
- * Precedence: `--port` flag, then the `PORT` environment variable, then
- * `3000`. A `PORT` value that is not a valid port number is ignored (the
- * default applies); an invalid `--port` flag has already been rejected by
- * {@link parseArgs}.
+ * A malformed `PORT` is ignored; an invalid `--port` has already been
+ * rejected by {@link parseArgs}.
  *
  * @param flagPort - Port from the `--port`/`-p` flag, if given.
  * @param env - Environment to read `PORT` from.
+ * @param configuredPort - Code-level fallback from `ServerConfig.port`.
  * @defaultValue `env` defaults to `process.env`.
  *
  * @internal
  */
 export function resolvePort(
   flagPort: number | undefined,
-  env: Readonly<Record<string, string | undefined>> = process.env
+  env: Readonly<Record<string, string | undefined>> = process.env,
+  configuredPort?: number
 ): number {
-  if (flagPort !== undefined) return flagPort;
-  const raw = env.PORT;
-  if (raw !== undefined && raw.trim() !== "") {
-    const port = Number(raw);
-    if (isValidPort(port)) return port;
-  }
-  return 3000;
+  return resolveListenPort(flagPort, configuredPort, env);
+}
+
+/** Resolve a CLI host with standard precedence: flag, `HOST`, code, default. */
+export function resolveHost(
+  flagHost: string | undefined,
+  env: Readonly<Record<string, string | undefined>> = process.env,
+  configuredHost?: string
+): string {
+  return resolveListenHost(flagHost, configuredHost, env);
 }
 
 /** Parse a `--port` value, rejecting anything that is not a valid port. */

@@ -21,6 +21,7 @@ import {
   type ServerBranding,
 } from "./branding.js";
 import { assertServerConfig, type ServerConfig } from "./config.js";
+import { resolveListenHost, resolveListenPort } from "./listen-address.js";
 import {
   toAuthenticatedRequestContext,
   toRequestContext,
@@ -174,6 +175,28 @@ interface NodeHttpListener {
   once(event: "error", listener: (error: unknown) => void): void;
   listen(port: number, hostname: string, callback?: () => void): NodeHttpServer;
   address(): { port: number } | string | null;
+}
+
+/**
+ * Optional Node-listener routes registered while the framework mounts its
+ * production Fetch handler, before requests are accepted.
+ *
+ * This lets CLI-owned integrations add narrowly scoped routes while retaining
+ * `listen()`'s host validation and OAuth resource initialization.
+ */
+export interface ListenOptions {
+  /** Additional routes protected by the server's normal middleware stack. */
+  routes?: readonly ListenRoute[];
+  /** Explicit bind host; takes precedence over `HOST` and configured `host`. */
+  host?: string;
+}
+
+/** An additional route owned by a caller of {@link MCPServer.listen}. */
+export interface ListenRoute {
+  /** Whether this route handles a request. */
+  match: (request: Request) => boolean;
+  /** Handler invoked when {@link match} returns `true`. */
+  handler: FetchHandler;
 }
 
 function omitRootSchemaDialect<T>(schema: T): T {
@@ -331,6 +354,16 @@ export class MCPServer<TUser = never> {
    */
   get basePath(): string {
     return this.#basePath();
+  }
+
+  /** Configured bind host, before CLI and environment overrides. */
+  get host(): string | undefined {
+    return this.#config.host;
+  }
+
+  /** Configured bind port, before CLI and environment overrides. */
+  get port(): number | undefined {
+    return this.#config.port;
   }
 
   /**
@@ -712,9 +745,11 @@ export class MCPServer<TUser = never> {
   }
 
   /**
-   * Serve over HTTP on Node. Pass port `0` for an ephemeral port.
+   * Serve over HTTP on Node. Pass port `0` for an ephemeral port. Port
+   * precedence is the argument, `PORT`, `config.port`, then `3000`; host
+   * precedence is `options.host`, `HOST`, `config.host`, then `127.0.0.1`.
    *
-   * Binds `config.host` (default `127.0.0.1`). Localhost-class binds get
+   * Localhost-class binds get
    * DNS-rebinding Host protection automatically. Origin validation is off
    * unless `allowedOrigins` is set. To serve publicly set `host: "0.0.0.0"`;
    * behind a platform edge that is all that's needed, and `allowedHosts`
@@ -729,12 +764,16 @@ export class MCPServer<TUser = never> {
    * @throws If called on a localhost-class bind after {@link MCPServer.getHandler}
    * already mounted the app without Host validation.
    */
-  async listen(port = 3000): Promise<{ port: number; url: string }> {
+  async listen(
+    port: number | undefined = undefined,
+    options: ListenOptions = {}
+  ): Promise<{ port: number; url: string }> {
     this.#assertOpen("listen()");
-    this.#assertListenOAuthConfiguration();
     const { createServer } = await import("node:http");
     const { toNodeHandler } = await import("./node-bridge.js");
-    const host = this.#config.host ?? "127.0.0.1";
+    const host = resolveListenHost(options.host, this.#config.host);
+    const requestedPort = resolveListenPort(port, this.#config.port);
+    this.#assertListenOAuthConfiguration(host);
 
     return new Promise((resolve, reject) => {
       let resolveFetch: ((fetch: FetchHandler) => void) | undefined;
@@ -773,14 +812,20 @@ export class MCPServer<TUser = never> {
       }) as NodeHttpListener;
 
       server.once("error", rejectAndClose);
-      server.listen(port, host, () => {
+      server.listen(requestedPort, host, () => {
         try {
           const address = server.address();
           const boundPort =
             typeof address === "object" && address !== null
               ? address.port
-              : port;
-          const { fetch } = this.#ensureMounted("listen", boundPort);
+              : requestedPort;
+          const { fetch } = this.#ensureMounted(
+            "listen",
+            boundPort,
+            undefined,
+            options.routes,
+            host
+          );
           resolveFetch?.(fetch);
           if (!settled) {
             settled = true;
@@ -852,7 +897,8 @@ export class MCPServer<TUser = never> {
 
   #resolveOAuthResource(
     mode: "listen" | "handler",
-    listenPort?: number
+    listenPort?: number,
+    listenHost?: string
   ): URL | undefined {
     if (this.#config.oauth === undefined) {
       return undefined;
@@ -861,7 +907,7 @@ export class MCPServer<TUser = never> {
       return this.#oauthResource;
     }
 
-    const host = this.#config.host ?? "127.0.0.1";
+    const host = listenHost ?? this.#config.host ?? "127.0.0.1";
     const localListen =
       mode === "listen" &&
       listenPort !== undefined &&
@@ -880,11 +926,10 @@ export class MCPServer<TUser = never> {
     );
   }
 
-  #assertListenOAuthConfiguration(): void {
+  #assertListenOAuthConfiguration(host: string): void {
     if (this.#config.oauth === undefined) {
       return;
     }
-    const host = this.#config.host ?? "127.0.0.1";
     if (["127.0.0.1", "localhost", "::1"].includes(host)) {
       return;
     }
@@ -961,11 +1006,15 @@ export class MCPServer<TUser = never> {
    * `allowedOrigins` is set explicitly (SDK-aligned: the handler is open by
    * default). When enabled, Origin is checked only on non-GET/HEAD requests.
    */
-  #validationPolicy(mode: "listen" | "handler"): {
+  #validationPolicy(
+    mode: "listen" | "handler",
+    listenHost?: string
+  ): {
     hosts: string[] | undefined;
     origins: string[] | undefined;
   } {
-    const { host = "127.0.0.1", allowedHosts, allowedOrigins } = this.#config;
+    const { allowedHosts, allowedOrigins } = this.#config;
+    const host = listenHost ?? this.#config.host ?? "127.0.0.1";
     const localhostBind = ["127.0.0.1", "localhost", "::1"].includes(host);
     const hosts =
       allowedHosts !== undefined
@@ -983,14 +1032,16 @@ export class MCPServer<TUser = never> {
   #ensureMounted(
     mode: "listen" | "handler",
     listenPort?: number,
-    bus?: ServerEventBus
+    bus?: ServerEventBus,
+    additionalRoutes: readonly ListenRoute[] = [],
+    listenHost?: string
   ): {
     fetch: FetchHandler;
     handler: McpHttpHandler;
   } {
     this.#assertOpen();
     if (this.#fetchHandler === undefined || this.#handler === undefined) {
-      const { hosts, origins } = this.#validationPolicy(mode);
+      const { hosts, origins } = this.#validationPolicy(mode, listenHost);
       const basePath = this.#basePath();
       const nestedBasePath = basePath === "/" ? "" : basePath;
       const middlewares = [
@@ -1013,7 +1064,7 @@ export class MCPServer<TUser = never> {
       if (hosts === undefined) {
         if (mode === "listen") {
           console.warn(
-            `[mcp-use] listen() is serving on ${this.#config.host} without ` +
+            `[mcp-use] listen() is serving on ${listenHost} without ` +
               `Host validation. Behind a platform edge that only routes your ` +
               `own domains this is expected; if this process is reachable ` +
               `directly, set allowedHosts to restrict it.`
@@ -1023,7 +1074,7 @@ export class MCPServer<TUser = never> {
 
       this.#validateViewBindingsAtMount();
 
-      const resource = this.#resolveOAuthResource(mode, listenPort);
+      const resource = this.#resolveOAuthResource(mode, listenPort, listenHost);
       if (resource !== undefined) {
         const provider = this.#config.oauth!;
         middlewares.push(oauthMetadata(provider, resource));
@@ -1100,7 +1151,7 @@ export class MCPServer<TUser = never> {
       const routes: Array<{
         match: (request: Request) => boolean;
         handler: FetchHandler;
-      }> = [];
+      }> = [...additionalRoutes];
 
       const brandingDevMode = this.#viewsPrimed
         ? this.#viewsDevMode
@@ -1170,7 +1221,7 @@ export class MCPServer<TUser = never> {
     } else if (
       mode === "listen" &&
       !this.#hostValidated &&
-      this.#validationPolicy("listen").hosts !== undefined
+      this.#validationPolicy("listen", listenHost).hosts !== undefined
     ) {
       throw new Error(
         "Cannot listen() on a localhost bind after getHandler(): the app is " +

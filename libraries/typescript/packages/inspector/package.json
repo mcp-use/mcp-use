@@ -23,17 +23,7 @@
   "exports": {
     ".": {
       "types": "./dist/server/index.d.ts",
-      "import": "./dist/server/index.js",
-      "default": "./dist/server/index.js"
-    },
-    "./dev": {
-      "types": "./dist/server/index.d.ts",
-      "import": "./dist/server/index.js",
-      "default": "./dist/server/index.js"
-    },
-    "./proxy": {
-      "types": "./dist/server/proxy-routes.d.ts",
-      "import": "./dist/server/proxy-routes.js"
+      "import": "./dist/server/index.js"
     },
     "./client": {
       "types": "./dist/client/index.d.ts",
@@ -54,16 +44,15 @@
     "dev:server": "VITE_DEV=true tsx watch src/server/server.ts",
     "dev:standalone": "tsx watch src/server/server.ts",
     "clean": "rimraf dist",
-    "build": "npm run clean && npm run build:client && npm run build:client-exports && npm run build:server && npm run build:cli && npm run build:app",
-    "build:app": "vite build --config vite.app.config.ts",
+    "build": "npm run clean && npm run build:client-exports && npm run build:server && npm run build:app && npm run verify:package",
+    "build:app": "vite build --config vite.app.config.ts && node scripts/compress-app.mjs",
     "watch:app": "vite build --watch --config vite.app.config.ts",
     "preview:app": "vite preview --config vite.app.config.ts --host 127.0.0.1",
     "serve:app": "pnpm build:app && pnpm preview:app",
     "analyze:app": "ANALYZE=true vite build --config vite.app.config.ts",
-    "build:client": "vite build",
-    "build:client-exports": "tsup --config tsup.client.ts && tsc -p tsconfig.client.json --emitDeclarationOnly --declaration",
-    "build:server": "tsup 'src/server/**/*.ts' --format esm --out-dir dist/server && tsc -p tsconfig.server.json --emitDeclarationOnly --declaration",
-    "build:cli": "tsup src/server/cli.ts --format esm --out-dir dist/",
+    "build:client-exports": "tsup --config tsup.client.ts",
+    "build:server": "tsup --config tsup.server.ts",
+    "verify:package": "node scripts/verify-package.mjs",
     "prepublishOnly": "pnpm --filter @mcp-use/client build && pnpm build",
     "start": "node dist/cli.js --port 3000",
     "preview": "vite preview",
@@ -92,17 +81,48 @@
     "node": ">=22.22.2"
   },
   "peerDependencies": {
+    "@base-ui/react": "^1.6.0",
+    "@mcp-use/agent": "^2.0.0-alpha.0",
     "@mcp-use/client": "^2.0.0-alpha.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "express": "^4.21.2 || ^5.0.0",
+    "lucide-react": "^0.562.0",
+    "markdown-to-jsx": "^9.7.4",
+    "mcp-use": "workspace:*",
+    "motion": "^12.34.2",
     "react": "^18.0.0 || ^19.0.0",
     "react-dom": "^18.0.0 || ^19.0.0",
-    "react-router": "^7.12.0"
+    "react-resizable-panels": "^4.6.4",
+    "sonner": "^2.0.7",
+    "tailwind-merge": "^3.5.0"
   },
   "peerDependenciesMeta": {
+    "@base-ui/react": {
+      "optional": true
+    },
+    "@mcp-use/agent": {
+      "optional": true
+    },
     "@mcp-use/client": {
       "optional": true
     },
+    "class-variance-authority": {
+      "optional": true
+    },
+    "clsx": {
+      "optional": true
+    },
     "express": {
+      "optional": true
+    },
+    "lucide-react": {
+      "optional": true
+    },
+    "markdown-to-jsx": {
+      "optional": true
+    },
+    "motion": {
       "optional": true
     },
     "react": {
@@ -111,43 +131,47 @@
     "react-dom": {
       "optional": true
     },
-    "react-router": {
+    "react-resizable-panels": {
+      "optional": true
+    },
+    "sonner": {
+      "optional": true
+    },
+    "tailwind-merge": {
       "optional": true
     }
   },
-  "dependencies": {
-    "@base-ui/react": "^1.6.0",
-    "@hono/node-server": "^1.19.13",
-    "@mcp-use/agent": "workspace:*",
-    "@mcp-use/client": "workspace:*",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "hono": "^4.12.12",
-    "lucide-react": "^0.562.0",
-    "markdown-to-jsx": "^9.7.4",
-    "motion": "^12.34.2",
-    "open": "^11.0.0",
-    "react-resizable-panels": "^4.6.4",
-    "sonner": "^2.0.7",
-    "tailwind-merge": "^3.5.0"
-  },
+  "dependencies": {},
   "publishConfig": {
     "access": "public"
   },
   "devDependencies": {
+    "@base-ui/react": "^1.6.0",
+    "@hono/node-server": "^1.19.13",
+    "@mcp-use/agent": "workspace:*",
+    "@mcp-use/client": "workspace:*",
     "@playwright/test": "^1.58.2",
     "@tailwindcss/vite": "^4.2.0",
     "@types/express": "^5.0.6",
-    "mcp-use": "workspace:*",
     "@vitejs/plugin-react": "^6.0.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "emulate": "0.5.0",
     "eslint": "^9.39.2",
     "express": "^5.2.1",
+    "hono": "^4.12.12",
+    "lucide-react": "^0.562.0",
+    "markdown-to-jsx": "^9.7.4",
+    "motion": "^12.34.2",
     "oauth2-mock-server": "^8.2.2",
+    "open": "^11.0.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-router": "^7.12.0",
+    "react-resizable-panels": "^4.6.4",
     "rollup-plugin-visualizer": "^6.0.3",
+    "sonner": "^2.0.7",
+    "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.2.0",
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",

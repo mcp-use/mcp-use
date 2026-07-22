@@ -88,6 +88,7 @@ interface BaseServerConfig {
   instructions?: string;
   basePath?: string;
   host?: string;
+  port?: number;
   allowedHosts?: string[];
   allowedOrigins?: string[];
   legacy?: "stateless" | "reject";
@@ -102,6 +103,8 @@ type ServerConfig<TUser = never> = BaseServerConfig &
     ? { oauth?: undefined }
     : { oauth: OAuthProvider<TUser> });
 ```
+
+`host` and `port` are code-level listener fallbacks. `listen()` and `mcp-use start` use them only after an explicit flag/value and `HOST`/`PORT`; use `port: 0` to request an ephemeral port.
 
 `ServerConfig<TUser>` requires `oauth` when `TUser` is not `never` and rejects it when no authenticated user type is declared.
 

@@ -300,19 +300,11 @@ function getCurrentPackageVersions(
   if (isDevelopment) {
     return {
       "mcp-use": "workspace:*",
-      "@mcp-use/inspector": "workspace:*",
     };
   }
   const requestedSdk = sdkVersion ?? "latest";
-  const requestedStableSdk =
-    requestedSdk === "latest" || /^\d+\.\d+\.\d+$/.test(requestedSdk);
-  const inspectorChannel =
-    !requestedStableSdk || packageJson.version.includes("-")
-      ? "beta"
-      : "latest";
   return {
     "mcp-use": requestedSdk,
-    "@mcp-use/inspector": inspectorChannel,
   };
 }
 
@@ -351,13 +343,6 @@ function processTemplateFile(
       `"mcp-use": "${mcpUseVersion}"`
     );
   }
-
-  const inspectorVersion =
-    versions["@mcp-use/inspector"] ?? (isDevelopment ? "workspace:*" : "beta");
-  processedContent = processedContent.replace(
-    /"@mcp-use\/inspector": "workspace:\*"/,
-    `"@mcp-use/inspector": "${inspectorVersion}"`
-  );
 
   return processedContent;
 }
