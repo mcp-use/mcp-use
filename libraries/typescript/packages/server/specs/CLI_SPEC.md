@@ -80,7 +80,7 @@ All global CLI state lives under `~/.mcp-use/`; project state lives under the pr
 ### Cloud identity and organization
 
 ```text
-mcp-use login [--api-key <key>] [--org <id-or-slug>] [--no-open]
+mcp-use login [--api-key <key> | --device-code <code>] [--org <id-or-slug>] [--no-open]
 mcp-use logout [--yes]
 mcp-use whoami [--json]
 mcp-use org list [--json]
@@ -88,7 +88,7 @@ mcp-use org current [--json]
 mcp-use org use <id-or-slug>
 ```
 
-- `login` uses `--api-key` or `MCP_USE_API_KEY` when present; otherwise it runs OAuth device authorization, prints the verification URL/code, and opens the URL unless `--no-open` or non-TTY. It validates the resulting credential before persisting it. `--org` validates and stores the selection; without it, the account default is stored when available. v2 does not expose pre-approved device-code injection.
+- `login` uses `--api-key` or `MCP_USE_API_KEY` when present; otherwise it runs OAuth device authorization, prints the verification URL/code, and opens the URL unless `--no-open` or non-TTY. `--device-code` redeems a short-lived, pre-approved RFC 8628 device code non-interactively through the same token endpoint, then creates and validates a CLI API key before persisting it. `--api-key` and `--device-code` are mutually exclusive; an explicit `--device-code` takes precedence over `MCP_USE_API_KEY`. `--org` validates and stores the selection; without it, the account default is stored when available. Device codes and bearer credentials are never included in output or structured errors.
 - `logout` deletes local cloud credentials and organization selection; remote key revocation remains a web-account action. `whoami` verifies the stored key and returns user plus active organization; missing/expired credentials exit `1` with a `mcp-use login` hint.
 - `org list` returns memberships and marks the active organization. `org current` requires a resolvable active/default organization. `org use` validates membership, updates local state, and best-effort updates the account default; local success is authoritative.
 

@@ -289,11 +289,13 @@ mcp-use login [options]
 
 **Options:**
 
-| Option                 | Description                                                                | Default             |
-| ---------------------- | -------------------------------------------------------------------------- | ------------------- |
-| `--api-key <key>`      | Save an API key directly. Intended for CI and agent harnesses.             | Browser/device flow |
-| `--org <org>`          | Select an organization by slug, ID, or name without an interactive prompt. | Prompt when needed  |
-| `--device-code <code>` | Redeem a pre-approved device code without opening a browser.               | None                |
+| Option                 | Description                                                | Default             |
+| ---------------------- | ---------------------------------------------------------- | ------------------- |
+| `--api-key <key>`      | Authenticate with an API key.                              | Browser/device flow |
+| `--device-code <code>` | Redeem a short-lived, pre-approved RFC 8628 device code.   | None                |
+| `--org <id-or-slug>`   | Select the active organization by ID or slug.              | Account default     |
+| `--no-open`            | Do not open the verification URL during interactive login. | Opens on a TTY      |
+| `--json`               | Emit one machine-readable JSON result.                     | Human-readable text |
 
 **Examples:**
 
@@ -306,8 +308,10 @@ mcp-use login --api-key mcp_... --org my-org
 **Notes and behavior:**
 
 - Interactive login starts a device-code flow and opens a browser.
-- If the account belongs to multiple organizations and `--org` is omitted, the CLI prompts for an organization.
-- In non-TTY environments, use `--org` to avoid an organization selection prompt.
+- `--device-code` skips the browser and redeems the code through the same token endpoint. The CLI then creates, validates, and stores a persistent API key.
+- `--api-key` and `--device-code` cannot be combined. An explicit `--device-code` takes precedence over `MCP_USE_API_KEY`.
+- The CLI never writes the device code, bearer token, or API key to human-readable or JSON output.
+- If `--org` is omitted, the CLI stores the account-default organization when one is available.
 - `MCP_USE_API_KEY` can provide the API key for non-interactive login.
 
 ### `whoami`
