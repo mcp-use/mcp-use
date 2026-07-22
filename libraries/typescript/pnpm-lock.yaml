@@ -198,6 +198,15 @@ importers:
       '@mcp-use/inspector':
         specifier: workspace:*
         version: link:../inspector
+      '@tailwindcss/oxide':
+        specifier: 4.2.0
+        version: 4.2.0
+      lightningcss:
+        specifier: ^1.32.0
+        version: 1.32.0
+      rolldown:
+        specifier: 1.0.3
+        version: 1.0.3
     devDependencies:
       '@modelcontextprotocol/server':
         specifier: https://pkg.pr.new/@modelcontextprotocol/server@f60b40179b0f090f6d64248be1312245a160b5ee

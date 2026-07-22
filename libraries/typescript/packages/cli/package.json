@@ -39,7 +39,11 @@
     "build": "rimraf dist && tsup --config tsup.config.ts && node scripts/verify-package.mjs",
     "test": "node --test tests/proxy.test.mjs"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@tailwindcss/oxide": "4.2.0",
+    "lightningcss": "^1.32.0",
+    "rolldown": "1.0.3"
+  },
   "peerDependencies": {
     "@mcp-use/client": "^2.0.0-alpha.0",
     "@mcp-use/inspector": "^20.0.0-beta.0"
