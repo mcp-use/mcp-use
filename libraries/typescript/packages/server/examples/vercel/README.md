@@ -5,7 +5,7 @@ the framework's stateless design end to end.
 
 ## What this demonstrates
 
-- **`server.getHandler()` is the serverless deployment door.** `MCPServer`
+- **`server.fetch` is the serverless deployment door.** `MCPServer`
   builds a fresh SDK server per HTTP request (no session affinity, no shared
   in-memory state), so its web-standard `(request: Request) => Promise<Response>`
   handler works unmodified as a Vercel Function — no adapter layer, no shim.
@@ -18,7 +18,7 @@ the framework's stateless design end to end.
   the function instance actually serving the request — a live look at the
   serverless environment.
 - **Zero Host/Origin configuration.** DNS-rebinding protection exists to
-  guard locally bound servers; `getHandler()` never binds a socket, so it
+  guard locally bound servers; `server.fetch` never binds a socket, so it
   applies no Host validation by default. That's safe on Vercel because the
   platform edge only routes hostnames assigned to the deployment — a
   DNS-rebinding-style `Host` never reaches the function. To opt into strict
@@ -30,7 +30,7 @@ the framework's stateless design end to end.
 Vercel Functions are invoked per-request (and reused while "warm," with no
 guaranteed continuity between invocations). A server that kept per-client
 session state in memory would behave inconsistently across cold starts and
-horizontal scaling. `MCPServer` never does that — `getHandler()` mounts the
+horizontal scaling. `MCPServer` never does that — the first `server.fetch` call mounts the
 Hono app and MCP registry once (cheap, at module scope), and every incoming
 request gets a brand-new SDK server built from that registry. There is
 nothing to lose between invocations, which is exactly what serverless
@@ -40,7 +40,7 @@ requires.
 
 ```
 mcp-server.ts    module-scope MCPServer: tool and resource registrations
-api/mcp.ts       Vercel Function entry — exports server.getHandler() as `fetch`
+api/mcp.ts       Vercel Function entry — exports the server's `fetch`
 smoke.ts         local, no-network test of the exported handler
 ```
 

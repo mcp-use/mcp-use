@@ -31,6 +31,20 @@ This file provides a NAVIGATION GUIDE ONLY. Before implementing any MCP server f
 
 Comprehensive guide for building production-ready MCP servers with tools, resources, prompts, and widgets using mcp-use.
 
+## Tool typing rule
+
+Always assign a statically declared tool to an exported constant:
+`export const toolName = server.tool(...)`. The generated `mcp-env.d.ts` reads
+exported `ToolRef` values to type views, and `useCallTool("name")` is a
+TypeScript error when the matching ref is not exported. Re-export refs from
+split tool modules. Only genuinely dynamic registration should use
+`useDynamicTool<Args, Result>("name")` in a view.
+
+After changing tools or views, run `npm run typecheck` (or
+`mcp-use typecheck`). It refreshes the managed `mcp-env.d.ts` entry import
+before invoking the project's own TypeScript compiler, so a missing tool export
+is reported without a dev server or separate sync command.
+
 ## ⚠️ FIRST: New Project or Existing Project?
 
 **Before doing anything else, determine whether you are inside an existing mcp-use project.**
@@ -384,7 +398,7 @@ const server = new MCPServer({
   version: "1.0.0"
 });
 
-server.tool(
+export const greet = server.tool(
   {
     name: "greet",
     description: "Greet a user",
@@ -421,5 +435,3 @@ server.listen();
 - `server.use('mcp:tools/call', fn)` - MCP middleware (tools, resources, prompts, list ops)
 - `server.use('mcp:*', fn)` - Catch-all MCP middleware
 - `server.use(fn)` - HTTP middleware (Hono)
-
-

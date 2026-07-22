@@ -134,14 +134,14 @@ describe("runBuild", () => {
     expect(code).toMatch(/from ["']zod["']/);
 
     // The built entry runs under plain node and default-exports the
-    // MCPServer instance (getHandler present); drive a real request through
+    // MCPServer instance (`fetch` present); drive a real request through
     // the handler to prove the export is live.
     const mod = (await import(pathToFileURL(entryFile).href)) as {
-      default: { getHandler(): (request: Request) => Promise<Response> };
+      default: { fetch(request: Request): Promise<Response> };
     };
-    expect(typeof mod.default.getHandler).toBe("function");
+    expect(typeof mod.default.fetch).toBe("function");
 
-    const handler = mod.default.getHandler();
+    const handler = mod.default.fetch;
     const response = await handler(
       new Request("http://localhost/mcp", {
         method: "POST",
@@ -427,9 +427,9 @@ describe("runBuild (views)", () => {
       const mod = (await import(
         pathToFileURL(join(buildDir, "index.js")).href
       )) as {
-        default: { getHandler(): (request: Request) => Promise<Response> };
+        default: { fetch(request: Request): Promise<Response> };
       };
-      const handler = mod.default.getHandler();
+      const handler = mod.default.fetch;
 
       const listBody = await handlerMcp(handler, "resources/list");
       const resources = (listBody["result"] as { resources: { uri: string }[] })
@@ -582,13 +582,11 @@ describe("runBuild (views)", () => {
     const mod = (await import(
       pathToFileURL(join(buildDir, "index.js")).href
     )) as {
-      default: { getHandler(): (request: Request) => Promise<Response> };
+      default: { fetch(request: Request): Promise<Response> };
     };
-    const readBody = await handlerMcp(
-      mod.default.getHandler(),
-      "resources/read",
-      { uri: "ui://views/product-search-result.html" }
-    );
+    const readBody = await handlerMcp(mod.default.fetch, "resources/read", {
+      uri: "ui://views/product-search-result.html",
+    });
     const text = (readBody["result"] as { contents: { text: string }[] })
       .contents[0]!.text;
     expect(text).toContain('<script type="module">');

@@ -1,7 +1,7 @@
 # mcp-use v2 — complete CLI contract
 
 **Status:** Implemented.
-**Scope:** the complete first-party `mcp-use` CLI: `dev`, `build`, `start`, cloud auth, organizations, servers, deployments, deploy, client, screenshot, and skills; plus optional Inspector mounting in `dev` and production `start`.
+**Scope:** the complete first-party `mcp-use` CLI: `dev`, `build`, `typecheck`, `start`, cloud auth, organizations, servers, deployments, deploy, client, screenshot, and skills; plus optional Inspector mounting in `dev` and production `start`.
 **Package:** `mcp-use@2`, published from `packages/server`. The package owns the bin, runtime, command chunks, and toolchain. The development Inspector remains independently published. There is no separate CLI implementation, devkit, or config package. `@mcp-use/cli@4` is a compatibility-only proxy for the historical install command.
 
 ## Goals
@@ -33,9 +33,9 @@ server.tool(/* … */);
 export default server;
 ```
 
-`mcp-use dev` and `mcp-use start` own the socket. Serverless targets (Vercel, etc.) bypass the CLI entirely and wrap `server.getHandler()` in their own handler file — `examples/vercel` already matches this shape (module-scope server + `api/mcp.ts` wrapping `getHandler()`). `mcp-use build` is the blessed path for node deployments, but `package.json` scripts are user-owned; nothing enforces it.
+`mcp-use dev` and `mcp-use start` own the socket. Serverless targets (Vercel, etc.) bypass the CLI entirely and export `server.fetch` from their handler file — the server stays at module scope and owns its Hono application. `mcp-use build` is the blessed path for node deployments, but `package.json` scripts are user-owned; nothing enforces it.
 
-**Entry discovery:** conventional locations, first hit wins — `src/index.ts`, `src/server.ts`, `index.ts`, `server.ts` — overridable with `--entry <path>` on `dev` and `build`.
+**Entry discovery:** conventional locations, first hit wins — `src/index.ts`, `src/server.ts`, `index.ts`, `server.ts` — overridable with `--entry <path>` on `dev`, `build`, and `typecheck`.
 
 `examples/railway` follows this shape (its platform door is `mcp-use build` + `mcp-use start`; host selection via `RAILWAY_PUBLIC_DOMAIN` stays constructor config on the server, which `dev`/`start` honor through `listen()`).
 
@@ -43,7 +43,7 @@ export default server;
 
 The first-party command contract belongs to `mcp-use`:
 
-- Runtime and toolchain: `dev`, `build`, `start`.
+- Runtime and toolchain: `dev`, `build`, `typecheck`, `start`.
 - Cloud identity: `login`, `logout`, `whoami`.
 - Cloud resources: `org`, `servers`, `deployments`, `deploy`.
 - Local and integration workflows: `client`, `screenshot`, `skills`.
@@ -247,7 +247,7 @@ Target user `package.json` shape:
 └─ cloud/        ← deploy linkage (link.json)
 ```
 
-This contract writes `build/` (using `cache/` as Vite's `cacheDir`), `state/tunnel.json` during tunneled dev, and `cloud/link.json` after deploy. `generated/` is reserved for the explicit typegen escape hatch. `build/` contains no mutable runtime state, so build output stays reproducible and disposable. Because everything under `.mcp-use/` is gitignored and `rm -rf`-safe, nothing committed ever lives here. The root-level `mcp-env.d.ts` typing shim belongs in the project source tree; templates scaffold it, and `dev`/`build` recreate it from the discovered entry path when missing without overwriting an existing file (`VIEWS_SPEC.md` § Typing).
+This contract writes `build/` (using `cache/` as Vite's `cacheDir`), `state/tunnel.json` during tunneled dev, and `cloud/link.json` after deploy. `generated/` is reserved for the explicit typegen escape hatch. `build/` contains no mutable runtime state, so build output stays reproducible and disposable. Because everything under `.mcp-use/` is gitignored and `rm -rf`-safe, nothing committed ever lives here. The root-level `mcp-env.d.ts` typing shim belongs in the project source tree and is scaffolded by every first-party template. `dev`, `build`, and `typecheck` reconcile declarations carrying an mcp-use generated header with the discovered entry path; a declaration without that marker is user-owned and never overwritten (`VIEWS_SPEC.md` § Typing).
 
 Rules, all inherited from v1 and locked:
 
@@ -256,6 +256,12 @@ Rules, all inherited from v1 and locked:
 - **Per-project, not global.** Project build/linkage state lives in `.mcp-use/`; cloud identity and saved-client state live in the explicitly owned global paths under `~/.mcp-use/` defined above. Neither side scans or writes outside its declared paths.
 
 ## Commands
+
+### `mcp-use typecheck` (in `src/cli/typecheck.ts`, dispatched from the bin)
+
+Discovers the server entry with the same `--path`, `--entry`, and `--mcp-dir` rules as `dev`/`build`, reconciles the managed root `mcp-env.d.ts`, then resolves `typescript` from the selected project and invokes its `tsc` binary with `--noEmit`. This preserves the project's compiler version and plugins; the CLI does not bundle TypeScript. Arguments after `--` are forwarded to `tsc`, and the command returns the compiler's exit code. Missing TypeScript or entry discovery failures exit `1` with an actionable error.
+
+The command does not inspect or execute the server and does not generate tool-specific types. Its only type preparation is keeping the constant `typeof import("./entry.js")` bridge current. Templates commit that bridge, so editor typechecking and a direct `tsc --noEmit` also work before any mcp-use command has run. No install or postinstall lifecycle hook is involved.
 
 ### `mcp-use build` (in `src/cli/build.ts`, dispatched from the bin)
 
@@ -268,7 +274,7 @@ Writes `.mcp-use/build/manifest.json`:
   "buildId": "…",
   "entryPoint": "index.js",
   "createdAt": "…",
-  "views": {}
+  "views": {},
 }
 ```
 
@@ -276,14 +282,14 @@ Writes `.mcp-use/build/manifest.json`:
 
 When `MCP_ASSETS_URL` is set during a default external views build, the embedded view asset paths become full CDN URLs containing the server entry's `basePath`. The CLI leaves `build/views/` on disk and prints an upload instruction; it does not upload files. Inline builds do not rewrite embedded JS/CSS; `MCP_ASSETS_URL` can still select the host for copied `public/` files at runtime. Runtime env uses `MCP_URL` for the server origin, `MCP_ASSETS_URL` for asset and public-file URLs, and `CSP_URLS` / `CSP_*_DOMAINS` for global CSP.
 
-The build is transpile-only and does not run a typecheck. Projects own their `tsc --noEmit` script.
+The build is transpile-only and does not run a typecheck. First-party templates expose `mcp-use typecheck` as their project-owned `typecheck` script.
 
 ### `mcp-use dev` (in `src/cli/dev.ts`, dispatched from the bin)
 
 A single long-lived process. It:
 
 1. Creates a Vite dev server (Environment API, node/SSR environment only) and loads the entry through the module runner.
-2. Grabs the default-exported `MCPServer`, wraps `server.getHandler()` behind an **atomically swappable reference**.
+2. Grabs the default-exported `MCPServer`, injects the process-scoped event bus through its internal CLI lifecycle hook, and wraps `server.fetch` behind an **atomically swappable reference**.
 3. Binds **one** Node HTTP listener (vendored `toNodeHandler` bridge) that delegates every request to the current handler.
 4. Unless `--no-inspector` is set, resolves `@mcp-use/inspector` from the project and calls its framework-neutral `mountInspector()` on that same listener. Missing optional tooling does not stop the MCP server; one package-manager-aware install hint is printed instead.
 
@@ -291,7 +297,7 @@ On file change (only files in the entry's module graph count): Vite invalidates,
 
 - **Port:** `--port`, else integer `PORT` env, else `3000`; if the preferred port cannot be bound on the listen host, or (on localhost-class binds) something already accepts connections on loopback, probe upward.
 - **Host:** `--host`, else non-empty `HOST` env, else `127.0.0.1` (matching the server's own localhost-first posture, SPEC.md delta 5). Printed and auto-opened URLs use the browsable equivalent: `localhost` for loopback/wildcard binds, the given host verbatim otherwise; wildcard binds additionally print a `Network:` line with the machine's LAN address.
-- **DNS-rebinding protection:** `getHandler()` deliberately applies no Host/Origin validation (its contract assumes a platform edge in front) — in dev, this process is the edge. On localhost-class binds the listener validates `Host` against the localhost allowlist plus the active tunnel hostname (tunnel traffic arrives with the tunnel's public Host), rejecting with the SDK's JSON-RPC 403 shape _before_ any routing, so the MCP endpoint, the dev API routes, and Vite-served module URLs are all covered. Origin is not validated unless the server's `allowedOrigins` is set (SDK-aligned default). Rebinding manifests as a non-localhost `Host`; sandboxed view iframes have an opaque origin, so their module/asset GETs legitimately carry `Origin: null`. Those loads also run in CORS mode, so they need `Access-Control-Allow-Origin`: the MCP server's view asset and public routes (mounted in both dev and production) always emit `*`. Vite-served module URLs (checked per request, so runtime tunnel start/stop takes effect immediately): while a tunnel is active, emit `*` so foreign and opaque-origin hosts can fetch the module graph; without a tunnel on a localhost bind, reflect a validated loopback `Origin` (exact request origin — `localhost` / `127.0.0.1` / `[::1]`, any port/scheme accepted by `validateOriginHeader` against `localhostAllowedOrigins()`) and merge `Vary: Origin`, so a local MCP host (e.g. inspector at `http://localhost:6274`) can load modules while foreign origins, `Origin: null`, and missing Origin get no ACAO and the source module graph stays unreadable to arbitrary websites. Vite's own CORS middleware is disabled (`cors: false`) so its localhost-only default neither blocks tunnel-rendering hosts nor fights the gated header. Non-localhost binds get no validation (the legitimate hostnames are unknowable) and print a warning instead.
+- **DNS-rebinding protection:** `server.fetch` deliberately applies no Host/Origin validation by default (its contract assumes a platform edge in front) — in dev, this process is the edge. On localhost-class binds the listener validates `Host` against the localhost allowlist plus the active tunnel hostname (tunnel traffic arrives with the tunnel's public Host), rejecting with the SDK's JSON-RPC 403 shape _before_ any routing, so the MCP endpoint, the dev API routes, and Vite-served module URLs are all covered. Origin is not validated unless the server's `allowedOrigins` is set (SDK-aligned default). Rebinding manifests as a non-localhost `Host`; sandboxed view iframes have an opaque origin, so their module/asset GETs legitimately carry `Origin: null`. Those loads also run in CORS mode, so they need `Access-Control-Allow-Origin`: the MCP server's view asset and public routes (mounted in both dev and production) always emit `*`. Vite-served module URLs (checked per request, so runtime tunnel start/stop takes effect immediately): while a tunnel is active, emit `*` so foreign and opaque-origin hosts can fetch the module graph; without a tunnel on a localhost bind, reflect a validated loopback `Origin` (exact request origin — `localhost` / `127.0.0.1` / `[::1]`, any port/scheme accepted by `validateOriginHeader` against `localhostAllowedOrigins()`) and merge `Vary: Origin`, so a local MCP host (e.g. inspector at `http://localhost:6274`) can load modules while foreign origins, `Origin: null`, and missing Origin get no ACAO and the source module graph stays unreadable to arbitrary websites. Vite's own CORS middleware is disabled (`cors: false`) so its localhost-only default neither blocks tunnel-rendering hosts nor fights the gated header. Non-localhost binds get no validation (the legitimate hostnames are unknowable) and print a warning instead.
 - **Tunnel:** `--tunnel` starts a public tunnel as soon as the HTTP listener is bound (via `npx @mcp-use/tunnel`). The inspector UI can also start/stop the tunnel at runtime through dev-only API routes (below) without restarting the dev process.
 - **Auto-open:** when the project-local Inspector mounted successfully, its URL is opened in the default browser (dependency-free `open`/`start`/`xdg-open` spawn, best-effort). `--no-open` disables it, and it is skipped automatically when stdout is not a TTY, so agents/CI never trigger a browser launch or see a "failed to open" error. A missing or explicitly disabled Inspector is never opened.
 - **Env:** `.env` loaded via Node's native `process.loadEnvFile()` (guarded by an `existsSync` check, since `loadEnvFile` throws on a missing file) before the entry is imported.
@@ -328,7 +334,7 @@ The returned mount serves the exact UI bundle shipped in the installed package u
 
 The Inspector surface and dev-control routes are not exposed through a public `mcp-use dev` tunnel. A wildcard bind serves them only to loopback Host values; the public tunnel and LAN-facing wildcard hosts expose the MCP endpoint and required view assets, not a loopback-capable proxy into the developer machine. An explicitly selected non-loopback bind may expose the Inspector but disables loopback proxy targets and already carries the CLI's network-exposure warning.
 
-`MCPServer.getHandler()`, `listen()`, and `mcp-use build` do not mount an Inspector shell or proxy. Plain `mcp-use start` also returns `404` for `GET ${basePath}/inspector`; only `mcp-use start --with-inspector` mounts it. Standalone inspection of arbitrary endpoints remains explicit: `npx @mcp-use/inspector --url <mcp-url>`.
+`server.fetch`, `listen()`, and `mcp-use build` do not mount an Inspector shell or proxy. Plain `mcp-use start` also returns `404` for `GET ${basePath}/inspector`; only `mcp-use start --with-inspector` mounts it. Standalone inspection of arbitrary endpoints remains explicit: `npx @mcp-use/inspector --url <mcp-url>`.
 
 ## Why the server entry reloads instead of HMR
 

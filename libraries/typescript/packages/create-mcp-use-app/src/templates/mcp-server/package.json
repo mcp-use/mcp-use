@@ -24,7 +24,7 @@
     "dev": "mcp-use dev",
     "start": "mcp-use start",
     "deploy": "mcp-use deploy",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "mcp-use typecheck"
   },
   "dependencies": {
     "mcp-use": "workspace:*",

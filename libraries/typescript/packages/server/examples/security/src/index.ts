@@ -6,7 +6,7 @@ const server = new MCPServer({
   title: "Host and origin validation",
   description: "Restricts a framework-mounted MCP endpoint to its known hosts.",
   // These are additive: localhost continues to work for local development.
-  // They make getHandler() reject an unrecognised Host or POST Origin.
+  // They make server.fetch reject an unrecognised Host or POST Origin.
   allowedHosts: ["api.example.com"],
   allowedOrigins: ["app.example.com"],
 });

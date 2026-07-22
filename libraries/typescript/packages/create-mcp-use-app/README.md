@@ -57,7 +57,7 @@ my-mcp-server/
 ├── index.ts                              # MCP server entry point
 ├── package.json                          # Scripts and dependencies
 ├── tsconfig.json                         # TypeScript configuration
-├── mcp-env.d.ts                          # Generated view typing bridge
+├── mcp-env.d.ts                          # Managed view typing bridge
 ├── public/                               # Static assets
 └── views/                                # Included by the mcp-apps template
     └── product-search-result/
@@ -74,6 +74,7 @@ my-mcp-server/
 | **🎨 MCP Apps Views**   | React views discovered and bundled by the CLI      |
 | **🛠️ Example Tools**    | Sample MCP tools, resources, and prompts          |
 | **📦 Build Scripts**    | Ready-to-use development and production scripts   |
+| **✅ Type Checking**    | Refreshes MCP view types, then runs local TypeScript |
 | **🚀 Production Ready** | Optimized build configuration                     |
 
 ---
@@ -285,7 +286,7 @@ The inspector automatically opens at `http://localhost:3000/mcp/inspector` where
 Bind a tool to a view with the tool definition's `view` field:
 
 ```typescript
-server.tool(
+export const showAnalytics = server.tool(
   {
     name: "show-analytics",
     description: "Show analytics for a reporting period",
@@ -316,9 +317,7 @@ interface Analytics {
 
 export default function AnalyticsDashboard() {
   const view = useToolContext();
-  const refresh = useCallTool<{ period: string }, Analytics>(
-    "show-analytics"
-  );
+  const refresh = useCallTool("show-analytics");
 
   if (view.status === "pending") return <p>Loading analytics…</p>;
   if (view.status === "error") return <p>{view.error.message}</p>;

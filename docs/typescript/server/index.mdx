@@ -46,7 +46,7 @@ Tools are functions clients can invoke. Use tools for actions, lookups, and work
 import { text } from "mcp-use/server";
 import { z } from "zod";
 
-server.tool(
+export const getTime = server.tool(
   {
     name: "get-time",
     description: "Return the current server time as an ISO timestamp",
@@ -159,7 +159,7 @@ The recommended server pattern is to define a custom tool with a `widget: { name
 import { text, widget } from "mcp-use/server";
 import { z } from "zod";
 
-server.tool(
+export const searchProducts = server.tool(
   {
     name: "search-products",
     description: "Search products and display the results in a widget",

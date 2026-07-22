@@ -9,7 +9,10 @@ import {
   type ServerContext,
   type StandardSchemaWithJSON,
 } from "@modelcontextprotocol/server";
+import type { Context, Env, HonoRequest as HonoRequestType } from "hono";
+import { HonoRequest } from "hono/request";
 
+import { getRequestBag } from "./fetch-app.js";
 import type { OAuthExtra } from "./oauth/provider.js";
 import { supportsViews } from "./views/capabilities.js";
 
@@ -96,11 +99,17 @@ export type OAuthAuth<TUser> = {
   resource?: URL;
 };
 
-type RequestContextBase = {
+type RequestContextBase<TEnv extends Env> = Omit<Context<TEnv>, "req"> & {
   /** Aborted when the client cancels the request or the connection drops. */
   signal: AbortSignal;
-  /** The originating HTTP request, when served over HTTP. */
-  request?: Request;
+  /** Hono request for the originating HTTP exchange. Its raw Web Request is available as `request.raw`. */
+  request?: HonoRequestType;
+  /**
+   * Deprecated v1-compatible alias for {@link RequestContext.request}.
+   *
+   * @deprecated Use `request` instead.
+   */
+  req?: HonoRequestType;
   /** Per-request client capability queries. */
   client: RequestClientContext;
   /** Request or read a keyed form- or URL-mode elicitation. */
@@ -149,9 +158,10 @@ type RequestContextBase = {
 export type RequestContext<
   TUser = never,
   HasOAuth extends boolean = false,
+  TEnv extends Env = Env,
 > = HasOAuth extends true
-  ? RequestContextBase & { auth: OAuthAuth<TUser> }
-  : RequestContextBase & { auth?: never };
+  ? RequestContextBase<TEnv> & { auth: OAuthAuth<TUser> }
+  : RequestContextBase<TEnv> & { auth?: never };
 
 type MappedOAuthAuthInfo<TUser> = AuthInfo & {
   expiresAt: number;
@@ -238,11 +248,20 @@ function createElicit(
  *
  * @internal
  */
-export function toRequestContext(
+export function toRequestContext<TEnv extends Env = Env>(
   ctx: ServerContext
-): RequestContext<never, false> {
-  const request = ctx.http?.req;
-  return {
+): RequestContext<never, false, TEnv> {
+  const rawRequest = ctx.http?.req;
+  const http =
+    rawRequest === undefined
+      ? undefined
+      : (getRequestBag(rawRequest).honoContext as Context<TEnv> | undefined);
+  const request: HonoRequestType | undefined =
+    http?.req ??
+    (rawRequest === undefined
+      ? undefined
+      : (new HonoRequest(rawRequest) as HonoRequestType));
+  const additions = {
     signal: ctx.mcpReq.signal,
     ...(request !== undefined && { request }),
     ...(ctx.mcpReq.inputResponses !== undefined && {
@@ -251,7 +270,11 @@ export function toRequestContext(
     client: toClientContext(ctx),
     elicit: createElicit(ctx.mcpReq.inputResponses),
     requestState: <T = unknown>() => ctx.mcpReq.requestState<T>(),
-    async reportProgress(progress, total, message): Promise<boolean> {
+    async reportProgress(
+      progress: number,
+      total?: number,
+      message?: string
+    ): Promise<boolean> {
       const progressToken = ctx.mcpReq._meta?.progressToken;
       if (progressToken === undefined) return false;
       await ctx.mcpReq.notify({
@@ -265,7 +288,11 @@ export function toRequestContext(
       });
       return true;
     },
-    async sendLog(level, data, logger): Promise<void> {
+    async sendLog(
+      level: Parameters<RequestContextBase<TEnv>["sendLog"]>[0],
+      data: unknown,
+      logger?: string
+    ): Promise<void> {
       await ctx.mcpReq.notify({
         method: "notifications/message",
         params: {
@@ -276,16 +303,22 @@ export function toRequestContext(
       });
     },
   };
+  if (http !== undefined) {
+    return Object.assign(http, additions) as RequestContext<never, false, TEnv>;
+  }
+  return {
+    ...additions,
+    ...(request !== undefined && { req: request }),
+  } as RequestContext<never, false, TEnv>;
 }
 
 /** @internal Projects mapped OAuth auth information into callback context. */
-export function toAuthenticatedRequestContext<TUser>(
+export function toAuthenticatedRequestContext<TUser, TEnv extends Env = Env>(
   ctx: ServerContext
-): RequestContext<TUser, true> {
+): RequestContext<TUser, true, TEnv> {
   const authInfo = ctx.http?.authInfo;
   requireOAuthAuthInfo<TUser>(authInfo);
-  return {
-    ...toRequestContext(ctx),
+  return Object.assign(toRequestContext<TEnv>(ctx), {
     auth: {
       user: authInfo.extra.user,
       payload: authInfo.extra.payload,
@@ -296,5 +329,5 @@ export function toAuthenticatedRequestContext<TUser>(
       expiresAt: authInfo.expiresAt,
       ...(authInfo.resource !== undefined && { resource: authInfo.resource }),
     },
-  };
+  });
 }

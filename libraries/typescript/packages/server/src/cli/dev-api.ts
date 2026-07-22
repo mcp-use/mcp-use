@@ -5,7 +5,7 @@
 
 import type { TunnelManager } from "./tunnel.js";
 
-/** Web-standard request handler, as returned by `MCPServer.getHandler()`. */
+/** Web-standard request handler compatible with `MCPServer.fetch`. */
 type FetchHandler = (request: Request) => Promise<Response>;
 
 /**
@@ -45,7 +45,7 @@ export interface DevInfoResponse {
  * ```ts
  * const handler = createDevApiHandler(
  *   { getBasePath: () => "/mcp", port: 3000, tunnel },
- *   server.getHandler()
+ *   server.fetch
  * );
  * ```
  */

@@ -66,7 +66,7 @@ pnpm dev
 
 `pnpm dev` runs `tsx watch` on a standalone entry that owns the socket. That
 entry composes a fetch-native app (Hono in this example) with the consent routes and the MCP handler
-(`getHandler()`) on one port. When `MCP_URL` is absent, it defaults to
+(`server.fetch`) on one port. When `MCP_URL` is absent, it defaults to
 `http://localhost:3000` (or the configured `PORT`) so OAuth resource metadata
 resolves locally. Public and tunnel deployments require `MCP_URL`. The shared
 handler uses `legacy: "stateless"`.

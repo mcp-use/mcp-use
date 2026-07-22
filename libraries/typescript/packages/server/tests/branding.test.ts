@@ -148,7 +148,7 @@ describe("server branding", () => {
       ],
     });
     primeDev(server, root);
-    const handler = server.getHandler();
+    const handler = server.fetch;
 
     expect(server.branding.favicon).toBe("explicit.svg");
     const response = await handler(new Request("http://localhost/favicon.ico"));
@@ -210,7 +210,7 @@ describe("server branding", () => {
         },
       ],
     });
-    const dataResponse = await dataServer.getHandler()(
+    const dataResponse = await dataServer.fetch(
       new Request("http://localhost/favicon.ico")
     );
     expect(dataResponse.status).toBe(200);
@@ -223,7 +223,7 @@ describe("server branding", () => {
       version: "1.0.0",
       favicon: "https://cdn.example.com/favicon.png?v=2",
     });
-    const handler = remoteServer.getHandler();
+    const handler = remoteServer.fetch;
     for (const method of ["GET", "HEAD"]) {
       const response = await handler(
         new Request("http://localhost/favicon.ico", { method })
@@ -246,8 +246,7 @@ describe("server branding", () => {
     expect(empty.branding.icons).toEqual([]);
     expect(empty.branding.favicon).toBeUndefined();
     expect(
-      (await empty.getHandler()(new Request("http://localhost/favicon.ico")))
-        .status
+      (await empty.fetch(new Request("http://localhost/favicon.ico"))).status
     ).toBe(404);
     await empty.close();
 
@@ -256,7 +255,7 @@ describe("server branding", () => {
       version: "1.0.0",
       favicon: "missing.svg",
     });
-    const missingResponse = await missing.getHandler()(
+    const missingResponse = await missing.fetch(
       new Request("http://localhost/favicon.ico")
     );
     expect(missingResponse.status).toBe(404);
@@ -273,7 +272,7 @@ describe("server branding", () => {
     });
     primeDev(server, root);
 
-    const response = await server.getHandler()(
+    const response = await server.fetch(
       new Request("http://localhost/favicon.ico")
     );
     expect(response.status).toBe(200);
@@ -374,7 +373,7 @@ describe("server branding", () => {
       oauth,
     });
     primeDev(server, root);
-    const handler = server.getHandler();
+    const handler = server.fetch;
 
     expect(
       (await handler(new Request("https://request.example/favicon.ico"))).status

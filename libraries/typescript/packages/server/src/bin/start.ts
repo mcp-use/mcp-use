@@ -32,16 +32,16 @@ interface ListenableServer {
   basePath?: unknown;
   host?: unknown;
   port?: unknown;
-  listen(
-    port?: number,
-    options?: {
-      host?: string;
-      routes?: ReadonlyArray<{
-        match: (request: Request) => boolean;
-        handler: FetchHandler;
-      }>;
-    }
-  ): Promise<unknown>;
+  app: {
+    use(
+      path: "*",
+      handler: (
+        context: { req: { raw: Request } },
+        next: () => Promise<void>
+      ) => Response | Promise<Response | void>
+    ): unknown;
+  };
+  listen(port?: number, options?: { host?: string }): Promise<unknown>;
   close?(): unknown;
 }
 
@@ -182,15 +182,13 @@ async function startWithInspector(
     oauthProxyAllowLoopback: false,
   });
 
-  return server.listen(port, {
-    host,
-    routes: [
-      {
-        match: (request) => isInspectorRequest(request, basePath),
-        handler: inspector,
-      },
-    ],
+  server.app.use("*", async (context, next) => {
+    if (isInspectorRequest(context.req.raw, basePath)) {
+      return inspector(context.req.raw);
+    }
+    await next();
   });
+  return server.listen(port, { host });
 }
 
 async function loadBuiltInInspector(): Promise<{

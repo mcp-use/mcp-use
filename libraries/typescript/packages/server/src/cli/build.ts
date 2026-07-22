@@ -28,7 +28,7 @@ import {
   nextStandaloneSsrOptions,
 } from "./next-compat.js";
 import { mcpUseViewsPlugin } from "./views-plugin.js";
-import { ensureMcpEnvDeclaration } from "./mcp-env-declaration.js";
+import { syncMcpEnvDeclaration } from "./mcp-env-declaration.js";
 import {
   resolveBuildBasePath,
   validateViewBindingsAtBuild,
@@ -295,7 +295,7 @@ async function buildView(
  * (the `MCPServer` instance) so `mcp-use start` can import and serve it.
  *
  * There is deliberately no typecheck step — the build is transpile-only;
- * users run `tsc --noEmit` via their own script.
+ * users run `mcp-use typecheck` via their own script.
  *
  * @param options - Project root and optional entry override.
  * @throws If no entry is found (see {@link discoverEntry}) or a server/view
@@ -315,8 +315,9 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     options.entry === undefined
       ? discoverEntry(sourceRoot)
       : discoverEntry(options.cwd, options.entry);
-  if (await ensureMcpEnvDeclaration(options.cwd, entry)) {
-    console.log("[mcp-use] created mcp-env.d.ts");
+  const declarationStatus = await syncMcpEnvDeclaration(options.cwd, entry);
+  if (declarationStatus === "created" || declarationStatus === "updated") {
+    console.log(`[mcp-use] ${declarationStatus} mcp-env.d.ts`);
   }
   const paths = resolveWorkspacePaths(options.cwd);
   const viewsDirectory =

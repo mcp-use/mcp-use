@@ -9,7 +9,7 @@ import type { ToolRef } from "../src/index.js";
 import type { DeepPartial } from "../src/react/types/register.js";
 import type {
   CallToolHandle,
-  useCallTool,
+  useDynamicTool,
 } from "../src/react/hooks/use-call-tool.js";
 import type {
   CallToolResult,
@@ -35,12 +35,6 @@ describe("DeepPartial", () => {
 });
 
 describe("useCallTool empty Register", () => {
-  it("accepts a plain string when Register is empty", () => {
-    type NameParam = Parameters<typeof useCallTool>[0];
-    expectTypeOf<NameParam>().toEqualTypeOf<string>();
-    expect(true).toBe(true);
-  });
-
   it("infers from a ToolRef value", () => {
     const server = new MCPServer({ name: "types", version: "0.0.0" });
     const ref = server.tool(
@@ -91,7 +85,7 @@ describe("useCallTool empty Register", () => {
     expect(true).toBe(true);
   });
 
-  it("shares the CallToolSuccess result contract across string, ToolRef, and explicit generics", () => {
+  it("shares the CallToolSuccess result contract across string, ToolRef, and dynamic calls", () => {
     type Output = { text: string };
     type FromString = CallToolHandle<Record<string, unknown>, Output>;
     type FromRef = CallToolHandle<{ text: string }, Output>;
@@ -115,6 +109,9 @@ describe("useCallTool empty Register", () => {
     expectTypeOf<FromExplicit["data"]>().toEqualTypeOf<
       CallToolSuccess<Output> | undefined
     >();
+    expectTypeOf<
+      ReturnType<typeof useDynamicTool<{ text: string }, Output>>
+    >().toEqualTypeOf<FromExplicit>();
 
     expect(true).toBe(true);
   });

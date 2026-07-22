@@ -12,7 +12,7 @@
 3. **`tool()` returns `ToolRef<Name, Input, Output>`** (not `this`). Typed `useCallTool` is pure type inference over exported refs — zero codegen, nothing generated on the dev/build hot path.
 4. **Hook-first, latched view data.** The default export mounts when bootstrap starts the connection — before any tool result — and stays mounted for the iframe lifetime; the runtime never spreads props onto it. `useToolContext<Name>()` is the primary data API: a discriminated union over `pending` / `ready` / `error`. While pending, partial and complete inputs replace one `DeepPartial<Input>` `toolInput` snapshot. The first structured success or tool error is latched permanently; content-only successes are valid ambient activity and are ignored. Split hooks cover host context and actions; there is deliberately no aggregate hook.
 5. **The React runtime builds on `@modelcontextprotocol/ext-apps`** (guest `App` class); the server package **inlines** the few wire constants and emits spec `_meta` itself — no ext-apps import server-side. Bootstrap creates a `McpAppRuntime` with exactly one eagerly configured App and one cached connection attempt; initialization failure is terminal for that mount. The runtime owns capabilities, snapshots, and deterministic disposal; the official ext-apps `App` owns MCP Apps protocol behavior; React hooks subscribe to narrow external-store channels via `ViewRuntimeContext`.
-6. **No response helpers — views included.** The no-response-helpers ground rule (`SPEC.md`) applies without exception. View-bound tool handlers return a plain `CallToolResult`: `{ content, structuredContent, _meta? }`. `structuredContent` is typed by the tool's `outputSchema` at the return position (existing `ToolResult<TOutput>` machinery).
+6. **Prefer raw `CallToolResult` for view-bound tools.** View-bound tool handlers return a plain `CallToolResult`: `{ content, structuredContent, _meta? }`. `structuredContent` is typed by the tool's `outputSchema` at the return position (existing `ToolResult<TOutput>` machinery). The deprecated `widget()` helper is a thin shim that shapes the same envelope — prefer writing the raw result.
 7. **React runtime ships as `mcp-use/react`.** `react` and `react-dom` are optional peers owned by the application.
 8. **Parity with v1 hooks, minus two named gaps** (file upload, cross-session view state) that the MCP Apps spec cannot express — see "Dropped from v1".
 9. **Views use external production assets by default, with opt-in inline delivery.** One Vite client build runs per view. The default build emits a hashed entry, optional split chunks, and CSS under `.mcp-use/build/views/<name>/assets/`; `resources/read` synthesizes HTML with absolute asset URLs. `mcp-use build --inline` instead emits one self-contained JS chunk plus aggregated CSS into the embedded registry, and `resources/read` places both directly in the HTML document. There is no `--no-inline`; omitting `--inline` preserves external delivery. Project-public files remain under `${basePath}/_mcp-use/public/…` in both modes. Hosts obtain the HTML document only through `resources/read`.
@@ -234,7 +234,7 @@ The v1 `invoking`/`invoked` strings and `widgetAccessible` flag are `openai/*` o
 
 ### Returning results from view-bound tools
 
-View-bound tool handlers return a plain `CallToolResult` — the same shape as every other tool, with no response helpers:
+View-bound tool handlers return a plain `CallToolResult` — the same shape as every other tool (prefer raw; the deprecated `widget()` helper only builds this envelope):
 
 ```ts
 return {
@@ -406,7 +406,7 @@ Hosts obtain the HTML document only through `resources/read`; there is no HTTP d
 
 ### Registration mechanism
 
-How build/dev registry data becomes MCP registrations. Two facts about the implemented server shape every design must live under: the registry **freezes at first mount** (registration after `listen()`/`getHandler()` throws — registrations are replayed per request, late ones would be silently inconsistent), and `getHandler()` is **synchronous** and typically called at module scope in serverless entries. So view registration must be complete by the time the entry module finishes evaluating, and it cannot await a filesystem read to get there. v1's trigger — `mountWidgets()` doing async `fs` work _inside_ `listen()`/`getHandler()`, then calling `server.uiResource()` — is structurally impossible here and is not wanted back.
+How build/dev registry data becomes MCP registrations. The registry **freezes at first mount** (registration after `listen()` or the first `server.fetch` request throws — registrations are replayed per request, late ones would be silently inconsistent). View registration must therefore be complete by the time the entry module finishes evaluating; it cannot await a filesystem read on the first request. v1's trigger — `mountWidgets()` doing async `fs` work inside the serving path, then calling `server.uiResource()` — is structurally impossible here and is not wanted back.
 
 **Instance registry, primed via an internal API.** `MCPServer` grows a views registry alongside `#tools`/`#resources`, populated through one symbol-keyed method:
 
@@ -445,7 +445,7 @@ server[registerViews]({
 export default server;
 ```
 
-Because priming happens during module evaluation of the built entry, it is complete before any downstream `getHandler()`/`listen()` call. The registry itself is part of the JS module graph; the referenced asset files remain separate deployment artifacts. Per mode:
+Because priming happens during module evaluation of the built entry, it is complete before any downstream `server.fetch`/`listen()` call. The registry itself is part of the JS module graph; the referenced asset files remain separate deployment artifacts. Per mode:
 
 - **`start`:** imports the built entry; views are primed by the wrapper before `listen()`. Nothing new in the `start` contract.
 - **Serverless:** the function entry imports `.mcp-use/build/index.js`, not the TypeScript source. The MCP list/read/tool-metadata paths use the embedded registry with no filesystem access, while rendered views still require the built view assets through traced filesystem files, platform static assets, or `MCP_ASSETS_URL`.
@@ -529,7 +529,7 @@ v1 parity: authors drop static files in a project-root `public/` directory and r
 
 ### `start` and serverless
 
-`mcp-use start` imports the built wrapper entry, which primes views with external asset paths by default or embedded source after `build --inline`. It serves `.mcp-use/build/views/<name>/` when external bundles exist and `.mcp-use/build/views/public/` in both modes; Vite and view discovery are absent from the start path. Serverless targets use the same built entry and `getHandler()` routes.
+`mcp-use start` imports the built wrapper entry, which primes views with external asset paths by default or embedded source after `build --inline`. It serves `.mcp-use/build/views/<name>/` when external bundles exist and `.mcp-use/build/views/public/` in both modes; Vite and view discovery are absent from the start path. Serverless targets use the same built entry and `server.fetch` routes.
 
 In external mode, production view bundles and project-public files are filesystem-backed unless their URLs point to a static host. Inline mode removes the view-bundle filesystem dependency, but project-public files remain external assets. Node `start` reads required files from `.mcp-use/build/views/`. Vercel-style functions must trace that directory when it contains required external or public assets. Cloudflare Workers must expose equivalent Workers Static Assets or bundled VFS files. With `MCP_ASSETS_URL`, a CDN or static host can serve the required URL mappings instead; the server still needs the embedded registry in `index.js`.
 
@@ -537,7 +537,7 @@ In external mode, production view bundles and project-public files are filesyste
 
 ## Typing: `ToolRef` + `Register` (zero codegen)
 
-Exports-based inference is the primary mode; tool typegen is an explicit escape hatch only, never on the dev/build hot path. `dev` and `build` only ensure that the constant root `mcp-env.d.ts` shim exists; they do not inspect tools or generate a registry. The full option space behind this choice (including the rejected alternatives) is preserved in `type_proposals.md`.
+Exports-based inference is the primary mode; tool typegen is an explicit escape hatch only, never on the dev/build hot path. `dev`, `build`, and `typecheck` only reconcile the constant root `mcp-env.d.ts` shim; they do not inspect tools or generate a registry. The full option space behind this choice (including the rejected alternatives) is preserved in `type_proposals.md`.
 
 ### `tool()` return-type change
 
@@ -550,7 +550,7 @@ This ends `server.tool(…).tool(…)` chaining — an acceptable break: nothing
 View bundles must never contain server code, so the ref **value** is never imported by a view. The type crosses in type space only:
 
 ```ts
-// mcp-env.d.ts — scaffolded at the project root; dev/build recreate it if missing
+// mcp-env.d.ts — scaffolded at the project root; mcp-use refreshes the entry
 // (the vite-env.d.ts pattern: configuration, not codegen — it lives in the
 // source tree because .mcp-use/ is gitignored and rm -rf-safe, CLI_SPEC.md)
 declare module "*.css";
@@ -568,7 +568,7 @@ export interface Register {} // filled (or not) by the project's mcp-env.d.ts
 
 type RegisteredToolsModule = Register extends { tools: infer M }
   ? M
-  : Record<never, never>;
+  : undefined;
 
 type ToolsFromModule<M> = {
   [K in keyof M as M[K] extends ToolRef<infer N, any, any>
@@ -578,10 +578,14 @@ type ToolsFromModule<M> = {
     : never;
 };
 
-type RegisteredTools = ToolsFromModule<RegisteredToolsModule>;
+type RegisteredTools = RegisteredToolsModule extends undefined
+  ? Record<string, { input: Record<string, unknown>; output: unknown }>
+  : ToolsFromModule<RegisteredToolsModule>;
 ```
 
-Users export the refs of tools views care about (`export const searchFruits = server.tool(…)`) — the module is the registry; no map API, no `export type AppType` ritual, no user-written `declare module`. The name union covers **every exported ref** regardless of `visibility` (a view may call model-visible tools too; `visibility: "app"` declares app-only visibility — the host hides the tool from the model per `_meta.ui.visibility`, not the server). `typeof import()` is a live tsserver edge: add a tool, and every view's `useCallTool` union updates with no process running. Multi-file registration composes via re-exports (`export * from "./tools/fruits.js"`).
+Users export every statically declared tool ref (`export const searchFruits = server.tool(…)`) — the module is the registry; no map API, no `export type AppType` ritual, no user-written `declare module`. The name union covers **every exported ref** regardless of `visibility` (a view may call model-visible tools too; `visibility: "app"` declares app-only visibility — the host hides the tool from the model per `_meta.ui.visibility`, not the server). `typeof import()` is a live tsserver edge: add a tool, and every view's `useCallTool` union updates with no process running. Multi-file registration composes via re-exports (`export * from "./tools/fruits.js"`).
+
+Once `mcp-env.d.ts` registers the server entry, `useCallTool("name")` accepts only those exported refs. Forgetting `export const` is therefore a TypeScript error at the call site whose expected string tells the author to export the `ToolRef`. Tools registered from loops, runtime configuration, OpenAPI documents, or other dynamic sources use the explicitly typed `useDynamicTool<Args, Result>("name")` escape hatch instead.
 
 `ToolContextHandle` resolves through the same map. The type parameter is the view's single bound tool name (`keyof RegisteredTools`). There is no `toolName` field on any branch — one-to-one binding makes a runtime tool-name discriminant unnecessary:
 
@@ -632,16 +636,14 @@ Keying by tool name (not view directory name) is deliberate: view names exist on
 
 1. `useCallTool("name")` — primary; typed via `Register` when the project has `mcp-env.d.ts` and the ref is exported.
 2. `useCallTool(toolRef)` — for contexts where the ref value is legitimately in scope (the inline-JSX stretch path); not for file-based views (value import = server code in the bundle).
-3. `useCallTool<Args, Result>("name")` — explicit generics for dynamically registered tools (statically untypeable in any framework) and unexported refs.
-4. Empty `Register` (no `mcp-env.d.ts`) degrades to `(name: string)` — non-scaffolded projects compile untouched until `dev` or `build` creates the shim.
-
-A forgotten `export const` silently drops that one tool to rung 3/4 — documented habit; a lint rule is a possible follow-up, not alpha scope.
+3. `useDynamicTool<Args, Result>("name")` — explicit generics for dynamically registered tools that are statically untypeable in any framework.
+4. Empty `Register` (no `mcp-env.d.ts`) degrades to `(name: string)` — non-scaffolded projects compile untouched until `dev`, `build`, or `typecheck` creates the shim.
 
 ### Typegen, demoted
 
-No command generates tool-specific types during `dev`, `build`, or `start` — v1's run-the-server generator (`tool-registry-generator.ts`, `zod-to-ts.ts`) is not ported. `dev` and `build` perform one constant-file check: if root `mcp-env.d.ts` is absent, they create it with CSS module typing and a type-only import of the discovered server entry; an existing file is never overwritten. `mcp-use typegen` (+ `mcp-use check` for CI freshness) remains the explicit secondary mode, for consumers with no compile-time path to the server source; if/when built, it is a TS-checker-based static extractor (reads resolved `ToolRef` types; never executes user code), defaulting output to `.mcp-use/generated/`. Not an alpha deliverable.
+No command generates tool-specific types during `dev`, `build`, `typecheck`, or `start` — v1's run-the-server generator (`tool-registry-generator.ts`, `zod-to-ts.ts`) is not ported. `dev`, `build`, and `typecheck` perform one constant-file reconciliation: if root `mcp-env.d.ts` is absent, they create it with CSS module typing and a type-only import of the discovered server entry; if it carries a current or legacy mcp-use generated header, they refresh it; otherwise they treat it as user-owned and never overwrite it. `mcp-use typecheck` then runs the project's own `tsc --noEmit`, combining that reconciliation and compiler pass into the agent/CI workflow. A future `mcp-use typegen` remains an explicit secondary mode for consumers with no compile-time path to server source; if built, it is a TS-checker-based static extractor (reads resolved `ToolRef` types; never executes user code), defaulting output to `.mcp-use/generated/`. Not an alpha deliverable.
 
-The v2 `create-mcp-use-app` MCP Apps template is the reference for the root `mcp-env.d.ts` + exported-refs pattern.
+All v2 `create-mcp-use-app` templates scaffold the root `mcp-env.d.ts`; the MCP Apps template is the reference for the exported-refs pattern.
 
 ---
 
@@ -942,7 +944,7 @@ function useViewTheme(): "light" | "dark"; // narrow theme-only subscription
 function useCallTool<Name extends keyof RegisteredTools>(name: Name):
   CallToolHandle<RegisteredTools[Name]["input"], RegisteredTools[Name]["output"]>;
 function useCallTool<R extends ToolRef<string, unknown, unknown>>(ref: R): /* same, from the ref */;
-function useCallTool<Args extends Record<string, unknown>, Result = unknown>(name: string):
+function useDynamicTool<Args extends Record<string, unknown>, Result = unknown>(name: string):
   CallToolHandle<Args, Result>;
 
 interface CallToolHandle<Args, Result> {
@@ -1175,7 +1177,7 @@ function SearchResultContent() {
 }
 ```
 
-Everything result-shaped enters through `useToolContext` (typed by the server's `outputSchema`; `query` is there because the handler echoes it for model visibility); everything ambient or imperative goes through split hooks; the view→model paths (`ModelContext`, `sendFollowUpMessage`, view-tool results) are visible and explicit in the JSX. For tools not in the `Register` (dynamic registration, unexported refs), the explicit-generics rung applies with hand-written types: `useCallTool<{ fruit: string }, { name: string; producer: string }>("get-fruit-details")`.
+Everything result-shaped enters through `useToolContext` (typed by the server's `outputSchema`; `query` is there because the handler echoes it for model visibility); everything ambient or imperative goes through split hooks; the view→model paths (`ModelContext`, `sendFollowUpMessage`, view-tool results) are visible and explicit in the JSX. Static tools must be exported into the `Register`. For tools that cannot be statically exported because they are registered dynamically, the explicit escape hatch applies with hand-written types: `useDynamicTool<{ fruit: string }, { name: string; producer: string }>("get-fruit-details")`.
 
 ### Hook surface (v1 → v2 → backing primitive)
 
@@ -1219,8 +1221,9 @@ Everything result-shaped enters through `useToolContext` (typed by the server's 
 
 The full build/serve contract is "Build system & serving", above; it extends the **implemented** `CLI_SPEC.md` (which scoped views out) and its ground rules hold — reload-not-HMR for the server entry, `start` pays zero toolchain cost, vite reachable only through the lazy `dev`/`build` chunk. Command summary:
 
-- **`mcp-use dev`:** ensures root `mcp-env.d.ts` exists without overwriting it, then adds the Vite client environment to the existing dev server; public assets and Vite module graph serve through its middleware at `${basePath}/_mcp-use/`. View-file edits get Vite's own HMR (pure client code, sharing the one Vite dev server); server-entry edits follow the existing reload contract and invalidate all three primitive lists over the shared SDK event bus (decision 12). No tool-inspecting typegen hook runs.
-- **`mcp-use build`:** ensures root `mcp-env.d.ts` exists without overwriting it, runs one client build per view, embeds the resulting registry in the generated wrapper entry, mirrors it in `.mcp-use/build/manifest.json` for runtime adapters, and runs the binding checks. External hashed assets under `.mcp-use/build/views/<name>/` are the default. `--inline` embeds the single-chunk JS and aggregated CSS in each resource instead.
+- **`mcp-use dev`:** reconciles the managed root `mcp-env.d.ts`, then adds the Vite client environment to the existing dev server; public assets and Vite module graph serve through its middleware at `${basePath}/_mcp-use/`. View-file edits get Vite's own HMR (pure client code, sharing the one Vite dev server); server-entry edits follow the existing reload contract and invalidate all three primitive lists over the shared SDK event bus (decision 12). No tool-inspecting typegen hook runs.
+- **`mcp-use build`:** reconciles the managed root `mcp-env.d.ts`, runs one client build per view, embeds the resulting registry in the generated wrapper entry, mirrors it in `.mcp-use/build/manifest.json` for runtime adapters, and runs the binding checks. External hashed assets under `.mcp-use/build/views/<name>/` are the default. `--inline` embeds the single-chunk JS and aggregated CSS in each resource instead.
+- **`mcp-use typecheck`:** reconciles the same managed declaration, then runs the selected project's own TypeScript compiler with `--noEmit`. It does not execute the server or require a preceding dev/build command.
 - **`mcp-use start`:** reads `entryPoint` from `manifest.json`, imports the built wrapper entry, and serves production view bundles plus public assets. It performs no Vite evaluation, view discovery, or runtime registry-file read. View documents are obtained only through `resources/read`.
 
 ## Testing
@@ -1232,7 +1235,7 @@ The full build/serve contract is "Build system & serving", above; it extends the
 
 ## Deltas vs v1 (for the migration guide)
 
-1. Every `widget` name → `view` (`widget:` config, `useWidget*`, `WidgetControls`, `ui://widget/…` → `ui://views/…`). The v1 `widget()` response helper is dropped — handlers return plain `CallToolResult`.
+1. Every `widget` name → `view` (`widget:` config, `useWidget*`, `WidgetControls`, `ui://widget/…` → `ui://views/…`). The v1 `widget()` response helper remains as a deprecated shim that returns a plain `CallToolResult`; prefer writing that shape directly.
 2. `useWidgetProps()` → latched `useToolContext()` (`pending | ready | error`; partial and complete args share a `DeepPartial` pending `toolInput`); `useWidget()` → split data, host, and action hooks. Components mount once. The first structured result becomes typed `toolOutput`; content-only ambient successes are ignored; `ToolError` owns the error branch.
 3. View files default-export the component and may export immutable `viewConfig` (auto-resize / display modes). Result types come from `outputSchema` via `useToolContext<Name>()` (required on view-bound tools). Resource facts (description, CSP, permissions, domain, prefersBorder) are declared on the single binder's `view:` config and emitted on the resource. Each view binds at most one tool.
 4. In-component `isPending` skeleton branching → `useToolContext()` `pending` / `ready` / `error` branching inside the always-mounted default export.
@@ -1243,7 +1246,7 @@ The full build/serve contract is "Build system & serving", above; it extends the
 9. Tool config `invoking`/`invoked`/`widgetAccessible` removed (openai overlay, no spec equivalent; `visibility` covers app/model narrowing).
 10. Views work against the stateless 2026-07-28 wire; nothing view-related depends on sessions.
 11. Asset routes move from `${basePath}/mcp-use/widgets/…` to two framework-owned spaces: `${basePath}/_mcp-use/views/<name>/…` for default hashed production bundles and `${basePath}/_mcp-use/public/…` for project-public files. Each view has an independent client build with no shared chunks. Hosts obtain the HTML document only through `resources/read`; by default it loads external JS/CSS from the view route or full CDN URLs embedded when `MCP_ASSETS_URL` is set at build time, while `build --inline` places JS/CSS directly in the document. `MCP_URL` selects the server origin, while `MCP_ASSETS_URL` selects the external asset prefix and may include a path. One request-scoped `globalThis.__mcpUseViewConfig` supplies `publicBase`; no origin is baked into that runtime config at server startup.
-12. Registration no longer happens inside `listen()`/`getHandler()` (v1's async `mountWidgets` → `server.uiResource()`): the build primes the instance through a generated wrapper entry, and `resources/read` synthesizes the document from embedded registry data instead of reading built HTML from disk. `server.uiResource()` has no v2 equivalent, and neither do v1's `exposeAsTool` / hand-built `uiResource` registrations — at most one tool binds a view via `view: { name }`, and an unbound view warns (decision 10).
+12. Registration no longer happens inside `listen()` or first-request setup (v1's async `mountWidgets` → `server.uiResource()`): the build primes the instance through a generated wrapper entry, and `resources/read` synthesizes the document from embedded registry data instead of reading built HTML from disk. `server.uiResource()` has no v2 equivalent, and neither do v1's `exposeAsTool` / hand-built `uiResource` registrations — at most one tool binds a view via `view: { name }`, and an unbound view warns (decision 10).
 13. Ambient hooks split by concern: `useHostContext()`, `useSendFollowUp()`, `useOpenExternal()`, `useDisplayMode()`, `useSendSizeChanged()` — split-by-concern is the design; each hook rerenders only on its channel (action hooks return stable runtime-owned callbacks). v1's aggregate `<McpUseProvider autoSize>` is replaced by `viewConfig.autoResize` plus direct composition of `ThemeProvider` / `ViewControls`.
 
 ## Open questions

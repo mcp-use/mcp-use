@@ -15,7 +15,7 @@ server.use("mcp:tools/call", async (ctx, next) => {
 
 server.use("mcp:tools/list", async (ctx, next) => {
   // Operation middleware has both parsed MCP params and the original request.
-  if (ctx.request?.headers.get("x-example-access") !== "allow") {
+  if (ctx.request?.header("x-example-access") !== "allow") {
     throw new Error("Tool discovery requires x-example-access: allow.");
   }
   return next();

@@ -55,6 +55,6 @@ Deno.test("MCPServer registers the v2 surface in Deno", () => {
   assertEquals(typeof server.tool, "function");
   assertEquals(typeof server.resource, "function");
   assertEquals(typeof server.prompt, "function");
-  assertEquals(typeof server.getHandler, "function");
+  assertEquals(typeof server.fetch, "function");
   assertEquals(typeof server.listen, "function");
 });

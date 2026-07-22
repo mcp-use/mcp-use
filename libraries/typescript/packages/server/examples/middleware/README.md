@@ -2,14 +2,14 @@
 
 This server demonstrates two layers:
 
-- `mcp:tools/list` reads `ctx.request.headers` and rejects discovery unless the
+- `mcp:tools/list` reads `ctx.request.header()` and rejects discovery unless the
   client sends `x-example-access: allow`.
 - `mcp:tools/call` records request-local state before an `echo` call reaches
   its tool handler.
 
-MCP middleware combines the parsed operation with the originating HTTP request.
-Use framework middleware around `server.getHandler()` only for routes or policy
-that must run before MCP parsing.
+MCP middleware combines the parsed operation with the originating Hono context.
+Use `server.use("*", honoMiddleware)` for routes or policy that must run before
+MCP parsing; values set with `c.set()` are available through `ctx.get()`.
 
 ```sh
 pnpm dev

@@ -63,21 +63,27 @@ export default server;
 
 /** A built entry that verifies the production Inspector route contract. */
 const INSPECTOR_ENTRY = `
+let inspectorMiddleware;
 const server = {
   basePath: "/api/mcp",
+  app: {
+    use(path, handler) {
+      if (path !== "*") throw new Error("expected global Inspector middleware");
+      inspectorMiddleware = handler;
+    },
+  },
   async listen(port = 3000, options) {
-    if (!Array.isArray(options?.routes) || options.routes.length !== 1) {
-      throw new Error("expected one Inspector route");
-    }
-    const [route] = options.routes;
+    if (typeof inspectorMiddleware !== "function") throw new Error("missing Inspector middleware");
     const inspector = new Request("http://localhost/api/mcp/inspector");
-    if (!route.match(inspector)) {
+    const inspectorResponse = await inspectorMiddleware({ req: { raw: inspector } }, async () => {
       throw new Error("Inspector route did not match");
-    }
-    const inspectorResponse = await route.handler(inspector);
-    if (route.match(new Request("http://localhost/api/mcp"))) {
-      throw new Error("Inspector route intercepted MCP");
-    }
+    });
+    let continued = false;
+    await inspectorMiddleware(
+      { req: { raw: new Request("http://localhost/api/mcp") } },
+      async () => { continued = true; }
+    );
+    if (!continued) throw new Error("Inspector middleware intercepted MCP");
     if ((await inspectorResponse.text()) !== "inspector") {
       throw new Error("Inspector route was not dispatched");
     }
@@ -168,14 +174,11 @@ describe("parseArgs", () => {
     expect(parseArgs(["dev"]).open).toBe(true);
   });
 
-  it("parses --no-inspector (dev inspector defaults to on)", () => {
+  it("parses --no-inspector / --with-inspector as an optional preference", () => {
+    expect(parseArgs(["dev"]).inspector).toBeUndefined();
+    expect(parseArgs(["start"]).inspector).toBeUndefined();
     expect(parseArgs(["dev", "--no-inspector"]).inspector).toBe(false);
-    expect(parseArgs(["dev"]).inspector).toBe(true);
-  });
-
-  it("parses --with-inspector for production start", () => {
-    expect(parseArgs(["start", "--with-inspector"]).withInspector).toBe(true);
-    expect(parseArgs(["start"]).withInspector).toBe(false);
+    expect(parseArgs(["start", "--with-inspector"]).inspector).toBe(true);
   });
 
   it("parses --source-maps for build", () => {
@@ -202,6 +205,16 @@ describe("parseArgs", () => {
     expect(parseArgs(["-h"]).help).toBe(true);
     expect(parseArgs(["--version"]).version).toBe(true);
     expect(parseArgs(["-v"]).version).toBe(true);
+  });
+
+  it("forwards arguments after -- only for typecheck", () => {
+    expect(
+      parseArgs(["typecheck", "--", "--project", "tsconfig.check.json"])
+        .passthrough
+    ).toEqual(["--project", "tsconfig.check.json"]);
+    expect(() => parseArgs(["build", "--", "--pretty", "false"])).toThrow(
+      /only available for typecheck/i
+    );
   });
 
   it("rejects invalid ports", () => {

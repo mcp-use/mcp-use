@@ -12,6 +12,7 @@ import {
   type StandardSchemaWithJSON,
 } from "@modelcontextprotocol/server";
 import type { Server as NodeHttpServer } from "node:http";
+import { Hono, type Env, type MiddlewareHandler } from "hono";
 
 import {
   createFaviconHandler,
@@ -27,18 +28,15 @@ import {
   toRequestContext,
   type RequestContext,
 } from "./context.js";
+import { toPromptResult, toResourceResult } from "./response-conversion.js";
 import {
-  composeFetch,
   getRequestBag,
   hostValidationMiddleware,
   isHtmlNavigationRequest,
   jsonBodyMiddleware,
-  matchesPath,
   originValidationMiddleware,
-  routeFetch,
-  toFrameworkHandler,
   type FetchHandler,
-  type FrameworkHandler,
+  type FetchMiddleware,
 } from "./fetch-app.js";
 import { corsFetchMiddleware, isGlobalCorsEnabled } from "./middleware/cors.js";
 import {
@@ -59,7 +57,6 @@ import {
 import { requestLogger } from "./logging.js";
 import { createMcpMount } from "./mount-mcp.js";
 import { normalizeCompletions } from "./resource-completion.js";
-import type { NodeRequestHandler } from "./node-bridge.js";
 import { registerOpenAPITools } from "./openapi/index.js";
 import type { FromOpenAPIOptions } from "./openapi/types.js";
 import {
@@ -127,7 +124,7 @@ import {
 type HasOAuth<TUser> = [TUser] extends [never] ? false : true;
 
 /** Type-erased registry entry replayed when a per-request SDK server is built. */
-interface ToolEntry<TUser> {
+interface ToolEntry<TUser, TEnv extends Env> {
   /** Declarative tool metadata and schemas supplied at registration time. */
   definition: ToolDefinition;
   /** Tool callback widened for heterogeneous storage in the registry. */
@@ -135,38 +132,45 @@ interface ToolEntry<TUser> {
     Record<string, unknown>,
     never,
     TUser,
-    HasOAuth<TUser>
+    HasOAuth<TUser>,
+    TEnv
   >;
 }
 
 /** Static resource definition and callback retained for per-request replay. */
-interface ResourceEntry<TUser> {
+interface ResourceEntry<TUser, TEnv extends Env> {
   /** Declarative resource metadata supplied at registration time. */
   definition: ResourceDefinition;
   /** Callback invoked when the registered resource URI is read. */
-  callback: ResourceCallback<TUser, HasOAuth<TUser>>;
+  callback: ResourceCallback<TUser, HasOAuth<TUser>, TEnv>;
 }
 
 /** Parameterized resource definition and type-erased callback registry entry. */
-interface ResourceTemplateEntry<TUser> {
+interface ResourceTemplateEntry<TUser, TEnv extends Env> {
   /** Declarative template metadata, including its URI template. */
   definition: ResourceTemplateDefinition;
   /** Template callback widened to store every inferred variable shape. */
   callback: ResourceTemplateCallback<
     Record<string, TemplateVariableValue>,
     TUser,
-    HasOAuth<TUser>
+    HasOAuth<TUser>,
+    TEnv
   >;
   /** SDK callback map normalized once at author-time registration. */
   complete?: ReturnType<typeof normalizeCompletions>;
 }
 
 /** Prompt definition and type-erased callback retained for request-time replay. */
-interface PromptEntry<TUser> {
+interface PromptEntry<TUser, TEnv extends Env> {
   /** Declarative prompt metadata and optional argument schema. */
   definition: PromptDefinition;
   /** Prompt callback widened to store every inferred argument shape. */
-  callback: PromptCallback<Record<string, unknown>, TUser, HasOAuth<TUser>>;
+  callback: PromptCallback<
+    Record<string, unknown>,
+    TUser,
+    HasOAuth<TUser>,
+    TEnv
+  >;
 }
 
 /** Node HTTP listener returned by `listen()`. */
@@ -177,26 +181,10 @@ interface NodeHttpListener {
   address(): { port: number } | string | null;
 }
 
-/**
- * Optional Node-listener routes registered while the framework mounts its
- * production Fetch handler, before requests are accepted.
- *
- * This lets CLI-owned integrations add narrowly scoped routes while retaining
- * `listen()`'s host validation and OAuth resource initialization.
- */
+/** Options accepted by {@link MCPServer.listen}. */
 export interface ListenOptions {
-  /** Additional routes protected by the server's normal middleware stack. */
-  routes?: readonly ListenRoute[];
   /** Explicit bind host; takes precedence over `HOST` and configured `host`. */
   host?: string;
-}
-
-/** An additional route owned by a caller of {@link MCPServer.listen}. */
-export interface ListenRoute {
-  /** Whether this route handles a request. */
-  match: (request: Request) => boolean;
-  /** Handler invoked when {@link match} returns `true`. */
-  handler: FetchHandler;
 }
 
 function omitRootSchemaDialect<T>(schema: T): T {
@@ -226,6 +214,20 @@ function omitToolSchemaDialects(
   }));
 }
 
+function registerFetchMiddleware<TEnv extends Env>(
+  app: Hono<TEnv>,
+  middleware: FetchMiddleware
+): void {
+  app.use("*", async (context, next) => {
+    const response = await middleware(context.req.raw, async () => {
+      await next();
+      return context.res;
+    });
+    context.res = response;
+    return response;
+  });
+}
+
 /**
  * MCP server with declarative tool/resource/prompt registration, served
  * statelessly over a composed fetch handler.
@@ -247,13 +249,16 @@ function omitToolSchemaDialects(
  * await server.listen(3000);
  * ```
  */
-export class MCPServer<TUser = never> {
+export class MCPServer<TUser = never, TEnv extends Env = Env> {
   readonly #config: ServerConfig<TUser>;
   readonly #branding: ReturnType<typeof normalizeServerBranding>;
-  readonly #tools = new Map<string, ToolEntry<TUser>>();
-  readonly #resources = new Map<string, ResourceEntry<TUser>>();
-  readonly #resourceTemplates = new Map<string, ResourceTemplateEntry<TUser>>();
-  readonly #prompts = new Map<string, PromptEntry<TUser>>();
+  readonly #tools = new Map<string, ToolEntry<TUser, TEnv>>();
+  readonly #resources = new Map<string, ResourceEntry<TUser, TEnv>>();
+  readonly #resourceTemplates = new Map<
+    string,
+    ResourceTemplateEntry<TUser, TEnv>
+  >();
+  readonly #prompts = new Map<string, PromptEntry<TUser, TEnv>>();
   readonly #views = new Map<string, ViewManifestEntry>();
   /**
    * One-to-one tool→view bindings. Each view name maps to the single tool
@@ -274,7 +279,9 @@ export class MCPServer<TUser = never> {
   #viewsProjectRoot = process.cwd();
 
   #fetchHandler: FetchHandler | undefined;
+  #httpApp: Hono<TEnv> | undefined;
   #handler: McpHttpHandler | undefined;
+  #eventBus: ServerEventBus | undefined;
   #httpServer: NodeHttpListener | undefined;
   #oauthResource: URL | undefined;
   #oauthResourceResolved = false;
@@ -289,6 +296,40 @@ export class MCPServer<TUser = never> {
   readonly #proxyOperations = new Set<Promise<void>>();
   /** Whether terminal shutdown has begun. */
   #closed = false;
+
+  /** Hono application that owns HTTP middleware and routes. */
+  readonly app: Hono<TEnv>;
+
+  /** Register a typed `GET` route on {@link MCPServer.app}. */
+  readonly get: Hono<TEnv>["get"];
+
+  /** Register a typed `POST` route on {@link MCPServer.app}. */
+  readonly post: Hono<TEnv>["post"];
+
+  /** Register a typed `PUT` route on {@link MCPServer.app}. */
+  readonly put: Hono<TEnv>["put"];
+
+  /** Register a typed `PATCH` route on {@link MCPServer.app}. */
+  readonly patch: Hono<TEnv>["patch"];
+
+  /** Register a typed `DELETE` route on {@link MCPServer.app}. */
+  readonly delete: Hono<TEnv>["delete"];
+
+  /** Register a typed route for every HTTP method on {@link MCPServer.app}. */
+  readonly all: Hono<TEnv>["all"];
+
+  /**
+   * Canonical Web-standard handler for edge runtimes and framework mounting.
+   *
+   * @example
+   * ```ts
+   * export default server;
+   * // or: export const POST = server.fetch;
+   * ```
+   */
+  readonly fetch: (
+    ...args: Parameters<Hono<TEnv>["fetch"]>
+  ) => Promise<Response>;
 
   /**
    * Create an MCP server from a parsed, bundled OpenAPI document.
@@ -325,12 +366,27 @@ export class MCPServer<TUser = never> {
    * is both the MCP route and the path of the OAuth protected-resource
    * identity, so any explicit OAuth resource URL must use that exact path.
    * Nothing binds or listens until {@link MCPServer.listen} or
-   * {@link MCPServer.getHandler} is called.
+   * the first request reaches {@link MCPServer.fetch}.
    */
   constructor(config: ServerConfig<TUser>) {
     assertServerConfig(config);
     this.#config = config;
     this.#branding = normalizeServerBranding(config);
+    this.app = new Hono<TEnv>();
+    this.app.use("*", async (context, next) => {
+      getRequestBag(context.req.raw).honoContext = context as never;
+      await next();
+    });
+    this.get = this.app.get.bind(this.app) as Hono<TEnv>["get"];
+    this.post = this.app.post.bind(this.app) as Hono<TEnv>["post"];
+    this.put = this.app.put.bind(this.app) as Hono<TEnv>["put"];
+    this.patch = this.app.patch.bind(this.app) as Hono<TEnv>["patch"];
+    this.delete = this.app.delete.bind(this.app) as Hono<TEnv>["delete"];
+    this.all = this.app.all.bind(this.app) as Hono<TEnv>["all"];
+    this.fetch = async (request, env, executionCtx) => {
+      this.#ensureMounted("handler");
+      return this.#httpApp!.fetch(request, env, executionCtx);
+    };
     if (config.oauth !== undefined) {
       const mcpUrl =
         typeof process === "undefined" ? undefined : process.env["MCP_URL"];
@@ -385,10 +441,19 @@ export class MCPServer<TUser = never> {
     return this.#branding;
   }
 
+  /** @deprecated Use {@link MCPServer.fetch} directly. */
+  getHandler(): typeof this.fetch {
+    return this.fetch;
+  }
+
   /**
    * Register a tool. Input is validated against `inputSchema` before the callback
    * runs; results carrying `structuredContent` are type-checked against
    * `outputSchema` at the callback's return position.
+   *
+   * Assign static registrations to exported constants so `mcp-env.d.ts` can
+   * expose their {@link ToolRef} types to views:
+   * `export const search = server.tool(...)`.
    *
    * @returns A {@link ToolRef} carrying the tool name and phantom types for
    * inference-based view typing.
@@ -399,7 +464,8 @@ export class MCPServer<TUser = never> {
       InferToolInput<T>,
       InferToolOutput<T>,
       TUser,
-      HasOAuth<TUser>
+      HasOAuth<TUser>,
+      TEnv
     >
   ): ToolRef<InferToolName<T>, InferToolInput<T>, InferToolOutput<T>> {
     this.#assertNotStarted("tool", definition.name);
@@ -410,7 +476,8 @@ export class MCPServer<TUser = never> {
         Record<string, unknown>,
         never,
         TUser,
-        HasOAuth<TUser>
+        HasOAuth<TUser>,
+        TEnv
       >,
     });
     return Object.freeze({
@@ -472,7 +539,7 @@ export class MCPServer<TUser = never> {
   /** Register a static resource readable at `definition.uri`. */
   resource(
     definition: ResourceDefinition,
-    callback: ResourceCallback<TUser, HasOAuth<TUser>>
+    callback: ResourceCallback<TUser, HasOAuth<TUser>, TEnv>
   ): this {
     this.#assertNotStarted("resource", definition.name);
     this.#resources.set(definition.name, { definition, callback });
@@ -493,7 +560,8 @@ export class MCPServer<TUser = never> {
     callback: ResourceTemplateCallback<
       InferTemplateParams<{ uriTemplate: TUriTemplate }>,
       TUser,
-      HasOAuth<TUser>
+      HasOAuth<TUser>,
+      TEnv
     >
   ): this {
     this.#assertNotStarted("resourceTemplate", definition.name);
@@ -507,7 +575,8 @@ export class MCPServer<TUser = never> {
       callback: callback as ResourceTemplateCallback<
         Record<string, TemplateVariableValue>,
         TUser,
-        HasOAuth<TUser>
+        HasOAuth<TUser>,
+        TEnv
       >,
     });
     return this;
@@ -519,7 +588,7 @@ export class MCPServer<TUser = never> {
    */
   prompt<T extends PromptDefinition>(
     definition: T,
-    callback: PromptCallback<InferPromptInput<T>, TUser, HasOAuth<TUser>>
+    callback: PromptCallback<InferPromptInput<T>, TUser, HasOAuth<TUser>, TEnv>
   ): this {
     this.#assertNotStarted("prompt", definition.name);
     this.#prompts.set(definition.name, {
@@ -527,7 +596,8 @@ export class MCPServer<TUser = never> {
       callback: callback as PromptCallback<
         Record<string, unknown>,
         TUser,
-        HasOAuth<TUser>
+        HasOAuth<TUser>,
+        TEnv
       >,
     });
     return this;
@@ -599,62 +669,23 @@ export class MCPServer<TUser = never> {
   }
 
   /**
-   * Web-standard request handler for the whole app (MCP endpoint included) —
-   * usable directly on serverless/edge runtimes or in tests.
+   * Register HTTP middleware or typed MCP operation middleware.
    *
-   * The handler never binds a socket, so no Host/Origin validation applies
-   * by default: DNS rebinding targets locally bound servers, and platform
-   * edges (Vercel, Cloudflare, …) only route hostnames assigned to the
-   * deployment. Set `allowedHosts`/`allowedOrigins` to opt into validation
-   * (additive — localhost-class values stay allowed).
+   * MCP patterns always use an `mcp:` prefix (for example
+   * `mcp:tools/call`, `mcp:*`). Every other overload is Hono middleware and
+   * may target all routes or a path pattern.
    *
-   * Pass the same `bus` to multiple server instances when their handlers
-   * replace one another while existing `subscriptions/listen` streams remain
-   * open. The bus is fixed when this instance first mounts.
-   *
-   * @param options - Optional handler wiring.
-   *
-   * @example
-   * ```ts
-   * const handler = server.getHandler();
-   * export default { fetch: handler };
-   * ```
-   */
-  getHandler(options: { bus?: ServerEventBus } = {}): FrameworkHandler {
-    this.#assertOpen("getHandler()");
-    const { fetch } = this.#ensureMounted("handler", undefined, options.bus);
-    return toFrameworkHandler(fetch);
-  }
-
-  /**
-   * Node `(req, res) => void` handler for composing with an existing
-   * `http.Server`. Uses the same internal `toNodeHandler` bridge as
-   * {@link MCPServer.listen}; MCPServer users do not need to import
-   * `mcp-use/node`.
-   *
-   * @example
-   * ```ts
-   * import { createServer } from "node:http";
-   * const httpServer = createServer(await server.getNodeHandler());
-   * httpServer.listen(3000);
-   * ```
-   */
-  async getNodeHandler(): Promise<NodeRequestHandler> {
-    const { fetch } = this.#ensureMounted("handler");
-    const { toNodeHandler } = await import("./node-bridge.js");
-    return toNodeHandler({ fetch });
-  }
-
-  /**
-   * Register MCP operation middleware that intercepts JSON-RPC dispatch.
-   *
-   * Patterns use an `mcp:` prefix (for example `mcp:tools/call`, `mcp:*`).
    * Exact methods may transform their typed result. The global `mcp:*` pattern
    * is pass-through middleware. Middleware runs in registration order; call
    * `next()` to continue the chain.
    *
    * @example
    * ```ts
+   * server.use("/api/*", async (c, next) => {
+   *   c.set("requestId", crypto.randomUUID());
+   *   await next();
+   * });
+   *
    * server.use("mcp:tools/call", async (ctx, next) => {
    *   console.log(`Calling tool: ${ctx.params.name}`);
    *   return next();
@@ -663,10 +694,34 @@ export class MCPServer<TUser = never> {
    */
   use<P extends McpMiddlewarePattern>(
     pattern: P,
-    handler: McpMiddlewareFnFor<P>
+    handler: McpMiddlewareFnFor<P, TEnv>
+  ): this;
+  use(handler: MiddlewareHandler<TEnv>): this;
+  use(path: `/${string}` | "*", ...handlers: MiddlewareHandler<TEnv>[]): this;
+  use(
+    patternOrHandler: string | MiddlewareHandler<TEnv>,
+    ...handlers: unknown[]
   ): this {
-    this.#assertNotStarted("middleware", pattern);
-    this.#mcpMiddlewares.push(createMcpMiddlewareEntry(pattern, handler));
+    if (
+      typeof patternOrHandler === "string" &&
+      patternOrHandler.startsWith("mcp:")
+    ) {
+      this.#assertNotStarted("middleware", patternOrHandler);
+      const handler = handlers[0] as McpMiddlewareFnFor<
+        McpMiddlewarePattern,
+        TEnv
+      >;
+      this.#mcpMiddlewares.push(
+        createMcpMiddlewareEntry(
+          patternOrHandler as McpMiddlewarePattern,
+          handler
+        )
+      );
+      return this;
+    }
+
+    const register = this.app.use as (...args: unknown[]) => unknown;
+    register.call(this.app, patternOrHandler, ...handlers);
     return this;
   }
 
@@ -687,11 +742,27 @@ export class MCPServer<TUser = never> {
    */
   on<P extends McpEventPattern>(
     pattern: P,
-    handler: McpEventListenerFnFor<P>
+    handler: McpEventListenerFnFor<P, TEnv>
   ): this {
     this.#assertNotStarted("event listener", pattern);
     this.#mcpEventListeners.push(createMcpEventListenerEntry(pattern, handler));
     return this;
+  }
+
+  /**
+   * Attach the shared development event bus before the first request.
+   *
+   * @param bus - Bus retained across hot-reloaded server instances.
+   * @internal
+   */
+  __setEventBus(bus: ServerEventBus): void {
+    this.#assertNotStarted("event bus", "shared");
+    this.#eventBus = bus;
+  }
+
+  /** Mount and validate the Hono/MCP application without serving a request. @internal */
+  __mount(): void {
+    this.#ensureMounted("handler");
   }
 
   /**
@@ -761,7 +832,7 @@ export class MCPServer<TUser = never> {
    * requests accepted before then are queued. Public/wildcard listeners must
    * configure the resource before calling this method.
    *
-   * @throws If called on a localhost-class bind after {@link MCPServer.getHandler}
+   * @throws If called on a localhost-class bind after {@link MCPServer.fetch}
    * already mounted the app without Host validation.
    */
   async listen(
@@ -819,13 +890,7 @@ export class MCPServer<TUser = never> {
             typeof address === "object" && address !== null
               ? address.port
               : requestedPort;
-          const { fetch } = this.#ensureMounted(
-            "listen",
-            boundPort,
-            undefined,
-            options.routes,
-            host
-          );
+          const { fetch } = this.#ensureMounted("listen", boundPort, host);
           resolveFetch?.(fetch);
           if (!settled) {
             settled = true;
@@ -846,7 +911,7 @@ export class MCPServer<TUser = never> {
    * Abort in-flight MCP exchanges and stop the HTTP listener.
    *
    * A closed server is done for good — the underlying MCP handler stays
-   * closed, so `listen()`/`getHandler()` cannot revive it. Create a new
+   * closed, so `listen()`/`fetch()` cannot revive it. Create a new
    * instance to serve again.
    */
   async close(): Promise<void> {
@@ -922,7 +987,7 @@ export class MCPServer<TUser = never> {
     }
 
     throw new Error(
-      "OAuth requires an explicit resource or MCP_URL when using getHandler() or listening on a non-local host"
+      "OAuth requires an explicit resource or MCP_URL when using server.fetch or listening on a non-local host"
     );
   }
 
@@ -947,7 +1012,7 @@ export class MCPServer<TUser = never> {
       throw new Error(
         `Cannot register ${kind} "${name}" after the server has started: ` +
           `registrations are replayed per request from the registry, ` +
-          `so register everything before listen()/getHandler().`
+          `so register everything before listen()/server.fetch.`
       );
     }
   }
@@ -962,11 +1027,12 @@ export class MCPServer<TUser = never> {
         this.#assertNotStarted("tool", definition.name);
         this.#tools.set(definition.name, {
           definition,
-          callback: callback as ToolCallback<
+          callback: callback as unknown as ToolCallback<
             Record<string, unknown>,
             never,
             TUser,
-            HasOAuth<TUser>
+            HasOAuth<TUser>,
+            TEnv
           >,
         });
       },
@@ -974,17 +1040,22 @@ export class MCPServer<TUser = never> {
         this.#assertNotStarted("resource", definition.name);
         this.#resources.set(definition.name, {
           definition,
-          callback: callback as ResourceCallback<TUser, HasOAuth<TUser>>,
+          callback: callback as unknown as ResourceCallback<
+            TUser,
+            HasOAuth<TUser>,
+            TEnv
+          >,
         });
       },
       registerPrompt: (definition, callback) => {
         this.#assertNotStarted("prompt", definition.name);
         this.#prompts.set(definition.name, {
           definition,
-          callback: callback as PromptCallback<
+          callback: callback as unknown as PromptCallback<
             Record<string, unknown>,
             TUser,
-            HasOAuth<TUser>
+            HasOAuth<TUser>,
+            TEnv
           >,
         });
       },
@@ -1001,7 +1072,7 @@ export class MCPServer<TUser = never> {
    * Configured lists are additive to the localhost-class allowlists, so local
    * runs keep working when a deployment hostname is added. With nothing
    * configured, `listen()` on a localhost-class bind validates Host against the
-   * localhost lists (the DNS-rebinding threat model), while `getHandler()` —
+   * localhost lists (the DNS-rebinding threat model), while `server.fetch` —
    * which never binds — applies no validation. Origin validation is off unless
    * `allowedOrigins` is set explicitly (SDK-aligned: the handler is open by
    * default). When enabled, Origin is checked only on non-GET/HEAD requests.
@@ -1032,8 +1103,6 @@ export class MCPServer<TUser = never> {
   #ensureMounted(
     mode: "listen" | "handler",
     listenPort?: number,
-    bus?: ServerEventBus,
-    additionalRoutes: readonly ListenRoute[] = [],
     listenHost?: string
   ): {
     fetch: FetchHandler;
@@ -1044,6 +1113,7 @@ export class MCPServer<TUser = never> {
       const { hosts, origins } = this.#validationPolicy(mode, listenHost);
       const basePath = this.#basePath();
       const nestedBasePath = basePath === "/" ? "" : basePath;
+      const httpApp = new Hono<TEnv>();
       const middlewares = [
         jsonBodyMiddleware(),
         requestLogger(this.#config.logging),
@@ -1080,16 +1150,21 @@ export class MCPServer<TUser = never> {
         middlewares.push(oauthMetadata(provider, resource));
       }
 
+      for (const middleware of middlewares) {
+        registerFetchMiddleware(httpApp, middleware);
+      }
+
       const { handler, fetch: mcpFetch } = createMcpMount(
         (ctx) => this.#buildSdkServer(ctx),
         {
           path: basePath,
-          ...((this.#config.legacy !== undefined || bus !== undefined) && {
+          ...((this.#config.legacy !== undefined ||
+            this.#eventBus !== undefined) && {
             handler: {
               ...(this.#config.legacy !== undefined && {
                 legacy: this.#config.legacy,
               }),
-              ...(bus !== undefined && { bus }),
+              ...(this.#eventBus !== undefined && { bus: this.#eventBus }),
             },
           }),
           ...(resource !== undefined && {
@@ -1148,11 +1223,6 @@ export class MCPServer<TUser = never> {
         return respond();
       };
 
-      const routes: Array<{
-        match: (request: Request) => boolean;
-        handler: FetchHandler;
-      }> = [...additionalRoutes];
-
       const brandingDevMode = this.#viewsPrimed
         ? this.#viewsDevMode
         : process.env["NODE_ENV"] !== "production";
@@ -1162,10 +1232,9 @@ export class MCPServer<TUser = never> {
         deferCors: deferViewCors,
       });
       if (faviconHandler !== undefined) {
-        routes.push({
-          match: (request) => new URL(request.url).pathname === "/favicon.ico",
-          handler: faviconHandler,
-        });
+        this.app.all("/favicon.ico", (context) =>
+          faviconHandler(context.req.raw)
+        );
       }
 
       const viewHandler = createViewPublicHandler(basePath, this.#views, {
@@ -1175,15 +1244,11 @@ export class MCPServer<TUser = never> {
         deferCors: deferViewCors,
       });
       if (viewHandler !== undefined) {
-        routes.push({
-          match: (request) =>
-            request.method === "GET" || request.method === "HEAD"
-              ? new URL(request.url).pathname.startsWith(
-                  `${nestedBasePath}/_mcp-use/public/`
-                )
-              : false,
-          handler: viewHandler,
-        });
+        this.app.on(
+          ["GET", "HEAD"],
+          `${nestedBasePath}/_mcp-use/public/*`,
+          (context) => viewHandler(context.req.raw)
+        );
       }
 
       if (!this.#viewsDevMode) {
@@ -1193,43 +1258,32 @@ export class MCPServer<TUser = never> {
           { projectRoot: this.#viewsProjectRoot, deferCors: deferViewCors }
         );
         if (viewAssetsHandler !== undefined) {
-          routes.push({
-            match: (request) =>
-              request.method === "GET" || request.method === "HEAD"
-                ? new URL(request.url).pathname.startsWith(
-                    `${nestedBasePath}/_mcp-use/views/`
-                  )
-                : false,
-            handler: viewAssetsHandler,
-          });
+          this.app.on(
+            ["GET", "HEAD"],
+            `${nestedBasePath}/_mcp-use/views/*`,
+            (context) => viewAssetsHandler(context.req.raw)
+          );
         }
       }
 
-      routes.push({
-        match: (request) => matchesPath(request, basePath),
-        handler: endpointHandler,
-      });
-
-      const terminal = routeFetch(routes);
-      this.#fetchHandler = composeFetch(terminal, ...middlewares);
+      this.app.all(basePath, (context) => endpointHandler(context.req.raw));
+      httpApp.route("/", this.app);
+      this.#httpApp = httpApp;
+      this.#fetchHandler = async (request) => httpApp.fetch(request);
       this.#handler = handler;
       this.#hostValidated = hosts !== undefined;
-    } else if (bus !== undefined && this.#handler.bus !== bus) {
-      throw new Error(
-        "Cannot change the MCP event bus after the server has started."
-      );
     } else if (
       mode === "listen" &&
       !this.#hostValidated &&
       this.#validationPolicy("listen", listenHost).hosts !== undefined
     ) {
       throw new Error(
-        "Cannot listen() on a localhost bind after getHandler(): the app is " +
-          "already mounted without Host validation (getHandler() expects a " +
-          "platform edge in front). Call listen() first, or set allowedHosts."
+        "Cannot listen() on a localhost bind after server.fetch mounted the app " +
+          "without Host validation (server.fetch expects a platform edge in " +
+          "front). Call listen() first, or set allowedHosts."
       );
     }
-    return { fetch: this.#fetchHandler, handler: this.#handler };
+    return { fetch: this.#fetchHandler!, handler: this.#handler! };
   }
 
   #validateToolViewBinding(definition: ToolDefinition): void {
@@ -1363,24 +1417,24 @@ export class MCPServer<TUser = never> {
 
   #createMiddlewareContext<M extends McpMiddlewareMethod>(
     method: M,
-    params: MiddlewareContext<M>["params"],
+    params: MiddlewareContext<M, TEnv>["params"],
     ctx: ServerContext
-  ): MiddlewareContext<M> {
-    return {
+  ): MiddlewareContext<M, TEnv> {
+    const requestContext = toRequestContext<TEnv>(ctx);
+    return Object.assign(requestContext, {
       method,
       params,
-      ...(ctx.http?.req !== undefined && { request: ctx.http.req }),
       ...(ctx.sessionId !== undefined && {
         session: { sessionId: ctx.sessionId },
       }),
       ...(ctx.http?.authInfo !== undefined && { auth: ctx.http.authInfo }),
       state: new Map(),
-    } as MiddlewareContext<M>;
+    }) as unknown as MiddlewareContext<M, TEnv>;
   }
 
   #runMcpHook<M extends McpMiddlewareMethod>(
     method: M,
-    ctx: MiddlewareContext<M>,
+    ctx: MiddlewareContext<M, TEnv>,
     innerFn: () => Promise<McpMiddlewareResult<M>>
   ): Promise<McpMiddlewareResult<M>> {
     return runMcpOperation(
@@ -1438,8 +1492,8 @@ export class MCPServer<TUser = never> {
       const wrapped = async (request: unknown, extra: unknown) => {
         const serverContext = extra as ServerContext;
         const params =
-          (request as { params?: MiddlewareContext<M>["params"] }).params ??
-          ({} as MiddlewareContext<M>["params"]);
+          (request as { params?: MiddlewareContext<M, TEnv>["params"] })
+            .params ?? ({} as MiddlewareContext<M, TEnv>["params"]);
         const mwCtx = this.#createMiddlewareContext(
           method,
           params,
@@ -1489,7 +1543,7 @@ export class MCPServer<TUser = never> {
 
   #registerTool(
     server: SdkMcpServer,
-    { definition, callback }: ToolEntry<TUser>
+    { definition, callback }: ToolEntry<TUser, TEnv>
   ): void {
     const view = definition.view;
 
@@ -1628,7 +1682,7 @@ export class MCPServer<TUser = never> {
 
   #registerResource(
     server: SdkMcpServer,
-    { definition, callback }: ResourceEntry<TUser>
+    { definition, callback }: ResourceEntry<TUser, TEnv>
   ): void {
     server.registerResource(
       definition.name,
@@ -1657,19 +1711,19 @@ export class MCPServer<TUser = never> {
           },
           ctx
         );
-        const innerFn = async () => callback(uri, this.#toRequestContext(ctx));
-        return (await this.#runMcpHook(
-          "resources/read",
-          mwCtx,
-          innerFn
-        )) as Awaited<ReturnType<typeof callback>>;
+        const innerFn = async () =>
+          toResourceResult(
+            await callback(uri, this.#toRequestContext(ctx)),
+            uri.href
+          );
+        return await this.#runMcpHook("resources/read", mwCtx, innerFn);
       }
     );
   }
 
   #registerResourceTemplate(
     server: SdkMcpServer,
-    { definition, callback, complete }: ResourceTemplateEntry<TUser>
+    { definition, callback, complete }: ResourceTemplateEntry<TUser, TEnv>
   ): void {
     const template = new ResourceTemplate(definition.uriTemplate, {
       list: undefined,
@@ -1703,16 +1757,15 @@ export class MCPServer<TUser = never> {
           ctx
         );
         const innerFn = async () =>
-          callback(
-            uri,
-            variables as Record<string, TemplateVariableValue>,
-            this.#toRequestContext(ctx)
+          toResourceResult(
+            await callback(
+              uri,
+              variables as Record<string, TemplateVariableValue>,
+              this.#toRequestContext(ctx)
+            ),
+            uri.href
           );
-        return (await this.#runMcpHook(
-          "resources/read",
-          mwCtx,
-          innerFn
-        )) as Awaited<ReturnType<typeof callback>>;
+        return await this.#runMcpHook("resources/read", mwCtx, innerFn);
       }
     );
   }
@@ -1740,7 +1793,7 @@ export class MCPServer<TUser = never> {
 
   #registerPrompt(
     server: SdkMcpServer,
-    { definition, callback }: PromptEntry<TUser>
+    { definition, callback }: PromptEntry<TUser, TEnv>
   ): void {
     const config = {
       ...(definition.title !== undefined && { title: definition.title }),
@@ -1766,11 +1819,11 @@ export class MCPServer<TUser = never> {
           string,
           unknown
         >;
-        return callback(effectiveArgs, this.#toRequestContext(ctx));
+        return toPromptResult(
+          await callback(effectiveArgs, this.#toRequestContext(ctx))
+        );
       };
-      return (await this.#runMcpHook("prompts/get", mwCtx, innerFn)) as Awaited<
-        ReturnType<typeof callback>
-      >;
+      return await this.#runMcpHook("prompts/get", mwCtx, innerFn);
     };
 
     if (definition.schema !== undefined) {
@@ -1791,13 +1844,18 @@ export class MCPServer<TUser = never> {
 
   #toRequestContext(
     ctx: ServerContext
-  ): RequestContext<TUser, HasOAuth<TUser>> {
+  ): RequestContext<TUser, HasOAuth<TUser>, TEnv> {
     if (this.#config.oauth === undefined) {
-      return toRequestContext(ctx) as RequestContext<TUser, HasOAuth<TUser>>;
+      return toRequestContext<TEnv>(ctx) as RequestContext<
+        TUser,
+        HasOAuth<TUser>,
+        TEnv
+      >;
     }
-    return toAuthenticatedRequestContext<TUser>(ctx) as RequestContext<
+    return toAuthenticatedRequestContext<TUser, TEnv>(ctx) as RequestContext<
       TUser,
-      HasOAuth<TUser>
+      HasOAuth<TUser>,
+      TEnv
     >;
   }
 }

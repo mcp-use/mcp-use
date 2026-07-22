@@ -7,7 +7,7 @@ const server = new MCPServer({
   description: "The smallest useful mcp-use server.",
 });
 
-server.tool(
+export const greet = server.tool(
   {
     name: "greet",
     description: "Return a friendly greeting.",

@@ -1,7 +1,7 @@
 /**
  * Request-logging tests: the compact two-line format (HTTP summary line plus
  * indented MCP detail line), error surfacing, level handling, and noise
- * skipping — driven through `MCPServer.getHandler()` with synthetic
+ * skipping — driven through `MCPServer.fetch` with synthetic
  * 2026-07-28 requests, capturing `console.log`.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -54,7 +54,7 @@ function buildServer(config: Partial<ServerConfig> = {}): MCPServer {
   return server;
 }
 
-/** Synthetic modern (2026-07-28) MCP request against a getHandler(). */
+/** Synthetic modern (2026-07-28) MCP request against server.fetch. */
 function mcpRequest(
   method: string,
   params: Record<string, unknown>,
@@ -78,7 +78,7 @@ function mcpRequest(
   });
 }
 
-describe("requestLogger (via MCPServer.getHandler)", () => {
+describe("requestLogger (via MCPServer.fetch)", () => {
   let logSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
@@ -102,7 +102,7 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
 
   it("logs a two-line summary + detail for tools/call", async () => {
     const server = buildServer();
-    const response = await server.getHandler()(
+    const response = await server.fetch(
       mcpRequest(
         "tools/call",
         { name: "greet", arguments: { who: "world" } },
@@ -121,7 +121,7 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
 
   it("echoes inline input/output at debug level", async () => {
     const server = buildServer({ logging: { level: "debug" } });
-    await server.getHandler()(
+    await server.fetch(
       mcpRequest(
         "tools/call",
         { name: "greet", arguments: { who: "world" } },
@@ -139,7 +139,7 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
 
   it("truncates long inline input at debug level", async () => {
     const server = buildServer({ logging: { level: "debug" } });
-    await server.getHandler()(
+    await server.fetch(
       mcpRequest(
         "tools/call",
         { name: "greet", arguments: { who: "x".repeat(200) } },
@@ -157,7 +157,7 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
 
   it("logs the resource URI for resources/read", async () => {
     const server = buildServer();
-    await server.getHandler()(
+    await server.fetch(
       mcpRequest(
         "resources/read",
         { uri: "config://settings" },
@@ -172,7 +172,7 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
 
   it("logs the prompt name for prompts/get", async () => {
     const server = buildServer();
-    await server.getHandler()(
+    await server.fetch(
       mcpRequest(
         "prompts/get",
         { name: "standup", arguments: { team: "core" } },
@@ -185,7 +185,7 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
 
   it("logs methods without a subject as the bare method name", async () => {
     const server = buildServer();
-    await server.getHandler()(mcpRequest("tools/list", {}));
+    await server.fetch(mcpRequest("tools/list", {}));
     expect(loggedLines()[1]).toBe("  tools/list raw-request/0.0.0");
     await server.close();
   });
@@ -193,7 +193,7 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
   it("shows clientInfo as the initialize subject without repeating it", async () => {
     const server = buildServer();
     // Legacy handshake: initialize carries clientInfo in params, no envelope.
-    await server.getHandler()(
+    await server.fetch(
       new Request("http://localhost/mcp", {
         method: "POST",
         headers: {
@@ -218,7 +218,7 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
 
   it("appends ERROR with the tool's message for isError results", async () => {
     const server = buildServer();
-    await server.getHandler()(
+    await server.fetch(
       mcpRequest(
         "tools/call",
         { name: "fail", arguments: { reason: "on purpose" } },
@@ -233,7 +233,7 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
 
   it("appends ERROR with the JSON-RPC error message for protocol errors", async () => {
     const server = buildServer();
-    await server.getHandler()(
+    await server.fetch(
       mcpRequest(
         "tools/call",
         { name: "no-such-tool", arguments: {} },
@@ -248,7 +248,7 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
 
   it("logs a single line for non-MCP requests", async () => {
     const server = buildServer();
-    await server.getHandler()(
+    await server.fetch(
       new Request("http://localhost/health", { method: "GET" })
     );
     const lines = loggedLines();
@@ -259,7 +259,7 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
 
   it("logs unknown inspector paths and skips favicon noise", async () => {
     const server = buildServer();
-    const handler = server.getHandler();
+    const handler = server.fetch;
     await handler(
       new Request("http://localhost/mcp/inspector", { method: "GET" })
     );
@@ -275,7 +275,7 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
 
   it("logs nothing when logging is disabled", async () => {
     const server = buildServer({ logging: { enabled: false } });
-    const response = await server.getHandler()(mcpRequest("tools/list", {}));
+    const response = await server.fetch(mcpRequest("tools/list", {}));
     expect(response.status).toBe(200);
     expect(logSpy).not.toHaveBeenCalled();
     await server.close();
@@ -283,7 +283,7 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
 
   it("emits the full request/response dump at trace level", async () => {
     const server = buildServer({ logging: { level: "trace" } });
-    await server.getHandler()(
+    await server.fetch(
       mcpRequest(
         "tools/call",
         { name: "greet", arguments: { who: "dump" } },
@@ -303,7 +303,7 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
 
   it("redacts credential headers in the trace dump", async () => {
     const server = buildServer({ logging: { level: "trace" } });
-    await server.getHandler()(
+    await server.fetch(
       mcpRequest(
         "tools/call",
         { name: "greet", arguments: { who: "auth" } },
@@ -318,7 +318,7 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
 
   it("sanitizes control characters out of request-derived log text", async () => {
     const server = buildServer();
-    await server.getHandler()(
+    await server.fetch(
       mcpRequest(
         "tools/call",
         { name: "fail", arguments: { reason: "line1\nFORGED 200 OK" } },
@@ -337,7 +337,7 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
   it("MCP_USE_LOG_LEVEL overrides the configured level", async () => {
     vi.stubEnv("MCP_USE_LOG_LEVEL", "trace");
     const server = buildServer();
-    await server.getHandler()(mcpRequest("tools/list", {}));
+    await server.fetch(mcpRequest("tools/list", {}));
     expect(loggedLines().join("\n")).toContain("[TRACE] Request Details");
     await server.close();
   });
@@ -346,7 +346,7 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
     // allowedHosts mounts via createMcpHonoApp, whose JSON middleware stashes
     // parsedBody in context vars — the logger must pick it up from there.
     const server = buildServer({ allowedHosts: ["api.example.com"] });
-    await server.getHandler()(
+    await server.fetch(
       mcpRequest(
         "tools/call",
         { name: "greet", arguments: { who: "hono" } },

@@ -62,7 +62,7 @@ From this directory:
 pnpm dev
 ```
 
-`mcp-use dev` owns the local socket and calls `getHandler()` on this
+`mcp-use dev` owns the local socket and serves `server.fetch` from this
 default-exported server. Before importing the entry, it resolves the actual
 local port and, when `MCP_URL` is absent, supplies a scoped trusted local
 canonical origin. The shared handler uses `legacy: "stateless"`. Public and

@@ -175,7 +175,7 @@ describe("MCPServer landing page routing", () => {
       async (uri) => ({ contents: [{ uri: uri.href, text: "mild" }] })
     );
 
-    const handler = server.getHandler();
+    const handler = server.fetch;
     const get = await handler(
       htmlRequest("https://public.example.test/api/mcp")
     );
@@ -221,7 +221,7 @@ describe("MCPServer landing page routing", () => {
         basePath: "/",
       })
     );
-    const handler = server.getHandler();
+    const handler = server.fetch;
 
     const landing = await handler(htmlRequest("https://root.example.test/"));
     expect(landing.status).toBe(200);
@@ -241,7 +241,7 @@ describe("MCPServer landing page routing", () => {
         allowedHosts: ["safe.example.test"],
       })
     );
-    const response = await server.getHandler()(
+    const response = await server.fetch(
       new Request("https://evil.example.test/mcp", {
         headers: { accept: "text/html", host: "evil.example.test" },
       })
@@ -264,7 +264,7 @@ describe("publicLandingPage OAuth behavior", () => {
   }
 
   it("requires OAuth by default but renders HTML after authentication", async () => {
-    const handler = oauthServer().getHandler();
+    const handler = oauthServer().fetch;
 
     const unauthorized = await handler(
       htmlRequest("https://api.example.test/mcp")
@@ -288,7 +288,7 @@ describe("publicLandingPage OAuth behavior", () => {
   });
 
   it("makes only negotiated browser GET/HEAD public when enabled", async () => {
-    const handler = oauthServer(true).getHandler();
+    const handler = oauthServer(true).fetch;
 
     for (const method of ["GET", "HEAD"] as const) {
       const landing = await handler(
@@ -334,7 +334,7 @@ describe("publicLandingPage OAuth behavior", () => {
   });
 
   it("treats an explicit false value the same as the default", async () => {
-    const response = await oauthServer(false).getHandler()(
+    const response = await oauthServer(false).fetch(
       htmlRequest("https://api.example.test/mcp")
     );
     expect(response.status).toBe(401);

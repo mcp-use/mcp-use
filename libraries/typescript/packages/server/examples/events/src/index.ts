@@ -11,7 +11,7 @@ const observations: string[] = [];
 server.on("mcp:tools/list", (ctx) => {
   observations.push("tools/list:before");
   observations.push(
-    `request-id:${ctx.request?.headers.get("x-example-request-id") ?? "none"}`
+    `request-id:${ctx.request?.header("x-example-request-id") ?? "none"}`
   );
 });
 

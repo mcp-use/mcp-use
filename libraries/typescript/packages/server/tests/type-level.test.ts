@@ -20,6 +20,7 @@ import {
   createMcpEventListenerEntry,
   createMcpMiddlewareEntry,
   MCPServer,
+  text,
 } from "../src/index.js";
 import type {
   Annotations,
@@ -566,16 +567,10 @@ describe("MCP middleware type narrowing", () => {
 
   it("rejects results belonging to a different method", () => {
     const server = new MCPServer({ name: "types", version: "0.0.0" });
-    server.use(
-      "mcp:tools/list",
-      // @ts-expect-error — tools/list middleware must return Tool[]
-      async () => ({ content: [] })
-    );
-    server.use(
-      "mcp:*",
-      // @ts-expect-error — a wildcard cannot return one method's result
-      async () => [] as SdkTool[]
-    );
+    // @ts-expect-error — tools/list middleware must return Tool[]
+    server.use("mcp:tools/list", async () => ({ content: [] }));
+    // @ts-expect-error — a wildcard cannot return one method's result
+    server.use("mcp:*", async () => [] as SdkTool[]);
     expect(server).toBeDefined();
   });
 
@@ -589,6 +584,25 @@ describe("MCP middleware type narrowing", () => {
         CallToolResult | InputRequiredResult
       >();
     });
+    expect(server).toBeDefined();
+  });
+});
+
+describe("deprecated helper returns on resource/prompt callbacks", () => {
+  it("accepts helper-shaped CallToolResult and raw envelopes", () => {
+    const server = new MCPServer({ name: "types", version: "0.0.0" });
+    server.resource({ name: "greeting", uri: "app://greeting" }, async () =>
+      text("hello")
+    );
+    server.resource({ name: "raw", uri: "app://raw" }, async (uri) => ({
+      contents: [{ uri: uri.href, mimeType: "text/plain", text: "raw" }],
+    }));
+    server.prompt({ name: "review" }, async () => text("please review"));
+    server.prompt({ name: "raw-prompt" }, async () => ({
+      messages: [
+        { role: "user", content: { type: "text", text: "please review" } },
+      ],
+    }));
     expect(server).toBeDefined();
   });
 });

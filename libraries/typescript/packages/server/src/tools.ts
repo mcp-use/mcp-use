@@ -5,6 +5,7 @@ import type {
   StandardSchemaWithJSON,
   ToolAnnotations,
 } from "@modelcontextprotocol/server";
+import type { Env } from "hono";
 
 import type { McpUiResourceCsp } from "@modelcontextprotocol/ext-apps";
 
@@ -129,9 +130,9 @@ export interface ToolRef<
 
 /**
  * Result a tool callback may return, keyed by the tool's inferred output
- * type. Completed calls use the SDK's raw {@link CallToolResult}; interactive
- * calls may return an {@link InputRequiredResult}. There is no
- * framework-specific result layer.
+ * type. Prefer the SDK's raw {@link CallToolResult}; interactive calls may
+ * return an {@link InputRequiredResult}. Deprecated response helpers
+ * (`text`, `object`, …) return the same envelope and remain accepted.
  *
  * Without an `outputSchema` (`TOutput = never`) any `CallToolResult` is
  * accepted. With one, the result must carry `structuredContent` matching the
@@ -212,7 +213,8 @@ export type ToolCallback<
   TOutput = never,
   TUser = never,
   HasOAuth extends boolean = false,
+  TEnv extends Env = Env,
 > = (
   params: TInput,
-  ctx: RequestContext<TUser, HasOAuth>
+  ctx: RequestContext<TUser, HasOAuth, TEnv>
 ) => ToolResult<TOutput> | Promise<ToolResult<TOutput>>;

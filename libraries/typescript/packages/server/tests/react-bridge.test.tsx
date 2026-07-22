@@ -15,6 +15,7 @@ import {
   ThemeProvider,
   toolResultText,
   useCallTool,
+  useDynamicTool,
   useDisplayMode,
   useHostContext,
   useOpenExternal,
@@ -907,7 +908,7 @@ describe("react bridge runtime", () => {
 
     function Probe() {
       const context = useToolContext();
-      const tool = useCallTool<{ id: string }, { value: string }>("lookup");
+      const tool = useDynamicTool<{ id: string }, { value: string }>("lookup");
       return (
         <div>
           <span data-testid="meta">

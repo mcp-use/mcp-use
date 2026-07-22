@@ -6,7 +6,7 @@ export interface Register {}
 
 type RegisteredToolsModule = Register extends { tools: infer M }
   ? M
-  : Record<never, never>;
+  : undefined;
 
 type ToolsFromModule<M> = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ToolRef conditional inference requires `any` in the constraint position (spec)
@@ -25,8 +25,15 @@ type ToolsFromModule<M> = {
 /**
  * Map of registered tool names to their inferred input/output types, derived
  * from exported {@link ToolRef} values in the augmented {@link Register} module.
+ *
+ * Projects without an `mcp-env.d.ts` registration retain a loose string map so
+ * existing non-scaffolded applications keep compiling. Once the module is
+ * registered, only exported tool refs are accepted by typed React hooks; an
+ * empty registered module therefore exposes no tool names.
  */
-export type RegisteredTools = ToolsFromModule<RegisteredToolsModule>;
+export type RegisteredTools = RegisteredToolsModule extends undefined
+  ? Record<string, { input: Record<string, unknown>; output: unknown }>
+  : ToolsFromModule<RegisteredToolsModule>;
 
 /**
  * Recursive partial for streamed JSON: every field optional at every depth.

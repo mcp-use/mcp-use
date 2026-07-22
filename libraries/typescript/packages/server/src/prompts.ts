@@ -1,7 +1,9 @@
 import type {
+  CallToolResult,
   GetPromptResult,
   StandardSchemaWithJSON,
 } from "@modelcontextprotocol/server";
+import type { Env } from "hono";
 
 import type { RequestContext } from "./context.js";
 
@@ -29,7 +31,10 @@ export type InferPromptInput<T> = T extends {
   : Record<string, unknown>;
 
 /**
- * Prompt execution callback. Returns the SDK's raw {@link GetPromptResult}.
+ * Prompt execution callback. Prefer the SDK's raw {@link GetPromptResult}.
+ *
+ * Deprecated response helpers that return a {@link CallToolResult} are still
+ * accepted and converted at registration time.
  *
  * @example
  * ```ts
@@ -44,7 +49,11 @@ export type PromptCallback<
   TInput = Record<string, unknown>,
   TUser = never,
   HasOAuth extends boolean = false,
+  TEnv extends Env = Env,
 > = (
   params: TInput,
-  ctx: RequestContext<TUser, HasOAuth>
-) => GetPromptResult | Promise<GetPromptResult>;
+  ctx: RequestContext<TUser, HasOAuth, TEnv>
+) =>
+  | GetPromptResult
+  | CallToolResult
+  | Promise<GetPromptResult | CallToolResult>;

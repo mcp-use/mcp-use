@@ -6,6 +6,16 @@ const server = new MCPServer({ name: "fixture", version: "0.0.0" });
 
 export const notATool = "ignored";
 
+// Registered at runtime but intentionally not exported: it must not enter the
+// view-facing RegisteredTools map.
+server.tool(
+  {
+    name: "unexported-tool",
+    inputSchema: z.object({ value: z.string() }),
+  },
+  async ({ value }) => ({ content: [{ type: "text", text: value }] })
+);
+
 export const searchFruits = server.tool(
   {
     name: "search-fruits",

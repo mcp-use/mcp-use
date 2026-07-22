@@ -20,7 +20,7 @@ const server = new MCPServer({
   version: "1.0.0",
 });
 
-server.tool(
+export const greet = server.tool(
   {
     name: "greet",
     description: "Greet someone by name",

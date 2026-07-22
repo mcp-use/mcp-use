@@ -1061,6 +1061,7 @@ async function main(): Promise<void> {
   }
   if (validatedTemplate === "blank") {
     console.log("   ├── public/");
+    console.log("   ├── mcp-env.d.ts");
     console.log("   ├── index.ts (server entry point)");
     console.log("   ├── package.json");
     console.log("   ├── tsconfig.json");
@@ -1082,6 +1083,7 @@ async function main(): Promise<void> {
     console.log("   ├── tsconfig.json");
     console.log("   └── README.md");
   } else if (validatedTemplate === "mcp-server") {
+    console.log("   ├── mcp-env.d.ts");
     console.log("   ├── index.ts (server entry point)");
     console.log("   ├── package.json");
     console.log("   ├── tsconfig.json");

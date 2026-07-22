@@ -87,7 +87,7 @@ const server = new MCPServer({
   version: "1.0.0",
 });
 
-server.tool(
+export const getWeather = server.tool(
   {
     name: "get_weather",
     description: "Get weather for a city",
@@ -119,7 +119,7 @@ const server = new MCPServer({
   version: "1.0.0",
 });
 
-server.tool(
+export const getWeather = server.tool(
   {
     name: "get-weather",
     description: "Get weather for a city",

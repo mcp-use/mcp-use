@@ -5,7 +5,7 @@ icon: "settings"
 github: "https://github.com/mcp-use/mcp-use/blob/beta/libraries/typescript/packages/server/src/config.ts"
 ---
 
-`ServerConfig` is the object you pass to `new MCPServer(...)`. `name` and `version` are required. The v2 server is stateless and fetch-native; there are no Hono or session-store fields on this type.
+`ServerConfig` is the object you pass to `new MCPServer(...)`. `name` and `version` are required. The v2 server is stateless, uses Hono for HTTP routing, and exposes a Fetch-standard serving boundary; there are no session-store fields on this type.
 
 ```ts
 import { MCPServer } from "mcp-use";
@@ -41,8 +41,8 @@ const server = new MCPServer({
 <ParamField body="favicon" type="string">Explicit browser favicon source. It accepts the same source forms as `icons` and overrides favicon inference. The server exposes the selected image at the root-level `/favicon.ico` route.</ParamField>
 <ParamField body="instructions" type="string">Server-wide guidance surfaced to models by MCP clients.</ParamField>
 <ParamField body="basePath" type="string" default="/mcp">Exact MCP endpoint pathname. It must start with `/` and cannot contain whitespace, `//`, a query, a fragment, or a trailing slash except for `/` itself.</ParamField>
-<ParamField body="host" type="string" default="127.0.0.1">Hostname used by `listen()`. Set `"0.0.0.0"` for a public bind. `getHandler()` does not bind a socket.</ParamField>
-<ParamField body="allowedHosts" type="string[]">Additional Host-header allowlist entries. Values are additive to localhost names and enable Host validation for `getHandler()`.</ParamField>
+<ParamField body="host" type="string" default="127.0.0.1">Hostname used by `listen()`. Set `"0.0.0.0"` for a public bind. `server.fetch` does not bind a socket.</ParamField>
+<ParamField body="allowedHosts" type="string[]">Additional Host-header allowlist entries. Values are additive to localhost names and enable Host validation for `server.fetch`.</ParamField>
 <ParamField body="allowedOrigins" type="string[]">Additional Origin-header allowlist entries. Values are additive to localhost origins. When omitted, Origin validation is off (SDK-aligned). GET and HEAD skip Origin validation when enabled.</ParamField>
 <ParamField body="legacy" type='"stateless" | "reject"' default="stateless">Serve 2025-era clients through the stateless compatibility path, or reject them for a modern-only server.</ParamField>
 <ParamField body="publicLandingPage" type="boolean" default="false">Expose the HTML landing page without bearer authentication when OAuth is configured. The page remains available for explicit HTML GET/HEAD navigation and MCP protocol requests stay protected.</ParamField>

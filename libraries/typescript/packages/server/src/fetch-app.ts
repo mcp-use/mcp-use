@@ -3,32 +3,10 @@ import {
   originValidationResponse,
   type AuthInfo,
 } from "@modelcontextprotocol/server";
+import type { Context, Env } from "hono";
 
 /** Web-standard request handler. */
 export type FetchHandler = (request: Request) => Promise<Response>;
-
-/** Request shapes accepted by {@link toFrameworkHandler}. */
-export type FrameworkRequestLike = Request | { req: { raw: Request } };
-
-/**
- * Universal web handler mountable in Vercel, Hono, TanStack, and other
- * fetch-native frameworks without `c.req.raw` boilerplate.
- */
-export type FrameworkHandler = (
-  input: FrameworkRequestLike
-) => Promise<Response>;
-
-/**
- * Wrap a {@link FetchHandler} for framework duck-typing (Hono `Context`, etc.).
- *
- * @param fetch - Inner fetch handler produced by {@link MCPServer.getHandler}.
- */
-export function toFrameworkHandler(fetch: FetchHandler): FrameworkHandler {
-  return (input) => {
-    const request = input instanceof Request ? input : input.req.raw;
-    return fetch(request);
-  };
-}
 
 /** Onion middleware over a {@link FetchHandler} terminal. */
 export type FetchMiddleware = (
@@ -42,6 +20,8 @@ export interface RequestBag {
   parsedBody?: unknown;
   /** Verified OAuth identity forwarded to the SDK handler. */
   authInfo?: AuthInfo;
+  /** Hono context associated with this request while it traverses the app. */
+  honoContext?: Context<Env>;
 }
 
 const requestBags = new WeakMap<Request, RequestBag>();
@@ -161,30 +141,6 @@ export function isHtmlNavigationRequest(request: Request): boolean {
       return name === "q" && Number(value) === 0;
     });
   });
-}
-
-/**
- * Dispatch to the first matching route handler.
- *
- * @param routes - Ordered route table; first match wins.
- * @param fallback - Handler when nothing matches.
- */
-export function routeFetch(
-  routes: Array<{
-    match: (request: Request) => boolean;
-    handler: FetchHandler;
-  }>,
-  fallback: FetchHandler = async () =>
-    new Response("Not Found", { status: 404 })
-): FetchHandler {
-  return async (request: Request): Promise<Response> => {
-    for (const route of routes) {
-      if (route.match(request)) {
-        return route.handler(request);
-      }
-    }
-    return fallback(request);
-  };
 }
 
 /**

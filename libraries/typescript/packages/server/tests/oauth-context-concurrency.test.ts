@@ -8,6 +8,7 @@ import {
   type ServerContext,
 } from "@modelcontextprotocol/server";
 import { afterEach, describe, expect, it } from "vitest";
+import type { HonoRequest } from "hono";
 
 import { toAuthenticatedRequestContext } from "../src/context.js";
 import {
@@ -34,7 +35,7 @@ interface CallbackObservation {
   clientId?: string | undefined;
   expiresAt: number;
   resource?: URL | undefined;
-  request?: Request | undefined;
+  request?: HonoRequest | undefined;
   signal: AbortSignal;
 }
 
@@ -247,7 +248,7 @@ describe("createMcpMount OAuth request context", () => {
         expect(observation.clientId).toBe(expected.clientId);
         expect(observation.expiresAt).toBe(expected.expiresAt);
         expect(observation.resource).toBe(expected.resource);
-        expect(observation.request).toBeInstanceOf(Request);
+        expect(observation.request).toHaveProperty("raw");
         expect(observation.signal).toBeInstanceOf(AbortSignal);
       }
       expect(alice.scopes).toEqual(["read:alice"]);

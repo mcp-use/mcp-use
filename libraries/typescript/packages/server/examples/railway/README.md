@@ -10,7 +10,7 @@ any container/VM host without a serverless invocation model) runs an app.
   `mcp-use dev` (local reload), `mcp-use build` (compile to
   `.mcp-use/build/`), and `mcp-use start` (serve the build) own the socket
   and shutdown signals. This is the node-deployment door, as opposed to the
-  per-invocation `getHandler()` handler used on serverless platforms (see the
+  per-invocation `server.fetch` handler used on serverless platforms (see the
   `vercel` example).
 - **A long-lived process is still stateless MCP.** `MCPServer` builds a fresh
   SDK server from its tool/resource/prompt registry on *every* request (see

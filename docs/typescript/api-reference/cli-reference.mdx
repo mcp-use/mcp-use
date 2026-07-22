@@ -29,9 +29,9 @@ For hands-on workflows, see the [CLI Client guide](/typescript/tooling/client-cl
   <Card title="Tunnels" icon="train-front-tunnel" href="#tunneling-reference">
     `mcp-use dev --tunnel` exposes a local server through a public URL.
   </Card>
-  <Card title="Skills and types" icon="wand" href="#skills-add">
-    `mcp-use skills add` installs agent skills. `mcp-use generate-types` writes
-    widget type augmentation.
+  <Card title="Typecheck" icon="wand" href="#typecheck">
+    `mcp-use typecheck` refreshes MCP view types and runs the project's own
+    TypeScript compiler.
   </Card>
 </CardGroup>
 
@@ -110,6 +110,26 @@ mcp-use dev --tunnel
 - `mcp-use dev` writes development session metadata to `.mcp-use/sessions.json`.
 - See [Tunneling reference](#tunneling-reference) for the lifecycle and limits of `--tunnel`.
 
+## `typecheck`
+
+**Purpose:** Refresh the managed `mcp-env.d.ts` declaration for the discovered server entry, then run the project's installed TypeScript compiler with `--noEmit`.
+
+**Syntax:**
+
+```bash
+mcp-use typecheck [options] [-- <tsc-options>]
+```
+
+The command accepts `--path`, `--entry`, and `--mcp-dir` with the same meanings as `dev` and `build`. Arguments after `--` are forwarded to TypeScript:
+
+```bash
+mcp-use typecheck
+mcp-use typecheck --entry src/server.ts
+mcp-use typecheck -- --project tsconfig.check.json --pretty false
+```
+
+`mcp-env.d.ts` is scaffolded into new projects, so editors and plain `tsc --noEmit` work before the first CLI run. The command refreshes declarations carrying an mcp-use generated header when the entry changes and never overwrites a user-owned declaration. TypeScript must be installed in the selected project.
+
 ## `build`
 
 **Purpose:** Build the exported MCP server and its views into `.mcp-use/build/`.
@@ -146,7 +166,7 @@ mcp-use build --path ./my-server
 - The command bundles the default-exported server as `.mcp-use/build/index.js` and writes `.mcp-use/build/manifest.json`.
 - Each `views/<name>/view.tsx` builds to hashed external assets under `.mcp-use/build/views/<name>/` by default.
 - Pass `--inline` to embed each view's bundled JavaScript and CSS directly in the HTML returned by `resources/read`. There is no `--no-inline`; omit `--inline` to use external assets.
-- The build is transpile-only. Run `tsc --noEmit` as a separate project script when type checking is required.
+- The build is transpile-only. Run `mcp-use typecheck` as a separate project script when type checking is required.
 - TypeScript path aliases come from the selected project's `tsconfig.json`.
 - If `MCP_ASSETS_URL` is set for an external build, view paths are rewritten to that asset origin using the server's `basePath`. Inline view bundles are not rewritten.
 - The selected project's `public/` directory is copied to `.mcp-use/build/views/public/`.

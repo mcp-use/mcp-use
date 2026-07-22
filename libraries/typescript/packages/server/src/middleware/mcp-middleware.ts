@@ -13,6 +13,7 @@ import type {
   RequestTypeMap,
   ResultTypeMap,
 } from "@modelcontextprotocol/server";
+import type { Context, Env, HonoRequest } from "hono";
 
 const MCP_MIDDLEWARE_METHODS = [
   "tools/call",
@@ -94,16 +95,25 @@ export function withMcpMiddlewareParams<M extends McpMiddlewareMethod>(
   return { ...request, params } as RequestTypeMap[M];
 }
 
-interface MiddlewareContextCommon {
-  /** The originating HTTP request, when this operation is served over HTTP. */
-  request?: Request;
+type MiddlewareContextCommon<TEnv extends Env = Env> = Omit<
+  Context<TEnv>,
+  "req"
+> & {
+  /** Hono request for the originating HTTP exchange. */
+  request?: HonoRequest;
+  /**
+   * Deprecated v1-compatible alias for {@link MiddlewareContext.request}.
+   *
+   * @deprecated Use `request` instead.
+   */
+  req?: HonoRequest;
   /** Session info when the underlying transport provides a session ID. */
   session?: { sessionId: string };
   /** OAuth info extracted from the validated access token. */
   auth?: AuthInfo;
   /** Shared state for middleware participating in this request. */
   state: Map<string, unknown>;
-}
+};
 
 /**
  * Context passed to MCP middleware.
@@ -113,8 +123,9 @@ interface MiddlewareContextCommon {
  */
 export type MiddlewareContext<
   M extends McpMiddlewareMethod = McpMiddlewareMethod,
+  TEnv extends Env = Env,
 > = M extends McpMiddlewareMethod
-  ? MiddlewareContextCommon & {
+  ? MiddlewareContextCommon<TEnv> & {
       method: M;
       params: McpMiddlewareOperationMap[M]["params"];
     }
@@ -123,7 +134,8 @@ export type MiddlewareContext<
 /** Preferred explicit name for the method-correlated middleware context. */
 export type McpMiddlewareContext<
   M extends McpMiddlewareMethod = McpMiddlewareMethod,
-> = MiddlewareContext<M>;
+  TEnv extends Env = Env,
+> = MiddlewareContext<M, TEnv>;
 
 /** Context with narrowed params for `tools/call`. */
 export type ToolsCallMiddlewareContext = MiddlewareContext<"tools/call">;
@@ -141,8 +153,8 @@ export type PromptsGetMiddlewareContext = MiddlewareContext<"prompts/get">;
 export type PromptsListMiddlewareContext = MiddlewareContext<"prompts/list">;
 
 /** Map retained for compatibility and convenient indexed lookup. */
-export type McpMiddlewarePatternMap = {
-  [M in McpMiddlewareMethod]: MiddlewareContext<M>;
+export type McpMiddlewarePatternMap<TEnv extends Env = Env> = {
+  [M in McpMiddlewareMethod]: MiddlewareContext<M, TEnv>;
 };
 
 /** Continue the middleware chain with the result type for method `M`. */
@@ -151,8 +163,11 @@ export type McpMiddlewareNext<M extends McpMiddlewareMethod> = () => Promise<
 >;
 
 /** Middleware for one exact MCP method. */
-export type McpExactMiddlewareFn<M extends McpMiddlewareMethod> = (
-  ctx: MiddlewareContext<M>,
+export type McpExactMiddlewareFn<
+  M extends McpMiddlewareMethod,
+  TEnv extends Env = Env,
+> = (
+  ctx: MiddlewareContext<M, TEnv>,
   next: McpMiddlewareNext<M>
 ) => Promise<McpMiddlewareResult<M>>;
 
@@ -165,18 +180,17 @@ export type McpExactMiddlewareFn<M extends McpMiddlewareMethod> = (
  */
 export type McpMiddlewareFn<
   Methods extends McpMiddlewareMethod = McpMiddlewareMethod,
+  TEnv extends Env = Env,
 > = (
-  ctx: MiddlewareContext<Methods>,
+  ctx: MiddlewareContext<Methods, TEnv>,
   next: () => Promise<void>
 ) => Promise<void>;
 
 /** Exact MCP middleware methods plus the global pass-through wildcard. */
 export type McpMiddlewarePatternBody = McpMiddlewareMethod | "*";
 
-/** Canonical `mcp:` patterns plus prefixless compatibility forms. */
-export type McpMiddlewarePattern =
-  | McpMiddlewarePatternBody
-  | `mcp:${McpMiddlewarePatternBody}`;
+/** Canonical `mcp:` middleware patterns. */
+export type McpMiddlewarePattern = `mcp:${McpMiddlewarePatternBody}`;
 
 /** Observer patterns additionally support grouping related MCP methods. */
 export type McpEventPatternBody =
@@ -185,7 +199,7 @@ export type McpEventPatternBody =
   | "resources/*"
   | "prompts/*";
 
-type McpEventBasePattern = McpEventPatternBody | `mcp:${McpEventPatternBody}`;
+type McpEventBasePattern = `mcp:${McpEventPatternBody}`;
 
 type StripMcpPrefix<P extends string> = P extends `mcp:${infer Body}`
   ? Body
@@ -208,11 +222,14 @@ export type McpMiddlewareMethodsForPattern<P extends string> =
     : never;
 
 /** Infer an exact or type-preserving wildcard handler from pattern `P`. */
-export type McpMiddlewareFnFor<P extends McpMiddlewarePattern> =
+export type McpMiddlewareFnFor<
+  P extends McpMiddlewarePattern,
+  TEnv extends Env = Env,
+> =
   StripMcpPrefix<P> extends infer Body
     ? Body extends McpMiddlewareMethod
-      ? McpExactMiddlewareFn<Body>
-      : McpMiddlewareFn<McpMiddlewareMethodsForPattern<P>>
+      ? McpExactMiddlewareFn<Body, TEnv>
+      : McpMiddlewareFn<McpMiddlewareMethodsForPattern<P>, TEnv>
     : never;
 
 /**
@@ -237,10 +254,10 @@ export interface McpMiddlewareEntry {
  * implementation signature is the deliberate erasure boundary, like the
  * official SDK's `setRequestHandler` implementation.
  */
-export function createMcpMiddlewareEntry<P extends McpMiddlewarePattern>(
-  pattern: P,
-  handler: McpMiddlewareFnFor<P>
-): McpMiddlewareEntry;
+export function createMcpMiddlewareEntry<
+  P extends McpMiddlewarePattern,
+  TEnv extends Env = Env,
+>(pattern: P, handler: McpMiddlewareFnFor<P, TEnv>): McpMiddlewareEntry;
 // eslint-disable-next-line no-redeclare -- implementation signature
 export function createMcpMiddlewareEntry(
   pattern: McpMiddlewarePattern,
@@ -290,11 +307,10 @@ export type McpEventPhase = "before" | "complete";
 /** Read-only observer context correlated by MCP method. */
 export type ReadonlyMiddlewareContext<
   M extends McpMiddlewareMethod = McpMiddlewareMethod,
+  TEnv extends Env = Env,
 > = M extends McpMiddlewareMethod
-  ? Omit<MiddlewareContext<M>, "params" | "request" | "state"> & {
+  ? Omit<MiddlewareContext<M, TEnv>, "params" | "state"> & {
       readonly params: Readonly<McpMiddlewareOperationMap[M]["params"]>;
-      /** The originating HTTP request, when this operation is served over HTTP. */
-      readonly request?: Request;
       readonly state: ReadonlyMap<string, unknown>;
     }
   : never;
@@ -302,22 +318,28 @@ export type ReadonlyMiddlewareContext<
 /** Read-only observer invoked before an MCP handler runs. */
 export type McpEventListenerFn<
   Methods extends McpMiddlewareMethod = McpMiddlewareMethod,
-> = <M extends Methods>(ctx: ReadonlyMiddlewareContext<M>) => void;
+  TEnv extends Env = Env,
+> = <M extends Methods>(ctx: ReadonlyMiddlewareContext<M, TEnv>) => void;
 
 /** Read-only observer invoked after an MCP handler completes. */
 export type McpCompleteEventListenerFn<
   Methods extends McpMiddlewareMethod = McpMiddlewareMethod,
+  TEnv extends Env = Env,
 > = <M extends Methods>(
-  ctx: ReadonlyMiddlewareContext<M>,
+  ctx: ReadonlyMiddlewareContext<M, TEnv>,
   result: McpMiddlewareResult<M>
 ) => void;
 
-type McpExactEventListenerFn<M extends McpMiddlewareMethod> = (
-  ctx: ReadonlyMiddlewareContext<M>
-) => void;
+type McpExactEventListenerFn<
+  M extends McpMiddlewareMethod,
+  TEnv extends Env = Env,
+> = (ctx: ReadonlyMiddlewareContext<M, TEnv>) => void;
 
-type McpExactCompleteEventListenerFn<M extends McpMiddlewareMethod> = (
-  ctx: ReadonlyMiddlewareContext<M>,
+type McpExactCompleteEventListenerFn<
+  M extends McpMiddlewareMethod,
+  TEnv extends Env = Env,
+> = (
+  ctx: ReadonlyMiddlewareContext<M, TEnv>,
   result: McpMiddlewareResult<M>
 ) => void;
 
@@ -331,18 +353,23 @@ type StripCompleteSuffix<P extends string> = P extends `${infer Body}:complete`
   : P;
 
 /** Infer a typed before/complete observer from event pattern `P`. */
-export type McpEventListenerFnFor<P extends McpEventPattern> =
+export type McpEventListenerFnFor<
+  P extends McpEventPattern,
+  TEnv extends Env = Env,
+> =
   StripCompleteSuffix<StripMcpPrefix<P>> extends infer Body
     ? Body extends McpMiddlewareMethod
       ? P extends `${string}:complete`
-        ? McpExactCompleteEventListenerFn<Body>
-        : McpExactEventListenerFn<Body>
+        ? McpExactCompleteEventListenerFn<Body, TEnv>
+        : McpExactEventListenerFn<Body, TEnv>
       : P extends `${string}:complete`
         ? McpCompleteEventListenerFn<
-            McpMiddlewareMethodsForPattern<StripCompleteSuffix<P>>
+            McpMiddlewareMethodsForPattern<StripCompleteSuffix<P>>,
+            TEnv
           >
         : McpEventListenerFn<
-            McpMiddlewareMethodsForPattern<StripCompleteSuffix<P>>
+            McpMiddlewareMethodsForPattern<StripCompleteSuffix<P>>,
+            TEnv
           >
     : never;
 
@@ -354,10 +381,10 @@ export interface McpEventListenerEntry {
 }
 
 /** Adapt a public method-correlated observer for type-erased storage. */
-export function createMcpEventListenerEntry<P extends McpEventPattern>(
-  pattern: P,
-  handler: McpEventListenerFnFor<P>
-): McpEventListenerEntry;
+export function createMcpEventListenerEntry<
+  P extends McpEventPattern,
+  TEnv extends Env = Env,
+>(pattern: P, handler: McpEventListenerFnFor<P, TEnv>): McpEventListenerEntry;
 // eslint-disable-next-line no-redeclare -- implementation signature
 export function createMcpEventListenerEntry(
   pattern: McpEventPattern,
@@ -388,20 +415,23 @@ function isMcpMiddlewareMethod(value: string): value is McpMiddlewareMethod {
 }
 
 /** Compose matching middleware in FIFO registration order. */
-export function composeMiddleware<M extends McpMiddlewareMethod>(
+export function composeMiddleware<
+  M extends McpMiddlewareMethod,
+  TEnv extends Env = Env,
+>(
   entries: McpMiddlewareEntry[],
   method: M,
   innerFn: () => Promise<McpMiddlewareResult<M>>
-): (ctx: MiddlewareContext<M>) => Promise<McpMiddlewareResult<M>> {
+): (ctx: MiddlewareContext<M, TEnv>) => Promise<McpMiddlewareResult<M>> {
   const matching = entries.filter((entry) =>
     matchesPattern(entry.pattern, method)
   );
 
   if (matching.length === 0) {
-    return (_ctx: MiddlewareContext<M>) => innerFn();
+    return (_ctx: MiddlewareContext<M, TEnv>) => innerFn();
   }
 
-  return (ctx: MiddlewareContext<M>) => {
+  return (ctx: MiddlewareContext<M, TEnv>) => {
     let index = -1;
 
     const dispatch = (i: number): Promise<McpMiddlewareResult<M>> => {
@@ -415,9 +445,9 @@ export function composeMiddleware<M extends McpMiddlewareMethod>(
       }
 
       const entry = matching[i]!;
-      return entry.handler(ctx, () => dispatch(i + 1)) as Promise<
-        McpMiddlewareResult<M>
-      >;
+      return entry.handler(ctx as unknown as MiddlewareContext, () =>
+        dispatch(i + 1)
+      ) as Promise<McpMiddlewareResult<M>>;
     };
 
     return dispatch(0);
@@ -425,32 +455,37 @@ export function composeMiddleware<M extends McpMiddlewareMethod>(
 }
 
 /** Build a read-only snapshot of middleware context for observer events. */
-export function freezeMiddlewareContext<M extends McpMiddlewareMethod>(
-  ctx: MiddlewareContext<M>
-): ReadonlyMiddlewareContext<M> {
+export function freezeMiddlewareContext<
+  M extends McpMiddlewareMethod,
+  TEnv extends Env = Env,
+>(ctx: MiddlewareContext<M, TEnv>): ReadonlyMiddlewareContext<M, TEnv> {
   return Object.freeze({
     method: ctx.method,
     params: Object.freeze({ ...ctx.params }),
     ...(ctx.request !== undefined && { request: ctx.request }),
+    ...(ctx.req !== undefined && { req: ctx.req }),
     ...(ctx.session !== undefined && {
       session: Object.freeze({ ...ctx.session }),
     }),
     ...(ctx.auth !== undefined && { auth: ctx.auth }),
     state: new Map(ctx.state),
-  }) as unknown as ReadonlyMiddlewareContext<M>;
+  }) as unknown as ReadonlyMiddlewareContext<M, TEnv>;
 }
 
 /** Run before/complete observers around a method-correlated middleware chain. */
-export async function runMcpOperation<M extends McpMiddlewareMethod>(
+export async function runMcpOperation<
+  M extends McpMiddlewareMethod,
+  TEnv extends Env = Env,
+>(
   middlewares: McpMiddlewareEntry[],
   events: McpEventListenerEntry[],
   method: M,
-  ctx: MiddlewareContext<M>,
+  ctx: MiddlewareContext<M, TEnv>,
   innerFn: () => Promise<McpMiddlewareResult<M>>
 ): Promise<McpMiddlewareResult<M>> {
   dispatchMcpEvents(events, method, "before", ctx);
 
-  const chained = composeMiddleware(middlewares, method, innerFn);
+  const chained = composeMiddleware<M, TEnv>(middlewares, method, innerFn);
   const result = await chained(ctx);
   assertValidMiddlewareResult(method, result);
 
@@ -530,11 +565,14 @@ function assertArrayProperty(
   }
 }
 
-function dispatchMcpEvents<M extends McpMiddlewareMethod>(
+function dispatchMcpEvents<
+  M extends McpMiddlewareMethod,
+  TEnv extends Env = Env,
+>(
   events: McpEventListenerEntry[],
   method: M,
   phase: McpEventPhase,
-  ctx: MiddlewareContext<M>,
+  ctx: MiddlewareContext<M, TEnv>,
   result?: McpMiddlewareResult<M>
 ): void {
   const frozen = freezeMiddlewareContext(ctx);
@@ -543,7 +581,7 @@ function dispatchMcpEvents<M extends McpMiddlewareMethod>(
       continue;
     }
     try {
-      entry.handler(frozen, result);
+      entry.handler(frozen as unknown as ReadonlyMiddlewareContext, result);
     } catch (error) {
       console.error(
         `[mcp-use] MCP event listener for "${entry.pattern}" (${phase}) threw:`,

@@ -85,7 +85,7 @@ for the full contract.
 
 ## Result channels
 
-View-bound tool handlers return a plain `CallToolResult` — no response helpers:
+View-bound tool handlers return a plain `CallToolResult` (prefer raw; deprecated helpers only shape the same envelope):
 
 1. **`structuredContent`** — model-visible and view-visible structured payload,
    typed by the bound tool's `outputSchema`. In the view it surfaces as
@@ -120,7 +120,7 @@ its callback belongs only to that invocation. They are not copied into one
 another. Use vendor-namespaced keys for custom definition metadata:
 
 ```ts
-server.tool(
+export const searchFruits = server.tool(
   {
     name: "search-fruits",
     _meta: { "fruit.example/catalog-version": 3 },

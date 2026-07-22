@@ -644,21 +644,21 @@ describe("MCPServer legacy posture", () => {
 
   it("serves 2025-era clients statelessly by default", async () => {
     const server = minimalServer();
-    const response = await server.getHandler()(legacyInitializeRequest());
+    const response = await server.fetch(legacyInitializeRequest());
     expect(response.status).toBe(200);
     await server.close();
   });
 
   it("rejects 2025-era clients under legacy: 'reject'", async () => {
     const server = minimalServer({ legacy: "reject" });
-    const response = await server.getHandler()(legacyInitializeRequest());
+    const response = await server.fetch(legacyInitializeRequest());
     expect(response.ok).toBe(false);
     await server.close();
   });
 
   it("reports config.description as implementation metadata", async () => {
     const server = minimalServer();
-    const response = await server.getHandler()(legacyInitializeRequest());
+    const response = await server.fetch(legacyInitializeRequest());
     // Legacy serving answers over streamable-HTTP SSE framing; the initialize
     // result is the first `data:` line.
     const text = await response.text();
@@ -724,7 +724,7 @@ describe("MCPServer basePath accessor", () => {
   });
 });
 
-describe("MCPServer getHandler (no network)", () => {
+describe("MCPServer fetch handler (no network)", () => {
   it("serves MCP through the web-standard handler on a custom basePath", async () => {
     const server = new MCPServer({
       name: "handler-test",
@@ -734,7 +734,7 @@ describe("MCPServer getHandler (no network)", () => {
     server.tool({ name: "ping" }, async () => ({
       content: [{ type: "text", text: "pong" }],
     }));
-    const handler = server.getHandler();
+    const handler = server.fetch;
 
     const response = await handler(
       new Request("http://localhost/api/mcp", {
@@ -780,7 +780,7 @@ describe("MCPServer getHandler (no network)", () => {
 
 /*
  * Host/Origin validation policy: listen() on a localhost bind validates by
- * default (DNS-rebinding protection), getHandler() applies no validation
+ * default (DNS-rebinding protection), server.fetch applies no validation
  * unless configured (a fetch handler never binds — a platform edge in front
  * only routes hostnames assigned to the deployment), and configured lists
  * are additive to the localhost allowlists.
@@ -798,7 +798,7 @@ describe("MCPServer validation policy", () => {
     return server;
   }
 
-  /** Synthetic tools/list Request for driving a getHandler() directly. */
+  /** Synthetic tools/list Request for driving server.fetch directly. */
   function toolsListRequest(headers: Record<string, string> = {}): Request {
     return new Request("http://placeholder.test/mcp", {
       method: "POST",
@@ -827,18 +827,18 @@ describe("MCPServer validation policy", () => {
     });
   }
 
-  it("getHandler serves foreign Hosts when nothing is configured", async () => {
+  it("server.fetch serves foreign Hosts when nothing is configured", async () => {
     const server = minimalServer();
-    const response = await server.getHandler()(
+    const response = await server.fetch(
       toolsListRequest({ host: "my-app.vercel.app" })
     );
     expect(response.status).toBe(200);
     await server.close();
   });
 
-  it("getHandler with allowedHosts validates additively", async () => {
+  it("server.fetch with allowedHosts validates additively", async () => {
     const server = minimalServer({ allowedHosts: ["api.example.com"] });
-    const handler = server.getHandler();
+    const handler = server.fetch;
     const status = async (host: string) =>
       (await handler(toolsListRequest({ host }))).status;
     expect(await status("api.example.com")).toBe(200);
@@ -848,9 +848,9 @@ describe("MCPServer validation policy", () => {
     await server.close();
   });
 
-  it("getHandler with allowedHosts validates Host but not Origin by default", async () => {
+  it("server.fetch with allowedHosts validates Host but not Origin by default", async () => {
     const server = minimalServer({ allowedHosts: ["api.example.com"] });
-    const handler = server.getHandler();
+    const handler = server.fetch;
     const hostStatus = async (host: string) =>
       (await handler(toolsListRequest({ host }))).status;
     expect(await hostStatus("api.example.com")).toBe(200);
@@ -864,9 +864,9 @@ describe("MCPServer validation policy", () => {
     await server.close();
   });
 
-  it("getHandler with only allowedOrigins validates Origin but not Host", async () => {
+  it("server.fetch with only allowedOrigins validates Origin but not Host", async () => {
     const server = minimalServer({ allowedOrigins: ["app.example.com"] });
-    const handler = server.getHandler();
+    const handler = server.fetch;
     const ok = await handler(
       toolsListRequest({
         host: "anything.example.com",
@@ -899,15 +899,8 @@ describe("MCPServer validation policy", () => {
 
   it("protects additional listener routes with the listen Host policy", async () => {
     const server = minimalServer();
-    const { url } = await server.listen(0, {
-      routes: [
-        {
-          match: (request) =>
-            new URL(request.url).pathname === "/mcp/inspector",
-          handler: async () => new Response("inspector"),
-        },
-      ],
-    });
+    server.get("/mcp/inspector", (context) => context.text("inspector"));
+    const { url } = await server.listen(0);
     try {
       await expect(fetch(`${url}/inspector`)).resolves.toMatchObject({
         status: 200,
@@ -951,10 +944,10 @@ describe("MCPServer validation policy", () => {
     }
   });
 
-  it("rejects a localhost listen() after getHandler() mounted without validation", async () => {
+  it("rejects a localhost listen() after server.fetch mounted without validation", async () => {
     const server = minimalServer();
-    server.getHandler();
-    await expect(server.listen(0)).rejects.toThrow(/after getHandler/);
+    await server.fetch(new Request("http://edge.example/mcp"));
+    await expect(server.listen(0)).rejects.toThrow(/after server\.fetch/);
     await server.close();
   });
 
@@ -962,9 +955,9 @@ describe("MCPServer validation policy", () => {
     const server = minimalServer();
     await server.close();
 
-    expect(() => server.getHandler()).toThrow(
-      "Cannot call getHandler() after the server has closed."
-    );
+    await expect(
+      server.fetch(new Request("http://edge.example/mcp"))
+    ).rejects.toThrow("Cannot use the server after it has closed.");
     await expect(server.listen(0)).rejects.toThrow(
       "Cannot call listen() after the server has closed."
     );
@@ -972,12 +965,12 @@ describe("MCPServer validation policy", () => {
 
   it("keeps a previously mounted server closed", async () => {
     const server = minimalServer();
-    server.getHandler();
+    await server.fetch(new Request("http://edge.example/mcp"));
     await server.close();
 
-    expect(() => server.getHandler()).toThrow(
-      "Cannot call getHandler() after the server has closed."
-    );
+    await expect(
+      server.fetch(new Request("http://edge.example/mcp"))
+    ).rejects.toThrow("Cannot use the server after it has closed.");
     await expect(server.listen(0)).rejects.toThrow(
       "Cannot call listen() after the server has closed."
     );

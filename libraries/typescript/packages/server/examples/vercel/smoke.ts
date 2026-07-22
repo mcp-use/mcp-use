@@ -130,7 +130,7 @@ async function main(): Promise<void> {
   assert.match(rollBody.result.content[0]?.text ?? "", /^Rolled 2d6: /);
   console.log("tools/call (roll-dice) ok:", rollBody.result.content[0]?.text);
 
-  // 4. A foreign Host is served: getHandler() applies no Host validation
+  // 4. A foreign Host is served: server.fetch applies no Host validation
   // (Vercel's edge only routes hostnames assigned to the deployment, so a
   // DNS-rebinding-style Host never reaches the function).
   const foreignHost = await handler(

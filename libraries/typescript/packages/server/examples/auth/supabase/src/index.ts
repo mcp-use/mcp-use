@@ -1,13 +1,7 @@
 import { createServer } from "node:http";
 import { existsSync } from "node:fs";
 
-import {
-  composeFetch,
-  jsonBodyMiddleware,
-  matchesPathPrefix,
-  MCPServer,
-  routeFetch,
-} from "mcp-use";
+import { MCPServer } from "mcp-use";
 import { oauthSupabaseProvider } from "mcp-use/oauth/supabase";
 import { toNodeHandler } from "mcp-use/node";
 import { z } from "zod";
@@ -119,15 +113,9 @@ server.tool(
 );
 
 const authHandler = createAuthHandler({ supabaseUrl, publishableKey });
-const fetch = composeFetch(
-  routeFetch(
-    [{ match: (r) => matchesPathPrefix(r, "/auth"), handler: authHandler }],
-    server.getHandler()
-  ),
-  jsonBodyMiddleware()
-);
+server.all("/auth/*", (c) => authHandler(c.req.raw));
 
-const listener = toNodeHandler({ fetch });
+const listener = toNodeHandler({ fetch: server.fetch });
 const httpServer = createServer((req, res) => {
   void listener(req, res);
 });
