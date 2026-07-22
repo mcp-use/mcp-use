@@ -1,5 +1,11 @@
 # mcp-use
 
+## 2.0.0-beta.24
+
+### Minor Changes
+
+- 786dbf6: Add `mcp-use build --inline` to embed each production view's bundled JavaScript and CSS directly in its MCP resource. External hashed view assets remain the default.
+
 ## 2.0.0-beta.23
 
 ### Patch Changes

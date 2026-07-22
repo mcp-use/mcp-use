@@ -263,7 +263,7 @@ Rules, all inherited from v1 and locked:
 
 ### `mcp-use build` (in `src/cli/build.ts`, dispatched from the bin)
 
-Vite emits the server bundle to `.mcp-use/build/` with `ssr: { external: true }`: every bare import stays external and resolves from `node_modules` at runtime; only the user's source is bundled. Output is unminified ESM targeting the package's Node floor, with sourcemaps. When views exist, `VIEWS_SPEC.md` adds one client build per view plus a generated server wrapper that embeds the view asset registry.
+Vite emits the server bundle to `.mcp-use/build/` with `ssr: { external: true }`: every bare import stays external and resolves from `node_modules` at runtime; only the user's source is bundled. Output is unminified ESM targeting the package's Node floor. `--source-maps` emits the server map and external view maps; inline view maps remain disabled to keep inline resources free of source payload and external map dependencies. When views exist, `VIEWS_SPEC.md` adds one client build per view plus a generated server wrapper that embeds the view asset registry.
 
 Writes `.mcp-use/build/manifest.json`:
 
@@ -272,12 +272,13 @@ Writes `.mcp-use/build/manifest.json`:
   "buildId": "…",
   "entryPoint": "index.js",
   "createdAt": "…",
+  "views": {}
 }
 ```
 
-`buildId` is a random hex id and `createdAt` is an ISO timestamp. `start` currently consumes `entryPoint`. The file contains no Inspector flag or view registry. When views exist, the generated `index.js` wrapper embeds their external asset paths and primes the server during module evaluation. Every build copies project-root `public/` into `build/views/public/` when present, including tool-only servers whose branding references local files.
+`buildId` is a random hex id and `createdAt` is an ISO timestamp. The file contains no Inspector flag. `views` contains the mode-neutral registry for runtime adapters; `start` consumes `entryPoint` and relies on the generated wrapper's embedded copy. By default, view entries reference external asset paths. `mcp-use build --inline` instead embeds each view's bundled JavaScript and CSS so `resources/read` returns them directly in the HTML document. There is no `--no-inline`; omitting `--inline` keeps the default external-assets mode. Every build copies project-root `public/` into `build/views/public/` when present, including tool-only servers and inline builds whose views reference public files.
 
-When `MCP_ASSETS_URL` is set during a views build, the embedded view asset paths become full CDN URLs containing the server entry's `basePath`. The CLI leaves `build/views/` on disk and prints an upload instruction; it does not upload files. The static host must map the two `_mcp-use/views/` and `_mcp-use/public/` URL spaces described in `VIEWS_SPEC.md`. Runtime env uses `MCP_URL` for the server origin, `MCP_ASSETS_URL` for asset and public-file URLs, and `CSP_URLS` / `CSP_*_DOMAINS` for global CSP.
+When `MCP_ASSETS_URL` is set during a default external views build, the embedded view asset paths become full CDN URLs containing the server entry's `basePath`. The CLI leaves `build/views/` on disk and prints an upload instruction; it does not upload files. Inline builds do not rewrite embedded JS/CSS; `MCP_ASSETS_URL` can still select the host for copied `public/` files at runtime. Runtime env uses `MCP_URL` for the server origin, `MCP_ASSETS_URL` for asset and public-file URLs, and `CSP_URLS` / `CSP_*_DOMAINS` for global CSP.
 
 The build is transpile-only and does not run a typecheck. Projects own their `tsc --noEmit` script.
 

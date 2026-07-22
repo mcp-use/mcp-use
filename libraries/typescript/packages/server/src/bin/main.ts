@@ -36,6 +36,8 @@ export interface CliCommandOptions {
   inspector?: boolean;
   /** Emit source maps in production build output (`--source-maps`). */
   sourceMaps?: boolean;
+  /** Embed production view JS and CSS in MCP resources (`--inline`). */
+  inline?: boolean;
 }
 
 const HELP = `mcp-use — run MCP servers built with mcp-use
@@ -65,6 +67,7 @@ Options:
   --mcp-dir <dir>    Directory containing the MCP entry and views/
   --views-dir <dir>  Views directory (default: views/ or <mcp-dir>/views/)
   --source-maps      Emit source maps in build output (build only)
+  --inline           Embed view JS and CSS in MCP resources (build only)
   --tunnel           Expose the dev server through a public tunnel (dev only)
   --no-open          Do not auto-open the inspector in a browser (dev only)
   --no-inspector     Start dev without loading the optional Inspector
@@ -205,6 +208,7 @@ async function cliCommand(
     ...(!args.open && { open: false }),
     ...(!args.inspector && { inspector: false }),
     ...(args.sourceMaps && { sourceMaps: true }),
+    ...(args.inline && { inline: true }),
   };
 
   try {

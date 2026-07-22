@@ -112,7 +112,7 @@ const TRANSPARENT_IFRAME_STYLE =
  * Synthesize a complete HTML document for a view from registry data.
  *
  * Production (`kind: "external"`) loads built assets over HTTP with absolute
- * URLs. Legacy `kind: "inline"` embeds JS/CSS directly. Dev uses Vite module
+ * URLs. Production `kind: "inline"` embeds JS/CSS directly. Dev uses Vite module
  * URLs (`kind: "external"` with origin-absolute paths).
  *
  * @param entry - Primed registry entry for the view.
