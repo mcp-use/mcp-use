@@ -1,5 +1,17 @@
 # mcp-use
 
+## 2.0.0-beta.30
+
+### Minor Changes
+
+- 8259292: Add `mcp-use start --tunnel` for production builds. The command waits for the server to bind, tunnels the actual port, prints the public MCP URL, reuses saved tunnel state, and releases the tunnel during startup failure or graceful shutdown. It composes with `--host` and `--with-inspector` while keeping tunnel code out of ordinary production startup.
+
+### Patch Changes
+
+- Updated dependencies [8259292]
+  - @mcp-use/cli@4.0.0-beta.6
+  - @mcp-use/inspector@20.0.0-beta.22
+
 ## 2.0.0-beta.29
 
 ### Minor Changes
