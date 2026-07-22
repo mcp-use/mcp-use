@@ -38,7 +38,14 @@
     },
     "packages/cli": {
       "entry": ["src/index.ts", "tests/**/*.mjs"],
-      "project": ["src/**/*.ts", "tests/**/*.mjs"]
+      "project": ["src/**/*.ts", "tests/**/*.mjs"],
+      "ignoreDependencies": [
+        "@modelcontextprotocol/server",
+        "@tailwindcss/vite",
+        "@vitejs/plugin-react",
+        "tailwindcss",
+        "vite"
+      ]
     },
     "packages/client": {
       "entry": [

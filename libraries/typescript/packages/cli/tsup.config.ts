@@ -28,7 +28,18 @@ export default defineConfig({
   sourcemap: false,
   minify: true,
   dts: false,
-  external: ["@mcp-use/client", "@mcp-use/inspector"],
+  // Vite is loaded only by the dev/build command chunks. Keep that toolchain
+  // external so tsup does not follow Tailwind's platform-native optional
+  // binaries into the published CLI package.
+  external: [
+    "@mcp-use/client",
+    "@mcp-use/inspector",
+    "@modelcontextprotocol/server",
+    "@tailwindcss/vite",
+    "@vitejs/plugin-react",
+    "tailwindcss",
+    "vite",
+  ],
   define: {
     __MCP_USE_PACKAGE_VERSION__: JSON.stringify(framework.version),
   },
