@@ -32,6 +32,24 @@ const UI_CAPABILITIES = {
   },
 };
 
+const UI_EXTENSION_ID = "io.modelcontextprotocol/ui";
+const CLIENT_CAPABILITIES_META_KEY =
+  "io.modelcontextprotocol/clientCapabilities";
+const CLIENT_INFO_META_KEY = "io.modelcontextprotocol/clientInfo";
+
+type ClientMetadataProbe = {
+  capabilities: Record<string, unknown>;
+  info: Record<string, unknown>;
+  canExtensions: boolean;
+  canMissing: boolean;
+  extension: Record<string, unknown> | null;
+  supportsViews: boolean;
+};
+
+type ClientUserProbe = {
+  user: object | null;
+};
+
 const resultsSchema = z.object({
   query: z.string(),
   items: z.array(z.object({ id: z.string(), name: z.string() })),
@@ -111,6 +129,54 @@ function buildViewsServer(): MCPServer {
     }
   );
 
+  server.tool({ name: "client-metadata-probe" }, async (_params, ctx) => {
+    const capabilities = ctx.client.capabilities();
+    const info = ctx.client.info();
+    const extension = ctx.client.extension(UI_EXTENSION_ID);
+    const canExtensions = ctx.client.can("extensions");
+    const canMissing = ctx.client.can("missing-capability");
+    const supportsClientViews = ctx.client.supportsViews();
+
+    // Accessors must return fresh top-level copies without changing the
+    // request-scoped snapshot used by subsequent reads.
+    capabilities.extensions = {};
+    info.name = "mutated-client";
+    if (extension !== undefined) {
+      extension.mimeTypes = [];
+    }
+
+    const structuredContent: ClientMetadataProbe = {
+      capabilities: ctx.client.capabilities(),
+      info: ctx.client.info(),
+      canExtensions,
+      canMissing,
+      extension: ctx.client.extension(UI_EXTENSION_ID) ?? null,
+      supportsViews: supportsClientViews,
+    };
+    return {
+      structuredContent,
+      content: [{ type: "text", text: JSON.stringify(structuredContent) }],
+    };
+  });
+
+  server.tool({ name: "client-user-probe" }, async (_params, ctx) => {
+    const user = ctx.client.user();
+    if (user !== undefined) {
+      user.locale = "mutated-locale";
+      if (user.location !== undefined) {
+        user.location.city = "mutated-city";
+      }
+    }
+
+    const structuredContent: ClientUserProbe = {
+      user: ctx.client.user() ?? null,
+    };
+    return {
+      structuredContent,
+      content: [{ type: "text", text: JSON.stringify(structuredContent) }],
+    };
+  });
+
   server.tool(
     {
       name: "app-only-action",
@@ -187,13 +253,27 @@ describe("views server core (e2e over HTTP)", () => {
   let url: string;
   let uiClient: Client;
   let plainClient: Client;
+  let legacyClient: Client;
 
   beforeAll(async () => {
     const started = await server.listen(0);
     url = started.url;
 
     uiClient = new Client(
-      { name: "ui-client", version: "1.0.0" },
+      {
+        name: "ui-client",
+        title: "UI Client",
+        version: "1.0.0",
+        description: "Client metadata test fixture",
+        websiteUrl: "https://client.example.com",
+        icons: [
+          {
+            src: "https://client.example.com/icon.png",
+            mimeType: "image/png",
+            sizes: ["48x48"],
+          },
+        ],
+      },
       {
         versionNegotiation: { mode: { pin: "2026-07-28" } },
         capabilities: UI_CAPABILITIES,
@@ -206,11 +286,18 @@ describe("views server core (e2e over HTTP)", () => {
       { versionNegotiation: { mode: { pin: "2026-07-28" } } }
     );
     await plainClient.connect(new StreamableHTTPClientTransport(new URL(url)));
+
+    legacyClient = new Client(
+      { name: "legacy-client", version: "1.0.0" },
+      { capabilities: { sampling: {} } }
+    );
+    await legacyClient.connect(new StreamableHTTPClientTransport(new URL(url)));
   });
 
   afterAll(async () => {
     await uiClient.close();
     await plainClient.close();
+    await legacyClient.close();
     await server.close();
   });
 
@@ -608,6 +695,226 @@ describe("views server core (e2e over HTTP)", () => {
       arguments: {},
     });
     expect(plainResult.structuredContent).toEqual({ ui: false });
+  });
+
+  it("exposes typed client capabilities and implementation metadata per request", async () => {
+    const uiResult = await uiClient.callTool({
+      name: "client-metadata-probe",
+      arguments: {},
+    });
+    expect(uiResult.structuredContent).toEqual({
+      capabilities: UI_CAPABILITIES,
+      info: {
+        name: "ui-client",
+        title: "UI Client",
+        version: "1.0.0",
+        description: "Client metadata test fixture",
+        websiteUrl: "https://client.example.com",
+        icons: [
+          {
+            src: "https://client.example.com/icon.png",
+            mimeType: "image/png",
+            sizes: ["48x48"],
+          },
+        ],
+      },
+      canExtensions: true,
+      canMissing: false,
+      extension: UI_CAPABILITIES.extensions[UI_EXTENSION_ID],
+      supportsViews: true,
+    });
+
+    const plainResult = await plainClient.callTool({
+      name: "client-metadata-probe",
+      arguments: {},
+    });
+    expect(plainResult.structuredContent).toEqual({
+      capabilities: {},
+      info: { name: "plain-client", version: "1.0.0" },
+      canExtensions: false,
+      canMissing: false,
+      extension: null,
+      supportsViews: false,
+    });
+  });
+
+  it("does not cache client metadata between requests on one connection", async () => {
+    const overridden = await uiClient.callTool({
+      name: "client-metadata-probe",
+      arguments: {},
+      _meta: {
+        [CLIENT_CAPABILITIES_META_KEY]: {},
+        [CLIENT_INFO_META_KEY]: {
+          name: "request-override",
+          version: "2.0.0",
+        },
+      },
+    });
+    expect(overridden.structuredContent).toMatchObject({
+      capabilities: {},
+      info: { name: "request-override", version: "2.0.0" },
+      canExtensions: false,
+      extension: null,
+      supportsViews: false,
+    });
+
+    const restored = await uiClient.callTool({
+      name: "client-metadata-probe",
+      arguments: {},
+    });
+    expect(restored.structuredContent).toMatchObject({
+      capabilities: UI_CAPABILITIES,
+      info: { name: "ui-client", version: "1.0.0" },
+      canExtensions: true,
+      supportsViews: true,
+    });
+  });
+
+  it("returns empty client metadata without a modern request envelope", async () => {
+    const result = await legacyClient.callTool({
+      name: "client-metadata-probe",
+      arguments: {},
+    });
+    expect(result.structuredContent).toEqual({
+      capabilities: {},
+      info: {},
+      canExtensions: false,
+      canMissing: false,
+      extension: null,
+      supportsViews: false,
+    });
+  });
+
+  it("normalizes current OpenAI user metadata and returns defensive copies", async () => {
+    const result = await uiClient.callTool({
+      name: "client-user-probe",
+      arguments: {},
+      _meta: {
+        "openai/locale": "en-US",
+        "webplus/i18n": "fr-FR",
+        "openai/userAgent": "chatgpt-web",
+        "openai/userLocation": {
+          city: "San Francisco",
+          region: "California",
+          country: "US",
+          timezone: "America/Los_Angeles",
+          latitude: 37.7749,
+          longitude: -122.4194,
+        },
+        "openai/subject": "subject-1",
+        "openai/session": "conversation-1",
+        "openai/organization": "organization-1",
+      },
+    });
+
+    expect(result.structuredContent).toEqual({
+      user: {
+        locale: "en-US",
+        userAgent: "chatgpt-web",
+        location: {
+          city: "San Francisco",
+          region: "California",
+          country: "US",
+          timezone: "America/Los_Angeles",
+          latitude: 37.7749,
+          longitude: -122.4194,
+        },
+        subject: "subject-1",
+        conversationId: "conversation-1",
+        organizationId: "organization-1",
+      },
+    });
+  });
+
+  it("uses the legacy locale hint and accepts string coordinates", async () => {
+    const result = await uiClient.callTool({
+      name: "client-user-probe",
+      arguments: {},
+      _meta: {
+        "webplus/i18n": "it-IT",
+        "openai/userLocation": {
+          latitude: "45.4642",
+          longitude: "9.19",
+        },
+      },
+    });
+
+    expect(result.structuredContent).toEqual({
+      user: {
+        locale: "it-IT",
+        location: { latitude: "45.4642", longitude: "9.19" },
+      },
+    });
+  });
+
+  it("ignores malformed and undocumented user metadata", async () => {
+    const result = await uiClient.callTool({
+      name: "client-user-probe",
+      arguments: {},
+      _meta: {
+        "openai/locale": 42,
+        "webplus/i18n": false,
+        "openai/userAgent": {},
+        "openai/userLocation": {
+          city: 123,
+          latitude: Number.POSITIVE_INFINITY,
+          longitude: false,
+        },
+        "openai/subject": [],
+        "openai/session": null,
+        "openai/organization": true,
+        timezone_offset_minutes: -420,
+      },
+    });
+
+    expect(result.structuredContent).toEqual({ user: null });
+  });
+
+  it("does not cache user metadata between requests", async () => {
+    const first = await uiClient.callTool({
+      name: "client-user-probe",
+      arguments: {},
+      _meta: { "openai/subject": "request-one" },
+    });
+    expect(first.structuredContent).toEqual({
+      user: { subject: "request-one" },
+    });
+
+    const second = await uiClient.callTool({
+      name: "client-user-probe",
+      arguments: {},
+      _meta: { "openai/locale": "fr-FR" },
+    });
+    expect(second.structuredContent).toEqual({
+      user: { locale: "fr-FR" },
+    });
+  });
+
+  it("returns undefined when user metadata is missing", async () => {
+    const result = await uiClient.callTool({
+      name: "client-user-probe",
+      arguments: {},
+    });
+
+    expect(result.structuredContent).toEqual({ user: null });
+  });
+
+  it("reads ordinary OpenAI metadata on legacy-fallback requests", async () => {
+    const result = await legacyClient.callTool({
+      name: "client-user-probe",
+      arguments: {},
+      _meta: {
+        "openai/locale": "de-DE",
+        "openai/organization": "legacy-organization",
+      },
+    });
+
+    expect(result.structuredContent).toEqual({
+      user: {
+        locale: "de-DE",
+        organizationId: "legacy-organization",
+      },
+    });
   });
 
   it("serves MCP list/read with no assets directory on disk", async () => {

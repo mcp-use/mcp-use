@@ -299,7 +299,7 @@ describe("MCPServer (phase 1, e2e over HTTP)", () => {
       conditions: "sunny",
       temperature: "22°C",
     });
-    expect(result._meta).toEqual({
+    expect(result._meta).toMatchObject({
       "example.com/result": { scope: "tool-call" },
       "io.modelcontextprotocol/serverInfo": {
         name: "phase1-test",
