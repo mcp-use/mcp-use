@@ -48,6 +48,7 @@
     "optimize-standalone-inspector-package",
     "registry-mcp-v2-dependencies",
     "rename-starter-mcp-server-template",
+    "request-scoped-client-context",
     "resource-template-completion",
     "skip-dev-info-standalone-probe",
     "start-production-tunnel",

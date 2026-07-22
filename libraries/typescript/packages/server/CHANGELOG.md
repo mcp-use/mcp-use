@@ -1,5 +1,15 @@
 # mcp-use
 
+## 2.0.0-beta.32
+
+### Minor Changes
+
+- 23bba3b: Restore the v1-compatible `ctx.client.can()`, `capabilities()`, `info()`, `extension()`, and `user()` helpers using v2 request-scoped metadata. Client capabilities and implementation details come from the modern MCP envelope, while normalized OpenAI caller hints come from ordinary request `_meta`; no metadata is cached across requests or treated as authenticated identity.
+
+### Patch Changes
+
+- @mcp-use/inspector@20.0.0-beta.24
+
 ## 2.0.0-beta.31
 
 ### Patch Changes
