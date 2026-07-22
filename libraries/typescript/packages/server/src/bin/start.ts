@@ -59,6 +59,8 @@ export interface StartOptions {
   host?: string | undefined;
   /** Mount the bundled Inspector on the same production listener. */
   withInspector?: boolean | undefined;
+  /** Start a public tunnel after the production listener binds. */
+  tunnel?: boolean | undefined;
 }
 
 /**
@@ -71,7 +73,9 @@ export interface StartedServer {
   port: number;
   /** URL of the MCP endpoint, as reported by the server's `listen()`. */
   url: string;
-  /** Stop the server (delegates to the instance's `close()`, if present). */
+  /** Public MCP endpoint URL when `--tunnel` was requested. */
+  tunnelUrl?: string;
+  /** Stop the tunnel, when active, then delegate to the server's `close()`. */
   close(): Promise<void>;
 }
 
@@ -82,7 +86,7 @@ export interface StartedServer {
  * Reads the build manifest, sets `NODE_ENV=production` (only if unset),
  * imports the built entry, and calls `listen()` on its default export.
  *
- * @param options - Project root and optional port override.
+ * @param options - Project root and optional address, Inspector, and tunnel settings.
  * @throws Error with an actionable message when the manifest is missing
  * (pointing at `mcp-use build`), malformed, or the entry's default export is
  * not a server.
@@ -158,11 +162,60 @@ export async function runStart(options: StartOptions): Promise<StartedServer> {
       ? result.url
       : `http://localhost:${boundPort}`;
 
+  let tunnel:
+    | {
+        start(port: number): Promise<{ url: string }>;
+        stop(): Promise<void>;
+      }
+    | undefined;
+  let tunnelUrl: string | undefined;
+  if (options.tunnel === true) {
+    try {
+      // Keep the tunnel process/state code outside the ordinary production
+      // start evaluation graph. The listener must bind successfully before a
+      // public route is created for it.
+      const { createTunnelManager } = await import("../cli/tunnel.js");
+      tunnel = createTunnelManager(
+        join(options.cwd, WORKSPACE_DIR_NAME, "state", "tunnel.json")
+      );
+      const tunnelInfo = await tunnel.start(boundPort);
+      const endpoint = new URL(url);
+      tunnelUrl = new URL(
+        `${endpoint.pathname}${endpoint.search}`,
+        `${tunnelInfo.url}/`
+      ).toString();
+    } catch (error) {
+      try {
+        await tunnel?.stop();
+      } catch {
+        // Preserve the tunnel startup error after best-effort cleanup.
+      }
+      try {
+        await candidate.close?.();
+      } catch {
+        // Preserve the tunnel startup error after best-effort cleanup.
+      }
+      throw error;
+    }
+  }
+
   return {
     port: boundPort,
     url,
+    ...(tunnelUrl !== undefined && { tunnelUrl }),
     close: async () => {
-      await candidate.close?.();
+      let cleanupError: unknown;
+      try {
+        await tunnel?.stop();
+      } catch (error) {
+        cleanupError = error;
+      }
+      try {
+        await candidate.close?.();
+      } catch (error) {
+        cleanupError ??= error;
+      }
+      if (cleanupError !== undefined) throw cleanupError;
     },
   };
 }

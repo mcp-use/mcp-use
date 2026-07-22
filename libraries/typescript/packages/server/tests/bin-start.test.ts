@@ -7,7 +7,25 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
+
+const tunnelMocks = vi.hoisted(() => ({
+  create: vi.fn(),
+  start: vi.fn(),
+  stop: vi.fn(),
+}));
+
+vi.mock("../src/cli/tunnel.js", () => ({
+  createTunnelManager: tunnelMocks.create,
+}));
 
 import { parseArgs, resolveHost, resolvePort } from "../src/bin/args.js";
 import { main } from "../src/bin/main.js";
@@ -126,6 +144,22 @@ afterAll(async () => {
   );
 });
 
+beforeEach(() => {
+  tunnelMocks.start.mockReset();
+  tunnelMocks.stop.mockReset();
+  tunnelMocks.create.mockReset();
+  tunnelMocks.start.mockResolvedValue({
+    url: "https://public-test.local.mcp-use.run",
+    subdomain: "public-test",
+  });
+  tunnelMocks.stop.mockResolvedValue(undefined);
+  tunnelMocks.create.mockReturnValue({
+    start: tunnelMocks.start,
+    stop: tunnelMocks.stop,
+    status: () => ({ url: null }),
+  });
+});
+
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
@@ -166,7 +200,9 @@ describe("parseArgs", () => {
 
   it("parses --tunnel", () => {
     expect(parseArgs(["dev", "--tunnel"]).tunnel).toBe(true);
+    expect(parseArgs(["start", "--tunnel"]).tunnel).toBe(true);
     expect(parseArgs(["dev"]).tunnel).toBe(false);
+    expect(parseArgs(["start"]).tunnel).toBe(false);
   });
 
   it("parses --no-open (auto-open defaults to on)", () => {
@@ -332,6 +368,76 @@ describe("runStart", () => {
     }
   });
 
+  it("starts a tunnel after binding and closes both resources", async () => {
+    const cwd = await makeProject({ entrySource: HTTP_ENTRY });
+    tunnelMocks.start.mockImplementationOnce(async (port: number) => {
+      const response = await fetch(`http://127.0.0.1:${port}/mcp`);
+      expect(await response.text()).toBe("hello from built server");
+      return {
+        url: "https://public-test.local.mcp-use.run",
+        subdomain: "public-test",
+      };
+    });
+
+    const started = await runStart({ cwd, port: 0, tunnel: true });
+
+    expect(tunnelMocks.create).toHaveBeenCalledWith(
+      join(cwd, ".mcp-use", "state", "tunnel.json")
+    );
+    expect(tunnelMocks.start).toHaveBeenCalledWith(started.port);
+    expect(started.tunnelUrl).toBe("https://public-test.local.mcp-use.run/mcp");
+
+    await started.close();
+    expect(tunnelMocks.stop).toHaveBeenCalledOnce();
+    await expect(fetch(started.url)).rejects.toThrow();
+  });
+
+  it("closes the bound server when tunnel startup fails", async () => {
+    const cwd = await makeProject({ entrySource: HTTP_ENTRY });
+    let boundPort: number | undefined;
+    tunnelMocks.start.mockImplementationOnce(async (port: number) => {
+      boundPort = port;
+      throw new Error("tunnel unavailable");
+    });
+
+    await expect(runStart({ cwd, port: 0, tunnel: true })).rejects.toThrow(
+      "tunnel unavailable"
+    );
+
+    expect(tunnelMocks.stop).toHaveBeenCalledOnce();
+    expect(boundPort).toBeDefined();
+    await expect(
+      fetch(`http://127.0.0.1:${boundPort ?? 0}/mcp`)
+    ).rejects.toThrow();
+  });
+
+  it("coexists with Inspector routing on the production listener", async () => {
+    mountInspector.mockImplementation(
+      () => async () => new Response("inspector")
+    );
+    const cwd = await makeProject({ entrySource: INSPECTOR_ENTRY });
+
+    const started = await runStart({
+      cwd,
+      port: 4568,
+      withInspector: true,
+      tunnel: true,
+    });
+    try {
+      expect(mountInspector).toHaveBeenCalledWith({
+        basePath: "/api/mcp",
+        devMode: false,
+        oauthProxyAllowLoopback: false,
+      });
+      expect(tunnelMocks.start).toHaveBeenCalledWith(4568);
+      expect(started.tunnelUrl).toBe(
+        "https://public-test.local.mcp-use.run/api/mcp"
+      );
+    } finally {
+      await started.close();
+    }
+  });
+
   it("applies address precedence: flags over env over server config over defaults", async () => {
     const cwd = await makeProject({ entrySource: ADDRESS_ENTRY });
 
@@ -385,6 +491,48 @@ describe("main", () => {
     const logs = vi.spyOn(console, "log").mockImplementation(() => {});
     await expect(main(["--help"])).resolves.toBe(0);
     expect(logs.mock.calls.flat().join("\n")).toContain("Usage: mcp-use");
+    expect(logs.mock.calls.flat().join("\n")).toContain(
+      "public tunnel (dev/start only)"
+    );
+  });
+
+  it("prints the public MCP URL and stops the tunnel on a signal", async () => {
+    const cwd = await makeProject({ entrySource: ECHO_ENTRY });
+    const logs = vi.spyOn(console, "log").mockImplementation(() => {});
+    const exit = vi
+      .spyOn(process, "exit")
+      .mockImplementation((() => undefined) as never);
+    const existingSigint = new Set(process.listeners("SIGINT"));
+    const existingSigterm = new Set(process.listeners("SIGTERM"));
+
+    await expect(
+      main(["start", "--path", cwd, "--port", "4567", "--tunnel"])
+    ).resolves.toBe(0);
+
+    expect(logs.mock.calls.flat().join("\n")).toContain(
+      "mcp-use public MCP URL: https://public-test.local.mcp-use.run/mcp"
+    );
+
+    const sigint = process
+      .listeners("SIGINT")
+      .find((listener) => !existingSigint.has(listener));
+    const sigterm = process
+      .listeners("SIGTERM")
+      .find((listener) => !existingSigterm.has(listener));
+    expect(sigint).toBeDefined();
+    expect(sigterm).toBeDefined();
+
+    try {
+      sigint?.("SIGINT");
+      sigterm?.("SIGTERM");
+      await vi.waitFor(() => {
+        expect(exit).toHaveBeenCalledWith(0);
+      });
+      expect(tunnelMocks.stop).toHaveBeenCalledOnce();
+    } finally {
+      if (sigint !== undefined) process.off("SIGINT", sigint);
+      if (sigterm !== undefined) process.off("SIGTERM", sigterm);
+    }
   });
 
   it("prints client help for client --help", async () => {
