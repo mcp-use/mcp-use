@@ -27,6 +27,7 @@ export function detectPendingAutoConnect(search?: string): boolean {
       // sessionStorage unavailable
     }
 
+    // Legacy runtime config injected by older server-managed Inspector shells.
     const shellAutoConnectUrl = (
       window as Window & { __MCP_USE_INSPECTOR__?: { autoConnectUrl?: string } }
     ).__MCP_USE_INSPECTOR__?.autoConnectUrl;

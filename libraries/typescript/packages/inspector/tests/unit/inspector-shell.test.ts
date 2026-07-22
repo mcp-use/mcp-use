@@ -1,16 +1,18 @@
 import { Hono } from "hono";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { resolveInspectorBundleAssetUrls } from "../../src/server/bundle-assets.js";
 import { registerInspectorShell } from "../../src/server/inspector-shell.js";
 
 describe("Inspector shell", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("loads the browser bundle from the installed package route", async () => {
     const app = new Hono();
     registerInspectorShell(
       app,
       {
-        assetsPath: "/mcp/inspector/assets",
         inspectorMode: "standalone",
       },
       "/mcp"
@@ -29,12 +31,13 @@ describe("Inspector shell", () => {
     expect(html).toContain('window.__MCP_INSPECTOR_MODE__ = "standalone"');
   });
 
-  it("versions both application assets from the installed package", () => {
-    const assets = resolveInspectorBundleAssetUrls("/inspector/assets");
+  it("enables dev CLI controls only for mcp-use dev", async () => {
+    vi.stubEnv("MCP_USE_DEV_CLI", "1");
+    const app = new Hono();
+    registerInspectorShell(app);
 
-    expect(assets.jsUrl).toMatch(/^\/inspector\/assets\/inspector\.js\?v=.+$/);
-    expect(assets.cssUrl).toMatch(
-      /^\/inspector\/assets\/inspector\.css\?v=.+$/
-    );
+    const response = await app.request("http://localhost/inspector");
+
+    expect(await response.text()).toContain("window.__MCP_DEV_CLI__ = true");
   });
 });

@@ -1,18 +1,12 @@
 import type { Context, Hono } from "hono";
-import {
-  resolveInspectorBundleAssetUrls,
-  type InspectorMode,
-} from "./bundle-assets.js";
 import { renderInspectorFaviconLinks } from "./favicon-links.js";
-import { registerInspectorFaviconStatic } from "./favicon-static.js";
 import { registerInspectorStaticAssets } from "./static-assets.js";
 import { getInspectorVersion } from "./version.js";
 
 const INSPECTOR_VERSION = getInspectorVersion();
+type InspectorMode = "standalone" | "embedded" | "cloud";
 
-export type { InspectorMode } from "./bundle-assets.js";
-
-export type InspectorShellConfig = {
+type InspectorShellConfig = {
   basePath?: string;
   devMode?: boolean;
   sandboxOrigin?: string | null;
@@ -21,10 +15,6 @@ export type InspectorShellConfig = {
   inspectorMode?: InspectorMode;
   manufactChatUrl?: string | null;
   disableTelemetry?: boolean;
-  /** Root-relative URL where the installed package's browser bundle is mounted. */
-  assetsPath?: string;
-  /** Root-relative prefix for locally served favicon files. */
-  faviconBasePath?: string;
   /** Preserve the standalone CLI's `/` to `/inspector` redirect (default true). */
   rootRedirect?: boolean;
 };
@@ -74,13 +64,16 @@ function generateInspectorShellHtml(
       `<script>window.__MCP_USE_ANONYMIZED_TELEMETRY__ = false;try{localStorage.setItem("MCP_USE_ANONYMIZED_TELEMETRY","false");}catch(e){}</script>`
     );
   }
+  if (process.env.MCP_USE_DEV_CLI === "1") {
+    scripts.push(`<script>window.__MCP_DEV_CLI__ = true;</script>`);
+  }
   const runtimeScripts = scripts.join("\n    ");
 
   return `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    ${renderInspectorFaviconLinks(config?.faviconBasePath ?? basePath)}
+    ${renderInspectorFaviconLinks(`${basePath}/inspector/assets`)}
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -178,8 +171,12 @@ export function registerInspectorShell(
   config?: InspectorShellConfig,
   basePath: string = ""
 ) {
-  const assetsPath = config?.assetsPath ?? `${basePath}/inspector/assets`;
-  const assets = resolveInspectorBundleAssetUrls(assetsPath);
+  const assetsPath = `${basePath}/inspector/assets`;
+  const version = encodeURIComponent(INSPECTOR_VERSION);
+  const assets = {
+    jsUrl: `${assetsPath}/inspector.js?v=${version}`,
+    cssUrl: `${assetsPath}/inspector.css?v=${version}`,
+  };
   const p = (suffix: string) => `${basePath}${suffix}`;
   const effectiveConfig: InspectorShellConfig = {
     ...config,
@@ -198,8 +195,6 @@ export function registerInspectorShell(
       generateInspectorShellHtml(effectiveConfig, basePath, assets)
     );
   };
-
-  registerInspectorFaviconStatic(app, config?.faviconBasePath ?? basePath);
 
   // Scoped local assets must be registered before the Inspector SPA fallback,
   // otherwise `/inspector/assets/*` would be answered with the HTML shell.

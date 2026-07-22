@@ -26,6 +26,7 @@ describe("mountInspector", () => {
       'window.__MCP_PROXY_URL__ = "/tools/mcp/inspector/api/proxy"'
     );
     expect(html).toContain("window.__MCP_DEV_MODE__ = true");
+    expect(html).toContain('window.__MCP_INSPECTOR_MODE__ = "embedded"');
 
     const config = await inspector(
       new Request("http://localhost/tools/mcp/inspector/config.json")

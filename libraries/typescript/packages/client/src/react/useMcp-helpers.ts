@@ -253,9 +253,16 @@ export function startConnectionHealthMonitoring(params: {
       const authHeaders = params.getAuthHeaders
         ? await params.getAuthHeaders()
         : {};
+      const healthCheckHeaders = {
+        ...params.allHeaders,
+        ...authHeaders,
+        ...(params.gatewayUrl && params.url
+          ? { "X-Target-URL": params.url }
+          : {}),
+      };
       const response = await fetch(healthCheckUrl, {
         method: "HEAD",
-        headers: { ...params.allHeaders, ...authHeaders },
+        headers: healthCheckHeaders,
         signal: AbortSignal.timeout(5000),
       });
 

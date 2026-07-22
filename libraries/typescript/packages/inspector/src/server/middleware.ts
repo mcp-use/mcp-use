@@ -140,15 +140,12 @@ function registerInspectorRoutes(
   }
 
   registerInspectorProxyRoutes(app, routesConfig, basePath);
-  const scopedAssetsPath = `${basePath}/inspector/assets`;
   registerInspectorShell(
     app,
     {
       devMode: options?.devMode ?? true,
       sandboxOrigin: options?.sandboxOrigin,
-      inspectorMode: "standalone",
-      assetsPath: scopedAssetsPath,
-      faviconBasePath: scopedAssetsPath,
+      inspectorMode: "embedded",
       rootRedirect: false,
       basePath,
       proxyUrl: `${basePath}/inspector/api/proxy`,

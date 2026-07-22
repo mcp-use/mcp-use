@@ -3,7 +3,6 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { logger } from "hono/logger";
 import open from "open";
 import { registerInspectorShell } from "./inspector-shell.js";
 import { registerInspectorProxyRoutes } from "./proxy-routes.js";
@@ -84,8 +83,6 @@ app.use(
     exposeHeaders: ["*"],
   })
 );
-app.use("/inspector/api/proxy/*", logger());
-
 registerInspectorProxyRoutes(app, {
   autoConnectUrl: mcpUrl,
   oauthProxyAllowedOrigins: [],
