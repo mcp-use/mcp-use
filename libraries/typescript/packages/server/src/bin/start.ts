@@ -208,7 +208,7 @@ async function loadBuiltInInspector(): Promise<{
     }): FetchHandler;
   }>;
   try {
-    loaded = await import("@mcp-use/inspector");
+    loaded = (await import("@mcp-use/inspector")) as unknown as typeof loaded;
   } catch (error) {
     if (isModuleNotFound(error)) {
       throw new Error(

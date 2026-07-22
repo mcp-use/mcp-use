@@ -33,7 +33,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: libraries/typescript/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @mcp-use/client build && pnpm --filter mcp-use build
+      - run: pnpm --filter @mcp-use/client build && pnpm --filter mcp-use build && pnpm --filter @mcp-use/cli build
       - run: pnpm verify:examples
       - name: Upload example verification logs
         if: always()
