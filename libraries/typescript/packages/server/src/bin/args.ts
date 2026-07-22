@@ -33,6 +33,8 @@ export interface ParsedArgs {
   withInspector: boolean;
   /** Whether build output should include source maps (build only). */
   sourceMaps: boolean;
+  /** Whether production view JS and CSS should be embedded in MCP resources. */
+  inline: boolean;
   /** Whether `--help`/`-h` was passed. */
   help: boolean;
   /** Whether `--version`/`-v` was passed. */
@@ -64,6 +66,7 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
     open: true,
     withInspector: false,
     sourceMaps: false,
+    inline: false,
     help: false,
     version: false,
   };
@@ -132,6 +135,9 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
         break;
       case "--source-maps":
         args.sourceMaps = true;
+        break;
+      case "--inline":
+        args.inline = true;
         break;
       default:
         if (flag.startsWith("-")) {
