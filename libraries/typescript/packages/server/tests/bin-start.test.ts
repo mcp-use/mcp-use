@@ -131,6 +131,20 @@ describe("parseArgs", () => {
     expect(parseArgs(["build"]).sourceMaps).toBe(false);
   });
 
+  it("parses --inline for build without changing the default", () => {
+    expect(parseArgs(["build", "--inline"]).inline).toBe(true);
+    expect(parseArgs(["build"]).inline).toBe(false);
+    expect(() => parseArgs(["build", "--no-inline"])).toThrow(
+      /Unknown option: --no-inline/
+    );
+  });
+
+  it("documents --inline in command help", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    await expect(main(["build", "--help"])).resolves.toBe(0);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("--inline"));
+  });
+
   it("parses help and version flags", () => {
     expect(parseArgs(["--help"]).help).toBe(true);
     expect(parseArgs(["-h"]).help).toBe(true);

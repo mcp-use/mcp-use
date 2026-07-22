@@ -38,11 +38,10 @@ export interface ViewResourceFacts {
 }
 
 /**
- * Compatibility manifest entry whose JS and CSS are embedded in the
- * synthesized HTML document.
+ * Manifest entry whose JS and CSS are embedded in the synthesized HTML
+ * document.
  *
- * The production CLI emits {@link ExternalViewManifestEntry}; this shape
- * remains available to existing internal callers.
+ * The production CLI emits this shape for `mcp-use build --inline`.
  */
 export interface InlineViewManifestEntry {
   /** Discriminant for the embedded bundle shape. */
@@ -92,9 +91,9 @@ export interface ExternalViewManifestEntry {
 /**
  * One entry in the primed views registry.
  *
- * Production builds emit {@link ExternalViewManifestEntry} with view-relative
- * asset paths or build-time-rewritten CDN URLs; `mcp-use dev` emits
- * origin-absolute Vite URLs.
+ * Production builds emit {@link ExternalViewManifestEntry} by default and
+ * {@link InlineViewManifestEntry} with `mcp-use build --inline`; `mcp-use dev`
+ * emits origin-absolute Vite URLs.
  */
 export type ViewManifestEntry =
   | InlineViewManifestEntry

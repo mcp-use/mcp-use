@@ -361,7 +361,7 @@ describe("runBuild (views)", () => {
     vi.restoreAllMocks();
   });
 
-  it("builds views manifest, assets, wrapper entry, and binding checks", async () => {
+  it("builds external view assets by default", async () => {
     const cwd = copyFixture("build-views", "views");
     dirs.push(cwd);
 
@@ -551,6 +551,51 @@ describe("runBuild (views)", () => {
     } finally {
       process.chdir(previousCwd);
     }
+  }, 60_000);
+
+  it("embeds view JavaScript and CSS in resources with --inline", async () => {
+    const cwd = copyFixture("build-views-inline", "views");
+    dirs.push(cwd);
+
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    await runBuild({ cwd, inline: true });
+
+    const buildDir = join(cwd, WORKSPACE_DIR_NAME, "build");
+    const manifest = JSON.parse(
+      readFileSync(join(buildDir, BUILD_MANIFEST_NAME), "utf8")
+    ) as BuildManifest;
+    const product = manifest.views["product-search-result"];
+    expect(product).toMatchObject({ kind: "inline" });
+    expect(product?.kind).toBe("inline");
+    if (product?.kind !== "inline") {
+      throw new Error("expected an inline view manifest entry");
+    }
+    expect(product.js).toMatch(/bootstrapView|createElement|react/i);
+    expect(product.js).not.toContain("sourceMappingURL=data:");
+    expect(product.css).toContain("tailwindcss");
+    expect(existsSync(join(buildDir, "views", "product-search-result"))).toBe(
+      false
+    );
+
+    const entryCode = readFileSync(join(buildDir, "index.js"), "utf8");
+    expect(entryCode).toMatch(/"kind"\s*:\s*"inline"/);
+
+    const mod = (await import(
+      pathToFileURL(join(buildDir, "index.js")).href
+    )) as {
+      default: { getHandler(): (request: Request) => Promise<Response> };
+    };
+    const readBody = await handlerMcp(
+      mod.default.getHandler(),
+      "resources/read",
+      { uri: "ui://views/product-search-result.html" }
+    );
+    const text = (readBody["result"] as { contents: { text: string }[] })
+      .contents[0]!.text;
+    expect(text).toContain('<script type="module">');
+    expect(text).not.toContain('<script type="module" src=');
+    expect(text).toContain("<style>");
+    expect(text).not.toContain("/_mcp-use/views/product-search-result/");
   }, 60_000);
 
   it("escapes </script> in legacy inline module source", () => {

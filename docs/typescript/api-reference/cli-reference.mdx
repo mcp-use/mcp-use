@@ -115,11 +115,14 @@ mcp-use build [options]
 | `--mcp-dir <dir>`   | MCP source directory containing the entry and `views/`.                  | None                           |
 | `--views-dir <dir>` | View directory, relative to the project root.                            | `views/` or `<mcp-dir>/views/` |
 | `--with-inspector`  | Include the Inspector in the production build.                           | Disabled                       |
+| `--source-maps`     | Emit source maps for server and external view bundles.                   | Disabled                       |
+| `--inline`          | Embed each view's bundled JavaScript and CSS in its MCP resource.        | Disabled                       |
 
 **Examples:**
 
 ```bash
 mcp-use build
+mcp-use build --inline
 mcp-use build --with-inspector
 mcp-use build --mcp-dir src/mcp
 mcp-use build --entry src/server.ts --views-dir src/views
@@ -129,10 +132,11 @@ mcp-use build --path ./my-server
 **Notes and behavior:**
 
 - The command bundles the default-exported server as `.mcp-use/build/index.js` and writes `.mcp-use/build/manifest.json`.
-- Each `views/<name>/view.tsx` is built under `.mcp-use/build/views/<name>/`; its mode-neutral view map is stored in the existing `.mcp-use/build/manifest.json`.
+- Each `views/<name>/view.tsx` builds to hashed external assets under `.mcp-use/build/views/<name>/` by default.
+- Pass `--inline` to embed each view's bundled JavaScript and CSS directly in the HTML returned by `resources/read`. There is no `--no-inline`; omit `--inline` to use external assets.
 - The build is transpile-only. Run `tsc --noEmit` as a separate project script when type checking is required.
 - TypeScript path aliases come from the selected project's `tsconfig.json`.
-- If `MCP_ASSETS_URL` is set, view manifest paths are rewritten to that asset origin using the server's `basePath`.
+- If `MCP_ASSETS_URL` is set for an external build, view paths are rewritten to that asset origin using the server's `basePath`. Inline view bundles are not rewritten.
 - The selected project's `public/` directory is copied to `.mcp-use/build/views/public/`.
 
 ## `start`

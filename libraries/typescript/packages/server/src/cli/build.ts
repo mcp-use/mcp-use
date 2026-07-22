@@ -86,6 +86,12 @@ export interface BuildOptions {
   withInspector?: boolean;
   /** Emit source maps for the server and view bundles. */
   sourceMaps?: boolean;
+  /**
+   * Embed each production view's JavaScript and CSS in its MCP resource.
+   *
+   * @defaultValue `false`; views use external hashed assets.
+   */
+  inline?: boolean;
 }
 
 /**
@@ -160,10 +166,9 @@ function applyBuildAssetsPrefix(
 }
 
 /**
- * Build one view into hashed assets on disk, then record view-relative paths
- * in the manifest (served over HTTP at runtime).
+ * Build one view into either embedded source or hashed assets on disk.
  */
-async function buildExternalView(
+async function buildView(
   view: DiscoveredView,
   options: {
     cwd: string;
@@ -171,6 +176,7 @@ async function buildExternalView(
     viewsOutDir: string;
     userViteConfig: string | false;
     sourceMaps: boolean;
+    inline: boolean;
   }
 ): Promise<ViewsManifest[string]> {
   const viewOutDir = join(options.viewsOutDir, view.name);
@@ -193,8 +199,9 @@ async function buildExternalView(
     build: {
       outDir: viewOutDir,
       emptyOutDir: true,
+      write: !options.inline,
       target: "es2022",
-      sourcemap: options.sourceMaps,
+      sourcemap: options.inline ? false : options.sourceMaps,
       minify: true,
       cssCodeSplit: false,
       chunkSizeWarningLimit: 1000,
@@ -203,6 +210,7 @@ async function buildExternalView(
         input: { [view.name]: virtualViewId(view.name) },
         output: {
           format: "es",
+          codeSplitting: !options.inline,
           entryFileNames: "assets/[name]-[hash].js",
           chunkFileNames: "assets/[name]-[hash].js",
           assetFileNames: "assets/[name]-[hash][extname]",
@@ -224,6 +232,8 @@ async function buildExternalView(
 
   let jsFileName: string | undefined;
   let cssFileName: string | undefined;
+  let inlineJs: string | undefined;
+  const inlineCss: string[] = [];
 
   for (const item of items) {
     if (typeof item !== "object" || item === null || !("fileName" in item)) {
@@ -237,11 +247,19 @@ async function buildExternalView(
       type?: string;
       isEntry?: boolean;
       fileName: string;
+      code?: string;
+      source?: string | Uint8Array;
     };
     if (typed.type === "chunk" && typed.isEntry === true) {
       jsFileName = typed.fileName;
+      inlineJs = typed.code;
     } else if (typed.type === "asset" && typed.fileName.endsWith(".css")) {
       cssFileName = typed.fileName;
+      if (typeof typed.source === "string") {
+        inlineCss.push(typed.source);
+      } else if (typed.source instanceof Uint8Array) {
+        inlineCss.push(new TextDecoder().decode(typed.source));
+      }
     }
   }
 
@@ -249,6 +267,19 @@ async function buildExternalView(
     throw new Error(
       `Client build produced no entry chunk for view "${view.name}".`
     );
+  }
+
+  if (options.inline) {
+    if (inlineJs === undefined) {
+      throw new Error(
+        `Client build produced no entry source for view "${view.name}".`
+      );
+    }
+    return {
+      kind: "inline",
+      js: inlineJs,
+      css: inlineCss.join("\n"),
+    };
   }
 
   return {
@@ -300,6 +331,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
   const userViteConfig = resolveUserViteConfig(options.cwd);
   const inspector = options.withInspector === true;
   const sourceMaps = options.sourceMaps === true;
+  const inline = options.inline === true;
 
   if (views.length === 0) {
     await build({
@@ -384,14 +416,15 @@ export async function runBuild(options: BuildOptions): Promise<void> {
   const viewsManifest: ViewsManifest = {};
   const buildAssetsBase = readBuildAssetsBase();
   for (const view of views) {
-    let manifestEntry = await buildExternalView(view, {
+    let manifestEntry = await buildView(view, {
       cwd: options.cwd,
       cacheDir: paths.cache,
       viewsOutDir,
       userViteConfig,
       sourceMaps,
+      inline,
     });
-    if (buildAssetsBase !== undefined) {
+    if (buildAssetsBase !== undefined && !inline) {
       manifestEntry = applyBuildAssetsPrefix(
         manifestEntry,
         view.name,
@@ -402,7 +435,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     viewsManifest[view.name] = manifestEntry;
   }
 
-  if (buildAssetsBase !== undefined) {
+  if (buildAssetsBase !== undefined && !inline) {
     console.log(
       `[mcp-use] MCP_ASSETS_URL set — manifest uses CDN URLs; upload ` +
         `${relative(options.cwd, viewsOutDir)}/ to your asset host.`
