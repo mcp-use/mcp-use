@@ -104,7 +104,7 @@ import type {
   ToolViewConfig,
 } from "./tools.js";
 import { resolveToolInputSchema } from "./tools.js";
-import { trackTelemetry } from "./telemetry.js";
+import { recordUsage } from "./usage.js";
 import { supportsViews } from "./views/capabilities.js";
 import type { ViewResourceFacts } from "./views/types.js";
 import {
@@ -131,7 +131,7 @@ import {
  */
 type HasOAuth<TUser> = [TUser] extends [never] ? false : true;
 
-interface ClientTelemetry {
+interface ClientUsage {
   client_name: string;
   client_version: string;
   protocol_era: "modern" | "legacy";
@@ -164,13 +164,13 @@ function productId(value: unknown, fallback: string): string {
     : fallback;
 }
 
-function clientTelemetryFromBody(body: unknown): ClientTelemetry | undefined {
+function clientUsageFromBody(body: unknown): ClientUsage | undefined {
   if (!isJSONRPCRequest(body)) return undefined;
   const params = record(body.params);
   if (body.method === "initialize") {
     const info = record(params?.["clientInfo"]);
     const capabilities = record(params?.["capabilities"]) ?? {};
-    return clientTelemetry(
+    return clientUsage(
       info,
       capabilities,
       params?.["protocolVersion"],
@@ -181,7 +181,7 @@ function clientTelemetryFromBody(body: unknown): ClientTelemetry | undefined {
   const info = record(meta?.[CLIENT_INFO_META_KEY]);
   const capabilities = record(meta?.[CLIENT_CAPABILITIES_META_KEY]);
   if (info === undefined || capabilities === undefined) return undefined;
-  return clientTelemetry(
+  return clientUsage(
     info,
     capabilities,
     meta?.[PROTOCOL_VERSION_META_KEY],
@@ -189,12 +189,12 @@ function clientTelemetryFromBody(body: unknown): ClientTelemetry | undefined {
   );
 }
 
-function clientTelemetry(
+function clientUsage(
   info: Record<string, unknown> | undefined,
   capabilities: Record<string, unknown>,
   protocolVersion: unknown,
-  era: ClientTelemetry["protocol_era"]
-): ClientTelemetry {
+  era: ClientUsage["protocol_era"]
+): ClientUsage {
   const typedCapabilities = capabilities as ClientCapabilities;
   return {
     client_name: productId(info?.["name"], "other"),
@@ -378,7 +378,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   #hostValidated = false;
   readonly #mcpMiddlewares: McpMiddlewareEntry[] = [];
   readonly #mcpEventListeners: McpEventListenerEntry[] = [];
-  readonly #telemetryScope = crypto.randomUUID();
+  readonly #usageScope = crypto.randomUUID();
   readonly #openApiTools = new Set<string>();
   readonly #proxiedTools = new Set<string>();
   readonly #proxiedResources = new Set<string>();
@@ -1128,7 +1128,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   }
 
   #trackConfigured(): void {
-    trackTelemetry(
+    recordUsage(
       "server",
       "configured",
       {
@@ -1163,21 +1163,21 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         legacy_policy: this.#config.legacy ?? "stateless",
       },
       {
-        onceKey: `${this.#telemetryScope}:server`,
+        onceKey: `${this.#usageScope}:server`,
         serverRoot: this.#viewsProjectRoot,
       }
     );
   }
 
   #trackClient(body: unknown): void {
-    const client = clientTelemetryFromBody(body);
+    const client = clientUsageFromBody(body);
     if (client === undefined) return;
-    trackTelemetry(
+    recordUsage(
       "client",
       "observed",
       { ...client },
       {
-        onceKey: `${this.#telemetryScope}:client:${JSON.stringify(client)}`,
+        onceKey: `${this.#usageScope}:client:${JSON.stringify(client)}`,
         serverRoot: this.#viewsProjectRoot,
       }
     );
@@ -1633,12 +1633,12 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     const client =
       request === undefined
         ? undefined
-        : clientTelemetryFromBody(getRequestBag(request).parsedBody);
+        : clientUsageFromBody(getRequestBag(request).parsedBody);
     const capture = (
       outcome: "success" | "error" | "input_required",
       completedPhase: boolean
     ): void => {
-      trackTelemetry(
+      recordUsage(
         "operation",
         "completed",
         {

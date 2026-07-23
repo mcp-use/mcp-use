@@ -77,7 +77,7 @@ async function identity(serverRoot?: string): Promise<Identity> {
     try {
       const fs = await import("node:fs/promises");
       const directory = `${serverRoot}/.mcp-use`;
-      const file = `${directory}/telemetry.json`;
+      const file = `${directory}/usage.json`;
       const read = async (): Promise<string | undefined> => {
         try {
           const value = JSON.parse(await fs.readFile(file, "utf8")) as unknown;
@@ -122,8 +122,8 @@ async function identity(serverRoot?: string): Promise<Identity> {
   return resolving;
 }
 
-/** Capture one anonymous, flat SDK telemetry event. @internal */
-export function trackTelemetry(
+/** Capture one anonymous, flat SDK usage event. @internal */
+export function recordUsage(
   feature: string,
   action: string,
   properties: Properties = {},
@@ -190,7 +190,7 @@ export function trackTelemetry(
   void request.then(() => pending.delete(request));
 }
 
-/** Wait for in-flight telemetry in tests and validation fixtures. @internal */
-export async function flushTelemetry(): Promise<void> {
+/** Wait for in-flight usage events in validation fixtures. @internal */
+export async function flushUsage(): Promise<void> {
   await Promise.all([...pending]);
 }
