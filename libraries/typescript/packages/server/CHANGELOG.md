@@ -1,5 +1,12 @@
 # mcp-use
 
+## 2.0.0-beta.48
+
+### Patch Changes
+
+- e802317: Remove saved client servers immediately without confirmation and reject unsupported `--yes` and `--json` flags.
+  - @mcp-use/inspector@20.0.0-beta.40
+
 ## 2.0.0-beta.47
 
 ### Minor Changes
