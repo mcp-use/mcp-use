@@ -104,6 +104,11 @@ jobs:
           git commit -m "chore(typescript): version packages (canary)" || echo "No changes to commit"
           git push
 
+      - name: Build versioned packages (Canary)
+        if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
+        working-directory: libraries/typescript
+        run: pnpm build
+
       - name: Publish packages (Canary)
         if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
         working-directory: libraries/typescript
@@ -647,6 +652,11 @@ jobs:
         run: |
           git branch --force main origin/main
           pnpm version:beta
+
+      - name: Build versioned beta packages
+        if: steps.changesets.outputs.pending == 'true'
+        working-directory: libraries/typescript
+        run: pnpm build
 
       - name: Commit beta versions
         if: steps.changesets.outputs.pending == 'true'
