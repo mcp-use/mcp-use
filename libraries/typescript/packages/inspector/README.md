@@ -278,7 +278,10 @@ For **Ollama**, the API key is optional and you can point the inspector at a loc
 The inspector automatically saves your configurations:
 
 - **Server connections** persist across page reloads
-- **Credentials** are stored securely in your browser's localStorage
+- **OAuth sessions** persist as AES-256-GCM ciphertext using a non-extractable
+  origin key in IndexedDB
+- **Secret headers and client secrets** are runtime-only and must be supplied
+  again after reload
 - **Session preferences** are maintained automatically
 - Clear all sessions anytime with the **"Clear All"** button
 

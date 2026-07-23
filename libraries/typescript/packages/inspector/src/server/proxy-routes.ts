@@ -1,5 +1,10 @@
 import type { Hono } from "hono";
 import { mountMcpProxy, mountOAuthProxy } from "./proxy/index.js";
+import {
+  createInspectorRateLimiter,
+  INSPECTOR_API_RATE_LIMIT,
+  INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
+} from "./rate-limit.js";
 
 export type InspectorProxyRoutesConfig = {
   /** URL passed to the client via config.json for auto-connect. */
@@ -23,6 +28,15 @@ export function registerInspectorProxyRoutes(
   const p = (suffix: string) => `${basePath}${suffix}`;
   const allowLoopback = config?.oauthProxyAllowLoopback ?? false;
   const mountOAuth = config?.oauth !== false;
+
+  app.use(
+    p("/inspector/api/*"),
+    createInspectorRateLimiter({
+      points: INSPECTOR_API_RATE_LIMIT,
+      durationSeconds: INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
+      key: "inspector-api",
+    })
+  );
 
   app.get(p("/inspector/health"), (c) => {
     return c.json({

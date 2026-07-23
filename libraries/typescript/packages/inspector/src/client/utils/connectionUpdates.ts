@@ -7,6 +7,8 @@ import {
   LocalStorageProvider,
   type McpServer,
   type McpServerConfig,
+  type PersistedMcpServerConfig,
+  toPersistedServerConfig,
 } from "@mcp-use/client/react";
 
 export interface OAuthStaticConfig {
@@ -140,27 +142,26 @@ const INSPECTOR_CONNECTION_EXTRA_KEYS = [
 ] as const;
 
 const INSPECTOR_CONNECTION_STORAGE_KEY = "mcp-inspector-connections";
-const INSPECTOR_CONNECTION_STORAGE_VERSION = "2";
+const INSPECTOR_CONNECTION_STORAGE_VERSION = "3";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-function stripPersistedClientSecrets(
+type PersistedInspectorConnectionConfig = PersistedMcpServerConfig &
+  Pick<
+    EditableConnectionConfig,
+    "requestTimeout" | "resetTimeoutOnProgress" | "maxTotalTimeout"
+  >;
+
+function sanitizePersistedInspectorConfig(
   stored: Record<string, unknown>
-): Record<string, unknown> {
-  const sanitized = { ...stored };
-  delete sanitized.clientSecret;
-  delete sanitized.client_secret;
-
-  if (isRecord(sanitized.oauth)) {
-    const oauth = { ...sanitized.oauth };
-    delete oauth.clientSecret;
-    delete oauth.client_secret;
-    sanitized.oauth = oauth;
-  }
-
-  return sanitized;
+): PersistedInspectorConnectionConfig {
+  const normalized = normalizeStoredServerConfig(stored);
+  return {
+    ...toPersistedServerConfig(normalized),
+    ...pickInspectorConnectionExtras(stored),
+  };
 }
 
 function pickInspectorConnectionExtras(
@@ -193,13 +194,21 @@ export function saveStoredConnectionConfig(
     const allServers = stored
       ? (JSON.parse(stored) as Record<string, EditableConnectionConfig>)
       : {};
-    allServers[id] = stripPersistedClientSecrets({
+    const merged = {
       ...allServers[id],
       ...config,
-    }) as unknown as EditableConnectionConfig;
+    };
+    const sanitizedServers = Object.fromEntries(
+      Object.entries({ ...allServers, [id]: merged }).flatMap(
+        ([serverId, value]) =>
+          isRecord(value)
+            ? [[serverId, sanitizePersistedInspectorConfig(value)]]
+            : []
+      )
+    );
     localStorage.setItem(
       INSPECTOR_CONNECTION_STORAGE_KEY,
-      JSON.stringify(allServers)
+      JSON.stringify(sanitizedServers)
     );
   } catch {
     // ignore storage errors
@@ -538,9 +547,9 @@ export class InspectorConnectionStorageProvider extends LocalStorageProvider {
     this.inspectorStorageVersionKey = `${inspectorStorageKey}-version`;
   }
 
-  getServers(): Record<string, McpServerConfig> {
+  getServers(): Record<string, PersistedInspectorConnectionConfig> {
     const raw = this.readRawStoredServers();
-    const migrated: Record<string, McpServerConfig> = {};
+    const migrated: Record<string, PersistedInspectorConnectionConfig> = {};
     let recoveredEntries = 0;
 
     for (const [id, value] of Object.entries(raw)) {
@@ -549,8 +558,7 @@ export class InspectorConnectionStorageProvider extends LocalStorageProvider {
         continue;
       }
 
-      const sanitized = stripPersistedClientSecrets(value);
-      const normalized = normalizeStoredServerConfig(sanitized);
+      const normalized = sanitizePersistedInspectorConfig(value);
       const url =
         typeof normalized.url === "string" ? normalized.url.trim() : id.trim();
       try {
@@ -570,12 +578,11 @@ export class InspectorConnectionStorageProvider extends LocalStorageProvider {
       }
     }
 
-    const serialized = JSON.stringify(migrated);
     if (
       recoveredEntries > 0 ||
       this.readStorageVersion() !== INSPECTOR_CONNECTION_STORAGE_VERSION
     ) {
-      this.writeRecoveredStorage(serialized);
+      this.writeRecoveredStorage(migrated);
       if (recoveredEntries > 0) {
         console.info(
           `[Inspector] Recovered ${recoveredEntries} stale connection storage entr${recoveredEntries === 1 ? "y" : "ies"}.`
@@ -586,12 +593,12 @@ export class InspectorConnectionStorageProvider extends LocalStorageProvider {
     return migrated;
   }
 
-  setServers(servers: Record<string, McpServerConfig>): void {
+  setServers(servers: Record<string, PersistedMcpServerConfig>): void {
     const prev = this.readRawStoredServers();
     const merged = Object.fromEntries(
       Object.entries(servers).map(([id, config]) => [
         id,
-        stripPersistedClientSecrets({
+        sanitizePersistedInspectorConfig({
           ...pickInspectorConnectionExtras(prev[id]),
           ...config,
           // Tunnel switching is a live transport override. Persist the stable
@@ -604,18 +611,18 @@ export class InspectorConnectionStorageProvider extends LocalStorageProvider {
             : {}),
         }),
       ])
-    ) as Record<string, McpServerConfig>;
+    ) as Record<string, PersistedInspectorConnectionConfig>;
     super.setServers(merged);
     this.markStorageVersion();
   }
 
-  setServer(id: string, config: McpServerConfig): void {
+  setServer(id: string, config: PersistedMcpServerConfig): void {
     const servers = this.getServers();
     const prev = this.readRawStoredServers();
     servers[id] = {
       ...pickInspectorConnectionExtras(prev[id]),
       ...config,
-    } as McpServerConfig;
+    } as PersistedInspectorConnectionConfig;
     this.setServers(servers);
   }
 
@@ -649,9 +656,11 @@ export class InspectorConnectionStorageProvider extends LocalStorageProvider {
     }
   }
 
-  private writeRecoveredStorage(serialized: string): void {
+  private writeRecoveredStorage(
+    servers: Record<string, PersistedInspectorConnectionConfig>
+  ): void {
     try {
-      localStorage.setItem(this.inspectorStorageKey, serialized);
+      localStorage.setItem(this.inspectorStorageKey, JSON.stringify(servers));
       this.markStorageVersion();
     } catch {
       // Best-effort migration: callers still receive the recovered value.

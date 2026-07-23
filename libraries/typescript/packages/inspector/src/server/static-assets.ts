@@ -3,6 +3,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { gunzipSync } from "node:zlib";
 import type { Hono } from "hono";
+import {
+  createInspectorRateLimiter,
+  INSPECTOR_ASSET_RATE_LIMIT,
+  INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
+} from "./rate-limit.js";
 
 const CONTENT_TYPES: Record<string, string> = {
   ".js": "application/javascript",
@@ -36,6 +41,15 @@ export function registerInspectorStaticAssets(
 ) {
   const appDir = resolveInspectorAppDir();
   const identityCache = new Map<string, Buffer>();
+
+  app.use(
+    `${mountPath}/*`,
+    createInspectorRateLimiter({
+      points: INSPECTOR_ASSET_RATE_LIMIT,
+      durationSeconds: INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
+      key: "inspector-assets",
+    })
+  );
 
   app.get(`${mountPath}/*`, (c) => {
     const subPath = c.req.path.slice(mountPath.length);

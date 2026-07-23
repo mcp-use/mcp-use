@@ -344,18 +344,37 @@ export interface McpServerConfig extends Omit<
 /** @deprecated Use {@link McpServerConfig} */
 export type McpServerOptions = McpServerConfig;
 
-/** Persisted connection config (callbacks and runtime wiring stripped). */
-export type PersistedMcpServerConfig = Omit<
+/** Non-secret connection settings that built-in providers may persist. */
+export type PersistedMcpServerConfig = Pick<
   McpServerConfig,
-  | "authProvider"
-  | "fetch"
-  | "wrapTransport"
-  | "onPopupWindow"
-  | "onSamplingRequest"
-  | "onElicitationRequest"
-  | "onNotificationReceived"
-  | "serverId"
->;
+  | "url"
+  | "displayName"
+  | "enabled"
+  | "oauthProxyUrl"
+  | "connectionMode"
+  | "autoProxyFallback"
+  | "callbackUrl"
+  | "storageKeyPrefix"
+  | "logLevel"
+  | "autoRetry"
+  | "autoReconnect"
+  | "reconnectionOptions"
+  | "popupFeatures"
+  | "preventAutoAuth"
+  | "useRedirectFlow"
+  | "protocolNegotiation"
+  | "timeout"
+  | "clientInfo"
+> & {
+  /** Proxy endpoint only. Proxy authorization headers are runtime-only. */
+  proxyConfig?: Pick<ProxyConfig, "proxyAddress">;
+  /** Public OAuth registration settings only. */
+  oauth?: {
+    clientId?: string;
+    clientMetadataUrl?: string;
+    scope?: string;
+  };
+};
 
 /** Notification received from one managed MCP server. */
 export interface McpNotification {
@@ -637,10 +656,16 @@ export type UseMcpResult = {
 };
 
 /**
- * Connected MCP server: flat persisted config + live connection state.
+ * Connected MCP server: non-secret settings, live runtime headers, and state.
  * Returned from `useMcpClient().servers`.
  */
-export interface McpServer extends PersistedMcpServerConfig, UseMcpResult {
+type LiveMcpServerConfig = Omit<PersistedMcpServerConfig, "proxyConfig"> & {
+  headers?: Record<string, string>;
+  proxyConfig?: ProxyConfig;
+  clientOptions?: McpServerConfig["clientOptions"];
+};
+
+export interface McpServer extends LiveMcpServerConfig, UseMcpResult {
   id: string;
   notifications: McpNotification[];
   unreadNotificationCount: number;
@@ -673,13 +698,11 @@ const PERSISTED_SERVER_CONFIG_KEYS = [
   "url",
   "displayName",
   "enabled",
-  "proxyConfig",
   "oauthProxyUrl",
   "connectionMode",
   "autoProxyFallback",
   "callbackUrl",
   "storageKeyPrefix",
-  "headers",
   "logLevel",
   "autoRetry",
   "autoReconnect",
@@ -687,11 +710,9 @@ const PERSISTED_SERVER_CONFIG_KEYS = [
   "popupFeatures",
   "preventAutoAuth",
   "useRedirectFlow",
-  "clientOptions",
   "protocolNegotiation",
   "timeout",
   "clientInfo",
-  "oauth",
 ] as const satisfies readonly (keyof PersistedMcpServerConfig)[];
 
 /** Extract the persisted config subset from input or a connected server. */
@@ -705,10 +726,44 @@ export function pickPersistedServerConfig(
       (out as Record<string, unknown>)[key] = value;
     }
   }
+  if (source.proxyConfig?.proxyAddress !== undefined) {
+    out.proxyConfig = { proxyAddress: source.proxyConfig.proxyAddress };
+  }
+  if (source.oauth) {
+    const oauth: NonNullable<PersistedMcpServerConfig["oauth"]> = {};
+    if (source.oauth.clientId !== undefined) {
+      oauth.clientId = source.oauth.clientId;
+    }
+    if (source.oauth.clientMetadataUrl !== undefined) {
+      oauth.clientMetadataUrl = source.oauth.clientMetadataUrl;
+    }
+    if (source.oauth.scope !== undefined) {
+      oauth.scope = source.oauth.scope;
+    }
+    if (Object.keys(oauth).length > 0) {
+      out.oauth = oauth;
+    }
+  }
   return out;
 }
 
-/** Strip non-persisted fields from a server config before storage / exposure. */
+/** Extract non-callback connection settings for live comparisons and exposure. */
+export function pickLiveServerConfig(
+  source: McpServerConfig | McpServer
+): LiveMcpServerConfig {
+  return {
+    ...pickPersistedServerConfig(source),
+    ...(source.headers !== undefined ? { headers: source.headers } : {}),
+    ...(source.proxyConfig !== undefined
+      ? { proxyConfig: source.proxyConfig }
+      : {}),
+    ...(source.clientOptions !== undefined
+      ? { clientOptions: source.clientOptions }
+      : {}),
+  };
+}
+
+/** Strip non-persisted fields from a server config before storage. */
 export function toPersistedServerConfig(
   config: McpServerConfig
 ): PersistedMcpServerConfig {

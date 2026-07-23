@@ -467,12 +467,8 @@ describe("runBuild (views)", () => {
         expect(chunkImport).not.toBeNull();
         const chunkRelative = `assets/${chunkImport![1]!}`;
         expect(product.js).toContain(chunkRelative);
-        const chunkUrl = text.match(
-          new RegExp(
-            `/mcp/_mcp-use/views/product-search-result/${chunkRelative.replace(/\./g, "\\.")}`
-          )
-        );
-        if (chunkUrl === null) {
+        const chunkUrl = `/mcp/_mcp-use/views/product-search-result/${chunkRelative}`;
+        if (!text.includes(chunkUrl)) {
           const chunkBasename = chunkImport![1]!;
           const chunkResponse = await handler(
             new Request(

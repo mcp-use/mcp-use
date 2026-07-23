@@ -122,6 +122,11 @@ mountInspector(app, {
 
 The Inspector can call tools, read resources, and inspect prompts on any connected server. Keep it in local development. If a custom integration exposes it on a network, disable loopback proxying and put it behind the same access controls as other internal tools.
 
+Each mounted Inspector also applies process-local limits of 120 proxy/OAuth
+requests and 600 asset requests per minute. Exhausted routes return `429 Too
+Many Requests` with `Retry-After`; these limits complement, rather than replace,
+network-edge authentication and rate limiting.
+
 ## Related Documentation
 
 - [Getting Started](/inspector/index) - Basic inspector usage

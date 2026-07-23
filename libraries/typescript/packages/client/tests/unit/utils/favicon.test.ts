@@ -72,7 +72,7 @@ describe("detectFavicon", () => {
     vi.stubGlobal("FileReader", MockFileReader);
 
     fetchMock.mockImplementation(async (url: string) => {
-      if (url.includes("favicon.tools.mcp-use.com")) {
+      if (new URL(url).hostname === "favicon.tools.mcp-use.com") {
         return {
           ok: true,
           json: async () => ({

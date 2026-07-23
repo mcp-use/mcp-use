@@ -22,29 +22,55 @@ const OPENAI_FILE_APIS_SCRIPT = `<script>
  * (inspector) before the view bundle calls `bootstrapView`.
  */
 export function injectOpenAiFileApis(html: string): string {
-  if (html.includes("<head>")) {
-    return html.replace("<head>", "<head>" + OPENAI_FILE_APIS_SCRIPT);
+  const headEnd = findOpeningConstructEnd(html, "<head");
+  if (headEnd !== undefined) {
+    return insertAt(html, headEnd, OPENAI_FILE_APIS_SCRIPT);
   }
-  if (html.includes("<HEAD>")) {
-    return html.replace("<HEAD>", "<HEAD>" + OPENAI_FILE_APIS_SCRIPT);
-  }
-  if (html.includes("<html>")) {
-    return html.replace(
-      "<html>",
-      "<html><head>" + OPENAI_FILE_APIS_SCRIPT + "</head>"
+  const htmlEnd = findOpeningConstructEnd(html, "<html");
+  if (htmlEnd !== undefined) {
+    return insertAt(
+      html,
+      htmlEnd,
+      "<head>" + OPENAI_FILE_APIS_SCRIPT + "</head>"
     );
   }
-  if (html.includes("<HTML>")) {
-    return html.replace(
-      "<HTML>",
-      "<HTML><head>" + OPENAI_FILE_APIS_SCRIPT + "</head>"
-    );
-  }
-  if (html.includes("<!DOCTYPE") || html.includes("<!doctype")) {
-    return html.replace(
-      /(<!DOCTYPE[^>]*>|<!doctype[^>]*>)/i,
-      "$1<head>" + OPENAI_FILE_APIS_SCRIPT + "</head>"
+  const doctypeEnd = findOpeningConstructEnd(html, "<!doctype");
+  if (doctypeEnd !== undefined) {
+    return insertAt(
+      html,
+      doctypeEnd,
+      "<head>" + OPENAI_FILE_APIS_SCRIPT + "</head>"
     );
   }
   return OPENAI_FILE_APIS_SCRIPT + html;
+}
+
+function findOpeningConstructEnd(
+  html: string,
+  lowercasePrefix: string
+): number | undefined {
+  const lowercaseHtml = html.toLowerCase();
+  let searchFrom = 0;
+  while (searchFrom < lowercaseHtml.length) {
+    const start = lowercaseHtml.indexOf(lowercasePrefix, searchFrom);
+    if (start === -1) return undefined;
+    const boundary = lowercaseHtml[start + lowercasePrefix.length];
+    if (
+      boundary === ">" ||
+      boundary === " " ||
+      boundary === "\t" ||
+      boundary === "\n" ||
+      boundary === "\r" ||
+      boundary === "\f"
+    ) {
+      const end = lowercaseHtml.indexOf(">", start + lowercasePrefix.length);
+      return end === -1 ? undefined : end + 1;
+    }
+    searchFrom = start + lowercasePrefix.length;
+  }
+  return undefined;
+}
+
+function insertAt(value: string, index: number, addition: string): string {
+  return value.slice(0, index) + addition + value.slice(index);
 }

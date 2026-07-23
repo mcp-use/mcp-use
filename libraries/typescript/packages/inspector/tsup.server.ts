@@ -1,6 +1,11 @@
 import { defineConfig } from "tsup";
 
-const bundledServerDependencies = ["hono", "@hono/node-server", "open"];
+const bundledServerDependencies = [
+  "hono",
+  "@hono/node-server",
+  "open",
+  "rate-limiter-flexible",
+];
 
 export default defineConfig([
   {

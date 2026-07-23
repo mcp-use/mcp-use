@@ -15,6 +15,9 @@ on:
       - "libraries/typescript/pnpm-lock.yaml"
       - ".github/workflows/server-examples.yml"
 
+permissions:
+  contents: read
+
 jobs:
   verify:
     name: Client-driven example verification

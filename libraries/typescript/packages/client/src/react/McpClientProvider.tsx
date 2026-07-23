@@ -17,8 +17,9 @@ import type {
   McpServerConfig,
   PendingElicitationRequest,
   PendingSamplingRequest,
+  PersistedMcpServerConfig,
 } from "./types.js";
-import { pickPersistedServerConfig, toPersistedServerConfig } from "./types.js";
+import { pickLiveServerConfig, toPersistedServerConfig } from "./types.js";
 import { useMcp } from "./useMcp.js";
 import { useMcpServerQueues } from "./useMcpServerQueues.js";
 
@@ -82,8 +83,8 @@ function isSameMcpServer(left: McpServer, right: McpServer): boolean {
   return (
     left.id === right.id &&
     sameSerializedValue(
-      pickPersistedServerConfig(left),
-      pickPersistedServerConfig(right)
+      pickLiveServerConfig(left),
+      pickLiveServerConfig(right)
     ) &&
     left.name === right.name &&
     left.state === right.state &&
@@ -356,7 +357,7 @@ function McpServerWrapper({
 
   useEffect(() => {
     const server: McpServer = {
-      ...toPersistedServerConfig(options),
+      ...pickLiveServerConfig(options),
       ...mcp,
       id,
       displayName: displayName || options.displayName || id,
@@ -820,7 +821,7 @@ export function McpClientProvider({
             acc[config.id] = toPersistedServerConfig(config.options);
             return acc;
           },
-          {} as Record<string, McpServerConfig>
+          {} as Record<string, PersistedMcpServerConfig>
         );
 
         await Promise.resolve(storageProvider.setServers(serversToSave));
@@ -1005,8 +1006,8 @@ export function McpClientProvider({
 
       if (
         sameSerializedValue(
-          pickPersistedServerConfig(currentConfig.options),
-          pickPersistedServerConfig(updatedOptions)
+          pickLiveServerConfig(currentConfig.options),
+          pickLiveServerConfig(updatedOptions)
         )
       ) {
         return;

@@ -54,7 +54,9 @@ function normalizeBasePath(value: string | undefined): string {
       `withMcpUse basePath must be a concrete absolute path; received ${JSON.stringify(raw)}.`
     );
   }
-  return raw.replace(/\/+$/, "");
+  let end = raw.length;
+  while (end > 0 && raw.charCodeAt(end - 1) === 47) end--;
+  return raw.slice(0, end);
 }
 
 function mergeHeaders(

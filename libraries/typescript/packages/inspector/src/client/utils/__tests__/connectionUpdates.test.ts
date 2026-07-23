@@ -173,6 +173,13 @@ describe("InspectorConnectionStorageProvider v2 recovery", () => {
             proxyAddress:
               "https://inspector.example.com/mcp/inspector/api/proxy",
           },
+          headers: { Authorization: "Bearer direct-secret" },
+          proxyConfig: {
+            proxyAddress:
+              "https://inspector.example.com/mcp/inspector/api/proxy",
+            headers: { Authorization: "Bearer proxy-secret" },
+            customHeaders: { "X-Secret": "custom-secret" },
+          },
           oauth: {
             clientId: "public-id",
             clientSecret: "must-not-remain",
@@ -201,7 +208,16 @@ describe("InspectorConnectionStorageProvider v2 recovery", () => {
     expect(localStorage.getItem("mcp-inspector-connections")).not.toContain(
       "must-not-remain"
     );
-    expect(localStorage.getItem("mcp-inspector-connections-version")).toBe("2");
+    expect(localStorage.getItem("mcp-inspector-connections")).not.toContain(
+      "direct-secret"
+    );
+    expect(localStorage.getItem("mcp-inspector-connections")).not.toContain(
+      "proxy-secret"
+    );
+    expect(localStorage.getItem("mcp-inspector-connections")).not.toContain(
+      "custom-secret"
+    );
+    expect(localStorage.getItem("mcp-inspector-connections-version")).toBe("3");
   });
 
   it("drops unreadable storage without affecting future writes", () => {
@@ -258,6 +274,6 @@ describe("InspectorConnectionStorageProvider v2 recovery", () => {
         connectionMode: "auto",
       },
     });
-    expect(localStorage.getItem("custom-connections-version")).toBe("2");
+    expect(localStorage.getItem("custom-connections-version")).toBe("3");
   });
 });

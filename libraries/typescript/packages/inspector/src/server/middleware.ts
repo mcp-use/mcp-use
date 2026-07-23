@@ -285,10 +285,22 @@ function isHonoApp(value: unknown): value is Hono {
 
 function normalizeInspectorBasePath(raw: string | undefined): string {
   if (raw === undefined) return "/mcp";
-  let value = raw
-    .trim()
-    .replace(/\/{2,}/g, "/")
-    .replace(/\/+$/, "");
+  const trimmed = raw.trim();
+  const normalized: string[] = [];
+  let previousWasSlash = false;
+  for (const character of trimmed) {
+    if (character === "/") {
+      if (!previousWasSlash) normalized.push(character);
+      previousWasSlash = true;
+    } else {
+      normalized.push(character);
+      previousWasSlash = false;
+    }
+  }
+  while (normalized.length > 0 && normalized[normalized.length - 1] === "/") {
+    normalized.pop();
+  }
+  let value = normalized.join("");
   if (value === "" || value === "/") return "";
   if (!value.startsWith("/")) value = `/${value}`;
   return value;

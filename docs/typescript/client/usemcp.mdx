@@ -116,6 +116,11 @@ import { LocalStorageProvider } from "@mcp-use/client/react";
 </McpClientProvider>;
 ```
 
+Built-in providers persist only non-secret connection settings. Supply bearer
+tokens, request headers, and proxy headers again at runtime after a reload.
+Browser OAuth tokens remain persistent by default and are encrypted with
+AES-256-GCM using a non-extractable origin key stored in IndexedDB.
+
 ## Standalone `useMcp`
 
 For one server without the provider:

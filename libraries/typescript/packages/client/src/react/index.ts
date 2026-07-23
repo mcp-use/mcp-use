@@ -15,12 +15,11 @@ export type {
   /** @deprecated Use McpServerConfig */
   McpServerOptions,
   PersistedMcpServerConfig,
-  pickPersistedServerConfig,
-  toPersistedServerConfig,
   McpNotification,
   PendingSamplingRequest,
   PendingElicitationRequest,
 } from "./types.js";
+export { pickPersistedServerConfig, toPersistedServerConfig } from "./types.js";
 export { useMcp } from "./useMcp.js";
 export { detectFavicon } from "../utils/favicon.js";
 

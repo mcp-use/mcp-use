@@ -76,6 +76,7 @@
   "devDependencies": {
     "@e2b/code-interpreter": "^2.6.1",
     "@types/react": "^19.2.14",
+    "fake-indexeddb": "^6.2.5",
     "jsdom": "^27.0.0",
     "react": "^19.2.3",
     "react-test-renderer": "^19.2.4",

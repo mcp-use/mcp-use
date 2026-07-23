@@ -122,6 +122,9 @@ Persistence helpers: `pickPersistedServerConfig`, `toPersistedServerConfig`, `Pe
 | `removeServerMetadata(id)` | Delete metadata |
 
 Built-in: `LocalStorageProvider(storageKey?)`, `MemoryStorageProvider()`.
+Both read and write `PersistedMcpServerConfig`, which intentionally excludes
+request headers, proxy headers, auth tokens, client secrets, callbacks,
+providers, and other runtime-only values.
 
 ## RPC logging
 

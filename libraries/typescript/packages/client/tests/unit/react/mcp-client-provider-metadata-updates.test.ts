@@ -190,6 +190,11 @@ describe("McpClientProvider metadata-only updates", () => {
         client.addServer("persisted", {
           url: "http://localhost:3000/mcp",
           authProvider: { tokens: async () => undefined } as any,
+          headers: { Authorization: "Bearer runtime-only" },
+          proxyConfig: {
+            proxyAddress: "https://proxy.example.com",
+            headers: { Authorization: "Bearer proxy-runtime-only" },
+          },
           fetch: vi.fn(),
           wrapTransport: ((transport: any) => transport) as any,
           onPopupWindow: vi.fn(),
@@ -218,6 +223,10 @@ describe("McpClientProvider metadata-only updates", () => {
     expect(stored.wrapTransport).toBeUndefined();
     expect(stored.onPopupWindow).toBeUndefined();
     expect(stored.onSamplingRequest).toBeUndefined();
+    expect(stored.headers).toBeUndefined();
+    expect(stored.proxyConfig).toEqual({
+      proxyAddress: "https://proxy.example.com",
+    });
   });
 
   it("keeps updateServer as a reconnecting update path but preserves OAuth credentials", async () => {

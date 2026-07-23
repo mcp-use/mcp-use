@@ -35,6 +35,32 @@ const UI_META = {
 
 const report = [];
 
+function hasExactDomain(domains, expected) {
+  return new Set(domains ?? []).has(expected);
+}
+
+function hasUrlLocation(value, expectedOrigin, expectedPathPrefix) {
+  if (!value) return false;
+  try {
+    const parsed = new URL(value);
+    return (
+      parsed.origin === expectedOrigin &&
+      parsed.pathname.startsWith(expectedPathPrefix)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function rebaseUrl(value, origin) {
+  if (!value) return undefined;
+  const parsed = new URL(value);
+  const target = new URL(origin);
+  parsed.protocol = target.protocol;
+  parsed.host = target.host;
+  return parsed.toString();
+}
+
 function log(section, data) {
   report.push({ section, ...data });
   console.log(`\n## ${section}`);
@@ -177,17 +203,14 @@ async function main() {
   {
     clearEnv();
     const { urls, csp } = await readView(handler);
-    const localScript = urls.script?.replace(
-      /^https?:\/\/[^/]+/,
-      "http://127.0.0.1:3000"
-    );
+    const localScript = rebaseUrl(urls.script, "http://127.0.0.1:3000");
     const status = localScript
       ? (await handler(new Request(localScript))).status
       : 0;
     log("Default (no env)", {
       pass:
-        urls.script?.startsWith("http://127.0.0.1:3000/mcp/") &&
-        csp?.connectDomains?.some((d) => d.includes("127.0.0.1")) &&
+        hasUrlLocation(urls.script, "http://127.0.0.1:3000", "/mcp/") &&
+        hasExactDomain(csp?.connectDomains, "http://127.0.0.1:3000") &&
         status === 200,
       scriptUrl: urls.script,
       publicBase: urls.publicBase,
@@ -203,9 +226,9 @@ async function main() {
     const { urls, csp } = await readView(handler);
     log("MCP_URL only (server origin)", {
       pass:
-        urls.script?.startsWith("https://server.example.com/mcp/") &&
-        csp?.connectDomains?.includes("https://server.example.com") &&
-        csp?.resourceDomains?.includes("https://server.example.com"),
+        hasUrlLocation(urls.script, "https://server.example.com", "/mcp/") &&
+        hasExactDomain(csp?.connectDomains, "https://server.example.com") &&
+        hasExactDomain(csp?.resourceDomains, "https://server.example.com"),
       scriptUrl: urls.script,
       connectDomains: csp?.connectDomains,
       resourceDomains: csp?.resourceDomains,
@@ -220,10 +243,10 @@ async function main() {
     const { urls, csp } = await readView(handler);
     log("Split MCP_URL + MCP_ASSETS_URL", {
       pass:
-        urls.script?.startsWith("https://cdn.example.com/") &&
-        csp?.connectDomains?.includes("https://server.example.com") &&
-        csp?.resourceDomains?.includes("https://cdn.example.com") &&
-        !csp?.resourceDomains?.includes("https://server.example.com"),
+        hasUrlLocation(urls.script, "https://cdn.example.com", "/") &&
+        hasExactDomain(csp?.connectDomains, "https://server.example.com") &&
+        hasExactDomain(csp?.resourceDomains, "https://cdn.example.com") &&
+        !hasExactDomain(csp?.resourceDomains, "https://server.example.com"),
       scriptUrl: urls.script,
       publicBase: urls.publicBase,
       connectDomains: csp?.connectDomains,
@@ -236,8 +259,8 @@ async function main() {
     process.env.CSP_URLS = "https://supabase.co,https://api.example.com";
     const { csp } = await readView(handler);
     const allHave = (cat) =>
-      csp?.[cat]?.includes("https://supabase.co") &&
-      csp?.[cat]?.includes("https://api.example.com");
+      hasExactDomain(csp?.[cat], "https://supabase.co") &&
+      hasExactDomain(csp?.[cat], "https://api.example.com");
     log("CSP_URLS shortcut (all four categories)", {
       pass:
         allHave("connectDomains") &&
@@ -269,9 +292,12 @@ async function main() {
     const { csp } = await readView(handler);
     log("Per-category CSP_CONNECT_DOMAINS override", {
       pass:
-        csp?.connectDomains?.includes("https://connect-only.example.com") &&
-        !csp?.connectDomains?.includes("https://a.com") &&
-        csp?.frameDomains?.includes("https://a.com"),
+        hasExactDomain(
+          csp?.connectDomains,
+          "https://connect-only.example.com"
+        ) &&
+        !hasExactDomain(csp?.connectDomains, "https://a.com") &&
+        hasExactDomain(csp?.frameDomains, "https://a.com"),
       connectDomains: csp?.connectDomains,
       frameDomains: csp?.frameDomains,
     });
@@ -285,8 +311,8 @@ async function main() {
     });
     log("X-Forwarded-* (no MCP_URL)", {
       pass:
-        urls.script?.startsWith("https://fruit.example.com/mcp/") &&
-        csp?.resourceDomains?.includes("https://fruit.example.com"),
+        hasUrlLocation(urls.script, "https://fruit.example.com", "/mcp/") &&
+        hasExactDomain(csp?.resourceDomains, "https://fruit.example.com"),
       scriptUrl: urls.script,
       resourceDomains: csp?.resourceDomains,
     });
@@ -301,7 +327,7 @@ async function main() {
     handler = await loadHandler();
     const { urls } = await readView(handler);
     log("Build with MCP_ASSETS_URL (CDN manifest)", {
-      pass: urls.script?.startsWith("https://cdn.example.com/"),
+      pass: hasUrlLocation(urls.script, "https://cdn.example.com", "/"),
       scriptUrl: urls.script,
     });
   }
@@ -313,18 +339,23 @@ async function main() {
     setupProject({ basePath: customBasePath });
     const customHandler = await loadHandler();
     const { urls, csp } = await readView(customHandler, {}, customBasePath);
-    const localScript = urls.script?.replace(
-      /^https?:\/\/[^/]+/,
-      "http://127.0.0.1:3000"
-    );
+    const localScript = rebaseUrl(urls.script, "http://127.0.0.1:3000");
     const status = localScript
       ? (await customHandler(new Request(localScript))).status
       : 0;
     log("Custom basePath (/api/mcp)", {
       pass:
-        urls.script?.includes("/api/mcp/_mcp-use/views/") &&
-        urls.publicBase?.includes("/api/mcp/_mcp-use/public/") &&
-        csp?.connectDomains?.some((d) => d.includes("127.0.0.1")) &&
+        hasUrlLocation(
+          urls.script,
+          "http://127.0.0.1:3000",
+          "/api/mcp/_mcp-use/views/"
+        ) &&
+        hasUrlLocation(
+          urls.publicBase,
+          "http://127.0.0.1:3000",
+          "/api/mcp/_mcp-use/public/"
+        ) &&
+        hasExactDomain(csp?.connectDomains, "http://127.0.0.1:3000") &&
         status === 200,
       basePath: customBasePath,
       scriptUrl: urls.script,

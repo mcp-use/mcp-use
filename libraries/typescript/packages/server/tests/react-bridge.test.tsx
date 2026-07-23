@@ -2167,14 +2167,15 @@ describe("react bridge runtime", () => {
 
     expect(setViewState).toBeDefined();
     if (setViewState === undefined) throw new Error("setter was not captured");
+    const capturedSetViewState = setViewState;
     expect(() =>
-      setViewState({
+      capturedSetViewState({
         count: 0,
         _uiContext: "reserved",
       } as unknown as CountState)
     ).toThrow('reserved key "_uiContext"');
     expect(() =>
-      setViewState({ count: BigInt(1) } as unknown as CountState)
+      capturedSetViewState({ count: BigInt(1) } as unknown as CountState)
     ).toThrow("must be JSON-serializable");
   });
 

@@ -22,7 +22,7 @@ for (let i = 0; i < args.length; i++) {
     }
     const url = args[i + 1];
     if (!isValidUrl(url)) {
-      console.error(`Error: Invalid URL format: ${url}`);
+      console.error("Error: Invalid URL format.");
       console.error("URL must start with http://, https://, ws://, or wss://");
       process.exit(1);
     }
@@ -35,9 +35,7 @@ for (let i = 0; i < args.length; i++) {
     }
     const parsedPort = Number.parseInt(args[i + 1], 10);
     if (Number.isNaN(parsedPort) || parsedPort < 1 || parsedPort > 65535) {
-      console.error(
-        `Error: Port must be a number between 1 and 65535, got: ${args[i + 1]}`
-      );
+      console.error("Error: Port must be a number between 1 and 65535.");
       process.exit(1);
     }
     startPort = parsedPort;
@@ -68,7 +66,7 @@ Examples:
 `);
     process.exit(0);
   } else {
-    console.error(`Error: Unknown option: ${args[i]}`);
+    console.error("Error: Unknown option.");
     console.error("Run with --help to see available options.");
     process.exit(1);
   }
@@ -101,9 +99,9 @@ async function startServer() {
       fetch: app.fetch,
       port,
     });
-    console.log(`🚀 MCP Inspector running on http://localhost:${port}`);
+    console.log("MCP Inspector started.");
     if (mcpUrl) {
-      console.log(`📡 Auto-connecting to: ${mcpUrl}`);
+      console.log("Auto-connect configured.");
     }
     if (!noOpen) {
       const openUrl = new URL(`http://localhost:${port}/inspector`);
@@ -112,14 +110,15 @@ async function startServer() {
       }
       try {
         await open(openUrl.toString());
-        console.log(`🌐 Browser opened`);
+        console.log("Browser opened.");
       } catch {
-        console.log(`🌐 Please open ${openUrl} in your browser`);
+        console.log("Browser could not be opened automatically.");
       }
     }
     return { port, fetch: app.fetch };
   } catch (error) {
-    console.error("Failed to start server:", error);
+    const errorName = error instanceof Error ? error.name : "UnknownError";
+    console.error(`Failed to start server (${errorName}).`);
     process.exit(1);
   }
 }

@@ -1,4 +1,3 @@
-import { spawn } from "node:child_process";
 import { constants } from "node:fs";
 import {
   access,
@@ -12,6 +11,7 @@ import {
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
+import { openBrowser as launchBrowser } from "../cli/open-browser.js";
 
 /** Usage error reported with exit code 2 by the CLI boundary. */
 export class UsageError extends Error {
@@ -113,19 +113,7 @@ export async function confirm(
 
 /** Best-effort dependency-free browser opener. */
 export function openBrowser(url: string): void {
-  const [command, args]: [string, string[]] =
-    process.platform === "darwin"
-      ? ["open", [url]]
-      : process.platform === "win32"
-        ? ["cmd", ["/c", "start", "", url]]
-        : ["xdg-open", [url]];
-  try {
-    const child = spawn(command, args, { detached: true, stdio: "ignore" });
-    child.on("error", () => {});
-    child.unref();
-  } catch {
-    // Opening a browser is always best-effort.
-  }
+  launchBrowser(url);
 }
 
 /** Check whether a filesystem path exists. */

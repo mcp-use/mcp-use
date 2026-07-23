@@ -1,4 +1,8 @@
-import type { McpServerConfig } from "./types.js";
+import {
+  toPersistedServerConfig,
+  type McpServerConfig,
+  type PersistedMcpServerConfig,
+} from "./types.js";
 
 export interface CachedServerMetadata {
   name?: string;
@@ -15,10 +19,12 @@ export interface CachedServerMetadata {
 
 export interface StorageProvider {
   getServers():
-    | Promise<Record<string, McpServerConfig>>
-    | Record<string, McpServerConfig>;
-  setServers(servers: Record<string, McpServerConfig>): Promise<void> | void;
-  setServer(id: string, config: McpServerConfig): Promise<void> | void;
+    | Promise<Record<string, PersistedMcpServerConfig>>
+    | Record<string, PersistedMcpServerConfig>;
+  setServers(
+    servers: Record<string, PersistedMcpServerConfig>
+  ): Promise<void> | void;
+  setServer(id: string, config: PersistedMcpServerConfig): Promise<void> | void;
   removeServer(id: string): Promise<void> | void;
   clear(): Promise<void> | void;
   getServerMetadata?(
@@ -41,25 +47,52 @@ export class LocalStorageProvider implements StorageProvider {
     this.metadataKey = `${storageKey}-metadata`;
   }
 
-  getServers(): Record<string, McpServerConfig> {
+  getServers(): Record<string, PersistedMcpServerConfig> {
     try {
       const stored = localStorage.getItem(this.storageKey);
-      return stored ? JSON.parse(stored) : {};
-    } catch (error) {
-      console.error("[LocalStorageProvider] Failed to load servers:", error);
+      if (!stored) return {};
+      const parsed: unknown = JSON.parse(stored);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return {};
+      }
+      const sanitized = Object.fromEntries(
+        Object.entries(parsed).flatMap(([id, config]) =>
+          config && typeof config === "object" && !Array.isArray(config)
+            ? [
+                [
+                  id,
+                  toPersistedServerConfig(config as McpServerConfig),
+                ] as const,
+              ]
+            : []
+        )
+      );
+      const serialized = JSON.stringify(sanitized);
+      if (serialized !== stored) {
+        localStorage.setItem(this.storageKey, serialized);
+      }
+      return sanitized;
+    } catch {
+      console.error("[LocalStorageProvider] Failed to load servers.");
       return {};
     }
   }
 
-  setServers(servers: Record<string, McpServerConfig>): void {
+  setServers(servers: Record<string, PersistedMcpServerConfig>): void {
     try {
-      localStorage.setItem(this.storageKey, JSON.stringify(servers));
-    } catch (error) {
-      console.error("[LocalStorageProvider] Failed to save servers:", error);
+      const sanitized = Object.fromEntries(
+        Object.entries(servers).map(([id, config]) => [
+          id,
+          toPersistedServerConfig(config),
+        ])
+      );
+      localStorage.setItem(this.storageKey, JSON.stringify(sanitized));
+    } catch {
+      console.error("[LocalStorageProvider] Failed to save servers.");
     }
   }
 
-  setServer(id: string, config: McpServerConfig): void {
+  setServer(id: string, config: PersistedMcpServerConfig): void {
     const servers = this.getServers();
     servers[id] = config;
     this.setServers(servers);
@@ -76,8 +109,8 @@ export class LocalStorageProvider implements StorageProvider {
     try {
       localStorage.removeItem(this.storageKey);
       localStorage.removeItem(this.metadataKey);
-    } catch (error) {
-      console.error("[LocalStorageProvider] Failed to clear:", error);
+    } catch {
+      console.error("[LocalStorageProvider] Failed to clear.");
     }
   }
 
@@ -85,8 +118,8 @@ export class LocalStorageProvider implements StorageProvider {
     try {
       const stored = localStorage.getItem(this.metadataKey);
       return stored ? JSON.parse(stored) : {};
-    } catch (error) {
-      console.error("[LocalStorageProvider] Failed to load metadata:", error);
+    } catch {
+      console.error("[LocalStorageProvider] Failed to load metadata.");
       return {};
     }
   }
@@ -94,8 +127,8 @@ export class LocalStorageProvider implements StorageProvider {
   private setAllMetadata(metadata: Record<string, CachedServerMetadata>): void {
     try {
       localStorage.setItem(this.metadataKey, JSON.stringify(metadata));
-    } catch (error) {
-      console.error("[LocalStorageProvider] Failed to save metadata:", error);
+    } catch {
+      console.error("[LocalStorageProvider] Failed to save metadata.");
     }
   }
 
@@ -117,19 +150,24 @@ export class LocalStorageProvider implements StorageProvider {
 }
 
 export class MemoryStorageProvider implements StorageProvider {
-  private storage: Record<string, McpServerConfig> = {};
+  private storage: Record<string, PersistedMcpServerConfig> = {};
   private metadata: Record<string, CachedServerMetadata> = {};
 
-  getServers(): Record<string, McpServerConfig> {
+  getServers(): Record<string, PersistedMcpServerConfig> {
     return { ...this.storage };
   }
 
-  setServers(servers: Record<string, McpServerConfig>): void {
-    this.storage = { ...servers };
+  setServers(servers: Record<string, PersistedMcpServerConfig>): void {
+    this.storage = Object.fromEntries(
+      Object.entries(servers).map(([id, config]) => [
+        id,
+        toPersistedServerConfig(config),
+      ])
+    );
   }
 
-  setServer(id: string, config: McpServerConfig): void {
-    this.storage[id] = config;
+  setServer(id: string, config: PersistedMcpServerConfig): void {
+    this.storage[id] = toPersistedServerConfig(config);
   }
 
   removeServer(id: string): void {

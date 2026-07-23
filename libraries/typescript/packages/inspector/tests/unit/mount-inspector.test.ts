@@ -125,6 +125,21 @@ describe("mountInspector", () => {
     ).toBe(200);
   });
 
+  it("normalizes long repeated and trailing slash input", async () => {
+    const repeated = "/".repeat(20_000);
+    const inspector = mountInspector({
+      basePath: `${repeated}deep${repeated}mcp${repeated}`,
+    });
+
+    expect(
+      (
+        await inspector(
+          new Request("http://localhost/deep/mcp/inspector/health")
+        )
+      ).status
+    ).toBe(200);
+  });
+
   it("derives auto-connect from the public request origin", async () => {
     const inspector = mountInspector({ basePath: "/mcp" });
 
@@ -141,7 +156,7 @@ describe("mountInspector", () => {
     mountInspector(app, { basePath: "/mcp" });
     app.get("/application", (_req, res) => res.send("application route"));
     app.post("/echo", express.text({ type: "*/*" }), (req, res) =>
-      res.type("application/json").send(req.body)
+      res.type("text/plain").send(req.body)
     );
     const server = app.listen(0);
 

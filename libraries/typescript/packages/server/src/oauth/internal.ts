@@ -264,5 +264,8 @@ function normalizeBasePath(basePath: string): string {
 }
 
 function normalizePathname(pathname: string): string {
-  return pathname === "/" ? "/" : pathname.replace(/\/+$/, "");
+  if (pathname === "/") return "/";
+  let end = pathname.length;
+  while (end > 0 && pathname.charCodeAt(end - 1) === 47) end--;
+  return pathname.slice(0, end);
 }

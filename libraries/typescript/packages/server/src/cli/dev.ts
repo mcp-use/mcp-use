@@ -17,7 +17,6 @@
  * so library consumers and production startup never evaluate Vite.
  */
 
-import { spawn } from "node:child_process";
 import { createServer as createNodeServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { networkInterfaces } from "node:os";
@@ -33,6 +32,7 @@ import {
   validateHostHeader,
   validateOriginHeader,
 } from "@modelcontextprotocol/server";
+import { openBrowser } from "./open-browser.js";
 
 import {
   resolveHost,
@@ -166,22 +166,7 @@ export interface DevOptions {
  * crash or log noise into the dev process.
  */
 function openInBrowser(url: string): void {
-  const [command, args]: [string, string[]] =
-    process.platform === "darwin"
-      ? ["open", [url]]
-      : process.platform === "win32"
-        ? // `start` is a cmd built-in; the empty string is the window title.
-          ["cmd", ["/c", "start", "", url]]
-        : ["xdg-open", [url]];
-  try {
-    const child = spawn(command, args, { stdio: "ignore", detached: true });
-    child.on("error", () => {
-      // Swallow: auto-open is a convenience, never a failure.
-    });
-    child.unref();
-  } catch {
-    // Synchronous spawn failures are equally non-fatal.
-  }
+  openBrowser(url);
 }
 
 /**

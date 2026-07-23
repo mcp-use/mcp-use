@@ -7,9 +7,8 @@ import type {
   OAuthDiscoveryState,
   OAuthTokens,
 } from "@modelcontextprotocol/client";
-import { sanitizeUrl } from "./url.js";
 import { LocalStorageKVStore } from "./storage.js";
-import { OAuthSessionStore, type StoredState } from "./session-store.js";
+import { OAuthSessionStore } from "./session-store.js";
 
 /**
  * Serialize request body for proxying
@@ -21,6 +20,14 @@ async function serializeBody(body: BodyInit): Promise<any> {
   }
   if (body instanceof Blob) return await body.text();
   return body;
+}
+
+function trimTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) {
+    end--;
+  }
+  return value.slice(0, end);
 }
 
 /** Options for the browser implementation of {@link OAuthClientProvider}. */
@@ -70,6 +77,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   readonly serverUrl: string;
   readonly staticClientInfo?: OAuthClientInformation;
   private session: OAuthSessionStore;
+  private readonly storage: LocalStorageKVStore;
 
   // Browser-only state
   readonly preventAutoAuth?: boolean;
@@ -77,6 +85,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   private oauthProxyUrl?: string;
   private connectionUrl?: string;
   private proxyOAuthRequests: boolean;
+  private lastAttemptedAuthUrl: string | null = null;
   readonly onPopupWindow:
     | ((
         url: string,
@@ -92,10 +101,11 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       );
     }
     this.serverUrl = serverUrl;
+    this.storage = new LocalStorageKVStore();
     this.session = new OAuthSessionStore(
       serverUrl,
       { ...options, allowClientSecret: false },
-      new LocalStorageKVStore()
+      this.storage
     );
     this.preventAutoAuth = options.preventAutoAuth;
     this.useRedirectFlow = options.useRedirectFlow;
@@ -173,8 +183,8 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       if (!doc) return url;
 
       const suffix = suffixParts.length ? `/${suffixParts.join("/")}` : "";
-      const connectionPath = connection.pathname.replace(/\/+$/, "");
-      const targetPath = target.pathname.replace(/\/+$/, "");
+      const connectionPath = trimTrailingSlashes(connection.pathname);
+      const targetPath = trimTrailingSlashes(target.pathname);
       // Path-insertion form: swap the proxy's inserted path for the server's.
       // Root form (no suffix) stays root. Unrelated suffixes are preserved.
       const newSuffix =
@@ -395,6 +405,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     tokens: OAuthTokens,
     ctx?: OAuthClientInformationContext
   ): Promise<void> {
+    this.lastAttemptedAuthUrl = null;
     return this.session.saveTokens(tokens, ctx);
   }
 
@@ -496,21 +507,26 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
    * use `redirectToAuthorization` for that.
    */
   async prepareAuthorizationUrl(authorizationUrl: URL): Promise<string> {
-    return this.session.storeAuthorizationState(authorizationUrl, {
-      extraProviderOptions: {
-        oauthProxyUrl: this.oauthProxyUrl,
-        ...(this.clientMetadataUrl
-          ? { clientMetadataUrl: this.clientMetadataUrl }
-          : {}),
-        ...(this.staticClientInfo
-          ? { staticClientInfo: this.staticClientInfo }
-          : {}),
-        ...(this.scope ? { scope: this.scope } : {}),
-      },
-      flowType: this.useRedirectFlow ? "redirect" : "popup",
-      returnUrl:
-        typeof window !== "undefined" ? window.location.href : undefined,
-    });
+    const prepared = await this.session.storeAuthorizationState(
+      authorizationUrl,
+      {
+        extraProviderOptions: {
+          oauthProxyUrl: this.oauthProxyUrl,
+          ...(this.clientMetadataUrl
+            ? { clientMetadataUrl: this.clientMetadataUrl }
+            : {}),
+          ...(this.staticClientInfo
+            ? { staticClientInfo: this.staticClientInfo }
+            : {}),
+          ...(this.scope ? { scope: this.scope } : {}),
+        },
+        flowType: this.useRedirectFlow ? "redirect" : "popup",
+        returnUrl:
+          typeof window !== "undefined" ? window.location.href : undefined,
+      }
+    );
+    this.lastAttemptedAuthUrl = prepared;
+    return prepared;
   }
 
   /**
@@ -574,71 +590,29 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
    * Retrieves the last URL passed to `redirectToAuthorization`. Useful for manual fallback.
    */
   getLastAttemptedAuthUrl(): string | null {
-    const storedUrl = localStorage.getItem(this.getKey("last_auth_url"));
-    if (!storedUrl) return null;
-    const storedCallbackUrl = localStorage.getItem(
-      this.getKey("last_auth_callback_url")
-    );
-    if (storedCallbackUrl !== this.callbackUrl) {
-      console.info(
-        `[${this.storageKeyPrefix}] Recovering stale OAuth state whose callback cannot be verified.`
-      );
-      this.clearStorage();
-      return null;
-    }
-    const sanitized = sanitizeUrl(storedUrl);
-    try {
-      const redirectUri = new URL(sanitized).searchParams.get("redirect_uri");
-      if (
-        redirectUri &&
-        new URL(redirectUri).toString() !== new URL(this.callbackUrl).toString()
-      ) {
-        console.info(
-          `[${this.storageKeyPrefix}] Recovering stale OAuth state after the Inspector callback path changed.`
-        );
-        this.clearStorage();
-        return null;
-      }
-    } catch {
-      this.clearStorage();
-      return null;
-    }
-    return sanitized;
+    return this.lastAttemptedAuthUrl;
   }
 
   clearStorage(): number {
+    this.lastAttemptedAuthUrl = null;
     const prefixPattern = `${this.storageKeyPrefix}_${this.serverUrlHash}_`;
     const statePattern = `${this.storageKeyPrefix}:state_`;
     const keysToRemove: string[] = [];
     let count = 0;
 
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (!key) continue;
-
+    for (const key of this.storage.keys()) {
       if (key.startsWith(prefixPattern)) {
         keysToRemove.push(key);
       } else if (key.startsWith(statePattern)) {
-        try {
-          const item = localStorage.getItem(key);
-          if (item) {
-            const state = JSON.parse(item) as Partial<StoredState>;
-            if (state.serverUrlHash === this.serverUrlHash) {
-              keysToRemove.push(key);
-            }
-          }
-        } catch (e) {
-          console.warn(
-            `[${this.storageKeyPrefix}] Error parsing state key ${key} during clearStorage:`,
-            e
-          );
-        }
+        // State payloads are encrypted, so synchronous cleanup removes every
+        // short-lived authorization state under this provider prefix.
+        keysToRemove.push(key);
       }
     }
 
     const uniqueKeysToRemove = [...new Set(keysToRemove)];
     uniqueKeysToRemove.forEach((key) => {
-      localStorage.removeItem(key);
+      this.storage.remove(key);
       count++;
     });
     return count;

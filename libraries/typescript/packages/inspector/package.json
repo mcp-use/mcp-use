@@ -169,6 +169,7 @@
     "react-dom": "^19.2.3",
     "react-router": "^7.12.0",
     "react-resizable-panels": "^4.6.4",
+    "rate-limiter-flexible": "^11.2.0",
     "rollup-plugin-visualizer": "^6.0.3",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",

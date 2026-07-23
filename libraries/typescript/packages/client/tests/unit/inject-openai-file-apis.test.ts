@@ -8,10 +8,13 @@ async function runInjectedFileApis(html: string) {
   expect(injected).toContain("uploadFile");
   expect(injected).toContain("getFileDownloadUrl");
 
-  const scriptMatch = injected.match(/<script>[\s\S]*?<\/script>/);
-  expect(scriptMatch).not.toBeNull();
+  const parsed = new DOMParser().parseFromString(injected, "text/html");
+  const script = Array.from(parsed.scripts).find((candidate) =>
+    candidate.textContent?.includes("window.openai.uploadFile")
+  );
+  expect(script?.textContent).toBeTruthy();
   // eslint-disable-next-line no-new-func
-  new Function(scriptMatch![0].replace(/^<script>|<\/script>$/g, ""))();
+  new Function(script!.textContent!)();
 
   const api = (
     window as unknown as {
@@ -47,6 +50,16 @@ describe("injectOpenAiFileApis", () => {
 
   it("prepends when html has no head", async () => {
     await runInjectedFileApis("<div>widget</div>");
+  });
+
+  it("handles mixed-case tags and long doctypes without regular expressions", () => {
+    const attributes = ' data-test="x"'.repeat(2_000);
+    const html = `<!DoCtYpE html${attributes}><HtMl><HeAd></HeAd></HtMl>`;
+    const injected = injectOpenAiFileApis(html);
+    expect(injected).toContain("<HeAd><script>");
+    expect(injected.indexOf("uploadFile")).toBeLessThan(
+      injected.indexOf("</HeAd>")
+    );
   });
 });
 

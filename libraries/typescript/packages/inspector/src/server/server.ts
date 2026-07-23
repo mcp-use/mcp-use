@@ -42,22 +42,23 @@ async function startServer() {
         `💡 Tip: run \`pnpm dev\` to serve UI + API on one port via Vite.`
       );
     } else {
-      console.warn(`🚀 MCP Inspector running on http://localhost:${port}`);
+      console.warn("MCP Inspector started.");
     }
 
     if (process.env.NODE_ENV !== "production" && !hasNoOpenFlag()) {
       const url = `http://localhost:${port}`;
       try {
         await open(url);
-        console.warn(`🌐 Browser opened automatically`);
+        console.warn("Browser opened automatically.");
       } catch {
-        console.warn(`🌐 Please open ${url} in your browser`);
+        console.warn("Browser could not be opened automatically.");
       }
     }
 
     return { port, fetch: app.fetch };
   } catch (error) {
-    console.error("Failed to start server:", error);
+    const errorName = error instanceof Error ? error.name : "UnknownError";
+    console.error(`Failed to start server (${errorName}).`);
     process.exit(1);
   }
 }

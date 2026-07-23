@@ -11,6 +11,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { OAuthClientInformation } from "@modelcontextprotocol/client";
 import { BrowserOAuthClientProvider } from "../../../src/auth/browser.js";
+import { LocalStorageKVStore } from "../../../src/auth/storage.js";
 import { installMemoryLocalStorage } from "../../helpers/memory-local-storage.js";
 
 const SERVER_URL = "https://mcp.example.com";
@@ -109,43 +110,36 @@ describe("BrowserOAuthClientProvider — pre-registered client_id", () => {
     expect(info).toBeUndefined();
   });
 
-  it("clears stale OAuth state when the Inspector callback path changes", () => {
+  it("keeps the last attempted authorization URL in memory only", async () => {
     const provider = new BrowserOAuthClientProvider(SERVER_URL, {
       callbackUrl: "https://app.example.com/inspector/oauth/callback",
+      preventAutoAuth: true,
     });
-    localStorage.setItem(
-      provider.getKey("last_auth_url"),
-      "https://auth.example.com/authorize?redirect_uri=https%3A%2F%2Fapp.example.com%2Fmcp%2Finspector%2Foauth%2Fcallback"
-    );
-    localStorage.setItem(
-      provider.getKey("last_auth_callback_url"),
-      provider.callbackUrl
-    );
-    localStorage.setItem(provider.getKey("code_verifier"), "stale-verifier");
-    localStorage.setItem(
-      provider.getKey("client_info"),
-      JSON.stringify({ client_id: "stale-client" })
+    const prepared = await provider.prepareAuthorizationUrl(
+      new URL("https://auth.example.com/authorize")
     );
 
-    expect(provider.getLastAttemptedAuthUrl()).toBeNull();
-    expect(localStorage.getItem(provider.getKey("last_auth_url"))).toBeNull();
-    expect(localStorage.getItem(provider.getKey("code_verifier"))).toBeNull();
-    expect(localStorage.getItem(provider.getKey("client_info"))).toBeNull();
+    expect(provider.getLastAttemptedAuthUrl()).toBe(prepared);
+    const stored = localStorage.getItem(provider.getKey("last_auth_url"));
+    expect(stored).not.toBe(prepared);
+    expect(JSON.parse(stored ?? "{}")).toMatchObject({
+      v: 1,
+      alg: "A256GCM",
+    });
   });
 
-  it("clears opaque stale authorization URLs without a callback marker", () => {
-    const provider = new BrowserOAuthClientProvider(SERVER_URL, {
+  it("does not expose a persisted authorization URL after reload", async () => {
+    const first = new BrowserOAuthClientProvider(SERVER_URL, {
       callbackUrl: "https://app.example.com/inspector/oauth/callback",
     });
-    localStorage.setItem(
-      provider.getKey("last_auth_url"),
-      "https://auth.example.com/authorize?auth_id=opaque"
+    await first.prepareAuthorizationUrl(
+      new URL("https://auth.example.com/authorize")
     );
-    localStorage.setItem(provider.getKey("code_verifier"), "stale-verifier");
 
-    expect(provider.getLastAttemptedAuthUrl()).toBeNull();
-    expect(localStorage.getItem(provider.getKey("last_auth_url"))).toBeNull();
-    expect(localStorage.getItem(provider.getKey("code_verifier"))).toBeNull();
+    const reloaded = new BrowserOAuthClientProvider(SERVER_URL, {
+      callbackUrl: "https://app.example.com/inspector/oauth/callback",
+    });
+    expect(reloaded.getLastAttemptedAuthUrl()).toBeNull();
   });
 
   it("includes scope in clientMetadata when configured", () => {
@@ -181,7 +175,8 @@ describe("BrowserOAuthClientProvider — pre-registered client_id", () => {
     );
     expect(stateKey).toBeDefined();
 
-    const stored = JSON.parse(localStorage.getItem(stateKey!)!);
+    const serialized = await new LocalStorageKVStore().get(stateKey!);
+    const stored = JSON.parse(serialized!);
     expect(stored.providerOptions.staticClientInfo).toEqual({
       client_id: "preregistered-abc",
     });
@@ -218,7 +213,8 @@ describe("BrowserOAuthClientProvider — pre-registered client_id", () => {
     );
     expect(stateKey).toBeDefined();
 
-    const stored = JSON.parse(localStorage.getItem(stateKey!)!);
+    const serialized = await new LocalStorageKVStore().get(stateKey!);
+    const stored = JSON.parse(serialized!);
     expect(stored.providerOptions.clientMetadataUrl).toBe(
       "https://app.example.com/oauth/client-metadata.json"
     );
