@@ -34,6 +34,27 @@ export interface Message {
   }>;
 }
 
+export interface ChatSerializedMessage {
+  role: string;
+  content: unknown;
+  attachments?: unknown;
+}
+
+export interface ChatBodyContext {
+  disabledTools: string[];
+  widgetModelContext?: string;
+}
+
+export type ChatBodyBuilder = (
+  messages: ChatSerializedMessage[],
+  context: ChatBodyContext
+) => unknown;
+
+export interface SendMessageOptions {
+  throwOnError?: boolean;
+  onAccepted?: () => void;
+}
+
 export interface LLMConfig {
   provider: ProviderName;
   apiKey: string;

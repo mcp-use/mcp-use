@@ -1,5 +1,5 @@
 import { TextShimmer } from "@/client/components/ui/text-shimmer";
-import { memo, useCallback, useMemo, type RefObject } from "react";
+import { memo, useCallback, useMemo, useRef, type RefObject } from "react";
 import type { MessageContentBlock } from "@/client/types/message-content-block";
 import { AssistantMessage } from "./AssistantMessage";
 import { ToolCallDisplay } from "./ToolCallDisplay";
@@ -8,6 +8,7 @@ import { UserMessage } from "./UserMessage";
 import type { MessageAttachment } from "./types";
 import { isViewTool } from "@mcp-use/client/react";
 import { buildMessageTokenMap, type InspectorTraceEvent } from "./trace";
+import { normalizeWidgetMessage } from "./widget-message";
 
 interface Message {
   id: string;
@@ -50,6 +51,7 @@ interface MessageListProps {
   messagesEndRef?: RefObject<HTMLDivElement | null>;
   /** Trace events used to derive per-message token counts on hover. */
   traceEvents?: InspectorTraceEvent[];
+  modelContextScope?: string;
 }
 
 export const MessageList = memo(
@@ -62,7 +64,9 @@ export const MessageList = memo(
     sendMessage,
     messagesEndRef,
     traceEvents = [],
+    modelContextScope,
   }: MessageListProps) => {
+    const widgetMessageInFlightRef = useRef(false);
     const messageTokenMap = useMemo(
       () => buildMessageTokenMap(messages, traceEvents),
       [messages, traceEvents]
@@ -85,30 +89,29 @@ export const MessageList = memo(
       return isViewTool(toolMeta);
     };
 
-    // Convert a ui/message content array to a text string + image attachments,
-    // then forward to sendMessage so the full message reaches the LLM.
     const handleFollowUp = useCallback(
-      (content: MessageContentBlock[]) => {
-        const text = content
-          .filter(
-            (c): c is { type: "text"; text: string } =>
-              c.type === "text" && "text" in c
-          )
-          .map((c) => c.text)
-          .join("\n");
-        const images: MessageAttachment[] = content
-          .filter(
-            (c): c is { type: "image"; data: string; mimeType: string } =>
-              c.type === "image" && "data" in c && "mimeType" in c
-          )
-          .map((c) => ({
-            type: "image" as const,
-            data: c.data,
-            mimeType: c.mimeType,
-          }));
-        sendMessage?.(text, images.length > 0 ? images : undefined);
+      async (content: MessageContentBlock[]) => {
+        if (isLoading || widgetMessageInFlightRef.current) {
+          throw new Error("Chat is busy with another turn");
+        }
+        if (!sendMessage) {
+          throw new Error("Chat is not available on this host surface");
+        }
+
+        const normalized = normalizeWidgetMessage(content);
+        widgetMessageInFlightRef.current = true;
+        try {
+          await sendMessage(
+            normalized.text,
+            normalized.attachments.length > 0
+              ? normalized.attachments
+              : undefined
+          );
+        } finally {
+          widgetMessageInFlightRef.current = false;
+        }
       },
-      [sendMessage]
+      [isLoading, sendMessage]
     );
 
     // Determine if we're in "thinking" state vs "streaming" state
@@ -279,6 +282,7 @@ export const MessageList = memo(
                                   part.toolInvocation.toolName
                                 )}
                                 onSendFollowUp={handleFollowUp}
+                                modelContextScope={modelContextScope}
                                 partialToolArgs={
                                   part.toolInvocation.partialArgs
                                 }
@@ -331,6 +335,7 @@ export const MessageList = memo(
                                     readResource={readResource}
                                     toolMeta={getToolMeta(toolCall.toolName)}
                                     onSendFollowUp={handleFollowUp}
+                                    modelContextScope={modelContextScope}
                                   />
                                 </div>
                               )}

@@ -104,6 +104,29 @@ test.describe("Conformance UI widgets - Tools Tab", () => {
       page.getByTestId("tool-execution-results-content")
     ).toContainText("Custom");
   });
+
+  test("chat-conformance fixture keeps Chat capabilities off the Tools surface", async ({
+    page,
+  }) => {
+    await page.getByTestId("tool-item-chat-conformance-fixture").click();
+    await page.getByTestId("tool-execution-execute-button").click();
+    await expect(page.getByTestId("tool-result-view-mcp-apps")).toBeVisible({
+      timeout: 10000,
+    });
+
+    const fixture = getMcpAppsGuestFrame(page, "chat-conformance-fixture");
+    await expect(fixture.getByText("Chat conformance fixture")).toBeVisible();
+
+    await fixture.getByRole("button", { name: "Call app-only tool" }).click();
+    await expect(fixture.getByTestId("fixture-helper-status")).toContainText(
+      "App helper received"
+    );
+
+    await fixture.getByRole("button", { name: "Send follow-up" }).click();
+    await expect(fixture.getByTestId("fixture-follow-up-status")).toContainText(
+      /support|message/i
+    );
+  });
 });
 
 test.describe("Conformance UI widgets - Resources Tab", () => {
@@ -244,6 +267,49 @@ test.describe("Conformance UI widgets - Chat Tab", () => {
     await expect(widgetFrame.getByText(/tokyo/i)).toBeVisible({
       timeout: 10000,
     });
+  });
+
+  test("app-only tools stay out of the Chat model tool selector", async ({
+    page,
+  }) => {
+    await page.getByTestId("chat-tool-selector").click();
+    await expect(
+      page.getByText("chat-conformance-fixture", { exact: true })
+    ).toBeVisible();
+    await expect(
+      page.getByText("chat-conformance-helper", { exact: true })
+    ).not.toBeVisible();
+  });
+
+  test("chat-conformance fixture sends follow-ups and replaces model context", async ({
+    page,
+  }) => {
+    await page
+      .getByTestId("chat-input")
+      .fill("Use the chat-conformance-fixture tool now");
+    await page.getByTestId("chat-send-button").click();
+
+    await expect(
+      page.getByTestId("chat-tool-call-chat-conformance-fixture")
+    ).toBeVisible({ timeout: 20000 });
+    await expect(page.getByTestId("chat-tool-call-status-result")).toBeVisible({
+      timeout: 45000,
+    });
+
+    const fixture = getMcpAppsGuestFrame(page, "chat-conformance-fixture");
+    await expect(fixture.getByText("Chat conformance fixture")).toBeVisible();
+    await fixture.getByRole("button", { name: "Update model context" }).click();
+    await fixture.getByRole("button", { name: "Update model context" }).click();
+    await expect(fixture.getByTestId("fixture-context-value")).toContainText(
+      "Selection: 2"
+    );
+    await expect(page.getByText("State synced to model")).toBeVisible();
+
+    await fixture.getByRole("button", { name: "Send follow-up" }).click();
+    await expect(fixture.getByTestId("fixture-follow-up-status")).toHaveText(
+      "sent",
+      { timeout: 45000 }
+    );
   });
 
   test("apps-sdk-only-card in chat - should show raw result without widget", async ({

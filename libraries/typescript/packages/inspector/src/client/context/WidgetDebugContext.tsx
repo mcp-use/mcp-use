@@ -16,6 +16,7 @@ import {
   useRef,
   useState,
 } from "react";
+import type { WidgetModelContext } from "@/client/components/chat/widget-model-context";
 
 type WidgetProtocol = "mcp-apps";
 
@@ -37,17 +38,15 @@ export interface WidgetDeclaredCsp {
   baseUriDomains?: string[];
 }
 
-interface WidgetInfo {
+export interface WidgetInfo {
   toolName: string;
   protocol: WidgetProtocol;
+  modelContextScope?: string;
   hostContext?: any;
   cspViolations: CspViolation[];
   declaredCsp?: WidgetDeclaredCsp;
   effectivePolicy?: string;
-  modelContext?: {
-    content?: any[];
-    structuredContent?: Record<string, unknown>;
-  };
+  modelContext?: WidgetModelContext;
   widgetState?: any;
 }
 
@@ -93,6 +92,7 @@ interface WidgetDebugContextType extends WidgetDebugState {
   updatePlaygroundSettings: (settings: Partial<PlaygroundSettings>) => void;
   clearAllWidgets: () => void;
   getAllModelContexts: () => Map<string, WidgetInfo["modelContext"]>;
+  getModelContexts: (scope: string) => Map<string, WidgetInfo["modelContext"]>;
 }
 
 const WidgetDebugContext = createContext<WidgetDebugContextType | undefined>(
@@ -109,6 +109,22 @@ const DEFAULT_PLAYGROUND_SETTINGS: PlaygroundSettings = {
   locale: "en-US",
   timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
 };
+
+export function selectModelContexts(
+  widgets: ReadonlyMap<string, WidgetInfo>,
+  scope?: string
+): Map<string, WidgetInfo["modelContext"]> {
+  const contexts = new Map<string, WidgetInfo["modelContext"]>();
+  for (const [id, widget] of widgets) {
+    if (
+      widget.modelContext &&
+      (scope === undefined || widget.modelContextScope === scope)
+    ) {
+      contexts.set(id, widget.modelContext);
+    }
+  }
+  return contexts;
+}
 
 /**
  * Provider for widget debugging context
@@ -280,14 +296,13 @@ export function WidgetDebugProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const getAllModelContexts = useCallback(() => {
-    const contexts = new Map<string, WidgetInfo["modelContext"]>();
-    for (const [id, widget] of state.widgets) {
-      if (widget.modelContext) {
-        contexts.set(id, widget.modelContext);
-      }
-    }
-    return contexts;
-  }, [state.widgets]);
+    return selectModelContexts(stateRef.current.widgets);
+  }, []);
+
+  const getModelContexts = useCallback(
+    (scope: string) => selectModelContexts(stateRef.current.widgets, scope),
+    []
+  );
 
   // Memoize context value to prevent unnecessary re-renders of consumers
   const value = useMemo<WidgetDebugContextType>(
@@ -305,6 +320,7 @@ export function WidgetDebugProvider({ children }: { children: ReactNode }) {
       updatePlaygroundSettings,
       clearAllWidgets,
       getAllModelContexts,
+      getModelContexts,
     }),
     [
       state,
@@ -320,6 +336,7 @@ export function WidgetDebugProvider({ children }: { children: ReactNode }) {
       updatePlaygroundSettings,
       clearAllWidgets,
       getAllModelContexts,
+      getModelContexts,
     ]
   );
 

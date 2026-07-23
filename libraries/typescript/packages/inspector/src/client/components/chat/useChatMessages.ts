@@ -7,9 +7,11 @@ import {
 } from "./conversion";
 import type {
   AuthConfig,
+  ChatBodyBuilder,
   LLMConfig,
   Message,
   MessageAttachment,
+  SendMessageOptions,
   StreamProtocol,
 } from "./types";
 import { fileToAttachment, hashString, isValidTotalSize } from "./utils";
@@ -27,11 +29,11 @@ import {
   type ManagedChatNotice,
 } from "./managedChatNotice";
 import { parsePartialToolArgs } from "./partialToolArgs";
-
-interface WidgetModelContext {
-  content?: Array<{ type: string; text: string }>;
-  structuredContent?: Record<string, unknown>;
-}
+import {
+  serializeWidgetModelContexts,
+  widgetModelContextProviderMessage,
+  type WidgetModelContext,
+} from "./widget-model-context";
 
 interface UseChatMessagesProps {
   mcpServerUrl: string;
@@ -65,11 +67,10 @@ interface UseChatMessagesProps {
    * object that will be JSON-stringified as the request body.
    * When omitted, the default body includes `mcpServerUrl`, `llmConfig`,
    * `authConfig`, and `messages`.
-   * Use this to send only `{ messages }` to a server-managed backend.
+   * The second argument contains the effective disabled tools and serialized
+   * scoped widget context.
    */
-  body?: (
-    messages: Array<{ role: string; content: unknown; attachments?: unknown }>
-  ) => unknown;
+  body?: ChatBodyBuilder;
 }
 
 export function useChatMessages({
@@ -99,6 +100,7 @@ export function useChatMessages({
     message?: string;
   } | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const sendInProgressRef = useRef(false);
   const traceIdRef = useRef(0);
 
   const recordTrace = useCallback((event: InspectorTraceEventInput) => {
@@ -114,7 +116,8 @@ export function useChatMessages({
     async (
       userInput: string,
       promptResults: PromptResult[],
-      extraAttachments?: MessageAttachment[]
+      extraAttachments?: MessageAttachment[],
+      options?: SendMessageOptions
     ) => {
       const allAttachments = [...attachments, ...(extraAttachments ?? [])];
       // Can send if there's text, prompt results, or attachments
@@ -122,9 +125,28 @@ export function useChatMessages({
         userInput.trim() ||
         promptResults.length > 0 ||
         allAttachments.length > 0;
-      if (!hasContent || !llmConfig || !isConnected) {
+      const rejectOrReturn = (message: string) => {
+        if (options?.throwOnError) {
+          throw new Error(message);
+        }
+      };
+      if (!hasContent) {
+        rejectOrReturn("Chat message must include content");
         return;
       }
+      if (!llmConfig) {
+        rejectOrReturn("Chat is not configured");
+        return;
+      }
+      if (!isConnected) {
+        rejectOrReturn("The MCP server is not connected");
+        return;
+      }
+      if (sendInProgressRef.current) {
+        rejectOrReturn("Chat is busy with another turn");
+        return;
+      }
+      sendInProgressRef.current = true;
 
       const promptResultsMessages =
         convertPromptResultsToMessages(promptResults);
@@ -189,36 +211,15 @@ export function useChatMessages({
           }
         }
 
-        // Build widget state context messages (per SEP-1865 ui/update-model-context)
-        // These inform the LLM about current widget UI state so it can reason about what the user sees.
-        const widgetContextMessages: Message[] = [];
-        if (widgetModelContexts && widgetModelContexts.size > 0) {
-          const parts: string[] = [];
-          for (const [, ctx] of widgetModelContexts) {
-            if (!ctx) continue;
-            if (ctx.content?.length) {
-              parts.push(ctx.content.map((c) => c.text).join("\n"));
-            } else if (ctx.structuredContent) {
-              parts.push(JSON.stringify(ctx.structuredContent));
-            }
-          }
-          if (parts.length > 0) {
-            widgetContextMessages.push({
-              id: `widget-context-${Date.now()}`,
-              role: "user",
-              content: `[Current Widget State]\n${parts.join("\n")}`,
-              timestamp: Date.now(),
-            });
-          }
-        }
-
-        const historyMessages = [
-          ...messages,
-          ...userMessages,
-          ...widgetContextMessages,
-        ];
-
+        const historyMessages = [...messages, ...userMessages];
+        const serializedWidgetContext = serializeWidgetModelContexts(
+          widgetModelContexts ?? new Map()
+        );
+        const widgetContextMessage = widgetModelContextProviderMessage(
+          serializedWidgetContext
+        );
         const serialisedMessages = [
+          ...(widgetContextMessage ? [widgetContextMessage] : []),
           ...historyMessages.map((m) => ({
             role: m.role,
             content:
@@ -236,15 +237,22 @@ export function useChatMessages({
           (waitForChatApiUrl ? await waitForChatApiUrl() : undefined) ??
           inspectorApi("chat/stream");
 
+        const disabledToolNames = [...(disabledTools ?? [])].sort();
+        const bodyContext = {
+          disabledTools: disabledToolNames,
+          ...(serializedWidgetContext
+            ? { widgetModelContext: serializedWidgetContext }
+            : {}),
+        };
         const requestBody = bodyBuilder
-          ? bodyBuilder(serialisedMessages)
+          ? bodyBuilder(serialisedMessages, bodyContext)
           : {
               mcpServerUrl,
               llmConfig,
               authConfig: authConfigWithTokens,
               messages: serialisedMessages,
-              ...(disabledTools && disabledTools.size > 0
-                ? { disabledTools: [...disabledTools] }
+              ...(disabledToolNames.length > 0
+                ? { disabledTools: disabledToolNames }
                 : {}),
             };
         const requestEnvelope = bodyBuilder
@@ -258,8 +266,8 @@ export function useChatMessages({
                 baseUrl: llmConfig.baseUrl,
               },
               messages: serialisedMessages,
-              ...(disabledTools && disabledTools.size > 0
-                ? { disabledTools: [...disabledTools] }
+              ...(disabledToolNames.length > 0
+                ? { disabledTools: disabledToolNames }
                 : {}),
             };
         recordTrace({
@@ -268,7 +276,10 @@ export function useChatMessages({
             url: resolvedUrl,
             protocol: streamProtocol,
             envelope: requestEnvelope,
-            providerMessages: convertMessagesToProvider(historyMessages),
+            providerMessages: [
+              ...(widgetContextMessage ? [widgetContextMessage] : []),
+              ...convertMessagesToProvider(historyMessages),
+            ],
           },
         });
 
@@ -292,6 +303,11 @@ export function useChatMessages({
             );
             if (notice) {
               setManagedChatNotice(notice);
+              if (options?.throwOnError) {
+                throw new Error(
+                  `Chat request failed with HTTP ${response.status}`
+                );
+              }
               return;
             }
           }
@@ -302,11 +318,15 @@ export function useChatMessages({
                   (errBody.mcpServerUrl as string | undefined) ?? mcpServerUrl,
                 message: errBody.message as string | undefined,
               });
+              if (options?.throwOnError) {
+                throw new Error("The MCP server requires authentication");
+              }
               return;
             }
           }
           throw new Error(`HTTP error! status: ${response.status}`);
         }
+        options?.onAccepted?.();
 
         // Create assistant message that will be updated with streaming content
         const assistantMessageId = `assistant-${Date.now()}`;
@@ -765,11 +785,17 @@ export function useChatMessages({
       } catch (error) {
         // Don't show Abort Error
         if (error instanceof DOMException && error.name === "AbortError") {
+          if (options?.throwOnError) {
+            throw new Error("Chat turn was cancelled");
+          }
           return;
         }
 
         if (chatApiUrl && isCloudFetchFailure(error)) {
           setManagedChatNotice({ kind: "cloud_unavailable" });
+          if (options?.throwOnError) {
+            throw new Error("Chat service is unavailable");
+          }
           return;
         }
 
@@ -797,9 +823,13 @@ export function useChatMessages({
           timestamp: Date.now(),
         };
         setMessages((prev) => [...prev, errorMessage]);
+        if (options?.throwOnError) {
+          throw new Error(errorDetail);
+        }
       } finally {
         setIsLoading(false);
         abortControllerRef.current = null;
+        sendInProgressRef.current = false;
       }
     },
     [
