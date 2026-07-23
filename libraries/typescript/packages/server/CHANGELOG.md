@@ -1,5 +1,18 @@
 # mcp-use
 
+## 2.0.0-beta.41
+
+### Minor Changes
+
+- c991412: Remove the `mcp-use skills` command from the CLI. Coding-agent skills remain
+  available through the `create-mcp-use-app` setup flow.
+
+### Patch Changes
+
+- Updated dependencies [c991412]
+  - @mcp-use/cli@4.0.0-beta.9
+  - @mcp-use/inspector@20.0.0-beta.33
+
 ## 2.0.0-beta.40
 
 ### Patch Changes

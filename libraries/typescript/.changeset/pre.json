@@ -53,6 +53,7 @@
     "pin-create-app-beta36",
     "rebuild-prerelease-after-versioning",
     "registry-mcp-v2-dependencies",
+    "remove-cli-skills-command",
     "rename-starter-mcp-server-template",
     "request-scoped-client-context",
     "request-scoped-server-notifications",
