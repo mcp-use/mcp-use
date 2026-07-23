@@ -52,6 +52,7 @@
     "openapi-server-tools-v2",
     "optimize-standalone-inspector-package",
     "pin-create-app-beta36",
+    "quiet-ravens-view",
     "rebuild-prerelease-after-versioning",
     "registry-mcp-v2-dependencies",
     "remove-cli-skills-command",

@@ -1,5 +1,12 @@
 # mcp-use
 
+## 2.0.0-beta.43
+
+### Patch Changes
+
+- a0501f8: Track anonymous, content-free adoption of public React hooks inside MCP Views.
+  - @mcp-use/inspector@20.0.0-beta.35
+
 ## 2.0.0-beta.42
 
 ### Patch Changes
