@@ -48,7 +48,7 @@ permissions:
 
 on:
   push:
-    branches: [main, canary, beta]
+    branches: [main, canary]
   pull_request:
     branches: [main, canary, beta]
   workflow_call:
