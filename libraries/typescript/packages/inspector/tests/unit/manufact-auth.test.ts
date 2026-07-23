@@ -72,6 +72,10 @@ describe("Manufact Inspector OAuth", () => {
     localStorage.clear();
     popup.location.href = "";
     popup.closed = false;
+    Object.assign(window.location, {
+      origin: "http://localhost:3005",
+      href: "http://localhost:3005/inspector",
+    });
     vi.clearAllMocks();
   });
 
@@ -151,6 +155,43 @@ describe("Manufact Inspector OAuth", () => {
         authOrigin: "https://cloud.example",
       },
       "http://localhost:3005"
+    );
+  });
+
+  it("uses OAuth consent from a hosted Manufact Inspector", async () => {
+    Object.assign(window.location, {
+      origin: "https://inspector.dev.manufact.com",
+      href: "https://inspector.dev.manufact.com/inspector",
+    });
+    const fetchMock = vi.fn(
+      async (input: string | URL | Request, init?: RequestInit) => {
+        const url = String(input);
+        if (url.endsWith("openid-configuration")) {
+          return Response.json(metadata);
+        }
+        if (url === metadata.registration_endpoint) {
+          expect(init?.method).toBe("POST");
+          return Response.json(
+            { client_id: "hosted-inspector-client" },
+            { status: 201 }
+          );
+        }
+        throw new Error(`Unexpected request: ${url}`);
+      }
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await authorizeManufact(
+      "https://cloud.dev.manufact.com/api/v1/inspector/chat/stream"
+    );
+
+    const authorizationUrl = new URL(popup.location.href);
+    expect(authorizationUrl.origin + authorizationUrl.pathname).toBe(
+      metadata.authorization_endpoint
+    );
+    expect(authorizationUrl.searchParams.get("prompt")).toBe("consent");
+    expect(authorizationUrl.searchParams.get("client_id")).toBe(
+      "hosted-inspector-client"
     );
   });
 
