@@ -25,6 +25,7 @@
     "client-cli-auto-install",
     "client-sdk-v2-migration",
     "create-app-sdk-version",
+    "default-inspector-hosted-chat",
     "dev-port-probe-envdir",
     "dialect-json-schema-validator",
     "eager-inspector-ui",

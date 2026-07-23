@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 20.0.0-beta.31
+
+### Patch Changes
+
+- fa40e85: Default hosted chat and Manufact sign-in to the Manufact Cloud endpoint when no runtime or build-time chat URL is configured. Remove the dark-mode border from the sign-in card and render the Manufact wordmark in white.
+  - mcp-use@2.0.0-beta.39
+
 ## 20.0.0-beta.30
 
 ### Patch Changes
