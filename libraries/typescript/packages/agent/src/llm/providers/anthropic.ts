@@ -262,7 +262,11 @@ export async function* streamChat(
           try {
             args = JSON.parse(entry.argsJson);
           } catch {
-            args = {};
+            yield {
+              type: "error",
+              message: `Anthropic returned invalid JSON arguments for tool "${entry.name}".`,
+            };
+            return;
           }
         }
         yield {

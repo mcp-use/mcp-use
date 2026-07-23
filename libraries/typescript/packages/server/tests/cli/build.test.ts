@@ -566,6 +566,10 @@ describe("runBuild (views)", () => {
       throw new Error("expected an inline view manifest entry");
     }
     expect(product.js).toMatch(/bootstrapView|createElement|react/i);
+    expect(product.js).not.toContain("eu.i.posthog.com");
+    expect(product.js).not.toContain(
+      "phc_lyTtbYwvkdSbrcMQNPiKiiRWrrM1seyKIMjycSvItEI"
+    );
     expect(product.js).not.toContain("sourceMappingURL=data:");
     expect(product.css).toContain("tailwindcss");
     expect(existsSync(join(buildDir, "views", "product-search-result"))).toBe(

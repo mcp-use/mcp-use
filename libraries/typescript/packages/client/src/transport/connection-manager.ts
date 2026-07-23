@@ -11,6 +11,7 @@ export abstract class ConnectionManager<T = any> {
   private _connection: T | null = null;
   private _task: Promise<void> | null = null;
   private _abortController: AbortController | null = null;
+  private _startPromise: Promise<T> | null = null;
 
   constructor() {
     this.reset();
@@ -43,7 +44,9 @@ export abstract class ConnectionManager<T = any> {
    * @returns The established connection.
    * @throws If the connection cannot be established.
    */
-  async start(): Promise<T> {
+  start(): Promise<T> {
+    if (this._startPromise) return this._startPromise;
+
     // Reset internal state before starting
     this.reset();
 
@@ -51,7 +54,14 @@ export abstract class ConnectionManager<T = any> {
 
     // Kick off the background task that manages the connection
     this._task = this.connectionTask();
+    this._startPromise = this.waitUntilReady().catch((error) => {
+      this._startPromise = null;
+      throw error;
+    });
+    return this._startPromise;
+  }
 
+  private async waitUntilReady(): Promise<T> {
     // Wait until the connection is ready or an error occurs
     await this._readyPromise;
 
@@ -71,6 +81,8 @@ export abstract class ConnectionManager<T = any> {
    * Stop the connection manager and close the connection.
    */
   async stop(): Promise<void> {
+    if (!this._task) return;
+
     if (this._task && this._abortController) {
       logger.debug(`Cancelling ${this.constructor.name} task`);
 
@@ -89,6 +101,8 @@ export abstract class ConnectionManager<T = any> {
 
     // Wait until the connection cleanup has completed
     await this._donePromise;
+    this._task = null;
+    this._startPromise = null;
     logger.debug(`${this.constructor.name} task completed`);
   }
 

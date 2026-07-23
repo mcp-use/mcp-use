@@ -98,4 +98,67 @@ describe("Anthropic tool streaming", () => {
       { type: "done" },
     ]);
   });
+
+  it("does not emit an executable tool call for malformed arguments", async () => {
+    const sse = [
+      {
+        type: "content_block_start",
+        index: 0,
+        content_block: {
+          type: "tool_use",
+          id: "tool_1",
+          name: "create_view",
+          input: {},
+        },
+      },
+      {
+        type: "content_block_delta",
+        index: 0,
+        delta: {
+          type: "input_json_delta",
+          partial_json: '{"elements":',
+        },
+      },
+      { type: "content_block_stop", index: 0 },
+    ]
+      .map((event) => `data: ${JSON.stringify(event)}\n\n`)
+      .join("");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(sse, {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        })
+      )
+    );
+
+    const events = [];
+    for await (const event of streamChat({
+      config: {
+        provider: "anthropic",
+        model: "claude-test",
+        apiKey: "test-key",
+      },
+      messages: [{ role: "user", content: "draw something" }],
+      tools: [
+        {
+          name: "create_view",
+          inputSchema: { type: "object" },
+        },
+      ],
+    })) {
+      events.push(event);
+    }
+
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "error",
+        message: expect.stringContaining("invalid JSON arguments"),
+      })
+    );
+    expect(events).not.toContainEqual(
+      expect.objectContaining({ type: "tool-call-ready" })
+    );
+  });
 });

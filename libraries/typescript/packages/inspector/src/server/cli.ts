@@ -99,7 +99,7 @@ async function startServer() {
       fetch: app.fetch,
       port,
     });
-    console.log("MCP Inspector started.");
+    console.log(`MCP Inspector started at http://localhost:${port}/inspector`);
     if (mcpUrl) {
       console.log("Auto-connect configured.");
     }
@@ -111,13 +111,16 @@ async function startServer() {
       try {
         await open(openUrl.toString());
         console.log("Browser opened.");
-      } catch {
-        console.log("Browser could not be opened automatically.");
+      } catch (error) {
+        console.log(
+          `Browser could not be opened automatically. Open ${openUrl.toString()} manually.`
+        );
+        console.error(error);
       }
     }
     return { port, fetch: app.fetch };
-  } catch {
-    console.error("Failed to start server (StartupError).");
+  } catch (error) {
+    console.error("Failed to start server (StartupError).", error);
     process.exit(1);
   }
 }

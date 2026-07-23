@@ -6,6 +6,7 @@ import {
   type McpAuthCallbackMessage,
 } from "./popup.js";
 import type { StoredState } from "./session-store.js";
+import { LocalStorageKVStore } from "./storage.js";
 
 interface AuthCallbackMeta {
   state?: string | null;
@@ -103,25 +104,19 @@ function renderResult(
   document.body.appendChild(container);
 }
 
-function findStoredState(state: string): {
+async function findStoredState(state: string): Promise<{
   key: string;
   value: StoredState;
-} {
-  const defaultKey = `mcp:auth:state_${state}`;
-  let key = localStorage.getItem(defaultKey) ? defaultKey : null;
-
-  if (!key) {
-    const suffix = `:state_${state}`;
-    for (let index = 0; index < localStorage.length; index++) {
-      const candidate = localStorage.key(index);
-      if (candidate?.endsWith(suffix)) {
-        key = candidate;
-        break;
-      }
-    }
-  }
-
-  const serialized = key ? localStorage.getItem(key) : null;
+  store: LocalStorageKVStore;
+}> {
+  const store = new LocalStorageKVStore();
+  const legacySuffix = `:state_${state}`;
+  const scopedSuffix = `_state_${state}`;
+  const key = (await store.keys()).find(
+    (candidate) =>
+      candidate.endsWith(legacySuffix) || candidate.endsWith(scopedSuffix)
+  );
+  const serialized = key ? await store.get(key) : null;
   if (!key || !serialized) {
     throw new Error(`Invalid or expired OAuth state "${state}".`);
   }
@@ -130,11 +125,11 @@ function findStoredState(state: string): {
   try {
     value = JSON.parse(serialized) as StoredState;
   } catch {
-    localStorage.removeItem(key);
+    await store.remove(key);
     throw new Error("Failed to parse stored OAuth state.");
   }
 
-  return { key, value };
+  return { key, value, store };
 }
 
 function redirectWithError(returnUrl: string, message: string): void {
@@ -218,6 +213,7 @@ async function completeAuthorization(): Promise<void> {
   const callbackParams = new URLSearchParams(window.location.search);
   const state = callbackParams.get("state");
   let stateKey: string | null = null;
+  let stateStore: LocalStorageKVStore | null = null;
   let storedState: StoredState | null = null;
   let provider: BrowserOAuthClientProvider | null = null;
 
@@ -226,12 +222,13 @@ async function completeAuthorization(): Promise<void> {
       throw new Error("OAuth callback is missing the state parameter.");
     }
 
-    const stored = findStoredState(state);
+    const stored = await findStoredState(state);
     stateKey = stored.key;
+    stateStore = stored.store;
     storedState = stored.value;
 
     if (!storedState.expiry || storedState.expiry < Date.now()) {
-      localStorage.removeItem(stateKey);
+      await stateStore.remove(stateKey);
       throw new Error(
         "OAuth state has expired. Please start authentication again."
       );
@@ -250,7 +247,7 @@ async function completeAuthorization(): Promise<void> {
     });
 
     await transport.finishAuth(callbackParams);
-    localStorage.removeItem(stateKey);
+    await stateStore.remove(stateKey);
     signalResult(true, undefined, storedState, {
       state,
       serverUrlHash: storedState.serverUrlHash,
@@ -259,8 +256,12 @@ async function completeAuthorization(): Promise<void> {
     const message = error instanceof Error ? error.message : String(error);
     console.error("[mcp-callback] OAuth callback failed:", error);
 
-    if (stateKey) localStorage.removeItem(stateKey);
-    if (provider) localStorage.removeItem(provider.getKey("last_auth_url"));
+    if (stateKey && stateStore) await stateStore.remove(stateKey);
+    if (provider) {
+      await (stateStore ?? new LocalStorageKVStore()).remove(
+        provider.getKey("last_auth_url")
+      );
+    }
 
     signalResult(false, message, storedState, {
       state,

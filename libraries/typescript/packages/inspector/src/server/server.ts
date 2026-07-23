@@ -42,7 +42,7 @@ async function startServer() {
         `💡 Tip: run \`pnpm dev\` to serve UI + API on one port via Vite.`
       );
     } else {
-      console.warn("MCP Inspector started.");
+      console.warn(`MCP Inspector started at http://localhost:${port}`);
     }
 
     if (process.env.NODE_ENV !== "production" && !hasNoOpenFlag()) {
@@ -50,14 +50,17 @@ async function startServer() {
       try {
         await open(url);
         console.warn("Browser opened automatically.");
-      } catch {
-        console.warn("Browser could not be opened automatically.");
+      } catch (error) {
+        console.warn(
+          `Browser could not be opened automatically. Open ${url} manually.`
+        );
+        console.error(error);
       }
     }
 
     return { port, fetch: app.fetch };
-  } catch {
-    console.error("Failed to start server (StartupError).");
+  } catch (error) {
+    console.error("Failed to start server (StartupError).", error);
     process.exit(1);
   }
 }

@@ -14,6 +14,7 @@ import {
   providerConfigFromOptions,
   type NativeLLMConfig,
 } from "../llm/provider_config.js";
+import { convertExternalHistoryToProvider } from "../llm/messageFormat.js";
 import type {
   LlmStreamEvent,
   ProviderConfig,
@@ -30,7 +31,7 @@ import type {
 import { normalizeRunOptions } from "./normalize_run_options.js";
 import type { RunOptions } from "./run_options.js";
 import { RemoteAgent } from "./remote.js";
-import type { MCPServerConfig } from "./types.js";
+import type { BaseMessage, MCPServerConfig } from "./types.js";
 
 export type {
   ProviderName,
@@ -55,6 +56,7 @@ type ResolvedRunOptions = {
   prompt?: string;
   maxSteps?: number;
   manageConnector?: boolean;
+  externalHistory?: BaseMessage[];
   messages?: ProviderMessage[];
   schema?: ZodSchema<unknown>;
   signal?: AbortSignal;
@@ -338,6 +340,11 @@ export class MCPAgent {
     ];
     if (this.memoryEnabled && this.conversationMessages.length > 0) {
       messages.push(...this.conversationMessages);
+    }
+    if (options.externalHistory?.length) {
+      messages.push(
+        ...convertExternalHistoryToProvider(options.externalHistory)
+      );
     }
     if (options.messages?.length) {
       messages.push(...options.messages);

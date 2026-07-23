@@ -33,7 +33,7 @@
 npm install @mcp-use/client
 ```
 
-Node.js ≥ 20. For React hooks, install `react` as a peer dependency.
+Node.js ≥ 22.22.2. For React hooks, install `react` as a peer dependency.
 
 ---
 

@@ -86,6 +86,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   private connectionUrl?: string;
   private proxyOAuthRequests: boolean;
   private lastAttemptedAuthUrl: string | null = null;
+  private authorizationPending = false;
   readonly onPopupWindow:
     | ((
         url: string,
@@ -152,6 +153,14 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
 
   getKey(keySuffix: string): string {
     return this.session.getKey(keySuffix);
+  }
+
+  get hasPendingFlow(): boolean {
+    return this.authorizationPending;
+  }
+
+  markFlowComplete(): void {
+    this.authorizationPending = false;
   }
 
   /**
@@ -406,6 +415,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     ctx?: OAuthClientInformationContext
   ): Promise<void> {
     this.lastAttemptedAuthUrl = null;
+    this.authorizationPending = false;
     return this.session.saveTokens(tokens, ctx);
   }
 
@@ -526,6 +536,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       }
     );
     this.lastAttemptedAuthUrl = prepared;
+    this.authorizationPending = true;
     return prepared;
   }
 
@@ -595,17 +606,13 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
 
   clearStorage(): number {
     this.lastAttemptedAuthUrl = null;
+    this.authorizationPending = false;
     const prefixPattern = `${this.storageKeyPrefix}_${this.serverUrlHash}_`;
-    const statePattern = `${this.storageKeyPrefix}:state_`;
     const keysToRemove: string[] = [];
     let count = 0;
 
     for (const key of this.storage.keys()) {
       if (key.startsWith(prefixPattern)) {
-        keysToRemove.push(key);
-      } else if (key.startsWith(statePattern)) {
-        // State payloads are encrypted, so synchronous cleanup removes every
-        // short-lived authorization state under this provider prefix.
         keysToRemove.push(key);
       }
     }

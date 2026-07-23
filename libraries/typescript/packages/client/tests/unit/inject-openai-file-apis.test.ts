@@ -71,4 +71,17 @@ describe("injectOpenAiFileApis HTML shape", () => {
       injected.indexOf("<title>")
     );
   });
+
+  it("ignores greater-than characters inside quoted head attributes", () => {
+    const html =
+      "<html><head data-label=\"a > b\" data-other='c > d'><title>x</title></head></html>";
+    const injected = injectOpenAiFileApis(html);
+
+    expect(injected).toContain(
+      "<head data-label=\"a > b\" data-other='c > d'><script>"
+    );
+    expect(injected.indexOf("uploadFile")).toBeLessThan(
+      injected.indexOf("<title>")
+    );
+  });
 });

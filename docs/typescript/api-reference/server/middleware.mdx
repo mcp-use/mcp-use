@@ -111,6 +111,10 @@ Hook points: `tools/call`, `resources/read`, `prompts/get`, and `tools/list` / `
 Read-only telemetry — cannot block or mutate params. Append `:complete` for after-handler:
 
 Observers support `mcp:*` and category patterns such as `mcp:tools/*`, in addition to exact methods.
+Their frozen snapshot contains `method`, `params`, `request` (`req` is a
+deprecated alias), `session`, `auth`, and read-only `state`. It is intentionally
+not a full Hono `Context`; APIs such as `ctx.get()` and `ctx.env` are available
+to middleware, not observers.
 
 ```ts
 server.on("mcp:tools/call", (ctx) => {

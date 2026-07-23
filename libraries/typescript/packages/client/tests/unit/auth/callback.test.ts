@@ -2,6 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { StoredState } from "../../../src/auth/session-store.js";
+import { LocalStorageKVStore } from "../../../src/auth/storage.js";
 
 const mocks = vi.hoisted(() => ({
   finishAuth: vi.fn(),
@@ -123,7 +124,7 @@ describe("onMcpAuthorization", () => {
     const second = onMcpAuthorization();
 
     expect(second).toBe(first);
-    expect(mocks.finishAuth).toHaveBeenCalledOnce();
+    await vi.waitFor(() => expect(mocks.finishAuth).toHaveBeenCalledOnce());
     resolveFinish();
     await first;
   });
@@ -181,6 +182,32 @@ describe("onMcpAuthorization", () => {
       window.location.origin
     );
     expect(close).toHaveBeenCalledOnce();
+    expect(localStorage.getItem(stateKey)).toBeNull();
+  });
+
+  it("decrypts a persisted state record before completing the callback", async () => {
+    const storedState: StoredState = {
+      expiry: Date.now() + 60_000,
+      serverUrlHash: "server-hash",
+      providerOptions,
+      flowType: "popup",
+    };
+    await new LocalStorageKVStore().set(stateKey, JSON.stringify(storedState));
+    expect(localStorage.getItem(stateKey)).not.toContain("serverUrlHash");
+
+    const { onMcpAuthorization } =
+      await import("../../../src/auth/callback.js");
+    await onMcpAuthorization();
+
+    expect(mocks.finishAuth).toHaveBeenCalledOnce();
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: true,
+        state,
+        serverUrlHash: "server-hash",
+      }),
+      window.location.origin
+    );
     expect(localStorage.getItem(stateKey)).toBeNull();
   });
 

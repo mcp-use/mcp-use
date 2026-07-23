@@ -64,4 +64,14 @@ describe("Inspector route rate limits", () => {
     expect(INSPECTOR_API_RATE_LIMIT).toBe(120);
     expect(INSPECTOR_ASSET_RATE_LIMIT).toBe(600);
   });
+
+  it("uses the fallback Retry-After for non-finite limiter values", async () => {
+    const app = new Hono();
+    app.get("/limited", (c) =>
+      inspectorRateLimitResponse(c, { msBeforeNext: Number.NaN })
+    );
+
+    const response = await app.request("/limited");
+    expect(response.headers.get("Retry-After")).toBe("60");
+  });
 });

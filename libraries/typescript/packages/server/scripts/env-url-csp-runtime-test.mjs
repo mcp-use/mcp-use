@@ -243,7 +243,11 @@ async function main() {
     const { urls, csp } = await readView(handler);
     log("Split MCP_URL + MCP_ASSETS_URL", {
       pass:
-        hasUrlLocation(urls.script, "https://cdn.example.com", "/") &&
+        hasUrlLocation(
+          urls.script,
+          "https://cdn.example.com",
+          "/storage/v1/object/public/widgets/mcp/_mcp-use/views/product-search-result/"
+        ) &&
         hasExactDomain(csp?.connectDomains, "https://server.example.com") &&
         hasExactDomain(csp?.resourceDomains, "https://cdn.example.com") &&
         !hasExactDomain(csp?.resourceDomains, "https://server.example.com"),
@@ -327,7 +331,11 @@ async function main() {
     handler = await loadHandler();
     const { urls } = await readView(handler);
     log("Build with MCP_ASSETS_URL (CDN manifest)", {
-      pass: hasUrlLocation(urls.script, "https://cdn.example.com", "/"),
+      pass: hasUrlLocation(
+        urls.script,
+        "https://cdn.example.com",
+        "/storage/v1/object/public/widgets/mcp/_mcp-use/views/product-search-result/"
+      ),
       scriptUrl: urls.script,
     });
   }

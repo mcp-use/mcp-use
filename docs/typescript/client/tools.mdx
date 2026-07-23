@@ -40,6 +40,8 @@ try {
 Pass MCP request options as the third argument:
 
 ```typescript
+const abortController = new AbortController();
+
 await conn.callTool(
   "long_task",
   { input: "data" },

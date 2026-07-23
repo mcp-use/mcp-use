@@ -15,7 +15,8 @@ function retryAfterSeconds(error: unknown): number {
     error &&
     typeof error === "object" &&
     "msBeforeNext" in error &&
-    typeof error.msBeforeNext === "number"
+    typeof error.msBeforeNext === "number" &&
+    Number.isFinite(error.msBeforeNext)
   ) {
     return Math.max(1, Math.ceil(error.msBeforeNext / 1_000));
   }

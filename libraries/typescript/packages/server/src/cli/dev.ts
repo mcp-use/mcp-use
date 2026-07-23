@@ -392,11 +392,6 @@ export async function runDev(options: DevOptions): Promise<void> {
     envDir: false,
     logLevel: "warn",
     cacheDir: paths.cache,
-    define: {
-      __MCP_USE_VIEW_USAGE_DISABLED__: JSON.stringify(
-        process.env.MCP_USE_ANONYMIZED_TELEMETRY === "false"
-      ),
-    },
     resolve: {
       tsconfigPaths: true,
       alias: { tailwindcss: resolveTailwindCss() },

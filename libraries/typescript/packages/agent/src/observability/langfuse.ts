@@ -59,7 +59,7 @@ async function initializeLangfuse(
     const langfuseModule = await import("langfuse-langchain").catch(() => null);
     if (!langfuseModule) {
       logger.debug(
-        "Langfuse package not installed - tracing disabled. Install with: npm install @langfuse/langchain"
+        "Langfuse package not installed - tracing disabled. Install with: npm install langfuse-langchain"
       );
       return;
     }

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LocalStorageProvider } from "../../../src/react/storage.js";
 import { installMemoryLocalStorage } from "../../helpers/memory-local-storage.js";
 
@@ -71,5 +71,24 @@ describe("LocalStorageProvider secret allowlist", () => {
       proxyConfig: { proxyAddress: "https://proxy.example.com" },
     });
     expect(localStorage.getItem("connections")).not.toContain("runtime-only");
+  });
+
+  it("returns sanitized servers when the migration rewrite fails", () => {
+    localStorage.setItem(
+      "connections",
+      JSON.stringify({
+        primary: {
+          url: "https://mcp.example.com",
+          headers: { Authorization: "Bearer secret" },
+        },
+      })
+    );
+    vi.spyOn(localStorage, "setItem").mockImplementation(() => {
+      throw new Error("quota exceeded");
+    });
+
+    expect(new LocalStorageProvider("connections").getServers()).toEqual({
+      primary: { url: "https://mcp.example.com" },
+    });
   });
 });

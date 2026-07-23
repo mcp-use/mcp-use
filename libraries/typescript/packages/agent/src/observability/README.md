@@ -16,7 +16,7 @@ Install the required packages based on your observability platform:
 
 ```bash
 # For Langfuse
-npm install langfuse @langfuse/langchain
+npm install langfuse langfuse-langchain
 ```
 
 ## Configuration
@@ -39,7 +39,7 @@ MCP_USE_LANGFUSE=true  # Set to false to disable
 The observability is automatically integrated into MCPAgent:
 
 ```typescript
-import { MCPAgent } from "@mcp-use/agent";
+import { MCPAgent } from "@mcp-use/agent/langchain";
 
 const agent = new MCPAgent({
   llm: myLLM,
@@ -59,8 +59,8 @@ const result = await agent.run("What's the weather?");
 You can provide custom callbacks:
 
 ```typescript
-import { CallbackHandler } from "@langfuse/langchain";
-import { MCPAgent } from "@mcp-use/agent";
+import { CallbackHandler } from "langfuse-langchain";
+import { MCPAgent } from "@mcp-use/agent/langchain";
 
 const customHandler = new CallbackHandler({
   secretKey: "custom-secret",
@@ -79,7 +79,7 @@ const agent = new MCPAgent({
 For advanced use cases, you can use the ObservabilityManager directly:
 
 ```typescript
-import { ObservabilityManager } from "mcp-use/observability";
+import { ObservabilityManager } from "@mcp-use/agent/langchain";
 
 // Create a manager
 const manager = new ObservabilityManager({
@@ -136,7 +136,7 @@ try {
 Enable debug logging to see observability events:
 
 ```typescript
-import { logger } from "mcp-use/logging";
+import { logger } from "@mcp-use/client";
 
 // Set log level to debug
 process.env.LOG_LEVEL = "debug";

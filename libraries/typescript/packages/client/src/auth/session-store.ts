@@ -425,7 +425,7 @@ export class OAuthSessionStore {
     opts: StoreAuthorizationStateOptions = {}
   ): Promise<string> {
     const state = globalThis.crypto.randomUUID();
-    const stateKey = `${this.storageKeyPrefix}:state_${state}`;
+    const stateKey = `${this.storageKeyPrefix}_${this.serverUrlHash}_state_${state}`;
 
     const stateData: StoredState = {
       serverUrlHash: this.serverUrlHash,

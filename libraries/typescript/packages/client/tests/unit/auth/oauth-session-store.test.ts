@@ -386,8 +386,8 @@ describe("OAuthSessionStore", () => {
         session.redirectUrl
       );
 
-      // StoredState persisted under `${prefix}:state_${state}`
-      const stateKey = `mcp:auth:state_${state}`;
+      // StoredState is isolated to this server's namespace.
+      const stateKey = session.getKey(`state_${state}`);
       const storedJson = kv.get(stateKey);
       expect(storedJson).toBeTruthy();
       const stored = JSON.parse(storedJson!) as StoredState;
@@ -422,7 +422,7 @@ describe("OAuthSessionStore", () => {
 
       const state = url.searchParams.get("state");
       const stored = JSON.parse(
-        kv.get(`mcp:auth:state_${state}`)!
+        kv.get(session.getKey(`state_${state}`))!
       ) as StoredState;
       expect(stored.providerOptions.oauthProxyUrl).toBe(
         "https://proxy.example.com/oauth"

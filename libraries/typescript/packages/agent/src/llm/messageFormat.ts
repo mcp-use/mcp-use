@@ -1,5 +1,6 @@
 import { isToolResultError, toolResultToContent } from "./toolResultParts.js";
 import type { ContentPart, ProviderMessage } from "./types.js";
+import type { BaseMessage } from "../agents/types.js";
 
 interface InspectorAttachment {
   type: "image" | "file";
@@ -22,6 +23,87 @@ interface InspectorMessageLike {
   content: unknown;
   attachments?: InspectorAttachment[];
   parts?: InspectorMessagePart[];
+}
+
+type LangChainMessageLike = BaseMessage & {
+  _getType?: () => string;
+  getType?: () => string;
+  type?: string;
+  tool_call_id?: string;
+  name?: string;
+  tool_calls?: Array<{
+    id?: string;
+    name: string;
+    args?: Record<string, unknown>;
+  }>;
+};
+
+function messageText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((part) =>
+        part &&
+        typeof part === "object" &&
+        "text" in part &&
+        typeof part.text === "string"
+          ? part.text
+          : ""
+      )
+      .join("");
+  }
+  return JSON.stringify(content ?? "");
+}
+
+function langChainMessageType(message: LangChainMessageLike): string {
+  try {
+    if (typeof message._getType === "function") return message._getType();
+    if (typeof message.getType === "function") return message.getType();
+  } catch {
+    // Fall through to structural type fields.
+  }
+  return message.type ?? "";
+}
+
+/** Convert legacy LangChain external history for the native agent runtime. */
+export function convertExternalHistoryToProvider(
+  messages: BaseMessage[]
+): ProviderMessage[] {
+  return messages.map((raw, index) => {
+    const message = raw as LangChainMessageLike;
+    const type = langChainMessageType(message);
+    const content = messageText(message.content);
+    if (type === "human" || type === "user") {
+      return { role: "user", content };
+    }
+    if (type === "system") {
+      return { role: "system", content };
+    }
+    if (type === "ai" || type === "assistant") {
+      const toolCalls = message.tool_calls?.map((call, callIndex) => ({
+        id: call.id ?? `external_${index}_${callIndex}`,
+        name: call.name,
+        args: call.args ?? {},
+      }));
+      return {
+        role: "assistant",
+        content,
+        ...(toolCalls?.length ? { toolCalls } : {}),
+      };
+    }
+    if (type === "tool") {
+      return {
+        role: "tool",
+        content,
+        toolCallId: message.tool_call_id ?? `external_${index}`,
+        ...(message.name ? { toolName: message.name } : {}),
+        toolResult: message.content,
+      };
+    }
+    throw new TypeError(
+      `Unsupported external history message type at index ${index}: ${type || "unknown"}`
+    );
+  });
 }
 
 function extractText(m: InspectorMessageLike): string {

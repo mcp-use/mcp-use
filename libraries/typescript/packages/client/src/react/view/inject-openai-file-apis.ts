@@ -63,8 +63,24 @@ function findOpeningConstructEnd(
       boundary === "\r" ||
       boundary === "\f"
     ) {
-      const end = lowercaseHtml.indexOf(">", start + lowercasePrefix.length);
-      return end === -1 ? undefined : end + 1;
+      let quote: '"' | "'" | undefined;
+      for (
+        let index = start + lowercasePrefix.length;
+        index < html.length;
+        index++
+      ) {
+        const character = html[index];
+        if (quote) {
+          if (character === quote) quote = undefined;
+          continue;
+        }
+        if (character === '"' || character === "'") {
+          quote = character;
+          continue;
+        }
+        if (character === ">") return index + 1;
+      }
+      return undefined;
     }
     searchFrom = start + lowercasePrefix.length;
   }

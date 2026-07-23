@@ -308,11 +308,19 @@ export type McpEventPhase = "before" | "complete";
 export type ReadonlyMiddlewareContext<
   M extends McpMiddlewareMethod = McpMiddlewareMethod,
   TEnv extends Env = Env,
-> = M extends McpMiddlewareMethod
-  ? Omit<MiddlewareContext<M, TEnv>, "params" | "state"> & {
-      readonly params: Readonly<McpMiddlewareOperationMap[M]["params"]>;
-      readonly state: ReadonlyMap<string, unknown>;
-    }
+> = TEnv extends Env
+  ? M extends McpMiddlewareMethod
+    ? {
+        readonly method: M;
+        readonly params: Readonly<McpMiddlewareOperationMap[M]["params"]>;
+        readonly request?: HonoRequest;
+        /** @deprecated Use `request` instead. */
+        readonly req?: HonoRequest;
+        readonly session?: Readonly<{ sessionId: string }>;
+        readonly auth?: Readonly<AuthInfo>;
+        readonly state: ReadonlyMap<string, unknown>;
+      }
+    : never
   : never;
 
 /** Read-only observer invoked before an MCP handler runs. */

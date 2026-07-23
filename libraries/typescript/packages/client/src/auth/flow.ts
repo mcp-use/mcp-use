@@ -17,6 +17,7 @@ type FlowProvider = OAuthClientProvider & {
   getProxyFetch?: (baseFetch?: typeof fetch) => typeof fetch | undefined;
   getKey?: (keySuffix: string) => string;
   getLastAttemptedAuthUrl?: () => string | null;
+  markFlowComplete?: () => void;
   useRedirectFlow?: boolean;
 };
 
@@ -103,7 +104,9 @@ async function waitForBrowserAuthComplete(
   }
 
   if (provider.useRedirectFlow) {
-    // Full-page redirect navigates away; nothing to await in-page.
+    // Do not return to the caller and retry the MCP connection before the
+    // full-page navigation replaces this JavaScript context.
+    await new Promise<void>(() => {});
     return;
   }
 
@@ -124,25 +127,29 @@ async function waitForBrowserAuthComplete(
     }
   }
 
-  const result = await runAuthPopup({
-    popup: null,
-    state,
-    tokensKey,
-    timeoutMs,
-  });
+  try {
+    const result = await runAuthPopup({
+      popup: null,
+      state,
+      tokensKey,
+      timeoutMs,
+    });
 
-  switch (result.kind) {
-    case "success":
-      return;
-    case "cancelled":
-      throw new Error("OAuth authentication was cancelled.");
-    case "timeout":
-      throw new Error(
-        `OAuth callback not received within ${timeoutMs}ms. Ensure /oauth/callback calls onMcpAuthorization().`
-      );
-    case "error":
-      throw new Error(result.error);
-    default:
-      throw new Error("Unexpected OAuth popup result");
+    switch (result.kind) {
+      case "success":
+        return;
+      case "cancelled":
+        throw new Error("OAuth authentication was cancelled.");
+      case "timeout":
+        throw new Error(
+          `OAuth callback not received within ${timeoutMs}ms. Ensure /oauth/callback calls onMcpAuthorization().`
+        );
+      case "error":
+        throw new Error(result.error);
+      default:
+        throw new Error("Unexpected OAuth popup result");
+    }
+  } finally {
+    provider.markFlowComplete?.();
   }
 }

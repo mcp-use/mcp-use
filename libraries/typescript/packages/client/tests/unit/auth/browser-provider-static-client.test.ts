@@ -142,6 +142,42 @@ describe("BrowserOAuthClientProvider — pre-registered client_id", () => {
     expect(reloaded.getLastAttemptedAuthUrl()).toBeNull();
   });
 
+  it("clears only authorization state for the current server", async () => {
+    const first = new BrowserOAuthClientProvider(SERVER_URL, {
+      callbackUrl: "https://app.example.com/oauth/callback",
+    });
+    const second = new BrowserOAuthClientProvider(
+      "https://other.example.com/mcp",
+      {
+        callbackUrl: "https://app.example.com/oauth/callback",
+      }
+    );
+    await first.prepareAuthorizationUrl(
+      new URL("https://auth.example.com/authorize")
+    );
+    await second.prepareAuthorizationUrl(
+      new URL("https://auth.example.com/authorize")
+    );
+
+    const firstStatePrefix = `${first.storageKeyPrefix}_${first.serverUrlHash}_state_`;
+    const secondStatePrefix = `${second.storageKeyPrefix}_${second.serverUrlHash}_state_`;
+    expect(
+      Object.keys(localStorage).some((key) => key.startsWith(firstStatePrefix))
+    ).toBe(true);
+    expect(
+      Object.keys(localStorage).some((key) => key.startsWith(secondStatePrefix))
+    ).toBe(true);
+
+    first.clearStorage();
+
+    expect(
+      Object.keys(localStorage).some((key) => key.startsWith(firstStatePrefix))
+    ).toBe(false);
+    expect(
+      Object.keys(localStorage).some((key) => key.startsWith(secondStatePrefix))
+    ).toBe(true);
+  });
+
   it("includes scope in clientMetadata when configured", () => {
     const provider = new BrowserOAuthClientProvider(SERVER_URL, {
       callbackUrl: "https://app.example.com/oauth/callback",
@@ -171,7 +207,7 @@ describe("BrowserOAuthClientProvider — pre-registered client_id", () => {
 
     // Find the state key written by prepareAuthorizationUrl.
     const stateKey = Object.keys(localStorage).find((k) =>
-      k.startsWith("mcp:auth:state_")
+      k.includes("_state_")
     );
     expect(stateKey).toBeDefined();
 
@@ -209,7 +245,7 @@ describe("BrowserOAuthClientProvider — pre-registered client_id", () => {
     await provider.prepareAuthorizationUrl(authUrl);
 
     const stateKey = Object.keys(localStorage).find((k) =>
-      k.startsWith("mcp:auth:state_")
+      k.includes("_state_")
     );
     expect(stateKey).toBeDefined();
 

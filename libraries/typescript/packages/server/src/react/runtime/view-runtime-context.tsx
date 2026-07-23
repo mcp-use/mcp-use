@@ -2,12 +2,10 @@ import type { McpUiHostContext } from "@modelcontextprotocol/ext-apps";
 import {
   createContext,
   useContext,
-  useEffect,
   useSyncExternalStore,
   type ReactNode,
 } from "react";
 
-import { recordRuntimeUsage } from "../../usage.js";
 import type { McpAppRuntime } from "./view-runtime.js";
 
 type ViewHook =
@@ -67,18 +65,8 @@ export function ViewRuntimeProvider({
  *
  * @internal
  */
-export function useViewRuntime(hook?: ViewHook): McpAppRuntime {
+export function useViewRuntime(_hook?: ViewHook): McpAppRuntime {
   const runtime = useContext(ViewRuntimeContext);
-  useEffect(() => {
-    if (hook !== undefined) {
-      recordRuntimeUsage(
-        "view",
-        "hook_used",
-        { hook },
-        { onceKey: `view:${hook}` }
-      );
-    }
-  }, [hook]);
   if (!runtime) {
     throw new Error(
       "mcp-use/react hooks require a browser view mounted by bootstrapView"

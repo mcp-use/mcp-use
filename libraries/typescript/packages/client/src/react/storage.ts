@@ -69,7 +69,13 @@ export class LocalStorageProvider implements StorageProvider {
       );
       const serialized = JSON.stringify(sanitized);
       if (serialized !== stored) {
-        localStorage.setItem(this.storageKey, serialized);
+        try {
+          localStorage.setItem(this.storageKey, serialized);
+        } catch {
+          console.error(
+            "[LocalStorageProvider] Failed to persist sanitized servers."
+          );
+        }
       }
       return sanitized;
     } catch {

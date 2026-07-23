@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { OAuthClientProvider } from "@modelcontextprotocol/client";
 
@@ -10,8 +12,13 @@ vi.mock("@modelcontextprotocol/client", async (importOriginal) => {
   };
 });
 
+vi.mock("../../../src/auth/popup.js", () => ({
+  runAuthPopup: vi.fn(),
+}));
+
 import { auth, UnauthorizedError } from "@modelcontextprotocol/client";
 import { completeOAuthFlow, isUnauthorized } from "../../../src/auth/flow.js";
+import { runAuthPopup } from "../../../src/auth/popup.js";
 
 describe("isUnauthorized", () => {
   it("detects UnauthorizedError, code 401, and message wrappers", () => {
@@ -27,6 +34,7 @@ describe("isUnauthorized", () => {
 describe("completeOAuthFlow", () => {
   beforeEach(() => {
     vi.mocked(auth).mockReset();
+    vi.mocked(runAuthPopup).mockReset();
   });
 
   it("returns early when auth() yields AUTHORIZED", async () => {
@@ -99,5 +107,41 @@ describe("completeOAuthFlow", () => {
       provider,
       expect.objectContaining({ authorizationCode: "auth-code" })
     );
+  });
+
+  it("does not relaunch a browser flow already started by the transport", async () => {
+    vi.mocked(runAuthPopup).mockResolvedValue({ kind: "success" });
+    const markFlowComplete = vi.fn();
+    const provider = {
+      hasPendingFlow: true,
+      getKey: () => "mcp:auth_server_tokens",
+      getLastAttemptedAuthUrl: () =>
+        "https://auth.example.com/authorize?state=stored-state",
+      markFlowComplete,
+    } as unknown as OAuthClientProvider;
+
+    await completeOAuthFlow(provider, "https://example.com/mcp");
+
+    expect(auth).not.toHaveBeenCalled();
+    expect(runAuthPopup).toHaveBeenCalledWith(
+      expect.objectContaining({ state: "stored-state" })
+    );
+    expect(markFlowComplete).toHaveBeenCalledOnce();
+  });
+
+  it("does not resolve a full-page redirect flow before navigation", async () => {
+    const provider = {
+      hasPendingFlow: true,
+      useRedirectFlow: true,
+    } as unknown as OAuthClientProvider;
+    let settled = false;
+
+    void completeOAuthFlow(provider, "https://example.com/mcp").finally(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+
+    expect(auth).not.toHaveBeenCalled();
+    expect(settled).toBe(false);
   });
 });

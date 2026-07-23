@@ -54,16 +54,13 @@ export class MCPAgentExecutionEvent extends BaseTelemetryEvent {
     return {
       // Core execution info
       execution_method: this.data.executionMethod,
-      query: this.data.query,
       query_length: this.data.query.length,
       success: this.data.success,
       // Agent configuration
       model_provider: this.data.modelProvider,
       model_name: this.data.modelName,
       server_count: this.data.serverCount,
-      server_identifiers: this.data.serverIdentifiers,
       total_tools_available: this.data.totalToolsAvailable,
-      tools_available_names: this.data.toolsAvailableNames,
       max_steps_configured: this.data.maxStepsConfigured,
       memory_enabled: this.data.memoryEnabled,
       use_server_manager: this.data.useServerManager,
@@ -74,8 +71,6 @@ export class MCPAgentExecutionEvent extends BaseTelemetryEvent {
       // Execution results (always include, even if null)
       steps_taken: this.data.stepsTaken ?? null,
       tools_used_count: this.data.toolsUsedCount ?? null,
-      tools_used_names: this.data.toolsUsedNames ?? null,
-      response: this.data.response ?? null,
       response_length: this.data.response ? this.data.response.length : null,
       execution_time_ms: this.data.executionTimeMs ?? null,
       error_type: this.data.errorType ?? null,

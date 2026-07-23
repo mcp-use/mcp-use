@@ -1,5 +1,4 @@
 declare const __MCP_USE_PACKAGE_VERSION__: string;
-declare const __MCP_USE_VIEW_USAGE_DISABLED__: boolean;
 
 // Disable at any time with MCP_USE_ANONYMIZED_TELEMETRY=false.
 
@@ -53,12 +52,7 @@ function safeEnv(name: string): string | undefined {
 }
 
 function disabled(): boolean {
-  if (
-    env("MCP_USE_ANONYMIZED_TELEMETRY") === "false" ||
-    (typeof __MCP_USE_VIEW_USAGE_DISABLED__ !== "undefined" &&
-      __MCP_USE_VIEW_USAGE_DISABLED__)
-  )
-    return true;
+  if (env("MCP_USE_ANONYMIZED_TELEMETRY") === "false") return true;
   try {
     const scope = globalThis as typeof globalThis & {
       __MCP_USE_ANONYMIZED_TELEMETRY__?: boolean;
@@ -223,19 +217,6 @@ export function recordUsage(
   capture(feature, action, properties, options, () =>
     identity(options.serverRoot)
   );
-}
-
-/** Capture from a browser runtime without pulling in server persistence. @internal */
-export function recordRuntimeUsage(
-  feature: string,
-  action: string,
-  properties: Properties = {},
-  options: Omit<Options, "serverRoot"> = {}
-): void {
-  capture(feature, action, properties, options, async () => ({
-    id: runtimeId,
-    stability: "process",
-  }));
 }
 
 /** Wait for in-flight usage events in validation fixtures. @internal */

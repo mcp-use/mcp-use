@@ -48,7 +48,7 @@ MCP_SERVER_URL=http://127.0.0.1:3102/mcp ./cli_scripting_example.sh
 Point `MCP_USE_CLI` at a local binary if needed:
 
 ```bash
-MCP_USE_CLI="pnpm --dir ../../../../cli exec mcp-use" ./cli_basic_example.sh
+MCP_USE_CLI="pnpm --dir ../../../cli exec mcp-use" ./cli_basic_example.sh
 ```
 
 ## Notes

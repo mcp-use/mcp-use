@@ -42,6 +42,15 @@ OAuth callback: import `onMcpAuthorization` from `@mcp-use/client/react` on your
 | Popup (default) | — | Desktop web |
 | Redirect | `useRedirectFlow: true` | Mobile, popup blockers |
 
+### Manual browser authorization
+
+Set `preventAutoAuth: true` on a `BrowserOAuthClientProvider` to prepare an
+authorization URL without opening it automatically. Read that URL with
+`getLastAttemptedAuthUrl()` and present it to the user in the same page
+lifetime. The fallback URL is intentionally kept in memory only and is not
+available after the provider or page is recreated; start a new authorization
+attempt after a reload.
+
 ### Pre-registered client
 
 ```typescript

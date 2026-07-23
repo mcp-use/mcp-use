@@ -627,6 +627,8 @@ describe("MCP middleware type narrowing", () => {
     }
     server.on("mcp:tools/*", (ctx) => {
       expectTypeOf(ctx.method).toEqualTypeOf<"tools/call" | "tools/list">();
+      // @ts-expect-error — observers receive a frozen snapshot, not Hono Context
+      ctx.get("requestId");
     });
     server.on("mcp:tools/*:complete", (ctx, result) => {
       expectTypeOf(ctx.method).toMatchTypeOf<"tools/call" | "tools/list">();
