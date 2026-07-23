@@ -1,5 +1,16 @@
 # mcp-use
 
+## 2.0.0-beta.37
+
+### Patch Changes
+
+- 5d70398: Add anonymous v2 server usage metrics for server composition, feature adoption,
+  client protocol capabilities, and sampled operation outcomes. Persist a random
+  per-server identity in the project's gitignored `.mcp-use/usage.json` when
+  storage is available, while retaining runtime-scoped correlation and privacy
+  safeguards.
+  - @mcp-use/inspector@20.0.0-beta.29
+
 ## 2.0.0-beta.36
 
 ### Patch Changes
