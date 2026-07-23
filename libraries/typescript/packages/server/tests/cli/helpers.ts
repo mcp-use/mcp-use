@@ -1,6 +1,12 @@
 /** Shared test helpers: fixture copying, raw 2026-07-28 MCP requests, polling. */
 import { randomBytes } from "node:crypto";
-import { cpSync, mkdirSync, rmSync } from "node:fs";
+import {
+  cpSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { createServer, type Server } from "node:net";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -42,6 +48,23 @@ export function copyFixture(
 /** Remove a scratch dir, ignoring failures. */
 export function removeDir(dir: string): void {
   rmSync(dir, { recursive: true, force: true });
+}
+
+/** Bind the basic fixture's add tool to a named view for CLI error tests. */
+export function bindBasicToolToView(cwd: string, viewName: string): void {
+  const entry = join(cwd, "src", "index.ts");
+  const source = readFileSync(entry, "utf8");
+  writeFileSync(
+    entry,
+    source.replace(
+      'description: "Add two numbers",',
+      [
+        'description: "Add two numbers",',
+        "    outputSchema: z.object({ result: z.number() }),",
+        `    view: { name: ${JSON.stringify(viewName)} },`,
+      ].join("\n")
+    )
+  );
 }
 
 /** The per-request _meta envelope required by the stateless 2026-07-28 wire. */

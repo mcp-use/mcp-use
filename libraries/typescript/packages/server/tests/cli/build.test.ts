@@ -19,7 +19,7 @@ import {
 import { mcpUseViewsPlugin } from "../../src/cli/views-plugin.js";
 import { VIRTUAL_VIEW_RESOLVED_PREFIX } from "../../src/cli/views.js";
 import { synthesizeViewDocument } from "../../src/views/document.js";
-import { copyFixture, removeDir } from "./helpers.js";
+import { bindBasicToolToView, copyFixture, removeDir } from "./helpers.js";
 
 const UI_META = {
   "io.modelcontextprotocol/protocolVersion": "2026-07-28",
@@ -103,7 +103,19 @@ describe("runBuild", () => {
       '<svg xmlns="http://www.w3.org/2000/svg"></svg>'
     );
 
-    await runBuild({ cwd });
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      await runBuild({ cwd });
+      expect(
+        logSpy.mock.calls.some(
+          (call) =>
+            call.length === 1 &&
+            call[0] === "[mcp-use] views directory not configured."
+        )
+      ).toBe(true);
+    } finally {
+      logSpy.mockRestore();
+    }
 
     const envDeclaration = readFileSync(join(cwd, "mcp-env.d.ts"), "utf8");
     expect(envDeclaration).toContain('tools: typeof import("./src/index.js")');
@@ -175,6 +187,46 @@ describe("runBuild", () => {
     expect(await response.json()).toMatchObject({
       result: { content: [{ type: "text", text: "3" }] },
     });
+  });
+
+  it.each([
+    ["an empty views directory", false],
+    ["a view directory without a React component", true],
+  ])("builds a tool-only server with %s", async (_label, nestedDirectory) => {
+    const cwd = copyFixture(`build-zero-views-${String(nestedDirectory)}`);
+    dirs.push(cwd);
+    const viewsDir = nestedDirectory
+      ? join(cwd, "views", "unfinished")
+      : join(cwd, "views");
+    mkdirSync(viewsDir, { recursive: true });
+
+    await expect(runBuild({ cwd })).resolves.toBeUndefined();
+    const manifest = JSON.parse(
+      readFileSync(
+        join(cwd, WORKSPACE_DIR_NAME, "build", BUILD_MANIFEST_NAME),
+        "utf8"
+      )
+    ) as BuildManifest;
+    expect(manifest.views).toEqual({});
+  });
+
+  it("fails precisely when a tool binds a view and no view component exists", async () => {
+    const cwd = copyFixture("build-zero-views-bound");
+    dirs.push(cwd);
+    mkdirSync(join(cwd, "views", "unfinished"), { recursive: true });
+    bindBasicToolToView(cwd, "does-not-exist");
+
+    let error: unknown;
+    try {
+      await runBuild({ cwd });
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toBeInstanceOf(Error);
+    expect(String(error)).toContain(
+      'Tool "add" is bound to view "does-not-exist" which is not in the primed views registry.'
+    );
+    expect(String(error)).not.toContain("no views were primed");
   });
 
   it("honors an --entry override", async () => {

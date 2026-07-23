@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { runDev } from "../../src/cli/index.js";
 import {
+  bindBasicToolToView,
   copyFixture,
   getFreePort,
   listToolNames,
@@ -335,6 +336,46 @@ export default server;`
         : undefined
     );
     expect(await listToolNames(dev.url)).toEqual(["add", "subtract"]);
+  });
+
+  it("runs a tool-only server without a views directory", async () => {
+    const cwd = copyFixture("dev-zero-views-missing");
+    cleanups.push(() => removeDir(cwd));
+
+    const dev = await startDev(cwd, await getFreePort(), undefined, false);
+    cleanups.push(dev.stop);
+    expect(await listToolNames(dev.url)).toEqual(["add"]);
+    expect(dev.logs).toContain("[mcp-use] views directory not configured.");
+    expect(dev.logs.join("\n")).not.toContain("no views were primed");
+  });
+
+  it.each([
+    ["an empty views directory", false],
+    ["a view directory without a React component", true],
+  ])("runs a tool-only server with %s", async (_label, nestedDirectory) => {
+    const cwd = copyFixture(`dev-zero-views-${String(nestedDirectory)}`);
+    cleanups.push(() => removeDir(cwd));
+    const viewsDir = nestedDirectory
+      ? join(cwd, "views", "unfinished")
+      : join(cwd, "views");
+    mkdirSync(viewsDir, { recursive: true });
+
+    const dev = await startDev(cwd, await getFreePort(), undefined, false);
+    cleanups.push(dev.stop);
+    expect(await listToolNames(dev.url)).toEqual(["add"]);
+    expect(dev.logs).not.toContain("[mcp-use] views directory not configured.");
+    expect(dev.logs.join("\n")).not.toContain("no views were primed");
+  });
+
+  it("fails precisely when a tool binds a view and no view component exists", async () => {
+    const cwd = copyFixture("dev-zero-views-bound");
+    cleanups.push(() => removeDir(cwd));
+    mkdirSync(join(cwd, "views", "unfinished"), { recursive: true });
+    bindBasicToolToView(cwd, "does-not-exist");
+
+    await expect(runDev({ cwd, port: await getFreePort() })).rejects.toThrow(
+      'Tool "add" is bound to view "does-not-exist" which is not in the primed views registry.'
+    );
   });
 
   it("notifies connected clients after server catalog reloads", async () => {

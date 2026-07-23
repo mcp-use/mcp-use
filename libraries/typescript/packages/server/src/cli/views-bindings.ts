@@ -155,9 +155,13 @@ export async function validateViewBindingsAtBuild(
     sourcemapInterceptor: "node",
   });
   const previousCliImport = process.env["MCP_USE_CLI_IMPORT"];
+  const previousMcpUrl = process.env["MCP_URL"];
 
   try {
     process.env["MCP_USE_CLI_IMPORT"] = "1";
+    if (previousMcpUrl === undefined) {
+      process.env["MCP_URL"] = BUILD_ENTRY_MCP_URL;
+    }
     delete (globalThis as Record<string, unknown>)[COMPAT_GLOBAL];
     const serverModule = (await runner.import(entry)) as {
       default?: ServerLike;
@@ -183,6 +187,11 @@ export async function validateViewBindingsAtBuild(
       delete process.env["MCP_USE_CLI_IMPORT"];
     } else {
       process.env["MCP_USE_CLI_IMPORT"] = previousCliImport;
+    }
+    if (previousMcpUrl === undefined) {
+      delete process.env["MCP_URL"];
+    } else {
+      process.env["MCP_URL"] = previousMcpUrl;
     }
     await runner.close();
   }
