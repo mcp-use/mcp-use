@@ -151,6 +151,12 @@ export interface ProxyMountHost {
   registerPrompt(definition: PromptDefinition, callback: PromptCallback): void;
   /** Track a proxy client owned by the parent server. */
   trackOwner(owner: { close(): Promise<void> }): void;
+  /** Record one successfully introspected upstream namespace. */
+  trackNamespace?(counts: {
+    tools: number;
+    resources: number;
+    prompts: number;
+  }): void;
 }
 
 interface ProxyNamespacePlan {
@@ -329,6 +335,11 @@ async function introspect(
 }
 
 function mountPlan(host: ProxyMountHost, plan: ProxyNamespacePlan): void {
+  host.trackNamespace?.({
+    tools: plan.tools.length,
+    resources: plan.resources.length,
+    prompts: plan.prompts.length,
+  });
   for (const tool of plan.tools) {
     const name = prefixedName(plan.namespace, tool.name);
     if (host.hasTool(name)) {
