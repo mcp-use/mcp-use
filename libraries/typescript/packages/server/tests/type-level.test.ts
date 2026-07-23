@@ -40,6 +40,7 @@ import type {
   ToolDefinition,
   ToolResult,
 } from "../src/index.js";
+import { useViewState } from "../src/react/index.js";
 import type { FileMetadata, UseFilesResult } from "../src/react/index.js";
 
 describe("server branding config", () => {
@@ -147,6 +148,24 @@ describe("useFiles public types", () => {
     expectTypeOf<UseFilesResult["getDownloadUrl"]>().toEqualTypeOf<
       (file: FileMetadata) => Promise<{ downloadUrl: string }>
     >();
+    expect(true).toBe(true);
+  });
+});
+
+describe("useViewState public types", () => {
+  it("requires object state and exposes a synchronous useState-style setter", () => {
+    if (false) {
+      const [state, setState] = useViewState({ count: 0 });
+      expectTypeOf(state).toEqualTypeOf<{ count: number }>();
+      expectTypeOf(setState).returns.toBeVoid();
+      setState({ count: 1 });
+      setState((previous) => ({ count: previous.count + 1 }));
+
+      // @ts-expect-error — view state must be an object, not an array
+      useViewState(["first", "second"]);
+      // @ts-expect-error — a default object is required
+      useViewState();
+    }
     expect(true).toBe(true);
   });
 });

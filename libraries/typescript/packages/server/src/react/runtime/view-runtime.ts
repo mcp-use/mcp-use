@@ -150,7 +150,7 @@ export type ViewToolCallback = Parameters<App["registerTool"]>[2];
 /**
  * Per-document MCP Apps runtime: owns one guest {@link App}, one cached
  * connection attempt, tool-handler handoff, narrow external-store channels,
- * one {@link ModelContextStore}, and disposal.
+ * one shared view-state/model-context store, and disposal.
  *
  * Created by {@link createMcpAppRuntime} / {@link bootstrapView}. Hooks obtain
  * the instance from {@link ViewRuntimeContext}.
@@ -162,7 +162,7 @@ export interface McpAppRuntime {
   readonly config: NormalizedViewConfig;
 
   /**
-   * Per-runtime model-context node tree and async flush pump.
+   * Per-runtime structured view state, model-context tree, and async flush pump.
    *
    * Constructed with this runtime and disposed with it. React components obtain
    * it via {@link useViewRuntime}; the imperative `modelContext` API delegates

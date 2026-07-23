@@ -34,6 +34,7 @@ export { useOpenExternal } from "./hooks/use-open-external.js";
 export { useSendFollowUp } from "./hooks/use-send-follow-up.js";
 export { useSendSizeChanged } from "./hooks/use-send-size-changed.js";
 export { useViewTheme } from "./hooks/use-view-theme.js";
+export { useViewState } from "./hooks/use-view-state.js";
 export {
   useToolContext,
   type ToolContextHandle,
