@@ -1,7 +1,8 @@
 import { readdirSync } from "node:fs";
 import { join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = new URL("../", import.meta.url).pathname;
+const root = fileURLToPath(new URL("../", import.meta.url));
 const files = walk(join(root, "dist"));
 
 if (!files.includes("dist/bin.js")) throw new Error("Missing dist/bin.js");

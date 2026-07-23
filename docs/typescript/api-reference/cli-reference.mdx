@@ -189,6 +189,7 @@ mcp-use start [options]
 | `--port <port>`    | Server port.                                             | `PORT`, server config, or `3000`      |
 | `--host <host>`    | Bind address. Use `0.0.0.0` to listen on all interfaces. | `HOST`, server config, or `127.0.0.1` |
 | `--with-inspector` | Mount the bundled Inspector at `${basePath}/inspector`.  | Disabled                              |
+| `--tunnel`         | Create a public tunnel for the production server.        | Disabled                              |
 
 **Examples:**
 
@@ -198,11 +199,13 @@ mcp-use start --port 8080
 mcp-use start --host 0.0.0.0
 mcp-use start --with-inspector
 mcp-use start --path ./my-server
+mcp-use start --tunnel
 ```
 
 **Notes and behavior:**
 
 - Address precedence is CLI flag, environment variable, server configuration, then default: `--port` → `PORT` → `config.port` → `3000`, and `--host` → `HOST` → `config.host` → `127.0.0.1`.
+- `--tunnel` starts the tunnel only after the production server binds. The command prints the public MCP URL and closes the tunnel when the process shuts down.
 - The command requires `.mcp-use/build/manifest.json`; run `mcp-use build` first.
 - It imports the manifest's built `entryPoint` and requires that module to default-export an `MCPServer`.
 - `start` does not rediscover source entries or views. `--entry`, `--mcp-dir`, and `--views-dir` belong to `dev` and `build`.
@@ -212,10 +215,11 @@ mcp-use start --path ./my-server
 
 ## Tunneling reference
 
-`mcp-use dev --tunnel` creates a public URL that forwards to the local MCP server.
+`mcp-use dev --tunnel` and `mcp-use start --tunnel` create a public URL that forwards to the local MCP server.
 
 ```bash
 mcp-use dev --tunnel
+mcp-use start --tunnel
 ```
 
 Tunnel limits and lifecycle:
@@ -672,7 +676,7 @@ mcp-use generate-types --server src/server.ts
 | `MCP_API_URL`               | `login`, cloud API config                 | Manufact API URL. The CLI normalizes it to include `/api/v1`.                                                                                                                                               | `https://cloud.manufact.com/api/v1` |
 | `MCP_USE_API_KEY`           | `login`                                   | API key for non-interactive login.                                                                                                                                                                          | None                                |
 | `MCP_USE_API`               | Tunnel cleanup and local tunnel API calls | Tunnel service API base used by integrated tunnel cleanup paths.                                                                                                                                            | `https://local.mcp-use.run`         |
-| `MCP_USE_TUNNEL_API`        | `dev --tunnel`                            | Tunnel service API base used when creating development tunnels.                                                                                                                                             | `https://local.mcp-use.run`         |
+| `MCP_USE_TUNNEL_API`        | `dev --tunnel`, `start --tunnel`          | Tunnel service API base used when creating local tunnels.                                                                                                                                                   | `https://local.mcp-use.run`         |
 | `MCP_USE_CHROME_PATH`       | `client screenshot`                       | Chrome executable path for screenshots.                                                                                                                                                                     | Auto-detected                       |
 | `PUPPETEER_EXECUTABLE_PATH` | `client screenshot`                       | Fallback Chrome executable path.                                                                                                                                                                            | Auto-detected                       |
 | `CHROME_PATH`               | `client screenshot`                       | Fallback Chrome executable path.                                                                                                                                                                            | Auto-detected                       |

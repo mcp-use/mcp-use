@@ -1,5 +1,52 @@
 # mcp-use
 
+## 2.0.0-beta.34
+
+### Minor Changes
+
+- c8c4174: Restore `ctx.sendNotification(method, params?)` for custom notifications related to the active MCP request. The v1-compatible helper now delegates to the official v2 request notification primitive without reintroducing sessions or cross-request state.
+
+### Patch Changes
+
+- @mcp-use/inspector@20.0.0-beta.26
+
+## 2.0.0-beta.33
+
+### Patch Changes
+
+- Updated dependencies [b5151b5]
+  - @mcp-use/cli@4.0.0-beta.7
+  - @mcp-use/inspector@20.0.0-beta.25
+
+## 2.0.0-beta.32
+
+### Minor Changes
+
+- 23bba3b: Restore the v1-compatible `ctx.client.can()`, `capabilities()`, `info()`, `extension()`, and `user()` helpers using v2 request-scoped metadata. Client capabilities and implementation details come from the modern MCP envelope, while normalized OpenAI caller hints come from ordinary request `_meta`; no metadata is cached across requests or treated as authenticated identity.
+
+### Patch Changes
+
+- @mcp-use/inspector@20.0.0-beta.24
+
+## 2.0.0-beta.31
+
+### Patch Changes
+
+- 95d286e: Replace the transitive `pkg.pr.new` MCP v2 preview dependencies with registry-published SDK beta packages and the temporary npm build of ext-apps PR #720.
+  - @mcp-use/inspector@20.0.0-beta.23
+
+## 2.0.0-beta.30
+
+### Minor Changes
+
+- 8259292: Add `mcp-use start --tunnel` for production builds. The command waits for the server to bind, tunnels the actual port, prints the public MCP URL, reuses saved tunnel state, and releases the tunnel during startup failure or graceful shutdown. It composes with `--host` and `--with-inspector` while keeping tunnel code out of ordinary production startup.
+
+### Patch Changes
+
+- Updated dependencies [8259292]
+  - @mcp-use/cli@4.0.0-beta.6
+  - @mcp-use/inspector@20.0.0-beta.22
+
 ## 2.0.0-beta.29
 
 ### Minor Changes

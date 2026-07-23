@@ -1,5 +1,5 @@
 /**
- * Tunnel lifecycle for `mcp-use dev` — spawns `@mcp-use/tunnel`,
+ * Tunnel lifecycle for `mcp-use dev` and `mcp-use start` — spawns `@mcp-use/tunnel`,
  * parses the public URL from stdout, persists the subdomain under
  * `.mcp-use/state/tunnel.json`, and releases it through the tunnel API before
  * reuse.
@@ -27,8 +27,7 @@ interface TunnelStateFile {
 }
 
 /**
- * Minimal tunnel manager surface used by {@link createDevApiHandler} and
- * {@link runDev}.
+ * Minimal tunnel manager surface used by the dev and production CLI paths.
  */
 export interface TunnelManager {
   /**

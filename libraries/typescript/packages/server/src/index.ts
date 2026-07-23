@@ -137,6 +137,7 @@ export type {
   OAuthAuth,
   RequestClientContext,
   RequestContext,
+  UserContext,
 } from "./context.js";
 export type {
   InferToolInput,

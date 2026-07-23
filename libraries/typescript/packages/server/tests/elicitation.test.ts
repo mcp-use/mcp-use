@@ -34,6 +34,7 @@ describe("elicitation and input_required", () => {
     data: unknown;
     logger?: string | undefined;
   }> = [];
+  const customNotifications: Array<{ status: string }> = [];
   const server = new MCPServer({
     name: "elicitation-test",
     version: "1.0.0",
@@ -113,6 +114,13 @@ describe("elicitation and input_required", () => {
     return { content: [{ type: "text", text: "Log sent" }] };
   });
 
+  server.tool({ name: "emit-notification" }, async (_params, ctx) => {
+    await ctx.sendNotification("com.example/import-status", {
+      status: "started",
+    });
+    return { content: [{ type: "text", text: "Notification sent" }] };
+  });
+
   beforeAll(async () => {
     const started = await server.listen(0);
     client = new Client(
@@ -147,6 +155,13 @@ describe("elicitation and input_required", () => {
     client.setNotificationHandler("notifications/message", (notification) => {
       logMessages.push(notification.params);
     });
+    client.setNotificationHandler(
+      "com.example/import-status",
+      { params: z.object({ status: z.string() }) },
+      (params) => {
+        customNotifications.push(params);
+      }
+    );
     await client.connect(
       new StreamableHTTPClientTransport(new URL(started.url))
     );
@@ -189,6 +204,15 @@ describe("elicitation and input_required", () => {
         url: "https://example.com/authorize",
       })
     );
+  });
+
+  it("sends a custom notification on the originating request", async () => {
+    const result = await client.callTool({ name: "emit-notification" });
+
+    expect(result.content).toEqual([
+      { type: "text", text: "Notification sent" },
+    ]);
+    expect(customNotifications).toEqual([{ status: "started" }]);
   });
 
   it("sends request-scoped logging notifications", async () => {

@@ -26,7 +26,7 @@ export interface ParsedArgs {
   viewsDir: string | undefined;
   /** Value of `--host`, or `undefined` if the flag was not passed. */
   host: string | undefined;
-  /** Whether `--tunnel` was passed (dev only). */
+  /** Whether `--tunnel` was passed (dev/start only). */
   tunnel: boolean;
   /** `false` when `--no-open` was passed (dev only); `true` otherwise. */
   open: boolean;

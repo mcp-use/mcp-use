@@ -1,5 +1,13 @@
 # @mcp-use/agent
 
+## 2.0.0-beta.13
+
+### Patch Changes
+
+- 95d286e: Replace the transitive `pkg.pr.new` MCP v2 preview dependencies with registry-published SDK beta packages and the temporary npm build of ext-apps PR #720.
+- Updated dependencies [95d286e]
+  - @mcp-use/client@2.0.0-beta.12
+
 ## 2.0.0-beta.12
 
 ### Patch Changes

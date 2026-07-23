@@ -17,8 +17,6 @@ onlyBuiltDependencies:
 # blunt supply-chain attacks where a malicious version is yanked within
 # hours of publish. Workspace-published names are exempted.
 minimumReleaseAge: 4320
-# pkg.pr.new pre-release tarballs are intentional direct + transitive deps during v2 migration.
-blockExoticSubdeps: false
 minimumReleaseAgeExclude:
   - mcp-use
   - "@mcp-use/*"
@@ -38,6 +36,7 @@ minimumReleaseAgeExclude:
 
 overrides:
   mcp-use: workspace:*
+  "@mcp-use/client": workspace:*
   "@mcp-use/inspector": workspace:*
   create-mcp-use-app: workspace:*
   "@langchain/core": ^1.1.8
