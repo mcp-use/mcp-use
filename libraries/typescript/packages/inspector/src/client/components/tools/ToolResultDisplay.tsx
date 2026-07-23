@@ -21,8 +21,6 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { toast } from "sonner";
-import type { MessageContentBlock } from "@/client/types/message-content-block";
 import { getViewResourceUri, isViewTool } from "@mcp-use/client/react";
 import { McpAppsViewPanel } from "../mcp-apps/McpAppsViewPanel";
 import { MCPAppsDebugControls } from "../MCPAppsDebugControls";
@@ -464,34 +462,6 @@ export function ToolResultDisplay({
     [readResource]
   );
 
-  // Memoize onSendFollowUp to prevent infinite re-render loop
-  // This callback is used in MCPAppsRenderer's effect dependency array
-  const memoizedOnSendFollowUp = useCallback(
-    (content: MessageContentBlock[]) => {
-      const text = content
-        .filter(
-          (c): c is { type: "text"; text: string } =>
-            c.type === "text" && "text" in c
-        )
-        .map((c) => c.text)
-        .join("\n");
-      const imageCount = content.filter((c) => c.type === "image").length;
-      const resourceCount = content.filter((c) => c.type === "resource").length;
-      const extras = [
-        imageCount > 0 && `${imageCount} image${imageCount > 1 ? "s" : ""}`,
-        resourceCount > 0 &&
-          `${resourceCount} resource${resourceCount > 1 ? "s" : ""}`,
-      ]
-        .filter(Boolean)
-        .join(", ");
-      toast.info("Widget follow-up", {
-        description: [text, extras].filter(Boolean).join(" — "),
-        duration: 5000,
-      });
-    },
-    []
-  );
-
   // Detect widget protocol (MCP Apps only)
   // IMPORTANT: These hooks must be called before any early returns
   const widgetProtocol = useMemo(
@@ -836,7 +806,6 @@ export function ToolResultDisplay({
                           customProps={activeProps || undefined}
                           displayMode={mcpAppsDisplayMode}
                           onDisplayModeChange={setMcpAppsDisplayMode}
-                          onSendFollowUp={memoizedOnSendFollowUp}
                           onWidgetHeightChange={
                             onWidgetHeightChange
                               ? (height) => onWidgetHeightChange(height)

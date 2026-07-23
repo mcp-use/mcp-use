@@ -6,6 +6,7 @@ import {
 import { copyToClipboard } from "@/client/utils/browser";
 import { useCallback, useMemo, useState } from "react";
 import type { ToolResult } from "./ToolResultDisplay";
+import { mergeToolMetadata } from "./tool-metadata";
 
 export function useToolExecution({
   selectedTool,
@@ -75,7 +76,10 @@ export function useToolExecution({
         signal: controller.signal,
       });
       const duration = Date.now() - startTime;
-      const updatedToolMeta = (result as any)?._meta ?? toolMeta;
+      const updatedToolMeta = mergeToolMetadata(
+        toolMeta,
+        (result as any)?._meta
+      );
 
       captureInspectorEvent(
         new MCPToolExecutionEvent({
