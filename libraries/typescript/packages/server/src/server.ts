@@ -3,7 +3,12 @@ import {
   localhostAllowedOrigins,
   McpServer as SdkMcpServer,
   ResourceTemplate,
+  CLIENT_CAPABILITIES_META_KEY,
+  CLIENT_INFO_META_KEY,
+  PROTOCOL_VERSION_META_KEY,
+  isJSONRPCRequest,
   isInputRequiredResult,
+  type ClientCapabilities,
   type McpHttpHandler,
   type McpRequestContext,
   type PromptCallback as SdkPromptCallback,
@@ -42,6 +47,7 @@ import { corsFetchMiddleware, isGlobalCorsEnabled } from "./middleware/cors.js";
 import {
   createMcpEventListenerEntry,
   createMcpMiddlewareEntry,
+  matchesPattern,
   runMcpOperation,
   withMcpMiddlewareParams,
   type McpEventListenerFnFor,
@@ -98,6 +104,8 @@ import type {
   ToolViewConfig,
 } from "./tools.js";
 import { resolveToolInputSchema } from "./tools.js";
+import { recordUsage } from "./usage.js";
+import { supportsViews } from "./views/capabilities.js";
 import type { ViewResourceFacts } from "./views/types.js";
 import {
   createViewPublicHandler,
@@ -122,6 +130,86 @@ import {
  * before any callback runs.
  */
 type HasOAuth<TUser> = [TUser] extends [never] ? false : true;
+
+interface ClientUsage {
+  client_name: string;
+  client_version: string;
+  protocol_era: "modern" | "legacy";
+  protocol_version: string;
+  connection_mode: "stateless_request" | "legacy_session";
+  sampling_capability: boolean;
+  elicitation_capability: boolean;
+  roots_capability: boolean;
+  extensions_capability: boolean;
+  views_capability: boolean;
+  capability_count: number;
+}
+
+function record(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function productId(value: unknown, fallback: string): string {
+  if (typeof value !== "string") return fallback;
+  const normalized = value.trim();
+  return normalized.length > 0 &&
+    normalized.length <= 64 &&
+    ![...normalized].some((character) => {
+      const code = character.charCodeAt(0);
+      return code < 32 || code === 127;
+    })
+    ? normalized
+    : fallback;
+}
+
+function clientUsageFromBody(body: unknown): ClientUsage | undefined {
+  if (!isJSONRPCRequest(body)) return undefined;
+  const params = record(body.params);
+  if (body.method === "initialize") {
+    const info = record(params?.["clientInfo"]);
+    const capabilities = record(params?.["capabilities"]) ?? {};
+    return clientUsage(
+      info,
+      capabilities,
+      params?.["protocolVersion"],
+      "legacy"
+    );
+  }
+  const meta = record(params?.["_meta"]);
+  const info = record(meta?.[CLIENT_INFO_META_KEY]);
+  const capabilities = record(meta?.[CLIENT_CAPABILITIES_META_KEY]);
+  if (info === undefined || capabilities === undefined) return undefined;
+  return clientUsage(
+    info,
+    capabilities,
+    meta?.[PROTOCOL_VERSION_META_KEY],
+    "modern"
+  );
+}
+
+function clientUsage(
+  info: Record<string, unknown> | undefined,
+  capabilities: Record<string, unknown>,
+  protocolVersion: unknown,
+  era: ClientUsage["protocol_era"]
+): ClientUsage {
+  const typedCapabilities = capabilities as ClientCapabilities;
+  return {
+    client_name: productId(info?.["name"], "other"),
+    client_version: productId(info?.["version"], "unknown"),
+    protocol_era: era,
+    protocol_version: productId(protocolVersion, "unknown"),
+    connection_mode: era === "modern" ? "stateless_request" : "legacy_session",
+    sampling_capability: Object.hasOwn(capabilities, "sampling"),
+    elicitation_capability: Object.hasOwn(capabilities, "elicitation"),
+    roots_capability: Object.hasOwn(capabilities, "roots"),
+    extensions_capability: Object.hasOwn(capabilities, "extensions"),
+    views_capability: supportsViews(typedCapabilities),
+    capability_count: Object.keys(capabilities).length,
+  };
+}
 
 /** Type-erased registry entry replayed when a per-request SDK server is built. */
 interface ToolEntry<TUser, TEnv extends Env> {
@@ -290,6 +378,17 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   #hostValidated = false;
   readonly #mcpMiddlewares: McpMiddlewareEntry[] = [];
   readonly #mcpEventListeners: McpEventListenerEntry[] = [];
+  readonly #usageScope = crypto.randomUUID();
+  readonly #openApiTools = new Set<string>();
+  readonly #proxiedTools = new Set<string>();
+  readonly #proxiedResources = new Set<string>();
+  readonly #proxiedPrompts = new Set<string>();
+  #httpMiddlewareCount = 0;
+  #proxyServersConfigured = 0;
+  #proxyServersConnected = 0;
+  #proxyToolsDiscovered = 0;
+  #proxyResourcesDiscovered = 0;
+  #proxyPromptsDiscovered = 0;
   /** Client instances created by {@link MCPServer.proxy} and owned by this server. */
   readonly #proxyOwners: Array<{ close(): Promise<void> }> = [];
   /** Proxy registrations that {@link close} must let finish before cleanup. */
@@ -357,6 +456,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       version: options.version ?? options.spec.info.version ?? "1.0.0",
     });
     registerOpenAPITools(server, options);
+    for (const name of server.#tools.keys()) server.#openApiTools.add(name);
     return server;
   }
 
@@ -470,6 +570,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   ): ToolRef<InferToolName<T>, InferToolInput<T>, InferToolOutput<T>> {
     this.#assertNotStarted("tool", definition.name);
     this.#validateToolViewBinding(definition);
+    this.#openApiTools.delete(definition.name);
+    this.#proxiedTools.delete(definition.name);
     this.#tools.set(definition.name, {
       definition,
       callback: callback as ToolCallback<
@@ -542,6 +644,9 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     callback: ResourceCallback<TUser, HasOAuth<TUser>, TEnv>
   ): this {
     this.#assertNotStarted("resource", definition.name);
+    const previous = this.#resources.get(definition.name);
+    if (previous !== undefined)
+      this.#proxiedResources.delete(previous.definition.uri);
     this.#resources.set(definition.name, { definition, callback });
     return this;
   }
@@ -591,6 +696,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     callback: PromptCallback<InferPromptInput<T>, TUser, HasOAuth<TUser>, TEnv>
   ): this {
     this.#assertNotStarted("prompt", definition.name);
+    this.#proxiedPrompts.delete(definition.name);
     this.#prompts.set(definition.name, {
       definition,
       callback: callback as PromptCallback<
@@ -655,9 +761,11 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       const { isProxyConnection, mountProxyConnection, mountProxyServers } =
         await import("./mcp-proxy.js");
       if (isProxyConnection(input)) {
+        this.#proxyServersConfigured += 1;
         await mountProxyConnection(this.#proxyHost(), input);
         return;
       }
+      this.#proxyServersConfigured += Object.keys(input).length;
       await mountProxyServers(this.#proxyHost(), input);
     })();
     this.#proxyOperations.add(operation);
@@ -722,6 +830,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
 
     const register = this.app.use as (...args: unknown[]) => unknown;
     register.call(this.app, patternOrHandler, ...handlers);
+    this.#httpMiddlewareCount +=
+      typeof patternOrHandler === "function" ? 1 : handlers.length;
     return this;
   }
 
@@ -1017,6 +1127,62 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     }
   }
 
+  #trackConfigured(): void {
+    recordUsage(
+      "server",
+      "configured",
+      {
+        tools_total: this.#tools.size,
+        tools_local:
+          this.#tools.size - this.#openApiTools.size - this.#proxiedTools.size,
+        tools_openapi: this.#openApiTools.size,
+        tools_proxied: this.#proxiedTools.size,
+        resources: this.#resources.size,
+        resource_templates: this.#resourceTemplates.size,
+        prompts: this.#prompts.size,
+        views: this.#views.size,
+        proxy_servers_configured: this.#proxyServersConfigured,
+        proxy_servers_connected: this.#proxyServersConnected,
+        proxy_tools_discovered: this.#proxyToolsDiscovered,
+        proxy_resources_discovered: this.#proxyResourcesDiscovered,
+        proxy_prompts_discovered: this.#proxyPromptsDiscovered,
+        proxy_tools_mounted: this.#proxiedTools.size,
+        proxy_resources_mounted: this.#proxiedResources.size,
+        proxy_prompts_mounted: this.#proxiedPrompts.size,
+        http_middleware: this.#httpMiddlewareCount,
+        mcp_middleware: this.#mcpMiddlewares.length,
+        observers_before: this.#mcpEventListeners.filter(
+          ({ phase }) => phase === "before"
+        ).length,
+        observers_complete: this.#mcpEventListeners.filter(
+          ({ phase }) => phase === "complete"
+        ).length,
+        oauth_configured: this.#config.oauth !== undefined,
+        cors_configured: this.#config.cors !== undefined,
+        request_state_configured: this.#config.requestState !== undefined,
+        legacy_policy: this.#config.legacy ?? "stateless",
+      },
+      {
+        onceKey: `${this.#usageScope}:server`,
+        serverRoot: this.#viewsProjectRoot,
+      }
+    );
+  }
+
+  #trackClient(body: unknown): void {
+    const client = clientUsageFromBody(body);
+    if (client === undefined) return;
+    recordUsage(
+      "client",
+      "observed",
+      { ...client },
+      {
+        onceKey: `${this.#usageScope}:client:${JSON.stringify(client)}`,
+        serverRoot: this.#viewsProjectRoot,
+      }
+    );
+  }
+
   #proxyHost(): ProxyMountHost {
     return {
       isStarted: () => this.#handler !== undefined,
@@ -1025,6 +1191,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       hasPrompt: (name) => this.#prompts.has(name),
       registerTool: (definition, callback) => {
         this.#assertNotStarted("tool", definition.name);
+        this.#proxiedTools.add(definition.name);
         this.#tools.set(definition.name, {
           definition,
           callback: callback as unknown as ToolCallback<
@@ -1038,6 +1205,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       },
       registerResource: (definition, callback) => {
         this.#assertNotStarted("resource", definition.name);
+        this.#proxiedResources.add(definition.uri);
         this.#resources.set(definition.name, {
           definition,
           callback: callback as unknown as ResourceCallback<
@@ -1049,6 +1217,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       },
       registerPrompt: (definition, callback) => {
         this.#assertNotStarted("prompt", definition.name);
+        this.#proxiedPrompts.add(definition.name);
         this.#prompts.set(definition.name, {
           definition,
           callback: callback as unknown as PromptCallback<
@@ -1061,6 +1230,12 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       },
       trackOwner: (owner) => {
         this.#proxyOwners.push(owner);
+      },
+      trackNamespace: ({ tools, resources, prompts }) => {
+        this.#proxyServersConnected += 1;
+        this.#proxyToolsDiscovered += tools;
+        this.#proxyResourcesDiscovered += resources;
+        this.#proxyPromptsDiscovered += prompts;
       },
     };
   }
@@ -1198,8 +1373,16 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         };
       }
 
-      const mcpRouteHandler: FetchHandler = (request) =>
-        protectWithBearer(request, () => mcpFetch(request));
+      const mcpRouteHandler: FetchHandler = (request) => {
+        return protectWithBearer(request, () => {
+          const body = getRequestBag(request).parsedBody;
+          if (isJSONRPCRequest(body)) {
+            this.#trackConfigured();
+            this.#trackClient(body);
+          }
+          return mcpFetch(request);
+        });
+      };
       const endpointHandler: FetchHandler = async (request) => {
         if (!isHtmlNavigationRequest(request)) {
           return mcpRouteHandler(request);
@@ -1437,13 +1620,93 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     ctx: MiddlewareContext<M, TEnv>,
     innerFn: () => Promise<McpMiddlewareResult<M>>
   ): Promise<McpMiddlewareResult<M>> {
+    const startedAt = performance.now();
+    const matchedMiddleware = this.#mcpMiddlewares.filter((entry) =>
+      matchesPattern(entry.pattern, method)
+    ).length;
+    const matchedObservers = (phase: "before" | "complete") =>
+      this.#mcpEventListeners.filter(
+        (entry) =>
+          entry.phase === phase && matchesPattern(entry.pattern, method)
+      ).length;
+    const request = ctx.request?.raw;
+    const client =
+      request === undefined
+        ? undefined
+        : clientUsageFromBody(getRequestBag(request).parsedBody);
+    const capture = (
+      outcome: "success" | "error" | "input_required",
+      completedPhase: boolean
+    ): void => {
+      recordUsage(
+        "operation",
+        "completed",
+        {
+          method,
+          outcome,
+          duration_ms: Math.max(0, Math.round(performance.now() - startedAt)),
+          primitive_origin: this.#primitiveOrigin(method, ctx.params),
+          matched_middleware: matchedMiddleware,
+          observers_before: matchedObservers("before"),
+          observers_complete: completedPhase ? matchedObservers("complete") : 0,
+          ...(client?.protocol_era === "modern"
+            ? client
+            : { client_name: "unknown", protocol_era: "legacy" }),
+        },
+        {
+          sampleRate: outcome === "success" ? 0.1 : 1,
+          serverRoot: this.#viewsProjectRoot,
+        }
+      );
+    };
     return runMcpOperation(
       this.#mcpMiddlewares,
       this.#mcpEventListeners,
       method,
       ctx,
       innerFn
+    ).then(
+      (result) => {
+        const outcome = isInputRequiredResult(result)
+          ? "input_required"
+          : method === "tools/call" &&
+              typeof result === "object" &&
+              result !== null &&
+              "isError" in result &&
+              result.isError === true
+            ? "error"
+            : "success";
+        capture(outcome, true);
+        return result;
+      },
+      (error: unknown) => {
+        capture("error", false);
+        throw error;
+      }
     );
+  }
+
+  #primitiveOrigin(
+    method: McpMiddlewareMethod,
+    params: Record<string, unknown>
+  ): "local" | "openapi" | "proxied" | "mixed" {
+    if (method === "tools/call") {
+      const name = String(params["name"]);
+      if (this.#proxiedTools.has(name)) return "proxied";
+      if (this.#openApiTools.has(name)) return "openapi";
+      return "local";
+    }
+    if (method === "resources/read") {
+      return this.#proxiedResources.has(String(params["uri"]))
+        ? "proxied"
+        : "local";
+    }
+    if (method === "prompts/get") {
+      return this.#proxiedPrompts.has(String(params["name"]))
+        ? "proxied"
+        : "local";
+    }
+    return "mixed";
   }
 
   /**

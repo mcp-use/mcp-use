@@ -28,6 +28,8 @@ export default defineConfig([
       // Completion normalization is a synchronous internal dependency kept
       // outside the root entry's independently enforced size budget.
       "internal/resource-completion": "src/resource-completion.ts",
+      // Internal-only validation entry; absent from package exports.
+      "internal/usage": "src/usage.ts",
       // Runtime-only binary: owns `mcp-use start` and delegates development
       // commands to the separately installed @mcp-use/cli package.
       bin: "src/bin.ts",
