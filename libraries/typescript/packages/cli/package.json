@@ -26,6 +26,9 @@
     ".": {
       "types": "./types/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./vite-client": {
+      "types": "./types/vite-client.d.ts"
     }
   },
   "files": [

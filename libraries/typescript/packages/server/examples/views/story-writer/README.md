@@ -15,7 +15,7 @@ they arrive via `useToolContext<"write-story">()`.
   `mcp-use dev` / `build` / `start`.
 - **One tool ↔ one view** via `view: { name, description, prefersBorder }` on
   `write-story`.
-- **Zero-codegen typing** via `src/mcp-env.d.ts` and the exported `writeStory`
+- **Zero-codegen typing** via `mcp-env.d.ts` and the exported `writeStory`
   tool ref.
 - **Tailwind CSS v4** — `vite.config.ts` (`@tailwindcss/vite`) and
   `@import "tailwindcss"` in `view.css`.
@@ -64,12 +64,12 @@ pnpm build && pnpm start
 ## Typing (`mcp-env.d.ts`)
 
 ```ts
-// src/mcp-env.d.ts
-declare module "*.css";
+// mcp-env.d.ts
+import "mcp-use/vite-client";
 
 declare module "mcp-use/react" {
   interface Register {
-    tools: typeof import("./index.js");
+    tools: typeof import("./src/index.js");
   }
 }
 

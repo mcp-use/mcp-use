@@ -18,7 +18,7 @@ the model plays O by calling `place-mark` while the view is open.
   to take its turn.
 - **One tool ↔ one view** via `view: { name, description, prefersBorder }` on
   `start-game`.
-- **Zero-codegen typing** via `src/mcp-env.d.ts` and the exported `startGame`
+- **Zero-codegen typing** via `mcp-env.d.ts` and the exported `startGame`
   tool ref.
 - **Latched initial context** — `useToolContext<"start-game">()` remains
   pending through progressive input, then permanently latches the first
@@ -70,12 +70,12 @@ pnpm build && pnpm start
 ## Typing (`mcp-env.d.ts`)
 
 ```ts
-// src/mcp-env.d.ts
-declare module "*.css";
+// mcp-env.d.ts
+import "mcp-use/vite-client";
 
 declare module "mcp-use/react" {
   interface Register {
-    tools: typeof import("./index.js");
+    tools: typeof import("./src/index.js");
   }
 }
 

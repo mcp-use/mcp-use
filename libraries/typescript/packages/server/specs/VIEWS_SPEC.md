@@ -553,7 +553,7 @@ View bundles must never contain server code, so the ref **value** is never impor
 // mcp-env.d.ts — scaffolded at the project root; mcp-use refreshes the entry
 // (the vite-env.d.ts pattern: configuration, not codegen — it lives in the
 // source tree because .mcp-use/ is gitignored and rm -rf-safe, CLI_SPEC.md)
-declare module "*.css";
+import "mcp-use/vite-client";
 
 declare module "mcp-use/react" {
   interface Register {
@@ -641,7 +641,7 @@ Keying by tool name (not view directory name) is deliberate: view names exist on
 
 ### Typegen, demoted
 
-No command generates tool-specific types during `dev`, `build`, `typecheck`, or `start` — v1's run-the-server generator (`tool-registry-generator.ts`, `zod-to-ts.ts`) is not ported. `dev`, `build`, and `typecheck` perform one constant-file reconciliation: if root `mcp-env.d.ts` is absent, they create it with CSS module typing and a type-only import of the discovered server entry; if it carries a current or legacy mcp-use generated header, they refresh it; otherwise they treat it as user-owned and never overwrite it. `mcp-use typecheck` then runs the project's own `tsc --noEmit`, combining that reconciliation and compiler pass into the agent/CI workflow. A future `mcp-use typegen` remains an explicit secondary mode for consumers with no compile-time path to server source; if built, it is a TS-checker-based static extractor (reads resolved `ToolRef` types; never executes user code), defaulting output to `.mcp-use/generated/`. Not an alpha deliverable.
+No command generates tool-specific types during `dev`, `build`, `typecheck`, or `start` — v1's run-the-server generator (`tool-registry-generator.ts`, `zod-to-ts.ts`) is not ported. `dev`, `build`, and `typecheck` perform one constant-file reconciliation: if root `mcp-env.d.ts` is absent, they create it with the framework-owned Vite client types and a type-only import of the discovered server entry; if it carries a current or legacy mcp-use generated header, they refresh it; otherwise they treat it as user-owned and never overwrite it. The Vite types cover client asset imports, `import.meta.env`, and HMR without requiring generated projects to declare Vite as a direct dependency. `mcp-use typecheck` then runs the project's own `tsc --noEmit`, combining that reconciliation and compiler pass into the agent/CI workflow. A future `mcp-use typegen` remains an explicit secondary mode for consumers with no compile-time path to server source; if built, it is a TS-checker-based static extractor (reads resolved `ToolRef` types; never executes user code), defaulting output to `.mcp-use/generated/`. Not an alpha deliverable.
 
 All v2 `create-mcp-use-app` templates scaffold the root `mcp-env.d.ts`; the MCP Apps template is the reference for the exported-refs pattern.
 

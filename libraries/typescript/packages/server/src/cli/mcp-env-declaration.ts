@@ -1,8 +1,8 @@
 /**
  * Root-level MCP env declaration shared by dev, build, and typecheck.
  *
- * Combines CSS module typing and a live type-only edge to the server entry so
- * exported `ToolRef`s update in TypeScript without rerunning the CLI.
+ * Combines Vite client typing and a live type-only edge to the server entry so
+ * assets and exported `ToolRef`s work in TypeScript without extra declarations.
  */
 
 import { readFile, writeFile } from "node:fs/promises";
@@ -50,7 +50,7 @@ export function renderMcpEnvDeclaration(cwd: string, entry: string): string {
   const importPath = declarationImportPath(cwd, entry);
   return [
     MCP_ENV_DECLARATION_HEADER,
-    'declare module "*.css";',
+    'import "mcp-use/vite-client";',
     "",
     'declare module "mcp-use/react" {',
     "  interface Register {",

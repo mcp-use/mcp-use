@@ -16,9 +16,16 @@ describe("runTypecheck", () => {
     const cwd = copyFixture("typecheck");
     dirs.push(cwd);
     writeFileSync(
+      join(cwd, "logo.svg"),
+      '<svg xmlns="http://www.w3.org/2000/svg"></svg>'
+    );
+    writeFileSync(
       join(cwd, "view.ts"),
       [
         'import { useCallTool } from "mcp-use/react";',
+        'import logoUrl from "./logo.svg";',
+        "const typedLogoUrl: string = logoUrl;",
+        "void typedLogoUrl;",
         "// @ts-expect-error add is registered but its ToolRef is not exported",
         'useCallTool("add");',
       ].join("\n")
@@ -41,6 +48,9 @@ describe("runTypecheck", () => {
     ).resolves.toBe(0);
     expect(readFileSync(join(cwd, "mcp-env.d.ts"), "utf8")).toContain(
       'tools: typeof import("./src/index.js")'
+    );
+    expect(readFileSync(join(cwd, "mcp-env.d.ts"), "utf8")).toContain(
+      'import "mcp-use/vite-client"'
     );
   });
 });

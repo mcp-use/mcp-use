@@ -29,9 +29,9 @@ describe("renderMcpEnvDeclaration", () => {
     );
   });
 
-  it("includes CSS module typing", () => {
+  it("includes the framework-owned Vite client types", () => {
     expect(renderMcpEnvDeclaration("/project", "/project/index.ts")).toContain(
-      'declare module "*.css"'
+      'import "mcp-use/vite-client"'
     );
   });
 });
