@@ -1,5 +1,13 @@
 # mcp-use
 
+## 2.0.0-beta.38
+
+### Patch Changes
+
+- 066f449: Report the published package version in anonymous SDK usage metrics by rebuilding
+  prerelease artifacts after package versioning and before publication.
+  - @mcp-use/inspector@20.0.0-beta.30
+
 ## 2.0.0-beta.37
 
 ### Patch Changes
