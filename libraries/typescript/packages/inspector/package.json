@@ -71,6 +71,7 @@
     "test:e2e:python": "node tests/e2e/scripts/run-python-e2e.mjs",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
+    "test:apps-conformance": "node scripts/run-mcp-apps-conformance.mjs",
     "test:e2e:tunnel": "node tests/e2e/scripts/run-tunnel-test.mjs",
     "install:pnpm": "pnpm install",
     "install:npm": "npm install",

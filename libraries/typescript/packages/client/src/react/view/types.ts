@@ -25,6 +25,14 @@ export interface ViewConnection {
     options?: { timeout?: number; resetTimeoutOnProgress?: boolean }
   ) => Promise<unknown>;
   readResource: (uri: string) => Promise<unknown>;
+  tools?: readonly {
+    name: string;
+    _meta?: {
+      ui?: {
+        visibility?: readonly ("model" | "app")[];
+      };
+    };
+  }[];
   resources?: readonly { uri: string; _meta?: { ui?: unknown } }[];
 }
 
