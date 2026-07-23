@@ -34,7 +34,7 @@ import { useViewRuntime } from "../runtime/view-runtime-context.js";
  * ```
  */
 export function useSendFollowUp(): (args: { prompt: string }) => Promise<void> {
-  const runtime = useViewRuntime();
+  const runtime = useViewRuntime("useSendFollowUp");
   return useCallback(
     async (args: { prompt: string }) => {
       await runtime.sendMessage({

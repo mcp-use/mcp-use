@@ -67,6 +67,9 @@ export default defineConfig([
     splitting: false,
     sourcemap: false,
     clean: false,
+    define: {
+      __MCP_USE_PACKAGE_VERSION__: JSON.stringify(frameworkPackage.version),
+    },
     external: [
       "react",
       "react-dom",

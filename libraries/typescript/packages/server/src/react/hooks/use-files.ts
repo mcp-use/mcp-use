@@ -26,7 +26,7 @@ import type { UseFilesResult } from "../types/file-types.js";
  * ```
  */
 export function useFiles(): UseFilesResult {
-  const runtime = useViewRuntime();
+  const runtime = useViewRuntime("useFiles");
   const { isSupported } = useSyncExternalStore(
     runtime.subscribeFiles,
     runtime.getFilesSnapshot

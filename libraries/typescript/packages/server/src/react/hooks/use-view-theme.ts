@@ -18,6 +18,6 @@ import { useViewRuntime } from "../runtime/view-runtime-context.js";
  * ```
  */
 export function useViewTheme(): "light" | "dark" {
-  const runtime = useViewRuntime();
+  const runtime = useViewRuntime("useViewTheme");
   return useSyncExternalStore(runtime.subscribeTheme, runtime.getThemeSnapshot);
 }

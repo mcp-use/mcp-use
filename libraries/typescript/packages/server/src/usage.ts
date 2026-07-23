@@ -1,9 +1,15 @@
 declare const __MCP_USE_PACKAGE_VERSION__: string;
+declare const __MCP_USE_VIEW_USAGE_DISABLED__: boolean;
 
 // Disable at any time with MCP_USE_ANONYMIZED_TELEMETRY=false.
 
 type Value = string | number | boolean;
 type Properties = Record<string, Value | undefined>;
+type Options = {
+  onceKey?: string;
+  sampleRate?: number;
+  serverRoot?: string;
+};
 
 const EVENT = "mcp_use_sdk_event";
 const ENDPOINT = "https://eu.i.posthog.com/i/v0/e/";
@@ -44,6 +50,27 @@ function safeEnv(name: string): string | undefined {
     !hasControl(value)
     ? value
     : undefined;
+}
+
+function disabled(): boolean {
+  if (
+    env("MCP_USE_ANONYMIZED_TELEMETRY") === "false" ||
+    (typeof __MCP_USE_VIEW_USAGE_DISABLED__ !== "undefined" &&
+      __MCP_USE_VIEW_USAGE_DISABLED__)
+  )
+    return true;
+  try {
+    const scope = globalThis as typeof globalThis & {
+      __MCP_USE_ANONYMIZED_TELEMETRY__?: boolean;
+    };
+    return (
+      scope.__MCP_USE_ANONYMIZED_TELEMETRY__ === false ||
+      (typeof localStorage !== "undefined" &&
+        localStorage.getItem("MCP_USE_ANONYMIZED_TELEMETRY") === "false")
+    );
+  } catch {
+    return false;
+  }
 }
 
 function clean(properties: Properties): Properties {
@@ -122,20 +149,16 @@ async function identity(serverRoot?: string): Promise<Identity> {
   return resolving;
 }
 
-/** Capture one anonymous, flat SDK usage event. @internal */
-export function recordUsage(
+function capture(
   feature: string,
   action: string,
-  properties: Properties = {},
-  options: {
-    onceKey?: string;
-    sampleRate?: number;
-    serverRoot?: string;
-  } = {}
+  properties: Properties,
+  options: Options,
+  resolveIdentity: () => Promise<Identity>
 ): void {
   const validationId = safeEnv("MCP_USE_TELEMETRY_VALIDATION_ID");
   if (
-    env("MCP_USE_ANONYMIZED_TELEMETRY") === "false" ||
+    disabled() ||
     (env("NODE_ENV") === "test" && validationId === undefined) ||
     pending.size >= 16
   )
@@ -148,7 +171,7 @@ export function recordUsage(
   if (validationId === undefined && Math.random() >= rate) return;
   const request = (async () => {
     try {
-      const resolvedIdentity = await identity(options.serverRoot);
+      const resolvedIdentity = await resolveIdentity();
       const body = JSON.stringify({
         api_key: TOKEN,
         event: EVENT,
@@ -188,6 +211,31 @@ export function recordUsage(
   })();
   pending.add(request);
   void request.then(() => pending.delete(request));
+}
+
+/** Capture one anonymous, flat SDK usage event. @internal */
+export function recordUsage(
+  feature: string,
+  action: string,
+  properties: Properties = {},
+  options: Options = {}
+): void {
+  capture(feature, action, properties, options, () =>
+    identity(options.serverRoot)
+  );
+}
+
+/** Capture from a browser runtime without pulling in server persistence. @internal */
+export function recordRuntimeUsage(
+  feature: string,
+  action: string,
+  properties: Properties = {},
+  options: Omit<Options, "serverRoot"> = {}
+): void {
+  capture(feature, action, properties, options, async () => ({
+    id: runtimeId,
+    stability: "process",
+  }));
 }
 
 /** Wait for in-flight usage events in validation fixtures. @internal */

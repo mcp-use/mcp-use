@@ -79,7 +79,7 @@ export function useViewTool<
     | Exclude<ToolResult<TOutput>, InputRequiredResult>
     | Promise<Exclude<ToolResult<TOutput>, InputRequiredResult>>
 ): void {
-  const runtime = useViewRuntime();
+  const runtime = useViewRuntime("useViewTool");
   const handlerRef = useRef(handler);
   handlerRef.current = handler;
   const definitionRef = useRef<ViewToolDefinition>(definition);
