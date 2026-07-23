@@ -58,6 +58,31 @@ describe("completeOAuthFlow", () => {
     );
   });
 
+  it("preserves the callback issuer from getAuthorizationResponse", async () => {
+    vi.mocked(auth)
+      .mockResolvedValueOnce("REDIRECT")
+      .mockResolvedValueOnce("AUTHORIZED");
+    const getAuthorizationResponse = vi.fn(async () => ({
+      code: "auth-code",
+      iss: "https://auth.example.com",
+    }));
+    const provider = {
+      getAuthorizationResponse,
+    } as unknown as OAuthClientProvider;
+
+    await completeOAuthFlow(provider, "https://example.com/mcp");
+
+    expect(getAuthorizationResponse).toHaveBeenCalledOnce();
+    expect(auth).toHaveBeenLastCalledWith(
+      provider,
+      expect.objectContaining({
+        serverUrl: "https://example.com/mcp",
+        authorizationCode: "auth-code",
+        iss: "https://auth.example.com",
+      })
+    );
+  });
+
   it("skips the first auth() when hasPendingFlow is set", async () => {
     vi.mocked(auth).mockResolvedValueOnce("AUTHORIZED");
     const getAuthorizationCode = vi.fn(async () => "auth-code");

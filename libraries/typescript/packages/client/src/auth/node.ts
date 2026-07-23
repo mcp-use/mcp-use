@@ -44,6 +44,14 @@ export class OAuthFlowError extends Error {
   }
 }
 
+/** Authorization response captured by the Node loopback callback. */
+export interface NodeOAuthAuthorizationResponse {
+  /** Authorization code returned by the authorization server. */
+  code: string;
+  /** RFC 9207 authorization-server issuer, when present in the callback. */
+  iss?: string;
+}
+
 interface Deferred<T> {
   promise: Promise<T>;
   resolve: (value: T) => void;
@@ -125,9 +133,9 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
 
   private server: Server | null = null;
   /** Currently in-flight deferred — used to prevent overlapping flows. */
-  private pending: Deferred<string> | null = null;
-  /** Latest deferred (settled or in-flight) — what `getAuthorizationCode()` returns. */
-  private lastFlow: Deferred<string> | null = null;
+  private pending: Deferred<NodeOAuthAuthorizationResponse> | null = null;
+  /** Latest deferred (settled or in-flight) for the loopback response. */
+  private lastFlow: Deferred<NodeOAuthAuthorizationResponse> | null = null;
   private pendingTimer: NodeJS.Timeout | null = null;
 
   private constructor(
@@ -286,7 +294,7 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
 
     await this.startLoopback();
 
-    this.pending = createDeferred<string>();
+    this.pending = createDeferred<NodeOAuthAuthorizationResponse>();
     this.lastFlow = this.pending;
     // Swallow unhandled rejections — callers may not subscribe before the
     // callback fires, but `getAuthorizationCode()` still returns the same
@@ -317,15 +325,26 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
 
   /**
    * Resolves with the authorization code captured by the loopback callback.
+   *
+   * @remarks This compatibility method omits the RFC 9207 issuer. OAuth flow
+   * orchestrators should use {@link getAuthorizationResponse} when available.
    * Must be called after `redirectToAuthorization()`. Returns the same
    * promise whether the callback has fired or not — callers may subscribe
    * before or after.
    */
   getAuthorizationCode(): Promise<string> {
+    return this.getAuthorizationResponse().then((response) => response.code);
+  }
+
+  /**
+   * Resolves with the authorization code and RFC 9207 issuer captured by the
+   * loopback callback.
+   */
+  getAuthorizationResponse(): Promise<NodeOAuthAuthorizationResponse> {
     if (!this.lastFlow) {
       return Promise.reject(
         new Error(
-          "NodeOAuthClientProvider.getAuthorizationCode() called before redirectToAuthorization()"
+          "NodeOAuthClientProvider.getAuthorizationResponse() called before redirectToAuthorization()"
         )
       );
     }
@@ -387,11 +406,11 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
     }
   }
 
-  private resolvePending(code: string): void {
+  private resolvePending(response: NodeOAuthAuthorizationResponse): void {
     const p = this.pending;
     this.pending = null;
     this.stopLoopback();
-    p?.resolve(code);
+    p?.resolve(response);
   }
 
   private rejectPending(err: Error): void {
@@ -415,6 +434,7 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
 
     const code = url.searchParams.get("code");
     const state = url.searchParams.get("state");
+    const iss = url.searchParams.get("iss") ?? undefined;
     const err = url.searchParams.get("error");
     const errDesc = url.searchParams.get("error_description") ?? undefined;
 
@@ -436,7 +456,7 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
     res.statusCode = 200;
     res.setHeader("content-type", "text/html; charset=utf-8");
     res.end(SUCCESS_HTML);
-    this.resolvePending(code);
+    this.resolvePending({ code, ...(iss !== undefined ? { iss } : {}) });
   }
 }
 

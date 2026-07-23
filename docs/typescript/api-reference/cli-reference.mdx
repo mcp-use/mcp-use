@@ -24,7 +24,7 @@ For hands-on workflows, see the [CLI Client guide](/typescript/tooling/client-cl
   </Card>
   <Card title="Client CLI" icon="terminal" href="#client">
     `mcp-use client` saves MCP servers, calls tools, reads resources, gets
-    prompts, handles OAuth, and captures widget screenshots.
+    prompts, and handles OAuth.
   </Card>
   <Card title="Tunnels" icon="train-front-tunnel" href="#tunneling-reference">
     `mcp-use dev --tunnel` exposes a local server through a public URL.
@@ -507,7 +507,7 @@ mcp-use servers env remove API_KEY --server srv_abc123
 
 ## `client`
 
-**Purpose:** Use MCP servers from the terminal. The client command can save server connections, call tools, read resources, get prompts, manage OAuth tokens, and render MCP Apps widgets as PNG screenshots.
+**Purpose:** Save HTTP MCP server connections, call tools, read resources, get prompts, and manage OAuth credentials from the terminal.
 
 **Syntax:**
 
@@ -518,66 +518,46 @@ mcp-use client <name> <scope> <action>
 
 **Top-level subcommands:**
 
-| Command                                | Purpose                                    | Key options                                                       |
-| -------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------- |
-| `connect [name] [url]`                 | Save an MCP server under a short name.     | `--stdio`, `--auth <token>`, `--no-oauth`, `--auth-timeout <ms>`  |
-| `list`                                 | List saved servers.                        | None                                                              |
-| `remove <name>`                        | Remove a saved server.                     | None                                                              |
-| `screenshot --mcp <url> --tool <name>` | Render a widget from an ad-hoc MCP server. | `--mcp <url>`, `-H, --header <header>`, common screenshot options |
+| Command                | Purpose                                | Key options                                                                                        |
+| ---------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `connect <name> <url>` | Verify and save an HTTP(S) MCP server. | `-H, --header`, `--no-oauth`, `--auth-timeout <ms>`, `--protocol <version>`, `--no-open`, `--json` |
+| `list`                 | List saved servers.                    | `--json`                                                                                           |
+| `remove <name>`        | Remove a saved server and credentials. | `--yes`                                                                                            |
 
 **Per-server scopes:**
 
-| Scope                | Actions                                                      |
-| -------------------- | ------------------------------------------------------------ |
-| `tools`              | `list`, `call <tool> [args...]`, `describe <tool>`           |
-| `resources`          | `list`, `read <uri>`, `subscribe <uri>`, `unsubscribe <uri>` |
-| `prompts`            | `list`, `get <prompt> [args...]`                             |
-| `auth`               | `status`, `refresh`, `logout`                                |
-| `screenshot`         | `--tool <name> [args...]`                                    |
-| Top-level per server | `interactive`, `disconnect`                                  |
+| Scope       | Actions                                                             |
+| ----------- | ------------------------------------------------------------------- |
+| `tools`     | `list`, `describe <tool>`, `call <tool> [args...] [--timeout <ms>]` |
+| `resources` | `list`, `read <uri>`                                                |
+| `prompts`   | `list`, `get <prompt> [args...]`                                    |
+| `auth`      | `status`, `logout [--yes]`                                          |
+
+Every action in this table accepts `--json` except where the top-level table does not advertise it.
 
 **Examples:**
 
 ```bash
 mcp-use client connect local http://localhost:3000/mcp
-mcp-use client connect fs "npx -y @modelcontextprotocol/server-filesystem /tmp" --stdio
 mcp-use client list
 mcp-use client local tools list
 mcp-use client local tools call read_file path=/tmp/test.txt
 mcp-use client local resources read "file:///tmp/data.json"
 mcp-use client local prompts get greeting name=Alice
 mcp-use client local auth status
-mcp-use client local screenshot --tool show-board boardId=demo
-mcp-use client screenshot --mcp https://mcp.example.com --tool show-board
-mcp-use client local disconnect
 ```
 
 **Notes and behavior:**
 
-- Saved servers are stored in `~/.mcp-use/cli-sessions.json`.
-- OAuth tokens for saved HTTP servers are stored under `~/.mcp-use/oauth/<urlHash>/`.
-- `connect --auth <token>` stores a static bearer token and skips OAuth.
+- Saved server metadata is stored in `~/.mcp-use/client/servers.json`. Credentials are stored separately under `~/.mcp-use/client/credentials/`.
+- In an interactive TTY, OAuth displays `This server requires OAuth. Press Enter to open your browser.` and opens the browser only after Enter.
+- `--no-open`, `--json`, and non-TTY operation never prompt or open a browser. They print the authorization URL to stderr while the loopback callback continues waiting.
 - `connect --no-oauth` prevents automatic OAuth when the server returns `401`.
+- Repeated `-H, --header <"Key: Value">` options store static headers as credentials.
 - Tool and prompt arguments accept `key=value`, `key:=<json>`, or a single JSON object argument.
-- `tools call --screenshot` captures a widget screenshot when the tool declares a UI resource.
-- `resources subscribe` keeps the process running until interrupted.
-
-Common screenshot options:
-
-| Option                      | Description                                                    | Default                        |
-| --------------------------- | -------------------------------------------------------------- | ------------------------------ |
-| `--tool <name>`             | Tool whose UI resource should be rendered.                     | Required                       |
-| `--width <px>`              | Output image width.                                            | Widget natural width           |
-| `--height <px>`             | Output image height.                                           | Widget natural height          |
-| `--device-scale-factor <n>` | Device pixel ratio. Must be greater than `0` and at most `4`.  | `1`                            |
-| `--inspector <url>`         | Inspector host that serves `/inspector/preview/:view`.         | Auto-spawned                   |
-| `--theme <theme>`           | Rendered color scheme. Accepted values are `light` and `dark`. | `light`                        |
-| `--output <path>`           | Output PNG path.                                               | `./<view>-<timestamp>.png`     |
-| `--wait-for <selector>`     | Readiness selector.                                            | `body[data-view-ready="true"]` |
-| `--delay <ms>`              | Extra wait after readiness.                                    | `0`                            |
-| `--timeout <ms>`            | Navigation and readiness timeout.                              | `30000`                        |
-| `--cdp-url <url>`           | Existing CDP WebSocket URL instead of local Chrome.            | None                           |
-| `--quiet`                   | Suppress development server output.                            | Disabled                       |
+- `--json` may appear anywhere after `client`. Success emits exactly one JSON value to stdout. Errors emit exactly one JSON error envelope to stderr and no stdout value.
+- Calls, resource reads, and prompt gets emit raw MCP result envelopes. Lists emit arrays, and `tools describe` emits one tool object.
+- Tool `isError` results exit `1` and retain the original protocol result in `error.details` under `--json`.
 
 <Card
   title="CLI Client guide"
@@ -585,7 +565,7 @@ Common screenshot options:
   href="/typescript/tooling/client-cli"
 >
   Use the guide for connection workflows, OAuth behavior, argument parsing
-  examples, scripting patterns, and screenshots.
+  examples, and scripting patterns.
 </Card>
 
 ## `skills add`
