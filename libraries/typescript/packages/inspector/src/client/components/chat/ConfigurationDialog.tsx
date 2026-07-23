@@ -534,7 +534,7 @@ export function ConfigurationDialog({
               type="button"
               onClick={freeTierInfo.onLoginClick}
               data-testid="chat-config-sign-in-card"
-              className="relative w-full cursor-pointer overflow-hidden rounded-2xl text-left transition-opacity hover:opacity-95 active:opacity-90"
+              className="relative w-full cursor-pointer overflow-hidden rounded-2xl border-0 text-left transition-opacity hover:opacity-95 active:opacity-90"
             >
               <div
                 className="absolute inset-0 bg-[#edf2ff] dark:bg-background"

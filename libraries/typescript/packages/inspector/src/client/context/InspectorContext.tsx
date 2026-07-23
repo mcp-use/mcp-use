@@ -1,4 +1,5 @@
 import type { LLMConfig, StreamProtocol } from "@/client/components/chat/types";
+import { resolveManufactChatUrl } from "@/client/utils/manufact-chat-url";
 import type { ReactNode } from "react";
 import { createContext, use, useCallback, useState } from "react";
 
@@ -18,11 +19,10 @@ export type TabType =
  * embedded / hosted mode (e.g. inside inspector.manufact.com or the Vibe IDE).
  *
  * ── Hosted-inspector chat flow ──────────────────────────────────────────────
- * When `chatApiUrl` is set (baked in at build time via VITE_MANUFACT_CHAT_URL),
- * the Chat tab switches from client-side LLM calls to a managed backend:
+ * The Chat tab uses a managed backend by default:
  *
- *   1. `InspectorProvider` (below) reads VITE_MANUFACT_CHAT_URL and sets
- *      `chatApiUrl` and `chatStreamProtocol: "data-stream"`.
+ *   1. `InspectorProvider` (below) prefers the runtime MANUFACT_CHAT_URL,
+ *      then VITE_MANUFACT_CHAT_URL, and finally the Manufact Cloud endpoint.
  *
  *   2. `LayoutContent` passes these down to `ChatTab` as props; `ChatTab`
  *      then passes `useClientSide={false}` to `useChatMessages`.
@@ -158,15 +158,18 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
   //      so a single pre-built npm tarball can be configured at deploy time.
   //   2. `VITE_MANUFACT_CHAT_URL` — build-time Vite env, for local dev builds
   //      where you rebuild the client anyway.
-  const hostedChatUrl =
-    (typeof window !== "undefined"
+  //   3. Manufact Cloud — production fallback so hosted chat and sign-in are
+  //      available without additional configuration.
+  const hostedChatUrl = resolveManufactChatUrl(
+    typeof window !== "undefined"
       ? (window as Window & { __MANUFACT_CHAT_URL__?: string })
           .__MANUFACT_CHAT_URL__
-      : undefined) ??
-    ((typeof import.meta !== "undefined"
+      : undefined,
+    (typeof import.meta !== "undefined"
       ? (import.meta as unknown as Record<string, Record<string, string>>).env
           ?.VITE_MANUFACT_CHAT_URL
-      : undefined) as string | undefined);
+      : undefined) as string | undefined
+  );
 
   const [state, setState] = useState<InspectorState>({
     selectedServerId: null,
@@ -179,13 +182,11 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
     tunnelUrl: null,
     isTunnelStarting: false,
     isEmbedded: false,
-    embeddedConfig: hostedChatUrl
-      ? {
-          chatApiUrl: hostedChatUrl,
-          chatStreamProtocol: "data-stream",
-          chatEnableFreeTierUpgrade: true,
-        }
-      : {},
+    embeddedConfig: {
+      chatApiUrl: hostedChatUrl,
+      chatStreamProtocol: "data-stream",
+      chatEnableFreeTierUpgrade: true,
+    },
   });
 
   const setSelectedServerId = useCallback((serverId: string | null) => {
@@ -235,9 +236,18 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
 
   const setEmbeddedMode = useCallback(
     (isEmbedded: boolean, config: EmbeddedConfig = {}) => {
-      setState((prev) => ({ ...prev, isEmbedded, embeddedConfig: config }));
+      setState((prev) => ({
+        ...prev,
+        isEmbedded,
+        embeddedConfig: {
+          ...config,
+          chatApiUrl: resolveManufactChatUrl(config.chatApiUrl, hostedChatUrl),
+          chatStreamProtocol: config.chatStreamProtocol ?? "data-stream",
+          chatEnableFreeTierUpgrade: config.chatEnableFreeTierUpgrade ?? true,
+        },
+      }));
     },
-    []
+    [hostedChatUrl]
   );
 
   const navigateToItem = useCallback(
