@@ -139,7 +139,7 @@ run_test() {
         # Verify package versions based on flags
         if command -v jq > /dev/null 2>&1; then
             local package_json="$app_name/package.json"
-            if [[ "$(jq -r '(.dependencies // {}) + (.devDependencies // {}) + (.optionalDependencies // {}) | ."@mcp-use/inspector" // empty' "$package_json")" != "" ]]; then
+            if [[ "$(jq -r '(.dependencies // {}) + (.devDependencies // {}) + (.optionalDependencies // {}) + (.peerDependencies // {}) | ."@mcp-use/inspector" // empty' "$package_json")" != "" ]]; then
                 echo -e "${RED}❌ FAILED: Inspector is bundled by mcp-use and must not be a direct dependency${NC}"
                 TESTS_FAILED=$((TESTS_FAILED + 1))
                 return 1
