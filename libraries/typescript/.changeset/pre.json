@@ -32,6 +32,7 @@
     "fix-cli-package-verifier-windows",
     "fix-cli-runtime-build-pipeline",
     "follow-inspector-beta-cdn",
+    "forward-manufact-chat-url-embedded-inspector",
     "fresh-oauth-resource-v2",
     "friendly-dots-fail",
     "hono-http-surface",
