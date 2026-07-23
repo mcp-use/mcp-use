@@ -8,6 +8,8 @@ Sibling examples for MCP Apps views with `mcp-use`:
   download URLs with `useFiles`
 - [`story-writer/`](./story-writer/) — progressive pending tool input into a
   live view (default `viewConfig`, terminal result latch)
+- [`view-state/`](./view-state/) — a small product carousel with a
+  model-visible cart
 - [`excalidraw/`](./excalidraw/) — port of the original
   [`excalidraw/excalidraw-mcp`](https://github.com/excalidraw/excalidraw-mcp)
   app with `viewConfig.autoResize` / `displayModes`, safe partial parsing until

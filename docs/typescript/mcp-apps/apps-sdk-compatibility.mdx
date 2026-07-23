@@ -15,7 +15,7 @@ OpenAI's Apps SDK remains supported, and ChatGPT also implements the MCP Apps UI
 In practice:
 
 - Use `widget: { name }` and `widget({ props, output })` on the server.
-- Use `useWidget()` and `useCallTool()` in React widgets.
+- Use `useToolContext()`, `useViewState()`, and `useCallTool()` in React views.
 - Let `mcp-use` translate compatibility metadata for ChatGPT.
 - Reach for Apps SDK extensions only when a ChatGPT-specific capability has no shared MCP Apps equivalent yet.
 
@@ -23,13 +23,15 @@ In practice:
 
 The same widget code should work across supported hosts:
 
-| Widget behavior | mcp-use API |
-| --- | --- |
-| Read tool input, result props, metadata, host context, and state | `useWidget()` |
-| Call MCP tools from the widget | `useCallTool()` |
-| Update model-visible widget state | `useWidget().setState` or `ModelContext` |
-| Send a follow-up user message | `useWidget().sendFollowUpMessage` |
-| Request inline, fullscreen, or picture-in-picture display | `useWidget().requestDisplayMode` |
+| Widget behavior                                           | mcp-use API         |
+| --------------------------------------------------------- | ------------------- |
+| Read tool input, structured output, content, and metadata | `useToolContext()`  |
+| Read host environment data                                | `useHostContext()`  |
+| Call MCP tools from the widget                            | `useCallTool()`     |
+| Update model-visible view state                           | `useViewState()`    |
+| Describe visible UI                                       | `ModelContext`      |
+| Send a follow-up user message                             | `useSendFollowUp()` |
+| Request inline, fullscreen, or picture-in-picture display | `useDisplayMode()`  |
 
 These APIs keep widget code focused on behavior instead of host-specific bridge details.
 
