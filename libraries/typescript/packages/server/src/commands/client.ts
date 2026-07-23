@@ -43,7 +43,7 @@ const CLIENT_HELP = `Usage: mcp-use client <command> [options]
 Commands:
   connect <name> <url>   Connect and save an HTTP(S) MCP server
   list [--json]          List saved servers
-  remove <name> [--yes]  Remove a saved server
+  remove <name>          Remove a saved server
   <name>                 Invoke tools/resources/prompts on a saved server
 
 Connect options:
@@ -87,10 +87,8 @@ export async function runClient(argv: readonly string[]): Promise<number> {
       return await connect(normalizedArgv.slice(1), json);
     if (first === "list") return await list(normalizedArgv.slice(1), json);
     if (first === "remove") {
-      if (json) {
-        throw new UsageError("mcp-use client remove does not support --json.");
-      }
-      return await remove(normalizedArgv.slice(1));
+      const commandIndex = argv.indexOf("remove");
+      return await remove(argv.filter((_, index) => index !== commandIndex));
     }
     if (first === undefined) {
       throw new UsageError("Usage: mcp-use client <connect|list|remove|name>");
@@ -183,21 +181,13 @@ async function list(argv: readonly string[], json: boolean): Promise<number> {
 }
 
 async function remove(argv: readonly string[]): Promise<number> {
-  const { values, positionals } = parseArgs({
+  const { positionals } = parseArgs({
     args: [...argv],
     allowPositionals: true,
     strict: true,
-    options: { yes: { type: "boolean" } },
+    options: {},
   });
   const name = one(positionals, "mcp-use client remove <name>");
-  if (
-    !(await confirm(`Remove saved server ${name}?`, {
-      yes: values.yes === true,
-      json: false,
-    }))
-  ) {
-    return 0;
-  }
   const saved = await readServers();
   delete saved.servers[name];
   await writePrivateJson(SERVERS_PATH, saved);
