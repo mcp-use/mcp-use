@@ -1,5 +1,11 @@
 # @mcp-use/cli
 
+## 4.0.0-beta.7
+
+### Patch Changes
+
+- b5151b5: Fix CLI package verification on Windows by converting the package file URL to a native path before scanning `dist`.
+
 ## 4.0.0-beta.6
 
 ### Minor Changes

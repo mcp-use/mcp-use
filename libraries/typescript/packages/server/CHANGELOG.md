@@ -1,5 +1,13 @@
 # mcp-use
 
+## 2.0.0-beta.33
+
+### Patch Changes
+
+- Updated dependencies [b5151b5]
+  - @mcp-use/cli@4.0.0-beta.7
+  - @mcp-use/inspector@20.0.0-beta.25
+
 ## 2.0.0-beta.32
 
 ### Minor Changes

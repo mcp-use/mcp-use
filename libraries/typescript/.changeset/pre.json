@@ -29,6 +29,7 @@
     "eager-inspector-ui",
     "enable-sdk-logging-capability",
     "fix-beta-scaffold-templates",
+    "fix-cli-package-verifier-windows",
     "fix-cli-runtime-build-pipeline",
     "follow-inspector-beta-cdn",
     "fresh-oauth-resource-v2",
