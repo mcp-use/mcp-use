@@ -278,7 +278,7 @@ describe("client human-readable output", () => {
     expect(stderr).toBe("");
   });
 
-  it("rejects --json for remove in every position", async () => {
+  it("removes without confirmation and rejects unsupported flags", async () => {
     await expect(
       runClient([
         "connect",
@@ -287,11 +287,23 @@ describe("client human-readable output", () => {
         "--no-oauth",
       ])
     ).resolves.toBe(0);
+    stdout = "";
+
+    await expect(runClient(["remove", "remove-json"])).resolves.toBe(0);
+    expect(stdout).toBe("Removed remove-json.\n");
+    expect(stderr).toBe("");
+
+    await runClient([
+      "connect",
+      "remove-flags",
+      "https://mcp.example.com/mcp",
+      "--no-oauth",
+    ]);
 
     for (const argv of [
-      ["--json", "remove", "remove-json", "--yes"],
-      ["remove", "--json", "remove-json", "--yes"],
-      ["remove", "remove-json", "--yes", "--json"],
+      ["--json", "remove", "remove-flags"],
+      ["remove", "--json", "remove-flags"],
+      ["remove", "remove-flags", "--json"],
     ]) {
       stdout = "";
       stderr = "";
@@ -299,14 +311,22 @@ describe("client human-readable output", () => {
       await expect(runClient(argv)).resolves.toBe(2);
 
       expect(stdout).toBe("");
-      expect(stderr).toBe("mcp-use client remove does not support --json.\n");
+      expect(stderr).toContain("Unknown option '--json'");
+      expect(stderr).not.toContain("does not support --json");
     }
 
     stdout = "";
     stderr = "";
+    await expect(runClient(["remove", "remove-flags", "--yes"])).resolves.toBe(
+      2
+    );
+    expect(stdout).toBe("");
+    expect(stderr).toContain("Unknown option '--yes'");
+
+    stderr = "";
     await expect(runClient(["list", "--json"])).resolves.toBe(0);
     expect(JSON.parse(stdout)).toContainEqual({
-      name: "remove-json",
+      name: "remove-flags",
       oauth: false,
       protocol: "auto",
       url: "https://mcp.example.com/mcp",
