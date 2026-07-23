@@ -1,5 +1,11 @@
 # @mcp-use/cli
 
+## 4.0.0-beta.8
+
+### Patch Changes
+
+- 1a9b6fb: Correct framework and standalone CLI version reporting, and harden the packaged edge, start, dependency, and clean-install boundaries.
+
 ## 4.0.0-beta.7
 
 ### Patch Changes

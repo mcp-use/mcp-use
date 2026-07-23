@@ -1,5 +1,14 @@
 # mcp-use
 
+## 2.0.0-beta.36
+
+### Patch Changes
+
+- 1a9b6fb: Correct framework and standalone CLI version reporting, and harden the packaged edge, start, dependency, and clean-install boundaries.
+- Updated dependencies [1a9b6fb]
+  - @mcp-use/cli@4.0.0-beta.8
+  - @mcp-use/inspector@20.0.0-beta.28
+
 ## 2.0.0-beta.35
 
 ### Patch Changes

@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 20.0.0-beta.28
+
+### Patch Changes
+
+- Updated dependencies [1a9b6fb]
+  - mcp-use@2.0.0-beta.36
+
 ## 20.0.0-beta.27
 
 ### Patch Changes

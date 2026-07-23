@@ -58,6 +58,7 @@
     "stream-inspector-tool-input",
     "strict-exported-tool-refs",
     "strip-tools-list-schema-dialect",
+    "tight-beta-boundaries",
     "ts7-stable-node20-scaffold",
     "typed-mcp-middleware-results",
     "v2-server-scaffold",
