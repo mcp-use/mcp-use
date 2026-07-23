@@ -45,15 +45,21 @@ describe("discoverViews", () => {
     ]);
   });
 
-  it("does not discover legacy resources/ paths", () => {
+  it("discovers legacy resources/<name>/widget.tsx entries", () => {
     const cwd = tempProject();
     mkdirSync(join(cwd, "resources", "legacy"), { recursive: true });
     writeFileSync(
-      join(cwd, "resources", "legacy", "view.tsx"),
+      join(cwd, "resources", "legacy", "widget.tsx"),
       "export default () => null;"
     );
 
-    expect(discoverViews(cwd)).toEqual([]);
+    expect(discoverViews(cwd)).toEqual([
+      {
+        name: "legacy",
+        entryPath: join(cwd, "resources", "legacy", "widget.tsx"),
+        legacy: true,
+      },
+    ]);
   });
 
   it("discovers an explicit views directory relative to the project root", () => {
@@ -77,7 +83,7 @@ describe("isViewPath", () => {
     expect(isViewPath("/project/views/demo/components/Card.tsx", cwd)).toBe(
       true
     );
-    expect(isViewPath("/project/resources/demo/view.tsx", cwd)).toBe(false);
+    expect(isViewPath("/project/resources/demo/widget.tsx", cwd)).toBe(true);
   });
 
   it("matches paths under a custom views directory", () => {
@@ -101,6 +107,9 @@ describe("isViewEntryPath", () => {
     expect(isViewEntryPath("/project/views/demo/index.tsx", cwd)).toBe(false);
     expect(isViewEntryPath("/project/resources/demo/view.tsx", cwd)).toBe(
       false
+    );
+    expect(isViewEntryPath("/project/resources/demo/widget.tsx", cwd)).toBe(
+      true
     );
   });
 

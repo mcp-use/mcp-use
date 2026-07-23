@@ -54,6 +54,21 @@ export default defineConfig([
       options.minifyIdentifiers = false;
     },
   },
+  // Deprecated temporary v1 compatibility entry. Build it independently so
+  // shared-chunk extraction cannot alter the native root entry's graph or
+  // edge/startup budgets. Remove this whole target in mcp-use v3.
+  {
+    entry: {
+      "compat-v1": "src/compat-v1.ts",
+    },
+    format: ["esm"],
+    target: "node22",
+    dts: false,
+    splitting: false,
+    sourcemap: false,
+    clean: false,
+    external: ["@mcp-use/client", "@mcp-use/cli"],
+  },
   // Browser-only view runtime (`mcp-use/react`). Must not be reachable
   // from the `.` export or `bin` graphs — same invariant as the cli chunk above.
   {

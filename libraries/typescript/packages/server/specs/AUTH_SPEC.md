@@ -29,6 +29,13 @@ const server = new MCPServer({
 
 `oauth` configures a resource server. In direct mode, its provider tells mcp-use how to verify bearer tokens and which external authorization servers to advertise in protected-resource metadata. In proxy mode, it also configures the local authorization server that protected-resource metadata advertises.
 
+The deprecated `mcp-use/server` migration entry re-exports only the implemented
+direct provider factories (Auth0, Clerk, Keycloak, Supabase, WorkOS, and Better
+Auth), translates their common v1 option names, and exposes the normalized v1
+callback user/scope shape. It rejects `verifyJwt: false`. It does not export or
+emulate `oauthProxy`, `jwksVerifier`, or authorization-server proxy mode. This
+carveout is temporary and removed in v3; native code imports provider subpaths.
+
 ## Keep the official SDK behind mcp-use
 
 Consumers import OAuth APIs only from `mcp-use/oauth`. They do not install, version, or import `@modelcontextprotocol/server` directly. It remains a regular dependency of mcp-use, not a consumer-managed peer dependency.

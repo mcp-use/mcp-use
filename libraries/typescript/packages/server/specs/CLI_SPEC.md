@@ -35,6 +35,14 @@ export default server;
 
 `mcp-use dev` and `mcp-use start` own the socket. Serverless targets (Vercel, etc.) bypass the CLI entirely and export `server.fetch` from their handler file — the server stays at module scope and owns its Hono application. `mcp-use build` is the blessed path for node deployments, but `package.json` scripts are user-owned; nothing enforces it.
 
+**Deprecated v1-entry carveout:** while evaluating an entry that imports
+`mcp-use/server`, `dev`, `build`, and `start` suppress that facade's top-level
+`listen()` call and accept its single process-captured server when no default
+export exists. The generated build wrapper converts the captured server into a
+default export. This capture is unavailable to native `mcp-use` entries, which
+retain the strict contract above. Compatibility evaluation emits the one
+`MCP_USE_V1_COMPAT` deprecation warning and is removed with the subpath in v3.
+
 **Entry discovery:** conventional locations, first hit wins — `src/index.ts`, `src/server.ts`, `index.ts`, `server.ts` — overridable with `--entry <path>` on `dev`, `build`, and `typecheck`.
 
 `examples/railway` follows this shape (its platform door is `mcp-use build` + `mcp-use start`; host selection via `RAILWAY_PUBLIC_DOMAIN` stays constructor config on the server, which `dev`/`start` honor through `listen()`).

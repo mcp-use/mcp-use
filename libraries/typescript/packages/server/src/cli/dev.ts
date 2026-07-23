@@ -83,7 +83,11 @@ interface ServerLike {
     views: ViewsManifest,
     options?: { dev?: boolean; projectRoot?: string }
   ): void;
+  /** Deprecated v1 widget metadata registration seam. */
+  __registerLegacyViews?(widgets: Record<string, unknown>): void;
 }
+
+const COMPAT_GLOBAL = "__mcpUseV1CompatServer";
 
 /**
  * Options for {@link runDev}.
@@ -269,7 +273,9 @@ function applyViteModuleCors(
  * {@link ServerLike}.
  */
 function serverFrom(moduleExports: Record<string, unknown>): ServerLike {
-  const server = moduleExports["default"];
+  const server =
+    moduleExports["default"] ??
+    (globalThis as Record<string, unknown>)[COMPAT_GLOBAL];
   if (server === null || typeof server !== "object") {
     throw new Error(
       "The server entry must default-export the MCPServer instance " +
@@ -311,6 +317,7 @@ function serverFrom(moduleExports: Record<string, unknown>): ServerLike {
  */
 export async function runDev(options: DevOptions): Promise<void> {
   process.env.MCP_USE_DEV_CLI = "1";
+  process.env.MCP_USE_CLI_IMPORT = "1";
   const paths = resolveWorkspacePaths(options.cwd);
   const eventBus = new InMemoryServerEventBus((error) => {
     console.error("[mcp-use] notification delivery failed:", error);
@@ -396,6 +403,7 @@ export async function runDev(options: DevOptions): Promise<void> {
       tsconfigPaths: true,
       alias: { tailwindcss: resolveTailwindCss() },
     },
+    oxc: { jsx: { runtime: "automatic" } },
     plugins: viewsAtStartup
       ? [
           nextStandaloneCompatPlugin(options.cwd),
@@ -435,6 +443,7 @@ export async function runDev(options: DevOptions): Promise<void> {
 
   const importServer = async (): Promise<ServerLike> => {
     const load = async (): Promise<ServerLike> => {
+      delete (globalThis as Record<string, unknown>)[COMPAT_GLOBAL];
       const moduleExports = (await runner.import(entry)) as Record<
         string,
         unknown
@@ -442,6 +451,19 @@ export async function runDev(options: DevOptions): Promise<void> {
       const server = serverFrom(moduleExports);
 
       if (currentViews.length > 0) {
+        const legacyViews = currentViews.filter((view) => view.legacy === true);
+        if (legacyViews.length > 0) {
+          if (typeof server.__registerLegacyViews !== "function") {
+            throw new Error(
+              "Legacy resources/*/widget.tsx views require the temporary mcp-use/server compatibility entry."
+            );
+          }
+          const legacyModules: Record<string, unknown> = {};
+          for (const view of legacyViews) {
+            legacyModules[view.name] = await runner.import(view.entryPath);
+          }
+          server.__registerLegacyViews(legacyModules);
+        }
         const viewsManifest = buildDevViewsManifest(currentViews);
         if (typeof server.__primeViews !== "function") {
           throw new Error(
