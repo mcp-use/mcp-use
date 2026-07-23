@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 2.0.0-beta.11
+
+### Patch Changes
+
+- 18e9eb6: Pin beta scaffolds to `mcp-use@2.0.0-beta.36` by default while preserving `--dev` and explicit `--sdk-version` overrides.
+
 ## 2.0.0-beta.10
 
 ### Patch Changes
