@@ -175,8 +175,13 @@ describe("direct OAuth providers", () => {
       jwtSecret: secret,
     });
     const verifier = provider.createTokenVerifier(protectedResource);
-    const token = (issuer: string, audience: string, exp: number) =>
-      new SignJWT({ sub: "user-1", client_id: "client-1" })
+    const token = (
+      issuer: string,
+      audience: string,
+      exp: number,
+      claims: Record<string, unknown> = {}
+    ) =>
+      new SignJWT({ sub: "user-1", client_id: "client-1", ...claims })
         .setProtectedHeader({ alg: "HS256" })
         .setIssuer(issuer)
         .setAudience(audience)
@@ -187,13 +192,13 @@ describe("direct OAuth providers", () => {
       verifier.verifyAccessToken(
         await token(
           "https://example-project.supabase.co/auth/v1",
-          protectedResource.href,
+          "authenticated",
           now() + 60
         )
       )
     ).resolves.toMatchObject({ clientId: "client-1" });
     const invalidTokens: readonly [string, string, number][] = [
-      ["https://other.supabase.co/auth/v1", protectedResource.href, now() + 60],
+      ["https://other.supabase.co/auth/v1", "authenticated", now() + 60],
       ["https://example-project.supabase.co/auth/v1", "other", now() + 60],
       [
         "https://example-project.supabase.co/auth/v1",
@@ -208,6 +213,42 @@ describe("direct OAuth providers", () => {
         code: "invalid_token",
       });
     }
+    await expect(
+      verifier.verifyAccessToken(
+        await token(
+          "https://example-project.supabase.co/auth/v1",
+          "authenticated",
+          now() + 60,
+          { resource: "https://other.example/mcp" }
+        )
+      )
+    ).rejects.toMatchObject({
+      code: "invalid_token",
+      message: "Token resource claim does not match protected resource",
+    });
+
+    const customAudienceProvider = oauthSupabaseProvider({
+      projectId: "example-project",
+      jwtSecret: secret,
+      audience: "mcp-api",
+    });
+    await expect(
+      customAudienceProvider
+        .createTokenVerifier(protectedResource)
+        .verifyAccessToken(
+          await token(
+            "https://example-project.supabase.co/auth/v1",
+            "mcp-api",
+            now() + 60
+          )
+        )
+    ).resolves.toMatchObject({ resource: protectedResource });
+    expect(() =>
+      oauthSupabaseProvider({
+        projectId: "example-project",
+        audience: " ",
+      })
+    ).toThrow(/audience/);
   });
 
   it("uses empty clientId for Supabase tokens without client_id", async () => {
@@ -219,7 +260,7 @@ describe("direct OAuth providers", () => {
     const token = await new SignJWT({ sub: "user-1" })
       .setProtectedHeader({ alg: "HS256" })
       .setIssuer("https://example-project.supabase.co/auth/v1")
-      .setAudience(protectedResource.href)
+      .setAudience("authenticated")
       .setExpirationTime(now() + 60)
       .sign(new TextEncoder().encode(secret));
 
@@ -249,7 +290,7 @@ describe("direct OAuth providers", () => {
     })
       .setProtectedHeader({ alg: "HS256" })
       .setIssuer("http://localhost:54321/platform/auth/v1")
-      .setAudience(protectedResource.href)
+      .setAudience("authenticated")
       .setExpirationTime(now() + 60)
       .sign(new TextEncoder().encode(secret));
     await expect(
@@ -269,7 +310,7 @@ describe("direct OAuth providers", () => {
     ).toThrow(/HTTPS|localhost/);
   });
 
-  it("maps Clerk claims and retains issuer path prefixes in endpoints", async () => {
+  it("supports Clerk issuer-bound and configured-audience access tokens", async () => {
     const { privateKey, publicKey } = await generateKeyPair("RS256");
     const jwk = await exportJWK(publicKey);
     jwk.kid = "clerk-key";
@@ -290,7 +331,7 @@ describe("direct OAuth providers", () => {
           privateKey,
           "clerk-key",
           "https://clerk.example.test/tenant",
-          protectedResource.href,
+          undefined,
           {
             sub: "clerk-user",
             client_id: "client",
@@ -305,6 +346,63 @@ describe("direct OAuth providers", () => {
         permissions: ["read"],
       },
     });
+
+    const audienceProvider = oauthClerkProvider({
+      frontendApiUrl: "https://clerk.example.test/tenant",
+      audience: "clerk-api",
+    });
+    await expect(
+      wrapOAuthTokenVerifier(
+        audienceProvider,
+        protectedResource
+      ).verifyAccessToken(
+        await signedToken(
+          privateKey,
+          "clerk-key",
+          "https://clerk.example.test/tenant",
+          "clerk-api",
+          { sub: "clerk-user", client_id: "client" }
+        )
+      )
+    ).resolves.toMatchObject({ resource: protectedResource });
+    await expect(
+      wrapOAuthTokenVerifier(
+        audienceProvider,
+        protectedResource
+      ).verifyAccessToken(
+        await signedToken(
+          privateKey,
+          "clerk-key",
+          "https://clerk.example.test/tenant",
+          "other-api",
+          { sub: "clerk-user", client_id: "client" }
+        )
+      )
+    ).rejects.toMatchObject({ code: "invalid_token" });
+    await expect(
+      wrapOAuthTokenVerifier(provider, protectedResource).verifyAccessToken(
+        await signedToken(
+          privateKey,
+          "clerk-key",
+          "https://clerk.example.test/tenant",
+          undefined,
+          {
+            sub: "clerk-user",
+            client_id: "client",
+            resource: "https://other.example/mcp",
+          }
+        )
+      )
+    ).rejects.toMatchObject({
+      code: "invalid_token",
+      message: "Token resource claim does not match protected resource",
+    });
+    expect(() =>
+      oauthClerkProvider({
+        frontendApiUrl: "https://clerk.example.test/tenant",
+        audience: " ",
+      })
+    ).toThrow(/audience/);
   });
 
   it("normalizes WorkOS hosts without appending a second suffix and maps claims", async () => {

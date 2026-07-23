@@ -232,6 +232,45 @@ describe("OAuth core", () => {
     }
   });
 
+  it("keeps provider audiences separate from the protected resource", async () => {
+    const key = new TextEncoder().encode(
+      "a sufficiently long test signing key"
+    );
+    const issuer = "https://issuer.example.test";
+    const verifier = createJwtVerifier({
+      issuer,
+      jwksUrl: new URL(`${issuer}/.well-known/jwks.json`),
+      key,
+      algorithms: ["HS256"],
+      resource: canonicalResource,
+      audience: "provider-api",
+    });
+    const sign = (claims: Record<string, unknown>) =>
+      new SignJWT({ sub: "user-1", client_id: "client-1", ...claims })
+        .setProtectedHeader({ alg: "HS256" })
+        .setIssuer(issuer)
+        .setExpirationTime(Math.floor(Date.now() / 1000) + 60)
+        .sign(key);
+
+    await expect(
+      verifier.verifyAccessToken(await sign({ aud: "provider-api" }))
+    ).resolves.toMatchObject({ resource: canonicalResource });
+    await expect(
+      verifier.verifyAccessToken(await sign({ aud: "other-api" }))
+    ).rejects.toMatchObject({ code: OAuthErrorCode.InvalidToken });
+    await expect(
+      verifier.verifyAccessToken(
+        await sign({
+          aud: "provider-api",
+          resource: "https://other.example/mcp",
+        })
+      )
+    ).rejects.toMatchObject({
+      code: OAuthErrorCode.InvalidToken,
+      message: "Token resource claim does not match protected resource",
+    });
+  });
+
   it("rejects verifier output that does not prove resource binding", async () => {
     const expectedResource = new URL("https://api.example.test/mcp");
     const provider = createProvider({

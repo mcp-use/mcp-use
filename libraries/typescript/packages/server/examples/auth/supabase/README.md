@@ -31,6 +31,12 @@ Also set:
 JWTs. If set, it must be at least 32 bytes. Without it, this example verifies
 ES256 tokens using the project's Supabase JWKS endpoint.
 
+Supabase OAuth access tokens use `aud: "authenticated"` by default, and the
+provider validates that audience without conflating it with the MCP resource
+URL. Set `SUPABASE_AUDIENCE` only when a Custom Access Token Hook emits a
+different audience. A token that carries an explicit RFC 8707 `resource` claim
+must still match the canonical MCP resource.
+
 For a deployed server, set `MCP_URL` to its public origin, for example
 `https://mcp.example.com`. The framework derives the protected resource URL as
 `https://mcp.example.com/mcp`, advertises resource metadata there, and checks a

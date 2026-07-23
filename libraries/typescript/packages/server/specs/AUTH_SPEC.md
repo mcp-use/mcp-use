@@ -447,8 +447,10 @@ provider verifier, asserts resource binding against the resolved canonical
 resource URL, then returns the final SDK-compatible `AuthInfo` with `extra`
 merged as `{ ...authInfo.extra, ...provider.mapAuthInfo(authInfo) }`. Binding
 succeeds when the token carries an RFC 8707 `resource` claim matching
-`expectedResource`, or when `authInfo.resource` is absent but audience
-validation was proven (an internal marker set by `createJwtVerifier`).
+`expectedResource`; otherwise a provider-specific audience validated by
+`createJwtVerifier`, an explicitly issuer-bound provider token model, or an
+`aud` claim containing the canonical MCP resource establishes the binding.
+Provider audience identifiers remain separate from the canonical resource URL.
 Therefore every successful bearer-gate result has the typed mcp-use values
 before it reaches fetch middleware, `createMcpMount`, or the SDK callback. Custom providers use
 this same wrapper; they cannot omit the public `mapAuthInfo` callback or rely
@@ -758,7 +760,7 @@ The first implementation phase supplies only the resource-server seam. Provider 
 
 Each adapter verifies tokens, maps verified claims to a typed `user`, preserves the verified payload, provides normalized permissions, and advertises its authorization-server metadata. Each adapter must map claims rather than cast decoded payloads. No adapter offers `verifyJwt: false`.
 
-JWT adapters share a `jose` implementation for remote JWKS caching and signature verification. They always validate issuer and expiry and establish that every token was issued for the canonical MCP resource by validating its audience or RFC 8707 resource binding; a token for which the provider cannot establish that binding is rejected. Opaque-token adapters use RFC 7662 introspection and likewise require the introspection result to establish the canonical MCP resource before mapping it into the same `AuthInfo` contract. Verifiers throw `OAuthError` with `OAuthErrorCode.InvalidToken` for rejected credentials so the core gate returns the correct challenge.
+JWT adapters share a `jose` implementation for remote JWKS caching and signature verification. They always validate issuer and expiry and establish binding using the provider's configured audience, an explicitly issuer-bound provider token model, or the canonical MCP resource in `aud` or an RFC 8707 `resource` claim. Provider-specific audience identifiers do not have to equal the canonical MCP URL. A token with an explicit `resource` claim must match that URL, and a token for which the provider cannot establish any supported binding is rejected. Opaque-token adapters use RFC 7662 introspection and likewise require the introspection result to establish the canonical MCP resource before mapping it into the same `AuthInfo` contract. Verifiers throw `OAuthError` with `OAuthErrorCode.InvalidToken` for rejected credentials so the core gate returns the correct challenge.
 
 In direct mode, clients use the external authorization server's registration, authorization, and token endpoints. mcp-use serves protected-resource metadata, advertises the external authorization server, and verifies the resulting access token. The external authorization server must be advertised for the canonical resource and issue a token specifically bound to that resource, including the RFC 8707 `resource` indicator when applicable. mcp-use never handles authorization codes or client secrets in direct mode.
 

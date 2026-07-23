@@ -20,9 +20,12 @@ cp .env.example .env
 ```
 
 Set `CLERK_AUDIENCE` only when your Clerk access-token configuration uses an
-audience. For public and tunnel deployments, set `MCP_URL` to the server
-origin, such as `https://mcp.example.com`, not the `/mcp` endpoint. The CLI
-derives the canonical protected resource as `https://mcp.example.com/mcp`.
+audience. When omitted, the provider uses Clerk's issuer-bound access-token
+model. In either mode, a token that carries an explicit RFC 8707 `resource`
+claim must match the canonical MCP resource. For public and tunnel
+deployments, set `MCP_URL` to the server origin, such as
+`https://mcp.example.com`, not the `/mcp` endpoint. The CLI derives the
+canonical protected resource as `https://mcp.example.com/mcp`.
 
 Run the server:
 

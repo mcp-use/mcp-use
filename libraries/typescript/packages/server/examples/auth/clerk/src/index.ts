@@ -2,6 +2,8 @@ import { MCPServer } from "mcp-use";
 import { oauthClerkProvider } from "mcp-use/oauth/clerk";
 import { z } from "zod";
 
+const audience = process.env.CLERK_AUDIENCE?.trim();
+
 const getUserInfoOutputSchema = z.object({
   user: z.object({
     id: z.string(),
@@ -27,6 +29,7 @@ const server = new MCPServer({
   publicLandingPage: true,
   oauth: oauthClerkProvider({
     frontendApiUrl: requireEnv("CLERK_FRONTEND_API_URL"),
+    ...(audience && { audience }),
   }),
 });
 
