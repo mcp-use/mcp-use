@@ -293,6 +293,8 @@ const packageJson = JSON.parse(
   readFileSync(join(__dirname, "../package.json"), "utf-8")
 );
 
+const DEFAULT_MCP_USE_VERSION = "2.0.0-beta.25";
+
 function getCurrentPackageVersions(
   isDevelopment: boolean = false,
   sdkVersion?: string
@@ -302,7 +304,7 @@ function getCurrentPackageVersions(
       "mcp-use": "workspace:*",
     };
   }
-  const requestedSdk = sdkVersion ?? "latest";
+  const requestedSdk = sdkVersion ?? DEFAULT_MCP_USE_VERSION;
   return {
     "mcp-use": requestedSdk,
   };
@@ -326,7 +328,7 @@ function processTemplateFile(
 
   const mcpUseVersion = isDevelopment
     ? "workspace:*"
-    : versions["mcp-use"] || "latest";
+    : versions["mcp-use"] || DEFAULT_MCP_USE_VERSION;
 
   if (isDevelopment) {
     processedContent = processedContent.replace(

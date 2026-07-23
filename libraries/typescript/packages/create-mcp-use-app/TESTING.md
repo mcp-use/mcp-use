@@ -101,12 +101,12 @@ cat package.json | grep "mcp-use"
 # Should show: "mcp-use": "canary"
 ```
 
-**Test default (latest versions):**
+**Test default (pinned beta version):**
 ```bash
-npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-latest --template ui
-cd test-latest
+npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-beta --template mcp-apps
+cd test-beta
 cat package.json | grep "mcp-use"
-# Should show: "mcp-use": "latest" or a specific version like "^1.2.3"
+# Should show the exact pinned beta, with no tag or semver range.
 ```
 
 ### 4. Test All Templates
@@ -184,7 +184,7 @@ You can also manually trigger the workflow from the GitHub Actions tab.
 
 - ✅ `--dev` flag creates projects with `workspace:*` versions
 - ✅ `--sdk-version <version>` flag pins `mcp-use` to the given npm version or dist-tag
-- ✅ Default (no flag) creates projects with `latest` or specific versions
+- ✅ Default (no flag) creates projects with the exact pinned beta version
 - ✅ All package dependencies use correct version format
 
 ### Cross-Platform

@@ -12,6 +12,8 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+EXPECTED_DEFAULT_MCP_USE_VERSION="2.0.0-beta.25"
+
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEST_DIR="${TEST_DIR:-/tmp/create-mcp-use-app-test-$$}"
@@ -184,14 +186,14 @@ run_test() {
                 fi
                 echo -e "${GREEN}   ✓ Verified sdk version: $mcp_use_version${NC}"
             else
-                # Check for latest or specific versions (not workspace:* or canary)
+                # The default must be an exact, immutable beta version.
                 local mcp_use_version=$(jq -r '.dependencies."mcp-use"' "$package_json")
-                if [[ "$mcp_use_version" == "workspace:"* ]] || [[ "$mcp_use_version" == "canary" ]]; then
-                    echo -e "${RED}❌ FAILED: Expected latest/specific version, got: $mcp_use_version${NC}"
+                if [[ "$mcp_use_version" != "$EXPECTED_DEFAULT_MCP_USE_VERSION" ]]; then
+                    echo -e "${RED}❌ FAILED: Expected pinned mcp-use@$EXPECTED_DEFAULT_MCP_USE_VERSION, got: $mcp_use_version${NC}"
                     TESTS_FAILED=$((TESTS_FAILED + 1))
                     return 1
                 fi
-                echo -e "${GREEN}   ✓ Verified latest/specific versions${NC}"
+                echo -e "${GREEN}   ✓ Verified pinned mcp-use@$mcp_use_version${NC}"
             fi
 
             if ! grep -q "\-\-dev" <<< "$flag"; then
@@ -254,7 +256,11 @@ run_test "Version-Sdk-Canary" npm mcp-server "--sdk-version canary" ""
 echo ""
 run_test "Version-Sdk-Semver" npm mcp-server "--sdk-version 1.0.0" ""
 echo ""
-run_test "Version-Latest" npm mcp-server "" ""
+run_test "Version-Pinned-Beta-Server" npm mcp-server "" ""
+echo ""
+run_test "Version-Pinned-Beta-Apps" npm mcp-apps "" ""
+echo ""
+run_test "Version-Pinned-Beta-Blank" npm blank "" ""
 echo ""
 
 # Optional: Test with installation (slower)
