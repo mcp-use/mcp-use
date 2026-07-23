@@ -115,7 +115,7 @@ export function useCallTool<const Name extends string>(
 export function useCallTool(
   nameOrRef: string | ToolRef<string, unknown, unknown>
 ) {
-  return useToolCall(nameOrRef);
+  return useToolCall(nameOrRef, "useCallTool");
 }
 
 /**
@@ -142,7 +142,7 @@ export function useDynamicTool<
   Args extends Record<string, unknown>,
   Result = unknown,
 >(name: string): CallToolHandle<Args, Result> {
-  return useToolCall<Args, Result>(name);
+  return useToolCall<Args, Result>(name, "useDynamicTool");
 }
 
 /** Shared hook implementation for inferred and explicitly typed tool calls. */
@@ -150,10 +150,11 @@ function useToolCall<
   Args extends Record<string, unknown> = Record<string, unknown>,
   Result = unknown,
 >(
-  nameOrRef: string | ToolRef<string, unknown, unknown>
+  nameOrRef: string | ToolRef<string, unknown, unknown>,
+  hook: "useCallTool" | "useDynamicTool"
 ): CallToolHandle<Args, Result> {
   const toolName = typeof nameOrRef === "string" ? nameOrRef : nameOrRef.name;
-  const runtime = useViewRuntime();
+  const runtime = useViewRuntime(hook);
   const [data, setData] = useState<CallToolSuccess<Result> | undefined>(
     undefined
   );

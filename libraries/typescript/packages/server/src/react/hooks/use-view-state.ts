@@ -32,7 +32,7 @@ import { useViewRuntime } from "../runtime/view-runtime-context.js";
 export function useViewState<T extends Record<string, unknown>>(
   defaultState: T | (() => T)
 ): readonly [T, (state: SetStateAction<T>) => void] {
-  const runtime = useViewRuntime();
+  const runtime = useViewRuntime("useViewState");
   const store = runtime.modelContextStore;
   const defaultRef = useRef<T | null>(null);
 

@@ -125,7 +125,7 @@ export interface HostContextHandle {
  * ```
  */
 export function useHostContext(): HostContextHandle {
-  const runtime = useViewRuntime();
+  const runtime = useViewRuntime("useHostContext");
   const { hostContext, isConnected } = useSyncExternalStore(
     runtime.subscribeHost,
     runtime.getHostSnapshot
