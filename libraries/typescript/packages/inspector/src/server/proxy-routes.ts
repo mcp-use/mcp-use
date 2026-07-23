@@ -1,7 +1,7 @@
 import type { Hono } from "hono";
+import RateLimiterMemory from "rate-limiter-flexible/lib/RateLimiterMemory.js";
 import { mountMcpProxy, mountOAuthProxy } from "./proxy/index.js";
 import {
-  createInspectorRateLimiter,
   INSPECTOR_API_RATE_LIMIT,
   INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
 } from "./rate-limit.js";
@@ -28,15 +28,10 @@ export function registerInspectorProxyRoutes(
   const p = (suffix: string) => `${basePath}${suffix}`;
   const allowLoopback = config?.oauthProxyAllowLoopback ?? false;
   const mountOAuth = config?.oauth !== false;
-
-  app.use(
-    p("/inspector/api/*"),
-    createInspectorRateLimiter({
-      points: INSPECTOR_API_RATE_LIMIT,
-      durationSeconds: INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
-      key: "inspector-api",
-    })
-  );
+  const apiRateLimiter = new RateLimiterMemory({
+    points: INSPECTOR_API_RATE_LIMIT,
+    duration: INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
+  });
 
   app.get(p("/inspector/health"), (c) => {
     return c.json({
@@ -50,6 +45,7 @@ export function registerInspectorProxyRoutes(
   mountMcpProxy(app, {
     path: p("/inspector/api/proxy"),
     allowLoopback,
+    rateLimiter: apiRateLimiter,
   });
 
   if (mountOAuth) {
@@ -59,6 +55,7 @@ export function registerInspectorProxyRoutes(
       enableLogging: true,
       allowedOrigins: config?.oauthProxyAllowedOrigins ?? [],
       allowLoopback,
+      rateLimiter: apiRateLimiter,
     });
   }
 

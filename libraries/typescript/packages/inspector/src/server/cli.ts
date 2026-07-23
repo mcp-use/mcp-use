@@ -116,9 +116,8 @@ async function startServer() {
       }
     }
     return { port, fetch: app.fetch };
-  } catch (error) {
-    const errorName = error instanceof Error ? error.name : "UnknownError";
-    console.error(`Failed to start server (${errorName}).`);
+  } catch {
+    console.error("Failed to start server (StartupError).");
     process.exit(1);
   }
 }

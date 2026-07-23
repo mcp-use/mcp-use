@@ -13,6 +13,12 @@ import { lookup } from "node:dns/promises";
 import { Buffer } from "node:buffer";
 import { isIP } from "node:net";
 import type { Context, Hono } from "hono";
+import RateLimiterMemory from "rate-limiter-flexible/lib/RateLimiterMemory.js";
+import {
+  INSPECTOR_API_RATE_LIMIT,
+  INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
+  inspectorRateLimitResponse,
+} from "../rate-limit.js";
 
 type OAuthEndpointKind =
   | "registration"
@@ -65,6 +71,8 @@ interface OAuthProxyOptions {
     serverUrl: string,
     c: Context
   ) => Promise<boolean> | boolean;
+  /** Shared process-local limiter for Inspector proxy and OAuth routes. */
+  rateLimiter?: RateLimiterMemory;
 }
 
 const SAFE_REQUEST_HEADERS = new Set([
@@ -108,6 +116,10 @@ export function mountOAuthProxy(
     enableLogging = true,
     authenticate,
     validateServerUrl,
+    rateLimiter: configuredRateLimiter = new RateLimiterMemory({
+      points: INSPECTOR_API_RATE_LIMIT,
+      duration: INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
+    }),
   } = options;
   const origins = new Set(allowedOrigins.map(normalizeOrigin));
   const bindings = new Map<string, Binding>();
@@ -126,6 +138,11 @@ export function mountOAuthProxy(
   });
 
   app.get(`${basePath}/metadata`, async (c) => {
+    try {
+      await configuredRateLimiter.consume("inspector-api");
+    } catch (error) {
+      return inspectorRateLimitResponse(c, error);
+    }
     if (!(await isAuthenticated(c, authenticate))) {
       return c.json({ error: "Unauthorized" }, 401);
     }
@@ -227,6 +244,11 @@ export function mountOAuthProxy(
   });
 
   app.post(`${basePath}/proxy`, async (c) => {
+    try {
+      await configuredRateLimiter.consume("inspector-api");
+    } catch (error) {
+      return inspectorRateLimitResponse(c, error);
+    }
     if (!(await isAuthenticated(c, authenticate))) {
       return c.json({ error: "Unauthorized" }, 401);
     }

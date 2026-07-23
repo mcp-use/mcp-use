@@ -1,3 +1,6 @@
+// eslint-disable-next-line @typescript-eslint/triple-slash-reference -- tsup's declaration build does not automatically include this ambient subpath type.
+/// <reference path="../rate-limiter-flexible-memory.d.ts" />
+
 /**
  * MCP Inspector - local Fetch handler and framework mounting adapters
  *

@@ -1,32 +1,33 @@
 import { Hono } from "hono";
+import RateLimiterMemory from "rate-limiter-flexible/lib/RateLimiterMemory.js";
 import { describe, expect, it } from "vitest";
 import {
-  createInspectorRateLimiter,
   INSPECTOR_API_RATE_LIMIT,
   INSPECTOR_ASSET_RATE_LIMIT,
+  inspectorRateLimitResponse,
 } from "../../src/server/rate-limit.js";
 
 describe("Inspector route rate limits", () => {
   it("uses separate budgets for assets and proxy/OAuth traffic", async () => {
     const app = new Hono();
-    app.use(
-      "/assets/*",
-      createInspectorRateLimiter({
-        points: 2,
-        durationSeconds: 60,
-        key: "assets",
-      })
-    );
-    app.use(
-      "/api/*",
-      createInspectorRateLimiter({
-        points: 1,
-        durationSeconds: 60,
-        key: "api",
-      })
-    );
-    app.get("/assets/*", (c) => c.text("asset"));
-    app.get("/api/*", (c) => c.text("api"));
+    const assetLimiter = new RateLimiterMemory({ points: 2, duration: 60 });
+    const apiLimiter = new RateLimiterMemory({ points: 1, duration: 60 });
+    app.get("/assets/*", async (c) => {
+      try {
+        await assetLimiter.consume("assets");
+      } catch (error) {
+        return inspectorRateLimitResponse(c, error);
+      }
+      return c.text("asset");
+    });
+    app.get("/api/*", async (c) => {
+      try {
+        await apiLimiter.consume("api");
+      } catch (error) {
+        return inspectorRateLimitResponse(c, error);
+      }
+      return c.text("api");
+    });
 
     expect((await app.request("/assets/app.js")).status).toBe(200);
     expect((await app.request("/api/proxy")).status).toBe(200);
@@ -43,15 +44,15 @@ describe("Inspector route rate limits", () => {
 
   it("allows traffic again after the window resets", async () => {
     const app = new Hono();
-    app.use(
-      "/limited",
-      createInspectorRateLimiter({
-        points: 1,
-        durationSeconds: 1,
-        key: "reset",
-      })
-    );
-    app.get("/limited", (c) => c.text("ok"));
+    const limiter = new RateLimiterMemory({ points: 1, duration: 1 });
+    app.get("/limited", async (c) => {
+      try {
+        await limiter.consume("reset");
+      } catch (error) {
+        return inspectorRateLimitResponse(c, error);
+      }
+      return c.text("ok");
+    });
 
     expect((await app.request("/limited")).status).toBe(200);
     expect((await app.request("/limited")).status).toBe(429);
