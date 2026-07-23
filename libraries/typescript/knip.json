@@ -63,7 +63,11 @@
         "tests/e2e/**/*.{ts,tsx,mjs}"
       ],
       "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"],
-      "ignoreDependencies": ["tailwindcss", "tw-animate-css"]
+      "ignoreDependencies": [
+        "inspector-rate-limiter-memory",
+        "tailwindcss",
+        "tw-animate-css"
+      ]
     },
     "packages/create-mcp-use-app": {
       "entry": ["scripts/**/*.{js,mjs,ts}", "src/index.ts"],
