@@ -12,8 +12,8 @@
 import { lookup } from "node:dns/promises";
 import { Buffer } from "node:buffer";
 import { isIP } from "node:net";
-import type { Context, Hono } from "hono";
-import RateLimiterMemory from "rate-limiter-flexible/lib/RateLimiterMemory.js";
+import type { Context, Hono, Next } from "hono";
+import { RateLimiterMemory } from "rate-limiter-flexible";
 import {
   INSPECTOR_API_RATE_LIMIT,
   INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
@@ -124,6 +124,16 @@ export function mountOAuthProxy(
   const origins = new Set(allowedOrigins.map(normalizeOrigin));
   const bindings = new Map<string, Binding>();
   const confidentialClients = new Map<string, ConfidentialClient>();
+  const rateLimit = async (c: Context, next: Next) => {
+    try {
+      await configuredRateLimiter.consume(
+        `${c.req.raw.constructor.name}:inspector-api`
+      );
+    } catch (error) {
+      return inspectorRateLimitResponse(c, error);
+    }
+    return next();
+  };
 
   app.use(`${basePath}/*`, async (c, next) => {
     const origin = c.req.header("Origin");
@@ -137,12 +147,7 @@ export function mountOAuthProxy(
     if (origin) setCorsHeaders(c.res.headers, origin);
   });
 
-  app.get(`${basePath}/metadata`, async (c) => {
-    try {
-      await configuredRateLimiter.consume("inspector-api");
-    } catch (error) {
-      return inspectorRateLimitResponse(c, error);
-    }
+  app.get(`${basePath}/metadata`, rateLimit, async (c) => {
     if (!(await isAuthenticated(c, authenticate))) {
       return c.json({ error: "Unauthorized" }, 401);
     }
@@ -243,12 +248,7 @@ export function mountOAuthProxy(
     }
   });
 
-  app.post(`${basePath}/proxy`, async (c) => {
-    try {
-      await configuredRateLimiter.consume("inspector-api");
-    } catch (error) {
-      return inspectorRateLimitResponse(c, error);
-    }
+  app.post(`${basePath}/proxy`, rateLimit, async (c) => {
     if (!(await isAuthenticated(c, authenticate))) {
       return c.json({ error: "Unauthorized" }, 401);
     }

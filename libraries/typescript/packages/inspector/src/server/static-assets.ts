@@ -2,8 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { gunzipSync } from "node:zlib";
-import type { Hono } from "hono";
-import RateLimiterMemory from "rate-limiter-flexible/lib/RateLimiterMemory.js";
+import type { Context, Hono, Next } from "hono";
+import { RateLimiterMemory } from "rate-limiter-flexible";
 import {
   INSPECTOR_ASSET_RATE_LIMIT,
   INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
@@ -46,13 +46,18 @@ export function registerInspectorStaticAssets(
     points: INSPECTOR_ASSET_RATE_LIMIT,
     duration: INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
   });
-
-  app.get(`${mountPath}/*`, async (c) => {
+  const rateLimit = async (c: Context, next: Next) => {
     try {
-      await rateLimiter.consume("inspector-assets");
+      await rateLimiter.consume(
+        `${c.req.raw.constructor.name}:inspector-assets`
+      );
     } catch (error) {
       return inspectorRateLimitResponse(c, error);
     }
+    return next();
+  };
+
+  app.get(`${mountPath}/*`, rateLimit, async (c) => {
     const subPath = c.req.path.slice(mountPath.length);
     const relative = subPath.startsWith("/") ? subPath.slice(1) : subPath;
     if (!relative || relative.includes("..")) {

@@ -7,10 +7,10 @@
  * @module mcp-proxy
  */
 
-import type { Context, Hono } from "hono";
+import type { Context, Hono, Next } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
-import RateLimiterMemory from "rate-limiter-flexible/lib/RateLimiterMemory.js";
+import { RateLimiterMemory } from "rate-limiter-flexible";
 import {
   INSPECTOR_API_RATE_LIMIT,
   INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
@@ -135,6 +135,14 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
       points: INSPECTOR_API_RATE_LIMIT,
       duration: INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
     });
+  const rateLimit = async (c: Context, next: Next) => {
+    try {
+      await rateLimiter.consume(`${c.req.raw.constructor.name}:inspector-api`);
+    } catch (error) {
+      return inspectorRateLimitResponse(c, error);
+    }
+    return next();
+  };
 
   // CRITICAL: Enable CORS and expose all headers for FastMCP session management
   // The Mcp-Session-Id header MUST be exposed for the browser to read it
@@ -165,12 +173,7 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
   }
 
   // Handle all HTTP methods for the proxy
-  app.all(`${basePath}/*`, async (c) => {
-    try {
-      await rateLimiter.consume("inspector-api");
-    } catch (error) {
-      return inspectorRateLimitResponse(c, error);
-    }
+  app.all(`${basePath}/*`, rateLimit, async (c) => {
     try {
       // Optional authentication
       if (options.authenticate) {

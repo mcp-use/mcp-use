@@ -1,5 +1,5 @@
 import type { Hono } from "hono";
-import RateLimiterMemory from "rate-limiter-flexible/lib/RateLimiterMemory.js";
+import { RateLimiterMemory } from "rate-limiter-flexible";
 import { mountMcpProxy, mountOAuthProxy } from "./proxy/index.js";
 import {
   INSPECTOR_API_RATE_LIMIT,
