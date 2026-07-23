@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 20.0.0-beta.38
+
+### Patch Changes
+
+- 24d2024: Make MCP Apps Chat messages await delivery, scope widget model context to the active Chat surface, and keep app-only tools out of model tool registries.
+  - mcp-use@2.0.0-beta.46
+
 ## 20.0.0-beta.37
 
 ### Patch Changes

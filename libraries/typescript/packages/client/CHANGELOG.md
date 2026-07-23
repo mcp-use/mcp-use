@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.0.0-beta.14
+
+### Patch Changes
+
+- 24d2024: Make MCP Apps Chat messages await delivery, scope widget model context to the active Chat surface, and keep app-only tools out of model tool registries.
+
 ## 2.0.0-beta.13
 
 ### Patch Changes

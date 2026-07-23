@@ -18,6 +18,7 @@
     "build-v2-external-view-assets",
     "bun-pm-and-source-maps",
     "bundle-cli-build-pipeline",
+    "calm-chats-follow",
     "calm-proxies-compose",
     "chatgpt-files-hook",
     "clean-create-app-inspector-deps",
