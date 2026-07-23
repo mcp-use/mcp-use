@@ -1,5 +1,12 @@
 # @mcp-use/agent
 
+## 2.0.0-beta.14
+
+### Patch Changes
+
+- Updated dependencies [ac3d1eb]
+  - @mcp-use/client@2.0.0-beta.13
+
 ## 2.0.0-beta.13
 
 ### Patch Changes
