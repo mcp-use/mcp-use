@@ -8,20 +8,6 @@ import {
 
 import type { McpAppRuntime } from "./view-runtime.js";
 
-type ViewHook =
-  | "useCallTool"
-  | "useDisplayMode"
-  | "useDynamicTool"
-  | "useFiles"
-  | "useHostContext"
-  | "useOpenExternal"
-  | "useSendFollowUp"
-  | "useSendSizeChanged"
-  | "useToolContext"
-  | "useViewState"
-  | "useViewTheme"
-  | "useViewTool";
-
 /**
  * React context holding the document's {@link McpAppRuntime}.
  *
@@ -65,7 +51,7 @@ export function ViewRuntimeProvider({
  *
  * @internal
  */
-export function useViewRuntime(_hook?: ViewHook): McpAppRuntime {
+export function useViewRuntime(): McpAppRuntime {
   const runtime = useContext(ViewRuntimeContext);
   if (!runtime) {
     throw new Error(

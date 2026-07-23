@@ -6,6 +6,13 @@ export interface RunOptions<T = string> {
   prompt?: string;
   maxSteps?: number;
   manageConnector?: boolean;
+  /**
+   * Additional LangChain-formatted history for this call.
+   *
+   * The native agent appends it after memory-enabled stored conversation and
+   * before `messages` and the current `prompt`. It does not clear or replace
+   * stored memory.
+   */
   externalHistory?: BaseMessage[];
   messages?: ProviderMessage[];
   schema?: ZodSchema<T>;

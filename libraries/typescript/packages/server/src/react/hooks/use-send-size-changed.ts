@@ -61,6 +61,6 @@ export function useSendSizeChanged(): (size: {
   width?: number;
   height?: number;
 }) => Promise<void> {
-  const runtime = useViewRuntime("useSendSizeChanged");
+  const runtime = useViewRuntime();
   return runtime.sendSizeChanged;
 }

@@ -114,4 +114,24 @@ describe("convertExternalHistoryToProvider", () => {
       },
     ]);
   });
+
+  it("preserves errors from replayed LangChain tool messages", () => {
+    expect(
+      convertExternalHistoryToProvider([
+        new ToolMessage({
+          content: "Tool failed",
+          tool_call_id: "call_error",
+          status: "error",
+        }),
+      ])
+    ).toEqual([
+      {
+        role: "tool",
+        content: "Tool failed",
+        toolCallId: "call_error",
+        toolResult: "Tool failed",
+        toolIsError: true,
+      },
+    ]);
+  });
 });

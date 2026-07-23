@@ -34,7 +34,7 @@ import { useViewRuntime } from "../runtime/view-runtime-context.js";
  * ```
  */
 export function useOpenExternal(): (args: { url: string }) => Promise<void> {
-  const runtime = useViewRuntime("useOpenExternal");
+  const runtime = useViewRuntime();
   return useCallback(
     async (args: { url: string }) => {
       await runtime.openLink({ url: args.url });

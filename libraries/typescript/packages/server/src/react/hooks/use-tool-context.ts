@@ -89,7 +89,7 @@ export type ToolContextHandle<Name extends keyof RegisteredTools = never> =
 export function useToolContext<
   Name extends keyof RegisteredTools = never,
 >(): ToolContextHandle<Name> {
-  const runtime = useViewRuntime("useToolContext");
+  const runtime = useViewRuntime();
   const snap = useSyncExternalStore(
     runtime.subscribeTool,
     runtime.getToolSnapshot

@@ -18,11 +18,22 @@ describe("capturePostHog", () => {
         query: "private prompt",
         response: "private response",
         authorization_header: "Bearer secret",
+        authorizationHeader: "Bearer camel-secret",
         server_identifier: "private-server",
+        serverName: "private-camel-server",
+        servers: ["private-server"],
         tools_used_names: ["private-tool"],
+        toolsAvailableNames: ["private-camel-tool"],
         model_name: "gpt-test",
         query_length: 14,
         response_length: "private response",
+        profile: {
+          accessToken: "private-token",
+          nested: {
+            callbackUrl: "https://private.example",
+            modelProvider: "openai",
+          },
+        },
       },
     });
 
@@ -31,6 +42,41 @@ describe("capturePostHog", () => {
     expect(body.properties).toEqual({
       model_name: "gpt-test",
       query_length: 14,
+      profile: {
+        nested: {
+          modelProvider: "openai",
+        },
+      },
+    });
+  });
+
+  it("sanitizes nested identify properties", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response());
+    vi.stubGlobal("fetch", fetchMock);
+
+    await capturePostHog({
+      event: "$identify",
+      distinctId: "anonymous-id",
+      properties: {
+        $set: {
+          plan: "pro",
+          apiToken: "private-token",
+          serverName: "private-server",
+          preferences: {
+            callbackUrl: "https://private.example",
+            theme: "dark",
+          },
+        },
+      },
+    });
+
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const body = JSON.parse(String(init.body));
+    expect(body.properties).toEqual({
+      $set: {
+        plan: "pro",
+        preferences: { theme: "dark" },
+      },
     });
   });
 

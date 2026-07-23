@@ -98,9 +98,9 @@ describe("MCPClient Telemetry Integration", () => {
         sandbox: false,
         all_callbacks: false,
         verify: false,
-        servers: [],
         num_servers: 0,
       });
+      expect(captureCall.properties).not.toHaveProperty("servers");
     });
 
     it("should track init event with codeMode enabled", async () => {
@@ -154,9 +154,10 @@ describe("MCPClient Telemetry Integration", () => {
         sandbox: false,
         all_callbacks: false,
         verify: false,
-        servers: ["server-1", "server-2"],
         num_servers: 2,
       });
+      expect(JSON.stringify(captureCall.properties)).not.toContain("server-1");
+      expect(JSON.stringify(captureCall.properties)).not.toContain("server-2");
     });
 
     it("should track init event with sampling callback", async () => {
@@ -221,9 +222,11 @@ describe("MCPClient Telemetry Integration", () => {
         sandbox: false,
         all_callbacks: false,
         verify: false,
-        servers: ["test-server"],
         num_servers: 1,
       });
+      expect(JSON.stringify(captureCall.properties)).not.toContain(
+        "test-server"
+      );
     });
   });
 });

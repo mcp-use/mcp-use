@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { ConnectionManager } from "../../../src/transport/connection-manager.js";
 
 class TestConnectionManager extends ConnectionManager<{ id: number }> {
-  readonly establish = vi.fn(async () => ({ id: 1 }));
+  private nextId = 0;
+  readonly establish = vi.fn(async () => ({ id: ++this.nextId }));
   readonly close = vi.fn(async () => {});
 
   protected establishConnection(): Promise<{ id: number }> {
@@ -40,6 +41,31 @@ describe("ConnectionManager", () => {
     await manager.start();
 
     expect(manager.establish).toHaveBeenCalledTimes(2);
+    await manager.stop();
+  });
+
+  it("waits for an in-progress stop before restarting", async () => {
+    const manager = new TestConnectionManager();
+    let releaseFirstClose!: () => void;
+    const firstClose = new Promise<void>((resolve) => {
+      releaseFirstClose = resolve;
+    });
+    manager.close.mockImplementation(async ({ id }) => {
+      if (id === 1) await firstClose;
+    });
+
+    await expect(manager.start()).resolves.toEqual({ id: 1 });
+    const stopping = manager.stop();
+    await vi.waitFor(() => expect(manager.close).toHaveBeenCalledOnce());
+
+    const restarting = manager.start();
+    expect(manager.establish).toHaveBeenCalledOnce();
+
+    releaseFirstClose();
+    await stopping;
+    await expect(restarting).resolves.toEqual({ id: 2 });
+    expect(manager.establish).toHaveBeenCalledTimes(2);
+
     await manager.stop();
   });
 });

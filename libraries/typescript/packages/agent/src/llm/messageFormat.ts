@@ -31,6 +31,7 @@ type LangChainMessageLike = BaseMessage & {
   type?: string;
   tool_call_id?: string;
   name?: string;
+  status?: "success" | "error";
   tool_calls?: Array<{
     id?: string;
     name: string;
@@ -92,12 +93,15 @@ export function convertExternalHistoryToProvider(
       };
     }
     if (type === "tool") {
+      const toolIsError =
+        message.status === "error" || isToolResultError(message.content);
       return {
         role: "tool",
         content,
         toolCallId: message.tool_call_id ?? `external_${index}`,
         ...(message.name ? { toolName: message.name } : {}),
         toolResult: message.content,
+        ...(toolIsError ? { toolIsError: true } : {}),
       };
     }
     throw new TypeError(

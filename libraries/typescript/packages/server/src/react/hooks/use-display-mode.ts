@@ -58,7 +58,7 @@ export function useDisplayMode(): {
    */
   requestDisplayMode: (args: { mode: DisplayMode }) => Promise<void>;
 } {
-  const runtime = useViewRuntime("useDisplayMode");
+  const runtime = useViewRuntime();
   const { displayMode, availableDisplayModes } = useSyncExternalStore(
     runtime.subscribeDisplay,
     runtime.getDisplaySnapshot

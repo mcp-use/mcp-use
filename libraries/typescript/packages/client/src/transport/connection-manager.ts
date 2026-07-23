@@ -12,6 +12,7 @@ export abstract class ConnectionManager<T = any> {
   private _task: Promise<void> | null = null;
   private _abortController: AbortController | null = null;
   private _startPromise: Promise<T> | null = null;
+  private _stopPromise: Promise<void> | null = null;
 
   constructor() {
     this.reset();
@@ -45,6 +46,9 @@ export abstract class ConnectionManager<T = any> {
    * @throws If the connection cannot be established.
    */
   start(): Promise<T> {
+    if (this._stopPromise) {
+      return this._stopPromise.then(() => this.start());
+    }
     if (this._startPromise) return this._startPromise;
 
     // Reset internal state before starting
@@ -80,9 +84,20 @@ export abstract class ConnectionManager<T = any> {
   /**
    * Stop the connection manager and close the connection.
    */
-  async stop(): Promise<void> {
-    if (!this._task) return;
+  stop(): Promise<void> {
+    if (this._stopPromise) return this._stopPromise;
+    if (!this._task) return Promise.resolve();
 
+    const trackedStop = this.stopTask().finally(() => {
+      if (this._stopPromise === trackedStop) {
+        this._stopPromise = null;
+      }
+    });
+    this._stopPromise = trackedStop;
+    return trackedStop;
+  }
+
+  private async stopTask(): Promise<void> {
     if (this._task && this._abortController) {
       logger.debug(`Cancelling ${this.constructor.name} task`);
 

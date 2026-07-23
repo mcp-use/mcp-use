@@ -161,7 +161,7 @@ Runs a prompt to completion and returns the final result. Without a schema, the 
 
 <ParamField body="options.maxSteps" type="number" default="constructor maxSteps" >Maximum model-call steps for this run. The constructor default is `5`.</ParamField>
 <ParamField body="options.manageConnector" type="boolean" default="true" >Whether the agent should initialize connections before the run and clean up connector-only runs after completion.</ParamField>
-<ParamField body="options.externalHistory" type="BaseMessage[]" default="conversation history" >History to use for this run instead of the agent's stored conversation history.</ParamField>
+<ParamField body="options.externalHistory" type="BaseMessage[]" default="undefined" >Additional LangChain-formatted history for this run. The native agent places stored memory first (when enabled), then `externalHistory`, `messages`, and the current prompt. Supplying it does not clear or replace stored memory.</ParamField>
 <ParamField body="options.schema" type="ZodSchema<T>" default="undefined" >Schema for structured output. When present, `run()` returns `Promise<T>`.</ParamField>
 <ParamField body="options.signal" type="AbortSignal" default="undefined" >Abort signal passed to the underlying LangChain execution.</ParamField>
 
@@ -838,7 +838,8 @@ Options object accepted by `run`, `stream`, `streamEvents`, and `prettyStreamEve
 >   Whether the agent manages initialization and connector cleanup for the call.
 > </ResponseField>
 > <ResponseField name="externalHistory" type="BaseMessage[]">
->   Conversation history override for the call.
+>   Additional history appended after the native agent's stored memory and
+>   before provider messages and the current prompt.
 > </ResponseField>
 > <ResponseField name="schema" type="ZodSchema<T>">
 >   Zod schema for structured output.

@@ -39,9 +39,9 @@ MCP_USE_LANGFUSE=true  # Set to false to disable
 The observability is automatically integrated into MCPAgent:
 
 ```typescript
-import { MCPAgent } from "@mcp-use/agent/langchain";
+import { LangChainMCPAgent } from "@mcp-use/agent/langchain";
 
-const agent = new MCPAgent({
+const agent = new LangChainMCPAgent({
   llm: myLLM,
   client: myMCPClient,
   // Observability is automatically enabled if environment variables are set
@@ -60,14 +60,14 @@ You can provide custom callbacks:
 
 ```typescript
 import { CallbackHandler } from "langfuse-langchain";
-import { MCPAgent } from "@mcp-use/agent/langchain";
+import { LangChainMCPAgent } from "@mcp-use/agent/langchain";
 
 const customHandler = new CallbackHandler({
   secretKey: "custom-secret",
   publicKey: "custom-public",
 });
 
-const agent = new MCPAgent({
+const agent = new LangChainMCPAgent({
   llm: myLLM,
   client: myMCPClient,
   callbacks: [customHandler], // Use custom callbacks instead of auto-detected ones
@@ -117,7 +117,7 @@ await manager.shutdown();
 For serverless environments (AWS Lambda, Vercel, etc.), ensure proper shutdown:
 
 ```typescript
-const agent = new MCPAgent({
+const agent = new LangChainMCPAgent({
   /* ... */
 });
 
