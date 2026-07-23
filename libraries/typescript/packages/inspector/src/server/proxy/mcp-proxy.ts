@@ -137,7 +137,9 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
     });
   const rateLimit = async (c: Context, next: Next) => {
     try {
-      await rateLimiter.consume(`${c.req.raw.constructor.name}:inspector-api`);
+      // RateLimiterMemory prefixes and stringifies keys. The Hono request
+      // wrapper therefore maps every request to one mounted-instance budget.
+      await rateLimiter.consume(c.req as unknown as string);
     } catch (error) {
       return inspectorRateLimitResponse(c, error);
     }
