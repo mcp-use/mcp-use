@@ -1,7 +1,12 @@
 import { serve } from "@hono/node-server";
 import open from "open";
 import { createDevApiApp } from "./create-dev-api-app.js";
-import { isPortAvailable, parsePortFromArgs, hasNoOpenFlag } from "./utils.js";
+import {
+  formatErrorDiagnostic,
+  hasNoOpenFlag,
+  isPortAvailable,
+  parsePortFromArgs,
+} from "./utils.js";
 
 const isDev =
   process.env.NODE_ENV === "development" || process.env.VITE_DEV === "true";
@@ -54,13 +59,15 @@ async function startServer() {
         console.warn(
           `Browser could not be opened automatically. Open ${url} manually.`
         );
-        console.error(error);
+        console.error(`Browser open error: ${formatErrorDiagnostic(error)}`);
       }
     }
 
     return { port, fetch: app.fetch };
   } catch (error) {
-    console.error("Failed to start server (StartupError).", error);
+    console.error(
+      `Failed to start server (StartupError): ${formatErrorDiagnostic(error)}`
+    );
     process.exit(1);
   }
 }

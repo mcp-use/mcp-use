@@ -6,7 +6,11 @@ import { cors } from "hono/cors";
 import open from "open";
 import { registerInspectorShell } from "./inspector-shell.js";
 import { registerInspectorProxyRoutes } from "./proxy-routes.js";
-import { findAvailablePort, isValidUrl } from "./utils.js";
+import {
+  findAvailablePort,
+  formatErrorDiagnostic,
+  isValidUrl,
+} from "./utils.js";
 import { getInspectorVersion } from "./version.js";
 
 const args = process.argv.slice(2);
@@ -115,12 +119,14 @@ async function startServer() {
         console.log(
           `Browser could not be opened automatically. Open ${openUrl.toString()} manually.`
         );
-        console.error(error);
+        console.error(`Browser open error: ${formatErrorDiagnostic(error)}`);
       }
     }
     return { port, fetch: app.fetch };
   } catch (error) {
-    console.error("Failed to start server (StartupError).", error);
+    console.error(
+      `Failed to start server (StartupError): ${formatErrorDiagnostic(error)}`
+    );
     process.exit(1);
   }
 }
