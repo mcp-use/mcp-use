@@ -16,7 +16,7 @@
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
     "resolveJsonModule": true,
-    "noUncheckedSideEffectImports": false
+    "noUncheckedSideEffectImports": true
   },
-  "include": ["src/**/*", "views/**/*"]
+  "include": ["mcp-env.d.ts", "src/**/*", "views/**/*"]
 }

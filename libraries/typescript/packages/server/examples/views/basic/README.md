@@ -22,7 +22,7 @@ and the per-action hooks).
   `pip`).
 - **Explicit presentation composition** — the default export wraps content in
   `ThemeProvider` and `ViewControls` directly (there is no `McpUseProvider`).
-- **Zero-codegen typing** via `src/mcp-env.d.ts` and exported tool refs
+- **Zero-codegen typing** via `mcp-env.d.ts` and exported tool refs
   (`searchFruits`, `getFruitDetails`).
 - **Capability gating** — `search-fruits` returns a markdown table fallback when
   the client does not advertise MCP Apps support.
@@ -63,8 +63,8 @@ pnpm build && pnpm start
 View bundles never import server code. Types cross in type-space only:
 
 ```ts
-// src/mcp-env.d.ts
-declare module "*.css";
+// mcp-env.d.ts
+import "mcp-use/vite-client";
 
 declare module "mcp-use/react" {
   interface Register {

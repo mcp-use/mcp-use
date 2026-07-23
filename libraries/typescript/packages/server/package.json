@@ -29,6 +29,9 @@
       "types": "./dist/react/index.d.ts",
       "import": "./dist/react/index.js"
     },
+    "./vite-client": {
+      "types": "./dist/vite-client.d.ts"
+    },
     "./landing": {
       "types": "./dist/landing.d.ts",
       "import": "./dist/landing.js"

@@ -107,7 +107,7 @@ describe("runBuild", () => {
 
     const envDeclaration = readFileSync(join(cwd, "mcp-env.d.ts"), "utf8");
     expect(envDeclaration).toContain('tools: typeof import("./src/index.js")');
-    expect(envDeclaration).toContain('declare module "*.css"');
+    expect(envDeclaration).toContain('import "mcp-use/vite-client"');
 
     const buildDir = join(cwd, WORKSPACE_DIR_NAME, "build");
     const entryFile = join(buildDir, "index.js");

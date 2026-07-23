@@ -10,7 +10,7 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "noUncheckedSideEffectImports": false
+    "noUncheckedSideEffectImports": true
   },
   "include": [
     "index.ts",

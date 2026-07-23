@@ -11,5 +11,5 @@
     "outDir": "dist",
     "declaration": true
   },
-  "include": ["tools.d.ts", "src/**/*", "views/**/*"]
+  "include": ["mcp-env.d.ts", "src/**/*", "views/**/*"]
 }

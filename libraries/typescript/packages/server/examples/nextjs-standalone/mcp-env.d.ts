@@ -1,5 +1,5 @@
 // mcp-use generated env declaration
-declare module "*.css";
+import "mcp-use/vite-client";
 
 declare module "mcp-use/react" {
   interface Register {

@@ -282,7 +282,7 @@ describe("runDev", () => {
       'tools: typeof import("./src/index.js")'
     );
     expect(readFileSync(join(cwd, "mcp-env.d.ts"), "utf8")).toContain(
-      'declare module "*.css"'
+      'import "mcp-use/vite-client"'
     );
   });
 

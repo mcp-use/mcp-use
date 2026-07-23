@@ -1,4 +1,4 @@
-import { readdirSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -10,6 +10,9 @@ if (!files.includes(join("dist", "bin.js"))) {
 }
 if (!files.includes(join("dist", "index.js"))) {
   throw new Error("Missing dist/index.js");
+}
+if (!existsSync(join(root, "types", "vite-client.d.ts"))) {
+  throw new Error("Missing types/vite-client.d.ts");
 }
 if (files.some((file) => file.endsWith(".map"))) {
   throw new Error("CLI package must not publish source maps");
