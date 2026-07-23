@@ -124,10 +124,6 @@ function sharedAppOrigin(origin: string): string {
   return `${url.protocol}//manufact.com`;
 }
 
-function sharedLoginUrl(origin: string): string {
-  return `${sharedAppOrigin(origin)}/login`;
-}
-
 function sharedSignOutUrl(origin: string): string {
   return `${sharedAppOrigin(origin)}/auth/embedded-sign-out`;
 }
@@ -514,28 +510,6 @@ export async function authorizeManufact(
   );
   if (!popup) throw new Error("Allow popups to sign in with Manufact");
   emit(origin, { authorizing: true });
-  if (canShareManufactSession(window.location.href, origin)) {
-    popup.location.href = sharedLoginUrl(origin);
-    const sessionPoll = window.setInterval(async () => {
-      if (popup.closed) {
-        window.clearInterval(sessionPoll);
-        emit(origin, { authorizing: false });
-        return;
-      }
-      const user = await fetchSessionUser(origin);
-      if (!user) return;
-      window.clearInterval(sessionPoll);
-      popup.close();
-      emit(origin, {
-        loaded: true,
-        authorizing: false,
-        accessToken: null,
-        user,
-        mode: "session",
-      });
-    }, 1000);
-    return;
-  }
   try {
     const metadata = await discover(origin);
     const client = await getClient(origin, metadata);
