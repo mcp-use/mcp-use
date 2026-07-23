@@ -37,20 +37,15 @@ import {
   useViewDisplayModeControls,
   VIEW_DIMENSIONS,
 } from "./use-display-mode.js";
+import {
+  assertAppCanCallTool,
+  buildDefaultHostCapabilities,
+  resolveRequestedDisplayMode,
+} from "./view-host-policy.js";
 
 const DEFAULT_HOST_INFO = { name: "mcp-use-client", version: "2.0.0" } as const;
 const DEFAULT_TOOL_CALL_TIMEOUT = 600_000;
 const SANDBOX_PROXY_READY = "ui/notifications/sandbox-proxy-ready";
-const DEFAULT_HOST_CAPABILITIES: McpUiHostCapabilities = {
-  openLinks: {},
-  serverTools: {},
-  serverResources: {},
-  logging: {},
-  updateModelContext: { text: {} },
-  // ponytail: always advertised; bridge.onmessage no-ops when onMessage unset
-  message: { text: {} },
-};
-
 function CloseIcon() {
   return (
     <svg
@@ -171,6 +166,18 @@ function ViewRendererBase({
   const [internalDisplayMode, setInternalDisplayMode] =
     useState<ViewDisplayMode>("inline");
   const displayMode = displayModeProp ?? internalDisplayMode;
+  const effectiveHostCapabilities = useMemo<McpUiHostCapabilities>(
+    () => ({
+      ...buildDefaultHostCapabilities({
+        hasConnection: source.kind === "live",
+        hasMessageHandler: onMessage !== undefined,
+        hasModelContextHandler: onModelContextUpdate !== undefined,
+        hasLogHandler: onLog !== undefined,
+      }),
+      ...hostCapabilities,
+    }),
+    [hostCapabilities, onLog, onMessage, onModelContextUpdate, source.kind]
+  );
 
   // Guest hostContext must track the shell's displayMode even when the parent
   // only uses ViewRenderer's internal state (e.g. inspector chat).
@@ -441,7 +448,7 @@ function ViewRendererBase({
         if (disposed) return;
 
         const capabilities: McpUiHostCapabilities = {
-          ...(hostCapabilities ?? DEFAULT_HOST_CAPABILITIES),
+          ...effectiveHostCapabilities,
           sandbox: {
             csp: cspMode === "permissive" ? undefined : resolved.csp,
             permissions: resolved.permissions,
@@ -452,84 +459,101 @@ function ViewRendererBase({
           hostContext: hostContextRef.current,
         });
 
-        bridge.onmessage = async ({
-          content,
-        }: McpUiMessageRequest["params"]) => {
-          if (content.length > 0 && onMessageRef.current) {
-            onMessageRef.current(content);
-          }
-          return {};
-        };
+        if (capabilities.message) {
+          bridge.onmessage = async ({
+            content,
+          }: McpUiMessageRequest["params"]) => {
+            if (!onMessageRef.current) {
+              throw new Error("This host surface does not support ui/message");
+            }
+            if (content.length > 0) {
+              onMessageRef.current(content);
+            }
+            return {};
+          };
+        }
 
         bridge.onopenlink = async ({ url }: McpUiOpenLinkRequest["params"]) => {
           if (url) window.open(url, "_blank", "noopener,noreferrer");
           return {};
         };
 
-        bridge.oncalltool = (async ({
-          name,
-          arguments: args,
-        }: CallToolRequest["params"]) => {
-          const conn = connectionRef.current;
-          if (!conn) throw new Error("Server connection not available");
-          try {
-            return await conn.callTool(name, args || {}, {
-              timeout: toolCallTimeout,
-              resetTimeoutOnProgress: true,
-            });
-          } catch (error) {
-            bridge?.sendToolCancelled({
-              reason: error instanceof Error ? error.message : String(error),
-            });
-            throw error;
-          }
-        }) as typeof bridge.oncalltool;
+        if (capabilities.serverTools) {
+          bridge.oncalltool = (async ({
+            name,
+            arguments: args,
+          }: CallToolRequest["params"]) => {
+            const conn = connectionRef.current;
+            if (!conn) throw new Error("Server connection not available");
+            assertAppCanCallTool(conn.tools, name);
+            try {
+              return await conn.callTool(name, args || {}, {
+                timeout: toolCallTimeout,
+                resetTimeoutOnProgress: true,
+              });
+            } catch (error) {
+              bridge?.sendToolCancelled({
+                reason: error instanceof Error ? error.message : String(error),
+              });
+              throw error;
+            }
+          }) as typeof bridge.oncalltool;
+        }
 
-        bridge.onreadresource = (async ({
-          uri,
-        }: ReadResourceRequest["params"]) => {
-          const conn = connectionRef.current;
-          if (!conn) throw new Error("Server connection not available");
-          return (await conn.readResource(uri)) as object;
-        }) as NonNullable<AppBridge["onreadresource"]>;
+        if (capabilities.serverResources) {
+          bridge.onreadresource = (async ({
+            uri,
+          }: ReadResourceRequest["params"]) => {
+            const conn = connectionRef.current;
+            if (!conn) throw new Error("Server connection not available");
+            return (await conn.readResource(uri)) as object;
+          }) as NonNullable<AppBridge["onreadresource"]>;
 
-        bridge.onlistresources = (async () => {
-          const conn = connectionRef.current;
-          if (!conn) throw new Error("Server connection not available");
-          return { resources: [...(conn.resources ?? [])] } as object;
-        }) as NonNullable<AppBridge["onlistresources"]>;
+          bridge.onlistresources = (async () => {
+            const conn = connectionRef.current;
+            if (!conn) throw new Error("Server connection not available");
+            return { resources: [...(conn.resources ?? [])] } as object;
+          }) as NonNullable<AppBridge["onlistresources"]>;
+        }
 
         bridge.onrequestdisplaymode = async ({
           mode,
         }: McpUiRequestDisplayModeRequest["params"]) => {
           const requested = (mode ?? "inline") as ViewDisplayMode;
-          const available = hostContextRef.current?.availableDisplayModes ?? [
-            "inline",
-            "pip",
-            "fullscreen",
-          ];
-          const effective = available.includes(requested)
-            ? requested
-            : displayModeRef.current;
+          const effective = resolveRequestedDisplayMode({
+            requested,
+            current: displayModeRef.current,
+            hostAvailable: hostContextRef.current?.availableDisplayModes,
+            appAvailable: bridge?.getAppCapabilities()?.availableDisplayModes,
+          });
           await handleDisplayModeChangeRef.current(effective);
           return { mode: effective };
         };
 
-        bridge.onupdatemodelcontext = async ({
-          content,
-          structuredContent,
-        }: McpUiUpdateModelContextRequest["params"]) => {
-          onModelContextUpdateRef.current?.({ content, structuredContent });
-          return {};
-        };
+        if (capabilities.updateModelContext) {
+          bridge.onupdatemodelcontext = async ({
+            content,
+            structuredContent,
+          }: McpUiUpdateModelContextRequest["params"]) => {
+            if (!onModelContextUpdateRef.current) {
+              throw new Error(
+                "This host surface does not support model context updates"
+              );
+            }
+            onModelContextUpdateRef.current({ content, structuredContent });
+            return {};
+          };
+        }
 
-        bridge.onloggingmessage = async ({
-          level,
-          data,
-        }: LoggingMessageNotificationParams) => {
-          onLogRef.current?.({ level, data });
-          return {};
-        };
+        if (capabilities.logging) {
+          bridge.onloggingmessage = async ({
+            level,
+            data,
+          }: LoggingMessageNotificationParams) => {
+            onLogRef.current?.({ level, data });
+            return {};
+          };
+        }
 
         bridge.onsizechange = async ({
           height,
@@ -625,7 +649,7 @@ function ViewRendererBase({
     resolved,
     activeSandboxUrl,
     hostInfo,
-    hostCapabilities,
+    effectiveHostCapabilities,
     cspMode,
     viewId,
     wrapTransport,

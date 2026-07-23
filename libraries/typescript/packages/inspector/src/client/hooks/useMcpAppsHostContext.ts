@@ -6,6 +6,7 @@ import { useMemo } from "react";
 import type { McpUiHostContext } from "@mcp-use/client/react";
 import type { Tool } from "@mcp-use/client/react";
 import type { PlaygroundSettings } from "../context/WidgetDebugContext";
+import { getPackageVersion } from "../telemetry/utils";
 
 type DisplayMode = "inline" | "pip" | "fullscreen";
 
@@ -28,48 +29,94 @@ function readCssVar(styles: CSSStyleDeclaration, name: string): string {
   return styles.getPropertyValue(name).trim();
 }
 
+const THEME_COLOR_VARIABLES = [
+  "--background",
+  "--foreground",
+  "--card",
+  "--muted",
+  "--muted-foreground",
+  "--primary",
+  "--primary-foreground",
+  "--secondary",
+  "--accent",
+  "--accent-foreground",
+  "--destructive",
+  "--border",
+  "--ring",
+] as const;
+
+function readThemeValues(
+  theme: "light" | "dark"
+): Record<(typeof THEME_COLOR_VARIABLES)[number], string> {
+  const probe = document.createElement("div");
+  probe.className = `mcp-apps-host-theme-probe-${theme}`;
+  probe.hidden = true;
+  (document.body ?? document.documentElement).appendChild(probe);
+  const styles = getComputedStyle(probe);
+  const values = Object.fromEntries(
+    THEME_COLOR_VARIABLES.map((name) => [name, readCssVar(styles, name)])
+  ) as Record<(typeof THEME_COLOR_VARIABLES)[number], string>;
+  probe.remove();
+  return values;
+}
+
+export function buildLightDarkValue(
+  lightValue: string,
+  darkValue: string
+): string {
+  if (!lightValue) return darkValue;
+  if (!darkValue) return lightValue;
+  return `light-dark(${lightValue}, ${darkValue})`;
+}
+
 function buildHostStyleVariables(): Record<string, string> {
   if (typeof window === "undefined") return {};
 
   const styles = getComputedStyle(document.documentElement);
+  const lightValues = readThemeValues("light");
+  const darkValues = readThemeValues("dark");
   const variables: Record<string, string> = {};
   const add = (name: string, value: string) => {
     if (value) variables[name] = value;
   };
+  const addThemeColor = (
+    name: string,
+    cssVariable: string,
+    fallbackCssVariable?: string
+  ) => {
+    const light =
+      lightValues[cssVariable as keyof typeof lightValues] ||
+      (fallbackCssVariable
+        ? lightValues[fallbackCssVariable as keyof typeof lightValues]
+        : "");
+    const dark =
+      darkValues[cssVariable as keyof typeof darkValues] ||
+      (fallbackCssVariable
+        ? darkValues[fallbackCssVariable as keyof typeof darkValues]
+        : "");
+    add(name, buildLightDarkValue(light, dark));
+  };
 
-  const background = readCssVar(styles, "--background");
-  const foreground = readCssVar(styles, "--foreground");
-  const card = readCssVar(styles, "--card");
-  const muted = readCssVar(styles, "--muted");
-  const mutedForeground = readCssVar(styles, "--muted-foreground");
-  const primary = readCssVar(styles, "--primary");
-  const primaryForeground = readCssVar(styles, "--primary-foreground");
-  const secondary = readCssVar(styles, "--secondary");
-  const accent = readCssVar(styles, "--accent");
-  const accentForeground = readCssVar(styles, "--accent-foreground");
-  const destructive = readCssVar(styles, "--destructive");
-  const border = readCssVar(styles, "--border");
-  const ring = readCssVar(styles, "--ring");
   const radius = readCssVar(styles, "--radius");
 
-  add("--color-background-primary", background);
-  add("--color-background-secondary", card || secondary);
-  add("--color-background-tertiary", muted || accent);
-  add("--color-background-inverse", primary);
-  add("--color-background-ghost", accent || muted);
-  add("--color-background-danger", destructive);
+  addThemeColor("--color-background-primary", "--background");
+  addThemeColor("--color-background-secondary", "--card", "--secondary");
+  addThemeColor("--color-background-tertiary", "--muted", "--accent");
+  addThemeColor("--color-background-inverse", "--primary");
+  addThemeColor("--color-background-ghost", "--accent", "--muted");
+  addThemeColor("--color-background-danger", "--destructive");
 
-  add("--color-text-primary", foreground);
-  add("--color-text-secondary", mutedForeground);
-  add("--color-text-tertiary", mutedForeground);
-  add("--color-text-inverse", primaryForeground);
-  add("--color-text-ghost", accentForeground || mutedForeground);
-  add("--color-text-danger", destructive);
+  addThemeColor("--color-text-primary", "--foreground");
+  addThemeColor("--color-text-secondary", "--muted-foreground");
+  addThemeColor("--color-text-tertiary", "--muted-foreground");
+  addThemeColor("--color-text-inverse", "--primary-foreground");
+  addThemeColor("--color-text-ghost", "--accent-foreground");
+  addThemeColor("--color-text-danger", "--destructive");
 
-  add("--color-border-primary", border);
-  add("--color-border-secondary", border);
-  add("--color-border-tertiary", border);
-  add("--color-ring-primary", ring || border);
+  addThemeColor("--color-border-primary", "--border");
+  addThemeColor("--color-border-secondary", "--border");
+  addThemeColor("--color-border-tertiary", "--border");
+  addThemeColor("--color-ring-primary", "--ring", "--border");
 
   add("--border-radius-sm", radius);
   add("--border-radius-md", radius);
@@ -108,7 +155,7 @@ export function useMcpAppsHostContext({
       locale: playground.locale,
       timeZone: playground.timeZone,
       platform: deviceType === "mobile" ? "mobile" : "web",
-      userAgent: "mcp-use-inspector/0.16.2",
+      userAgent: `mcp-use-inspector/${getPackageVersion()}`,
       deviceCapabilities: playground.capabilities,
       safeAreaInsets: playground.safeAreaInsets,
       styles: { variables: buildHostStyleVariables() as any },

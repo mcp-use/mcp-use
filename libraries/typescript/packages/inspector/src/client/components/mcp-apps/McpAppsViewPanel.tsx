@@ -102,11 +102,15 @@ export function McpAppsViewPanel({
       partialToolInput={partialToolInput}
       cancelled={cancelled}
       className={viewRendererClassName}
-      onMessage={(content) => {
-        if (content.length > 0 && onSendFollowUp) {
-          onSendFollowUp(content as MessageContentBlock[]);
-        }
-      }}
+      onMessage={
+        onSendFollowUp
+          ? (content) => {
+              if (content.length > 0) {
+                onSendFollowUp(content as MessageContentBlock[]);
+              }
+            }
+          : undefined
+      }
       onInlineHeightChange={
         displayMode === "inline" ? onWidgetHeightChange : undefined
       }

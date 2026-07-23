@@ -17,9 +17,14 @@ import { useTheme } from "@/client/context/ThemeContext";
 import { useWidgetDebug } from "@/client/context/WidgetDebugContext";
 import { useDeviceViewport } from "@/client/hooks/useDeviceViewport";
 import { useMcpAppsHostContext } from "@/client/hooks/useMcpAppsHostContext";
+import { buildCspAuditRecord } from "@/client/mcp-apps/csp-audit";
+import { getPackageVersion } from "@/client/telemetry/utils";
 import { getServerDisplayName, getServerIconUrl } from "@/client/utils/servers";
 
-const HOST_INFO = { name: "mcp-use-inspector", version: "11.0.0" } as const;
+const HOST_INFO = {
+  name: "mcp-use-inspector",
+  version: getPackageVersion(),
+} as const;
 
 function useStableViewConnection(
   server: ReturnType<typeof useMcpClient>["servers"][number] | undefined,
@@ -38,6 +43,9 @@ function useStableViewConnection(
       readResource: (uri) => readResourceRef.current(uri),
       get resources() {
         return serverRef.current?.resources;
+      },
+      get tools() {
+        return serverRef.current?.tools;
       },
     };
   }, [server?.id]);
@@ -159,6 +167,17 @@ export function useViewHostProps(options: {
       });
 
       const declared = resolved.declaredCsp;
+      const auditRecord = buildCspAuditRecord({
+        viewId,
+        mode: cspMode,
+        declared,
+      });
+      console.info("[MCP Apps CSP]", auditRecord);
+      consoleLogBus.publish({
+        level: "info",
+        args: ["[MCP Apps CSP]", auditRecord],
+        timestamp: new Date().toISOString(),
+      });
       let effectivePolicy: string | undefined;
       if (cspMode === "permissive") {
         effectivePolicy = [

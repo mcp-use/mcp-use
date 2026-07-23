@@ -102,7 +102,7 @@ const WidgetDebugContext = createContext<WidgetDebugContextType | undefined>(
 const DEFAULT_PLAYGROUND_SETTINGS: PlaygroundSettings = {
   deviceType: "desktop",
   customViewport: { width: 768, height: 1024 },
-  cspMode: "permissive",
+  cspMode: "widget-declared",
   displayModeOverride: null,
   capabilities: { hover: true, touch: false },
   safeAreaInsets: { top: 0, right: 0, bottom: 0, left: 0 },

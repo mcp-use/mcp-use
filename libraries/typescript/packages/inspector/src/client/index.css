@@ -181,7 +181,8 @@
   }
 }
 
-:root {
+:root,
+.mcp-apps-host-theme-probe-light {
   --radius: 0.625rem;
   --cmdk-shadow: 0 16px 70px rgb(0 0 0 / 20%);
   --background: oklch(1 0 0);
@@ -291,7 +292,8 @@
     0 48px 48px -24px var(--shadow-color), 0 96px 96px -48px var(--shadow-color);
 }
 
-.dark {
+.dark,
+.mcp-apps-host-theme-probe-dark {
   --cmdk-shadow: 0 16px 70px rgb(0 0 0 / 50%);
   --background: oklch(0.141 0.005 285.823);
   --foreground: oklch(0.985 0 0);
