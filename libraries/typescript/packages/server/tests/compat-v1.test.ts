@@ -10,7 +10,9 @@ import {
   hasAnyScope,
   hasScope,
   MCPServer,
+  oauthAuth0Provider,
   object,
+  requireScope,
   text,
   widget,
 } from "../src/compat-v1.js";
@@ -34,6 +36,80 @@ describe("temporary v1 compatibility entry", () => {
     expect(getAuth(context)).toBe(auth);
     expect(hasScope(context, ["read:data", "admin"])).toBe(true);
     expect(hasAnyScope(context, ["missing", "admin"])).toBe(true);
+  });
+
+  it("reads verified OAuth identity in legacy HTTP scope middleware", async () => {
+    const resource = new URL("http://localhost/mcp");
+    const server = new MCPServer({
+      name: "scope-middleware",
+      version: "1.0.0",
+      oauth: {
+        resource,
+        oauthMetadata: {
+          issuer: "https://auth.example.com",
+          authorization_endpoint: "https://auth.example.com/authorize",
+          token_endpoint: "https://auth.example.com/token",
+          response_types_supported: ["code"],
+        },
+        createTokenVerifier: () => ({
+          verifyAccessToken: async (token) => ({
+            token,
+            clientId: "client",
+            scopes: token === "allowed" ? ["read:data"] : [],
+            expiresAt: Date.now() / 1000 + 60,
+            resource,
+          }),
+        }),
+        mapAuthInfo: () => ({
+          user: { id: "user-1" },
+          payload: { sub: "user-1" },
+          permissions: [],
+        }),
+      },
+    });
+    server.use("/mcp", requireScope("read:data"));
+    server.get("/mcp", (context) =>
+      context.json({ userId: getAuth(context).user.userId })
+    );
+
+    const allowed = await server.fetch(
+      new Request(resource, {
+        headers: { authorization: "Bearer allowed" },
+      })
+    );
+    expect(allowed.status).toBe(200);
+    expect(await allowed.json()).toEqual({ userId: "user-1" });
+
+    const denied = await server.fetch(
+      new Request(resource, {
+        headers: { authorization: "Bearer denied" },
+      })
+    );
+    expect(denied.status).toBe(403);
+    expect(await denied.json()).toMatchObject({
+      error: "insufficient_scope",
+      required: ["read:data"],
+    });
+  });
+
+  it("preserves native OAuth resource options in legacy provider factories", () => {
+    const serviceDocumentationUrl = new URL("https://docs.example.com/oauth");
+    const provider = oauthAuth0Provider({
+      domain: "https://auth.example.com",
+      resource: "https://api.example.com/mcp",
+      requiredScopes: ["tools:read"],
+      scopesSupported: ["tools:read", "tools:write"],
+      resourceName: "Example tools",
+      serviceDocumentationUrl,
+    });
+
+    expect(provider).toMatchObject({
+      resource: "https://api.example.com/mcp",
+      requiredScopes: ["tools:read"],
+      scopesSupported: ["tools:read", "tools:write"],
+      resourceName: "Example tools",
+      serviceDocumentationUrl,
+    });
   });
 
   it("runs common inline v1 tools, resources, templates, and prompts over v2", async () => {

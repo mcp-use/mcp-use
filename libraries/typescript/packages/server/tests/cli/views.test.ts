@@ -45,7 +45,7 @@ describe("discoverViews", () => {
     ]);
   });
 
-  it("discovers legacy resources/<name>/widget.tsx entries", () => {
+  it("discovers legacy resources/<name>/widget.tsx entries only when enabled", () => {
     const cwd = tempProject();
     mkdirSync(join(cwd, "resources", "legacy"), { recursive: true });
     writeFileSync(
@@ -53,7 +53,8 @@ describe("discoverViews", () => {
       "export default () => null;"
     );
 
-    expect(discoverViews(cwd)).toEqual([
+    expect(discoverViews(cwd)).toEqual([]);
+    expect(discoverViews(cwd, undefined, { includeLegacy: true })).toEqual([
       {
         name: "legacy",
         entryPath: join(cwd, "resources", "legacy", "widget.tsx"),
@@ -77,7 +78,7 @@ describe("discoverViews", () => {
 });
 
 describe("isViewPath", () => {
-  it("matches paths under views/<name>/", () => {
+  it("matches paths under native views and legacy resources", () => {
     const cwd = "/project";
     expect(isViewPath("/project/views/demo/view.tsx", cwd)).toBe(true);
     expect(isViewPath("/project/views/demo/components/Card.tsx", cwd)).toBe(
@@ -101,7 +102,7 @@ describe("isViewPath", () => {
 });
 
 describe("isViewEntryPath", () => {
-  it("matches only views/<name>/view.tsx", () => {
+  it("matches native view and legacy widget entries", () => {
     const cwd = "/project";
     expect(isViewEntryPath("/project/views/demo/view.tsx", cwd)).toBe(true);
     expect(isViewEntryPath("/project/views/demo/index.tsx", cwd)).toBe(false);

@@ -54,9 +54,9 @@ export default defineConfig([
       options.minifyIdentifiers = false;
     },
   },
-  // Deprecated v1 bridge. Uses splitting so compat-v1.js stays a thin entry, but
-  // remains a separate target so the native index graph is unchanged. Minified
-  // post-build. Removed in mcp-use v3.
+  // Deprecated v1 bridge. Uses splitting so compat-v1.js stays a thin entry,
+  // but remains a separate target so the native index graph is unchanged.
+  // Removed in mcp-use v3.
   {
     entry: {
       "compat-v1": "src/compat-v1.ts",
@@ -65,6 +65,7 @@ export default defineConfig([
     target: "node22",
     dts: false,
     splitting: true,
+    minify: true,
     sourcemap: false,
     clean: false,
     external: ["@mcp-use/client", "@mcp-use/cli"],

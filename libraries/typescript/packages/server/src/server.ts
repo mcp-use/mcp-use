@@ -1371,17 +1371,43 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           bag.authInfo = result;
           return next();
         };
+
+        // Authenticate the exact MCP route before the user-owned Hono app
+        // runs. This makes verified identity available to route middleware
+        // while leaving OAuth discovery, assets, and unrelated custom routes
+        // public. The explicitly public HTML landing-page carveout remains the
+        // only unauthenticated request allowed through this route.
+        httpApp.use("*", async (context, next) => {
+          if (new URL(context.req.url).pathname !== basePath) {
+            await next();
+            return;
+          }
+          if (
+            this.#config.publicLandingPage === true &&
+            isHtmlNavigationRequest(context.req.raw)
+          ) {
+            await next();
+            return;
+          }
+          const response = await protectWithBearer(
+            context.req.raw,
+            async () => {
+              await next();
+              return context.res;
+            }
+          );
+          context.res = response;
+          return response;
+        });
       }
 
       const mcpRouteHandler: FetchHandler = (request) => {
-        return protectWithBearer(request, () => {
-          const body = getRequestBag(request).parsedBody;
-          if (isJSONRPCRequest(body)) {
-            this.#trackConfigured();
-            this.#trackClient(body);
-          }
-          return mcpFetch(request);
-        });
+        const body = getRequestBag(request).parsedBody;
+        if (isJSONRPCRequest(body)) {
+          this.#trackConfigured();
+          this.#trackClient(body);
+        }
+        return mcpFetch(request);
       };
       const endpointHandler: FetchHandler = async (request) => {
         if (!isHtmlNavigationRequest(request)) {
@@ -1400,9 +1426,6 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
             this.#resources.values()
           );
         };
-        if (resource !== undefined && this.#config.publicLandingPage !== true) {
-          return protectWithBearer(request, respond);
-        }
         return respond();
       };
 

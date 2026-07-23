@@ -90,7 +90,7 @@
     "node": ">=22.22.2"
   },
   "scripts": {
-    "build": "rimraf dist && tsup && bash -c 'shopt -s nullglob; files=(dist/compat-v1.js dist/compat-v1/*.js); pnpm exec esbuild \"${files[@]}\" --minify --format=esm --target=node22 --outdir=dist --allow-overwrite' && tsc --emitDeclarationOnly --declaration && rimraf dist/.tsbuildinfo",
+    "build": "rimraf dist && tsup && tsc --emitDeclarationOnly --declaration && rimraf dist/.tsbuildinfo",
     "dev": "tsc --watch",
     "test": "vitest",
     "test:run": "npm run typecheck && vitest run",

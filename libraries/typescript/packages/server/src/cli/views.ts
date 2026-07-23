@@ -15,6 +15,7 @@ import {
   nextStandaloneCompatPlugin,
   nextStandaloneSsrOptions,
 } from "./next-compat.js";
+import { legacyWidgetMetadataPlugin } from "./legacy-widget-metadata.js";
 
 /** Author-facing view source directory at the project root. */
 export const VIEWS_SOURCE_DIR = "views" as const;
@@ -69,7 +70,8 @@ export function resolveViewsDir(cwd: string, override?: string): string {
  */
 export function discoverViews(
   cwd: string,
-  override?: string
+  override?: string,
+  options?: { includeLegacy?: boolean }
 ): DiscoveredView[] {
   const viewsDir = resolveViewsDir(cwd, override);
   const resourcesDir =
@@ -78,7 +80,9 @@ export function discoverViews(
       : resolve(dirname(viewsDir), "resources");
   const byName = new Map<string, DiscoveredView>();
   scanViewDirectory(viewsDir, "view.tsx", false, byName);
-  scanViewDirectory(resourcesDir, "widget.tsx", true, byName);
+  if (options?.includeLegacy === true) {
+    scanViewDirectory(resourcesDir, "widget.tsx", true, byName);
+  }
   const views = [...byName.values()];
   views.sort((a, b) => a.name.localeCompare(b.name));
   return views;
@@ -221,7 +225,11 @@ export async function createBindingValidationServer(
       alias: nextStandaloneAliases(cwd),
     },
     oxc: { jsx: { runtime: "automatic" } },
-    plugins: [nextStandaloneCompatPlugin(cwd), react()],
+    plugins: [
+      nextStandaloneCompatPlugin(cwd),
+      legacyWidgetMetadataPlugin(),
+      react(),
+    ],
     server: { middlewareMode: true, hmr: false },
     ssr: {
       ...nextStandaloneSsrOptions(cwd),

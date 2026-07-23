@@ -7,6 +7,7 @@
  */
 
 import type {
+  AuthInfo as SdkAuthInfo,
   CallToolResult,
   GetPromptResult,
   ReadResourceResult,
@@ -49,6 +50,7 @@ import type {
   ToolViewConfig,
 } from "./tools.js";
 import type { ViewsManifest } from "./views/types.js";
+import { getRequestBag } from "./fetch-app.js";
 
 const COMPAT_MESSAGE =
   'Deprecated temporary v1 compatibility. Use the native v2 API from "mcp-use". This entry will be removed in mcp-use v3.';
@@ -1033,9 +1035,12 @@ export function getAuth(context: McpContext<boolean> | Context): AuthInfo {
   const direct = (context as { auth?: AuthInfo }).auth;
   if (direct !== undefined) return direct;
   const stored = (context as Context).get?.("auth") as AuthInfo | undefined;
-  if (stored === undefined)
-    throw new Error("Authentication context is missing.");
-  return stored;
+  if (stored !== undefined) return stored;
+  const request = (context as Context).req?.raw;
+  const verified =
+    request === undefined ? undefined : getRequestBag(request).authInfo;
+  if (verified !== undefined) return compatAuthFromSdk(verified);
+  throw new Error("Authentication context is missing.");
 }
 
 /** @deprecated Check `ctx.auth.scopes` in native v2. Removed in mcp-use v3. */
@@ -1136,6 +1141,42 @@ function normalizeServerConfig(config: ServerConfig): UnknownRecord {
     ...(config.favicon !== undefined && { favicon: config.favicon }),
     ...(config.icons !== undefined && { icons: config.icons }),
     ...(config.websiteUrl !== undefined && { websiteUrl: config.websiteUrl }),
+  };
+}
+
+function compatAuthFromSdk(authInfo: SdkAuthInfo): AuthInfo {
+  const extra = authInfo.extra;
+  if (
+    extra === undefined ||
+    typeof extra !== "object" ||
+    extra === null ||
+    !("user" in extra) ||
+    typeof extra.user !== "object" ||
+    extra.user === null ||
+    Array.isArray(extra.user) ||
+    !("payload" in extra) ||
+    typeof extra.payload !== "object" ||
+    extra.payload === null ||
+    Array.isArray(extra.payload) ||
+    !("permissions" in extra) ||
+    !Array.isArray(extra.permissions) ||
+    !extra.permissions.every((permission) => typeof permission === "string")
+  ) {
+    throw new Error("Authentication context is missing mapped OAuth data.");
+  }
+  const user = extra.user as UnknownRecord;
+  const id = user["userId"] ?? user["id"];
+  return {
+    user: {
+      ...user,
+      ...(typeof id === "string" && { userId: id }),
+      permissions: [...extra.permissions],
+      scopes: [...authInfo.scopes],
+    } as UserInfo,
+    payload: extra.payload as UnknownRecord,
+    accessToken: authInfo.token,
+    scopes: [...authInfo.scopes],
+    permissions: [...extra.permissions],
   };
 }
 

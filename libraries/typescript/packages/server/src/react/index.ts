@@ -49,6 +49,8 @@ export {
 /**
  * Deprecated temporary v1 widget compatibility. New views must use the
  * focused native v2 hooks exported above. Removed in mcp-use v3.
+ *
+ * @deprecated Use the native v2 view exports above. Removed in mcp-use v3.
  */
 export {
   McpUseProvider,

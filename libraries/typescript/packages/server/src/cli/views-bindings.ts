@@ -5,6 +5,7 @@
 import { createServerModuleRunner, type DevEnvironment } from "vite";
 
 import type { ViewsManifest } from "../views/types.js";
+import { legacyWidgetMetadataId } from "./legacy-widget-metadata.js";
 import type { DiscoveredView } from "./views.js";
 
 const DEFAULT_BASE_PATH = "/mcp";
@@ -46,9 +47,19 @@ async function registerLegacyViews(
   }
   const modules: Record<string, unknown> = {};
   for (const view of legacy) {
-    modules[view.name] = await runner.import(view.entryPath);
+    modules[view.name] = await runner.import(
+      legacyWidgetMetadataId(view.entryPath)
+    );
   }
   server.__registerLegacyViews(modules);
+}
+
+/** Build-time facts discovered by evaluating only the server entry. */
+export interface BuildEntryInspection {
+  /** Configured MCP route. */
+  basePath: string;
+  /** Whether the entry captured the deprecated v1 compatibility server. */
+  supportsLegacyViews: boolean;
 }
 
 /**
@@ -59,10 +70,10 @@ async function registerLegacyViews(
  *
  * @internal
  */
-export async function resolveBuildBasePath(
+export async function inspectBuildEntry(
   environment: DevEnvironment,
   entry: string
-): Promise<string> {
+): Promise<BuildEntryInspection> {
   const runner = createServerModuleRunner(environment, {
     hmr: false,
     sourcemapInterceptor: "node",
@@ -87,8 +98,12 @@ export async function resolveBuildBasePath(
       );
     }
 
-    return server.basePath ?? DEFAULT_BASE_PATH;
+    return {
+      basePath: server.basePath ?? DEFAULT_BASE_PATH,
+      supportsLegacyViews: typeof server.__registerLegacyViews === "function",
+    };
   } finally {
+    delete (globalThis as Record<string, unknown>)[COMPAT_GLOBAL];
     if (previousMcpUrl === undefined) {
       delete process.env["MCP_URL"];
     } else {
@@ -101,6 +116,18 @@ export async function resolveBuildBasePath(
     }
     await runner.close();
   }
+}
+
+/**
+ * Import the server entry and read its configured MCP route.
+ *
+ * @internal
+ */
+export async function resolveBuildBasePath(
+  environment: DevEnvironment,
+  entry: string
+): Promise<string> {
+  return (await inspectBuildEntry(environment, entry)).basePath;
 }
 
 /**
@@ -151,6 +178,7 @@ export async function validateViewBindingsAtBuild(
     server.__primeViews(viewsManifest);
     server.__mount();
   } finally {
+    delete (globalThis as Record<string, unknown>)[COMPAT_GLOBAL];
     if (previousCliImport === undefined) {
       delete process.env["MCP_USE_CLI_IMPORT"];
     } else {

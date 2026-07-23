@@ -20,7 +20,7 @@ import {
   oauthKeycloakProvider as nativeKeycloakProvider,
   type KeycloakOAuthProviderOptions,
 } from "../oauth/keycloak.js";
-import type { OAuthProvider } from "../oauth/provider.js";
+import type { OAuthProvider, OAuthResourceOptions } from "../oauth/provider.js";
 import {
   oauthSupabaseProvider as nativeSupabaseProvider,
   type SupabaseOAuthProviderOptions,
@@ -47,6 +47,29 @@ function rejectVerifyJwt(options: unknown): void {
   }
 }
 
+function resourceOptions(
+  options: OAuthResourceOptions,
+  resource?: URL | string
+): OAuthResourceOptions {
+  return {
+    ...((resource ?? options.resource) !== undefined && {
+      resource: resource ?? options.resource,
+    }),
+    ...(options.requiredScopes !== undefined && {
+      requiredScopes: options.requiredScopes,
+    }),
+    ...(options.scopesSupported !== undefined && {
+      scopesSupported: options.scopesSupported,
+    }),
+    ...(options.resourceName !== undefined && {
+      resourceName: options.resourceName,
+    }),
+    ...(options.serviceDocumentationUrl !== undefined && {
+      serviceDocumentationUrl: options.serviceDocumentationUrl,
+    }),
+  };
+}
+
 /** @deprecated Removed in mcp-use v3. */
 export function oauthSupabaseProvider(
   options: Partial<SupabaseOAuthProviderOptions> = {}
@@ -58,12 +81,10 @@ export function oauthSupabaseProvider(
   const jwtSecret =
     options.jwtSecret ?? env("MCP_USE_OAUTH_SUPABASE_JWT_SECRET");
   return nativeSupabaseProvider({
+    ...resourceOptions(options),
     ...(projectId !== undefined && { projectId }),
     ...(supabaseUrl !== undefined && { supabaseUrl }),
     ...(jwtSecret !== undefined && { jwtSecret }),
-    ...(options.scopesSupported !== undefined && {
-      scopesSupported: options.scopesSupported,
-    }),
   });
 }
 
@@ -79,11 +100,8 @@ export function oauthAuth0Provider(
   const audience = options.audience ?? env("MCP_USE_OAUTH_AUTH0_AUDIENCE");
   if (domain === undefined) throw new Error("Auth0 domain is required.");
   return nativeAuth0Provider({
+    ...resourceOptions(options, options.resource ?? audience),
     domain,
-    ...(audience !== undefined && { resource: audience }),
-    ...(options.scopesSupported !== undefined && {
-      scopesSupported: options.scopesSupported,
-    }),
   });
 }
 
@@ -103,12 +121,9 @@ export function oauthKeycloakProvider(
     throw new Error("Keycloak serverUrl and realm are required.");
   }
   return nativeKeycloakProvider({
+    ...resourceOptions(options, options.resource ?? audience),
     serverUrl,
     realm,
-    ...(audience !== undefined && { resource: audience }),
-    ...(options.scopesSupported !== undefined && {
-      scopesSupported: options.scopesSupported,
-    }),
   });
 }
 
@@ -120,10 +135,8 @@ export function oauthWorkOSProvider(
   const subdomain = options.subdomain ?? env("MCP_USE_OAUTH_WORKOS_SUBDOMAIN");
   if (subdomain === undefined) throw new Error("WorkOS subdomain is required.");
   return nativeWorkOSProvider({
+    ...resourceOptions(options),
     subdomain,
-    ...(options.scopesSupported !== undefined && {
-      scopesSupported: options.scopesSupported,
-    }),
   });
 }
 
@@ -141,11 +154,8 @@ export function oauthClerkProvider(
     throw new Error("Clerk frontendApiUrl is required.");
   }
   return nativeClerkProvider({
+    ...resourceOptions(options, options.resource ?? options.audience),
     frontendApiUrl,
-    ...(options.audience !== undefined && { resource: options.audience }),
-    ...(options.scopesSupported !== undefined && {
-      scopesSupported: options.scopesSupported,
-    }),
   });
 }
 
@@ -160,9 +170,7 @@ export function oauthBetterAuthProvider(
   if (authURL === undefined)
     throw new Error("Better Auth authURL is required.");
   return nativeBetterAuthProvider({
+    ...resourceOptions(options),
     authURL,
-    ...(options.scopesSupported !== undefined && {
-      scopesSupported: options.scopesSupported,
-    }),
   });
 }

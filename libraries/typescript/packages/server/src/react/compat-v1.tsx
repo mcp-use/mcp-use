@@ -14,6 +14,7 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -23,6 +24,7 @@ import { ViewControls } from "./components/view-controls.js";
 import { useDisplayMode } from "./hooks/use-display-mode.js";
 import { useHostContext } from "./hooks/use-host-context.js";
 import { useToolContext } from "./hooks/use-tool-context.js";
+import { useViewTheme } from "./hooks/use-view-theme.js";
 import { useViewRuntime } from "./runtime/view-runtime-context.js";
 import type { DisplayMode, SafeAreaInsets } from "./types/host-types.js";
 
@@ -179,7 +181,7 @@ interface UseWidgetResultBase<
   displayMode: DisplayMode;
   /** Host safe-area wrapper. */
   safeArea: SafeArea;
-  /** Maximum host height, or zero when unbounded. */
+  /** Maximum host height, using the v1 600px default when unbounded. */
   maxHeight: number;
   /** Maximum host width. */
   maxWidth?: number;
@@ -253,6 +255,8 @@ export function useWidget<
   const host = useHostContext();
   const display = useDisplayMode();
   const [state, setLocalState] = useState<TState | null>(null);
+  const stateRef = useRef<TState | null>(null);
+  const stateUpdateQueue = useRef<Promise<void>>(Promise.resolve());
 
   const structured =
     tool.status === "ready" && isRecord(tool.toolOutput)
@@ -287,18 +291,23 @@ export function useWidget<
     async (next: TState | ((previous: TState | null) => TState)) => {
       const resolved =
         typeof next === "function"
-          ? (next as (previous: TState | null) => TState)(state)
+          ? (next as (previous: TState | null) => TState)(stateRef.current)
           : next;
+      stateRef.current = resolved;
       setLocalState(resolved);
-      const app = await runtime.connect();
-      if (app.getHostCapabilities()?.updateModelContext !== undefined) {
-        await app.updateModelContext({
-          content: [{ type: "text", text: JSON.stringify(resolved) }],
-          structuredContent: resolved as UnknownObject,
-        });
-      }
+      const update = stateUpdateQueue.current.then(async () => {
+        const app = await runtime.connect();
+        if (app.getHostCapabilities()?.updateModelContext !== undefined) {
+          await app.updateModelContext({
+            content: [{ type: "text", text: JSON.stringify(resolved) }],
+            structuredContent: resolved as UnknownObject,
+          });
+        }
+      });
+      stateUpdateQueue.current = update.catch(() => {});
+      await update;
     },
-    [runtime, state]
+    [runtime]
   );
 
   const sendFollowUpMessage = useCallback(
@@ -332,7 +341,9 @@ export function useWidget<
   );
 
   const pendingInput =
-    tool.status === "pending" && Object.keys(input).length > 0;
+    tool.status === "pending" &&
+    runtime.getToolSnapshot().isToolInputPartial &&
+    Object.keys(input).length > 0;
   const browserPlatform = host.platform === "mobile" ? "mobile" : "desktop";
   const publicUrl =
     typeof window === "undefined"
@@ -354,7 +365,7 @@ export function useWidget<
     theme: host.theme,
     displayMode: host.displayMode,
     safeArea: { insets: host.safeArea },
-    maxHeight: host.maxHeight ?? 0,
+    maxHeight: host.maxHeight ?? 600,
     ...(host.maxWidth !== undefined && { maxWidth: host.maxWidth }),
     userAgent: {
       device: { type: browserPlatform },
@@ -402,7 +413,7 @@ export function useWidgetProps<TProps = UnknownObject>(
  * @deprecated Use native v2 `useViewTheme`. Removed in mcp-use v3.
  */
 export function useWidgetTheme(): Theme {
-  return useWidget().theme;
+  return useViewTheme();
 }
 
 /**
@@ -417,16 +428,13 @@ export function useWidgetState<TState>(
   (state: TState | ((previous: TState | null) => TState)) => Promise<void>,
 ] {
   const widget = useWidget<UnknownObject, TState>();
+  const { isAvailable, setState, state } = widget;
   useEffect(() => {
-    if (
-      widget.state === null &&
-      defaultState !== undefined &&
-      widget.isAvailable
-    ) {
-      void widget.setState(defaultState);
+    if (state === null && defaultState !== undefined && isAvailable) {
+      void setState(defaultState);
     }
-  }, [defaultState, widget]);
-  return [widget.state, widget.setState] as const;
+  }, [defaultState, isAvailable, setState, state]);
+  return [state, setState] as const;
 }
 
 /**
