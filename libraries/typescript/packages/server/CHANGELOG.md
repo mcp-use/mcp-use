@@ -1,5 +1,15 @@
 # mcp-use
 
+## 2.0.0-beta.34
+
+### Minor Changes
+
+- c8c4174: Restore `ctx.sendNotification(method, params?)` for custom notifications related to the active MCP request. The v1-compatible helper now delegates to the official v2 request notification primitive without reintroducing sessions or cross-request state.
+
+### Patch Changes
+
+- @mcp-use/inspector@20.0.0-beta.26
+
 ## 2.0.0-beta.33
 
 ### Patch Changes
