@@ -1,7 +1,7 @@
 # mcp-use v2 — complete CLI contract
 
 **Status:** Implemented.
-**Scope:** the complete first-party `mcp-use` CLI: `dev`, `build`, `typecheck`, `start`, cloud auth, organizations, servers, deployments, deploy, client, screenshot, and skills; plus optional Inspector mounting in `dev` and production `start`.
+**Scope:** the complete first-party `mcp-use` CLI: `dev`, `build`, `typecheck`, `start`, cloud auth, organizations, servers, deployments, deploy, client, and screenshot; plus optional Inspector mounting in `dev` and production `start`.
 **Package:** `mcp-use@2`, published from `packages/server`. The package owns the bin, runtime, command chunks, and toolchain. The development Inspector remains independently published. There is no separate CLI implementation, devkit, or config package. `@mcp-use/cli@4` is a compatibility-only proxy for the historical install command.
 
 ## Goals
@@ -46,7 +46,7 @@ The first-party command contract belongs to `mcp-use`:
 - Runtime and toolchain: `dev`, `build`, `typecheck`, `start`.
 - Cloud identity: `login`, `logout`, `whoami`.
 - Cloud resources: `org`, `servers`, `deployments`, `deploy`.
-- Local and integration workflows: `client`, `screenshot`, `skills`.
+- Local and integration workflows: `client`, `screenshot`.
 
 For users and automation that still invoke `npx @mcp-use/cli`, the separately
 published `@mcp-use/cli@4` package contains only a bin shim. It depends on the
@@ -178,16 +178,6 @@ mcp-use screenshot (--server <name> | --mcp <url>) --tool <name> [args...]
 - Without `--cdp-url`, the command uses an installed Chromium-family browser or exits `1` with installation guidance. Omitted dimensions use the rendered view's natural size. Device scale factor defaults to `1` and must be greater than `0` and at most `4`. Output defaults to `./<view>-<timestamp>.png`; an existing explicit path is replaced.
 - Success prints the absolute output path; `--json` emits `{ "path", "width", "height", "deviceScaleFactor" }`. Browser readiness/timeout, missing UI metadata, tool failure, and write failure exit `1`.
 
-### Skills
-
-```text
-mcp-use skills add [--path <directory>]
-  [--agent <cursor|claude-code|codex|all>] [--skill <name>...]
-```
-
-- `path` defaults to cwd and must exist. `agent` defaults to `all`; omitted `--skill` installs the maintained mcp-use skill set.
-- The command delegates to the published `skills` CLI using an argument-array child process equivalent to `npx --yes skills add mcp-use/mcp-use`; it does not download or extract archives itself. The child exit code is propagated, and no telemetry is added by `mcp-use`.
-
 ## Package layout & dependency rules
 
 `mcp-use` ships the bin:
@@ -197,7 +187,7 @@ mcp-use skills add [--path <directory>]
 { "bin": { "mcp-use": "./dist/bin.js" } }
 ```
 
-The framework bin is a tiny proxy to the prebuilt `@mcp-use/cli` package. `@mcp-use/cli` exposes a side-effect-free programmatic `main(argv, { frameworkVersion })` entry: the framework bin injects the version compiled from the `mcp-use` manifest, while the standalone CLI bin injects the `@mcp-use/cli` manifest version. This keeps `mcp-use --version` correct even when the independently published packages have deliberately different versions. The CLI dispatches every substantial command with `await import(...)` to a real sibling chunk built with code splitting enabled. At minimum the CLI output has distinct chunks for `start`, `dev`, `build`, cloud identity, organizations, servers, deployments, deploy, client, screenshot, and skills.
+The framework bin is a tiny proxy to the prebuilt `@mcp-use/cli` package. `@mcp-use/cli` exposes a side-effect-free programmatic `main(argv, { frameworkVersion })` entry: the framework bin injects the version compiled from the `mcp-use` manifest, while the standalone CLI bin injects the `@mcp-use/cli` manifest version. This keeps `mcp-use --version` correct even when the independently published packages have deliberately different versions. The CLI dispatches every substantial command with `await import(...)` to a real sibling chunk built with code splitting enabled. At minimum the CLI output has distinct chunks for `start`, `dev`, `build`, cloud identity, organizations, servers, deployments, deploy, client, and screenshot.
 
 `mcp-use/dist/index.js`, `mcp-use/dist/react/index.js`, and the CLI `start` dispatch chunk have no static import path to Vite. The `start` dispatch chunk is an edge-safe dynamic bridge: its static graph also contains no Node builtins, Client SDK, v1 SDK, or unrelated command. The Node-only production listener is loaded only after `start` is invoked. Vite imports live only in the CLI command chunks that use them; `dev` and `build` are separate so loading one does not evaluate the other. Structural build-output tests enforce these boundaries rather than relying on source naming.
 

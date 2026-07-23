@@ -89,7 +89,6 @@ describe("published CLI boundaries", () => {
       "deploy",
       "client",
       "screenshot",
-      "skills",
     ]) {
       expect(cliBin.dynamicSpecifiers).toContain(`./commands/${command}.js`);
     }

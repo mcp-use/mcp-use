@@ -496,6 +496,9 @@ describe("main", () => {
     expect(logs.mock.calls.flat().join("\n")).toContain(
       "public tunnel (dev/start only)"
     );
+    expect(logs.mock.calls.flat().join("\n")).not.toContain(
+      "Install maintained coding-agent skills"
+    );
   });
 
   it("prints the public MCP URL and stops the tunnel on a signal", async () => {

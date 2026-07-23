@@ -4,7 +4,7 @@ description: "Command reference for the @mcp-use/cli package and mcp-use executa
 icon: "terminal"
 ---
 
-The `mcp-use` package installs the `mcp-use` executable and includes the prebuilt `@mcp-use/cli` implementation. Use this page as the exhaustive command reference for local development, production builds, cloud deploys, saved MCP client sessions, skills, and CLI environment variables.
+The `mcp-use` package installs the `mcp-use` executable and includes the prebuilt `@mcp-use/cli` implementation. Use this page as the exhaustive command reference for local development, production builds, cloud deploys, saved MCP client sessions, and CLI environment variables.
 
 For hands-on workflows, see the [CLI Client guide](/typescript/tooling/client-cli), [Tunneling guide](/tunneling/index), and [Manufact Cloud deployment guide](/typescript/server/deployment/mcp-use).
 
@@ -587,38 +587,6 @@ Common screenshot options:
   Use the guide for connection workflows, OAuth behavior, argument parsing
   examples, scripting patterns, and screenshots.
 </Card>
-
-## `skills add`
-
-**Purpose:** Install mcp-use AI agent skills for Cursor, Claude Code, and Codex.
-
-**Syntax:**
-
-```bash
-mcp-use skills add [options]
-mcp-use skills install [options]
-```
-
-**Options:**
-
-| Option              | Description        | Default           |
-| ------------------- | ------------------ | ----------------- |
-| `-p, --path <path>` | Project directory. | Current directory |
-
-**Examples:**
-
-```bash
-mcp-use skills add
-mcp-use skills add -p ./my-server
-mcp-use skills install
-```
-
-**Notes and behavior:**
-
-- `skills install` is an alias for `skills add`.
-- The command downloads the latest mcp-use skills from [github.com/mcp-use/mcp-use](https://github.com/mcp-use/mcp-use).
-- Skills are installed into `.cursor/skills/`, `.claude/skills/`, and `.agents/skills/`.
-- `create-mcp-use-app` can install skills during project creation unless `--no-skills` is used.
 
 ## `generate-types`
 
