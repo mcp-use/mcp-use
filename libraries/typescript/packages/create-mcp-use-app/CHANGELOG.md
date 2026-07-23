@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 2.0.0-beta.12
+
+### Patch Changes
+
+- a3edf35: Provide Vite client types through `mcp-use` so generated projects can import CSS, SVG, and other supported assets without maintaining custom declarations or depending directly on Vite.
+
 ## 2.0.0-beta.11
 
 ### Patch Changes
