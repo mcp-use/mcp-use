@@ -172,8 +172,10 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
     app.use(`${basePath}/*`, logger());
   }
 
+  app.use(`${basePath}/*`, rateLimit);
+
   // Handle all HTTP methods for the proxy
-  app.all(`${basePath}/*`, rateLimit, async (c) => {
+  app.all(`${basePath}/*`, async (c) => {
     try {
       // Optional authentication
       if (options.authenticate) {

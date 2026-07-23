@@ -146,8 +146,9 @@ export function mountOAuthProxy(
     await next();
     if (origin) setCorsHeaders(c.res.headers, origin);
   });
+  app.use(`${basePath}/*`, rateLimit);
 
-  app.get(`${basePath}/metadata`, rateLimit, async (c) => {
+  app.get(`${basePath}/metadata`, async (c) => {
     if (!(await isAuthenticated(c, authenticate))) {
       return c.json({ error: "Unauthorized" }, 401);
     }
@@ -248,7 +249,7 @@ export function mountOAuthProxy(
     }
   });
 
-  app.post(`${basePath}/proxy`, rateLimit, async (c) => {
+  app.post(`${basePath}/proxy`, async (c) => {
     if (!(await isAuthenticated(c, authenticate))) {
       return c.json({ error: "Unauthorized" }, 401);
     }

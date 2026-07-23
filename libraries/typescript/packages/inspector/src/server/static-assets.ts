@@ -57,7 +57,8 @@ export function registerInspectorStaticAssets(
     return next();
   };
 
-  app.get(`${mountPath}/*`, rateLimit, async (c) => {
+  app.use(`${mountPath}/*`, rateLimit);
+  app.get(`${mountPath}/*`, async (c) => {
     const subPath = c.req.path.slice(mountPath.length);
     const relative = subPath.startsWith("/") ? subPath.slice(1) : subPath;
     if (!relative || relative.includes("..")) {
