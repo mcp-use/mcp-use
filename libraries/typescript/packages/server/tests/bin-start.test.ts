@@ -545,6 +545,8 @@ describe("main", () => {
     await expect(main(["client", "--help"])).resolves.toBe(0);
     const output = logs.mock.calls.flat().join("\n");
     expect(output).toContain("mcp-use client connect");
+    expect(output).toContain("--no-open");
+    expect(output).not.toContain("  --open");
     expect(output).not.toContain("mcp-use deploy");
   });
 

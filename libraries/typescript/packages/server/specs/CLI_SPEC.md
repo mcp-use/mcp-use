@@ -141,7 +141,7 @@ mcp-use deploy [path] [--org <id-or-slug>] [--name <name>]
 ```text
 mcp-use client connect <name> <url> [-H, --header <"Key: Value">...]
   [--no-oauth] [--auth-timeout <ms>] [--protocol <auto|2026-07-28|2025-11-25>]
-  [--open] [--no-open] [--json]
+  [--no-open] [--json]
 mcp-use client list [--json]
 mcp-use client remove <name> [--yes]
 mcp-use client <name> tools list [--json]
@@ -152,14 +152,14 @@ mcp-use client <name> resources read <uri> [--json]
 mcp-use client <name> prompts list [--json]
 mcp-use client <name> prompts get <prompt> [args...] [--json]
 mcp-use client <name> auth status [--json]
-mcp-use client <name> auth logout [--yes]
+mcp-use client <name> auth logout [--yes] [--json]
 ```
 
 - v2 alpha client commands support HTTP(S) MCP servers; stdio, interactive REPL, resource subscriptions, implicit active sessions, and forced OAuth refresh are omitted. Every operation names a saved server.
-- `connect` validates a unique filesystem-safe name, connects before saving, and attempts OAuth on an authorization challenge unless `--no-oauth`. On OAuth, the CLI prints the authorization URL; in a TTY it prompts before opening the browser unless `--open` or `--no-open` is set. `--open` auto-opens without prompting; `--no-open`, non-TTY, and `--json` print the URL only while the loopback callback still waits. Repeated headers are stored as credentials, not metadata. Reusing a name requires removing it first.
+- `connect` validates a unique filesystem-safe name, connects before saving, and attempts OAuth on an authorization challenge unless `--no-oauth`. In an interactive TTY, OAuth prints `This server requires OAuth. Press Enter to open your browser.`, waits for Enter, and then opens the browser. `--no-open`, `--json`, and non-TTY operation never prompt or open a browser; they print the authorization URL to stderr while the loopback callback continues to wait. Repeated headers are stored as credentials, not metadata. Reusing a name requires removing it first.
 - `client` and `screenshot` dynamic-import `@mcp-use/client`. When it is missing, the CLI installs it automatically: into the nearest project `package.json` when one exists, otherwise into `~/.mcp-use/client-sdk/`. Auto-install continues the current command in-process and imports from the install location.
 - Tool/prompt arguments accept either one JSON object or `key=value` pairs; `key:=<json>` supplies typed JSON values. Mixing the full-object and pair forms is usage error `2`. Calls time out with exit `1`; tool `isError` results are operation failures and retain their protocol content in JSON error details.
-- Default human output renders borderless terminal lists and readable MCP content. `--json` emits the raw protocol result envelope for calls, reads, and prompts, and arrays for lists.
+- Default human output renders borderless terminal lists and readable MCP content; tool lists format described tools as `<name> - <description>`. Every client command that advertises `--json` accepts it anywhere after `client`. `--json` emits exactly one value to stdout: the raw protocol result envelope for calls, reads, and prompts; the described tool object for `tools describe`; arrays for lists; and command result objects for connect and auth commands. Errors emit exactly one JSON error envelope to stderr and no stdout value.
 
 ### Screenshot
 

@@ -14,6 +14,7 @@ export {
   createOAuthProvider,
   NodeOAuthClientProvider,
   OAuthFlowError,
+  type NodeOAuthAuthorizationResponse,
   type NodeOAuthOptions,
   type OAuthProviderOptions,
 } from "./auth/node.js";

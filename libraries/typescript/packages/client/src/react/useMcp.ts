@@ -1287,11 +1287,16 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
                 });
 
                 if (authResult === "REDIRECT") {
-                  // Step 2: Get the authorization code that was captured during redirectToAuthorization
-                  const authCode = await (
-                    authProviderRef.current as any
-                  ).getAuthorizationCode?.();
-                  if (!authCode) {
+                  // Step 2: Get the authorization response captured during
+                  // redirectToAuthorization, including RFC 9207 `iss` when
+                  // the provider exposes it.
+                  const flowProvider = authProviderRef.current as any;
+                  const authResponse =
+                    await flowProvider.getAuthorizationResponse?.();
+                  const authCode =
+                    authResponse?.code ??
+                    (await flowProvider.getAuthorizationCode?.());
+                  if (typeof authCode !== "string") {
                     throw new Error(
                       "Authorization code not captured by headless provider"
                     );
@@ -1301,6 +1306,9 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
                   await auth(authProviderRef.current, {
                     serverUrl: url,
                     authorizationCode: authCode,
+                    ...(authResponse?.iss !== undefined
+                      ? { iss: authResponse.iss }
+                      : {}),
                     fetchFn: authProviderRef.current.getProxyFetch?.(),
                   });
                 }

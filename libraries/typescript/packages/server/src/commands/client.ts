@@ -1,12 +1,14 @@
 import { createHash } from "node:crypto";
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
+import { createInterface } from "node:readline/promises";
 import { parseArgs } from "node:util";
 
 import type { MCPConnection } from "@mcp-use/client";
 
 import { loadClientPackage } from "./load-client.js";
 import {
+  CommandError,
   confirm,
   GLOBAL_STATE_DIR,
   openBrowser,
@@ -40,8 +42,8 @@ const CLIENT_HELP = `Usage: mcp-use client <command> [options]
 
 Commands:
   connect <name> <url>   Connect and save an HTTP(S) MCP server
-  list                   List saved servers
-  remove <name>          Remove a saved server
+  list [--json]          List saved servers
+  remove <name> [--yes]  Remove a saved server
   <name>                 Invoke tools/resources/prompts on a saved server
 
 Connect options:
@@ -49,22 +51,26 @@ Connect options:
   --no-oauth                    Skip OAuth on authorization challenges
   --auth-timeout <ms>           OAuth wait timeout (default: 300000)
   --protocol <auto|2026-07-28|2025-11-25>
-  --open                        Open the OAuth URL in a browser without prompting
   --no-open                     Print the OAuth URL only
   --json                        Emit machine-readable output
 
 Saved server commands:
-  mcp-use client <name> tools list|describe|call ...
-  mcp-use client <name> resources list|read ...
-  mcp-use client <name> prompts list|get ...
-  mcp-use client <name> auth status|logout
+  mcp-use client <name> tools list [--json]
+  mcp-use client <name> tools describe <tool> [--json]
+  mcp-use client <name> tools call <tool> [args...] [--timeout <ms>] [--json]
+  mcp-use client <name> resources list [--json]
+  mcp-use client <name> resources read <uri> [--json]
+  mcp-use client <name> prompts list [--json]
+  mcp-use client <name> prompts get <prompt> [args...] [--json]
+  mcp-use client <name> auth status [--json]
+  mcp-use client <name> auth logout [--yes] [--json]
 
 Examples:
   mcp-use client connect linear https://mcp.linear.app/mcp
   mcp-use client linear tools list
   mcp-use client linear tools call search_issues query="open bugs"`;
 
-type BrowserMode = "ask" | "always" | "never";
+type BrowserMode = "ask" | "never";
 
 /** Run the `mcp-use client` command family. */
 export async function runClient(argv: readonly string[]): Promise<number> {
@@ -73,19 +79,27 @@ export async function runClient(argv: readonly string[]): Promise<number> {
     return 0;
   }
   const json = wantsJson(argv);
+  const normalizedArgv = argv.filter((token) => token !== "--json");
+  const first = normalizedArgv[0];
+  const reportJson = json && first !== "remove";
   try {
-    const first = argv[0];
-    if (first === "connect") return await connect(argv.slice(1), json);
-    if (first === "list") return await list(argv.slice(1), json);
-    if (first === "remove") return await remove(argv.slice(1), json);
+    if (first === "connect")
+      return await connect(normalizedArgv.slice(1), json);
+    if (first === "list") return await list(normalizedArgv.slice(1), json);
+    if (first === "remove") {
+      if (json) {
+        throw new UsageError("mcp-use client remove does not support --json.");
+      }
+      return await remove(normalizedArgv.slice(1));
+    }
     if (first === undefined) {
       throw new UsageError("Usage: mcp-use client <connect|list|remove|name>");
     }
-    return await savedServerCommand(first, argv.slice(1), json);
+    return await savedServerCommand(first, normalizedArgv.slice(1), json);
   } catch (error) {
     return reportError(
       error instanceof TypeError ? new UsageError(error.message) : error,
-      json
+      reportJson
     );
   }
 }
@@ -103,14 +117,9 @@ async function connect(
       "no-oauth": { type: "boolean" },
       "auth-timeout": { type: "string" },
       protocol: { type: "string", default: "auto" },
-      open: { type: "boolean" },
       "no-open": { type: "boolean" },
-      json: { type: "boolean" },
     },
   });
-  if (values.open === true && values["no-open"] === true) {
-    throw new UsageError("Cannot combine --open and --no-open.");
-  }
   if (positionals.length !== 2) {
     throw new UsageError("Usage: mcp-use client connect <name> <url>");
   }
@@ -141,7 +150,6 @@ async function connect(
     credentials,
     timeout,
     resolveBrowserMode({
-      open: values.open === true,
       noOpen: values["no-open"] === true,
       json,
     })
@@ -174,18 +182,18 @@ async function list(argv: readonly string[], json: boolean): Promise<number> {
   return 0;
 }
 
-async function remove(argv: readonly string[], json: boolean): Promise<number> {
+async function remove(argv: readonly string[]): Promise<number> {
   const { values, positionals } = parseArgs({
     args: [...argv],
     allowPositionals: true,
     strict: true,
-    options: { yes: { type: "boolean" }, json: { type: "boolean" } },
+    options: { yes: { type: "boolean" } },
   });
   const name = one(positionals, "mcp-use client remove <name>");
   if (
     !(await confirm(`Remove saved server ${name}?`, {
       yes: values.yes === true,
-      json,
+      json: false,
     }))
   ) {
     return 0;
@@ -194,7 +202,7 @@ async function remove(argv: readonly string[], json: boolean): Promise<number> {
   delete saved.servers[name];
   await writePrivateJson(SERVERS_PATH, saved);
   await rm(credentialsDirectory(name), { recursive: true, force: true });
-  printResult({ removed: name }, json, `Removed ${name}.`);
+  printResult({ removed: name }, false, `Removed ${name}.`);
   return 0;
 }
 
@@ -228,7 +236,7 @@ async function savedServerCommand(
         args: [...argv.slice(2)],
         allowPositionals: true,
         strict: true,
-        options: { yes: { type: "boolean" }, json: { type: "boolean" } },
+        options: { yes: { type: "boolean" } },
       });
       if (positionals.length !== 0) {
         throw new UsageError(`Usage: mcp-use client ${name} auth logout`);
@@ -255,7 +263,8 @@ async function savedServerCommand(
     name,
     definition,
     credentials,
-    300_000
+    300_000,
+    resolveBrowserMode({ noOpen: false, json })
   );
   try {
     if (family === "tools") {
@@ -266,7 +275,11 @@ async function savedServerCommand(
           tools,
           json,
           tools
-            .map((tool) => `${tool.name}\t${tool.description ?? ""}`)
+            .map((tool) =>
+              tool.description
+                ? `${tool.name} - ${tool.description}`
+                : tool.name
+            )
             .join("\n")
         );
         return 0;
@@ -350,7 +363,6 @@ async function callTool(
     strict: true,
     options: {
       timeout: { type: "string", default: "30000" },
-      json: { type: "boolean" },
     },
   });
   const timeout = parsePositiveInteger(values.timeout, "--timeout");
@@ -360,8 +372,10 @@ async function callTool(
     { timeout }
   );
   if (result.isError === true) {
-    throw new Error(
-      `Tool ${tool} returned an error: ${JSON.stringify(result)}`
+    throw new CommandError(
+      "tool_error",
+      `Tool ${tool} returned an error.`,
+      result
     );
   }
   printResult(result, json);
@@ -383,15 +397,11 @@ async function openConnection(
         authTimeoutMs,
         storageKeyPrefix: `mcp-use-cli:${name}`,
         openBrowser: async (url: string) => {
-          process.stderr.write(`Open this URL to authenticate:\n${url}\n`);
-          if (browserMode === "never") return;
-          if (browserMode === "ask") {
-            const accepted = await confirm("Open in browser?", {
-              yes: false,
-              json: false,
-            });
-            if (!accepted) return;
+          if (browserMode === "never") {
+            process.stderr.write(`Open this URL to authenticate:\n${url}\n`);
+            return;
           }
+          await waitForOAuthEnter();
           openBrowser(url);
         },
         // Conditional exports select NodeOAuthOptions at runtime. TypeScript
@@ -488,13 +498,25 @@ export function parseMcpArguments(
 }
 
 function resolveBrowserMode(options: {
-  open: boolean;
   noOpen: boolean;
   json: boolean;
 }): BrowserMode {
   if (options.json || options.noOpen || !process.stdin.isTTY) return "never";
-  if (options.open) return "always";
   return "ask";
+}
+
+async function waitForOAuthEnter(): Promise<void> {
+  const prompt = createInterface({
+    input: process.stdin,
+    output: process.stderr,
+  });
+  try {
+    await prompt.question(
+      "This server requires OAuth. Press Enter to open your browser."
+    );
+  } finally {
+    prompt.close();
+  }
 }
 
 function parseHeaders(values: readonly string[]): Record<string, string> {
@@ -557,7 +579,7 @@ function parseJsonOnly(argv: readonly string[]): void {
     args: [...argv],
     allowPositionals: false,
     strict: true,
-    options: { json: { type: "boolean" } },
+    options: {},
   });
 }
 

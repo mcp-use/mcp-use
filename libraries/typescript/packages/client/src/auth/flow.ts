@@ -3,6 +3,7 @@ import {
   UnauthorizedError,
   type OAuthClientProvider,
 } from "@modelcontextprotocol/client";
+import type { NodeOAuthAuthorizationResponse } from "./node.js";
 import { runAuthPopup } from "./popup.js";
 
 const DEFAULT_AUTH_TIMEOUT_MS = 5 * 60_000;
@@ -11,6 +12,7 @@ const DEFAULT_AUTH_TIMEOUT_MS = 5 * 60_000;
 type FlowProvider = OAuthClientProvider & {
   serverUrlHash?: string;
   hasPendingFlow?: boolean;
+  getAuthorizationResponse?: () => Promise<NodeOAuthAuthorizationResponse>;
   getAuthorizationCode?: () => Promise<string>;
   getProxyFetch?: (baseFetch?: typeof fetch) => typeof fetch | undefined;
   getKey?: (keySuffix: string) => string;
@@ -70,11 +72,18 @@ export async function completeOAuthFlow(
     }
   }
 
-  if (typeof flowProvider.getAuthorizationCode === "function") {
-    const code = await flowProvider.getAuthorizationCode();
+  if (
+    typeof flowProvider.getAuthorizationResponse === "function" ||
+    typeof flowProvider.getAuthorizationCode === "function"
+  ) {
+    const response =
+      typeof flowProvider.getAuthorizationResponse === "function"
+        ? await flowProvider.getAuthorizationResponse()
+        : { code: await flowProvider.getAuthorizationCode!() };
     await auth(provider, {
       serverUrl,
-      authorizationCode: code,
+      authorizationCode: response.code,
+      ...(response.iss !== undefined ? { iss: response.iss } : {}),
       fetchFn,
     });
     return;
