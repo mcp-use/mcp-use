@@ -483,8 +483,10 @@ describe("main", () => {
 
   it("prints the package version for --version", async () => {
     const logs = vi.spyOn(console, "log").mockImplementation(() => {});
-    await expect(main(["--version"])).resolves.toBe(0);
-    expect(logs.mock.calls.flat().join("")).toMatch(/^\d+\.\d+\.\d+/);
+    await expect(
+      main(["--version"], { frameworkVersion: "9.8.7-test" })
+    ).resolves.toBe(0);
+    expect(logs.mock.calls.flat().join("")).toBe("9.8.7-test");
   });
 
   it("prints help for --help", async () => {

@@ -7,12 +7,9 @@ import test from "node:test";
 
 const execFileAsync = promisify(execFile);
 
-test("runs the prebuilt CLI with the framework version", async () => {
-  const serverPackage = JSON.parse(
-    await readFile(
-      new URL("../../server/package.json", import.meta.url),
-      "utf8"
-    )
+test("runs the standalone prebuilt CLI with its own version", async () => {
+  const cliPackage = JSON.parse(
+    await readFile(new URL("../package.json", import.meta.url), "utf8")
   );
   const { stdout, stderr } = await execFileAsync(
     process.execPath,
@@ -21,5 +18,5 @@ test("runs the prebuilt CLI with the framework version", async () => {
   );
 
   assert.equal(stderr, "");
-  assert.equal(stdout.trim(), serverPackage.version);
+  assert.equal(stdout.trim(), cliPackage.version);
 });

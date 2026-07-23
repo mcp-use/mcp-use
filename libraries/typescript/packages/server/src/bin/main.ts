@@ -5,12 +5,9 @@
  * The library entry, bin, and production `start` path therefore never
  * evaluate Vite or an unrelated command implementation.
  */
-import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { parseArgs, type ParsedArgs } from "./args.js";
-
-declare const __MCP_USE_PACKAGE_VERSION__: string | undefined;
 
 /**
  * Options this bin passes to the cli's `runDev`/`runBuild`.
@@ -40,6 +37,12 @@ export interface CliCommandOptions {
   sourceMaps?: boolean;
   /** Embed production view JS and CSS in MCP resources (`--inline`). */
   inline?: boolean;
+}
+
+/** Metadata owned by the package invoking the shared CLI dispatcher. */
+export interface CliMainOptions {
+  /** Version printed by `--version`. */
+  frameworkVersion: string;
 }
 
 const HELP = `mcp-use — run MCP servers built with mcp-use
@@ -88,9 +91,12 @@ Options:
  *
  * @internal
  */
-export async function main(argv: readonly string[]): Promise<number> {
+export async function main(
+  argv: readonly string[],
+  options: CliMainOptions = { frameworkVersion: "unknown" }
+): Promise<number> {
   if (argv.length === 1 && ["--version", "-v"].includes(argv[0] ?? "")) {
-    console.log(readOwnVersion());
+    console.log(options.frameworkVersion);
     return 0;
   }
   if (argv.some((token) => token === "--help" || token === "-h")) {
@@ -144,7 +150,7 @@ export async function main(argv: readonly string[]): Promise<number> {
   }
 
   if (args.version) {
-    console.log(readOwnVersion());
+    console.log(options.frameworkVersion);
     return 0;
   }
   if (args.help) {
@@ -256,32 +262,4 @@ async function cliCommand(
     console.error(error instanceof Error ? error.message : String(error));
     return 1;
   }
-}
-
-/**
- * Read this package's own version for `--version`.
- *
- * Probes both layouts — `dist/bin.js` (bundled, package root is one level
- * up) and `src/bin/main.ts` (tests, package root is two levels up) — and
- * verifies the manifest's `name` so an unrelated package.json never wins.
- */
-function readOwnVersion(): string {
-  if (typeof __MCP_USE_PACKAGE_VERSION__ !== "undefined") {
-    return __MCP_USE_PACKAGE_VERSION__;
-  }
-  for (const relative of ["../package.json", "../../package.json"]) {
-    try {
-      const raw = readFileSync(new URL(relative, import.meta.url), "utf8");
-      const pkg = JSON.parse(raw) as { name?: unknown; version?: unknown };
-      if (
-        (pkg.name === "mcp-use" || pkg.name === "mcp-use") &&
-        typeof pkg.version === "string"
-      ) {
-        return pkg.version;
-      }
-    } catch {
-      // Not there or unreadable — try the next candidate.
-    }
-  }
-  return "unknown";
 }

@@ -1,12 +1,7 @@
-#!/usr/bin/env node
-import { main } from "../../server/src/bin/main.js";
-
-main(process.argv.slice(2)).then(
-  (code) => {
-    process.exitCode = code;
-  },
-  (error: unknown) => {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  }
-);
+/**
+ * Side-effect-free programmatic entry for the prebuilt mcp-use CLI.
+ *
+ * @internal
+ */
+export { main } from "../../server/src/bin/main.js";
+export type { CliMainOptions } from "../../server/src/bin/main.js";

@@ -40,6 +40,7 @@
     "version:check": "changeset status",
     "verify:beta-plan": "node scripts/beta-release-plan.mjs",
     "verify:beta-packs": "node scripts/verify-beta-packs.mjs",
+    "verify:release-install": "node scripts/verify-release-install.mjs",
     "verify:examples": "node packages/server/examples/verify-examples.mjs",
     "test_app": "pnpm test_app:mcp-server",
     "test_app:mcp-server": "rimraf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template mcp-server && cd test_app && pnpm install && pnpm dev",
