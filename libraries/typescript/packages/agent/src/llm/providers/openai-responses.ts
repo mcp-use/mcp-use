@@ -177,6 +177,18 @@ export function appendToolOutputsToInput(
   }
 }
 
+function responsesReasoningFields(
+  config: ProviderConfig
+): Record<string, unknown> {
+  const effort = config.reasoningEffort;
+  // ponytail: omit reasoning.* unless caller opts in — most chat models 400 on it
+  if (!effort || effort === "none") return {};
+  return {
+    include: ["reasoning.encrypted_content"],
+    reasoning: { effort },
+  };
+}
+
 function buildResponsesBody(
   params: ResponsesTurnParams,
   stream: boolean
@@ -185,9 +197,8 @@ function buildResponsesBody(
     model: params.config.model,
     input: params.input,
     store: false,
-    include: ["reasoning.encrypted_content"],
-    reasoning: { effort: params.config.reasoningEffort ?? "low" },
     stream,
+    ...responsesReasoningFields(params.config),
   };
   if (params.instructions) body.instructions = params.instructions;
   if (params.tools && params.tools.length > 0) {
@@ -418,4 +429,4 @@ export async function completeResponsesTurn(
   };
 }
 
-export { isToolResultError };
+export { isToolResultError, responsesReasoningFields };

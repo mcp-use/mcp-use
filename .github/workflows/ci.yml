@@ -695,15 +695,16 @@ jobs:
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
         run: pnpm --filter mcp-use --if-present test:unit
-      - name: Run mcp-use Agent Integration Tests
+      - name: Run @mcp-use/agent Unit Tests
+        env:
+          MCP_USE_ANONYMIZED_TELEMETRY: false
+        run: pnpm --filter @mcp-use/agent test:unit
+      - name: Run @mcp-use/agent native OpenAI e2e
         if: env.OPENAI_API_KEY != ''
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
-          LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
-          MCP_USE_LANGFUSE: true
           MCP_USE_ANONYMIZED_TELEMETRY: false
-        run: pnpm --filter mcp-use --if-present test:integration:agent
+        run: pnpm --filter @mcp-use/agent test:integration:native-openai
 
   typescript-knip:
     needs: typescript-lint
