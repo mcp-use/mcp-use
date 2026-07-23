@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 20.0.0-beta.32
+
+### Patch Changes
+
+- 042a082: Use the standard OAuth consent flow when signing in to hosted Inspector chat.
+  - mcp-use@2.0.0-beta.40
+
 ## 20.0.0-beta.31
 
 ### Patch Changes

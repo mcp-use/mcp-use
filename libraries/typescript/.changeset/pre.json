@@ -58,6 +58,7 @@
     "request-scoped-server-notifications",
     "resource-template-completion",
     "skip-dev-info-standalone-probe",
+    "sour-socks-approve",
     "start-production-tunnel",
     "stream-inspector-tool-input",
     "strict-exported-tool-refs",
