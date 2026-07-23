@@ -49,7 +49,7 @@
     "dev": "tsc --watch",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:unit": "vitest run --exclude 'tests/integration/**'",
+    "test:unit": "vitest run --exclude 'tests/integration/**' --exclude 'tests/docs/**'",
     "test:integration": "vitest run tests/integration",
     "test:integration:agent": "vitest run tests/integration/agent",
     "test:integration:run": "vitest run tests/integration/agent/test_agent_run.test.ts",

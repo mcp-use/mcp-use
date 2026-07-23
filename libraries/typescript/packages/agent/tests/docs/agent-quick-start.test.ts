@@ -6,7 +6,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { MCPClient } from "@mcp-use/client";
-import { MCPAgent } from "../../src/agents/mcp_agent.js";
+import { LangChainMCPAgent } from "../../src/langchain.js";
 import { ChatOpenAI } from "@langchain/openai";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -21,7 +21,7 @@ describe.skipIf(!process.env.OPENAI_API_KEY)(
   () => {
     let client: MCPClient;
     let llm: ChatOpenAI;
-    let agent: MCPAgent;
+    let agent: LangChainMCPAgent;
 
     beforeAll(async () => {
       // Configure MCP servers as shown in documentation
@@ -47,11 +47,12 @@ describe.skipIf(!process.env.OPENAI_API_KEY)(
       });
 
       // Create agent
-      agent = new MCPAgent({
+      agent = new LangChainMCPAgent({
         llm,
         client,
         systemPrompt:
           "You are a helpful assistant with access to file system tools.",
+        autoInitialize: true,
       });
     }, 60000);
 

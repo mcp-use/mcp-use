@@ -387,20 +387,16 @@ describe("aI SDK Compatibility", () => {
     expect(accumulatedText).toBe("Hello world!");
   });
 
-  // Optional integration test with real LLM
+  // Optional integration test with real LLM (LangChain bridge — streamEvents emits LangChain events)
   it.skipIf(!process.env.OPENAI_API_KEY)(
     "should work end-to-end with real MCPAgent and OpenAI",
     async () => {
-      // Dynamic imports to avoid loading dependencies if test is skipped
-      const { MCPAgent } = await import("../src/agents/mcp_agent.js");
+      const { LangChainMCPAgent } = await import("../src/langchain.js");
       const { MCPClient } = await import("@mcp-use/client");
       const { ChatOpenAI } = await import("@langchain/openai");
 
-      // Create a minimal MCP setup for testing
       const client = new MCPClient({
-        mcpServers: {
-          // Use a simple echo server or no server for basic LLM testing
-        },
+        mcpServers: {},
       });
 
       const llm = new ChatOpenAI({
@@ -409,11 +405,11 @@ describe("aI SDK Compatibility", () => {
         streaming: true,
       });
 
-      const agent = new MCPAgent({
+      const agent = new LangChainMCPAgent({
         llm,
         client,
-        maxSteps: 5, // Allows recursionLimit of 15 (5 * 3)
-        verbose: false,
+        maxSteps: 5,
+        autoInitialize: true,
       });
 
       try {
