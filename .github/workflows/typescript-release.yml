@@ -42,7 +42,9 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 23
+          # npm 12 (used for trusted publishing) requires Node 22.22+, 24.15+,
+          # or 26+. Pin the current LTS line rather than the unsupported Node 23.
+          node-version: 24
           cache: "pnpm"
           cache-dependency-path: libraries/typescript/pnpm-lock.yaml
           registry-url: "https://registry.npmjs.org"

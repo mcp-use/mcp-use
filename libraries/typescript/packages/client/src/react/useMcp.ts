@@ -36,6 +36,7 @@ import {
 import type { UseMcpOptions, UseMcpResult } from "./types.js";
 import { loadServerIcon } from "./useMcp-helpers.js";
 import { useMcpOperations } from "./useMcp-operations.js";
+import { getOAuthTokenExpiry } from "./token-expiry.js";
 
 const DEFAULT_RECONNECT_DELAY = 3000;
 const DEFAULT_RETRY_DELAY = 5000;
@@ -1103,10 +1104,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
             return "failed";
           }
           if (tokens?.access_token) {
-            // Calculate expires_at from expires_in if available
-            const expiresAt = tokens.expires_in
-              ? Date.now() + tokens.expires_in * 1000
-              : undefined;
+            const expiresAt = getOAuthTokenExpiry(tokens);
 
             // Best-effort: resolve the OAuth token endpoint + client credentials
             // so consumers can persist them for server-side proactive refresh.

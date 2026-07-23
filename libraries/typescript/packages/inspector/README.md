@@ -404,7 +404,6 @@ See our [contributing guide](https://github.com/mcp-use/mcp-use/blob/main/CONTRI
 ## 📚 Learn More
 
 - [Inspector Documentation](https://mcp-use.com/docs/inspector) - Complete usage guide and tutorials
-- [Self-Hosting Guide](https://mcp-use.com/docs/inspector/self-hosting) - Deploy your own instance
 - [mcp-use Documentation](https://mcp-use.com/docs) - Full framework documentation
 - [Model Context Protocol](https://modelcontextprotocol.io) - Official MCP specification
 - [GitHub Repository](https://github.com/mcp-use/mcp-use) - Source code and examples
