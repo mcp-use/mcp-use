@@ -20,7 +20,6 @@ export default defineConfig({
     "commands/deployments": "../server/src/commands/deployments.ts",
     "commands/deploy": "../server/src/commands/deploy.ts",
     "commands/client": "../server/src/commands/client.ts",
-    "commands/skills": "../server/src/commands/skills.ts",
     "commands/screenshot": "../server/src/commands/screenshot.ts",
   },
   format: ["esm"],

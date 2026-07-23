@@ -62,7 +62,6 @@ Commands:
   deployments Manage cloud deployments and logs
   deploy   Deploy the current GitHub project
   client   Connect to and invoke MCP servers
-  skills   Install maintained coding-agent skills
   screenshot Capture an MCP Apps view
 
 Options:
@@ -131,10 +130,6 @@ export async function main(
   if (command === "client") {
     const { runClient } = await import("../commands/client.js");
     return runClient(argv.slice(1));
-  }
-  if (command === "skills") {
-    const { runSkills } = await import("../commands/skills.js");
-    return runSkills(argv.slice(1));
   }
   if (command === "screenshot") {
     const { runScreenshot } = await import("../commands/screenshot.js");
