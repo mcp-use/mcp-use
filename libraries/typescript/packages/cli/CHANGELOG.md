@@ -1,5 +1,11 @@
 # @mcp-use/cli
 
+## 4.0.0-beta.10
+
+### Minor Changes
+
+- e53c958: Add `mcp-use login --device-code <code>` for securely redeeming short-lived, pre-approved device codes in non-interactive onboarding flows.
+
 ## 4.0.0-beta.9
 
 ### Minor Changes

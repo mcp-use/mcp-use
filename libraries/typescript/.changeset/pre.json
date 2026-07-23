@@ -22,6 +22,7 @@
     "chatgpt-files-hook",
     "clean-create-app-inspector-deps",
     "cli-client-ux-fixes",
+    "cli-device-code-login",
     "client-cli-auto-install",
     "client-sdk-v2-migration",
     "codeql-security-hardening",
