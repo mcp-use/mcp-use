@@ -18,11 +18,16 @@ export function ManufactWordmark({
   textClassName?: string;
 }) {
   return (
-    <span className={cn("inline-flex items-center gap-1.5", className)}>
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 text-black dark:text-white",
+        className
+      )}
+    >
       <ManufactLogomark size={symbolSize} />
       <span
         className={cn(
-          "font-medium leading-none text-black [font-family:var(--font-family-outfit)]",
+          "font-medium leading-none text-current [font-family:var(--font-family-outfit)]",
           textClassName
         )}
       >
