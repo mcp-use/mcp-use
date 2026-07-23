@@ -277,6 +277,42 @@ describe("client human-readable output", () => {
     expect(stdout).toBe("echo - Echo input\n");
     expect(stderr).toBe("");
   });
+
+  it("rejects --json for remove in every position", async () => {
+    await expect(
+      runClient([
+        "connect",
+        "remove-json",
+        "https://mcp.example.com/mcp",
+        "--no-oauth",
+      ])
+    ).resolves.toBe(0);
+
+    for (const argv of [
+      ["--json", "remove", "remove-json", "--yes"],
+      ["remove", "--json", "remove-json", "--yes"],
+      ["remove", "remove-json", "--yes", "--json"],
+    ]) {
+      stdout = "";
+      stderr = "";
+
+      await expect(runClient(argv)).resolves.toBe(2);
+
+      expect(stdout).toBe("");
+      expect(stderr).toBe("mcp-use client remove does not support --json.\n");
+    }
+
+    stdout = "";
+    stderr = "";
+    await expect(runClient(["list", "--json"])).resolves.toBe(0);
+    expect(JSON.parse(stdout)).toContainEqual({
+      name: "remove-json",
+      oauth: false,
+      protocol: "auto",
+      url: "https://mcp.example.com/mcp",
+    });
+    expect(stderr).toBe("");
+  });
 });
 
 describe("client OAuth browser UX", () => {

@@ -80,12 +80,18 @@ export async function runClient(argv: readonly string[]): Promise<number> {
   }
   const json = wantsJson(argv);
   const normalizedArgv = argv.filter((token) => token !== "--json");
+  const first = normalizedArgv[0];
+  const reportJson = json && first !== "remove";
   try {
-    const first = normalizedArgv[0];
     if (first === "connect")
       return await connect(normalizedArgv.slice(1), json);
     if (first === "list") return await list(normalizedArgv.slice(1), json);
-    if (first === "remove") return await remove(normalizedArgv.slice(1), json);
+    if (first === "remove") {
+      if (json) {
+        throw new UsageError("mcp-use client remove does not support --json.");
+      }
+      return await remove(normalizedArgv.slice(1));
+    }
     if (first === undefined) {
       throw new UsageError("Usage: mcp-use client <connect|list|remove|name>");
     }
@@ -93,7 +99,7 @@ export async function runClient(argv: readonly string[]): Promise<number> {
   } catch (error) {
     return reportError(
       error instanceof TypeError ? new UsageError(error.message) : error,
-      json
+      reportJson
     );
   }
 }
@@ -176,7 +182,7 @@ async function list(argv: readonly string[], json: boolean): Promise<number> {
   return 0;
 }
 
-async function remove(argv: readonly string[], json: boolean): Promise<number> {
+async function remove(argv: readonly string[]): Promise<number> {
   const { values, positionals } = parseArgs({
     args: [...argv],
     allowPositionals: true,
@@ -187,7 +193,7 @@ async function remove(argv: readonly string[], json: boolean): Promise<number> {
   if (
     !(await confirm(`Remove saved server ${name}?`, {
       yes: values.yes === true,
-      json,
+      json: false,
     }))
   ) {
     return 0;
@@ -196,7 +202,7 @@ async function remove(argv: readonly string[], json: boolean): Promise<number> {
   delete saved.servers[name];
   await writePrivateJson(SERVERS_PATH, saved);
   await rm(credentialsDirectory(name), { recursive: true, force: true });
-  printResult({ removed: name }, json, `Removed ${name}.`);
+  printResult({ removed: name }, false, `Removed ${name}.`);
   return 0;
 }
 
