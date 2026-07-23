@@ -5,7 +5,8 @@
  */
 
 import { existsSync, readdirSync } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
+import react from "@vitejs/plugin-react";
 import type { ViteDevServer } from "vite";
 
 import type { ViewsManifest } from "../views/types.js";
@@ -14,6 +15,7 @@ import {
   nextStandaloneCompatPlugin,
   nextStandaloneSsrOptions,
 } from "./next-compat.js";
+import { legacyWidgetMetadataPlugin } from "./legacy-widget-metadata.js";
 
 /** Author-facing view source directory at the project root. */
 export const VIEWS_SOURCE_DIR = "views" as const;
@@ -34,6 +36,8 @@ export interface DiscoveredView {
   name: string;
   /** Absolute path to `views/<name>/view.tsx`. */
   entryPath: string;
+  /** Whether this entry uses the deprecated `resources/<name>/widget.tsx` layout. */
+  legacy?: boolean;
 }
 
 /**
@@ -66,25 +70,47 @@ export function resolveViewsDir(cwd: string, override?: string): string {
  */
 export function discoverViews(
   cwd: string,
-  override?: string
+  override?: string,
+  options?: { includeLegacy?: boolean }
 ): DiscoveredView[] {
   const viewsDir = resolveViewsDir(cwd, override);
-  if (!existsSync(viewsDir)) {
-    return [];
+  const resourcesDir =
+    override === undefined
+      ? resolve(cwd, "resources")
+      : resolve(dirname(viewsDir), "resources");
+  const byName = new Map<string, DiscoveredView>();
+  scanViewDirectory(viewsDir, "view.tsx", false, byName);
+  if (options?.includeLegacy === true) {
+    scanViewDirectory(resourcesDir, "widget.tsx", true, byName);
   }
-
-  const views: DiscoveredView[] = [];
-  for (const entry of readdirSync(viewsDir, { withFileTypes: true })) {
-    if (!entry.isDirectory()) {
-      continue;
-    }
-    const entryPath = join(viewsDir, entry.name, "view.tsx");
-    if (existsSync(entryPath)) {
-      views.push({ name: entry.name, entryPath });
-    }
-  }
+  const views = [...byName.values()];
   views.sort((a, b) => a.name.localeCompare(b.name));
   return views;
+}
+
+function scanViewDirectory(
+  directory: string,
+  filename: string,
+  legacy: boolean,
+  views: Map<string, DiscoveredView>
+): void {
+  if (!existsSync(directory)) return;
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const entryPath = join(directory, entry.name, filename);
+    if (!existsSync(entryPath)) continue;
+    if (legacy && views.has(entry.name)) {
+      console.warn(
+        `[mcp-use] Both native and legacy view entries exist for "${entry.name}"; using views/${entry.name}/view.tsx.`
+      );
+      continue;
+    }
+    views.set(entry.name, {
+      name: entry.name,
+      entryPath,
+      ...(legacy && { legacy: true }),
+    });
+  }
 }
 
 /**
@@ -120,7 +146,16 @@ export function isViewPath(
   override?: string
 ): boolean {
   const viewsDir = resolveViewsDir(cwd, override);
-  return file === viewsDir || file.startsWith(`${viewsDir}/`);
+  const resourcesDir =
+    override === undefined
+      ? resolve(cwd, "resources")
+      : resolve(dirname(viewsDir), "resources");
+  return (
+    file === viewsDir ||
+    file.startsWith(`${viewsDir}/`) ||
+    file === resourcesDir ||
+    file.startsWith(`${resourcesDir}/`)
+  );
 }
 
 /**
@@ -134,10 +169,20 @@ export function isViewEntryPath(
   override?: string
 ): boolean {
   const viewsDir = resolveViewsDir(cwd, override);
-  const rel = file.startsWith(`${viewsDir}/`)
+  const resourcesDir =
+    override === undefined
+      ? resolve(cwd, "resources")
+      : resolve(dirname(viewsDir), "resources");
+  const viewsRel = file.startsWith(`${viewsDir}/`)
     ? file.slice(viewsDir.length + 1)
     : file;
-  return /^[^/]+\/view\.tsx$/.test(rel);
+  const resourcesRel = file.startsWith(`${resourcesDir}/`)
+    ? file.slice(resourcesDir.length + 1)
+    : file;
+  return (
+    /^[^/]+\/view\.tsx$/.test(viewsRel) ||
+    /^[^/]+\/widget\.tsx$/.test(resourcesRel)
+  );
 }
 
 /**
@@ -179,7 +224,12 @@ export async function createBindingValidationServer(
       tsconfigPaths: true,
       alias: nextStandaloneAliases(cwd),
     },
-    plugins: [nextStandaloneCompatPlugin(cwd)],
+    oxc: { jsx: { runtime: "automatic" } },
+    plugins: [
+      nextStandaloneCompatPlugin(cwd),
+      legacyWidgetMetadataPlugin(),
+      react(),
+    ],
     server: { middlewareMode: true, hmr: false },
     ssr: {
       ...nextStandaloneSsrOptions(cwd),

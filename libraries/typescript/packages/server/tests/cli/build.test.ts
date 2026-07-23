@@ -665,6 +665,105 @@ describe("runBuild (views)", () => {
     await expect(runBuild({ cwd })).resolves.toBeUndefined();
   }, 60_000);
 
+  it("ignores legacy widget entries for a native v2 server", async () => {
+    const cwd = copyFixture("build-native-ignores-legacy");
+    dirs.push(cwd);
+    mkdirSync(join(cwd, "resources", "unused"), { recursive: true });
+    writeFileSync(
+      join(cwd, "resources", "unused", "widget.tsx"),
+      [
+        "const href = window.location.href;",
+        "export const widgetMetadata = { description: href };",
+        "export default function Unused() { return null; }",
+      ].join("\n")
+    );
+
+    await runBuild({ cwd });
+
+    const manifest = JSON.parse(
+      readFileSync(
+        join(cwd, WORKSPACE_DIR_NAME, "build", BUILD_MANIFEST_NAME),
+        "utf8"
+      )
+    ) as BuildManifest;
+    expect(manifest.views).toEqual({});
+  }, 60_000);
+
+  it("builds legacy browser widgets without SSR-evaluating their module", async () => {
+    const cwd = copyFixture("build-legacy-browser-widget", "views");
+    dirs.push(cwd);
+    removeDir(join(cwd, "views"));
+    mkdirSync(join(cwd, "resources", "legacy-card"), { recursive: true });
+    writeFileSync(
+      join(cwd, "src", "index.ts"),
+      [
+        'import { MCPServer, widget } from "mcp-use/server";',
+        'import { z } from "zod";',
+        'const server = new MCPServer({ name: "legacy", version: "1.0.0" });',
+        "server.tool({",
+        '  name: "show-card",',
+        "  schema: z.object({ message: z.string() }),",
+        '  widget: { name: "legacy-card" },',
+        "  cb: async ({ message }) => widget({ props: { message } }),",
+        "});",
+        "void server.listen();",
+      ].join("\n")
+    );
+    writeFileSync(
+      join(cwd, "resources", "legacy-card", "widget.tsx"),
+      [
+        'import { z } from "zod";',
+        "const browserHref = window.location.href;",
+        "export const widgetMetadata = {",
+        '  description: "Legacy browser card",',
+        "  props: z.object({ message: z.string() }),",
+        "  metadata: { prefersBorder: true },",
+        "};",
+        "export default function LegacyCard() {",
+        "  return <div>{browserHref}</div>;",
+        "}",
+      ].join("\n")
+    );
+
+    await expect(runBuild({ cwd })).resolves.toBeUndefined();
+
+    const buildDir = join(cwd, WORKSPACE_DIR_NAME, "build");
+    const manifest = JSON.parse(
+      readFileSync(join(buildDir, BUILD_MANIFEST_NAME), "utf8")
+    ) as BuildManifest;
+    expect(manifest.views["legacy-card"]).toMatchObject({ kind: "external" });
+    expect(readFileSync(join(buildDir, "index.js"), "utf8")).toContain(
+      "Legacy browser card"
+    );
+
+    const previousCliImport = process.env["MCP_USE_CLI_IMPORT"];
+    process.env["MCP_USE_CLI_IMPORT"] = "1";
+    let mod: { default: { fetch(request: Request): Promise<Response> } };
+    try {
+      mod = (await import(pathToFileURL(join(buildDir, "index.js")).href)) as {
+        default: { fetch(request: Request): Promise<Response> };
+      };
+    } finally {
+      if (previousCliImport === undefined) {
+        delete process.env["MCP_USE_CLI_IMPORT"];
+      } else {
+        process.env["MCP_USE_CLI_IMPORT"] = previousCliImport;
+      }
+    }
+    const listBody = await handlerMcp(mod.default.fetch, "resources/list");
+    const resources = (
+      listBody["result"] as {
+        resources: Array<{ uri: string; description?: string }>;
+      }
+    ).resources;
+    expect(resources).toContainEqual(
+      expect.objectContaining({
+        uri: "ui://views/legacy-card.html",
+        description: "Legacy browser card",
+      })
+    );
+  }, 60_000);
+
   it("fails when a tool binds a missing view", async () => {
     const cwd = copyFixture("build-views-missing", "views");
     dirs.push(cwd);

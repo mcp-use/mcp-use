@@ -30,9 +30,14 @@ import {
 import { mcpUseViewsPlugin } from "./views-plugin.js";
 import { syncMcpEnvDeclaration } from "./mcp-env-declaration.js";
 import {
+  inspectBuildEntry,
   resolveBuildBasePath,
   validateViewBindingsAtBuild,
 } from "./views-bindings.js";
+import {
+  legacyWidgetMetadataId,
+  legacyWidgetMetadataPlugin,
+} from "./legacy-widget-metadata.js";
 import {
   createBindingValidationServer,
   discoverViews,
@@ -96,21 +101,50 @@ export interface BuildOptions {
 async function writeWrapperEntry(
   cacheDir: string,
   userEntry: string,
-  viewsManifest: ViewsManifest
+  viewsManifest: ViewsManifest,
+  views: readonly DiscoveredView[]
 ): Promise<string> {
   const wrapperPath = join(cacheDir, WRAPPER_BASENAME);
   await mkdir(cacheDir, { recursive: true });
   const manifestJson = JSON.stringify(viewsManifest);
-  await writeFile(
-    wrapperPath,
-    [
-      `import server from ${JSON.stringify(userEntry)};`,
-      `import { registerViews } from "mcp-use";`,
-      `server[registerViews](${manifestJson});`,
-      `export default server;`,
-      "",
-    ].join("\n")
+  const legacy = views.filter((view) => view.legacy === true);
+  const lines =
+    legacy.length > 0
+      ? [
+          `import ${JSON.stringify(userEntry)};`,
+          `import { registerViews } from "mcp-use";`,
+        ]
+      : [
+          `import * as serverModule from ${JSON.stringify(userEntry)};`,
+          `import { registerViews } from "mcp-use";`,
+        ];
+  legacy.forEach((view, index) => {
+    lines.push(
+      `import * as legacyWidget${index} from ${JSON.stringify(
+        legacyWidgetMetadataId(view.entryPath)
+      )};`
+    );
+  });
+  lines.push(
+    legacy.length > 0
+      ? `const server = globalThis.__mcpUseV1CompatServer;`
+      : `const server = serverModule.default;`,
+    `if (!server) throw new Error("The server entry must default-export MCPServer or use the deprecated mcp-use/server compatibility entry.");`
   );
+  if (legacy.length > 0) {
+    const entries = legacy
+      .map(
+        (view, index) => `${JSON.stringify(view.name)}: legacyWidget${index}`
+      )
+      .join(", ");
+    lines.push(`server.__registerLegacyViews?.({ ${entries} });`);
+  }
+  lines.push(
+    `server[registerViews] ? server[registerViews](${manifestJson}) : server.__primeViews(${manifestJson});`,
+    `export default server;`,
+    ""
+  );
+  await writeFile(wrapperPath, lines.join("\n"));
   return wrapperPath;
 }
 
@@ -186,6 +220,7 @@ async function buildView(
       tsconfigPaths: true,
       alias: { tailwindcss: resolveTailwindCss() },
     },
+    oxc: { jsx: { runtime: "automatic" } },
     plugins: [
       tailwindcss(),
       react(),
@@ -323,43 +358,76 @@ export async function runBuild(options: BuildOptions): Promise<void> {
   const viewsDirectory =
     options.viewsDir ??
     (options.mcpDir === undefined ? undefined : join(options.mcpDir, "views"));
-  const views = discoverViews(options.cwd, viewsDirectory);
+  const discoveredViews = discoverViews(options.cwd, viewsDirectory, {
+    includeLegacy: true,
+  });
+  let views = discoveredViews;
   const userViteConfig = resolveUserViteConfig(options.cwd);
   const sourceMaps = options.sourceMaps === true;
   const inline = options.inline === true;
+  let bindingServer:
+    | Awaited<ReturnType<typeof createBindingValidationServer>>
+    | undefined;
+  let inspectedBasePath: string | undefined;
+
+  if (discoveredViews.some((view) => view.legacy === true)) {
+    bindingServer = await createBindingValidationServer(
+      options.cwd,
+      paths.cache,
+      false
+    );
+    let inspection: Awaited<ReturnType<typeof inspectBuildEntry>>;
+    try {
+      inspection = await inspectBuildEntry(
+        bindingServer.environments.ssr,
+        entry
+      );
+    } catch (error) {
+      await bindingServer.close();
+      throw error;
+    }
+    inspectedBasePath = inspection.basePath;
+    if (!inspection.supportsLegacyViews) {
+      views = discoveredViews.filter((view) => view.legacy !== true);
+    }
+  }
 
   if (views.length === 0) {
-    await build({
-      root: options.cwd,
-      configFile: false,
-      envDir: false,
-      publicDir: false,
-      logLevel: "warn",
-      cacheDir: paths.cache,
-      resolve: {
-        tsconfigPaths: true,
-        alias: nextStandaloneAliases(options.cwd),
-      },
-      plugins: [nextStandaloneCompatPlugin(options.cwd)],
-      build: {
-        ssr: entry,
-        outDir: paths.build,
-        emptyOutDir: true,
-        target: "node22",
-        sourcemap: sourceMaps,
-        minify: false,
-        rollupOptions: {
-          output: {
-            format: "es",
-            entryFileNames: BUILD_ENTRY_NAME,
+    try {
+      await build({
+        root: options.cwd,
+        configFile: false,
+        envDir: false,
+        publicDir: false,
+        logLevel: "warn",
+        cacheDir: paths.cache,
+        resolve: {
+          tsconfigPaths: true,
+          alias: nextStandaloneAliases(options.cwd),
+        },
+        plugins: [nextStandaloneCompatPlugin(options.cwd)],
+        build: {
+          ssr: entry,
+          outDir: paths.build,
+          emptyOutDir: true,
+          target: "node22",
+          sourcemap: sourceMaps,
+          minify: false,
+          rollupOptions: {
+            output: {
+              format: "es",
+              entryFileNames: BUILD_ENTRY_NAME,
+            },
           },
         },
-      },
-      ssr: {
-        ...nextStandaloneSsrOptions(options.cwd),
-        target: "node",
-      },
-    });
+        ssr: {
+          ...nextStandaloneSsrOptions(options.cwd),
+          target: "node",
+        },
+      });
+    } finally {
+      await bindingServer?.close();
+    }
 
     // Branding may reference project-public icon files even when the server
     // has no views. Keep the runtime public-asset location identical in both
@@ -391,7 +459,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
   const viewsOutDir = join(paths.build, "views");
   await mkdir(viewsOutDir, { recursive: true });
 
-  const bindingServer = await createBindingValidationServer(
+  bindingServer ??= await createBindingValidationServer(
     options.cwd,
     paths.cache,
     false
@@ -400,10 +468,9 @@ export async function runBuild(options: BuildOptions): Promise<void> {
   const viewsManifest: ViewsManifest = {};
   const buildAssetsBase = readBuildAssetsBase();
   try {
-    buildBasePath = await resolveBuildBasePath(
-      bindingServer.environments.ssr,
-      entry
-    );
+    buildBasePath =
+      inspectedBasePath ??
+      (await resolveBuildBasePath(bindingServer.environments.ssr, entry));
 
     for (const view of views) {
       let manifestEntry = await buildView(view, {
@@ -442,7 +509,8 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     await validateViewBindingsAtBuild(
       bindingServer.environments.ssr,
       entry,
-      viewsManifest
+      viewsManifest,
+      views
     );
   } finally {
     await bindingServer.close();
@@ -451,7 +519,8 @@ export async function runBuild(options: BuildOptions): Promise<void> {
   const wrapperEntry = await writeWrapperEntry(
     paths.cache,
     entry,
-    viewsManifest
+    viewsManifest,
+    views
   );
 
   await build({
@@ -465,7 +534,11 @@ export async function runBuild(options: BuildOptions): Promise<void> {
       tsconfigPaths: true,
       alias: nextStandaloneAliases(options.cwd),
     },
-    plugins: [nextStandaloneCompatPlugin(options.cwd)],
+    oxc: { jsx: { runtime: "automatic" } },
+    plugins: [
+      nextStandaloneCompatPlugin(options.cwd),
+      legacyWidgetMetadataPlugin(),
+    ],
     build: {
       ssr: wrapperEntry,
       outDir: paths.build,

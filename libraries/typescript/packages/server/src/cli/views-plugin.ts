@@ -89,11 +89,20 @@ export function mcpUseViewsPlugin(options: McpUseViewsPluginOptions): Plugin {
         lines.push(`import "@vitejs/plugin-react/preamble";`);
       }
       lines.push(`import ${JSON.stringify(VIRTUAL_TAILWIND_ID)};`);
+      lines.push(`import { bootstrapView } from "mcp-use/react";`);
       lines.push(
-        `import { bootstrapView } from "mcp-use/react";`,
-        `import * as viewModule from ${JSON.stringify(view.entryPath)};`,
-        `bootstrapView(viewModule);`
+        `import * as viewModule from ${JSON.stringify(view.entryPath)};`
       );
+      if (view.legacy === true) {
+        lines.push(
+          `const legacyMetadata = viewModule.widgetMetadata?.metadata;`,
+          `bootstrapView({ ...viewModule, viewConfig: {`,
+          `  ...(legacyMetadata?.autoResize !== undefined && { autoResize: legacyMetadata.autoResize }),`,
+          `} });`
+        );
+      } else {
+        lines.push(`bootstrapView(viewModule);`);
+      }
       if (options.dev !== undefined) {
         lines.push(
           `if (import.meta.hot) {`,

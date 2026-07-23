@@ -47,10 +47,12 @@ interface DevHandle {
 const cleanups: (() => Promise<void> | void)[] = [];
 let originalMcpUrl: string | undefined;
 let originalPort: string | undefined;
+let originalCliImport: string | undefined;
 
 beforeEach(() => {
   originalMcpUrl = process.env["MCP_URL"];
   originalPort = process.env["PORT"];
+  originalCliImport = process.env["MCP_USE_CLI_IMPORT"];
 });
 
 afterEach(async () => {
@@ -67,6 +69,11 @@ afterEach(async () => {
     delete process.env["PORT"];
   } else {
     process.env["PORT"] = originalPort;
+  }
+  if (originalCliImport === undefined) {
+    delete process.env["MCP_USE_CLI_IMPORT"];
+  } else {
+    process.env["MCP_USE_CLI_IMPORT"] = originalCliImport;
   }
 });
 
@@ -546,6 +553,7 @@ export default server;`
 
   it("does not leak a synthetic MCP_URL when startup fails", async () => {
     delete process.env["MCP_URL"];
+    delete process.env["MCP_USE_CLI_IMPORT"];
     const cwd = copyFixture("dev-oauth-startup-failure");
     cleanups.push(() => removeDir(cwd));
     writeOAuthEntry(cwd);
@@ -560,6 +568,7 @@ throw new Error("startup failure after MCPServer construction");
       "startup failure after MCPServer construction"
     );
     expect(process.env["MCP_URL"]).toBeUndefined();
+    expect(process.env["MCP_USE_CLI_IMPORT"]).toBeUndefined();
   });
 
   it("does not reuse a prior run's local OAuth identity", async () => {

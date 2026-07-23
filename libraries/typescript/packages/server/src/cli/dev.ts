@@ -58,6 +58,10 @@ import { syncMcpEnvDeclaration } from "./mcp-env-declaration.js";
 import { resolveWorkspacePaths } from "./workspace.js";
 import { mcpUseViewsPlugin } from "./views-plugin.js";
 import {
+  legacyWidgetMetadataId,
+  legacyWidgetMetadataPlugin,
+} from "./legacy-widget-metadata.js";
+import {
   buildDevViewsManifest,
   discoverViews,
   isViewPath,
@@ -83,7 +87,11 @@ interface ServerLike {
     views: ViewsManifest,
     options?: { dev?: boolean; projectRoot?: string }
   ): void;
+  /** Deprecated v1 widget metadata registration seam. */
+  __registerLegacyViews?(widgets: Record<string, unknown>): void;
 }
+
+const COMPAT_GLOBAL = "__mcpUseV1CompatServer";
 
 /**
  * Options for {@link runDev}.
@@ -269,7 +277,9 @@ function applyViteModuleCors(
  * {@link ServerLike}.
  */
 function serverFrom(moduleExports: Record<string, unknown>): ServerLike {
-  const server = moduleExports["default"];
+  const server =
+    moduleExports["default"] ??
+    (globalThis as Record<string, unknown>)[COMPAT_GLOBAL];
   if (server === null || typeof server !== "object") {
     throw new Error(
       "The server entry must default-export the MCPServer instance " +
@@ -366,8 +376,10 @@ export async function runDev(options: DevOptions): Promise<void> {
     (options.mcpDir === undefined ? undefined : join(options.mcpDir, "views"));
   let currentViews: DiscoveredView[] = discoverViews(
     options.cwd,
-    viewsDirectory
+    viewsDirectory,
+    { includeLegacy: true }
   );
+  let legacyViewsEnabled = false;
   // The Vite client environment (views plugin, Fast Refresh, HMR socket,
   // asset origin) is configured once, from this snapshot. `currentViews`
   // stays live for request routing and re-priming, but a project that starts
@@ -396,9 +408,11 @@ export async function runDev(options: DevOptions): Promise<void> {
       tsconfigPaths: true,
       alias: { tailwindcss: resolveTailwindCss() },
     },
+    oxc: { jsx: { runtime: "automatic" } },
     plugins: viewsAtStartup
       ? [
           nextStandaloneCompatPlugin(options.cwd),
+          legacyWidgetMetadataPlugin(),
           tailwindcss(),
           mcpUseViewsPlugin({
             getViews: () => currentViews,
@@ -435,13 +449,41 @@ export async function runDev(options: DevOptions): Promise<void> {
 
   const importServer = async (): Promise<ServerLike> => {
     const load = async (): Promise<ServerLike> => {
-      const moduleExports = (await runner.import(entry)) as Record<
-        string,
-        unknown
-      >;
+      delete (globalThis as Record<string, unknown>)[COMPAT_GLOBAL];
+      const previousCliImport = process.env["MCP_USE_CLI_IMPORT"];
+      let moduleExports: Record<string, unknown>;
+      try {
+        process.env["MCP_USE_CLI_IMPORT"] = "1";
+        moduleExports = (await runner.import(entry)) as Record<string, unknown>;
+      } finally {
+        if (previousCliImport === undefined) {
+          delete process.env["MCP_USE_CLI_IMPORT"];
+        } else {
+          process.env["MCP_USE_CLI_IMPORT"] = previousCliImport;
+        }
+      }
       const server = serverFrom(moduleExports);
+      legacyViewsEnabled = typeof server.__registerLegacyViews === "function";
+      currentViews = discoverViews(options.cwd, viewsDirectory, {
+        includeLegacy: legacyViewsEnabled,
+      });
 
       if (currentViews.length > 0) {
+        const legacyViews = currentViews.filter((view) => view.legacy === true);
+        if (legacyViews.length > 0) {
+          if (typeof server.__registerLegacyViews !== "function") {
+            throw new Error(
+              "Legacy resources/*/widget.tsx views require the temporary mcp-use/server compatibility entry."
+            );
+          }
+          const legacyModules: Record<string, unknown> = {};
+          for (const view of legacyViews) {
+            legacyModules[view.name] = await runner.import(
+              legacyWidgetMetadataId(view.entryPath)
+            );
+          }
+          server.__registerLegacyViews(legacyModules);
+        }
         const viewsManifest = buildDevViewsManifest(currentViews);
         if (typeof server.__primeViews !== "function") {
           throw new Error(
@@ -589,7 +631,9 @@ export async function runDev(options: DevOptions): Promise<void> {
     }
 
     const previousViews = currentViews;
-    currentViews = discoverViews(options.cwd, viewsDirectory);
+    currentViews = discoverViews(options.cwd, viewsDirectory, {
+      includeLegacy: legacyViewsEnabled,
+    });
 
     const viewsChanged =
       previousViews.length !== currentViews.length ||
@@ -599,9 +643,19 @@ export async function runDev(options: DevOptions): Promise<void> {
           v.entryPath !== currentViews[i]?.entryPath
       );
 
-    if (viewsChanged) {
+    const legacyMetadataChanged =
+      legacyViewsEnabled &&
+      currentViews.some(
+        (view) => view.legacy === true && view.entryPath === file
+      );
+    if (viewsChanged || legacyMetadataChanged) {
       reload();
     }
+  };
+
+  const onFileChange = (file: string): void => {
+    onViewFilesystemEvent(file);
+    onSsrFileEvent(file);
   };
 
   const onFileAddOrUnlink = (file: string): void => {
@@ -612,7 +666,7 @@ export async function runDev(options: DevOptions): Promise<void> {
   // A `change` event cannot add or remove a view directory, so only
   // `add`/`unlink` rescan `views/` — content edits never pay for the
   // synchronous filesystem walk in discoverViews().
-  vite.watcher.on("change", onSsrFileEvent);
+  vite.watcher.on("change", onFileChange);
   vite.watcher.on("add", onFileAddOrUnlink);
   vite.watcher.on("unlink", onFileAddOrUnlink);
 
@@ -686,7 +740,7 @@ export async function runDev(options: DevOptions): Promise<void> {
    * watcher subscriptions, tunnel, HTTP listener, module runner, Vite.
    */
   const teardown = async (): Promise<void> => {
-    vite.watcher.off("change", onSsrFileEvent);
+    vite.watcher.off("change", onFileChange);
     vite.watcher.off("add", onFileAddOrUnlink);
     vite.watcher.off("unlink", onFileAddOrUnlink);
     await tunnelManager.stop();
