@@ -1,13 +1,14 @@
 import { readFileSync } from "node:fs";
 import { defineConfig } from "tsup";
 
-const framework = JSON.parse(
-  readFileSync(new URL("../server/package.json", import.meta.url), "utf8")
+const cliPackage = JSON.parse(
+  readFileSync(new URL("./package.json", import.meta.url), "utf8")
 ) as { version: string };
 
 export default defineConfig({
   entry: {
-    bin: "src/index.ts",
+    index: "src/index.ts",
+    bin: "src/bin.ts",
     "next-server-shims": "../server/src/cli/next-server-shims.ts",
     "commands/start": "../server/src/commands/start.ts",
     "commands/dev": "../server/src/commands/dev.ts",
@@ -41,6 +42,6 @@ export default defineConfig({
     "vite",
   ],
   define: {
-    __MCP_USE_PACKAGE_VERSION__: JSON.stringify(framework.version),
+    __MCP_USE_CLI_VERSION__: JSON.stringify(cliPackage.version),
   },
 });

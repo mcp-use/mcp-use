@@ -1,4 +1,9 @@
+import { readFileSync } from "node:fs";
 import { defineConfig } from "tsup";
+
+const frameworkPackage = JSON.parse(
+  readFileSync(new URL("./package.json", import.meta.url), "utf8")
+) as { version: string };
 
 export default defineConfig([
   {
@@ -38,6 +43,14 @@ export default defineConfig([
     sourcemap: false,
     clean: true,
     external: ["@mcp-use/client", "@mcp-use/cli"],
+    define: {
+      __MCP_USE_PACKAGE_VERSION__: JSON.stringify(frameworkPackage.version),
+    },
+    esbuildOptions(options) {
+      options.minifySyntax = true;
+      options.minifyWhitespace = true;
+      options.minifyIdentifiers = false;
+    },
   },
   // Browser-only view runtime (`mcp-use/react`). Must not be reachable
   // from the `.` export or `bin` graphs — same invariant as the cli chunk above.
