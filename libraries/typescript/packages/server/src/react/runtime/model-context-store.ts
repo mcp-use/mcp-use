@@ -1,6 +1,12 @@
 import type { App } from "@modelcontextprotocol/ext-apps";
 import type { ContentBlock } from "@modelcontextprotocol/server";
 
+/** Model-visible state owned by one mounted view runtime. */
+export type ViewState = Record<string, unknown>;
+
+/** Reserved field carrying the serialized {@link ModelContext} tree. */
+export const UI_CONTEXT_KEY = "_uiContext" as const;
+
 interface ModelContextNode {
   id: string;
   parentId: string | null;
@@ -12,46 +18,42 @@ interface StoredModelContextNode extends ModelContextNode {
   order: number;
 }
 
-/**
- * Complete `ui/update-model-context` params built from the store — the wire
- * shape of the MCP Apps spec's `content` blocks. Each push carries the full
- * current state (the spec's overwrite semantics).
- *
- * @internal
- */
+interface OpenAiWidgetState {
+  modelContent?: ViewState;
+  privateContent?: ViewState;
+  imageIds?: string[];
+  [key: string]: unknown;
+}
+
+interface ChatGptWidgetApi {
+  widgetState?: OpenAiWidgetState | null;
+  setWidgetState(state: OpenAiWidgetState): Promise<void>;
+}
+
+interface OpenAiSetGlobalsEvent extends Event {
+  detail?: {
+    globals?: {
+      widgetState?: OpenAiWidgetState | null;
+    };
+  };
+}
+
+/** Complete model-visible snapshot sent on every update. */
 export interface ModelContextParams {
-  /**
-   * Content blocks: empty, or a single text block with the serialized
-   * description tree.
-   */
+  structuredContent: ViewState & { [UI_CONTEXT_KEY]: string };
   content: ContentBlock[];
 }
 
-/**
- * Narrow runtime surface the flush pump needs to connect and send.
- *
- * @internal
- */
+/** Narrow runtime surface used by the shared state/context flush pump. */
 export interface ModelContextStoreHost {
   /** Connect once, or return the cached in-flight / settled connection promise. */
   connect(): Promise<App>;
 }
 
-const EMPTY_SERIALIZED = JSON.stringify({ content: [] });
-
-/**
- * Warn-once flag for hosts that omit the `updateModelContext` capability.
- * Document-scoped so HMR / rebootstrap do not spam the console.
- */
+/** Warn-once flag for hosts that omit the `updateModelContext` capability. */
 let warnedModelContextUnsupported = false;
 
-/**
- * Mark that the missing-`updateModelContext` warning has been emitted.
- *
- * @returns `true` if this call should emit the warning (first time only).
- *
- * @internal
- */
+/** Mark that the missing-capability warning has been emitted. */
 export function markModelContextUnsupportedWarned(): boolean {
   if (warnedModelContextUnsupported) {
     return false;
@@ -60,65 +62,141 @@ export function markModelContextUnsupportedWarned(): boolean {
   return true;
 }
 
-/**
- * @internal Reset the missing-capability warn-once flag between tests.
- *
- * Prefer {@link _resetModelContextForTesting} from `model-context.tsx` when the
- * active runtime's store must also be cleared; this seam only resets the
- * document-level warn flag (dispose already drops the store).
- */
+/** Reset the missing-capability warn-once flag between tests. */
 export function _resetModelContextForTesting(): void {
   warnedModelContextUnsupported = false;
 }
 
-/**
- * @internal Reset the missing-capability warn-once flag between tests.
- */
+/** Reset the missing-capability warn-once flag between tests. */
 export function _resetModelContextUnsupportedWarnedForTesting(): void {
   warnedModelContextUnsupported = false;
 }
 
+function getChatGptWidgetApi(): ChatGptWidgetApi | undefined {
+  if (typeof window === "undefined") return undefined;
+  const api = (window as unknown as { openai?: Partial<ChatGptWidgetApi> })
+    .openai;
+  return typeof api?.setWidgetState === "function"
+    ? (api as ChatGptWidgetApi)
+    : undefined;
+}
+
+function filterUiContext(state: ViewState): ViewState {
+  const { [UI_CONTEXT_KEY]: _, ...viewState } = state;
+  return viewState;
+}
+
+function assertValidViewState(state: ViewState): string {
+  if (state === null || Array.isArray(state) || typeof state !== "object") {
+    throw new TypeError("useViewState state must be a plain object");
+  }
+  if (Object.prototype.hasOwnProperty.call(state, UI_CONTEXT_KEY)) {
+    throw new TypeError(
+      `useViewState state cannot contain the reserved key "${UI_CONTEXT_KEY}"`
+    );
+  }
+
+  try {
+    const serialized = JSON.stringify(state);
+    if (serialized === undefined) {
+      throw new TypeError("serialization returned undefined");
+    }
+    return serialized;
+  } catch (error: unknown) {
+    const reason = error instanceof Error ? `: ${error.message}` : "";
+    throw new TypeError(
+      `useViewState state must be JSON-serializable${reason}`
+    );
+  }
+}
+
 /**
- * Per-runtime model-context node tree and async flush pump.
+ * Per-runtime view-state document, model-context tree, and async flush pump.
  *
- * Owned by one {@link McpAppRuntime}: constructed with it, disposed with it.
- * Mutations update desired state and schedule a microtask-batched pump that
- * acknowledges a payload only after a successful `updateModelContext` send.
+ * `useViewState`, `ModelContext`, and the imperative `modelContext` API all
+ * mutate this single owner. Each delivery contains the complete merged
+ * snapshot because `ui/update-model-context` has overwrite semantics.
  *
  * @internal
  */
 export class ModelContextStore {
   readonly #host: ModelContextStoreHost;
   readonly #nodes = new Map<string, StoredModelContextNode>();
+  readonly #viewStateListeners = new Set<() => void>();
   #nextOrder = 0;
+  #viewState: ViewState | null = null;
+  #firstDefaultSerialized: string | null = null;
   #flushScheduled = false;
   #disposed = false;
   /** Bumped on {@link dispose} so late in-flight completions are ignored. */
   #epoch = 0;
-  /**
-   * Serialized form of the latest tree. Starts empty so views that never
-   * register context are not dirty.
-   */
-  #desiredSerialized = EMPTY_SERIALIZED;
-  /**
-   * Last successfully delivered payload. Starts empty so an empty push is
-   * sent only as a clear after non-empty context existed.
-   */
-  #acknowledgedSerialized = EMPTY_SERIALIZED;
+  /** Latest complete payload, or null until state/context is first registered. */
+  #desiredSerialized: string | null = null;
+  /** Last successfully delivered payload. */
+  #acknowledgedSerialized: string | null = null;
   #inFlight: Promise<void> | null = null;
+  #removeOpenAiListener: (() => void) | null = null;
 
-  /**
-   * @param host - Runtime bridge used to `connect` and send updates.
-   */
+  /** Create a store backed by the owning view runtime's host connection. */
   constructor(host: ModelContextStoreHost) {
     this.#host = host;
+    this.#hydrateFromChatGpt();
   }
 
+  /** Stable external-store subscription used by `useViewState`. */
+  readonly subscribeViewState = (listener: () => void): (() => void) => {
+    this.#viewStateListeners.add(listener);
+    return () => {
+      this.#viewStateListeners.delete(listener);
+    };
+  };
+
+  /** Current canonical view state, excluding the reserved UI-context field. */
+  readonly getViewStateSnapshot = (): ViewState | null => this.#viewState;
+
   /**
-   * Register or replace a node and schedule a flush.
-   *
-   * @param node - Node identity, parent link, and text content.
+   * Initialize view state from a hook default when ChatGPT restored no state.
+   * The first hook default wins; later conflicting defaults warn in development.
    */
+  initializeViewState(defaultState: ViewState): void {
+    if (this.#disposed) return;
+    const serializedDefault = assertValidViewState(defaultState);
+
+    if (this.#firstDefaultSerialized === null) {
+      this.#firstDefaultSerialized = serializedDefault;
+    } else if (
+      this.#firstDefaultSerialized !== serializedDefault &&
+      (typeof process === "undefined" || process.env.NODE_ENV !== "production")
+    ) {
+      console.warn(
+        "[useViewState] Multiple components supplied conflicting defaults; " +
+          "the first initialized default wins."
+      );
+    }
+
+    if (this.#viewState === null) {
+      this.#viewState = defaultState;
+      this.#emitViewState();
+      this.#updateDesiredAndSchedule();
+      return;
+    }
+
+    // A restored ChatGPT value still needs an initial delivery to merge the
+    // currently rendered ModelContext tree and preserve the complete snapshot.
+    this.#updateDesiredAndSchedule();
+  }
+
+  /** Resolve and apply a `useState`-style update synchronously. */
+  updateViewState(updater: (previous: ViewState | null) => ViewState): void {
+    if (this.#disposed) return;
+    const nextState = updater(this.#viewState);
+    assertValidViewState(nextState);
+    this.#viewState = nextState;
+    this.#emitViewState();
+    this.#updateDesiredAndSchedule();
+  }
+
+  /** Register or replace a model-context node and schedule a merged flush. */
   setNode(node: ModelContextNode): void {
     if (this.#disposed) return;
     const order = this.#nodes.get(node.id)?.order ?? this.#nextOrder++;
@@ -126,29 +204,21 @@ export class ModelContextStore {
     this.#updateDesiredAndSchedule();
   }
 
-  /**
-   * Remove a node by id and schedule a flush.
-   *
-   * @param id - Node id previously passed to {@link setNode}.
-   */
+  /** Remove a model-context node and schedule a merged flush. */
   removeNode(id: string): void {
     if (this.#disposed) return;
     if (!this.#nodes.delete(id)) return;
     this.#updateDesiredAndSchedule();
   }
 
-  /** Remove every node and schedule a flush (empty clear when previously non-empty). */
+  /** Remove every model-context node. */
   clear(): void {
-    if (this.#disposed) return;
-    if (this.#nodes.size === 0) return;
+    if (this.#disposed || this.#nodes.size === 0) return;
     this.#nodes.clear();
     this.#updateDesiredAndSchedule();
   }
 
-  /**
-   * Invalidate the store: ignore late in-flight completions and reject further
-   * mutations. Does not send a final clear — the runtime is going away.
-   */
+  /** Invalidate the store and ignore late in-flight completions. */
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
@@ -156,16 +226,17 @@ export class ModelContextStore {
     this.#flushScheduled = false;
     this.#inFlight = null;
     this.#nodes.clear();
+    this.#viewStateListeners.clear();
+    this.#removeOpenAiListener?.();
+    this.#removeOpenAiListener = null;
     this.#nextOrder = 0;
-    this.#desiredSerialized = EMPTY_SERIALIZED;
-    this.#acknowledgedSerialized = EMPTY_SERIALIZED;
+    this.#viewState = null;
+    this.#firstDefaultSerialized = null;
+    this.#desiredSerialized = null;
+    this.#acknowledgedSerialized = null;
   }
 
-  /**
-   * Serialize the registered tree into an indented markdown-like string.
-   *
-   * @returns Description text, or `""` when nothing is registered.
-   */
+  /** Serialize registered context nodes into an indented markdown list. */
   buildDescriptionString(): string {
     const byParent = new Map<string | null, StoredModelContextNode[]>();
 
@@ -179,15 +250,11 @@ export class ModelContextStore {
       }
     }
 
-    // Sibling order = registration order. React runs effects in document order
-    // for siblings, so this tracks on-screen order; sorting by `useId` strings
-    // would not (`:r10:` sorts before `:r2:`).
     for (const list of byParent.values()) {
       list.sort((a, b) => a.order - b.order);
     }
 
     const lines: string[] = [];
-
     const traverseTree = (parentId: string | null, depth: number): void => {
       const children = byParent.get(parentId);
       if (!children) return;
@@ -203,36 +270,85 @@ export class ModelContextStore {
     return lines.join("\n");
   }
 
-  /**
-   * Build the `ui/update-model-context` params from the current tree.
-   *
-   * @returns Empty `content` when nothing is registered; otherwise one text block.
-   */
+  /** Build the complete merged payload sent through either host transport. */
   buildModelContextParams(): ModelContextParams {
-    const description = this.buildDescriptionString();
-    if (description.length === 0) {
-      return { content: [] };
-    }
-    return { content: [{ type: "text", text: description }] };
+    const structuredContent = {
+      ...(this.#viewState ?? {}),
+      [UI_CONTEXT_KEY]: this.buildDescriptionString(),
+    };
+    return {
+      structuredContent,
+      content: [{ type: "text", text: JSON.stringify(structuredContent) }],
+    };
   }
 
-  /**
-   * @internal Clear nodes and pump state between tests without disposing the
-   * owning runtime (warn-once flag is reset separately).
-   */
+  /** Clear state between tests without disposing the owning runtime. */
   resetForTesting(): void {
     this.#nodes.clear();
     this.#nextOrder = 0;
+    this.#viewState = null;
+    this.#firstDefaultSerialized = null;
     this.#flushScheduled = false;
     this.#inFlight = null;
-    this.#desiredSerialized = EMPTY_SERIALIZED;
-    this.#acknowledgedSerialized = EMPTY_SERIALIZED;
+    this.#desiredSerialized = null;
+    this.#acknowledgedSerialized = null;
     // Keep #disposed / #epoch — a disposed store stays disposed.
   }
 
-  /** @internal Serialized tree for tests. */
+  /** Internal serialized tree for tests. */
   getDescriptionForTesting(): string {
     return this.buildDescriptionString();
+  }
+
+  #emitViewState(): void {
+    for (const listener of this.#viewStateListeners) {
+      listener();
+    }
+  }
+
+  #hydrateFromChatGpt(): void {
+    const api = getChatGptWidgetApi();
+    if (!api) return;
+
+    const applyWidgetState = (
+      widgetState: OpenAiWidgetState | null | undefined,
+      scheduleMergedWrite: boolean
+    ) => {
+      const modelContent = widgetState?.modelContent;
+      if (
+        modelContent === null ||
+        Array.isArray(modelContent) ||
+        typeof modelContent !== "object"
+      ) {
+        return;
+      }
+      const nextViewState = filterUiContext(modelContent);
+      try {
+        assertValidViewState(nextViewState);
+      } catch {
+        return;
+      }
+      this.#viewState = nextViewState;
+      this.#emitViewState();
+      if (scheduleMergedWrite) {
+        this.#updateDesiredAndSchedule();
+      }
+    };
+
+    applyWidgetState(api.widgetState, false);
+
+    const handleSetGlobals = (event: Event): void => {
+      if (this.#disposed) return;
+      const widgetState = (event as OpenAiSetGlobalsEvent).detail?.globals
+        ?.widgetState;
+      if (widgetState !== undefined) {
+        applyWidgetState(widgetState, true);
+      }
+    };
+    window.addEventListener("openai:set_globals", handleSetGlobals);
+    this.#removeOpenAiListener = () => {
+      window.removeEventListener("openai:set_globals", handleSetGlobals);
+    };
   }
 
   #updateDesiredAndSchedule(): void {
@@ -241,8 +357,7 @@ export class ModelContextStore {
   }
 
   #schedulePump(): void {
-    if (this.#disposed) return;
-    if (this.#flushScheduled) return;
+    if (this.#disposed || this.#flushScheduled) return;
     this.#flushScheduled = true;
     queueMicrotask(() => {
       this.#flushScheduled = false;
@@ -251,55 +366,60 @@ export class ModelContextStore {
   }
 
   #pump(): void {
-    if (this.#disposed) return;
-    if (this.#inFlight) return;
-    if (this.#desiredSerialized === this.#acknowledgedSerialized) return;
+    if (this.#disposed || this.#inFlight) return;
+    if (
+      this.#desiredSerialized === null ||
+      this.#desiredSerialized === this.#acknowledgedSerialized
+    ) {
+      return;
+    }
 
     const params = this.buildModelContextParams();
-    // Re-serialize from the live tree and track that exact form for ack.
     const serialized = JSON.stringify(params);
     this.#desiredSerialized = serialized;
     if (serialized === this.#acknowledgedSerialized) return;
 
     const sendEpoch = this.#epoch;
-    let sendSucceeded = false;
 
     this.#inFlight = (async () => {
       try {
-        const app = await this.#host.connect();
-        if (this.#disposed || sendEpoch !== this.#epoch) return;
+        const chatGptApi = getChatGptWidgetApi();
+        if (chatGptApi) {
+          await chatGptApi.setWidgetState({
+            privateContent: {},
+            ...chatGptApi.widgetState,
+            modelContent: params.structuredContent,
+          });
+        } else {
+          const app = await this.#host.connect();
+          if (this.#disposed || sendEpoch !== this.#epoch) return;
 
-        if (app.getHostCapabilities()?.updateModelContext === undefined) {
-          if (markModelContextUnsupportedWarned()) {
-            console.warn(
-              "[ModelContext] Host does not declare the updateModelContext capability; model-context updates are not sent."
-            );
+          if (app.getHostCapabilities()?.updateModelContext === undefined) {
+            if (markModelContextUnsupportedWarned()) {
+              console.warn(
+                "[ModelContext] Host does not declare the updateModelContext capability; model-context updates are not sent."
+              );
+            }
+            return;
           }
-          // Stay dirty — a later host/capability may accept updates.
-          return;
+
+          await app.updateModelContext(
+            params as Parameters<App["updateModelContext"]>[0]
+          );
         }
 
-        await app.updateModelContext(
-          params as Parameters<App["updateModelContext"]>[0]
-        );
         if (this.#disposed || sendEpoch !== this.#epoch) return;
-
-        // Acknowledge the exact payload that was sent. If desired moved on
-        // mid-flight, the store stays dirty and the finally-block re-pumps.
         this.#acknowledgedSerialized = serialized;
-        sendSucceeded = true;
       } catch (error: unknown) {
         if (this.#disposed || sendEpoch !== this.#epoch) return;
-        console.warn("[ModelContext] Failed to update model context:", error);
+        console.warn("[mcp-use] Failed to update model context:", error);
       } finally {
         this.#inFlight = null;
         if (
           !this.#disposed &&
           sendEpoch === this.#epoch &&
-          sendSucceeded &&
-          this.#desiredSerialized !== this.#acknowledgedSerialized
+          this.#desiredSerialized !== serialized
         ) {
-          // Coalesced mutations during the in-flight send — push the latest.
           this.#pump();
         }
       }

@@ -47,20 +47,17 @@ function requireActiveModelContextStore(): ModelContextStore {
  * Annotate a portion of the view UI with a description the model can see.
  *
  * Registers `content` in a hierarchical tree that serializes into an indented
- * markdown list and is pushed to the host via `ui/update-model-context`
- * (ext-apps `App.updateModelContext`). Updates batch per microtask. An async
- * flush pump acknowledges a payload only after a successful send; failed
- * update requests and missing host capability stay dirty and retry on the next
- * mutation. Each push carries the complete current context — the spec's
- * overwrite semantics (the host may defer delivery until the next model turn).
+ * markdown list under `_uiContext`. The store merges that field with
+ * `useViewState` and sends the complete snapshot through ChatGPT widget state
+ * or MCP Apps `ui/update-model-context`. Updates batch per microtask. Failed
+ * requests stay dirty and retry after the next mutation.
  *
  * An empty `content` (trimmed) does not register a node and does not orphan
  * children — nested {@link ModelContext} nodes re-parent to the nearest
  * registered ancestor (or root).
  *
- * When the host does not declare the `updateModelContext` capability, pushes
- * are skipped (payload stays dirty) and a one-time `console.warn` names the
- * gap.
+ * On the MCP Apps path, a host without the `updateModelContext` capability
+ * skips pushes and receives a one-time `console.warn`.
  *
  * @param props - Component props.
  * @param props.content - Text describing what the user is currently seeing.
@@ -111,11 +108,9 @@ export function ModelContext({ content, children }: ModelContextProps) {
  *
  * Delegates to the active document runtime's {@link ModelContextStore}.
  * Strings register as root-level nodes in the same tree {@link ModelContext}
- * builds; each push overwrites the previous context on the host (the host may
- * defer delivery until the next model turn). Updates batch per microtask and
- * use the same async flush pump (ack only on success). When the host lacks the
- * `updateModelContext` capability, pushes stay dirty with a one-time
- * `console.warn`.
+ * builds. Every push merges the complete tree under `_uiContext` beside the
+ * current `useViewState` object. Updates batch per microtask and use the same
+ * async flush pump as the component API.
  *
  * @throws When no view runtime is mounted (`bootstrapView` has not activated a
  *   runtime, or it has been disposed).
@@ -197,7 +192,8 @@ export function buildDescriptionString(): string {
 export function buildModelContextParams(): ModelContextParams {
   return (
     getActiveRuntime()?.modelContextStore.buildModelContextParams() ?? {
-      content: [],
+      structuredContent: { _uiContext: "" },
+      content: [{ type: "text", text: '{"_uiContext":""}' }],
     }
   );
 }

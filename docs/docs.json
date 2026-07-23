@@ -280,6 +280,7 @@
                 "icon": "atom",
                 "pages": [
                   "typescript/api-reference/react/usewidget",
+                  "typescript/api-reference/react/useviewstate",
                   "typescript/api-reference/react/usecalltool",
                   "typescript/api-reference/react/usefiles",
                   "typescript/api-reference/react/mcpuseprovider",

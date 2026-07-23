@@ -3,7 +3,7 @@ import { AppBridge } from "@modelcontextprotocol/ext-apps/app-bridge";
 import { act, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { useState, type ComponentType } from "react";
+import { useState, type ComponentType, type SetStateAction } from "react";
 
 import {
   bootstrapView,
@@ -22,6 +22,7 @@ import {
   useSendFollowUp,
   useSendSizeChanged,
   useToolContext,
+  useViewState,
   useViewTheme,
   useViewTool,
   ViewControls,
@@ -99,11 +100,13 @@ async function startHost(
 
   const modelContextUpdates: {
     content?: { type: string; text?: string }[];
+    structuredContent?: Record<string, unknown>;
   }[] = [];
   bridge.onupdatemodelcontext = async (params) => {
     modelContextUpdates.push(
       params as {
         content?: { type: string; text?: string }[];
+        structuredContent?: Record<string, unknown>;
       }
     );
     return {};
@@ -117,6 +120,21 @@ async function startHost(
 
   await bridge.connect(hostTransport);
   return { bridge, init, modelContextUpdates };
+}
+
+function expectModelContextUpdate(
+  update:
+    | {
+        content?: { type: string; text?: string }[];
+        structuredContent?: Record<string, unknown>;
+      }
+    | undefined,
+  expected: Record<string, unknown>
+): void {
+  expect(update?.structuredContent).toEqual(expected);
+  expect(update?.content).toEqual([
+    { type: "text", text: JSON.stringify(expected) },
+  ]);
 }
 
 describe("react bridge runtime", () => {
@@ -1574,6 +1592,13 @@ describe("react bridge runtime", () => {
     await waitFor(() => {
       expect(screen.getByTestId("registered").textContent).toBe("ready");
     });
+    await waitFor(async () => {
+      const names = (await bridge.listTools({})).tools.map((tool) => tool.name);
+      expect(names).toHaveLength(2);
+      expect(names).toEqual(
+        expect.arrayContaining(["parsed-command", "reset-command"])
+      );
+    });
 
     const parsedResult = await bridge.callTool({
       name: "parsed-command",
@@ -2064,6 +2089,226 @@ describe("react bridge runtime", () => {
     expect(modelContextUpdates).toHaveLength(0);
   });
 
+  it("initializes useViewState, shares it across components, and sends complete MCP model context", async () => {
+    resetRuntime();
+    const { init, modelContextUpdates } = await startHost();
+    let lazyInitializations = 0;
+
+    function Counter() {
+      const [state, setState] = useViewState({ count: 0 });
+      return (
+        <button
+          type="button"
+          onClick={() =>
+            setState((previous) => ({ count: previous.count + 1 }))
+          }
+        >
+          child:{state.count}
+        </button>
+      );
+    }
+
+    function View() {
+      const [state] = useViewState(() => {
+        lazyInitializations += 1;
+        return { count: 0 };
+      });
+      return (
+        <div>
+          <span data-testid="parent-count">parent:{state.count}</span>
+          <Counter />
+        </div>
+      );
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await waitFor(() => {
+      expect(modelContextUpdates).toHaveLength(1);
+    });
+    expect(lazyInitializations).toBe(1);
+    expectModelContextUpdate(modelContextUpdates[0], {
+      count: 0,
+      _uiContext: "",
+    });
+
+    await act(async () => {
+      screen.getByText("child:0").click();
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("parent-count").textContent).toBe("parent:1");
+      expect(screen.getByText("child:1")).not.toBeNull();
+      expect(modelContextUpdates).toHaveLength(2);
+    });
+    expectModelContextUpdate(modelContextUpdates[1], {
+      count: 1,
+      _uiContext: "",
+    });
+  });
+
+  it("rejects reserved and non-serializable useViewState values", async () => {
+    resetRuntime();
+    const { init } = await startHost();
+    type CountState = { count: number };
+    let setViewState: ((state: SetStateAction<CountState>) => void) | undefined;
+
+    function View() {
+      const [, setState] = useViewState<CountState>({ count: 0 });
+      setViewState = setState;
+      return <div data-testid="state-host" />;
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+    await waitFor(() => {
+      expect(screen.getByTestId("state-host")).not.toBeNull();
+    });
+
+    expect(setViewState).toBeDefined();
+    if (setViewState === undefined) throw new Error("setter was not captured");
+    expect(() =>
+      setViewState({
+        count: 0,
+        _uiContext: "reserved",
+      } as unknown as CountState)
+    ).toThrow('reserved key "_uiContext"');
+    expect(() =>
+      setViewState({ count: BigInt(1) } as unknown as CountState)
+    ).toThrow("must be JSON-serializable");
+  });
+
+  it("restores and subscribes to ChatGPT widget state without using MCP model context", async () => {
+    resetRuntime();
+    const widgetApi: {
+      widgetState: {
+        modelContent: Record<string, unknown>;
+        privateContent: Record<string, unknown>;
+        imageIds: string[];
+      };
+      setWidgetState: ReturnType<typeof vi.fn>;
+    } = {
+      widgetState: {
+        modelContent: { count: 4, _uiContext: "stale" },
+        privateContent: { secret: true },
+        imageIds: ["image-1"],
+      },
+      setWidgetState: vi.fn(async (nextState) => {
+        widgetApi.widgetState = nextState;
+      }),
+    };
+    Object.defineProperty(window, "openai", {
+      configurable: true,
+      writable: true,
+      value: widgetApi,
+    });
+
+    try {
+      const { init, modelContextUpdates } = await startHost();
+
+      function View() {
+        const [state, setState] = useViewState({ count: 0 });
+        return (
+          <ModelContext content="Dashboard">
+            <button
+              type="button"
+              onClick={() =>
+                setState((previous) => ({ count: previous.count + 1 }))
+              }
+            >
+              count:{state.count}
+            </button>
+          </ModelContext>
+        );
+      }
+
+      bootstrapView({ default: View as ComponentType });
+      await init;
+
+      await waitFor(() => {
+        expect(screen.getByText("count:4")).not.toBeNull();
+        expect(widgetApi.setWidgetState).toHaveBeenCalledTimes(1);
+      });
+      expect(widgetApi.setWidgetState).toHaveBeenLastCalledWith({
+        privateContent: { secret: true },
+        imageIds: ["image-1"],
+        modelContent: { count: 4, _uiContext: "- Dashboard" },
+      });
+
+      await act(async () => {
+        window.dispatchEvent(
+          new CustomEvent("openai:set_globals", {
+            detail: {
+              globals: {
+                widgetState: {
+                  ...widgetApi.widgetState,
+                  modelContent: { count: 8, _uiContext: "host context" },
+                },
+              },
+            },
+          })
+        );
+      });
+      await waitFor(() => {
+        expect(screen.getByText("count:8")).not.toBeNull();
+        expect(widgetApi.setWidgetState).toHaveBeenCalledTimes(2);
+      });
+      expect(widgetApi.widgetState.modelContent).toEqual({
+        count: 8,
+        _uiContext: "- Dashboard",
+      });
+
+      await act(async () => {
+        screen.getByText("count:8").click();
+      });
+      await waitFor(() => {
+        expect(screen.getByText("count:9")).not.toBeNull();
+        expect(widgetApi.setWidgetState).toHaveBeenCalledTimes(3);
+      });
+      expect(widgetApi.widgetState.modelContent).toEqual({
+        count: 9,
+        _uiContext: "- Dashboard",
+      });
+      expect(modelContextUpdates).toHaveLength(0);
+    } finally {
+      resetRuntime();
+      delete (window as unknown as { openai?: unknown }).openai;
+    }
+  });
+
+  it("falls back to MCP model context when window.openai has no setWidgetState", async () => {
+    resetRuntime();
+    Object.defineProperty(window, "openai", {
+      configurable: true,
+      writable: true,
+      value: { widgetState: { modelContent: { count: 99 } } },
+    });
+
+    try {
+      const { init, modelContextUpdates } = await startHost();
+
+      function View() {
+        const [state] = useViewState({ count: 1 });
+        return <div data-testid="fallback-count">{state.count}</div>;
+      }
+
+      bootstrapView({ default: View as ComponentType });
+      await init;
+
+      await waitFor(() => {
+        expect(screen.getByTestId("fallback-count").textContent).toBe("1");
+        expect(modelContextUpdates).toHaveLength(1);
+      });
+      expectModelContextUpdate(modelContextUpdates[0], {
+        count: 1,
+        _uiContext: "",
+      });
+    } finally {
+      resetRuntime();
+      delete (window as unknown as { openai?: unknown }).openai;
+    }
+  });
+
   it("pushes ModelContext content and clears after removal", async () => {
     resetRuntime();
     const { init, modelContextUpdates } = await startHost();
@@ -2086,15 +2331,15 @@ describe("react bridge runtime", () => {
     await waitFor(() => {
       expect(modelContextUpdates).toHaveLength(1);
     });
-    expect(modelContextUpdates[0]?.content).toEqual([
-      { type: "text", text: "- Viewing apples" },
-    ]);
+    expectModelContextUpdate(modelContextUpdates[0], {
+      _uiContext: "- Viewing apples",
+    });
 
     screen.getByText("remove").click();
     await waitFor(() => {
       expect(modelContextUpdates).toHaveLength(2);
     });
-    expect(modelContextUpdates[1]?.content).toEqual([]);
+    expectModelContextUpdate(modelContextUpdates[1], { _uiContext: "" });
   });
 
   it("serializes nested ModelContext trees and batches sync updates", async () => {
@@ -2102,6 +2347,7 @@ describe("react bridge runtime", () => {
     const { init, modelContextUpdates } = await startHost();
 
     function View() {
+      useViewState({ count: 1 });
       return (
         <ModelContext content="Dashboard">
           <ModelContext content="Revenue" />
@@ -2116,9 +2362,10 @@ describe("react bridge runtime", () => {
     await waitFor(() => {
       expect(modelContextUpdates).toHaveLength(1);
     });
-    expect(modelContextUpdates[0]?.content?.[0]?.text).toBe(
-      ["- Dashboard", "  - Revenue", "  - Costs"].join("\n")
-    );
+    expectModelContextUpdate(modelContextUpdates[0], {
+      count: 1,
+      _uiContext: ["- Dashboard", "  - Revenue", "  - Costs"].join("\n"),
+    });
 
     // Multiple sync imperative updates in one turn → one additional push.
     modelContext.set("a", "Alpha");
@@ -2126,8 +2373,12 @@ describe("react bridge runtime", () => {
     await waitFor(() => {
       expect(modelContextUpdates).toHaveLength(2);
     });
-    expect(modelContextUpdates[1]?.content?.[0]?.text).toContain("- Alpha");
-    expect(modelContextUpdates[1]?.content?.[0]?.text).toContain("- Beta");
+    expect(modelContextUpdates[1]?.structuredContent?._uiContext).toContain(
+      "- Alpha"
+    );
+    expect(modelContextUpdates[1]?.structuredContent?._uiContext).toContain(
+      "- Beta"
+    );
   });
 
   it("dedupes identical consecutive ModelContext pushes", async () => {
@@ -2149,9 +2400,9 @@ describe("react bridge runtime", () => {
     await waitFor(() => {
       expect(modelContextUpdates).toHaveLength(1);
     });
-    expect(modelContextUpdates[0]?.content).toEqual([
-      { type: "text", text: "- Same" },
-    ]);
+    expect(modelContextUpdates[0]?.structuredContent).toEqual({
+      _uiContext: "- Same",
+    });
 
     // Identical re-set must not deliver another push.
     modelContext.set("k", "Same");
@@ -2183,9 +2434,9 @@ describe("react bridge runtime", () => {
     await waitFor(() => {
       expect(modelContextUpdates).toHaveLength(1);
     });
-    expect(modelContextUpdates[0]?.content?.[0]?.text).toBe(
-      labels.map((label) => `- ${label}`).join("\n")
-    );
+    expect(modelContextUpdates[0]?.structuredContent).toEqual({
+      _uiContext: labels.map((label) => `- ${label}`).join("\n"),
+    });
   });
 
   it("skips model-context updates when the host lacks the updateModelContext capability", async () => {
@@ -2227,23 +2478,25 @@ describe("react bridge runtime", () => {
     await waitFor(() => {
       expect(modelContextUpdates).toHaveLength(1);
     });
-    expect(modelContextUpdates[0]?.content).toEqual([
-      { type: "text", text: "- Viewing cart" },
-    ]);
+    expect(modelContextUpdates[0]?.structuredContent).toEqual({
+      _uiContext: "- Viewing cart",
+    });
 
     modelContext.set("active", "Viewing checkout");
     await waitFor(() => {
       expect(modelContextUpdates).toHaveLength(2);
     });
-    expect(modelContextUpdates[1]?.content).toEqual([
-      { type: "text", text: "- Viewing checkout" },
-    ]);
+    expect(modelContextUpdates[1]?.structuredContent).toEqual({
+      _uiContext: "- Viewing checkout",
+    });
 
     modelContext.remove("active");
     await waitFor(() => {
       expect(modelContextUpdates).toHaveLength(3);
     });
-    expect(modelContextUpdates[2]?.content).toEqual([]);
+    expect(modelContextUpdates[2]?.structuredContent).toEqual({
+      _uiContext: "",
+    });
 
     modelContext.set("a", "A");
     modelContext.set("b", "B");
@@ -2252,7 +2505,9 @@ describe("react bridge runtime", () => {
     });
     modelContext.clear();
     await waitFor(() => {
-      expect(modelContextUpdates.at(-1)?.content).toEqual([]);
+      expect(modelContextUpdates.at(-1)?.structuredContent).toEqual({
+        _uiContext: "",
+      });
     });
   });
 
@@ -2274,7 +2529,9 @@ describe("react bridge runtime", () => {
     await waitFor(() => {
       expect(modelContextUpdates).toHaveLength(1);
     });
-    expect(modelContextUpdates[0]?.content?.[0]?.text).toBe("- child");
+    expect(modelContextUpdates[0]?.structuredContent).toEqual({
+      _uiContext: "- child",
+    });
   });
 
   it("failed model-context send remains dirty and retries on the next mutation", async () => {
@@ -2317,9 +2574,9 @@ describe("react bridge runtime", () => {
     await waitFor(() => {
       expect(modelContextUpdates).toHaveLength(1);
     });
-    expect(modelContextUpdates[0]?.content).toEqual([
-      { type: "text", text: "- Second" },
-    ]);
+    expect(modelContextUpdates[0]?.structuredContent).toEqual({
+      _uiContext: "- Second",
+    });
 
     warnSpy.mockRestore();
   });
@@ -2370,8 +2627,8 @@ describe("react bridge runtime", () => {
     await waitFor(() => {
       expect(modelContextUpdates).toHaveLength(2);
     });
-    expect(modelContextUpdates[0]?.content?.[0]?.text).toBe("- A");
-    expect(modelContextUpdates[1]?.content?.[0]?.text).toBe("- C");
+    expect(modelContextUpdates[0]?.structuredContent?._uiContext).toBe("- A");
+    expect(modelContextUpdates[1]?.structuredContent?._uiContext).toBe("- C");
     expect(callCount).toBe(2);
   });
 
