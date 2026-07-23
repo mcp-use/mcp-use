@@ -16,38 +16,8 @@ import type { Context, Env, Next } from "hono";
 
 import type { ServerConfig as NativeServerConfig } from "./config.js";
 import type { RequestContext, RequestClientContext } from "./context.js";
-import {
-  oauthAuth0Provider as nativeAuth0Provider,
-  type Auth0OAuthProviderOptions,
-} from "./oauth/auth0.js";
-import {
-  oauthBetterAuthProvider as nativeBetterAuthProvider,
-  type BetterAuthOAuthProviderOptions,
-} from "./oauth/better-auth.js";
-import {
-  oauthClerkProvider as nativeClerkProvider,
-  type ClerkOAuthProviderOptions,
-} from "./oauth/clerk.js";
-import {
-  oauthKeycloakProvider as nativeKeycloakProvider,
-  type KeycloakOAuthProviderOptions,
-} from "./oauth/keycloak.js";
-import {
-  oauthSupabaseProvider as nativeSupabaseProvider,
-  type SupabaseOAuthProviderOptions,
-} from "./oauth/supabase.js";
-import {
-  oauthWorkOSProvider as nativeWorkOSProvider,
-  type WorkOSOAuthProviderOptions,
-} from "./oauth/workos.js";
+import type { FromOpenAPIOptions } from "./openapi/types.js";
 import type { OAuthProvider } from "./oauth/provider.js";
-import {
-  registerOpenAPITools,
-  type FromOpenAPIOptions,
-  type OpenAPIDocument,
-  type OpenAPIAuth,
-  type OpenAPIExcludeRule,
-} from "./openapi/index.js";
 import type { PromptDefinition as NativePromptDefinition } from "./prompts.js";
 import {
   array as nativeArray,
@@ -588,15 +558,7 @@ export class MCPServer<
    * Removed in mcp-use v3.
    */
   static fromOpenAPI(options: FromOpenAPIOptions): MCPServer {
-    const server = new MCPServer({
-      name: options.name ?? options.spec.info.title,
-      version: options.version ?? options.spec.info.version ?? "1.0.0",
-    });
-    registerOpenAPITools(
-      server as unknown as Parameters<typeof registerOpenAPITools>[0],
-      options
-    );
-    return server;
+    return NativeMCPServer.fromOpenAPI(options) as unknown as MCPServer;
   }
 
   /** Native v2 MCP route path. */
@@ -1044,7 +1006,16 @@ export type {
   OpenAPIAuth,
   OpenAPIDocument,
   OpenAPIExcludeRule,
-};
+} from "./openapi/types.js";
+/** @deprecated Import from `mcp-use/oauth/*`. Removed in mcp-use v3. */
+export {
+  oauthAuth0Provider,
+  oauthBetterAuthProvider,
+  oauthClerkProvider,
+  oauthKeycloakProvider,
+  oauthSupabaseProvider,
+  oauthWorkOSProvider,
+} from "./compat-v1/oauth.js";
 /** @deprecated Use native v2 middleware types from `mcp-use`. Removed in mcp-use v3. */
 export type {
   McpMiddlewareFn,
@@ -1052,85 +1023,6 @@ export type {
   McpMiddlewarePattern,
   MiddlewareContext,
 } from "./middleware/mcp-middleware.js";
-
-/** @deprecated Migrate elicitation to native v2. Removed in mcp-use v3. */
-export interface EnumOption {
-  /** Protocol value. */
-  value: string;
-  /** Human-readable label. */
-  title: string;
-}
-
-/** @deprecated Migrate elicitation to native v2. Removed in mcp-use v3. */
-export interface LegacyEnumOption {
-  /** Protocol value. */
-  value: string;
-  /** Human-readable legacy label. */
-  name: string;
-}
-
-/** @deprecated Temporary v1 elicitation schema helper. Removed in mcp-use v3. */
-export function untitledEnum(values: string[]): {
-  type: "string";
-  enum: string[];
-} {
-  return { type: "string", enum: [...values] };
-}
-
-/** @deprecated Temporary v1 elicitation schema helper. Removed in mcp-use v3. */
-export function titledEnum(options: EnumOption[]): {
-  type: "string";
-  oneOf: Array<{ const: string; title: string }>;
-} {
-  return {
-    type: "string",
-    oneOf: options.map(({ value, title }) => ({ const: value, title })),
-  };
-}
-
-/** @deprecated Temporary v1 elicitation schema helper. Removed in mcp-use v3. */
-export function legacyEnum(options: LegacyEnumOption[]): {
-  type: "string";
-  enum: string[];
-  enumNames: string[];
-} {
-  return {
-    type: "string",
-    enum: options.map(({ value }) => value),
-    enumNames: options.map(({ name }) => name),
-  };
-}
-
-/** @deprecated Temporary v1 elicitation schema helper. Removed in mcp-use v3. */
-export function untitledMultiEnum(values: string[]): {
-  type: "array";
-  items: { type: "string"; enum: string[] };
-} {
-  return { type: "array", items: { type: "string", enum: [...values] } };
-}
-
-/** @deprecated Temporary v1 elicitation schema helper. Removed in mcp-use v3. */
-export function titledMultiEnum(options: EnumOption[]): {
-  type: "array";
-  items: { anyOf: Array<{ const: string; title: string }> };
-} {
-  return {
-    type: "array",
-    items: {
-      anyOf: options.map(({ value, title }) => ({ const: value, title })),
-    },
-  };
-}
-
-/** @deprecated Temporary v1 elicitation schema helper. Removed in mcp-use v3. */
-export function enumSchema<T extends Record<string, unknown>>(
-  fields: T
-): {
-  type: "object";
-  properties: T;
-} {
-  return { type: "object", properties: fields };
-}
 
 /**
  * Read v1-compatible authentication data from a tool or Hono context.
@@ -1202,156 +1094,6 @@ export function requireAnyScope(needed: string[]) {
       403
     );
   };
-}
-
-/**
- * v1 Supabase provider factory with environment fallbacks.
- *
- * @deprecated Import `oauthSupabaseProvider` from `mcp-use/oauth/supabase`.
- * Removed in mcp-use v3.
- */
-export function oauthSupabaseProvider(
-  options: Partial<SupabaseOAuthProviderOptions> = {}
-): OAuthProvider<unknown> {
-  rejectVerifyJwt(options);
-  const projectId =
-    options.projectId ?? env("MCP_USE_OAUTH_SUPABASE_PROJECT_ID");
-  const supabaseUrl = options.supabaseUrl ?? env("MCP_USE_OAUTH_SUPABASE_URL");
-  const jwtSecret =
-    options.jwtSecret ?? env("MCP_USE_OAUTH_SUPABASE_JWT_SECRET");
-  return nativeSupabaseProvider({
-    ...(projectId !== undefined && { projectId }),
-    ...(supabaseUrl !== undefined && { supabaseUrl }),
-    ...(jwtSecret !== undefined && { jwtSecret }),
-    ...(options.scopesSupported !== undefined && {
-      scopesSupported: options.scopesSupported,
-    }),
-  });
-}
-
-/**
- * v1 Auth0 provider factory with environment fallbacks.
- *
- * @deprecated Import `oauthAuth0Provider` from `mcp-use/oauth/auth0`. Removed
- * in mcp-use v3.
- */
-export function oauthAuth0Provider(
-  options: Partial<Auth0OAuthProviderOptions> & {
-    audience?: string;
-    verifyJwt?: boolean;
-  } = {}
-): OAuthProvider<unknown> {
-  rejectVerifyJwt(options);
-  const domain = options.domain ?? env("MCP_USE_OAUTH_AUTH0_DOMAIN");
-  const audience = options.audience ?? env("MCP_USE_OAUTH_AUTH0_AUDIENCE");
-  if (domain === undefined) throw new Error("Auth0 domain is required.");
-  return nativeAuth0Provider({
-    domain,
-    ...(audience !== undefined && { resource: audience }),
-    ...(options.scopesSupported !== undefined && {
-      scopesSupported: options.scopesSupported,
-    }),
-  });
-}
-
-/**
- * v1 Keycloak provider factory with environment fallbacks.
- *
- * @deprecated Import `oauthKeycloakProvider` from `mcp-use/oauth/keycloak`.
- * Removed in mcp-use v3.
- */
-export function oauthKeycloakProvider(
-  options: Partial<KeycloakOAuthProviderOptions> & {
-    audience?: string;
-    verifyJwt?: boolean;
-  } = {}
-): OAuthProvider<unknown> {
-  rejectVerifyJwt(options);
-  const serverUrl =
-    options.serverUrl ?? env("MCP_USE_OAUTH_KEYCLOAK_SERVER_URL");
-  const realm = options.realm ?? env("MCP_USE_OAUTH_KEYCLOAK_REALM");
-  const audience = options.audience ?? env("MCP_USE_OAUTH_KEYCLOAK_AUDIENCE");
-  if (serverUrl === undefined || realm === undefined) {
-    throw new Error("Keycloak serverUrl and realm are required.");
-  }
-  return nativeKeycloakProvider({
-    serverUrl,
-    realm,
-    ...(audience !== undefined && { resource: audience }),
-    ...(options.scopesSupported !== undefined && {
-      scopesSupported: options.scopesSupported,
-    }),
-  });
-}
-
-/**
- * v1 WorkOS provider factory with environment fallbacks.
- *
- * @deprecated Import `oauthWorkOSProvider` from `mcp-use/oauth/workos`.
- * Removed in mcp-use v3.
- */
-export function oauthWorkOSProvider(
-  options: Partial<WorkOSOAuthProviderOptions> & { verifyJwt?: boolean } = {}
-): OAuthProvider<unknown> {
-  rejectVerifyJwt(options);
-  const subdomain = options.subdomain ?? env("MCP_USE_OAUTH_WORKOS_SUBDOMAIN");
-  if (subdomain === undefined) throw new Error("WorkOS subdomain is required.");
-  return nativeWorkOSProvider({
-    subdomain,
-    ...(options.scopesSupported !== undefined && {
-      scopesSupported: options.scopesSupported,
-    }),
-  });
-}
-
-/**
- * v1 Clerk provider factory with environment fallbacks.
- *
- * @deprecated Import `oauthClerkProvider` from `mcp-use/oauth/clerk`. Removed
- * in mcp-use v3.
- */
-export function oauthClerkProvider(
-  options: Partial<ClerkOAuthProviderOptions> & {
-    audience?: string;
-    verifyJwt?: boolean;
-  } = {}
-): OAuthProvider<unknown> {
-  rejectVerifyJwt(options);
-  const frontendApiUrl =
-    options.frontendApiUrl ?? env("MCP_USE_OAUTH_CLERK_FRONTEND_API_URL");
-  if (frontendApiUrl === undefined) {
-    throw new Error("Clerk frontendApiUrl is required.");
-  }
-  return nativeClerkProvider({
-    frontendApiUrl,
-    ...(options.audience !== undefined && { resource: options.audience }),
-    ...(options.scopesSupported !== undefined && {
-      scopesSupported: options.scopesSupported,
-    }),
-  });
-}
-
-/**
- * v1 Better Auth provider factory with environment fallbacks.
- *
- * @deprecated Import `oauthBetterAuthProvider` from
- * `mcp-use/oauth/better-auth`. Removed in mcp-use v3.
- */
-export function oauthBetterAuthProvider(
-  options: Partial<BetterAuthOAuthProviderOptions> & {
-    verifyJwt?: boolean;
-  } = {}
-): OAuthProvider<unknown> {
-  rejectVerifyJwt(options);
-  const authURL = options.authURL ?? env("MCP_USE_OAUTH_BETTER_AUTH_URL");
-  if (authURL === undefined)
-    throw new Error("Better Auth authURL is required.");
-  return nativeBetterAuthProvider({
-    authURL,
-    ...(options.scopesSupported !== undefined && {
-      scopesSupported: options.scopesSupported,
-    }),
-  });
 }
 
 function normalizeServerConfig(config: ServerConfig): UnknownRecord {
@@ -1589,19 +1331,4 @@ function unsupported(feature: string, replacement: string): Error {
   return new Error(
     `[${COMPAT_CODE}] ${feature} is not supported by the temporary v1 compatibility entry; ${replacement}.`
   );
-}
-
-function rejectVerifyJwt(options: unknown): void {
-  if (
-    typeof options === "object" &&
-    options !== null &&
-    (options as { verifyJwt?: unknown }).verifyJwt === false
-  ) {
-    throw unsupported("verifyJwt: false", "v2 always verifies bearer tokens");
-  }
-}
-
-function env(name: string): string | undefined {
-  const value = process.env[name];
-  return value === undefined || value.trim() === "" ? undefined : value;
 }
