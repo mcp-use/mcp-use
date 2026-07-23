@@ -35,6 +35,7 @@ import type {
   ProxyHttpConfig,
   ProxyServerConfig,
   ReadResourceResult,
+  RequestContext,
   RequestClientContext,
   ResourceDefinition,
   ResourceTemplateDefinition,
@@ -177,6 +178,14 @@ describe("request client metadata types", () => {
       conversationId?: string;
       organizationId?: string;
     }>();
+  });
+});
+
+describe("request notification types", () => {
+  it("preserves the v1-compatible request-scoped notification signature", () => {
+    expectTypeOf<RequestContext["sendNotification"]>().toEqualTypeOf<
+      (method: string, params?: Record<string, unknown>) => Promise<void>
+    >();
   });
 });
 

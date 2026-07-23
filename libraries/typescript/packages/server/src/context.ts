@@ -242,6 +242,29 @@ type RequestContextBase<TEnv extends Env> = Omit<Context<TEnv>, "req"> & {
    */
   requestState: RequestStateAccessor;
   /**
+   * Sends a one-way notification related to the current MCP request.
+   *
+   * The notification is delivered on the originating request's response
+   * stream and must be sent before the callback returns. Use the
+   * `server.notifyToolsChanged()` and related server helpers for
+   * cross-request list or resource invalidations.
+   *
+   * @param method - Application-defined notification method.
+   * @param params - Optional JSON-serializable notification parameters.
+   * @returns A promise that resolves after the notification is sent.
+   *
+   * @example
+   * ```ts
+   * await ctx.sendNotification("com.example/import-status", {
+   *   status: "started",
+   * });
+   * ```
+   */
+  sendNotification(
+    method: string,
+    params?: Record<string, unknown>
+  ): Promise<void>;
+  /**
    * Report request-scoped progress when the caller supplied a progress token.
    *
    * @returns `true` when a notification was sent, `false` when the caller did
@@ -494,6 +517,15 @@ export function toRequestContext<TEnv extends Env = Env>(
     client: toClientContext(ctx),
     elicit: createElicit(ctx.mcpReq.inputResponses),
     requestState: <T = unknown>() => ctx.mcpReq.requestState<T>(),
+    async sendNotification(
+      method: string,
+      params?: Record<string, unknown>
+    ): Promise<void> {
+      await ctx.mcpReq.notify({
+        method,
+        ...(params !== undefined && { params }),
+      });
+    },
     async reportProgress(
       progress: number,
       total?: number,

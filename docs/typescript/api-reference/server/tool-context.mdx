@@ -16,7 +16,7 @@ github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packa
   </a>
 </Callout>
 
-`RequestContext` is the second argument (`ctx`) passed to tool, resource, and prompt callbacks. It exposes request cancellation, the current HTTP request, OAuth identity when configured, stateless elicitation, progress and logging helpers, and the client metadata declared in the current request.
+`RequestContext` is the second argument (`ctx`) passed to tool, resource, and prompt callbacks. It exposes request cancellation, the current HTTP request, OAuth identity when configured, stateless elicitation, request-scoped notifications, progress and logging helpers, and the client metadata declared in the current request.
 
 ```ts wrap
 import { MCPServer } from "mcp-use";
@@ -62,6 +62,44 @@ Context object passed to tool, resource, and prompt callbacks. It augments the a
 ```ts
 import type { RequestContext } from "mcp-use";
 ```
+
+### sendNotification
+
+Sends a custom one-way notification related to the active MCP request. The
+notification travels on the originating request's response stream and must be
+awaited before the callback returns. It does not create a session or a
+post-response push channel.
+
+For cross-request tool, prompt, and resource changes, use the corresponding
+`server.notify*` helper instead.
+
+**Signature**
+
+```ts wrap
+sendNotification: (method: string, params?: Record<string, unknown>) =>
+  Promise<void>;
+```
+
+**Example**
+
+```ts wrap
+await ctx.sendNotification("com.example/import-status", {
+  status: "started",
+});
+```
+
+**Parameters**
+
+> <ParamField body="method" type="string" required="true">
+>   Application-defined notification method. Use a namespace you control.
+> </ParamField>
+> <ParamField body="params" type="Record<string, unknown>" default="undefined">
+>   Optional JSON-serializable notification parameters.
+> </ParamField>
+
+**Returns**
+
+> <ResponseField name="returns" type="Promise<void>" />
 
 ### sample
 
@@ -159,12 +197,15 @@ elicit: {
 
 ### reportProgress
 
-Sends a progress notification to the client. Optional (`undefined`) unless the client requested progress updates for this tool call by supplying a `progressToken`. Null-check before calling: `await ctx.reportProgress?.(50, 100, "Halfway")`.
+Sends a progress notification to the client when the request includes a
+`progressToken`. Returns `false` without sending when the caller did not
+request progress updates.
 
 **Signature**
 
 ```ts wrap
-reportProgress?: (progress: number, total?: number, message?: string) => Promise<void>;
+reportProgress: (progress: number, total?: number, message?: string) =>
+  Promise<boolean>;
 ```
 
 **Parameters**
@@ -184,16 +225,16 @@ reportProgress?: (progress: number, total?: number, message?: string) => Promise
 
 **Returns**
 
-> <ResponseField name="returns" type="Promise<void>" />
+> <ResponseField name="returns" type="Promise<boolean>" />
 
-### log
+### sendLog
 
 Sends a log notification to the client. Always present on `ctx`, and sends notifications when the client supports them. Levels follow RFC 5424; if the client set a minimum log level, messages below that threshold are dropped silently.
 
 **Signature**
 
 ```ts wrap
-log: (
+sendLog: (
   level:
     | "debug"
     | "info"
@@ -203,7 +244,7 @@ log: (
     | "critical"
     | "alert"
     | "emergency",
-  message: string,
+  data: unknown,
   logger?: string,
 ) => Promise<void>;
 ```
@@ -218,9 +259,9 @@ log: (
 >   {" "}
 >   RFC 5424 log level.{" "}
 > </ParamField>
-> <ParamField body="message" type="string" required="true">
+> <ParamField body="data" type="unknown" required="true">
 >   {" "}
->   Log message content.{" "}
+>   JSON-serializable log data.{" "}
 > </ParamField>
 > <ParamField body="logger" type="string" default='"tool"'>
 >   {" "}
