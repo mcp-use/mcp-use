@@ -203,14 +203,11 @@ The scaffolded project includes these dependencies:
 
 ### Core Dependencies
 
-- `mcp-use` - The MCP framework
-- `@mcp-use/cli` - Build and development tool
-- `@mcp-use/inspector` - Web-based debugger
+- `mcp-use` - The MCP framework, including its CLI and built-in Inspector
 
 ### Development Dependencies
 
 - `typescript` - TypeScript compiler
-- `tsx` - TypeScript executor for development
 - `@types/node` - Node.js type definitions
 
 ### Template-Specific Dependencies
