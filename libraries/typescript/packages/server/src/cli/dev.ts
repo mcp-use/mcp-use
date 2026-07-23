@@ -521,6 +521,7 @@ export async function runDev(options: DevOptions): Promise<void> {
       autoConnectUrl: `${devOrigin}${nextBasePath}`,
       oauthProxyAllowLoopback: localhostBind || wildcardBind,
       devMode: true,
+      manufactChatUrl: process.env["MANUFACT_CHAT_URL"],
     });
     if (typeof mounted !== "function") {
       throw new Error(

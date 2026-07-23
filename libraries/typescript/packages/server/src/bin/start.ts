@@ -233,6 +233,7 @@ async function startWithInspector(
     basePath,
     devMode: false,
     oauthProxyAllowLoopback: false,
+    manufactChatUrl: process.env["MANUFACT_CHAT_URL"],
   });
 
   server.app.use("*", async (context, next) => {
@@ -249,6 +250,7 @@ async function loadBuiltInInspector(): Promise<{
     basePath: string;
     devMode: boolean;
     oauthProxyAllowLoopback: boolean;
+    manufactChatUrl?: string | undefined;
   }): FetchHandler;
 }> {
   let loaded: Partial<{
@@ -256,6 +258,7 @@ async function loadBuiltInInspector(): Promise<{
       basePath: string;
       devMode: boolean;
       oauthProxyAllowLoopback: boolean;
+      manufactChatUrl?: string | undefined;
     }): FetchHandler;
   }>;
   try {

@@ -23,6 +23,8 @@ export interface DevInspectorMountOptions {
   oauthProxyAllowLoopback: boolean;
   /** Mark the mounted UI as part of the `mcp-use dev` process. */
   devMode: true;
+  /** Hosted chat endpoint injected into the Inspector shell, from `MANUFACT_CHAT_URL`. */
+  manufactChatUrl?: string | undefined;
 }
 
 /** Structurally typed Inspector package entry loaded from the user's project. */
