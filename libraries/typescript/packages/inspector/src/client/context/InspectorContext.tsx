@@ -1,5 +1,4 @@
 import type { LLMConfig, StreamProtocol } from "@/client/components/chat/types";
-import { resolveManufactChatUrl } from "@/client/utils/manufact-chat-url";
 import type { ReactNode } from "react";
 import { createContext, use, useCallback, useState } from "react";
 
@@ -160,16 +159,20 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
   //      where you rebuild the client anyway.
   //   3. Manufact Cloud — production fallback so hosted chat and sign-in are
   //      available without additional configuration.
-  const hostedChatUrl = resolveManufactChatUrl(
+  const runtimeHostedChatUrl =
     typeof window !== "undefined"
       ? (window as Window & { __MANUFACT_CHAT_URL__?: string })
           .__MANUFACT_CHAT_URL__
-      : undefined,
-    (typeof import.meta !== "undefined"
+      : undefined;
+  const buildTimeHostedChatUrl =
+    typeof import.meta !== "undefined"
       ? (import.meta as unknown as Record<string, Record<string, string>>).env
           ?.VITE_MANUFACT_CHAT_URL
-      : undefined) as string | undefined
-  );
+      : undefined;
+  const hostedChatUrl =
+    runtimeHostedChatUrl?.trim() ||
+    buildTimeHostedChatUrl?.trim() ||
+    "https://cloud.manufact.com/api/v1/inspector/chat/stream";
 
   const [state, setState] = useState<InspectorState>({
     selectedServerId: null,
@@ -241,7 +244,7 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
         isEmbedded,
         embeddedConfig: {
           ...config,
-          chatApiUrl: resolveManufactChatUrl(config.chatApiUrl, hostedChatUrl),
+          chatApiUrl: config.chatApiUrl?.trim() || hostedChatUrl,
           chatStreamProtocol: config.chatStreamProtocol ?? "data-stream",
           chatEnableFreeTierUpgrade: config.chatEnableFreeTierUpgrade ?? true,
         },
