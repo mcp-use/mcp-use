@@ -30,7 +30,8 @@ interface ToolResultRendererProps {
   serverId?: string;
   readResource?: (uri: string) => Promise<any>;
   toolMeta?: Record<string, any>;
-  onSendFollowUp?: (content: MessageContentBlock[]) => void;
+  onSendFollowUp?: (content: MessageContentBlock[]) => Promise<void>;
+  modelContextScope?: string;
   partialToolArgs?: Record<string, unknown>;
   cancelled?: boolean;
 }
@@ -43,6 +44,7 @@ export function ToolResultRenderer({
   readResource,
   toolMeta,
   onSendFollowUp,
+  modelContextScope,
   partialToolArgs,
   cancelled,
 }: ToolResultRendererProps) {
@@ -89,6 +91,7 @@ export function ToolResultRenderer({
           displayMode={displayMode}
           onDisplayModeChange={setDisplayMode}
           onSendFollowUp={onSendFollowUp}
+          modelContextScope={modelContextScope}
           partialToolInput={partialToolArgs}
           cancelled={cancelled}
           noWrapper

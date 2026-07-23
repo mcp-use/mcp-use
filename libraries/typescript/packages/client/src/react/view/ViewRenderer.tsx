@@ -40,6 +40,7 @@ import {
 import {
   assertAppCanCallTool,
   buildDefaultHostCapabilities,
+  dispatchUiMessage,
   resolveRequestedDisplayMode,
 } from "./view-host-policy.js";
 
@@ -121,6 +122,8 @@ function ViewRendererBase({
   hostInfo = DEFAULT_HOST_INFO,
   hostContext,
   hostCapabilities,
+  messageCapabilities,
+  modelContextCapabilities,
   cspMode = "widget-declared",
   displayMode: displayModeProp,
   onDisplayModeChange,
@@ -173,10 +176,20 @@ function ViewRendererBase({
         hasMessageHandler: onMessage !== undefined,
         hasModelContextHandler: onModelContextUpdate !== undefined,
         hasLogHandler: onLog !== undefined,
+        messageCapabilities,
+        modelContextCapabilities,
       }),
       ...hostCapabilities,
     }),
-    [hostCapabilities, onLog, onMessage, onModelContextUpdate, source.kind]
+    [
+      hostCapabilities,
+      messageCapabilities,
+      modelContextCapabilities,
+      onLog,
+      onMessage,
+      onModelContextUpdate,
+      source.kind,
+    ]
   );
 
   // Guest hostContext must track the shell's displayMode even when the parent
@@ -463,12 +476,7 @@ function ViewRendererBase({
           bridge.onmessage = async ({
             content,
           }: McpUiMessageRequest["params"]) => {
-            if (!onMessageRef.current) {
-              throw new Error("This host surface does not support ui/message");
-            }
-            if (content.length > 0) {
-              onMessageRef.current(content);
-            }
+            await dispatchUiMessage(onMessageRef.current, content);
             return {};
           };
         }
@@ -540,7 +548,10 @@ function ViewRendererBase({
                 "This host surface does not support model context updates"
               );
             }
-            onModelContextUpdateRef.current({ content, structuredContent });
+            await onModelContextUpdateRef.current({
+              content,
+              structuredContent,
+            });
             return {};
           };
         }
@@ -894,6 +905,11 @@ function viewRendererAreEqual(
   if (prev.customProps !== next.customProps) return false;
   if (prev.hostContext !== next.hostContext) return false;
   if (prev.hostCapabilities !== next.hostCapabilities) return false;
+  if (prev.messageCapabilities !== next.messageCapabilities) return false;
+  if (prev.modelContextCapabilities !== next.modelContextCapabilities)
+    return false;
+  if (prev.onMessage !== next.onMessage) return false;
+  if (prev.onModelContextUpdate !== next.onModelContextUpdate) return false;
   if (prev.cspMode !== next.cspMode) return false;
   if (prev.mockOpenAiFileApis !== next.mockOpenAiFileApis) return false;
   if (prev.onInlineHeightChange !== next.onInlineHeightChange) return false;
@@ -914,6 +930,7 @@ export {
   isViewResource,
   isViewTool,
 } from "./view-detection.js";
+export { isToolVisibleToModel } from "./view-host-policy.js";
 export { parseCustomProps } from "./parse-custom-props.js";
 export { buildViewSandboxBlobUrl } from "./sandbox-blob-url.js";
 export { injectOpenAiFileApis } from "./inject-openai-file-apis.js";
@@ -932,4 +949,5 @@ export type {
   McpUiHostContext,
   McpUiResourceCsp,
   McpUiResourcePermissions,
+  McpUiSupportedContentBlockModalities,
 } from "./ext-apps-bridge.js";

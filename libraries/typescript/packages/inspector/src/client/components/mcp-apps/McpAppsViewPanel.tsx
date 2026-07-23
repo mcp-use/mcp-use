@@ -6,6 +6,8 @@ import { WidgetWrapper } from "@/client/components/ui/WidgetWrapper";
 import { Spinner } from "@/client/components/ui/spinner";
 import { cn } from "@/client/lib/utils";
 
+const CHAT_MESSAGE_CAPABILITIES = { text: {}, image: {} } as const;
+
 export interface McpAppsViewPanelProps {
   serverId: string;
   viewId: string;
@@ -18,7 +20,8 @@ export interface McpAppsViewPanelProps {
   customProps?: Record<string, string>;
   displayMode: ViewDisplayMode;
   onDisplayModeChange: (mode: ViewDisplayMode) => void;
-  onSendFollowUp?: (content: MessageContentBlock[]) => void;
+  onSendFollowUp?: (content: MessageContentBlock[]) => Promise<void>;
+  modelContextScope?: string;
   onWidgetHeightChange?: (height: number) => void;
   partialToolInput?: Record<string, unknown>;
   cancelled?: boolean;
@@ -45,6 +48,7 @@ export function McpAppsViewPanel({
   displayMode,
   onDisplayModeChange,
   onSendFollowUp,
+  modelContextScope,
   onWidgetHeightChange,
   partialToolInput,
   cancelled,
@@ -62,6 +66,7 @@ export function McpAppsViewPanel({
     readResource,
     displayMode,
     onDisplayModeChange,
+    modelContextScope,
   });
 
   if (!hostProps) {
@@ -102,13 +107,12 @@ export function McpAppsViewPanel({
       partialToolInput={partialToolInput}
       cancelled={cancelled}
       className={viewRendererClassName}
+      messageCapabilities={
+        onSendFollowUp ? CHAT_MESSAGE_CAPABILITIES : undefined
+      }
       onMessage={
         onSendFollowUp
-          ? (content) => {
-              if (content.length > 0) {
-                onSendFollowUp(content as MessageContentBlock[]);
-              }
-            }
+          ? (content) => onSendFollowUp(content as MessageContentBlock[])
           : undefined
       }
       onInlineHeightChange={

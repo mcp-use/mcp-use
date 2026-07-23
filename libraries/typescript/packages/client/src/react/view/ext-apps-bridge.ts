@@ -14,5 +14,6 @@ export type {
   McpUiResourceCsp,
   McpUiResourcePermissions,
   McpUiSizeChangedNotification,
+  McpUiSupportedContentBlockModalities,
   McpUiUpdateModelContextRequest,
 } from "@modelcontextprotocol/ext-apps/app-bridge";

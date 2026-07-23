@@ -7,7 +7,12 @@ import {
   convertMessagesToProvider,
   convertPromptResultsToMessages,
 } from "./conversion";
-import type { LLMConfig, Message, MessageAttachment } from "./types";
+import type {
+  LLMConfig,
+  Message,
+  MessageAttachment,
+  SendMessageOptions,
+} from "./types";
 import { fileToAttachment, isValidTotalSize } from "./utils";
 import {
   appendTraceEvent,
@@ -22,14 +27,14 @@ import {
   type ManagedChatNotice,
 } from "./managedChatNotice";
 import { parsePartialToolArgs } from "./partialToolArgs";
+import {
+  serializeWidgetModelContexts,
+  widgetModelContextProviderMessage,
+  type WidgetModelContext,
+} from "./widget-model-context";
 
 // Type alias for backward compatibility
 type MCPConnection = McpServer;
-
-interface WidgetModelContext {
-  content?: Array<{ type: string; text: string }>;
-  structuredContent?: Record<string, unknown>;
-}
 
 interface UseChatMessagesClientSideProps {
   connection: MCPConnection;
@@ -59,6 +64,7 @@ export function useChatMessagesClientSide({
   const [managedChatNotice, setManagedChatNotice] =
     useState<ManagedChatNotice | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const sendInProgressRef = useRef(false);
   const traceIdRef = useRef(0);
 
   const recordTrace = useCallback((event: InspectorTraceEventInput) => {
@@ -80,16 +86,36 @@ export function useChatMessagesClientSide({
     async (
       userInput: string,
       promptResults: PromptResult[],
-      extraAttachments?: MessageAttachment[]
+      extraAttachments?: MessageAttachment[],
+      options?: SendMessageOptions
     ) => {
       const allAttachments = [...attachments, ...(extraAttachments ?? [])];
       const hasContent =
         userInput.trim() ||
         promptResults.length > 0 ||
         allAttachments.length > 0;
-      if (!hasContent || !llmConfig || !isConnected) {
+      const rejectOrReturn = (message: string) => {
+        if (options?.throwOnError) {
+          throw new Error(message);
+        }
+      };
+      if (!hasContent) {
+        rejectOrReturn("Chat message must include content");
         return;
       }
+      if (!llmConfig) {
+        rejectOrReturn("Chat is not configured");
+        return;
+      }
+      if (!isConnected) {
+        rejectOrReturn("The MCP server is not connected");
+        return;
+      }
+      if (sendInProgressRef.current) {
+        rejectOrReturn("Chat is busy with another turn");
+        return;
+      }
+      sendInProgressRef.current = true;
 
       const promptResultsMessages =
         convertPromptResultsToMessages(promptResults);
@@ -117,6 +143,12 @@ export function useChatMessagesClientSide({
       const assistantMessageId = `assistant-${Date.now()}`;
 
       try {
+        let accepted = false;
+        const markAccepted = () => {
+          if (accepted) return;
+          accepted = true;
+          options?.onAccepted?.();
+        };
         let currentTextPart = "";
         const parts: Array<{
           type: "text" | "tool-invocation";
@@ -159,36 +191,23 @@ export function useChatMessagesClientSide({
           },
         ]);
 
-        const widgetContextMessages: Message[] = [];
-        if (widgetModelContexts && widgetModelContexts.size > 0) {
-          const widgetParts: string[] = [];
-          for (const [, ctx] of widgetModelContexts) {
-            if (!ctx) continue;
-            if (ctx.content?.length) {
-              widgetParts.push(ctx.content.map((c) => c.text).join("\n"));
-            } else if (ctx.structuredContent) {
-              widgetParts.push(JSON.stringify(ctx.structuredContent));
-            }
-          }
-          if (widgetParts.length > 0) {
-            widgetContextMessages.push({
-              id: `widget-context-${Date.now()}`,
-              role: "user",
-              content: `[Current Widget State]\n${widgetParts.join("\n")}`,
-              timestamp: Date.now(),
-            });
-          }
-        }
-
         const hasImageAttachments = (userMessage.attachments?.length ?? 0) > 0;
         const historyMessages = [
           ...messages,
           ...promptResultsMessages,
-          ...widgetContextMessages,
           ...(userInput.trim() || hasImageAttachments ? [userMessage] : []),
         ];
 
-        const providerMessages = convertMessagesToProvider(historyMessages);
+        const serializedWidgetContext = serializeWidgetModelContexts(
+          widgetModelContexts ?? new Map()
+        );
+        const widgetContextMessage = widgetModelContextProviderMessage(
+          serializedWidgetContext
+        );
+        const providerMessages = [
+          ...(widgetContextMessage ? [widgetContextMessage] : []),
+          ...convertMessagesToProvider(historyMessages),
+        ];
         recordTrace({
           type: "request",
           request: {
@@ -207,7 +226,10 @@ export function useChatMessagesClientSide({
           }),
           mcpServers: [connection],
           systemPrompt,
-          disallowedTools: disabledTools ? [...disabledTools] : undefined,
+          disallowedTools:
+            disabledTools && disabledTools.size > 0
+              ? [...disabledTools].sort()
+              : undefined,
           maxSteps: 10,
           autoInitialize: true,
         });
@@ -226,6 +248,7 @@ export function useChatMessagesClientSide({
           messages: providerMessages,
           signal: abortControllerRef.current?.signal,
         })) {
+          markAccepted();
           if (abortControllerRef.current?.signal.aborted) break;
 
           // Keep inspector compatible with an older installed agent build while
@@ -367,6 +390,7 @@ export function useChatMessagesClientSide({
             }
           }
         }
+        markAccepted();
 
         setMessages((prev) =>
           prev.map((msg) =>
@@ -394,6 +418,9 @@ export function useChatMessagesClientSide({
         }
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
+          if (options?.throwOnError) {
+            throw new Error("Chat turn was cancelled");
+          }
           return;
         }
 
@@ -405,6 +432,9 @@ export function useChatMessagesClientSide({
           setMessages((prev) =>
             prev.filter((m) => m.id !== assistantMessageId)
           );
+          if (options?.throwOnError) {
+            throw new Error("Chat request could not be completed");
+          }
           return;
         }
 
@@ -451,9 +481,13 @@ export function useChatMessagesClientSide({
           timestamp: Date.now(),
         };
         setMessages((prev) => [...prev, errorMessage]);
+        if (options?.throwOnError) {
+          throw new Error(errorDetail);
+        }
       } finally {
         setIsLoading(false);
         abortControllerRef.current = null;
+        sendInProgressRef.current = false;
       }
     },
     [

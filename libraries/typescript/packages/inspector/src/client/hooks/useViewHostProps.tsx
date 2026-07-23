@@ -20,10 +20,18 @@ import { useMcpAppsHostContext } from "@/client/hooks/useMcpAppsHostContext";
 import { buildCspAuditRecord } from "@/client/mcp-apps/csp-audit";
 import { getPackageVersion } from "@/client/telemetry/utils";
 import { getServerDisplayName, getServerIconUrl } from "@/client/utils/servers";
+import {
+  normalizeWidgetModelContext,
+  serializeWidgetModelContexts,
+} from "@/client/components/chat/widget-model-context";
 
 const HOST_INFO = {
   name: "mcp-use-inspector",
   version: getPackageVersion(),
+} as const;
+const CHAT_MODEL_CONTEXT_CAPABILITIES = {
+  text: {},
+  structuredContent: {},
 } as const;
 
 function useStableViewConnection(
@@ -65,6 +73,7 @@ export function useViewHostProps(options: {
   onDisplayModeChange?: (mode: ViewDisplayMode) => void;
   inlineMaxWidth?: number;
   chromeless?: boolean;
+  modelContextScope?: string;
   onReady?: () => void;
 }): Pick<
   ViewRendererProps,
@@ -75,6 +84,7 @@ export function useViewHostProps(options: {
   | "wrapTransport"
   | "onCspViolation"
   | "onModelContextUpdate"
+  | "modelContextCapabilities"
   | "onLog"
   | "onResourceResolved"
   | "displayMode"
@@ -100,6 +110,7 @@ export function useViewHostProps(options: {
     onDisplayModeChange,
     inlineMaxWidth,
     chromeless,
+    modelContextScope,
     onReady,
   } = options;
 
@@ -113,6 +124,7 @@ export function useViewHostProps(options: {
     addCspViolation,
     setWidgetModelContext,
     setWidgetDeclaredCsp,
+    getModelContexts,
   } = useWidgetDebug();
 
   const cspMode: ViewCspMode =
@@ -163,6 +175,7 @@ export function useViewHostProps(options: {
       addWidget(viewId, {
         toolName,
         protocol: "mcp-apps",
+        modelContextScope,
         hostContext: hostContextRef.current,
       });
 
@@ -198,7 +211,14 @@ export function useViewHostProps(options: {
       }
       setWidgetDeclaredCsp(viewId, declared, effectivePolicy);
     },
-    [addWidget, viewId, toolName, cspMode, setWidgetDeclaredCsp]
+    [
+      addWidget,
+      viewId,
+      toolName,
+      modelContextScope,
+      cspMode,
+      setWidgetDeclaredCsp,
+    ]
   );
 
   useEffect(() => {
@@ -223,19 +243,30 @@ export function useViewHostProps(options: {
     [addCspViolation, viewId]
   );
 
-  const onModelContextUpdate = useCallback(
+  const handleModelContextUpdate = useCallback(
     ({
       content,
       structuredContent,
     }: Parameters<
       NonNullable<ViewRendererProps["onModelContextUpdate"]>
     >[0]) => {
-      setWidgetModelContext(viewId, {
-        content: content as any[] | undefined,
-        structuredContent: structuredContent as
-          | Record<string, unknown>
-          | undefined,
+      if (!modelContextScope) {
+        throw new Error(
+          "This host surface does not support model context updates"
+        );
+      }
+      const normalized = normalizeWidgetModelContext({
+        content,
+        structuredContent,
       });
+      const nextContexts = getModelContexts(modelContextScope);
+      if (normalized) {
+        nextContexts.set(viewId, normalized);
+      } else {
+        nextContexts.delete(viewId);
+      }
+      serializeWidgetModelContexts(nextContexts);
+      setWidgetModelContext(viewId, normalized);
       try {
         localStorage.setItem(
           `mcp-use:widget-state:${viewId}`,
@@ -245,7 +276,7 @@ export function useViewHostProps(options: {
         // ignore quota errors
       }
     },
-    [setWidgetModelContext, viewId]
+    [getModelContexts, modelContextScope, setWidgetModelContext, viewId]
   );
 
   const onLog = useCallback(
@@ -312,7 +343,12 @@ export function useViewHostProps(options: {
     cspMode,
     wrapTransport,
     onCspViolation,
-    onModelContextUpdate,
+    onModelContextUpdate: modelContextScope
+      ? handleModelContextUpdate
+      : undefined,
+    modelContextCapabilities: modelContextScope
+      ? CHAT_MODEL_CONTEXT_CAPABILITIES
+      : undefined,
     onLog,
     onResourceResolved,
     displayMode,

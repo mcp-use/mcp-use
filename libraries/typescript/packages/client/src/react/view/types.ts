@@ -3,6 +3,7 @@ import type {
   McpUiHostContext,
   McpUiResourceCsp,
   McpUiResourcePermissions,
+  McpUiSupportedContentBlockModalities,
 } from "./ext-apps-bridge.js";
 
 export type {
@@ -10,6 +11,7 @@ export type {
   McpUiHostContext,
   McpUiResourceCsp,
   McpUiResourcePermissions,
+  McpUiSupportedContentBlockModalities,
 };
 import type { Transport } from "@modelcontextprotocol/client";
 import type { ReactNode } from "react";
@@ -100,16 +102,18 @@ export interface ViewRendererProps {
   hostInfo?: { name: string; version: string };
   hostContext?: McpUiHostContext;
   hostCapabilities?: Partial<McpUiHostCapabilities>;
+  messageCapabilities?: McpUiSupportedContentBlockModalities;
+  modelContextCapabilities?: McpUiSupportedContentBlockModalities;
   cspMode?: ViewCspMode;
   displayMode?: ViewDisplayMode;
   onDisplayModeChange?: (mode: ViewDisplayMode) => void;
   inlineMaxWidth?: number;
   chromeless?: boolean;
-  onMessage?: (content: unknown[]) => void;
+  onMessage?: (content: unknown[]) => void | Promise<void>;
   onModelContextUpdate?: (ctx: {
     content?: unknown;
     structuredContent?: unknown;
-  }) => void;
+  }) => void | Promise<void>;
   onLog?: (entry: { level: string; data: unknown }) => void;
   onReady?: () => void;
   onLifecycleChange?: (event: ViewLifecycleEvent) => void;

@@ -60,6 +60,8 @@ import { useLocalSystemPrompt } from "./chat/system-prompt/useLocalSystemPrompt"
 import { resolveSystemPrompt } from "./chat/system-prompt/local-storage";
 import type { ChatSystemPromptProvider } from "./chat/system-prompt/types";
 import { useWidgetDebug } from "../context/WidgetDebugContext";
+import type { ChatBodyBuilder, MessageAttachment } from "./chat/types";
+import { resolveChatToolPolicy } from "./chat/chat-tool-policy";
 
 // Structural type — avoids nominal incompatibility when pnpm creates
 // multiple peer-variant copies of mcp-use with duplicate class declarations.
@@ -127,11 +129,10 @@ export interface ChatTabProps {
   extraHeaders?: Record<string, string>;
   /**
    * Custom body builder for the streaming request.
-   * Use to send only `{ messages }` to a server-managed backend.
+   * The second argument contains the effective disabled tools and serialized
+   * scoped widget context. Existing one-argument callbacks remain valid.
    */
-  body?: (
-    messages: Array<{ role: string; content: unknown; attachments?: unknown }>
-  ) => unknown;
+  body?: ChatBodyBuilder;
   /** Pluggable chat history storage. Defaults to localStorage in standalone mode. */
   chatStorageProvider?: ChatStorageProvider;
   /** When false, hides the built-in history sidebar even if a provider is available. */
@@ -249,13 +250,18 @@ export function ChatTab({
   // Track position of trigger for removal in textarea
   const triggerSpanRef = useRef<{ start: number; end: number } | null>(null);
 
+  const { modelVisibleTools, effectiveDisabledTools } = useMemo(
+    () => resolveChatToolPolicy(connection.tools ?? [], disabledTools),
+    [connection.tools, disabledTools]
+  );
+
   const toolInfos: ToolInfo[] = useMemo(
     () =>
-      (connection.tools ?? []).map((t) => ({
+      modelVisibleTools.map((t) => ({
         name: t.name,
         description: t.description,
       })),
-    [connection.tools]
+    [modelVisibleTools]
   );
 
   // Use custom hooks for configuration, chat messages and mcp prompts handling
@@ -283,9 +289,9 @@ export function ChatTab({
       localLlmConfig,
     });
 
-  const { getAllModelContexts } = useWidgetDebug();
-
-  const widgetModelContexts = getAllModelContexts();
+  const { getModelContexts } = useWidgetDebug();
+  const modelContextScope = `chat:${serverId}`;
+  const widgetModelContexts = getModelContexts(modelContextScope);
 
   // Use client-side or server-side chat implementation
   const chatHookParams = {
@@ -294,7 +300,7 @@ export function ChatTab({
     isConnected,
     readResource,
     widgetModelContexts,
-    disabledTools,
+    disabledTools: effectiveDisabledTools,
   };
 
   const serverSideChat = useChatMessages({
@@ -307,7 +313,7 @@ export function ChatTab({
     waitForChatApiUrl,
     widgetModelContexts,
     initialMessages: restoredMessages ?? initialMessages,
-    disabledTools,
+    disabledTools: effectiveDisabledTools,
     streamProtocol,
     credentials,
     extraHeaders,
@@ -333,6 +339,17 @@ export function ChatTab({
     traceEvents,
     tokenUsage,
   } = effectiveClientSide ? clientSideChat : serverSideChat;
+
+  const sendWidgetMessage = useCallback(
+    (message: string, widgetAttachments?: MessageAttachment[]) =>
+      new Promise<void>((resolve, reject) => {
+        void sendMessage(message, [], widgetAttachments, {
+          throwOnError: true,
+          onAccepted: resolve,
+        }).then(resolve, reject);
+      }),
+    [sendMessage]
+  );
 
   const [shaderPhase, setShaderPhase] = useState<ShaderPhase>(() =>
     messages.length === 0 ? "visible" : "hidden"
@@ -1551,7 +1568,8 @@ export function ChatTab({
               serverId={connection.url}
               readResource={readResource}
               tools={connection.tools}
-              sendMessage={(msg, atts) => sendMessage(msg, [], atts)}
+              sendMessage={sendWidgetMessage}
+              modelContextScope={modelContextScope}
               serverBaseUrl={connection.url}
               messagesEndRef={messagesEndRef}
               traceEvents={traceEvents}

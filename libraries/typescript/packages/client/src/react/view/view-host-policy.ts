@@ -1,4 +1,7 @@
-import type { McpUiHostCapabilities } from "./ext-apps-bridge.js";
+import type {
+  McpUiHostCapabilities,
+  McpUiSupportedContentBlockModalities,
+} from "./ext-apps-bridge.js";
 import type { ViewConnection, ViewDisplayMode } from "./types.js";
 
 type CapabilityInputs = {
@@ -6,6 +9,8 @@ type CapabilityInputs = {
   hasMessageHandler: boolean;
   hasModelContextHandler: boolean;
   hasLogHandler: boolean;
+  messageCapabilities?: McpUiSupportedContentBlockModalities;
+  modelContextCapabilities?: McpUiSupportedContentBlockModalities;
 };
 
 export function buildDefaultHostCapabilities({
@@ -13,6 +18,8 @@ export function buildDefaultHostCapabilities({
   hasMessageHandler,
   hasModelContextHandler,
   hasLogHandler,
+  messageCapabilities,
+  modelContextCapabilities,
 }: CapabilityInputs): McpUiHostCapabilities {
   return {
     openLinks: {},
@@ -23,9 +30,36 @@ export function buildDefaultHostCapabilities({
         }
       : {}),
     ...(hasLogHandler ? { logging: {} } : {}),
-    ...(hasModelContextHandler ? { updateModelContext: { text: {} } } : {}),
-    ...(hasMessageHandler ? { message: { text: {} } } : {}),
+    ...(hasModelContextHandler
+      ? { updateModelContext: modelContextCapabilities ?? { text: {} } }
+      : {}),
+    ...(hasMessageHandler
+      ? { message: messageCapabilities ?? { text: {} } }
+      : {}),
   };
+}
+
+export function isToolVisibleToModel(tool: { _meta?: unknown }): boolean {
+  if (!tool._meta || typeof tool._meta !== "object") return true;
+  const ui = (tool._meta as Record<string, unknown>).ui;
+  if (!ui || typeof ui !== "object") return true;
+  const visibility = (ui as Record<string, unknown>).visibility;
+  return (
+    !Array.isArray(visibility) || visibility.some((value) => value === "model")
+  );
+}
+
+export async function dispatchUiMessage(
+  handler: ((content: unknown[]) => void | Promise<void>) | undefined,
+  content: unknown[]
+): Promise<void> {
+  if (!handler) {
+    throw new Error("This host surface does not support ui/message");
+  }
+  if (content.length === 0) {
+    throw new Error("ui/message requires at least one content block");
+  }
+  await handler(content);
 }
 
 export function resolveRequestedDisplayMode({

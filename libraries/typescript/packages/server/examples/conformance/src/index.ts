@@ -739,6 +739,41 @@ export const getWeatherDelayed = server.tool(
   }
 );
 
+// =============================================================================
+// VIEW: chat-conformance
+// =============================================================================
+
+export const chatConformanceHelper = server.tool(
+  {
+    name: "chat-conformance-helper",
+    description: "App-only helper used by the local Chat conformance fixture",
+    inputSchema: z.object({ value: z.string() }),
+    visibility: "app",
+  },
+  async ({ value }) => ({
+    content: [{ type: "text", text: `App helper received: ${value}` }],
+    structuredContent: { value },
+  })
+);
+
+export const chatConformanceFixture = server.tool(
+  {
+    name: "chat-conformance-fixture",
+    description:
+      "Open the local fixture for Chat messages, model context, and app-only tools",
+    inputSchema: z.object({}),
+    outputSchema: z.object({ ready: z.boolean() }),
+    view: {
+      name: "chat-conformance",
+      description: "Local fixture for MCP Apps Chat conformance",
+    },
+  },
+  async () => ({
+    content: [{ type: "text", text: "Chat conformance fixture ready" }],
+    structuredContent: { ready: true },
+  })
+);
+
 server.tool(
   {
     name: "report-client-capabilities",

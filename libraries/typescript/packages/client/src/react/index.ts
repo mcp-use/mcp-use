@@ -103,6 +103,7 @@ export {
   getViewResourceUri,
   isViewResource,
   isViewTool,
+  isToolVisibleToModel,
   parseCustomProps,
   buildViewSandboxBlobUrl,
   type ViewRendererProps,
@@ -118,4 +119,5 @@ export {
   type McpUiHostContext,
   type McpUiResourceCsp,
   type McpUiResourcePermissions,
+  type McpUiSupportedContentBlockModalities,
 } from "./view/ViewRenderer.js";
