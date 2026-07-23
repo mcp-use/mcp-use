@@ -58,7 +58,8 @@
     "test:integration:structured": "vitest run tests/integration/agent/test_agent_structured_output.test.ts",
     "test:integration:manager": "vitest run tests/integration/agent/test_server_manager.test.ts",
     "test:integration:observability": "vitest run tests/integration/agent/test_agent_observability.test.ts",
-    "test:integration:codemode": "vitest run tests/integration/agent/test_code_mode.test.ts"
+    "test:integration:codemode": "vitest run tests/integration/agent/test_code_mode.test.ts",
+    "test:integration:native-openai": "vitest run tests/integration/agent/test_agent_native_openai.test.ts"
   },
   "dependencies": {
     "@mcp-use/client": "workspace:*",

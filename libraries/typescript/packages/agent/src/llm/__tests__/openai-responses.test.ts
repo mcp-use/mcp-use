@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   extractFunctionCalls,
+  responsesReasoningFields,
   seedInputFromMessages,
 } from "../providers/openai-responses";
 import { toolResultToContent } from "../toolResultParts";
@@ -105,6 +106,43 @@ describe("extractFunctionCalls", () => {
         arguments: '{"city":"Paris"}',
       },
     ]);
+  });
+});
+
+describe("responsesReasoningFields", () => {
+  it("omits reasoning params by default", () => {
+    expect(
+      responsesReasoningFields({
+        provider: "openai",
+        model: "gpt-4o-mini",
+        apiKey: "k",
+      })
+    ).toEqual({});
+  });
+
+  it("omits reasoning params when effort is none", () => {
+    expect(
+      responsesReasoningFields({
+        provider: "openai",
+        model: "o3-mini",
+        apiKey: "k",
+        reasoningEffort: "none",
+      })
+    ).toEqual({});
+  });
+
+  it("includes reasoning params when effort is set", () => {
+    expect(
+      responsesReasoningFields({
+        provider: "openai",
+        model: "o3-mini",
+        apiKey: "k",
+        reasoningEffort: "low",
+      })
+    ).toEqual({
+      include: ["reasoning.encrypted_content"],
+      reasoning: { effort: "low" },
+    });
   });
 });
 

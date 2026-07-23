@@ -198,11 +198,6 @@ export class MCPAgent {
     if (this.initialized) return;
 
     if (this.isSimplifiedMode) {
-      if (!this.client && this.mcpServersConfig) {
-        const { MCPClient } = await import("@mcp-use/client");
-        this.client = new MCPClient({ mcpServers: this.mcpServersConfig });
-        this.clientOwnedByAgent = true;
-      }
       if (this.llmString) {
         this.driver = createLlmDriver(
           parseLLMStringToProviderConfig(this.llmString, this.llmConfig)
@@ -210,6 +205,12 @@ export class MCPAgent {
       }
     } else if (this.explicitProviderConfig) {
       this.driver = createLlmDriver(this.explicitProviderConfig);
+    }
+
+    if (!this.client && this.mcpServersConfig && !this.hasLiveConnections()) {
+      const { MCPClient } = await import("@mcp-use/client");
+      this.client = new MCPClient({ mcpServers: this.mcpServersConfig });
+      this.clientOwnedByAgent = true;
     }
 
     if (!this.driver) {
