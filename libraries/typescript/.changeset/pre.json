@@ -20,6 +20,7 @@
     "bundle-cli-build-pipeline",
     "calm-proxies-compose",
     "chatgpt-files-hook",
+    "clean-create-app-inspector-deps",
     "cli-client-ux-fixes",
     "client-cli-auto-install",
     "client-sdk-v2-migration",
