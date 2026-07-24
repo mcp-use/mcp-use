@@ -4,7 +4,7 @@ description: "Understand the support boundary for fixed-client OAuth providers."
 icon: "shuffle"
 ---
 
-mcp-use does not export `oauthProxy()` and does not implement authorization, callback, token-exchange, or fixed-client brokering routes. This page is intentionally excluded from navigation.
+mcp-use does not provide a server-side OAuth proxy factory or implement authorization, callback, token-exchange, or fixed-client brokering routes. This page is intentionally excluded from navigation.
 
 If your identity provider supports Dynamic Client Registration, use a [built-in provider](/v2/typescript/server/authentication/index) or [Custom Provider](/v2/typescript/server/authentication/providers/custom). The MCP client then registers directly with the authorization server, while mcp-use acts only as the protected resource server.
 
