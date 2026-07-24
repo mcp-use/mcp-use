@@ -89,11 +89,13 @@ Prefer raw results:
 
 ## Bind a View
 
-Place the React entry at `views/<name>/view.tsx`, set `view.name` to that
-directory name, and return its data in `structuredContent`.
+Export the tool reference from the server entry so `mcp-env.d.ts` can expose
+its input and output types to View code. Place the React entry at
+`views/<name>/view.tsx`, set `view.name` to that directory name, and return its
+data in `structuredContent`.
 
 ```typescript
-server.tool(
+export const searchProducts = server.tool(
   {
     name: "search-products",
     inputSchema: z.object({ query: z.string() }),
