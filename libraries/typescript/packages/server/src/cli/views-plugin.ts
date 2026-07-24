@@ -13,6 +13,8 @@ import {
 
 const VIRTUAL_TAILWIND_ID = "virtual:mcp-use/tailwind.css";
 const VIRTUAL_TAILWIND_RESOLVED_ID = `\0${VIRTUAL_TAILWIND_ID}`;
+const VIRTUAL_CSP_RUNTIME_ID = "virtual:mcp-use/csp-runtime";
+const VIRTUAL_CSP_RUNTIME_RESOLVED_ID = `\0${VIRTUAL_CSP_RUNTIME_ID}`;
 
 /**
  * Options for {@link mcpUseViewsPlugin}.
@@ -52,10 +54,22 @@ export interface McpUseViewsPluginOptions {
 export function mcpUseViewsPlugin(options: McpUseViewsPluginOptions): Plugin {
   return {
     name: "mcp-use-views",
+    config() {
+      return {
+        // Vite may otherwise resolve the view source and the pre-bundled
+        // mcp-use/react entry to versioned and unversioned React URLs. Those
+        // are distinct browser modules and trigger React's invalid-hook-call
+        // guard even though they originate from the same installed package.
+        resolve: { dedupe: ["react", "react-dom"] },
+      };
+    },
     applyToEnvironment(environment) {
       return environment.name === "client";
     },
     resolveId(id) {
+      if (id === VIRTUAL_CSP_RUNTIME_ID) {
+        return VIRTUAL_CSP_RUNTIME_RESOLVED_ID;
+      }
       if (id === VIRTUAL_TAILWIND_ID) {
         return VIRTUAL_TAILWIND_RESOLVED_ID;
       }
@@ -65,6 +79,17 @@ export function mcpUseViewsPlugin(options: McpUseViewsPluginOptions): Plugin {
       return `\0${id}`;
     },
     load(id) {
+      if (id === VIRTUAL_CSP_RUNTIME_RESOLVED_ID) {
+        // Zod 4 deliberately exposes this global configuration object so
+        // strict-CSP hosts can opt out of its new Function capability probe
+        // before Zod evaluates. The probe is caught by Zod, but browsers still
+        // report it as a CSP violation.
+        return [
+          "globalThis.__zod_globalConfig ??= {};",
+          "globalThis.__zod_globalConfig.jitless = true;",
+          "",
+        ].join("\n");
+      }
       if (id === VIRTUAL_TAILWIND_RESOLVED_ID) {
         // Host theme is applied via ext-apps applyDocumentTheme (data-theme on
         // html) and optional .dark wrappers — not OS prefers-color-scheme.
@@ -82,10 +107,13 @@ export function mcpUseViewsPlugin(options: McpUseViewsPluginOptions): Plugin {
         return undefined;
       }
       const lines: string[] = [];
+      // This side-effect module must evaluate before the view and all of its
+      // dependencies so strict-CSP configuration is in place before Zod loads.
+      lines.push(`import ${JSON.stringify(VIRTUAL_CSP_RUNTIME_ID)};`);
       if (options.dev?.reactRefresh === true) {
-        // Must be the first import: the preamble hooks the refresh runtime
-        // into the window before react-dom (via the bootstrap import below)
-        // or any refresh-wrapped view module evaluates.
+        // Must precede component imports: the preamble hooks the refresh
+        // runtime into the window before react-dom (via the bootstrap import
+        // below) or any refresh-wrapped view module evaluates.
         lines.push(`import "@vitejs/plugin-react/preamble";`);
       }
       lines.push(`import ${JSON.stringify(VIRTUAL_TAILWIND_ID)};`);

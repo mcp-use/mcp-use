@@ -340,7 +340,7 @@ describe("runBuild", () => {
 });
 
 describe("runBuild (views)", () => {
-  it("virtual entry imports the full view module for named viewConfig", () => {
+  it("configures a single React runtime and CSP-safe view evaluation", async () => {
     const plugin = mcpUseViewsPlugin({
       getViews: () => [
         {
@@ -349,10 +349,35 @@ describe("runBuild (views)", () => {
         },
       ],
     });
+
+    const config = plugin.config;
+    expect(config).toBeTypeOf("function");
+    const resolvedConfig = await (
+      config as () => Promise<Record<string, unknown>> | Record<string, unknown>
+    )();
+    expect(resolvedConfig).toMatchObject({
+      resolve: { dedupe: ["react", "react-dom"] },
+    });
+
+    const resolveId = plugin.resolveId;
+    expect(resolveId).toBeTypeOf("function");
+    const cspRuntimeId = (resolveId as (id: string) => string | undefined)(
+      "virtual:mcp-use/csp-runtime"
+    );
+    expect(cspRuntimeId).toBe("\0virtual:mcp-use/csp-runtime");
+
     const load = plugin.load;
     expect(load).toBeTypeOf("function");
+    const cspRuntime = (load as (id: string) => string | undefined)(
+      cspRuntimeId!
+    );
+    expect(cspRuntime).toContain("__zod_globalConfig.jitless = true");
+
     const source = (load as (id: string) => string | undefined)(
       `${VIRTUAL_VIEW_RESOLVED_PREFIX}demo`
+    );
+    expect(source?.split("\n")[0]).toBe(
+      'import "virtual:mcp-use/csp-runtime";'
     );
     expect(source).toContain(
       'import * as viewModule from "/abs/views/demo/view.tsx"'
