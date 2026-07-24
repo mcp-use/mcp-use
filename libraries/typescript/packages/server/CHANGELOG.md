@@ -1,5 +1,14 @@
 # mcp-use
 
+## 2.0.0-beta.59
+
+### Patch Changes
+
+- 34a5c81: Refine the MCP Apps starter display modes by removing its picture-in-picture exit control and moving the mcp-use badge to the top in fullscreen.
+
+  Show a centered, CSS-only `Compiling...` indicator while a view's entry module loads, and remove it before rendering the app.
+  - @mcp-use/inspector@20.0.0-beta.51
+
 ## 2.0.0-beta.58
 
 ### Patch Changes

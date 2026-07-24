@@ -19,6 +19,7 @@
     "build-v2-external-view-assets",
     "bun-pm-and-source-maps",
     "bundle-cli-build-pipeline",
+    "calm-cards-float",
     "calm-chats-follow",
     "calm-proxies-compose",
     "calm-views-no-eval",
