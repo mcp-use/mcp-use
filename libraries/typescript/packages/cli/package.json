@@ -1,7 +1,7 @@
 {
   "name": "@mcp-use/cli",
   "type": "module",
-  "version": "4.0.0-beta.12",
+  "version": "4.0.0-beta.13",
   "description": "Prebuilt CLI, development server, and build pipeline for mcp-use",
   "author": "mcp-use, Inc.",
   "license": "MIT",

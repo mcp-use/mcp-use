@@ -1,5 +1,14 @@
 # mcp-use
 
+## 2.0.0-beta.57
+
+### Patch Changes
+
+- 54567d5: Keep managed views on one deduplicated React runtime and configure Zod's supported jitless mode before view dependencies evaluate. This prevents invalid hook calls in development and removes the caught `eval` CSP violation without weakening the view sandbox policy.
+- Updated dependencies [54567d5]
+  - @mcp-use/cli@4.0.0-beta.13
+  - @mcp-use/inspector@20.0.0-beta.49
+
 ## 2.0.0-beta.56
 
 ### Patch Changes
