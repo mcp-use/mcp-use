@@ -1,5 +1,14 @@
 # mcp-use
 
+## 2.0.0-beta.58
+
+### Patch Changes
+
+- 8456b15: Keep `mcp-use/react` out of Vite's dependency bundle while explicitly optimizing its CommonJS React dependencies, and apply React deduplication at the dev server's final config layer. This makes dependency and view imports share one React dispatcher.
+- Updated dependencies [8456b15]
+  - @mcp-use/cli@4.0.0-beta.14
+  - @mcp-use/inspector@20.0.0-beta.50
+
 ## 2.0.0-beta.57
 
 ### Patch Changes
