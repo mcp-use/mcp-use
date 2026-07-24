@@ -35,7 +35,7 @@ API-reference pages are also outside this migration checklist.
   - [x] Clarify that scopes come from verified SDK auth info and permissions come from the provider mapping.
 - [x] [OAuth proxy](/v2/typescript/server/authentication/providers/oauth-proxy)
   - [x] Remove the page from native v2 navigation or convert it into an explicit unsupported-feature migration note.
-  - [x] Delete all `oauthProxy()` examples, options, fixed-client recipes, and token-brokering route descriptions.
+  - [x] Delete all legacy proxy factory examples, options, fixed-client recipes, and token-brokering route descriptions.
   - [x] Remove inbound OAuth Proxy links from the other authentication guides.
   - [x] Direct fixed-client brokering to an external authorization-server implementation instead of mcp-use.
 - [x] [Custom OAuth provider](/v2/typescript/server/authentication/providers/custom)
