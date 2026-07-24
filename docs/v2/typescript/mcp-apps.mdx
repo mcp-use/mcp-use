@@ -1,15 +1,19 @@
 ---
 title: "Overview"
-description: "Understand when to build MCP Apps with mcp-use and where to go next."
+description: "Understand how MCP tools render interactive UI with mcp-use."
 icon: "blocks"
 ---
 
-MCP Apps bring rich, interactive interfaces into AI conversations. With `mcp-use`, your MCP tools can render React widgets for search results, dashboards, forms, previews, workflows, and any experience where users should act directly on structured data.
+MCP Apps let your tools render interactive UI inside AI conversations. Build a View when users need to explore data, complete a form, review a preview, or act on a tool result.
 
-In `mcp-use`, an MCP App is a TypeScript MCP server plus React widget files in `resources/`. The `mcp-apps` template wires up the server, widget build, local development tooling, and compatibility metadata for hosts such as ChatGPT.
+An MCP App combines three parts:
+
+- an `MCPServer`
+- a tool bound to a View
+- a React component under `views/`
 
 <video
-  alt="MCP Apps Widget Example"
+  alt="Interactive MCP App View"
   style={{
     maxWidth: "600px",
     borderRadius: "8px",
@@ -23,63 +27,132 @@ In `mcp-use`, an MCP App is a TypeScript MCP server plus React widget files in `
   <source src="/images/widget.mp4" type="video/mp4" />
 </video>
 
-## What MCP Apps do
+## How a tool renders a View
 
-An MCP App lets a tool return a widget alongside the model-visible answer. The model receives a concise text result, and the widget receives structured data for rendering.
-
-This separation keeps large UI data out of the model context while still giving the user an interactive view.
-
-```typescript
-return widget({
-  props: { query, results }, // widget rendering data
-  output: text(`Found ${results.length} products.`), // model-visible text
-});
-```
-
-The matching React widget lives at `resources/product-search-result/widget.tsx` and reads `props` with `useWidget()`.
-
-## How mcp-use structures an app
-
-The `mcp-apps` template keeps server code and widget code in one TypeScript project. These are the files you edit most often:
+Add `view: { name }` to a tool definition. The name must match a directory under `views/`.
 
 ```text
-my-widget-server/
+product-search/
 ├── index.ts
-├── resources/
-│   ├── product-search-result/
-│   │   └── widget.tsx
-│   └── styles.css
+├── views/
+│   └── product-results/
+│       └── view.tsx
 ├── public/
-├── ...
-├── package.json
-└── tsconfig.json
+├── mcp-env.d.ts
+└── package.json
 ```
 
-The tool definition in `index.ts` chooses the widget with `widget: { name }`. The tool handler returns `widget({ props, output })`.
+The View-bound tool must declare an `outputSchema`. Its handler returns a normal MCP tool result with matching `structuredContent`.
 
-The widget file uses `useWidget()` to read `props`, pending state, host context, widget state, and host actions.
+```typescript
+import { MCPServer } from "mcp-use";
+import { z } from "zod";
 
-## What the model sees
+const server = new MCPServer({
+  name: "product-search",
+  version: "1.0.0",
+});
 
-MCP tool results separate model-visible output from widget-only data.
+const productResultsSchema = z.object({
+  query: z.string(),
+  results: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+    }),
+  ),
+});
 
-| Field | Model sees it? | Widget sees it? | Use it for |
-| --- | --- | --- | --- |
-| `content` | Yes | Yes | Short text summary for the conversation |
-| `structuredContent` | No | Yes, as `props` | Data the widget renders |
-| `_meta` | No | Yes, as `metadata` | Extra widget metadata |
+const products = [
+  { id: "starter-kit", name: "Starter kit" },
+  { id: "travel-kit", name: "Travel kit" },
+];
 
-Use `output: text(...)` for the model-visible answer. Use `props` for widget rendering data.
+export const searchProducts = server.tool(
+  {
+    name: "search-products",
+    inputSchema: z.object({
+      query: z.string(),
+    }),
+    outputSchema: productResultsSchema,
+    view: {
+      name: "product-results",
+      description: "Product search results",
+      prefersBorder: true,
+    },
+  },
+  async ({ query }) => {
+    const results = products.filter(({ name }) =>
+      name.toLowerCase().includes(query.toLowerCase()),
+    );
 
-For a deeper explanation of widget state, model-visible context, and the `useWidget()` data model, see the [useWidget API reference](/v2/typescript/api-reference/react/usewidget).
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Found ${results.length} products matching "${query}".`,
+        },
+      ],
+      structuredContent: {
+        query,
+        results,
+      },
+    };
+  },
+);
 
-## Compatibility
+export default server;
+```
 
-`mcp-use` uses the normal widget APIs to emit the metadata and bridge behavior ChatGPT needs, so the same widget code can run in ChatGPT and MCP Apps hosts.
+Each View can be bound to at most one tool. Export the tool reference so mcp-use can infer its input and output types inside the View.
 
-Apps SDK APIs remain useful for ChatGPT-specific host extensions that are not part of the shared MCP Apps spec yet. Use [Apps SDK compatibility](/v2/typescript/mcp-apps/apps-sdk-compatibility) when you need to understand that boundary.
+## Read the tool result in the View
 
-## Start here
+A View default-exports a React component. The component receives no React props. Read the tool lifecycle and result with `useToolContext()`.
+
+```tsx
+import { useToolContext } from "mcp-use/react";
+
+export default function ProductResults() {
+  const { status, toolInput, toolOutput, error } =
+    useToolContext<"search-products">();
+
+  if (status === "error") {
+    return <p>{error.message}</p>;
+  }
+
+  if (status === "pending") {
+    return <p>Searching for {toolInput?.query ?? "products"}…</p>;
+  }
+
+  return (
+    <main>
+      <h2>Results for “{toolOutput.query}”</h2>
+      <ul>
+        {toolOutput.results.map(({ id, name }) => (
+          <li key={id}>{name}</li>
+        ))}
+      </ul>
+    </main>
+  );
+}
+```
+
+## Choose what the model and View receive
+
+MCP tool results provide separate channels for conversation output, structured data, and View-only metadata.
+
+| Channel             | Model receives it? | View receives it?    | Use it for                                                        |
+| ------------------- | ------------------ | -------------------- | ----------------------------------------------------------------- |
+| `content`           | Yes                | Yes, as `content`    | A concise result for the conversation and text-only clients       |
+| `structuredContent` | Yes                | Yes, as `toolOutput` | Typed data that the model can reason over and the View can render |
+| `_meta`             | No                 | Yes, as `meta`       | Data that is not visible to the model                             |
+
+Do not place secrets in any result channel. A View runs on the client and can read its result data.
+
+Clients that do not render MCP Apps can still use the tool's `content` and `structuredContent`. Use `ctx.client.supportsViews()` only when a text-only client needs materially different output.
+
+## Continue building
 
 <CardGroup cols={2}>
   <Card
@@ -87,41 +160,34 @@ Apps SDK APIs remain useful for ChatGPT-specific host extensions that are not pa
     icon="rocket"
     href="/v2/typescript/mcp-apps/quickstart"
   >
-    Create a TypeScript MCP App, run it locally, and render the template widget.
+    Create a project, run it locally, and render its View in the Inspector.
   </Card>
   <Card
-    title="Build widgets"
+    title="Build Views"
     icon="panel-top"
     href="/v2/typescript/mcp-apps/widgets"
   >
-    Create a React widget and return it from a TypeScript MCP tool.
-  </Card>
-  <Card
-    title="Model context"
-    icon="brain"
-    href="/v2/typescript/mcp-apps/model-context"
-  >
-    Decide what the model sees, what the widget sees, and what state persists.
+    Bind a tool to a React component and handle its result.
   </Card>
   <Card
     title="Interactivity"
     icon="mouse-pointer-click"
     href="/v2/typescript/mcp-apps/interactivity"
   >
-    Add tool calls, state, follow-up messages, and display controls.
+    Call tools, open links, send follow-up messages, and change display modes.
   </Card>
   <Card
-    title="Apps SDK compatibility"
-    icon="openai"
-    href="/v2/typescript/mcp-apps/apps-sdk-compatibility"
+    title="Model context"
+    icon="brain"
+    href="/v2/typescript/mcp-apps/model-context"
   >
-    Understand how MCP Apps run in ChatGPT and when Apps SDK extensions matter.
+    Expose View state and visible UI information to future model turns.
   </Card>
   <Card
     title="Content Security Policy"
     icon="shield"
     href="/v2/typescript/mcp-apps/content-security-policy"
   >
-    Allow widget API calls, assets, embeds, and static deployments.
+    Allow the external APIs, assets, and embedded content your View needs.
   </Card>
 </CardGroup>
