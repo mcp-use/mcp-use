@@ -44,6 +44,7 @@ const getUserInfoOutputSchema = z.object({
 const projectId = environmentValue("SUPABASE_PROJECT_ID");
 const supabaseUrlEnv = environmentValue("SUPABASE_URL");
 const jwtSecret = environmentValue("SUPABASE_JWT_SECRET");
+const audience = environmentValue("SUPABASE_AUDIENCE");
 const publishableKey = environmentValue("SUPABASE_PUBLISHABLE_KEY");
 
 if (projectId === undefined && supabaseUrlEnv === undefined) {
@@ -71,6 +72,7 @@ const server = new MCPServer({
     ...(projectId !== undefined && { projectId }),
     ...(supabaseUrlEnv !== undefined && { supabaseUrl: supabaseUrlEnv }),
     ...(jwtSecret !== undefined && { jwtSecret }),
+    ...(audience !== undefined && { audience }),
   }),
 });
 

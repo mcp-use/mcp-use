@@ -19,11 +19,16 @@ Copy the example environment file and add your Clerk Frontend API URL:
 cp .env.example .env
 ```
 
-This example uses Clerk's issuer-bound access-token model. A token that carries
-an explicit RFC 8707 `resource` claim must match the canonical MCP resource.
-For public and tunnel deployments, set `MCP_URL` to the server origin, such as
-`https://mcp.example.com`, not the `/mcp` endpoint. The CLI derives the
-canonical protected resource as `https://mcp.example.com/mcp`.
+By default, this example uses Clerk's issuer-bound access-token model. If your
+Clerk access tokens include an audience, set `CLERK_AUDIENCE` to the exact
+`aud` value. The example passes that value to `oauthClerkProvider` as its
+`audience` option.
+
+A token that carries an explicit RFC 8707 `resource` claim must match the
+canonical MCP resource. For public and tunnel deployments, set `MCP_URL` to
+the server origin, such as `https://mcp.example.com`, not the `/mcp` endpoint.
+The CLI derives the canonical protected resource as
+`https://mcp.example.com/mcp`.
 
 Run the server:
 
