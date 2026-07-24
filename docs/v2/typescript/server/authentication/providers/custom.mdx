@@ -6,12 +6,6 @@ icon: "code"
 
 Use `oauthCustomProvider` when your authorization server supports Dynamic Client Registration (DCR) but mcp-use does not provide a built-in adapter. The MCP client registers upstream; your server publishes metadata, verifies access tokens, and maps verified claims into application identity.
 
-<Warning>
-  A custom provider is not an OAuth proxy. Fixed-client brokering requires an
-  external authorization-server implementation; mcp-use never receives or stores
-  the upstream client secret.
-</Warning>
-
 ## Required contract
 
 Import `MCPServer` from `mcp-use` and the provider contract from `mcp-use/oauth`.
