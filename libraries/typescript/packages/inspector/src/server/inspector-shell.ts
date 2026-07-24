@@ -2,7 +2,7 @@ import type { Context, Hono } from "hono";
 import { renderInspectorFaviconLinks } from "./favicon-links.js";
 import { registerInspectorStaticAssets } from "./static-assets.js";
 import { getInspectorVersion } from "./version.js";
-import { buildSandboxProxyBlobHtml } from "@mcp-use/client/react";
+import { buildSandboxProxyBlobHtml } from "@mcp-use/client/sandbox";
 
 const INSPECTOR_VERSION = getInspectorVersion();
 type InspectorMode = "standalone" | "embedded" | "cloud";
