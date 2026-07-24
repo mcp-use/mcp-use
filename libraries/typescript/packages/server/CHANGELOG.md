@@ -1,5 +1,16 @@
 # mcp-use
 
+## 2.0.0-beta.54
+
+### Patch Changes
+
+- a7dd305: Reduce v2 Node server startup and request overhead with a conditioned,
+  self-contained Node entry, buffered JSON response writes, and narrower
+  JSON-RPC response guards. Preserve the Node-free edge entry, streaming
+  responses, middleware behavior, and protocol validation.
+- ae9065a: Keep provider-specific JWT audiences separate from the canonical MCP resource. Restore Supabase's `authenticated` audience and Clerk's optional audience/issuer-bound token verification while continuing to reject mismatched explicit resource claims.
+  - @mcp-use/inspector@20.0.0-beta.46
+
 ## 2.0.0-beta.53
 
 ### Patch Changes
