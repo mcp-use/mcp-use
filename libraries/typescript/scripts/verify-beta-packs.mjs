@@ -131,9 +131,11 @@ function verifyFrameworkPack(packed, manifest, files) {
     if (manifest.dependencies?.[dependency] === undefined)
       throw new Error(`mcp-use must depend on ${dependency}`);
   }
-  if (packedBytes > 250_000)
+  // The package includes a Node-optimized root alongside the edge-safe graph.
+  // Keep enough headroom for small SDK changes without allowing silent growth.
+  if (packedBytes > 375_000)
     throw new Error(`mcp-use packed budget exceeded: ${packedBytes} bytes`);
-  if (unpackedBytes > 1_000_000)
+  if (unpackedBytes > 1_500_000)
     throw new Error(`mcp-use unpacked budget exceeded: ${unpackedBytes} bytes`);
   if (files.size > 150)
     throw new Error(`mcp-use file budget exceeded: ${files.size} files`);
