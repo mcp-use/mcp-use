@@ -4,20 +4,25 @@ description: "Use the MCP client in Node.js, browser, and React"
 icon: "container"
 ---
 
-The root `@mcp-use/client` import picks Node or browser behavior via package conditions. React is a separate entry.
+The root `@mcp-use/client` import uses package conditions to select its runtime
+implementation. Node gets the Node entry; browsers and other default
+environments get the browser-safe entry. React connection management is
+available from a separate entry point.
 
-| Environment | Import | HTTP | Stdio | Code mode |
-| ----------- | ------ | ---- | ----- | --------- |
-| Node.js 20+ | `@mcp-use/client` | ✅ | ✅ | ✅ |
-| Browser | `@mcp-use/client` | ✅ | ❌ | ❌ |
-| React | `@mcp-use/client/react` | ✅ | ❌ | ❌ |
+| Environment | Import | HTTP | Stdio | Config files | Code Mode |
+| ----------- | ------ | ---- | ----- | ------------ | --------- |
+| Node.js `>=22.22.2` | `@mcp-use/client` | Yes | Yes | Yes | Yes |
+| Browser | `@mcp-use/client` | Yes | No | No | No |
+| React | `@mcp-use/client/react` | Yes | No | No | No |
 
 ## Node.js
+
+The Node entry includes HTTP and stdio transports, filesystem configuration,
+Code Mode, and Node OAuth helpers.
 
 ```typescript
 import { MCPClient, loadConfigFile } from "@mcp-use/client";
 
-// Inline config
 const client = new MCPClient({
   mcpServers: {
     api: { url: "https://api.example.com/mcp" },
@@ -28,28 +33,37 @@ const client = new MCPClient({
   },
 });
 
-// Or from a JSON file
-const client2 = new MCPClient(loadConfigFile("./mcp-config.json"));
+const clientFromFile = new MCPClient(loadConfigFile("./mcp-config.json"));
 
-const connections = await client.connectAll();
-await connections.api.callTool("ping", {});
-await client.close();
+try {
+  const connections = await client.connectAll();
+  await connections.api.callTool("ping", {});
+} finally {
+  await Promise.all([client.close(), clientFromFile.close()]);
+}
 ```
 
 ## Browser
 
-HTTP only. No stdio, config files, or code mode.
+The browser entry exposes the HTTP connection API and browser OAuth support. It
+does not include process spawning, filesystem configuration, or local code
+execution.
 
 ```typescript
 import { MCPClient } from "@mcp-use/client";
 
 const client = new MCPClient({
-  mcpServers: { api: { url: "https://api.example.com/mcp" } },
+  mcpServers: {
+    api: { url: "https://api.example.com/mcp" },
+  },
 });
 
-const connection = await client.connect("api");
-await connection.callTool("tool", {});
-await client.close();
+try {
+  const connection = await client.connect("api");
+  await connection.callTool("tool", {});
+} finally {
+  await client.close();
+}
 ```
 
 <Warning>
@@ -58,8 +72,19 @@ await client.close();
 
 ## React
 
+Install the client and your application's supported React version:
+
 ```bash
-npm install @mcp-use/client react
+npm install @mcp-use/client@beta react
 ```
 
-See [React integration](/v2/typescript/client/usemcp). Widget rendering hooks are in `mcp-use/react`.
+`@mcp-use/client/react` provides connection-management APIs such as `useMcp`,
+`McpClientProvider`, `useMcpClient`, and `useMcpServer`. It also exports
+`ViewRenderer` for hosts that render an MCP App View.
+
+Code running inside a View uses the View APIs from `mcp-use/react`, including
+`useToolContext`, `useCallTool`, and `useViewState`. These hooks communicate
+with the host; they do not create or manage MCP server connections.
+
+See [React integration](/v2/typescript/client/usemcp) for connection setup and
+[MCP Apps](/v2/typescript/mcp-apps) for building and hosting Views.
