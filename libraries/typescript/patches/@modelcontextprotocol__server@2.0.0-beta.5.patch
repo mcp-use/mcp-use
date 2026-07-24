@@ -1,0 +1,42 @@
+diff --git a/dist/src-BX_fm-dB.cjs b/dist/src-BX_fm-dB.cjs
+index e972f8f41d00c2bda03237e0d0667b2d0f7da0d9..a1adb82b5d151ebe48f75e09004b5e3410f15e52 100644
+--- a/dist/src-BX_fm-dB.cjs
++++ b/dist/src-BX_fm-dB.cjs
+@@ -4419,14 +4419,14 @@ const isJSONRPCNotification = (value) => _modelcontextprotocol_core_internal.JSO
+ *
+ * @returns True if the value is a valid {@linkcode JSONRPCResultResponse}, false otherwise.
+ */
+-const isJSONRPCResultResponse = (value) => _modelcontextprotocol_core_internal.JSONRPCResultResponseSchema.safeParse(value).success;
++const isJSONRPCResultResponse = (value) => typeof value === "object" && value !== null && Object.hasOwn(value, "result") && _modelcontextprotocol_core_internal.JSONRPCResultResponseSchema.safeParse(value).success;
+ /**
+ * Checks if a value is a valid {@linkcode JSONRPCErrorResponse}.
+ * @param value - The value to check.
+ *
+ * @returns True if the value is a valid {@linkcode JSONRPCErrorResponse}, false otherwise.
+ */
+-const isJSONRPCErrorResponse = (value) => _modelcontextprotocol_core_internal.JSONRPCErrorResponseSchema.safeParse(value).success;
++const isJSONRPCErrorResponse = (value) => typeof value === "object" && value !== null && Object.hasOwn(value, "error") && _modelcontextprotocol_core_internal.JSONRPCErrorResponseSchema.safeParse(value).success;
+ /**
+ * Checks if a value is a valid {@linkcode JSONRPCResponse} (either a result or error response).
+ * @param value - The value to check.
+diff --git a/dist/src-D86MbS1I.mjs b/dist/src-D86MbS1I.mjs
+index fecce52cb9f86ea7c2a43e696781785f1ac73470..e1f893308afc4008518a512c3fb51dc2801dbc2d 100644
+--- a/dist/src-D86MbS1I.mjs
++++ b/dist/src-D86MbS1I.mjs
+@@ -4418,14 +4418,14 @@ const isJSONRPCNotification = (value) => JSONRPCNotificationSchema.safeParse(val
+ *
+ * @returns True if the value is a valid {@linkcode JSONRPCResultResponse}, false otherwise.
+ */
+-const isJSONRPCResultResponse = (value) => JSONRPCResultResponseSchema.safeParse(value).success;
++const isJSONRPCResultResponse = (value) => typeof value === "object" && value !== null && Object.hasOwn(value, "result") && JSONRPCResultResponseSchema.safeParse(value).success;
+ /**
+ * Checks if a value is a valid {@linkcode JSONRPCErrorResponse}.
+ * @param value - The value to check.
+ *
+ * @returns True if the value is a valid {@linkcode JSONRPCErrorResponse}, false otherwise.
+ */
+-const isJSONRPCErrorResponse = (value) => JSONRPCErrorResponseSchema.safeParse(value).success;
++const isJSONRPCErrorResponse = (value) => typeof value === "object" && value !== null && Object.hasOwn(value, "error") && JSONRPCErrorResponseSchema.safeParse(value).success;
+ /**
+ * Checks if a value is a valid {@linkcode JSONRPCResponse} (either a result or error response).
+ * @param value - The value to check.

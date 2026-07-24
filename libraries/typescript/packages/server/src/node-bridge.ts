@@ -2,7 +2,8 @@
  * Vendored from `@modelcontextprotocol/node` `toNodeHandler.ts` (SDK 2.0.0-beta.4).
  * ponytail: track upstream SSE/backpressure fixes when bumping `@modelcontextprotocol/server`.
  *
- * @internal Lazy-imported from `listen()` and `mcp-use dev` only.
+ * @internal Bundled into the Node root; remains free of runtime Node imports
+ * so the generic edge graph can reuse the response adapter safely.
  */
 import type {
   AuthInfo,
@@ -102,6 +103,29 @@ export function toNodeHandler(
     if (response.body === null) {
       finished = true;
       res.end();
+      return;
+    }
+
+    // MCP request/response payloads are ordinary buffered JSON. Avoid routing
+    // those through the async ReadableStream iterator used for SSE and other
+    // streaming responses: it adds a promise turn and backpressure bookkeeping
+    // for every chunk on the hottest server path.
+    if (
+      response.headers
+        .get("content-type")
+        ?.toLowerCase()
+        .includes("application/json")
+    ) {
+      try {
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        finished = true;
+        res.end(bytes);
+      } catch {
+        // Match the streaming path below: an aborted upstream body closes the
+        // Node response without turning it into an unhandled rejection.
+        finished = true;
+        res.end();
+      }
       return;
     }
 

@@ -25,13 +25,19 @@ describe("runtime package boundaries", () => {
     expectForbiddenRuntimeModules(resolutions);
   });
 
-  it("allows only the official SDK process shim under default Node conditions", async () => {
+  it("loads only the SDK process shim and listen HTTP adapter under Node conditions", async () => {
     const resolutions = await traceImport([]);
     const builtins = builtinResolutions(resolutions);
 
-    expect(builtins.map(({ url }) => url)).toEqual(["node:process"]);
-    expect(builtins[0]?.parentURL).toMatch(
-      /@modelcontextprotocol\/server\/dist\/shimsNode\.mjs$/
+    expect(builtins.map(({ url }) => url)).toEqual([
+      "node:process",
+      "node:http",
+    ]);
+    expect(
+      builtins.find(({ url }) => url === "node:process")?.parentURL
+    ).toMatch(/@modelcontextprotocol\/server\/dist\/shimsNode\.mjs$/);
+    expect(builtins.find(({ url }) => url === "node:http")?.parentURL).toMatch(
+      /dist\/internal\/node-http\.js$/
     );
     expectForbiddenRuntimeModules(resolutions);
   });

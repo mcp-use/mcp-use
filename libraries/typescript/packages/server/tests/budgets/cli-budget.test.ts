@@ -25,11 +25,13 @@ describe("published CLI boundaries", () => {
       "the edge graph must not reach command chunks"
     ).toEqual([]);
     expect(
-      [...graph.dynamicSpecifiers].some((specifier) =>
-        specifier.includes("node-bridge")
-      ),
-      "listen() must lazy-load the Node HTTP adapter"
-    ).toBe(true);
+      [...graph.files.values()].join("\n"),
+      "the edge graph must include the edge-safe Node response bridge"
+    ).toContain("toNodeHandler");
+    expect(
+      graph.staticPackages,
+      "listen() must resolve Node HTTP through the package condition map"
+    ).toContain("#mcp-use-node-http");
     expect(
       [...graph.dynamicSpecifiers].some((specifier) =>
         specifier.includes("public-route")

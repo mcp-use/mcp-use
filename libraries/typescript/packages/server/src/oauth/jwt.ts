@@ -1,6 +1,5 @@
 import {
   OAuthError,
-  OAuthErrorCode,
   type AuthInfo,
   type OAuthTokenVerifier,
 } from "@modelcontextprotocol/server";
@@ -11,7 +10,10 @@ import {
   type JWTVerifyGetKey,
 } from "jose";
 
+import { invalidToken } from "./errors.js";
 import { isLocalhost, isRecord } from "./guards.js";
+
+export { invalidToken } from "./errors.js";
 
 /** @internal Record of claims extracted from a verified JWT. */
 export type VerifiedPayload = Record<string, unknown>;
@@ -186,15 +188,6 @@ export function requiredFutureNumber(
     throw invalidToken(`Missing or expired ${name} claim`);
   }
   return value;
-}
-
-/** @internal Creates an OAuth invalid-token error with an optional cause. */
-export function invalidToken(message: string, cause?: unknown): OAuthError {
-  const error = new OAuthError(OAuthErrorCode.InvalidToken, message);
-  if (cause !== undefined) {
-    error.cause = cause;
-  }
-  return error;
 }
 
 function verifiedResource(

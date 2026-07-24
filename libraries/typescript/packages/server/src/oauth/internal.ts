@@ -9,7 +9,7 @@ import {
   isRecord,
   parseAbsoluteUrl,
 } from "./guards.js";
-import { invalidToken } from "./jwt.js";
+import { invalidToken } from "./errors.js";
 import type { OAuthExtra, OAuthProvider } from "./provider.js";
 
 export {

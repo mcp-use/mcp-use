@@ -67,6 +67,11 @@ function disabled(): boolean {
   }
 }
 
+/** Whether anonymous usage capture is disabled in the current runtime. @internal */
+export function isUsageDisabled(): boolean {
+  return disabled();
+}
+
 function clean(properties: Properties): Properties {
   return Object.fromEntries(
     Object.entries(properties).filter(([key, value]) => {
