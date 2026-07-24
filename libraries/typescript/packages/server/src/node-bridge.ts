@@ -10,6 +10,8 @@ import type {
   McpHandlerRequestOptions,
 } from "@modelcontextprotocol/server";
 
+import { isBufferedResponse } from "./buffered-response.js";
+
 /** Minimal duck-typed shape of a Node.js `IncomingMessage`. */
 export interface NodeIncomingMessageLike extends AsyncIterable<
   Uint8Array | string
@@ -75,9 +77,10 @@ export function toNodeHandler(
       abort.abort();
     }
 
+    let request: Request | undefined;
     let response: Response;
     try {
-      const request = await toWebRequest(req, parsedBody, {
+      request = await toWebRequest(req, parsedBody, {
         signal: abort.signal,
       });
       response = await handler.fetch(request, {
@@ -106,16 +109,10 @@ export function toNodeHandler(
       return;
     }
 
-    // MCP request/response payloads are ordinary buffered JSON. Avoid routing
-    // those through the async ReadableStream iterator used for SSE and other
-    // streaming responses: it adds a promise turn and backpressure bookkeeping
-    // for every chunk on the hottest server path.
-    if (
-      response.headers
-        .get("content-type")
-        ?.toLowerCase()
-        .includes("application/json")
-    ) {
+    // Framework-owned SDK replies carry an explicit buffered-body marker.
+    // Avoid the async iterator overhead for those known single-buffer bodies;
+    // arbitrary application/json responses remain on the streaming path.
+    if (isBufferedResponse(response, request)) {
       try {
         const bytes = new Uint8Array(await response.arrayBuffer());
         finished = true;

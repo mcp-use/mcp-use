@@ -77,11 +77,12 @@ export default defineConfig([
     splitting: false,
     sourcemap: false,
     clean: false,
-    external: ["@mcp-use/client", "@mcp-use/cli", "zod"],
+    external: ["@mcp-use/client", "@mcp-use/cli"],
     noExternal: [
       "hono",
       "@modelcontextprotocol/core",
       "@modelcontextprotocol/server",
+      "zod",
     ],
     define: packageVersionDefine,
     esbuildOptions(options) {

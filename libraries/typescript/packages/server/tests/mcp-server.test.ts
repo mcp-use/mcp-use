@@ -10,6 +10,7 @@ import {
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { isBufferedResponse } from "../src/buffered-response.js";
 import { MCPServer, completable } from "../src/index.js";
 import type {
   MetaObject,
@@ -741,38 +742,38 @@ describe("MCPServer fetch handler (no network)", () => {
     }));
     const handler = server.fetch;
 
-    const response = await handler(
-      new Request("http://localhost/api/mcp", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          accept: "application/json, text/event-stream",
-          "mcp-protocol-version": "2026-07-28",
-          "mcp-method": "tools/call",
-          "mcp-name": "ping",
-        },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "tools/call",
-          params: {
-            name: "ping",
-            arguments: {},
-            // The stateless 2026-07-28 wire replaces the initialize handshake
-            // with a per-request _meta envelope; these three keys are required.
-            _meta: {
-              "io.modelcontextprotocol/protocolVersion": "2026-07-28",
-              "io.modelcontextprotocol/clientInfo": {
-                name: "raw-request",
-                version: "0.0.0",
-              },
-              "io.modelcontextprotocol/clientCapabilities": {},
+    const request = new Request("http://localhost/api/mcp", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+        "mcp-protocol-version": "2026-07-28",
+        "mcp-method": "tools/call",
+        "mcp-name": "ping",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: {
+          name: "ping",
+          arguments: {},
+          // The stateless 2026-07-28 wire replaces the initialize handshake
+          // with a per-request _meta envelope; these three keys are required.
+          _meta: {
+            "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+            "io.modelcontextprotocol/clientInfo": {
+              name: "raw-request",
+              version: "0.0.0",
             },
+            "io.modelcontextprotocol/clientCapabilities": {},
           },
-        }),
-      })
-    );
+        },
+      }),
+    });
+    const response = await handler(request);
     expect(response.status).toBe(200);
+    expect(isBufferedResponse(response, request)).toBe(true);
     // Modern (2026-07-28) exchanges answer with a single JSON body unless the
     // handler streams a related message first (responseMode 'auto').
     const body: unknown = await response.json();

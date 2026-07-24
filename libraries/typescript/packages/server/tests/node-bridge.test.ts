@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
+import { markBufferedResponse } from "../src/buffered-response.js";
 import { listenFetch, type ListenFetchResult } from "./helpers/listen-fetch.js";
 
 describe("Node response bridge", () => {
@@ -12,7 +13,9 @@ describe("Node response bridge", () => {
 
   it("serves buffered JSON responses intact", async () => {
     listener = await listenFetch(async () =>
-      Response.json({ jsonrpc: "2.0", id: 1, result: { ok: true } })
+      markBufferedResponse(
+        Response.json({ jsonrpc: "2.0", id: 1, result: { ok: true } })
+      )
     );
 
     const response = await fetch(listener.url);
@@ -22,6 +25,48 @@ describe("Node response bridge", () => {
       jsonrpc: "2.0",
       id: 1,
       result: { ok: true },
+    });
+  });
+
+  it("streams unmarked JSON responses without waiting for completion", async () => {
+    const encoder = new TextEncoder();
+    let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
+    listener = await listenFetch(async () => {
+      const body = new ReadableStream<Uint8Array>({
+        start(streamController) {
+          controller = streamController;
+          streamController.enqueue(encoder.encode('{"first":'));
+        },
+      });
+      return new Response(body, {
+        headers: { "content-type": "application/json" },
+      });
+    });
+
+    const responsePromise = fetch(listener.url);
+    const outcome = await Promise.race([
+      responsePromise.then(() => "response" as const),
+      new Promise<"timeout">((resolve) =>
+        setTimeout(() => resolve("timeout"), 250)
+      ),
+    ]);
+    if (outcome === "timeout") {
+      controller?.close();
+    }
+    expect(outcome).toBe("response");
+
+    const response = await responsePromise;
+    const reader = response.body!.getReader();
+    const first = await reader.read();
+    expect(new TextDecoder().decode(first.value)).toBe('{"first":');
+
+    controller?.enqueue(encoder.encode("true}"));
+    controller?.close();
+    const second = await reader.read();
+    expect(new TextDecoder().decode(second.value)).toBe("true}");
+    await expect(reader.read()).resolves.toEqual({
+      done: true,
+      value: undefined,
     });
   });
 
