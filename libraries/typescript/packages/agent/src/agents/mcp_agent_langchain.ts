@@ -236,7 +236,7 @@ export class MCPAgent {
 
     // Common configuration for both modes
     this.maxSteps = options.maxSteps ?? 5;
-    this.autoInitialize = options.autoInitialize ?? false;
+    this.autoInitialize = options.autoInitialize ?? this.isSimplifiedMode;
     this.memoryEnabled = options.memoryEnabled ?? true;
     this.systemPrompt = options.systemPrompt ?? null;
     this.systemPromptTemplateOverride = options.systemPromptTemplate ?? null;
@@ -1650,7 +1650,7 @@ export class MCPAgent {
 
   /**
    * Yields with pretty-printed output for code mode.
-   * This method formats and displays tool executions in a user-friendly way with syntax highlighting.
+   * This method formats and displays tool executions in a user-friendly way for the terminal.
    * @deprecated Use options object instead: prettyStreamEvents({ prompt, maxSteps, ... })
    */
   public prettyStreamEvents<T = string>(

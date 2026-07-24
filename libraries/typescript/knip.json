@@ -31,11 +31,11 @@
     "packages/agent": {
       "entry": [
         "src/index.ts",
-        "src/browser-agent.ts",
         "src/langchain.ts",
-        "tests/**/*.ts"
+        "tests/**/*.ts",
+        "examples/**/*.ts"
       ],
-      "project": ["src/**/*.ts", "tests/**/*.ts"]
+      "project": ["src/**/*.ts", "tests/**/*.ts", "examples/**/*.ts"]
     },
     "packages/cli": {
       "entry": ["src/index.ts", "tests/**/*.mjs"],

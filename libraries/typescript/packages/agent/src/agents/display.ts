@@ -1,56 +1,9 @@
+import { stripVTControlCharacters } from "node:util";
 import type { StreamEvent } from "@langchain/core/tracers/log_stream";
 
 /**
  * Helper functions for pretty-printing code mode tool executions
  */
-
-// Dynamically import optional display dependencies and Node.js built-ins
-let chalk: any = null;
-let highlight: any = null;
-let stripVTControlCharacters: ((str: string) => string) | null = null;
-let displayPackagesWarned = false;
-
-// Check if we're in a Node.js environment
-const isNode = typeof process !== "undefined" && process.versions?.node;
-
-(async () => {
-  // Load Node.js util for stripVTControlCharacters (Node.js only)
-  if (isNode) {
-    try {
-      const utilModule = await import("node:util");
-      stripVTControlCharacters = utilModule.stripVTControlCharacters;
-    } catch {
-      // node:util not available, will use plain text fallback
-    }
-  }
-
-  try {
-    const chalkModule = await import("chalk");
-    chalk = chalkModule.default;
-  } catch {
-    // chalk not available, will use plain text
-  }
-
-  try {
-    const cliHighlightModule = await import("cli-highlight");
-    highlight = cliHighlightModule.highlight;
-  } catch {
-    // cli-highlight not available, will use plain text
-  }
-
-  // Show warning if packages are missing (only once, and only in Node.js)
-  if (isNode && (!chalk || !highlight)) {
-    if (!displayPackagesWarned) {
-      displayPackagesWarned = true;
-      console.warn(
-        "\n✨ For enhanced console output with colors and syntax highlighting, install:\n\n" +
-          "  npm install chalk cli-highlight\n" +
-          "  # or\n" +
-          "  pnpm add chalk cli-highlight\n"
-      );
-    }
-  }
-})();
 
 const TERMINAL_WIDTH = process.stdout.columns || 120;
 
@@ -61,42 +14,36 @@ interface ExecuteCodeResult {
   execution_time: number;
 }
 
-// Helper functions for optional chalk styling
-const chalkHelper = {
-  gray: (str: string) => chalk?.gray(str) ?? str,
-  bold: {
-    white: (str: string) => chalk?.bold?.white(str) ?? str,
-  },
-  bgGray: (str: string) => chalk?.bgGray(str) ?? str,
-  cyan: (str: string) => chalk?.cyan(str) ?? str,
-  dim: (str: string) => chalk?.dim(str) ?? str,
-  red: (str: string) => chalk?.red(str) ?? str,
-  green: (str: string) => chalk?.green(str) ?? str,
-};
-
-// Helper for optional syntax highlighting
-function highlightCode(content: string, language?: string): string {
-  if (!highlight) {
-    return content; // Plain text fallback
-  }
-  try {
-    return highlight(content, {
-      language: language ?? "javascript",
-      ignoreIllegals: true,
-    });
-  } catch {
-    return content; // Fallback on error
-  }
+/**
+ * Whether to emit ANSI escapes: only on a TTY stdout, and never when the
+ * `NO_COLOR` convention is set. Edge runtimes without `process.stdout`
+ * get plain text.
+ */
+function colorsEnabled(): boolean {
+  if (typeof process === "undefined") return false;
+  if (process.env?.["NO_COLOR"] !== undefined) return false;
+  return process.stdout?.isTTY === true;
 }
+
+type Style = (text: string) => string;
+
+function ansi(open: number, close: number): Style {
+  return (text) =>
+    colorsEnabled() ? `\u001B[${open}m${text}\u001B[${close}m` : text;
+}
+
+const style = {
+  gray: ansi(90, 39),
+  bold: ansi(1, 22),
+  cyan: ansi(36, 39),
+  dim: ansi(2, 22),
+  red: ansi(31, 39),
+  green: ansi(32, 39),
+};
 
 // Remove ANSI color codes for length calculation
 function stripAnsi(str: string): string {
-  if (stripVTControlCharacters) {
-    return stripVTControlCharacters(str);
-  }
-  // Fallback: Simple regex to strip ANSI codes (for non-Node.js environments)
-  // eslint-disable-next-line no-control-regex
-  return str.replace(/\x1b\[[0-9;]*m/g, "");
+  return stripVTControlCharacters(str);
 }
 
 // wrap lines correctly, preserving ANSI codes
@@ -142,53 +89,37 @@ function wrapAnsiLine(line: string, maxWidth: number): string[] {
   return result;
 }
 
-function printBox(
-  content: string,
-  title?: string,
-  language?: string,
-  bgColor = false
-) {
+function printBox(content: string, title?: string) {
   const width = TERMINAL_WIDTH;
 
-  let displayContent = content;
-  if (language) {
-    try {
-      displayContent = highlightCode(content, language);
-    } catch {
-      // Highlighting failed, use plain content
-    }
-  }
-
-  const lines = displayContent
+  const lines = content
     .split("\n")
     .flatMap((line) => wrapAnsiLine(line, width - 4));
 
-  console.log(chalkHelper.gray("┌" + "─".repeat(width - 2) + "┐"));
+  console.log(style.gray("┌" + "─".repeat(width - 2) + "┐"));
 
   if (title) {
     const stripped = stripAnsi(title);
     const lineText = `${title} `;
     const padding = Math.max(0, width - 4 - stripped.length - 2);
     console.log(
-      chalkHelper.gray("│ ") +
-        chalkHelper.bold.white(lineText) +
+      style.gray("│ ") +
+        style.bold(lineText) +
         " ".repeat(padding) +
-        chalkHelper.gray(" │")
+        style.gray(" │")
     );
-    console.log(chalkHelper.gray("├" + "─".repeat(width - 2) + "┤"));
+    console.log(style.gray("├" + "─".repeat(width - 2) + "┤"));
   }
 
   lines.forEach((line) => {
     const stripped = stripAnsi(line);
     const padding = Math.max(0, width - 4 - stripped.length);
-    const finalLine = bgColor
-      ? chalkHelper.bgGray(line + " ".repeat(padding))
-      : line + " ".repeat(padding);
-
-    console.log(chalkHelper.gray("│ ") + finalLine + chalkHelper.gray(" │"));
+    console.log(
+      style.gray("│ ") + line + " ".repeat(padding) + style.gray(" │")
+    );
   });
 
-  console.log(chalkHelper.gray("└" + "─".repeat(width - 2) + "┘"));
+  console.log(style.gray("└" + "─".repeat(width - 2) + "┘"));
 }
 
 /**
@@ -289,16 +220,16 @@ function handleToolStart(event: StreamEvent) {
   // Special handling for execute_code to show the code nicely
   const code = extractCodeFromToolInput(input);
   if (code) {
-    printBox(code, `${toolName} - input`, "javascript", false);
+    printBox(code, `${toolName} - input`);
 
     // Show other parameters if any
     const otherParams = { ...input };
     delete otherParams.code;
     if (Object.keys(otherParams).length > 0) {
-      printBox(renderContent(otherParams), "Other Parameters", "json", false);
+      printBox(renderContent(otherParams), "Other Parameters");
     }
   } else {
-    printBox(renderContent(input), `${toolName} - input`, "json", false);
+    printBox(renderContent(input), `${toolName} - input`);
   }
 }
 
@@ -420,7 +351,7 @@ function formatSearchToolsAsTree(
     const serverPrefix = isLastServer ? "└─" : "├─";
 
     lines.push(
-      `${serverPrefix} ${chalkHelper.cyan(server)} (${serverTools.length} tools)`
+      `${serverPrefix} ${style.cyan(server)} (${serverTools.length} tools)`
     );
 
     // Add tools under this server
@@ -469,7 +400,7 @@ function formatSearchToolsAsTree(
 
         // Add indent and dim styling to each line
         for (const descLine of wrappedLines) {
-          lines.push(`${descriptionIndent}${chalkHelper.dim(descLine)}`);
+          lines.push(`${descriptionIndent}${style.dim(descLine)}`);
         }
       }
     }
@@ -521,31 +452,24 @@ function handleToolEnd(event: StreamEvent) {
           execResult.error !== undefined &&
           execResult.error !== "";
         const statusText = isError
-          ? chalkHelper.red("error")
-          : chalkHelper.green("success");
+          ? style.red("error")
+          : style.green("success");
         const title = `${toolName} - ${statusText} - ${timeStr}`;
 
         // Only show the result, not the full object
         if (execResult.result !== null && execResult.result !== undefined) {
           const resultStr = renderContent(execResult.result);
-          const language =
-            typeof execResult.result === "object" ? "json" : undefined;
-          printBox(resultStr, title, language, false);
+          printBox(resultStr, title);
         } else {
-          printBox("(no result)", title, undefined, false);
+          printBox("(no result)", title);
         }
 
         if (execResult.logs && execResult.logs.length > 0) {
-          printBox(execResult.logs.join("\n"), `Logs`, undefined, false);
+          printBox(execResult.logs.join("\n"), `Logs`);
         }
 
         if (execResult.error) {
-          printBox(
-            execResult.error,
-            chalkHelper.red("Error"),
-            undefined,
-            false
-          );
+          printBox(execResult.error, style.red("Error"));
         }
         return;
       }
@@ -599,9 +523,9 @@ function handleToolEnd(event: StreamEvent) {
         const meta = contentWithMeta.meta;
         const treeStr = formatSearchToolsAsTree(results, meta, query);
         const statusText =
-          status === "success" ? chalk.green("Success") : chalk.red("Error");
+          status === "success" ? style.green("Success") : style.red("Error");
         const title = `${statusText}: ${toolName} - Result`;
-        printBox(treeStr, title, undefined, false);
+        printBox(treeStr, title);
         return;
       }
 
@@ -613,9 +537,9 @@ function handleToolEnd(event: StreamEvent) {
           query
         );
         const statusText =
-          status === "success" ? chalk.green("Success") : chalk.red("Error");
+          status === "success" ? style.green("Success") : style.red("Error");
         const title = `${statusText}: ${toolName} - Result`;
-        printBox(treeStr, title, undefined, false);
+        printBox(treeStr, title);
         return;
       }
     }
@@ -648,18 +572,17 @@ function handleToolEnd(event: StreamEvent) {
 
     // Format the content for display
     const contentStr = renderContent(displayContent);
-    const language = typeof displayContent === "object" ? "json" : undefined;
 
     // Create title with tool name
     const statusLabel =
       status === "success"
-        ? chalkHelper.green("Success")
+        ? style.green("Success")
         : isError
-          ? chalkHelper.red("Error")
+          ? style.red("Error")
           : "Result";
     const title = `${statusLabel}: ${toolName} - Result`;
 
-    printBox(contentStr, title, language, false);
+    printBox(contentStr, title);
     return;
   }
 
@@ -673,25 +596,22 @@ function handleToolEnd(event: StreamEvent) {
 
     if (execResult.result !== null && execResult.result !== undefined) {
       const resultStr = renderContent(execResult.result);
-      const language =
-        typeof execResult.result === "object" ? "json" : undefined;
-      printBox(resultStr, `Result - ${timeStr}`, language, false);
+      printBox(resultStr, `Result - ${timeStr}`);
     }
 
     if (execResult.logs && execResult.logs.length > 0) {
-      printBox(execResult.logs.join("\n"), `Logs`, undefined, false);
+      printBox(execResult.logs.join("\n"), `Logs`);
     }
 
     if (execResult.error) {
-      printBox(execResult.error, chalkHelper.red("Error"), undefined, false);
+      printBox(execResult.error, style.red("Error"));
     }
     return;
   }
 
   // Ultimate fallback: display raw output
   const outputStr = renderContent(output);
-  const language = typeof output === "object" ? "json" : undefined;
-  printBox(outputStr, "Result", language, false);
+  printBox(outputStr, "Result");
 }
 
 /**
