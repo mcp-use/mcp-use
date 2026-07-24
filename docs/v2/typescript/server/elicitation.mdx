@@ -1,212 +1,153 @@
 ---
 title: "Elicitation"
-description: "Request user input from TypeScript MCP tools with safe form and URL flows."
+description: "Request user input from TypeScript MCP tools with form and URL flows."
 icon: "check"
 ---
 
-Elicitation lets a tool pause and ask the client for user input. Use it when a tool cannot continue safely without a user decision, missing field, or external authorization step.
+Elicitation lets a tool return an `input_required` result. A capable client
+collects input and retries the original tool call; the callback runs again with
+the response in its request context.
 
-This guide focuses on when to use elicitation and how to handle the user response. Use the [Tool context API reference](/v2/typescript/api-reference/server/tool-context#elicit) for exact overloads, result types, timeout options, validation errors, and return shapes. For enum fields, use Zod (`z.enum`, `z.array(z.enum(...))`) — see [Elicitation schemas](/v2/typescript/api-reference/server/elicitation-schemas) if you are migrating from v1 enum helpers.
+Use form mode for ordinary structured input and URL mode when values must stay
+on an external site.
 
-## Choose form mode or URL mode
+## Handle the input-required round
 
-Use form mode for non-sensitive structured input. Use URL mode for sensitive or external flows.
-
-| Need | Mode |
-| --- | --- |
-| Ask for preferences, labels, confirmation fields, or non-sensitive details | Form mode |
-| Send the user through OAuth, payment, credential entry, or another sensitive flow | URL mode |
-
-Never collect credentials, API keys, payment details, or OAuth secrets through form mode. Form responses pass through the MCP client.
-
-Keep form schemas flat and simple. Use top-level primitive fields, enum fields, and string-array enum selections. For nested objects, files, credentials, or richer forms, send the user through URL mode or another external flow.
-
-## Check client support
-
-Only use elicitation when the connected client supports the mode you need. Provide a fallback for clients that do not advertise that support.
+Every call has a stable correlation key, a user-facing message, and either a
+Standard Schema form schema or a URL:
 
 ```typescript
-import { error, text } from "mcp-use/server";
+import { MCPServer } from "mcp-use";
 import { z } from "zod";
 
+const server = new MCPServer({
+  name: "deployment-server",
+  version: "1.0.0",
+});
+
+const approvalSchema = z.object({
+  approve: z.boolean().describe("Approve this deployment"),
+  note: z.string().max(200).optional(),
+});
+
 server.tool(
   {
-    name: "collect_contact",
-    description: "Collect non-sensitive contact details before continuing.",
-  },
-  async (_params, ctx) => {
-    if (!ctx.client.capabilities().elicitation?.form) {
-      return error("This client does not support form elicitation.");
-    }
-
-    const result = await ctx.elicit(
-      "Who should receive the follow-up?",
-      z.object({
-        name: z.string().describe("Recipient name"),
-        email: z.string().email().describe("Recipient email"),
-      }),
-    );
-
-    if (result.action !== "accept") {
-      return text("No contact details were provided.");
-    }
-
-    return text(`Follow-up will go to ${result.data.name} at ${result.data.email}.`);
-  },
-);
-```
-
-In form mode, mcp-use validates accepted responses against your Zod schema before returning `result.data`.
-
-## Handle every user decision
-
-An elicitation request can be accepted, declined, or cancelled. Treat each outcome deliberately.
-
-```typescript
-const result = await ctx.elicit(
-  "Confirm the export settings.",
-  z.object({
-    includePrivateFields: z.boolean().default(false),
-  }),
-);
-
-switch (result.action) {
-  case "accept":
-    return text(
-      result.data.includePrivateFields
-        ? "Exporting with private fields."
-        : "Exporting without private fields.",
-    );
-  case "decline":
-    return text("The user declined to provide export settings.");
-  case "cancel":
-    return text("The export was cancelled.");
-}
-```
-
-Use `decline` for an explicit refusal and `cancel` for dismissal or interruption. Avoid continuing a risky operation after either outcome.
-
-## Use form mode for non-sensitive data
-
-Form mode works well when the user needs to choose or fill in ordinary application data.
-
-```typescript
-server.tool(
-  {
-    name: "create_ticket",
-    description: "Create a support ticket after asking for missing details.",
-  },
-  async (_params, ctx) => {
-    if (!ctx.client.capabilities().elicitation?.form) {
-      return error("This client does not support form elicitation.");
-    }
-
-    const result = await ctx.elicit(
-      "Add ticket details.",
-      z.object({
-        title: z.string().min(3),
-        priority: z.enum(["low", "normal", "high"]).default("normal"),
-        description: z.string().optional(),
-      }),
-    );
-
-    if (result.action !== "accept") {
-      return text("Ticket creation cancelled.");
-    }
-
-    const ticket = await tickets.create(result.data);
-    return text(`Created ticket ${ticket.id}.`);
-  },
-);
-```
-
-Use `.describe()` on fields when labels or expected values are not obvious. Use `.default()` only when the default is safe.
-
-## Use URL mode for sensitive flows
-
-URL mode directs the user to an external page. Use it when secrets or authorization codes must stay outside the MCP client.
-
-```typescript
-server.tool(
-  {
-    name: "connect_github",
-    description: "Ask the user to authorize GitHub access.",
-  },
-  async (_params, ctx) => {
-    if (!ctx.client.capabilities().elicitation?.url) {
-      return error("This client does not support URL elicitation.");
-    }
-
-    const authRequest = await githubAuth.createAuthorizationRequest();
-    const result = await ctx.elicit("Authorize GitHub access to continue.", authRequest.url);
-
-    if (result.action !== "accept") {
-      return error("GitHub authorization was not completed.");
-    }
-
-    const connection = await githubAuth.waitForCallback(authRequest.state);
-
-    if (!connection.ok) {
-      return error("GitHub authorization did not finish.");
-    }
-
-    return text("GitHub authorization completed.");
-  },
-);
-```
-
-The `accept` action only means the user continued the URL flow. Your server must still verify the OAuth callback, exchange the code, and store tokens securely before reporting success.
-
-## Catch validation and client errors
-
-Wrap elicitation when the tool can recover from validation errors, unsupported clients, timeouts, or transport failures.
-
-```typescript
-try {
-  const result = await ctx.elicit(
-    "Choose a deployment environment.",
-    z.object({
+    name: "deploy",
+    inputSchema: z.object({
       environment: z.enum(["staging", "production"]),
     }),
-  );
+    outputSchema: z.object({
+      environment: z.string(),
+      deployed: z.boolean(),
+    }),
+  },
+  async ({ environment }, ctx) => {
+    const approval = await ctx.elicit(
+      "deployment-approval",
+      `Deploy to ${environment}?`,
+      approvalSchema,
+    );
 
-  if (result.action !== "accept") {
-    return text("Deployment cancelled.");
-  }
+    if (approval.status === "required") {
+      return approval.result;
+    }
 
-  return text(`Deploying to ${result.data.environment}.`);
-} catch (err) {
-  return error(`Could not collect deployment input: ${err instanceof Error ? err.message : String(err)}`);
-}
+    if (approval.status !== "accept" || !approval.data.approve) {
+      return {
+        isError: true,
+        content: [{ type: "text", text: "Deployment was not approved." }],
+      };
+    }
+
+    // Side effects belong after accepted input. This callback ran once before
+    // input was required and now runs again with ctx.inputResponses.
+    await deployments.start(environment, approval.data.note);
+
+    const data = { environment, deployed: true };
+    return {
+      content: [{ type: "text", text: JSON.stringify(data) }],
+      structuredContent: data,
+    };
+  },
+);
+
+export default server;
 ```
 
-For exact timeout behavior, validation error types, and verbose schema forms, see the [Tool context API reference](/v2/typescript/api-reference/server/tool-context#elicit).
+The stable key correlates the embedded request with the matching value in
+`ctx.inputResponses`. `ctx.elicit()` reads and validates that response for you.
+Invalid accepted form data produces another `required` round.
 
-## Test elicitation locally
+The result statuses are:
 
-Run the elicitation example or call an elicitation tool from the Inspector.
+| Status     | Meaning                                                           |
+| ---------- | ----------------------------------------------------------------- |
+| `required` | Return `result` directly so the client can collect input          |
+| `accept`   | Valid form data is available as `data`; URL mode has no form data |
+| `decline`  | The user explicitly refused                                       |
+| `cancel`   | The user dismissed or interrupted the flow                        |
+
+## Form mode
+
+Form mode accepts a Standard Schema that can be converted to JSON Schema. Keep
+forms flat and use primitive fields, enums, and arrays of enum values. Add
+descriptions and refinements before passing the schema to `ctx.elicit()`.
+
+Do not collect passwords, API keys, payment details, or OAuth secrets in form
+mode. Submitted form values pass through the MCP client.
+
+## URL mode
+
+Pass an absolute URL string as the third argument. Keep the external flow's
+state in a trusted backend and look it up with a stable, unguessable handle
+from the original tool input:
+
+```typescript
+const flow = await githubAuth.getOrCreateFlow(connectionId);
+
+const authorization = await ctx.elicit(
+  "github-authorization",
+  "Authorize GitHub access",
+  flow.authorizationUrl,
+);
+
+if (authorization.status === "required") {
+  return authorization.result;
+}
+
+if (authorization.status !== "accept") {
+  return {
+    isError: true,
+    content: [{ type: "text", text: "Authorization was not completed." }],
+  };
+}
+
+const connection = await githubAuth.requireCompleted(flow.id);
+```
+
+URL mode asks the client to open an external flow; it does not return secrets or
+prove that the flow succeeded. `getOrCreateFlow` must return the same
+server-stored flow when the callback reruns with `connectionId`. Verify callback
+state and completion on your own backend before performing a protected action.
+
+## Keep multi-round workflows safe
+
+Because the callback re-runs for each input-required round:
+
+- Perform reads and validation before elicitation as needed.
+- Perform irreversible side effects only after the relevant `accept`.
+- Use a different stable key for each distinct question.
+- Use verified `requestState` when a multi-step workflow needs trusted state.
+- Treat bare `ctx.inputResponses` as untrusted client input if you read it
+  directly.
+
+## Run and test the example
 
 ```bash
-cd libraries/typescript/packages/mcp-use/examples/server/features/elicitation
-pnpm install
+cd libraries/typescript/packages/server/examples/elicitation
 pnpm dev
 ```
 
-Then open the Inspector, call a tool that uses elicitation, and verify accept, decline, and cancel behavior.
-
-## Next steps
-
-<CardGroup cols={2}>
-  <Card title="Tool context API reference" icon="terminal" href="/v2/typescript/api-reference/server/tool-context#elicit">
-    Look up `ctx.elicit()` overloads, result types, timeout options, and validation behavior.
-  </Card>
-  <Card title="Elicitation schemas (v1 migration)" icon="list-checks" href="/v2/typescript/api-reference/server/elicitation-schemas">
-    Map removed v1 enum helpers to Zod form schemas.
-  </Card>
-  <Card title="Sampling" icon="pipette" href="/v2/typescript/server/sampling">
-    Ask the client LLM for a completion during tool execution.
-  </Card>
-  <Card title="Client elicitation" icon="monitor" href="/v2/typescript/client/elicitation">
-    Handle elicitation requests in a TypeScript MCP client.
-  </Card>
-</CardGroup>
+Connect a client that supports form and URL elicitation to
+`http://localhost:3000/mcp`. Test accept, decline, cancel, an invalid form
+response that triggers another round, and the URL callback-verification path.

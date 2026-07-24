@@ -4,127 +4,100 @@ description: "Configure Clerk OAuth authentication for a TypeScript MCP server."
 icon: "/images/icons/clerk.svg"
 ---
 
-Use the Clerk provider when Clerk is your identity system. MCP clients register directly with Clerk through Dynamic Client Registration, and your MCP server verifies Clerk-issued tokens.
-
-This guide covers the Clerk setup path. Use the [auth providers API reference](/v2/typescript/api-reference/server/auth-providers#oauthclerkprovider) for exact `oauthClerkProvider()` options, defaults, and errors.
+Use `oauthClerkProvider` when Clerk is the authorization server. MCP clients register directly with Clerk, and mcp-use verifies Clerk-issued access tokens.
 
 ## Configure Clerk
 
-In the [Clerk Dashboard](https://dashboard.clerk.com/):
+In the [Clerk Dashboard](https://dashboard.clerk.com/), enable Dynamic Client Registration for the application and copy its Frontend API URL. Enable and request `user:org:read` when tools need organization context.
 
-1. Create or open your Clerk application.
-2. Go to **Configure > OAuth Applications**.
-3. Enable **Dynamic Client Registration**.
-4. Enable the `user:org:read` scope if your tools need Clerk organization context.
-5. Go to **API Keys** and copy your Frontend API URL.
-
-The Frontend API URL usually looks like one of these:
-
-```text
-https://verb-noun-42.clerk.accounts.dev
-https://clerk.your-domain.com
-```
-
-## Set environment variables
+Pass the Frontend API URL explicitly:
 
 ```bash
-MCP_USE_OAUTH_CLERK_FRONTEND_API_URL=https://verb-noun-42.clerk.accounts.dev
+CLERK_FRONTEND_API_URL=https://verb-noun-42.clerk.accounts.dev
+# Optional when Clerk emits a dedicated access-token audience:
+# CLERK_AUDIENCE=https://api.example.com
 ```
 
-## Configure the MCP server
-
 ```typescript
-import { MCPServer, oauthClerkProvider } from "mcp-use/server";
+import { MCPServer } from "mcp-use";
+import { oauthClerkProvider } from "mcp-use/oauth/clerk";
+
+const frontendApiUrl = process.env.CLERK_FRONTEND_API_URL;
+if (!frontendApiUrl) {
+  throw new Error("CLERK_FRONTEND_API_URL is required");
+}
 
 const server = new MCPServer({
   name: "clerk-server",
   version: "1.0.0",
-  oauth: oauthClerkProvider(),
+  oauth: oauthClerkProvider({
+    frontendApiUrl,
+    ...(process.env.CLERK_AUDIENCE
+      ? { audience: process.env.CLERK_AUDIENCE }
+      : {}),
+    scopesSupported: ["profile", "email", "offline_access", "user:org:read"],
+  }),
 });
 
-await server.listen(3000);
+export default server;
 ```
 
-You can pass the Frontend API URL directly instead of using an environment variable:
+`audience` is optional. Set it only when Clerk emits that exact `aud`; when omitted, the provider uses issuer-bound access-token verification.
+
+## Use organization context
+
+Clerk maps `org_id`, `org_role`, and `org_slug` to `organizationId`, `organizationRole`, and `organizationSlug`. Organization permissions are top-level `ctx.auth.permissions`.
 
 ```typescript
-oauth: oauthClerkProvider({
-  frontendApiUrl: "https://verb-noun-42.clerk.accounts.dev",
-});
-```
-
-If your tools need Clerk organization context, advertise the organization scope too:
-
-```typescript
-oauth: oauthClerkProvider({
-  frontendApiUrl: "https://verb-noun-42.clerk.accounts.dev",
-  scopesSupported: ["profile", "email", "offline_access", "user:org:read"],
-});
-```
-
-## Use organization claims
-
-When you use Clerk Organizations, Clerk can include `org_id` in the token. This requires Organizations to be enabled, the `user:org:read` scope to be available to the OAuth app, and the client to request that scope.
-
-```typescript
-import { error, object } from "mcp-use/server";
-
 server.tool(
   {
     name: "list_documents",
-    description: "List documents for the authenticated Clerk organization.",
+    description: "List documents for the Clerk organization.",
   },
   async (_args, ctx) => {
-    if (!ctx.auth) {
-      return error("Unauthorized");
-    }
-
-    const orgId = ctx.auth.user.org_id as string | undefined;
-
-    if (!orgId) {
-      return error("Organization context required.");
+    const organizationId = ctx.auth.user.organizationId;
+    if (
+      !organizationId ||
+      !ctx.auth.permissions.includes("org:documents:read")
+    ) {
+      return {
+        isError: true,
+        content: [{ type: "text", text: "Organization access required" }],
+      };
     }
 
     const documents = await db.documents.findMany({
-      where: { organizationId: orgId },
+      where: { organizationId },
     });
-
-    return object({ documents });
+    return {
+      content: [{ type: "text", text: JSON.stringify(documents) }],
+    };
   },
 );
 ```
 
-The SDK preserves `org_role` and `org_slug` on `ctx.auth.user`. When Clerk includes `org_permissions`, the SDK maps them to `ctx.auth.user.permissions`. Treat these fields as optional and guard before using them.
-
-## Verify the setup
-
-Run the server and connect with an OAuth-capable MCP client.
-
-```bash
-npm run dev
-```
-
-Confirm these cases:
-
-- The client discovers Clerk OAuth metadata.
-- The client registers with Clerk.
-- Authenticated tool calls include `ctx.auth.user.userId`.
-- Organization-scoped tools are tested with a client that requested `user:org:read`.
-- Organization-scoped tools reject calls without organization context.
-
-## Next steps
+The mapped user also includes `id`, optional `email`, `name`, `username`, `picture`, and `emailVerified`, plus `roles`.
 
 <CardGroup cols={2}>
-  <Card title="Runnable Clerk example" icon="github" href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/clerk">
-    Compare your setup with a working mcp-use Clerk server.
+  <Card
+    title="Runnable Clerk example"
+    icon="github"
+    href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/auth/clerk"
+  >
+    Compare with the maintained Clerk example.
   </Card>
-  <Card title="Clerk OAuth documentation" icon="book-open" href="https://clerk.com/docs/guides/configure/auth-strategies/oauth/how-clerk-implements-oauth">
-    Review Clerk's OAuth behavior.
+  <Card
+    title="Clerk OAuth documentation"
+    icon="book-open"
+    href="https://clerk.com/docs/guides/configure/auth-strategies/oauth/how-clerk-implements-oauth"
+  >
+    Review Clerk OAuth and DCR behavior.
   </Card>
-  <Card title="User Context" icon="user" href="/v2/typescript/server/authentication/user-context">
-    Use Clerk identity and organization data inside tools.
-  </Card>
-  <Card title="Clerk provider API reference" icon="terminal" href="/v2/typescript/api-reference/server/auth-providers#oauthclerkprovider">
-    Look up exact provider options and defaults.
+  <Card
+    title="User Context"
+    icon="user"
+    href="/v2/typescript/server/authentication/user-context"
+  >
+    Use Clerk identity, organization, and permissions.
   </Card>
 </CardGroup>
