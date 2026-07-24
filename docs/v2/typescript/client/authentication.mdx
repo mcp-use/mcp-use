@@ -4,9 +4,14 @@ description: "OAuth and bearer tokens for MCP client connections"
 icon: "shield"
 ---
 
-## OAuth (automatic)
+HTTP connections support automatic OAuth, pre-registered public clients,
+bearer tokens, custom headers, and custom authentication providers.
 
-For HTTP servers without a bearer token, the client auto-provisions OAuth on connect:
+## Automatic OAuth with `MCPClient`
+
+`MCPClient` creates an OAuth provider for an HTTP server unless the server
+configuration already supplies an `authProvider`, `authToken`, `oauth: false`,
+or an `Authorization` header.
 
 ```typescript
 import { MCPClient } from "@mcp-use/client";
@@ -17,49 +22,67 @@ const client = new MCPClient({
   },
 });
 
-// Node: blocks until authorized (loopback). Browser: popup or redirect.
-await client.connect("demo");
-```
-
-Disable with `oauth: false`. Override options with an `oauth` object on the server config. Pass a custom `authProvider` to skip auto-provisioning.
-
-### React
-
-```tsx
-const mcp = useMcp({ url: "https://api.example.com/mcp" });
-
-if (mcp.state === "pending_auth") {
-  return <button onClick={mcp.authenticate}>Sign in</button>;
+try {
+  await client.connect("demo");
+} finally {
+  await client.close();
 }
 ```
 
-OAuth callback: import `onMcpAuthorization` from `@mcp-use/client/react` on your callback route. See [React integration](/v2/typescript/client/usemcp#oauth-callback).
+In Node.js, the default provider opens a browser and waits for its loopback
+callback. In the browser build, the default provider opens a popup; set
+`useRedirectFlow: true` inside the server's `oauth` options to use a full-page
+redirect.
 
-### Flow modes
+Pass a custom `authProvider` when your application owns the authorization flow.
 
-| Mode | Option | When |
-| ---- | ------ | ---- |
-| Popup (default) | — | Desktop web |
-| Redirect | `useRedirectFlow: true` | Mobile, popup blockers |
+## React: explicit authentication
 
-### Manual browser authorization
+React connection APIs use an explicit authorization step by default.
+`preventAutoAuth` defaults to `true`, so an unauthorized connection enters
+`pending_auth` until the user calls `authenticate()`.
 
-Set `preventAutoAuth: true` on a `BrowserOAuthClientProvider` to prepare an
-authorization URL without opening it automatically. Read that URL with
-`getLastAttemptedAuthUrl()` and present it to the user in the same page
-lifetime. The fallback URL is intentionally kept in memory only and is not
-available after the provider or page is recreated; start a new authorization
-attempt after a reload.
+```tsx
+import { useMcp } from "@mcp-use/client/react";
 
-### Pre-registered client
+export function ProtectedConnection() {
+  const mcp = useMcp({
+    url: "https://api.example.com/mcp",
+  });
+
+  if (mcp.state === "pending_auth") {
+    return <button onClick={() => void mcp.authenticate()}>Sign in</button>;
+  }
+
+  return <p>Connection state: {mcp.state}</p>;
+}
+```
+
+Set `preventAutoAuth: false` on `useMcp` or a
+`McpClientProvider` server configuration to start authorization automatically.
+Popup mode is the default; set the top-level React option
+`useRedirectFlow: true` for a full-page redirect.
+
+On your callback route, import `onMcpAuthorization` from
+`@mcp-use/client/react`. See
+[React integration](/v2/typescript/client/usemcp#oauth-callback).
+
+## Pre-registered clients
+
+The `MCPClient` configuration uses
+`oauth.staticClientInfo.client_id`:
 
 ```typescript
+import { MCPClient } from "@mcp-use/client";
+
 const client = new MCPClient({
   mcpServers: {
     slack: {
       url: "https://mcp.example.com/mcp",
       oauth: {
-        clientId: "my-client-id",
+        staticClientInfo: {
+          client_id: "my-client-id",
+        },
         clientMetadataUrl:
           "https://app.example.com/.well-known/oauth-client-metadata.json",
         scope: "openid profile",
@@ -69,22 +92,94 @@ const client = new MCPClient({
 });
 ```
 
-Browser clients are public PKCE clients — no client secrets in the browser.
+React uses a different, UI-oriented shape:
 
-### OAuth proxy (browser)
+```tsx
+import { useMcp } from "@mcp-use/client/react";
 
-When upstream OAuth endpoints lack CORS:
+const mcp = useMcp({
+  url: "https://mcp.example.com/mcp",
+  oauth: {
+    clientId: "my-client-id",
+    clientMetadataUrl:
+      "https://app.example.com/.well-known/oauth-client-metadata.json",
+    scope: "openid profile",
+  },
+});
+```
 
-```typescript
-useMcp({
+Browser OAuth clients are public PKCE clients. Do not put a `client_secret` in
+browser configuration; `BrowserOAuthClientProvider` rejects one in
+`staticClientInfo`.
+
+## OAuth proxy in the browser
+
+Use an OAuth proxy when the authorization server's metadata, token, or
+registration endpoints do not support browser CORS:
+
+```tsx
+import { useMcp } from "@mcp-use/client/react";
+
+const mcp = useMcp({
   url: "https://mcp.example.com/mcp",
   oauthProxyUrl: "https://app.example.com/api/mcp-oauth",
 });
 ```
 
-## Bearer token
+For the browser `MCPClient`, `oauth.oauthProxyUrl` configures the proxy and
+`oauth.proxyOAuthRequests` controls whether OAuth HTTP requests use it. The
+latter defaults to `true` when the browser provider is created. React routes its
+OAuth requests through the configured `oauthProxyUrl`; it does not expose
+`proxyOAuthRequests` as a `useMcp` option.
+
+## Manual browser authorization
+
+Construct a `BrowserOAuthClientProvider` with `preventAutoAuth: true` and pass it
+to the browser client when you need to present the authorization URL yourself:
 
 ```typescript
+import {
+  BrowserOAuthClientProvider,
+  isUnauthorized,
+  MCPClient,
+} from "@mcp-use/client";
+
+const authProvider = new BrowserOAuthClientProvider(
+  "https://api.example.com/mcp",
+  { preventAutoAuth: true }
+);
+const client = new MCPClient({
+  mcpServers: {
+    api: {
+      url: "https://api.example.com/mcp",
+      authProvider,
+    },
+  },
+});
+
+try {
+  await client.connect("api");
+} catch (error) {
+  if (!isUnauthorized(error)) throw error;
+
+  const authorizationUrl = authProvider.getLastAttemptedAuthUrl();
+  if (authorizationUrl) {
+    window.location.assign(authorizationUrl);
+  }
+}
+```
+
+`getLastAttemptedAuthUrl()` returns the URL for the current provider instance.
+It is kept in memory only, so start a new authorization attempt after a page
+reload. The auto-provisioned browser provider also accepts
+`oauth.preventAutoAuth`, but an explicit provider gives your application access
+to the prepared URL.
+
+## Bearer tokens
+
+```typescript
+import { MCPClient } from "@mcp-use/client";
+
 const client = new MCPClient({
   mcpServers: {
     api: {
@@ -95,19 +190,30 @@ const client = new MCPClient({
 });
 ```
 
-Or use headers (also disables auto-OAuth):
+An explicit `Authorization` header also disables automatic OAuth:
 
 ```typescript
-headers: { Authorization: "Bearer sk-..." }
+import { MCPClient } from "@mcp-use/client";
+
+const client = new MCPClient({
+  mcpServers: {
+    api: {
+      url: "https://api.example.com/mcp",
+      headers: {
+        Authorization: `Bearer ${process.env.API_KEY}`,
+      },
+    },
+  },
+});
 ```
 
-## Server config fields
+## `MCPClient` server fields
 
 | Field | Description |
 | ----- | ----------- |
 | `authToken` | Bearer token |
 | `headers` | Custom HTTP headers |
-| `oauth` | OAuth options, or `false` to disable |
+| `oauth` | Automatic OAuth options, or `false` to disable automatic OAuth |
 | `authProvider` | Custom SDK-compatible provider |
 
 ## Node OAuth helpers
@@ -122,4 +228,5 @@ import {
 } from "@mcp-use/client";
 ```
 
-Use these for headless scripts or custom storage. Browser OAuth uses `localStorage` automatically.
+Use these exports for headless scripts, custom storage, or an authorization flow
+you manage directly.

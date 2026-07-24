@@ -1,58 +1,91 @@
 ---
 title: "Notifications"
-description: "Handle real-time updates from MCP servers"
+description: "Handle one-way updates from MCP servers"
 icon: "bell"
 ---
 
-MCP notifications are one-way JSON-RPC messages (no response).
+MCP notifications are one-way JSON-RPC messages with no response. Register a
+handler when your application needs to react to server updates.
 
-## Receive (server → client)
+## Receive server notifications
 
-Global handler on the client:
+Set a default handler on the client:
 
 ```typescript
 import { MCPClient } from "@mcp-use/client";
 
-const client = new MCPClient(
-  { mcpServers: { demo: { url: "http://localhost:3000/mcp" } } },
-  {
-    onNotification: async (notification) => {
-      console.log(notification.method, notification.params);
-    },
+const client = new MCPClient({
+  mcpServers: {
+    demo: { url: "http://localhost:3000/mcp" },
   },
-);
+  onNotification: async (notification) => {
+    console.log(notification.method, notification.params);
+  },
+});
 ```
 
-Or per-connection:
+An individual server configuration can provide its own `onNotification`
+callback. Per-server callbacks take precedence over the global default.
+
+You can also register a handler on a connection:
 
 ```typescript
-const conn = await client.connect("demo");
+const connection = await client.connect("demo");
 
-conn.on("notification", async (notification) => {
+connection.on("notification", async (notification) => {
   if (notification.method === "notifications/tools/list_changed") {
-    await conn.listTools();
+    await connection.listTools();
   }
 });
 ```
 
-Common methods: `notifications/tools/list_changed`, `notifications/resources/list_changed`, `notifications/prompts/list_changed`.
+The standard list-change method names are:
 
-## Send (client → server)
+- `notifications/tools/list_changed`
+- `notifications/resources/list_changed`
+- `notifications/prompts/list_changed`
 
-Update roots — the client sends `notifications/roots/list_changed`:
-
-```typescript
-await conn.setRoots([
-  { uri: "file:///home/user/project", name: "Project" },
-]);
-```
-
-Pass initial roots in server config or connector options.
+The client automatically refreshes its tool cache for tool list changes. Refresh
+resources or prompts when your application needs their updated values.
 
 ## React
 
-`McpClientProvider` stores notifications on each server (`notifications`, `unreadNotificationCount`). Use `onNotificationReceived` per server for custom handling.
+Each server managed by `McpClientProvider` exposes:
 
-## Reference
+- `notifications`, the stored notification entries
+- `unreadNotificationCount`
+- `markNotificationRead`, `markAllNotificationsRead`, and
+  `clearNotifications`
 
-Server-side: [Notifications](/v2/typescript/server/notifications)
+Set `onNotificationReceived` on a server configuration to run custom logic when
+the provider receives and stores a notification.
+
+## Roots compatibility
+
+`setRoots()` and `getRoots()` are compatibility APIs for sessionful servers.
+Roots are not part of the current sessionless protocol.
+
+For a compatible server, pass initial roots in its client configuration:
+
+```typescript
+import { MCPClient } from "@mcp-use/client";
+
+const client = new MCPClient({
+  mcpServers: {
+    legacy: {
+      url: "http://localhost:3000/mcp",
+      roots: [{ uri: "file:///home/user/project", name: "Project" }],
+    },
+  },
+});
+```
+
+Calling `connection.setRoots(roots)` replaces the cached roots and sends
+`notifications/roots/list_changed` when connected. `connection.getRoots()`
+returns the current cached list. Use these methods only for a server that
+negotiated the sessionful protocol and requests roots.
+
+## Related
+
+Server-side notification sending is covered in
+[Notifications](/v2/typescript/server/notifications).

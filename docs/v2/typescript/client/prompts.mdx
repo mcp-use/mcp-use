@@ -4,26 +4,32 @@ description: "Fetch server-defined prompt templates"
 icon: "message-square"
 ---
 
+Prompts are server-defined message templates. List the available prompts, then
+request one by name with its arguments.
+
 ```typescript
 import { MCPClient } from "@mcp-use/client";
 
 const client = new MCPClient({
-  mcpServers: { demo: { url: "http://localhost:3000/mcp" } },
+  mcpServers: {
+    demo: { url: "http://localhost:3000/mcp" },
+  },
 });
 
 try {
-  const conn = await client.connect("demo");
+  const connection = await client.connect("demo");
 
-  const prompts = await conn.listPrompts();
-  for (const p of prompts) {
-    console.log(p.name, p.description);
+  const { prompts } = await connection.listPrompts();
+  for (const prompt of prompts) {
+    console.log(prompt.name, prompt.description);
   }
 
-  const result = await conn.getPrompt("plan_trip", {
+  const result = await connection.getPrompt("plan_trip", {
     destination: "Japan",
     days: "7",
   });
 
+  console.log(result.description);
   for (const message of result.messages) {
     if (message.content.type === "text") {
       console.log(message.role, message.content.text);
@@ -34,13 +40,38 @@ try {
 }
 ```
 
+`listPrompts()` returns `{ prompts }`. `getPrompt(name, args)` returns a prompt
+result with an optional `description` and a `messages` array. Each message has a
+`role` and one MCP content block.
+
 ## React
 
 ```tsx
-const server = useMcpServer("demo");
-const result = await server?.getPrompt("code_review", { language: "ts" });
+import { useMcpServer } from "@mcp-use/client/react";
+
+export function LoadPromptButton() {
+  const server = useMcpServer("demo");
+
+  async function handleLoad() {
+    if (server?.state !== "ready") return;
+
+    const result = await server.getPrompt("code_review", {
+      language: "ts",
+    });
+    console.log(result.messages);
+  }
+
+  return (
+    <button disabled={server?.state !== "ready"} onClick={handleLoad}>
+      Load prompt
+    </button>
+  );
+}
 ```
+
+The React `getPrompt` arguments are optional and use string values.
 
 ## Reference
 
-[`MCPConnection`](/v2/typescript/api-reference/client/mcp-session) — `listPrompts`, `getPrompt`.
+[`MCPConnection`](/v2/typescript/api-reference/client/mcp-session) —
+`listPrompts` and `getPrompt`.
