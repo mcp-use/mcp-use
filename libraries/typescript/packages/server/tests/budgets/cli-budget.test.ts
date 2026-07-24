@@ -2,6 +2,7 @@ import { isBuiltin } from "node:module";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { init, parse } from "es-module-lexer";
 import { describe, expect, it } from "vitest";
+import packageJson from "../../package.json";
 
 const DIST = new URL("../../dist/", import.meta.url);
 const CLI_DIST = new URL("../../../cli/dist/", import.meta.url);
@@ -108,7 +109,33 @@ describe("published CLI boundaries", () => {
   it("keeps the unpacked framework artifact below five MiB", async () => {
     expect(await directoryBytes(DIST)).toBeLessThanOrEqual(5 * 1024 * 1024);
   });
+
+  it("declares every external package used by the Node bundle", async () => {
+    const graph = await buildStaticGraph(new URL("index-node.js", DIST));
+    const declaredRuntimePackages = new Set([
+      ...Object.keys(packageJson.dependencies),
+      ...Object.keys(packageJson.peerDependencies),
+    ]);
+    const undeclared = [...graph.staticPackages].filter(
+      (specifier) =>
+        !isBuiltin(specifier) &&
+        !declaredRuntimePackages.has(packageName(specifier))
+    );
+
+    expect(undeclared).toEqual([]);
+    expect(graph.staticPackages).not.toContain("zod");
+    expect(graph.staticPackages).not.toContain("zod/v4");
+  });
 });
+
+function packageName(specifier: string): string {
+  if (!specifier.startsWith("@")) {
+    const separator = specifier.indexOf("/");
+    return separator === -1 ? specifier : specifier.slice(0, separator);
+  }
+  const separator = specifier.indexOf("/", specifier.indexOf("/") + 1);
+  return separator === -1 ? specifier : specifier.slice(0, separator);
+}
 
 function expectForbiddenPackages(
   graph: ModuleGraph,
