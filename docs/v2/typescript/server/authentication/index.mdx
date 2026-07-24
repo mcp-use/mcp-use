@@ -22,12 +22,6 @@ mcp-use supports resource-server providers whose authorization server supports D
 
 The MCP client registers and performs the authorization flow directly with the authorization server. Your MCP server does not handle authorization codes or exchange them for tokens.
 
-<Warning>
-  mcp-use does not include OAuth Proxy or fixed-client token brokering. If an
-  identity provider gives you only one pre-registered client ID and secret, put
-  a standards-compliant authorization server or broker in front of it.
-</Warning>
-
 ## Configure the server
 
 Import the server from `mcp-use` and the provider from its dedicated OAuth entry point. Provider configuration is explicit; mcp-use does not read provider-specific environment variables.
