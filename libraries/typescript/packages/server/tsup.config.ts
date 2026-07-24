@@ -5,6 +5,20 @@ const frameworkPackage = JSON.parse(
   readFileSync(new URL("./package.json", import.meta.url), "utf8")
 ) as { version: string };
 
+const packageVersionDefine = {
+  __MCP_USE_PACKAGE_VERSION__: JSON.stringify(frameworkPackage.version),
+};
+
+function minifyFrameworkOutput(options: {
+  minifySyntax?: boolean;
+  minifyWhitespace?: boolean;
+  minifyIdentifiers?: boolean;
+}): void {
+  options.minifySyntax = true;
+  options.minifyWhitespace = true;
+  options.minifyIdentifiers = false;
+}
+
 export default defineConfig([
   {
     entry: {
@@ -34,6 +48,8 @@ export default defineConfig([
       // commands to the separately installed @mcp-use/cli package.
       bin: "src/bin.ts",
       "node-bridge": "src/node-bridge.ts",
+      "internal/node-http": "src/node-http.ts",
+      "internal/node-http-unavailable": "src/node-http-unavailable.ts",
       "next/index": "src/next/index.ts",
     },
     // ESM-only: the v2 @modelcontextprotocol/* packages ship no CJS entry, so a
@@ -44,14 +60,37 @@ export default defineConfig([
     splitting: true,
     sourcemap: false,
     clean: true,
-    external: ["@mcp-use/client", "@mcp-use/cli"],
-    define: {
-      __MCP_USE_PACKAGE_VERSION__: JSON.stringify(frameworkPackage.version),
+    external: ["@mcp-use/client", "@mcp-use/cli", "#mcp-use-node-http"],
+    define: packageVersionDefine,
+    esbuildOptions: minifyFrameworkOutput,
+  },
+  // Node gets a self-contained root bundle. Inlining Hono and the v2 SDK
+  // removes module-linking overhead from cold process starts, while the
+  // generic root above stays split and free of Node builtins for Workers.
+  {
+    entry: {
+      "index-node": "src/index.ts",
     },
+    format: ["esm"],
+    target: "node22",
+    dts: false,
+    splitting: false,
+    sourcemap: false,
+    clean: false,
+    external: ["@mcp-use/client", "@mcp-use/cli"],
+    noExternal: [
+      "hono",
+      "@modelcontextprotocol/core",
+      "@modelcontextprotocol/server",
+      "zod",
+    ],
+    define: packageVersionDefine,
     esbuildOptions(options) {
-      options.minifySyntax = true;
-      options.minifyWhitespace = true;
-      options.minifyIdentifiers = false;
+      minifyFrameworkOutput(options);
+      options.alias = {
+        ...options.alias,
+        "#mcp-use-node-http": "node:http",
+      };
     },
   },
   // Deprecated v1 bridge. Uses splitting so compat-v1.js stays a thin entry,
@@ -68,7 +107,7 @@ export default defineConfig([
     minify: true,
     sourcemap: false,
     clean: false,
-    external: ["@mcp-use/client", "@mcp-use/cli"],
+    external: ["@mcp-use/client", "@mcp-use/cli", "#mcp-use-node-http"],
   },
   // Browser-only view runtime (`mcp-use/react`). Must not be reachable
   // from the `.` export or `bin` graphs — same invariant as the cli chunk above.
@@ -83,9 +122,7 @@ export default defineConfig([
     splitting: false,
     sourcemap: false,
     clean: false,
-    define: {
-      __MCP_USE_PACKAGE_VERSION__: JSON.stringify(frameworkPackage.version),
-    },
+    define: packageVersionDefine,
     external: [
       "react",
       "react-dom",

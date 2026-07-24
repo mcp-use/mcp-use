@@ -16,6 +16,7 @@ import {
   type ServerContext,
   type StandardSchemaWithJSON,
 } from "@modelcontextprotocol/server";
+import { createServer as createNodeHttpServer } from "#mcp-use-node-http";
 import type { Server as NodeHttpServer } from "node:http";
 import { Hono, type Env, type MiddlewareHandler } from "hono";
 
@@ -28,6 +29,7 @@ import {
 } from "./branding.js";
 import { assertServerConfig, type ServerConfig } from "./config.js";
 import { resolveListenHost, resolveListenPort } from "./listen-address.js";
+import { toNodeHandler } from "./node-bridge.js";
 import {
   toAuthenticatedRequestContext,
   toRequestContext,
@@ -104,7 +106,7 @@ import type {
   ToolViewConfig,
 } from "./tools.js";
 import { resolveToolInputSchema } from "./tools.js";
-import { recordUsage } from "./usage.js";
+import { isUsageDisabled, recordUsage } from "./usage.js";
 import { supportsViews } from "./views/capabilities.js";
 import type { ViewResourceFacts } from "./views/types.js";
 import {
@@ -950,8 +952,6 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     options: ListenOptions = {}
   ): Promise<{ port: number; url: string }> {
     this.#assertOpen("listen()");
-    const { createServer } = await import("node:http");
-    const { toNodeHandler } = await import("./node-bridge.js");
     const host = resolveListenHost(options.host, this.#config.host);
     const requestedPort = resolveListenPort(port, this.#config.port);
     this.#assertListenOAuthConfiguration(host);
@@ -988,7 +988,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       const nodeHandler = toNodeHandler({
         fetch: async (request) => (await fetchReady)(request),
       });
-      const server = createServer((req, res) => {
+      const server = createNodeHttpServer((req, res) => {
         void nodeHandler(req, res);
       }) as NodeHttpListener;
 
@@ -1553,7 +1553,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     }
   }
 
-  /** Build a fresh SDK server from the registry (runs once per request). */
+  /** Build a fully registered SDK server from the immutable registry. */
   #buildSdkServer(ctx: McpRequestContext): SdkMcpServer {
     const { name, version, title, description, instructions } = this.#config;
     const authInfo = ctx.authInfo;
@@ -1643,6 +1643,28 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     ctx: MiddlewareContext<M, TEnv>,
     innerFn: () => Promise<McpMiddlewareResult<M>>
   ): Promise<McpMiddlewareResult<M>> {
+    // The upstream SDK validates every tools/call result against
+    // CallToolResultSchema before it reaches the transport. When there are no
+    // middleware entries or observers, running the middleware pipeline would
+    // only repeat that full schema parse.
+    const runOperation =
+      method === "tools/call" &&
+      this.#mcpMiddlewares.length === 0 &&
+      this.#mcpEventListeners.length === 0
+        ? innerFn
+        : () =>
+            runMcpOperation(
+              this.#mcpMiddlewares,
+              this.#mcpEventListeners,
+              method,
+              ctx,
+              innerFn
+            );
+
+    if (isUsageDisabled()) {
+      return runOperation();
+    }
+
     const startedAt = performance.now();
     const matchedMiddleware = this.#mcpMiddlewares.filter((entry) =>
       matchesPattern(entry.pattern, method)
@@ -1682,13 +1704,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         }
       );
     };
-    return runMcpOperation(
-      this.#mcpMiddlewares,
-      this.#mcpEventListeners,
-      method,
-      ctx,
-      innerFn
-    ).then(
+    return runOperation().then(
       (result) => {
         const outcome = isInputRequiredResult(result)
           ? "input_required"

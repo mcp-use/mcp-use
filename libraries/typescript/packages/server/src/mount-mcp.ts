@@ -6,6 +6,7 @@ import {
   type McpServerFactory,
 } from "@modelcontextprotocol/server";
 
+import { trackBufferedResponse } from "./buffered-response.js";
 import { getRequestBag, matchesPath, type FetchHandler } from "./fetch-app.js";
 import {
   extractClientCapabilitiesFromBody,
@@ -102,10 +103,20 @@ export function createMcpMount(
     }
 
     const authInfo = getAuthInfo?.(request) ?? bag.authInfo;
-    return handler.fetch(request, {
+    const response = await handler.fetch(request, {
       ...(parsedBody !== undefined && { parsedBody }),
       ...(authInfo !== undefined && { authInfo }),
     });
+    // The SDK currently constructs JSON replies with Response.json(), so these
+    // bodies are fully buffered. Record that contract at the SDK boundary
+    // instead of inferring it later from a content type that custom handlers
+    // may also use for genuinely streaming JSON.
+    return response.headers
+      .get("content-type")
+      ?.toLowerCase()
+      .includes("application/json")
+      ? trackBufferedResponse(request, response)
+      : response;
   };
 
   return { handler, fetch };

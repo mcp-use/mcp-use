@@ -103,3 +103,6 @@ allowBuilds:
   # sharp dependency must not run a native build in CI.
   sharp: false
   unrs-resolver: true
+
+patchedDependencies:
+  "@modelcontextprotocol/server@2.0.0-beta.5": patches/@modelcontextprotocol__server@2.0.0-beta.5.patch

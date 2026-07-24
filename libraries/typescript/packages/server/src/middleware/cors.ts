@@ -1,3 +1,4 @@
+import { inheritBufferedResponse } from "../buffered-response.js";
 import type { CorsOptions } from "../config.js";
 import type { FetchMiddleware } from "../fetch-app.js";
 
@@ -72,11 +73,14 @@ function mergeCorsHeaders(response: Response, headers: HeadersInit): Response {
   corsHeaders.forEach((value, key) => {
     merged.set(key, value);
   });
-  return new Response(response.body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers: merged,
-  });
+  return inheritBufferedResponse(
+    response,
+    new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: merged,
+    })
+  );
 }
 
 /**

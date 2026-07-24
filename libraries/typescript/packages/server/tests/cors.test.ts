@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import {
+  isBufferedResponse,
+  markBufferedResponse,
+} from "../src/buffered-response.js";
 import { composeFetch } from "../src/fetch-app.js";
 import { corsFetchMiddleware } from "../src/middleware/cors.js";
 
@@ -45,6 +49,22 @@ describe("corsFetchMiddleware", () => {
     expect(response.headers.get("Access-Control-Allow-Origin")).toBe(
       "https://app.example.com"
     );
+  });
+
+  it("preserves the buffered marker across its header-only wrapper", async () => {
+    const fetch = composeFetch(
+      async () => markBufferedResponse(Response.json({ ok: true })),
+      corsFetchMiddleware({ origin: "https://app.example.com" })
+    );
+
+    const response = await fetch(
+      new Request("http://localhost/mcp", {
+        method: "POST",
+        headers: { Origin: "https://app.example.com" },
+      })
+    );
+
+    expect(isBufferedResponse(response)).toBe(true);
   });
 
   it("does not override responses that already set ACAO", async () => {

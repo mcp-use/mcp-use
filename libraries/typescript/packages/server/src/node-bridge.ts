@@ -2,12 +2,15 @@
  * Vendored from `@modelcontextprotocol/node` `toNodeHandler.ts` (SDK 2.0.0-beta.4).
  * ponytail: track upstream SSE/backpressure fixes when bumping `@modelcontextprotocol/server`.
  *
- * @internal Lazy-imported from `listen()` and `mcp-use dev` only.
+ * @internal Bundled into the Node root; remains free of runtime Node imports
+ * so the generic edge graph can reuse the response adapter safely.
  */
 import type {
   AuthInfo,
   McpHandlerRequestOptions,
 } from "@modelcontextprotocol/server";
+
+import { isBufferedResponse } from "./buffered-response.js";
 
 /** Minimal duck-typed shape of a Node.js `IncomingMessage`. */
 export interface NodeIncomingMessageLike extends AsyncIterable<
@@ -74,9 +77,10 @@ export function toNodeHandler(
       abort.abort();
     }
 
+    let request: Request | undefined;
     let response: Response;
     try {
-      const request = await toWebRequest(req, parsedBody, {
+      request = await toWebRequest(req, parsedBody, {
         signal: abort.signal,
       });
       response = await handler.fetch(request, {
@@ -102,6 +106,23 @@ export function toNodeHandler(
     if (response.body === null) {
       finished = true;
       res.end();
+      return;
+    }
+
+    // Framework-owned SDK replies carry an explicit buffered-body marker.
+    // Avoid the async iterator overhead for those known single-buffer bodies;
+    // arbitrary application/json responses remain on the streaming path.
+    if (isBufferedResponse(response, request)) {
+      try {
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        finished = true;
+        res.end(bytes);
+      } catch {
+        // Match the streaming path below: an aborted upstream body closes the
+        // Node response without turning it into an unhandled rejection.
+        finished = true;
+        res.end();
+      }
       return;
     }
 

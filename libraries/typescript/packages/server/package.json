@@ -20,9 +20,20 @@
     "server",
     "typescript"
   ],
+  "imports": {
+    "#mcp-use-node-http": {
+      "workerd": "./dist/internal/node-http-unavailable.js",
+      "browser": "./dist/internal/node-http-unavailable.js",
+      "node": "./dist/internal/node-http.js",
+      "default": "./dist/internal/node-http-unavailable.js"
+    }
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "workerd": "./dist/index.js",
+      "browser": "./dist/index.js",
+      "node": "./dist/index-node.js",
       "import": "./dist/index.js"
     },
     "./server": {
