@@ -26,6 +26,7 @@ import {
   toMcpServerConfig,
   type EditableConnectionConfig,
 } from "@/client/utils/connectionUpdates";
+import { isInspectorSamplingAvailable } from "@/client/utils/samplingProtocol";
 import { getServerDisplayName } from "@/client/utils/servers";
 import { useMcpClient, type McpServer } from "@mcp-use/client/react";
 import {
@@ -262,6 +263,21 @@ export function Layout({ children }: LayoutProps) {
     [setActiveTab, navigate, location.search]
   );
 
+  // A bookmarked sampling URL can be restored before protocol negotiation
+  // finishes. Once a modern connection is known, move to a supported tab.
+  useEffect(() => {
+    const selectedServer = connections.find(
+      (connection) => connection.id === selectedServerId
+    );
+    if (
+      activeTab === "sampling" &&
+      selectedServer &&
+      !isInspectorSamplingAvailable(selectedServer)
+    ) {
+      handleTabChange("tools");
+    }
+  }, [activeTab, connections, selectedServerId, handleTabChange]);
+
   // Listen for custom navigation events from toast (for sampling and elicitation requests)
   useEffect(() => {
     const handleNavigateToSampling = (event: globalThis.Event) => {
@@ -270,8 +286,16 @@ export function Layout({ children }: LayoutProps) {
       }>;
       const requestId = customEvent.detail.requestId;
 
-      // Switch to sampling tab and auto-select the request
-      if (selectedServerId) {
+      const selectedServer = connections.find(
+        (connection) => connection.id === selectedServerId
+      );
+
+      // Modern connections neither advertise nor expose legacy sampling.
+      if (
+        selectedServerId &&
+        selectedServer &&
+        isInspectorSamplingAvailable(selectedServer)
+      ) {
         navigateToItem(selectedServerId, "sampling", requestId);
       }
     };
@@ -327,7 +351,7 @@ export function Layout({ children }: LayoutProps) {
         handleNavigateToToolResult
       );
     };
-  }, [selectedServerId, handleTabChange, navigateToItem]);
+  }, [selectedServerId, connections, handleTabChange, navigateToItem]);
 
   // Refs for search inputs in tabs
   const toolsSearchRef = useRef<{

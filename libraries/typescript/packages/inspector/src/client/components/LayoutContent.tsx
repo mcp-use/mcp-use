@@ -12,6 +12,7 @@ import { ServerMetadataTab } from "@/client/components/ServerMetadataTab";
 import { ToolsTab } from "@/client/components/ToolsTab";
 import { useInspector } from "@/client/context/InspectorContext";
 import type { TabType } from "@/client/context/InspectorContext";
+import { isInspectorSamplingAvailable } from "@/client/utils/samplingProtocol";
 import { isLocalhostServerUrl } from "@/client/utils/servers";
 import {
   buildManagedAuthHeaders,
@@ -179,6 +180,9 @@ export function LayoutContent({
 
   // Helper to check if a tab should be rendered
   const isTabVisible = (tab: TabType): boolean => {
+    if (tab === "sampling" && !isInspectorSamplingAvailable(selectedServer)) {
+      return false;
+    }
     if (!embeddedConfig.visibleTabs) return true;
     return embeddedConfig.visibleTabs.includes(tab);
   };

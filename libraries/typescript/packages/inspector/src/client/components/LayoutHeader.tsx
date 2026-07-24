@@ -9,6 +9,10 @@ import {
   isLocalhostServerUrl,
 } from "@/client/utils/servers";
 import { getBasePath } from "@/client/utils/basePath";
+import {
+  isInspectorSamplingAvailable,
+  STATELESS_SAMPLING_UNSUPPORTED_MESSAGE,
+} from "@/client/utils/samplingProtocol";
 import { ChevronDown, Plus } from "lucide-react";
 import type { McpServer } from "@mcp-use/client/react";
 import { useState } from "react";
@@ -290,15 +294,23 @@ export function LayoutHeader({
                   .filter((tab) => tab.id !== "separator")
                   .map((tab) => {
                     const count = getTabCount(tab.id, selectedServer);
+                    const isDisabled =
+                      tab.id === "sampling" &&
+                      !isInspectorSamplingAvailable(selectedServer);
 
-                    return (
+                    const trigger = (
                       <TabsTrigger
-                        key={tab.id}
                         value={tab.id}
+                        disabled={isDisabled}
+                        disabledTooltip={
+                          isDisabled
+                            ? STATELESS_SAMPLING_UNSUPPORTED_MESSAGE
+                            : undefined
+                        }
                         data-testid={`tab-${tab.id}`}
                         icon={tab.icon}
                         iconOnly
-                        title={tab.label}
+                        title={isDisabled ? undefined : tab.label}
                         badge={
                           count > 0 ? (
                             <TabCountBadge
@@ -312,6 +324,12 @@ export function LayoutHeader({
                       >
                         <span className="sr-only">{tab.label}</span>
                       </TabsTrigger>
+                    );
+
+                    return (
+                      <span key={tab.id} className="contents">
+                        {trigger}
+                      </span>
                     );
                   })}
               </TabsList>

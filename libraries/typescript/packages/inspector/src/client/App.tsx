@@ -20,6 +20,7 @@ import {
   getDefaultInspectorProxyAddress,
   InspectorConnectionStorageProvider,
 } from "./utils/connectionUpdates";
+import { wrapTransportForLegacySampling } from "./utils/samplingProtocol";
 
 /**
  * Syncs the active tab from InspectorContext into a ref readable by
@@ -135,6 +136,7 @@ function App() {
             defaultServerConfig={{
               preventAutoAuth: true,
               useRedirectFlow: true,
+              wrapTransport: wrapTransportForLegacySampling,
             }}
             clientInfo={{
               name: "mcp-use Inspector",
