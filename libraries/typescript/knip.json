@@ -25,6 +25,7 @@
       ],
       "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"],
       "ignoreBinaries": ["npx"],
+      "ignoreUnresolved": ["#mcp-use-node-http"],
       "ignoreDependencies": ["mcp-use"]
     },
     "packages/agent": {
