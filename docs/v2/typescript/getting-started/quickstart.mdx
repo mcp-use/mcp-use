@@ -1,0 +1,200 @@
+---
+title: "Quickstart"
+description: "Create, run, and deploy your first MCP server with create-mcp-use-app."
+icon: "rocket"
+---
+
+<Visibility for="agents">
+  For the complete documentation index, see
+  [llms.txt](https://mcp-use.com/docs/llms.txt).
+</Visibility>
+
+Use this quickstart to scaffold a working TypeScript MCP server, run it locally, and verify it with the Inspector.
+
+<Note>
+This quickstart covers the **mcp-use Server** SDK.
+
+Building an AI agent or MCP Client instead? Head to the [MCP Agent](/v2/typescript/agent/index) or [MCP Client](/v2/typescript/client/index) introductions instead.
+
+</Note>
+
+## Prerequisites
+
+- **Node.js** 22.22.2+
+- Basic familiarity with React and TypeScript
+
+## Create your server
+
+Scaffold a new project:
+
+```bash
+npx create-mcp-use-app
+```
+
+The CLI asks four questions. The first needs an answer; the rest have a default you accept by pressing Enter.
+
+1. **What is your project name?** Sets the folder name and the server's `name`. Enter `.` to scaffold into the current directory.
+2. **Select a template:** Pick one of the three below with the arrow keys. `mcp-apps` is highlighted by default.
+3. **Install AI coding skills for Cursor, Claude Code, and Codex?** Adds mcp-use skills so your coding agent understands the framework. Defaults to yes.
+4. **Install dependencies?** Installs with the package manager you ran the command with (npm, pnpm, or Bun). Defaults to yes.
+
+| Template             | What you get                                                              |
+| -------------------- | ------------------------------------------------------------------------- |
+| `mcp-apps` (default) | A server plus an example React widget that renders in ChatGPT and Claude. |
+| `mcp-server`         | A server with an example tool and prompt.                                 |
+| `blank`              | A minimal server with no examples.                                        |
+
+To skip the questions, pass the name and template as arguments:
+
+```bash
+npx create-mcp-use-app my-server --template mcp-apps
+```
+
+## Start the dev server
+
+```bash
+cd my-server
+npm run dev
+```
+
+`npm run dev` runs `mcp-use dev`, which:
+
+- serves the MCP endpoint at `http://localhost:3000/mcp`
+- opens the **Inspector** at `http://localhost:3000/mcp/inspector`
+- hot-reloads tools, resources, prompts, and widgets as you edit, with no restart and no dropped connections
+
+Open the Inspector, go to the **Tools** tab, and run a tool to see it respond. With the `mcp-apps` template, calling `search-tools` renders the widget inline.
+
+You can also test the running server from the terminal with the `mcp-use client` CLI. This is the quickest path for scripts and coding agents, which can't drive the Inspector's UI:
+
+```bash
+npx mcp-use client connect local http://localhost:3000/mcp
+npx mcp-use client local tools list
+```
+
+The first command saves the server under the name `local`; later commands address it by that name. See the [CLI client](/v2/typescript/tooling/client-cli) reference for the full command set.
+
+## Explore the project
+
+```
+my-server/
+├── resources/                  # React widgets, auto-discovered
+│   └── greeting-card/
+│       └── widget.tsx
+├── public/                     # Static assets (icons, images)
+├── index.ts                    # Server entry: tools, resources, prompts
+├── mcp-env.d.ts                # Managed server-to-widget typing bridge
+├── package.json
+└── tsconfig.json
+```
+
+`index.ts` is where you register your tools, resources, and prompts. Each folder under `resources/` is a widget; its folder name matches the `widget.name` a tool references.
+
+## Add a tool
+
+Open `index.ts` and add a tool to the existing `server`. `text`, `widget`, and `z` are already imported at the top of the file:
+
+```typescript
+export const greetingCard = server.tool(
+  {
+    name: "greeting-card",
+    description: "Create a greeting card for someone",
+    schema: z.object({
+      name: z.string().describe("Who to greet"),
+      message: z.string().describe("The message inside the card"),
+    }),
+    widget: {
+      name: "greeting-card",
+      invoking: "Designing the card...",
+      invoked: "Card ready",
+    },
+  },
+  async ({ name, message }) =>
+    widget({
+      props: { name, message },
+      output: text(`Made a card for ${name}`),
+    }),
+);
+```
+
+Keep statically declared tools in exported constants. The generated `mcp-env.d.ts` uses those exported tool refs to type calls from your widget, so TypeScript will flag a `useCallTool("greeting-card")` call when its matching ref is not exported.
+
+Run `npm run typecheck` after editing tools or widgets. The scaffolded script refreshes `mcp-env.d.ts` for the server entry, then runs the project's own TypeScript compiler with `--noEmit`.
+
+Instead of returning plain text, this tool returns a widget. `widget.name` (`greeting-card`) points at a folder under `resources/`, and `widget({ props })` passes that data to the widget's `useWidget().props`. The widget doesn't exist yet, so build it next.
+
+## Add a widget
+
+Create `resources/greeting-card/widget.tsx`. The folder name must match the tool's `widget.name`:
+
+```tsx
+import { McpUseProvider, useWidget } from "mcp-use/react";
+
+interface GreetingCardProps {
+  name: string;
+  message: string;
+}
+
+export default function GreetingCard() {
+  const { props } = useWidget<GreetingCardProps>();
+
+  return (
+    <McpUseProvider autoSize>
+      <div style={{ padding: "2rem", textAlign: "center" }}>
+        <h2>Hello, {props.name}!</h2>
+        <p>{props.message}</p>
+      </div>
+    </McpUseProvider>
+  );
+}
+```
+
+Save the file. The dev server discovers the new widget and hot-reloads, so reload the **Tools** tab in the Inspector and call `greeting-card` with `{ name: "Ada", message: "Welcome aboard!" }`. The card renders inline.
+
+<Tip>
+  See [Tools](/v2/typescript/server/tools),
+  [Resources](/v2/typescript/server/resources), and
+  [Prompts](/v2/typescript/server/prompts) for the full API, and [MCP
+  Apps](/v2/typescript/mcp-apps) to build widgets.
+</Tip>
+
+## Deploy to Manufact Cloud
+
+When you're ready to share your server, deploy it with one command:
+
+```bash
+npm run deploy
+```
+
+This runs `mcp-use deploy`, which builds your server and deploys it to [Manufact Cloud](https://manufact.com) with a public MCP URL, logs, and metrics. The first run walks you through logging in and connecting your project.
+
+<Card
+  title="Deployment guide"
+  icon="rocket"
+  href="/v2/typescript/server/deployment/mcp-use"
+  horizontal
+>
+  GitHub connection, environment variables, regions, and redeploys.
+</Card>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="MCP Server" icon="server" href="/v2/typescript/server">
+    Tools, resources, prompts, and server configuration.
+  </Card>
+  <Card title="MCP Apps" icon="app-window-mac" href="/v2/typescript/mcp-apps">
+    Build interactive widgets for ChatGPT and Claude.
+  </Card>
+  <Card title="Inspector" icon="bug-play" href="/inspector/index">
+    Test and debug your server interactively.
+  </Card>
+  <Card title="MCP 101" icon="brain" href="/home/mcp101">
+    How clients, servers, and the three primitives fit together.
+  </Card>
+</CardGroup>
+
+<Tip>
+  **Need help?** Join our [Discord](https://discord.gg/XkNkSkMz3V) or check out
+  [GitHub](https://github.com/mcp-use/mcp-use).
+</Tip>

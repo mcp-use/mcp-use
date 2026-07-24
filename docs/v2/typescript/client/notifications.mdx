@@ -1,0 +1,58 @@
+---
+title: "Notifications"
+description: "Handle real-time updates from MCP servers"
+icon: "bell"
+---
+
+MCP notifications are one-way JSON-RPC messages (no response).
+
+## Receive (server → client)
+
+Global handler on the client:
+
+```typescript
+import { MCPClient } from "@mcp-use/client";
+
+const client = new MCPClient(
+  { mcpServers: { demo: { url: "http://localhost:3000/mcp" } } },
+  {
+    onNotification: async (notification) => {
+      console.log(notification.method, notification.params);
+    },
+  },
+);
+```
+
+Or per-connection:
+
+```typescript
+const conn = await client.connect("demo");
+
+conn.on("notification", async (notification) => {
+  if (notification.method === "notifications/tools/list_changed") {
+    await conn.listTools();
+  }
+});
+```
+
+Common methods: `notifications/tools/list_changed`, `notifications/resources/list_changed`, `notifications/prompts/list_changed`.
+
+## Send (client → server)
+
+Update roots — the client sends `notifications/roots/list_changed`:
+
+```typescript
+await conn.setRoots([
+  { uri: "file:///home/user/project", name: "Project" },
+]);
+```
+
+Pass initial roots in server config or connector options.
+
+## React
+
+`McpClientProvider` stores notifications on each server (`notifications`, `unreadNotificationCount`). Use `onNotificationReceived` per server for custom handling.
+
+## Reference
+
+Server-side: [Notifications](/v2/typescript/server/notifications)

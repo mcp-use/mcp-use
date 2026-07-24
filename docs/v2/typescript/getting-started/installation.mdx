@@ -1,0 +1,181 @@
+---
+title: "Installation"
+description: "Install mcp_use and get your development environment ready"
+icon: "download"
+---
+
+<Info>
+  **Prerequisites**:
+  - Install [Node.js](https://nodejs.org/) (version 22.22.2 or higher)
+  - npm, pnpm, or Bun package manager
+</Info>
+
+### MCP Servers
+
+The fastest way to scaffold a new MCP server project is to use `create-mcp-use-app`:
+
+<CodeGroup>
+```bash npm
+npx create-mcp-use-app my-mcp-server
+cd my-mcp-server
+npm run dev
+```
+
+```bash pnpm
+pnpm create mcp-use-app my-mcp-server
+cd my-mcp-server
+pnpm dev
+```
+
+```bash bun
+bunx create-mcp-use-app my-mcp-server
+cd my-mcp-server
+bun run dev
+```
+</CodeGroup>
+
+This command will:
+- Create a new directory with your project name
+- Initialize a TypeScript project with mcp-use configured
+- Set up a basic MCP server template with example tools
+- Optionally install all dependencies
+- Optionally install skills for agent support
+
+<Tip>
+Check out [UI Widgets](/v2/typescript/mcp-apps) with support to MCP-UI and OpenAI Apps SDK for ChatGPT.
+</Tip>
+
+### Server Metadata
+
+The generated project includes pre-configured server metadata that is visible in MCP Inspector and MCP clients:
+
+- **Name & Title**: Both set to your project name (customizable in `index.ts`)
+- **Instructions**: Model-facing guidance for cross-tool workflows and server-wide constraints
+- **Icons**: mcp-use branding icons included in `public/` folder
+- **Website URL**: Defaults to https://mcp-use.com (customizable)
+- **Favicon**: Included for browser display
+
+These settings appear in:
+- MCP Inspector UI (server dropdown and "View server info" modal)
+- MCP clients that support server metadata
+- ChatGPT when using your server as an app
+
+**Customizing Server Metadata:**
+
+Open `index.ts` in your project to customize:
+
+```typescript
+const server = new MCPServer({
+  name: 'my-project',          // Set by create-mcp-use-app
+  title: 'My Custom Title',    // display name - shown in clients
+  version: '1.0.0',
+  description: 'My awesome server',
+  instructions: 'Use lookup tools before write tools; ask for confirmation before changes.',
+  websiteUrl: 'https://my-site.com',  // Your website or docs
+  favicon: 'favicon.ico',      // Already in public/ folder
+  icons: [
+    {
+      src: 'my-icon.svg',      // Add custom icon to public/ folder
+      mimeType: 'image/svg+xml',
+      sizes: ['512x512']
+    }
+  ]
+})
+```
+
+**Note:** Icon paths (like `icon.svg`) are automatically converted to absolute URLs (e.g., `http://localhost:3000/mcp-use/public/icon.svg`) when `baseUrl` is configured.
+
+---
+
+You can also install mcp-use as a library and build your own MCP server from scratch.
+<CodeGroup>
+```bash npm
+npm install mcp-use
+```
+
+```bash pnpm
+pnpm add mcp-use
+```
+
+```bash bun
+bun add mcp-use
+```
+</CodeGroup>
+
+```typescript
+import { MCPServer } from "mcp-use/server";
+import { z } from "zod";
+
+const server = new MCPServer({
+  name: "my-server",
+  title: "My Server", // display name
+  version: "1.0.0",
+  description: "My custom MCP server",
+  websiteUrl: "https://mcp-use.com",
+  favicon: "favicon.ico",
+  icons: [
+    {
+      src: "icon.svg",
+      mimeType: "image/svg+xml",
+      sizes: ["512x512"]
+    }
+  ]
+});
+
+// Define a tool
+server.tool({
+  name: "get_weather",
+  description: "Get weather for a city",
+  schema: z.object({
+    city: z.string().describe("City name"),
+  }),
+}, async ({ city }) => {
+  return { temperature: 72, condition: "sunny", city };
+});
+
+// Start the MCP server
+server.listen(3000);
+```
+
+For the local Inspector, run `mcp-use dev`; to mount it on a production build
+for internal testing, use `mcp-use start --with-inspector`.
+
+Check out the examples [here](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server).
+
+Visit the [MCP Server](/v2/typescript/server) documentation for more details.
+
+### MCP Agent & Client
+
+Install mcp_use using your preferred package manager:
+
+<CodeGroup>
+```bash npm
+npm install mcp-use
+```
+
+```bash pnpm
+pnpm add mcp-use
+```
+
+```bash bun
+bun add mcp-use
+```
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Agent" icon="brain" href="/v2/typescript/agent">
+    Build AI Agents with tool calling capabilities through MCP connections
+  </Card>
+  <Card title="Client" icon="router" href="/v2/typescript/client">
+    A full featured MCP Client implementation for TypeScript
+  </Card>
+  <Card title="Server" icon="server" href="/v2/typescript/server">
+    The MCP Server framework implementation for TypeScript, with Apps SDK and MCP-UI support
+  </Card>
+</CardGroup>
+
+<Tip>
+**Need Help?** Join our [Discord](https://discord.gg/XkNkSkMz3V) or [Github](https://github.com/mcp-use/mcp-use) communities.
+</Tip>

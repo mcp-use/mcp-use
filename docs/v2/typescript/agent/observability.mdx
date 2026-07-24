@@ -1,0 +1,126 @@
+---
+title: "Observability"
+description: "Trace MCPAgent runs with Langfuse or custom LangChain callbacks."
+icon: "eye"
+---
+
+`MCPAgent` can attach LangChain callbacks to each run. Use observability to inspect prompts, model calls, tool calls, errors, latency, metadata, and tags.
+
+Observability is enabled by default. If no supported callback integration is configured, the agent runs normally without traces.
+
+## Enable Langfuse
+
+Set Langfuse credentials before the agent initializes. mcp-use auto-detects them and installs the Langfuse callback handler.
+
+```bash
+export LANGFUSE_PUBLIC_KEY="pk-lf-..."
+export LANGFUSE_SECRET_KEY="sk-lf-..."
+# Optional:
+export LANGFUSE_HOST="https://cloud.langfuse.com"
+```
+
+```typescript
+import { MCPAgent } from "@mcp-use/agent";
+import { MCPClient } from "@mcp-use/client";
+import { ChatOpenAI } from "@langchain/openai";
+
+const client = new MCPClient({
+  mcpServers: {
+    filesystem: {
+      command: "npx",
+      args: [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/path/to/allowed/files",
+      ],
+    },
+  },
+});
+
+const agent = new MCPAgent({
+  llm: new ChatOpenAI({ model: "gpt-4o" }),
+  client,
+  maxSteps: 30,
+});
+
+const result = await agent.run({
+  prompt: "Analyze the sales data",
+});
+
+console.log(result);
+await agent.flush();
+await agent.close();
+```
+
+Call `flush()` before a serverless function exits so buffered traces have time to send.
+
+## Add metadata and tags
+
+Use metadata for trace attributes and tags for filtering. Metadata keys are sanitized, object values must be serializable, and large serialized values are truncated.
+
+```typescript
+import { MCPAgent } from "@mcp-use/agent";
+import { MCPClient } from "@mcp-use/client";
+
+const agent = new MCPAgent({
+  llm,
+  client,
+  maxSteps: 30,
+});
+
+agent.setMetadata({
+  agent_id: "customer-support-agent-01",
+  version: "v2.0.0",
+  environment: "production",
+  customer_id: "cust_12345",
+});
+
+agent.setTags(["customer-support", "high-priority", "beta-feature"]);
+
+const result = await agent.run({
+  prompt: "Process customer request",
+});
+```
+
+## Use custom callbacks
+
+Pass custom LangChain callbacks when you want to use your own Langfuse handler or another tracing platform. Custom callbacks replace auto-detected callbacks for the agent.
+
+```typescript
+import { CallbackHandler } from "langfuse-langchain";
+import { MCPAgent } from "@mcp-use/agent";
+
+const customHandler = new CallbackHandler({
+  publicKey: "pk-lf-custom",
+  secretKey: "sk-lf-custom",
+  baseUrl: "https://custom-langfuse.com",
+});
+
+const agent = new MCPAgent({
+  llm,
+  client,
+  callbacks: [customHandler],
+});
+```
+
+## Disable observability
+
+Set `observe: false` when you do not want the agent to look for observability integrations.
+
+```typescript
+const agent = new MCPAgent({
+  llm,
+  client,
+  observe: false,
+});
+```
+
+You can also disable Langfuse auto-detection with `MCP_USE_LANGFUSE=false`.
+
+## What traces include
+
+Configured callbacks receive the LangChain run tree for agent execution. Depending on the callback platform, traces can include model calls, streamed chunks, tool calls, tool inputs and outputs, errors, timing, metadata, tags, and conversation flow.
+
+## Next steps
+
+- [MCPAgent API Reference](/v2/typescript/api-reference/agent/mcp-agent)

@@ -1,0 +1,176 @@
+---
+title: "Resources"
+description: "Expose readable data and content from a TypeScript MCP server with static resources and resource templates."
+icon: "folder-open"
+---
+
+Resources expose content that clients can discover and read by URI. Use a resource when the client should inspect data without invoking an action-oriented workflow.
+
+This guide focuses on when and how to register resources. Use the [Resources API reference](/v2/typescript/api-reference/server/resources) for exact definition fields, callback signatures, MIME behavior, annotations, and return types.
+
+## Choose static resources or templates
+
+Use a static resource for one known URI. Use a resource template when the URI contains a variable segment.
+
+| Need | Use |
+| --- | --- |
+| Current app settings, service status, latest report | `server.resource()` |
+| Files by path, users by ID, records by key | `server.resourceTemplate()` |
+| Interactive UI rendered in a client | [MCP Apps](/v2/typescript/mcp-apps) |
+| An operation that changes state or calls a workflow | [Tools](/v2/typescript/server/tools) |
+
+Resources are best for readable content. If the model should decide to perform work, use a tool instead.
+
+## Register a static resource
+
+Register a static resource when the URI is fixed and the callback can return the current content for that URI.
+
+```typescript
+import { MCPServer, object } from "mcp-use/server";
+
+const server = new MCPServer({
+  name: "inventory-server",
+  version: "1.0.0",
+});
+
+server.resource(
+  {
+    name: "inventory_summary",
+    uri: "inventory://summary",
+    title: "Inventory Summary",
+    description: "Current warehouse inventory totals.",
+  },
+  async () =>
+    object({
+      warehouses: 3,
+      products: 1284,
+      lowStockItems: 17,
+    }),
+);
+```
+
+Use stable URI schemes that describe your domain, such as `inventory://`, `docs://`, or `app://`. Keep the URI meaningful enough that a client can display it without extra context.
+
+## Register a resource template
+
+Register a resource template when clients should read many related resources through one URI pattern.
+
+```typescript
+import { text } from "mcp-use/server";
+
+server.resourceTemplate(
+  {
+    name: "customer_profile",
+    uriTemplate: "customer://{customerId}/profile",
+    title: "Customer Profile",
+    description: "Customer profile by customer ID.",
+  },
+  async (_uri, { customerId }) => {
+    const customer = await customers.get(customerId);
+    return text(`Customer: ${customer.name}\nPlan: ${customer.plan}`);
+  },
+);
+```
+
+Template parameters are extracted from the URI and passed to the callback. Keep parameter names descriptive, because clients may expose them in autocomplete or resource pickers.
+
+## Add autocomplete for template parameters
+
+Use completion callbacks when a client can help users choose valid URI values.
+
+```typescript
+import { text } from "mcp-use/server";
+
+server.resourceTemplate(
+  {
+    name: "project_docs",
+    uriTemplate: "docs://{projectId}/{topic}",
+    title: "Project Documentation",
+    description: "Documentation page by project and topic.",
+    callbacks: {
+      complete: {
+        projectId: async (value) => {
+          const projects = await searchProjects(value);
+          return projects.map((project) => project.id);
+        },
+        topic: ["overview", "setup", "api"],
+      },
+    },
+  },
+  async (_uri, { projectId, topic }) => {
+    const page = await docs.read(projectId, topic);
+    return text(page);
+  },
+);
+```
+
+Use list-based completion for small fixed sets. Use callback-based completion when suggestions depend on live data or another argument.
+
+## Return content with helpers
+
+Use response helpers to return resource content. They set the MCP-compatible content shape and MIME metadata for common cases.
+
+```typescript
+import { image, markdown, mix, object } from "mcp-use/server";
+
+server.resource(
+  {
+    name: "latest_report",
+    uri: "reports://latest",
+    title: "Latest Report",
+    description: "The latest generated business report.",
+  },
+  async () => {
+    const report = await reports.latest();
+    const chartPng = await charts.render(report);
+
+    return mix(
+      markdown(report.summaryMarkdown),
+      object({ metrics: report.metrics }),
+      image(chartPng, "image/png"),
+    );
+  },
+);
+```
+
+See [Response Helpers](/v2/typescript/server/response-helpers) for a chooser and [Response helpers API reference](/v2/typescript/api-reference/server/response-helpers) for exact MIME and return behavior.
+
+## Notify clients when resources change
+
+When a resource changes after clients have listed or subscribed to resources, notify clients so they can refresh.
+
+```typescript
+await server.sendResourcesListChanged();
+await server.notifyResourceUpdated("inventory://summary");
+```
+
+Use `sendResourcesListChanged()` when the set of available resources changes. Use `notifyResourceUpdated(uri)` when content at an existing URI changes and subscribers should read it again.
+
+See [Resource Subscriptions](/v2/typescript/server/subscriptions) and [Notifications](/v2/typescript/server/notifications) for update workflows.
+
+## Test resources locally
+
+Run the development server and inspect resources in the Inspector.
+
+```bash
+npm run dev
+```
+
+Open `http://localhost:3000/mcp/inspector`, select the Resources tab, read each resource, and test both successful reads and not-found cases.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Resources API reference" icon="terminal" href="/v2/typescript/api-reference/server/resources">
+    Look up resource definitions, callback signatures, template types, and annotations.
+  </Card>
+  <Card title="Response Helpers" icon="drill" href="/v2/typescript/server/response-helpers">
+    Choose helpers for text, JSON, Markdown, media, and mixed content.
+  </Card>
+  <Card title="Resource Subscriptions" icon="rss" href="/v2/typescript/server/subscriptions">
+    Notify subscribed clients when resource content changes.
+  </Card>
+  <Card title="Tools" icon="wrench" href="/v2/typescript/server/tools">
+    Use tools for actions, lookups, mutations, and workflows.
+  </Card>
+</CardGroup>

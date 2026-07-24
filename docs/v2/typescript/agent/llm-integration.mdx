@@ -1,0 +1,140 @@
+---
+title: "LLM integration"
+description: "Connect MCPAgent to OpenAI, Anthropic, Google, Groq, or a custom LangChain chat model."
+icon: "brain-circuit"
+---
+
+`MCPAgent` runs through LangChain chat models. You can either pass a `"provider/model"` string and let the agent create the model, or pass an existing LangChain chat model instance.
+
+The model must support tool calling. Structured output and streaming are optional, but they are required for the corresponding `MCPAgent` features to work well.
+
+## Use simplified mode
+
+Simplified mode supports `openai`, `anthropic`, `google`, and `groq` provider strings. Install the matching LangChain package and set the provider API key in the environment.
+
+| Provider string   | Package                   | API key                                            |
+| ----------------- | ------------------------- | -------------------------------------------------- |
+| `openai/model`    | `@langchain/openai`       | `OPENAI_API_KEY`                                   |
+| `anthropic/model` | `@langchain/anthropic`    | `ANTHROPIC_API_KEY`                                |
+| `google/model`    | `@langchain/google-genai` | `GOOGLE_API_KEY` or `GOOGLE_GENERATIVE_AI_API_KEY` |
+| `groq/model`      | `@langchain/groq`         | `GROQ_API_KEY`                                     |
+
+```typescript
+import { MCPAgent } from "@mcp-use/agent";
+
+const agent = new MCPAgent({
+  llm: "openai/gpt-4o",
+  llmConfig: {
+    temperature: 0.2,
+    maxTokens: 1000,
+  },
+  mcpServers: {
+    filesystem: {
+      command: "npx",
+      args: ["-y", "@modelcontextprotocol/server-filesystem", "./"],
+    },
+  },
+});
+
+const result = await agent.run({
+  prompt: "Summarize the files in this directory.",
+});
+
+console.log(result);
+await agent.close();
+```
+
+Pass `llmConfig.apiKey` when you cannot use environment variables.
+
+```typescript
+const agent = new MCPAgent({
+  llm: "anthropic/claude-sonnet-4-6",
+  llmConfig: {
+    apiKey: process.env.ANTHROPIC_API_KEY,
+    temperature: 0,
+  },
+  mcpServers,
+});
+```
+
+## Use explicit mode
+
+Explicit mode accepts any LangChain-compatible chat model. Use it for custom model setup, provider-specific options, callbacks, or models not supported by simplified mode.
+
+### OpenAI
+
+```typescript
+import { ChatOpenAI } from "@langchain/openai";
+import { MCPAgent } from "@mcp-use/agent";
+import { MCPClient } from "@mcp-use/client";
+
+const client = new MCPClient({ mcpServers });
+const llm = new ChatOpenAI({
+  model: "gpt-4o",
+  temperature: 0.7,
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+const agent = new MCPAgent({ llm, client });
+```
+
+### Anthropic
+
+```typescript
+import { ChatAnthropic } from "@langchain/anthropic";
+import { MCPAgent } from "@mcp-use/agent";
+import { MCPClient } from "@mcp-use/client";
+
+const client = new MCPClient({ mcpServers });
+const llm = new ChatAnthropic({
+  model: "claude-sonnet-4-6",
+  temperature: 0.7,
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
+
+const agent = new MCPAgent({ llm, client });
+```
+
+### Google Gemini
+
+```typescript
+import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { MCPAgent } from "@mcp-use/agent";
+import { MCPClient } from "@mcp-use/client";
+
+const client = new MCPClient({ mcpServers });
+const llm = new ChatGoogleGenerativeAI({
+  model: "gemini-pro",
+  temperature: 0.7,
+  apiKey: process.env.GOOGLE_API_KEY,
+});
+
+const agent = new MCPAgent({ llm, client });
+```
+
+### Groq
+
+```typescript
+import { ChatGroq } from "@langchain/groq";
+import { MCPAgent } from "@mcp-use/agent";
+import { MCPClient } from "@mcp-use/client";
+
+const client = new MCPClient({ mcpServers });
+const llm = new ChatGroq({
+  model: "llama-3.1-70b-versatile",
+  temperature: 0.7,
+  apiKey: process.env.GROQ_API_KEY,
+});
+
+const agent = new MCPAgent({ llm, client });
+```
+
+## Verify provider support
+
+Before wiring a model into a production workflow, run one prompt that requires a tool call. If the model cannot call tools, the agent will not be able to use MCP tools even if the client connection succeeds.
+
+For more providers, use a LangChain chat model that supports tool calling and pass it through explicit mode. See the [LangChain JavaScript chat model integrations](https://js.langchain.com/docs/integrations/chat/).
+
+## Next steps
+
+- [MCPAgent API Reference](/v2/typescript/api-reference/agent/mcp-agent)

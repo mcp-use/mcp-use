@@ -1,0 +1,109 @@
+---
+title: "Structured output"
+description: "Return typed MCPAgent results with Zod schema validation."
+icon: "braces"
+---
+
+Pass a Zod schema to `run`, `stream`, or `streamEvents` when your application needs validated data instead of prose. The method returns the schema's inferred TypeScript type or throws if conversion fails.
+
+## Return a typed object
+
+Define the schema close to the run that needs it. Field descriptions help the LLM gather the right information before the final conversion step.
+
+```typescript
+import { z } from "zod";
+
+const schema = z.object({
+  totalFiles: z.number().describe("Number of files found"),
+  fileTypes: z.array(z.string()).describe("File extensions in the project"),
+  summary: z.string().describe("Short explanation of the project contents"),
+});
+
+const result = await agent.run({
+  prompt: "Analyze the current directory.",
+  schema,
+});
+
+console.log(result.totalFiles);
+```
+
+`result.totalFiles` is typed as `number`, and `result.fileTypes` is typed as `string[]`.
+
+## Use a complete agent example
+
+This example asks an agent to inspect files and return a typed summary.
+
+```typescript
+import { z } from "zod";
+import { MCPAgent } from "@mcp-use/agent";
+
+const ProjectSummary = z.object({
+  packageName: z.string().nullable(),
+  scripts: z.array(z.string()),
+  hasTests: z.boolean(),
+  notes: z.string(),
+});
+
+type ProjectSummary = z.infer<typeof ProjectSummary>;
+
+async function main() {
+  const agent = new MCPAgent({
+    llm: "openai/gpt-4o",
+    mcpServers: {
+      filesystem: {
+        command: "npx",
+        args: ["-y", "@modelcontextprotocol/server-filesystem", "./"],
+      },
+    },
+  });
+
+  try {
+    const summary: ProjectSummary = await agent.run({
+      prompt: "Inspect package.json and summarize the project scripts.",
+      schema: ProjectSummary,
+      maxSteps: 8,
+    });
+
+    console.log(summary);
+  } finally {
+    await agent.close();
+  }
+}
+
+main().catch(console.error);
+```
+
+## How validation works
+
+`run()` and `stream()` convert the final text result to the schema after agent execution completes. The SDK validates with Zod and retries formatting up to three times.
+
+`streamEvents()` adds schema information to the prompt before execution and emits structured-output events after the stream finishes.
+
+## Stream structured output events
+
+Use `streamEvents()` when a UI needs progress events during structured-output conversion.
+
+```typescript
+for await (const event of agent.streamEvents({
+  prompt: "Inspect the project and return a summary.",
+  schema: ProjectSummary,
+})) {
+  if (event.event === "on_structured_output_progress") {
+    console.log(event.data?.message);
+  }
+
+  if (event.event === "on_structured_output") {
+    const summary = ProjectSummary.parse(event.data?.output);
+    console.log(summary);
+  }
+
+  if (event.event === "on_structured_output_error") {
+    throw new Error(String(event.data?.error));
+  }
+}
+```
+
+## Next steps
+
+- [Streaming](/v2/typescript/agent/streaming)
+- [MCPAgent API Reference](/v2/typescript/api-reference/agent/mcp-agent)

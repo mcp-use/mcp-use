@@ -1,0 +1,220 @@
+---
+title: "Prompts"
+description: "Create reusable TypeScript MCP prompt templates with typed arguments and model-ready output."
+icon: "message-square"
+---
+
+Prompts are reusable templates that MCP clients can request and send to a model. Use a prompt when you want to package a repeatable instruction, not when you want the server to perform an action.
+
+This guide focuses on prompt design and common patterns. Use the [Prompts API reference](/v2/typescript/api-reference/server/prompts) for exact `server.prompt()` signatures, callback types, completion overloads, and return shapes.
+
+## Use prompts for reusable model instructions
+
+Use prompts when the client needs a structured instruction with optional arguments. Use tools when the server should run code, call an API, or change state.
+
+| Need | Use |
+| --- | --- |
+| Generate a repeatable model instruction | Prompt |
+| Run server-side logic or call an API | Tool |
+| Expose readable content by URI | Resource |
+| Display interactive UI | [Tool with an MCP App widget](/v2/typescript/mcp-apps) |
+
+A good prompt has a task-shaped name, a clear description, typed arguments, and output that is ready for the model.
+
+## Register a prompt
+
+Define a prompt with `server.prompt()`. The schema describes arguments the client can collect before requesting the prompt.
+
+```typescript
+import { MCPServer, text } from "mcp-use/server";
+import { z } from "zod";
+
+const server = new MCPServer({
+  name: "inventory-server",
+  version: "1.0.0",
+});
+
+server.prompt(
+  {
+    name: "summarize_inventory",
+    description: "Create an inventory summary for a specific audience.",
+    schema: z.object({
+      audience: z.enum(["operations", "finance", "support"]),
+      timeframe: z.string().describe("Reporting period, such as today or Q2"),
+    }),
+  },
+  async ({ audience, timeframe }) =>
+    text(
+      `Summarize inventory changes for ${audience} during ${timeframe}. Include risks, causes, and next actions.`,
+    ),
+);
+```
+
+The server validates prompt arguments before the callback runs. TypeScript infers the callback parameter type from the Zod schema.
+
+## Return prompt content
+
+You can return MCP prompt messages directly or use response helpers. Prefer helpers for simple text or structured context; use direct messages when you need full control over message roles and content blocks.
+
+```typescript
+server.prompt(
+  {
+    name: "review_code",
+    description: "Create a code review prompt for a specific language.",
+    schema: z.object({
+      language: z.string(),
+      code: z.string(),
+    }),
+  },
+  async ({ language, code }) => ({
+    messages: [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text:
+            `You are an expert ${language} developer. Review this code for correctness, security, and maintainability.\n\n` +
+            code,
+        },
+      },
+    ],
+  }),
+);
+```
+
+For simple prompts, response helpers keep the callback shorter:
+
+```typescript
+import { mix, object, text } from "mcp-use/server";
+
+server.prompt(
+  {
+    name: "prepare_release_notes",
+    description: "Draft release notes from a list of changes.",
+    schema: z.object({
+      version: z.string(),
+      changes: z.array(z.string()),
+    }),
+  },
+  async ({ version, changes }) =>
+    mix(
+      text(`Draft release notes for version ${version}.`),
+      object({ changes }),
+    ),
+);
+```
+
+See [Response Helpers](/v2/typescript/server/response-helpers) for a chooser and [Response helpers API reference](/v2/typescript/api-reference/server/response-helpers) for exact conversion behavior.
+
+## Design prompt arguments for clients
+
+Prompt arguments should be easy for a client or user to fill in. Use enums for constrained choices, descriptions for ambiguous fields, and defaults only when the default is safe.
+
+```typescript
+schema: z.object({
+  tone: z.enum(["concise", "technical", "executive"]).default("concise"),
+  audience: z.string().describe("Who will read the generated content"),
+  includeRisks: z.boolean().default(true),
+})
+```
+
+Avoid using prompt arguments as hidden configuration. If the value affects model behavior, make the field name and description visible.
+
+## Add autocomplete for prompt arguments
+
+Use `completable()` when clients can suggest valid values while the user fills in prompt arguments.
+
+```typescript
+import { completable } from "mcp-use/server";
+
+server.prompt(
+  {
+    name: "summarize_project",
+    description: "Summarize a project for a selected team.",
+    schema: z.object({
+      team: completable(z.string(), ["platform", "sales", "support"]),
+      projectId: completable(z.string(), async (value, context) => {
+        const team = context?.arguments?.team as string | undefined;
+        const projects = await searchProjects({ team, query: value });
+        return projects.map((project) => project.id);
+      }),
+    }),
+  },
+  async ({ team, projectId }) =>
+    text(`Summarize project ${projectId} for the ${team} team.`),
+);
+```
+
+Use list-based completion for small fixed sets. Use callback-based completion when suggestions depend on live data or another argument.
+
+## Use authenticated context when needed
+
+When OAuth is configured, prompt callbacks can read verified user information from `ctx.auth`.
+
+```typescript
+import { text } from "mcp-use/server";
+
+server.prompt(
+  {
+    name: "personal_weekly_summary",
+    description: "Create a weekly summary prompt for the authenticated user.",
+  },
+  async (_args, ctx) => {
+    if (!ctx.auth) {
+      throw new Error("Unauthorized");
+    }
+
+    return text(
+      `Create a weekly work summary for user ${ctx.auth.user.userId}. Include open decisions, risks, and follow-ups.`,
+    );
+  },
+);
+```
+
+Use `ctx.auth` only for verified identity from server authentication. Throw when the prompt request should fail instead of returning prompt content. See [User Context](/v2/typescript/server/authentication/user-context) for guide-level patterns and [Tool context API reference](/v2/typescript/api-reference/server/tool-context) for exact context fields.
+
+## Notify clients when prompts change
+
+If your server adds or removes prompts at runtime, notify connected clients so they can refresh their prompt list.
+
+```typescript
+server.prompt(
+  {
+    name: "incident_summary",
+    description: "Create an incident summary from notes.",
+    schema: z.object({ notes: z.string() }),
+  },
+  async ({ notes }) => text(`Summarize this incident:\n\n${notes}`),
+);
+
+await server.sendPromptsListChanged();
+```
+
+See [Notifications](/v2/typescript/server/notifications) for server-to-client notification patterns.
+
+## Test prompts locally
+
+Run the development server and request the prompt from the Inspector.
+
+```bash
+npm run dev
+```
+
+Open `http://localhost:3000/mcp/inspector`, select the Prompts tab, enter argument values, and verify the generated prompt content.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Prompts API reference" icon="terminal" href="/v2/typescript/api-reference/server/prompts">
+    Look up prompt definitions, callback signatures, completion helpers, and return types.
+  </Card>
+  <Card title="Response Helpers" icon="drill" href="/v2/typescript/server/response-helpers">
+    Choose helpers for text, JSON, Markdown, and mixed prompt content.
+  </Card>
+  <Card title="Tools" icon="wrench" href="/v2/typescript/server/tools">
+    Use tools when the server should run code or call external systems.
+  </Card>
+  <Card title="Resources" icon="folder-open" href="/v2/typescript/server/resources">
+    Expose readable content by URI.
+  </Card>
+</CardGroup>

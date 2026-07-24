@@ -1,0 +1,133 @@
+---
+title: "useViewState"
+description: "Share JSON-serializable view state across React components and expose it to the model."
+icon: "database"
+---
+
+`useViewState` stores one model-visible state object for each mounted view. Every component in that view reads and updates the same object.
+
+```tsx
+import { useViewState } from "mcp-use/react";
+
+function Counter() {
+  const [state, setState] = useViewState({ count: 0 });
+
+  return (
+    <button
+      onClick={() =>
+        setState((previous) => ({
+          ...previous,
+          count: previous.count + 1,
+        }))
+      }
+    >
+      Count: {state.count}
+    </button>
+  );
+}
+```
+
+## Signature
+
+```ts
+function useViewState<T extends Record<string, unknown>>(
+  defaultState: T | (() => T),
+): readonly [T, (state: SetStateAction<T>) => void];
+```
+
+## Parameters
+
+<ParamField body="defaultState" type="T | (() => T)" required="True">
+  Initial state object or a lazy initializer. ChatGPT-restored state takes
+  precedence over this value. When multiple components provide defaults, the
+  first initialized default wins.
+</ParamField>
+
+The state must be a JSON-serializable object. Arrays and primitives cannot be the root value. The reserved `_uiContext` key is managed by [`ModelContext`](/v2/typescript/api-reference/react/modelcontext) and cannot appear in developer state.
+
+## Returns
+
+`useViewState` returns a readonly `[state, setState]` tuple.
+
+<ResponseField name="state" type="T">
+  The current shared state for this mounted view. The internal `_uiContext`
+  field is never returned.
+</ResponseField>
+
+<ResponseField name="setState" type="(state: SetStateAction<T>) => void">
+  Replace the object or update it from the latest shared value. The local update
+  is synchronous and optimistic; host delivery continues asynchronously.
+</ResponseField>
+
+## Share state across components
+
+One mounted view owns one state object. Imported child components can call `useViewState` and receive the same value as the root component.
+
+```tsx
+function Toolbar() {
+  const [{ sort }, setState] = useViewState({ sort: "newest" });
+  return (
+    <button onClick={() => setState({ sort: "price" })}>Sort: {sort}</button>
+  );
+}
+
+function ProductView() {
+  const [state] = useViewState({ sort: "newest" });
+  return (
+    <>
+      <Toolbar />
+      <ProductGrid sort={state.sort} />
+    </>
+  );
+}
+```
+
+Separate view instances never share state.
+
+## Host behavior
+
+| Host             | Delivery                                                                                                  | Restoration                                                                                                 |
+| ---------------- | --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| ChatGPT Apps SDK | `window.openai.setWidgetState`, under `modelContent`                                                      | Restored from `window.openai.widgetState.modelContent` and kept current through `openai:set_globals` events |
+| MCP Apps         | `ui/update-model-context` with the object in `structuredContent` and its JSON representation in `content` | Kept for the current iframe lifetime; cross-remount restoration is not available yet                        |
+
+The default object is delivered after the hook mounts, even if `setState` is never called.
+
+## Combine state with ModelContext
+
+`useViewState`, `<ModelContext>`, and `modelContext.set()` share one model-visible snapshot. The serialized context tree is stored under `_uiContext`:
+
+```tsx
+function Dashboard() {
+  const [state] = useViewState({ count: 1 });
+
+  return (
+    <ModelContext content="Dashboard">
+      <ModelContext content="Revenue chart is visible" />
+      <p>{state.count} active report</p>
+    </ModelContext>
+  );
+}
+```
+
+The host receives:
+
+```json
+{
+  "count": 1,
+  "_uiContext": "- Dashboard\n  - Revenue chart is visible"
+}
+```
+
+Every update sends the complete merged snapshot, so state changes preserve UI context and context changes preserve state.
+
+## Errors and delivery failures
+
+`setState` throws when the next object contains `_uiContext` or cannot be serialized with `JSON.stringify`, such as an object containing a circular reference or `bigint`.
+
+Host delivery failures do not roll back the local state. The runtime logs a warning and keeps the latest snapshot ready to retry after the next state or context mutation.
+
+## Related
+
+- Use [`ModelContext`](/v2/typescript/api-reference/react/modelcontext) to describe what the user currently sees.
+- Use React `useState` for ephemeral values the model does not need, such as hover state.

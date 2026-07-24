@@ -1,0 +1,109 @@
+---
+title: "Compose MCP servers"
+description: "Proxy multiple MCP servers through one TypeScript MCP endpoint with server.proxy() and the optional @mcp-use/client package."
+icon: "git-merge"
+---
+
+`server.proxy()` connects to multiple upstream HTTP MCP servers and exposes their tools, static resources, and prompts through one endpoint. Config-map keys and negotiated server names automatically namespace proxied capabilities.
+
+## Install the optional client
+
+Proxying requires `@mcp-use/client` v2. The package is an optional peer of `mcp-use`, so applications that do not call `server.proxy()` do not need to install it.
+
+```bash
+npm install mcp-use @mcp-use/client
+```
+
+If you call `server.proxy()` without the client installed, mcp-use throws an error with the install command. Importing or running a server without calling `proxy()` does not load the client package.
+
+## Proxy multiple servers
+
+Pass an object whose keys identify upstreams and whose values contain HTTP connection settings. The keys automatically become capability namespaces.
+
+```typescript
+import { MCPServer } from "mcp-use";
+
+const server = new MCPServer({
+  name: "gateway",
+  version: "1.0.0",
+});
+
+await server.proxy({
+  weather: {
+    url: "https://weather.example.com/mcp",
+  },
+  internal: {
+    url: "https://internal.example.com/mcp",
+    authToken: process.env.INTERNAL_MCP_TOKEN,
+  },
+});
+
+server.tool({ name: "gateway_status" }, async () => ({
+  content: [{ type: "text", text: "Gateway is running" }],
+}));
+
+await server.listen(3000);
+```
+
+The gateway exposes upstream names with a `<namespace>_` prefix:
+
+| Upstream capability            | Gateway capability  |
+| ------------------------------ | ------------------- |
+| `weather` prompt `forecast`    | `weather_forecast`  |
+| `internal` resource `handbook` | `internal_handbook` |
+
+Static resource URIs use the `mcp-use-proxy` scheme. The gateway maps each proxy URI back to the original upstream URI when a client reads it.
+
+Call `proxy()` before `listen()` or the first `server.fetch` request. Registration is best-effort: a connection failure skips that upstream, an introspection failure skips only the affected capability kind, and a name collision skips only the colliding capability. Each failure is written to the server's diagnostics while other upstreams and capabilities remain available.
+
+Proxy config deliberately supports bearer tokens and explicit authentication headers, but not automatic OAuth. `server.proxy()` disables the client's browser-based OAuth flow, so starting the gateway never opens a browser. Obtain and refresh credentials in your application, then pass them with `authToken` or `headers`.
+
+## Mount an existing connection
+
+Pass a ready `MCPConnection` when your application creates the client itself. The upstream's negotiated server name automatically becomes the namespace.
+
+```typescript
+import { MCPClient } from "@mcp-use/client";
+import { MCPServer } from "mcp-use";
+
+const client = new MCPClient({
+  mcpServers: {
+    secure_database: {
+      url: "https://database.example.com/mcp",
+      authToken: process.env.DATABASE_MCP_TOKEN,
+      oauth: false,
+    },
+  },
+});
+
+const connection = await client.connect("secure_database");
+
+const server = new MCPServer({
+  name: "gateway",
+  version: "1.0.0",
+});
+
+await server.proxy(connection);
+await server.listen(3000);
+```
+
+The parent server owns connections it creates from a config object and closes them in `server.close()`. Your application remains responsible for an explicitly supplied connection:
+
+```typescript
+await server.close();
+await client.close();
+```
+
+## Forwarded behavior
+
+The proxy introspects each upstream once during setup and forwards:
+
+- Tool metadata, input and output JSON Schemas, calls, structured content, error results, cancellation, and progress
+- Static resource metadata and reads
+- Prompt metadata, argument schemas, and prompt requests
+
+The initial v2 implementation does not proxy resource templates, completions, subscriptions, upstream list-change re-synchronization, or legacy push-style sampling and elicitation callbacks.
+
+## Run the complete example
+
+The [multiple-server proxy example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/proxy) starts two local upstream servers and proxies both through one gateway.

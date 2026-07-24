@@ -1,0 +1,138 @@
+---
+title: "Auth0 Provider"
+description: "Configure Auth0 Dynamic Client Registration authentication for a TypeScript MCP server."
+icon: "/images/icons/auth0.svg"
+---
+
+Use the Auth0 provider when Auth0 is your OAuth authorization server. MCP clients register directly with Auth0 through Dynamic Client Registration, and your MCP server verifies Auth0 access tokens on incoming MCP requests.
+
+This guide covers the Auth0 setup path. Use the [auth providers API reference](/v2/typescript/api-reference/server/auth-providers#oauthauth0provider) for exact `oauthAuth0Provider()` options, environment variable fallbacks, defaults, and errors.
+
+## Configure Auth0
+
+In the [Auth0 Dashboard](https://manage.auth0.com), configure the tenant for MCP clients.
+
+1. Go to **Settings > Advanced** and enable **Resource Parameter Compatibility Profile**.
+2. Promote the login connections that MCP clients may use to domain-level connections.
+3. Create an API for your MCP server.
+
+Use the Auth0 CLI to promote a connection when needed:
+
+```bash
+auth0 api get connections
+auth0 api patch connections/YOUR_CONNECTION_ID --data '{"is_domain_connection": true}'
+```
+
+Create an API with an identifier that you will use as the provider audience:
+
+```bash
+auth0 api post resource-servers --data '{
+  "identifier": "https://your-api.example.com",
+  "name": "MCP Tools API",
+  "signing_alg": "RS256",
+  "token_dialect": "rfc9068_profile_authz",
+  "enforce_policies": true,
+  "scopes": [
+    { "value": "read:data", "description": "Read data" }
+  ]
+}'
+```
+
+Use the `rfc9068_profile_authz` token dialect when your tools need Auth0 permissions in access tokens.
+
+## Set environment variables
+
+```bash
+MCP_USE_OAUTH_AUTH0_DOMAIN=your-tenant.auth0.com
+MCP_USE_OAUTH_AUTH0_AUDIENCE=https://your-api.example.com
+```
+
+The domain is your Auth0 tenant domain. The audience must match the API identifier you created.
+
+## Configure the MCP server
+
+```typescript
+import { MCPServer, oauthAuth0Provider } from "mcp-use/server";
+
+const server = new MCPServer({
+  name: "auth0-server",
+  version: "1.0.0",
+  oauth: oauthAuth0Provider(),
+});
+
+await server.listen(3000);
+```
+
+You can pass `domain` and `audience` directly instead of using environment variables:
+
+```typescript
+oauth: oauthAuth0Provider({
+  domain: "your-tenant.auth0.com",
+  audience: "https://your-api.example.com",
+});
+```
+
+## Use Auth0 permissions in tools
+
+Auth0 permissions are available on `ctx.auth.permissions` when they are present in the access token.
+
+```typescript
+import { error, text } from "mcp-use/server";
+import { z } from "zod";
+
+server.tool(
+  {
+    name: "delete_document",
+    description: "Delete a document when the caller has Auth0 permission.",
+    schema: z.object({
+      documentId: z.string(),
+    }),
+  },
+  async ({ documentId }, ctx) => {
+    if (!ctx.auth) {
+      return error("Unauthorized");
+    }
+
+    if (!ctx.auth.permissions.includes("delete:documents")) {
+      return error("Forbidden: delete:documents permission required");
+    }
+
+    await db.documents.delete({ id: documentId });
+    return text("Document deleted.");
+  },
+);
+```
+
+Use [User Context](/v2/typescript/server/authentication/user-context) for broader access-control patterns.
+
+## Verify the setup
+
+Run the server and connect with an OAuth-capable MCP client.
+
+```bash
+npm run dev
+```
+
+Confirm these cases:
+
+- The client discovers your server's OAuth metadata.
+- The client registers with Auth0 and completes login.
+- Authenticated tool calls include `ctx.auth`.
+- Tool calls without a valid bearer token are rejected.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Runnable Auth0 example" icon="github" href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/auth0">
+    Compare your setup with a working mcp-use Auth0 server.
+  </Card>
+  <Card title="Auth0 MCP Authorization Guide" icon="book-open" href="https://auth0.com/ai/docs/mcp/get-started/authorization-for-your-mcp-server">
+    Review Auth0's MCP authorization setup.
+  </Card>
+  <Card title="User Context" icon="user" href="/v2/typescript/server/authentication/user-context">
+    Read Auth0 user and permission data inside tools.
+  </Card>
+  <Card title="Auth0 provider API reference" icon="terminal" href="/v2/typescript/api-reference/server/auth-providers#oauthauth0provider">
+    Look up exact provider options and defaults.
+  </Card>
+</CardGroup>

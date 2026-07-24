@@ -1,0 +1,111 @@
+---
+title: "OAuth"
+description: "Choose and configure OAuth authentication for TypeScript MCP servers."
+icon: "shield-check"
+---
+
+Use OAuth when your MCP server needs to identify the caller, protect MCP transport endpoints, or scope data by user, organization, role, or permission. Configure one OAuth provider on `MCPServer`; mcp-use then attaches authenticated user data to tool context.
+
+This guide helps you choose the right authentication path. Use the [auth providers API reference](/v2/typescript/api-reference/server/auth-providers) for exact provider options, defaults, return shapes, and verification behavior.
+
+## Choose an authentication path
+
+Most MCP servers should use a Dynamic Client Registration provider. Use OAuth Proxy only when the upstream identity provider cannot register MCP clients dynamically.
+
+| Situation | Use |
+| --- | --- |
+| You use Auth0, Better Auth, Clerk, Keycloak, Supabase, or WorkOS | A built-in provider |
+| Your provider advertises a `registration_endpoint` | [Custom Provider](/v2/typescript/server/authentication/providers/custom) |
+| Your provider only gives you one fixed `clientId` and `clientSecret` | [OAuth Proxy](/v2/typescript/server/authentication/providers/oauth-proxy) |
+| You only need local development without identity | No OAuth provider |
+
+With a Dynamic Client Registration provider, clients register directly with the upstream identity provider. Your MCP server exposes discovery metadata and verifies bearer tokens. It does not handle the authorization code or token exchange.
+
+With OAuth Proxy, your MCP server mediates authorization and token exchange because the upstream provider cannot register each MCP client itself.
+
+## Start with a built-in provider
+
+Choose the provider that matches your identity system:
+
+- [Auth0](/v2/typescript/server/authentication/providers/auth0): Auth0 OAuth with Dynamic Client Registration.
+- [Better Auth](/v2/typescript/server/authentication/providers/better-auth): Self-hosted OAuth with Better Auth's OAuth Provider plugin.
+- [Clerk](/v2/typescript/server/authentication/providers/clerk): Clerk OAuth with user and organization claims.
+- [Keycloak](/v2/typescript/server/authentication/providers/keycloak): Keycloak realm authentication with role mapping.
+- [Supabase](/v2/typescript/server/authentication/providers/supabase): Supabase OAuth 2.1 server authentication.
+- [WorkOS](/v2/typescript/server/authentication/providers/workos): WorkOS AuthKit authentication with organization context.
+- [Custom Provider](/v2/typescript/server/authentication/providers/custom): Any DCR-capable OAuth provider with custom token verification.
+
+## Configure the server
+
+Pass the selected provider to `MCPServer`.
+
+```typescript
+import { MCPServer, oauthAuth0Provider } from "mcp-use/server";
+
+const server = new MCPServer({
+  name: "secure-server",
+  version: "1.0.0",
+  oauth: oauthAuth0Provider(),
+});
+
+await server.listen(3000);
+```
+
+Provider pages show the required dashboard steps and environment variables. The API reference owns the full provider option catalog.
+
+## Protect tools with user context
+
+When OAuth is configured and the request is authenticated, tools can read `ctx.auth`.
+
+```typescript
+import { error, object } from "mcp-use/server";
+
+server.tool(
+  {
+    name: "get_profile",
+    description: "Return the authenticated caller.",
+  },
+  async (_args, ctx) => {
+    if (!ctx.auth) {
+      return error("Unauthorized");
+    }
+
+    return object({
+      userId: ctx.auth.user.userId,
+      email: ctx.auth.user.email,
+      scopes: ctx.auth.scopes,
+      permissions: ctx.auth.permissions,
+    });
+  },
+);
+```
+
+Use [User Context](/v2/typescript/server/authentication/user-context) for access-control patterns inside tools.
+
+## What authentication changes
+
+When `oauth` is configured:
+
+- MCP discovery endpoints advertise OAuth metadata.
+- MCP transport endpoints, including `/mcp/*`, require `Authorization: Bearer <token>`.
+- Invalid, expired, or unverifiable tokens are rejected before tool code runs.
+- Tool callbacks receive authenticated user data on `ctx.auth`.
+
+Keep provider-specific setup in the provider page. Keep authorization decisions close to the tool or middleware that needs them.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="User Context" icon="user" href="/v2/typescript/server/authentication/user-context">
+    Read identity, scopes, roles, and permissions inside tools.
+  </Card>
+  <Card title="Auth providers API reference" icon="terminal" href="/v2/typescript/api-reference/server/auth-providers">
+    Look up exact provider options, defaults, and verification behavior.
+  </Card>
+  <Card title="Client Authentication" icon="router" href="/v2/typescript/client/authentication">
+    Connect a TypeScript MCP client to an OAuth-protected server.
+  </Card>
+  <Card title="OAuth Proxy" icon="shuffle" href="/v2/typescript/server/authentication/providers/oauth-proxy">
+    Bridge providers that do not support Dynamic Client Registration.
+  </Card>
+</CardGroup>
