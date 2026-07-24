@@ -24,9 +24,8 @@ export const ViewRuntimeContext = createContext<McpAppRuntime | null>(null);
  * delivery is owned by the runtime's {@link McpAppRuntime.modelContextStore};
  * this provider only exposes the runtime through context.
  *
- * @param props - Provider props.
- * @param props.runtime - Runtime created by bootstrap for this mount.
- * @param props.children - View tree.
+ * @param props - Provider props: the runtime created by bootstrap for this
+ *   mount and its view-tree children.
  *
  * @internal
  */

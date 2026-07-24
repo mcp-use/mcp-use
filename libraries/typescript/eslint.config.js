@@ -276,23 +276,10 @@ export default [
       "no-process-exit": "off",
     },
   },
-  // mcp-use (includes the folded-in CLI and dev/build
-  // toolchain under src/cli/) — strictest type safety, no escape hatches.
-  // `any` is banned outright; `unknown` is allowed only at real boundaries
-  // and must be narrowed before use (the no-unsafe-* rules enforce this).
-  // Doc comments must be valid TSDoc (see packages/server/CLAUDE.md).
+  // Validate TSDoc syntax and require comments on public package declarations.
   {
-    files: ["packages/server/src/**/*.ts"],
-    languageOptions: {
-      parser: tsparser,
-      parserOptions: {
-        ecmaVersion: 2022,
-        sourceType: "module",
-        projectService: false,
-        project: ["./packages/server/tsconfig.test.json"],
-        tsconfigRootDir: import.meta.dirname,
-      },
-    },
+    files: ["packages/*/src/**/*.{ts,tsx,mts}"],
+    ignores: ["packages/inspector/src/**"],
     plugins: {
       tsdoc: tsdocPlugin,
       jsdoc: jsdocPlugin,
@@ -323,6 +310,25 @@ export default [
           exemptEmptyConstructors: true,
         },
       ],
+    },
+  },
+  // mcp-use (includes the folded-in CLI and dev/build
+  // toolchain under src/cli/) — strictest type safety, no escape hatches.
+  // `any` is banned outright; `unknown` is allowed only at real boundaries
+  // and must be narrowed before use (the no-unsafe-* rules enforce this).
+  {
+    files: ["packages/server/src/**/*.ts"],
+    languageOptions: {
+      parser: tsparser,
+      parserOptions: {
+        ecmaVersion: 2022,
+        sourceType: "module",
+        projectService: false,
+        project: ["./packages/server/tsconfig.test.json"],
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
       "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/no-unsafe-argument": "error",
       "@typescript-eslint/no-unsafe-assignment": "error",

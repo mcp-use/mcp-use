@@ -59,11 +59,10 @@ function requireActiveModelContextStore(): ModelContextStore {
  * On the MCP Apps path, a host without the `updateModelContext` capability
  * skips pushes and receives a one-time `console.warn`.
  *
- * @param props - Component props.
- * @param props.content - Text describing what the user is currently seeing.
- * @param props.children - Optional nested UI; nested {@link ModelContext}
- *   nodes serialize as indented children of this node when this node has
- *   non-empty content.
+ * @param props - Component props: `content` describes what the user is
+ *   currently seeing; optional `children` may contain nested {@link ModelContext}
+ *   nodes, which serialize as indented children when this node has non-empty
+ *   content.
  *
  * @example
  * ```tsx
