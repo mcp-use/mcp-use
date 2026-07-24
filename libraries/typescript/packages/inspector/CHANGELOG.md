@@ -1,5 +1,14 @@
 # @mcp-use/inspector
 
+## 20.0.0-beta.45
+
+### Patch Changes
+
+- af09aee: Enable server-to-client sampling for legacy stateful MCP connections. Hide the
+  sampling content, disable its navigation tab with an explanatory tooltip, and
+  omit the sampling client capability on modern stateless connections.
+  - mcp-use@2.0.0-beta.53
+
 ## 20.0.0-beta.44
 
 ### Patch Changes
