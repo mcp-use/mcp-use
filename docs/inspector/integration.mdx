@@ -17,15 +17,12 @@ When using a generated `mcp-use` project, run `npm run dev`. The CLI loads the I
 Generated and existing projects receive the Inspector through `mcp-use`. Add `@mcp-use/inspector` directly only when overriding the framework-supplied version or mounting it without `mcp-use`.
 
 ```typescript
-import { MCPServer } from "mcp-use/server";
+import { MCPServer } from "mcp-use";
 
 const server = new MCPServer({
   name: "my-server",
   version: "1.0.0",
 });
-
-// Add your tools, resources, prompts...
-server.tool(/* ... */);
 
 export default server;
 ```
@@ -45,16 +42,43 @@ This changes neither the build output nor its manifest. Treat a production Inspe
 
 For custom development servers, `mountInspector()` from `@mcp-use/inspector` provides the complete local Inspector: packaged UI, proxy, OAuth BFF, and callbacks. It can register on Hono/Express or return a framework-neutral Fetch handler.
 
-```typescript
-import { mountInspector } from "@mcp-use/inspector";
+### Fetch handler integration
 
-const inspect = mountInspector({
-  basePath: "/mcp",
+Dispatch Inspector paths to the handler and all other paths to your server.
+This complete example uses the same listener for the MCP endpoint and
+Inspector:
+
+```typescript
+import { MCPServer } from "mcp-use";
+import { mountInspector, type InspectorFetchHandler } from "@mcp-use/inspector";
+
+const basePath = "/mcp";
+const inspectorPath = `${basePath}/inspector`;
+
+const server = new MCPServer({
+  name: "my-server",
+  version: "1.0.0",
+  basePath,
+});
+
+const inspector = mountInspector({
+  basePath,
   autoConnectUrl: "http://localhost:3000/mcp",
 });
 
-const response = await inspect(request);
+export const fetch: InspectorFetchHandler = async (request) => {
+  const pathname = new URL(request.url).pathname;
+
+  if (pathname === inspectorPath || pathname.startsWith(`${inspectorPath}/`)) {
+    return inspector(request);
+  }
+
+  return server.fetch(request);
+};
 ```
+
+When the public origin is not known in advance, omit `autoConnectUrl`. The
+handler then derives the connection URL from the request origin and `basePath`.
 
 ### Hono Integration
 
@@ -106,17 +130,21 @@ import { mountInspector } from "@mcp-use/inspector";
 mountInspector(app, {
   basePath: "/mcp",
   autoConnectUrl: "http://localhost:3000/mcp",
+  manufactChatUrl: "https://chat.example.com",
   sandboxOrigin: "https://sandbox.example.com",
+  oauthProxyAllowedOrigins: ["https://admin.example.com"],
 });
 ```
 
-| Option                    | Type             | Default                             | Description                                             |
-| ------------------------- | ---------------- | ----------------------------------- | ------------------------------------------------------- |
-| `basePath`                | `string`         | `'/mcp'`                            | MCP prefix; Inspector mounts at `${basePath}/inspector` |
-| `autoConnectUrl`          | `string \| null` | Current request origin + `basePath` | MCP server URL to auto-connect on load; `null` disables |
-| `devMode`                 | `boolean`        | `true`                              | Enables same-origin sandbox for MCP Apps widgets        |
-| `sandboxOrigin`           | `string \| null` | `undefined`                         | Override the sandbox origin for MCP Apps widgets        |
-| `oauthProxyAllowLoopback` | `boolean`        | `true`                              | Permit local proxy/OAuth access to loopback targets     |
+| Option                     | Type                | Default                             | Description                                                                         |
+| -------------------------- | ------------------- | ----------------------------------- | ----------------------------------------------------------------------------------- |
+| `basePath`                 | `string`            | `'/mcp'`                            | MCP prefix; Inspector mounts at `${basePath}/inspector`                             |
+| `autoConnectUrl`           | `string \| null`    | Current request origin + `basePath` | MCP server URL to auto-connect on load; `null` disables                             |
+| `manufactChatUrl`          | `string \| null`    | `undefined`                         | Manufact Chat URL made available to the Inspector UI                                |
+| `devMode`                  | `boolean`           | `true`                              | Enables the same-origin sandbox for MCP App views                                   |
+| `sandboxOrigin`            | `string \| null`    | `undefined`                         | Overrides the sandbox origin for MCP App views                                      |
+| `oauthProxyAllowedOrigins` | `readonly string[]` | `[]`                                | Explicit cross-origin callers allowed to use the OAuth BFF; same-origin is implicit |
+| `oauthProxyAllowLoopback`  | `boolean`           | `true`                              | Permit local proxy/OAuth access to loopback targets                                 |
 
 ## Protect mounted Inspector routes
 
@@ -131,5 +159,4 @@ network-edge authentication and rate limiting.
 
 - [Getting Started](/inspector/index) - Basic inspector usage
 - [CLI Usage](/inspector/cli) - Standalone inspector usage
-- [Inspector chat components](/typescript/api-reference/client/inspector-chat-components) - API reference for exported chat UI
 - [Debug widgets in the Inspector](/inspector/debugging-chatgpt-apps) - Test widget rendering and host behavior

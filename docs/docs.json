@@ -943,6 +943,7 @@
         "product": "Inspector",
         "description": "Debug and test MCP Apps & Servers",
         "icon": "/images/inspector-logo.svg",
+        "href": "/inspector/index",
         "groups": [
           {
             "group": "Inspector",
