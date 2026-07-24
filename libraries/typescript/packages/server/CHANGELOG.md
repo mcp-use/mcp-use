@@ -1,5 +1,14 @@
 # mcp-use
 
+## 2.0.0-beta.55
+
+### Patch Changes
+
+- 1dd88c2: Ship the self-contained, Node-optimized runtime entry with package-size
+  verification calibrated for the additional Node bundle and coverage that
+  prevents undeclared runtime dependencies from escaping the bundle.
+  - @mcp-use/inspector@20.0.0-beta.47
+
 ## 2.0.0-beta.54
 
 ### Patch Changes

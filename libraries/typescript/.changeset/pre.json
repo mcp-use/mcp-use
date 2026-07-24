@@ -63,6 +63,7 @@
     "quiet-ravens-view",
     "rebuild-prerelease-after-versioning",
     "registry-mcp-v2-dependencies",
+    "release-node-bundle-budget",
     "remove-cli-skills-command",
     "rename-starter-mcp-server-template",
     "request-scoped-client-context",
