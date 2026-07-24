@@ -148,7 +148,7 @@ mcp-use deploy [path] [--org <id-or-slug>] [--name <name>]
 
 ```text
 mcp-use client connect <name> <url> [-H, --header <"Key: Value">...]
-  [--no-oauth] [--auth-timeout <ms>] [--protocol <auto|2026-07-28|2025-11-25>]
+  [--no-oauth] [--auth-timeout <ms>] [--protocol <auto|legacy|modern>]
   [--no-open] [--json]
 mcp-use client list [--json]
 mcp-use client remove <name>
@@ -165,6 +165,8 @@ mcp-use client <name> auth logout [--yes] [--json]
 
 - v2 alpha client commands support HTTP(S) MCP servers; stdio, interactive REPL, resource subscriptions, implicit active sessions, and forced OAuth refresh are omitted. Every operation names a saved server.
 - `connect` validates a unique filesystem-safe name, connects before saving, and attempts OAuth on an authorization challenge unless `--no-oauth`. In an interactive TTY, OAuth prints `This server requires OAuth. Press Enter to open your browser.`, waits for Enter, and then opens the browser. `--no-open`, `--json`, and non-TTY operation never prompt or open a browser; they print the authorization URL to stderr while the loopback callback continues to wait. Repeated headers are stored as credentials, not metadata. Reusing a name requires removing it first.
+- `--protocol auto` prefers the modern wire and falls back to legacy. `--protocol legacy` selects only the legacy wire. `--protocol modern` selects the stateless, sessionless modern wire with no fallback. Saved metadata stores these names, never protocol revision dates.
+- A strict protocol mismatch exits `1` with code `protocol_mismatch`. User-facing mismatch messages name `legacy` or `modern` and do not expose protocol revision dates.
 - `client` and `screenshot` dynamic-import `@mcp-use/client`. When it is missing, the CLI installs it automatically: into the nearest project `package.json` when one exists, otherwise into `~/.mcp-use/client-sdk/`. Auto-install continues the current command in-process and imports from the install location.
 - Tool/prompt arguments accept either one JSON object or `key=value` pairs; `key:=<json>` supplies typed JSON values. Mixing the full-object and pair forms is usage error `2`. Calls time out with exit `1`; tool `isError` results are operation failures and retain their protocol content in JSON error details.
 - `client remove` immediately and idempotently deletes the named local server metadata and credentials. It does not prompt, and `--yes` is not a supported option.

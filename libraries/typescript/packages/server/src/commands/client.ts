@@ -24,7 +24,7 @@ import {
 interface SavedServer {
   url: string;
   oauth: boolean;
-  protocol: "auto" | "2026-07-28" | "2025-11-25";
+  protocol: "auto" | "legacy" | "modern";
 }
 
 interface SavedServers {
@@ -50,7 +50,10 @@ Connect options:
   -H, --header <"Key: Value">   Static header (repeatable)
   --no-oauth                    Skip OAuth on authorization challenges
   --auth-timeout <ms>           OAuth wait timeout (default: 300000)
-  --protocol <auto|2026-07-28|2025-11-25>
+  --protocol <auto|legacy|modern>  Protocol mode (default: auto)
+                                  auto: prefer modern, fall back to legacy
+                                  legacy: legacy wire only
+                                  modern: stateless/sessionless, no fallback
   --no-open                     Print the OAuth URL only
   --json                        Emit machine-readable output
 
@@ -75,7 +78,7 @@ type BrowserMode = "ask" | "never";
 /** Run the `mcp-use client` command family. */
 export async function runClient(argv: readonly string[]): Promise<number> {
   if (argv.includes("--help") || argv.includes("-h")) {
-    console.log(CLIENT_HELP);
+    process.stdout.write(`${CLIENT_HELP}\n`);
     return 0;
   }
   const json = wantsJson(argv);
@@ -398,8 +401,21 @@ async function openConnection(
         // resolves the package's browser-default declaration in this build.
       } as unknown as Parameters<typeof createOAuthProvider>[1])
     : undefined;
-  const protocolNegotiation =
-    definition.protocol === "auto" ? "auto" : { pin: definition.protocol };
+  const protocolConfig =
+    definition.protocol === "auto"
+      ? { protocolNegotiation: "auto" as const }
+      : definition.protocol === "modern"
+        ? {
+            protocolNegotiation: {
+              pin: "2026-07-28",
+            },
+          }
+        : {
+            protocolNegotiation: "legacy" as const,
+            clientOptions: {
+              supportedProtocolVersions: ["2025-11-25"],
+            },
+          };
   const client = new MCPClient({
     mcpServers: {
       [name]: {
@@ -408,11 +424,15 @@ async function openConnection(
           ? { headers: credentials.headers }
           : {}),
         ...(authProvider !== undefined ? { authProvider } : { oauth: false }),
-        protocolNegotiation,
+        ...protocolConfig,
       },
     },
   });
-  return client.connect(name);
+  try {
+    return await client.connect(name);
+  } catch (error) {
+    throw normalizeProtocolConnectionError(error, definition.protocol);
+  }
 }
 
 /**
@@ -522,8 +542,8 @@ function parseHeaders(values: readonly string[]): Record<string, string> {
 }
 
 function parseProtocol(value: string | undefined): SavedServer["protocol"] {
-  if (value !== "auto" && value !== "2026-07-28" && value !== "2025-11-25") {
-    throw new UsageError(`Invalid protocol: ${value}`);
+  if (value !== "auto" && value !== "legacy" && value !== "modern") {
+    throw new UsageError("Invalid protocol. Expected auto, legacy, or modern.");
   }
   return value;
 }
@@ -545,7 +565,61 @@ function validateName(name: string): void {
 }
 
 async function readServers(): Promise<SavedServers> {
-  return readJson(SERVERS_PATH, { servers: {} });
+  const saved = await readJson<{
+    servers: Record<
+      string,
+      Omit<SavedServer, "protocol"> & { protocol?: unknown }
+    >;
+  }>(SERVERS_PATH, { servers: {} });
+  const normalized: SavedServers = { servers: {} };
+  let migrated = false;
+
+  for (const [name, server] of Object.entries(saved.servers)) {
+    const protocol = normalizeSavedProtocol(server.protocol);
+    normalized.servers[name] = { ...server, protocol };
+    migrated ||= protocol !== server.protocol;
+  }
+
+  if (migrated) {
+    await writePrivateJson(SERVERS_PATH, normalized);
+  }
+  return normalized;
+}
+
+function normalizeSavedProtocol(value: unknown): SavedServer["protocol"] {
+  if (value === "auto" || value === "legacy" || value === "modern") {
+    return value;
+  }
+  if (value === undefined) return "auto";
+  if (value === "2025-11-25") return "legacy";
+  if (value === "2026-07-28") return "modern";
+  throw new UsageError(
+    "Saved server has an invalid protocol setting. Remove and reconnect it."
+  );
+}
+
+function normalizeProtocolConnectionError(
+  error: unknown,
+  protocol: SavedServer["protocol"]
+): unknown {
+  if (
+    protocol === "auto" ||
+    !(error instanceof Error) ||
+    (!error.message.includes("Unsupported protocol version") &&
+      !error.message.includes("pinned protocol version"))
+  ) {
+    return error;
+  }
+  if (protocol === "legacy") {
+    return new CommandError(
+      "protocol_mismatch",
+      "Server does not support the requested legacy protocol."
+    );
+  }
+  return new CommandError(
+    "protocol_mismatch",
+    "Server does not support the requested modern protocol (stateless/sessionless, no fallback)."
+  );
 }
 
 function credentialsDirectory(name: string): string {

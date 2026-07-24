@@ -20,6 +20,19 @@ mcp-use client list
 mcp-use client remove demo
 ```
 
+Protocol selection:
+
+```bash
+# Prefer modern and fall back to legacy (default)
+mcp-use client connect compatible http://127.0.0.1:3102/mcp --protocol auto --no-oauth
+
+# Require the legacy wire
+mcp-use client connect legacy http://127.0.0.1:3101/mcp --protocol legacy --no-oauth
+
+# Require the stateless, sessionless modern wire with no fallback
+mcp-use client connect modern http://127.0.0.1:3102/mcp --protocol modern --no-oauth
+```
+
 Stdio:
 
 ```bash
