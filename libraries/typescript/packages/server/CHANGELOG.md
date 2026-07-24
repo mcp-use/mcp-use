@@ -1,5 +1,20 @@
 # mcp-use
 
+## 2.0.0-beta.49
+
+### Patch Changes
+
+- 9eb99e4: Allow tool-only servers to build and run without a views directory or React
+  view component.
+
+  `mcp-use build` and `mcp-use dev` now prime and validate an empty view registry,
+  log when the views directory is not configured, and preserve the precise
+  view-binding error when a tool references a view that does not exist.
+
+- Updated dependencies [9eb99e4]
+  - @mcp-use/cli@4.0.0-beta.12
+  - @mcp-use/inspector@20.0.0-beta.41
+
 ## 2.0.0-beta.48
 
 ### Patch Changes
