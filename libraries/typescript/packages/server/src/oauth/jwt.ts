@@ -21,6 +21,14 @@ export interface JwtVerifierOptions {
   issuer: string;
   jwksUrl: URL;
   resource: URL;
+  /** Provider-specific JWT audience, when it differs from the MCP resource. */
+  audience?: string | string[];
+  /**
+   * Treat successful issuer validation as the provider's resource binding.
+   * Use only for providers whose access-token model is scoped by issuer rather
+   * than an aud/resource claim.
+   */
+  issuerBoundAccessTokens?: boolean;
   algorithms?: readonly string[];
   key?: Uint8Array;
 }
@@ -32,12 +40,24 @@ export function createJwtVerifier(
   // jose overloads key material vs JWKS getters; runtime accepts either.
   const key = options.key ?? createRemoteJWKSet(options.jwksUrl);
   const configuredResource = canonicalUrl(options.resource);
+  const configuredAudience = verifierAudience(options.audience);
+  if (
+    configuredAudience !== undefined &&
+    options.issuerBoundAccessTokens === true
+  ) {
+    throw new TypeError(
+      "JWT verifier cannot combine audience and issuer-bound access tokens"
+    );
+  }
 
   return {
     async verifyAccessToken(token: string): Promise<AuthInfo> {
       try {
         const { payload } = await jwtVerify(token, key as JWTVerifyGetKey, {
           issuer: options.issuer,
+          ...(configuredAudience !== undefined && {
+            audience: configuredAudience,
+          }),
           ...(options.algorithms !== undefined && {
             algorithms: [...options.algorithms],
           }),
@@ -51,7 +71,12 @@ export function createJwtVerifier(
         const clientId =
           requiredString(claims, "client_id") ?? requiredString(claims, "azp");
         const expiresAt = requiredFutureNumber(claims, "exp");
-        const resource = verifiedResource(claims, configuredResource);
+        const resource = verifiedResource(
+          claims,
+          configuredResource,
+          configuredAudience !== undefined ||
+            options.issuerBoundAccessTokens === true
+        );
 
         return {
           token,
@@ -199,7 +224,8 @@ export function invalidToken(message: string, cause?: unknown): OAuthError {
 
 function verifiedResource(
   claims: VerifiedPayload,
-  configuredResource: URL
+  configuredResource: URL,
+  providerBindingWasValidated: boolean
 ): URL {
   const value = claims["resource"];
   if (value !== undefined) {
@@ -215,6 +241,14 @@ function verifiedResource(
     return configuredResource;
   }
 
+  // A provider-specific audience validated by jose, or an explicitly
+  // issuer-bound provider verifier, proves that the token targets the
+  // configured API. Preserve the canonical MCP resource separately so
+  // provider identifiers are not conflated with RFC 8707 resource URLs.
+  if (providerBindingWasValidated) {
+    return configuredResource;
+  }
+
   const audience = claims["aud"];
   if (!validAudience(audience)) {
     throw invalidToken("Token audience claim must be a string or string array");
@@ -226,6 +260,27 @@ function verifiedResource(
     );
   }
   return configuredResource;
+}
+
+function verifierAudience(
+  value: JwtVerifierOptions["audience"]
+): string | string[] | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value === "string" && value.trim().length > 0) {
+    return value;
+  }
+  if (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every(
+      (audience) => typeof audience === "string" && audience.trim().length > 0
+    )
+  ) {
+    return [...value];
+  }
+  throw new TypeError(
+    "JWT verifier audience must be a non-empty string or string array"
+  );
 }
 
 function validAudience(value: unknown): value is string | string[] {

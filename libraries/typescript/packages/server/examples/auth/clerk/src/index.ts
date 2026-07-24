@@ -20,6 +20,8 @@ const getUserInfoOutputSchema = z.object({
   resource: z.string().nullable(),
 });
 
+const audience = optionalEnv("CLERK_AUDIENCE");
+
 const server = new MCPServer({
   name: "clerk-direct-auth-example",
   version: "1.0.0",
@@ -27,6 +29,7 @@ const server = new MCPServer({
   publicLandingPage: true,
   oauth: oauthClerkProvider({
     frontendApiUrl: requireEnv("CLERK_FRONTEND_API_URL"),
+    ...(audience !== undefined && { audience }),
   }),
 });
 
@@ -64,11 +67,16 @@ server.tool(
 );
 
 function requireEnv(name: string): string {
-  const value = process.env[name]?.trim();
-  if (value === undefined || value === "") {
+  const value = optionalEnv(name);
+  if (value === undefined) {
     throw new Error(`Missing required environment variable: ${name}`);
   }
   return value;
+}
+
+function optionalEnv(name: string): string | undefined {
+  const value = process.env[name]?.trim();
+  return value === undefined || value === "" ? undefined : value;
 }
 
 export default server;

@@ -34,17 +34,26 @@ export interface ClerkOAuthUser {
 /** Configures Clerk JWT verification and protected-resource metadata. */
 export interface ClerkOAuthProviderOptions extends OAuthResourceOptions {
   frontendApiUrl: URL | string;
+  /** Expected Clerk access-token audience, when the application emits one. */
+  audience?: string;
 }
 
 /**
  * Creates a provider that verifies Clerk access tokens and maps their claims.
  *
- * @param options - Clerk frontend API URL and resource-server settings.
- * @returns A provider that rejects tokens not issued for the resolved MCP resource.
+ * @param options - Clerk frontend API URL, optional token audience, and resource-server settings.
+ * @returns A provider that verifies Clerk-issued access tokens and explicit resource claims.
  */
 export function oauthClerkProvider(
   options: ClerkOAuthProviderOptions
 ): OAuthProvider<ClerkOAuthUser> {
+  if (
+    options.audience !== undefined &&
+    (typeof options.audience !== "string" ||
+      options.audience.trim().length === 0)
+  ) {
+    throw new TypeError("Clerk audience must be non-empty");
+  }
   const issuer = normalizedProviderUrl(
     options.frontendApiUrl,
     "Clerk frontendApiUrl"
@@ -56,6 +65,9 @@ export function oauthClerkProvider(
         issuer,
         jwksUrl: new URL(providerEndpoint(issuer, ".well-known/jwks.json")),
         resource,
+        ...(options.audience !== undefined
+          ? { audience: options.audience }
+          : { issuerBoundAccessTokens: true }),
       }),
     oauthMetadata: metadata(issuer),
     mapAuthInfo: (authInfo) => mapUser(authInfo),

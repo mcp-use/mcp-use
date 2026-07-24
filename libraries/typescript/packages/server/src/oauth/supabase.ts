@@ -42,12 +42,14 @@ export interface SupabaseOAuthProviderOptions extends OAuthResourceOptions {
   projectId?: string;
   supabaseUrl?: URL | string;
   jwtSecret?: string;
+  /** Expected access-token audience. Defaults to Supabase's `authenticated`. */
+  audience?: string;
 }
 
 /**
  * Creates a provider that verifies Supabase access tokens and maps their claims.
  *
- * @param options - Supabase project or URL, optional JWT secret, and resource-server settings.
+ * @param options - Supabase project or URL, optional JWT secret/audience, and resource-server settings.
  * @returns A provider that rejects tokens without a valid configured Supabase signature and issuer.
  */
 export function oauthSupabaseProvider(
@@ -56,6 +58,10 @@ export function oauthSupabaseProvider(
   const supabaseUrl = resolveSupabaseUrl(options);
   const issuer = providerEndpoint(supabaseUrl, "auth/v1").replace(/\/$/, "");
   const secret = options.jwtSecret;
+  const audience = options.audience ?? "authenticated";
+  if (typeof audience !== "string" || audience.trim().length === 0) {
+    throw new TypeError("Supabase audience must be non-empty");
+  }
   if (secret !== undefined && new TextEncoder().encode(secret).length < 32) {
     throw new TypeError("Supabase jwtSecret must be at least 32 bytes");
   }
@@ -71,6 +77,7 @@ export function oauthSupabaseProvider(
           ? { key: new TextEncoder().encode(secret), algorithms: ["HS256"] }
           : { algorithms: ["ES256"] }),
         resource,
+        audience,
       }),
     oauthMetadata: {
       issuer,
