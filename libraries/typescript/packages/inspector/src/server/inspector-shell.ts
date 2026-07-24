@@ -2,9 +2,23 @@ import type { Context, Hono } from "hono";
 import { renderInspectorFaviconLinks } from "./favicon-links.js";
 import { registerInspectorStaticAssets } from "./static-assets.js";
 import { getInspectorVersion } from "./version.js";
+import { buildSandboxProxyBlobHtml } from "@mcp-use/client/react";
 
 const INSPECTOR_VERSION = getInspectorVersion();
 type InspectorMode = "standalone" | "embedded" | "cloud";
+
+function alternateLoopbackOrigin(requestUrl: URL): string | undefined {
+  const alternateHost =
+    requestUrl.hostname === "localhost"
+      ? "127.0.0.1"
+      : requestUrl.hostname === "127.0.0.1" || requestUrl.hostname === "::1"
+        ? "localhost"
+        : undefined;
+  if (!alternateHost) return undefined;
+  const origin = new URL(requestUrl.origin);
+  origin.hostname = alternateHost;
+  return origin.origin;
+}
 
 type InspectorShellConfig = {
   basePath?: string;
@@ -191,9 +205,15 @@ export function registerInspectorShell(
   };
 
   const serveShell = (c: Context) => {
-    return c.html(
-      generateInspectorShellHtml(effectiveConfig, basePath, assets)
-    );
+    const requestUrl = new URL(c.req.url);
+    const shellConfig = {
+      ...effectiveConfig,
+      sandboxOrigin:
+        effectiveConfig.sandboxOrigin ??
+        alternateLoopbackOrigin(requestUrl) ??
+        null,
+    };
+    return c.html(generateInspectorShellHtml(shellConfig, basePath, assets));
   };
 
   // Scoped local assets must be registered before the Inspector SPA fallback,
@@ -202,6 +222,9 @@ export function registerInspectorShell(
 
   app.get(p("/inspector/oauth-popup-closed.html"), (c) =>
     c.html(OAUTH_POPUP_CLOSED_HTML)
+  );
+  app.get(p("/inspector/sandbox"), (c) =>
+    c.html(buildSandboxProxyBlobHtml(new URL(c.req.url).search))
   );
   app.get(p("/inspector"), serveShell);
   app.get(`${p("/inspector")}/`, serveShell);

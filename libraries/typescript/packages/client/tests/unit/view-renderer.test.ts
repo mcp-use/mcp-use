@@ -3,6 +3,7 @@ import { resolveViewResource } from "../../src/react/view/resolve-view-resource.
 import {
   buildViewSandboxBlobUrl,
   buildSandboxProxyBlobHtml,
+  buildViewSandboxUrl,
 } from "../../src/react/view/sandbox-blob-url.js";
 import {
   getViewResourceUri,
@@ -30,6 +31,24 @@ describe("buildViewSandboxBlobUrl", () => {
     expect(buildSandboxProxyBlobHtml(search)).toBe(
       buildSandboxProxyBlobHtml(search)
     );
+  });
+});
+
+describe("buildViewSandboxUrl", () => {
+  it("preserves a distinct document origin and appends sandbox policy", () => {
+    const url = buildViewSandboxUrl(
+      new URL("https://sandbox.example/inspector/sandbox"),
+      {
+        cspMode: "widget-declared",
+        permissions: { clipboardWrite: {} },
+        widgetCsp: { connectDomains: ["https://api.example"] },
+      }
+    );
+
+    expect(url.origin).toBe("https://sandbox.example");
+    expect(url.searchParams.get("csp_mode")).toBe("widget-declared");
+    expect(url.searchParams.get("permissions")).toContain("clipboardWrite");
+    expect(url.searchParams.get("widget_csp")).toContain("https://api.example");
   });
 });
 

@@ -17,6 +17,7 @@ import {
   useState,
 } from "react";
 import type { WidgetModelContext } from "@/client/components/chat/widget-model-context";
+import type { ViewAppToolConnection } from "@mcp-use/client/react";
 
 type WidgetProtocol = "mcp-apps";
 
@@ -48,6 +49,7 @@ export interface WidgetInfo {
   effectivePolicy?: string;
   modelContext?: WidgetModelContext;
   widgetState?: any;
+  appToolConnection?: ViewAppToolConnection;
 }
 
 export type DeviceType = "mobile" | "desktop";
@@ -89,10 +91,15 @@ interface WidgetDebugContextType extends WidgetDebugState {
     csp: WidgetDeclaredCsp | undefined,
     effectivePolicy?: string
   ) => void;
+  setWidgetAppToolConnection: (
+    widgetId: string,
+    connection: ViewAppToolConnection | null
+  ) => void;
   updatePlaygroundSettings: (settings: Partial<PlaygroundSettings>) => void;
   clearAllWidgets: () => void;
   getAllModelContexts: () => Map<string, WidgetInfo["modelContext"]>;
   getModelContexts: (scope: string) => Map<string, WidgetInfo["modelContext"]>;
+  getAppToolConnections: (scope: string) => ViewAppToolConnection[];
 }
 
 const WidgetDebugContext = createContext<WidgetDebugContextType | undefined>(
@@ -124,6 +131,22 @@ export function selectModelContexts(
     }
   }
   return contexts;
+}
+
+export function selectAppToolConnections(
+  widgets: ReadonlyMap<string, WidgetInfo>,
+  scope: string
+): ViewAppToolConnection[] {
+  const connections: ViewAppToolConnection[] = [];
+  for (const widget of widgets.values()) {
+    if (
+      widget.modelContextScope === scope &&
+      widget.appToolConnection?.tools.length
+    ) {
+      connections.push(widget.appToolConnection);
+    }
+  }
+  return connections;
 }
 
 /**
@@ -274,6 +297,24 @@ export function WidgetDebugProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const setWidgetAppToolConnection = useCallback(
+    (widgetId: string, connection: ViewAppToolConnection | null) => {
+      setState((prev) => {
+        const widget = prev.widgets.get(widgetId);
+        if (!widget) return prev;
+        if (widget.appToolConnection === connection) return prev;
+
+        const newWidgets = new Map(prev.widgets);
+        newWidgets.set(widgetId, {
+          ...widget,
+          appToolConnection: connection ?? undefined,
+        });
+        return { ...prev, widgets: newWidgets };
+      });
+    },
+    []
+  );
+
   const updatePlaygroundSettings = useCallback(
     (settings: Partial<PlaygroundSettings>) => {
       setState((prev) => ({
@@ -304,6 +345,10 @@ export function WidgetDebugProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const getAppToolConnections = useCallback((scope: string) => {
+    return selectAppToolConnections(stateRef.current.widgets, scope);
+  }, []);
+
   // Memoize context value to prevent unnecessary re-renders of consumers
   const value = useMemo<WidgetDebugContextType>(
     () => ({
@@ -317,10 +362,12 @@ export function WidgetDebugProvider({ children }: { children: ReactNode }) {
       setWidgetModelContext,
       setWidgetState,
       setWidgetDeclaredCsp,
+      setWidgetAppToolConnection,
       updatePlaygroundSettings,
       clearAllWidgets,
       getAllModelContexts,
       getModelContexts,
+      getAppToolConnections,
     }),
     [
       state,
@@ -333,10 +380,12 @@ export function WidgetDebugProvider({ children }: { children: ReactNode }) {
       setWidgetModelContext,
       setWidgetState,
       setWidgetDeclaredCsp,
+      setWidgetAppToolConnection,
       updatePlaygroundSettings,
       clearAllWidgets,
       getAllModelContexts,
       getModelContexts,
+      getAppToolConnections,
     ]
   );
 

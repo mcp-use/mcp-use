@@ -1,10 +1,12 @@
 import { ViewRenderer } from "@mcp-use/client/react";
-import type { ViewDisplayMode } from "@mcp-use/client/react";
+import type { ViewDisplayMode, ViewRendererProps } from "@mcp-use/client/react";
 import { useViewHostProps } from "@/client/hooks/useViewHostProps";
 import type { MessageContentBlock } from "@/client/types/message-content-block";
 import { WidgetWrapper } from "@/client/components/ui/WidgetWrapper";
 import { Spinner } from "@/client/components/ui/spinner";
 import { cn } from "@/client/lib/utils";
+import { useCallback } from "react";
+import type { LLMConfig } from "@/client/components/chat/types";
 
 const CHAT_MESSAGE_CAPABILITIES = { text: {}, image: {} } as const;
 
@@ -22,6 +24,7 @@ export interface McpAppsViewPanelProps {
   onDisplayModeChange: (mode: ViewDisplayMode) => void;
   onSendFollowUp?: (content: MessageContentBlock[]) => Promise<void>;
   modelContextScope?: string;
+  llmConfig?: LLMConfig | null;
   onWidgetHeightChange?: (height: number) => void;
   partialToolInput?: Record<string, unknown>;
   cancelled?: boolean;
@@ -49,6 +52,7 @@ export function McpAppsViewPanel({
   onDisplayModeChange,
   onSendFollowUp,
   modelContextScope,
+  llmConfig,
   onWidgetHeightChange,
   partialToolInput,
   cancelled,
@@ -67,7 +71,18 @@ export function McpAppsViewPanel({
     displayMode,
     onDisplayModeChange,
     modelContextScope,
+    llmConfig,
   });
+
+  const handleMessage = useCallback(
+    (content: Parameters<NonNullable<ViewRendererProps["onMessage"]>>[0]) => {
+      if (!onSendFollowUp) {
+        throw new Error("Chat is not available on this host surface");
+      }
+      return onSendFollowUp(content as MessageContentBlock[]);
+    },
+    [onSendFollowUp]
+  );
 
   if (!hostProps) {
     const loading = <Spinner className="size-5" />;
@@ -110,11 +125,7 @@ export function McpAppsViewPanel({
       messageCapabilities={
         onSendFollowUp ? CHAT_MESSAGE_CAPABILITIES : undefined
       }
-      onMessage={
-        onSendFollowUp
-          ? (content) => onSendFollowUp(content as MessageContentBlock[])
-          : undefined
-      }
+      onMessage={onSendFollowUp ? handleMessage : undefined}
       onInlineHeightChange={
         displayMode === "inline" ? onWidgetHeightChange : undefined
       }

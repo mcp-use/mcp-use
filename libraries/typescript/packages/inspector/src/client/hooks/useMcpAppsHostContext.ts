@@ -158,7 +158,13 @@ export function useMcpAppsHostContext({
       userAgent: `mcp-use-inspector/${getPackageVersion()}`,
       deviceCapabilities: playground.capabilities,
       safeAreaInsets: playground.safeAreaInsets,
-      styles: { variables: buildHostStyleVariables() as any },
+      styles: {
+        variables: buildHostStyleVariables() as any,
+        css: {
+          fonts:
+            '@font-face{font-family:"MCP Host Sans";src:local("Ubuntu"),local("Arial");font-display:swap;}',
+        },
+      },
       toolInfo: tool
         ? {
             id: toolCallId,

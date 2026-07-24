@@ -27,6 +27,17 @@ describe("mountInspector", () => {
     );
     expect(html).toContain("window.__MCP_DEV_MODE__ = true");
     expect(html).toContain('window.__MCP_INSPECTOR_MODE__ = "embedded"');
+    expect(html).toContain(
+      'window.__MCP_SANDBOX_ORIGIN__ = "http://127.0.0.1"'
+    );
+
+    const sandbox = await inspector(
+      new Request(
+        "http://127.0.0.1/tools/mcp/inspector/sandbox?csp_mode=widget-declared"
+      )
+    );
+    expect(sandbox.status).toBe(200);
+    expect(await sandbox.text()).toContain("sandbox-proxy-ready");
 
     const config = await inspector(
       new Request("http://localhost/tools/mcp/inspector/config.json")

@@ -5,6 +5,7 @@ import type { MessageContentBlock } from "@/client/types/message-content-block";
 import { McpAppsViewPanel } from "@/client/components/mcp-apps/McpAppsViewPanel";
 import { useWidgetDebug } from "../../context/WidgetDebugContext";
 import { Spinner } from "../ui/spinner";
+import type { LLMConfig } from "./types";
 
 function ModelContextBadge({ widgetId }: { widgetId: string }) {
   const { getWidget } = useWidgetDebug();
@@ -32,6 +33,7 @@ interface ToolResultRendererProps {
   toolMeta?: Record<string, any>;
   onSendFollowUp?: (content: MessageContentBlock[]) => Promise<void>;
   modelContextScope?: string;
+  llmConfig?: LLMConfig | null;
   partialToolArgs?: Record<string, unknown>;
   cancelled?: boolean;
 }
@@ -45,6 +47,7 @@ export function ToolResultRenderer({
   toolMeta,
   onSendFollowUp,
   modelContextScope,
+  llmConfig,
   partialToolArgs,
   cancelled,
 }: ToolResultRendererProps) {
@@ -92,6 +95,7 @@ export function ToolResultRenderer({
           onDisplayModeChange={setDisplayMode}
           onSendFollowUp={onSendFollowUp}
           modelContextScope={modelContextScope}
+          llmConfig={llmConfig}
           partialToolInput={partialToolArgs}
           cancelled={cancelled}
           noWrapper

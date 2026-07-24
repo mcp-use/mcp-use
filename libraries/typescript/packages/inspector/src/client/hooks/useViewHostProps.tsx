@@ -5,7 +5,7 @@ import type {
   ViewDisplayMode,
   ViewRendererProps,
 } from "@mcp-use/client/react";
-import { useMcpClient } from "@mcp-use/client/react";
+import { buildViewSandboxUrl, useMcpClient } from "@mcp-use/client/react";
 import type { Tool } from "@mcp-use/client/react";
 import { X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
@@ -17,6 +17,7 @@ import { useTheme } from "@/client/context/ThemeContext";
 import { useWidgetDebug } from "@/client/context/WidgetDebugContext";
 import { useDeviceViewport } from "@/client/hooks/useDeviceViewport";
 import { useMcpAppsHostContext } from "@/client/hooks/useMcpAppsHostContext";
+import { useMcpAppsHostActions } from "@/client/hooks/useMcpAppsHostActions";
 import { buildCspAuditRecord } from "@/client/mcp-apps/csp-audit";
 import { getPackageVersion } from "@/client/telemetry/utils";
 import { getServerDisplayName, getServerIconUrl } from "@/client/utils/servers";
@@ -24,6 +25,8 @@ import {
   normalizeWidgetModelContext,
   serializeWidgetModelContexts,
 } from "@/client/components/chat/widget-model-context";
+import { getInspectorBase } from "@/client/utils/basePath";
+import type { LLMConfig } from "@/client/components/chat/types";
 
 const HOST_INFO = {
   name: "mcp-use-inspector",
@@ -33,6 +36,10 @@ const CHAT_MODEL_CONTEXT_CAPABILITIES = {
   text: {},
   structuredContent: {},
 } as const;
+
+interface InspectorSandboxWindow extends Window {
+  __MCP_SANDBOX_ORIGIN__?: string;
+}
 
 function useStableViewConnection(
   server: ReturnType<typeof useMcpClient>["servers"][number] | undefined,
@@ -74,16 +81,21 @@ export function useViewHostProps(options: {
   inlineMaxWidth?: number;
   chromeless?: boolean;
   modelContextScope?: string;
+  llmConfig?: LLMConfig | null;
   onReady?: () => void;
 }): Pick<
   ViewRendererProps,
   | "source"
   | "hostInfo"
   | "hostContext"
+  | "sandboxUrl"
   | "cspMode"
   | "wrapTransport"
   | "onCspViolation"
   | "onModelContextUpdate"
+  | "onSamplingRequest"
+  | "onDownloadFile"
+  | "onAppToolsChanged"
   | "modelContextCapabilities"
   | "onLog"
   | "onResourceResolved"
@@ -111,6 +123,7 @@ export function useViewHostProps(options: {
     inlineMaxWidth,
     chromeless,
     modelContextScope,
+    llmConfig,
     onReady,
   } = options;
 
@@ -125,7 +138,10 @@ export function useViewHostProps(options: {
     setWidgetModelContext,
     setWidgetDeclaredCsp,
     getModelContexts,
+    setWidgetAppToolConnection,
   } = useWidgetDebug();
+  const { onSamplingRequest, onDownloadFile } =
+    useMcpAppsHostActions(llmConfig);
 
   const cspMode: ViewCspMode =
     playground.cspMode === "permissive" ? "permissive" : "widget-declared";
@@ -162,6 +178,23 @@ export function useViewHostProps(options: {
         : null,
     [connection, resourceUri]
   );
+
+  const sandboxUrl = useMemo(() => {
+    if (typeof window === "undefined") return undefined;
+    const origin = (window as InspectorSandboxWindow).__MCP_SANDBOX_ORIGIN__;
+    if (!origin) return undefined;
+    try {
+      const documentUrl = new URL(`${getInspectorBase()}/sandbox`, origin);
+      return (resolved: ResolvedViewResource) =>
+        buildViewSandboxUrl(documentUrl, {
+          cspMode,
+          permissions: resolved.permissions,
+          widgetCsp: resolved.declaredCsp,
+        });
+    } catch {
+      return undefined;
+    }
+  }, [cspMode]);
 
   const wrapTransport = useCallback(
     (
@@ -279,6 +312,14 @@ export function useViewHostProps(options: {
     [getModelContexts, modelContextScope, setWidgetModelContext, viewId]
   );
 
+  const handleAppToolsChanged = useCallback<
+    NonNullable<ViewRendererProps["onAppToolsChanged"]>
+  >(
+    (appToolConnection) =>
+      setWidgetAppToolConnection(viewId, appToolConnection),
+    [setWidgetAppToolConnection, viewId]
+  );
+
   const onLog = useCallback(
     ({
       level,
@@ -338,6 +379,7 @@ export function useViewHostProps(options: {
 
   return {
     source,
+    sandboxUrl,
     hostInfo: HOST_INFO,
     hostContext,
     cspMode,
@@ -349,6 +391,9 @@ export function useViewHostProps(options: {
     modelContextCapabilities: modelContextScope
       ? CHAT_MODEL_CONTEXT_CAPABILITIES
       : undefined,
+    onSamplingRequest,
+    onDownloadFile,
+    onAppToolsChanged: modelContextScope ? handleAppToolsChanged : undefined,
     onLog,
     onResourceResolved,
     displayMode,
