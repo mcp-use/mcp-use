@@ -1,9 +1,8 @@
 import { isViewTool } from "@mcp-use/client/react";
 import type { ViewDisplayMode } from "@mcp-use/client/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import type { MessageContentBlock } from "@/client/types/message-content-block";
 import { McpAppsViewPanel } from "@/client/components/mcp-apps/McpAppsViewPanel";
-import { debugMcpApps } from "@/client/mcp-apps/debug";
 import { useWidgetDebug } from "../../context/WidgetDebugContext";
 import { Spinner } from "../ui/spinner";
 import type { LLMConfig } from "./types";
@@ -52,11 +51,6 @@ export function ToolResultRenderer({
   partialToolArgs,
   cancelled,
 }: ToolResultRendererProps) {
-  const instanceIdRef = useRef(
-    `tool-result-${Math.random().toString(36).substring(2, 9)}`
-  );
-  const renderCountRef = useRef(0);
-  renderCountRef.current += 1;
   const toolCallId = useMemo(
     () =>
       `chat-tool-${toolName}-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
@@ -84,27 +78,6 @@ export function ToolResultRenderer({
 
   const memoizedToolArgs = useMemo(() => toolArgs, [toolName, parsedResult]);
   const memoizedResult = useMemo(() => parsedResult, [toolName, parsedResult]);
-
-  debugMcpApps("tool-result-render", {
-    instanceId: instanceIdRef.current,
-    renderCount: renderCountRef.current,
-    toolCallId,
-    toolName,
-    hasResult: result !== null && result !== undefined,
-    hasResourceUri: Boolean(resourceUri),
-  });
-
-  useEffect(() => {
-    const instanceId = instanceIdRef.current;
-    debugMcpApps("tool-result-mount", { instanceId, toolCallId, toolName });
-    return () => {
-      debugMcpApps("tool-result-unmount", {
-        instanceId,
-        toolCallId,
-        toolName,
-      });
-    };
-  }, [toolCallId, toolName]);
 
   if (isMcpAppsTool && resourceUri && serverId && readResource) {
     return (

@@ -50,24 +50,6 @@ const DEFAULT_HOST_INFO = { name: "mcp-use-client", version: "2.0.0" } as const;
 const DEFAULT_TOOL_CALL_TIMEOUT = 600_000;
 const SANDBOX_PROXY_READY = "ui/notifications/sandbox-proxy-ready";
 
-function debugViewRenderer(
-  event: string,
-  details: Record<string, unknown>
-): void {
-  if (typeof window === "undefined") return;
-  try {
-    if (
-      window.localStorage.getItem("mcp-use:debug-mcp-apps") !== "1" &&
-      new URLSearchParams(window.location.search).get("debugMcpApps") !== "1"
-    ) {
-      return;
-    }
-  } catch {
-    return;
-  }
-  console.debug("[MCP Apps Debug]", event, JSON.stringify(details));
-}
-
 function CloseIcon() {
   return (
     <svg
@@ -172,10 +154,6 @@ function ViewRendererBase({
   invoking,
   invoked,
 }: ViewRendererProps) {
-  const instanceIdRef = useRef(
-    `view-renderer-${Math.random().toString(36).substring(2, 9)}`
-  );
-  const bridgeRunCountRef = useRef(0);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const bridgeRef = useRef<AppBridge | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -325,13 +303,6 @@ function ViewRendererBase({
 
   // Resolve widget HTML from live connection or preloaded source
   useEffect(() => {
-    const instanceId = instanceIdRef.current;
-    debugViewRenderer("resource-effect-start", {
-      instanceId,
-      viewId,
-      sourceKind: source.kind,
-      liveResourceUri,
-    });
     let cancelledEffect = false;
     onLifecycleChangeRef.current?.({ status: "resolving" });
 
@@ -399,11 +370,6 @@ function ViewRendererBase({
 
     return () => {
       cancelledEffect = true;
-      debugViewRenderer("resource-effect-cleanup", {
-        instanceId,
-        viewId,
-        liveResourceUri,
-      });
     };
   }, [source.kind, liveResourceUri, preloadedHtml, cspMode, resolveSandboxUrl]);
 
@@ -485,18 +451,6 @@ function ViewRendererBase({
   // Bridge lifecycle: sandbox → connect → resource-ready → initialized
   useEffect(() => {
     if (!resolved || !activeSandboxUrl) return;
-    bridgeRunCountRef.current += 1;
-    const bridgeRun = bridgeRunCountRef.current;
-    const instanceId = instanceIdRef.current;
-    debugViewRenderer("bridge-effect-start", {
-      instanceId,
-      viewId,
-      bridgeRun,
-      hasMessageCapability: Boolean(effectiveHostCapabilities.message),
-      hasModelContextCapability: Boolean(
-        effectiveHostCapabilities.updateModelContext
-      ),
-    });
     const iframe = iframeRef.current;
     if (!iframe) return;
 
@@ -670,12 +624,6 @@ function ViewRendererBase({
           const handler = onAppToolsChangedRef.current;
           if (!bridge || !handler) return;
           const appCapabilities = bridge.getAppCapabilities();
-          debugViewRenderer("app-tools-capabilities", {
-            instanceId,
-            viewId,
-            bridgeRun,
-            appCapabilities,
-          });
           if (!appCapabilities?.tools) {
             handler(null);
             return;
@@ -685,12 +633,6 @@ function ViewRendererBase({
           const signature = JSON.stringify(result.tools);
           if (signature === publishedAppToolsSignature) return;
           publishedAppToolsSignature = signature;
-          debugViewRenderer("app-tools-published", {
-            instanceId,
-            viewId,
-            bridgeRun,
-            toolNames: result.tools.map((tool) => tool.name),
-          });
           const currentBridge = bridge;
           handler({
             tools: result.tools as Tool[],
@@ -732,11 +674,6 @@ function ViewRendererBase({
 
         bridgeRef.current = bridge;
         setInitCount((c) => c + 1);
-        debugViewRenderer("bridge-initialized", {
-          instanceId,
-          viewId,
-          bridgeRun,
-        });
         onLifecycleChangeRef.current?.({ status: "initialized" });
 
         await publishAppTools();
@@ -753,18 +690,7 @@ function ViewRendererBase({
             ...toolInputRef.current,
             ...parseCustomProps(customPropsRef.current),
           };
-          debugViewRenderer("tool-input-send", {
-            instanceId,
-            viewId,
-            bridgeRun,
-            argumentKeys: Object.keys(mergedArgs),
-          });
           await bridge.sendToolInput({ arguments: mergedArgs });
-          debugViewRenderer("tool-input-sent", {
-            instanceId,
-            viewId,
-            bridgeRun,
-          });
         }
         const toolResultPayload = buildToolResultPayload(
           toolOutputRef.current,
@@ -789,12 +715,6 @@ function ViewRendererBase({
 
     return () => {
       disposed = true;
-      debugViewRenderer("bridge-effect-cleanup", {
-        instanceId,
-        viewId,
-        bridgeRun,
-        initialized: bridgeRef.current === bridge,
-      });
       const toClose = bridge;
       bridgeRef.current = null;
       onAppToolsChangedRef.current?.(null);

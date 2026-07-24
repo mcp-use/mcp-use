@@ -27,7 +27,6 @@ import {
 } from "@/client/components/chat/widget-model-context";
 import { getInspectorBase } from "@/client/utils/basePath";
 import type { LLMConfig } from "@/client/components/chat/types";
-import { debugMcpApps } from "@/client/mcp-apps/debug";
 
 const HOST_INFO = {
   name: "mcp-use-inspector",
@@ -316,13 +315,8 @@ export function useViewHostProps(options: {
   const handleAppToolsChanged = useCallback<
     NonNullable<ViewRendererProps["onAppToolsChanged"]>
   >(
-    (appToolConnection) => {
-      debugMcpApps("app-tools-changed", {
-        viewId,
-        toolNames: appToolConnection?.tools.map((tool) => tool.name) ?? [],
-      });
-      setWidgetAppToolConnection(viewId, appToolConnection);
-    },
+    (appToolConnection) =>
+      setWidgetAppToolConnection(viewId, appToolConnection),
     [setWidgetAppToolConnection, viewId]
   );
 

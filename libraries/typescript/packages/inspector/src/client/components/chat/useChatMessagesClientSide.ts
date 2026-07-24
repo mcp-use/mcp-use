@@ -36,7 +36,6 @@ import {
   widgetModelContextProviderMessage,
   type WidgetModelContext,
 } from "./widget-model-context";
-import { debugMcpApps } from "@/client/mcp-apps/debug";
 
 // Type alias for backward compatibility
 type MCPConnection = McpServer;
@@ -240,15 +239,6 @@ export function useChatMessagesClientSide({
           maxSteps: 10,
           autoInitialize: true,
         });
-        debugMcpApps("agent-app-tools", {
-          connectionCount: appToolConnections?.length ?? 0,
-          toolNames:
-            appToolConnections?.flatMap(
-              (appConnection) =>
-                appConnection.tools?.map((tool) => tool.name) ?? []
-            ) ?? [],
-        });
-
         const commitMessageParts = () => {
           setMessages((prev) =>
             prev.map((msg) =>
