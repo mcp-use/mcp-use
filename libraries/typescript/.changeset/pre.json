@@ -66,6 +66,7 @@
     "request-scoped-client-context",
     "request-scoped-server-notifications",
     "resource-template-completion",
+    "scoped-client-command-help",
     "skip-dev-info-standalone-probe",
     "sour-socks-approve",
     "start-production-tunnel",

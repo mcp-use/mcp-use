@@ -1,5 +1,12 @@
 # mcp-use
 
+## 2.0.0-beta.52
+
+### Patch Changes
+
+- 6a647f9: Add scoped `--help` and `-h` pages for every `mcp-use client` command family and leaf without loading saved connections or the client SDK.
+  - @mcp-use/inspector@20.0.0-beta.44
+
 ## 2.0.0-beta.51
 
 ### Patch Changes
