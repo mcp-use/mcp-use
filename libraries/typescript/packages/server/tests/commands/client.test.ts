@@ -391,7 +391,7 @@ describe("client protocol selection", () => {
   );
 
   it("advertises only named protocol modes in help and validation errors", async () => {
-    await expect(runClient(["--help"])).resolves.toBe(0);
+    await expect(runClient(["connect", "--help"])).resolves.toBe(0);
     expect(stdout).toContain("--protocol <auto|legacy|modern>");
     expect(stdout).not.toMatch(/\d{4}-\d{2}-\d{2}/);
 

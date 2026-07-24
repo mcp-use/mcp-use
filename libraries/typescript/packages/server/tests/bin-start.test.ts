@@ -541,14 +541,15 @@ describe("main", () => {
   });
 
   it("prints client help for client --help", async () => {
-    const logs = vi.spyOn(console, "log").mockImplementation(() => {});
+    const stdout = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
     await expect(main(["client", "--help"])).resolves.toBe(0);
-    const output = logs.mock.calls.flat().join("\n");
-    expect(output).toContain("mcp-use client connect");
+    const output = stdout.mock.calls.flat().join("");
+    expect(output).toContain("connect <name> <url>");
     expect(output).toContain("remove <name>");
     expect(output).not.toContain("remove <name> [--yes]");
-    expect(output).toContain("--no-open");
-    expect(output).not.toContain("  --open");
+    expect(output).toContain("-h, --help");
     expect(output).not.toContain("mcp-use deploy");
   });
 
