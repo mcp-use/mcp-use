@@ -27,6 +27,23 @@ npx mcp-use client list
 npx mcp-use client remove dev
 ```
 
+## Choose a protocol mode
+
+The default `--protocol auto` mode prefers the modern MCP wire and falls back
+to the legacy wire when the server does not support modern negotiation.
+
+Use `legacy` or `modern` when you need strict compatibility testing:
+
+```bash
+npx mcp-use client connect old-server https://old.example.com/mcp \
+  --protocol legacy
+npx mcp-use client connect modern-server https://modern.example.com/mcp \
+  --protocol modern
+```
+
+`legacy` uses only the legacy wire. `modern` uses the stateless, sessionless
+modern wire with no fallback.
+
 ## Authenticate with OAuth
 
 When a server requires OAuth in an interactive terminal, the CLI displays this prompt:
@@ -136,6 +153,8 @@ npx mcp-use client dev tools call get-weather city=Tokyo --json | jq '.content'
 
 - `Unknown saved server: <name>`: run `npx mcp-use client list`, or reconnect with `npx mcp-use client connect <name> <url>`.
 - `Tool not found: <name>`: run `tools list` against the same saved server.
+- `protocol_mismatch`: reconnect with `--protocol auto`, or choose the protocol
+  mode the server supports.
 - An OAuth command waits without opening a browser: open the authorization URL printed to stderr, then complete authorization before the configured timeout.
 - A tool returns an error: under `--json`, inspect `error.details` for the original MCP tool result.
 

@@ -522,11 +522,11 @@ mcp-use client <name> <scope> <action>
 
 **Top-level subcommands:**
 
-| Command                | Purpose                                | Key options                                                                                        |
-| ---------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `connect <name> <url>` | Verify and save an HTTP(S) MCP server. | `-H, --header`, `--no-oauth`, `--auth-timeout <ms>`, `--protocol <version>`, `--no-open`, `--json` |
-| `list`                 | List saved servers.                    | `--json`                                                                                           |
-| `remove <name>`        | Remove a saved server and credentials. | `--yes`                                                                                            |
+| Command                | Purpose                                | Key options                                                                                                     |
+| ---------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `connect <name> <url>` | Verify and save an HTTP(S) MCP server. | `-H, --header`, `--no-oauth`, `--auth-timeout <ms>`, `--protocol <auto\|legacy\|modern>`, `--no-open`, `--json` |
+| `list`                 | List saved servers.                    | `--json`                                                                                                        |
+| `remove <name>`        | Remove a saved server and credentials. | `--yes`                                                                                                         |
 
 **Per-server scopes:**
 
@@ -557,6 +557,9 @@ mcp-use client local auth status
 - In an interactive TTY, OAuth displays `This server requires OAuth. Press Enter to open your browser.` and opens the browser only after Enter.
 - `--no-open`, `--json`, and non-TTY operation never prompt or open a browser. They print the authorization URL to stderr while the loopback callback continues waiting.
 - `connect --no-oauth` prevents automatic OAuth when the server returns `401`.
+- `--protocol auto` prefers the modern wire and falls back to legacy. `legacy`
+  selects only the legacy wire. `modern` selects the stateless, sessionless
+  modern wire with no fallback.
 - Repeated `-H, --header <"Key: Value">` options store static headers as credentials.
 - Tool and prompt arguments accept `key=value`, `key:=<json>`, or a single JSON object argument.
 - `--json` may appear anywhere after `client`. Success emits exactly one JSON value to stdout. Errors emit exactly one JSON error envelope to stderr and no stdout value.

@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -8,8 +8,18 @@ const AUTHORIZATION_URL = "https://auth.example.com/authorize?state=test";
 
 const mocks = vi.hoisted(() => ({
   closePrompt: vi.fn(),
+  connectError: undefined as unknown,
   config: undefined as
-    | { mcpServers: Record<string, { authProvider?: unknown }> }
+    | {
+        mcpServers: Record<
+          string,
+          {
+            authProvider?: unknown;
+            clientOptions?: { supportedProtocolVersions?: string[] };
+            protocolNegotiation?: "auto" | "legacy" | { pin: "2026-07-28" };
+          }
+        >;
+      }
     | undefined,
   createInterface: vi.fn(),
   loadClientPackage: vi.fn(),
@@ -52,6 +62,7 @@ beforeEach(async () => {
   vi.resetAllMocks();
   vi.resetModules();
   mocks.config = undefined;
+  mocks.connectError = undefined;
   mocks.triggerOAuth = false;
   homeDirectory = await mkdtemp(join(tmpdir(), "mcp-use-client-"));
   vi.stubEnv("HOME", homeDirectory);
@@ -103,6 +114,7 @@ beforeEach(async () => {
       }
 
       async connect(name: string): Promise<typeof connection> {
+        if (mocks.connectError !== undefined) throw mocks.connectError;
         const provider = mocks.config?.mcpServers[name]?.authProvider as
           | { options: { openBrowser: (url: string) => Promise<void> } }
           | undefined;
@@ -333,6 +345,157 @@ describe("client human-readable output", () => {
     });
     expect(stderr).toBe("");
   });
+});
+
+describe("client protocol selection", () => {
+  it.each([
+    {
+      protocol: "auto",
+      expected: {
+        protocolNegotiation: "auto",
+      },
+    },
+    {
+      protocol: "modern",
+      expected: {
+        protocolNegotiation: { pin: "2026-07-28" },
+      },
+    },
+    {
+      protocol: "legacy",
+      expected: {
+        clientOptions: {
+          supportedProtocolVersions: ["2025-11-25"],
+        },
+        protocolNegotiation: "legacy",
+      },
+    },
+  ] as const)(
+    "maps --protocol $protocol to the official SDK negotiation options",
+    async ({ protocol, expected }) => {
+      await expect(
+        runClient([
+          "connect",
+          `protocol-${protocol}`,
+          "https://mcp.example.com/mcp",
+          "--no-oauth",
+          "--protocol",
+          protocol,
+        ])
+      ).resolves.toBe(0);
+
+      expect(mocks.config?.mcpServers[`protocol-${protocol}`]).toMatchObject(
+        expected
+      );
+    }
+  );
+
+  it("advertises only named protocol modes in help and validation errors", async () => {
+    await expect(runClient(["--help"])).resolves.toBe(0);
+    expect(stdout).toContain("--protocol <auto|legacy|modern>");
+    expect(stdout).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+
+    for (const value of ["2025-11-25", "2026-07-28", "invalid"]) {
+      stdout = "";
+      stderr = "";
+      await expect(
+        runClient([
+          "connect",
+          "invalid-protocol",
+          "https://mcp.example.com/mcp",
+          "--no-oauth",
+          "--protocol",
+          value,
+        ])
+      ).resolves.toBe(2);
+      expect(stdout).toBe("");
+      expect(stderr).toBe(
+        "Invalid protocol. Expected auto, legacy, or modern.\n"
+      );
+    }
+  });
+
+  it("migrates saved revision values before listing or reconnecting", async () => {
+    const { GLOBAL_STATE_DIR } = await import("../../src/commands/shared.js");
+    const clientDirectory = join(GLOBAL_STATE_DIR, "client");
+    const serversPath = join(clientDirectory, "servers.json");
+    await mkdir(clientDirectory, { recursive: true });
+    await writeFile(
+      serversPath,
+      JSON.stringify({
+        servers: {
+          old: {
+            url: "https://old.example.com/mcp",
+            oauth: false,
+            protocol: "2025-11-25",
+          },
+          new: {
+            url: "https://new.example.com/mcp",
+            oauth: false,
+            protocol: "2026-07-28",
+          },
+        },
+      })
+    );
+
+    await expect(runClient(["list", "--json"])).resolves.toBe(0);
+    expect(JSON.parse(stdout)).toEqual([
+      {
+        name: "old",
+        url: "https://old.example.com/mcp",
+        oauth: false,
+        protocol: "legacy",
+      },
+      {
+        name: "new",
+        url: "https://new.example.com/mcp",
+        oauth: false,
+        protocol: "modern",
+      },
+    ]);
+    expect(await readFile(serversPath, "utf8")).not.toMatch(
+      /\d{4}-\d{2}-\d{2}/
+    );
+    await rm(clientDirectory, { recursive: true, force: true });
+  });
+
+  it.each([
+    {
+      protocol: "legacy",
+      upstream:
+        "Unsupported protocol version: 2025-11-25; supported: 2026-07-28",
+      message: "Server does not support the requested legacy protocol.",
+    },
+    {
+      protocol: "modern",
+      upstream: "The server did not offer pinned protocol version 2026-07-28",
+      message:
+        "Server does not support the requested modern protocol (stateless/sessionless, no fallback).",
+    },
+  ] as const)(
+    "reports a named mismatch error for strict $protocol mode",
+    async ({ protocol, upstream, message }) => {
+      mocks.connectError = new Error(upstream);
+
+      await expect(
+        runClient([
+          "connect",
+          `mismatch-${protocol}`,
+          "https://mcp.example.com/mcp",
+          "--no-oauth",
+          "--protocol",
+          protocol,
+          "--json",
+        ])
+      ).resolves.toBe(1);
+
+      expect(stdout).toBe("");
+      expect(JSON.parse(stderr)).toEqual({
+        error: { code: "protocol_mismatch", message },
+      });
+      expect(stderr).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+    }
+  );
 });
 
 describe("client OAuth browser UX", () => {
