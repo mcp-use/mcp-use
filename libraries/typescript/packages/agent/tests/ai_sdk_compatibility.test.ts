@@ -391,7 +391,7 @@ describe("aI SDK Compatibility", () => {
   it.skipIf(!process.env.OPENAI_API_KEY)(
     "should work end-to-end with real MCPAgent and OpenAI",
     async () => {
-      const { LangChainMCPAgent } = await import("../src/langchain.js");
+      const { MCPAgent } = await import("../src/langchain.js");
       const { MCPClient } = await import("@mcp-use/client");
       const { ChatOpenAI } = await import("@langchain/openai");
 
@@ -405,7 +405,7 @@ describe("aI SDK Compatibility", () => {
         streaming: true,
       });
 
-      const agent = new LangChainMCPAgent({
+      const agent = new MCPAgent({
         llm,
         client,
         maxSteps: 5,

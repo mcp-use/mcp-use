@@ -19,37 +19,39 @@ Use `MCPAgent` when you want the model to decide which MCP tools to call. Use [`
 
 ## Installation
 
-Install `@mcp-use/agent`, `@mcp-use/client`, and one LangChain provider package for the LLM you want to use.
+Install `@mcp-use/agent`. `@mcp-use/client` is included as a dependency.
 
 <CodeGroup>
 ```bash npm
-npm install @mcp-use/agent @mcp-use/client
+npm install @mcp-use/agent
 ```
 
 ```bash pnpm
-pnpm add @mcp-use/agent @mcp-use/client
+pnpm add @mcp-use/agent
 ```
 
 ```bash bun
-bun add @mcp-use/agent @mcp-use/client
+bun add @mcp-use/agent
 ```
 </CodeGroup>
 
+For the LangChain bridge (`import { MCPAgent } from "@mcp-use/agent/langchain"`) or when you pass an explicit LangChain chat model, also install the peers you use:
+
 <CodeGroup>
 ```bash OpenAI
-npm install @langchain/openai
+npm install langchain @langchain/openai
 ```
 
 ```bash Anthropic
-npm install @langchain/anthropic
+npm install langchain @langchain/anthropic
 ```
 
 ```bash Google
-npm install @langchain/google-genai
+npm install langchain @langchain/google-genai
 ```
 
 ```bash Groq
-npm install @langchain/groq
+npm install langchain @langchain/groq
 ```
 </CodeGroup>
 

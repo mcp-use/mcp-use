@@ -6,7 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ChatOpenAI } from "@langchain/openai";
 import { describe, expect, it } from "vitest";
-import { LangChainMCPAgent } from "../../../src/langchain.js";
+import { MCPAgent } from "../../../src/langchain.js";
 import { MCPClient } from "@mcp-use/client";
 import { HumanMessage, AIMessage, ToolMessage } from "@langchain/core/messages";
 
@@ -29,7 +29,7 @@ describe.skipIf(!process.env.OPENAI_API_KEY)(
         },
       });
       const llm = new ChatOpenAI({ model: OPENAI_MODEL, temperature: 0 });
-      const agent = new LangChainMCPAgent({
+      const agent = new MCPAgent({
         llm,
         client,
         maxSteps: 5,
@@ -64,7 +64,7 @@ describe.skipIf(!process.env.OPENAI_API_KEY)(
         },
       });
       const llm = new ChatOpenAI({ model: OPENAI_MODEL, temperature: 0 });
-      const agent = new LangChainMCPAgent({
+      const agent = new MCPAgent({
         llm,
         client,
         maxSteps: 5,

@@ -120,7 +120,6 @@ export class MCPAgent {
     }
 
     this.maxSteps = options.maxSteps ?? 10;
-    this.autoInitialize = options.autoInitialize ?? false;
     this.systemPrompt =
       options.systemPrompt ??
       "You are a helpful assistant with access to MCP tools.";
@@ -177,6 +176,9 @@ export class MCPAgent {
         parseLLMStringToProviderConfig(this.llmString, this.llmConfig)
       );
     }
+
+    // ponytail: simplified mode should work with run() only — no manual initialize()
+    this.autoInitialize = options.autoInitialize ?? this.isSimplifiedMode;
   }
 
   private resolveMcpServers(mcpServers?: McpServersInput): void {
