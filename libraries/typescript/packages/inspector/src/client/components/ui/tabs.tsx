@@ -274,6 +274,8 @@ interface TabsTriggerProps {
   value: string;
   className?: string;
   disabled?: boolean;
+  /** Tooltip shown for an aria-disabled tab. */
+  disabledTooltip?: string;
   icon?: LucideIcon;
   title?: string;
   showDot?: boolean;
@@ -299,7 +301,11 @@ const ConditionalTooltip = ({
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger
-          render={<span className="contents">{children}</span>}
+          render={
+            <span className="inline-flex" title={title}>
+              {children}
+            </span>
+          }
           nativeButton={false}
         />
         <TooltipContent>{title}</TooltipContent>
@@ -330,6 +336,7 @@ const TabsTrigger = React.forwardRef<
       value,
       className,
       disabled,
+      disabledTooltip,
       icon: Icon,
       title: titleProp,
       showDot = false,
@@ -349,25 +356,28 @@ const TabsTrigger = React.forwardRef<
     const showLabel = !iconOnly && (!collapsed || isActive || alwaysExpanded);
     const badgeOnIcon = iconOnly || (collapsed && !showLabel);
 
-    // Use title prop when provided (for collapsed mode tooltips)
-    const title = collapsed && !showLabel && titleProp ? titleProp : undefined;
+    const tooltipTitle = disabled ? disabledTooltip : titleProp;
+    const showTooltip =
+      Boolean(disabled && disabledTooltip) || (collapsed && !showLabel);
+    const title =
+      !disabled && collapsed && !showLabel && titleProp ? titleProp : undefined;
 
     return (
-      <ConditionalTooltip
-        title={titleProp as string}
-        collapsed={collapsed && !showLabel}
-      >
+      <ConditionalTooltip title={tooltipTitle} collapsed={showTooltip}>
         <button
           ref={ref}
-          disabled={disabled}
-          onClick={() => handleValueChange(value)}
+          aria-disabled={disabled || undefined}
+          tabIndex={disabled ? -1 : undefined}
+          onClick={() => {
+            if (!disabled) handleValueChange(value);
+          }}
           data-tab-value={value}
           data-tab-active={isActive}
           role="tab"
           aria-selected={isActive ? "true" : "false"}
-          title={title}
+          title={disabled && disabledTooltip ? disabledTooltip : title}
           className={cn(
-            "relative z-10 inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-all duration-[250ms] ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
+            "relative z-10 inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-all duration-[250ms] ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 aria-disabled:pointer-events-none aria-disabled:cursor-not-allowed aria-disabled:opacity-50 cursor-pointer",
             iconOnly ? "size-9 shrink-0 flex-none rounded-full p-0" : "flex-1",
             variant === "default" && !iconOnly && "py-2.5",
             variant === "default" && !iconOnly && "rounded-md px-4",

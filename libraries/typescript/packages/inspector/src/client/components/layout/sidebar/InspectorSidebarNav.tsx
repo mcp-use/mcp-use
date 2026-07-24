@@ -1,5 +1,9 @@
 import { cn } from "@/client/lib/utils";
 import type { TabType } from "@/client/context/InspectorContext";
+import {
+  isInspectorSamplingAvailable,
+  STATELESS_SAMPLING_UNSUPPORTED_MESSAGE,
+} from "@/client/utils/samplingProtocol";
 import type { McpServer } from "@mcp-use/client/react";
 import {
   Tooltip,
@@ -71,21 +75,33 @@ export function InspectorSidebarNav({
         const showDot = shouldShowDot(tab.id, count, collapsed);
         const Icon = tab.icon;
         const isActive = activeTab === tab.id;
+        const isDisabled =
+          tab.id === "sampling" &&
+          !isInspectorSamplingAvailable(selectedServer);
         const hasTrailing = count > 0 || showDot;
 
         const row = (
           <button
             ref={getRowRef(tab.id)}
             type="button"
+            aria-disabled={isDisabled || undefined}
+            tabIndex={isDisabled ? -1 : undefined}
             data-testid={`tab-${tab.id}`}
             data-active={isActive ? true : undefined}
-            onClick={() => onTabChange(tab.id)}
+            title={
+              isDisabled ? STATELESS_SAMPLING_UNSUPPORTED_MESSAGE : undefined
+            }
+            onClick={() => {
+              if (!isDisabled) onTabChange(tab.id);
+            }}
             className={cn(
               sidebarMenuButtonClass,
               collapsed
                 ? "size-8! w-8! max-w-8! shrink-0 justify-center gap-0 p-0!"
                 : "w-full max-w-full sidebar-nav-pill-bleed-x pl-(--sidebar-nav-icon-pl-bleed) pr-(--sidebar-nav-pr-bleed)",
-              hasTrailing && !collapsed && sidebarNavRowTrailingPaddingClass
+              hasTrailing && !collapsed && sidebarNavRowTrailingPaddingClass,
+              "aria-disabled:cursor-not-allowed aria-disabled:opacity-50",
+              isDisabled && "pointer-events-none"
             )}
           >
             <Icon className="size-4 shrink-0" />
@@ -98,11 +114,29 @@ export function InspectorSidebarNav({
             key={tab.id}
             className={cn("group/menu-item relative", index === 0 && "mt-4")}
           >
-            {collapsed ? (
+            {collapsed || isDisabled ? (
               <Tooltip delayDuration={0}>
-                <TooltipTrigger render={row} nativeButton />
+                <TooltipTrigger
+                  render={
+                    isDisabled ? (
+                      <span
+                        className="block cursor-not-allowed"
+                        title={STATELESS_SAMPLING_UNSUPPORTED_MESSAGE}
+                      >
+                        {row}
+                      </span>
+                    ) : (
+                      row
+                    )
+                  }
+                  nativeButton={!isDisabled}
+                />
                 <TooltipContent side="right">
-                  {count > 0 ? `${tab.label} (${count})` : tab.label}
+                  {isDisabled
+                    ? STATELESS_SAMPLING_UNSUPPORTED_MESSAGE
+                    : count > 0
+                      ? `${tab.label} (${count})`
+                      : tab.label}
                 </TooltipContent>
               </Tooltip>
             ) : (
