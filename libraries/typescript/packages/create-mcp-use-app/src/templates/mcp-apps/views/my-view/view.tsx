@@ -16,7 +16,6 @@ import { useState } from "react";
 import { z } from "zod";
 
 import {
-  CloseIcon,
   ExpandIcon,
   ExternalLinkIcon,
   MonitorIcon,
@@ -124,65 +123,47 @@ export default function McpApp() {
                 </span>
               </Tooltip>
             </div>
-            <div className="flex items-center gap-2">
-              {!isFullscreen && !isPip && (
-                <>
-                  {availableDisplayModes.includes("pip") && (
-                    <Tooltip
-                      label="MCP Apps display mode: picture-in-picture"
-                      multiline
-                    >
-                      <button
-                        type="button"
-                        className="cursor-pointer rounded-full border border-neutral-300 p-2 text-neutral-900 transition-colors hover:bg-neutral-100 dark:border-neutral-600 dark:text-neutral-100 dark:hover:bg-neutral-800"
-                        aria-label="Picture-in-picture"
-                        onClick={() => void requestDisplayMode({ mode: "pip" })}
-                      >
-                        <PipIcon />
-                      </button>
-                    </Tooltip>
-                  )}
-                  {availableDisplayModes.includes("fullscreen") && (
-                    <Tooltip
-                      label="MCP Apps display mode: fullscreen"
-                      multiline
-                    >
-                      <button
-                        type="button"
-                        className="cursor-pointer rounded-full border border-neutral-300 p-2 text-neutral-900 transition-colors hover:bg-neutral-100 dark:border-neutral-600 dark:text-neutral-100 dark:hover:bg-neutral-800"
-                        aria-label="Fullscreen"
-                        onClick={() =>
-                          void requestDisplayMode({ mode: "fullscreen" })
-                        }
-                      >
-                        <ExpandIcon />
-                      </button>
-                    </Tooltip>
-                  )}
-                </>
-              )}
-              {(isFullscreen || isPip) && (
-                <Tooltip
-                  label="MCP Apps display mode: return to inline"
-                  multiline
-                >
-                  <button
-                    type="button"
-                    className="cursor-pointer rounded-full border border-neutral-300 p-2 text-neutral-900 transition-colors hover:bg-neutral-100 dark:border-neutral-600 dark:text-neutral-100 dark:hover:bg-neutral-800"
-                    aria-label="Exit"
-                    onClick={() => void requestDisplayMode({ mode: "inline" })}
+            {!isPip && (
+              <div className="flex items-center gap-2">
+                {availableDisplayModes.includes("pip") && (
+                  <Tooltip
+                    label="MCP Apps display mode: picture-in-picture"
+                    multiline
                   >
-                    <CloseIcon />
-                  </button>
-                </Tooltip>
-              )}
-            </div>
+                    <button
+                      type="button"
+                      className="cursor-pointer rounded-full border border-neutral-300 p-2 text-neutral-900 transition-colors hover:bg-neutral-100 dark:border-neutral-600 dark:text-neutral-100 dark:hover:bg-neutral-800"
+                      aria-label="Picture-in-picture"
+                      onClick={() => void requestDisplayMode({ mode: "pip" })}
+                    >
+                      <PipIcon />
+                    </button>
+                  </Tooltip>
+                )}
+                {availableDisplayModes.includes("fullscreen") && (
+                  <Tooltip label="MCP Apps display mode: fullscreen" multiline>
+                    <button
+                      type="button"
+                      className="cursor-pointer rounded-full border border-neutral-300 p-2 text-neutral-900 transition-colors hover:bg-neutral-100 dark:border-neutral-600 dark:text-neutral-100 dark:hover:bg-neutral-800"
+                      aria-label="Fullscreen"
+                      onClick={() =>
+                        void requestDisplayMode({ mode: "fullscreen" })
+                      }
+                    >
+                      <ExpandIcon />
+                    </button>
+                  </Tooltip>
+                )}
+              </div>
+            )}
           </div>
         )}
         {!isMobile && (
           <button
             type="button"
-            className="absolute bottom-6 left-1/2 z-20 flex -translate-x-1/2 cursor-pointer flex-col items-center gap-1 border-0 bg-transparent p-0 text-neutral-900 transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
+            className={`absolute left-1/2 z-20 flex -translate-x-1/2 cursor-pointer flex-col items-center gap-1 border-0 bg-transparent p-0 text-neutral-900 transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50 ${
+              isFullscreen ? "top-6" : "bottom-6"
+            }`}
             disabled={!canOpenExternal}
             title="mcp-use on GitHub"
             onClick={() =>
@@ -202,7 +183,7 @@ export default function McpApp() {
         <div
           className={`relative z-10 flex flex-col items-center text-center ${
             isFullscreen
-              ? "min-h-0 flex-1 justify-center overflow-y-auto px-6 py-8"
+              ? "min-h-0 flex-1 justify-center overflow-y-auto px-6 pt-24 pb-8"
               : isMobile
                 ? "px-6 py-10"
                 : "min-h-[400px] px-8 py-8 pb-16 sm:min-h-[440px] sm:px-10 sm:py-10 sm:pb-16"

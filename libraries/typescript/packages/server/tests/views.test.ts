@@ -1233,9 +1233,11 @@ describe("views document synthesis", () => {
     expect(html).not.toMatch(/<script[^>]+src=/);
     expect(html).not.toMatch(/<link[^>]+stylesheet/);
     expect(html).toContain("__mcpUseViewConfig");
-    expect(html).toContain(
-      "<style>html,body,#root{background:transparent}</style>"
-    );
+    expect(html).toContain("html,body,#root{background:transparent}");
+    expect(html).toContain('<div id="root" data-mcp-use-loading></div>');
+    expect(html).toContain("#root[data-mcp-use-loading]");
+    expect(html).toContain('content:"Compiling..."');
+    expect(html).toContain("@keyframes mcp-use-view-spin");
   });
 
   it("escapes </script> inside inlined module source so the document does not terminate early", () => {
@@ -1275,6 +1277,7 @@ describe("views document synthesis", () => {
       'src="http://localhost:3000/@id/__x00__virtual:mcp-use/views/demo"'
     );
     expect(html).toContain('src="http://localhost:3000/@vite/client"');
+    expect(html).toContain('<div id="root" data-mcp-use-loading></div>');
   });
 
   it("resolves view-relative production asset paths", () => {

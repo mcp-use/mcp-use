@@ -70,6 +70,9 @@ function configsEqual(
 }
 
 function renderView(mounted: MountedView, View: ComponentType): void {
+  document
+    .getElementById(mounted.rootId)
+    ?.removeAttribute("data-mcp-use-loading");
   mounted.root.render(
     <ErrorBoundary>
       <ViewRuntimeProvider runtime={mounted.runtime}>
