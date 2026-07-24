@@ -15,6 +15,11 @@
     }
   },
   "favicon": "/favicon.svg",
+  "banner": {
+    "content": "mcp-use v2 is in beta and the API is subject to change.",
+    "dismissible": false,
+    "type": "warning"
+  },
   "contextual": {
     "options": [
       "copy",
@@ -328,8 +333,7 @@
                     "group": "Get Started",
                     "pages": [
                       "v2/typescript/getting-started/welcome",
-                      "v2/typescript/getting-started/quickstart",
-                      "v2/typescript/getting-started/installation"
+                      "v2/typescript/getting-started/quickstart"
                     ]
                   },
                   {
