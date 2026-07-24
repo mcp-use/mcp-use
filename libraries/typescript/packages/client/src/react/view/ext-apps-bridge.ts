@@ -6,6 +6,8 @@ export {
 } from "@modelcontextprotocol/ext-apps/app-bridge";
 
 export type {
+  McpUiDownloadFileRequest,
+  McpUiDownloadFileResult,
   McpUiHostCapabilities,
   McpUiHostContext,
   McpUiMessageRequest,

@@ -1,10 +1,17 @@
 import { ViewRenderer } from "@mcp-use/client/react";
-import type { ViewDisplayMode } from "@mcp-use/client/react";
+import type {
+  ViewDisplayMode,
+  ViewLifecycleEvent,
+  ViewRendererProps,
+} from "@mcp-use/client/react";
 import { useViewHostProps } from "@/client/hooks/useViewHostProps";
 import type { MessageContentBlock } from "@/client/types/message-content-block";
 import { WidgetWrapper } from "@/client/components/ui/WidgetWrapper";
 import { Spinner } from "@/client/components/ui/spinner";
 import { cn } from "@/client/lib/utils";
+import { debugMcpApps } from "@/client/mcp-apps/debug";
+import { useCallback, useEffect, useRef } from "react";
+import type { LLMConfig } from "@/client/components/chat/types";
 
 const CHAT_MESSAGE_CAPABILITIES = { text: {}, image: {} } as const;
 
@@ -22,6 +29,7 @@ export interface McpAppsViewPanelProps {
   onDisplayModeChange: (mode: ViewDisplayMode) => void;
   onSendFollowUp?: (content: MessageContentBlock[]) => Promise<void>;
   modelContextScope?: string;
+  llmConfig?: LLMConfig | null;
   onWidgetHeightChange?: (height: number) => void;
   partialToolInput?: Record<string, unknown>;
   cancelled?: boolean;
@@ -49,12 +57,18 @@ export function McpAppsViewPanel({
   onDisplayModeChange,
   onSendFollowUp,
   modelContextScope,
+  llmConfig,
   onWidgetHeightChange,
   partialToolInput,
   cancelled,
   noWrapper = false,
   className,
 }: McpAppsViewPanelProps) {
+  const instanceIdRef = useRef(
+    `view-panel-${Math.random().toString(36).substring(2, 9)}`
+  );
+  const renderCountRef = useRef(0);
+  renderCountRef.current += 1;
   const hostProps = useViewHostProps({
     serverId,
     viewId,
@@ -67,7 +81,53 @@ export function McpAppsViewPanel({
     displayMode,
     onDisplayModeChange,
     modelContextScope,
+    llmConfig,
   });
+
+  debugMcpApps("view-panel-render", {
+    instanceId: instanceIdRef.current,
+    renderCount: renderCountRef.current,
+    viewId,
+    toolName,
+    hasHostProps: Boolean(hostProps),
+    hasMessageHandler: Boolean(onSendFollowUp),
+    hasModelContextScope: Boolean(modelContextScope),
+  });
+
+  useEffect(() => {
+    const instanceId = instanceIdRef.current;
+    debugMcpApps("view-panel-mount", { instanceId, viewId, toolName });
+    return () => {
+      debugMcpApps("view-panel-unmount", { instanceId, viewId, toolName });
+    };
+  }, [toolName, viewId]);
+
+  const handleMessage = useCallback(
+    (content: Parameters<NonNullable<ViewRendererProps["onMessage"]>>[0]) => {
+      debugMcpApps("view-message", {
+        instanceId: instanceIdRef.current,
+        viewId,
+        blockCount: content.length,
+      });
+      if (!onSendFollowUp) {
+        throw new Error("Chat is not available on this host surface");
+      }
+      return onSendFollowUp(content as MessageContentBlock[]);
+    },
+    [onSendFollowUp, viewId]
+  );
+
+  const handleLifecycleChange = useCallback(
+    (event: ViewLifecycleEvent) => {
+      debugMcpApps("view-lifecycle", {
+        instanceId: instanceIdRef.current,
+        viewId,
+        status: event.status,
+        ...("error" in event ? { error: event.error } : {}),
+      });
+    },
+    [viewId]
+  );
 
   if (!hostProps) {
     const loading = <Spinner className="size-5" />;
@@ -110,11 +170,8 @@ export function McpAppsViewPanel({
       messageCapabilities={
         onSendFollowUp ? CHAT_MESSAGE_CAPABILITIES : undefined
       }
-      onMessage={
-        onSendFollowUp
-          ? (content) => onSendFollowUp(content as MessageContentBlock[])
-          : undefined
-      }
+      onMessage={onSendFollowUp ? handleMessage : undefined}
+      onLifecycleChange={handleLifecycleChange}
       onInlineHeightChange={
         displayMode === "inline" ? onWidgetHeightChange : undefined
       }

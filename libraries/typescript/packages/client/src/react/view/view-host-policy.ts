@@ -9,6 +9,8 @@ type CapabilityInputs = {
   hasMessageHandler: boolean;
   hasModelContextHandler: boolean;
   hasLogHandler: boolean;
+  hasSamplingHandler?: boolean;
+  hasDownloadHandler?: boolean;
   messageCapabilities?: McpUiSupportedContentBlockModalities;
   modelContextCapabilities?: McpUiSupportedContentBlockModalities;
 };
@@ -18,6 +20,8 @@ export function buildDefaultHostCapabilities({
   hasMessageHandler,
   hasModelContextHandler,
   hasLogHandler,
+  hasSamplingHandler,
+  hasDownloadHandler,
   messageCapabilities,
   modelContextCapabilities,
 }: CapabilityInputs): McpUiHostCapabilities {
@@ -30,6 +34,8 @@ export function buildDefaultHostCapabilities({
         }
       : {}),
     ...(hasLogHandler ? { logging: {} } : {}),
+    ...(hasSamplingHandler ? { sampling: {} } : {}),
+    ...(hasDownloadHandler ? { downloadFile: {} } : {}),
     ...(hasModelContextHandler
       ? { updateModelContext: modelContextCapabilities ?? { text: {} } }
       : {}),

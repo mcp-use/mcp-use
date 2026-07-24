@@ -289,9 +289,10 @@ export function ChatTab({
       localLlmConfig,
     });
 
-  const { getModelContexts } = useWidgetDebug();
+  const { getModelContexts, getAppToolConnections } = useWidgetDebug();
   const modelContextScope = `chat:${serverId}`;
   const widgetModelContexts = getModelContexts(modelContextScope);
+  const appToolConnections = getAppToolConnections(modelContextScope);
 
   // Use client-side or server-side chat implementation
   const chatHookParams = {
@@ -301,6 +302,7 @@ export function ChatTab({
     readResource,
     widgetModelContexts,
     disabledTools: effectiveDisabledTools,
+    appToolConnections,
   };
 
   const serverSideChat = useChatMessages({
@@ -1570,6 +1572,7 @@ export function ChatTab({
               tools={connection.tools}
               sendMessage={sendWidgetMessage}
               modelContextScope={modelContextScope}
+              llmConfig={llmConfig}
               serverBaseUrl={connection.url}
               messagesEndRef={messagesEndRef}
               traceEvents={traceEvents}

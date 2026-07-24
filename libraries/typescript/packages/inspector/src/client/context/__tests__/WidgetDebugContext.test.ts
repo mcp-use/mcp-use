@@ -1,13 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { selectModelContexts, type WidgetInfo } from "../WidgetDebugContext";
+import {
+  selectAppToolConnections,
+  selectModelContexts,
+  type WidgetInfo,
+} from "../WidgetDebugContext";
 
-function widget(scope: string, text: string): WidgetInfo {
+function widget(
+  scope: string | undefined,
+  text: string,
+  extras: Partial<WidgetInfo> = {}
+): WidgetInfo {
   return {
     toolName: text,
     protocol: "mcp-apps",
     modelContextScope: scope,
     cspViolations: [],
     modelContext: { content: [{ type: "text", text }] },
+    ...extras,
   };
 }
 
@@ -30,5 +39,48 @@ describe("selectModelContexts", () => {
     ]);
     widgets.delete("chat-widget");
     expect(selectModelContexts(widgets, "chat:server-a").size).toBe(0);
+  });
+});
+
+describe("selectAppToolConnections", () => {
+  it("returns only app tools from the active chat scope", () => {
+    const callTool = async () => ({ content: [] });
+    const widgets = new Map<string, WidgetInfo>([
+      [
+        "chat-widget",
+        widget("chat:server-a", "chat app", {
+          appToolConnection: {
+            tools: [
+              {
+                name: "app_ping",
+                inputSchema: { type: "object", properties: {} },
+              },
+            ],
+            callTool,
+          },
+        }),
+      ],
+      [
+        "other-chat",
+        widget("chat:server-b", "other app", {
+          appToolConnection: {
+            tools: [
+              {
+                name: "other_ping",
+                inputSchema: { type: "object", properties: {} },
+              },
+            ],
+            callTool,
+          },
+        }),
+      ],
+      ["tools-widget", widget(undefined, "tools")],
+    ]);
+
+    expect(
+      selectAppToolConnections(widgets, "chat:server-a").flatMap((connection) =>
+        connection.tools.map((tool) => tool.name)
+      )
+    ).toEqual(["app_ping"]);
   });
 });

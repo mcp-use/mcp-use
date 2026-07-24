@@ -1,5 +1,9 @@
 import { MCPChatMessageEvent, captureInspectorEvent } from "@/client/telemetry";
-import { MCPAgent, providerConfigFromOptions } from "@mcp-use/agent";
+import {
+  MCPAgent,
+  providerConfigFromOptions,
+  type McpConnectionLike,
+} from "@mcp-use/agent";
 import type { McpServer } from "@mcp-use/client/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PromptResult } from "../../hooks/useMCPPrompts";
@@ -32,6 +36,7 @@ import {
   widgetModelContextProviderMessage,
   type WidgetModelContext,
 } from "./widget-model-context";
+import { debugMcpApps } from "@/client/mcp-apps/debug";
 
 // Type alias for backward compatibility
 type MCPConnection = McpServer;
@@ -43,6 +48,7 @@ interface UseChatMessagesClientSideProps {
   readResource?: (uri: string) => Promise<any>;
   widgetModelContexts?: Map<string, WidgetModelContext | undefined>;
   disabledTools?: Set<string>;
+  appToolConnections?: McpConnectionLike[];
   initialMessages?: Message[];
   systemPrompt?: string;
 }
@@ -54,6 +60,7 @@ export function useChatMessagesClientSide({
   readResource,
   widgetModelContexts,
   disabledTools,
+  appToolConnections,
   initialMessages,
   systemPrompt = DEFAULT_CHAT_SYSTEM_PROMPT,
 }: UseChatMessagesClientSideProps) {
@@ -224,7 +231,7 @@ export function useChatMessagesClientSide({
             baseUrl: llmConfig.baseUrl,
             credentials: llmConfig.credentials,
           }),
-          mcpServers: [connection],
+          mcpServers: [connection, ...(appToolConnections ?? [])],
           systemPrompt,
           disallowedTools:
             disabledTools && disabledTools.size > 0
@@ -232,6 +239,14 @@ export function useChatMessagesClientSide({
               : undefined,
           maxSteps: 10,
           autoInitialize: true,
+        });
+        debugMcpApps("agent-app-tools", {
+          connectionCount: appToolConnections?.length ?? 0,
+          toolNames:
+            appToolConnections?.flatMap(
+              (appConnection) =>
+                appConnection.tools?.map((tool) => tool.name) ?? []
+            ) ?? [],
         });
 
         const commitMessageParts = () => {
@@ -498,6 +513,7 @@ export function useChatMessagesClientSide({
       readResource,
       attachments,
       disabledTools,
+      appToolConnections,
       widgetModelContexts,
       recordTrace,
       systemPrompt,

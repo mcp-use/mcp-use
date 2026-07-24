@@ -1,12 +1,22 @@
 import type {
+  McpUiDownloadFileRequest,
+  McpUiDownloadFileResult,
   McpUiHostCapabilities,
   McpUiHostContext,
   McpUiResourceCsp,
   McpUiResourcePermissions,
   McpUiSupportedContentBlockModalities,
 } from "./ext-apps-bridge.js";
+import type {
+  CreateMessageRequest,
+  CreateMessageResult,
+  CreateMessageResultWithTools,
+  Tool,
+} from "@modelcontextprotocol/client";
 
 export type {
+  McpUiDownloadFileRequest,
+  McpUiDownloadFileResult,
   McpUiHostCapabilities,
   McpUiHostContext,
   McpUiResourceCsp,
@@ -74,6 +84,11 @@ export type ViewCspViolation = {
   timestamp: number;
 };
 
+export type ViewAppToolConnection = {
+  tools: Tool[];
+  callTool: (name: string, args?: Record<string, unknown>) => Promise<unknown>;
+};
+
 export type ViewLifecycleStatus =
   | "resolving"
   | "sandbox-loading"
@@ -110,6 +125,13 @@ export interface ViewRendererProps {
   inlineMaxWidth?: number;
   chromeless?: boolean;
   onMessage?: (content: unknown[]) => void | Promise<void>;
+  onSamplingRequest?: (
+    params: CreateMessageRequest["params"]
+  ) => Promise<CreateMessageResult | CreateMessageResultWithTools>;
+  onDownloadFile?: (
+    params: McpUiDownloadFileRequest["params"]
+  ) => Promise<McpUiDownloadFileResult>;
+  onAppToolsChanged?: (connection: ViewAppToolConnection | null) => void;
   onModelContextUpdate?: (ctx: {
     content?: unknown;
     structuredContent?: unknown;

@@ -2,6 +2,7 @@ import {
   AppBridge,
   PostMessageTransport,
   buildAllowAttribute,
+  type McpUiDownloadFileRequest,
   type McpUiHostCapabilities,
   type McpUiMessageRequest,
   type McpUiOpenLinkRequest,
@@ -13,6 +14,7 @@ import type {
   CallToolRequest,
   LoggingMessageNotificationParams,
   ReadResourceRequest,
+  Tool,
   Transport,
 } from "@modelcontextprotocol/client";
 import React, {
@@ -47,6 +49,25 @@ import {
 const DEFAULT_HOST_INFO = { name: "mcp-use-client", version: "2.0.0" } as const;
 const DEFAULT_TOOL_CALL_TIMEOUT = 600_000;
 const SANDBOX_PROXY_READY = "ui/notifications/sandbox-proxy-ready";
+
+function debugViewRenderer(
+  event: string,
+  details: Record<string, unknown>
+): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (
+      window.localStorage.getItem("mcp-use:debug-mcp-apps") !== "1" &&
+      new URLSearchParams(window.location.search).get("debugMcpApps") !== "1"
+    ) {
+      return;
+    }
+  } catch {
+    return;
+  }
+  console.debug("[MCP Apps Debug]", event, JSON.stringify(details));
+}
+
 function CloseIcon() {
   return (
     <svg
@@ -130,6 +151,9 @@ function ViewRendererBase({
   inlineMaxWidth = 768,
   chromeless,
   onMessage,
+  onSamplingRequest,
+  onDownloadFile,
+  onAppToolsChanged,
   onModelContextUpdate,
   onLog,
   onReady,
@@ -148,6 +172,10 @@ function ViewRendererBase({
   invoking,
   invoked,
 }: ViewRendererProps) {
+  const instanceIdRef = useRef(
+    `view-renderer-${Math.random().toString(36).substring(2, 9)}`
+  );
+  const bridgeRunCountRef = useRef(0);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const bridgeRef = useRef<AppBridge | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -169,13 +197,20 @@ function ViewRendererBase({
   const [internalDisplayMode, setInternalDisplayMode] =
     useState<ViewDisplayMode>("inline");
   const displayMode = displayModeProp ?? internalDisplayMode;
+  const hasMessageHandler = onMessage !== undefined;
+  const hasModelContextHandler = onModelContextUpdate !== undefined;
+  const hasLogHandler = onLog !== undefined;
+  const hasSamplingHandler = onSamplingRequest !== undefined;
+  const hasDownloadHandler = onDownloadFile !== undefined;
   const effectiveHostCapabilities = useMemo<McpUiHostCapabilities>(
     () => ({
       ...buildDefaultHostCapabilities({
         hasConnection: source.kind === "live",
-        hasMessageHandler: onMessage !== undefined,
-        hasModelContextHandler: onModelContextUpdate !== undefined,
-        hasLogHandler: onLog !== undefined,
+        hasMessageHandler,
+        hasModelContextHandler,
+        hasLogHandler,
+        hasSamplingHandler,
+        hasDownloadHandler,
         messageCapabilities,
         modelContextCapabilities,
       }),
@@ -183,11 +218,13 @@ function ViewRendererBase({
     }),
     [
       hostCapabilities,
+      hasLogHandler,
+      hasSamplingHandler,
+      hasDownloadHandler,
+      hasMessageHandler,
+      hasModelContextHandler,
       messageCapabilities,
       modelContextCapabilities,
-      onLog,
-      onMessage,
-      onModelContextUpdate,
       source.kind,
     ]
   );
@@ -204,6 +241,12 @@ function ViewRendererBase({
   hostContextRef.current = effectiveHostContext;
   const onMessageRef = useRef(onMessage);
   onMessageRef.current = onMessage;
+  const onSamplingRequestRef = useRef(onSamplingRequest);
+  onSamplingRequestRef.current = onSamplingRequest;
+  const onDownloadFileRef = useRef(onDownloadFile);
+  onDownloadFileRef.current = onDownloadFile;
+  const onAppToolsChangedRef = useRef(onAppToolsChanged);
+  onAppToolsChangedRef.current = onAppToolsChanged;
   const toolInputRef = useRef(toolInput);
   toolInputRef.current = toolInput;
   const partialToolInputRef = useRef(partialToolInput);
@@ -282,6 +325,13 @@ function ViewRendererBase({
 
   // Resolve widget HTML from live connection or preloaded source
   useEffect(() => {
+    const instanceId = instanceIdRef.current;
+    debugViewRenderer("resource-effect-start", {
+      instanceId,
+      viewId,
+      sourceKind: source.kind,
+      liveResourceUri,
+    });
     let cancelledEffect = false;
     onLifecycleChangeRef.current?.({ status: "resolving" });
 
@@ -349,6 +399,11 @@ function ViewRendererBase({
 
     return () => {
       cancelledEffect = true;
+      debugViewRenderer("resource-effect-cleanup", {
+        instanceId,
+        viewId,
+        liveResourceUri,
+      });
     };
   }, [source.kind, liveResourceUri, preloadedHtml, cspMode, resolveSandboxUrl]);
 
@@ -430,6 +485,18 @@ function ViewRendererBase({
   // Bridge lifecycle: sandbox → connect → resource-ready → initialized
   useEffect(() => {
     if (!resolved || !activeSandboxUrl) return;
+    bridgeRunCountRef.current += 1;
+    const bridgeRun = bridgeRunCountRef.current;
+    const instanceId = instanceIdRef.current;
+    debugViewRenderer("bridge-effect-start", {
+      instanceId,
+      viewId,
+      bridgeRun,
+      hasMessageCapability: Boolean(effectiveHostCapabilities.message),
+      hasModelContextCapability: Boolean(
+        effectiveHostCapabilities.updateModelContext
+      ),
+    });
     const iframe = iframeRef.current;
     if (!iframe) return;
 
@@ -478,6 +545,28 @@ function ViewRendererBase({
           }: McpUiMessageRequest["params"]) => {
             await dispatchUiMessage(onMessageRef.current, content);
             return {};
+          };
+        }
+
+        if (capabilities.sampling) {
+          bridge.oncreatesamplingmessage = async (params) => {
+            const handler = onSamplingRequestRef.current;
+            if (!handler) {
+              throw new Error("This host surface does not support sampling");
+            }
+            return handler(params);
+          };
+        }
+
+        if (capabilities.downloadFile) {
+          bridge.ondownloadfile = async (
+            params: McpUiDownloadFileRequest["params"]
+          ) => {
+            const handler = onDownloadFileRef.current;
+            if (!handler) {
+              throw new Error("This host surface does not support downloads");
+            }
+            return handler(params);
           };
         }
 
@@ -576,6 +665,50 @@ function ViewRendererBase({
           }
         };
 
+        let publishedAppToolsSignature: string | null = null;
+        const publishAppTools = async () => {
+          const handler = onAppToolsChangedRef.current;
+          if (!bridge || !handler) return;
+          const appCapabilities = bridge.getAppCapabilities();
+          debugViewRenderer("app-tools-capabilities", {
+            instanceId,
+            viewId,
+            bridgeRun,
+            appCapabilities,
+          });
+          if (!appCapabilities?.tools) {
+            handler(null);
+            return;
+          }
+          const result = await bridge.listTools({});
+          if (disposed || !bridge) return;
+          const signature = JSON.stringify(result.tools);
+          if (signature === publishedAppToolsSignature) return;
+          publishedAppToolsSignature = signature;
+          debugViewRenderer("app-tools-published", {
+            instanceId,
+            viewId,
+            bridgeRun,
+            toolNames: result.tools.map((tool) => tool.name),
+          });
+          const currentBridge = bridge;
+          handler({
+            tools: result.tools as Tool[],
+            callTool: (name, args) =>
+              currentBridge.callTool({
+                name,
+                arguments: args ?? {},
+              }),
+          });
+        };
+
+        bridge.setNotificationHandler(
+          "notifications/tools/list_changed",
+          async () => {
+            await publishAppTools();
+          }
+        );
+
         const initPromise = hookInitialized(bridge);
         let transport: Transport = new PostMessageTransport(
           iframe.contentWindow!,
@@ -599,11 +732,20 @@ function ViewRendererBase({
 
         bridgeRef.current = bridge;
         setInitCount((c) => c + 1);
+        debugViewRenderer("bridge-initialized", {
+          instanceId,
+          viewId,
+          bridgeRun,
+        });
         onLifecycleChangeRef.current?.({ status: "initialized" });
 
+        await publishAppTools();
+
         const currentPartialToolInput = partialToolInputRef.current;
-        if (currentPartialToolInput) {
-          bridge.sendToolInputPartial({
+        const hasCompletedToolResult =
+          toolOutputRef.current !== undefined && toolOutputRef.current !== null;
+        if (currentPartialToolInput && !hasCompletedToolResult) {
+          await bridge.sendToolInputPartial({
             arguments: currentPartialToolInput,
           });
         } else {
@@ -611,14 +753,25 @@ function ViewRendererBase({
             ...toolInputRef.current,
             ...parseCustomProps(customPropsRef.current),
           };
-          bridge.sendToolInput({ arguments: mergedArgs });
+          debugViewRenderer("tool-input-send", {
+            instanceId,
+            viewId,
+            bridgeRun,
+            argumentKeys: Object.keys(mergedArgs),
+          });
+          await bridge.sendToolInput({ arguments: mergedArgs });
+          debugViewRenderer("tool-input-sent", {
+            instanceId,
+            viewId,
+            bridgeRun,
+          });
         }
         const toolResultPayload = buildToolResultPayload(
           toolOutputRef.current,
           customPropsRef.current
         );
         if (toolResultPayload) {
-          bridge.sendToolResult(toolResultPayload);
+          await bridge.sendToolResult(toolResultPayload);
         }
         onLifecycleChangeRef.current?.({ status: "ready" });
       } catch (err) {
@@ -636,8 +789,15 @@ function ViewRendererBase({
 
     return () => {
       disposed = true;
+      debugViewRenderer("bridge-effect-cleanup", {
+        instanceId,
+        viewId,
+        bridgeRun,
+        initialized: bridgeRef.current === bridge,
+      });
       const toClose = bridge;
       bridgeRef.current = null;
+      onAppToolsChangedRef.current?.(null);
       if (!toClose) return;
       onLifecycleChangeRef.current?.({ status: "tearing-down" });
       void (async () => {
@@ -672,26 +832,39 @@ function ViewRendererBase({
   useEffect(() => {
     const bridge = bridgeRef.current;
     if (!bridge || initCount === 0 || !effectiveHostContext) return;
-    bridge.setHostContext(effectiveHostContext);
+    void bridge.setHostContext(effectiveHostContext);
   }, [effectiveHostContext, initCount]);
 
   // Partial tool input
   useEffect(() => {
     const bridge = bridgeRef.current;
-    if (!bridge || initCount === 0 || !partialToolInput) return;
-    bridge.sendToolInputPartial({ arguments: partialToolInput });
-  }, [initCount, partialToolInput]);
+    if (
+      !bridge ||
+      initCount === 0 ||
+      !partialToolInput ||
+      (toolOutput !== undefined && toolOutput !== null)
+    ) {
+      return;
+    }
+    void bridge.sendToolInputPartial({ arguments: partialToolInput });
+  }, [initCount, partialToolInput, toolOutput]);
 
   // Tool input + custom props
   useEffect(() => {
     const bridge = bridgeRef.current;
-    if (!bridge || initCount === 0 || partialToolInput) return;
+    if (
+      !bridge ||
+      initCount === 0 ||
+      (partialToolInput && (toolOutput === undefined || toolOutput === null))
+    ) {
+      return;
+    }
     const mergedArgs = {
       ...toolInput,
       ...parseCustomProps(customProps),
     };
-    bridge.sendToolInput({ arguments: mergedArgs });
-  }, [initCount, toolInput, partialToolInput, customProps]);
+    void bridge.sendToolInput({ arguments: mergedArgs });
+  }, [initCount, toolInput, partialToolInput, customProps, toolOutput]);
 
   // Tool output
   useEffect(() => {
@@ -699,14 +872,14 @@ function ViewRendererBase({
     if (!bridge || initCount === 0) return;
     const toolResultPayload = buildToolResultPayload(toolOutput, customProps);
     if (!toolResultPayload) return;
-    bridge.sendToolResult(toolResultPayload);
+    void bridge.sendToolResult(toolResultPayload);
   }, [initCount, toolOutput, customProps]);
 
   // Cancellation
   useEffect(() => {
     const bridge = bridgeRef.current;
     if (!bridge || initCount === 0 || !cancelled) return;
-    bridge.sendToolCancelled({ reason: "Cancelled by user" });
+    void bridge.sendToolCancelled({ reason: "Cancelled by user" });
   }, [cancelled, initCount]);
 
   const readyFiredRef = useRef(false);
@@ -909,6 +1082,9 @@ function viewRendererAreEqual(
   if (prev.modelContextCapabilities !== next.modelContextCapabilities)
     return false;
   if (prev.onMessage !== next.onMessage) return false;
+  if (prev.onSamplingRequest !== next.onSamplingRequest) return false;
+  if (prev.onDownloadFile !== next.onDownloadFile) return false;
+  if (prev.onAppToolsChanged !== next.onAppToolsChanged) return false;
   if (prev.onModelContextUpdate !== next.onModelContextUpdate) return false;
   if (prev.cspMode !== next.cspMode) return false;
   if (prev.mockOpenAiFileApis !== next.mockOpenAiFileApis) return false;
@@ -932,7 +1108,11 @@ export {
 } from "./view-detection.js";
 export { isToolVisibleToModel } from "./view-host-policy.js";
 export { parseCustomProps } from "./parse-custom-props.js";
-export { buildViewSandboxBlobUrl } from "./sandbox-blob-url.js";
+export {
+  buildSandboxProxyBlobHtml,
+  buildViewSandboxBlobUrl,
+  buildViewSandboxUrl,
+} from "./sandbox-blob-url.js";
 export { injectOpenAiFileApis } from "./inject-openai-file-apis.js";
 export type {
   ViewConnection,
@@ -943,8 +1123,11 @@ export type {
   ViewCspViolation,
   ViewLifecycleEvent,
   ViewLifecycleStatus,
+  ViewAppToolConnection,
 } from "./types.js";
 export type {
+  McpUiDownloadFileRequest,
+  McpUiDownloadFileResult,
   McpUiHostCapabilities,
   McpUiHostContext,
   McpUiResourceCsp,

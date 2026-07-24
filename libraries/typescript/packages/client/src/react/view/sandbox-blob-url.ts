@@ -17,6 +17,16 @@ type ViewSandboxBlobUrlOptions = {
   widgetCsp?: McpUiResourceCsp;
 };
 
+/** Build a configured HTTP(S) sandbox proxy URL. */
+export function buildViewSandboxUrl(
+  sandboxDocumentUrl: URL,
+  options: ViewSandboxBlobUrlOptions
+): URL {
+  const url = new URL(sandboxDocumentUrl.href);
+  applySandboxSearchParams(url, options);
+  return url;
+}
+
 function applySandboxSearchParams(
   url: URL,
   options: ViewSandboxBlobUrlOptions

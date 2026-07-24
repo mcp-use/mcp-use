@@ -5,7 +5,7 @@ import { AssistantMessage } from "./AssistantMessage";
 import { ToolCallDisplay } from "./ToolCallDisplay";
 import { ToolResultRenderer } from "./ToolResultRenderer";
 import { UserMessage } from "./UserMessage";
-import type { MessageAttachment } from "./types";
+import type { LLMConfig, MessageAttachment } from "./types";
 import { isViewTool } from "@mcp-use/client/react";
 import { buildMessageTokenMap, type InspectorTraceEvent } from "./trace";
 import { normalizeWidgetMessage } from "./widget-message";
@@ -52,6 +52,7 @@ interface MessageListProps {
   /** Trace events used to derive per-message token counts on hover. */
   traceEvents?: InspectorTraceEvent[];
   modelContextScope?: string;
+  llmConfig?: LLMConfig | null;
 }
 
 export const MessageList = memo(
@@ -65,8 +66,13 @@ export const MessageList = memo(
     messagesEndRef,
     traceEvents = [],
     modelContextScope,
+    llmConfig,
   }: MessageListProps) => {
     const widgetMessageInFlightRef = useRef(false);
+    const isLoadingRef = useRef(isLoading);
+    isLoadingRef.current = isLoading;
+    const sendMessageRef = useRef(sendMessage);
+    sendMessageRef.current = sendMessage;
     const messageTokenMap = useMemo(
       () => buildMessageTokenMap(messages, traceEvents),
       [messages, traceEvents]
@@ -91,17 +97,18 @@ export const MessageList = memo(
 
     const handleFollowUp = useCallback(
       async (content: MessageContentBlock[]) => {
-        if (isLoading || widgetMessageInFlightRef.current) {
+        if (isLoadingRef.current || widgetMessageInFlightRef.current) {
           throw new Error("Chat is busy with another turn");
         }
-        if (!sendMessage) {
+        const currentSendMessage = sendMessageRef.current;
+        if (!currentSendMessage) {
           throw new Error("Chat is not available on this host surface");
         }
 
         const normalized = normalizeWidgetMessage(content);
         widgetMessageInFlightRef.current = true;
         try {
-          await sendMessage(
+          await currentSendMessage(
             normalized.text,
             normalized.attachments.length > 0
               ? normalized.attachments
@@ -111,7 +118,7 @@ export const MessageList = memo(
           widgetMessageInFlightRef.current = false;
         }
       },
-      [isLoading, sendMessage]
+      []
     );
 
     // Determine if we're in "thinking" state vs "streaming" state
@@ -283,6 +290,7 @@ export const MessageList = memo(
                                 )}
                                 onSendFollowUp={handleFollowUp}
                                 modelContextScope={modelContextScope}
+                                llmConfig={llmConfig}
                                 partialToolArgs={
                                   part.toolInvocation.partialArgs
                                 }
@@ -336,6 +344,7 @@ export const MessageList = memo(
                                     toolMeta={getToolMeta(toolCall.toolName)}
                                     onSendFollowUp={handleFollowUp}
                                     modelContextScope={modelContextScope}
+                                    llmConfig={llmConfig}
                                   />
                                 </div>
                               )}

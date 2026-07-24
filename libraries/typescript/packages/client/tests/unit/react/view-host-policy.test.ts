@@ -24,12 +24,16 @@ describe("buildDefaultHostCapabilities", () => {
         hasMessageHandler: true,
         hasModelContextHandler: true,
         hasLogHandler: true,
+        hasSamplingHandler: true,
+        hasDownloadHandler: true,
       })
     ).toEqual({
       openLinks: {},
       serverTools: {},
       serverResources: {},
       logging: {},
+      sampling: {},
+      downloadFile: {},
       updateModelContext: { text: {} },
       message: { text: {} },
     });
