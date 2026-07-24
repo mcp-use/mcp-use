@@ -353,15 +353,6 @@
                         ]
                       },
                       {
-                        "group": "Session Management",
-                        "icon": "key-round",
-                        "pages": [
-                          "v2/typescript/server/session-management/memory-storage",
-                          "v2/typescript/server/session-management/filesystem-storage",
-                          "v2/typescript/server/session-management/redis-storage"
-                        ]
-                      },
-                      {
                         "group": "Authorization",
                         "icon": "shield",
                         "pages": [
@@ -527,7 +518,6 @@
                           "v2/typescript/api-reference/server/auth-providers"
                         ]
                       },
-                      "v2/typescript/api-reference/server/sessions",
                       "v2/typescript/api-reference/server/middleware",
                       "v2/typescript/api-reference/server/widgets"
                     ]
