@@ -115,7 +115,6 @@ import {
   oauthCustomProvider,
   type OAuthAuthInfo,
   type OAuthMetadata,
-  type OAuthTokenVerifier,
 } from "mcp-use/oauth";
 
 type AppUser = {
@@ -124,7 +123,8 @@ type AppUser = {
   organizationId?: string;
 };
 
-declare function createYourVerifier(resource: URL): OAuthTokenVerifier;
+const demoAccessToken = process.env.DEMO_ACCESS_TOKEN;
+if (!demoAccessToken) throw new Error("DEMO_ACCESS_TOKEN is required");
 
 const oauthMetadata = {
   issuer: "https://auth.example.com",
@@ -140,9 +140,29 @@ const server = new MCPServer({
   version: "1.0.0",
   oauth: oauthCustomProvider<AppUser>({
     oauthMetadata,
-    createTokenVerifier(resource) {
-      return createYourVerifier(resource);
-    },
+    createTokenVerifier: (resource) => ({
+      async verifyAccessToken(token) {
+        if (token !== demoAccessToken) {
+          throw new Error("Invalid access token");
+        }
+
+        return {
+          token,
+          clientId: "demo-client",
+          scopes: ["profile"],
+          expiresAt: Math.floor(Date.now() / 1000) + 3600,
+          resource,
+          extra: {
+            payload: {
+              sub: "user-123",
+              email: "user@example.com",
+              organization_id: "org-123",
+              permissions: ["documents:read"],
+            },
+          },
+        };
+      },
+    }),
     mapAuthInfo(authInfo: OAuthAuthInfo) {
       const payload = authInfo.extra?.payload as Record<string, unknown>;
       return {
@@ -166,7 +186,9 @@ const server = new MCPServer({
 });
 ```
 
-`createTokenVerifier` receives the canonical MCP resource and must validate it when verifying each token. `mapAuthInfo` runs only after SDK auth information has been verified and must return `{ user, payload, permissions }`. It does not rewrite `ctx.auth.scopes`; those come from the verifier's verified auth info.
+This fixed-token verifier keeps the example small and is only suitable for local testing. In production, validate the token signature, issuer, expiry, and MCP resource, or introspect an opaque token with the authorization server.
+
+`createTokenVerifier` receives the canonical MCP resource. `mapAuthInfo` runs only after SDK auth information has been verified and must return `{ user, payload, permissions }`. It does not rewrite `ctx.auth.scopes`; those come from the verifier's verified auth info.
 
 ## Next steps
 
