@@ -1,0 +1,170 @@
+---
+title: "Sampling"
+description: "Request client-side LLM completions from TypeScript MCP tools."
+icon: "pipette"
+---
+
+Sampling lets a tool ask the connected client's LLM for a completion during tool execution. Use it when the server needs model judgment but should not own an LLM provider integration.
+
+This guide focuses on when to use sampling and how to keep tools resilient. Use the [Tool context API reference](/v2/typescript/api-reference/server/tool-context#sample) for exact overloads, options, progress behavior, defaults, and return shapes.
+
+## Use sampling when the client should provide the model
+
+Sampling is useful when the connected client already has the right model, credentials, policy, or user context.
+
+Good fits:
+
+| Need | Why sampling fits |
+| --- | --- |
+| Summarize text returned by a tool | The client model can transform the result before the tool responds. |
+| Classify or rank user-provided content | The server avoids a separate LLM provider dependency. |
+| Generate a draft that depends on client policy | The client's model and policy stay in control. |
+
+Do not use sampling for deterministic server logic, authorization decisions, or work that must succeed in clients without sampling support.
+
+## Check client support
+
+Only call `ctx.sample()` when the client advertises the `sampling` capability. Provide a deterministic fallback.
+
+```typescript
+import { MCPServer, text } from "mcp-use/server";
+import { z } from "zod";
+
+const server = new MCPServer({
+  name: "analysis-server",
+  version: "1.0.0",
+});
+
+server.tool(
+  {
+    name: "analyze_sentiment",
+    description: "Analyze sentiment, using client sampling when available.",
+    schema: z.object({
+      text: z.string(),
+    }),
+  },
+  async ({ text: input }, ctx) => {
+    if (!ctx.client.can("sampling")) {
+      return text(`Received ${input.length} characters. Sampling is not available.`);
+    }
+
+    const response = await ctx.sample(
+      `Classify this text as positive, negative, or neutral. Return one word.\n\n${input}`,
+    );
+    const content = Array.isArray(response.content) ? response.content[0] : response.content;
+    const sentiment = content?.type === "text" ? content.text.trim() : "unknown";
+
+    return text(`Sentiment: ${sentiment}`);
+  },
+);
+```
+
+The fallback should still give the user a useful result, even if it is less capable than the sampled path.
+
+## Keep prompts narrow
+
+Sampling works best when the prompt asks for one clear output. Put server-side data into the prompt and ask for a bounded result.
+
+```typescript
+const response = await ctx.sample(
+  `Summarize these release notes in three bullets for a support team.\n\n${notes}`,
+);
+```
+
+Avoid asking the sampled model to make hidden business decisions. If the tool changes state, keep the state-changing logic on the server and use sampling only for language or analysis.
+
+## Use full control when needed
+
+Use the full request form when the tool needs a system prompt, multiple messages, or model preferences.
+
+```typescript
+const response = await ctx.sample({
+  systemPrompt: "You write concise operational summaries.",
+  messages: [
+    {
+      role: "user",
+      content: {
+        type: "text",
+        text: `Summarize this incident timeline:\n\n${timeline}`,
+      },
+    },
+  ],
+  maxTokens: 200,
+});
+```
+
+Keep exact option tuning in the API reference. The guide-level choice is simple: use a string prompt for ordinary completions, and use the full request object when the message structure matters.
+
+## Report long-running progress
+
+Sampling can take time. If the client supplied a progress token, mcp-use can report progress while waiting. For custom progress handling or intervals, see the [Tool context API reference](/v2/typescript/api-reference/server/tool-context#sample).
+
+For long non-sampling work, use `ctx.reportProgress` directly:
+
+```typescript
+server.tool(
+  {
+    name: "process_records",
+    description: "Process records and report progress.",
+    schema: z.object({ batchId: z.string() }),
+  },
+  async ({ batchId }, ctx) => {
+    await ctx.reportProgress?.(0, 100, "Starting");
+    await processBatch(batchId);
+    await ctx.reportProgress?.(100, 100, "Complete");
+    return text("Batch processed.");
+  },
+);
+```
+
+Use [Notifications](/v2/typescript/server/notifications) for broader server-to-client notification workflows.
+
+## Handle sampling failures
+
+Sampling can fail when the client rejects the request, disconnects, times out, or returns content your tool does not expect.
+
+```typescript
+try {
+  const response = await ctx.sample("Summarize this text in one sentence:\n\n" + input);
+  const content = Array.isArray(response.content) ? response.content[0] : response.content;
+
+  if (content?.type !== "text") {
+    return text("The client returned a non-text sampling result.");
+  }
+
+  return text(content.text);
+} catch (err) {
+  return text(`Sampling was unavailable: ${err instanceof Error ? err.message : String(err)}`);
+}
+```
+
+Return a fallback result when the tool can still complete. Return an error only when sampling is required for correctness.
+
+## Test sampling locally
+
+Run a server with a sampling tool and call it from a client that supports sampling, such as the Inspector.
+
+```bash
+cd libraries/typescript/packages/mcp-use/examples/server/features/sampling
+pnpm install
+pnpm dev
+```
+
+In the Inspector, call the sampling tool, approve the sampling request, and verify both the sampled path and the fallback path.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Tool context API reference" icon="terminal" href="/v2/typescript/api-reference/server/tool-context#sample">
+    Look up `ctx.sample()` overloads, options, progress behavior, and return shapes.
+  </Card>
+  <Card title="Elicitation" icon="check" href="/v2/typescript/server/elicitation">
+    Ask the user for input during tool execution.
+  </Card>
+  <Card title="Notifications" icon="bell" href="/v2/typescript/server/notifications">
+    Send status, progress, and custom notifications to connected clients.
+  </Card>
+  <Card title="Client sampling" icon="monitor" href="/v2/typescript/client/sampling">
+    Configure sampling support in a TypeScript MCP client.
+  </Card>
+</CardGroup>

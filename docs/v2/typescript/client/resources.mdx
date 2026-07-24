@@ -1,0 +1,48 @@
+---
+title: "Resources"
+description: "List and read MCP server resources"
+icon: "folder-open"
+---
+
+Resources are URI-addressed content from MCP servers.
+
+```typescript
+import { MCPClient } from "@mcp-use/client";
+
+const client = new MCPClient({
+  mcpServers: { demo: { url: "http://localhost:3000/mcp" } },
+});
+
+try {
+  const conn = await client.connect("demo");
+
+  const resources = await conn.listResources();
+  for (const r of resources) {
+    console.log(r.uri, r.name, r.mimeType);
+  }
+
+  const result = await conn.readResource("file:///config.json");
+  for (const content of result.contents) {
+    if ("text" in content) console.log(content.text);
+  }
+} finally {
+  await client.close();
+}
+```
+
+## Resource templates
+
+Parameterized URIs (e.g. `db://users/{id}`) are discovered via `listResourceTemplates()` and read with `readResource(uri)`.
+
+## React
+
+```tsx
+const server = useMcpServer("demo");
+if (server?.state === "ready") {
+  const data = await server.readResource(uri);
+}
+```
+
+## Reference
+
+[`MCPConnection`](/v2/typescript/api-reference/client/mcp-session) — `listResources`, `listResourceTemplates`, `readResource`, `subscribeResource`.

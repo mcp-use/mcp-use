@@ -1,0 +1,66 @@
+---
+title: "Code Mode"
+description: "Let agents write code to call MCP tools"
+icon: "code"
+---
+
+Code mode exposes `execute_code` and `search_tools` so agents run JavaScript with access to connected MCP tools instead of making individual tool calls. Node.js only.
+
+## Enable
+
+```typescript
+import { MCPClient } from "@mcp-use/client";
+
+const client = new MCPClient(
+  {
+    mcpServers: {
+      fs: {
+        command: "npx",
+        args: ["-y", "@modelcontextprotocol/server-filesystem", "./data"],
+      },
+    },
+  },
+  { codeMode: true },
+);
+
+const result = await client.executeCode(`
+  const files = await fs.list_directory({ path: "." });
+  return files.length;
+`);
+
+console.log(result.result, result.logs, result.error);
+await client.close();
+```
+
+## Executors
+
+| Executor | Use case |
+| -------- | -------- |
+| `"vm"` (default) | Local Node.js VM — fast, trusted environments |
+| `"e2b"` | Cloud sandbox — untrusted code (`@e2b/code-interpreter` + API key) |
+| Custom function / `BaseCodeExecutor` | Your own runtime |
+
+```typescript
+{ codeMode: {
+    enabled: true,
+    executor: "e2b",
+    executorOptions: { apiKey: process.env.E2B_API_KEY!, timeoutMs: 300_000 },
+}}
+```
+
+## Agent integration
+
+Use with `@mcp-use/agent` and `PROMPTS.CODE_MODE`:
+
+```typescript
+import { MCPAgent, PROMPTS } from "@mcp-use/agent";
+
+const agent = new MCPAgent({ llm, client, systemPrompt: PROMPTS.CODE_MODE });
+await agent.run("List all files and count them");
+```
+
+## Reference
+
+[Code mode API reference](/v2/typescript/api-reference/client/code-mode) — config types, `searchTools`, `ExecutionResult`.
+
+[Anthropic: Code execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp)

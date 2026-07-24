@@ -1,0 +1,172 @@
+---
+title: "User Context"
+description: "Use authenticated user data inside TypeScript MCP server tools."
+icon: "user"
+---
+
+Use `ctx.auth` inside tool callbacks when a tool needs the authenticated caller. It is present only when OAuth middleware authenticated the request, so guard before reading user fields.
+
+This guide focuses on access-control patterns. Use the [Auth API reference](/v2/typescript/api-reference/server/auth) for the exact `AuthInfo` and `UserInfo` fields.
+
+## Guard authenticated tools
+
+Return an authorization error before doing work that requires a user.
+
+```typescript
+import { error, text } from "mcp-use/server";
+import { z } from "zod";
+
+server.tool(
+  {
+    name: "create_document",
+    description: "Create a document owned by the authenticated user.",
+    schema: z.object({
+      title: z.string(),
+      content: z.string(),
+    }),
+  },
+  async ({ title, content }, ctx) => {
+    if (!ctx.auth) {
+      return error("Unauthorized");
+    }
+
+    const document = await db.documents.create({
+      title,
+      content,
+      createdBy: ctx.auth.user.userId,
+    });
+
+    return text(`Created document ${document.id}.`);
+  },
+);
+```
+
+If every tool in a group needs the same rule, use middleware. If only one tool needs the rule, keep the check in the tool.
+
+## Read identity fields
+
+Use `ctx.auth.user.userId` as the stable user identifier. Optional profile fields depend on the provider and granted scopes.
+
+```typescript
+const { user } = ctx.auth;
+
+const profile = {
+  userId: user.userId,
+  email: user.email,
+  name: user.name,
+  picture: user.picture,
+};
+```
+
+Do not assume `email`, `name`, or provider-specific fields are always present. Check before using them in database keys or user-facing output.
+
+## Check scopes and permissions
+
+Use scopes for OAuth grants and permissions for application authorization. mcp-use exposes both on `ctx.auth`.
+
+```typescript
+import { error, text } from "mcp-use/server";
+
+server.tool(
+  {
+    name: "delete_document",
+    description: "Delete a document when the caller has permission.",
+  },
+  async ({ documentId }, ctx) => {
+    if (!ctx.auth) {
+      return error("Unauthorized");
+    }
+
+    if (!ctx.auth.permissions.includes("documents:delete")) {
+      return error("Forbidden: documents:delete permission required");
+    }
+
+    await db.documents.delete({ id: documentId });
+    return text("Document deleted.");
+  },
+);
+```
+
+Providers map claims differently. Check the provider page for claim conventions and use the API reference for the exact helper functions.
+
+## Scope data by organization or tenant
+
+Many providers add organization or tenant claims to `ctx.auth.user`. Narrow custom fields before using them.
+
+```typescript
+import { error, object } from "mcp-use/server";
+
+server.tool(
+  {
+    name: "list_documents",
+    description: "List documents for the authenticated organization.",
+  },
+  async (_args, ctx) => {
+    if (!ctx.auth) {
+      return error("Unauthorized");
+    }
+
+    const organizationId = ctx.auth.user.organization_id as string | undefined;
+
+    if (!organizationId) {
+      return error("Organization context required.");
+    }
+
+    const documents = await db.documents.findMany({
+      where: { organizationId },
+    });
+
+    return object({ documents });
+  },
+);
+```
+
+Use provider-specific claim names consistently in your app. For example, Clerk and WorkOS expose organization context with different field names.
+
+## Customize claim mapping
+
+Use a provider's `getUserInfo` option when the token uses custom claim names or when you want normalized user fields across providers.
+
+```typescript
+import { MCPServer, oauthCustomProvider } from "mcp-use/server";
+
+const server = new MCPServer({
+  name: "secure-server",
+  version: "1.0.0",
+  oauth: oauthCustomProvider({
+    issuer: "https://auth.example.com",
+    authEndpoint: "https://auth.example.com/oauth/authorize",
+    tokenEndpoint: "https://auth.example.com/oauth/token",
+    async verifyToken(token) {
+      return verifyTokenWithYourProvider(token);
+    },
+    getUserInfo(payload) {
+      return {
+        userId: payload.sub as string,
+        email: payload.email as string | undefined,
+        organizationId: payload["https://example.com/org_id"],
+        roles: (payload["https://example.com/roles"] as string[]) ?? [],
+      };
+    },
+  }),
+});
+```
+
+Fields returned from `getUserInfo` live under `ctx.auth.user`. Top-level `ctx.auth.scopes` and `ctx.auth.permissions` are derived from the verified payload, so your verifier or upstream token must include those claims when tools need them.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="shield-check" href="/v2/typescript/server/authentication/index">
+    Choose and configure an OAuth provider.
+  </Card>
+  <Card title="Auth API reference" icon="terminal" href="/v2/typescript/api-reference/server/auth">
+    Look up `AuthInfo`, `UserInfo`, and authorization helpers.
+  </Card>
+  <Card title="Middleware" icon="layers" href="/v2/typescript/server/middleware">
+    Apply shared authorization checks across tools.
+  </Card>
+  <Card title="Auth providers API reference" icon="plug" href="/v2/typescript/api-reference/server/auth-providers">
+    Look up provider-specific `getUserInfo` options.
+  </Card>
+</CardGroup>

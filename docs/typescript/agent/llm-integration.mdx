@@ -20,7 +20,7 @@ Simplified mode supports `openai`, `anthropic`, `google`, and `groq` provider st
 | `groq/model`      | `@langchain/groq`         | `GROQ_API_KEY`                                     |
 
 ```typescript
-import { MCPAgent } from "@mcp-use/agent";
+import { MCPAgent } from "mcp-use";
 
 const agent = new MCPAgent({
   llm: "openai/gpt-4o",
@@ -65,8 +65,7 @@ Explicit mode accepts any LangChain-compatible chat model. Use it for custom mod
 
 ```typescript
 import { ChatOpenAI } from "@langchain/openai";
-import { MCPAgent } from "@mcp-use/agent";
-import { MCPClient } from "@mcp-use/client";
+import { MCPAgent, MCPClient } from "mcp-use";
 
 const client = new MCPClient({ mcpServers });
 const llm = new ChatOpenAI({
@@ -82,8 +81,7 @@ const agent = new MCPAgent({ llm, client });
 
 ```typescript
 import { ChatAnthropic } from "@langchain/anthropic";
-import { MCPAgent } from "@mcp-use/agent";
-import { MCPClient } from "@mcp-use/client";
+import { MCPAgent, MCPClient } from "mcp-use";
 
 const client = new MCPClient({ mcpServers });
 const llm = new ChatAnthropic({
@@ -99,8 +97,7 @@ const agent = new MCPAgent({ llm, client });
 
 ```typescript
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { MCPAgent } from "@mcp-use/agent";
-import { MCPClient } from "@mcp-use/client";
+import { MCPAgent, MCPClient } from "mcp-use";
 
 const client = new MCPClient({ mcpServers });
 const llm = new ChatGoogleGenerativeAI({
@@ -116,8 +113,7 @@ const agent = new MCPAgent({ llm, client });
 
 ```typescript
 import { ChatGroq } from "@langchain/groq";
-import { MCPAgent } from "@mcp-use/agent";
-import { MCPClient } from "@mcp-use/client";
+import { MCPAgent, MCPClient } from "mcp-use";
 
 const client = new MCPClient({ mcpServers });
 const llm = new ChatGroq({

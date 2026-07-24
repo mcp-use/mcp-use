@@ -22,7 +22,7 @@ All exports come from `mcp-use/react`:
 import {
   useWidget,
   useWidgetProps,
-  useViewState,
+  useWidgetState,
   useWidgetTheme,
 } from "mcp-use/react";
 import type {
@@ -185,20 +185,34 @@ const props = useWidgetProps<{ city: string; temperature: number }>();
 // { city: "Paris", temperature: 22 }
 ```
 
-### useViewState
+### useWidgetState
 
-`useViewState` replaces the legacy `useWidgetState` helper. It requires a JSON-serializable object default, shares one state object across the mounted view, and returns a synchronous `useState`-style setter.
+Convenience wrapper around `useWidget` that returns persisted state as a `[state, setState]` tuple, similar to `useState` but persisted and visible to the model. When `defaultState` is provided and the current state is `null`, the hook initializes it once the widget runtime is available (`isAvailable === true`).
 
-```tsx wrap
-import { useViewState } from "mcp-use/react";
+**Type Parameters**
+><ParamField body="TState" type="object" required="True" >   Shape of the persisted state. </ParamField>
 
-const [state, setState] = useViewState({ favorites: [] as string[] });
-setState((previous) => ({
-  favorites: [...previous.favorites, "new-item"],
-}));
+**Parameters**
+><ParamField body="defaultState" type="TState" default="undefined" >   Optional initial state. Applied via `setState` only when the current state is `null` and the runtime is available. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="readonly [TState | null, (state: TState | ((prev: TState | null) => TState)) => Promise<void>]" >   A readonly tuple of the current state (`null` until set) and the `setState` updater. The updater accepts a value or a functional updater and persists via `ui/update-model-context`. </ResponseField>
+
+**Signature**
+```ts wrap
+function useWidgetState<TState>(defaultState?: TState): readonly [TState | null, (state: TState | ((prev: TState | null) => TState)) => Promise<void>]
 ```
 
-See the [`useViewState` API reference](/typescript/api-reference/react/useviewstate) for host restoration and `ModelContext` integration.
+**Example**
+
+```tsx wrap
+import { useWidgetState } from "mcp-use/react";
+
+const [favorites, setFavorites] = useWidgetState<string[]>([]);
+
+await setFavorites(["item1", "item2"]);
+await setFavorites((prev) => [...(prev ?? []), "newItem"]);
+```
 
 ### useWidgetTheme
 

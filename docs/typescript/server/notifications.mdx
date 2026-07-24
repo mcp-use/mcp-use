@@ -1,151 +1,149 @@
 ---
 title: "Notifications"
-description: "Send request-scoped and subscription notifications from TypeScript MCP servers."
+description: "Send server-to-client notifications from TypeScript MCP servers."
 icon: "bell"
 ---
 
-Notifications are one-way MCP messages. In the stateless 2026 protocol, a
-server can send notifications related to an active request or publish the
-standard list and resource changes that clients requested through
-`subscriptions/listen`.
+Notifications are one-way MCP messages. Use them to tell connected clients that something changed, report progress, or send custom status events.
 
-There is no session-targeted or arbitrary post-response push channel. Keep
-custom status notifications inside the tool, resource, or prompt callback that
-owns the active response stream.
+Broadcast notifications, session-targeted notifications, and resource-subscription updates require stateful sessions. Request-scoped progress and log notifications depend on the current tool call and the client-provided request context. In stateless edge environments, do not design workflows that depend on server-to-client session notifications.
+
+This guide focuses on notification workflows. Use the [MCPServer API reference](/typescript/api-reference/server/mcp-server) and [Tool context API reference](/typescript/api-reference/server/tool-context) for exact method signatures, return values, and payload shapes.
 
 ## Choose the notification path
 
-| Need                                                  | Use                                 |
-| ----------------------------------------------------- | ----------------------------------- |
-| Send a custom notification during the current request | `ctx.sendNotification(...)`         |
-| Report progress for the current request               | `ctx.reportProgress(...)`           |
-| Send a request-scoped MCP log message                 | `ctx.sendLog(...)`                  |
-| Tell subscribed clients that tools changed            | `server.notifyToolsChanged()`       |
-| Tell subscribed clients that prompts changed          | `server.notifyPromptsChanged()`     |
-| Tell subscribed clients that resources changed        | `server.notifyResourcesChanged()`   |
-| Tell subscribed clients that one resource changed     | `server.notifyResourceUpdated(uri)` |
+Choose the narrowest target that matches the workflow.
 
-## Notify the current client
+| Need | Use |
+| --- | --- |
+| Notify every connected client | `server.sendNotification(...)` |
+| Notify one known session | `server.sendNotificationToSession(...)` |
+| Notify the client running the current tool | `ctx.sendNotification(...)` |
+| Report progress for the current tool call | `ctx.reportProgress?.(...)` |
+| Tell clients to refresh tools, resources, or prompts | list-changed helpers |
+| Tell subscribed clients a resource changed | `server.notifyResourceUpdated(uri)` |
 
-Use `ctx.sendNotification(method, params?)` inside a callback. It preserves the
-v1 method-and-params signature while using the official v2 request notification
-channel.
+Use resource subscriptions for resource-specific updates. Use custom notifications for status events that are not tied to one resource.
 
-Use an application namespace for custom methods so clients can route them
-without colliding with standard MCP notifications.
+## Send a custom notification
+
+Use a namespaced method for custom notifications so clients can route them cleanly.
 
 ```typescript
+await server.sendNotification("custom/status-update", {
+  status: "ready",
+  checkedAt: new Date().toISOString(),
+});
+```
+
+Custom notifications are best for dashboards, background job status, and operational events. Keep payloads small and stable.
+
+## Notify the current client from a tool
+
+Inside a tool callback, use `ctx.sendNotification(...)` when only the calling client should receive the message.
+
+```typescript
+import { text } from "mcp-use/server";
+
 server.tool(
   {
-    name: "run-import",
-    description: "Run an import and report its status to the caller.",
+    name: "run_import",
+    description: "Run an import and notify the caller when it starts.",
   },
   async (_params, ctx) => {
-    await ctx.sendNotification("com.example/import-status", {
-      status: "started",
+    await ctx.sendNotification("custom/import-started", {
       startedAt: new Date().toISOString(),
     });
 
     await runImport();
-
-    await ctx.sendNotification("com.example/import-status", {
-      status: "completed",
-    });
-
-    return {
-      content: [{ type: "text", text: "Import complete." }],
-    };
+    return text("Import complete.");
   },
 );
 ```
 
-The notification is delivered on the originating request's response stream
-before its final result. Await it before returning from the callback. It cannot
-be saved and reused to notify that client after the request finishes.
+Use this for per-user status that should not be broadcast to other sessions.
 
-The receiving client registers a handler for the same custom method:
+## Notify a specific session
+
+Use session IDs when another operation needs to target one connected client.
 
 ```typescript
-import { Client } from "@modelcontextprotocol/client";
-import { z } from "zod";
+const sessions = server.getActiveSessions();
+const [sessionId] = sessions;
 
-const client = new Client({ name: "import-client", version: "1.0.0" });
+if (sessionId) {
+  const sent = await server.sendNotificationToSession(sessionId, "custom/welcome", {
+    message: "Connected.",
+  });
 
-client.setNotificationHandler(
-  "com.example/import-status",
-  { params: z.object({ status: z.string() }) },
-  (params) => {
-    console.log(params.status);
+  if (!sent) {
+    console.log("Session was no longer available.");
+  }
+}
+```
+
+Session-targeted notifications are only useful while the session remains connected. Use persistent storage for durable tasks that must survive disconnects.
+
+## Refresh client lists after dynamic changes
+
+If your server adds or removes tools, resources, or prompts at runtime, notify clients to refresh their cached lists.
+
+```typescript
+await server.sendToolsListChanged();
+await server.sendResourcesListChanged();
+await server.sendPromptsListChanged();
+```
+
+Call these after the registration set changes. Do not call them for normal tool results or ordinary resource content updates.
+
+## Report progress from long-running tools
+
+Use `ctx.reportProgress` when the current tool call has stages the client should see.
+
+```typescript
+server.tool(
+  {
+    name: "process_data",
+    description: "Process data in stages.",
+  },
+  async (_params, ctx) => {
+    await ctx.reportProgress?.(0, 100, "Starting");
+    await processStageOne();
+    await ctx.reportProgress?.(50, 100, "Halfway");
+    await processStageTwo();
+    await ctx.reportProgress?.(100, 100, "Complete");
+    return text("Done.");
   },
 );
 ```
 
-## Publish list and resource changes
+`ctx.reportProgress` is optional because clients only provide progress tokens for some calls. Always use optional chaining or a guard.
 
-Cross-request invalidations use the server's subscription-backed helpers. Only
-clients with an active `subscriptions/listen` request for the corresponding
-notification type receive them.
+## Test notifications locally
 
-```typescript
-await server.notifyToolsChanged();
-await server.notifyPromptsChanged();
-await server.notifyResourcesChanged();
-await server.notifyResourceUpdated("config://settings");
+Use a stateful local connection and a client that displays notifications.
+
+```bash
+cd libraries/typescript/packages/mcp-use/examples/server/features/notifications
+pnpm install
+pnpm dev
 ```
 
-These helpers are for registry and resource changes, not arbitrary custom
-messages.
-
-## Report progress
-
-Use `ctx.reportProgress` when the current request has stages the client should
-see. It returns `false` without sending anything when the caller did not supply
-a progress token.
-
-```typescript
-server.tool({ name: "process-data" }, async (_params, ctx) => {
-  await ctx.reportProgress(0, 100, "Starting");
-  await processStageOne();
-  await ctx.reportProgress(50, 100, "Halfway");
-  await processStageTwo();
-  await ctx.reportProgress(100, 100, "Complete");
-
-  return { content: [{ type: "text", text: "Done." }] };
-});
-```
-
-## Send an MCP log message
-
-`ctx.sendLog(level, data, logger?)` sends the standard
-`notifications/message` notification on the active request. Modern clients
-must opt in with a request log level; otherwise the SDK suppresses the message.
-
-```typescript
-await ctx.sendLog("info", { imported: 42 }, "import-worker");
-```
+In the Inspector, call tools that send custom notifications. If you use the example `toggle-mode` tool, confirm that the client receives a tools-list-changed notification.
 
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card
-    title="Tool context API reference"
-    icon="box"
-    href="/typescript/api-reference/server/tool-context"
-  >
-    Look up `ctx.sendNotification`, `ctx.reportProgress`, and `ctx.sendLog`.
+  <Card title="MCPServer API reference" icon="server" href="/typescript/api-reference/server/mcp-server">
+    Look up server notification methods and session helpers.
   </Card>
-  <Card
-    title="Resource subscriptions"
-    icon="rss"
-    href="/typescript/server/subscriptions"
-  >
+  <Card title="Tool context API reference" icon="box" href="/typescript/api-reference/server/tool-context">
+    Look up `ctx.sendNotification`, `ctx.sendNotificationToSession`, and `ctx.reportProgress`.
+  </Card>
+  <Card title="Resource Subscriptions" icon="rss" href="/typescript/server/subscriptions">
     Notify clients that subscribed resource content changed.
   </Card>
-  <Card
-    title="Client notifications"
-    icon="monitor"
-    href="/typescript/client/notifications"
-  >
-    Handle standard and custom notifications in a TypeScript MCP client.
+  <Card title="Client notifications" icon="monitor" href="/typescript/client/notifications">
+    Handle notifications in a TypeScript MCP client.
   </Card>
 </CardGroup>

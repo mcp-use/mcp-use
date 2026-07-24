@@ -19,19 +19,17 @@ Use `MCPAgent` when you want the model to decide which MCP tools to call. Use [`
 
 ## Installation
 
-Install `@mcp-use/agent`, `@mcp-use/client`, and one LangChain provider package for the LLM you want to use.
+Install `mcp-use` and one LangChain provider package for the LLM you want to use.
 
 <CodeGroup>
 ```bash npm
-npm install @mcp-use/agent @mcp-use/client
+npm install mcp-use
 ```
-
 ```bash pnpm
-pnpm add @mcp-use/agent @mcp-use/client
+pnpm add mcp-use
 ```
-
-```bash bun
-bun add @mcp-use/agent @mcp-use/client
+```bash yarn
+yarn add mcp-use
 ```
 </CodeGroup>
 
@@ -39,15 +37,12 @@ bun add @mcp-use/agent @mcp-use/client
 ```bash OpenAI
 npm install @langchain/openai
 ```
-
 ```bash Anthropic
 npm install @langchain/anthropic
 ```
-
 ```bash Google
 npm install @langchain/google-genai
 ```
-
 ```bash Groq
 npm install @langchain/groq
 ```
@@ -60,7 +55,7 @@ Set the matching API key in your environment: `OPENAI_API_KEY`, `ANTHROPIC_API_K
 This example connects to the filesystem MCP server and answers a question about the current directory. It uses simplified mode, so the agent creates the LangChain model and `MCPClient` during initialization.
 
 ```typescript
-import { MCPAgent } from "@mcp-use/agent";
+import { MCPAgent } from "mcp-use";
 
 const agent = new MCPAgent({
   llm: "openai/gpt-4o",

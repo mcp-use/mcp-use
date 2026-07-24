@@ -1,0 +1,97 @@
+---
+title: "File System Storage"
+description: "Persist TypeScript MCP server sessions across local development reloads."
+icon: folder
+---
+
+Use `FileSystemSessionStore` when a single development server should keep session metadata across hot reloads or short restarts. It writes serializable session metadata to a JSON file on disk.
+
+This guide focuses on the development workflow. Use the [Sessions API reference](/v2/typescript/api-reference/server/sessions#filesystemsessionstore) for constructor fields, defaults, cleanup behavior, and file format details.
+
+## Let non-production mode use it automatically
+
+When `NODE_ENV !== "production"`, mcp-use uses file system storage when you do not pass a custom `sessionStore`. This includes unset `NODE_ENV`, local development, test, and other non-production values.
+
+```typescript
+import { MCPServer } from "mcp-use/server";
+
+const server = new MCPServer({
+  name: "dev-server",
+  version: "1.0.0",
+});
+
+await server.listen(3000);
+```
+
+By default, non-production sessions are written under `.mcp-use/sessions.json` in the project root. Set `NODE_ENV=production` or pass an explicit `sessionStore` when you do not want file-backed sessions.
+
+## Configure it explicitly when needed
+
+Pass `FileSystemSessionStore` when you want to control where the session file lives.
+
+```typescript
+import { FileSystemSessionStore, MCPServer } from "mcp-use/server";
+
+const server = new MCPServer({
+  name: "dev-server",
+  version: "1.0.0",
+  sessionStore: new FileSystemSessionStore({
+    path: ".mcp-use/sessions.json",
+  }),
+});
+
+await server.listen(3000);
+```
+
+Keep the session file out of source control. It contains client session metadata and should be treated as runtime state.
+
+## Use it only for single-instance persistence
+
+File system storage is useful when one process reads and writes the session file. It is not designed for shared production storage.
+
+Use file system storage when:
+
+- You are developing with hot reload.
+- You are testing reconnect behavior locally.
+- One server process owns the session file.
+
+Do not use it when:
+
+- Multiple server instances run behind a load balancer.
+- The session file would live on ephemeral deployment storage.
+- High write volume would make disk I/O a bottleneck.
+
+Use [Redis Storage](/v2/typescript/server/session-management/redis-storage) for distributed deployments.
+
+## Understand restart behavior
+
+On startup, the store loads existing session metadata from the file. If the file is missing, the server starts with no sessions. If the file is corrupt or unreadable, the store logs the issue and starts fresh.
+
+Writes are debounced and use a temporary-file-then-rename pattern to reduce file corruption risk during local development.
+
+## Verify the behavior
+
+Use a local client and confirm:
+
+- A session survives a server hot reload.
+- Removing `.mcp-use/sessions.json` forces clients to initialize again.
+- Running two server instances against the same file is not part of your workflow.
+
+If you need multiple instances, use Redis instead.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="In-Memory Storage" icon="memory-stick" href="/v2/typescript/server/session-management/memory-storage">
+    Use process-local storage when sessions can reset on restart.
+  </Card>
+  <Card title="Redis Storage" icon="/images/icons/redis.svg" href="/v2/typescript/server/session-management/redis-storage">
+    Share session metadata and streams across server instances.
+  </Card>
+  <Card title="Sessions API reference" icon="terminal" href="/v2/typescript/api-reference/server/sessions#filesystemsessionstore">
+    Look up file store options, defaults, and methods.
+  </Card>
+  <Card title="ServerConfig API reference" icon="server" href="/v2/typescript/api-reference/server/server-config">
+    Look up `sessionStore` configuration.
+  </Card>
+</CardGroup>

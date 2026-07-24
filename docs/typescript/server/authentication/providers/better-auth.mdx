@@ -1,104 +1,227 @@
 ---
 title: "Better Auth Provider"
-description: "Use Better Auth's OAuth Provider plugin with a TypeScript MCP server."
+description: "Configure Better Auth OAuth Provider authentication for a TypeScript MCP server."
 icon: "/images/icons/better-auth.svg"
 ---
 
-Use Better Auth when your application owns the OAuth authorization server.
-Better Auth handles registration, sign-in, consent, and token issuance;
-`mcp-use` advertises those endpoints and verifies the access-token JWTs.
+Use the Better Auth provider when your app owns the authorization server. Better Auth handles login, consent, token issuance, and JWKS. Your MCP server mounts the Better Auth routes and verifies the resulting access tokens.
 
-## Configure the MCP resource server
+This guide covers the mcp-use setup path with the Better Auth OAuth Provider plugin. Use the [auth providers API reference](/typescript/api-reference/server/auth-providers#oauthbetterauthprovider) for exact `oauthBetterAuthProvider()` options, defaults, and errors.
 
-Pass the full Better Auth issuer URL, including its base path:
+## Install Better Auth
+
+```bash
+npm install better-auth @better-auth/oauth-provider better-sqlite3
+```
+
+Use the database package that matches your Better Auth deployment. The example below uses SQLite for local development.
+
+## Configure Better Auth
+
+Create an auth module with the OAuth Provider plugin and JWT plugin.
 
 ```typescript
-import { MCPServer } from "mcp-use";
-import { oauthBetterAuthProvider } from "mcp-use/oauth/better-auth";
+// auth.ts
+import { oauthProvider } from "@better-auth/oauth-provider";
+import Database from "better-sqlite3";
+import { betterAuth } from "better-auth";
+import { jwt } from "better-auth/plugins";
+
+export const auth = betterAuth({
+  baseURL: "http://localhost:3000",
+  basePath: "/api/auth",
+  secret: process.env.BETTER_AUTH_SECRET!,
+  database: new Database("./sqlite.db"),
+  socialProviders: {
+    github: {
+      clientId: process.env.GITHUB_CLIENT_ID!,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+    },
+  },
+  plugins: [
+    jwt(),
+    oauthProvider({
+      loginPage: "/sign-in",
+      consentPage: "/consent",
+      allowDynamicClientRegistration: true,
+      allowUnauthenticatedClientRegistration: true,
+      validAudiences: ["http://localhost:3000/mcp"],
+      customAccessTokenClaims: async ({ user }) => ({
+        email: user?.email,
+        name: user?.name,
+        picture: user?.image,
+      }),
+    }),
+  ],
+});
+```
+
+The JWT plugin is required because mcp-use verifies access-token signatures.
+
+## Prepare the database
+
+```bash
+npx auth@latest generate
+npx auth@latest migrate
+```
+
+## Mount Better Auth on the MCP server
+
+Mount Better Auth's auth routes and metadata routes on the same Hono app as the MCP server.
+
+```typescript
+// server.ts
+import {
+  oauthProviderAuthServerMetadata,
+  oauthProviderOpenIdConfigMetadata,
+} from "@better-auth/oauth-provider";
+import { MCPServer, oauthBetterAuthProvider } from "mcp-use/server";
+import { auth } from "./auth.js";
 
 const server = new MCPServer({
   name: "better-auth-server",
   version: "1.0.0",
   oauth: oauthBetterAuthProvider({
-    authURL: "http://localhost:61843/api/auth",
-    resource: "http://localhost:43127/mcp",
+    authURL: "http://localhost:3000/api/auth",
   }),
 });
 
-export default server;
+server.app.on(["GET", "POST"], "/api/auth/**", (c) => auth.handler(c.req.raw));
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET",
+};
+
+const authServerMetadata = oauthProviderAuthServerMetadata(auth, {
+  headers: corsHeaders,
+});
+server.app.get("/.well-known/oauth-authorization-server", (c) =>
+  authServerMetadata(c.req.raw),
+);
+server.app.get("/.well-known/oauth-authorization-server/api/auth", (c) =>
+  authServerMetadata(c.req.raw),
+);
+
+const openIdConfig = oauthProviderOpenIdConfigMetadata(auth, {
+  headers: corsHeaders,
+});
+server.app.get("/.well-known/openid-configuration", (c) =>
+  openIdConfig(c.req.raw),
+);
+server.app.get("/.well-known/openid-configuration/api/auth", (c) =>
+  openIdConfig(c.req.raw),
+);
+
+await server.listen(3000);
 ```
 
-The provider does not create or mount Better Auth. It derives Better Auth's
-`/oauth2/authorize`, `/oauth2/token`, `/oauth2/register`, and `/jwks` endpoints
-from `authURL`, then verifies JWT issuer, signature, expiration, and MCP
-resource audience.
+Browser-based MCP clients need the CORS headers on metadata responses.
 
-## Run Better Auth as a separate Hono app
+## Add login and consent routes
 
-The authorization server can be a separate application and origin. The normal
-`mcp-use` server above owns `/mcp` and its protected-resource metadata; the Hono
-app only mounts Better Auth, its discovery routes, and your login and consent
-pages.
+Better Auth redirects users to your login and consent pages during OAuth. These routes can be simple for local development, but production pages should match your app's auth UX.
 
 ```typescript
-import { serve } from "@hono/node-server";
-import { Hono } from "hono";
+server.app.get("/sign-in", (c) => {
+  const queryString = new URL(c.req.url).search;
 
-import { auth } from "./auth.js";
+  return c.html(`<!DOCTYPE html>
+<html>
+<body>
+  <button onclick="signIn()">Sign in with GitHub</button>
+  <script>
+    async function signIn() {
+      const res = await fetch('/api/auth/sign-in/social', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          provider: 'github',
+          callbackURL: '/api/auth/oauth2/authorize${queryString}',
+        }),
+      });
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+    }
+  </script>
+</body>
+</html>`);
+});
 
-const app = new Hono();
+server.app.get("/consent", (c) => {
+  const scope = new URL(c.req.url).searchParams.get("scope") || "openid";
 
-app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));
-serve({ fetch: app.fetch, port: 61843 });
+  return c.html(`<!DOCTYPE html>
+<html>
+<body>
+  <p>Requested scopes: ${scope}</p>
+  <button onclick="consent(true)">Allow</button>
+  <button onclick="consent(false)">Deny</button>
+  <script>
+    async function consent(accept) {
+      const res = await fetch('/api/auth/oauth2/consent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          accept,
+          oauth_query: window.location.search.slice(1),
+        }),
+      });
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+    }
+  </script>
+</body>
+</html>`);
+});
 ```
 
-Because the issuer contains `/api/auth`, also route Better Auth's RFC 8414
-path-insertion metadata endpoint
-`/.well-known/oauth-authorization-server/api/auth` to `auth.handler` or
-`oauthProviderAuthServerMetadata(auth)`. Better Auth's OAuth Provider guide
-documents the required discovery, login, and consent routes. If browser-based
-MCP clients call this separate origin directly, configure Hono CORS for the MCP
-origin and include that origin in Better Auth's `trustedOrigins`.
+Use Better Auth's OAuth Provider docs for production login and consent-page behavior.
 
-## Credential-free anonymous example
+## Set environment variables
 
-The repository's [runnable example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/auth/better-auth)
-runs a regular `mcp-use dev` process on port 43127 and a separate Hono/Better
-Auth process on port 61843. It uses anonymous sign-in, so it requires no
-Google/GitHub credentials, email service, or password UI.
-
-For easy local setup, the example omits a database. Better Auth then uses
-stateless cookie sessions and its memory adapter. Anonymous users, dynamic
-clients, codes, and consent reset whenever the process restarts; configure a
-persistent Better Auth database before using the pattern in production.
-
-## Access the verified identity
-
-```typescript
-server.tool({ name: "whoami" }, async (_params, ctx) => ({
-  content: [
-    {
-      type: "text",
-      text: JSON.stringify({
-        id: ctx.auth.user.id,
-        isAnonymous: ctx.auth.user.isAnonymous,
-        scopes: ctx.auth.scopes,
-      }),
-    },
-  ],
-}));
+```bash
+BETTER_AUTH_SECRET=your-secret-change-in-production
+GITHUB_CLIENT_ID=your-github-client-id
+GITHUB_CLIENT_SECRET=your-github-client-secret
 ```
 
-Profile and application-specific access-token fields must be added with Better
-Auth's `customAccessTokenClaims`. The built-in mapper recognizes `email`,
-`name`, `picture`, `email_verified`, `sid`, `is_anonymous`/`isAnonymous`,
-`roles`, and `permissions` when present.
+Set the GitHub callback URL to:
 
-<Card
-  title="Better Auth OAuth Provider"
-  icon="book-open"
-  href="https://better-auth.com/docs/plugins/oauth-provider"
->
-  Configure Better Auth's OAuth server, discovery routes, claims, and
-  persistence.
-</Card>
+```text
+http://localhost:3000/api/auth/callback/github
+```
+
+## Verify the setup
+
+Run the server and connect with an OAuth-capable MCP client.
+
+```bash
+npm run dev
+```
+
+Confirm these cases:
+
+- The client discovers Better Auth OAuth metadata.
+- The user can sign in and approve consent.
+- Authenticated tool calls include `ctx.auth.user.userId`.
+- Invalid or unsigned tokens are rejected.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Runnable Better Auth example" icon="github" href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/better-auth">
+    Compare your setup with a working mcp-use Better Auth server.
+  </Card>
+  <Card title="Better Auth OAuth Provider" icon="book-open" href="https://better-auth.com/docs/plugins/oauth-provider">
+    Review Better Auth's OAuth Provider plugin.
+  </Card>
+  <Card title="User Context" icon="user" href="/typescript/server/authentication/user-context">
+    Use Better Auth user claims inside tools.
+  </Card>
+  <Card title="Better Auth provider API reference" icon="terminal" href="/typescript/api-reference/server/auth-providers#oauthbetterauthprovider">
+    Look up exact provider options and defaults.
+  </Card>
+</CardGroup>

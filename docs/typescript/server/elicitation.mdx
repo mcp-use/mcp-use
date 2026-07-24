@@ -6,7 +6,7 @@ icon: "check"
 
 Elicitation lets a tool pause and ask the client for user input. Use it when a tool cannot continue safely without a user decision, missing field, or external authorization step.
 
-This guide focuses on when to use elicitation and how to handle the user response. Use the [Tool context API reference](/typescript/api-reference/server/tool-context#elicit) for exact overloads, result types, timeout options, validation errors, and return shapes. For enum fields, use Zod (`z.enum`, `z.array(z.enum(...))`) — see [Elicitation schemas](/typescript/api-reference/server/elicitation-schemas) if you are migrating from v1 enum helpers.
+This guide focuses on when to use elicitation and how to handle the user response. Use the [Tool context API reference](/typescript/api-reference/server/tool-context#elicit) for exact overloads, result types, timeout options, validation errors, and return shapes. Use the [Elicitation schemas API reference](/typescript/api-reference/server/elicitation-schemas) for enum schema helpers.
 
 ## Choose form mode or URL mode
 
@@ -200,8 +200,8 @@ Then open the Inspector, call a tool that uses elicitation, and verify accept, d
   <Card title="Tool context API reference" icon="terminal" href="/typescript/api-reference/server/tool-context#elicit">
     Look up `ctx.elicit()` overloads, result types, timeout options, and validation behavior.
   </Card>
-  <Card title="Elicitation schemas (v1 migration)" icon="list-checks" href="/typescript/api-reference/server/elicitation-schemas">
-    Map removed v1 enum helpers to Zod form schemas.
+  <Card title="Elicitation schemas API reference" icon="list-checks" href="/typescript/api-reference/server/elicitation-schemas">
+    Look up enum schema helpers for advanced form schemas.
   </Card>
   <Card title="Sampling" icon="pipette" href="/typescript/server/sampling">
     Ask the client LLM for a completion during tool execution.

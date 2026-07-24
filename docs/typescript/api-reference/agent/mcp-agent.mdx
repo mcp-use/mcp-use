@@ -2,37 +2,26 @@
 title: "MCPAgent"
 description: "API reference for MCPAgent constructor modes, run options, streaming methods, memory, and observability."
 icon: "brain"
-github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/agent/src/agents/mcp_agent.ts"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/agents/mcp_agent.ts"
 ---
 
 <Callout type="info" title="Source Code">
-  View the source code for this module on GitHub:{" "}
-  <a
-    href="https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/agent/src/agents/mcp_agent.ts"
-    target="_blank"
-    rel="noopener noreferrer"
-  >
-    https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/agent/src/agents/mcp_agent.ts
-  </a>
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/agents/mcp_agent.ts' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/agents/mcp_agent.ts</a>
 </Callout>
 
 `MCPAgent` connects a LangChain-compatible chat model to MCP servers. It discovers MCP tools, resources, and prompts, exposes them as LangChain tools, runs a multi-step agent loop, and returns either a string or a Zod-validated structured result.
 
-Related source files: [`types.ts`](https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/agent/src/agents/types.ts), [`remote.ts`](https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/agent/src/agents/remote.ts), and [`agents/index.ts`](https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/agent/src/agents/index.ts).
+Related source files: [`types.ts`](https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/agents/types.ts), [`remote.ts`](https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/agents/remote.ts), and [`agents/index.ts`](https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/agents/index.ts).
 
 ```ts wrap
-import { MCPAgent } from "@mcp-use/agent";
+import { MCPAgent } from "mcp-use";
 ```
 
-Import agent-specific exports from `@mcp-use/agent`:
+Use the `mcp-use/agent` subpath when you want agent-specific exported types:
 
 ```ts wrap
-import { MCPAgent } from "@mcp-use/agent";
-import type {
-  MCPAgentOptions,
-  MCPServerConfig,
-  LLMConfig,
-} from "@mcp-use/agent";
+import { MCPAgent } from "mcp-use/agent";
+import type { MCPAgentOptions, MCPServerConfig, LLMConfig } from "mcp-use/agent";
 ```
 
 ## Constructor
@@ -40,19 +29,12 @@ import type {
 Creates an MCP agent. The constructor supports explicit mode, where you provide a model and `MCPClient` or connectors, and simplified mode, where you provide a `"provider/model"` string and `mcpServers` configuration.
 
 **Parameters**
-
-> <ParamField body="options" type="MCPAgentOptions" required="true">
->   Agent configuration. Use either
->   [`ExplicitModeOptions`](#explicitmodeoptions) or
->   [`SimplifiedModeOptions`](#simplifiedmodeoptions).
-> </ParamField>
+><ParamField body="options" type="MCPAgentOptions" required="true" >Agent configuration. Use either [`ExplicitModeOptions`](#explicitmodeoptions) or [`SimplifiedModeOptions`](#simplifiedmodeoptions).</ParamField>
 
 **Returns**
-
-> <ResponseField name="returns" type="MCPAgent" />
+><ResponseField name="returns" type="MCPAgent" />
 
 **Signature**
-
 ```ts wrap
 constructor(options: MCPAgentOptions)
 ```
@@ -62,7 +44,7 @@ constructor(options: MCPAgentOptions)
 In simplified mode, `MCPAgent` creates the `MCPClient` and LLM during `initialize()`. The `llm` value must use the `"provider/model"` format.
 
 ```ts wrap
-import { MCPAgent } from "@mcp-use/agent";
+import { MCPAgent } from "mcp-use";
 
 const agent = new MCPAgent({
   llm: "openai/gpt-4o",
@@ -88,8 +70,7 @@ In explicit mode, you create the model and client yourself. Use this mode when y
 
 ```ts wrap
 import { ChatOpenAI } from "@langchain/openai";
-import { MCPAgent } from "@mcp-use/agent";
-import { MCPClient } from "@mcp-use/client";
+import { MCPAgent, MCPClient } from "mcp-use";
 
 const client = new MCPClient({
   mcpServers: {
@@ -120,11 +101,9 @@ await agent.close();
 Returns the installed `mcp-use` package version.
 
 **Returns**
-
-> <ResponseField name="returns" type="string" />
+><ResponseField name="returns" type="string" />
 
 **Signature**
-
 ```ts wrap
 static getPackageVersion(): string
 ```
@@ -134,19 +113,15 @@ static getPackageVersion(): string
 Connects to MCP servers, creates LangChain tools, builds the system message, configures observability callbacks, and creates the underlying LangChain agent executor. In simplified mode, this also creates the `MCPClient` and LLM from the constructor options.
 
 **Returns**
-
-> <ResponseField name="returns" type="Promise<void>" />
+><ResponseField name="returns" type="Promise<void>" />
 
 **Signature**
-
 ```ts wrap
 initialize(): Promise<void>
 ```
 
 <Note>
-  `run()` initializes the agent when connector management is enabled. Call
-  `initialize()` yourself when you want explicit lifecycle control before
-  `stream()`, `streamEvents()`, or repeated runs.
+`run()` initializes the agent when connector management is enabled. Call `initialize()` yourself when you want explicit lifecycle control before `stream()`, `streamEvents()`, or repeated runs.
 </Note>
 
 ### run
@@ -154,23 +129,17 @@ initialize(): Promise<void>
 Runs a prompt to completion and returns the final result. Without a schema, the result is a string. With a Zod schema, the result is parsed and returned as the schema's inferred type.
 
 **Parameters**
-
-> <ParamField body="options.prompt" type="string" required="true">
->   User request to send to the agent.
-> </ParamField>
-
-<ParamField body="options.maxSteps" type="number" default="constructor maxSteps" >Maximum model-call steps for this run. The constructor default is `5`.</ParamField>
-<ParamField body="options.manageConnector" type="boolean" default="true" >Whether the agent should initialize connections before the run and clean up connector-only runs after completion.</ParamField>
-<ParamField body="options.externalHistory" type="BaseMessage[]" default="undefined" >Additional LangChain-formatted history for this run. The native agent places stored memory first (when enabled), then `externalHistory`, `messages`, and the current prompt. Supplying it does not clear or replace stored memory.</ParamField>
-<ParamField body="options.schema" type="ZodSchema<T>" default="undefined" >Schema for structured output. When present, `run()` returns `Promise<T>`.</ParamField>
-<ParamField body="options.signal" type="AbortSignal" default="undefined" >Abort signal passed to the underlying LangChain execution.</ParamField>
+><ParamField body="options.prompt" type="string" required="true" >User request to send to the agent.</ParamField>
+><ParamField body="options.maxSteps" type="number" default="constructor maxSteps" >Maximum model-call steps for this run. The constructor default is `5`.</ParamField>
+><ParamField body="options.manageConnector" type="boolean" default="true" >Whether the agent should initialize connections before the run and clean up connector-only runs after completion.</ParamField>
+><ParamField body="options.externalHistory" type="BaseMessage[]" default="conversation history" >History to use for this run instead of the agent's stored conversation history.</ParamField>
+><ParamField body="options.schema" type="ZodSchema<T>" default="undefined" >Schema for structured output. When present, `run()` returns `Promise<T>`.</ParamField>
+><ParamField body="options.signal" type="AbortSignal" default="undefined" >Abort signal passed to the underlying LangChain execution.</ParamField>
 
 **Returns**
-
-> <ResponseField name="returns" type="Promise<string | T>" />
+><ResponseField name="returns" type="Promise<string | T>" />
 
 **Example**
-
 ```ts wrap
 import { z } from "zod";
 
@@ -187,23 +156,20 @@ const analysis = await agent.run({
       z.object({
         path: z.string(),
         count: z.number(),
-      }),
+      })
     ),
   }),
 });
 ```
 
 **Signature**
-
 ```ts wrap
 run(options: RunOptions): Promise<string>
 run<T>(options: RunOptions<T>): Promise<T>
 ```
 
 <Warning>
-  The positional overloads (`run(query, maxSteps, manageConnector,
-  externalHistory, outputSchema, signal)`) are still supported for
-  compatibility, but they are deprecated. Prefer the options object form.
+The positional overloads (`run(query, maxSteps, manageConnector, externalHistory, outputSchema, signal)`) are still supported for compatibility, but they are deprecated. Prefer the options object form.
 </Warning>
 
 ### stream
@@ -211,35 +177,18 @@ run<T>(options: RunOptions<T>): Promise<T>
 Streams high-level agent steps and returns the final answer as the async generator's return value. Each yielded step represents a tool call. Tool observations are logged internally and may be empty in the yielded object.
 
 **Parameters**
-
-> <ParamField body="options" type="RunOptions<T>" required="true">
->   Same options object accepted by [`run`](#run).
-> </ParamField>
+><ParamField body="options" type="RunOptions<T>" required="true" >Same options object accepted by [`run`](#run).</ParamField>
 
 **Yields**
-
-> <ResponseField name="AgentStep.action.tool" type="string">
->   Name of the tool the agent called.
-> </ResponseField>
-> <ResponseField name="AgentStep.action.toolInput" type="any">
->   Arguments passed to the tool.
-> </ResponseField>
-> <ResponseField name="AgentStep.action.log" type="string">
->   Short text description of the tool call.
-> </ResponseField>
-> <ResponseField name="AgentStep.observation" type="string">
->   Tool observation text when available.
-> </ResponseField>
+><ResponseField name="AgentStep.action.tool" type="string">Name of the tool the agent called.</ResponseField>
+><ResponseField name="AgentStep.action.toolInput" type="any">Arguments passed to the tool.</ResponseField>
+><ResponseField name="AgentStep.action.log" type="string">Short text description of the tool call.</ResponseField>
+><ResponseField name="AgentStep.observation" type="string">Tool observation text when available.</ResponseField>
 
 **Returns**
-
-> <ResponseField
->   name="returns"
->   type="AsyncGenerator<AgentStep, string | T, void>"
-> />
+><ResponseField name="returns" type="AsyncGenerator<AgentStep, string | T, void>" />
 
 **Example**
-
 ```ts wrap
 for await (const step of agent.stream({
   prompt: "Find the README and summarize it.",
@@ -250,7 +199,6 @@ for await (const step of agent.stream({
 ```
 
 **Signature**
-
 ```ts wrap
 stream(options: RunOptions): AsyncGenerator<AgentStep, string, void>
 stream<T>(options: RunOptions<T>): AsyncGenerator<AgentStep, T, void>
@@ -261,20 +209,12 @@ stream<T>(options: RunOptions<T>): AsyncGenerator<AgentStep, T, void>
 Streams low-level LangChain `StreamEvent` objects from the underlying agent executor. Use this method for token streaming, detailed progress UIs, and custom event handling.
 
 **Parameters**
-
-> <ParamField body="options" type="RunOptions<T>" required="true">
->   Same options object accepted by [`run`](#run).
-> </ParamField>
+><ParamField body="options" type="RunOptions<T>" required="true" >Same options object accepted by [`run`](#run).</ParamField>
 
 **Returns**
-
-> <ResponseField
->   name="returns"
->   type="AsyncGenerator<StreamEvent, void, void>"
-> />
+><ResponseField name="returns" type="AsyncGenerator<StreamEvent, void, void>" />
 
 **Example**
-
 ```ts wrap
 for await (const event of agent.streamEvents({
   prompt: "Search the MCP server for project metadata.",
@@ -287,7 +227,6 @@ for await (const event of agent.streamEvents({
 ```
 
 **Signature**
-
 ```ts wrap
 streamEvents(options: RunOptions): AsyncGenerator<StreamEvent, void, void>
 streamEvents<T>(options: RunOptions<T>): AsyncGenerator<StreamEvent, void, void>
@@ -298,17 +237,12 @@ streamEvents<T>(options: RunOptions<T>): AsyncGenerator<StreamEvent, void, void>
 Streams low-level events through the built-in terminal formatter. This method is intended for CLIs and local development output.
 
 **Parameters**
-
-> <ParamField body="options" type="RunOptions<T>" required="true">
->   Same options object accepted by [`run`](#run).
-> </ParamField>
+><ParamField body="options" type="RunOptions<T>" required="true" >Same options object accepted by [`run`](#run).</ParamField>
 
 **Returns**
-
-> <ResponseField name="returns" type="AsyncGenerator<void, string, void>" />
+><ResponseField name="returns" type="AsyncGenerator<void, string, void>" />
 
 **Example**
-
 ```ts wrap
 for await (const _ of agent.prettyStreamEvents({
   prompt: "List all available MCP tools.",
@@ -318,7 +252,6 @@ for await (const _ of agent.prettyStreamEvents({
 ```
 
 **Signature**
-
 ```ts wrap
 prettyStreamEvents(options: RunOptions): AsyncGenerator<void, string, void>
 prettyStreamEvents<T>(options: RunOptions<T>): AsyncGenerator<void, string, void>
@@ -329,11 +262,9 @@ prettyStreamEvents<T>(options: RunOptions<T>): AsyncGenerator<void, string, void
 Returns a copy of the current conversation history. Conversation memory is enabled by default.
 
 **Returns**
-
-> <ResponseField name="returns" type="BaseMessage[]" />
+><ResponseField name="returns" type="BaseMessage[]" />
 
 **Signature**
-
 ```ts wrap
 getConversationHistory(): BaseMessage[]
 ```
@@ -343,11 +274,9 @@ getConversationHistory(): BaseMessage[]
 Clears stored conversation history. When memory is enabled and a system message exists, the system message is preserved.
 
 **Returns**
-
-> <ResponseField name="returns" type="void" />
+><ResponseField name="returns" type="void" />
 
 **Signature**
-
 ```ts wrap
 clearConversationHistory(): void
 ```
@@ -357,11 +286,9 @@ clearConversationHistory(): void
 Returns the active LangChain `SystemMessage`, or `null` before initialization when no system message has been created.
 
 **Returns**
-
-> <ResponseField name="returns" type="SystemMessage | null" />
+><ResponseField name="returns" type="SystemMessage | null" />
 
 **Signature**
-
 ```ts wrap
 getSystemMessage(): SystemMessage | null
 ```
@@ -371,17 +298,12 @@ getSystemMessage(): SystemMessage | null
 Replaces the active system message. If the agent is already initialized and tools are loaded, the underlying agent executor is recreated with the new message.
 
 **Parameters**
-
-> <ParamField body="message" type="string" required="true">
->   System message content.
-> </ParamField>
+><ParamField body="message" type="string" required="true" >System message content.</ParamField>
 
 **Returns**
-
-> <ResponseField name="returns" type="void" />
+><ResponseField name="returns" type="void" />
 
 **Signature**
-
 ```ts wrap
 setSystemMessage(message: string): void
 ```
@@ -391,17 +313,12 @@ setSystemMessage(message: string): void
 Sets the list of tool names that should not be exposed to the agent. If the agent is already initialized, reinitialize the agent for the change to affect generated tools.
 
 **Parameters**
-
-> <ParamField body="disallowedTools" type="string[]" required="true">
->   Tool names to hide from the agent.
-> </ParamField>
+><ParamField body="disallowedTools" type="string[]" required="true" >Tool names to hide from the agent.</ParamField>
 
 **Returns**
-
-> <ResponseField name="returns" type="void" />
+><ResponseField name="returns" type="void" />
 
 **Signature**
-
 ```ts wrap
 setDisallowedTools(disallowedTools: string[]): void
 ```
@@ -411,11 +328,9 @@ setDisallowedTools(disallowedTools: string[]): void
 Returns the current disallowed tool name list.
 
 **Returns**
-
-> <ResponseField name="returns" type="string[]" />
+><ResponseField name="returns" type="string[]" />
 
 **Signature**
-
 ```ts wrap
 getDisallowedTools(): string[]
 ```
@@ -425,17 +340,12 @@ getDisallowedTools(): string[]
 Merges metadata into the current observability metadata. Keys are sanitized by replacing unsupported characters with underscores. Object values are serialized for validation and large serialized values are truncated.
 
 **Parameters**
-
-> <ParamField body="newMetadata" type="Record<string, any>" required="true">
->   Serializable key-value pairs to attach to observability traces.
-> </ParamField>
+><ParamField body="newMetadata" type="Record<string, any>" required="true" >Serializable key-value pairs to attach to observability traces.</ParamField>
 
 **Returns**
-
-> <ResponseField name="returns" type="void" />
+><ResponseField name="returns" type="void" />
 
 **Signature**
-
 ```ts wrap
 setMetadata(newMetadata: Record<string, any>): void
 ```
@@ -445,11 +355,9 @@ setMetadata(newMetadata: Record<string, any>): void
 Returns a copy of the current observability metadata.
 
 **Returns**
-
-> <ResponseField name="returns" type="Record<string, any>" />
+><ResponseField name="returns" type="Record<string, any>" />
 
 **Signature**
-
 ```ts wrap
 getMetadata(): Record<string, any>
 ```
@@ -459,17 +367,12 @@ getMetadata(): Record<string, any>
 Adds tags to observability traces. Tags are sanitized, deduplicated, and limited to 50 characters.
 
 **Parameters**
-
-> <ParamField body="newTags" type="string[]" required="true">
->   Tags to attach to observability traces.
-> </ParamField>
+><ParamField body="newTags" type="string[]" required="true" >Tags to attach to observability traces.</ParamField>
 
 **Returns**
-
-> <ResponseField name="returns" type="void" />
+><ResponseField name="returns" type="void" />
 
 **Signature**
-
 ```ts wrap
 setTags(newTags: string[]): void
 ```
@@ -479,11 +382,9 @@ setTags(newTags: string[]): void
 Returns a copy of the current observability tags.
 
 **Returns**
-
-> <ResponseField name="returns" type="string[]" />
+><ResponseField name="returns" type="string[]" />
 
 **Signature**
-
 ```ts wrap
 getTags(): string[]
 ```
@@ -493,11 +394,9 @@ getTags(): string[]
 Flushes observability traces through the configured `ObservabilityManager`. Use this in serverless functions before the function exits.
 
 **Returns**
-
-> <ResponseField name="returns" type="Promise<void>" />
+><ResponseField name="returns" type="Promise<void>" />
 
 **Signature**
-
 ```ts wrap
 flush(): Promise<void>
 ```
@@ -507,11 +406,9 @@ flush(): Promise<void>
 Closes agent resources, shuts down observability handlers, clears tools and the executor, closes the client or disconnects direct connectors, and marks the agent as uninitialized.
 
 **Returns**
-
-> <ResponseField name="returns" type="Promise<void>" />
+><ResponseField name="returns" type="Promise<void>" />
 
 **Signature**
-
 ```ts wrap
 close(): Promise<void>
 ```
@@ -523,7 +420,6 @@ close(): Promise<void>
 Public array of tool names called during agent execution. The array is appended to as runs execute.
 
 **Type**
-
 ```ts
 string[]
 ```
@@ -533,9 +429,8 @@ string[]
 Public `ObservabilityManager` instance used to create callbacks, flush traces, and shut down observability integrations.
 
 **Type**
-
 ```ts
-ObservabilityManager;
+ObservabilityManager
 ```
 
 ## Types
@@ -545,7 +440,6 @@ ObservabilityManager;
 Union of explicit and simplified constructor options.
 
 **Signature**
-
 ```ts wrap
 type MCPAgentOptions = ExplicitModeOptions | SimplifiedModeOptions;
 ```
@@ -555,79 +449,28 @@ type MCPAgentOptions = ExplicitModeOptions | SimplifiedModeOptions;
 Options for constructing an agent from a pre-instantiated LLM plus an `MCPClient` or direct connectors.
 
 **Fields**
-
-> <ResponseField name="llm" type="LanguageModel" required="true">
->   LangChain-compatible chat model instance.
-> </ResponseField>
-> <ResponseField name="client" type="MCPClient">
->   MCP client. Required when `connectors` is omitted and required for
->   `useServerManager`.
-> </ResponseField>
-> <ResponseField name="connectors" type="BaseConnector[]">
->   Direct connectors. Required when `client` is omitted.
-> </ResponseField>
-> <ResponseField name="maxSteps" type="number">
->   Default maximum agent steps. Defaults to `5`.
-> </ResponseField>
-> <ResponseField name="autoInitialize" type="boolean">
->   Initialize automatically when a run starts and connector management did not
->   initialize the agent. Defaults to `false`.
-> </ResponseField>
-> <ResponseField name="memoryEnabled" type="boolean">
->   Store conversation history across runs. Defaults to `true`.
-> </ResponseField>
-> <ResponseField name="systemPrompt" type="string | null">
->   System prompt override. Defaults to `null`.
-> </ResponseField>
-> <ResponseField name="systemPromptTemplate" type="string | null">
->   Template override used when generating the system message from tools.
->   Defaults to `null`.
-> </ResponseField>
-> <ResponseField name="additionalInstructions" type="string | null">
->   Extra instructions appended to the generated system prompt. Defaults to
->   `null`.
-> </ResponseField>
-> <ResponseField name="disallowedTools" type="string[]">
->   Tool names to hide from the agent. Defaults to `[]`.
-> </ResponseField>
-> <ResponseField name="additionalTools" type="StructuredToolInterface[]">
->   Extra LangChain tools to add after MCP tools are created. Defaults to `[]`.
-> </ResponseField>
-> <ResponseField name="toolsUsedNames" type="string[]">
->   Initial tool usage list. Defaults to `[]`.
-> </ResponseField>
-> <ResponseField name="exposeResourcesAsTools" type="boolean">
->   Expose MCP resources as tools. Defaults to `true`.
-> </ResponseField>
-> <ResponseField name="exposePromptsAsTools" type="boolean">
->   Expose MCP prompts as tools. Defaults to `true`.
-> </ResponseField>
-> <ResponseField name="useServerManager" type="boolean">
->   Use `ServerManager` tools instead of exposing all server tools directly.
->   Defaults to `false`.
-> </ResponseField>
-> <ResponseField name="verbose" type="boolean">
->   Enable verbose observability output. Defaults to `false`.
-> </ResponseField>
-> <ResponseField name="observe" type="boolean">
->   Enable observability callback setup. Defaults to `true`.
-> </ResponseField>
-> <ResponseField name="adapter" type="LangChainAdapter">
->   Custom adapter for converting MCP tools, resources, and prompts to LangChain
->   tools.
-> </ResponseField>
-> <ResponseField
->   name="serverManagerFactory"
->   type="(client: MCPClient) => ServerManager"
-> >
->   Factory for custom server manager instances.
-> </ResponseField>
-> <ResponseField name="callbacks" type="BaseCallbackHandler[]">
->   Custom LangChain callback handlers.
-> </ResponseField>
+><ResponseField name="llm" type="LanguageModel" required="true">LangChain-compatible chat model instance.</ResponseField>
+><ResponseField name="client" type="MCPClient">MCP client. Required when `connectors` is omitted and required for `useServerManager`.</ResponseField>
+><ResponseField name="connectors" type="BaseConnector[]">Direct connectors. Required when `client` is omitted.</ResponseField>
+><ResponseField name="maxSteps" type="number">Default maximum agent steps. Defaults to `5`.</ResponseField>
+><ResponseField name="autoInitialize" type="boolean">Initialize automatically when a run starts and connector management did not initialize the agent. Defaults to `false`.</ResponseField>
+><ResponseField name="memoryEnabled" type="boolean">Store conversation history across runs. Defaults to `true`.</ResponseField>
+><ResponseField name="systemPrompt" type="string | null">System prompt override. Defaults to `null`.</ResponseField>
+><ResponseField name="systemPromptTemplate" type="string | null">Template override used when generating the system message from tools. Defaults to `null`.</ResponseField>
+><ResponseField name="additionalInstructions" type="string | null">Extra instructions appended to the generated system prompt. Defaults to `null`.</ResponseField>
+><ResponseField name="disallowedTools" type="string[]">Tool names to hide from the agent. Defaults to `[]`.</ResponseField>
+><ResponseField name="additionalTools" type="StructuredToolInterface[]">Extra LangChain tools to add after MCP tools are created. Defaults to `[]`.</ResponseField>
+><ResponseField name="toolsUsedNames" type="string[]">Initial tool usage list. Defaults to `[]`.</ResponseField>
+><ResponseField name="exposeResourcesAsTools" type="boolean">Expose MCP resources as tools. Defaults to `true`.</ResponseField>
+><ResponseField name="exposePromptsAsTools" type="boolean">Expose MCP prompts as tools. Defaults to `true`.</ResponseField>
+><ResponseField name="useServerManager" type="boolean">Use `ServerManager` tools instead of exposing all server tools directly. Defaults to `false`.</ResponseField>
+><ResponseField name="verbose" type="boolean">Enable verbose observability output. Defaults to `false`.</ResponseField>
+><ResponseField name="observe" type="boolean">Enable observability callback setup. Defaults to `true`.</ResponseField>
+><ResponseField name="adapter" type="LangChainAdapter">Custom adapter for converting MCP tools, resources, and prompts to LangChain tools.</ResponseField>
+><ResponseField name="serverManagerFactory" type="(client: MCPClient) => ServerManager">Factory for custom server manager instances.</ResponseField>
+><ResponseField name="callbacks" type="BaseCallbackHandler[]">Custom LangChain callback handlers.</ResponseField>
 
 **Signature**
-
 ```ts wrap
 interface ExplicitModeOptions {
   llm: LanguageModel;
@@ -658,71 +501,25 @@ interface ExplicitModeOptions {
 Options for constructing an agent from an LLM string and MCP server configuration. The agent creates the LLM and client internally during initialization.
 
 **Fields**
-
-> <ResponseField name="llm" type="string" required="true">
->   LLM identifier in `"provider/model"` format, such as `"openai/gpt-4o"` or
->   `"anthropic/claude-sonnet-4-6"`.
-> </ResponseField>
-> <ResponseField
->   name="mcpServers"
->   type="Record<string, MCPServerConfig>"
->   required="true"
-> >
->   MCP server connection configuration keyed by server name.
-> </ResponseField>
-> <ResponseField name="llmConfig" type="LLMConfig">
->   Provider-specific LLM configuration such as `apiKey`, `temperature`,
->   `maxTokens`, and `topP`.
-> </ResponseField>
-> <ResponseField name="maxSteps" type="number">
->   Default maximum agent steps. Defaults to `5`.
-> </ResponseField>
-> <ResponseField name="autoInitialize" type="boolean">
->   Initialize automatically when a run starts and connector management did not
->   initialize the agent. Defaults to `false`.
-> </ResponseField>
-> <ResponseField name="memoryEnabled" type="boolean">
->   Store conversation history across runs. Defaults to `true`.
-> </ResponseField>
-> <ResponseField name="systemPrompt" type="string | null">
->   System prompt override. Defaults to `null`.
-> </ResponseField>
-> <ResponseField name="systemPromptTemplate" type="string | null">
->   Template override used when generating the system message from tools.
->   Defaults to `null`.
-> </ResponseField>
-> <ResponseField name="additionalInstructions" type="string | null">
->   Extra instructions appended to the generated system prompt. Defaults to
->   `null`.
-> </ResponseField>
-> <ResponseField name="disallowedTools" type="string[]">
->   Tool names to hide from the agent. Defaults to `[]`.
-> </ResponseField>
-> <ResponseField name="additionalTools" type="StructuredToolInterface[]">
->   Extra LangChain tools to add after MCP tools are created. Defaults to `[]`.
-> </ResponseField>
-> <ResponseField name="exposeResourcesAsTools" type="boolean">
->   Expose MCP resources as tools. Defaults to `true`.
-> </ResponseField>
-> <ResponseField name="exposePromptsAsTools" type="boolean">
->   Expose MCP prompts as tools. Defaults to `true`.
-> </ResponseField>
-> <ResponseField name="useServerManager" type="boolean">
->   Use `ServerManager` tools instead of exposing all server tools directly.
->   Defaults to `false`.
-> </ResponseField>
-> <ResponseField name="verbose" type="boolean">
->   Enable verbose observability output. Defaults to `false`.
-> </ResponseField>
-> <ResponseField name="observe" type="boolean">
->   Enable observability callback setup. Defaults to `true`.
-> </ResponseField>
-> <ResponseField name="callbacks" type="BaseCallbackHandler[]">
->   Custom LangChain callback handlers.
-> </ResponseField>
+><ResponseField name="llm" type="string" required="true">LLM identifier in `"provider/model"` format, such as `"openai/gpt-4o"` or `"anthropic/claude-sonnet-4-6"`.</ResponseField>
+><ResponseField name="mcpServers" type="Record<string, MCPServerConfig>" required="true">MCP server connection configuration keyed by server name.</ResponseField>
+><ResponseField name="llmConfig" type="LLMConfig">Provider-specific LLM configuration such as `apiKey`, `temperature`, `maxTokens`, and `topP`.</ResponseField>
+><ResponseField name="maxSteps" type="number">Default maximum agent steps. Defaults to `5`.</ResponseField>
+><ResponseField name="autoInitialize" type="boolean">Initialize automatically when a run starts and connector management did not initialize the agent. Defaults to `false`.</ResponseField>
+><ResponseField name="memoryEnabled" type="boolean">Store conversation history across runs. Defaults to `true`.</ResponseField>
+><ResponseField name="systemPrompt" type="string | null">System prompt override. Defaults to `null`.</ResponseField>
+><ResponseField name="systemPromptTemplate" type="string | null">Template override used when generating the system message from tools. Defaults to `null`.</ResponseField>
+><ResponseField name="additionalInstructions" type="string | null">Extra instructions appended to the generated system prompt. Defaults to `null`.</ResponseField>
+><ResponseField name="disallowedTools" type="string[]">Tool names to hide from the agent. Defaults to `[]`.</ResponseField>
+><ResponseField name="additionalTools" type="StructuredToolInterface[]">Extra LangChain tools to add after MCP tools are created. Defaults to `[]`.</ResponseField>
+><ResponseField name="exposeResourcesAsTools" type="boolean">Expose MCP resources as tools. Defaults to `true`.</ResponseField>
+><ResponseField name="exposePromptsAsTools" type="boolean">Expose MCP prompts as tools. Defaults to `true`.</ResponseField>
+><ResponseField name="useServerManager" type="boolean">Use `ServerManager` tools instead of exposing all server tools directly. Defaults to `false`.</ResponseField>
+><ResponseField name="verbose" type="boolean">Enable verbose observability output. Defaults to `false`.</ResponseField>
+><ResponseField name="observe" type="boolean">Enable observability callback setup. Defaults to `true`.</ResponseField>
+><ResponseField name="callbacks" type="BaseCallbackHandler[]">Custom LangChain callback handlers.</ResponseField>
 
 **Signature**
-
 ```ts wrap
 interface SimplifiedModeOptions {
   llm: string;
@@ -750,31 +547,17 @@ interface SimplifiedModeOptions {
 Configuration for an MCP server in simplified mode.
 
 **Fields**
-
-> <ResponseField name="command" type="string">
->   Command for a stdio server.
-> </ResponseField>
-> <ResponseField name="args" type="string[]">
->   Arguments passed to `command`.
-> </ResponseField>
-> <ResponseField name="env" type="Record<string, string>">
->   Environment variables for the server process.
-> </ResponseField>
-> <ResponseField name="url" type="string">
->   URL for a remote HTTP MCP server.
-> </ResponseField>
-> <ResponseField name="headers" type="Record<string, string>">
->   Headers sent to remote MCP servers.
-> </ResponseField>
-> <ResponseField name="auth_token" type="string">
->   Bearer token value accepted by existing config shapes.
-> </ResponseField>
-> <ResponseField name="authToken" type="string">
->   Bearer token value accepted by existing config shapes.
-> </ResponseField>
+><ResponseField name="command" type="string">Command for a stdio server.</ResponseField>
+><ResponseField name="args" type="string[]">Arguments passed to `command`.</ResponseField>
+><ResponseField name="env" type="Record<string, string>">Environment variables for the server process.</ResponseField>
+><ResponseField name="url" type="string">URL for a remote HTTP or SSE MCP server.</ResponseField>
+><ResponseField name="headers" type="Record<string, string>">Headers sent to remote MCP servers.</ResponseField>
+><ResponseField name="auth_token" type="string">Bearer token value accepted by existing config shapes.</ResponseField>
+><ResponseField name="authToken" type="string">Bearer token value accepted by existing config shapes.</ResponseField>
+><ResponseField name="transport" type='"http" | "sse"'>Remote transport preference.</ResponseField>
+><ResponseField name="preferSse" type="boolean">Prefer SSE when both transports are possible.</ResponseField>
 
 **Signature**
-
 ```ts wrap
 interface MCPServerConfig {
   command?: string;
@@ -784,6 +567,8 @@ interface MCPServerConfig {
   headers?: Record<string, string>;
   auth_token?: string;
   authToken?: string;
+  transport?: "http" | "sse";
+  preferSse?: boolean;
 }
 ```
 
@@ -792,26 +577,13 @@ interface MCPServerConfig {
 Configuration passed to internally created LangChain model instances in simplified mode.
 
 **Fields**
-
-> <ResponseField name="apiKey" type="string">
->   Provider API key. If omitted, the provider-specific environment variable is
->   used.
-> </ResponseField>
-> <ResponseField name="temperature" type="number">
->   Sampling temperature.
-> </ResponseField>
-> <ResponseField name="maxTokens" type="number">
->   Maximum output tokens.
-> </ResponseField>
-> <ResponseField name="topP" type="number">
->   Nucleus sampling value.
-> </ResponseField>
-> <ResponseField name="[key: string]" type="any">
->   Additional provider-specific LangChain model options.
-> </ResponseField>
+><ResponseField name="apiKey" type="string">Provider API key. If omitted, the provider-specific environment variable is used.</ResponseField>
+><ResponseField name="temperature" type="number">Sampling temperature.</ResponseField>
+><ResponseField name="maxTokens" type="number">Maximum output tokens.</ResponseField>
+><ResponseField name="topP" type="number">Nucleus sampling value.</ResponseField>
+><ResponseField name="[key: string]" type="any">Additional provider-specific LangChain model options.</ResponseField>
 
 **Signature**
-
 ```ts wrap
 interface LLMConfig {
   apiKey?: string;
@@ -827,29 +599,14 @@ interface LLMConfig {
 Options object accepted by `run`, `stream`, `streamEvents`, and `prettyStreamEvents`.
 
 **Fields**
-
-> <ResponseField name="prompt" type="string" required="true">
->   User request to send to the agent.
-> </ResponseField>
-> <ResponseField name="maxSteps" type="number">
->   Per-call step limit override.
-> </ResponseField>
-> <ResponseField name="manageConnector" type="boolean">
->   Whether the agent manages initialization and connector cleanup for the call.
-> </ResponseField>
-> <ResponseField name="externalHistory" type="BaseMessage[]">
->   Additional history appended after the native agent's stored memory and
->   before provider messages and the current prompt.
-> </ResponseField>
-> <ResponseField name="schema" type="ZodSchema<T>">
->   Zod schema for structured output.
-> </ResponseField>
-> <ResponseField name="signal" type="AbortSignal">
->   Abort signal for cancellation.
-> </ResponseField>
+><ResponseField name="prompt" type="string" required="true">User request to send to the agent.</ResponseField>
+><ResponseField name="maxSteps" type="number">Per-call step limit override.</ResponseField>
+><ResponseField name="manageConnector" type="boolean">Whether the agent manages initialization and connector cleanup for the call.</ResponseField>
+><ResponseField name="externalHistory" type="BaseMessage[]">Conversation history override for the call.</ResponseField>
+><ResponseField name="schema" type="ZodSchema<T>">Zod schema for structured output.</ResponseField>
+><ResponseField name="signal" type="AbortSignal">Abort signal for cancellation.</ResponseField>
 
 **Signature**
-
 ```ts wrap
 interface RunOptions<T = string> {
   prompt: string;
@@ -862,9 +619,7 @@ interface RunOptions<T = string> {
 ```
 
 <Note>
-  `RunOptions` is defined in the `mcp_agent.ts` source file. It is used
-  structurally by the public methods, so you can pass an object with these
-  fields without importing the interface.
+`RunOptions` is defined in the `mcp_agent.ts` source file. It is used structurally by the public methods, so you can pass an object with these fields without importing the interface.
 </Note>
 
 ## Related

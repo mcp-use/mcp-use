@@ -1,0 +1,40 @@
+---
+title: "Sampling"
+description: "Handle LLM completion requests from MCP servers"
+icon: "pipette"
+---
+
+When a server tool needs an LLM during execution, it sends a `sampling/createMessage` request to your client. Provide `onSampling` to handle it.
+
+```typescript
+import { MCPClient, type OnSamplingCallback } from "@mcp-use/client";
+
+const onSampling: OnSamplingCallback = async (params) => {
+  const text = await yourLLM.complete(params);
+  return {
+    role: "assistant",
+    content: { type: "text", text },
+    model: "your-model",
+    stopReason: "endTurn",
+  };
+};
+
+const client = new MCPClient(
+  { mcpServers: { demo: { url: "http://localhost:3000/mcp" } } },
+  { onSampling },
+);
+
+await client.connect("demo");
+```
+
+## Per-server override
+
+Set `onSampling` on an individual server config to override the global default.
+
+## React
+
+With `useMcp`, pass `onSampling` in options. With `McpClientProvider`, handle `server.pendingSamplingRequests` and call `approveSampling` / `rejectSampling`.
+
+## Reference
+
+Runnable example: [sampling-client.ts](https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/client/examples/node/communication/sampling-client.ts)

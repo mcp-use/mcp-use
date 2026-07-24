@@ -11,8 +11,7 @@ icon: memory-stick
 When `memoryEnabled` is `true`, the agent stores human, assistant, and tool messages after each run. This is the default.
 
 ```typescript
-import { MCPAgent } from "@mcp-use/agent";
-import { MCPClient } from "@mcp-use/client";
+import { MCPAgent, MCPClient } from "mcp-use";
 import { ChatOpenAI } from "@langchain/openai";
 
 const client = new MCPClient({

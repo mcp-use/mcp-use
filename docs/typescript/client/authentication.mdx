@@ -1,125 +1,413 @@
 ---
 title: "Authentication"
-description: "OAuth and bearer tokens for MCP client connections"
+description: "Secure your MCP connections with OAuth and bearer tokens"
 icon: "shield"
 ---
 
-## OAuth (automatic)
+The mcp-use client supports multiple authentication methods for secure connections to MCP servers, including OAuth 2.1 with automatic token management, bearer token authentication, and custom authentication providers.
 
-For HTTP servers without a bearer token, the client auto-provisions OAuth on connect:
+## Supported Authentication Methods
+
+- **OAuth 2.1**: Complete OAuth flow with automatic Dynamic Client Registration (DCR)
+- **Bearer Tokens**: API key and token-based authentication
+- **Custom Headers**: Flexible authentication header support
+
+## OAuth Authentication
+
+OAuth provides secure, token-based authentication with automatic token refresh and user consent flows.
 
 ```typescript
-import { MCPClient } from "@mcp-use/client";
+import { useMcp } from "mcp-use/react";
 
-const client = new MCPClient({
-  mcpServers: {
-    demo: { url: "https://api.example.com/mcp" },
-  },
-});
+function MyComponent() {
+  const mcp = useMcp({
+    url: "http://localhost:3000/mcp",
+    callbackUrl: "http://localhost:3000/callback",
+  });
 
-// Node: blocks until authorized (loopback). Browser: popup or redirect.
-await client.connect("demo");
-```
+  // Handle authentication states
+  if (mcp.state === "pending_auth") {
+    return <button onClick={mcp.authenticate}>Authenticate with OAuth</button>;
+  }
 
-Disable with `oauth: false`. Override options with an `oauth` object on the server config. Pass a custom `authProvider` to skip auto-provisioning.
+  if (mcp.state === "authenticating") {
+    return <div>Authenticating...</div>;
+  }
 
-### React
+  if (mcp.state === "ready") {
+    return <div>Connected! {mcp.tools.length} tools available</div>;
+  }
 
-```tsx
-const mcp = useMcp({ url: "https://api.example.com/mcp" });
-
-if (mcp.state === "pending_auth") {
-  return <button onClick={mcp.authenticate}>Sign in</button>;
+  return <div>Connecting...</div>;
 }
 ```
 
-OAuth callback: import `onMcpAuthorization` from `@mcp-use/client/react` on your callback route. See [React integration](/typescript/client/usemcp#oauth-callback).
+### Custom OAuth Provider (Headless/Testing)
 
-### Flow modes
-
-| Mode | Option | When |
-| ---- | ------ | ---- |
-| Popup (default) | — | Desktop web |
-| Redirect | `useRedirectFlow: true` | Mobile, popup blockers |
-
-### Manual browser authorization
-
-Set `preventAutoAuth: true` on a `BrowserOAuthClientProvider` to prepare an
-authorization URL without opening it automatically. Read that URL with
-`getLastAttemptedAuthUrl()` and present it to the user in the same page
-lifetime. The fallback URL is intentionally kept in memory only and is not
-available after the provider or page is recreated; start a new authorization
-attempt after a reload.
-
-### Pre-registered client
+If you run in non-browser environments (tests, headless runners, custom redirects), you can inject your own OAuth provider.
 
 ```typescript
-const client = new MCPClient({
+import { useMcp } from "mcp-use/react";
+import { MyOAuthClientProvider } from "./my-oauth-provider";
+
+const mcp = useMcp({
+  url: "http://localhost:3000/mcp",
+  authProvider: new MyOAuthClientProvider(),
+});
+```
+
+<Note>
+  When `authProvider` is provided, `useMcp` uses that provider directly instead of creating the default browser OAuth provider internally.
+</Note>
+
+### Bearer Token Authentication
+
+For servers requiring API keys or bearer tokens:
+
+<CodeGroup>
+```typescript React Hook
+import { useMcp } from 'mcp-use/react'
+
+function MyComponent() {
+const mcp = useMcp({
+url: 'http://localhost:3000/mcp',
+headers: {
+Authorization: 'Bearer sk-your-api-key-here'
+}
+})
+
+// Use mcp.tools, mcp.callTool, etc.
+}
+
+````
+
+```typescript HttpConnector
+import { HttpConnector } from 'mcp-use'
+
+const connector = new HttpConnector('http://localhost:3000/mcp', {
+  authToken: 'sk-your-api-key-here'
+})
+````
+
+</CodeGroup>
+
+## Node.js Client Authentication
+
+For server-side Node.js applications, use `MCPClient` with bearer tokens or custom headers. OAuth flows are browser-only and not available in Node.js environments.
+
+### Bearer Token Authentication
+
+The simplest way to authenticate with API-based MCP servers:
+
+<CodeGroup>
+```typescript MCPClient Config
+import { MCPClient } from 'mcp-use'
+
+const config = {
+mcpServers: {
+"my-server": {
+url: "https://api.example.com/mcp",
+authToken: "sk-your-api-key-here"
+}
+}
+}
+
+const client = MCPClient.fromDict(config)
+
+````
+
+```typescript With Environment Variables
+import { MCPClient } from 'mcp-use'
+
+const config = {
   mcpServers: {
-    slack: {
-      url: "https://mcp.example.com/mcp",
-      oauth: {
-        clientId: "my-client-id",
-        clientMetadataUrl:
-          "https://app.example.com/.well-known/oauth-client-metadata.json",
-        scope: "openid profile",
+    "my-server": {
+      url: "https://api.example.com/mcp",
+      authToken: process.env.API_KEY
+    }
+  }
+}
+
+const client = MCPClient.fromDict(config)
+````
+
+</CodeGroup>
+
+### Custom Headers
+
+For servers requiring custom authentication headers or additional metadata:
+
+```typescript
+import { MCPClient } from "mcp-use";
+
+const config = {
+  mcpServers: {
+    "my-server": {
+      url: "https://api.example.com/mcp",
+      headers: {
+        Authorization: "Bearer sk-your-api-key",
+        "X-API-Version": "2024-01-01",
+        "X-Custom-Header": "value",
       },
     },
   },
-});
+};
+
+const client = MCPClient.fromDict(config);
 ```
 
-Browser clients are public PKCE clients — no client secrets in the browser.
+### Configuration File
 
-### OAuth proxy (browser)
+Load authentication settings from a JSON configuration file:
 
-When upstream OAuth endpoints lack CORS:
+<CodeGroup>
+```typescript Load Config
+import { MCPClient } from 'mcp-use'
 
-```typescript
-useMcp({
-  url: "https://mcp.example.com/mcp",
-  oauthProxyUrl: "https://app.example.com/api/mcp-oauth",
-});
-```
+// Constructor accepts file path directly
+const client = new MCPClient('./mcp-config.json')
 
-## Bearer token
+// Or use fromDict with imported config
+import config from './mcp-config.json'
+const client = MCPClient.fromDict(config)
 
-```typescript
-const client = new MCPClient({
-  mcpServers: {
-    api: {
-      url: "https://api.example.com/mcp",
-      authToken: process.env.API_KEY,
+````
+
+```json mcp-config.json
+{
+  "mcpServers": {
+    "github": {
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer ghp_..."
+      }
     },
+    "linear": {
+      "url": "https://mcp.linear.app/mcp",
+      "authToken": "lin_..."
+    },
+    "custom-api": {
+      "url": "https://api.example.com/mcp",
+      "headers": {
+        "Authorization": "Bearer sk-...",
+        "X-API-Version": "2024-01-01"
+      }
+    }
+  }
+}
+````
+
+</CodeGroup>
+
+<Tip>
+  **Best Practice**: Store sensitive tokens in environment variables and
+  reference them in your configuration instead of hardcoding them in files.
+</Tip>
+
+## OAuth Flow Modes
+
+mcp-use supports two OAuth flow modes for client applications:
+
+### Popup Flow (Default)
+
+Opens OAuth authorization in a popup window. Best for desktop and web applications.
+
+**Advantages:**
+
+- User stays on the same page
+- Better UX for web applications
+- No navigation interruption
+
+**Usage:**
+
+```typescript
+const mcp = useMcp({
+  url: "http://localhost:3000/mcp",
+  callbackUrl: "http://localhost:3000/callback",
+  // Popup flow is the default
+});
+```
+
+### Redirect Flow
+
+Redirects the current window to the OAuth provider, then back to your app.
+
+**Advantages:**
+
+- Works in all browsers (popup blockers won't interfere)
+- Better for mobile browsers
+- More reliable across different environments
+
+**Usage:**
+
+```typescript
+const mcp = useMcp({
+  url: "http://localhost:3000/mcp",
+  callbackUrl: "http://localhost:3000/callback",
+  useRedirectFlow: true, // Enable redirect flow
+});
+```
+
+**Setup for Redirect Flow:**
+
+1. Create a callback page in your app:
+
+```typescript
+// pages/callback.tsx or app/callback/page.tsx
+import { onMcpAuthorization } from "mcp-use/auth";
+import { useEffect, useState } from "react";
+
+export default function OAuthCallback() {
+  const [status, setStatus] = useState<"processing" | "success" | "error">(
+    "processing"
+  );
+
+  useEffect(() => {
+    onMcpAuthorization()
+      .then(() => {
+        setStatus("success");
+        // Redirect back to main app
+        setTimeout(() => (window.location.href = "/"), 1000);
+      })
+      .catch((err) => {
+        setStatus("error");
+        console.error("Auth failed:", err);
+      });
+  }, []);
+
+  if (status === "processing") {
+    return <div>Completing authentication...</div>;
+  }
+  if (status === "success") {
+    return <div>Success! Redirecting...</div>;
+  }
+  return <div>Authentication failed</div>;
+}
+```
+
+2. Configure your callback URL to match this route:
+
+```typescript
+const mcp = useMcp({
+  url: "http://localhost:3000/mcp",
+  callbackUrl: "http://localhost:3000/callback", // Your callback page
+  useRedirectFlow: true,
+});
+```
+
+### Manual Authentication Control
+
+By default, mcp-use requires explicit user action to trigger OAuth authentication. When a server requires authentication, the connection enters `pending_auth` state and you must call the `authenticate()` method:
+
+```typescript
+const mcp = useMcp({
+  url: "http://localhost:3000/mcp",
+  // preventAutoAuth: true is the default
+});
+
+// Manually trigger authentication when ready
+if (mcp.state === "pending_auth") {
+  return <button onClick={mcp.authenticate}>Sign in to continue</button>;
+}
+```
+
+To enable automatic OAuth flow (legacy behavior), set `preventAutoAuth: false`:
+
+```typescript
+const mcp = useMcp({
+  url: "http://localhost:3000/mcp",
+  preventAutoAuth: false, // Auto-trigger OAuth popup
+});
+```
+
+## OAuth Flow Process
+
+When OAuth authentication is required:
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant OAuthServer
+    participant User
+    participant Callback
+
+    Client->>OAuthServer: 1. Authorization Request
+    OAuthServer->>User: 2. User Consent<br/>(Review & Approve)
+    User->>OAuthServer: Approve permissions
+    OAuthServer->>Callback: 3. Redirect with<br/>authorization code
+    Callback->>OAuthServer: 4. Token Exchange<br/>(code → access token)
+    OAuthServer->>Callback: Return access token
+    Callback->>Client: Token received
+    Client->>OAuthServer: 5. Authenticated Connection<br/>(using access token)
+    OAuthServer->>Client: MCP requests authorized
+```
+
+## Configuration Options
+
+### Node.js Client Configuration Parameters
+
+| Parameter    | Type   | Required | Description                                                                  |
+| ------------ | ------ | -------- | ---------------------------------------------------------------------------- |
+| `url`        | string | Yes      | MCP server endpoint URL                                                      |
+| `authToken`  | string | No       | Bearer token for authentication (added to Authorization header)              |
+| `auth_token` | string | No       | Alternative snake_case form of `authToken` (for Python config compatibility) |
+| `headers`    | object | No       | Custom HTTP headers including authentication headers                         |
+
+<Note>
+  **Configuration Compatibility**: Both `authToken` (camelCase) and `auth_token`
+  (snake_case) are accepted for token-based authentication. Use `authToken` for
+  TypeScript conventions; `auth_token` is supported for compatibility with
+  Python-style configurations.
+</Note>
+
+### OAuth Configuration Parameters (Browser Only)
+
+OAuth options are passed to `useMcp` (and to `addServer` on `McpClientProvider`) at the top level for transport/callback settings, plus a nested `oauth` object for pre-registered client credentials.
+
+| Parameter             | Type    | Required | Description                                                                                  |
+| --------------------- | ------- | -------- | -------------------------------------------------------------------------------------------- |
+| `callbackUrl`         | string  | No       | OAuth redirect URL (defaults to `/oauth/callback` on the current origin)                     |
+| `useRedirectFlow`     | boolean | No       | Use full-page redirect instead of popup (default: `false`)                                   |
+| `preventAutoAuth`     | boolean | No       | Wait for `authenticate()` instead of auto-triggering OAuth (default: `true`)                 |
+| `oauth.clientId`      | string  | No\*     | Pre-registered OAuth client ID. When set, the SDK skips Dynamic Client Registration.         |
+| `oauth.clientSecret`  | string  | No       | Pre-registered OAuth client secret for confidential clients without PKCE. Requires `clientId`. |
+| `oauth.scope`         | string  | No       | OAuth scopes string included in the authorize request                                        |
+
+### Pre-registered Client Credentials
+
+Some MCP servers strip the `registration_endpoint` from their auth-server metadata, which means Dynamic Client Registration is unavailable. For these servers, register a client with the provider yourself and pass the credentials through `oauth`:
+
+```typescript
+import { useMcp } from "mcp-use/react";
+
+const mcp = useMcp({
+  url: "https://mcp.example.com",
+  oauth: {
+    clientId: "my-preregistered-client-id",
+    clientSecret: "my-preregistered-client-secret",
+    scope: "openid profile email",
   },
 });
 ```
 
-Or use headers (also disables auto-OAuth):
+When `clientSecret` is also set, the SDK auto-switches token-endpoint authentication from `none` to `client_secret_basic` or `client_secret_post` (whichever the auth server advertises in `token_endpoint_auth_methods_supported`). Drop `clientSecret` for public clients using PKCE.
 
-```typescript
-headers: { Authorization: "Bearer sk-..." }
-```
+<Warning>
+  `clientSecret` is persisted in the browser's `localStorage` so it can be reused across page loads and during the OAuth callback. Only ship pre-registered secrets to first-party UIs where exposing the secret to the end user is acceptable.
+</Warning>
 
-## Server config fields
+## Example Servers that support OAuth
 
-| Field | Description |
-| ----- | ----------- |
-| `authToken` | Bearer token |
-| `headers` | Custom HTTP headers |
-| `oauth` | OAuth options, or `false` to disable |
-| `authProvider` | Custom SDK-compatible provider |
+### OAuth with DCR Support
 
-## Node OAuth helpers
+- **Linear**: `https://mcp.linear.app/mcp`
 
-```typescript
-import {
-  createOAuthProvider,
-  NodeOAuthClientProvider,
-  completeOAuthFlow,
-  isUnauthorized,
-  FileKVStore,
-} from "@mcp-use/client";
-```
+### OAuth with Manual Registration
 
-Use these for headless scripts or custom storage. Browser OAuth uses `localStorage` automatically.
+- **GitHub**: `https://api.githubcopilot.com/mcp/`
+
+### Bearer Token
+
+- Most API-based MCP servers
+
+Check your server's documentation for specific authentication requirements and supported methods.

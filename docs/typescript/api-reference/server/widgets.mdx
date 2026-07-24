@@ -544,20 +544,30 @@ interface DiscoverWidgetsOptions {
 
 ## Landing page
 
-`MCPServer` renders the v1 landing frontend at its exact `basePath` for GET and HEAD requests that explicitly accept `text/html`. It includes the animated mesh-gradient hero, endpoint copy control, hosted Manufact Inspector link, client installation tabs, and optional tools, prompts, and static resources registered before the server starts.
-
-Without OAuth, the page is public. With OAuth, it requires a bearer token by default. Set `publicLandingPage: true` to expose only the HTML page without a token; JSON, event-stream, wildcard probes, DELETE, and POST remain protected.
+`generateLandingPage` builds the SEO-friendly HTML page shown when a browser hits the MCP endpoint. Most servers do not call it directly: set `publicLandingPage: true` on `new MCPServer({ ... })` and the server renders this page automatically for browser GET requests.
 
 ```ts wrap
-import { MCPServer } from "mcp-use"
+import { MCPServer, oauthProxy } from "mcp-use/server"
 
 const server = new MCPServer({
   name: "public-landing-page-example",
-  title: "Public Landing Page Example",
   version: "1.0.0",
   description: "An OAuth-protected MCP server whose browser landing page remains public.",
+  baseUrl: "http://localhost:3000",
   publicLandingPage: true,
-  oauth,
+  oauth: oauthProxy({
+    issuer: "https://example.com/demo-oauth",
+    authEndpoint: "https://example.com/demo-oauth/authorize",
+    tokenEndpoint: "https://example.com/demo-oauth/token",
+    clientId: "public-landing-page-example",
+    scopes: ["openid", "profile", "read:demo"],
+    verifyToken: async (token: string) => {
+      if (token !== "demo-token") {
+        throw new Error("Invalid demo token")
+      }
+      return { payload: { sub: "demo-user" } }
+    },
+  }),
 })
 
 await server.listen(3000)
@@ -565,53 +575,48 @@ await server.listen(3000)
 
 ### generateLandingPage
 
-Generate the same v1-compatible HTML document outside `MCPServer`. The page includes SEO and JSON-LD metadata, connection instructions for common MCP clients, the hosted Manufact Inspector link, and optional icon and primitive lists. Its CSS and behavior are inline; the Outfit stylesheet and GitHub stars badge load from their original external URLs. Caller-provided values are escaped before entering HTML, including the JSON-LD script payload.
+Generate an SEO-friendly HTML landing page with connection instructions for Claude Code, Cursor, VS Code, VS Code Insiders, ChatGPT, and the hosted Manufact Inspector.
 
 ```ts
-import { generateLandingPage } from "mcp-use/landing"
+import { generateLandingPage } from "mcp-use/server"
 ```
 
-```ts
-const html = generateLandingPage({
-  name: "weather",
-  title: "Weather Tools",
-  version: "1.0.0",
-  url: "https://api.example.com/mcp",
-  tools: [{ name: "forecast", description: "Get a weather forecast." }],
-})
-```
+Returns a complete HTML document string (including inline CSS and JS) that lists install commands and deep links for each supported client, plus an optional Primitives section listing tools, prompts, and resources. All user-provided values are HTML-escaped. Tool entries may be plain strings or [LandingPageTool](#landingpagetool) objects.
 
 **Parameters**
-><ParamField body="options" type="LandingPageOptions" required="true" >   Server identity, endpoint URL, optional icon URL, and primitive lists. </ParamField>
+><ParamField body="name" type="string" required="true" >   Server name </ParamField>
+><ParamField body="version" type="string" required="true" >   Server version </ParamField>
+><ParamField body="url" type="string" required="true" >   Full server URL (protocol, host, port, and path) </ParamField>
+><ParamField body="description" type="string" >   Optional server description </ParamField>
+><ParamField body="tools" type="(LandingPageTool | string)[]" >   Optional list of tools (names or `{ name, description }`) </ParamField>
+><ParamField body="prompts" type="LandingPagePrompt[]" >   Optional list of prompts </ParamField>
+><ParamField body="resources" type="LandingPageResource[]" >   Optional list of resources </ParamField>
+><ParamField body="iconUrl" type="string" >   Optional full URL to the server icon image </ParamField>
 
 **Returns**
 ><ResponseField name="returns" type="string" />
 
 **Signature**
 ```ts wrap
-function generateLandingPage(options: LandingPageOptions): string
+function generateLandingPage(name: string, version: string, url: string, description?: string, tools?: (LandingPageTool | string)[], prompts?: LandingPagePrompt[], resources?: LandingPageResource[], iconUrl?: string): string
 ```
-
-`LandingPageOptions` requires `name`, `version`, and the absolute public MCP endpoint `url`. It also accepts `title`, `description`, `iconUrl`, `tools`, `prompts`, and `resources`.
 
 ### LandingPageTool
 
 A tool entry rendered in the landing page Primitives section.
 
 ```ts
-import type { LandingPageTool } from "mcp-use"
+import type { LandingPageTool } from "mcp-use/server"
 ```
 
 **Properties**
 ><ParamField body="name" type="string" required="true" >   Tool name </ParamField>
-><ParamField body="title" type="string" >   Optional human-readable title </ParamField>
 ><ParamField body="description" type="string" >   Optional tool description </ParamField>
 
 **Signature**
 ```ts wrap
 interface LandingPageTool {
   name: string
-  title?: string
   description?: string
 }
 ```
@@ -621,19 +626,17 @@ interface LandingPageTool {
 A prompt entry rendered in the landing page Primitives section.
 
 ```ts
-import type { LandingPagePrompt } from "mcp-use"
+import type { LandingPagePrompt } from "mcp-use/server"
 ```
 
 **Properties**
 ><ParamField body="name" type="string" required="true" >   Prompt name </ParamField>
-><ParamField body="title" type="string" >   Optional human-readable title </ParamField>
 ><ParamField body="description" type="string" >   Optional prompt description </ParamField>
 
 **Signature**
 ```ts wrap
 interface LandingPagePrompt {
   name: string
-  title?: string
   description?: string
 }
 ```
@@ -643,13 +646,12 @@ interface LandingPagePrompt {
 A resource entry rendered in the landing page Primitives section.
 
 ```ts
-import type { LandingPageResource } from "mcp-use"
+import type { LandingPageResource } from "mcp-use/server"
 ```
 
 **Properties**
 ><ParamField body="uri" type="string" required="true" >   Resource URI </ParamField>
 ><ParamField body="name" type="string" >   Optional resource name </ParamField>
-><ParamField body="title" type="string" >   Optional human-readable title </ParamField>
 ><ParamField body="description" type="string" >   Optional resource description </ParamField>
 
 **Signature**
@@ -657,7 +659,6 @@ import type { LandingPageResource } from "mcp-use"
 interface LandingPageResource {
   uri: string
   name?: string
-  title?: string
   description?: string
 }
 ```

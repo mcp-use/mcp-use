@@ -43,7 +43,7 @@ function useViewState<T extends Record<string, unknown>>(
   first initialized default wins.
 </ParamField>
 
-The state must be a JSON-serializable object. Arrays and primitives cannot be the root value. The reserved `_uiContext` key is managed by [`ModelContext`](/typescript/api-reference/react/modelcontext) and cannot appear in developer state.
+The state must be a JSON-serializable object. Arrays and primitives cannot be the root value. The reserved `_uiContext` key is managed by [`ModelContext`](/v2/typescript/api-reference/react/modelcontext) and cannot appear in developer state.
 
 ## Returns
 
@@ -129,5 +129,5 @@ Host delivery failures do not roll back the local state. The runtime logs a warn
 
 ## Related
 
-- Use [`ModelContext`](/typescript/api-reference/react/modelcontext) to describe what the user currently sees.
+- Use [`ModelContext`](/v2/typescript/api-reference/react/modelcontext) to describe what the user currently sees.
 - Use React `useState` for ephemeral values the model does not need, such as hover state.

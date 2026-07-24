@@ -1,87 +1,74 @@
 ---
 title: "Response Helpers"
-description: "Deprecated helpers that map to standard MCP CallToolResult shapes. Prefer raw wire returns."
+description: "Choose the right mcp-use response helper for tool, resource, prompt, and widget results."
 icon: "drill"
 ---
 
-<Warning>
-Response helpers are **deprecated**. Prefer returning the official MCP envelopes directly — `{ content: […] }` for tools, `{ contents: […] }` for resources, `{ messages: […] }` for prompts. Helpers remain for upgrade compatibility and map to those same shapes.
-</Warning>
+Response helpers create MCP-compatible results for tools, resources, and prompts. Use this page to choose the helper. Use the [Response helpers API reference](/typescript/api-reference/server/response-helpers) for exact signatures, parameters, return shapes, MIME types, and edge cases.
 
-Helpers build a tool-shaped `CallToolResult`. Resource and prompt callbacks may still return them; the server converts to `ReadResourceResult` / `GetPromptResult`. Use the [Response helpers API reference](/typescript/api-reference/server/response-helpers) for signatures.
+## Pick a helper
 
-## Prefer raw returns
+| Use case | Helper | Notes |
+| --- | --- | --- |
+| Return normal model-readable text | `text()` | Best default for simple tool and prompt output. |
+| Return Markdown | `markdown()` | Use when the client should render formatted text. |
+| Return structured JSON | `object()` | Adds structured content and a JSON text representation. |
+| Return an array | `array()` | Wraps the array in a `data` field for structured content. |
+| Return a failed tool result | `error()` | Sets the MCP tool-result error flag. |
+| Return several content blocks | `mix()` | Combines text, media, resources, and structured content. |
+| Embed a resource reference | `resource()` | Use when a tool result should point to readable resource content. |
+| Return an MCP App widget | `widget()` | Sends widget props as structured content and model-facing text through `output`. |
+| Return media or binary content | `image()`, `audio()`, `binary()` | Use the exact MIME-type behavior from the API reference. |
+
+## Common patterns
+
+Use `text()` for the smallest possible tool result:
 
 ```typescript
-import { MCPServer } from "mcp-use";
+import { text } from "mcp-use/server";
 
 server.tool(
-  { name: "get-time", description: "Return the current server time" },
-  async () => ({
-    content: [{ type: "text", text: new Date().toISOString() }],
-  }),
+  {
+    name: "get-time",
+    description: "Return the current server time",
+  },
+  async () => text(new Date().toISOString()),
 );
+```
+
+Use `object()` when the client or widget needs structured data:
+
+```typescript
+import { object } from "mcp-use/server";
 
 server.tool(
   {
     name: "get-status",
     description: "Return server status",
-    outputSchema: z.object({
-      status: z.string(),
-      checkedAt: z.string(),
-    }),
   },
-  async () => {
-    const data = {
+  async () =>
+    object({
       status: "ok",
       checkedAt: new Date().toISOString(),
-    };
-    return {
-      content: [{ type: "text", text: JSON.stringify(data) }],
-      structuredContent: data,
-    };
-  },
+    }),
 );
 ```
 
-## Migration map
-
-| Deprecated helper | Prefer |
-| --- | --- |
-| `text(s)` | `{ content: [{ type: "text", text: s }] }` |
-| `object(data)` | `{ content: [{ type: "text", text: JSON.stringify(data) }], structuredContent: data }` |
-| `array(xs)` | `{ content: [{ type: "text", text: JSON.stringify(xs) }], structuredContent: xs }` (no `{ data }` wrap) |
-| `error(msg)` | `{ isError: true, content: [{ type: "text", text: msg }] }` |
-| `image(data, mime)` | `{ content: [{ type: "image", data, mimeType: mime }] }` |
-| `widget({ props, output })` | Bind `view: { name }` and return `{ content, structuredContent: props }` |
-| Resource `text(s)` | `{ contents: [{ uri: uri.href, mimeType: "text/plain", text: s }] }` |
-| Prompt `text(s)` | `{ messages: [{ role: "user", content: { type: "text", text: s } }] }` |
-
-## Deprecated helpers (compat)
-
-| Use case | Helper |
-| --- | --- |
-| Plain text | `text()` |
-| Markdown / HTML / … | `markdown()`, `html()`, … |
-| Structured JSON | `object()`, `array()` |
-| Failed tool result | `error()` |
-| Several content blocks | `mix()` |
-| Embedded resource | `resource()` |
-| View props (legacy) | `widget()` |
-| Media | `image()`, `audio()`, `binary()` |
+Use `widget()` when a tool returns an MCP App widget:
 
 ```typescript
-import { text } from "mcp-use";
+import { text, widget } from "mcp-use/server";
 
-// Still works — prefer the raw shape above
-server.tool(
-  { name: "get-time", description: "Return the current server time" },
-  async () => text(new Date().toISOString()),
-);
+return widget({
+  props: { results },
+  output: text(`Found ${results.length} results`),
+});
 ```
+
+The model sees the `output` content. The widget reads `props` through `useWidget().props`.
 
 ## API details
 
 <Card title="Response helpers API reference" icon="terminal" href="/typescript/api-reference/server/response-helpers" horizontal>
-  Look up every helper signature, parameter, return type, and structured-content behavior.
+  Look up every helper signature, parameter, return type, MIME type, and structured-content behavior.
 </Card>

@@ -1,0 +1,148 @@
+---
+title: "Resource Subscriptions"
+description: "Notify subscribed TypeScript MCP clients when resource content changes."
+icon: "rss"
+---
+
+Resource subscriptions let clients opt in to updates for specific resource URIs. Use them when a client should refresh a known resource after the server changes its content.
+
+This guide focuses on the server workflow. Use the [MCPServer API reference](/v2/typescript/api-reference/server/mcp-server) for the exact `notifyResourceUpdated()` signature and related session behavior.
+
+## Use subscriptions for resource-specific updates
+
+Subscriptions are for resource content changes, not general status events.
+
+| Need | Use |
+| --- | --- |
+| Tell clients a known resource URI changed | Resource subscription |
+| Broadcast a job status event | [Notifications](/v2/typescript/server/notifications) |
+| Tell clients the resource list changed | `server.sendResourcesListChanged()` |
+| Return fresh data immediately | A tool or resource read |
+
+Clients subscribe to a resource URI. Your server notifies subscribers after that resource changes. Clients then read the resource again.
+
+## Define the resource
+
+Start with a resource that returns the current content for a stable URI.
+
+```typescript
+import { MCPServer, object, text } from "mcp-use/server";
+import { z } from "zod";
+
+const server = new MCPServer({
+  name: "settings-server",
+  version: "1.0.0",
+});
+
+let appSettings = {
+  theme: "light",
+  language: "en",
+};
+
+server.resource(
+  {
+    name: "app_settings",
+    uri: "settings://app",
+    title: "App Settings",
+    description: "Current application settings.",
+  },
+  async () => object(appSettings),
+);
+```
+
+Use a stable URI. Subscribers are attached to the URI, so changing the URI changes what clients must subscribe to.
+
+## Notify subscribers after updates
+
+When server state changes, call `server.notifyResourceUpdated(uri)`.
+
+```typescript
+server.tool(
+  {
+    name: "update_settings",
+    description: "Update application settings.",
+    schema: z.object({
+      theme: z.enum(["light", "dark"]).optional(),
+      language: z.string().optional(),
+    }),
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      openWorldHint: false,
+    },
+  },
+  async ({ theme, language }) => {
+    if (theme) appSettings.theme = theme;
+    if (language) appSettings.language = language;
+
+    await server.notifyResourceUpdated("settings://app");
+    return text("Settings updated.");
+  },
+);
+```
+
+The notification tells subscribed clients that the content changed. It does not include the new resource body. Clients should call `resources/read` for the URI again.
+
+## Notify list changes separately
+
+Use `sendResourcesListChanged()` only when the available resource set changes.
+
+```typescript
+server.resource(
+  {
+    name: "new_report",
+    uri: "reports://new",
+    title: "New Report",
+  },
+  async () => text("Report content"),
+);
+
+await server.sendResourcesListChanged();
+```
+
+If only the content at an existing URI changed, use `notifyResourceUpdated(uri)` instead.
+
+## Design for stateful sessions
+
+Resource subscriptions depend on connected sessions. They are not a durable queue.
+
+Use subscriptions when:
+
+- Clients are connected through stateful MCP sessions.
+- Missing an update is acceptable because the client can read the resource again.
+- The resource URI is stable.
+
+Do not use subscriptions as the only persistence mechanism for background jobs, audit trails, or critical delivery.
+
+## Test resource updates locally
+
+Use a stateful MCP client that can send `resources/subscribe`.
+
+```bash
+npm run dev
+```
+
+In another terminal, subscribe to the `settings://app` resource URI and keep the connection open. In a third terminal, call the `update_settings` tool with `theme=dark`.
+
+Verify these cases:
+
+- The resource can be read before any updates.
+- The update tool calls `notifyResourceUpdated()` after changing state.
+- The client receives the update notification and can read the new content.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Resources" icon="folder-open" href="/v2/typescript/server/resources">
+    Create static resources and resource templates.
+  </Card>
+  <Card title="Notifications" icon="bell" href="/v2/typescript/server/notifications">
+    Send custom status, progress, and list-changed notifications.
+  </Card>
+  <Card title="MCPServer API reference" icon="server" href="/v2/typescript/api-reference/server/mcp-server">
+    Look up `notifyResourceUpdated()` and resource notification methods.
+  </Card>
+  <Card title="MCP resources specification" icon="book-open" href="https://modelcontextprotocol.io/specification/2025-11-25/server/resources#subscriptions">
+    Read the protocol-level subscription behavior.
+  </Card>
+</CardGroup>

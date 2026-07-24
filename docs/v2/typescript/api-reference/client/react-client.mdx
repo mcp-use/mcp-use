@@ -1,0 +1,149 @@
+---
+title: "React client"
+description: "React provider, hooks, and storage for MCP connections"
+icon: "react"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/client/src/react/McpClientProvider.tsx"
+---
+
+```ts
+import {
+  McpClientProvider,
+  useMcpClient,
+  useMcpServer,
+  useMcp,
+  onMcpAuthorization,
+  LocalStorageProvider,
+  MemoryStorageProvider,
+} from "@mcp-use/client/react";
+
+import type {
+  McpServerConfig,
+  McpServer,
+  UseMcpOptions,
+  UseMcpResult,
+  StorageProvider,
+  McpClientProviderProps,
+  McpClientContextType,
+  ReconnectionOptions,
+} from "@mcp-use/client/react";
+```
+
+Widget hooks (`useWidget`, `useCallTool`, …) are in `mcp-use/react`, not here.
+
+## McpClientProvider
+
+Wraps the app to manage multiple HTTP MCP connections.
+
+### Props
+
+| Prop | Type | Default | Description |
+| ---- | ---- | ------- | ----------- |
+| `children` | `ReactNode` | — | Required |
+| `mcpServers` | `Record<string, McpServerConfig>` | — | Initial servers |
+| `defaultCallbackUrl` | `string` | origin + `/oauth/callback` | OAuth redirect |
+| `defaultProxyConfig` | `{ proxyAddress?, headers? }` | — | MCP proxy |
+| `defaultOAuthProxyUrl` | `string` | — | OAuth BFF URL |
+| `defaultAutoProxyFallback` | `boolean \| { enabled?, proxyAddress? }` | `true` | CORS/FastMCP retry |
+| `clientInfo` | `ClientInfo` | mcp-use defaults | Sent at init |
+| `storageProvider` | `StorageProvider` | — | Persist server configs |
+| `enableRpcLogging` | `boolean` | `false` | Log protocol messages |
+| `onServerAdded` | `(id, server) => void` | — | Lifecycle callback |
+| `onServerRemoved` | `(id) => void` | — | Lifecycle callback |
+| `onServerStateChange` | `(id, state) => void` | — | State changes |
+| `onSamplingRequest` | callback | — | Global sampling handler |
+| `onElicitationRequest` | callback | — | Global elicitation handler |
+
+## useMcpClient()
+
+Must run inside `McpClientProvider`.
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `servers` | `McpServer[]` | All managed servers |
+| `addServer(id, config)` | fn | Add server (ignores duplicate ids) |
+| `removeServer(id, opts?)` | fn | Remove; `clearCredentials` clears OAuth |
+| `updateServer(id, partial)` | fn | Update and reconnect |
+| `updateServerMetadata(id, { displayName })` | fn | Update label only |
+| `getServer(id)` | fn | Lookup by id |
+| `storageLoaded` | `boolean` | Storage hydration complete |
+
+## useMcpServer(id)
+
+Returns `McpServer | undefined` for one server.
+
+## useMcp(options)
+
+Standalone hook for a single HTTP connection. Returns `UseMcpResult`.
+
+Key options: `url`, `headers`, `enabled`, `callbackUrl`, `oauth`, `oauthProxyUrl`, `preventAutoAuth`, `useRedirectFlow`, `autoProxyFallback`, `autoReconnect`, `reconnectionOptions`, `onSampling`, `onElicitation`, `onNotification`, `clientInfo`, `fetch`.
+
+## McpServer
+
+Extends connection state with provider metadata:
+
+| Field | Description |
+| ----- | ----------- |
+| `id`, `url`, `displayName` | Identity |
+| `state` | Connection state |
+| `tools`, `resources`, `resourceTemplates`, `prompts` | Discovered items |
+| `serverInfo` | Negotiated server metadata |
+| `protocolEra`, `protocolVersion` | Negotiated protocol |
+| `callTool`, `readResource`, `getPrompt`, `complete`, … | Same as `UseMcpResult` |
+| `authenticate()`, `retry()`, `disconnect()` | Connection control |
+| `notifications`, `unreadNotificationCount` | Notification queue |
+| `pendingSamplingRequests`, `pendingElicitationRequests` | Reverse-request queues |
+| `approveSampling`, `rejectSampling`, `approveElicitation`, `rejectElicitation` | Handle queues |
+
+## McpServerConfig
+
+Server config for `addServer`. Extends `UseMcpOptions` with:
+
+| Field | Description |
+| ----- | ----------- |
+| `displayName` | UI label (preferred over deprecated `name`) |
+| `enabled` | Skip connection when `false` |
+| `onSamplingRequest`, `onElicitationRequest`, `onNotificationReceived` | Per-server callbacks |
+
+`McpServerOptions` is a deprecated alias for `McpServerConfig`.
+
+Persistence helpers: `pickPersistedServerConfig`, `toPersistedServerConfig`, `PersistedMcpServerConfig`.
+
+## StorageProvider
+
+| Method | Description |
+| ------ | ----------- |
+| `getServers()` | Load all configs |
+| `setServers(servers)` | Replace all |
+| `setServer(id, config)` | Upsert one |
+| `removeServer(id)` | Delete one |
+| `clear()` | Delete all |
+| `getServerMetadata(id)` | Optional cached metadata |
+| `setServerMetadata(id, meta)` | Store metadata |
+| `removeServerMetadata(id)` | Delete metadata |
+
+Built-in: `LocalStorageProvider(storageKey?)`, `MemoryStorageProvider()`.
+Both read and write `PersistedMcpServerConfig`, which intentionally excludes
+request headers, proxy headers, auth tokens, client secrets, callbacks,
+providers, and other runtime-only values.
+
+## RPC logging
+
+| Function | Description |
+| -------- | ----------- |
+| `getRpcLogs(serverId)` | Logs for one server |
+| `getAllRpcLogs()` | All logs |
+| `subscribeToRpcLogs(cb)` | Subscribe to new entries |
+| `clearRpcLogs(serverId?)` | Clear logs |
+
+## onMcpAuthorization()
+
+Call on your OAuth callback page. Handles popup postMessage and redirect flows.
+
+## Telemetry
+
+`Tel`, `Telemetry`, `setTelemetrySource` — browser telemetry re-exports.
+
+## Related
+
+- [React integration guide](/v2/typescript/client/usemcp)
+- [Authentication](/v2/typescript/client/authentication)

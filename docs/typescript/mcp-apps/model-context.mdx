@@ -1,107 +1,139 @@
 ---
 title: "Model context"
-description: "Choose what the model sees from tool results, structured view state, and the currently visible UI."
+description: "Understand what the model sees, what the widget sees, and how widget state reaches future model turns."
 icon: "brain"
 ---
 
-Use model context to give the next model turn the information it needs without duplicating every value rendered by the view. Tool results establish the initial context; `useViewState` and `ModelContext` update it as the user interacts.
+Model context is the information available to the model after a tool returns a widget and while the user interacts with that widget. Use it deliberately: send the model concise text, send the widget structured data, and expose UI state only when it helps the next model turn.
 
-## Choose the right channel
+## Tool results have separate audiences
 
-| Need                                          | Use                                                            |
-| --------------------------------------------- | -------------------------------------------------------------- |
-| Return a concise tool result                  | A text `content` block                                         |
-| Send structured render data to the view       | Tool-result `structuredContent`, read through `useToolContext` |
-| Keep structured user choices model-visible    | `useViewState`                                                 |
-| Describe what the user currently sees         | `<ModelContext>` or `modelContext.set()`                       |
-| Keep ephemeral UI state private to the iframe | React `useState`                                               |
-| Persist durable business data                 | Your backend                                                   |
+An MCP tool result can carry model-visible text and widget-only data at the same time.
 
-## Keep structured choices in view state
+| Field | Model sees it? | Widget sees it? | Use it for |
+| --- | --- | --- | --- |
+| `content` | Yes | Yes | A short answer or summary for the conversation |
+| `structuredContent` | No | Yes, as `props` | Data the widget renders |
+| `_meta` | No | Yes, as `metadata` | Extra widget data that should not be model-visible |
 
-Use `useViewState` for selections, filters, drafts, and progress that future model turns should understand.
+In `mcp-use`, `widget({ props, output, metadata })` maps these fields for you:
+
+```typescript
+return widget({
+  props: { query, results },
+  metadata: { generatedAt: new Date().toISOString() },
+  output: text(`Showing ${results.length} results for "${query}".`),
+});
+```
+
+The model can read the `output` text. The widget reads `props` and `metadata` through `useWidget()`, so it can show details like when the result was generated without adding that detail to the model context.
+
+## Keep model text short
+
+Use `output` to tell the model what happened, not to duplicate the full widget payload.
+
+```typescript
+return widget({
+  props: { query, results },
+  output: text(`Found ${results.length} matching products.`),
+});
+```
+
+This keeps large lists, tables, and visualization data out of the model context while still rendering them for the user.
+
+## Use props for rendering data
+
+Use `props` for data the widget needs to render.
 
 ```tsx
-import { useViewState } from "mcp-use/react";
+import { useWidget } from "mcp-use/react";
 
-function Filters() {
-  const [state, setState] = useViewState({
-    selectedCategory: "all",
-    sort: "newest",
-  });
+type ResultsProps = {
+  query: string;
+  results: { id: string; name: string }[];
+};
 
-  return (
-    <button onClick={() => setState({ ...state, sort: "price" })}>
-      Sort by price
-    </button>
-  );
+export function ResultsWidget() {
+  const { props, isPending } = useWidget<ResultsProps>();
+
+  if (isPending) return <div>Loading...</div>;
+
+  return <div>{props.results.length} results for {props.query}</div>;
 }
 ```
 
-The root state value must be a JSON-serializable object. All components in one mounted view share it. Separate view instances remain isolated.
+`props` is partial while `isPending` is `true`. Check `isPending` before reading required fields.
 
-ChatGPT restores the state through `window.openai.widgetState`. Other MCP Apps hosts keep it for the current iframe lifetime until the protocol provides a restoration channel.
+## Use state for user choices
 
-## Describe visible UI
+Use `setState` for user choices that should survive widget re-renders and be available to future model turns.
 
-Use `ModelContext` for natural-language descriptions that follow the React component lifecycle.
+```tsx
+import { useWidget } from "mcp-use/react";
+
+type FilterState = {
+  selectedCategory: string;
+};
+
+const { state, setState } = useWidget<{}, FilterState>();
+
+await setState({
+  selectedCategory: "audio",
+});
+```
+
+State should describe user-visible choices such as selected rows, filters, tabs, favorites, or form progress. Store durable business data in your backend instead.
+
+## Use ModelContext for what is visible
+
+Use `<ModelContext>` when the model should know what part of the widget the user is currently seeing.
 
 ```tsx
 import { ModelContext } from "mcp-use/react";
 
-function Dashboard() {
+type Product = {
+  id: string;
+  name: string;
+};
+
+function ProductPanel({ product }: { product: Product }) {
   return (
-    <ModelContext content="Dashboard">
-      <ModelContext content="Revenue chart is visible" />
-      <ModelContext content="Three alerts are unresolved" />
+    <ModelContext content={`Viewing product ${product.name} (${product.id})`}>
+      <ProductDetails product={product} />
     </ModelContext>
   );
 }
 ```
 
-Nested components serialize into an indented tree:
+`<ModelContext>` is lifecycle-aware. When the component unmounts, that context is removed.
 
-```text
-- Dashboard
-  - Revenue chart is visible
-  - Three alerts are unresolved
-```
+Use `modelContext.set()` for imperative events that do not map cleanly to JSX:
 
-Use the imperative API when an annotation does not map cleanly to JSX:
-
-```ts
+```tsx
 import { modelContext } from "mcp-use/react";
 
-modelContext.set("selected-product", "Selected Wireless Headphones");
-modelContext.remove("selected-product");
-```
+function onSelectProduct(product: Product) {
+  modelContext.set("selected-product", `Selected ${product.name}`);
+}
 
-## Understand the merged snapshot
-
-The runtime merges structured state and the serialized context tree into one complete object:
-
-```json
-{
-  "selectedCategory": "audio",
-  "sort": "price",
-  "_uiContext": "- Dashboard\n  - Revenue chart is visible"
+function onClosePanel() {
+  modelContext.remove("selected-product");
 }
 ```
 
-`_uiContext` is a reserved model-visible field. `useViewState` filters it from application state and rejects developer state containing the same key.
+## Choose the right channel
 
-Every write sends the complete snapshot. On MCP Apps hosts, mcp-use sends the object as `structuredContent` and a JSON text block as `content` through `ui/update-model-context`. On ChatGPT, mcp-use writes the object to `modelContent` with `window.openai.setWidgetState`.
-
-## Keep ephemeral values local
-
-Use React `useState` for transient details that the model does not need, such as hover state, open tooltips, or animation progress.
-
-```tsx
-const [hoveredId, setHoveredId] = useState<string | null>(null);
-```
+| Need | Use |
+| --- | --- |
+| The model needs a concise result | `output: text(...)` |
+| The widget needs render data | `props` |
+| The widget needs hidden auxiliary data | `metadata` |
+| The model should know user selections on future turns | `setState` |
+| The model should know what UI is visible now | `<ModelContext>` |
+| Data must persist across conversations or users | Your backend |
 
 ## Next steps
 
-- Read the [`useViewState` API reference](/typescript/api-reference/react/useviewstate) for signatures, errors, and host behavior.
-- Read the [`ModelContext` API reference](/typescript/api-reference/react/modelcontext) for nesting and imperative entries.
-- Use [Interactivity](/typescript/mcp-apps/interactivity) for tool calls and follow-up messages.
+- Use [Build widgets](/typescript/mcp-apps/widgets) for the server and React setup.
+- Use [Interactivity](/typescript/mcp-apps/interactivity) for buttons, tool calls, and follow-up messages.
+- Use the [`ModelContext` API reference](/typescript/api-reference/react/modelcontext) for full lifecycle behavior.

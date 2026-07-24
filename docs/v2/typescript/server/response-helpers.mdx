@@ -1,0 +1,87 @@
+---
+title: "Response Helpers"
+description: "Deprecated helpers that map to standard MCP CallToolResult shapes. Prefer raw wire returns."
+icon: "drill"
+---
+
+<Warning>
+Response helpers are **deprecated**. Prefer returning the official MCP envelopes directly — `{ content: […] }` for tools, `{ contents: […] }` for resources, `{ messages: […] }` for prompts. Helpers remain for upgrade compatibility and map to those same shapes.
+</Warning>
+
+Helpers build a tool-shaped `CallToolResult`. Resource and prompt callbacks may still return them; the server converts to `ReadResourceResult` / `GetPromptResult`. Use the [Response helpers API reference](/v2/typescript/api-reference/server/response-helpers) for signatures.
+
+## Prefer raw returns
+
+```typescript
+import { MCPServer } from "mcp-use";
+
+server.tool(
+  { name: "get-time", description: "Return the current server time" },
+  async () => ({
+    content: [{ type: "text", text: new Date().toISOString() }],
+  }),
+);
+
+server.tool(
+  {
+    name: "get-status",
+    description: "Return server status",
+    outputSchema: z.object({
+      status: z.string(),
+      checkedAt: z.string(),
+    }),
+  },
+  async () => {
+    const data = {
+      status: "ok",
+      checkedAt: new Date().toISOString(),
+    };
+    return {
+      content: [{ type: "text", text: JSON.stringify(data) }],
+      structuredContent: data,
+    };
+  },
+);
+```
+
+## Migration map
+
+| Deprecated helper | Prefer |
+| --- | --- |
+| `text(s)` | `{ content: [{ type: "text", text: s }] }` |
+| `object(data)` | `{ content: [{ type: "text", text: JSON.stringify(data) }], structuredContent: data }` |
+| `array(xs)` | `{ content: [{ type: "text", text: JSON.stringify(xs) }], structuredContent: xs }` (no `{ data }` wrap) |
+| `error(msg)` | `{ isError: true, content: [{ type: "text", text: msg }] }` |
+| `image(data, mime)` | `{ content: [{ type: "image", data, mimeType: mime }] }` |
+| `widget({ props, output })` | Bind `view: { name }` and return `{ content, structuredContent: props }` |
+| Resource `text(s)` | `{ contents: [{ uri: uri.href, mimeType: "text/plain", text: s }] }` |
+| Prompt `text(s)` | `{ messages: [{ role: "user", content: { type: "text", text: s } }] }` |
+
+## Deprecated helpers (compat)
+
+| Use case | Helper |
+| --- | --- |
+| Plain text | `text()` |
+| Markdown / HTML / … | `markdown()`, `html()`, … |
+| Structured JSON | `object()`, `array()` |
+| Failed tool result | `error()` |
+| Several content blocks | `mix()` |
+| Embedded resource | `resource()` |
+| View props (legacy) | `widget()` |
+| Media | `image()`, `audio()`, `binary()` |
+
+```typescript
+import { text } from "mcp-use";
+
+// Still works — prefer the raw shape above
+server.tool(
+  { name: "get-time", description: "Return the current server time" },
+  async () => text(new Date().toISOString()),
+);
+```
+
+## API details
+
+<Card title="Response helpers API reference" icon="terminal" href="/v2/typescript/api-reference/server/response-helpers" horizontal>
+  Look up every helper signature, parameter, return type, and structured-content behavior.
+</Card>

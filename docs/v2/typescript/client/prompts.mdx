@@ -1,0 +1,46 @@
+---
+title: "Prompts"
+description: "Fetch server-defined prompt templates"
+icon: "message-square"
+---
+
+```typescript
+import { MCPClient } from "@mcp-use/client";
+
+const client = new MCPClient({
+  mcpServers: { demo: { url: "http://localhost:3000/mcp" } },
+});
+
+try {
+  const conn = await client.connect("demo");
+
+  const prompts = await conn.listPrompts();
+  for (const p of prompts) {
+    console.log(p.name, p.description);
+  }
+
+  const result = await conn.getPrompt("plan_trip", {
+    destination: "Japan",
+    days: "7",
+  });
+
+  for (const message of result.messages) {
+    if (message.content.type === "text") {
+      console.log(message.role, message.content.text);
+    }
+  }
+} finally {
+  await client.close();
+}
+```
+
+## React
+
+```tsx
+const server = useMcpServer("demo");
+const result = await server?.getPrompt("code_review", { language: "ts" });
+```
+
+## Reference
+
+[`MCPConnection`](/v2/typescript/api-reference/client/mcp-session) — `listPrompts`, `getPrompt`.

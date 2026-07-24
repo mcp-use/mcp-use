@@ -1,0 +1,104 @@
+---
+title: "Better Auth Provider"
+description: "Use Better Auth's OAuth Provider plugin with a TypeScript MCP server."
+icon: "/images/icons/better-auth.svg"
+---
+
+Use Better Auth when your application owns the OAuth authorization server.
+Better Auth handles registration, sign-in, consent, and token issuance;
+`mcp-use` advertises those endpoints and verifies the access-token JWTs.
+
+## Configure the MCP resource server
+
+Pass the full Better Auth issuer URL, including its base path:
+
+```typescript
+import { MCPServer } from "mcp-use";
+import { oauthBetterAuthProvider } from "mcp-use/oauth/better-auth";
+
+const server = new MCPServer({
+  name: "better-auth-server",
+  version: "1.0.0",
+  oauth: oauthBetterAuthProvider({
+    authURL: "http://localhost:61843/api/auth",
+    resource: "http://localhost:43127/mcp",
+  }),
+});
+
+export default server;
+```
+
+The provider does not create or mount Better Auth. It derives Better Auth's
+`/oauth2/authorize`, `/oauth2/token`, `/oauth2/register`, and `/jwks` endpoints
+from `authURL`, then verifies JWT issuer, signature, expiration, and MCP
+resource audience.
+
+## Run Better Auth as a separate Hono app
+
+The authorization server can be a separate application and origin. The normal
+`mcp-use` server above owns `/mcp` and its protected-resource metadata; the Hono
+app only mounts Better Auth, its discovery routes, and your login and consent
+pages.
+
+```typescript
+import { serve } from "@hono/node-server";
+import { Hono } from "hono";
+
+import { auth } from "./auth.js";
+
+const app = new Hono();
+
+app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));
+serve({ fetch: app.fetch, port: 61843 });
+```
+
+Because the issuer contains `/api/auth`, also route Better Auth's RFC 8414
+path-insertion metadata endpoint
+`/.well-known/oauth-authorization-server/api/auth` to `auth.handler` or
+`oauthProviderAuthServerMetadata(auth)`. Better Auth's OAuth Provider guide
+documents the required discovery, login, and consent routes. If browser-based
+MCP clients call this separate origin directly, configure Hono CORS for the MCP
+origin and include that origin in Better Auth's `trustedOrigins`.
+
+## Credential-free anonymous example
+
+The repository's [runnable example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/auth/better-auth)
+runs a regular `mcp-use dev` process on port 43127 and a separate Hono/Better
+Auth process on port 61843. It uses anonymous sign-in, so it requires no
+Google/GitHub credentials, email service, or password UI.
+
+For easy local setup, the example omits a database. Better Auth then uses
+stateless cookie sessions and its memory adapter. Anonymous users, dynamic
+clients, codes, and consent reset whenever the process restarts; configure a
+persistent Better Auth database before using the pattern in production.
+
+## Access the verified identity
+
+```typescript
+server.tool({ name: "whoami" }, async (_params, ctx) => ({
+  content: [
+    {
+      type: "text",
+      text: JSON.stringify({
+        id: ctx.auth.user.id,
+        isAnonymous: ctx.auth.user.isAnonymous,
+        scopes: ctx.auth.scopes,
+      }),
+    },
+  ],
+}));
+```
+
+Profile and application-specific access-token fields must be added with Better
+Auth's `customAccessTokenClaims`. The built-in mapper recognizes `email`,
+`name`, `picture`, `email_verified`, `sid`, `is_anonymous`/`isAnonymous`,
+`roles`, and `permissions` when present.
+
+<Card
+  title="Better Auth OAuth Provider"
+  icon="book-open"
+  href="https://better-auth.com/docs/plugins/oauth-provider"
+>
+  Configure Better Auth's OAuth server, discovery routes, claims, and
+  persistence.
+</Card>

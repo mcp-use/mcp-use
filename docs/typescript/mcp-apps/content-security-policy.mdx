@@ -4,94 +4,95 @@ description: "Configure the domains that MCP Apps widgets can load, call, and em
 icon: "shield"
 ---
 
-Content Security Policy (CSP) controls which domains your views can fetch from, load scripts/styles from, and embed. Views run in sandboxed iframes, so CSP must explicitly allow any external resources.
+Content Security Policy (CSP) controls which domains your widgets can fetch from, load scripts/styles from, and embed. Widgets run in sandboxed iframes, so CSP must explicitly allow any external resources.
 
-## Server and asset origins
+## Configure the server origin
 
-Set **`MCP_URL`** to your server's public origin (OAuth resource URL, API calls, CSP `connectDomains`):
-
-```env
-MCP_URL=https://myserver.com
-```
-
-Set **`MCP_ASSETS_URL`** when view JS/CSS and `public/` files are served from a different prefix (CDN, Supabase Storage):
-
-```env
-MCP_ASSETS_URL=https://cdn.example.com/storage/v1/object/public/widgets
-```
-
-When `MCP_ASSETS_URL` is unset, assets use the same origin as `MCP_URL` (or the request origin behind a proxy).
-
-At **`mcp-use build`**, `MCP_ASSETS_URL` rewrites manifest paths to full `https://` URLs for static upload workflows.
-
-## CSP merge order
-
-On each `resources/read`, the framework merges CSP in this order (high → low priority):
-
-1. Author `view.csp` on the bound tool
-2. `CSP_*_DOMAINS` env vars (per category) or the `CSP_URLS` shortcut
-3. MCP auto-append: `MCP_URL` → `connectDomains`; assets origin → `resourceDomains`
-
-`CSP_URLS` and per-category env vars rank **above** MCP auto-append. Duplicate origins keep the higher-priority entry's position.
-
-## Add domains for one view
-
-Declare CSP on the tool's `view:` config:
+When `baseUrl` is set (via `MCPServer` constructor or `MCP_URL` environment variable), mcp-use automatically configures CSP:
 
 ```typescript
-server.tool(
-  {
-    name: "weather",
-    view: {
-      name: "weather-display",
-      csp: {
-        connectDomains: ["https://api.weather.com"],
-        resourceDomains: ["https://cdn.weather.com"],
-        frameDomains: ["https://trusted-embed.com"],
-      },
-    },
-  },
-  async () => ({ /* ... */ })
-);
+const server = new MCPServer({
+  name: "my-server",
+  version: "1.0.0",
+  baseUrl: process.env.MCP_URL, // Required for production
+});
 ```
 
-MCP Apps CSP fields: `connectDomains`, `resourceDomains`, `frameDomains`, `baseUriDomains`.
+This ensures:
 
-## Global CSP env vars
+- Widget URLs use the correct domain
+- CSP includes your server domain
+- Works behind proxies and custom domains
 
-Use `CSP_URLS` when every view needs the same extra domains (shortcut for **all four** categories):
+The server origin is auto-injected into each widget's `connectDomains`, `resourceDomains`, and `baseUriDomains`, so you don't need to add it manually.
+
+## Add domains for one widget
+
+For widgets that need additional domains (APIs, CDNs, etc.), configure CSP in your widget metadata.
+
+For file-based widgets, declare CSP with camelCase keys in `metadata.csp` on your exported `widgetMetadata`:
+
+```tsx
+import { type WidgetMetadata } from "mcp-use/react";
+import { z } from "zod";
+
+const propSchema = z.object({
+  city: z.string(),
+  temperature: z.number(),
+});
+
+export const widgetMetadata: WidgetMetadata = {
+  description: "Display weather",
+  props: propSchema,
+  metadata: {
+    csp: {
+      connectDomains: ["https://api.weather.com"],
+      resourceDomains: ["https://cdn.weather.com"],
+      frameDomains: ["https://trusted-embed.com"],
+    },
+  },
+};
+```
+
+<Note>
+Your CSP domains are merged with your server's base URL automatically. For ChatGPT, OpenAI's required domains are also added. Use [Apps SDK compatibility](/typescript/mcp-apps/apps-sdk-compatibility) for ChatGPT-specific host extensions.
+</Note>
+
+## Add domains for every widget
+
+Use `CSP_URLS` when every widget needs the same extra domains.
 
 ```env
+# Base URL: auto-included in widget CSP
+MCP_URL=https://myserver.com
+
+# Additional domains (comma-separated): appended to widget CSP
 CSP_URLS=https://api.example.com,https://cdn.example.com
 ```
 
-Override one category without affecting others:
+- **MCP_URL**: Base URL for widget assets and public files. Also used by the server to configure CSP.
+- **CSP_URLS**: (Optional) Additional domains to whitelist. Supports comma-separated list. Required for static deployments where widget assets are served from different domains.
 
-```env
-CSP_CONNECT_DOMAINS=https://api.example.com
-CSP_RESOURCE_DOMAINS=https://cdn.example.com
-CSP_FRAME_DOMAINS=https://embed.example.com
-CSP_BASE_URI_DOMAINS=https://myserver.com
-```
+## Static deployments
 
-## Static deployments (Supabase / CDN)
+When widgets are served from static storage while the MCP server runs elsewhere, configure both origins:
 
-When assets live on static storage and the MCP server runs elsewhere:
+- **MCP_URL**: Where widget assets are stored
+- **MCP_SERVER_URL**: Where the MCP server runs (for API calls)
+- **CSP_URLS**: Domains for storage and API access
 
-```env
-MCP_URL=https://PROJECT.supabase.co/functions/v1/mcp-server
-MCP_ASSETS_URL=https://PROJECT.supabase.co/storage/v1/object/public/widgets
-CSP_URLS=https://PROJECT.supabase.co
-```
+See [Supabase deployment](/typescript/server/deployment/supabase) for a complete setup.
 
-See [Supabase deployment](/typescript/server/deployment/supabase) for the full workflow.
+<Tip>
+**Alternative**: Instead of the global `CSP_URLS` environment variable, configure CSP per-widget in `metadata.csp`
+</Tip>
 
 ## Verify CSP
 
 The mcp-use Inspector provides a **CSP Mode Toggle** for testing:
 
 - **Permissive**: Relaxed CSP for debugging
-- **Widget-Declared**: Enforces the view's declared CSP (production-like)
+- **Widget-Declared**: Enforces the widget's declared CSP (production-like)
 
 <Warning>
 CSP violations are logged in the console. Use Widget-Declared mode to catch CSP issues before production deployment.
@@ -99,6 +100,6 @@ CSP violations are logged in the console. Use Widget-Declared mode to catch CSP 
 
 ## Next Steps
 
-- [MCP Apps](/typescript/mcp-apps): View overview and routing
+- [MCP Apps](/typescript/mcp-apps): Widget overview and routing
 - [Apps SDK compatibility](/typescript/mcp-apps/apps-sdk-compatibility): ChatGPT compatibility and host extensions
 - [Supabase Deployment](/typescript/server/deployment/supabase): Static deployment with CSP

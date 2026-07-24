@@ -1,0 +1,101 @@
+---
+title: Memory management
+description: "Control MCPAgent conversation history, stateless runs, and history resets."
+icon: memory-stick
+---
+
+`MCPAgent` keeps conversation history across runs by default. Disable memory for stateless requests, or clear history when a user starts a new task.
+
+## Keep conversation memory
+
+When `memoryEnabled` is `true`, the agent stores human, assistant, and tool messages after each run. This is the default.
+
+```typescript
+import { MCPAgent } from "@mcp-use/agent";
+import { MCPClient } from "@mcp-use/client";
+import { ChatOpenAI } from "@langchain/openai";
+
+const client = new MCPClient({
+  mcpServers: {
+    filesystem: {
+      command: "npx",
+      args: ["-y", "@modelcontextprotocol/server-filesystem", "./"],
+    },
+  },
+});
+
+const llm = new ChatOpenAI({ model: "gpt-4o" });
+
+const agent = new MCPAgent({
+  llm,
+  client,
+  memoryEnabled: true,
+});
+
+await agent.run({ prompt: "Hello, my name is Alice" });
+const response = await agent.run({ prompt: "What's my name?" });
+
+console.log(response);
+await agent.close();
+```
+
+## Run without memory
+
+When `memoryEnabled` is `false`, each run starts from the current system prompt and tool list only.
+
+```typescript
+const agent = new MCPAgent({
+  llm,
+  client,
+  memoryEnabled: false,
+});
+
+await agent.run({ prompt: "Hello, my name is Alice" });
+const response = await agent.run({ prompt: "What's my name?" });
+
+console.log(response);
+```
+
+Use stateless agents for request/response APIs, background jobs, and tests where earlier runs must not affect later behavior.
+
+## Inspect history
+
+`getConversationHistory()` returns a copy of the stored LangChain messages. Mutating the returned array does not mutate agent memory.
+
+```typescript
+const history = agent.getConversationHistory();
+console.log(`Current history has ${history.length} messages`);
+
+for (const message of history) {
+  console.log(message.constructor.name, message.content);
+}
+```
+
+## Clear history
+
+`clearConversationHistory()` removes stored conversation messages. If memory is enabled and the agent has a system message, the system message is preserved.
+
+```typescript
+agent.clearConversationHistory();
+
+const response = await agent.run({
+  prompt: "Start a new conversation",
+});
+```
+
+Use this after a user switches projects, changes accounts, or asks to start over.
+
+## Next steps
+
+<CardGroup cols={3}>
+  <Card
+    title="Structured Output"
+    icon="brackets-curly"
+    href="/v2/typescript/agent/structured-output"
+  >
+    Generate type-safe responses with Zod schemas.
+  </Card>
+  <Card title="Streaming" icon="wave-pulse" href="/v2/typescript/agent/streaming">
+    Stream agent responses in real time.
+  </Card>
+</CardGroup>
