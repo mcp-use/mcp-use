@@ -41,6 +41,7 @@ import {
 import {
   createBindingValidationServer,
   discoverViews,
+  resolveViewsDir,
   virtualViewId,
   type DiscoveredView,
 } from "./views.js";
@@ -358,6 +359,9 @@ export async function runBuild(options: BuildOptions): Promise<void> {
   const viewsDirectory =
     options.viewsDir ??
     (options.mcpDir === undefined ? undefined : join(options.mcpDir, "views"));
+  if (!existsSync(resolveViewsDir(options.cwd, viewsDirectory))) {
+    console.log("[mcp-use] views directory not configured.");
+  }
   const discoveredViews = discoverViews(options.cwd, viewsDirectory, {
     includeLegacy: true,
   });
@@ -393,7 +397,24 @@ export async function runBuild(options: BuildOptions): Promise<void> {
   }
 
   if (views.length === 0) {
+    bindingServer ??= await createBindingValidationServer(
+      options.cwd,
+      paths.cache,
+      false
+    );
     try {
+      await validateViewBindingsAtBuild(
+        bindingServer.environments.ssr,
+        entry,
+        {},
+        views
+      );
+      const wrapperEntry = await writeWrapperEntry(
+        paths.cache,
+        entry,
+        {},
+        views
+      );
       await build({
         root: options.cwd,
         configFile: false,
@@ -407,7 +428,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
         },
         plugins: [nextStandaloneCompatPlugin(options.cwd)],
         build: {
-          ssr: entry,
+          ssr: wrapperEntry,
           outDir: paths.build,
           emptyOutDir: true,
           target: "node22",

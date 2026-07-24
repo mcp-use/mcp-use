@@ -17,8 +17,9 @@
  * so library consumers and production startup never evaluate Vite.
  */
 
-import { createServer as createNodeServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { existsSync } from "node:fs";
+import { createServer as createNodeServer } from "node:http";
 import { networkInterfaces } from "node:os";
 import { join, resolve } from "node:path";
 import tailwindcss from "@tailwindcss/vite";
@@ -65,6 +66,7 @@ import {
   buildDevViewsManifest,
   discoverViews,
   isViewPath,
+  resolveViewsDir,
   type DiscoveredView,
 } from "./views.js";
 import type { ViewsManifest } from "../views/types.js";
@@ -374,6 +376,9 @@ export async function runDev(options: DevOptions): Promise<void> {
   const viewsDirectory =
     options.viewsDir ??
     (options.mcpDir === undefined ? undefined : join(options.mcpDir, "views"));
+  if (!existsSync(resolveViewsDir(options.cwd, viewsDirectory))) {
+    console.log("[mcp-use] views directory not configured.");
+  }
   let currentViews: DiscoveredView[] = discoverViews(
     options.cwd,
     viewsDirectory,
@@ -435,6 +440,9 @@ export async function runDev(options: DevOptions): Promise<void> {
       // upgrade handler to our server, so no dedicated HMR port exists to
       // collide when several dev processes run side by side.
       hmr: viewsAtStartup ? { server: httpServer } : false,
+      // Vite 8's Environment API keeps its WebSocket transport enabled when
+      // only `hmr: false` is set. Zero-view servers need no socket at all.
+      ...(!viewsAtStartup && { ws: false }),
     },
     ssr: {
       ...nextStandaloneSsrOptions(options.cwd),
@@ -468,33 +476,31 @@ export async function runDev(options: DevOptions): Promise<void> {
         includeLegacy: legacyViewsEnabled,
       });
 
-      if (currentViews.length > 0) {
-        const legacyViews = currentViews.filter((view) => view.legacy === true);
-        if (legacyViews.length > 0) {
-          if (typeof server.__registerLegacyViews !== "function") {
-            throw new Error(
-              "Legacy resources/*/widget.tsx views require the temporary mcp-use/server compatibility entry."
-            );
-          }
-          const legacyModules: Record<string, unknown> = {};
-          for (const view of legacyViews) {
-            legacyModules[view.name] = await runner.import(
-              legacyWidgetMetadataId(view.entryPath)
-            );
-          }
-          server.__registerLegacyViews(legacyModules);
-        }
-        const viewsManifest = buildDevViewsManifest(currentViews);
-        if (typeof server.__primeViews !== "function") {
+      const legacyViews = currentViews.filter((view) => view.legacy === true);
+      if (legacyViews.length > 0) {
+        if (typeof server.__registerLegacyViews !== "function") {
           throw new Error(
-            "Loaded MCPServer instance does not support __primeViews."
+            "Legacy resources/*/widget.tsx views require the temporary mcp-use/server compatibility entry."
           );
         }
-        server.__primeViews(viewsManifest, {
-          dev: true,
-          projectRoot: options.cwd,
-        });
+        const legacyModules: Record<string, unknown> = {};
+        for (const view of legacyViews) {
+          legacyModules[view.name] = await runner.import(
+            legacyWidgetMetadataId(view.entryPath)
+          );
+        }
+        server.__registerLegacyViews(legacyModules);
       }
+      const viewsManifest = buildDevViewsManifest(currentViews);
+      if (typeof server.__primeViews !== "function") {
+        throw new Error(
+          "Loaded MCPServer instance does not support __primeViews."
+        );
+      }
+      server.__primeViews(viewsManifest, {
+        dev: true,
+        projectRoot: options.cwd,
+      });
 
       return server;
     };

@@ -230,7 +230,7 @@ export async function createBindingValidationServer(
       legacyWidgetMetadataPlugin(),
       react(),
     ],
-    server: { middlewareMode: true, hmr: false },
+    server: { middlewareMode: true, hmr: false, ws: false },
     ssr: {
       ...nextStandaloneSsrOptions(cwd),
     },
