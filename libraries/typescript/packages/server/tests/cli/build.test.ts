@@ -357,6 +357,10 @@ describe("runBuild (views)", () => {
     )();
     expect(resolvedConfig).toMatchObject({
       resolve: { dedupe: ["react", "react-dom"] },
+      optimizeDeps: {
+        exclude: ["mcp-use/react"],
+        include: ["react", "react-dom", "react-dom/client"],
+      },
     });
 
     const resolveId = plugin.resolveId;
