@@ -1,222 +1,112 @@
 ---
 title: "Overview"
-description: "Build stateless TypeScript MCP servers with tools, resources, prompts, Views, authentication, and Web-standard deployment."
+description: "Understand the stateless server foundation behind every mcp-use v2 MCP App."
 icon: "list-start"
 ---
 
-Use the mcp-use TypeScript server framework to build stateless MCP servers with tools, resources, prompts, authentication, or interactive MCP App Views.
+mcp-use v2 is a full-stack TypeScript framework for MCP Apps. Every app is powered by a stateless `MCPServer` that exposes capabilities to AI clients and can render interactive React Views.
 
-If you are starting from scratch, use the [TypeScript quickstart](/v2/typescript/getting-started/quickstart) to scaffold a server. Use [Build your first MCP App](/v2/typescript/mcp-apps/quickstart) when the server should return a React View.
+Use this page to understand how the server and Views work together, configure protocol compatibility, and find the guide for each capability.
 
-## What mcp-use adds
+## What the v2 MCP Apps framework provides
 
-- **One-command scaffolding:** `npx create-mcp-use-app@beta` creates a runnable server with scripts, TypeScript configuration, examples, and optional Views.
-- **Inspector-first development:** `npm run dev` serves the MCP endpoint and Inspector so you can test tools, resources, prompts, and Views locally.
-- **Hot reload:** tools, resources, prompts, and Views update without manually restarting the development server.
-- **Bring your own validation library:** tool inputs, tool outputs, and prompt arguments accept Standard Schema-compatible validators with JSON Schema conversion.
-- **MCP Apps support:** create interactive Views that run in Claude and ChatGPT.
-- **Web-standard runtime:** run the same stateless server with the CLI, Hono, Fetch, Next.js, or a supported serverless platform.
+- **Stateless request handling:** each MCP request runs independently, so server state belongs in your application storage instead of an MCP session.
+- **Typed server primitives:** tool inputs, tool outputs, and prompt arguments accept Standard Schema-compatible validators with JSON Schema conversion.
+- **MCP App Views:** bind React Views to tools and render interactive results in Claude and ChatGPT.
+- **Authentication and middleware:** verify callers with OAuth and apply shared behavior around HTTP requests or MCP operations.
+- **Inspector-first development:** run, inspect, and hot-reload tools, resources, prompts, and Views locally.
 
-Zod, ArkType, and Valibot implement the required Standard Schema interfaces. The generated project uses Zod, but you can use another compatible validation library without changing the mcp-use registration API.
+Zod, ArkType, and Valibot implement the required Standard Schema interfaces. Generated projects use Zod, but you can bring another compatible validation library without changing the mcp-use registration API.
 
-## Core server concepts
+## How an MCP App fits together
 
-### Server instance
+An MCP App combines server capabilities and Views in one project:
 
-Create one `MCPServer` instance in your entry file. It owns MCP registrations, the Hono application, Web-standard request handling, authentication, and development routes.
+1. `MCPServer` registers tools, resources, prompts, authentication, and middleware.
+2. An AI client such as Claude or ChatGPT calls a tool.
+3. The tool returns model-readable `content` and optional typed `structuredContent`.
+4. When the tool has a `view` binding, the client renders the matching React View with the tool result.
+
+A View is an optional presentation layer for a tool, not a separate project type. The same MCP App can contain tools that render Views and tools that return data without a user interface.
+
+Scaffold the complete MCP App stack:
+
+```bash
+npx create-mcp-use-app@beta inventory-app --template mcp-apps
+```
+
+The [TypeScript quickstart](/v2/typescript/getting-started/quickstart) walks through the generated server, tools, and View. Use [Build your first MCP App](/v2/typescript/mcp-apps/quickstart) for the complete View workflow.
+
+## Build the server foundation
+
+Import `MCPServer` from `mcp-use`, register callbacks separately from their definitions, return MCP wire results, and default-export the server for the CLI.
 
 ```typescript
 import { MCPServer } from "mcp-use";
-
-const server = new MCPServer({
-  name: "inventory-server",
-  title: "Inventory Server",
-  version: "1.0.0",
-  description: "Look up products and prepare inventory summaries",
-  instructions:
-    "Call search-products before get-product-details. Confirm availability before preparing an order.",
-});
-```
-
-`instructions` are returned during MCP initialization. Use them for server-wide workflow guidance that does not belong in a single tool description.
-
-The CLI entry should default-export the server after registering its tools, resources, and prompts. The CLI then owns the HTTP listener.
-
-```typescript
-export default server;
-```
-
-For a standalone Node.js script, call `await server.listen()` instead.
-
-### Tools
-
-Tools are functions clients can invoke. Use tools for actions, lookups, and workflows.
-
-```typescript
 import { z } from "zod";
 
-export const getTime = server.tool(
+const server = new MCPServer({
+  name: "weather-server",
+  version: "1.0.0",
+  description: "Look up the weather for a city",
+  legacy: "stateless",
+});
+
+export const getWeather = server.tool(
   {
-    name: "get-time",
-    description: "Return the current server time as an ISO timestamp",
-    inputSchema: z.object({}),
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      openWorldHint: false,
-    },
-  },
-  async () => ({
-    content: [{ type: "text", text: new Date().toISOString() }],
-  }),
-);
-```
-
-`inputSchema` and `outputSchema` accept any compatible Standard Schema validator. Zod is used here because it is the default in generated projects.
-
-Learn more in [Tools](/v2/typescript/server/tools).
-
-### Resources
-
-Resources expose readable content by URI. Use resources for configuration, documents, generated data, or files that clients should inspect.
-
-```typescript
-server.resource(
-  {
-    name: "inventory-summary",
-    uri: "inventory://summary",
-    title: "Inventory Summary",
-    description: "Current warehouse inventory totals",
-    mimeType: "application/json",
-  },
-  async (uri) => ({
-    contents: [
-      {
-        uri: uri.href,
-        mimeType: "application/json",
-        text: JSON.stringify({
-          warehouses: 3,
-          products: 1284,
-          lowStockItems: 17,
-        }),
-      },
-    ],
-  }),
-);
-```
-
-Learn more in [Resources](/v2/typescript/server/resources).
-
-### Prompts
-
-Prompts are reusable templates for model interactions. Use prompts when clients should reuse a structured instruction with validated arguments.
-
-```typescript
-server.prompt(
-  {
-    name: "summarize-inventory",
-    description: "Create an inventory summary for a specific audience",
-    schema: z.object({
-      audience: z.enum(["operations", "finance", "support"]),
-      timeframe: z.string().describe("Reporting period, such as today or Q2"),
-    }),
-  },
-  async ({ audience, timeframe }) => ({
-    messages: [
-      {
-        role: "user",
-        content: {
-          type: "text",
-          text: `Summarize inventory changes for ${audience} during ${timeframe}. Include risks, causes, and next actions.`,
-        },
-      },
-    ],
-  }),
-);
-```
-
-Learn more in [Prompts](/v2/typescript/server/prompts).
-
-### MCP Apps
-
-An MCP App View is a React component rendered from a tool result. Put the component in `views/<view-name>/view.tsx`, then bind it to a tool with `view: { name }`.
-
-A View-bound tool must declare an `outputSchema` and return matching `structuredContent`. Export the tool reference so `mcp-env.d.ts` can provide typed data to the View.
-
-```typescript
-export const searchProducts = server.tool(
-  {
-    name: "search-products",
-    description: "Search products and display the results in a View",
+    name: "get-weather",
+    description: "Return the current weather for a city",
     inputSchema: z.object({
-      query: z.string().describe("Search term"),
-    }),
-    outputSchema: z.object({
-      query: z.string(),
-      results: z.array(z.object({ id: z.string(), name: z.string() })),
+      city: z.string().describe("City name, such as Paris"),
     }),
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
       openWorldHint: true,
     },
-    view: {
-      name: "product-search-result",
-      description: "Product search results",
-    },
   },
-  async ({ query }) => {
-    const results = await catalog.searchProducts(query);
-    const data = { query, results };
-
-    return {
-      content: [
-        {
-          type: "text",
-          text: `Found ${results.length} products for "${query}"`,
-        },
-      ],
-      structuredContent: data,
-    };
-  },
+  async ({ city }) => ({
+    content: [
+      {
+        type: "text",
+        text: `The weather in ${city} is sunny.`,
+      },
+    ],
+  }),
 );
+
+export default server;
 ```
 
-The View reads the typed tool result with `useToolContext()`.
+`mcp-use dev`, `mcp-use build`, and `mcp-use start` use the default export and own the HTTP listener. A standalone Node.js script can call `await server.listen()` instead.
 
-```tsx
-// views/product-search-result/view.tsx
-import { useToolContext } from "mcp-use/react";
+### Choose protocol compatibility
 
-export default function ProductSearchResult() {
-  const view = useToolContext<"search-products">();
+Set `legacy` on `MCPServer` to decide whether the endpoint accepts older MCP protocol requests.
 
-  if (view.status === "pending") {
-    return <div className="p-4">Searching…</div>;
-  }
+| Value | Behavior |
+| --- | --- |
+| `"stateless"` | Default. Accept modern requests and serve each 2025-era request independently without creating a session. Legacy GET and DELETE session operations return `405`. |
+| `"reject"` | Accept only the modern protocol. Older requests fail with an unsupported-protocol-version error. |
 
-  if (view.status === "error") {
-    return <div className="p-4">{view.error.message}</div>;
-  }
+Use `"stateless"` while clients are migrating. Use `"reject"` when every client connecting to the endpoint supports the modern protocol.
 
-  const { query, results } = view.toolOutput;
+See [`ServerConfig`](/v2/typescript/api-reference/server/server-config) for the complete configuration surface.
 
-  return (
-    <div className="p-4">
-      <h3>Results for "{query}"</h3>
-      <ul>
-        {results.map((result) => (
-          <li key={result.id}>{result.name}</li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-```
+## Explore server capabilities
 
-Learn more in [MCP Apps](/v2/typescript/mcp-apps) and [Build your first MCP App](/v2/typescript/mcp-apps/quickstart).
+| Capability | Use it for | Guide |
+| --- | --- | --- |
+| Tools | Actions, lookups, and workflows with validated inputs and outputs | [Tools](/v2/typescript/server/tools) |
+| Resources | Discoverable content that clients read by URI | [Resources](/v2/typescript/server/resources) |
+| Prompts | Reusable model instructions with validated arguments | [Prompts](/v2/typescript/server/prompts) |
+| Views | Interactive MCP App interfaces rendered from tool results in Claude and ChatGPT | [MCP Apps](/v2/typescript/mcp-apps) |
+| OAuth | Verified user identity, scopes, and permissions on `ctx.auth` | [Authentication](/v2/typescript/server/authentication/index) |
+| Middleware | Shared authorization, logging, rate limiting, request shaping, and observability | [Middleware](/v2/typescript/server/middleware) |
 
-## Local development loop
+Tools and prompts accept Standard Schema-compatible validation libraries. Views use exported tool references and `useToolContext()` to infer their input and output types.
+
+## Develop locally
 
 Run the development server from a scaffolded project:
 
@@ -224,14 +114,20 @@ Run the development server from a scaffolded project:
 npm run dev
 ```
 
-By default, local development gives you:
+The development server starts:
 
-| URL                                      | Purpose                                                       |
-| ---------------------------------------- | ------------------------------------------------------------- |
-| `http://localhost:3000/mcp`              | MCP endpoint for clients.                                     |
-| `http://localhost:3000/mcp/inspector`    | Inspector for testing tools, resources, prompts, and Views.   |
+| Route | Purpose |
+| --- | --- |
+| `/mcp` | MCP endpoint for clients |
+| `/mcp/inspector` | Inspector for testing tools, resources, prompts, and Views |
 
 Keep the Inspector open while editing `index.ts` and files under `views/`. The development server reloads MCP registrations and View assets as they change.
+
+Run the project type check after changing schemas or exported tool references:
+
+```bash
+npm run typecheck
+```
 
 ## Next steps
 
@@ -241,20 +137,10 @@ Keep the Inspector open while editing `index.ts` and files under `views/`. The d
     icon="rocket"
     href="/v2/typescript/getting-started/quickstart"
   >
-    Create and verify a TypeScript MCP server.
+    Scaffold, run, inspect, and deploy a v2 project.
   </Card>
   <Card title="Tools" icon="wrench" href="/v2/typescript/server/tools">
-    Build executable functions with validated inputs and outputs.
-  </Card>
-  <Card
-    title="Resources"
-    icon="folder-open"
-    href="/v2/typescript/server/resources"
-  >
-    Expose static and dynamic content by URI.
-  </Card>
-  <Card title="Prompts" icon="message-square" href="/v2/typescript/server/prompts">
-    Create reusable prompt templates.
+    Define validated tool inputs, outputs, and behavior.
   </Card>
   <Card
     title="MCP Apps"
@@ -264,10 +150,24 @@ Keep the Inspector open while editing `index.ts` and files under `views/`. The d
     Return interactive React Views from tools.
   </Card>
   <Card
-    title="Configuration"
+    title="Authentication"
+    icon="shield-check"
+    href="/v2/typescript/server/authentication/index"
+  >
+    Protect the server and access verified caller identity.
+  </Card>
+  <Card
+    title="Middleware"
+    icon="layers"
+    href="/v2/typescript/server/middleware"
+  >
+    Add shared behavior around HTTP and MCP operations.
+  </Card>
+  <Card
+    title="ServerConfig"
     icon="cog"
     href="/v2/typescript/api-reference/server/server-config"
   >
-    Configure routing, authentication, middleware, CORS, and deployment.
+    Configure protocol compatibility, routing, logging, and CORS.
   </Card>
 </CardGroup>
