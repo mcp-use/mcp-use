@@ -6,6 +6,7 @@ import { parseArgs } from "node:util";
 
 import type { MCPConnection } from "@mcp-use/client";
 
+import { resolveClientHelp } from "./client-help.js";
 import { loadClientPackage } from "./load-client.js";
 import {
   CommandError,
@@ -38,48 +39,18 @@ interface SavedCredentials {
 const CLIENT_DIR = join(GLOBAL_STATE_DIR, "client");
 const SERVERS_PATH = join(CLIENT_DIR, "servers.json");
 
-const CLIENT_HELP = `Usage: mcp-use client <command> [options]
-
-Commands:
-  connect <name> <url>   Connect and save an HTTP(S) MCP server
-  list [--json]          List saved servers
-  remove <name>          Remove a saved server
-  <name>                 Invoke tools/resources/prompts on a saved server
-
-Connect options:
-  -H, --header <"Key: Value">   Static header (repeatable)
-  --no-oauth                    Skip OAuth on authorization challenges
-  --auth-timeout <ms>           OAuth wait timeout (default: 300000)
-  --protocol <auto|legacy|modern>  Protocol mode (default: auto)
-                                  auto: prefer modern, fall back to legacy
-                                  legacy: legacy wire only
-                                  modern: stateless/sessionless, no fallback
-  --no-open                     Print the OAuth URL only
-  --json                        Emit machine-readable output
-
-Saved server commands:
-  mcp-use client <name> tools list [--json]
-  mcp-use client <name> tools describe <tool> [--json]
-  mcp-use client <name> tools call <tool> [args...] [--timeout <ms>] [--json]
-  mcp-use client <name> resources list [--json]
-  mcp-use client <name> resources read <uri> [--json]
-  mcp-use client <name> prompts list [--json]
-  mcp-use client <name> prompts get <prompt> [args...] [--json]
-  mcp-use client <name> auth status [--json]
-  mcp-use client <name> auth logout [--yes] [--json]
-
-Examples:
-  mcp-use client connect linear https://mcp.linear.app/mcp
-  mcp-use client linear tools list
-  mcp-use client linear tools call search_issues query="open bugs"`;
-
 type BrowserMode = "ask" | "never";
 
 /** Run the `mcp-use client` command family. */
 export async function runClient(argv: readonly string[]): Promise<number> {
   if (argv.includes("--help") || argv.includes("-h")) {
-    process.stdout.write(`${CLIENT_HELP}\n`);
-    return 0;
+    const help = resolveClientHelp(argv);
+    if (help.text !== undefined) {
+      process.stdout.write(`${help.text}\n`);
+      return 0;
+    }
+    process.stderr.write(`${help.error}\n`);
+    return 2;
   }
   const json = wantsJson(argv);
   const normalizedArgv = argv.filter((token) => token !== "--json");
