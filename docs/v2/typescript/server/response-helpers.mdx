@@ -1,31 +1,33 @@
 ---
 title: "Response Helpers"
-description: "Deprecated helpers that map to standard MCP CallToolResult shapes. Prefer raw wire returns."
+description: "Understand response helper behavior and prefer raw MCP results."
 icon: "drill"
 ---
 
 <Warning>
-Response helpers are **deprecated**. Prefer returning the official MCP envelopes directly — `{ content: […] }` for tools, `{ contents: […] }` for resources, `{ messages: […] }` for prompts. Helpers remain for upgrade compatibility and map to those same shapes.
+  Response helpers are deprecated. Return raw tool, resource, and prompt
+  envelopes when authoring callbacks.
 </Warning>
 
-Helpers build a tool-shaped `CallToolResult`. Resource and prompt callbacks may still return them; the server converts to `ReadResourceResult` / `GetPromptResult`. Use the [Response helpers API reference](/v2/typescript/api-reference/server/response-helpers) for signatures.
+Import the server and helpers from `mcp-use`. `mcp-use/server` is the v1
+compatibility entry point.
 
 ## Prefer raw returns
 
+This complete example uses raw tool results:
+
 ```typescript
 import { MCPServer } from "mcp-use";
+import { z } from "zod";
 
-server.tool(
-  { name: "get-time", description: "Return the current server time" },
-  async () => ({
-    content: [{ type: "text", text: new Date().toISOString() }],
-  }),
-);
+const server = new MCPServer({
+  name: "status-server",
+  version: "1.0.0",
+});
 
 server.tool(
   {
     name: "get-status",
-    description: "Return server status",
     outputSchema: z.object({
       status: z.string(),
       checkedAt: z.string(),
@@ -42,46 +44,62 @@ server.tool(
     };
   },
 );
+
+export default server;
 ```
 
-## Migration map
+## Raw equivalents
 
-| Deprecated helper | Prefer |
-| --- | --- |
-| `text(s)` | `{ content: [{ type: "text", text: s }] }` |
-| `object(data)` | `{ content: [{ type: "text", text: JSON.stringify(data) }], structuredContent: data }` |
-| `array(xs)` | `{ content: [{ type: "text", text: JSON.stringify(xs) }], structuredContent: xs }` (no `{ data }` wrap) |
-| `error(msg)` | `{ isError: true, content: [{ type: "text", text: msg }] }` |
-| `image(data, mime)` | `{ content: [{ type: "image", data, mimeType: mime }] }` |
-| `widget({ props, output })` | Bind `view: { name }` and return `{ content, structuredContent: props }` |
-| Resource `text(s)` | `{ contents: [{ uri: uri.href, mimeType: "text/plain", text: s }] }` |
-| Prompt `text(s)` | `{ messages: [{ role: "user", content: { type: "text", text: s } }] }` |
+| Deprecated helper       | Raw result                                                                             |
+| ----------------------- | -------------------------------------------------------------------------------------- |
+| `text(s)`               | `{ content: [{ type: "text", text: s }] }`                                             |
+| `object(data)`          | `{ content: [{ type: "text", text: JSON.stringify(data) }], structuredContent: data }` |
+| `array(xs)`             | `{ content: [{ type: "text", text: JSON.stringify(xs) }], structuredContent: xs }`     |
+| `error(message)`        | `{ isError: true, content: [{ type: "text", text: message }] }`                        |
+| `image(data, mimeType)` | `{ content: [{ type: "image", data, mimeType }] }`                                     |
+| `mix(...)`              | One result with the required `content` blocks                                          |
+| `widget(...)`           | A tool `view` plus raw `content` and `structuredContent`                               |
 
-## Deprecated helpers (compat)
+The root `mcp-use` `array(xs)` helper uses the array itself as
+`structuredContent`. The `mcp-use/server` compatibility helper uses a
+`{ data: xs }` wrapper. Prefer a raw array so the output matches the tool's
+schema directly.
 
-| Use case | Helper |
-| --- | --- |
-| Plain text | `text()` |
-| Markdown / HTML / … | `markdown()`, `html()`, … |
-| Structured JSON | `object()`, `array()` |
-| Failed tool result | `error()` |
-| Several content blocks | `mix()` |
-| Embedded resource | `resource()` |
-| View props (legacy) | `widget()` |
-| Media | `image()`, `audio()`, `binary()` |
+## Resources and prompts
+
+Helpers produce tool-shaped `CallToolResult` values. Resource and prompt
+callbacks still accept those values as deprecated conversion inputs, but their
+direct shapes are:
+
+```typescript
+// Resource
+return {
+  contents: [{ uri: uri.href, mimeType: "text/plain", text: "hello" }],
+};
+
+// Prompt
+return {
+  messages: [
+    { role: "user", content: { type: "text", text: "Review this code." } },
+  ],
+};
+```
+
+Raw returns make resource URIs, MIME types, prompt roles, and content blocks
+explicit.
+
+## Views
+
+Replace `widget()` with a tool definition that includes
+`view: { name: "<view-directory>" }`. A view-bound tool must declare an
+`outputSchema`, and every successful callback result must include matching
+`structuredContent`.
+
+Helpers remain available from the package root:
 
 ```typescript
 import { text } from "mcp-use";
-
-// Still works — prefer the raw shape above
-server.tool(
-  { name: "get-time", description: "Return the current server time" },
-  async () => text(new Date().toISOString()),
-);
 ```
 
-## API details
-
-<Card title="Response helpers API reference" icon="terminal" href="/v2/typescript/api-reference/server/response-helpers" horizontal>
-  Look up every helper signature, parameter, return type, and structured-content behavior.
-</Card>
+Raw envelopes are clearer when every callback already knows its protocol
+result type.

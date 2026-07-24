@@ -1,16 +1,17 @@
 ---
 title: "Tools"
-description: "Design and register TypeScript MCP tools with validated inputs, model-friendly descriptions, and useful results."
+description: "Design and register typed actions on a TypeScript MCP server."
 icon: "wrench"
 ---
 
-Tools are callable actions on your MCP server. Use a tool when the client should look up data, run a workflow, mutate server-side state, or return an MCP App widget.
+Tools let a model call server-side code. Give each tool a focused description,
+validate its input, declare its behavioral annotations, and return an official
+MCP `CallToolResult`.
 
-This guide focuses on tool design and common implementation patterns. Use the [Tools API reference](/v2/typescript/api-reference/server/tools) for `ToolDefinition`, callback signatures, type inference, defaults, and return types.
+## Register a tool
 
-## Start with a model-friendly tool
-
-A good tool is narrow enough for a model to choose correctly. Give the tool a clear name, describe when to use it, validate every input with Zod, and return the smallest useful result.
+`inputSchema` accepts a Standard Schema implementation that can produce JSON
+Schema. Zod is one option; ArkType and Valibot are also supported.
 
 ```typescript
 import { MCPServer } from "mcp-use";
@@ -21,12 +22,12 @@ const server = new MCPServer({
   version: "1.0.0",
 });
 
-export const getInventoryItem = server.tool(
+server.tool(
   {
-    name: "get_inventory_item",
-    description: "Look up one inventory item by SKU.",
+    name: "lookup-inventory",
+    description: "Return available inventory for one SKU.",
     inputSchema: z.object({
-      sku: z.string().describe("Inventory SKU, such as SKU-1234"),
+      sku: z.string().describe("Inventory SKU"),
     }),
     annotations: {
       readOnlyHint: true,
@@ -35,104 +36,40 @@ export const getInventoryItem = server.tool(
     },
   },
   async ({ sku }) => {
-    const item = await inventory.getItem(sku);
+    const count = await inventory.count(sku);
     return {
-      content: [{ type: "text", text: JSON.stringify(item) }],
-      structuredContent: item,
+      content: [{ type: "text", text: `${count} units available.` }],
     };
   },
 );
+
+export default server;
 ```
 
-Use names that describe the user task, not the internal API method. `get_inventory_item` is easier for a model to choose than `inventoryFindByPrimaryKey`.
+Field descriptions become hints for clients and models. The schema validates
+input before the callback runs and supplies the callback's inferred TypeScript
+type.
 
-<Warning>
-Assign every statically declared tool to an exported constant. The generated `mcp-env.d.ts` derives view types from exported tool refs, and `useCallTool("name")` fails type checking when the matching ref is not exported. Use `useDynamicTool<Args, Result>("name")` only for tools registered from runtime data, loops, OpenAPI documents, or other dynamic sources.
-</Warning>
+## Return structured output
 
-## Describe inputs with Zod
-
-Use Zod schemas for all tool inputs. The server validates the incoming arguments before your handler runs, and TypeScript infers the handler parameter type from the schema.
+Declare `outputSchema` when clients need a typed structured result. Every
+successful result from a schema-backed tool must include matching
+`structuredContent`. An error result may instead set `isError: true`.
 
 ```typescript
-export const searchOrders = server.tool(
+const availabilitySchema = z.object({
+  sku: z.string(),
+  available: z.number().int(),
+});
+
+server.tool(
   {
-    name: "search_orders",
-    description: "Search customer orders by status and date range.",
-    inputSchema: z.object({
-      status: z.enum(["open", "fulfilled", "cancelled"]).optional(),
-      fromDate: z.string().date().describe("Start date in YYYY-MM-DD format"),
-      toDate: z.string().date().describe("End date in YYYY-MM-DD format"),
-      limit: z.number().int().min(1).max(50).default(10),
-    }),
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      openWorldHint: true,
-    },
+    name: "inventory-status",
+    inputSchema: z.object({ sku: z.string() }),
+    outputSchema: availabilitySchema,
   },
-  async ({ status, fromDate, toDate, limit }) => {
-    const orders = await orders.search({ status, fromDate, toDate, limit });
-    return {
-      content: [{ type: "text", text: JSON.stringify({ orders }) }],
-      structuredContent: { orders },
-    };
-  },
-);
-```
-
-Prefer descriptive field names and `.describe()` text that tells the model what value to provide. Use defaults for ordinary behavior, but keep defaults visible when they affect cost, safety, or output size.
-
-## Add tool annotations
-
-Tool annotations tell clients and models how risky a tool is. Set the main behavior hints explicitly, especially for tools exposed to ChatGPT or MCP catalogs.
-
-```typescript
-annotations: {
-  readOnlyHint: true,      // The tool does not change server or external state.
-  destructiveHint: false,  // The tool does not delete or overwrite data.
-  openWorldHint: true,     // The tool reads from external systems or live data.
-}
-```
-
-Use `readOnlyHint: false` for tools that create, update, delete, send, purchase, deploy, or otherwise change state. Use `destructiveHint: true` when the change can remove data or is hard to undo.
-
-Add `idempotentHint` when retry behavior matters. Set it to `true` only when repeating the same call has the same effect as running it once.
-
-## Return the right kind of result
-
-Prefer raw MCP `CallToolResult` shapes. Deprecated [response helpers](/v2/typescript/server/response-helpers) still work for upgrades, but new code should return the wire envelopes directly.
-
-```typescript
-export const reserveInventory = server.tool(
-  {
-    name: "reserve_inventory",
-    description: "Reserve inventory for one order.",
-    inputSchema: z.object({
-      orderId: z.string(),
-      sku: z.string(),
-      quantity: z.number().int().positive(),
-    }),
-    annotations: {
-      readOnlyHint: false,
-      destructiveHint: false,
-      openWorldHint: true,
-    },
-  },
-  async ({ orderId, sku, quantity }) => {
-    const reservation = await inventory.reserve({ orderId, sku, quantity });
-
-    if (!reservation.ok) {
-      return {
-        isError: true,
-        content: [{ type: "text", text: reservation.reason }],
-      };
-    }
-
-    const data = {
-      reservationId: reservation.id,
-      status: "reserved",
-    };
+  async ({ sku }) => {
+    const data = { sku, available: await inventory.count(sku) };
     return {
       content: [{ type: "text", text: JSON.stringify(data) }],
       structuredContent: data,
@@ -141,55 +78,36 @@ export const reserveInventory = server.tool(
 );
 ```
 
-Use:
+Prefer raw results:
 
-| Use case                | Return                                                                                 |
-| ----------------------- | -------------------------------------------------------------------------------------- |
-| Human-readable output   | `{ content: [{ type: "text", text }] }`                                                |
-| Structured JSON         | `{ content: [{ type: "text", text: JSON.stringify(data) }], structuredContent: data }` |
-| Error                   | `{ isError: true, content: [{ type: "text", text: message }] }`                        |
-| Multiple content blocks | `{ content: [/* ContentBlock… */] }`                                                   |
-| View-bound tool         | `view: { name }` + `{ content, structuredContent }`                                    |
+| Need             | Return                                                     |
+| ---------------- | ---------------------------------------------------------- |
+| Text             | `{ content: [{ type: "text", text }] }`                    |
+| Typed JSON       | `{ content, structuredContent: data }` with `outputSchema` |
+| Expected failure | `{ isError: true, content: [{ type: "text", text }] }`     |
+| Several blocks   | `{ content: [/* content blocks */] }`                      |
 
-See [Response Helpers](/v2/typescript/server/response-helpers) for the deprecated-helper migration table and [Response helpers API reference](/v2/typescript/api-reference/server/response-helpers) for signatures.
+## Bind a View
 
-## Return views from tools
-
-Bind a view on the tool definition, then return a plain `CallToolResult` with view props in `structuredContent` and model-facing text in `content`. The deprecated `widget()` helper builds the same envelope.
-
-The `view.name` value must match a view under `resources/` (or your views directory).
+Place the React entry at `views/<name>/view.tsx`, set `view.name` to that
+directory name, and return its data in `structuredContent`.
 
 ```typescript
-export const searchProducts = server.tool(
+server.tool(
   {
-    name: "search_products",
-    description: "Search products and display matching results.",
-    inputSchema: z.object({
-      query: z.string().describe("Product search query"),
-    }),
+    name: "search-products",
+    inputSchema: z.object({ query: z.string() }),
     outputSchema: z.object({
       query: z.string(),
       results: z.array(z.object({ id: z.string(), name: z.string() })),
     }),
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      openWorldHint: true,
-    },
-    view: {
-      name: "product-search-result",
-    },
+    view: { name: "product-search-result" },
   },
   async ({ query }) => {
-    const results = await searchProducts(query);
-    const data = { query, results };
-
+    const data = { query, results: await products.search(query) };
     return {
       content: [
-        {
-          type: "text",
-          text: `Found ${results.length} products for "${query}"`,
-        },
+        { type: "text", text: `Found ${data.results.length} products.` },
       ],
       structuredContent: data,
     };
@@ -197,122 +115,41 @@ export const searchProducts = server.tool(
 );
 ```
 
-The model sees `content`. The view reads `structuredContent` via `useToolContext()`. See [MCP Apps](/v2/typescript/mcp-apps) for view workflow guidance.
+A view-bound tool must declare `outputSchema`, and one View can bind to only
+one tool. The view reads the structured data while the model reads `content`.
 
-## Use `ctx` for request-aware tools
+## Use request context
 
-The second callback argument, usually named `ctx`, exposes per-call authentication, request-scoped client metadata and capability checks, elicitation, progress, and logging.
-
-```typescript
-export const privateProfile = server.tool(
-  {
-    name: "private_profile",
-    description: "Return the authenticated user's profile.",
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      openWorldHint: false,
-    },
-  },
-  async (_params, ctx) => {
-    if (!ctx.auth) {
-      return {
-        isError: true,
-        content: [{ type: "text", text: "Unauthorized" }],
-      };
-    }
-
-    const data = {
-      userId: ctx.auth.user.userId,
-      email: ctx.auth.user.email,
-    };
-    return {
-      content: [{ type: "text", text: JSON.stringify(data) }],
-      structuredContent: data,
-    };
-  },
-);
-```
-
-Use `ctx.auth` only for verified identity from server authentication. Values returned by `ctx.client.info()`, `ctx.client.capabilities()`, `ctx.client.extension()`, and `ctx.client.user()` are self-reported by the client for the current request. `user()` normalizes optional OpenAI-specific `_meta` hints; even its subject, conversation, and organization identifiers are unverified and must never be used for access control.
-
-See the [Tool context API reference](/v2/typescript/api-reference/server/tool-context) for every `ctx` method, field, capability check, log level, and return type.
-
-## Handle tool failures deliberately
-
-Return `{ isError: true, content: […] }` when the tool ran but the requested operation could not complete. Throw only for unexpected failures that should be treated as server errors.
+The second callback argument is scoped to the current request. It includes an
+abort signal, client-reported capability metadata, progress and logging
+methods, and the originating Hono request when HTTP context exists.
 
 ```typescript
-export const fetchInvoice = server.tool(
-  {
-    name: "fetch_invoice",
-    description: "Fetch one invoice by invoice ID.",
-    inputSchema: z.object({ invoiceId: z.string() }),
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      openWorldHint: true,
-    },
-  },
-  async ({ invoiceId }) => {
-    const invoice = await billing.findInvoice(invoiceId);
-
-    if (!invoice) {
-      return {
-        isError: true,
-        content: [
-          { type: "text", text: `Invoice ${invoiceId} was not found.` },
-        ],
-      };
-    }
-
-    return {
-      content: [{ type: "text", text: JSON.stringify(invoice) }],
-      structuredContent: invoice,
-    };
-  },
-);
+server.tool({ name: "request-info" }, async (_input, ctx) => {
+  const data = {
+    client: ctx.client.info().name ?? "unknown",
+    supportsViews: ctx.client.supportsViews(),
+    aborted: ctx.signal.aborted,
+  };
+  return {
+    content: [{ type: "text", text: JSON.stringify(data) }],
+    structuredContent: data,
+  };
+});
 ```
 
-Make error messages actionable. Tell the model or user what failed and which input caused the failure.
+Client metadata is self-reported and must not be used for authorization.
+`ctx.auth` is available only when the server has an OAuth provider; use its
+verified provider user for access control.
 
-## Test a tool locally
+## Test tools
 
-Run the development server and call the tool from the Inspector.
+Run `mcp-use dev`, open the built-in inspector, and test valid inputs, schema
+failures, error results, and structured output:
 
 ```bash
-npm run dev
+npx mcp-use dev
 ```
 
-Then open `http://localhost:3000/mcp/inspector`, select the tool, enter test arguments, and verify both success and failure cases.
-
-## Next steps
-
-<CardGroup cols={2}>
-  <Card
-    title="Tools API reference"
-    icon="terminal"
-    href="/v2/typescript/api-reference/server/tools"
-  >
-    Look up tool definitions, callback signatures, inferred types, and return
-    shapes.
-  </Card>
-  <Card
-    title="Response Helpers"
-    icon="drill"
-    href="/v2/typescript/server/response-helpers"
-  >
-    Choose the right helper for text, JSON, errors, resources, media, and
-    widgets.
-  </Card>
-  <Card title="MCP Apps" icon="blocks" href="/v2/typescript/mcp-apps">
-    Return interactive widgets from tool results.
-  </Card>
-  <Card
-    title="Authentication"
-    icon="shield-check"
-    href="/v2/typescript/server/authentication/index"
-  >
-    Add verified user identity to protected tools.
-  </Card>
-</CardGroup>
+For view-bound tools, also verify that the View renders the returned
+`structuredContent`.

@@ -1,207 +1,163 @@
 ---
-title: Middleware
-description: Add cross-cutting behavior to TypeScript MCP operations with operation-level and HTTP middleware.
+title: "Middleware"
+description: "Add request-scoped protocol and HTTP middleware to TypeScript MCP servers."
 icon: "layers"
 ---
 
-Middleware lets you run shared logic around MCP operations without putting that logic in every tool, resource, or prompt callback. Use it for logging, scope checks, request shaping, rate limiting, and other cross-cutting behavior.
+Use MCP middleware when logic depends on a parsed MCP operation. Use Hono
+middleware for HTTP concerns that run before MCP parsing.
 
-This guide focuses on where middleware fits and how to apply common patterns. Use the [Middleware and proxy API reference](/v2/typescript/api-reference/server/middleware) for exact context fields, pattern matching rules, adapter behavior, and proxy options.
+| Need                                                 | Layer           |
+| ---------------------------------------------------- | --------------- |
+| Inspect a tool name or transform a list result       | MCP middleware  |
+| Enforce scopes for an MCP operation                  | MCP middleware  |
+| Add CORS, headers, request logging, or custom routes | Hono middleware |
 
-## Choose MCP middleware or HTTP middleware
+Both layers are request-scoped. Client metadata is carried on each request and
+there is no session affinity between calls.
 
-Use MCP middleware when the logic depends on the parsed MCP operation. Its `ctx.request` also exposes the originating HTTP request, so operation-specific authorization can inspect headers without a custom wrapper. Use HTTP middleware when logic belongs before MCP parsing.
-
-| Need                                                          | Use             |
-| ------------------------------------------------------------- | --------------- |
-| Check which tool is being called                              | MCP middleware  |
-| Filter tool, resource, or prompt lists                        | MCP middleware  |
-| Require OAuth scopes per MCP operation                        | MCP middleware  |
-| Add CORS, request logging, pre-MCP routing, or non-MCP routes | HTTP middleware |
-| Add Hono middleware                                           | HTTP middleware |
-
-MCP middleware patterns use the `mcp:` prefix. Register Hono middleware directly with `server.use()`; both custom routes and the MCP endpoint pass through it.
-
-## Wrap MCP tool calls
-
-Register MCP middleware with `server.use("mcp:<pattern>", handler)`. The handler receives a context object and a `next()` function.
+## Wrap an MCP operation
 
 ```typescript
-import { MCPServer, text } from "mcp-use/server";
+import { MCPServer } from "mcp-use";
 import { z } from "zod";
 
-const server = new MCPServer({ name: "my-server", version: "1.0.0" });
+const server = new MCPServer({
+  name: "middleware-server",
+  version: "1.0.0",
+});
 
 server.use("mcp:tools/call", async (ctx, next) => {
   const startedAt = Date.now();
   const result = await next();
-  console.log(`${ctx.params.name} finished in ${Date.now() - startedAt}ms`);
+  console.log(`${ctx.params.name}: ${Date.now() - startedAt}ms`);
   return result;
 });
 
 server.tool(
   {
-    name: "greet",
-    description: "Say hello.",
-    schema: z.object({ name: z.string() }),
+    name: "echo",
+    inputSchema: z.object({ message: z.string() }),
   },
-  async ({ name }) => text(`Hello, ${name}!`),
+  async ({ message }) => ({
+    content: [{ type: "text", text: message }],
+  }),
 );
 
-await server.listen();
+export default server;
 ```
 
-Call `next()` to continue to the next middleware or the final operation handler. Its result and the middleware return are typed for the selected MCP method. A replacement must therefore remain valid for that method.
+Exact patterns currently include:
 
-## Match the right operation
+- `mcp:tools/call` and `mcp:tools/list`
+- `mcp:resources/read` and `mcp:resources/list`
+- `mcp:prompts/get` and `mcp:prompts/list`
 
-The pattern after `mcp:` controls which MCP operations run through the middleware.
+Exact middleware may inspect or replace its method-specific result. The
+`mcp:*` wildcard is a pass-through wrapper: call `next()` or throw, and do not
+replace the downstream result. Middleware does not wrap initialization,
+completion, log-level changes, or subscription listen requests.
 
-| Pattern              | Use it for                                          |
-| -------------------- | --------------------------------------------------- |
-| `mcp:tools/call`     | Tool execution                                      |
-| `mcp:tools/list`     | Tool discovery                                      |
-| `mcp:resources/read` | Resource reads                                      |
-| `mcp:resources/list` | Resource discovery                                  |
-| `mcp:prompts/get`    | Prompt requests                                     |
-| `mcp:prompts/list`   | Prompt discovery                                    |
-| `mcp:*`              | Every operation currently wrapped by MCP middleware |
+## Read the originating HTTP request
 
-Use the narrowest pattern that covers the behavior. A narrow pattern keeps middleware easier to reason about and avoids accidental changes to unrelated operations.
-
-Exact patterns may transform their method-specific result. The global `mcp:*` pattern is a pass-through wrapper: use it for authentication, rate limiting, logging, timing, or shared state. It must call `next()` and cannot inspect or replace the downstream result. Register an exact pattern for result transformations.
-
-MCP middleware currently wraps tool calls, prompt gets, resource reads, and tool/resource/prompt list operations. It does not wrap protocol setup, completion, logging level changes, resource subscribe/unsubscribe requests, or every MCP method.
-
-## Add an OAuth scope guard
-
-When OAuth is configured, MCP middleware can read verified auth information from `ctx.auth`. Use this for operation-level authorization.
+`ctx.request` is the originating Hono `HonoRequest` when the MCP operation came
+from HTTP. Read headers with `ctx.request.header(name)`, the path with
+`ctx.request.path`, and the underlying Web `Request` with
+`ctx.request.raw`.
 
 ```typescript
-server.use("mcp:tools/call", async (ctx, next) => {
-  const toolName = ctx.params.name;
-  const requiredScope = `tools:call:${toolName}`;
-
-  if (
-    !ctx.auth?.scopes.includes(requiredScope) &&
-    !ctx.auth?.scopes.includes("tools:*")
-  ) {
-    throw new Error(`Insufficient scope. Required: ${requiredScope}`);
-  }
-
+server.use("mcp:tools/list", async (ctx, next) => {
+  console.log(ctx.request?.header("user-agent"));
   return next();
 });
 ```
 
-Use [server authentication](/v2/typescript/server/authentication/index) to verify the bearer token before relying on `ctx.auth`.
+Values set by Hono middleware with `c.set()` are available through `ctx.get()`.
 
-## Rate-limit expensive operations
+## Authorize and rate-limit verified identities
 
-Use middleware when the limit applies to a class of operations rather than one tool.
+When OAuth is configured, middleware `ctx.auth` contains verified SDK auth
+information. This example limits each verified OAuth client:
 
 ```typescript
-const callsBySession = new Map<string, number[]>();
+import { MCPServer } from "mcp-use";
+import { oauthAuth0Provider } from "mcp-use/oauth/auth0";
 
-server.use("mcp:tools/call", async (ctx, next) => {
-  const key = ctx.session?.sessionId ?? "anonymous";
-  const now = Date.now();
-  const recentCalls = (callsBySession.get(key) ?? []).filter(
-    (timestamp) => timestamp > now - 60_000,
-  );
+const domain = process.env.AUTH0_DOMAIN;
+if (!domain) throw new Error("AUTH0_DOMAIN is required");
 
-  if (recentCalls.length >= 30) {
+const authenticatedServer = new MCPServer({
+  name: "rate-limited-server",
+  version: "1.0.0",
+  oauth: oauthAuth0Provider({ domain }),
+});
+
+authenticatedServer.use("mcp:tools/call", async (ctx, next) => {
+  const key = ctx.auth.clientId;
+  if (!key) {
+    throw new Error("A verified OAuth client identity is required.");
+  }
+
+  if (!(await rateLimiter.take(`oauth-client:${key}`, 30, "1m"))) {
     throw new Error("Rate limit exceeded.");
   }
 
-  recentCalls.push(now);
-  callsBySession.set(key, recentCalls);
   return next();
 });
 ```
 
-For distributed rate limiting, store counters in Redis or another shared backend instead of an in-memory `Map`.
+Use a provider-mapped user subject or a trusted gateway identity when the
+limit must be per end user. Never key access control or rate limiting by a
+transport session ID, self-reported client metadata, or an unverified header.
+Use a shared external store for distributed limits.
 
-## Filter discovery results
+## Filter discovery
 
-Middleware can also wrap list operations. Use this when different clients or users should see different capabilities.
+List middleware receives the item array rather than the protocol envelope:
 
 ```typescript
 server.use("mcp:tools/list", async (_ctx, next) => {
-  const tools = await next(); // Tool[]
+  const tools = await next();
   return tools.filter((tool) => !tool.name.startsWith("_"));
 });
 ```
 
-Keep filtering rules predictable. Hidden tools should not be required for normal user workflows.
+Register middleware in deliberate order. The first registered handler is the
+outermost wrapper.
 
-## Order middleware deliberately
+## Add Hono middleware
 
-Middleware runs in registration order. The first middleware you register is the outermost wrapper.
-
-```typescript
-server.use("mcp:*", loggingMiddleware);
-server.use("mcp:tools/call", authMiddleware);
-server.use("mcp:tools/call", rateLimitMiddleware);
-```
-
-A practical order is logging, then authentication, then rate limiting, then operation-specific validation. That order lets logging observe rejected requests while still rejecting expensive work early.
-
-## Use HTTP middleware for request-level behavior
-
-Register Hono middleware directly on the server when behavior belongs at the HTTP layer.
+Register ordinary Hono middleware without the `mcp:` prefix:
 
 ```typescript
 server.use("*", async (c, next) => {
   const startedAt = Date.now();
   c.header("x-server", "mcp-use");
   await next();
-  console.log(
-    `${c.req.method} ${c.req.path} finished in ${Date.now() - startedAt}ms`,
-  );
+  console.log(`${c.req.method} ${c.req.path}: ${Date.now() - startedAt}ms`);
 });
 
 server.get("/health", (c) => c.json({ ok: true }));
 ```
 
-HTTP middleware runs before MCP parses the request. Use it for CORS, headers, raw request logging, and non-MCP routes. Use MCP middleware when you need `ctx.method`, `ctx.params`, `ctx.auth`, or MCP session information. Inside an MCP callback, the same Hono context is available: read middleware variables with `ctx.get()` and the raw Web request with `ctx.request.raw`.
+Use Hono middleware for raw HTTP policy and MCP middleware for parsed operation
+policy.
 
-## Test middleware locally
-
-Run the server and verify both the allowed and rejected paths.
+## Run and verify the example
 
 ```bash
-npm run dev
+cd libraries/typescript/packages/server/examples/middleware
+pnpm dev
 ```
 
-Use the Inspector at `http://localhost:3000/mcp/inspector` to call tools, list resources, and request prompts. Check server logs for middleware output and verify that rejected operations return the expected error.
+Connect to `http://localhost:3000/mcp` with
+`x-example-access: allow`, list tools, and call `echo`. Then run the repository
+scenario:
 
-## Next steps
+```bash
+pnpm verify
+```
 
-<CardGroup cols={2}>
-  <Card
-    title="Middleware API reference"
-    icon="terminal"
-    href="/v2/typescript/api-reference/server/middleware"
-  >
-    Look up middleware context fields, pattern matching, adapter behavior, and
-    proxy options.
-  </Card>
-  <Card
-    title="Authentication"
-    icon="shield-check"
-    href="/v2/typescript/server/authentication/index"
-  >
-    Configure OAuth before relying on `ctx.auth`.
-  </Card>
-  <Card title="Tools" icon="wrench" href="/v2/typescript/server/tools">
-    Design the tool callbacks that middleware wraps.
-  </Card>
-  <Card
-    title="Middleware example"
-    icon="github"
-    href="https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/examples/server/features/middleware/src/server.ts"
-  >
-    See a runnable server with logging, scope guard, rate limiting, and
-    filtering.
-  </Card>
-</CardGroup>
+See the
+[maintained middleware example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/middleware)
+for the complete server.
