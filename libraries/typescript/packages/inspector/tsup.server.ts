@@ -4,6 +4,7 @@ import { defineConfig } from "tsup";
 const bundledServerDependencies = [
   "hono",
   "@hono/node-server",
+  "@mcp-use/client",
   "open",
   "rate-limiter-flexible",
 ];

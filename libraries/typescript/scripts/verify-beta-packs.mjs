@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const root = process.cwd();
 const packages = [
@@ -87,7 +88,10 @@ try {
 }
 
 function verifyInspectorPack(packed, manifest, files) {
-  const { packedBytes, unpackedBytes } = packMetrics(packed, "inspector");
+  const { packedBytes, unpackedBytes, unpackedPackage } = packMetrics(
+    packed,
+    "inspector"
+  );
 
   if (Object.keys(manifest.dependencies ?? {}).length !== 0)
     throw new Error("@mcp-use/inspector must have zero regular dependencies");
@@ -99,6 +103,18 @@ function verifyInspectorPack(packed, manifest, files) {
     );
   if (files.size > 40)
     throw new Error(`Inspector file budget exceeded: ${files.size} files`);
+
+  const entry = pathToFileURL(
+    join(unpackedPackage, "dist/server/index.js")
+  ).href;
+  run(process.execPath, [
+    "--input-type=module",
+    "--eval",
+    `const inspector = await import(${JSON.stringify(entry)});
+if (typeof inspector.mountInspector !== "function") {
+  throw new Error("packed Inspector does not export mountInspector()");
+}`,
+  ]);
 }
 
 function verifyCliPack(packed, manifest, files) {
@@ -151,6 +167,7 @@ function packMetrics(packed, label) {
   return {
     packedBytes,
     unpackedBytes: directorySize(join(unpackDirectory, "package")),
+    unpackedPackage: join(unpackDirectory, "package"),
   };
 }
 
