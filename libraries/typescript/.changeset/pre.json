@@ -25,6 +25,7 @@
     "cli-client-ux-fixes",
     "cli-device-code-login",
     "client-cli-auto-install",
+    "client-cli-protocol-modes",
     "client-remove-without-confirmation",
     "client-sdk-v2-migration",
     "codeql-security-hardening",

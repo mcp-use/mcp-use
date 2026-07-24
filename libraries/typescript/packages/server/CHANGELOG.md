@@ -1,5 +1,14 @@
 # mcp-use
 
+## 2.0.0-beta.50
+
+### Patch Changes
+
+- 44182d0: Replace date-based `mcp-use client --protocol` values with `auto`, `legacy`,
+  and `modern`. The named modes select automatic negotiation, the legacy wire,
+  or the stateless and sessionless modern wire without fallback.
+  - @mcp-use/inspector@20.0.0-beta.42
+
 ## 2.0.0-beta.49
 
 ### Patch Changes
