@@ -16,6 +16,18 @@ const VIRTUAL_TAILWIND_RESOLVED_ID = `\0${VIRTUAL_TAILWIND_ID}`;
 const VIRTUAL_CSP_RUNTIME_ID = "virtual:mcp-use/csp-runtime";
 const VIRTUAL_CSP_RUNTIME_RESOLVED_ID = `\0${VIRTUAL_CSP_RUNTIME_ID}`;
 
+/** React packages that must resolve to one browser module in managed views. */
+export const VIEW_REACT_DEDUPE = ["react", "react-dom"];
+
+/**
+ * Keep the framework's ESM view runtime out of Vite's dependency bundle while
+ * pre-bundling the CommonJS React entry points it imports.
+ */
+export const VIEW_REACT_OPTIMIZE_DEPS = {
+  exclude: ["mcp-use/react"],
+  include: ["react", "react-dom", "react-dom/client"],
+};
+
 /**
  * Options for {@link mcpUseViewsPlugin}.
  *
@@ -60,7 +72,8 @@ export function mcpUseViewsPlugin(options: McpUseViewsPluginOptions): Plugin {
         // mcp-use/react entry to versioned and unversioned React URLs. Those
         // are distinct browser modules and trigger React's invalid-hook-call
         // guard even though they originate from the same installed package.
-        resolve: { dedupe: ["react", "react-dom"] },
+        resolve: { dedupe: VIEW_REACT_DEDUPE },
+        optimizeDeps: VIEW_REACT_OPTIMIZE_DEPS,
       };
     },
     applyToEnvironment(environment) {

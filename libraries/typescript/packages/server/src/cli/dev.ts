@@ -57,7 +57,11 @@ import { isInspectorPath, isInspectorRequest } from "./inspector-route.js";
 import { createTunnelManager } from "./tunnel.js";
 import { syncMcpEnvDeclaration } from "./mcp-env-declaration.js";
 import { resolveWorkspacePaths } from "./workspace.js";
-import { mcpUseViewsPlugin } from "./views-plugin.js";
+import {
+  mcpUseViewsPlugin,
+  VIEW_REACT_DEDUPE,
+  VIEW_REACT_OPTIMIZE_DEPS,
+} from "./views-plugin.js";
 import {
   legacyWidgetMetadataId,
   legacyWidgetMetadataPlugin,
@@ -412,7 +416,16 @@ export async function runDev(options: DevOptions): Promise<void> {
     resolve: {
       tsconfigPaths: true,
       alias: { tailwindcss: resolveTailwindCss() },
+      // Inline Vite config is applied after plugin config hooks. Keep this
+      // invariant at the final merge layer so the optimizer and transformed
+      // view source cannot receive distinct React module URLs.
+      dedupe: VIEW_REACT_DEDUPE,
     },
+    // Pre-bundling mcp-use/react makes its internal React import resolve to an
+    // unversioned optimizer URL while view source receives a versioned URL.
+    // Serving the framework entry as ESM keeps both imports on one dispatcher;
+    // its CommonJS ReactDOM dependency still needs explicit optimization.
+    optimizeDeps: VIEW_REACT_OPTIMIZE_DEPS,
     oxc: { jsx: { runtime: "automatic" } },
     plugins: viewsAtStartup
       ? [
