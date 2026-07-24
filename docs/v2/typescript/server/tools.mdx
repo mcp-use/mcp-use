@@ -144,6 +144,19 @@ Client metadata is self-reported and must not be used for authorization.
 `ctx.auth` is available only when the server has an OAuth provider; use its
 verified provider user for access control.
 
+## Notify tool-list listeners
+
+Publish a tool-list invalidation when the tools clients can discover have
+changed:
+
+```typescript
+await server.notifyToolsChanged();
+```
+
+Clients with an active subscription listener can then request `tools/list`
+again. This notification does not register or replace tools; register tools
+while constructing the server, before it starts handling requests.
+
 ## Test tools
 
 Run `mcp-use dev`, open the built-in inspector, and test valid inputs, schema
