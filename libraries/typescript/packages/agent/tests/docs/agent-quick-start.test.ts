@@ -9,10 +9,7 @@ import { fileURLToPath } from "node:url";
 import { OPENAI_MODEL } from "../integration/agent/constants.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const simpleServerPath = resolve(
-  __dirname,
-  "../servers/simple_server.ts"
-);
+const simpleServerPath = resolve(__dirname, "../servers/simple_server.ts");
 
 describe.skipIf(!process.env.OPENAI_API_KEY)(
   "Documentation Example: MCPAgent Quick Start",

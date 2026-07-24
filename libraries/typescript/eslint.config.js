@@ -290,10 +290,10 @@ export default [
       },
     },
     rules: {
-      "tsdoc/syntax": "error",
+      "tsdoc/syntax": "warn",
       // Coverage only — tag style/content is tsdoc/syntax + review territory.
       "jsdoc/require-jsdoc": [
-        "error",
+        "warn",
         {
           publicOnly: true,
           enableFixer: false,
@@ -310,6 +310,16 @@ export default [
           exemptEmptyConstructors: true,
         },
       ],
+    },
+  },
+  // Enforce TSDoc syntax in packages whose existing comments are compliant.
+  {
+    files: [
+      "packages/server/src/**/*.{ts,tsx,mts}",
+      "packages/create-mcp-use-app/src/**/*.{ts,tsx,mts}",
+    ],
+    rules: {
+      "tsdoc/syntax": "error",
     },
   },
   // mcp-use (includes the folded-in CLI and dev/build

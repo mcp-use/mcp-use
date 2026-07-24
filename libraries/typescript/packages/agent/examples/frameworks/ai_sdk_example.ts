@@ -17,7 +17,9 @@ async function* streamEventsToAISDK(
 ): AsyncGenerator<string, void, void> {
   for await (const event of streamEvents) {
     if (event.event === "on_chat_model_stream") {
-      const chunk = event.data?.chunk as { text?: string; content?: string } | undefined;
+      const chunk = event.data?.chunk as
+        | { text?: string; content?: string }
+        | undefined;
       const text =
         typeof chunk?.text === "string"
           ? chunk.text
