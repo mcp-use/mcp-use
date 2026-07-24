@@ -391,7 +391,6 @@
                         "pages": [
                           "v2/typescript/server/middleware",
                           "v2/typescript/server/elicitation",
-                          "v2/typescript/server/sampling",
                           "v2/typescript/server/subscriptions",
                           "v2/typescript/server/notifications"
                         ]
