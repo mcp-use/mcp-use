@@ -2864,6 +2864,32 @@ describe("react bridge runtime", () => {
     expect(startCount).toBe(1);
   });
 
+  it("removes the compiling indicator before the app renders", async () => {
+    resetRuntime();
+    const { init } = await startHost();
+    const container = document.createElement("div");
+    container.id = "root";
+    container.setAttribute("data-mcp-use-loading", "");
+    document.body.appendChild(container);
+    let loadingAttributeDuringRender: boolean | undefined;
+
+    function Probe() {
+      loadingAttributeDuringRender = container.hasAttribute(
+        "data-mcp-use-loading"
+      );
+      return <div data-testid="probe">ready</div>;
+    }
+
+    bootstrapView({ default: Probe as ComponentType });
+
+    expect(container.hasAttribute("data-mcp-use-loading")).toBe(false);
+    await init;
+    await waitFor(() => {
+      expect(screen.getByTestId("probe").textContent).toBe("ready");
+    });
+    expect(loadingAttributeDuringRender).toBe(false);
+  });
+
   it("changed HMR viewConfig warns and keeps the original config", async () => {
     resetRuntime();
     const { init } = await startHost();

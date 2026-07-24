@@ -475,7 +475,7 @@ By default, both static routes include `Access-Control-Allow-Origin: *`; an expl
 - **`external` (dev):** resolve origin-absolute Vite paths, including `/@vite/client` and the virtual view entry, against the request-derived assets base. Emit the same external tags.
 - **`inline` (production opt-in):** emit `<style>` and inline `<script type="module">` tags with HTML-end-tag escaping. `mcp-use build --inline` emits this entry kind.
 
-Every branch includes `__mcpUseViewConfig`, whose `publicBase` is resolved per request, and a `<div id="root">`. Production split chunks are loaded by relative imports from the entry module and require no additional document tags.
+Every branch includes `__mcpUseViewConfig`, whose `publicBase` is resolved per request, and a `<div id="root" data-mcp-use-loading>`. A framework-owned, CSS-only `Compiling...` indicator is centered while the entry module loads. The bootstrap removes `data-mcp-use-loading` immediately before calling `root.render`, so the indicator cannot overlap the app and requires no additional asset request. Production split chunks are loaded by relative imports from the entry module and require no additional document tags.
 
 **Origin resolution is request-scoped** — applied at `resources/read` emission time:
 

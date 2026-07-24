@@ -104,9 +104,21 @@ function escapeHtml(value: string): string {
     .replaceAll(">", "&gt;");
 }
 
-/** Transparent iframe canvas before React mounts (rounded views show host bg). */
-const TRANSPARENT_IFRAME_STYLE =
-  "<style>html,body,#root{background:transparent}</style>";
+/**
+ * Transparent iframe canvas plus a zero-dependency loading indicator.
+ *
+ * The bootstrap removes the loading attribute immediately before React
+ * renders, so the indicator cannot overlap the mounted app.
+ */
+const VIEW_BOOTSTRAP_STYLE = `<style>
+html,body,#root{background:transparent}
+html,body{margin:0}
+#root[data-mcp-use-loading]{display:flex;min-height:100vh;align-items:center;justify-content:center;flex-direction:column;gap:10px}
+#root[data-mcp-use-loading]::before{width:24px;height:24px;box-sizing:border-box;border:2px solid rgba(127,127,127,.28);border-top-color:rgba(127,127,127,.9);border-radius:50%;content:"";animation:mcp-use-view-spin .7s linear infinite}
+#root[data-mcp-use-loading]::after{color:rgba(127,127,127,.9);content:"Compiling...";font:500 13px/1.2 ui-sans-serif,system-ui,sans-serif}
+@keyframes mcp-use-view-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){#root[data-mcp-use-loading]::before{animation-duration:1.4s}}
+</style>`;
 
 /**
  * Synthesize a complete HTML document for a view from registry data.
@@ -142,11 +154,11 @@ export function synthesizeViewDocument(
 <head>
 <meta charset="utf-8">
 ${configScript}
-${TRANSPARENT_IFRAME_STYLE}
+${VIEW_BOOTSTRAP_STYLE}
 ${styleTag}
 </head>
 <body>
-<div id="root"></div>
+<div id="root" data-mcp-use-loading></div>
 ${moduleScript}
 </body>
 </html>`;
@@ -184,11 +196,11 @@ ${moduleScript}
 <head>
 <meta charset="utf-8">
 ${configScript}
-${TRANSPARENT_IFRAME_STYLE}
+${VIEW_BOOTSTRAP_STYLE}
 ${cssLinks}
 </head>
 <body>
-<div id="root"></div>
+<div id="root" data-mcp-use-loading></div>
 ${scriptTags}
 <script type="module" src="${escapeHtml(entryUrl)}"></script>
 </body>
