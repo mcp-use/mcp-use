@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.0.0-beta.15
+
+### Patch Changes
+
+- da86879: Keep MCP Apps widgets mounted while Chat state changes, deliver complete tool lifecycle notifications, isolate sandbox origins, and support host-confirmed sampling, downloads, context updates, and app-provided tools.
+
 ## 2.0.0-beta.14
 
 ### Patch Changes

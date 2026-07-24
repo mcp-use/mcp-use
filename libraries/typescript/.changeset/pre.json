@@ -69,6 +69,7 @@
     "skip-dev-info-standalone-probe",
     "sour-socks-approve",
     "start-production-tunnel",
+    "steady-widgets-render",
     "stream-inspector-tool-input",
     "strict-exported-tool-refs",
     "strip-tools-list-schema-dialect",
