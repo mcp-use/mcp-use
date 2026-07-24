@@ -1,5 +1,14 @@
 # @mcp-use/inspector
 
+## 20.0.0-beta.48
+
+### Patch Changes
+
+- be2dd8e: Expose the dependency-free sandbox document builder as a focused client
+  subpath and bundle it into the Inspector's Node entry so the zero-dependency
+  Inspector package loads in clean installations.
+  - mcp-use@2.0.0-beta.56
+
 ## 20.0.0-beta.47
 
 ### Patch Changes
