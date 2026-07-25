@@ -58,6 +58,9 @@ page("connect", {
     JSON,
     HELP,
   ],
+  notes: [
+    "JSON mode never opens a browser or prints an OAuth URL/state. If new consent is required, it returns oauth_interaction_required with an interactive retry command.",
+  ],
 });
 
 page("list", {
@@ -69,7 +72,7 @@ page("list", {
 page("remove", {
   usage: "mcp-use client remove <name> [options]",
   summary: "Immediately remove a saved server and its credentials.",
-  options: [HELP],
+  options: [JSON, HELP],
 });
 
 page("<name>", {

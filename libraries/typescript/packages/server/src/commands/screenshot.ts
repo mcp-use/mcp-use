@@ -39,8 +39,53 @@ interface LocalInspectorHandle {
   close(): Promise<void>;
 }
 
+const HELP = `Usage: mcp-use screenshot (--server <name> | --mcp <url>) --tool <name> [args...] [options]
+
+Call a view-backed MCP tool and capture its rendered MCP App as PNG.
+
+Source options:
+  --server <name>             Use a server saved by mcp-use client
+  --mcp <url>                 Connect directly to an HTTP(S) MCP endpoint
+  -H, --header <"Key: Value"> Header for --mcp; repeatable and incompatible
+                              with --server
+
+Capture options:
+  --tool <name>               View-backed tool to call (required)
+  --output <path>             Output PNG path (default: timestamped view name)
+  --width <px>                Host/widget width (default: 768, matching an
+                              OpenAI inline MCP App container)
+  --height <px>               Host viewport height used for responsive layout
+                              (default: 720); PNG is cropped to widget bounds
+  --device-scale-factor <n>   Pixel density, greater than 0 and at most 4
+                              (default: 1)
+  --theme <light|dark>        Host theme (default: light)
+  --wait-for <selector>       Wait for a selector before capture
+  --delay <ms>                Additional delay after readiness (default: 0)
+  --timeout <ms>              Tool/browser timeout (default: 30000)
+  --inspector <url>           Use an existing Inspector origin
+  --cdp-url <url>             Use an existing Chrome DevTools endpoint
+  --json                      Emit one result or error; never prompt
+  -h, --help                  Show this help
+
+Arguments:
+  Pass one JSON object or key=value/key:=<json> pairs after the options.
+
+Examples:
+  mcp-use screenshot --server demo --tool show-app appName=Demo
+  mcp-use screenshot --mcp https://example.com/mcp --tool show-app \\
+    '{"appName":"CI"}' --theme dark --output app.png --json
+
+Exit codes:
+  0  Capture succeeded or help
+  2  Invalid arguments
+  1  MCP, tool, Inspector, browser, readiness, or write failure`;
+
 /** Run `mcp-use screenshot`. */
 export async function runScreenshot(argv: readonly string[]): Promise<number> {
+  if (argv.some((token) => token === "--help" || token === "-h")) {
+    process.stdout.write(`${HELP}\n`);
+    return 0;
+  }
   const json = wantsJson(argv);
   let connection: MCPConnection | undefined;
   let browser: BrowserHandle | undefined;
@@ -56,7 +101,7 @@ export async function runScreenshot(argv: readonly string[]): Promise<number> {
         tool: { type: "string" },
         header: { type: "string", short: "H", multiple: true },
         output: { type: "string" },
-        width: { type: "string", default: "1280" },
+        width: { type: "string", default: "768" },
         height: { type: "string", default: "720" },
         "device-scale-factor": { type: "string", default: "1" },
         theme: { type: "string", default: "light" },
@@ -91,8 +136,8 @@ export async function runScreenshot(argv: readonly string[]): Promise<number> {
     const headers = parseHeaders(values.header ?? []);
     connection =
       values.server !== undefined
-        ? await openSavedConnection(values.server)
-        : await openDirectConnection(new URL(values.mcp!).href, headers);
+        ? await openSavedConnection(values.server, 300_000, json)
+        : await openDirectConnection(new URL(values.mcp!).href, headers, json);
 
     const tools = await connection.listTools();
     const tool = tools.find((candidate) => candidate.name === values.tool);
@@ -167,9 +212,15 @@ export async function runScreenshot(argv: readonly string[]): Promise<number> {
     await waitForDocument(browser, timeout);
     await waitForReady(browser, values["wait-for"], timeout);
     if (delay > 0) await sleep(delay);
+    const bounds = await readCaptureBounds(browser);
     const captured = (await browser.cdp.send(
       "Page.captureScreenshot",
-      { format: "png", captureBeyondViewport: false },
+      {
+        format: "png",
+        captureBeyondViewport: true,
+        fromSurface: true,
+        clip: { ...bounds, scale: 1 },
+      },
       browser.sessionId
     )) as { data?: unknown };
     if (typeof captured.data !== "string") {
@@ -184,7 +235,14 @@ export async function runScreenshot(argv: readonly string[]): Promise<number> {
     );
     await writeFile(output, Buffer.from(captured.data, "base64"));
     printResult(
-      { path: output, width, height, deviceScaleFactor: scale },
+      {
+        path: output,
+        width: bounds.width,
+        height: bounds.height,
+        viewport: { width, height },
+        deviceScaleFactor: scale,
+        theme: values.theme,
+      },
       json,
       output
     );
@@ -448,6 +506,69 @@ async function waitForReady(
     "browser_timeout",
     "View did not become ready in time."
   );
+}
+
+interface CaptureBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Read the rendered iframe's outer bounds after all requested settling time.
+ * The viewport controls responsive layout; the PNG represents only the MCP
+ * App surface, matching how an inline host embeds the widget.
+ */
+async function readCaptureBounds(
+  browser: BrowserHandle
+): Promise<CaptureBounds> {
+  const response = (await browser.cdp.send(
+    "Runtime.evaluate",
+    {
+      expression: `(() => {
+        const frame = document.querySelector("iframe");
+        if (!frame) return null;
+        const rect = frame.getBoundingClientRect();
+        return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+      })()`,
+      returnByValue: true,
+    },
+    browser.sessionId
+  )) as { result?: { value?: unknown } };
+  return normalizeCaptureBounds(response.result?.value);
+}
+
+/** Validate and pixel-align browser-provided CSS bounds for CDP capture. */
+export function normalizeCaptureBounds(value: unknown): CaptureBounds {
+  if (value === null || typeof value !== "object") {
+    throw new CommandError(
+      "capture_failed",
+      "Inspector preview did not expose rendered widget bounds."
+    );
+  }
+  const candidate = value as Partial<CaptureBounds>;
+  const numbers = [candidate.x, candidate.y, candidate.width, candidate.height];
+  if (
+    numbers.some(
+      (number) => typeof number !== "number" || !Number.isFinite(number)
+    ) ||
+    candidate.width! <= 0 ||
+    candidate.height! <= 0
+  ) {
+    throw new CommandError(
+      "capture_failed",
+      "Inspector preview returned invalid widget bounds."
+    );
+  }
+  const x = Math.floor(candidate.x!);
+  const y = Math.floor(candidate.y!);
+  return {
+    x,
+    y,
+    width: Math.ceil(candidate.x! + candidate.width!) - x,
+    height: Math.ceil(candidate.y! + candidate.height!) - y,
+  };
 }
 
 class CdpClient {

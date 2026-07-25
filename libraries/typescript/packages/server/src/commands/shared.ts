@@ -40,6 +40,12 @@ export class CommandError extends Error {
   }
 }
 
+/** Operational error that represents a missing or invalid CLI choice. */
+export class CommandUsageError extends CommandError {
+  /** Process exit code for command choices that must be supplied explicitly. */
+  readonly exitCode = 2;
+}
+
 /** Whether a command should emit machine-readable output. */
 export function wantsJson(argv: readonly string[]): boolean {
   return argv.includes("--json");
@@ -64,7 +70,11 @@ export function printResult(
 
 /** Report a command error using the CLI's text or JSON convention. */
 export function reportError(error: unknown, json: boolean): number {
-  const usage = error instanceof UsageError;
+  const usage =
+    error instanceof UsageError ||
+    (error instanceof CommandError &&
+      "exitCode" in error &&
+      error.exitCode === 2);
   const operational = error instanceof CommandError;
   const code = operational
     ? error.code
@@ -86,8 +96,30 @@ export function reportError(error: unknown, json: boolean): number {
     );
   } else {
     process.stderr.write(`${message}\n`);
+    if (operational && hasNextSteps(error.details)) {
+      for (const step of error.details.nextSteps) {
+        process.stderr.write(`\n${step.description}:\n  ${step.command}\n`);
+      }
+    }
   }
   return usage ? 2 : 1;
+}
+
+function hasNextSteps(value: unknown): value is {
+  nextSteps: Array<{ description: string; command: string }>;
+} {
+  if (value === null || typeof value !== "object") return false;
+  const steps = (value as { nextSteps?: unknown }).nextSteps;
+  return (
+    Array.isArray(steps) &&
+    steps.every(
+      (step) =>
+        step !== null &&
+        typeof step === "object" &&
+        typeof (step as { description?: unknown }).description === "string" &&
+        typeof (step as { command?: unknown }).command === "string"
+    )
+  );
 }
 
 /** Require confirmation for destructive operations. */

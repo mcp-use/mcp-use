@@ -55,14 +55,12 @@ export async function runClient(argv: readonly string[]): Promise<number> {
   const json = wantsJson(argv);
   const normalizedArgv = argv.filter((token) => token !== "--json");
   const first = normalizedArgv[0];
-  const reportJson = json && first !== "remove";
   try {
     if (first === "connect")
       return await connect(normalizedArgv.slice(1), json);
     if (first === "list") return await list(normalizedArgv.slice(1), json);
     if (first === "remove") {
-      const commandIndex = argv.indexOf("remove");
-      return await remove(argv.filter((_, index) => index !== commandIndex));
+      return await remove(normalizedArgv.slice(1), json);
     }
     if (first === undefined) {
       throw new UsageError("Usage: mcp-use client <connect|list|remove|name>");
@@ -71,7 +69,7 @@ export async function runClient(argv: readonly string[]): Promise<number> {
   } catch (error) {
     return reportError(
       error instanceof TypeError ? new UsageError(error.message) : error,
-      reportJson
+      json
     );
   }
 }
@@ -124,14 +122,16 @@ async function connect(
     resolveBrowserMode({
       noOpen: values["no-open"] === true,
       json,
-    })
+    }),
+    json,
+    `mcp-use client connect ${name} <url> --no-open`
   );
   await connection.disconnect();
   saved.servers[name] = definition;
   await writePrivateJson(SERVERS_PATH, saved);
   await writePrivateJson(credentialsPath(name), credentials);
   printResult(
-    { name, url: definition.url, protocol },
+    { name, url: safeUrlForOutput(definition.url), protocol },
     json,
     `Connected and saved ${name}.`
   );
@@ -144,6 +144,7 @@ async function list(argv: readonly string[], json: boolean): Promise<number> {
   const result = Object.entries(saved.servers).map(([name, server]) => ({
     name,
     ...server,
+    url: safeUrlForOutput(server.url),
   }));
   printResult(
     result,
@@ -154,7 +155,7 @@ async function list(argv: readonly string[], json: boolean): Promise<number> {
   return 0;
 }
 
-async function remove(argv: readonly string[]): Promise<number> {
+async function remove(argv: readonly string[], json: boolean): Promise<number> {
   const { positionals } = parseArgs({
     args: [...argv],
     allowPositionals: true,
@@ -166,7 +167,7 @@ async function remove(argv: readonly string[]): Promise<number> {
   delete saved.servers[name];
   await writePrivateJson(SERVERS_PATH, saved);
   await rm(credentialsDirectory(name), { recursive: true, force: true });
-  printResult({ removed: name }, false, `Removed ${name}.`);
+  printResult({ removed: name }, json, `Removed ${name}.`);
   return 0;
 }
 
@@ -219,6 +220,7 @@ async function savedServerCommand(
     }
   }
 
+  validateSavedCommandArgs(name, family, operation, argv.slice(2));
   const credentials = await readJson<SavedCredentials>(
     credentialsPath(name),
     {}
@@ -228,7 +230,8 @@ async function savedServerCommand(
     definition,
     credentials,
     300_000,
-    resolveBrowserMode({ noOpen: false, json })
+    resolveBrowserMode({ noOpen: false, json }),
+    json
   );
   try {
     if (family === "tools") {
@@ -309,27 +312,53 @@ async function savedServerCommand(
   }
 }
 
+function validateSavedCommandArgs(
+  name: string,
+  family: string | undefined,
+  operation: string | undefined,
+  args: readonly string[]
+): void {
+  if (
+    (family === "tools" && operation === "list") ||
+    (family === "resources" && operation === "list") ||
+    (family === "prompts" && operation === "list")
+  ) {
+    parseJsonOnly(args);
+    return;
+  }
+  if (family === "tools" && operation === "describe") {
+    one(args, `mcp-use client ${name} tools describe <tool>`);
+    return;
+  }
+  if (family === "tools" && operation === "call") {
+    parseToolCallArgs(name, args);
+    return;
+  }
+  if (family === "resources" && operation === "read") {
+    one(args, `mcp-use client ${name} resources read <uri>`);
+    return;
+  }
+  if (family === "prompts" && operation === "get") {
+    if (args[0] === undefined) {
+      throw new UsageError(
+        `Usage: mcp-use client ${name} prompts get <prompt> [args]`
+      );
+    }
+    parseMcpArguments(args.slice(1));
+    return;
+  }
+  throw new UsageError(
+    `Usage: mcp-use client ${name} <tools|resources|prompts|auth> ...`
+  );
+}
+
 async function callTool(
   connection: MCPConnection,
   serverName: string,
   argv: readonly string[],
   json: boolean
 ): Promise<number> {
-  const tool = argv[0];
-  if (tool === undefined) {
-    throw new UsageError(
-      `Usage: mcp-use client ${serverName} tools call <tool> [args]`
-    );
-  }
-  const { values, positionals } = parseArgs({
-    args: [...argv.slice(1)],
-    allowPositionals: true,
-    strict: true,
-    options: {
-      timeout: { type: "string", default: "30000" },
-    },
-  });
-  const timeout = parsePositiveInteger(values.timeout, "--timeout");
+  const { tool, timeout, positionals } = parseToolCallArgs(serverName, argv);
   const result = await connection.callTool(
     tool,
     parseMcpArguments(positionals),
@@ -346,14 +375,49 @@ async function callTool(
   return 0;
 }
 
+function parseToolCallArgs(
+  serverName: string,
+  argv: readonly string[]
+): { tool: string; timeout: number; positionals: string[] } {
+  const tool = argv[0];
+  if (tool === undefined) {
+    throw new UsageError(
+      `Usage: mcp-use client ${serverName} tools call <tool> [args]`
+    );
+  }
+  const { values, positionals } = parseArgs({
+    args: [...argv.slice(1)],
+    allowPositionals: true,
+    strict: true,
+    options: {
+      timeout: { type: "string", default: "30000" },
+    },
+  });
+  const timeout = parsePositiveInteger(values.timeout, "--timeout");
+  parseMcpArguments(positionals);
+  return { tool, timeout, positionals };
+}
+
 async function openConnection(
   name: string,
   definition: SavedServer,
   credentials: SavedCredentials,
   authTimeoutMs: number,
-  browserMode: BrowserMode = process.stdin.isTTY ? "ask" : "never"
+  browserMode: BrowserMode = process.stdin.isTTY ? "ask" : "never",
+  quiet = false,
+  interactiveCommand = `mcp-use client ${name} tools list`
 ): Promise<MCPConnection> {
-  const { createOAuthProvider, MCPClient } = await loadClientPackage();
+  const { createOAuthProvider, MCPClient, logger } = await loadClientPackage({
+    allowInstall: !quiet,
+  });
+  if (quiet) logger.level = "silent";
+  let rejectOAuthInteraction: ((error: CommandError) => void) | undefined;
+  const oauthInteractionRequired =
+    quiet && definition.oauth
+      ? new Promise<never>((_resolve, reject) => {
+          rejectOAuthInteraction = reject;
+        })
+      : undefined;
   const oauthBase = oauthDirectory(name);
   const authProvider = definition.oauth
     ? await createOAuthProvider(definition.url, {
@@ -361,6 +425,26 @@ async function openConnection(
         authTimeoutMs,
         storageKeyPrefix: `mcp-use-cli:${name}`,
         openBrowser: async (url: string) => {
+          if (quiet) {
+            setImmediate(() => {
+              rejectOAuthInteraction?.(
+                new CommandError(
+                  "oauth_interaction_required",
+                  "OAuth interaction is required; retry this command without --json in a terminal.",
+                  {
+                    server: name,
+                    nextSteps: [
+                      {
+                        description: "Authenticate interactively in a terminal",
+                        command: interactiveCommand,
+                      },
+                    ],
+                  }
+                )
+              );
+            });
+            return;
+          }
           if (browserMode === "never") {
             process.stderr.write(`Open this URL to authenticate:\n${url}\n`);
             return;
@@ -400,9 +484,28 @@ async function openConnection(
     },
   });
   try {
-    return await client.connect(name);
+    const connection = client.connect(name);
+    return await (oauthInteractionRequired === undefined
+      ? connection
+      : Promise.race([connection, oauthInteractionRequired]));
   } catch (error) {
-    throw normalizeProtocolConnectionError(error, definition.protocol);
+    if (
+      error instanceof CommandError &&
+      error.code === "oauth_interaction_required"
+    ) {
+      (authProvider as { dispose?: () => void } | undefined)?.dispose?.();
+      await (
+        client as typeof client & {
+          closeSession?: (serverName: string) => Promise<void>;
+        }
+      ).closeSession?.(name);
+      throw error;
+    }
+    throw sanitizeConnectionError(
+      normalizeProtocolConnectionError(error, definition.protocol),
+      definition,
+      credentials
+    );
   }
 }
 
@@ -413,7 +516,8 @@ async function openConnection(
  */
 export async function openSavedConnection(
   name: string,
-  authTimeoutMs = 300_000
+  authTimeoutMs = 300_000,
+  quiet = false
 ): Promise<MCPConnection> {
   const saved = await readServers();
   const definition = saved.servers[name];
@@ -424,7 +528,14 @@ export async function openSavedConnection(
     credentialsPath(name),
     {}
   );
-  return openConnection(name, definition, credentials, authTimeoutMs);
+  return openConnection(
+    name,
+    definition,
+    credentials,
+    authTimeoutMs,
+    process.stdin.isTTY ? "ask" : "never",
+    quiet
+  );
 }
 
 /**
@@ -434,13 +545,16 @@ export async function openSavedConnection(
  */
 export async function openDirectConnection(
   url: string,
-  headers: Record<string, string>
+  headers: Record<string, string>,
+  quiet = false
 ): Promise<MCPConnection> {
   return openConnection(
     "screenshot",
     { url, oauth: false, protocol: "auto" },
     { headers },
-    300_000
+    300_000,
+    "never",
+    quiet
   );
 }
 
@@ -535,6 +649,19 @@ function validateName(name: string): void {
   }
 }
 
+function safeUrlForOutput(raw: string): string {
+  const url = new URL(raw);
+  if (url.username !== "" || url.password !== "") {
+    url.username = "[REDACTED]";
+    url.password = "";
+  }
+  for (const key of [...url.searchParams.keys()]) {
+    url.searchParams.set(key, "[REDACTED]");
+  }
+  if (url.hash !== "") url.hash = "[REDACTED]";
+  return url.href;
+}
+
 async function readServers(): Promise<SavedServers> {
   const saved = await readJson<{
     servers: Record<
@@ -591,6 +718,72 @@ function normalizeProtocolConnectionError(
     "protocol_mismatch",
     "Server does not support the requested modern protocol (stateless/sessionless, no fallback)."
   );
+}
+
+function sanitizeConnectionError(
+  error: unknown,
+  definition: SavedServer,
+  credentials: SavedCredentials
+): unknown {
+  const secrets = connectionSecrets(definition.url, credentials.headers);
+  if (!(error instanceof Error) || secrets.size === 0) return error;
+  const message = redactText(error.message, secrets);
+  if (error instanceof CommandError) {
+    return new CommandError(
+      error.code,
+      message,
+      redactUnknown(error.details, secrets)
+    );
+  }
+  const safe = new Error(message);
+  safe.name = error.name;
+  return safe;
+}
+
+function connectionSecrets(
+  rawUrl: string,
+  headers: Record<string, string> | undefined
+): Set<string> {
+  const secrets = new Set<string>();
+  const url = new URL(rawUrl);
+  for (const value of [
+    url.username,
+    url.password,
+    ...url.searchParams.values(),
+    url.hash.slice(1),
+  ]) {
+    if (value !== "") secrets.add(value);
+  }
+  for (const value of Object.values(headers ?? {})) {
+    if (value !== "") {
+      secrets.add(value);
+      const bearer = value.match(/^Bearer\s+(.+)$/i)?.[1];
+      if (bearer !== undefined) secrets.add(bearer);
+    }
+  }
+  return secrets;
+}
+
+function redactUnknown(value: unknown, secrets: ReadonlySet<string>): unknown {
+  if (typeof value === "string") return redactText(value, secrets);
+  if (Array.isArray(value)) {
+    return value.map((item) => redactUnknown(item, secrets));
+  }
+  if (value === null || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [
+      key,
+      redactUnknown(item, secrets),
+    ])
+  );
+}
+
+function redactText(value: string, secrets: ReadonlySet<string>): string {
+  let result = value;
+  for (const secret of secrets) {
+    result = result.replaceAll(secret, "[REDACTED]");
+  }
+  return result;
 }
 
 function credentialsDirectory(name: string): string {

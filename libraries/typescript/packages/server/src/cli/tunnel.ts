@@ -148,6 +148,7 @@ export function createTunnelManager(stateFilePath: string): TunnelManager {
 
       let resolved = false;
       let shuttingDown = false;
+      let failureMessage: string | undefined;
 
       const markChildShutdown = (): void => {
         shuttingDown = true;
@@ -160,6 +161,12 @@ export function createTunnelManager(stateFilePath: string): TunnelManager {
         const isShutdownMessage =
           text.includes("Shutting down") || text.includes("🛑");
         const isErrorMessage = text.includes("✖") || text.includes("Error:");
+        if (isErrorMessage) {
+          failureMessage = text
+            .replace(/[✖🛑]/gu, "")
+            .replace(/^.*?Error:\s*/s, "")
+            .trim();
+        }
 
         if (!shuttingDown && !isShutdownMessage && !isErrorMessage) {
           process.stdout.write(text);
@@ -188,6 +195,9 @@ export function createTunnelManager(stateFilePath: string): TunnelManager {
 
       child.stderr.on("data", (data: Buffer) => {
         const text = data.toString();
+        if (/error|timeout|failed/i.test(text)) {
+          failureMessage = text.replace(/^.*?Error:\s*/is, "").trim();
+        }
         if (
           !shuttingDown &&
           !text.includes("INFO") &&
@@ -212,7 +222,12 @@ export function createTunnelManager(stateFilePath: string): TunnelManager {
       child.on("exit", (code) => {
         if (code !== 0 && code !== null && !resolved) {
           clearTimeout(setupTimeout);
-          reject(new Error(`Tunnel process exited with code ${code}`));
+          reject(
+            new Error(
+              failureMessage ??
+                `Tunnel process exited before publishing a URL (code ${code})`
+            )
+          );
         }
         // The tunnel CLI can exit after setup when its bore connection or
         // server-side registration disappears. Do not keep reporting a dead

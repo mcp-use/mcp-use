@@ -132,6 +132,8 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
   private openBrowserOverride?: (url: string) => Promise<void> | void;
 
   private server: Server | null = null;
+  /** Provider authorization URL, exposed only through the local redirect route. */
+  private authorizationUrl: string | null = null;
   /** Currently in-flight deferred — used to prevent overlapping flows. */
   private pending: Deferred<NodeOAuthAuthorizationResponse> | null = null;
   /** Latest deferred (settled or in-flight) for the loopback response. */
@@ -291,6 +293,7 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
       authorizationUrl,
       { flowType: "redirect" }
     );
+    this.authorizationUrl = sanitizedUrl;
 
     await this.startLoopback();
 
@@ -310,9 +313,11 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
     }, this.authTimeoutMs);
 
     const opener = this.openBrowserOverride ?? defaultOpener;
+    const launcherUrl = `http://127.0.0.1:${this.port}/authorize`;
     try {
-      await opener(sanitizedUrl);
-      // Browser opened (or queued). Caller will print the URL too — see CLI.
+      await opener(launcherUrl);
+      // The local launcher redirects without exposing OAuth state in terminal
+      // output when a CLI callback prints the opener URL for manual use.
     } catch (err) {
       // Non-fatal: we still print/keep listening so the user can paste.
       console.error(
@@ -404,6 +409,7 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
       this.server.close();
       this.server = null;
     }
+    this.authorizationUrl = null;
   }
 
   private resolvePending(response: NodeOAuthAuthorizationResponse): void {
@@ -425,6 +431,20 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
     res: import("node:http").ServerResponse
   ): void {
     const url = new URL(rawUrl, `http://127.0.0.1:${this.port}`);
+
+    if (url.pathname === "/authorize") {
+      if (this.authorizationUrl === null || this.pending === null) {
+        res.statusCode = 410;
+        res.end("Authorization flow is not active");
+        return;
+      }
+      res.statusCode = 302;
+      res.setHeader("location", this.authorizationUrl);
+      res.setHeader("cache-control", "no-store");
+      res.setHeader("referrer-policy", "no-referrer");
+      res.end();
+      return;
+    }
 
     if (url.pathname !== "/callback") {
       res.statusCode = 404;

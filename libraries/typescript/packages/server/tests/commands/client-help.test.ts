@@ -129,7 +129,7 @@ describe("client help tree", () => {
     await runClientHelp(["remove", "--help"]);
     const remove = stdout.mock.calls.flat().join("");
     expect(remove).not.toContain("--yes");
-    expect(remove).not.toContain("--json");
+    expect(remove).toContain("--json");
 
     stdout.mockClear();
     await runClientHelp(["demo", "auth", "logout", "--help"]);

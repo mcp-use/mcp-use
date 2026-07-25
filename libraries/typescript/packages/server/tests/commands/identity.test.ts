@@ -1,24 +1,53 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { writeCloudConfig, withApiKey } = vi.hoisted(() => {
+const {
+  clearCloudConfig,
+  closePrompt,
+  createInterface,
+  identity,
+  question,
+  writeCloudConfig,
+  withApiKey,
+} = vi.hoisted(() => {
   const identity = {
     userId: "user_1",
     email: "person@example.com",
-    organizations: [],
-    defaultOrganizationId: null,
+    organizations: [
+      {
+        id: "org_1",
+        name: "Acme",
+        slug: "acme",
+        role: "admin",
+      },
+    ],
+    defaultOrganizationId: "org_1" as string | null,
   };
   return {
+    clearCloudConfig: vi.fn(),
+    closePrompt: vi.fn(),
+    createInterface: vi.fn(),
+    identity,
+    question: vi.fn(),
     writeCloudConfig: vi.fn(async () => {}),
     withApiKey: vi.fn(() => ({ identity: async () => identity })),
   };
 });
 
+vi.mock("node:readline/promises", () => ({ createInterface }));
+
 vi.mock("../../src/commands/cloud-api.js", () => ({
   cloudAuthUrl: () => "https://cloud.example.test",
   CloudApi: { withApiKey },
-  clearCloudConfig: vi.fn(),
+  clearCloudConfig,
   readCloudConfig: vi.fn(),
-  resolveOrganization: vi.fn(),
+  resolveOrganization: (
+    organizations: Array<{ id: string; slug: string | null }>,
+    selector: string
+  ) =>
+    organizations.find(
+      (organization) =>
+        organization.id === selector || organization.slug === selector
+    ),
   writeCloudConfig,
 }));
 
@@ -26,14 +55,57 @@ import { runIdentity } from "../../src/commands/identity.js";
 
 const originalFetch = globalThis.fetch;
 const originalApiKey = process.env.MCP_USE_API_KEY;
+const originalStdinTty = Object.getOwnPropertyDescriptor(
+  process.stdin,
+  "isTTY"
+);
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
   if (originalApiKey === undefined) delete process.env.MCP_USE_API_KEY;
   else process.env.MCP_USE_API_KEY = originalApiKey;
+  if (originalStdinTty === undefined) {
+    Reflect.deleteProperty(process.stdin, "isTTY");
+  } else {
+    Object.defineProperty(process.stdin, "isTTY", originalStdinTty);
+  }
   writeCloudConfig.mockClear();
   withApiKey.mockClear();
+  clearCloudConfig.mockClear();
+  closePrompt.mockClear();
+  createInterface.mockReset();
+  question.mockReset();
+  identity.organizations.splice(0, identity.organizations.length, {
+    id: "org_1",
+    name: "Acme",
+    slug: "acme",
+    role: "admin",
+  });
+  identity.defaultOrganizationId = "org_1";
   vi.restoreAllMocks();
+});
+
+describe("logout UX", () => {
+  it("asks only whether to log out and then confirms completion", async () => {
+    question.mockResolvedValue("y");
+    createInterface.mockReturnValue({
+      close: closePrompt,
+      question,
+    });
+    Object.defineProperty(process.stdin, "isTTY", {
+      configurable: true,
+      value: true,
+    });
+    const stdout = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
+
+    await expect(runIdentity("logout", [])).resolves.toBe(0);
+
+    expect(question).toHaveBeenCalledWith("Log out? [y/N] ");
+    expect(clearCloudConfig).toHaveBeenCalledOnce();
+    expect(stdout.mock.calls.flat().join("")).toBe("Logged out.\n");
+  });
 });
 
 describe("login --device-code", () => {
@@ -69,7 +141,12 @@ describe("login --device-code", () => {
       "Bearer access-secret"
     );
     expect(withApiKey).toHaveBeenCalledWith(apiKey);
-    expect(writeCloudConfig).toHaveBeenCalledWith({ apiKey });
+    expect(writeCloudConfig).toHaveBeenCalledWith({
+      apiKey,
+      orgId: "org_1",
+      orgName: "Acme",
+      orgSlug: "acme",
+    });
     expect(stderr).not.toHaveBeenCalled();
     expect(stdout).not.toHaveBeenCalledWith(
       expect.stringContaining(deviceCode)
@@ -176,6 +253,132 @@ describe("login --device-code", () => {
 
     expect(stdout).toHaveBeenCalledWith(
       expect.stringContaining("--device-code <code>")
+    );
+  });
+
+  it("requires an explicit organization for headless login without a default", async () => {
+    identity.organizations.splice(
+      0,
+      identity.organizations.length,
+      {
+        id: "org_1",
+        name: "Acme",
+        slug: "acme",
+        role: "admin",
+      },
+      {
+        id: "org_2",
+        name: "Beta",
+        slug: "beta",
+        role: "member",
+      }
+    );
+    identity.defaultOrganizationId = null;
+    process.env.MCP_USE_API_KEY = "mcp_agent";
+    const stderr = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+
+    await expect(runIdentity("login", ["--json"])).resolves.toBe(2);
+
+    expect(writeCloudConfig).toHaveBeenCalledWith({ apiKey: "mcp_agent" });
+    expect(JSON.parse(stderr.mock.calls.flat().join(""))).toMatchObject({
+      error: {
+        code: "organization_required",
+        details: {
+          organizations: [
+            { id: "org_1", name: "Acme", slug: "acme" },
+            { id: "org_2", name: "Beta", slug: "beta" },
+          ],
+          nextSteps: [
+            {
+              command: "mcp-use org use <id-or-slug>",
+            },
+            {
+              command: "mcp-use login --org <id-or-slug>",
+            },
+          ],
+        },
+      },
+    });
+  });
+
+  it("selects an organization explicitly for headless agents", async () => {
+    identity.organizations.splice(
+      0,
+      identity.organizations.length,
+      {
+        id: "org_1",
+        name: "Acme",
+        slug: "acme",
+        role: "admin",
+      },
+      {
+        id: "org_2",
+        name: "Beta",
+        slug: "beta",
+        role: "member",
+      }
+    );
+    identity.defaultOrganizationId = null;
+    process.env.MCP_USE_API_KEY = "mcp_agent";
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(
+      runIdentity("login", ["--org", "beta", "--json"])
+    ).resolves.toBe(0);
+
+    expect(writeCloudConfig).toHaveBeenCalledWith({
+      apiKey: "mcp_agent",
+      orgId: "org_2",
+      orgName: "Beta",
+      orgSlug: "beta",
+    });
+  });
+
+  it("prompts an interactive user to select among multiple organizations", async () => {
+    identity.organizations.splice(
+      0,
+      identity.organizations.length,
+      {
+        id: "org_1",
+        name: "Acme",
+        slug: "acme",
+        role: "admin",
+      },
+      {
+        id: "org_2",
+        name: "Beta",
+        slug: "beta",
+        role: "member",
+      }
+    );
+    identity.defaultOrganizationId = null;
+    process.env.MCP_USE_API_KEY = "mcp_human";
+    question.mockResolvedValue("2");
+    createInterface.mockReturnValue({
+      close: closePrompt,
+      question,
+    });
+    Object.defineProperty(process.stdin, "isTTY", {
+      configurable: true,
+      value: true,
+    });
+    const stdout = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
+
+    await expect(runIdentity("login", [])).resolves.toBe(0);
+
+    expect(question).toHaveBeenCalledWith("Organization [1]: ");
+    expect(writeCloudConfig).toHaveBeenCalledWith({
+      apiKey: "mcp_human",
+      orgId: "org_2",
+      orgName: "Beta",
+      orgSlug: "beta",
+    });
+    expect(stdout.mock.calls.flat().join("")).toContain(
+      "Logged in as person@example.com (Beta)."
     );
   });
 });

@@ -236,10 +236,12 @@ function ViewPreviewBundle({
   view,
   bundle,
   widthOverride,
+  theme,
 }: {
   view: string;
   bundle: PreviewBundle;
   widthOverride?: number;
+  theme: "light" | "dark";
 }) {
   const [rendererReady, setRendererReady] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -281,7 +283,12 @@ function ViewPreviewBundle({
         }}
         cspMode="permissive"
         hostInfo={{ name: "mcp-use-inspector", version: "11.0.0" }}
-        mockOpenAiFileApis
+        hostContext={{ theme }}
+        // A partial `window.openai` makes legacy `useWidget()` builds select
+        // the ChatGPT adapter before the MCP Apps handshake and render with
+        // empty props. Bundle previews are MCP Apps hosts, so do not advertise
+        // a second host protocol just to provide optional file helpers.
+        mockOpenAiFileApis={false}
       />
     </div>
   );
@@ -441,6 +448,7 @@ export function ViewPreview() {
     const n = parseInt(raw, 10);
     return Number.isFinite(n) && n > 0 ? n : undefined;
   }, [search]);
+  const theme = search.get("theme") === "dark" ? "dark" : "light";
 
   if (bundle) {
     return (
@@ -448,6 +456,7 @@ export function ViewPreview() {
         view={view}
         bundle={bundle}
         widthOverride={widthOverride}
+        theme={theme}
       />
     );
   }
