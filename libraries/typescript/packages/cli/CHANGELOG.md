@@ -1,5 +1,11 @@
 # @mcp-use/cli
 
+## 4.0.0-beta.15
+
+### Patch Changes
+
+- 4b9e621: improve cli ux
+
 ## 4.0.0-beta.14
 
 ### Patch Changes

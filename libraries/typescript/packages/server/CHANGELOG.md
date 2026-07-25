@@ -1,5 +1,14 @@
 # mcp-use
 
+## 2.0.0-beta.60
+
+### Patch Changes
+
+- 4b9e621: improve cli ux
+- Updated dependencies [4b9e621]
+  - @mcp-use/cli@4.0.0-beta.15
+  - @mcp-use/inspector@20.0.0-beta.52
+
 ## 2.0.0-beta.59
 
 ### Patch Changes
