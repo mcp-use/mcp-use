@@ -37,7 +37,11 @@ export function filesystemServerConfig(root = process.cwd()) {
     mcpServers: {
       filesystem: {
         command: "npx",
-        args: ["-y", "@modelcontextprotocol/server-filesystem", path.resolve(root)],
+        args: [
+          "-y",
+          "@modelcontextprotocol/server-filesystem",
+          path.resolve(root),
+        ],
       },
     },
   };

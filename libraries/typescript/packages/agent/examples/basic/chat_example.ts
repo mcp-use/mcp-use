@@ -41,7 +41,9 @@ async function runMemoryChat() {
   const question = (prompt: string) =>
     new Promise<string>((resolve) => rl.question(prompt, resolve));
 
-  console.error("Interactive MCP chat — type exit to quit, clear to reset memory");
+  console.error(
+    "Interactive MCP chat — type exit to quit, clear to reset memory"
+  );
 
   try {
     while (true) {
