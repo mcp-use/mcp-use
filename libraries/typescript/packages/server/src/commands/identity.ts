@@ -1,15 +1,18 @@
 import { parseArgs } from "node:util";
+import { createInterface } from "node:readline/promises";
 
 import {
   clearCloudConfig,
   cloudAuthUrl,
   CloudApi,
+  type CloudOrganization,
   readCloudConfig,
   resolveOrganization,
   writeCloudConfig,
 } from "./cloud-api.js";
 import {
   CommandError,
+  CommandUsageError,
   confirm,
   openBrowser,
   printResult,
@@ -43,21 +46,47 @@ Authenticate the cloud CLI.
 Options:
   --api-key <key>       Authenticate with an API key
   --device-code <code>  Redeem a pre-approved device code
-  --org <id-or-slug>    Select the active organization
+  --org <id-or-slug>    Select the active organization (required for headless
+                        login when the account has no default)
   --no-open             Do not open the verification URL
   --json                Emit machine-readable output
   -h, --help            Show this help`;
+
+const LOGOUT_HELP = `Usage: mcp-use logout [options]
+
+Log out of the cloud CLI and delete local cloud credentials.
+
+Options:
+  --yes       Confirm without prompting
+  --json      Emit {"loggedOut":true}; never prompt
+  -h, --help  Show this help
+
+Exit codes:
+  0  Logged out, cancelled interactively, or help
+  2  Confirmation is required in a non-interactive run
+  1  Local credential removal failed`;
+
+const WHOAMI_HELP = `Usage: mcp-use whoami [options]
+
+Show the authenticated cloud identity and active organization.
+
+Options:
+  --json      Emit a machine-readable identity object
+  -h, --help  Show this help
+
+Exit codes:
+  0  Success or help
+  1  Authentication or API failure`;
 
 /** Run `login`, `logout`, or `whoami`. */
 export async function runIdentity(
   command: "login" | "logout" | "whoami",
   argv: readonly string[]
 ): Promise<number> {
-  if (
-    command === "login" &&
-    argv.some((token) => token === "--help" || token === "-h")
-  ) {
-    process.stdout.write(`${LOGIN_HELP}\n`);
+  if (argv.some((token) => token === "--help" || token === "-h")) {
+    process.stdout.write(
+      `${command === "login" ? LOGIN_HELP : command === "logout" ? LOGOUT_HELP : WHOAMI_HELP}\n`
+    );
     return 0;
   }
   const json = wantsJson(argv);
@@ -109,12 +138,35 @@ async function login(argv: readonly string[], json: boolean): Promise<number> {
         : await redeemProvidedDeviceCode(deviceCode);
   }
   const identity = await CloudApi.withApiKey(apiKey).identity();
-  const selected =
+  let selected =
     values.org !== undefined
       ? resolveOrganization(identity.organizations, values.org)
       : identity.organizations.find(
           (organization) => organization.id === identity.defaultOrganizationId
         );
+  selected ??=
+    identity.organizations.length === 1 ? identity.organizations[0] : undefined;
+  if (selected === undefined) {
+    await writeCloudConfig({ apiKey });
+    if (identity.organizations.length === 0) {
+      throw new CommandError(
+        "organization_required",
+        "The account does not belong to an organization.",
+        {
+          nextSteps: [
+            {
+              description: "Create or join an organization, then log in again",
+              command: "mcp-use login",
+            },
+          ],
+        }
+      );
+    }
+    if (json || !process.stdin.isTTY) {
+      throw organizationSelectionRequired(identity.organizations);
+    }
+    selected = await promptOrganization(identity.organizations);
+  }
   await writeCloudConfig({
     apiKey,
     ...(selected !== undefined
@@ -135,6 +187,63 @@ async function login(argv: readonly string[], json: boolean): Promise<number> {
   return 0;
 }
 
+function organizationSelectionRequired(
+  organizations: CloudOrganization[]
+): CommandUsageError {
+  return new CommandUsageError(
+    "organization_required",
+    "Choose an active organization for this login.",
+    {
+      organizations: organizations.map(({ id, name, slug }) => ({
+        id,
+        name,
+        slug,
+      })),
+      nextSteps: [
+        {
+          description: "Select an organization with this saved login",
+          command: "mcp-use org use <id-or-slug>",
+        },
+        {
+          description: "Select it during a future headless login",
+          command: "mcp-use login --org <id-or-slug>",
+        },
+      ],
+    }
+  );
+}
+
+async function promptOrganization(
+  organizations: CloudOrganization[]
+): Promise<CloudOrganization> {
+  process.stdout.write("Choose an active organization:\n");
+  organizations.forEach((organization, index) => {
+    const selector =
+      organization.slug === null ? organization.id : organization.slug;
+    process.stdout.write(
+      `  ${index + 1}. ${organization.name} (${selector})\n`
+    );
+  });
+  const prompt = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+  try {
+    const answer = await prompt.question("Organization [1]: ");
+    const index = answer.trim() === "" ? 0 : Number(answer) - 1;
+    if (
+      !Number.isInteger(index) ||
+      index < 0 ||
+      index >= organizations.length
+    ) {
+      throw new UsageError("Invalid organization selection.");
+    }
+    return organizations[index]!;
+  } finally {
+    prompt.close();
+  }
+}
+
 async function logout(argv: readonly string[], json: boolean): Promise<number> {
   const { values } = parseArgs({
     args: [...argv],
@@ -146,7 +255,7 @@ async function logout(argv: readonly string[], json: boolean): Promise<number> {
     },
   });
   if (
-    !(await confirm("Delete local cloud credentials?", {
+    !(await confirm("Log out?", {
       yes: values.yes === true,
       json,
     }))

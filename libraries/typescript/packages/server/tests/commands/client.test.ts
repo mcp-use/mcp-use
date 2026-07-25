@@ -4,10 +4,11 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const AUTHORIZATION_URL = "https://auth.example.com/authorize?state=test";
+const AUTHORIZATION_LAUNCHER_URL = "http://127.0.0.1:33418/authorize";
 
 const mocks = vi.hoisted(() => ({
   closePrompt: vi.fn(),
+  connectCall: vi.fn(),
   connectError: undefined as unknown,
   config: undefined as
     | {
@@ -17,12 +18,14 @@ const mocks = vi.hoisted(() => ({
             authProvider?: unknown;
             clientOptions?: { supportedProtocolVersions?: string[] };
             protocolNegotiation?: "auto" | "legacy" | { pin: "2026-07-28" };
+            url?: string;
           }
         >;
       }
     | undefined,
   createInterface: vi.fn(),
   loadClientPackage: vi.fn(),
+  logger: { level: "info" },
   openBrowser: vi.fn(),
   question: vi.fn(),
   triggerOAuth: false,
@@ -63,7 +66,9 @@ beforeEach(async () => {
   vi.resetModules();
   mocks.config = undefined;
   mocks.connectError = undefined;
+  mocks.connectCall.mockReset();
   mocks.triggerOAuth = false;
+  mocks.logger.level = "info";
   homeDirectory = await mkdtemp(join(tmpdir(), "mcp-use-client-"));
   vi.stubEnv("HOME", homeDirectory);
   stdinTtyDescriptor = Object.getOwnPropertyDescriptor(process.stdin, "isTTY");
@@ -102,6 +107,7 @@ beforeEach(async () => {
     question: mocks.question,
   });
   mocks.loadClientPackage.mockResolvedValue({
+    logger: mocks.logger,
     createOAuthProvider: async (
       _url: string,
       options: { openBrowser: (url: string) => Promise<void> }
@@ -114,12 +120,16 @@ beforeEach(async () => {
       }
 
       async connect(name: string): Promise<typeof connection> {
+        mocks.connectCall(name);
         if (mocks.connectError !== undefined) throw mocks.connectError;
         const provider = mocks.config?.mcpServers[name]?.authProvider as
           | { options: { openBrowser: (url: string) => Promise<void> } }
           | undefined;
         if (mocks.triggerOAuth && provider !== undefined) {
-          await provider.options.openBrowser(AUTHORIZATION_URL);
+          await provider.options.openBrowser(AUTHORIZATION_LAUNCHER_URL);
+          if (mocks.logger.level === "silent") {
+            await new Promise<never>(() => {});
+          }
         }
         return connection;
       }
@@ -141,6 +151,73 @@ afterEach(async () => {
 });
 
 describe("client JSON output", () => {
+  it("redacts URL credentials, query values, and fragments from results", async () => {
+    const rawUrl =
+      "https://user-secret:password-secret@mcp.example.com/mcp?token=query-secret#fragment-secret";
+
+    await expect(
+      runClient(["connect", "signed-url", rawUrl, "--no-oauth", "--json"])
+    ).resolves.toBe(0);
+
+    expect(stdout).not.toContain("user-secret");
+    expect(stdout).not.toContain("password-secret");
+    expect(stdout).not.toContain("query-secret");
+    expect(stdout).not.toContain("fragment-secret");
+    expect(JSON.parse(stdout)).toMatchObject({
+      name: "signed-url",
+      url: expect.stringContaining("REDACTED"),
+    });
+    expect(mocks.config?.mcpServers["signed-url"]).toMatchObject({
+      url: rawUrl,
+    });
+
+    stdout = "";
+    await expect(runClient(["list", "--json"])).resolves.toBe(0);
+    expect(stdout).not.toContain("user-secret");
+    expect(stdout).not.toContain("password-secret");
+    expect(stdout).not.toContain("query-secret");
+    expect(stdout).not.toContain("fragment-secret");
+  });
+
+  it("returns structured OAuth recovery without URL, state, logs, or browser", async () => {
+    mocks.triggerOAuth = true;
+
+    await expect(
+      runClient([
+        "connect",
+        "oauth-json",
+        "https://mcp.example.com/mcp",
+        "--json",
+      ])
+    ).resolves.toBe(1);
+
+    expect(stdout).toBe("");
+    expect(stderr.trim().split("\n")).toHaveLength(1);
+    expect(stderr).not.toContain(AUTHORIZATION_LAUNCHER_URL);
+    expect(stderr).not.toContain("state=test");
+    expect(JSON.parse(stderr)).toEqual({
+      error: {
+        code: "oauth_interaction_required",
+        message:
+          "OAuth interaction is required; retry this command without --json in a terminal.",
+        details: {
+          server: "oauth-json",
+          nextSteps: [
+            {
+              description: "Authenticate interactively in a terminal",
+              command: "mcp-use client connect oauth-json <url> --no-open",
+            },
+          ],
+        },
+      },
+    });
+    expect(mocks.openBrowser).not.toHaveBeenCalled();
+    expect(mocks.logger.level).toBe("silent");
+    expect(mocks.loadClientPackage).toHaveBeenCalledWith({
+      allowInstall: false,
+    });
+  });
+
   it("accepts --json throughout every data-returning command", async () => {
     await expect(
       runClient([
@@ -242,6 +319,36 @@ describe("client JSON output", () => {
     expect(stderr.match(/\n/g)).toHaveLength(1);
   });
 
+  it("redacts static headers and signed URL components from connection errors", async () => {
+    const headerSecret = "header-token-secret";
+    const querySecret = "query-token-secret";
+    mocks.connectError = new Error(
+      `Rejected Bearer ${headerSecret} while fetching https://mcp.example.com/mcp?token=${querySecret}`
+    );
+
+    await expect(
+      runClient([
+        "connect",
+        "secret-error",
+        `https://mcp.example.com/mcp?token=${querySecret}`,
+        "--no-oauth",
+        "-H",
+        `Authorization: Bearer ${headerSecret}`,
+        "--json",
+      ])
+    ).resolves.toBe(1);
+
+    expect(stdout).toBe("");
+    expect(stderr).not.toContain(headerSecret);
+    expect(stderr).not.toContain(querySecret);
+    expect(JSON.parse(stderr)).toMatchObject({
+      error: {
+        code: "command_failed",
+        message: expect.stringContaining("[REDACTED]"),
+      },
+    });
+  });
+
   it("retains a failed tool result in JSON error details", async () => {
     await runClient([
       "connect",
@@ -290,7 +397,7 @@ describe("client human-readable output", () => {
     expect(stderr).toBe("");
   });
 
-  it("removes without confirmation and rejects unsupported flags", async () => {
+  it("removes without confirmation and supports JSON anywhere", async () => {
     await expect(
       runClient([
         "connect",
@@ -301,8 +408,10 @@ describe("client human-readable output", () => {
     ).resolves.toBe(0);
     stdout = "";
 
-    await expect(runClient(["remove", "remove-json"])).resolves.toBe(0);
-    expect(stdout).toBe("Removed remove-json.\n");
+    await expect(runClient(["remove", "remove-json", "--json"])).resolves.toBe(
+      0
+    );
+    expect(JSON.parse(stdout)).toEqual({ removed: "remove-json" });
     expect(stderr).toBe("");
 
     await runClient([
@@ -320,11 +429,16 @@ describe("client human-readable output", () => {
       stdout = "";
       stderr = "";
 
-      await expect(runClient(argv)).resolves.toBe(2);
+      await expect(runClient(argv)).resolves.toBe(0);
 
-      expect(stdout).toBe("");
-      expect(stderr).toContain("Unknown option '--json'");
-      expect(stderr).not.toContain("does not support --json");
+      expect(JSON.parse(stdout)).toEqual({ removed: "remove-flags" });
+      expect(stderr).toBe("");
+      await runClient([
+        "connect",
+        "remove-flags",
+        "https://mcp.example.com/mcp",
+        "--no-oauth",
+      ]);
     }
 
     stdout = "";
@@ -499,6 +613,26 @@ describe("client protocol selection", () => {
 });
 
 describe("client OAuth browser UX", () => {
+  it("validates saved command options before connecting or starting OAuth", async () => {
+    await runClient([
+      "connect",
+      "oauth-validation",
+      "https://mcp.example.com/mcp",
+    ]);
+    const callsBefore = mocks.connectCall.mock.calls.length;
+    stdout = "";
+    stderr = "";
+    mocks.triggerOAuth = true;
+
+    await expect(
+      runClient(["oauth-validation", "tools", "list", "--no-open"])
+    ).resolves.toBe(2);
+
+    expect(mocks.connectCall).toHaveBeenCalledTimes(callsBefore);
+    expect(mocks.openBrowser).not.toHaveBeenCalled();
+    expect(stderr).toContain("Unknown option '--no-open'");
+  });
+
   it("waits for Enter before opening a browser in an interactive TTY", async () => {
     setStdinTty(true);
     mocks.triggerOAuth = true;
@@ -511,7 +645,7 @@ describe("client OAuth browser UX", () => {
     expect(mocks.question).toHaveBeenCalledWith(
       "This server requires OAuth. Press Enter to open your browser."
     );
-    expect(mocks.openBrowser).toHaveBeenCalledWith(AUTHORIZATION_URL);
+    expect(mocks.openBrowser).toHaveBeenCalledWith(AUTHORIZATION_LAUNCHER_URL);
     expect(mocks.question.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.openBrowser.mock.invocationCallOrder[0]!
     );
@@ -521,7 +655,6 @@ describe("client OAuth browser UX", () => {
   it.each([
     { label: "non-TTY", tty: false, before: [], after: [] },
     { label: "--no-open", tty: true, before: [], after: ["--no-open"] },
-    { label: "--json", tty: true, before: ["--json"], after: [] },
   ])(
     "prints the URL without prompting or opening under $label",
     async (mode) => {
@@ -541,15 +674,8 @@ describe("client OAuth browser UX", () => {
       expect(mocks.question).not.toHaveBeenCalled();
       expect(mocks.openBrowser).not.toHaveBeenCalled();
       expect(stderr).toBe(
-        `Open this URL to authenticate:\n${AUTHORIZATION_URL}\n`
+        `Open this URL to authenticate:\n${AUTHORIZATION_LAUNCHER_URL}\n`
       );
-      if (mode.label === "--json") {
-        expect(JSON.parse(stdout)).toMatchObject({
-          protocol: "auto",
-          url: "https://mcp.example.com/mcp",
-        });
-        expect(stdout.match(/\n/g)).toHaveLength(1);
-      }
     }
   );
 });

@@ -69,7 +69,7 @@ There are no `ls`, `rm`, `switch`, or `install` aliases in v2 alpha. The accepte
 - `--help` and `--version` write to stdout and exit `0`. Bare `mcp-use --help` prints the top-level command summary; `mcp-use <command> --help` prints that command's usage. Unknown commands/options, missing arguments, invalid enum/numeric values, mutually exclusive options, and a destructive command without confirmation in a non-TTY write one concise error plus a usage hint to stderr and exit `2`.
 - Successful finite commands exit `0`; empty lists and idempotent `logout`/`remove` operations are successful. Authentication, authorization, network, API, filesystem, build, MCP, browser, and remote-operation failures exit `1`. SIGINT exits `130`.
 - Human output is concise UTF-8 text on stdout. Errors and warnings go to stderr. ANSI styling is used only for a TTY and honors `NO_COLOR`; machine-readable output never contains ANSI.
-- Every finite data-returning command accepts `--json`. It emits exactly one JSON value followed by `\n`; errors emit `{"error":{"code":"...","message":"...","details":...}}` to stderr. Streaming `deployments logs --follow` emits JSON Lines when `--json` is set. Prompts are disabled under `--json` and whenever stdin is not a TTY.
+- Every data-returning command accepts `--json`. It emits exactly one JSON value followed by `\n`; errors emit `{"error":{"code":"...","message":"...","details":...}}` to stderr. `deployments logs --follow --json` remains silent while polling and emits one terminal object containing the collected logs. Prompts are disabled under `--json` and whenever stdin is not a TTY.
 - Destructive commands require an interactive confirmation or `--yes`. Cancellation is not an error and exits `0`; a non-TTY invocation without `--yes` is usage error `2`.
 - Cloud commands that accept `--org <id-or-slug>` use it for that invocation without changing the active organization. Otherwise they use the active organization, then the account default. Ambiguous names are rejected; organization names are display-only, not selectors.
 - IDs and slugs are passed as opaque strings. Pagination uses `--limit <1..100>` (default `30`) and `--skip <non-negative integer>` (default `0`). The API's returned order is preserved.
@@ -78,7 +78,7 @@ There are no `ls`, `rm`, `switch`, or `install` aliases in v2 alpha. The accepte
 
 All global CLI state lives under `~/.mcp-use/`; project state lives under the project's `.mcp-use/` workspace:
 
-- `~/.mcp-use/config.json` is owned by cloud commands and contains only the cloud API key plus active organization id/name/slug. `MCP_USE_CLOUD_API_URL` and `MCP_USE_CLOUD_WEB_URL` override endpoints for the process and are never persisted.
+- `~/.mcp-use/config.json` is owned by cloud commands and contains only the cloud API key plus active organization id/name/slug. `MCP_USE_CLOUD_API_URL` (or the v1-compatible `MCP_API_URL` alias) and `MCP_USE_CLOUD_WEB_URL` override endpoints for the process and are never persisted. The v2-specific variable wins when both API URL names are set.
 - `~/.mcp-use/client/servers.json` is owned by `client` and stores non-secret connection metadata keyed by explicit server name. There is no active/default client.
 - `~/.mcp-use/client/credentials/<sha256-of-server-name>.json` stores static headers or OAuth material used by `@mcp-use/client`. Removing a saved server removes its credential file; `client <name> auth logout` removes only the OAuth material while retaining non-OAuth connection metadata.
 - `~/.mcp-use/client-sdk/` is owned by `client` and `screenshot` when `@mcp-use/client` is auto-installed outside a project (for example `npx mcp-use client connect …` from a directory with no `package.json`). It holds a private `package.json` and `node_modules` for the client SDK only.
@@ -96,7 +96,7 @@ mcp-use org current [--json]
 mcp-use org use <id-or-slug>
 ```
 
-- `login` uses `--api-key` or `MCP_USE_API_KEY` when present; otherwise it runs OAuth device authorization, prints the verification URL/code, and opens the URL unless `--no-open` or non-TTY. `--device-code` redeems a short-lived, pre-approved RFC 8628 device code non-interactively through the same token endpoint, then creates and validates a CLI API key before persisting it. `--api-key` and `--device-code` are mutually exclusive; an explicit `--device-code` takes precedence over `MCP_USE_API_KEY`. `--org` validates and stores the selection; without it, the account default is stored when available. Device codes and bearer credentials are never included in output or structured errors.
+- `login` uses `--api-key` or `MCP_USE_API_KEY` when present; otherwise it runs OAuth device authorization, prints the verification URL/code, and opens the URL unless `--no-open` or non-TTY. `--device-code` redeems a short-lived, pre-approved RFC 8628 device code non-interactively through the same token endpoint, then creates and validates a CLI API key before persisting it. `--api-key` and `--device-code` are mutually exclusive; an explicit `--device-code` takes precedence over `MCP_USE_API_KEY`. `--org` validates and stores the selection. Without it, login uses the account default, automatically selects the only membership, or prompts an interactive user when several organizations remain. Headless/JSON login with several choices stores the authenticated key and exits `2` with the available IDs/slugs plus exact `org use` and future `login --org` commands. Device codes and bearer credentials are never included in output or structured errors.
 - `logout` deletes local cloud credentials and organization selection; remote key revocation remains a web-account action. `whoami` verifies the stored key and returns user plus active organization; missing/expired credentials exit `1` with a `mcp-use login` hint.
 - `org list` returns memberships and marks the active organization. `org current` requires a resolvable active/default organization. `org use` validates membership, updates local state, and best-effort updates the account default; local success is authoritative.
 
@@ -136,13 +136,17 @@ mcp-use deploy [path] [--org <id-or-slug>] [--name <name>]
   [--branch <name>] [--root-dir <path>] [--region <region>]
   [--env <KEY=VALUE>...] [--env-file <path>]
   [--build-command <cmd>] [--start-command <cmd>] [--dockerfile <path>]
-  [--new] [--open] [--yes] [--json]
+  [--watch-paths <glob>...] [--wait-for-ci]
+  [--no-github] [--new] [--open] [--yes] [--json]
 ```
 
-- `path` defaults to cwd. The project must be a Git repository with a supported GitHub remote. First deploy creates a Git-backed server; subsequent deploys reuse `.mcp-use/cloud/link.json`. `--new` ignores existing linkage and creates a new server after confirmation.
-- The branch defaults to the current branch. `--root-dir` and `--dockerfile` are repository-relative and must not escape the repository. Repeated `--env` values override duplicate keys from `--env-file`; values are uploaded but never echoed. Region values are API-supported region identifiers and are validated before upload.
-- The command does not create repositories, initialize Git, commit, push, install/configure the GitHub App, or upload an alternate platform-managed source tarball. Missing GitHub access fails with the exact installation/configuration URL and retry instructions; it never prompts or polls for external setup.
-- Success writes the project link atomically and returns server id, deployment id, status, and URLs. `--open` is best-effort after successful deployment and never changes a successful exit to failure.
+- `path` defaults to cwd. Plain deploy uses GitHub. When no origin exists, an interactive run offers to create a private repository and initialize/commit/push the project; `--yes` authorizes the same flow without prompts. A headless run without `--yes` fails with exact commands for GitHub creation and managed upload rather than guessing.
+- `--no-github` packages local source and uploads it to a platform-managed private repository. Linked managed servers record `sourceType: "managed"` in `.mcp-use/cloud/link.json` and automatically reuse the upload path. Archives exclude VCS data, dependencies, derived output, local CLI state, caches, coverage, `.env*`, and OS metadata, and may not exceed 80 MB.
+- The branch defaults to the current Git branch for GitHub and `main` for managed uploads. `--root-dir`, `--dockerfile`, and `--env-file` must not escape their source root. Repeated `--env` values override duplicate keys from `--env-file`; values are uploaded but never echoed.
+- `deploy --help` and `-h` are local and side-effect-free. `--json` emits one JSON document, never prompts or opens a browser, and does not imply consent; pair it with `--yes` for Git/repository mutations. `--open` and `--json` are incompatible. Actionable JSON failures use `{ error: { code, message, details: { nextSteps } }`.
+- Success writes the project link atomically and returns `sourceType`, server id, deployment id, status, and web URL. `--open` is best-effort after successful interactive deployment and never changes a successful exit to failure.
+- `--no-github` cannot change a linked GitHub-backed server into managed source in place. Use plain `deploy` to redeploy the linked GitHub server or `deploy --no-github --new --yes` to create a separate managed-source server.
+- `--watch-paths` is repeatable and `--wait-for-ci` configures GitHub automatic-deploy triggers on create/redeploy. Both are rejected for managed-source uploads.
 
 ### Client
 
@@ -151,7 +155,7 @@ mcp-use client connect <name> <url> [-H, --header <"Key: Value">...]
   [--no-oauth] [--auth-timeout <ms>] [--protocol <auto|legacy|modern>]
   [--no-open] [--json]
 mcp-use client list [--json]
-mcp-use client remove <name>
+mcp-use client remove <name> [--json]
 mcp-use client <name> tools list [--json]
 mcp-use client <name> tools describe <tool> [--json]
 mcp-use client <name> tools call <tool> [args...] [--timeout <ms>] [--json]
@@ -164,13 +168,13 @@ mcp-use client <name> auth logout [--yes] [--json]
 ```
 
 - v2 alpha client commands support HTTP(S) MCP servers; stdio, interactive REPL, resource subscriptions, implicit active sessions, and forced OAuth refresh are omitted. Every operation names a saved server.
-- `connect` validates a unique filesystem-safe name, connects before saving, and attempts OAuth on an authorization challenge unless `--no-oauth`. In an interactive TTY, OAuth prints `This server requires OAuth. Press Enter to open your browser.`, waits for Enter, and then opens the browser. `--no-open`, `--json`, and non-TTY operation never prompt or open a browser; they print the authorization URL to stderr while the loopback callback continues to wait. Repeated headers are stored as credentials, not metadata. Reusing a name requires removing it first.
+- `connect` validates a unique filesystem-safe name, connects before saving, and attempts OAuth on an authorization challenge unless `--no-oauth`. In an interactive TTY, OAuth prints `This server requires OAuth. Press Enter to open your browser.`, waits for Enter, and then opens the browser. `--no-open` and non-TTY human output never prompt or open a browser; they print a state-free local loopback launcher URL while the callback continues to wait. The launcher redirects the browser to the provider without placing the provider URL or OAuth state in terminal output. `--json` prints neither URL and never waits for fresh consent; it exits `1` with `oauth_interaction_required` and an interactive retry command in `error.details.nextSteps`. Repeated headers are stored as credentials, not metadata. Reusing a name requires removing it first.
 - `--protocol auto` prefers the modern wire and falls back to legacy. `--protocol legacy` selects only the legacy wire. `--protocol modern` selects the stateless, sessionless modern wire with no fallback. Saved metadata stores these names, never protocol revision dates.
 - A strict protocol mismatch exits `1` with code `protocol_mismatch`. User-facing mismatch messages name `legacy` or `modern` and do not expose protocol revision dates.
-- `client` and `screenshot` dynamic-import `@mcp-use/client`. When it is missing, the CLI installs it automatically: into the nearest project `package.json` when one exists, otherwise into `~/.mcp-use/client-sdk/`. Auto-install continues the current command in-process and imports from the install location.
+- `client` and `screenshot` dynamic-import `@mcp-use/client`. For human commands, when it is missing, the CLI installs it automatically: into the nearest project `package.json` when one exists, otherwise into `~/.mcp-use/client-sdk/`. Auto-install continues the current command in-process and imports from the install location. Under `--json`, the CLI never mutates dependencies or emits installer output; it returns `client_install_required` with an exact install command.
 - Tool/prompt arguments accept either one JSON object or `key=value` pairs; `key:=<json>` supplies typed JSON values. Mixing the full-object and pair forms is usage error `2`. Calls time out with exit `1`; tool `isError` results are operation failures and retain their protocol content in JSON error details.
-- `client remove` immediately and idempotently deletes the named local server metadata and credentials. It does not prompt, and `--yes` is not a supported option.
-- Default human output renders borderless terminal lists and readable MCP content; tool lists format described tools as `<name> - <description>`. Every client command that advertises `--json` accepts it anywhere after `client`. `--json` emits exactly one value to stdout: the raw protocol result envelope for calls, reads, and prompts; the described tool object for `tools describe`; arrays for lists; and command result objects for connect and auth commands. Errors emit exactly one JSON error envelope to stderr and no stdout value.
+- `client remove` immediately and idempotently deletes the named local server metadata and credentials. It does not prompt, supports `--json`, and does not support `--yes`.
+- Default human output renders borderless terminal lists and readable MCP content; tool lists format described tools as `<name> - <description>`. Saved URLs remain usable internally, but displayed URLs redact userinfo, every query value, and fragments so signed credentials cannot enter terminal output. Every client command that advertises `--json` accepts it anywhere after `client`. `--json` emits exactly one value to stdout: the raw protocol result envelope for calls, reads, and prompts; the described tool object for `tools describe`; arrays for lists; and command result objects for connect and auth commands. Errors emit exactly one JSON error envelope to stderr and no stdout value.
 
 ### Screenshot
 
@@ -186,8 +190,16 @@ mcp-use screenshot (--server <name> | --mcp <url>) --tool <name> [args...]
 - The CLI calls the tool and reads the UI resource through `@mcp-use/client`, then injects the result into the browser preview; credentials and tokens are never passed to browser JavaScript. The default inspector is the framework-compatible hosted preview. `--inspector` may select another compatible HTTP preview; the command never imports or auto-spawns `@mcp-use/inspector`.
 - A compatible preview origin implements protocol `mcp-use-inspector-preview` version `1`. `GET <origin>/inspector/health` returns `{ "status": "ok", "protocol": "mcp-use-inspector-preview", "version": 1, "capabilities": ["view-preview"] }`. Any missing field, different protocol/version, or absent `view-preview` capability is rejected before tool execution.
 - The browser navigates to `<origin>/inspector/preview/<percent-encoded-view-name>?protocol=1`. Before navigation, the CLI registers the already-fetched resource document, tool input, tool result, host context, and theme through CDP's new-document script API; the URL receives no MCP URL, headers, credentials, or result payload. The preview sets `document.body.dataset.viewReady = "true"` only after the app handshake and first stable render, or `document.body.dataset.viewError` to a non-secret error code on failure. The CLI waits for exactly one signal and treats simultaneous, malformed, or timed-out state as an inspector compatibility failure.
-- Without `--cdp-url`, the command uses an installed Chromium-family browser or exits `1` with installation guidance. Omitted dimensions use the rendered view's natural size. Device scale factor defaults to `1` and must be greater than `0` and at most `4`. Output defaults to `./<view>-<timestamp>.png`; an existing explicit path is replaced.
-- Success prints the absolute output path; `--json` emits `{ "path", "width", "height", "deviceScaleFactor" }`. Browser readiness/timeout, missing UI metadata, tool failure, and write failure exit `1`.
+- Without `--cdp-url`, the command uses an installed Chromium-family browser or exits `1` with installation guidance. Device scale factor defaults to `1` and must be greater than `0` and at most `4`. Output defaults to `./<view>-<timestamp>.png`; an existing explicit path is replaced.
+- The default host/widget width is 768 CSS pixels, matching an OpenAI inline
+  MCP App container. `--width` selects another responsive host width;
+  `--height` supplies the host viewport height but does not add padding to the
+  PNG. Captures are cropped to the rendered widget iframe's actual bounds.
+- Success prints the absolute output path; `--json` emits
+  `{ "path", "width", "height", "viewport", "deviceScaleFactor", "theme" }`,
+  where `width` and `height` are the captured widget bounds and `viewport`
+  reports the responsive host viewport. Browser readiness/timeout, missing UI
+  metadata, invalid widget bounds, tool failure, and write failure exit `1`.
 
 ## Package layout & dependency rules
 
@@ -216,7 +228,7 @@ Vite is a **regular dependency** of `@mcp-use/cli`, which is a regular dependenc
 
 Vite is framework implementation machinery: the package owns the compatible version and one install must provide the complete dev/build experience. Dependency installation and runtime evaluation are separate concerns; lazy chunks keep production startup lean even though Vite is installed. When views land, `@vitejs/plugin-react` is also a regular dependency. `react` and `react-dom` remain optional peers because applications own their singleton versions.
 
-`@mcp-use/client` is an optional peer at a compatible published version (`^2.0.0-alpha.0`). It remains independently published and independently installable; `mcp-use client` and `mcp-use screenshot` dynamic-import it and print install instructions when it is absent. Server library exports do not re-export or absorb the SDK.
+`@mcp-use/client` is an optional peer at a compatible published version (`^2.0.0-alpha.0`). It remains independently published and independently installable; `mcp-use client` and `mcp-use screenshot` dynamic-import it. Human commands auto-install it when absent; JSON commands return `client_install_required` without changing dependencies. Server library exports do not re-export or absorb the SDK.
 
 `mcp-use` declares `@mcp-use/inspector` as a regular dependency so the local Inspector and screenshot preview always match the framework release. The Inspector package itself has zero regular dependencies and ships its standalone browser application prebuilt and compressed. `@mcp-use/cli` declares both `@mcp-use/client` and `@mcp-use/inspector` as optional peers: the framework satisfies the Inspector peer, while Client-only commands retain their explicit opt-in behavior.
 

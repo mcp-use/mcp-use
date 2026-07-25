@@ -43,6 +43,15 @@ describe("NodeOAuthClientProvider", () => {
     authorizationUrl.searchParams.set("state", "test-state");
 
     await provider.redirectToAuthorization(authorizationUrl);
+    const launcherUrl = `http://127.0.0.1:${provider.callbackPort}/authorize`;
+    expect(openBrowser).toHaveBeenCalledWith(launcherUrl);
+    const launcherResponse = await fetch(launcherUrl, { redirect: "manual" });
+    expect(launcherResponse.status).toBe(302);
+    expect(launcherResponse.headers.get("location")).toContain(
+      "https://auth.example.com/authorize"
+    );
+    expect(launcherResponse.headers.get("location")).toContain("state=");
+    expect(launcherResponse.headers.get("cache-control")).toBe("no-store");
     const responsePromise: Promise<NodeOAuthAuthorizationResponse> =
       provider.getAuthorizationResponse();
     const legacyCodePromise = provider.getAuthorizationCode();

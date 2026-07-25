@@ -23,8 +23,40 @@ interface BuildLogs {
   status: string;
 }
 
+const HELP = `Usage: mcp-use deployments <command> [options]
+
+Manage cloud deployments and logs.
+
+Commands:
+  list                         List deployments
+  get <deployment-id>          Show one deployment
+  logs <deployment-id>         Read runtime or build logs
+  restart <deployment-id>      Create a replacement deployment
+  stop <deployment-id>         Stop a deployment
+  delete <deployment-id>       Delete a deployment
+
+Run mcp-use deployments <command> --help for all options.
+
+Exit codes:
+  0  Success or help
+  2  Invalid arguments or confirmation required
+  1  API or operational failure`;
+
+const COMMAND_HELP: Record<string, string> = {
+  list: `Usage: mcp-use deployments list [options]\n\nOptions:\n  --org <id-or-slug>  Override the active organization\n  --server <id>       Filter by server\n  --limit <n>         Results per page (default: 30; range: 1-100)\n  --skip <n>          Results to skip (default: 0)\n  --json              Emit the complete API page\n  -h, --help          Show this help`,
+  get: `Usage: mcp-use deployments get <deployment-id> [--json]\n\nOptions:\n  --json      Emit the complete deployment object\n  -h, --help  Show this help`,
+  logs: `Usage: mcp-use deployments logs <deployment-id> [options]\n\nOptions:\n  --build     Read build logs instead of runtime logs\n  --follow    Poll build logs until a terminal status\n  --json      Emit exactly one object; with --follow, emit only at completion\n  -h, --help  Show this help`,
+  restart: `Usage: mcp-use deployments restart <deployment-id> [options]\n\nOptions:\n  --branch <name>  Override the source branch\n  --follow         Follow build logs after restart\n  --json           Emit exactly one object; with --follow, emit only at completion\n  -h, --help       Show this help`,
+  stop: `Usage: mcp-use deployments stop <deployment-id> [options]\n\nOptions:\n  --yes       Confirm without prompting\n  --json      Emit the result; never prompt\n  -h, --help  Show this help`,
+  delete: `Usage: mcp-use deployments delete <deployment-id> [options]\n\nOptions:\n  --yes       Confirm without prompting\n  --json      Emit the result; never prompt\n  -h, --help  Show this help`,
+};
+
 /** Run the `mcp-use deployments` command family. */
 export async function runDeployments(argv: readonly string[]): Promise<number> {
+  if (argv.some((token) => token === "--help" || token === "-h")) {
+    process.stdout.write(`${COMMAND_HELP[argv[0] ?? ""] ?? HELP}\n`);
+    return 0;
+  }
   const json = wantsJson(argv);
   try {
     const subcommand = argv[0];
@@ -67,7 +99,7 @@ async function list(argv: readonly string[], json: boolean): Promise<number> {
   });
   const { api } = await cloudApiForOrganization(values.org);
   const result = await api.request<unknown>(`/deployments?${query}`);
-  printResult(result, json);
+  printResult(result, json, formatDeploymentList(result));
   return 0;
 }
 
@@ -80,7 +112,7 @@ async function get(argv: readonly string[], json: boolean): Promise<number> {
   const deployment = await api.request<Deployment>(
     `/deployments/${encodeURIComponent(id)}`
   );
-  printResult(deployment, json);
+  printResult(deployment, json, formatDeployment(deployment));
   return 0;
 }
 
@@ -194,6 +226,8 @@ async function streamBuildLogs(
   json: boolean
 ): Promise<void> {
   let offset = 0;
+  let status = "pending";
+  let collectedLogs = "";
   const terminal = new Set(["running", "failed", "stopped"]);
   let keepPolling = true;
   while (keepPolling) {
@@ -201,21 +235,25 @@ async function streamBuildLogs(
       `/deployments/${encodeURIComponent(id)}/build-logs?offset=${offset}`
     );
     if (response.logs !== "") {
-      if (json) {
-        process.stdout.write(
-          `${JSON.stringify({ deploymentId: id, offset, logs: response.logs, status: response.status })}\n`
-        );
-      } else {
+      collectedLogs += response.logs;
+      if (!json) {
         process.stdout.write(
           response.logs.endsWith("\n") ? response.logs : `${response.logs}\n`
         );
       }
     }
     offset = response.offset;
+    status = response.status;
     keepPolling = follow && !terminal.has(response.status);
     if (keepPolling) {
       await new Promise((resolve) => setTimeout(resolve, 1_000));
     }
+  }
+  if (json) {
+    printResult(
+      { deploymentId: id, offset, logs: collectedLogs, status },
+      true
+    );
   }
 }
 
@@ -249,4 +287,67 @@ function boundedInteger(
     );
   }
   return value;
+}
+
+function formatDeploymentList(value: unknown): string {
+  const items =
+    isRecord(value) && Array.isArray(value["items"])
+      ? value["items"].filter(isRecord)
+      : [];
+  if (items.length === 0) return "No deployments.";
+  const rows = items.map((item) =>
+    [
+      shortId(field(item, "id")),
+      field(item, "serverId") ?? "-",
+      field(item, "status") ?? "-",
+      field(item, "deploymentTrigger") ?? "-",
+      field(item, "gitBranch") ?? "-",
+      field(item, "createdAt") ?? "-",
+      summarize(field(item, "error")),
+    ].join("\t")
+  );
+  return [
+    "DEPLOYMENT\tSERVER\tSTATUS\tTRIGGER\tBRANCH\tCREATED\tERROR",
+    ...rows,
+  ].join("\n");
+}
+
+function formatDeployment(value: unknown): string {
+  if (!isRecord(value)) return String(value);
+  const id = field(value, "id") ?? "-";
+  const error = field(value, "error");
+  return [
+    `Deployment: ${id}`,
+    `Server: ${field(value, "serverId") ?? "-"}`,
+    `Status: ${field(value, "status") ?? "-"}`,
+    `Trigger: ${field(value, "deploymentTrigger") ?? "-"}`,
+    `Branch: ${field(value, "gitBranch") ?? "-"}`,
+    `Created: ${field(value, "createdAt") ?? "-"}`,
+    ...(error !== undefined
+      ? [
+          `Error: ${summarize(error)}`,
+          `Build logs: mcp-use deployments logs ${id} --build`,
+        ]
+      : []),
+  ].join("\n");
+}
+
+function field(value: unknown, key: string): string | undefined {
+  if (!isRecord(value)) return undefined;
+  const result = value[key];
+  return typeof result === "string" && result !== "" ? result : undefined;
+}
+
+function shortId(value: string | undefined): string {
+  return value === undefined ? "-" : value.slice(0, 8);
+}
+
+function summarize(value: string | undefined): string {
+  if (value === undefined) return "-";
+  const firstLine = value.split(/\r?\n/, 1)[0] ?? value;
+  return firstLine.length > 100 ? `${firstLine.slice(0, 97)}...` : firstLine;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }

@@ -40,9 +40,14 @@ Run `mcp-use deploy` from the project directory:
 mcp-use deploy
 ```
 
-By default, the CLI deploys from GitHub. It can help you connect the Manufact GitHub App, create a repository when needed, and stream build logs. After the first successful deploy, the CLI writes `.mcp-use/project.json` so later `mcp-use deploy` runs update the same cloud server.
+By default, the CLI deploys from GitHub. It can help you connect the Manufact GitHub App and create a repository when needed. Use `mcp-use deployments logs <id> --build --follow` to follow the resulting build. After the first successful deploy, the CLI writes `.mcp-use/cloud/link.json` so later `mcp-use deploy` runs update the same cloud server.
 
 Use the [Manufact CLI deploy reference](https://docs.manufact.com/cli/deploy) for the complete flag list, including `--branch`, `--root-dir`, `--region`, `--env`, `--env-file`, `--build-command`, `--start-command`, and `--dockerfile`.
+
+For agents and CI, use `--json` for one machine-readable result. It never
+answers confirmations: add `--yes` to authorize GitHub repository creation and
+Git mutations, or use `--no-github` to select a managed source upload. Run
+`mcp-use deploy --help` for the complete offline contract and recovery commands.
 
 ## Deploy without GitHub
 
@@ -58,6 +63,8 @@ This path:
 - Uploads your local source instead of deploying from your GitHub account.
 - Creates the server in a platform-managed repository.
 - Supports redeploys. Linked projects auto-detect the upload path, so `--no-github` is only required on the first deploy.
+- A linked GitHub server cannot be converted to managed source in place. Create a separate server with `mcp-use deploy --no-github --new --yes`.
+- JSON mode never opens a browser; use either `--json` or `--open`, not both.
 
 You can later connect your own GitHub repository from the server dashboard if you want push-to-deploy.
 
@@ -108,11 +115,11 @@ If you deploy several servers from the same repository, every push to that repo 
 # Create a server that only redeploys when its own app or shared code changes
 mcp-use deploy \
   --root-dir apps/iching \
-  --watch-paths "apps/iching/**" "packages/shared/**"
+  --watch-paths "apps/iching/**" --watch-paths "packages/shared/**"
 
 # Tune an existing server's triggers (no redeploy of unrelated apps)
 mcp-use servers update <id-or-slug> \
-  --watch-paths "apps/iching/**" "packages/shared/**" \
+  --watch-paths "apps/iching/**" --watch-paths "packages/shared/**" \
   --deploy-branches "release/*"
 
 # Clear the watch paths (back to "any change deploys")

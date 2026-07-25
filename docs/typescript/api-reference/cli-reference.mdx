@@ -247,7 +247,7 @@ See the [Tunneling guide](/tunneling/index) for client setup and testing workflo
 **Syntax:**
 
 ```bash
-mcp-use deploy [options]
+mcp-use deploy [path] [options]
 ```
 
 **Options:**
@@ -255,23 +255,23 @@ mcp-use deploy [options]
 | Option                    | Description                                                                            | Default            |
 | ------------------------- | -------------------------------------------------------------------------------------- | ------------------ |
 | `--open`                  | Open the deployment in a browser after a successful deploy.                            | Disabled           |
-| `--name <name>`           | Deployment or server name.                                                             | Auto-generated     |
-| `--port <port>`           | Server port used by the deployed process.                                              | `3000`             |
-| `--runtime <runtime>`     | Runtime, either `node` or `python`.                                                    | Auto-detected      |
-| `--new`                   | Create a new deployment instead of reusing the linked project.                         | Disabled           |
+| `--name <name>`           | Cloud server and new repository name.                                                  | Project name       |
+| `--new`                   | Create a new cloud server instead of reusing the linked server.                        | Disabled           |
 | `--env <key=value...>`    | Environment variable assignment. Repeatable.                                           | None               |
 | `--env-file <path>`       | Load environment variables from a `.env` file.                                         | None               |
-| `--branch <name>`         | Branch to deploy. Also scopes env sync to that branch preview environment.             | Current git branch |
-| `--root-dir <path>`       | Root directory inside the repository for monorepos.                                    | Repository root    |
+| `--branch <name>`         | Branch to deploy. Also scopes env sync to that branch preview environment.             | Current Git branch; `main` for managed source |
+| `--root-dir <path>`       | Build root inside the repository or uploaded project for monorepos.                    | Source root        |
 | `--org <slug-or-id>`      | Target organization.                                                                   | Active org         |
 | `-y, --yes`               | Skip confirmation prompts.                                                             | Disabled           |
-| `--region <region>`       | Deployment region: `US`, `EU`, or `APAC`.                                              | `US`               |
+| `--region <region>`       | Deployment region: `US`, `EU`, `APAC`, or another API-supported identifier.            | Platform automatic |
 | `--build-command <cmd>`   | Build command override.                                                                | Auto-detected      |
 | `--start-command <cmd>`   | Start command override.                                                                | Auto-detected      |
-| `--dockerfile <path>`     | Non-default Dockerfile path, relative to `--root-dir` or repository root.              | None               |
-| `--watch-paths <glob...>` | Only auto-deploy when matching files change. Set on new-server creation for monorepos. | All changes        |
-| `--wait-for-ci`           | Hold GitHub auto-deploys until other check runs pass. Set on new-server creation.      | Disabled           |
+| `--dockerfile <path>`     | Non-default Dockerfile path relative to the selected source root.                       | None               |
+| `--watch-paths <glob>`    | GitHub auto-deploy path filter. Repeatable; an empty value clears linked filters.       | All changes        |
+| `--wait-for-ci`           | Wait for other GitHub checks before an automatic deployment.                           | Disabled           |
 | `--no-github`             | Upload local source without connecting GitHub.                                         | Disabled           |
+| `--json`                  | Emit exactly one machine-readable result or error without prompts or browser opening.  | Human output       |
+| `-h, --help`              | Show local deploy help without authentication, Git probing, or network access.         | Disabled           |
 
 **Examples:**
 
@@ -281,11 +281,11 @@ mcp-use deploy --no-github
 mcp-use deploy --name my-server --open
 mcp-use deploy --env DATABASE_URL=postgres://... --env API_KEY=secret
 mcp-use deploy --env-file .env.production
-mcp-use deploy --runtime python
 mcp-use deploy --root-dir apps/mcp-server
-mcp-use deploy --root-dir apps/mcp-server --watch-paths "apps/mcp-server/**" "packages/shared/**"
+mcp-use deploy --root-dir apps/mcp-server --watch-paths "apps/mcp-server/**" --watch-paths "packages/shared/**"
 mcp-use deploy --new --name my-server-v2
 mcp-use deploy --org manufact-inc --region EU --yes
+mcp-use deploy --json --yes
 ```
 
 **Notes and behavior:**
@@ -293,8 +293,13 @@ mcp-use deploy --org manufact-inc --region EU --yes
 - The default path deploys from GitHub and prompts to install or connect the GitHub App when needed.
 - `--no-github` packs and uploads local source to a platform-managed repository.
 - Redeploys of a project already linked to a platform-managed server auto-detect the upload path. `--no-github` is only required on the first deploy for that path.
-- The command writes `.mcp-use/project.json` to link the local project to the cloud server.
-- The CLI adds `.mcp-use/` to `.gitignore` when it writes a project link.
+- In a project without a GitHub origin, an interactive deploy can create a private repository and push the project. For headless use, pass `--yes` to authorize that flow or choose `--no-github` explicitly.
+- `--json` never opens a browser, so it cannot be combined with `--open`.
+- `--no-github` cannot replace a linked GitHub server in place. Use `mcp-use deploy` for the linked GitHub source or `mcp-use deploy --no-github --new --yes` for a separate managed server.
+- `--json` guarantees machine-readable output and disables prompts, but does not authorize Git or repository mutations. Use `--json --yes` for headless GitHub setup.
+- `mcp-use deploy --help` is offline and lists copy-paste commands for every deployment mode.
+- The command writes `.mcp-use/cloud/link.json` to link the local project to the cloud server.
+- GitHub bootstrap adds `.mcp-use/` to `.gitignore`. Existing standard Git repositories use `.git/info/exclude`, avoiding a tracked `.gitignore` mutation.
 - Environment variables passed through `--env` and `--env-file` are synced to the target branch preview environment when `--branch` is set.
 
 ## Authentication commands
@@ -317,7 +322,7 @@ mcp-use login [options]
 | ---------------------- | ---------------------------------------------------------- | ------------------- |
 | `--api-key <key>`      | Authenticate with an API key.                              | Browser/device flow |
 | `--device-code <code>` | Redeem a short-lived, pre-approved RFC 8628 device code.   | None                |
-| `--org <id-or-slug>`   | Select the active organization by ID or slug.              | Account default     |
+| `--org <id-or-slug>`   | Select the active organization by ID or slug.              | Default or prompt   |
 | `--no-open`            | Do not open the verification URL during interactive login. | Opens on a TTY      |
 | `--json`               | Emit one machine-readable JSON result.                     | Human-readable text |
 
@@ -334,6 +339,7 @@ mcp-use login --api-key mcp_... --org my-org
 - Interactive login starts a device-code flow and opens a browser.
 - `--device-code` skips the browser and redeems the code through the same token endpoint. The CLI then creates, validates, and stores a persistent API key.
 - `--api-key` and `--device-code` cannot be combined. An explicit `--device-code` takes precedence over `MCP_USE_API_KEY`.
+- Login uses the account default or sole membership automatically. If several organizations remain, humans are prompted; agents and JSON callers must pass `--org <id-or-slug>` or select the saved login afterward with `mcp-use org use <id-or-slug>`.
 - The CLI never writes the device code, bearer token, or API key to human-readable or JSON output.
 - If `--org` is omitted, the CLI stores the account-default organization when one is available.
 - `MCP_USE_API_KEY` can provide the API key for non-interactive login.
@@ -460,7 +466,7 @@ mcp-use servers list
 mcp-use servers get srv_abc123
 mcp-use servers update srv_abc123 --branch main
 mcp-use servers update srv_abc123 --build-command "npm run build"
-mcp-use servers update srv_abc123 --watch-paths "apps/api/**" "packages/shared/**" --deploy-branches "release/*"
+mcp-use servers update srv_abc123 --watch-paths "apps/api/**" --watch-paths "packages/shared/**" --deploy-branches "release/*"
 mcp-use servers delete srv_abc123 --yes
 ```
 
@@ -555,7 +561,8 @@ mcp-use client local auth status
 
 - Saved server metadata is stored in `~/.mcp-use/client/servers.json`. Credentials are stored separately under `~/.mcp-use/client/credentials/`.
 - In an interactive TTY, OAuth displays `This server requires OAuth. Press Enter to open your browser.` and opens the browser only after Enter.
-- `--no-open`, `--json`, and non-TTY operation never prompt or open a browser. They print the authorization URL to stderr while the loopback callback continues waiting.
+- `--no-open` and non-TTY human output never prompt or open a browser; they print a state-free local launcher URL while the loopback callback continues waiting. The local route redirects to the provider without exposing OAuth state in terminal output.
+- `--json` never opens a browser or prints an OAuth URL or state. If fresh consent is required, it exits `1` with `oauth_interaction_required` and an interactive retry command in `error.details.nextSteps`.
 - `connect --no-oauth` prevents automatic OAuth when the server returns `401`.
 - `--protocol auto` prefers the modern wire and falls back to legacy. `legacy`
   selects only the legacy wire. `modern` selects the stateless, sessionless
@@ -563,6 +570,7 @@ mcp-use client local auth status
 - Repeated `-H, --header <"Key: Value">` options store static headers as credentials.
 - Tool and prompt arguments accept `key=value`, `key:=<json>`, or a single JSON object argument.
 - `--json` may appear anywhere after `client`. Success emits exactly one JSON value to stdout. Errors emit exactly one JSON error envelope to stderr and no stdout value.
+- If the optional `@mcp-use/client` SDK is missing, human commands install it automatically. JSON commands never mutate dependencies; they return `client_install_required` with an exact install command.
 - Calls, resource reads, and prompt gets emit raw MCP result envelopes. Lists emit arrays, and `tools describe` emits one tool object.
 - Tool `isError` results exit `1` and retain the original protocol result in `error.details` under `--json`.
 
@@ -628,7 +636,8 @@ mcp-use generate-types --server src/server.ts
 | `CSP_FRAME_DOMAINS`         | server runtime                            | Overrides `CSP_URLS` for `frameDomains`                                                                                                                                                                     | None                                |
 | `CSP_BASE_URI_DOMAINS`      | server runtime                            | Overrides `CSP_URLS` for `baseUriDomains`                                                                                                                                                                   | None                                |
 | `MCP_WEB_URL`               | `login`, cloud auth                       | Manufact web URL for auth pages.                                                                                                                                                                            | `https://manufact.com`              |
-| `MCP_API_URL`               | `login`, cloud API config                 | Manufact API URL. The CLI normalizes it to include `/api/v1`.                                                                                                                                               | `https://cloud.manufact.com/api/v1` |
+| `MCP_USE_CLOUD_API_URL`     | `login`, cloud API config                 | Manufact API URL. The CLI normalizes it to include `/api/v1`. Takes precedence over the v1-compatible `MCP_API_URL` alias.                                                                                  | `https://cloud.manufact.com/api/v1` |
+| `MCP_API_URL`               | `login`, cloud API config                 | Backward-compatible alias for `MCP_USE_CLOUD_API_URL`.                                                                                                                                                       | Unset                                |
 | `MCP_USE_API_KEY`           | `login`                                   | API key for non-interactive login.                                                                                                                                                                          | None                                |
 | `MCP_USE_API`               | Tunnel cleanup and local tunnel API calls | Tunnel service API base used by integrated tunnel cleanup paths.                                                                                                                                            | `https://local.mcp-use.run`         |
 | `MCP_USE_TUNNEL_API`        | `dev --tunnel`, `start --tunnel`          | Tunnel service API base used when creating local tunnels.                                                                                                                                                   | `https://local.mcp-use.run`         |

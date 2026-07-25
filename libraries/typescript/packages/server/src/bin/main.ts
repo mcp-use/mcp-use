@@ -9,6 +9,23 @@ import { resolve } from "node:path";
 
 import { parseArgs, type ParsedArgs } from "./args.js";
 
+// Node 25 exposes `localStorage` through a warning-producing lazy getter when
+// no --localstorage-file is configured. CLI/server code does not use that
+// browser store, so shadow it before any optional client or Inspector module
+// can probe the global.
+const nodeLocalStorage = Object.getOwnPropertyDescriptor(
+  globalThis,
+  "localStorage"
+);
+if (nodeLocalStorage?.get !== undefined && nodeLocalStorage.configurable) {
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    enumerable: nodeLocalStorage.enumerable ?? false,
+    value: undefined,
+    writable: true,
+  });
+}
+
 /**
  * Options this bin passes to the cli's `runDev`/`runBuild`.
  *
@@ -55,12 +72,12 @@ Commands:
   typecheck Refresh MCP types and run the project's TypeScript compiler
   start    Serve the production build from .mcp-use/build
   login    Authenticate the cloud CLI
-  logout   Delete local cloud credentials
+  logout   Log out of the cloud CLI
   whoami   Show the authenticated cloud identity
   org      Manage the active organization
   servers  Manage cloud servers and environment variables
   deployments Manage cloud deployments and logs
-  deploy   Deploy the current GitHub project
+  deploy   Deploy from GitHub or upload local source
   client   Connect to and invoke MCP servers
   screenshot Capture an MCP Apps view
 
@@ -80,6 +97,65 @@ Options:
   --no-inspector     Start dev without loading the optional Inspector
   -h, --help         Show this help
   -v, --version      Print the version`;
+
+const LOCAL_HELP: Record<string, string> = {
+  dev: `Usage: mcp-use dev [options]
+
+Start the development MCP server with view hot reload.
+
+Options:
+  -p, --port <n>     Listener port (default: $PORT or 3000)
+  --host <host>      Bind host (default: $HOST or 127.0.0.1)
+  --path <directory> Project root (default: current directory)
+  --entry <path>     Server entry module
+  --mcp-dir <dir>    Directory containing the entry and views/
+  --views-dir <dir>  Views directory
+  --tunnel           Start a public tunnel
+  --no-open          Do not open Inspector
+  --no-inspector     Do not load Inspector
+  -h, --help         Show this help
+
+Exit codes: 0 started/help, 2 invalid arguments, 1 startup failure`,
+  build: `Usage: mcp-use build [options]
+
+Build the MCP server into .mcp-use/build.
+
+Options:
+  --path <directory> Project root (default: current directory)
+  --entry <path>     Server entry module
+  --mcp-dir <dir>    Directory containing the entry and views/
+  --views-dir <dir>  Views directory
+  --source-maps      Emit source maps
+  --inline           Embed view JavaScript and CSS in MCP resources
+  -h, --help         Show this help
+
+Exit codes: 0 built/help, 2 invalid arguments, 1 build failure`,
+  typecheck: `Usage: mcp-use typecheck [options] [-- <tsc options>]
+
+Refresh MCP types and run the selected project's TypeScript compiler.
+
+Options:
+  --path <directory> Project root (default: current directory)
+  --entry <path>     Server entry module
+  --mcp-dir <dir>    Directory containing the MCP entry
+  -- <tsc options>   Forward remaining options to TypeScript
+  -h, --help         Show this help
+
+Exit codes: 0 passed/help, 2 invalid arguments, otherwise the compiler or operational exit code`,
+  start: `Usage: mcp-use start [options]
+
+Serve the production build from .mcp-use/build.
+
+Options:
+  -p, --port <n>     Listener port (default: $PORT or 3000)
+  --host <host>      Bind host (default: $HOST or 127.0.0.1)
+  --path <directory> Project root (default: current directory)
+  --with-inspector   Mount Inspector on the production listener
+  --tunnel           Start a public tunnel
+  -h, --help         Show this help
+
+Exit codes: 0 started/help, 2 invalid arguments, 1 startup failure`,
+};
 
 /**
  * Run the `mcp-use` CLI.
@@ -102,6 +178,11 @@ export async function main(
     const command = argv[0];
     if (command === undefined || command === "--help" || command === "-h") {
       console.log(HELP);
+      return 0;
+    }
+    const localHelp = LOCAL_HELP[command];
+    if (localHelp !== undefined) {
+      console.log(localHelp);
       return 0;
     }
   }
@@ -181,7 +262,7 @@ async function typecheckCommand(args: ParsedArgs): Promise<number> {
       ...(args.passthrough.length > 0 && { tscArgs: args.passthrough }),
     });
   } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
+    console.error(formatRuntimeError(error));
     return 1;
   }
 }
@@ -254,7 +335,24 @@ async function cliCommand(
     }
     return 0;
   } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
+    console.error(formatRuntimeError(error));
     return 1;
   }
+}
+
+function formatRuntimeError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/tunnel|bore connection/i.test(message)) {
+    return [
+      "[tunnel_connection_timeout] Public tunnel could not establish a connection.",
+      `Cause: ${message}`,
+      "",
+      "Retry:",
+      "  mcp-use dev --tunnel",
+      "",
+      "Verify outbound network access and tunnel service status:",
+      "  https://local.mcp-use.run",
+    ].join("\n");
+  }
+  return message;
 }

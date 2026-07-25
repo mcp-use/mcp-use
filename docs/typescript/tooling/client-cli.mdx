@@ -60,7 +60,9 @@ Use `--no-open` to authenticate without launching a browser:
 npx mcp-use client connect prod https://mcp.example.com/mcp --no-open
 ```
 
-With `--no-open`, `--json`, or non-interactive stdin, the CLI never prompts or opens a browser. It prints the authorization URL to stderr and continues waiting for the loopback callback. Open that URL yourself to finish authentication.
+With `--no-open` or non-interactive human output, the CLI never prompts or opens a browser. It prints a state-free local loopback launcher URL and continues waiting for the callback. Open that local URL yourself; it redirects to the provider without putting the provider URL or OAuth state in terminal output.
+
+Under `--json`, the CLI never prints the authorization URL or OAuth state and never waits for consent. If fresh authorization is required, it exits with `oauth_interaction_required` and provides an interactive retry command in `error.details.nextSteps`.
 
 Use `--no-oauth` for a public server or when an authorization challenge should fail instead of starting OAuth. Repeated `-H` or `--header` options add static request headers.
 
@@ -78,6 +80,8 @@ npx mcp-use client prod auth logout
 ```
 
 `auth logout` removes OAuth material but keeps the saved server and its non-OAuth connection metadata.
+
+Connection URLs are stored exactly for transport use, but CLI results redact URL userinfo, query values, and fragments so signed URLs and embedded credentials are not copied into logs.
 
 ## Call tools
 
