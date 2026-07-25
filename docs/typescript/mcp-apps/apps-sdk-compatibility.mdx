@@ -10,14 +10,15 @@ ChatGPT supports MCP Apps. That means a widget built with the MCP Apps bridge ca
 
 ## How ChatGPT fits in
 
-OpenAI's Apps SDK remains supported, and ChatGPT also implements the MCP Apps UI standard. `mcp-use` generates MCP Apps metadata and ChatGPT compatibility metadata from the same widget definitions.
+ChatGPT implements the MCP Apps UI standard. Build with the normal MCP Apps APIs; `mcp-use` emits the metadata ChatGPT needs from the same widget definitions.
 
 In practice:
 
 - Use `widget: { name }` and `widget({ props, output })` on the server.
 - Use `useWidget()` and `useCallTool()` in React widgets.
-- Let `mcp-use` translate compatibility metadata for ChatGPT.
 - Reach for Apps SDK extensions only when a ChatGPT-specific capability has no shared MCP Apps equivalent yet.
+
+If you have legacy `type: "appsSdk"` registrations, see [Migrate from Apps SDK](/typescript/mcp-apps/migrating-from-apps-sdk).
 
 ## What mcp-use abstracts
 
