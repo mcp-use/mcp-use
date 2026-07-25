@@ -83,6 +83,67 @@ export const searchOrders = server.tool(
 
 Prefer descriptive field names and `.describe()` text that tells the model what value to provide. Use defaults for ordinary behavior, but keep defaults visible when they affect cost, safety, or output size.
 
+## Use other schema libraries
+
+`inputSchema` accepts a Standard Schema implementation that can produce JSON
+Schema. Pass Zod and ArkType schemas directly. Wrap JSON Schema-first libraries
+such as TypeBox with `fromJsonSchema()`.
+
+### ArkType
+
+ArkType implements the Standard Schema validation and JSON Schema interfaces.
+Use `.describe()` to add field hints:
+
+```typescript
+import { type } from "arktype";
+import { MCPServer } from "mcp-use";
+
+const server = new MCPServer({ name: "arktype-server", version: "1.0.0" });
+
+export const greet = server.tool(
+  {
+    name: "greet",
+    inputSchema: type({
+      name: type("string").describe("Name to greet"),
+    }),
+  },
+  async ({ name }) => ({
+    content: [{ type: "text", text: `Hello, ${name}!` }],
+  }),
+);
+
+export default server;
+```
+
+### TypeBox
+
+TypeBox produces JSON Schema rather than a Standard Schema validator. Wrap the
+schema with `fromJsonSchema<T>()`; the adapter validates input and the generic
+preserves the inferred TypeBox type:
+
+```typescript
+import { fromJsonSchema, MCPServer } from "mcp-use";
+import Type from "typebox";
+
+const server = new MCPServer({ name: "typebox-server", version: "1.0.0" });
+
+const greetInput = Type.Object({
+  name: Type.String({ description: "Name to greet" }),
+});
+
+export const greet = server.tool(
+  {
+    name: "greet",
+    inputSchema: fromJsonSchema<Type.Static<typeof greetInput>>(greetInput),
+  },
+  async ({ name }) => ({
+    content: [{ type: "text", text: `Hello, ${name}!` }],
+  }),
+);
+
+export default server;
+```
+
 ## Add tool annotations
 
 Tool annotations tell clients and models how risky a tool is. Set the main behavior hints explicitly, especially for tools exposed to ChatGPT or MCP catalogs.

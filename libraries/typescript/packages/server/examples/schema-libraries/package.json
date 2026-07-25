@@ -1,0 +1,23 @@
+{
+  "name": "mcp-use-example-schema-libraries",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "mcp-use dev",
+    "build": "mcp-use build",
+    "start": "mcp-use start",
+    "typecheck": "tsc --noEmit",
+    "verify": "node ../verify-examples.mjs --example=schema-libraries"
+  },
+  "dependencies": {
+    "arktype": "^2.2.3",
+    "mcp-use": "workspace:*",
+    "typebox": "1.3.6",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "tsx": "^4.21.0",
+    "typescript": "^7.0.2"
+  }
+}
