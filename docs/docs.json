@@ -445,12 +445,18 @@
                     "icon": "brain",
                     "pages": [
                       "v2/typescript/agent/index",
-                      "v2/typescript/agent/llm-integration",
+                      "v2/typescript/agent/llm-providers",
                       "v2/typescript/agent/memory-management",
-                      "v2/typescript/agent/server-manager",
-                      "v2/typescript/agent/structured-output",
                       "v2/typescript/agent/streaming",
-                      "v2/typescript/agent/observability"
+                      {
+                        "group": "LangChain integration",
+                        "pages": [
+                          "v2/typescript/agent/langchain/index",
+                          "v2/typescript/agent/langchain/structured-output",
+                          "v2/typescript/agent/langchain/server-manager",
+                          "v2/typescript/agent/langchain/observability"
+                        ]
+                      }
                     ]
                   },
                   {
@@ -963,6 +969,22 @@
     ]
   },
   "redirects": [
+    {
+      "source": "/v2/typescript/agent/llm-integration",
+      "destination": "/v2/typescript/agent/llm-providers"
+    },
+    {
+      "source": "/v2/typescript/agent/structured-output",
+      "destination": "/v2/typescript/agent/langchain/structured-output"
+    },
+    {
+      "source": "/v2/typescript/agent/server-manager",
+      "destination": "/v2/typescript/agent/langchain/server-manager"
+    },
+    {
+      "source": "/v2/typescript/agent/observability",
+      "destination": "/v2/typescript/agent/langchain/observability"
+    },
     {
       "source": "/typescript/getting-started",
       "destination": "/typescript/getting-started/quickstart"
