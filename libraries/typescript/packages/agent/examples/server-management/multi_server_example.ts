@@ -20,11 +20,7 @@ async function main() {
       },
       filesystem: {
         command: "npx",
-        args: [
-          "-y",
-          "@modelcontextprotocol/server-filesystem",
-          process.cwd(),
-        ],
+        args: ["-y", "@modelcontextprotocol/server-filesystem", process.cwd()],
       },
     },
     maxSteps: 20,

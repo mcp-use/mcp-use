@@ -18,7 +18,8 @@ async function streamStepsExample() {
   });
 
   try {
-    const prompt = "Use the add tool to calculate 12 + 30. Reply with just the number.";
+    const prompt =
+      "Use the add tool to calculate 12 + 30. Reply with just the number.";
     console.log("Query:", prompt, "\n");
 
     let stepNumber = 1;

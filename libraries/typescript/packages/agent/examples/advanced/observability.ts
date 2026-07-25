@@ -39,7 +39,8 @@ async function main() {
 
   try {
     const result = await agent.run({
-      prompt: "Use the add tool to calculate 9 + 11. Reply with the number only.",
+      prompt:
+        "Use the add tool to calculate 9 + 11. Reply with the number only.",
     });
     console.log("Result:", result);
     await agent.flush();
