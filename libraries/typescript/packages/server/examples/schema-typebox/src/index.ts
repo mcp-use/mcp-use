@@ -1,4 +1,5 @@
-import { fromJsonSchema, MCPServer } from "mcp-use";
+import { fromJsonSchema } from "@modelcontextprotocol/server";
+import { MCPServer } from "mcp-use";
 import Type from "typebox";
 
 const server = new MCPServer({

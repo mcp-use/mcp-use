@@ -1002,6 +1002,9 @@ importers:
 
   packages/server/examples/schema-typebox:
     dependencies:
+      '@modelcontextprotocol/server':
+        specifier: 2.0.0-beta.5
+        version: 2.0.0-beta.5(patch_hash=48cb4d93becd715ebef39d3c2e439caa77bb77a36a299c0798d49e5f816c6c11)
       mcp-use:
         specifier: workspace:*
         version: link:../..

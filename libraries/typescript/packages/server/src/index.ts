@@ -67,7 +67,6 @@ export type {
 export {
   acceptedContent,
   createRequestStateCodec,
-  fromJsonSchema,
   inputRequired,
   inputResponse,
   isInputRequiredResult,
@@ -80,11 +79,9 @@ export type { CompletionCallback, CompletionContext } from "./completable.js";
  * Schema contracts accepted by `inputSchema`/`outputSchema` fields (re-exported
  * from the SDK): `StandardSchemaWithJSON` requires validation plus JSON
  * Schema conversion; `completable()` needs only `StandardSchemaV1`.
- * Implemented by zod v4, ArkType, Valibot, … JSON Schema-first libraries
- * such as TypeBox can be adapted with {@link fromJsonSchema}.
+ * Implemented by zod v4, ArkType, Valibot, …
  */
 export type {
-  JsonSchemaType,
   StandardSchemaV1,
   StandardSchemaWithJSON,
 } from "@modelcontextprotocol/server";
