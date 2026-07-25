@@ -20,6 +20,7 @@
         "src/index.ts",
         "src/bin.ts",
         "src/react/index.ts",
+        "src/vite-client.ts",
         "src/oauth/**/*.ts",
         "tests/**/*.{ts,tsx}"
       ],
