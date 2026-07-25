@@ -1,5 +1,5 @@
 {
-  "name": "mcp-use-example-schema-zod",
+  "name": "mcp-use-example-schema-arktype",
   "private": true,
   "type": "module",
   "scripts": {
@@ -7,11 +7,11 @@
     "build": "mcp-use build",
     "start": "mcp-use start",
     "typecheck": "tsc --noEmit",
-    "verify": "node ../verify-examples.mjs --example=schema-zod"
+    "verify": "node ../../verify-examples.mjs --example=schema-libraries-arktype"
   },
   "dependencies": {
-    "mcp-use": "workspace:*",
-    "zod": "^4.4.3"
+    "arktype": "^2.2.3",
+    "mcp-use": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.20.0",

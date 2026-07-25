@@ -981,14 +981,14 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
-  packages/server/examples/schema-arktype:
+  packages/server/examples/schema-libraries/arktype:
     dependencies:
       arktype:
         specifier: ^2.2.3
         version: 2.2.3
       mcp-use:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../..
     devDependencies:
       '@types/node':
         specifier: ^22.20.0
@@ -1000,14 +1000,14 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
-  packages/server/examples/schema-typebox:
+  packages/server/examples/schema-libraries/typebox:
     dependencies:
       '@modelcontextprotocol/server':
         specifier: 2.0.0-beta.5
         version: 2.0.0-beta.5(patch_hash=48cb4d93becd715ebef39d3c2e439caa77bb77a36a299c0798d49e5f816c6c11)
       mcp-use:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../..
       typebox:
         specifier: 1.3.6
         version: 1.3.6
@@ -1022,11 +1022,11 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
-  packages/server/examples/schema-zod:
+  packages/server/examples/schema-libraries/zod:
     dependencies:
       mcp-use:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../..
       zod:
         specifier: 4.4.3
         version: 4.4.3

@@ -1,5 +1,5 @@
 {
-  "name": "mcp-use-example-schema-arktype",
+  "name": "mcp-use-example-schema-typebox",
   "private": true,
   "type": "module",
   "scripts": {
@@ -7,11 +7,12 @@
     "build": "mcp-use build",
     "start": "mcp-use start",
     "typecheck": "tsc --noEmit",
-    "verify": "node ../verify-examples.mjs --example=schema-arktype"
+    "verify": "node ../../verify-examples.mjs --example=schema-libraries-typebox"
   },
   "dependencies": {
-    "arktype": "^2.2.3",
-    "mcp-use": "workspace:*"
+    "@modelcontextprotocol/server": "2.0.0-beta.5",
+    "mcp-use": "workspace:*",
+    "typebox": "1.3.6"
   },
   "devDependencies": {
     "@types/node": "^22.20.0",

@@ -28,9 +28,9 @@ export const examples = [
   local("sampling", { tools: ["explain-sampling"], scenario: "sampling" }),
   local("sessionless-lifecycle", { tools: ["request-info"] }),
   local("security", { tools: ["status"], scenario: "security" }),
-  local("schema-zod", { tools: ["greet"] }),
-  local("schema-arktype", { tools: ["greet"] }),
-  local("schema-typebox", { tools: ["greet"] }),
+  local("schema-libraries/zod", { tools: ["greet"] }),
+  local("schema-libraries/arktype", { tools: ["greet"] }),
+  local("schema-libraries/typebox", { tools: ["greet"] }),
   local("nextjs", {
     tools: ["greet", "show-status-card"],
     endpoint: "/api/mcp",

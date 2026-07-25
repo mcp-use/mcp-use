@@ -4,6 +4,7 @@ packages:
   - packages/client/examples/browser/react
   - packages/client/examples/conformance
   - packages/server/examples/*
+  - packages/server/examples/schema-libraries/*
   - packages/server/examples/views/*
   - packages/server/examples/auth/*
   - packages/create-mcp-use-app/src/templates/**/*
