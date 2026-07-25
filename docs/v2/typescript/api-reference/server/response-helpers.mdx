@@ -10,7 +10,7 @@ View the source code for this module on GitHub: <a href='https://github.com/mcp-
 </Callout>
 
 <Warning>
-**Deprecated.** Prefer returning raw MCP envelopes (`CallToolResult`, `ReadResourceResult`, `GetPromptResult`). These helpers remain for upgrade compatibility and map to those shapes. See [Response Helpers](/v2/typescript/server/response-helpers) for the migration table.
+**Deprecated.** Prefer returning raw MCP envelopes (`CallToolResult`, `ReadResourceResult`, `GetPromptResult`). These helpers remain for upgrade compatibility and map to those shapes.
 </Warning>
 
 Response helpers are standalone functions that build `CallToolResult` objects. Import them from `mcp-use`. Resource and prompt callbacks may still return helper results; the server converts them to `ReadResourceResult` / `GetPromptResult`.
