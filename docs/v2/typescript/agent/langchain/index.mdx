@@ -1,0 +1,109 @@
+---
+title: "Overview"
+description: "Set up LangChainMCPAgent with a LangChain chat model and MCP tools."
+icon: "link"
+---
+
+`LangChainMCPAgent` connects LangChain chat models and callbacks to MCP tools. Import it from `@mcp-use/agent/langchain`.
+
+## When to use LangChainMCPAgent
+
+Use `LangChainMCPAgent` when you need at least one of these capabilities:
+
+- an existing LangChain chat model or custom LangChain tool;
+- Zod structured-output conversion after an agent run;
+- LangChain `StreamEvent` output or `prettyStreamEvents()`;
+- Server Manager for on-demand access to one MCP server's tools; or
+- LangChain callbacks, Langfuse tracing, metadata, and tags.
+
+## Install LangChainMCPAgent
+
+Install the agent package, LangChain core packages, and the provider package for your model.
+
+<CodeGroup>
+```bash npm
+npm install @mcp-use/agent @mcp-use/client langchain @langchain/core @langchain/openai
+```
+
+```bash pnpm
+pnpm add @mcp-use/agent @mcp-use/client langchain @langchain/core @langchain/openai
+```
+
+```bash bun
+bun add @mcp-use/agent @mcp-use/client langchain @langchain/core @langchain/openai
+```
+</CodeGroup>
+
+Add `zod` for structured output. Add `langfuse` and `langfuse-langchain` for built-in Langfuse tracing.
+
+## Run a LangChain agent
+
+Set `OPENAI_API_KEY`, then run:
+
+```typescript
+import { ChatOpenAI } from "@langchain/openai";
+import { MCPClient } from "@mcp-use/client";
+import { LangChainMCPAgent } from "@mcp-use/agent/langchain";
+
+async function main() {
+  const client = new MCPClient({
+    mcpServers: {
+      filesystem: {
+        command: "npx",
+        args: ["-y", "@modelcontextprotocol/server-filesystem", "./"],
+      },
+    },
+  });
+
+  const agent = new LangChainMCPAgent({
+    llm: new ChatOpenAI({ model: "gpt-4o", temperature: 0 }),
+    client,
+  });
+
+  try {
+    await agent.initialize();
+    const result = await agent.run({
+      prompt: "Read package.json and summarize the project scripts.",
+    });
+    console.log(result);
+  } finally {
+    await agent.close();
+  }
+}
+
+main().catch(console.error);
+```
+
+A successful run prints a text answer based on `package.json`. `LangChainMCPAgent` defaults to `5` model-call steps.
+
+<Warning>
+  `LangChainMCPAgent.close()` closes its MCP client even when you supplied that
+  client. Do not share the client with work that must continue after the agent
+  closes.
+</Warning>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Structured output"
+    icon="braces"
+    href="/v2/typescript/agent/langchain/structured-output"
+  >
+    Convert final text into validated Zod data.
+  </Card>
+  <Card
+    title="Server Manager"
+    icon="server"
+    href="/v2/typescript/agent/langchain/server-manager"
+  >
+    Load one server's tools on demand.
+  </Card>
+  <Card
+    title="Observability"
+    icon="eye"
+    href="/v2/typescript/agent/langchain/observability"
+  >
+    Trace runs with Langfuse or custom callbacks.
+  </Card>
+</CardGroup>

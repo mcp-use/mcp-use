@@ -1,140 +1,24 @@
 ---
 title: "Streaming"
-description: "Stream MCPAgent tool steps, LangChain events, and terminal output."
+description: "Stream MCPAgent tool steps and provider-neutral LLM events."
 icon: "arrow-up-down"
 ---
 
-Use streaming when you need progress while an agent works. `MCPAgent` exposes three streaming methods: high-level tool steps, low-level LangChain events, and formatted terminal output.
+`MCPAgent` provides two streaming APIs. Use `stream()` for tool-step progress and a final string. Use `streamEvents()` for provider-neutral token, tool, usage, error, and completion events.
 
-| Method                 | Best for                                                  | Yields                                          |
-| ---------------------- | --------------------------------------------------------- | ----------------------------------------------- |
-| `stream()`             | Progress lists and logs of tool calls.                    | `AgentStep` objects for tool calls.             |
-| `streamEvents()`       | Token streaming, detailed UIs, and custom event handling. | LangChain `StreamEvent` objects.                |
-| `prettyStreamEvents()` | CLI output during local development.                      | Nothing meaningful; it prints formatted output. |
+| Method | Use it for | Output |
+| --- | --- | --- |
+| `stream()` | Tool progress and a final answer | Yields `AgentStep`; returns the final string |
+| `streamEvents()` | Token UIs and detailed tool lifecycle state | Yields `LlmStreamEvent`; returns `void` |
 
 ## Stream tool steps
 
-`stream()` yields each tool call as the agent runs. The generator's final return value is the final answer, but `for await` does not expose that return value.
-
-```typescript
-import { ChatOpenAI } from "@langchain/openai";
-import { MCPAgent } from "@mcp-use/agent";
-import { MCPClient } from "@mcp-use/client";
-
-async function stepStreamingExample() {
-  const client = new MCPClient({
-    mcpServers: {
-      playwright: {
-        command: "npx",
-        args: ["@playwright/mcp@latest"],
-      },
-    },
-  });
-
-  const llm = new ChatOpenAI({ model: "gpt-4o" });
-  const agent = new MCPAgent({ llm, client });
-
-  const stream = agent.stream({
-    prompt: "Search for the latest Python news and summarize it",
-  });
-
-  while (true) {
-    const { done, value } = await stream.next();
-
-    if (done) {
-      console.log("Final answer:");
-      console.log(value);
-      break;
-    }
-
-    console.log(`Tool: ${value.action.tool}`);
-    console.log(`Input: ${JSON.stringify(value.action.toolInput)}`);
-  }
-
-  await agent.close();
-}
-
-stepStreamingExample().catch(console.error);
-```
-
-`step.observation` can be empty when a step is yielded. Use `streamEvents()` if you need tool start and tool end events.
-
-## Stream low-level events
-
-Use `streamEvents()` for token-level model output, tool lifecycle events, and custom UI state.
-
-```typescript
-import { ChatOpenAI } from "@langchain/openai";
-import { MCPAgent } from "@mcp-use/agent";
-import { MCPClient } from "@mcp-use/client";
-
-async function eventStreamingExample() {
-  const client = new MCPClient({
-    mcpServers: {
-      playwright: {
-        command: "npx",
-        args: ["@playwright/mcp@latest"],
-      },
-    },
-  });
-
-  const llm = new ChatOpenAI({ model: "gpt-4o" });
-  const agent = new MCPAgent({ llm, client });
-
-  for await (const event of agent.streamEvents({
-    prompt: "Search for the latest Python news and summarize it",
-  })) {
-    if (event.event === "on_chat_model_stream") {
-      const text = event.data?.chunk?.text || event.data?.chunk?.content;
-      if (text) {
-        process.stdout.write(String(text));
-      }
-    }
-
-    if (event.event === "on_tool_start") {
-      console.log(`\nTool started: ${event.name}`);
-    }
-  }
-
-  await agent.close();
-}
-
-eventStreamingExample().catch(console.error);
-```
-
-<Note>
-  The event chunk property may be `text` or `content` depending on the LangChain
-  version and LLM provider. Check both properties for compatibility:
-
-```typescript
-const text = event.data?.chunk?.text || event.data?.chunk?.content;
-```
-
-</Note>
-
-## Print formatted terminal output
-
-`prettyStreamEvents()` formats tool calls, JSON, and streamed text for terminal output. Use it in CLIs and local scripts, not as a programmatic data API.
-
-<video
-  alt="Code Mode Streaming Example"
-  style={{
-    maxWidth: "600px",
-    borderRadius: "8px",
-    marginBottom: "1.5rem",
-    boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
-  }}
-  muted
-  autoPlay
-  loop
->
-  <source src="/images/code_mode.mp4" type="video/mp4" />
-</video>
+Read the generator directly when you need both yielded steps and its final return value.
 
 ```typescript
 import { MCPAgent } from "@mcp-use/agent";
 
-async function prettyStreamExample() {
+async function main() {
   const agent = new MCPAgent({
     llm: "openai/gpt-4o",
     mcpServers: {
@@ -145,50 +29,129 @@ async function prettyStreamExample() {
     },
   });
 
-  for await (const _ of agent.prettyStreamEvents({
-    prompt: "List all TypeScript files and count the total lines of code",
-    maxSteps: 20,
-  })) {
-    // Formatting is printed by the stream formatter.
-  }
+  try {
+    await agent.initialize();
+    const stream = agent.stream({
+      prompt: "Inspect package.json and summarize the project scripts.",
+    });
 
-  await agent.close();
+    while (true) {
+      const next = await stream.next();
+
+      if (next.done) {
+        console.log("Final answer:", next.value);
+        break;
+      }
+
+      console.log(`Tool: ${next.value.action.tool}`);
+      console.log(`Input: ${JSON.stringify(next.value.action.toolInput)}`);
+      if (next.value.observation) {
+        console.log(`Result: ${next.value.observation}`);
+      }
+    }
+  } finally {
+    await agent.close();
+  }
 }
 
-prettyStreamExample().catch(console.error);
+main().catch(console.error);
 ```
 
-<Note>
-  Pretty output uses ANSI color codes and works best in modern terminals. In
-  environments without color support, output degrades to plain text.
-</Note>
+For each tool call, `stream()` can yield an initial step with an empty `observation`, followed by another step containing the tool result. A `for await` loop receives the steps but does not expose the generator's final return value.
 
-## Pass run options
+## Stream provider-neutral events
 
-All streaming methods accept the same options object as `run`, including `prompt`, `maxSteps`, `schema`, `externalHistory`, and `signal`.
+`streamEvents()` uses the same `LlmStreamEvent` variants for every supported provider.
+
+```typescript
+import { MCPAgent, type LlmStreamEvent } from "@mcp-use/agent";
+
+async function main() {
+  const agent = new MCPAgent({
+    llm: "openai/gpt-4o",
+    mcpServers: {
+      filesystem: {
+        command: "npx",
+        args: ["-y", "@modelcontextprotocol/server-filesystem", "./"],
+      },
+    },
+  });
+
+  let answer = "";
+
+  try {
+    await agent.initialize();
+
+    for await (const event of agent.streamEvents({
+      prompt: "List the TypeScript files and summarize their purpose.",
+    })) {
+      handleEvent(event);
+      if (event.type === "text-delta") {
+        answer += event.delta;
+      }
+    }
+
+    console.log("\nFinal answer:", answer);
+  } finally {
+    await agent.close();
+  }
+}
+
+function handleEvent(event: LlmStreamEvent) {
+  switch (event.type) {
+    case "tool-call-ready":
+      console.log(`\nCalling ${event.toolName}`, event.args);
+      break;
+    case "tool-result":
+      console.log(`\n${event.toolName} finished; error=${event.isError}`);
+      break;
+    case "error":
+      console.error(`\nModel error: ${event.message}`);
+      break;
+  }
+}
+
+main().catch(console.error);
+```
+
+Accumulate `text-delta` values when your UI needs the complete final answer. `streamEvents()` itself returns no result and does not write the streamed turn to conversation memory.
+
+## Handle every event variant
+
+| `type` | Meaning |
+| --- | --- |
+| `text-delta` | A text fragment from the model |
+| `tool-call-start` | The model started producing a tool call |
+| `tool-call-args-delta` | A partial JSON argument fragment; concatenate fragments before parsing |
+| `tool-call-ready` | A complete tool name and parsed argument object |
+| `tool-result` | The tool result, with `isError` indicating tool failure |
+| `usage` | Provider token usage, when available |
+| `error` | A model-loop error message |
+| `done` | The tool loop finished |
+
+Tool execution failures are emitted as `tool-result` with `isError: true`. Other streaming failures can appear as `error`. Decide whether your UI should show a partial answer, retry, or fail the request.
+
+## Cancel a stream
+
+Pass an `AbortSignal` through the run options:
+
+```typescript
+const controller = new AbortController();
+const timeout = setTimeout(() => controller.abort(), 5_000);
+
+try {
+  for await (const event of agent.streamEvents({
+    prompt: "Perform a long audit.",
+    signal: controller.signal,
+  })) {
+    console.log(event.type);
+  }
+} finally {
+  clearTimeout(timeout);
+}
+```
 
 ## Next steps
 
-<CardGroup cols={3}>
-  <Card
-    title="Server Manager"
-    icon="server"
-    href="/v2/typescript/agent/server-manager"
-  >
-    Stream output from agents using multiple MCP servers.
-  </Card>
-  <Card
-    title="Structured Output"
-    icon="braces"
-    href="/v2/typescript/agent/structured-output"
-  >
-    Use structured output with streaming for type-safe responses.
-  </Card>
-  <Card
-    title="MCPAgent API Reference"
-    icon="terminal"
-    href="/v2/typescript/api-reference/agent/mcp-agent"
-  >
-    Check streaming method signatures and run options.
-  </Card>
-</CardGroup>
+- [Manage conversation memory](/v2/typescript/agent/memory-management)
+- [Configure an LLM provider](/v2/typescript/agent/llm-providers)
