@@ -981,7 +981,7 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
-  packages/server/examples/schema-libraries:
+  packages/server/examples/schema-arktype:
     dependencies:
       arktype:
         specifier: ^2.2.3
@@ -989,9 +989,41 @@ importers:
       mcp-use:
         specifier: workspace:*
         version: link:../..
+    devDependencies:
+      '@types/node':
+        specifier: ^22.20.0
+        version: 22.20.1
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
+  packages/server/examples/schema-typebox:
+    dependencies:
+      mcp-use:
+        specifier: workspace:*
+        version: link:../..
       typebox:
         specifier: 1.3.6
         version: 1.3.6
+    devDependencies:
+      '@types/node':
+        specifier: ^22.20.0
+        version: 22.20.1
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
+  packages/server/examples/schema-zod:
+    dependencies:
+      mcp-use:
+        specifier: workspace:*
+        version: link:../..
       zod:
         specifier: 4.4.3
         version: 4.4.3
