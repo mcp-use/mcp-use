@@ -113,9 +113,9 @@ function assertValidViewState(state: ViewState): string {
 /**
  * Per-runtime view-state document, model-context tree, and async flush pump.
  *
- * `useViewState`, `ModelContext`, and the imperative `modelContext` API all
- * mutate this single owner. Each delivery contains the complete merged
- * snapshot because `ui/update-model-context` has overwrite semantics.
+ * `useViewState` and `ModelContext` mutate this single owner. Each delivery
+ * contains the complete merged snapshot because `ui/update-model-context` has
+ * overwrite semantics.
  *
  * @internal
  */

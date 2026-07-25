@@ -10,7 +10,6 @@ import {
   disposeView,
   Image,
   ModelContext,
-  modelContext,
   ToolError,
   ThemeProvider,
   toolResultText,
@@ -2456,9 +2455,10 @@ describe("react bridge runtime", () => {
       _uiContext: ["- Dashboard", "  - Revenue", "  - Costs"].join("\n"),
     });
 
-    // Multiple sync imperative updates in one turn → one additional push.
-    modelContext.set("a", "Alpha");
-    modelContext.set("b", "Beta");
+    // Multiple synchronous store updates in one turn → one additional push.
+    const store = _getRuntimeForTesting()!.modelContextStore;
+    store.setNode({ id: "a", parentId: null, content: "Alpha" });
+    store.setNode({ id: "b", parentId: null, content: "Beta" });
     await waitFor(() => {
       expect(modelContextUpdates).toHaveLength(2);
     });
@@ -2485,7 +2485,8 @@ describe("react bridge runtime", () => {
       expect(screen.getByTestId("host")).not.toBeNull();
     });
 
-    modelContext.set("k", "Same");
+    const store = _getRuntimeForTesting()!.modelContextStore;
+    store.setNode({ id: "k", parentId: null, content: "Same" });
     await waitFor(() => {
       expect(modelContextUpdates).toHaveLength(1);
     });
@@ -2494,7 +2495,7 @@ describe("react bridge runtime", () => {
     });
 
     // Identical re-set must not deliver another push.
-    modelContext.set("k", "Same");
+    store.setNode({ id: "k", parentId: null, content: "Same" });
     await new Promise((resolve) => setTimeout(resolve, 25));
     expect(modelContextUpdates).toHaveLength(1);
   });
@@ -2546,58 +2547,6 @@ describe("react bridge runtime", () => {
     // Allow the flush to drain; the capability gate must swallow it.
     await new Promise((resolve) => setTimeout(resolve, 25));
     expect(modelContextUpdates).toHaveLength(0);
-  });
-
-  it("supports imperative modelContext set, remove, and clear", async () => {
-    resetRuntime();
-    const { init, modelContextUpdates } = await startHost();
-
-    function View() {
-      return <div data-testid="host">host</div>;
-    }
-
-    bootstrapView({ default: View as ComponentType });
-    await init;
-
-    await waitFor(() => {
-      expect(screen.getByTestId("host")).not.toBeNull();
-    });
-
-    modelContext.set("active", "Viewing cart");
-    await waitFor(() => {
-      expect(modelContextUpdates).toHaveLength(1);
-    });
-    expect(modelContextUpdates[0]?.structuredContent).toEqual({
-      _uiContext: "- Viewing cart",
-    });
-
-    modelContext.set("active", "Viewing checkout");
-    await waitFor(() => {
-      expect(modelContextUpdates).toHaveLength(2);
-    });
-    expect(modelContextUpdates[1]?.structuredContent).toEqual({
-      _uiContext: "- Viewing checkout",
-    });
-
-    modelContext.remove("active");
-    await waitFor(() => {
-      expect(modelContextUpdates).toHaveLength(3);
-    });
-    expect(modelContextUpdates[2]?.structuredContent).toEqual({
-      _uiContext: "",
-    });
-
-    modelContext.set("a", "A");
-    modelContext.set("b", "B");
-    await waitFor(() => {
-      expect(modelContextUpdates.length).toBeGreaterThanOrEqual(4);
-    });
-    modelContext.clear();
-    await waitFor(() => {
-      expect(modelContextUpdates.at(-1)?.structuredContent).toEqual({
-        _uiContext: "",
-      });
-    });
   });
 
   it("empty ModelContext parent preserves children at the nearest ancestor", async () => {
@@ -2653,13 +2602,14 @@ describe("react bridge runtime", () => {
       expect(screen.getByTestId("host")).not.toBeNull();
     });
 
-    modelContext.set("k", "First");
+    const store = _getRuntimeForTesting()!.modelContextStore;
+    store.setNode({ id: "k", parentId: null, content: "First" });
     await waitFor(() => {
       expect(shouldFail).toBe(false);
     });
     expect(modelContextUpdates).toHaveLength(0);
 
-    modelContext.set("k", "Second");
+    store.setNode({ id: "k", parentId: null, content: "Second" });
     await waitFor(() => {
       expect(modelContextUpdates).toHaveLength(1);
     });
@@ -2704,13 +2654,14 @@ describe("react bridge runtime", () => {
       expect(screen.getByTestId("host")).not.toBeNull();
     });
 
-    modelContext.set("k", "A");
+    const store = _getRuntimeForTesting()!.modelContextStore;
+    store.setNode({ id: "k", parentId: null, content: "A" });
     await waitFor(() => {
       expect(callCount).toBe(1);
     });
 
-    modelContext.set("k", "B");
-    modelContext.set("k", "C");
+    store.setNode({ id: "k", parentId: null, content: "B" });
+    store.setNode({ id: "k", parentId: null, content: "C" });
     releaseFirst?.();
 
     await waitFor(() => {
@@ -2754,7 +2705,11 @@ describe("react bridge runtime", () => {
       expect(screen.getByTestId("host")).not.toBeNull();
     });
 
-    modelContext.set("k", "Stale");
+    _getRuntimeForTesting()!.modelContextStore.setNode({
+      id: "k",
+      parentId: null,
+      content: "Stale",
+    });
     await waitFor(() => {
       expect(hostCalls).toBe(1);
     });
@@ -2770,15 +2725,6 @@ describe("react bridge runtime", () => {
     expect(hostCalls).toBe(1);
 
     warnSpy.mockRestore();
-  });
-
-  it("imperative modelContext throws when no view runtime is mounted", async () => {
-    resetRuntime();
-    await disposeView();
-    expect(_getRuntimeForTesting()).toBeNull();
-    expect(() => modelContext.set("k", "x")).toThrow(/bootstrapView/);
-    expect(() => modelContext.remove("k")).toThrow(/bootstrapView/);
-    expect(() => modelContext.clear()).toThrow(/bootstrapView/);
   });
 
   it("resolves root-relative public assets via Image", async () => {

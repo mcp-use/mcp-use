@@ -167,8 +167,7 @@ export interface McpAppRuntime {
    * Per-runtime structured view state, model-context tree, and async flush pump.
    *
    * Constructed with this runtime and disposed with it. React components obtain
-   * it via {@link useViewRuntime}; the imperative `modelContext` API delegates
-   * to the active document runtime's store.
+   * it via {@link useViewRuntime}.
    */
   readonly modelContextStore: ModelContextStore;
 
@@ -800,8 +799,8 @@ export function createMcpAppRuntime(
 }
 
 /**
- * Document-level active runtime used by the imperative {@link modelContext}
- * API and test seams.
+ * Document-level active runtime used by bootstrap lifecycle helpers and test
+ * seams.
  *
  * Set by {@link bootstrapView}; cleared on {@link McpAppRuntime.dispose}.
  */
@@ -811,7 +810,7 @@ let activeRuntime: McpAppRuntime | null = null;
 let pendingTestTransport: ViewRuntimeTransport | null = null;
 
 /**
- * Register `runtime` as the document-active instance for imperative APIs.
+ * Register `runtime` as the document-active instance.
  *
  * @param runtime - Runtime to activate, or `null` to clear.
  *

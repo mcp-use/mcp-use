@@ -16,7 +16,7 @@ export {
 export { type ViewConfig } from "./runtime/view-config.js";
 export { ErrorBoundary } from "./components/error-boundary.js";
 export { Image } from "./components/image.js";
-export { ModelContext, modelContext } from "./components/model-context.js";
+export { ModelContext } from "./components/model-context.js";
 export { ThemeProvider } from "./components/theme-provider.js";
 export { ViewControls } from "./components/view-controls.js";
 export {
