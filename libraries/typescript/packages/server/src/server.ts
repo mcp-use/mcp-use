@@ -380,7 +380,9 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   #hostValidated = false;
   readonly #mcpMiddlewares: McpMiddlewareEntry[] = [];
   readonly #mcpEventListeners: McpEventListenerEntry[] = [];
-  readonly #usageScope = crypto.randomUUID();
+  // Keep construction import-safe for Workers. The scope is only needed when
+  // request-time telemetry is recorded.
+  #usageScope: string | undefined;
   readonly #openApiTools = new Set<string>();
   readonly #proxiedTools = new Set<string>();
   readonly #proxiedResources = new Set<string>();
@@ -1163,7 +1165,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         legacy_policy: this.#config.legacy ?? "stateless",
       },
       {
-        onceKey: `${this.#usageScope}:server`,
+        onceKey: `${this.#usageScopeId()}:server`,
         serverRoot: this.#viewsProjectRoot,
       }
     );
@@ -1177,10 +1179,15 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       "observed",
       { ...client },
       {
-        onceKey: `${this.#usageScope}:client:${JSON.stringify(client)}`,
+        onceKey: `${this.#usageScopeId()}:client:${JSON.stringify(client)}`,
         serverRoot: this.#viewsProjectRoot,
       }
     );
+  }
+
+  #usageScopeId(): string {
+    this.#usageScope ??= crypto.randomUUID();
+    return this.#usageScope;
   }
 
   #proxyHost(): ProxyMountHost {

@@ -1,0 +1,23 @@
+---
+title: Railway
+description: Deploy an mcp-use server and its generated Views to Railway.
+---
+
+Railway is a Node/filesystem runtime. Build `.mcp-use/build` with the server;
+`server.fetch` then serves MCP and View assets from the same origin.
+
+```bash
+MCP_URL=https://<service>.up.railway.app/mcp npm run build
+railway up
+```
+
+Set Railway's public endpoint as `MCP_URL` and bind the application to
+`0.0.0.0:$PORT`. Point the service at its `/mcp` endpoint.
+
+```bash
+npx --yes mcp-use@beta screenshot \
+  --mcp https://<service>.up.railway.app/mcp --tool show-app \
+  --output railway-live-view.png
+```
+
+See the matching [Railway example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/deployment/railway).

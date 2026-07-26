@@ -1,0 +1,64 @@
+---
+title: Runtime-first deployment
+description: Deploy mcp-use Views with server.fetch on Node and edge runtimes.
+---
+
+`server.fetch(request)` is the portable mcp-use server boundary. Mount it at
+your MCP route; no framework-specific handler is required. Views add one
+deployment concern: their generated files live in `.mcp-use/build/views/`.
+
+Run the build with the public MCP endpoint before deploying:
+
+```bash
+MCP_URL=https://api.example.com/mcp mcp-use build
+```
+
+## Node and filesystem runtimes
+
+Use this for Railway, Manufact, Bun, and a Node Vercel Function. Deploy
+`.mcp-use/build` with the server and forward the MCP route, including its
+`_mcp-use` subtree, to `server.fetch`. The server reads the generated assets
+from disk and serves them from the same public origin.
+
+```ts
+export default server.fetch;
+```
+
+## Edge runtime with co-located static assets
+
+Use this for Workers and Edge Functions. Build once, publish
+`.mcp-use/build` through the platform's static asset binding, and route:
+
+- `<basePath>/_mcp-use/*` to static assets
+- every other request to `server.fetch(request)`
+
+When the static assets are hosted on the same public origin, set
+`MCP_ASSETS_URL` to that origin at build time. A Worker mounted at `/mcp`, for
+example, publishes `.mcp-use/build/views/` at
+`/mcp/_mcp-use/views/`.
+
+## Edge runtime with external assets
+
+Set `MCP_ASSETS_URL` to the public CDN or bucket prefix before building:
+
+```bash
+MCP_URL=https://api.example.com/mcp \
+MCP_ASSETS_URL=https://cdn.example.com/mcp-assets \
+mcp-use build
+```
+
+The build prints the exact destination, such as
+`https://cdn.example.com/mcp-assets/mcp/_mcp-use/views/<view-name>/`. Publish
+the contents of `.mcp-use/build/views/` at that prefix. The asset host must
+allow the View iframe's CORS and CSP requirements.
+
+## Verify the rendered View
+
+Checking CSS files alone is insufficient. After every deployment, capture the
+actual resource with the beta screenshot command:
+
+```bash
+npx --yes mcp-use@beta screenshot \
+  --mcp https://api.example.com/mcp --tool show-app \
+  --output live-view.png
+```

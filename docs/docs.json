@@ -131,7 +131,14 @@
                     "group": "Deployment",
                     "icon": "rocket",
                     "pages": [
+                      "typescript/server/deployment/runtime-patterns",
                       "typescript/server/deployment/mcp-use",
+                      "typescript/server/deployment/railway",
+                      "typescript/server/deployment/hono",
+                      "typescript/server/deployment/vercel",
+                      "typescript/server/deployment/cloudflare-workers",
+                      "typescript/server/deployment/deno",
+                      "typescript/server/deployment/bun",
                       "typescript/server/deployment/google",
                       "typescript/server/deployment/supabase"
                     ]

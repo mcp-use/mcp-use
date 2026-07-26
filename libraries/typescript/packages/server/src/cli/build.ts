@@ -514,9 +514,13 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     }
 
     if (buildAssetsBase !== undefined && !inline) {
+      const assetPath = `${buildAssetsBase}${viewAssetsBasePath(
+        buildBasePath,
+        "<view-name>"
+      )}`;
       console.log(
-        `[mcp-use] MCP_ASSETS_URL set — manifest uses CDN URLs; upload ` +
-          `${relative(options.cwd, viewsOutDir)}/ to your asset host.`
+        `[mcp-use] MCP_ASSETS_URL set — publish ` +
+          `${relative(options.cwd, viewsOutDir)}/ at ${assetPath}`
       );
       if (buildBasePath !== "/mcp") {
         console.log(
