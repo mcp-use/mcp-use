@@ -111,12 +111,24 @@ export function createMcpMount(
     // bodies are fully buffered. Record that contract at the SDK boundary
     // instead of inferring it later from a content type that custom handlers
     // may also use for genuinely streaming JSON.
-    return response.headers
+    const isJson = response.headers
       .get("content-type")
       ?.toLowerCase()
-      .includes("application/json")
-      ? trackBufferedResponse(request, response)
-      : response;
+      .includes("application/json");
+    if (!isJson) return response;
+
+    // Bun can drop a JSON stream returned directly from an async fetch
+    // handler. SDK JSON replies are already buffered, so materialize the body
+    // before returning it to Bun while keeping streaming SSE responses intact.
+    if ("Bun" in globalThis && response.body !== null) {
+      return new Response(await response.arrayBuffer(), {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+      });
+    }
+
+    return trackBufferedResponse(request, response);
   };
 
   return { handler, fetch };

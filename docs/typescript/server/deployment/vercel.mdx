@@ -1,0 +1,25 @@
+---
+title: Vercel Functions
+description: Deploy an mcp-use server with Views as a Vercel Function.
+---
+
+For a non-Next Vercel Function, include `.mcp-use/build/views/**` in the
+function bundle and rewrite both the MCP route and its nested asset paths to a
+catch-all function entrypoint.
+
+```bash
+MCP_URL=https://<project>.vercel.app/api/mcp npm run build
+vercel --prod
+```
+
+The example's `vercel.json` supplies the `includeFiles` and rewrite rules.
+Use `/api/mcp` as the endpoint and verify the rendered resource:
+
+```bash
+npx --yes mcp-use@beta screenshot \
+  --mcp https://<project>.vercel.app/api/mcp --tool show-app \
+  --output vercel-live-view.png
+```
+
+For Next.js, keep using the specialized `withMcpUse()` and
+`createNextHandler()` integration described in the [Next.js guide](/typescript/server/nextjs-drop-in).

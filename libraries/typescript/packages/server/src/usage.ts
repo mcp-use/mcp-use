@@ -20,7 +20,15 @@ const RESERVED = new Set(
     " "
   )
 );
-const runtimeId = crypto.randomUUID();
+// Workers prohibit random-value generation while evaluating a module. Usage is
+// only recorded from request-time server paths, so allocate this process ID on
+// first use instead of making the package unimportable in an edge runtime.
+let runtimeId: string | undefined;
+
+function getRuntimeId(): string {
+  runtimeId ??= crypto.randomUUID();
+  return runtimeId;
+}
 const once = new Set<string>();
 const pending = new Set<Promise<void>>();
 const identities = new Map<string, Promise<Identity>>();
@@ -49,6 +57,19 @@ function safeEnv(name: string): string | undefined {
     !hasControl(value)
     ? value
     : undefined;
+}
+
+/**
+ * Whether this runtime may persist the anonymous telemetry identity beside the
+ * project. Deno exposes Node compatibility APIs but its default edge/runtime
+ * permissions intentionally reject writes, so it must use the in-memory
+ * isolate identity instead. Workers do not expose `process` at all.
+ */
+function canPersistTelemetryIdentity(): boolean {
+  if (typeof process === "undefined" || process.versions?.node === undefined) {
+    return false;
+  }
+  return !("Deno" in globalThis);
 }
 
 function disabled(): boolean {
@@ -95,8 +116,8 @@ function clean(properties: Properties): Properties {
 async function identity(serverRoot?: string): Promise<Identity> {
   const projectId = safeEnv("MCP_USE_TELEMETRY_PROJECT_ID");
   if (projectId !== undefined) return { id: projectId, stability: "project" };
-  if (serverRoot === undefined || typeof process === "undefined")
-    return { id: runtimeId, stability: "process" };
+  if (serverRoot === undefined || !canPersistTelemetryIdentity())
+    return { id: getRuntimeId(), stability: "process" };
   const existing = identities.get(serverRoot);
   if (existing !== undefined) return existing;
   const resolving = (async (): Promise<Identity> => {
@@ -142,7 +163,7 @@ async function identity(serverRoot?: string): Promise<Identity> {
     } catch {
       // Storage is optional; runtime identity remains available.
     }
-    return { id: runtimeId, stability: "process" };
+    return { id: getRuntimeId(), stability: "process" };
   })();
   identities.set(serverRoot, resolving);
   return resolving;
@@ -186,7 +207,7 @@ function capture(
               ? "development"
               : __MCP_USE_PACKAGE_VERSION__,
           server_id: resolvedIdentity.id,
-          runtime_id: runtimeId,
+          runtime_id: getRuntimeId(),
           identity_stability: resolvedIdentity.stability,
           distinct_id: resolvedIdentity.id,
           sample_rate: validationId === undefined ? rate : 1,
