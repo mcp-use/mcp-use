@@ -1,5 +1,12 @@
 # mcp-use
 
+## 2.0.0-beta.61
+
+### Patch Changes
+
+- ef8187a: Make telemetry safe for edge and restricted runtimes, preserve View assets across portable `server.fetch` deployments, and fix buffered JSON replies on Bun.
+  - @mcp-use/inspector@20.0.0-beta.53
+
 ## 2.0.0-beta.60
 
 ### Patch Changes
