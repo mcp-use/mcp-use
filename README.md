@@ -243,20 +243,39 @@ mcp-use adds custom stateless request handling and optimized response paths on t
 
 mcp-use v2 had the smallest clean production install among the full-stack native MCP Apps frameworks tested: **74.4 MiB**, compared with **121.9 MiB** for xmcp and **137.5 MiB** for Skybridge. The mcp-use v1 result is included as a migration baseline, not as a native Apps peer.
 
-🟩 marks the category leader. ✅ means the capability is built into the framework; ❌ means it requires an extension, external client, or custom wiring.
+Green cells mark the category leader. ✅ means the capability is built into the framework; ❌ means it requires an extension, external client, or custom wiring. Compared here: [xmcp](https://github.com/basementstudio/xmcp), [Skybridge](https://github.com/alpic-ai/skybridge), the [official TypeScript SDK v2](https://github.com/modelcontextprotocol/typescript-sdk), and [mcp-handler](https://github.com/vercel/mcp-handler).
 
-|  | **mcp-use v2** | [xmcp](https://github.com/basementstudio/xmcp) | [Skybridge](https://github.com/alpic-ai/skybridge) | [Official SDK v2](https://github.com/modelcontextprotocol/typescript-sdk) | [mcp-handler](https://github.com/vercel/mcp-handler) |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| **Speed** | 🟩 **10,982 ops/s** | 6,585 ops/s | 8,116 ops/s | 8,050 ops/s | 6,324 ops/s |
-| **Clean install** | 🟩 **74.4 MiB** | 121.9 MiB | 137.5 MiB | — | — |
-| **GitHub stars** | 10,400 | 1,295 | 1,952 | 🟩 **12,965** | 629 |
-| **Views** | 🟩 ✅ | 🟩 ✅ | 🟩 ✅ | ❌ | ❌ |
-| **Native Views on MCP 2026** | 🟩 ✅ | ❌ | ❌ | ❌ | ❌ |
-| **One-line OAuth adapters** | 🟩 ✅ | 🟩 ✅ | 🟩 ✅ | ❌ | ❌ |
-| **MCP 2026 protocol** | 🟩 ✅ | ❌ | ❌ | 🟩 ✅ | ❌ |
-| **Built-in View screenshot CLI** | 🟩 ✅ | ❌ | ❌ | ❌ | ❌ |
-| **Built-in tunneling** | 🟩 ✅ | ❌ | 🟩 ✅ | ❌ | ❌ |
-| **Built-in Inspector** | 🟩 ✅ | ❌ | ❌ | ❌ | ❌ |
+```mermaid
+block-beta
+  columns 6
+
+  metric["Metric"] mcp["mcp-use v2"] xmcp["xmcp"] skybridge["Skybridge"] official["Official SDK v2"] handler["mcp-handler"]
+
+  speed["Speed"] speedMcp["10,982 ops/s"] speedXmcp["6,585 ops/s"] speedSkybridge["8,116 ops/s"] speedOfficial["8,050 ops/s"] speedHandler["6,324 ops/s"]
+  install["Clean install"] installMcp["74.4 MiB"] installXmcp["121.9 MiB"] installSkybridge["137.5 MiB"] installOfficial["—"] installHandler["—"]
+  stars["GitHub stars"] starsMcp["10,400"] starsXmcp["1,295"] starsSkybridge["1,952"] starsOfficial["12,965"] starsHandler["629"]
+  views["Views"] viewsMcp["✅"] viewsXmcp["✅"] viewsSkybridge["✅"] viewsOfficial["❌"] viewsHandler["❌"]
+  nativeViews["Native Views<br/>on MCP 2026"] nativeViewsMcp["✅"] nativeViewsXmcp["❌"] nativeViewsSkybridge["❌"] nativeViewsOfficial["❌"] nativeViewsHandler["❌"]
+  oauth["One-line<br/>OAuth adapters"] oauthMcp["✅"] oauthXmcp["✅"] oauthSkybridge["✅"] oauthOfficial["❌"] oauthHandler["❌"]
+  protocol["MCP 2026<br/>protocol"] protocolMcp["✅"] protocolXmcp["❌"] protocolSkybridge["❌"] protocolOfficial["✅"] protocolHandler["❌"]
+  screenshot["Built-in View<br/>screenshot CLI"] screenshotMcp["✅"] screenshotXmcp["❌"] screenshotSkybridge["❌"] screenshotOfficial["❌"] screenshotHandler["❌"]
+  tunnel["Built-in<br/>tunneling"] tunnelMcp["✅"] tunnelXmcp["❌"] tunnelSkybridge["✅"] tunnelOfficial["❌"] tunnelHandler["❌"]
+  inspector["Built-in<br/>Inspector"] inspectorMcp["✅"] inspectorXmcp["❌"] inspectorSkybridge["❌"] inspectorOfficial["❌"] inspectorHandler["❌"]
+
+  classDef label fill:#f6f8fa,stroke:#d0d7de,color:#1f2328,font-weight:bold
+  classDef brand fill:#dcfce7,stroke:#16a34a,color:#166534,font-weight:bold
+  classDef header fill:#f6f8fa,stroke:#d0d7de,color:#1f2328,font-weight:bold
+  classDef value fill:#ffffff,stroke:#d0d7de,color:#1f2328
+  classDef leader fill:#dcfce7,stroke:#16a34a,color:#166534,font-weight:bold
+  classDef unavailable fill:#f6f8fa,stroke:#d0d7de,color:#6e7781
+
+  class metric,speed,install,stars,views,nativeViews,oauth,protocol,screenshot,tunnel,inspector label
+  class mcp brand
+  class xmcp,skybridge,official,handler header
+  class speedXmcp,speedSkybridge,speedOfficial,speedHandler,installXmcp,installSkybridge,starsMcp,starsXmcp,starsSkybridge,starsHandler value
+  class speedMcp,installMcp,starsOfficial,viewsMcp,viewsXmcp,viewsSkybridge,nativeViewsMcp,oauthMcp,oauthXmcp,oauthSkybridge,protocolMcp,protocolOfficial,screenshotMcp,tunnelMcp,tunnelSkybridge,inspectorMcp leader
+  class installOfficial,installHandler,viewsOfficial,viewsHandler,nativeViewsXmcp,nativeViewsSkybridge,nativeViewsOfficial,nativeViewsHandler,oauthOfficial,oauthHandler,protocolXmcp,protocolSkybridge,protocolHandler,screenshotXmcp,screenshotSkybridge,screenshotOfficial,screenshotHandler,tunnelXmcp,tunnelOfficial,tunnelHandler,inspectorXmcp,inspectorSkybridge,inspectorOfficial,inspectorHandler unavailable
+```
 
 Speed uses the benchmark's median operations per second; mcp-use leads this selected comparison and the frameworks with native Views. Install size is limited to the equivalent full-stack Views frameworks. Stars are a July 27, 2026 snapshot. “Views” means native framework support for MCP Apps rather than a separate extension. “Native Views on MCP 2026” requires both that abstraction and support for the MCP 2026 protocol generation. “One-line OAuth adapters” means provider-specific helpers that plug into the framework with one configuration call; identity-provider setup is still required. “Built-in View screenshot CLI” means the framework itself can invoke a View-backed tool and save the rendered result as an image; external browser automation does not count. “Built-in tunneling” means the framework's development command can expose its local MCP endpoint directly. “Built-in Inspector” means the framework ships its own full protocol UI for tools, resources, prompts, Views, sampling, elicitation, and notifications; a framework-specific View emulator does not count.
 
