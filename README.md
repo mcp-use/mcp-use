@@ -49,12 +49,10 @@ Start from the terminal or give the same job to your coding agent. Both paths pr
 ### Start with code
 
 ```bash
-npx -y create-mcp-use-app@beta my-mcp-app --template mcp-apps --install --skills
-cd my-mcp-app
-npm run dev
+npx -y create-mcp-use-app@beta
 ```
 
-Your MCP endpoint is now available at [`http://localhost:3000/mcp`](http://localhost:3000/mcp), with the Inspector at [`http://localhost:3000/mcp/inspector`](http://localhost:3000/mcp/inspector).
+Follow the prompts, change into the generated project, and run `npm run dev`. Your MCP endpoint is then available at [`http://localhost:3000/mcp`](http://localhost:3000/mcp), with the Inspector at [`http://localhost:3000/mcp/inspector`](http://localhost:3000/mcp/inspector).
 
 [Read the TypeScript quickstart →](https://mcp-use.com/docs/typescript/getting-started/quickstart)
 
