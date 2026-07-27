@@ -341,6 +341,7 @@
                     "icon": "server",
                     "pages": [
                       "v2/typescript/server/index",
+                      "v2/typescript/server/migration",
                       "v2/typescript/server/examples",
                       {
                         "group": "Core Components",
