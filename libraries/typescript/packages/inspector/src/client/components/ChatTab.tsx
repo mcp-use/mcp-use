@@ -48,6 +48,7 @@ import { MessageList } from "./chat/MessageList";
 import { ChatScrollToBottomButton } from "./chat/ChatScrollToBottomButton";
 import { ChatScrollTopFade } from "./chat/ChatScrollTopFade";
 import { useChatScrollToBottom } from "./chat/useChatScrollToBottom";
+import { FullscreenChatOverlay } from "./chat/FullscreenChatOverlay";
 import type { ToolInfo } from "./chat/ToolSelector";
 import { useChatMessages } from "./chat/useChatMessages";
 import { useChatMessagesClientSide } from "./chat/useChatMessagesClientSide";
@@ -1636,6 +1637,20 @@ export function ChatTab({
             systemPromptProvider={effectiveSystemPromptProvider}
           />
         </div>
+      )}
+
+      {llmConfig && (
+        <FullscreenChatOverlay
+          messages={messages}
+          inputValue={inputValue}
+          isConnected={
+            isConnected && !managedChatNotice && !mcpServerAuthRequired
+          }
+          isLoading={isLoading}
+          onInputChange={setInputValue}
+          onSendMessage={handleSendMessage}
+          onStopStreaming={stop}
+        />
       )}
 
       {reconnectBannerNode}

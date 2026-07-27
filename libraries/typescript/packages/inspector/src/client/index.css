@@ -566,3 +566,10 @@ html[data-mcp-widget-fullscreen] [data-chat-history-toggle] {
   visibility: hidden;
   pointer-events: none;
 }
+
+/* Fullscreen chat can open tool-call details from its transcript drawer. These
+   portaled sheets must sit above the fixed MCP App shell and chat controls. */
+html[data-mcp-widget-fullscreen] [data-slot="sheet-overlay"],
+html[data-mcp-widget-fullscreen] [data-slot="sheet-content"] {
+  z-index: 300;
+}

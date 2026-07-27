@@ -148,11 +148,17 @@ export interface ViewRendererProps {
   mockOpenAiFileApis?: boolean;
   /** Fired when the guest reports inline height via ui/notifications/size-changed. */
   onInlineHeightChange?: (height: number) => void;
-  /** Inspector-only chrome shown above the iframe in fullscreen display mode. */
-  fullscreenHeader?: {
-    title: string;
-    iconUrl?: string | null;
-  };
+  /**
+   * Host chrome shown above the iframe in fullscreen display mode.
+   * Set to `false` for an embedded, edge-to-edge app with only the host close
+   * control floating over the top-right corner.
+   */
+  fullscreenHeader?:
+    | {
+        title: string;
+        iconUrl?: string | null;
+      }
+    | false;
   /** Optional host close control for fullscreen (e.g. shared Button + icon). */
   renderFullscreenClose?: (props: {
     onClick: () => void;

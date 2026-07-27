@@ -872,7 +872,7 @@ function ViewRendererBase({
             : undefined
       }
     >
-      {isFullscreen && (
+      {isFullscreen && fullscreenHeader !== false && (
         // ponytail: inspector Tailwind may not emit client arbitrary classes
         // (h-[50px], grid-cols-[auto_1fr_auto]) — use inline layout instead.
         <header
@@ -914,6 +914,28 @@ function ViewRendererBase({
           <div className="size-8 shrink-0" aria-hidden />
         </header>
       )}
+      {isFullscreen &&
+        fullscreenHeader === false &&
+        (renderFullscreenClose ? (
+          <div className="absolute right-3 top-3" style={{ zIndex: 110 }}>
+            {renderFullscreenClose({
+              onClick: () => void handleDisplayModeChange("inline"),
+              "data-testid": "debugger-exit-fullscreen-button",
+              "aria-label": "Exit fullscreen",
+            })}
+          </div>
+        ) : (
+          <button
+            type="button"
+            data-testid="debugger-exit-fullscreen-button"
+            aria-label="Exit fullscreen"
+            className="absolute right-3 top-3 flex size-8 cursor-pointer items-center justify-center rounded-full border border-border bg-background/90 text-foreground shadow-sm backdrop-blur-sm hover:bg-background"
+            style={{ zIndex: 110 }}
+            onClick={() => void handleDisplayModeChange("inline")}
+          >
+            <CloseIcon />
+          </button>
+        ))}
       {isPip &&
         (renderFullscreenClose ? (
           <div className="absolute right-3 top-3" style={{ zIndex: 110 }}>
