@@ -237,15 +237,19 @@ Prefer to run it yourself? Follow the [self-hosting guide →](https://mcpuse-co
 
 ## How mcp-use compares
 
-mcp-use v2 builds on the official TypeScript SDK v2 and adds the framework layer around it: typed tools and views, a React app pipeline, Inspector, client and screenshot tooling, deployment adapters, and an agent-friendly CLI.
+mcp-use v2 keeps the official TypeScript SDK v2 as its protocol foundation, then adds a full-stack runtime designed to improve the developer and coding-agent experience.
 
-**Is mcp-use a replacement for the official TypeScript SDK?**
+**How does mcp-use build on the official TypeScript SDK?**
 
-No. It uses the official `@modelcontextprotocol/core`, `server`, and `client` packages. Choose the official SDK directly when you want protocol-level primitives and intend to assemble the app, build, inspection, and deployment workflow yourself. Choose mcp-use when you want those pieces integrated behind one typed server API.
+mcp-use uses the official `@modelcontextprotocol/core`, `server`, and `client` packages for protocol compatibility. On top, it adds one typed server API, generated tool-to-view contracts, deterministic CLI feedback, scaffolding, Inspector, screenshot verification, deployment adapters, and workflows that agents can execute end to end.
 
-**Does the framework layer make it slower?**
+**What does mcp-use add for MCP Apps?**
 
-Not in our controlled workload. mcp-use v2 measured **10,982 median operations per second**, compared with **8,050** for the equivalent official SDK v2 fixture. It was the fastest modern Node and native MCP Apps implementation tested; compiled Rust `rmcp` and the older-protocol `tmcp` fixture led the broader mixed-language field.
+The official SDK does not include a native, end-to-end MCP Apps workflow in its server package; Apps are added through the separate `@modelcontextprotocol/ext-apps` extension and custom resource, metadata, build, and type wiring. mcp-use makes Views a first-class server feature: bind a `view` directly to an exported tool, share its schemas with React hooks, build it with the server, preview it in the Inspector, and verify it with the built-in screenshot tool.
+
+**What about performance?**
+
+The higher-level experience does not add higher request overhead. Custom stateless request handling and response paths on top of the official SDK measured **10,982 median operations per second**, compared with **8,050** for the equivalent official SDK v2 fixture: about **36% higher throughput** in our controlled workload.
 
 <p align="center">
   <a href="./static/readme/comparison-throughput.svg">
