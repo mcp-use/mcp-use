@@ -245,15 +245,18 @@ mcp-use v2 had the smallest clean production install among the full-stack native
 
 🟩 marks the category leader. ✅ means the capability is built into the framework; ❌ means it requires an extension, external client, or custom wiring.
 
-|  | **mcp-use v2** | [xmcp](https://xmcp.dev/blog/mcp-apps) | [Skybridge](https://docs.skybridge.tech/fundamentals/mcp-apps) | [Official SDK v2](https://ts.sdk.modelcontextprotocol.io/v2/) | tmcp | mcp-handler |
+|  | **mcp-use v2** | [xmcp](https://github.com/basementstudio/xmcp) | [Skybridge](https://github.com/alpic-ai/skybridge) | [Official SDK v2](https://github.com/modelcontextprotocol/typescript-sdk) | [tmcp](https://github.com/paoloricciuti/tmcp) | [mcp-handler](https://github.com/vercel/mcp-handler) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| **Native Views / MCP Apps** | 🟩 ✅ | 🟩 ✅ | 🟩 ✅ | ❌ | ❌ | ❌ |
-| **Throughput with native Views** | 🟩 **10,982 ops/s** | 6,585 ops/s | 8,116 ops/s | — | — | — |
+| **Speed** | 10,982 ops/s | 6,585 ops/s | 8,116 ops/s | 8,050 ops/s | 🟩 **18,425 ops/s** | 6,324 ops/s |
 | **Clean install** | 🟩 **74.4 MiB** | 121.9 MiB | 137.5 MiB | — | — | — |
+| **GitHub stars** | 10,400 | 1,295 | 1,952 | 🟩 **12,965** | 196 | 629 |
+| **Weekly npm downloads** | [50,793](https://www.npmjs.com/package/mcp-use) | [16,476](https://www.npmjs.com/package/xmcp) | [19,905](https://www.npmjs.com/package/skybridge) | [188,403](https://www.npmjs.com/package/@modelcontextprotocol/server) | 🟩 [**1,966,280**](https://www.npmjs.com/package/tmcp) | [692,381](https://www.npmjs.com/package/mcp-handler) |
+| **Views** | 🟩 ✅ | 🟩 ✅ | 🟩 ✅ | ❌ | ❌ | ❌ |
+| **Tools** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **MCP 2026 protocol** | 🟩 ✅ | ❌ | ❌ | 🟩 ✅ | ❌ | ❌ |
-| **Built-in MCP Apps preview** | 🟩 ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Built-in Inspector** | 🟩 ✅ | ❌ | 🟩 ✅ | ❌ | ❌ | ❌ |
 
-“Built-in MCP Apps preview” means the framework's own development UI renders the MCP Apps protocol. External clients and mocked Apps SDK runtimes do not count.
+Speed uses the benchmark's median operations per second; tmcp leads the complete TypeScript field, while mcp-use leads the frameworks with native Views. Install size is limited to the equivalent full-stack Views frameworks. Stars are a July 27, 2026 snapshot; npm downloads cover the completed week of July 18–24, 2026. “Views” means native framework support for MCP Apps rather than a separate extension, and “built-in Inspector” means the framework's own development command launches its inspection UI.
 
 **Lower is better.** Black is mcp-use v2; gray represents the migration baseline and other fixtures.
 
