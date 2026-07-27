@@ -249,32 +249,6 @@ not add request overhead here; it is not a universal performance guarantee.
 - The v1 and v2 App builds use equivalent source content and production build
   settings.
 
-## Reproduce or inspect the evidence
-
-The complete snapshot is committed with this report:
-
-- [Accepted load runs](./benchmarks/v2-beta-2026-07-27/data/benchmark-load-2026-07-27.jsonl):
-  three position-rotated rounds and the calculated medians.
-- [Cold-launch samples](./benchmarks/v2-beta-2026-07-27/data/benchmark-launch-2026-07-27.json):
-  median, quartiles, minimum, and maximum for every target.
-- [Size evidence](./benchmarks/v2-beta-2026-07-27/data/evidence.json):
-  install, tarball, application build, and feature-scope measurements.
-- [Harness and rejected runs](./benchmarks/v2-beta-2026-07-27):
-  exact fixtures, lockfiles, runner, workload configuration, and incomplete
-  runs excluded from the charts.
-
-Run the exact snapshot:
-
-```bash
-cd benchmarks/v2-beta-2026-07-27
-MCP_USE_VERSION=2.0.0-beta.61 \
-MCP_USE_V1=1.34.5 \
-./scripts/refresh-benchmark.sh full
-```
-
-The full run requires Node.js 24, npm, pnpm, Rust/Cargo, Docker, and Git. A
-shorter smoke run is available with `./scripts/refresh-benchmark.sh quick`.
-
 ## Limits and claim boundaries
 
 - Absolute localhost results move with machine load, scheduler behavior, and
@@ -284,8 +258,8 @@ shorter smoke run is available with `./scripts/refresh-benchmark.sh quick`.
   equivalent.
 - Production builds are compared only between mcp-use v1 and v2 because the
   other frameworks emit different artifact boundaries.
-- Rejected controller-capacity runs remain in the repository for auditability
-  and are excluded from every result above.
+- Two incomplete controller-capacity attempts were rejected and excluded from
+  every result above.
 - There is no composite “overall score.”
 
 Use the scoped result: **fastest modern Node and native MCP Apps

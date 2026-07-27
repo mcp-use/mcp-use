@@ -78,15 +78,7 @@ The public prompt owns the complete build, verification, and deployment workflow
 
 ## Quickstart: a typed MCP App
 
-The scaffold gives you the server, TypeScript configuration, development scripts, Inspector, and a React view pipeline. Start it once and the MCP endpoint also serves a client-ready landing page:
-
-<p align="center">
-  <a href="./static/readme/server-landing.jpg">
-    <img src="./static/readme/server-landing.jpg" alt="Generated mcp-use server landing page with its MCP URL and client installation guide" width="840">
-  </a>
-</p>
-
-<p align="center"><sub>Your generated server includes a shareable landing page, connection URL, and setup instructions for popular MCP clients.</sub></p>
+The scaffold gives you the server, TypeScript configuration, development scripts, Inspector, and a React view pipeline. Start it once and the MCP endpoint also serves a client-ready landing page with its connection URL and setup instructions.
 
 Replace its `index.ts` with a view-bound tool like this:
 
@@ -185,15 +177,7 @@ export default function WeatherCard() {
 }
 ```
 
-The model reads the concise `content` result. The view reads the typed `structuredContent` through `useToolContext()`, and `useCallTool()` can invoke exported server tools without duplicating their input or output types.
-
-<p align="center">
-  <a href="./static/readme/mcp-app-preview.jpg">
-    <img src="./static/readme/mcp-app-preview.jpg" alt="Interactive MCP App rendered inside the mcp-use Inspector" width="960">
-  </a>
-</p>
-
-<p align="center"><sub>Run the tool and interact with the view in the Inspector before testing it in an MCP client.</sub></p>
+The model reads the concise `content` result. The view reads the typed `structuredContent` through `useToolContext()`, and `useCallTool()` can invoke exported server tools without duplicating their input or output types. Run the tool and interact with the view in the Inspector before testing it in an MCP client.
 
 [Build your first MCP App →](https://mcp-use.com/docs/typescript/mcp-apps/quickstart)
 
@@ -206,13 +190,7 @@ The model reads the concise `content` result. The view reads the typed `structur
 | **Verify views** | Run tools and inspect the rendered app | Capture a PNG with `mcp-use screenshot` and inspect the image |
 | **Deploy** | Run `npm run deploy` | Use `mcp-use deploy --yes` and wait for a confirmed live state |
 
-<p align="center">
-  <a href="./static/readme/inspector-tool-call.jpg">
-    <img src="./static/readme/inspector-tool-call.jpg" alt="Calling a typed tool and viewing its MCP App response in the mcp-use Inspector" width="960">
-  </a>
-</p>
-
-<p align="center"><sub>The Inspector discovers your tools, validates their inputs, and renders MCP App responses beside the request.</sub></p>
+The Inspector discovers your tools, validates their inputs, and renders MCP App responses beside the request.
 
 ```bash
 # Terminal verification against a running local server
@@ -251,21 +229,9 @@ The official SDK does not include a native, end-to-end MCP Apps workflow in its 
 
 The higher-level experience does not add higher request overhead. Custom stateless request handling and response paths on top of the official SDK measured **10,982 median operations per second**, compared with **8,050** for the equivalent official SDK v2 fixture: about **36% higher throughput** in our controlled workload.
 
-<p align="center">
-  <a href="./static/readme/comparison-throughput.svg">
-    <img src="./static/readme/comparison-throughput.svg" alt="Median MCP throughput comparison across nine tested frameworks; higher is better" width="960">
-  </a>
-</p>
-
 **How does it compare with other native MCP Apps frameworks?**
 
 mcp-use v2 had the smallest clean production install among the full-stack native MCP Apps frameworks tested: **74.4 MiB**, compared with **121.9 MiB** for xmcp and **137.5 MiB** for Skybridge. The mcp-use v1 result is included as a migration baseline, not as a native Apps peer.
-
-<p align="center">
-  <a href="./static/readme/comparison-install-size.svg">
-    <img src="./static/readme/comparison-install-size.svg" alt="Clean production install footprint for native MCP Apps frameworks; lower is better" width="900">
-  </a>
-</p>
 
 **Does mcp-use lock deployment to Manufact Cloud?**
 
@@ -274,7 +240,7 @@ No. Manufact Cloud is the managed path for deployment, analytics, evals, observa
 > [!NOTE]
 > Benchmark snapshot: July 27, 2026, using published `mcp-use@2.0.0-beta.61`, `mcp-use@1.34.5`, and official SDK `2.0.0-beta.5` packages on Node.js 24.15.0. Absolute localhost results are machine-specific; throughput uses three position-rotated median rounds, and the broad field includes different languages and protocol generations.
 
-**[Read the detailed benchmark report →](./benchmark.md)** for exact fixtures, versions, Mermaid charts, raw accepted and rejected runs, and the reproducible benchmark harness.
+**[Read the detailed benchmark report →](./benchmark.md)** for the exact fixture versions, methodology, result tables, Mermaid charts, and claim boundaries.
 
 ## Examples
 
