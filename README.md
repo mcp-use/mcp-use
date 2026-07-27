@@ -241,7 +241,7 @@ mcp-use adds custom stateless request handling and optimized response paths on t
 
 **How does it compare with other TypeScript MCP frameworks?**
 
-mcp-use v2 had the smallest equivalent development stack tested: **74.4 MiB** installed and **1.06 MiB** across its direct npm tarballs. The equivalent official SDK stack measured **99.0 MiB**, while mcp-handler with Next.js measured **388.0 MiB**.
+mcp-use v2 had the smallest equivalent development stack tested: **74.4 MiB** installed and **5.68 MiB** unpacked across its direct npm packages. The equivalent official SDK stack measured **99.0 MiB**, while mcp-handler with Next.js measured **388.0 MiB**.
 
 Green cells mark the category leader. ✅ means the capability is built into the framework, ◐ means it is available through a separate extension and custom wiring, and ❌ means it requires an external implementation. Compared here: the [official TypeScript SDK v2](https://github.com/modelcontextprotocol/typescript-sdk), [xmcp](https://github.com/basementstudio/xmcp), [Skybridge](https://github.com/alpic-ai/skybridge), and [mcp-handler](https://github.com/vercel/mcp-handler).
 
@@ -253,7 +253,7 @@ block-beta
 
   speed["Speed"] speedMcp["10,982 ops/s"] speedOfficial["8,050 ops/s"] speedXmcp["6,585 ops/s"] speedSkybridge["8,116 ops/s"] speedHandler["6,324 ops/s"]
   install["Clean install"] installMcp["74.4 MiB"] installOfficial["99.0 MiB"] installXmcp["121.9 MiB"] installSkybridge["137.5 MiB"] installHandler["388.0 MiB"]
-  tarballs["Direct npm<br/>tarballs"] tarballsMcp["1.06 MiB"] tarballsOfficial["5.09 MiB"] tarballsXmcp["4.74 MiB"] tarballsSkybridge["1.07 MiB"] tarballsHandler["35.66 MiB"]
+  unpacked["Direct npm<br/>unpacked size"] unpackedMcp["5.68 MiB"] unpackedOfficial["27.47 MiB"] unpackedXmcp["16.60 MiB"] unpackedSkybridge["5.88 MiB"] unpackedHandler["165.37 MiB"]
   stars["GitHub stars"] starsMcp["10,400"] starsOfficial["12,965"] starsXmcp["1,295"] starsSkybridge["1,952"] starsHandler["629"]
   views["Views"] viewsMcp["✅"] viewsOfficial["◐ Extension"] viewsXmcp["✅"] viewsSkybridge["✅"] viewsHandler["❌"]
   nativeViews["Native Views<br/>on MCP 2026"] nativeViewsMcp["✅"] nativeViewsOfficial["❌"] nativeViewsXmcp["❌"] nativeViewsSkybridge["❌"] nativeViewsHandler["❌"]
@@ -271,16 +271,16 @@ block-beta
   classDef partial fill:#fff8c5,stroke:#d4a72c,color:#633c01,font-weight:bold
   classDef unavailable fill:#f6f8fa,stroke:#d0d7de,color:#6e7781
 
-  class metric,speed,install,tarballs,stars,views,nativeViews,oauth,protocol,screenshot,tunnel,inspector label
+  class metric,speed,install,unpacked,stars,views,nativeViews,oauth,protocol,screenshot,tunnel,inspector label
   class mcp brand
   class official,xmcp,skybridge,handler header
-  class speedOfficial,speedXmcp,speedSkybridge,speedHandler,installOfficial,installXmcp,installSkybridge,installHandler,tarballsOfficial,tarballsXmcp,tarballsSkybridge,tarballsHandler,starsMcp,starsXmcp,starsSkybridge,starsHandler value
-  class speedMcp,installMcp,tarballsMcp,starsOfficial,viewsMcp,viewsXmcp,viewsSkybridge,nativeViewsMcp,oauthMcp,oauthXmcp,oauthSkybridge,protocolMcp,protocolOfficial,screenshotMcp,tunnelMcp,tunnelSkybridge,inspectorMcp leader
+  class speedOfficial,speedXmcp,speedSkybridge,speedHandler,installOfficial,installXmcp,installSkybridge,installHandler,unpackedOfficial,unpackedXmcp,unpackedSkybridge,unpackedHandler,starsMcp,starsXmcp,starsSkybridge,starsHandler value
+  class speedMcp,installMcp,unpackedMcp,starsOfficial,viewsMcp,viewsXmcp,viewsSkybridge,nativeViewsMcp,oauthMcp,oauthXmcp,oauthSkybridge,protocolMcp,protocolOfficial,screenshotMcp,tunnelMcp,tunnelSkybridge,inspectorMcp leader
   class viewsOfficial partial
   class viewsHandler,nativeViewsOfficial,nativeViewsXmcp,nativeViewsSkybridge,nativeViewsHandler,oauthOfficial,oauthHandler,protocolXmcp,protocolSkybridge,protocolHandler,screenshotOfficial,screenshotXmcp,screenshotSkybridge,screenshotHandler,tunnelOfficial,tunnelXmcp,tunnelHandler,inspectorOfficial,inspectorXmcp,inspectorSkybridge,inspectorHandler unavailable
 ```
 
-Speed uses the benchmark's median operations per second; mcp-use leads this selected comparison and the frameworks with native Views. Clean install measures fresh `node_modules` on disk. Direct npm tarballs sum the compressed tarballs for each stack's explicitly installed packages, not its transitive download graph. The stacks are `mcp-use + zod`; official v2 server and Node packages + Apps extension and its required SDK peer + React, Vite, TypeScript, and zod; `xmcp + zod`; `Skybridge + zod`; and `mcp-handler` + Next.js, its SDK peer, React, TypeScript, and zod. Stars are a July 27, 2026 snapshot.
+Speed uses the benchmark's median operations per second; mcp-use leads this selected comparison and the frameworks with native Views. Clean install measures fresh `node_modules` on disk. Direct npm unpacked size sums the registry-reported unpacked size for each stack's explicitly installed packages, excluding transitive dependencies. The stacks are `mcp-use + zod`; official v2 server and Node packages + Apps extension and its required SDK peer + React, Vite, TypeScript, and zod; `xmcp + zod`; `Skybridge + zod`; and `mcp-handler` + Next.js, its SDK peer, React, TypeScript, and zod. Stars are a July 27, 2026 snapshot.
 
 “Views” means native framework support for MCP Apps; the official SDK's partial result requires its separate Apps extension plus application-specific resource, metadata, build, and type wiring. “Native Views on MCP 2026” requires both a native View abstraction and support for the MCP 2026 protocol generation. “One-line OAuth adapters” means provider-specific helpers that plug into the framework with one configuration call; identity-provider setup is still required. “Built-in View screenshot CLI” means the framework itself can invoke a View-backed tool and save the rendered result as an image; external browser automation does not count. “Built-in tunneling” means the framework's development command can expose its local MCP endpoint directly. “Built-in Inspector” means the framework ships its own full protocol UI for tools, resources, prompts, Views, sampling, elicitation, and notifications; a framework-specific View emulator does not count.
 
