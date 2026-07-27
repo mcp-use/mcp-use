@@ -233,7 +233,7 @@ Deploy to [Manufact Cloud](https://manufact.com) for managed builds, preview dep
 npm run deploy
 ```
 
-The same server can be hosted on standard Node.js infrastructure or adapted for [Vercel](./docs/typescript/server/deployment/vercel.mdx), [Cloudflare Workers](./docs/typescript/server/deployment/cloudflare-workers.mdx), [Railway](./docs/typescript/server/deployment/railway.mdx), [Bun](./docs/typescript/server/deployment/bun.mdx), [Deno](./docs/typescript/server/deployment/deno.mdx), [Supabase](https://docs.mcp-use.com/typescript/server/deployment/supabase), and other Fetch/Hono runtimes.
+Prefer to run it yourself? Follow the [self-hosting guide →](https://mcpuse-codex-v1-v2-docs-split.mintlify.site/v2/typescript/server/deployment/runtime-patterns).
 
 ## How mcp-use compares
 
