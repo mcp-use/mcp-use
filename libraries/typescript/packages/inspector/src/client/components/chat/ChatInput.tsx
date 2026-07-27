@@ -76,13 +76,7 @@ export function ChatInput({
   const hasAttachments = attachments.length > 0;
 
   return (
-    <div
-      className={cn(
-        "relative w-full",
-        isFullscreen && "flex items-center gap-2"
-      )}
-      data-chat-input-variant={variant}
-    >
+    <div className="relative w-full" data-chat-input-variant={variant}>
       {/* Attachment Previews */}
       {!isFullscreen && hasAttachments && (
         <div className="absolute top-0 left-0 right-0 z-20 p-3 flex gap-2 flex-wrap">
@@ -127,7 +121,7 @@ export function ChatInput({
         placeholder={isConnected ? placeholder : "Server not connected"}
         className={cn(
           isFullscreen
-            ? "field-sizing-fixed h-11 min-h-11 max-h-11 resize-none overflow-hidden px-4 py-2.5"
+            ? "field-sizing-fixed h-11 min-h-11 max-h-11 resize-none overflow-hidden py-2.5 pl-4 pr-12"
             : "p-4 min-h-[150px] max-h-[300px]",
           shape.container,
           !isFullscreen && hasAttachments && "pt-20",
@@ -151,7 +145,9 @@ export function ChatInput({
 
       {isFullscreen ? (
         trailingControls ? (
-          <div className="flex shrink-0 items-center">{trailingControls}</div>
+          <div className="absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center">
+            {trailingControls}
+          </div>
         ) : null
       ) : (
         /* Bottom toolbar: attach/tools left, trailing controls right */

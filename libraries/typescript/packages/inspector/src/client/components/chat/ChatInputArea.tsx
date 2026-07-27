@@ -148,8 +148,18 @@ export function ChatInputArea({
     ) : null;
 
   return (
-    <div className="w-full flex shrink-0 flex-col items-center px-2 pb-2 pt-0 sm:px-4 sm:pb-2 text-foreground">
-      <div className="relative w-full max-w-3xl backdrop-blur-xl">
+    <div
+      className={cn(
+        "w-full flex shrink-0 flex-col items-center px-2 pt-0 sm:px-4 text-foreground",
+        isFullscreen ? "pb-4 sm:pb-4" : "pb-2 sm:pb-2"
+      )}
+    >
+      <div
+        className={cn(
+          "relative w-full max-w-3xl",
+          !isFullscreen && "backdrop-blur-xl"
+        )}
+      >
         {!isFullscreen &&
           hasPendingElicitation &&
           onApproveElicitation &&
@@ -238,7 +248,6 @@ export function ChatInputArea({
                 size="sm"
                 className={cn(
                   "h-8 w-8 rounded-full p-0",
-                  isFullscreen && "h-11 w-11",
                   isLoading && "animate-spin",
                   !canSend && !isLoading && "bg-zinc-400"
                 )}
