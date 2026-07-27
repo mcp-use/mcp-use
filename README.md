@@ -177,6 +177,12 @@ export default function WeatherCard() {
 
 The model reads the concise `content` result. The view reads the typed `structuredContent` through `useToolContext()`, and `useCallTool()` can invoke exported server tools without duplicating their input or output types. Run the tool and interact with the view in the Inspector before testing it in an MCP client.
 
+<p align="center">
+  <img src="./static/readme/chatgpt-hello-world.gif" alt="Opening the Hello World MCP App in ChatGPT" width="100%" />
+  <br />
+  <sub>The same MCP App running inside ChatGPT.</sub>
+</p>
+
 [Build your first MCP App →](https://mcp-use.com/docs/typescript/mcp-apps/quickstart)
 
 ## Build, inspect, deploy
@@ -189,6 +195,12 @@ The model reads the concise `content` result. The view reads the typed `structur
 | **Deploy** | Run `npm run deploy` | Use `mcp-use deploy --yes` and wait for a confirmed live state |
 
 The Inspector discovers your tools, validates their inputs, and renders MCP App responses beside the request.
+
+<p align="center">
+  <img src="./static/readme/inspector-hello-world.jpg" alt="Hello World MCP App rendered in the mcp-use Inspector" width="100%" />
+  <br />
+  <sub>Invoke a tool and inspect its interactive view without leaving the development loop.</sub>
+</p>
 
 ```bash
 # Terminal verification against a running local server
