@@ -1,18 +1,13 @@
----
-title: "SDK v2 benchmarks"
-description: "Reproducible throughput, launch, install, package, and MCP App build comparisons for mcp-use v2."
-icon: "chart-no-axes-combined"
----
+# mcp-use SDK v2 benchmarks
 
 This report compares the published `mcp-use@2.0.0-beta.61` package with
 mcp-use v1, the official TypeScript SDK, and representative MCP frameworks.
 It was recorded on July 27, 2026 using Node.js 24.15.0.
 
-<Note>
-These are controlled localhost results, not a promise about every application
-or production environment. Compare the scoped medians and methodology, not a
-single absolute number.
-</Note>
+> [!NOTE]
+> These are controlled localhost results, not a promise about every application
+> or production environment. Compare the scoped medians and methodology, not a
+> single absolute number.
 
 ## Results at a glance
 
@@ -258,37 +253,15 @@ not add request overhead here; it is not a universal performance guarantee.
 
 The complete snapshot is committed with this report:
 
-<CardGroup cols={2}>
-  <Card
-    title="Accepted load runs"
-    icon="gauge"
-    href="https://github.com/mcp-use/mcp-use/blob/beta/benchmarks/v2-beta-2026-07-27/data/benchmark-load-2026-07-27.jsonl"
-  >
-    Three position-rotated rounds and the calculated medians.
-  </Card>
-  <Card
-    title="Cold-launch samples"
-    icon="timer"
-    href="https://github.com/mcp-use/mcp-use/blob/beta/benchmarks/v2-beta-2026-07-27/data/benchmark-launch-2026-07-27.json"
-  >
-    Median, quartiles, minimum, and maximum for every target.
-  </Card>
-  <Card
-    title="Size evidence"
-    icon="package-open"
-    href="https://github.com/mcp-use/mcp-use/blob/beta/benchmarks/v2-beta-2026-07-27/data/evidence.json"
-  >
-    Install, tarball, application build, and feature-scope measurements.
-  </Card>
-  <Card
-    title="Harness and rejected runs"
-    icon="code-xml"
-    href="https://github.com/mcp-use/mcp-use/tree/beta/benchmarks/v2-beta-2026-07-27"
-  >
-    Exact fixtures, lockfiles, runner, workload configuration, and incomplete
-    runs excluded from the charts.
-  </Card>
-</CardGroup>
+- [Accepted load runs](./benchmarks/v2-beta-2026-07-27/data/benchmark-load-2026-07-27.jsonl):
+  three position-rotated rounds and the calculated medians.
+- [Cold-launch samples](./benchmarks/v2-beta-2026-07-27/data/benchmark-launch-2026-07-27.json):
+  median, quartiles, minimum, and maximum for every target.
+- [Size evidence](./benchmarks/v2-beta-2026-07-27/data/evidence.json):
+  install, tarball, application build, and feature-scope measurements.
+- [Harness and rejected runs](./benchmarks/v2-beta-2026-07-27):
+  exact fixtures, lockfiles, runner, workload configuration, and incomplete
+  runs excluded from the charts.
 
 Run the exact snapshot:
 

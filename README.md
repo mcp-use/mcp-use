@@ -274,7 +274,7 @@ No. Manufact Cloud is the managed path for deployment, analytics, evals, observa
 > [!NOTE]
 > Benchmark snapshot: July 27, 2026, using published `mcp-use@2.0.0-beta.61`, `mcp-use@1.34.5`, and official SDK `2.0.0-beta.5` packages on Node.js 24.15.0. Absolute localhost results are machine-specific; throughput uses three position-rotated median rounds, and the broad field includes different languages and protocol generations.
 
-**[Read the detailed benchmark report →](https://mcpuse-codex-v1-v2-docs-split.mintlify.site/v2/typescript/benchmarks)** for exact fixtures, versions, Mermaid charts, raw accepted and rejected runs, and the reproducible benchmark harness.
+**[Read the detailed benchmark report →](./benchmark.md)** for exact fixtures, versions, Mermaid charts, raw accepted and rejected runs, and the reproducible benchmark harness.
 
 ## Examples
 

@@ -3,8 +3,8 @@
 This directory contains the exact fixtures, accepted results, rejected runs,
 and refresh script used for the July 27, 2026 mcp-use v2 beta comparison.
 
-Read the published methodology and interpretation in the
-[SDK v2 benchmark report](https://mcpuse-codex-v1-v2-docs-split.mintlify.site/v2/typescript/benchmarks).
+Read the methodology and interpretation in the
+[SDK v2 benchmark report](../../benchmark.md).
 
 ## Contents
 
