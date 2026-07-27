@@ -567,6 +567,15 @@ html[data-mcp-widget-fullscreen] [data-chat-history-toggle] {
   pointer-events: none;
 }
 
+/* Keep the regular chat composer mounted and move that exact shared surface
+   above a fullscreen MCP App. */
+html[data-mcp-widget-fullscreen] [data-chat-composer] {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 230;
+}
+
 /* Fullscreen chat can open tool-call details from its transcript drawer. These
    portaled sheets must sit above the fixed MCP App shell and chat controls. */
 html[data-mcp-widget-fullscreen] [data-slot="sheet-overlay"],

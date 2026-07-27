@@ -1592,7 +1592,8 @@ export function ChatTab({
       </div>
 
       {llmConfig && (
-        <div className="relative shrink-0">
+        <div className="relative shrink-0" data-chat-composer>
+          <FullscreenChatOverlay messages={messages} isLoading={isLoading} />
           {managedChatNoticeNode}
           <ChatInputArea
             inputValue={inputValue}
@@ -1637,20 +1638,6 @@ export function ChatTab({
             systemPromptProvider={effectiveSystemPromptProvider}
           />
         </div>
-      )}
-
-      {llmConfig && (
-        <FullscreenChatOverlay
-          messages={messages}
-          inputValue={inputValue}
-          isConnected={
-            isConnected && !managedChatNotice && !mcpServerAuthRequired
-          }
-          isLoading={isLoading}
-          onInputChange={setInputValue}
-          onSendMessage={handleSendMessage}
-          onStopStreaming={stop}
-        />
       )}
 
       {reconnectBannerNode}
