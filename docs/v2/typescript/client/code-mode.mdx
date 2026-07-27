@@ -34,11 +34,11 @@ await client.close();
 
 ## Executors
 
-| Executor | Use case |
-| -------- | -------- |
-| `"vm"` (default) | Local Node.js VM — fast, trusted environments |
-| `"e2b"` | Cloud sandbox — untrusted code (`@e2b/code-interpreter` + API key) |
-| Custom function / `BaseCodeExecutor` | Your own runtime |
+| Executor                             | Use case                                                           |
+| ------------------------------------ | ------------------------------------------------------------------ |
+| `"vm"` (default)                     | Local Node.js VM — fast, trusted environments                      |
+| `"e2b"`                              | Cloud sandbox — untrusted code (`@e2b/code-interpreter` + API key) |
+| Custom function / `BaseCodeExecutor` | Your own runtime                                                   |
 
 ```typescript
 { codeMode: {
@@ -61,6 +61,6 @@ await agent.run("List all files and count them");
 
 ## Reference
 
-[Code mode API reference](/v2/typescript/api-reference/client/code-mode) — config types, `searchTools`, `ExecutionResult`.
+[Client API reference](https://mcp-use-typescript-api-reference.vercel.app/modules/_mcp-use_client.index.html) — config types, `searchTools`, and `ExecutionResult`.
 
 [Anthropic: Code execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp)

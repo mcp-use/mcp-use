@@ -84,25 +84,25 @@ export default server;
 
 Set `legacy` on `MCPServer` to decide whether the endpoint accepts older MCP protocol requests.
 
-| Value | Behavior |
-| --- | --- |
+| Value         | Behavior                                                                                                                                                         |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `"stateless"` | Default. Accept modern requests and serve each 2025-era request independently without creating a session. Legacy GET and DELETE session operations return `405`. |
-| `"reject"` | Accept only the modern protocol. Older requests fail with an unsupported-protocol-version error. |
+| `"reject"`    | Accept only the modern protocol. Older requests fail with an unsupported-protocol-version error.                                                                 |
 
 Use `"stateless"` while clients are migrating. Use `"reject"` when every client connecting to the endpoint supports the modern protocol.
 
-See [`ServerConfig`](/v2/typescript/api-reference/server/server-config) for the complete configuration surface.
+See [`ServerConfig`](https://mcp-use-typescript-api-reference.vercel.app/modules/mcp-use.index.html#serverconfig) for the complete configuration surface.
 
 ## Explore server capabilities
 
-| Capability | Use it for | Guide |
-| --- | --- | --- |
-| Tools | Actions, lookups, and workflows with validated inputs and outputs | [Tools](/v2/typescript/server/tools) |
-| Resources | Discoverable content that clients read by URI | [Resources](/v2/typescript/server/resources) |
-| Prompts | Reusable model instructions with validated arguments | [Prompts](/v2/typescript/server/prompts) |
-| Views | Interactive MCP App interfaces rendered from tool results in Claude and ChatGPT | [MCP Apps](/v2/typescript/mcp-apps) |
-| OAuth | Verified user identity, scopes, and permissions on `ctx.auth` | [Authentication](/v2/typescript/server/authentication/index) |
-| Middleware | Shared authorization, logging, rate limiting, request shaping, and observability | [Middleware](/v2/typescript/server/middleware) |
+| Capability | Use it for                                                                       | Guide                                                        |
+| ---------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| Tools      | Actions, lookups, and workflows with validated inputs and outputs                | [Tools](/v2/typescript/server/tools)                         |
+| Resources  | Discoverable content that clients read by URI                                    | [Resources](/v2/typescript/server/resources)                 |
+| Prompts    | Reusable model instructions with validated arguments                             | [Prompts](/v2/typescript/server/prompts)                     |
+| Views      | Interactive MCP App interfaces rendered from tool results in Claude and ChatGPT  | [MCP Apps](/v2/typescript/mcp-apps)                          |
+| OAuth      | Verified user identity, scopes, and permissions on `ctx.auth`                    | [Authentication](/v2/typescript/server/authentication/index) |
+| Middleware | Shared authorization, logging, rate limiting, request shaping, and observability | [Middleware](/v2/typescript/server/middleware)               |
 
 Tools and prompts accept Standard Schema-compatible validation libraries. Views use exported tool references and `useToolContext()` to infer their input and output types.
 
@@ -116,9 +116,9 @@ npm run dev
 
 The development server starts:
 
-| Route | Purpose |
-| --- | --- |
-| `/mcp` | MCP endpoint for clients |
+| Route            | Purpose                                                    |
+| ---------------- | ---------------------------------------------------------- |
+| `/mcp`           | MCP endpoint for clients                                   |
 | `/mcp/inspector` | Inspector for testing tools, resources, prompts, and Views |
 
 Keep the Inspector open while editing `index.ts` and files under `views/`. The development server reloads MCP registrations and View assets as they change.
@@ -142,11 +142,7 @@ npm run typecheck
   <Card title="Tools" icon="wrench" href="/v2/typescript/server/tools">
     Define validated tool inputs, outputs, and behavior.
   </Card>
-  <Card
-    title="MCP Apps"
-    icon="app-window-mac"
-    href="/v2/typescript/mcp-apps"
-  >
+  <Card title="MCP Apps" icon="app-window-mac" href="/v2/typescript/mcp-apps">
     Return interactive React Views from tools.
   </Card>
   <Card
@@ -166,7 +162,7 @@ npm run typecheck
   <Card
     title="ServerConfig"
     icon="cog"
-    href="/v2/typescript/api-reference/server/server-config"
+    href="https://mcp-use-typescript-api-reference.vercel.app/modules/mcp-use.index.html#serverconfig"
   >
     Configure protocol compatibility, routing, logging, and CORS.
   </Card>

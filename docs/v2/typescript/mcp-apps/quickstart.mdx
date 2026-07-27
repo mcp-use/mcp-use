@@ -99,8 +99,7 @@ export const searchFruits = server.tool(
   async ({ query = "" }, ctx) => {
     const results = fruits.filter(
       (fruit) =>
-        query === "" ||
-        fruit.fruit.toLowerCase().includes(query.toLowerCase()),
+        query === "" || fruit.fruit.toLowerCase().includes(query.toLowerCase()),
     );
 
     await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -182,6 +181,6 @@ If the tool runs but no view appears, check that `view.name` exactly matches the
 
 ## Next steps
 
-- Use [`useToolContext()`](/v2/typescript/api-reference/react/usewidget) to read tool input, output, and lifecycle status.
-- Use [`useCallTool()`](/v2/typescript/api-reference/react/usecalltool) when a view needs to call another MCP tool.
+- Use [`useToolContext()`](https://mcp-use-typescript-api-reference.vercel.app/modules/mcp-use.react.html#usetoolcontext) to read tool input, output, and lifecycle status.
+- Use [`useCallTool()`](https://mcp-use-typescript-api-reference.vercel.app/modules/mcp-use.react.html#usecalltool) when a view needs to call another MCP tool.
 - Configure [Content Security Policy](/v2/typescript/mcp-apps/content-security-policy) before loading external APIs, images, scripts, embeds, or static assets.

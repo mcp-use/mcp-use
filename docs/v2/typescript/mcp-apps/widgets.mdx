@@ -92,9 +92,7 @@ const server = new MCPServer({
 });
 
 async function searchProducts(query: string) {
-  return [
-    { id: "sku_123", name: `${query} starter kit`, price: 29 },
-  ];
+  return [{ id: "sku_123", name: `${query} starter kit`, price: 29 }];
 }
 
 server.tool(
@@ -156,4 +154,4 @@ They must match exactly.
 
 - Use [Model context](/v2/typescript/mcp-apps/model-context) to decide what the model should know about widget state.
 - Use [Interactivity](/v2/typescript/mcp-apps/interactivity) when the widget needs buttons, state, tool calls, or follow-up messages.
-- Use the [`useWidget()` API reference](/v2/typescript/api-reference/react/usewidget) for all hook fields and defaults.
+- Use the [`useWidget()` API reference](https://mcp-use-typescript-api-reference.vercel.app/modules/mcp-use.react.html#usewidget) for all hook fields and defaults.
