@@ -4,11 +4,6 @@ This report compares the published `mcp-use@2.0.0-beta.61` package with
 mcp-use v1, the official TypeScript SDK, and representative MCP frameworks.
 It was recorded on July 27, 2026 using Node.js 24.15.0.
 
-> [!NOTE]
-> These are controlled localhost results, not a promise about every application
-> or production environment. Compare the scoped medians and methodology, not a
-> single absolute number.
-
 ## Results at a glance
 
 Compared with mcp-use v1, v2 measured:
@@ -43,10 +38,10 @@ config:
 ---
 xychart
   title "Median operations per second"
-  x-axis ["mcp-use v2", "Official v2", "mcp-use v1", "Skybridge", "xmcp", "mcp-handler", "tmcp", "rmcp"]
+  x-axis ["rmcp", "tmcp", "mcp-use v2", "mcp-use v1", "Skybridge", "Official v2", "xmcp", "mcp-handler"]
   y-axis "operations per second" 0 --> 30000
-  bar [10982, 0, 0, 0, 0, 0, 0, 0]
-  bar [0, 8050, 8615, 8116, 6585, 6324, 18425, 26459]
+  bar [0, 0, 10982, 0, 0, 0, 0, 0]
+  bar [26459, 18425, 0, 8615, 8116, 8050, 6585, 6324]
 ```
 
 mcp-use v2 delivered **10,982.2 median operations per second**, 27.5% above
@@ -93,10 +88,10 @@ config:
 ---
 xychart
   title "Median cold launch in milliseconds"
-  x-axis ["mcp-use v2", "Official v2", "mcp-use v1", "Skybridge", "xmcp", "mcp-handler", "tmcp", "rmcp"]
+  x-axis ["rmcp", "Official v2", "mcp-use v2", "xmcp", "tmcp", "mcp-use v1", "mcp-handler", "Skybridge"]
   y-axis "milliseconds" 0 --> 180
-  bar [68.145, 0, 0, 0, 0, 0, 0, 0]
-  bar [0, 67.839, 151.603, 168.260, 68.814, 158.498, 77.740, 3.400]
+  bar [0, 0, 68.145, 0, 0, 0, 0, 0]
+  bar [3.400, 67.839, 0, 68.814, 77.740, 151.603, 158.498, 168.260]
 ```
 
 | Framework | Median | Interquartile range |

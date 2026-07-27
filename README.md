@@ -231,12 +231,36 @@ The higher-level experience does not add higher request overhead. Custom statele
 
 mcp-use v2 had the smallest clean production install among the full-stack native MCP Apps frameworks tested: **74.4 MiB**, compared with **121.9 MiB** for xmcp and **137.5 MiB** for Skybridge. The mcp-use v1 result is included as a migration baseline, not as a native Apps peer.
 
+**Lower is better.** Black is mcp-use v2; gray represents the other fixtures.
+
+```mermaid
+---
+config:
+  themeVariables:
+    xyChart:
+      backgroundColor: "#ffffff"
+      titleColor: "#0c0c0c"
+      xAxisLabelColor: "#0c0c0c"
+      xAxisTitleColor: "#0c0c0c"
+      xAxisTickColor: "#0c0c0c"
+      xAxisLineColor: "#0c0c0c"
+      yAxisLabelColor: "#0c0c0c"
+      yAxisTitleColor: "#0c0c0c"
+      yAxisTickColor: "#0c0c0c"
+      yAxisLineColor: "#0c0c0c"
+      plotColorPalette: "#0c0c0c, #d4d4d8"
+---
+xychart
+  title "Clean production install in MiB"
+  x-axis ["mcp-use v2", "xmcp", "Skybridge", "mcp-use v1"]
+  y-axis "MiB on disk" 0 --> 450
+  bar [74.4, 0, 0, 0]
+  bar [0, 121.9, 137.5, 404.6]
+```
+
 **Does mcp-use lock deployment to Manufact Cloud?**
 
 No. Manufact Cloud is the managed path for deployment, analytics, evals, observability, and logs. To run the same stateless server on your own infrastructure, follow the [self-hosting guide →](https://mcpuse-codex-v1-v2-docs-split.mintlify.site/v2/typescript/server/deployment/runtime-patterns).
-
-> [!NOTE]
-> Benchmark snapshot: July 27, 2026, using published `mcp-use@2.0.0-beta.61`, `mcp-use@1.34.5`, and official SDK `2.0.0-beta.5` packages on Node.js 24.15.0. Absolute localhost results are machine-specific; throughput uses three position-rotated median rounds, and the broad field includes different languages and protocol generations.
 
 **[Read the detailed benchmark report →](./benchmark.md)** for the exact fixture versions, methodology, result tables, Mermaid charts, and claim boundaries.
 
