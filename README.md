@@ -58,10 +58,10 @@ Follow the prompts, change into the generated project, and run `npm run dev`. Yo
 
 ### Start with your agent
 
-Paste this into Claude Code, Codex, Cursor, or any coding agent. **[Read the prompt →](https://manufact.com/prompt.md)**
+Paste this into Claude Code, Codex, Cursor, or any coding agent. **[Read the prompt →](https://mcp-use.com/prompt.md)**
 
 ```text
-Build an MCP server following https://manufact.com/prompt.md
+Build an MCP server following https://mcp-use.com/prompt.md
 ```
 
 The public prompt owns the complete build, verification, and deployment workflow, so people and agents always inspect and follow the same instructions.
