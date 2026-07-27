@@ -106,7 +106,7 @@ export function ModelContext({ content, children }: ModelContextProps) {
  * Imperative model-context API for non-React call sites (event handlers,
  * stores).
  *
- * Delegates to the active document runtime's {@link ModelContextStore}.
+ * Delegates to the active document runtime's model-context store.
  * Strings register as root-level nodes in the same tree {@link ModelContext}
  * builds. Every push merges the complete tree under `_uiContext` beside the
  * current `useViewState` object. Updates batch per microtask and use the same

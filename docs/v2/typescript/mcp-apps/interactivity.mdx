@@ -103,7 +103,9 @@ function DisplayModeControls() {
   const expanded = displayMode === "fullscreen" || displayMode === "pip";
 
   return (
-    <button onClick={() => requestDisplayMode(expanded ? "inline" : "fullscreen")}>
+    <button
+      onClick={() => requestDisplayMode(expanded ? "inline" : "fullscreen")}
+    >
       {expanded ? "Exit" : "Expand"}
     </button>
   );
@@ -126,5 +128,5 @@ If one action must do multiple things, update local widget state first so the UI
 ## Next steps
 
 - Use [Model context](/v2/typescript/mcp-apps/model-context) to decide what the model should know about these interactions.
-- Use [`useCallTool()`](/v2/typescript/api-reference/react/usecalltool) for full call state and typing details.
-- Use [`useWidget()`](/v2/typescript/api-reference/react/usewidget) for all host actions and display-mode behavior.
+- Use [`useCallTool()`](https://mcp-use-typescript-api-reference.vercel.app/modules/mcp-use.react.html#usecalltool) for full call state and typing details.
+- Use [`useWidget()`](https://mcp-use-typescript-api-reference.vercel.app/modules/mcp-use.react.html#usewidget) for all host actions and display-mode behavior.

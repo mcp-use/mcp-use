@@ -1,9 +1,8 @@
 /**
- * `mcp-use` — MCP server framework on the official v2 SDK, with a Hono HTTP
- * application and a Web-standard Fetch serving boundary.
+ * Build stateless MCP servers with a Hono application and a Web-standard
+ * Fetch serving boundary.
  *
- * Greenfield rebuild of the mcp-use server package against the stateless
- * 2026-07-28 MCP protocol. See specs/SPEC.md for the phase plan and API contract.
+ * @packageDocumentation
  */
 
 export { MCPServer } from "./server.js";
@@ -172,9 +171,13 @@ export type {
   PromptDefinition,
 } from "./prompts.js";
 /**
- * @deprecated Prefer raw {@link CallToolResult} / {@link ReadResourceResult} /
- * {@link GetPromptResult} returns. These helpers remain for upgrade
- * compatibility and map to the official wire envelopes.
+ * @deprecated Prefer raw
+ * [CallToolResult](https://ts.sdk.modelcontextprotocol.io/types/types.CallToolResult.html),
+ * [ReadResourceResult](https://ts.sdk.modelcontextprotocol.io/types/types.ReadResourceResult.html),
+ * or
+ * [GetPromptResult](https://ts.sdk.modelcontextprotocol.io/types/types.GetPromptResult.html)
+ * returns. These helpers remain for upgrade compatibility and map to the
+ * official wire envelopes.
  */
 export {
   array,

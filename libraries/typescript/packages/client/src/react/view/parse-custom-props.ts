@@ -1,3 +1,11 @@
+/**
+ * Parses JSON object and array values from string-valued custom properties.
+ *
+ * Invalid JSON and scalar-looking strings are preserved unchanged.
+ *
+ * @param customProps - Properties supplied by a host integration.
+ * @returns A new record containing parsed object and array values.
+ */
 export function parseCustomProps(
   customProps?: Record<string, string>
 ): Record<string, unknown> {

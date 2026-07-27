@@ -12,7 +12,9 @@ export type SafeAreaInsets = NonNullable<McpUiHostContext["safeAreaInsets"]>;
  * Host application identity from the initialization handshake.
  */
 export type HostInfo = {
+  /** Host product name. */
   name: string;
+  /** Host product version. */
   version: string;
 };
 

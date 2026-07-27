@@ -1,21 +1,30 @@
 import type { LanguageModel } from "../types.js";
 import { logger } from "@mcp-use/client";
 
-/**
- * Configuration for LLM instances
- */
+/** Constructor settings forwarded to a dynamically loaded LangChain model. */
 export interface LLMConfig {
+  /** Provider API key. When omitted, the provider environment variable is used. */
   apiKey?: string;
+  /** Sampling temperature. */
   temperature?: number;
+  /** Maximum number of output tokens. */
   maxTokens?: number;
+  /** Nucleus sampling probability. */
   topP?: number;
+  /** Additional provider-specific constructor settings. */
   [key: string]: any; // Allow additional provider-specific config
 }
 
-/**
- * Supported LLM providers
- */
+/** LangChain providers supported by {@link createLLMFromString}. */
 export type LLMProvider = "openai" | "anthropic" | "google" | "groq";
+
+/** Parsed components of a LangChain model identifier. */
+export interface ParsedLLMString {
+  /** Normalized provider name. */
+  provider: LLMProvider;
+  /** Provider-specific model name. */
+  model: string;
+}
 
 /**
  * Provider configuration mapping
@@ -48,16 +57,13 @@ const PROVIDER_CONFIG = {
 } as const;
 
 /**
- * Parse LLM string format: "provider/model"
- * Examples:
- *   - "openai/gpt-4" -> { provider: "openai", model: "gpt-4" }
- *   - "anthropic/claude-sonnet-4-6" -> { provider: "anthropic", model: "claude-sonnet-4-6" }
- *   - "google/gemini-pro" -> { provider: "google", model: "gemini-pro" }
+ * Parses an LLM identifier in `"provider/model"` format.
+ *
+ * @param llmString - Provider and model separated by one slash.
+ * @returns The normalized provider and model.
+ * @throws Error if the format is invalid or the provider is unsupported.
  */
-export function parseLLMString(llmString: string): {
-  provider: LLMProvider;
-  model: string;
-} {
+export function parseLLMString(llmString: string): ParsedLLMString {
   const parts = llmString.split("/");
 
   if (parts.length !== 2) {
@@ -127,19 +133,21 @@ function getAPIKey(provider: LLMProvider, config?: LLMConfig): string {
 }
 
 /**
- * Dynamically import and instantiate an LLM from a string specification
+ * Dynamically imports and instantiates a LangChain chat model.
  *
  * @param llmString - LLM specification in format "provider/model" (e.g., "openai/gpt-4")
  * @param config - Optional configuration for the LLM (apiKey, temperature, etc.)
- * @returns Promise<LanguageModel> - Instantiated LLM instance
+ * @returns The instantiated LangChain model.
+ * @throws Error if credentials are unavailable, the provider package is not
+ * installed, or the model cannot be constructed.
  *
  * @example
- * ```typescript
+ * ```ts
  * const llm = await createLLMFromString('openai/gpt-4', { temperature: 0.7 });
  * ```
  *
  * @example
- * ```typescript
+ * ```ts
  * const llm = await createLLMFromString('anthropic/claude-sonnet-4-6');
  * ```
  */
@@ -227,7 +235,10 @@ export async function createLLMFromString(
 }
 
 /**
- * Validate that an LLM string is in the correct format
+ * Tests whether an LLM identifier has a supported provider and valid format.
+ *
+ * @param llmString - Candidate `"provider/model"` identifier.
+ * @returns `true` when {@link parseLLMString} accepts the identifier.
  */
 export function isValidLLMString(llmString: string): boolean {
   try {
@@ -238,9 +249,7 @@ export function isValidLLMString(llmString: string): boolean {
   }
 }
 
-/**
- * Get list of supported providers
- */
+/** @returns A new array containing every supported LangChain provider. */
 export function getSupportedProviders(): LLMProvider[] {
   return Object.keys(PROVIDER_CONFIG) as LLMProvider[];
 }

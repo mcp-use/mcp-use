@@ -8,6 +8,7 @@
 import type { BaseCallbackHandler } from "@langchain/core/callbacks/base";
 import { logger } from "@mcp-use/client";
 
+/** Configures callbacks and trace metadata for an agent. */
 export interface ObservabilityConfig {
   /** Custom callbacks to use instead of defaults */
   customCallbacks?: BaseCallbackHandler[];
@@ -25,6 +26,21 @@ export interface ObservabilityConfig {
   tagsProvider?: () => string[];
 }
 
+/** Snapshot returned by {@link ObservabilityManager.getStatus}. */
+export interface ObservabilityStatus {
+  /** Whether observability is enabled and has at least one callback. */
+  enabled: boolean;
+  /** Number of active callbacks. */
+  callbackCount: number;
+  /** Human-readable callback handler names. */
+  handlerNames: string[];
+  /** Current trace metadata. */
+  metadata: Record<string, any>;
+  /** Current trace tags. */
+  tags: string[];
+}
+
+/** Discovers, configures, and shuts down LangChain observability callbacks. */
 export class ObservabilityManager {
   private customCallbacks?: BaseCallbackHandler[];
   private availableHandlers: BaseCallbackHandler[] = [];
@@ -37,6 +53,9 @@ export class ObservabilityManager {
   private metadataProvider?: () => Record<string, any>;
   private tagsProvider?: () => string[];
 
+  /**
+   * @param config - Callback selection and trace metadata settings.
+   */
   constructor(config: ObservabilityConfig = {}) {
     this.customCallbacks = config.customCallbacks;
     this.verbose = config.verbose ?? false;
@@ -173,13 +192,7 @@ export class ObservabilityManager {
    * Get the current observability status including metadata and tags.
    * @returns Object containing enabled status, callback count, handler names, metadata, and tags.
    */
-  async getStatus(): Promise<{
-    enabled: boolean;
-    callbackCount: number;
-    handlerNames: string[];
-    metadata: Record<string, any>;
-    tags: string[];
-  }> {
+  async getStatus(): Promise<ObservabilityStatus> {
     const callbacks = await this.getCallbacks();
     const handlerNames = await this.getHandlerNames();
 
@@ -202,7 +215,7 @@ export class ObservabilityManager {
 
   /**
    * Add a callback to the custom callbacks list.
-   * @param callback The callback to add.
+   * @param callback - The callback to add.
    */
   addCallback(callback: BaseCallbackHandler): void {
     if (!this.customCallbacks) {

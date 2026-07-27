@@ -12,11 +12,18 @@ import type {
 } from "../types.js";
 import { tokenUsageFromRecord } from "../usage.js";
 
-/** Structured HTTP error from an LLM provider fetch (preserves status + JSON body). */
+/** HTTP error returned by an LLM provider request. */
 export class LlmRequestError extends Error {
+  /** HTTP response status. */
   readonly status: number;
+  /** Parsed JSON response body, or the raw response text. */
   readonly body?: unknown;
 
+  /**
+   * @param status - HTTP response status.
+   * @param message - Error message.
+   * @param body - Parsed or raw provider response body.
+   */
   constructor(status: number, message: string, body?: unknown) {
     super(message);
     this.name = "LlmRequestError";

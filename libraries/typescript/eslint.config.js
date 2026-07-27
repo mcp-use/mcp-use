@@ -276,6 +276,18 @@ export default [
       "no-process-exit": "off",
     },
   },
+  // Public SDK comments are TypeDoc input and must use valid TSDoc syntax.
+  // Documentation coverage is enforced against each package's public
+  // entrypoints by its strict TypeDoc configuration.
+  {
+    files: ["packages/{agent,client}/src/**/*.{ts,tsx,mts}"],
+    plugins: {
+      tsdoc: tsdocPlugin,
+    },
+    rules: {
+      "tsdoc/syntax": "error",
+    },
+  },
   // mcp-use (includes the folded-in CLI and dev/build
   // toolchain under src/cli/) — strictest type safety, no escape hatches.
   // `any` is banned outright; `unknown` is allowed only at real boundaries

@@ -9,6 +9,13 @@
 const CODE_MODE_PROMPT =
   "Use code execution mode to discover and call MCP tools programmatically.";
 
+/**
+ * Built-in prompt fragments for agent features.
+ *
+ * `CODE_MODE` instructs a model to discover and invoke MCP tools through the
+ * code execution interface.
+ */
 export const PROMPTS = {
+  /** Instruction used to enable code-based MCP tool discovery and calls. */
   CODE_MODE: CODE_MODE_PROMPT,
 } as const;

@@ -37,11 +37,17 @@ export interface StoredState {
  * @internal
  */
 export interface OAuthSessionStoreOptions {
+  /** Prefix used for persisted OAuth keys. */
   storageKeyPrefix?: string;
+  /** Human-readable OAuth client name. */
   clientName?: string;
+  /** Public website describing the OAuth client. */
   clientUri?: string;
+  /** Public OAuth client logo URL. */
   logoUri?: string;
+  /** OAuth redirect URI. */
   callbackUrl?: string;
+  /** OAuth Client ID Metadata Document URL. */
   clientMetadataUrl?: string;
   /** Whether this platform may persist confidential-client credentials. */
   allowClientSecret?: boolean;

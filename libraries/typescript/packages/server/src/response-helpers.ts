@@ -12,9 +12,13 @@ export interface TypedCallToolResult<
   T extends Record<string, unknown> = Record<string, unknown>,
 > {
   [x: string]: unknown;
+  /** Model-visible content blocks. */
   content: CallToolResult["content"];
+  /** Whether the result represents a tool-domain error. */
   isError?: CallToolResult["isError"];
+  /** Protocol extension metadata. */
   _meta?: CallToolResult["_meta"];
+  /** Typed structured payload. */
   structuredContent?: T;
 }
 
@@ -26,9 +30,13 @@ export interface TypedCallToolResult<
  */
 export interface ToolContentResult {
   [x: string]: unknown;
+  /** Model-visible content blocks. */
   content: CallToolResult["content"];
+  /** Whether the result represents a tool-domain error. */
   isError?: CallToolResult["isError"];
+  /** Protocol extension metadata. */
   _meta?: CallToolResult["_meta"];
+  /** Content-only helpers never provide structured content. */
   structuredContent?: never;
 }
 

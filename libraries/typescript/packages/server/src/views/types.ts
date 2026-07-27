@@ -47,8 +47,8 @@ export interface InlineViewManifestEntry {
   /** Discriminant for the embedded bundle shape. */
   kind: "inline";
   /**
-   * Minified ES module source embedded in a `<script type="module">` by
-   * {@link synthesizeViewDocument}.
+   * Minified ES module source embedded in the generated view document's
+   * `<script type="module">` element.
    */
   js: string;
   /**
@@ -99,7 +99,7 @@ export type ViewManifestEntry =
   | InlineViewManifestEntry
   | ExternalViewManifestEntry;
 
-/** Map of view name → registry entry, primed via {@link registerViews}. */
+/** Map of view name to registry entry, primed by `registerViews()`. */
 export interface ViewsManifest {
   [viewName: string]: ViewManifestEntry;
 }

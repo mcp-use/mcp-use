@@ -465,6 +465,7 @@
                     "icon": "wrench",
                     "pages": [
                       "v2/typescript/tooling/client-cli",
+                      "v2/typescript/api-reference/cli-reference",
                       {
                         "group": "Inspector",
                         "icon": "bug-play",
@@ -488,79 +489,7 @@
               {
                 "tab": "API Reference",
                 "icon": "terminal",
-                "groups": [
-                  {
-                    "group": "Overview",
-                    "pages": [
-                      "v2/typescript/api-reference/overview",
-                      "v2/typescript/api-reference/cli-reference"
-                    ]
-                  },
-                  {
-                    "group": "Server",
-                    "icon": "server",
-                    "pages": [
-                      "v2/typescript/api-reference/server/mcp-server",
-                      "v2/typescript/api-reference/server/server-config",
-                      {
-                        "group": "Tools, resources & prompts",
-                        "icon": "box",
-                        "pages": [
-                          "v2/typescript/api-reference/server/tools",
-                          "v2/typescript/api-reference/server/resources",
-                          "v2/typescript/api-reference/server/prompts"
-                        ]
-                      },
-                      "v2/typescript/api-reference/server/tool-context",
-                      "v2/typescript/api-reference/server/response-helpers",
-                      "v2/typescript/api-reference/server/elicitation-schemas",
-                      {
-                        "group": "Authentication",
-                        "icon": "shield",
-                        "pages": [
-                          "v2/typescript/api-reference/server/auth",
-                          "v2/typescript/api-reference/server/auth-providers"
-                        ]
-                      },
-                      "v2/typescript/api-reference/server/middleware",
-                      "v2/typescript/api-reference/server/widgets"
-                    ]
-                  },
-                  {
-                    "group": "React",
-                    "icon": "atom",
-                    "pages": [
-                      "v2/typescript/api-reference/react/usewidget",
-                      "v2/typescript/api-reference/react/useviewstate",
-                      "v2/typescript/api-reference/react/usecalltool",
-                      "v2/typescript/api-reference/react/usefiles",
-                      "v2/typescript/api-reference/react/mcpuseprovider",
-                      "v2/typescript/api-reference/react/widgetcontrols",
-                      "v2/typescript/api-reference/react/themeprovider",
-                      "v2/typescript/api-reference/react/errorboundary",
-                      "v2/typescript/api-reference/react/image",
-                      "v2/typescript/api-reference/react/modelcontext"
-                    ]
-                  },
-                  {
-                    "group": "Client",
-                    "icon": "router",
-                    "pages": [
-                      "v2/typescript/api-reference/client/mcp-client",
-                      "v2/typescript/api-reference/client/mcp-session",
-                      "v2/typescript/api-reference/client/code-mode",
-                      "v2/typescript/api-reference/client/react-client",
-                      "v2/typescript/api-reference/client/inspector-chat-components"
-                    ]
-                  },
-                  {
-                    "group": "Agent",
-                    "icon": "brain",
-                    "pages": [
-                      "v2/typescript/api-reference/agent/mcp-agent"
-                    ]
-                  }
-                ]
+                "href": "https://docs.mcp-use.com/v2/api-reference"
               }
             ]
           }

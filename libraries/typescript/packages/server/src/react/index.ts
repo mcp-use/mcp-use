@@ -1,11 +1,10 @@
 /**
- * React view runtime for MCP Apps (`mcp-use/react`).
+ * Build MCP App views with React components and hooks.
  *
- * Browser-only — built on the ext-apps guest `App` class. Layout:
- * `types/` (the zero-codegen typing layer and vendored host types),
- * `runtime/` (per-document `McpAppRuntime`, snapshots, and iframe bootstrap),
- * `hooks/` (the user-facing hook surface), and `components/`
- * (provider/utility components).
+ * This browser-only entry point provides the view runtime, typed tool context,
+ * host integration hooks, and reusable view components.
+ *
+ * @packageDocumentation
  */
 
 export {

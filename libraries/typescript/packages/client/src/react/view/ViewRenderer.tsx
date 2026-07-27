@@ -1017,6 +1017,13 @@ function viewRendererAreEqual(
   return true;
 }
 
+/**
+ * Renders an MCP App inside an isolated iframe and bridges host capabilities.
+ *
+ * The renderer resolves live MCP resources or accepts preloaded HTML, applies
+ * the selected CSP policy, and forwards tool state and host callbacks through
+ * the MCP Apps bridge.
+ */
 export const ViewRenderer = memo(ViewRendererBase, viewRendererAreEqual);
 
 export type { ViewRendererProps } from "./types.js";

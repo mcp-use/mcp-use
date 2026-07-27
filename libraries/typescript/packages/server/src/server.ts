@@ -950,7 +950,12 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   async listen(
     port: number | undefined = undefined,
     options: ListenOptions = {}
-  ): Promise<{ port: number; url: string }> {
+  ): Promise<{
+    /** Actual bound port, including an ephemeral port chosen for `0`. */
+    port: number;
+    /** HTTP URL of the bound MCP endpoint. */
+    url: string;
+  }> {
     this.#assertOpen("listen()");
     const host = resolveListenHost(options.host, this.#config.host);
     const requestedPort = resolveListenPort(port, this.#config.port);
