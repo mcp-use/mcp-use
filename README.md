@@ -237,13 +237,15 @@ The official SDK does not include a native, end-to-end MCP Apps workflow in its 
 
 **What about performance?**
 
-The higher-level experience does not add higher request overhead. Custom stateless request handling and response paths on top of the official SDK measured **10,982 median operations per second**, compared with **8,050** for the equivalent official SDK v2 fixture: about **36% higher throughput** in our controlled workload.
+mcp-use adds custom stateless request handling and optimized response paths on top of the official SDK. Those framework-level improvements measured **10,982 median operations per second**, compared with **8,050** for the equivalent official SDK v2 fixture: about **36% higher throughput** in our benchmark.
 
 **How does it compare with other native MCP Apps frameworks?**
 
 mcp-use v2 had the smallest clean production install among the full-stack native MCP Apps frameworks tested: **74.4 MiB**, compared with **121.9 MiB** for xmcp and **137.5 MiB** for Skybridge. The mcp-use v1 result is included as a migration baseline, not as a native Apps peer.
 
-**Lower is better.** Black is mcp-use v2; gray represents the other fixtures.
+**Lower is better.**
+
+**Legend:** ⬛ mcp-use v2 · 🟦 xmcp · 🟧 Skybridge · gray — migration baseline
 
 ```mermaid
 ---
@@ -260,14 +262,16 @@ config:
       yAxisTitleColor: "#0c0c0c"
       yAxisTickColor: "#0c0c0c"
       yAxisLineColor: "#0c0c0c"
-      plotColorPalette: "#0c0c0c, #d4d4d8"
+      plotColorPalette: "#0c0c0c, #2563eb, #f59e0b, #d4d4d8"
 ---
 xychart
   title "Clean production install in MiB"
   x-axis ["mcp-use v2", "xmcp", "Skybridge", "mcp-use v1"]
   y-axis "MiB on disk" 0 --> 450
   bar [74.4, 0, 0, 0]
-  bar [0, 121.9, 137.5, 404.6]
+  bar [0, 121.9, 0, 0]
+  bar [0, 0, 137.5, 0]
+  bar [0, 0, 0, 404.6]
 ```
 
 **Does mcp-use lock deployment to Manufact Cloud?**

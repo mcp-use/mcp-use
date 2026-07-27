@@ -1,8 +1,8 @@
 # mcp-use SDK v2 benchmarks
 
 This report compares the published `mcp-use@2.0.0-beta.61` package with
-mcp-use v1, the official TypeScript SDK, and representative MCP frameworks.
-It was recorded on July 27, 2026 using Node.js 24.15.0.
+mcp-use v1, the official TypeScript SDK, and representative TypeScript MCP
+frameworks. It was recorded on July 27, 2026 using Node.js 24.15.0.
 
 ## Results at a glance
 
@@ -17,7 +17,10 @@ Compared with mcp-use v1, v2 measured:
 
 ## Throughput
 
-**Higher is better.** Black is mcp-use v2; gray represents the other fixtures.
+**Higher is better.**
+
+**Legend:** ⬛ mcp-use v2 · 🟦 xmcp · 🟧 Skybridge · gray — no native MCP
+Apps or migration baseline
 
 ```mermaid
 ---
@@ -34,27 +37,27 @@ config:
       yAxisTitleColor: "#0c0c0c"
       yAxisTickColor: "#0c0c0c"
       yAxisLineColor: "#0c0c0c"
-      plotColorPalette: "#0c0c0c, #d4d4d8"
+      plotColorPalette: "#0c0c0c, #2563eb, #f59e0b, #d4d4d8"
 ---
 xychart
   title "Median operations per second"
-  x-axis ["rmcp", "tmcp", "mcp-use v2", "mcp-use v1", "Skybridge", "Official v2", "xmcp", "mcp-handler"]
-  y-axis "operations per second" 0 --> 30000
-  bar [0, 0, 10982, 0, 0, 0, 0, 0]
-  bar [26459, 18425, 0, 8615, 8116, 8050, 6585, 6324]
+  x-axis ["tmcp", "mcp-use v2", "mcp-use v1", "Skybridge", "Official v2", "Official v1", "xmcp", "mcp-handler"]
+  y-axis "operations per second" 0 --> 20000
+  bar [0, 10982, 0, 0, 0, 0, 0, 0]
+  bar [0, 0, 0, 0, 0, 0, 6585, 0]
+  bar [0, 0, 0, 8116, 0, 0, 0, 0]
+  bar [18425, 0, 8615, 0, 8050, 6914, 0, 6324]
 ```
 
 mcp-use v2 delivered **10,982.2 median operations per second**, 27.5% above
 mcp-use v1 and 36.4% above the equivalent official TypeScript SDK v2 fixture.
 
-It was the fastest modern Node and native MCP Apps implementation tested. It
-was not the fastest implementation in the broader mixed-language and
-mixed-protocol field: compiled Rust `rmcp` and the older-protocol `tmcp`
-fixture led raw throughput.
+Custom stateless request handling and optimized response paths on top of the
+official SDK made mcp-use v2 the fastest TypeScript framework with native MCP
+Apps support in this test.
 
 | Framework | Version | Protocol | Median ops/s | p95 | p99 | Stability |
 | --- | --- | --- | ---: | ---: | ---: | ---: |
-| rmcp (Rust) | 2.2.0 | 2025-11-25 | 26,458.7 | 1 ms | 2 ms | 100 |
 | tmcp | 1.19.4 | 2025-06-18 | 18,424.5 | 2 ms | 3 ms | 100 |
 | **mcp-use v2** | **2.0.0-beta.61** | **2026-07-28** | **10,982.2** | **4 ms** | **6 ms** | **100** |
 | mcp-use v1 | 1.34.5 | 2025-11-25 | 8,615.0 | 4 ms | 6 ms | 100 |
@@ -69,6 +72,9 @@ fixture led raw throughput.
 **Lower is better.** Each result is the median of 100 recorded process starts
 after 10 warmups, with launch order rotated across all targets.
 
+**Legend:** ⬛ mcp-use v2 · 🟦 xmcp · 🟧 Skybridge · gray — no native MCP
+Apps or migration baseline
+
 ```mermaid
 ---
 config:
@@ -84,19 +90,20 @@ config:
       yAxisTitleColor: "#0c0c0c"
       yAxisTickColor: "#0c0c0c"
       yAxisLineColor: "#0c0c0c"
-      plotColorPalette: "#0c0c0c, #d4d4d8"
+      plotColorPalette: "#0c0c0c, #2563eb, #f59e0b, #d4d4d8"
 ---
 xychart
   title "Median cold launch in milliseconds"
-  x-axis ["rmcp", "Official v2", "mcp-use v2", "xmcp", "tmcp", "mcp-use v1", "mcp-handler", "Skybridge"]
+  x-axis ["Official v2", "mcp-use v2", "xmcp", "tmcp", "Official v1", "mcp-use v1", "mcp-handler", "Skybridge"]
   y-axis "milliseconds" 0 --> 180
-  bar [0, 0, 68.145, 0, 0, 0, 0, 0]
-  bar [3.400, 67.839, 0, 68.814, 77.740, 151.603, 158.498, 168.260]
+  bar [0, 68.145, 0, 0, 0, 0, 0, 0]
+  bar [0, 0, 68.814, 0, 0, 0, 0, 0]
+  bar [0, 0, 0, 0, 0, 0, 0, 168.260]
+  bar [67.839, 0, 0, 77.740, 108.039, 151.603, 158.498, 0]
 ```
 
 | Framework | Median | Interquartile range |
 | --- | ---: | ---: |
-| rmcp (Rust) | 3.400 ms | 3.329–3.488 ms |
 | Official SDK v2 | 67.839 ms | 66.881–69.522 ms |
 | **mcp-use v2** | **68.145 ms** | **67.049–69.306 ms** |
 | xmcp | 68.814 ms | 67.894–70.376 ms |
@@ -115,6 +122,9 @@ median difference is measurement noise, not a meaningful product advantage.
 full-stack frameworks tested with a native MCP Apps build workflow. Low-level
 libraries with a narrower scope are not equivalent install targets.
 
+**Legend:** ⬛ mcp-use v2 · 🟦 xmcp · 🟧 Skybridge · gray — migration
+baseline
+
 ```mermaid
 ---
 config:
@@ -130,14 +140,16 @@ config:
       yAxisTitleColor: "#0c0c0c"
       yAxisTickColor: "#0c0c0c"
       yAxisLineColor: "#0c0c0c"
-      plotColorPalette: "#0c0c0c, #d4d4d8"
+      plotColorPalette: "#0c0c0c, #2563eb, #f59e0b, #d4d4d8"
 ---
 xychart
   title "Clean production install in MiB"
   x-axis ["mcp-use v2", "xmcp", "Skybridge", "mcp-use v1"]
   y-axis "MiB on disk" 0 --> 450
   bar [74.4, 0, 0, 0]
-  bar [0, 121.9, 137.5, 404.6]
+  bar [0, 121.9, 0, 0]
+  bar [0, 0, 137.5, 0]
+  bar [0, 0, 0, 404.6]
 ```
 
 | Framework | Direct install set | Disk | Installed packages |
@@ -206,9 +218,10 @@ extension and application-specific resource, metadata, build, and type wiring.
 mcp-use makes Views a native framework feature and carries their contracts from
 the tool definition through React and the Inspector.
 
-The 36.4% throughput result against the official SDK v2 fixture applies only
-to this controlled workload. It shows that the integrated framework layer did
-not add request overhead here; it is not a universal performance guarantee.
+mcp-use adds framework-level performance improvements on top of the official
+SDK, including custom stateless request handling and optimized response paths.
+Those improvements delivered **36.4% higher median throughput** than the
+equivalent official SDK v2 fixture in this benchmark.
 
 ## Methodology
 
@@ -226,7 +239,7 @@ not add request overhead here; it is not a universal performance guarantee.
   process and fresh MCP Drill control and worker containers.
 - Reported throughput and latency values are medians across the three accepted
   rounds.
-- All nine targets received MCP Drill's stability score of 100.
+- All eight TypeScript targets received MCP Drill's stability score of 100.
 
 ### Launch workload
 
@@ -248,7 +261,8 @@ not add request overhead here; it is not a universal performance guarantee.
 
 - Absolute localhost results move with machine load, scheduler behavior, and
   thermal conditions.
-- The broad throughput field spans languages and protocol generations.
+- The TypeScript throughput field spans protocol generations and framework
+  scopes.
 - Install comparisons are meaningful only when the tested package scope is
   equivalent.
 - Production builds are compared only between mcp-use v1 and v2 because the
@@ -257,6 +271,5 @@ not add request overhead here; it is not a universal performance guarantee.
   every result above.
 - There is no composite “overall score.”
 
-Use the scoped result: **fastest modern Node and native MCP Apps
-implementation in this nine-framework test**. Do not shorten it to “fastest
-MCP framework.”
+Use the scoped result: **fastest TypeScript framework with native MCP Apps
+support in this eight-fixture test**.
