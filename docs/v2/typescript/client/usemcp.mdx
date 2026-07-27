@@ -62,13 +62,13 @@ function ServerPanel({ serverId }: { serverId: string }) {
 
 ## Connection states
 
-| State | Meaning |
-| ----- | ------- |
-| `discovering` | Connecting |
-| `pending_auth` | OAuth required — call `server.authenticate()` |
-| `authenticating` | OAuth in progress |
-| `ready` | Connected |
-| `failed` | Error — call `server.retry()` |
+| State            | Meaning                                       |
+| ---------------- | --------------------------------------------- |
+| `discovering`    | Connecting                                    |
+| `pending_auth`   | OAuth required — call `server.authenticate()` |
+| `authenticating` | OAuth in progress                             |
+| `ready`          | Connected                                     |
+| `failed`         | Error — call `server.retry()`                 |
 
 OAuth does not auto-start by default (`preventAutoAuth: true`). Show a sign-in button when `state === "pending_auth"`.
 
@@ -146,4 +146,4 @@ Sampling, elicitation, and notifications are queued on each `McpServer` (`pendin
 
 ## Reference
 
-[React client API reference](/v2/typescript/api-reference/client/react-client) — provider props, hook return values, storage types.
+[React client API reference](https://mcp-use-typescript-api-reference.vercel.app/modules/_mcp-use_client.react.html) — provider props, hook return values, and storage types.

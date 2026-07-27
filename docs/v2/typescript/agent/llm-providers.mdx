@@ -8,14 +8,14 @@ icon: "brain-circuit"
 
 ## Choose a provider
 
-| Provider prefix | API key lookup | Configuration note |
-| --- | --- | --- |
-| `openai` | `OPENAI_API_KEY` | Uses the built-in OpenAI provider. |
-| `anthropic` | `ANTHROPIC_API_KEY` | Uses the built-in Anthropic provider. |
-| `google` | `GOOGLE_API_KEY` or `GOOGLE_GENERATIVE_AI_API_KEY` | Uses the built-in Google provider. |
-| `openrouter` | `OPENROUTER_API_KEY` | Model names may contain `/`, such as `openai/gpt-4o`. |
-| `ollama` | No key required | Defaults to `http://localhost:11434`. |
-| `openai-compatible` | `OPENAI_API_KEY` or `llmConfig.apiKey` | Requires the endpoint in `llmConfig.baseUrl`. |
+| Provider prefix     | API key lookup                                     | Configuration note                                    |
+| ------------------- | -------------------------------------------------- | ----------------------------------------------------- |
+| `openai`            | `OPENAI_API_KEY`                                   | Uses the built-in OpenAI provider.                    |
+| `anthropic`         | `ANTHROPIC_API_KEY`                                | Uses the built-in Anthropic provider.                 |
+| `google`            | `GOOGLE_API_KEY` or `GOOGLE_GENERATIVE_AI_API_KEY` | Uses the built-in Google provider.                    |
+| `openrouter`        | `OPENROUTER_API_KEY`                               | Model names may contain `/`, such as `openai/gpt-4o`. |
+| `ollama`            | No key required                                    | Defaults to `http://localhost:11434`.                 |
+| `openai-compatible` | `OPENAI_API_KEY` or `llmConfig.apiKey`             | Requires the endpoint in `llmConfig.baseUrl`.         |
 
 ## Configure a provider string
 
@@ -98,7 +98,7 @@ Initialization throws when:
 - a required API key is missing; or
 - no model driver can be created.
 
-Keep provider-specific tuning in `llmConfig` or `ProviderConfig`. See the [MCPAgent API reference](/v2/typescript/api-reference/agent/mcp-agent) for the complete option types.
+Keep provider-specific tuning in `llmConfig` or `ProviderConfig`. See the [MCPAgent API reference](https://mcp-use-typescript-api-reference.vercel.app/modules/_mcp-use_agent.index.html#mcpagent) for the complete option types.
 
 ## Next steps
 

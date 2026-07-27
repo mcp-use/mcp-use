@@ -1,3 +1,9 @@
+/**
+ * Verify access tokens from the Better Auth OAuth 2.1 Provider plugin.
+ *
+ * @packageDocumentation
+ */
+
 import type { AuthInfo, OAuthMetadata } from "@modelcontextprotocol/server";
 
 import {
@@ -19,13 +25,21 @@ import {
 
 /** Verified Better Auth claims exposed to authenticated MCP callbacks. */
 export interface BetterAuthOAuthUser {
+  /** Better Auth subject identifier. */
   id: string;
+  /** Primary email address, when included in the access token. */
   email?: string;
+  /** Display name, when included in the access token. */
   name?: string;
+  /** Profile image URL, when included in the access token. */
   picture?: string;
+  /** Whether Better Auth has verified {@link BetterAuthOAuthUser.email}. */
   emailVerified?: boolean;
+  /** Better Auth session identifier. */
   sessionId?: string;
+  /** Whether the session belongs to an anonymous user. */
   isAnonymous?: boolean;
+  /** Roles from the access token's `roles` claim. */
   roles: string[];
 }
 
@@ -44,6 +58,16 @@ export interface BetterAuthOAuthProviderOptions extends OAuthResourceOptions {
  *
  * @param options - Better Auth issuer URL and resource-server settings.
  * @returns A provider that rejects tokens not issued for the resolved MCP resource.
+ * @throws A `TypeError` if `authURL` is not a valid HTTP or HTTPS URL.
+ *
+ * @example
+ * ```ts
+ * import { oauthBetterAuthProvider } from "mcp-use/oauth/better-auth";
+ *
+ * const oauth = oauthBetterAuthProvider({
+ *   authURL: "https://auth.example.com/api/auth",
+ * });
+ * ```
  */
 export function oauthBetterAuthProvider(
   options: BetterAuthOAuthProviderOptions

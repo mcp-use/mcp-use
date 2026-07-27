@@ -1,2 +1,6 @@
 export { BaseAdapter } from "./base.js";
-export { NativeAdapter } from "./native_adapter.js";
+export {
+  NativeAdapter,
+  type NativeCallToolFn,
+  type NativeToolEntry,
+} from "./native_adapter.js";

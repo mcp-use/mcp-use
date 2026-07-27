@@ -59,7 +59,9 @@ import type {
 } from "../core/config.js";
 /** JSON-RPC envelope for `sampling/createMessage`. */
 export type SamplingCreateMessageRequest = {
+  /** JSON-RPC method name. */
   method: "sampling/createMessage";
+  /** Sampling request parameters. */
   params: SamplingCreateMessageParams;
 };
 /** @deprecated Use {@link SamplingCreateMessageRequest}. */

@@ -11,7 +11,7 @@ import type {
 } from "@modelcontextprotocol/client";
 import type { BaseConnector, NotificationHandler } from "../transport/base.js";
 
-/** Negotiated protocol era — same as SDK {@link ProtocolEra} (`"legacy"` | `"modern"`). */
+/** Negotiated protocol era: `"legacy"` or `"modern"`. */
 export type MCPProtocolEra = ProtocolEra;
 
 /**
@@ -19,12 +19,25 @@ export type MCPProtocolEra = ProtocolEra;
  * MCP protocols.
  */
 export interface MCPServerInfo {
+  /** Stable server name. */
   name: string;
+  /** Server version reported during initialization. */
   version?: string;
+  /** Optional human-readable server title. */
   title?: string;
+  /** Optional human-readable server description. */
   description?: string;
+  /** Public website describing the server. */
   websiteUrl?: string;
-  icons?: Array<{ src: string; mimeType?: string; sizes?: string[] }>;
+  /** Icons advertised by the server. */
+  icons?: Array<{
+    /** Icon URL. */
+    src: string;
+    /** Icon media type. */
+    mimeType?: string;
+    /** Supported icon sizes, such as `"48x48"`. */
+    sizes?: string[];
+  }>;
 }
 
 /**
@@ -34,11 +47,17 @@ export interface MCPServerInfo {
  * callers to branch on the negotiated era.
  */
 export interface MCPConnectionInfo {
+  /** Negotiated protocol era. */
   protocolEra: MCPProtocolEra;
+  /** Negotiated MCP protocol version. */
   protocolVersion: string;
+  /** Server identity reported during negotiation. */
   server: MCPServerInfo;
+  /** Capabilities advertised by the server. */
   capabilities: Record<string, unknown>;
+  /** Instructions advertised by the server. */
   instructions?: string;
+  /** Protocol extension metadata advertised by the server. */
   extensions: Record<string, unknown>;
 }
 
@@ -57,7 +76,7 @@ export interface MCPConnectionInfo {
  * - Notification handling
  * - Root directory management
  *
- * Sessions are typically created by {@link MCPClient.createSession} rather than
+ * Sessions are typically created by `MCPClient.createSession()` rather than
  * being instantiated directly.
  *
  * @example
@@ -84,7 +103,6 @@ export interface MCPConnectionInfo {
  * await session.initialize();
  * ```
  *
- * @see {@link MCPClient} for managing multiple sessions
  * @see {@link BaseConnector} for connector implementations
  */
 export class MCPConnection {
@@ -344,7 +362,7 @@ export class MCPConnection {
   /**
    * Normalized server metadata for this ready connection.
    *
-   * @throws {Error} When called before protocol negotiation completes.
+   * @throws When called before protocol negotiation completes.
    */
   get info(): MCPConnectionInfo {
     const protocolEra = this.protocolEra;

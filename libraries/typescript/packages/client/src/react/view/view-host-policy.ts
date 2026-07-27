@@ -4,6 +4,7 @@ import type {
 } from "./ext-apps-bridge.js";
 import type { ViewConnection, ViewDisplayMode } from "./types.js";
 
+/** Inputs used to derive the capabilities advertised by an MCP App host. */
 type CapabilityInputs = {
   hasConnection: boolean;
   hasMessageHandler: boolean;
@@ -15,6 +16,12 @@ type CapabilityInputs = {
   modelContextCapabilities?: McpUiSupportedContentBlockModalities;
 };
 
+/**
+ * Builds host capabilities from the callbacks and connections the host exposes.
+ *
+ * @param inputs - Available host features and supported content modalities.
+ * @returns Capabilities suitable for MCP App bridge initialization.
+ */
 export function buildDefaultHostCapabilities({
   hasConnection,
   hasMessageHandler,
@@ -45,6 +52,14 @@ export function buildDefaultHostCapabilities({
   };
 }
 
+/**
+ * Tests whether a tool is visible to the model.
+ *
+ * Tools without explicit visibility metadata remain model-visible.
+ *
+ * @param tool - Tool metadata to inspect.
+ * @returns `true` when the tool may be presented to the model.
+ */
 export function isToolVisibleToModel(tool: { _meta?: unknown }): boolean {
   if (!tool._meta || typeof tool._meta !== "object") return true;
   const ui = (tool._meta as Record<string, unknown>).ui;
@@ -55,6 +70,13 @@ export function isToolVisibleToModel(tool: { _meta?: unknown }): boolean {
   );
 }
 
+/**
+ * Validates and dispatches an MCP App `ui/message` payload.
+ *
+ * @param handler - Host callback that accepts message content.
+ * @param content - Content blocks supplied by the app.
+ * @throws When the host has no message handler or `content` is empty.
+ */
 export async function dispatchUiMessage(
   handler: ((content: unknown[]) => void | Promise<void>) | undefined,
   content: unknown[]
@@ -68,6 +90,12 @@ export async function dispatchUiMessage(
   await handler(content);
 }
 
+/**
+ * Resolves a display-mode request against host and app availability.
+ *
+ * @param options - Requested and current modes plus each side's supported modes.
+ * @returns The requested mode when both sides support it; otherwise `current`.
+ */
 export function resolveRequestedDisplayMode({
   requested,
   current,
@@ -86,6 +114,13 @@ export function resolveRequestedDisplayMode({
     : current;
 }
 
+/**
+ * Asserts that an MCP App may call a named server tool.
+ *
+ * @param tools - Tools available through the live view connection.
+ * @param name - Tool name requested by the app.
+ * @throws When the tool is unavailable or not visible to apps.
+ */
 export function assertAppCanCallTool(
   tools: ViewConnection["tools"],
   name: string

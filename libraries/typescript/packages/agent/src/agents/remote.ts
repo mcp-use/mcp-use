@@ -1,6 +1,4 @@
-/**
- * Remote agent implementation for executing agents via API.
- */
+/** Remote execution support for hosted MCP agents. */
 
 import type { ZodSchema } from "zod";
 import { toJSONSchema } from "zod";
@@ -50,13 +48,29 @@ function normalizeRemoteRunOptions<T>(
   };
 }
 
+/** Configures a {@link RemoteAgent}. */
+export interface RemoteAgentOptions {
+  /** Hosted agent identifier. */
+  agentId: string;
+  /** API key. Defaults to `MCP_USE_API_KEY`. */
+  apiKey?: string;
+  /** API origin. Defaults to `https://cloud.manufact.com`. */
+  baseUrl?: string;
+}
+
+/** Executes a hosted MCP agent through the mcp-use remote API. */
 export class RemoteAgent {
   private agentId: string;
   private apiKey: string;
   private baseUrl: string;
   private chatId: string | null = null;
 
-  constructor(options: { agentId: string; apiKey?: string; baseUrl?: string }) {
+  /**
+   * @param options - Hosted agent identifier and API connection settings.
+   * @throws Error if no API key is supplied or available from
+   * `MCP_USE_API_KEY`.
+   */
+  constructor(options: RemoteAgentOptions) {
     this.agentId = options.agentId;
     this.baseUrl = options.baseUrl ?? "https://cloud.manufact.com";
 
@@ -187,18 +201,24 @@ export class RemoteAgent {
   }
 
   /**
-   * Runs the remote agent with options object and returns a promise for the final result.
+   * Runs the remote agent and returns its final text.
+   *
+   * @param options - Input and per-run execution settings.
+   * @returns Final agent text.
    */
   public async run(options: RunOptions): Promise<string>;
 
   /**
-   * Runs the remote agent with options object and structured output.
+   * Runs the remote agent and parses its result with `options.schema`.
+   *
+   * @param options - Input, schema, and per-run execution settings.
+   * @returns The schema-validated result.
    */
   public async run<T>(options: RunOptions<T>): Promise<T>;
 
   /**
    * Runs the remote agent and returns a promise for the final result.
-   * @deprecated Use options object instead: run({ prompt, maxSteps, ... })
+   * @deprecated Use the options object instead: `run({ prompt, maxSteps, ... })`.
    */
   public async run<T = string>(
     query: string,
@@ -377,18 +397,27 @@ export class RemoteAgent {
   }
 
   /**
-   * Streams the remote agent execution with options object.
+   * Runs the remote agent through an async-generator interface.
+   *
+   * The current remote API does not emit intermediate values. Read the
+   * generator's return value for the final result.
+   *
+   * @param options - Input and per-run execution settings.
+   * @returns An async generator whose return value is the final text.
    */
   public stream(options: RunOptions): AsyncGenerator<any, string, void>;
 
   /**
-   * Streams the remote agent execution with options object and structured output.
+   * Runs structured remote execution through an async-generator interface.
+   *
+   * @param options - Input, schema, and per-run execution settings.
+   * @returns An async generator whose return value is schema validated.
    */
   public stream<T>(options: RunOptions<T>): AsyncGenerator<any, T, void>;
 
   /**
    * Streams the remote agent execution.
-   * @deprecated Use options object instead: stream({ prompt, maxSteps, ... })
+   * @deprecated Use the options object instead: `stream({ prompt, maxSteps, ... })`.
    */
   public stream<T = string>(
     query: string,
@@ -420,6 +449,7 @@ export class RemoteAgent {
     return result;
   }
 
+  /** Releases local remote-agent state. */
   public async close(): Promise<void> {
     /**
      * Close the remote agent connection.
