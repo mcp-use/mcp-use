@@ -1,0 +1,141 @@
+{
+  "schema_version": "run-config/v1",
+  "scenario_id": "mcp-use-v2-short",
+  "target": {
+    "kind": "server",
+    "url": "http://host.docker.internal:43100/mcp",
+    "transport": "streamable_http",
+    "protocol_version": "2026-07-28",
+    "protocol_version_policy": "strict",
+    "headers": {},
+    "auth": { "type": "none" },
+    "identification": {
+      "run_id_header": { "name": "X-MCP-Drill-Run", "value_template": "{{run_id}}" },
+      "user_agent": { "value": "mcpdrill/${run_id}" }
+    },
+    "timeouts": {
+      "connect_timeout_ms": 5000,
+      "request_timeout_ms": 30000,
+      "stream_stall_timeout_ms": 60000
+    },
+    "tls": { "verify": true, "ca_bundle_ref": null },
+    "redirect_policy": { "mode": "deny", "max_redirects": 0 }
+  },
+  "environment": {
+    "allowlist": {
+      "mode": "deny_by_default",
+      "allowed_targets": [
+        { "kind": "exact", "value": "http://host.docker.internal:43100/mcp" }
+      ]
+    },
+    "forbidden_patterns": []
+  },
+  "session_policy": {
+    "mode": "reuse",
+    "pool_size": null,
+    "ttl_ms": null,
+    "max_idle_ms": null
+  },
+  "workload": {
+    "in_flight_per_vu": 1,
+    "think_time": { "mode": "fixed", "base_ms": 0, "jitter_ms": 0 },
+    "operation_mix": [
+      { "operation": "tools_list", "weight": 1 },
+      { "operation": "tools_call", "weight": 9 }
+    ],
+    "tools": {
+      "selection": { "mode": "weighted" },
+      "templates": [
+        {
+          "template_id": "echo",
+          "tool_name": "benchmark_echo",
+          "weight": 1,
+          "arguments": { "message": "hello" }
+        }
+      ]
+    },
+    "payload_profiles": []
+  },
+  "stages": [
+    {
+      "stage_id": "stg_0000000000000001",
+      "stage": "preflight",
+      "enabled": true,
+      "duration_ms": 3000,
+      "load": { "target_vus": 1, "target_rps": null },
+      "stop_conditions": []
+    },
+    {
+      "stage_id": "stg_0000000000000002",
+      "stage": "baseline",
+      "enabled": true,
+      "duration_ms": 5000,
+      "load": { "target_vus": 5, "target_rps": null },
+      "stop_conditions": [
+        {
+          "id": "baseline_error_rate",
+          "metric": "error_rate",
+          "comparator": ">",
+          "threshold": 0.05,
+          "window_ms": 2000,
+          "sustain_windows": 1,
+          "scope": {}
+        }
+      ]
+    },
+    {
+      "stage_id": "stg_0000000000000003",
+      "stage": "ramp",
+      "enabled": true,
+      "duration_ms": 15000,
+      "load": { "target_vus": 50, "target_rps": null },
+      "stop_conditions": [
+        {
+          "id": "ramp_error_rate",
+          "metric": "error_rate",
+          "comparator": ">",
+          "threshold": 0.05,
+          "window_ms": 5000,
+          "sustain_windows": 1,
+          "scope": {}
+        }
+      ]
+    }
+  ],
+  "safety": {
+    "ramp_by_default": true,
+    "emergency_stop_enabled": true,
+    "identification_required": false,
+    "worker_failure_policy": "fail_fast",
+    "hard_caps": {
+      "max_vus": 100,
+      "max_rps": 20000,
+      "max_connections": 200,
+      "max_duration_ms": 120000,
+      "max_in_flight_per_vu": 10,
+      "max_telemetry_q_depth": 100000
+    },
+    "stop_policy": { "mode": "drain", "drain_timeout_ms": 10000 }
+  },
+  "reporting": {
+    "formats": ["json"],
+    "retention": { "raw_logs_days": 1, "metrics_days": 1, "reports_days": 1 },
+    "include": {
+      "store_raw_logs": true,
+      "store_metrics_snapshot": true,
+      "store_event_log": true
+    },
+    "redaction": { "redact_headers": ["Authorization", "X-Api-Key"] }
+  },
+  "telemetry": {
+    "structured_logs": { "enabled": true, "sample_rate": 1.0 },
+    "traces": {
+      "enabled": false,
+      "propagation": { "accept_incoming_traceparent": false }
+    }
+  },
+  "server_telemetry": {
+    "enabled": false,
+    "pair_key": "local"
+  }
+}

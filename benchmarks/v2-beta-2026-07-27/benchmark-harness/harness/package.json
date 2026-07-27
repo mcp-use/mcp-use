@@ -1,0 +1,14 @@
+{
+  "name": "mcp-framework-benchmark-harness",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@modelcontextprotocol/node": "2.0.0-beta.5",
+    "@modelcontextprotocol/server": "2.0.0-beta.5",
+    "mcp-sdk-v1": "npm:@modelcontextprotocol/sdk@1.29.0",
+    "mcp-use-v1": "npm:mcp-use@1.34.5",
+    "mcp-use-v2": "npm:mcp-use@2.0.0-beta.61",
+    "skybridge": "1.2.6",
+    "zod": "4.4.3"
+  }
+}
