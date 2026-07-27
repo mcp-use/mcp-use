@@ -48,7 +48,10 @@ import { MessageList } from "./chat/MessageList";
 import { ChatScrollToBottomButton } from "./chat/ChatScrollToBottomButton";
 import { ChatScrollTopFade } from "./chat/ChatScrollTopFade";
 import { useChatScrollToBottom } from "./chat/useChatScrollToBottom";
-import { FullscreenChatOverlay } from "./chat/FullscreenChatOverlay";
+import {
+  FullscreenChatOverlay,
+  useMcpWidgetFullscreen,
+} from "./chat/FullscreenChatOverlay";
 import type { ToolInfo } from "./chat/ToolSelector";
 import { useChatMessages } from "./chat/useChatMessages";
 import { useChatMessagesClientSide } from "./chat/useChatMessagesClientSide";
@@ -200,6 +203,7 @@ export function ChatTab({
   systemPromptProvider: externalSystemPromptProvider,
   elevatedHeader,
 }: ChatTabProps) {
+  const isMcpWidgetFullscreen = useMcpWidgetFullscreen();
   const { isEmbedded } = useInspector();
   const localSystemPromptProvider = useLocalSystemPrompt(serverId);
   const effectiveSystemPromptProvider =
@@ -1596,6 +1600,7 @@ export function ChatTab({
           <FullscreenChatOverlay messages={messages} isLoading={isLoading} />
           {managedChatNoticeNode}
           <ChatInputArea
+            variant={isMcpWidgetFullscreen ? "fullscreen" : "default"}
             inputValue={inputValue}
             isConnected={
               isConnected && !managedChatNotice && !mcpServerAuthRequired

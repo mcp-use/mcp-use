@@ -8,7 +8,7 @@ interface FullscreenChatOverlayProps {
   isLoading: boolean;
 }
 
-function useMcpWidgetFullscreen(): boolean {
+export function useMcpWidgetFullscreen(): boolean {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
