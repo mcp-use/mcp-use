@@ -253,10 +253,11 @@ mcp-use v2 had the smallest clean production install among the full-stack native
 | **Weekly npm downloads** | [50,793](https://www.npmjs.com/package/mcp-use) | [16,476](https://www.npmjs.com/package/xmcp) | [19,905](https://www.npmjs.com/package/skybridge) | [188,403](https://www.npmjs.com/package/@modelcontextprotocol/server) | 🟩 [**1,966,280**](https://www.npmjs.com/package/tmcp) | [692,381](https://www.npmjs.com/package/mcp-handler) |
 | **Views** | 🟩 ✅ | 🟩 ✅ | 🟩 ✅ | ❌ | ❌ | ❌ |
 | **Tools** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **One-line OAuth adapters** | 🟩 ✅ | 🟩 ✅ | 🟩 ✅ | ❌ | ❌ | ❌ |
 | **MCP 2026 protocol** | 🟩 ✅ | ❌ | ❌ | 🟩 ✅ | ❌ | ❌ |
 | **Built-in Inspector** | 🟩 ✅ | ❌ | 🟩 ✅ | ❌ | ❌ | ❌ |
 
-Speed uses the benchmark's median operations per second; tmcp leads the complete TypeScript field, while mcp-use leads the frameworks with native Views. Install size is limited to the equivalent full-stack Views frameworks. Stars are a July 27, 2026 snapshot; npm downloads cover the completed week of July 18–24, 2026. “Views” means native framework support for MCP Apps rather than a separate extension, and “built-in Inspector” means the framework's own development command launches its inspection UI.
+Speed uses the benchmark's median operations per second; tmcp leads the complete TypeScript field, while mcp-use leads the frameworks with native Views. Install size is limited to the equivalent full-stack Views frameworks. Stars are a July 27, 2026 snapshot; npm downloads cover the completed week of July 18–24, 2026. “Views” means native framework support for MCP Apps rather than a separate extension. “One-line OAuth adapters” means provider-specific helpers that plug into the framework with one configuration call; identity-provider setup is still required. “Built-in Inspector” means the framework's own development command launches its inspection UI.
 
 **Lower is better.** Black is mcp-use v2; gray represents the migration baseline and other fixtures.
 
