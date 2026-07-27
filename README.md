@@ -251,11 +251,14 @@ mcp-use v2 had the smallest clean production install among the full-stack native
 | **Clean install** | 🟩 **74.4 MiB** | 121.9 MiB | 137.5 MiB | — | — |
 | **GitHub stars** | 10,400 | 1,295 | 1,952 | 🟩 **12,965** | 629 |
 | **Views** | 🟩 ✅ | 🟩 ✅ | 🟩 ✅ | ❌ | ❌ |
+| **Native Views on MCP 2026** | 🟩 ✅ | ❌ | ❌ | ❌ | ❌ |
 | **One-line OAuth adapters** | 🟩 ✅ | 🟩 ✅ | 🟩 ✅ | ❌ | ❌ |
 | **MCP 2026 protocol** | 🟩 ✅ | ❌ | ❌ | 🟩 ✅ | ❌ |
-| **Built-in Inspector** | 🟩 ✅ | ❌ | 🟩 ✅ | ❌ | ❌ |
+| **Built-in View screenshot CLI** | 🟩 ✅ | ❌ | ❌ | ❌ | ❌ |
+| **Built-in tunneling** | 🟩 ✅ | ❌ | 🟩 ✅ | ❌ | ❌ |
+| **Built-in Inspector** | 🟩 ✅ | ❌ | ❌ | ❌ | ❌ |
 
-Speed uses the benchmark's median operations per second; mcp-use leads this selected comparison and the frameworks with native Views. Install size is limited to the equivalent full-stack Views frameworks. Stars are a July 27, 2026 snapshot. “Views” means native framework support for MCP Apps rather than a separate extension. “One-line OAuth adapters” means provider-specific helpers that plug into the framework with one configuration call; identity-provider setup is still required. “Built-in Inspector” means the framework's own development command launches its inspection UI.
+Speed uses the benchmark's median operations per second; mcp-use leads this selected comparison and the frameworks with native Views. Install size is limited to the equivalent full-stack Views frameworks. Stars are a July 27, 2026 snapshot. “Views” means native framework support for MCP Apps rather than a separate extension. “Native Views on MCP 2026” requires both that abstraction and support for the MCP 2026 protocol generation. “One-line OAuth adapters” means provider-specific helpers that plug into the framework with one configuration call; identity-provider setup is still required. “Built-in View screenshot CLI” means the framework itself can invoke a View-backed tool and save the rendered result as an image; external browser automation does not count. “Built-in tunneling” means the framework's development command can expose its local MCP endpoint directly. “Built-in Inspector” means the framework ships its own full protocol UI for tools, resources, prompts, Views, sampling, elicitation, and notifications; a framework-specific View emulator does not count.
 
 **Lower is better.** Black is mcp-use v2; gray represents the migration baseline and other fixtures.
 
