@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="820" viewBox="0 0 1400 820" role="img" aria-labelledby="title desc">
+  <title id="title">Median MCP throughput across nine tested frameworks</title>
+  <desc id="desc">mcp-use v2 measured 10,982 operations per second. rmcp and tmcp led the mixed-language field. Higher is better.</desc>
+  <defs>
+    <linearGradient id="mesh-base" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4026ff"/>
+      <stop offset=".52" stop-color="#6558ff"/>
+      <stop offset="1" stop-color="#9f4eff"/>
+    </linearGradient>
+    <radialGradient id="mesh-lime" cx=".08" cy=".05" r=".75">
+      <stop offset="0" stop-color="#b9f66a"/>
+      <stop offset=".42" stop-color="#b9f66a" stop-opacity=".72"/>
+      <stop offset="1" stop-color="#b9f66a" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="mesh-pink" cx=".92" cy=".16" r=".72">
+      <stop offset="0" stop-color="#f061ff"/>
+      <stop offset=".5" stop-color="#f061ff" stop-opacity=".65"/>
+      <stop offset="1" stop-color="#f061ff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="mesh-blue" cx=".18" cy=".78" r=".72">
+      <stop offset="0" stop-color="#55d8ff"/>
+      <stop offset=".5" stop-color="#55d8ff" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#55d8ff" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="highlight-bar">
+      <rect x="370" y="459" width="88" height="191" rx="12"/>
+    </clipPath>
+    <style>
+      .title { font: 750 36px Inter, ui-sans-serif, system-ui, sans-serif; fill: #17161c; letter-spacing: -.8px; }
+      .subtitle { font: 400 18px Inter, ui-sans-serif, system-ui, sans-serif; fill: #6d6878; }
+      .direction { font: 700 16px Inter, ui-sans-serif, system-ui, sans-serif; fill: #5847e8; }
+      .value { font: 700 15px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #302d37; }
+      .label { font: 600 16px Inter, ui-sans-serif, system-ui, sans-serif; fill: #6d6878; }
+      .label-strong { font: 750 16px Inter, ui-sans-serif, system-ui, sans-serif; fill: #17161c; }
+      .note { font: 400 15px Inter, ui-sans-serif, system-ui, sans-serif; fill: #6d6878; }
+    </style>
+  </defs>
+
+  <rect width="1400" height="820" rx="28" fill="#faf9fc"/>
+  <text x="60" y="68" class="title">Throughput under the same MCP workload</text>
+  <text x="60" y="104" class="subtitle">Three position-rotated rounds · median operations per second</text>
+  <rect x="1160" y="48" width="180" height="42" rx="21" fill="#ece9ff"/>
+  <text x="1250" y="75" text-anchor="middle" class="direction">↑ Higher is better</text>
+
+  <g stroke="#e7e3eb" stroke-width="1">
+    <line x1="60" y1="190" x2="1340" y2="190"/>
+    <line x1="60" y1="305" x2="1340" y2="305"/>
+    <line x1="60" y1="420" x2="1340" y2="420"/>
+    <line x1="60" y1="535" x2="1340" y2="535"/>
+    <line x1="60" y1="650" x2="1340" y2="650"/>
+  </g>
+
+  <g fill="#d4d1da">
+    <rect x="90" y="190" width="88" height="460" rx="12"/>
+    <rect x="230" y="330" width="88" height="320" rx="12"/>
+    <rect x="510" y="500" width="88" height="150" rx="12"/>
+    <rect x="650" y="509" width="88" height="141" rx="12"/>
+    <rect x="790" y="510" width="88" height="140" rx="12"/>
+    <rect x="930" y="530" width="88" height="120" rx="12"/>
+    <rect x="1070" y="536" width="88" height="114" rx="12"/>
+    <rect x="1210" y="540" width="88" height="110" rx="12"/>
+  </g>
+
+  <g clip-path="url(#highlight-bar)">
+    <rect x="370" y="459" width="88" height="191" fill="url(#mesh-base)"/>
+    <rect x="370" y="459" width="88" height="191" fill="url(#mesh-lime)"/>
+    <rect x="370" y="459" width="88" height="191" fill="url(#mesh-pink)"/>
+    <rect x="370" y="459" width="88" height="191" fill="url(#mesh-blue)"/>
+  </g>
+
+  <g text-anchor="middle" class="value">
+    <text x="134" y="176">26,459</text>
+    <text x="274" y="316">18,424</text>
+    <text x="414" y="445">10,982</text>
+    <text x="554" y="486">8,615</text>
+    <text x="694" y="495">8,116</text>
+    <text x="834" y="496">8,050</text>
+    <text x="974" y="516">6,914</text>
+    <text x="1114" y="522">6,585</text>
+    <text x="1254" y="526">6,324</text>
+  </g>
+
+  <g text-anchor="middle">
+    <text x="134" y="684" class="label"><tspan x="134">rmcp</tspan><tspan x="134" dy="20">(Rust)</tspan></text>
+    <text x="274" y="684" class="label">tmcp</text>
+    <text x="414" y="684" class="label-strong"><tspan x="414">mcp-use</tspan><tspan x="414" dy="20">v2</tspan></text>
+    <text x="554" y="684" class="label"><tspan x="554">mcp-use</tspan><tspan x="554" dy="20">v1</tspan></text>
+    <text x="694" y="684" class="label">Skybridge</text>
+    <text x="834" y="684" class="label"><tspan x="834">Official SDK</tspan><tspan x="834" dy="20">v2</tspan></text>
+    <text x="974" y="684" class="label"><tspan x="974">Official SDK</tspan><tspan x="974" dy="20">v1</tspan></text>
+    <text x="1114" y="684" class="label">xmcp</text>
+    <text x="1254" y="684" class="label"><tspan x="1254">mcp-</tspan><tspan x="1254" dy="20">handler</tspan></text>
+  </g>
+
+  <text x="60" y="775" class="note">mcp-use v2 was the fastest modern Node and native MCP Apps implementation tested. rmcp and tmcp led the mixed-language field.</text>
+</svg>

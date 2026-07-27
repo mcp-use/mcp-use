@@ -235,6 +235,43 @@ npm run deploy
 
 The same server can be hosted on standard Node.js infrastructure or adapted for [Vercel](./docs/typescript/server/deployment/vercel.mdx), [Cloudflare Workers](./docs/typescript/server/deployment/cloudflare-workers.mdx), [Railway](./docs/typescript/server/deployment/railway.mdx), [Bun](./docs/typescript/server/deployment/bun.mdx), [Deno](./docs/typescript/server/deployment/deno.mdx), [Supabase](https://docs.mcp-use.com/typescript/server/deployment/supabase), and other Fetch/Hono runtimes.
 
+## How mcp-use compares
+
+mcp-use v2 builds on the official TypeScript SDK v2 and adds the framework layer around it: typed tools and views, a React app pipeline, Inspector, client and screenshot tooling, deployment adapters, and an agent-friendly CLI.
+
+**Is mcp-use a replacement for the official TypeScript SDK?**
+
+No. It uses the official `@modelcontextprotocol/core`, `server`, and `client` packages. Choose the official SDK directly when you want protocol-level primitives and intend to assemble the app, build, inspection, and deployment workflow yourself. Choose mcp-use when you want those pieces integrated behind one typed server API.
+
+**Does the framework layer make it slower?**
+
+Not in our controlled workload. mcp-use v2 measured **10,982 median operations per second**, compared with **8,050** for the equivalent official SDK v2 fixture. It was the fastest modern Node and native MCP Apps implementation tested; compiled Rust `rmcp` and the older-protocol `tmcp` fixture led the broader mixed-language field.
+
+<p align="center">
+  <a href="./static/readme/comparison-throughput.svg">
+    <img src="./static/readme/comparison-throughput.svg" alt="Median MCP throughput comparison across nine tested frameworks; higher is better" width="960">
+  </a>
+</p>
+
+**How does it compare with other native MCP Apps frameworks?**
+
+mcp-use v2 had the smallest clean production install among the full-stack native MCP Apps frameworks tested: **74.4 MiB**, compared with **121.9 MiB** for xmcp and **137.5 MiB** for Skybridge. The mcp-use v1 result is included as a migration baseline, not as a native Apps peer.
+
+<p align="center">
+  <a href="./static/readme/comparison-install-size.svg">
+    <img src="./static/readme/comparison-install-size.svg" alt="Clean production install footprint for native MCP Apps frameworks; lower is better" width="900">
+  </a>
+</p>
+
+**Does mcp-use lock deployment to Manufact Cloud?**
+
+No. Manufact Cloud is the managed path for deployment, analytics, evals, observability, and logs. The same stateless server can run on ordinary Node.js infrastructure, Vercel, Railway, Supabase, Cloudflare Workers, Deno, Bun, Hono, and other Fetch-compatible runtimes.
+
+> [!NOTE]
+> Benchmark snapshot: July 27, 2026, using published `mcp-use@2.0.0-beta.61`, `mcp-use@1.34.5`, and official SDK `2.0.0-beta.5` packages on Node.js 24.15.0. Absolute localhost results are machine-specific; throughput uses three position-rotated median rounds, and the broad field includes different languages and protocol generations.
+
+**Detailed comparison report:** coming soon, with exact fixtures, versions, raw accepted and rejected runs, and the reproducible benchmark harness.
+
 ## Examples
 
 Remix a complete MCP App, inspect the source, or deploy it as a starting point:
