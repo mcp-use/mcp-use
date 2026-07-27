@@ -243,9 +243,19 @@ mcp-use adds custom stateless request handling and optimized response paths on t
 
 mcp-use v2 had the smallest clean production install among the full-stack native MCP Apps frameworks tested: **74.4 MiB**, compared with **121.9 MiB** for xmcp and **137.5 MiB** for Skybridge. The mcp-use v1 result is included as a migration baseline, not as a native Apps peer.
 
-**Lower is better.**
+🟩 marks the category leader. ✅ means the capability is built into the framework; ❌ means it requires an extension, external client, or custom wiring.
 
-**Legend:** ⬛ mcp-use v2 · 🟦 xmcp · 🟧 Skybridge · gray — migration baseline
+|  | **mcp-use v2** | [xmcp](https://xmcp.dev/blog/mcp-apps) | [Skybridge](https://docs.skybridge.tech/fundamentals/mcp-apps) | [Official SDK v2](https://ts.sdk.modelcontextprotocol.io/v2/) | tmcp | mcp-handler |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| **Native Views / MCP Apps** | 🟩 ✅ | 🟩 ✅ | 🟩 ✅ | ❌ | ❌ | ❌ |
+| **Throughput with native Views** | 🟩 **10,982 ops/s** | 6,585 ops/s | 8,116 ops/s | — | — | — |
+| **Clean install** | 🟩 **74.4 MiB** | 121.9 MiB | 137.5 MiB | — | — | — |
+| **MCP 2026 protocol** | 🟩 ✅ | ❌ | ❌ | 🟩 ✅ | ❌ | ❌ |
+| **Built-in MCP Apps preview** | 🟩 ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+
+“Built-in MCP Apps preview” means the framework's own development UI renders the MCP Apps protocol. External clients and mocked Apps SDK runtimes do not count.
+
+**Lower is better.** Black is mcp-use v2; gray represents the migration baseline and other fixtures.
 
 ```mermaid
 ---
@@ -262,16 +272,14 @@ config:
       yAxisTitleColor: "#0c0c0c"
       yAxisTickColor: "#0c0c0c"
       yAxisLineColor: "#0c0c0c"
-      plotColorPalette: "#0c0c0c, #2563eb, #f59e0b, #d4d4d8"
+      plotColorPalette: "#0c0c0c, #d4d4d8"
 ---
 xychart
   title "Clean production install in MiB"
   x-axis ["mcp-use v2", "xmcp", "Skybridge", "mcp-use v1"]
   y-axis "MiB on disk" 0 --> 450
   bar [74.4, 0, 0, 0]
-  bar [0, 121.9, 0, 0]
-  bar [0, 0, 137.5, 0]
-  bar [0, 0, 0, 404.6]
+  bar [0, 121.9, 137.5, 404.6]
 ```
 
 **Does mcp-use lock deployment to Manufact Cloud?**

@@ -17,10 +17,8 @@ Compared with mcp-use v1, v2 measured:
 
 ## Throughput
 
-**Higher is better.**
-
-**Legend:** ⬛ mcp-use v2 · 🟦 xmcp · 🟧 Skybridge · gray — no native MCP
-Apps or migration baseline
+**Higher is better.** Black is mcp-use v2; gray represents the other
+TypeScript fixtures.
 
 ```mermaid
 ---
@@ -37,16 +35,14 @@ config:
       yAxisTitleColor: "#0c0c0c"
       yAxisTickColor: "#0c0c0c"
       yAxisLineColor: "#0c0c0c"
-      plotColorPalette: "#0c0c0c, #2563eb, #f59e0b, #d4d4d8"
+      plotColorPalette: "#0c0c0c, #d4d4d8"
 ---
 xychart
   title "Median operations per second"
   x-axis ["tmcp", "mcp-use v2", "mcp-use v1", "Skybridge", "Official v2", "Official v1", "xmcp", "mcp-handler"]
   y-axis "operations per second" 0 --> 20000
   bar [0, 10982, 0, 0, 0, 0, 0, 0]
-  bar [0, 0, 0, 0, 0, 0, 6585, 0]
-  bar [0, 0, 0, 8116, 0, 0, 0, 0]
-  bar [18425, 0, 8615, 0, 8050, 6914, 0, 6324]
+  bar [18425, 0, 8615, 8116, 8050, 6914, 6585, 6324]
 ```
 
 mcp-use v2 delivered **10,982.2 median operations per second**, 27.5% above
@@ -72,9 +68,6 @@ Apps support in this test.
 **Lower is better.** Each result is the median of 100 recorded process starts
 after 10 warmups, with launch order rotated across all targets.
 
-**Legend:** ⬛ mcp-use v2 · 🟦 xmcp · 🟧 Skybridge · gray — no native MCP
-Apps or migration baseline
-
 ```mermaid
 ---
 config:
@@ -90,16 +83,14 @@ config:
       yAxisTitleColor: "#0c0c0c"
       yAxisTickColor: "#0c0c0c"
       yAxisLineColor: "#0c0c0c"
-      plotColorPalette: "#0c0c0c, #2563eb, #f59e0b, #d4d4d8"
+      plotColorPalette: "#0c0c0c, #d4d4d8"
 ---
 xychart
   title "Median cold launch in milliseconds"
   x-axis ["Official v2", "mcp-use v2", "xmcp", "tmcp", "Official v1", "mcp-use v1", "mcp-handler", "Skybridge"]
   y-axis "milliseconds" 0 --> 180
   bar [0, 68.145, 0, 0, 0, 0, 0, 0]
-  bar [0, 0, 68.814, 0, 0, 0, 0, 0]
-  bar [0, 0, 0, 0, 0, 0, 0, 168.260]
-  bar [67.839, 0, 0, 77.740, 108.039, 151.603, 158.498, 0]
+  bar [67.839, 0, 68.814, 77.740, 108.039, 151.603, 158.498, 168.260]
 ```
 
 | Framework | Median | Interquartile range |
@@ -122,9 +113,6 @@ median difference is measurement noise, not a meaningful product advantage.
 full-stack frameworks tested with a native MCP Apps build workflow. Low-level
 libraries with a narrower scope are not equivalent install targets.
 
-**Legend:** ⬛ mcp-use v2 · 🟦 xmcp · 🟧 Skybridge · gray — migration
-baseline
-
 ```mermaid
 ---
 config:
@@ -140,16 +128,14 @@ config:
       yAxisTitleColor: "#0c0c0c"
       yAxisTickColor: "#0c0c0c"
       yAxisLineColor: "#0c0c0c"
-      plotColorPalette: "#0c0c0c, #2563eb, #f59e0b, #d4d4d8"
+      plotColorPalette: "#0c0c0c, #d4d4d8"
 ---
 xychart
   title "Clean production install in MiB"
   x-axis ["mcp-use v2", "xmcp", "Skybridge", "mcp-use v1"]
   y-axis "MiB on disk" 0 --> 450
   bar [74.4, 0, 0, 0]
-  bar [0, 121.9, 0, 0]
-  bar [0, 0, 137.5, 0]
-  bar [0, 0, 0, 404.6]
+  bar [0, 121.9, 137.5, 404.6]
 ```
 
 | Framework | Direct install set | Disk | Installed packages |
