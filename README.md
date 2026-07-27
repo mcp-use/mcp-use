@@ -60,52 +60,13 @@ Your MCP endpoint is now available at [`http://localhost:3000/mcp`](http://local
 
 ### Start with your agent
 
-Paste this into Claude Code, Codex, Cursor, or any coding agent. It will ask what to build, set up the project, follow the mcp-use skill, verify the result, deploy it, and return the live URLs.
+Paste this into Claude Code, Codex, Cursor, or any coding agent. **[Read the prompt →](https://manufact.com/prompt.md)**
 
 ```text
-Build and deploy an MCP app to Manufact Cloud for me.
-
-Follow these steps in order. Do not report success until every required check and the deployment have succeeded.
-
-1. Ask what MCP server or app I want to build. If I am not sure, recommend the example MCP Apps template so I can see a working interactive app, and use it unless I choose something else.
-
-2. Inspect the current workspace before creating files. Treat it as an existing mcp-use project when package.json depends on "mcp-use" or the source imports MCPServer from "mcp-use". Do not scaffold inside an existing mcp-use project or unrelated application.
-
-3. Authenticate the v2 CLI:
-   npx -y mcp-use@beta login
-
-4. Install the mcp-apps-builder skill for the coding agents available in the workspace, then read and follow it:
-   npx --yes skills add mcp-use/mcp-use --yes --skill mcp-apps-builder -a cursor -a claude-code -a codex
-
-5. If this is a new project, scaffold it with the MCP Apps template and work inside the generated directory:
-   npx -y create-mcp-use-app@beta my-mcp-app --template mcp-apps --install --skills
-   If this is an existing mcp-use project, modify it in place instead.
-
-6. Implement the tools and views we agreed on. Assign every statically declared tool to an exported constant. Keep model-facing content separate from view-facing structuredContent, and use typed output schemas for view-bound tools.
-
-7. Verify the project before deploying:
-   - Run npm run typecheck and npm run build.
-   - Add @mcp-use/client@beta as a development dependency with the project's package manager, then start the server.
-   - Connect with: npx mcp-use client connect local http://localhost:3000/mcp
-   - List tools with: npx mcp-use client local tools list
-   - Call representative tools with realistic inputs using: npx mcp-use client local tools call <tool-name> <key=value arguments>
-   - For every interactive view, capture and inspect a screenshot using: npx mcp-use screenshot --server local --tool <tool-name> <key=value arguments> --output <name>.png
-   - If a check fails, fix it and rerun the check. Never describe an interrupted, blocked, or failed check as passing.
-
-8. Ask whether I want a Manufact-managed repository or my own GitHub account or organization.
-   - For a Manufact-managed repository, deploy with:
-     npx -y mcp-use@beta deploy --no-github --yes
-   - For my own GitHub, ask which account or organization to use. Make sure the mcp-use GitHub App is installed there by opening https://github.com/apps/mcp-use/installations/new for me to authorize, push the project to a repository in that account or organization, then deploy with:
-     npx -y mcp-use@beta deploy --yes
-
-9. Wait for the deployment to reach a confirmed live state. If login, verification, build, or deployment is blocked or fails, stop and tell me exactly what needs attention.
-
-10. When it is live, give me:
-    - the MCP URL to connect clients; and
-    - the Manufact Cloud dashboard URL for analytics, evals, observability, and logs.
+Build an MCP server following https://manufact.com/prompt.md
 ```
 
-This is the same public prompt contract used by Manufact Cloud. Cloud may insert a short-lived login code and an organization, but it does not change the build, verification, or deployment instructions. The README never contains personalized credentials.
+The public prompt owns the complete build, verification, and deployment workflow, so people and agents always inspect and follow the same instructions.
 
 ## Why mcp-use v2
 
@@ -117,7 +78,17 @@ This is the same public prompt contract used by Manufact Cloud. Cloud may insert
 
 ## Quickstart: a typed MCP App
 
-The scaffold gives you the server, TypeScript configuration, development scripts, Inspector, and a React view pipeline. Replace its `index.ts` with a view-bound tool like this:
+The scaffold gives you the server, TypeScript configuration, development scripts, Inspector, and a React view pipeline. Start it once and the MCP endpoint also serves a client-ready landing page:
+
+<p align="center">
+  <a href="./static/readme/server-landing.jpg">
+    <img src="./static/readme/server-landing.jpg" alt="Generated mcp-use server landing page with its MCP URL and client installation guide" width="840">
+  </a>
+</p>
+
+<p align="center"><sub>Your generated server includes a shareable landing page, connection URL, and setup instructions for popular MCP clients.</sub></p>
+
+Replace its `index.ts` with a view-bound tool like this:
 
 ```typescript
 import { MCPServer } from "mcp-use";
@@ -216,6 +187,14 @@ export default function WeatherCard() {
 
 The model reads the concise `content` result. The view reads the typed `structuredContent` through `useToolContext()`, and `useCallTool()` can invoke exported server tools without duplicating their input or output types.
 
+<p align="center">
+  <a href="./static/readme/mcp-app-preview.jpg">
+    <img src="./static/readme/mcp-app-preview.jpg" alt="Interactive MCP App rendered inside the mcp-use Inspector" width="960">
+  </a>
+</p>
+
+<p align="center"><sub>Run the tool and interact with the view in the Inspector before testing it in an MCP client.</sub></p>
+
 [Build your first MCP App →](https://mcp-use.com/docs/typescript/mcp-apps/quickstart)
 
 ## Build, inspect, deploy
@@ -226,6 +205,14 @@ The model reads the concise `content` result. The view reads the typed `structur
 | **Inspect** | Open `http://localhost:3000/mcp/inspector` | Connect with `mcp-use client`, list tools, and invoke them from the terminal |
 | **Verify views** | Run tools and inspect the rendered app | Capture a PNG with `mcp-use screenshot` and inspect the image |
 | **Deploy** | Run `npm run deploy` | Use `mcp-use deploy --yes` and wait for a confirmed live state |
+
+<p align="center">
+  <a href="./static/readme/inspector-tool-call.jpg">
+    <img src="./static/readme/inspector-tool-call.jpg" alt="Calling a typed tool and viewing its MCP App response in the mcp-use Inspector" width="960">
+  </a>
+</p>
+
+<p align="center"><sub>The Inspector discovers your tools, validates their inputs, and renders MCP App responses beside the request.</sub></p>
 
 ```bash
 # Terminal verification against a running local server
