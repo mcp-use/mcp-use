@@ -30,7 +30,7 @@
     "knip": "knip",
     "knip:deps": "knip --dependencies --no-exit-code",
     "knip:production": "knip --production",
-    "docs:api": "pnpm build:client && typedoc --options typedoc.json",
+    "docs:api": "pnpm build:client && typedoc --options typedoc.options.json",
     "dev": "pnpm run -r --parallel dev",
     "prepare": "cd ../.. && husky libraries/typescript/.husky",
     "changeset": "changeset",
