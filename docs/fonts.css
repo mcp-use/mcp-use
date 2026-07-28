@@ -3,17 +3,16 @@
  * © 2009-2025 Adobe Systems Incorporated. All Rights Reserved.
  */
 
-@import url("https://p.typekit.net/p.css?s=1&k=zmy3zmk&ht=tk&f=55314&a=164646275&app=typekit&e=css");
+@import url('https://p.typekit.net/p.css?s=1&k=zmy3zmk&ht=tk&f=55314&a=164646275&app=typekit&e=css');
 
 @font-face {
-  font-family: "inter-variable";
-  src:
-    url("https://use.typekit.net/af/250efc/00000000000000007750957d/31/l?primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&fvd=n4&v=3")
-      format("woff2"),
-    url("https://use.typekit.net/af/250efc/00000000000000007750957d/31/d?primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&fvd=n4&v=3")
-      format("woff"),
-    url("https://use.typekit.net/af/250efc/00000000000000007750957d/31/a?primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&fvd=n4&v=3")
-      format("opentype");
+  font-family: 'inter-variable';
+  src: url('https://use.typekit.net/af/250efc/00000000000000007750957d/31/l?primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&fvd=n4&v=3')
+      format('woff2'),
+    url('https://use.typekit.net/af/250efc/00000000000000007750957d/31/d?primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&fvd=n4&v=3')
+      format('woff'),
+    url('https://use.typekit.net/af/250efc/00000000000000007750957d/31/a?primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&fvd=n4&v=3')
+      format('opentype');
   font-display: auto;
   font-style: normal;
   font-weight: 100 900;
@@ -21,60 +20,10 @@
 }
 
 body {
-  font-family: "inter-variable", sans-serif;
+  font-family: 'inter-variable', sans-serif;
 }
 
 #sidebar-content ul li a img {
   background: none !important;
 }
 
-html:not([data-current-path^="/v2/typescript/"]) {
-  --banner-height: 0px !important;
-}
-
-html:not([data-current-path^="/v2/typescript/"]) #banner {
-  min-height: 0 !important;
-  height: 0 !important;
-  padding: 0 !important;
-  overflow: hidden !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
-}
-
-html[data-current-path^="/v2/typescript/"] #banner {
-  background: #60a5fa !important;
-}
-
-[data-component-part="products-selector-trigger"] {
-  order: 1;
-}
-
-div:has(> [data-component-part="version-select-trigger"]) {
-  order: 2;
-}
-
-html[data-current-path^="/v2/typescript/"]
-  [data-component-part="version-select-trigger"]
-  > span::after {
-  content: "Beta";
-  display: inline-flex;
-  align-items: center;
-  margin-left: 0.5rem;
-  padding: 0 0.25rem;
-  border: 0;
-  border-radius: 4px;
-  background: #f5f5f4;
-  color: #57534e;
-  font-size: 0.75rem;
-  font-weight: 500;
-  line-height: 1rem;
-  letter-spacing: normal;
-  vertical-align: middle;
-}
-
-html.dark[data-current-path^="/v2/typescript/"]
-  [data-component-part="version-select-trigger"]
-  > span::after {
-  background: #44403c;
-  color: #a8a29e;
-}

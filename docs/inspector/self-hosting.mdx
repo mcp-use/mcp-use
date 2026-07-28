@@ -17,11 +17,7 @@ docker run -d -p 127.0.0.1:8080:8080 --name mcp-inspector mcpuse/inspector:lates
 Then open `http://localhost:8080` to access your self-hosted Inspector.
 
 <Warning>
-  Anyone who can reach the Inspector can use it to connect to and call your MCP
-  servers. The examples bind to `127.0.0.1` so the Inspector is only reachable
-  from the host itself. If you need remote access, put it behind a reverse proxy
-  with authentication and TLS, or restrict access with firewall rules — don't
-  publish port 8080 on all interfaces.
+Anyone who can reach the Inspector can use it to connect to and call your MCP servers. The examples bind to `127.0.0.1` so the Inspector is only reachable from the host itself. If you need remote access, put it behind a reverse proxy with authentication and TLS, or restrict access with firewall rules — don't publish port 8080 on all interfaces.
 </Warning>
 
 ## Deployment options
@@ -44,7 +40,7 @@ Then open `http://localhost:8080` to access your self-hosted Inspector.
           - "127.0.0.1:8080:8080"
         restart: unless-stopped
         healthcheck:
-          test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/inspector/health"]
+          test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/inspector"]
           interval: 30s
           timeout: 10s
           retries: 3
@@ -53,8 +49,7 @@ Then open `http://localhost:8080` to access your self-hosted Inspector.
 </Tabs>
 
 <Note>
-  The image is based on `node:22-alpine`, which ships `wget` (BusyBox) but not
-  `curl` — use `wget` in healthchecks.
+The image is based on `node:20-alpine`, which ships `wget` (BusyBox) but not `curl` — use `wget` in healthchecks.
 </Note>
 
 ## Ports
@@ -81,20 +76,17 @@ docker load -i mcp-inspector.tar
 ```
 
 <Note>
-  When connecting from a self-hosted Inspector to an MCP server on another host,
-  the browser must be able to reach the server directly, or you can use the
-  proxy connection mode. See [Connection settings](/inspector/connection-settings)
-  for when to use each.
+When connecting from a self-hosted Inspector to an MCP server on another host, the browser must be able to reach the server directly, or you can use the proxy connection mode. See [Connection settings](/inspector/connection-settings) for when to use each.
 </Note>
 
 ## Alternatives
 
 Self-hosting is one of three ways to run the Inspector:
 
-| Option      | Command                                                | Best for                                          |
-| ----------- | ------------------------------------------------------ | ------------------------------------------------- |
-| Hosted      | [inspector.mcp-use.com](https://inspector.mcp-use.com) | Quick testing, no install                         |
-| Local CLI   | `npx @mcp-use/inspector`                               | Local development                                 |
-| Self-hosted | `docker run mcpuse/inspector:latest`                   | Controlled, enterprise, or air-gapped deployments |
+| Option | Command | Best for |
+| --- | --- | --- |
+| Hosted | [inspector.mcp-use.com](https://inspector.mcp-use.com) | Quick testing, no install |
+| Local CLI | `npx @mcp-use/inspector` | Local development |
+| Self-hosted | `docker run mcpuse/inspector:latest` | Production, enterprise, air-gapped |
 
-`mcp-use dev` mounts the Inspector at `/mcp/inspector` by default. Production starts do not mount it unless you opt in with `mcp-use start --with-inspector`; when enabled, it uses the same integrated route. Treat that route as an internal tool and apply the access controls described above.
+Servers built with `mcp-use` also auto-mount the Inspector at `/inspector` — see the [Inspector overview](/inspector/index).
