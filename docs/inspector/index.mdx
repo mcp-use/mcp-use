@@ -1,10 +1,10 @@
 ---
 title: "Inspector"
-description: "Connect to an MCP server, run tools, inspect resources and prompts, and debug widgets."
+description: "Connect to an MCP server, run tools, inspect resources and prompts, and debug MCP App views."
 icon: "monitor"
 ---
 
-Use the Inspector when you need to test an MCP server from the browser. It lets you connect to a server, call tools with typed inputs, inspect resources and prompts, try chat, preview widgets, and copy client setup commands.
+Use the Inspector when you need to test an MCP server from the browser. It lets you connect to an HTTP MCP endpoint, call tools with typed inputs, inspect server metadata, resources, and prompts, try chat, preview MCP App views, and copy client setup commands.
 
 [![Try this live](/images/UseLiveSmall.svg)](https://inspector.mcp-use.com)
 
@@ -23,16 +23,16 @@ npm run dev
 
 The default local URLs are:
 
-| URL | Purpose |
-| --- | --- |
-| `http://localhost:3000/mcp` | MCP endpoint |
-| `http://localhost:3000/inspector` | Inspector UI |
+| URL                                   | Purpose      |
+| ------------------------------------- | ------------ |
+| `http://localhost:3000/mcp`           | MCP endpoint |
+| `http://localhost:3000/mcp/inspector` | Inspector UI |
 
 You can also open the hosted Inspector at [inspector.mcp-use.com](https://inspector.mcp-use.com) or run it with [`npx @mcp-use/inspector`](/inspector/cli).
 
 ## Connect to a server
 
-Add a server from the dashboard. Choose the transport, enter the MCP endpoint URL, and click **Connect**.
+Add a server from the dashboard, enter its HTTP or HTTPS MCP endpoint URL, and click **Connect**. The connection UI supports HTTP endpoints only; it does not offer an SSE transport selector.
 
 <Frame caption="Connection form">
   <img
@@ -41,13 +41,13 @@ Add a server from the dashboard. Choose the transport, enter the MCP endpoint UR
   />
 </Frame>
 
-For most local and public HTTP servers, use **Direct**. Use **Via Proxy** only when the browser cannot reach the server directly because of CORS or network policy. See [Connection settings](/inspector/connection-settings) for the short decision guide.
+Connection mode defaults to **Auto**. It tries a direct browser connection first, then falls back to the configured proxy when direct access fails. Choose **Direct** to test only the browser path, or **Proxy** to always route through the proxy. See [Connection settings](/inspector/connection-settings) for the decision guide.
 
-When a server requires OAuth, the Inspector starts the auth flow for you. Complete the provider approval and return to the Inspector; the server card changes to the connected state after auth finishes.
+When a server requires OAuth, it enters a pending authentication state. Click **Authenticate**, complete the provider approval, and return to the Inspector. The server connects after authentication finishes.
 
 ## Run a tool
 
-Open a connected server and select the **Tools** tab. Choose a tool, fill the generated form, and run it.
+Open a connected server and select **Tools**. Choose a tool, fill the generated form, and run it.
 
 <Frame caption="Server tools">
   <img
@@ -56,7 +56,7 @@ Open a connected server and select the **Tools** tab. Choose a tool, fill the ge
   />
 </Frame>
 
-The Inspector shows the tool result, structured content, errors, and any widget returned by the tool. Use this view to verify schema validation, result shape, and widget data before testing the same server from a client.
+The Inspector shows the tool result, structured content, errors, and any MCP App view associated with the tool. Use this view to verify schema validation, result shape, and view data before testing the same server from a client.
 
 ## Inspect resources and prompts
 
@@ -64,23 +64,27 @@ Use **Resources** to read server-provided content by URI. Use **Prompts** to tes
 
 These tabs are useful when a client reports missing context. They show what the server actually exposes after connection and auth.
 
+## Navigate a connected server
+
+The connected-server navigation uses these views: **Server Metadata**, **Chat**, **Tools**, **Prompts**, **Resources**, **Sampling**, **Elicitation**, **Notifications**, and **Connection Settings**. Availability depends on the server's capabilities and connection type; for example, **Sampling** is available for compatible stateful connections.
+
 ## Try chat
 
 Use **Chat** to test how an LLM calls your server's tools in a conversation. The chat view can use hosted chat where available or a provider key stored in your browser.
 
-Keep chat testing focused on end-to-end behavior. Use the Tools tab first when you need to isolate input schemas, tool errors, or widget rendering.
+Keep chat testing focused on end-to-end behavior. Use the Tools tab first when you need to isolate input schemas, tool errors, or view rendering.
 
-## Debug widgets
+## Debug MCP App views
 
-When a tool returns an MCP App widget, the Inspector renders it below the tool result and exposes widget debug controls.
+When a tool has an MCP App view, the Inspector renders it below the tool result and exposes view debug controls.
 
-Use the widget view to check:
+Use the view debug controls to check:
 
-- the `props`, `output`, and metadata passed to the widget
+- the tool result, structured content, and app metadata passed to the view
 - inline, picture-in-picture, and fullscreen display modes
-- desktop, tablet, and mobile layout behavior
+- desktop, mobile, and custom viewport behavior
 - theme, locale, timezone, hover, touch, and safe-area settings
-- Content Security Policy behavior before trying the widget in a host
+- Content Security Policy behavior before trying the view in a host
 
 See [Debug widgets in the Inspector](/inspector/debugging-chatgpt-apps) for the full workflow.
 
@@ -109,11 +113,19 @@ For the full shortcut list, see [Keyboard shortcuts](/inspector/keyboard-shortcu
   <Card title="CLI usage" icon="terminal" href="/inspector/cli">
     Run the Inspector from the command line and auto-connect to a server.
   </Card>
-  <Card title="Connection settings" icon="settings" href="/inspector/connection-settings">
-    Choose Direct or Via Proxy and tune connection details only when needed.
+  <Card
+    title="Connection settings"
+    icon="settings"
+    href="/inspector/connection-settings"
+  >
+    Choose Auto, Direct, or Proxy and tune connection details only when needed.
   </Card>
-  <Card title="Debug widgets" icon="bug" href="/inspector/debugging-chatgpt-apps">
-    Test MCP Apps widgets, layout behavior, CSP, and display modes.
+  <Card
+    title="Debug MCP App views"
+    icon="bug"
+    href="/inspector/debugging-chatgpt-apps"
+  >
+    Test MCP App views, layout behavior, CSP, and display modes.
   </Card>
   <Card title="Mount the Inspector" icon="plug-2" href="/inspector/integration">
     Serve the Inspector from an Express, Hono, or mcp-use server.

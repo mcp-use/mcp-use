@@ -1,0 +1,195 @@
+---
+title: "Deploy to Manufact Cloud"
+description: "Deploy an MCP server from GitHub to Manufact Cloud"
+icon: "/images/logo-mcp-use.svg"
+---
+
+Manufact Cloud deploys a GitHub-backed `mcp-use` server and provides its
+hosted MCP URL, deployments, logs, environment variables, and client
+connection settings.
+
+## Prerequisites
+
+Before deploying:
+
+- Build the server with `mcp-use`.
+- Commit it to an existing Git repository.
+- Configure `origin` as a supported GitHub repository.
+- Push the branch you intend to deploy.
+- Install the Manufact GitHub App with access to that repository.
+- Sign in to a Manufact organization.
+
+Projects created with `create-mcp-use-app@beta` already contain the `mcp-use`
+executable and a `deploy` script. In another project, install the package:
+
+```bash
+npm install mcp-use@beta
+```
+
+Confirm the repository and branch before deploying:
+
+```bash
+git remote get-url origin
+git branch --show-current
+git status --short
+```
+
+The CLI does not initialize Git, create a repository, commit, push, install
+the GitHub App, or upload local source. Configure those prerequisites first.
+
+## Sign in
+
+```bash
+npx mcp-use login
+npx mcp-use whoami
+```
+
+For a non-interactive environment, use one supported credential flow:
+
+```bash
+npx mcp-use login --api-key "${MCP_USE_API_KEY}" --org YOUR_ORG
+```
+
+or:
+
+```bash
+npx mcp-use login --device-code YOUR_PREAPPROVED_CODE --org YOUR_ORG
+```
+
+`--api-key` and `--device-code` are mutually exclusive.
+
+## Start the first deployment
+
+Run from the server project directory:
+
+```bash
+npx mcp-use deploy --name my-server
+```
+
+The first deploy:
+
+1. Resolves the GitHub repository from `origin`.
+2. Confirms that the Manufact GitHub App can access it.
+3. Creates a Git-backed cloud server and starts a deployment.
+4. Writes the non-secret project link to `.mcp-use/cloud/link.json`.
+5. Prints the server ID, deployment ID, pending status, and dashboard URL.
+
+The command starts the deployment; it does not wait for the build to finish.
+
+<Note>
+  `.mcp-use/cloud/link.json` is the only project-local cloud linkage. Later
+  deploys reuse its organization and server IDs.
+</Note>
+
+## Follow the build
+
+Use the deployment ID printed by `deploy`:
+
+```bash
+npx mcp-use deployments get DEPLOYMENT_ID
+npx mcp-use deployments logs DEPLOYMENT_ID --build --follow
+```
+
+Build-log following is a separate command. Once the deployment is running,
+read its recent runtime logs with:
+
+```bash
+npx mcp-use deployments logs DEPLOYMENT_ID
+```
+
+List deployments when you need to recover an ID:
+
+```bash
+npx mcp-use deployments list --server SERVER_ID
+```
+
+## Redeploy and create another server
+
+With a link file present, this starts another deployment on the linked server:
+
+```bash
+npx mcp-use deploy
+```
+
+Pass `--new` to ignore the existing link and create a separate cloud server:
+
+```bash
+npx mcp-use deploy --new
+```
+
+Use `--yes` only when intentionally accepting non-interactive confirmations:
+
+```bash
+npx mcp-use deploy --new --yes
+```
+
+## Implemented deploy flags
+
+The command accepts:
+
+| Flag                        | Purpose                                              |
+| --------------------------- | ---------------------------------------------------- |
+| `[path]`                    | Project directory; defaults to the current directory |
+| `--org <id-or-slug>`        | Select the Manufact organization                     |
+| `--name <name>`             | Set the server name on creation                      |
+| `--branch <name>`           | Deploy a branch instead of the current branch        |
+| `--root-dir <path>`         | Repository-relative app root                         |
+| `--region <region>`         | Select an API-supported region                       |
+| `--env <KEY=VALUE>`         | Add an environment value; repeatable                 |
+| `--env-file <path>`         | Load environment values from a file                  |
+| `--build-command <command>` | Override the detected build command                  |
+| `--start-command <command>` | Override the detected start command                  |
+| `--dockerfile <path>`       | Use a repository-relative Dockerfile                 |
+| `--new`                     | Create a new server instead of reusing the link      |
+| `--open`                    | Open the dashboard after deployment starts           |
+| `--yes`                     | Accept confirmation prompts                          |
+| `--json`                    | Emit machine-readable output                         |
+
+`--root-dir` and `--dockerfile` must stay inside the repository. Repeated
+`--env` entries override duplicate keys loaded from `--env-file`, and the CLI
+does not echo uploaded values.
+
+Creation settings are applied when a server is created. For an existing
+server, use `mcp-use servers update` for supported mutable settings and
+`mcp-use servers env set` or `unset` for environment changes.
+
+Deployments always use the configured GitHub repository. The command does not
+create a platform-managed repository or upload a local source archive.
+
+## Monorepo example
+
+Deploy one app from an existing GitHub monorepo:
+
+```bash
+npx mcp-use deploy \
+  --name inventory-mcp \
+  --root-dir apps/inventory \
+  --build-command "npm run build" \
+  --start-command "npm start"
+```
+
+Repository-relative paths are resolved from the Git root even when the command
+is run inside the app directory.
+
+## Connect a client
+
+After the deployment is running, copy the exact generated MCP URL from the
+Manufact dashboard. Do not infer a hostname from the server slug; the
+dashboard is authoritative for generated and custom domains.
+
+```bash
+export MCP_URL="PASTE_THE_GENERATED_MCP_URL"
+npx mcp-use client connect production "${MCP_URL}"
+npx mcp-use client production tools list
+```
+
+Use that same exact URL in any other MCP client configuration.
+
+## More cloud operations
+
+- [Creating servers](https://docs.manufact.com/dashboard/servers)
+- [Deployments](https://docs.manufact.com/dashboard/deployments)
+- [Build and runtimes](https://docs.manufact.com/dashboard/build-runtimes)
+- [Environment variables](https://docs.manufact.com/dashboard/environment-variables)
+- [Runtime logs](https://docs.manufact.com/dashboard/logs)
+- [Connecting clients](https://docs.manufact.com/dashboard/connect-clients)

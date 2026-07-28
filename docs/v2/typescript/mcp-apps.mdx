@@ -1,0 +1,193 @@
+---
+title: "Overview"
+description: "Understand how MCP tools render interactive UI with mcp-use."
+icon: "blocks"
+---
+
+MCP Apps let your tools render interactive UI inside AI conversations. Build a View when users need to explore data, complete a form, review a preview, or act on a tool result.
+
+An MCP App combines three parts:
+
+- an `MCPServer`
+- a tool bound to a View
+- a React component under `views/`
+
+<video
+  alt="Interactive MCP App View"
+  style={{
+    maxWidth: "600px",
+    borderRadius: "8px",
+    marginBottom: "1.5rem",
+    boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+  }}
+  muted
+  autoPlay
+  loop
+>
+  <source src="/images/widget.mp4" type="video/mp4" />
+</video>
+
+## How a tool renders a View
+
+Add `view: { name }` to a tool definition. The name must match a directory under `views/`.
+
+```text
+product-search/
+├── index.ts
+├── views/
+│   └── product-results/
+│       └── view.tsx
+├── public/
+├── mcp-env.d.ts
+└── package.json
+```
+
+The View-bound tool must declare an `outputSchema`. Its handler returns a normal MCP tool result with matching `structuredContent`.
+
+```typescript
+import { MCPServer } from "mcp-use";
+import { z } from "zod";
+
+const server = new MCPServer({
+  name: "product-search",
+  version: "1.0.0",
+});
+
+const productResultsSchema = z.object({
+  query: z.string(),
+  results: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+    }),
+  ),
+});
+
+const products = [
+  { id: "starter-kit", name: "Starter kit" },
+  { id: "travel-kit", name: "Travel kit" },
+];
+
+export const searchProducts = server.tool(
+  {
+    name: "search-products",
+    inputSchema: z.object({
+      query: z.string(),
+    }),
+    outputSchema: productResultsSchema,
+    view: {
+      name: "product-results",
+      description: "Product search results",
+      prefersBorder: true,
+    },
+  },
+  async ({ query }) => {
+    const results = products.filter(({ name }) =>
+      name.toLowerCase().includes(query.toLowerCase()),
+    );
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Found ${results.length} products matching "${query}".`,
+        },
+      ],
+      structuredContent: {
+        query,
+        results,
+      },
+    };
+  },
+);
+
+export default server;
+```
+
+Each View can be bound to at most one tool. Export the tool reference so mcp-use can infer its input and output types inside the View.
+
+## Read the tool result in the View
+
+A View default-exports a React component. The component receives no React props. Read the tool lifecycle and result with `useToolContext()`.
+
+```tsx
+import { useToolContext } from "mcp-use/react";
+
+export default function ProductResults() {
+  const { status, toolInput, toolOutput, error } =
+    useToolContext<"search-products">();
+
+  if (status === "error") {
+    return <p>{error.message}</p>;
+  }
+
+  if (status === "pending") {
+    return <p>Searching for {toolInput?.query ?? "products"}…</p>;
+  }
+
+  return (
+    <main>
+      <h2>Results for “{toolOutput.query}”</h2>
+      <ul>
+        {toolOutput.results.map(({ id, name }) => (
+          <li key={id}>{name}</li>
+        ))}
+      </ul>
+    </main>
+  );
+}
+```
+
+## Choose what the model and View receive
+
+MCP tool results provide separate channels for conversation output, structured data, and View-only metadata.
+
+| Channel             | Model receives it? | View receives it?    | Use it for                                                        |
+| ------------------- | ------------------ | -------------------- | ----------------------------------------------------------------- |
+| `content`           | Yes                | Yes, as `content`    | A concise result for the conversation and text-only clients       |
+| `structuredContent` | Yes                | Yes, as `toolOutput` | Typed data that the model can reason over and the View can render |
+| `_meta`             | No                 | Yes, as `meta`       | Data that is not visible to the model                             |
+
+Do not place secrets in any result channel. A View runs on the client and can read its result data.
+
+Clients that do not render MCP Apps can still use the tool's `content` and `structuredContent`. Use `ctx.client.supportsViews()` only when a text-only client needs materially different output.
+
+## Continue building
+
+<CardGroup cols={2}>
+  <Card
+    title="Build your first MCP App"
+    icon="rocket"
+    href="/v2/typescript/mcp-apps/quickstart"
+  >
+    Create a project, run it locally, and render its View in the Inspector.
+  </Card>
+  <Card
+    title="Build Views"
+    icon="panel-top"
+    href="/v2/typescript/mcp-apps/widgets"
+  >
+    Bind a tool to a React component and handle its result.
+  </Card>
+  <Card
+    title="Interactivity"
+    icon="mouse-pointer-click"
+    href="/v2/typescript/mcp-apps/interactivity"
+  >
+    Call tools, open links, send follow-up messages, and change display modes.
+  </Card>
+  <Card
+    title="Model context"
+    icon="brain"
+    href="/v2/typescript/mcp-apps/model-context"
+  >
+    Expose View state and visible UI information to future model turns.
+  </Card>
+  <Card
+    title="Content Security Policy"
+    icon="shield"
+    href="/v2/typescript/mcp-apps/content-security-policy"
+  >
+    Allow the external APIs, assets, and embedded content your View needs.
+  </Card>
+</CardGroup>
