@@ -6,6 +6,7 @@
 
 import type { AuthInfo, OAuthMetadata } from "@modelcontextprotocol/server";
 
+import { oauthEnvironmentValue } from "./environment.js";
 import {
   booleanValue,
   createJwtVerifier,
@@ -45,16 +46,20 @@ export interface Auth0OAuthUser {
 
 /** Configures Auth0 JWT verification and protected-resource metadata. */
 export interface Auth0OAuthProviderOptions extends OAuthResourceOptions {
-  /** Auth0 tenant domain or issuer URL. */
-  domain: URL | string;
+  /**
+   * Auth0 tenant domain or issuer URL.
+   *
+   * @defaultValue `MCP_USE_OAUTH_AUTH0_DOMAIN`
+   */
+  domain?: URL | string;
 }
 
 /**
  * Creates a provider that verifies Auth0 access tokens and maps their claims.
  *
- * @param options - Auth0 domain and resource-server settings.
+ * @param options - Auth0 domain and resource-server settings. Defaults to v1 environment variables.
  * @returns A provider that rejects tokens not issued for the resolved MCP resource.
- * @throws A `TypeError` if `domain` is not a valid HTTP or HTTPS URL.
+ * @throws An `Error` if no domain is configured, or a `TypeError` if it is not a valid HTTP or HTTPS URL.
  *
  * @example
  * ```ts
@@ -66,11 +71,22 @@ export interface Auth0OAuthProviderOptions extends OAuthResourceOptions {
  * ```
  */
 export function oauthAuth0Provider(
-  options: Auth0OAuthProviderOptions
+  options: Auth0OAuthProviderOptions = {}
 ): OAuthProvider<Auth0OAuthUser> {
-  const issuer = normalizedProviderUrl(options.domain, "Auth0 domain").href;
-  return oauthCustomProvider<Auth0OAuthUser>({
+  const domain =
+    options.domain ?? oauthEnvironmentValue("MCP_USE_OAUTH_AUTH0_DOMAIN");
+  const audience = oauthEnvironmentValue("MCP_USE_OAUTH_AUTH0_AUDIENCE");
+  if (domain === undefined) {
+    throw new Error("Auth0 domain is required.");
+  }
+  const resolvedOptions = {
     ...options,
+    ...(options.resource === undefined &&
+      audience !== undefined && { resource: audience }),
+  };
+  const issuer = normalizedProviderUrl(domain, "Auth0 domain").href;
+  return oauthCustomProvider<Auth0OAuthUser>({
+    ...resolvedOptions,
     createTokenVerifier: (resource) =>
       createJwtVerifier({
         issuer,

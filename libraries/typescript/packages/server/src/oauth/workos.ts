@@ -6,6 +6,7 @@
 
 import type { AuthInfo, OAuthMetadata } from "@modelcontextprotocol/server";
 
+import { oauthEnvironmentValue } from "./environment.js";
 import {
   booleanValue,
   createJwtVerifier,
@@ -51,16 +52,20 @@ export interface WorkOSOAuthUser {
 
 /** Configures WorkOS JWT verification and protected-resource metadata. */
 export interface WorkOSOAuthProviderOptions extends OAuthResourceOptions {
-  /** AuthKit subdomain, with or without the `https://` scheme. */
-  subdomain: string;
+  /**
+   * AuthKit subdomain, with or without the `https://` scheme.
+   *
+   * @defaultValue `MCP_USE_OAUTH_WORKOS_SUBDOMAIN`
+   */
+  subdomain?: string;
 }
 
 /**
  * Creates a provider that verifies WorkOS access tokens and maps their claims.
  *
- * @param options - WorkOS AuthKit origin and resource-server settings.
+ * @param options - WorkOS AuthKit origin and resource-server settings. Defaults to v1 environment variables.
  * @returns A provider that rejects tokens not issued for the resolved MCP resource.
- * @throws A `TypeError` if `subdomain` is empty or uses a non-HTTPS URL.
+ * @throws An `Error` if no subdomain is configured, or a `TypeError` if it is empty or uses a non-HTTPS URL.
  *
  * @example
  * ```ts
@@ -72,9 +77,15 @@ export interface WorkOSOAuthProviderOptions extends OAuthResourceOptions {
  * ```
  */
 export function oauthWorkOSProvider(
-  options: WorkOSOAuthProviderOptions
+  options: WorkOSOAuthProviderOptions = {}
 ): OAuthProvider<WorkOSOAuthUser> {
-  const issuer = workosIssuer(options.subdomain);
+  const subdomain =
+    options.subdomain ??
+    oauthEnvironmentValue("MCP_USE_OAUTH_WORKOS_SUBDOMAIN");
+  if (subdomain === undefined) {
+    throw new Error("WorkOS subdomain is required.");
+  }
+  const issuer = workosIssuer(subdomain);
   return oauthCustomProvider<WorkOSOAuthUser>({
     ...options,
     createTokenVerifier: (resource) =>

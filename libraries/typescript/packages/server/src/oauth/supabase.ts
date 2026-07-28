@@ -6,6 +6,7 @@
 
 import type { AuthInfo, OAuthMetadata } from "@modelcontextprotocol/server";
 
+import { oauthEnvironmentValue } from "./environment.js";
 import { isRecord } from "./guards.js";
 import {
   createJwtVerifier,
@@ -57,11 +58,23 @@ export interface SupabaseAmr {
 
 /** Configures Supabase JWT verification and protected-resource metadata. */
 export interface SupabaseOAuthProviderOptions extends OAuthResourceOptions {
-  /** Supabase project identifier used to derive `supabaseUrl`. */
+  /**
+   * Supabase project identifier used to derive `supabaseUrl`.
+   *
+   * @defaultValue `MCP_USE_OAUTH_SUPABASE_PROJECT_ID`
+   */
   projectId?: string;
-  /** Full Supabase project URL. Takes precedence over `projectId`. */
+  /**
+   * Full Supabase project URL. Takes precedence over `projectId`.
+   *
+   * @defaultValue `MCP_USE_OAUTH_SUPABASE_URL`
+   */
   supabaseUrl?: URL | string;
-  /** Legacy HS256 JWT secret. Omit to verify ES256 tokens against project JWKS. */
+  /**
+   * Legacy HS256 JWT secret. Omit to verify ES256 tokens against project JWKS.
+   *
+   * @defaultValue `MCP_USE_OAUTH_SUPABASE_JWT_SECRET`
+   */
   jwtSecret?: string;
   /**
    * Expected access-token audience.
@@ -74,7 +87,7 @@ export interface SupabaseOAuthProviderOptions extends OAuthResourceOptions {
 /**
  * Creates a provider that verifies Supabase access tokens and maps their claims.
  *
- * @param options - Supabase project or URL, optional JWT secret/audience, and resource-server settings.
+ * @param options - Supabase project or URL, optional JWT secret/audience, and resource-server settings. Defaults to v1 environment variables.
  * @returns A provider that rejects tokens without a valid configured Supabase signature and issuer.
  * @throws A `TypeError` if project settings are invalid, `audience` is empty,
  * or `jwtSecret` is shorter than 32 bytes.
@@ -89,12 +102,28 @@ export interface SupabaseOAuthProviderOptions extends OAuthResourceOptions {
  * ```
  */
 export function oauthSupabaseProvider(
-  options: SupabaseOAuthProviderOptions
+  options: SupabaseOAuthProviderOptions = {}
 ): OAuthProvider<SupabaseOAuthUser> {
-  const supabaseUrl = resolveSupabaseUrl(options);
+  const projectId =
+    options.projectId ??
+    oauthEnvironmentValue("MCP_USE_OAUTH_SUPABASE_PROJECT_ID");
+  const configuredSupabaseUrl =
+    options.supabaseUrl ?? oauthEnvironmentValue("MCP_USE_OAUTH_SUPABASE_URL");
+  const jwtSecret =
+    options.jwtSecret ??
+    oauthEnvironmentValue("MCP_USE_OAUTH_SUPABASE_JWT_SECRET");
+  const resolvedOptions = {
+    ...options,
+    ...(projectId !== undefined && { projectId }),
+    ...(configuredSupabaseUrl !== undefined && {
+      supabaseUrl: configuredSupabaseUrl,
+    }),
+    ...(jwtSecret !== undefined && { jwtSecret }),
+  };
+  const supabaseUrl = resolveSupabaseUrl(resolvedOptions);
   const issuer = providerEndpoint(supabaseUrl, "auth/v1").replace(/\/$/, "");
-  const secret = options.jwtSecret;
-  const audience = options.audience ?? "authenticated";
+  const secret = resolvedOptions.jwtSecret;
+  const audience = resolvedOptions.audience ?? "authenticated";
   if (typeof audience !== "string" || audience.trim().length === 0) {
     throw new TypeError("Supabase audience must be non-empty");
   }
@@ -102,7 +131,7 @@ export function oauthSupabaseProvider(
     throw new TypeError("Supabase jwtSecret must be at least 32 bytes");
   }
   return oauthCustomProvider<SupabaseOAuthUser>({
-    ...options,
+    ...resolvedOptions,
     createTokenVerifier: (resource) =>
       createJwtVerifier({
         issuer,
