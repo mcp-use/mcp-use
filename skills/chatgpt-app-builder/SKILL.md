@@ -5,7 +5,7 @@ description: Build, modify, debug, or review ChatGPT Apps with mcp-use.
 
 # Build ChatGPT Apps with mcp-use
 
-Mcp-use is the full stack TypeScript framework for building MCP servers and MCP apps to plug-ins and Claude connectors
+mcp-use is the full stack TypeScript framework for building MCP servers and MCP apps to plug-ins and Claude connectors
 
 Use it to build fully typed MCP servers with tools, resources, prompts, 1 line oauth authentication adapters, middleware, production transports, a built-in Inspector, and headless tooling.
 
