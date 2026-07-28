@@ -6,7 +6,7 @@
     </picture>
   </a>
 
-  <h1>The TypeScript framework for MCP.</h1>
+  <h1>The TypeScript framework for MCP</h1>
 
   <p>
     Build, test, and ship MCP servers, ChatGPT plugins, Claude connectors, and interactive apps with typed tools, native Views, and a built-in Inspector.
