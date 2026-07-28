@@ -8,11 +8,11 @@
   <ul align="center" style="list-style: none;">
     <summary>
       <h1>The TypeScript framework for MCP</h1>
+    <h3>Build, test, and ship MCP servers, ChatGPT plugins, Claude connectors</h3>
     </summary>
   </ul>
 </div>
   
-  <h3>Build, test, and ship MCP servers, ChatGPT plugins, Claude connectors</h3>
 
   <p>
     Fully Typed, native Views and MCP Apps support, built-in Inspector and first class Agent experience.
@@ -46,47 +46,43 @@
 </div>
 
 > [!NOTE]
-> **TypeScript v2 is in beta.** Use the npm `beta` channel with Node.js **22.22.2 or newer**. [Python and TypeScript v1 →](#ecosystem)
+> **TypeScript v2 is in beta.** It's a major improvement over v1. Use the npm `beta` tag. [Python and TypeScript v1 →](#ecosystem)
 >
-> **Migrating from v1?** Most existing v1 servers can upgrade to `mcp-use@beta` without code changes through the included compatibility layer. To get the full benefits of v2, we recommend migrating to the native v2 API.
->
-> **Give it to your agent:**
+> **Migrating from v1? Give it to your agent:** [Read the migration guide →](https://docs.mcp-use.com/v2/server/migration)
 >
 > ```text
-> Migrate this mcp-use project to v2 following
-> https://docs.mcp-use.com/v2/server/migration
+> Migrate this mcp-use project to v2 following https://docs.mcp-use.com/v2/server/migration
 > ```
->
-> [Read the migration guide →](https://docs.mcp-use.com/v2/server/migration)
 
 ## Get started
 
-<table width="100%" style="width: 100%; table-layout: fixed;">
-  <colgroup>
-    <col width="50%">
-    <col width="50%">
-  </colgroup>
-  <thead>
-    <tr>
-      <th width="50%">Start with code</th>
-      <th width="50%">Start with your agent</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td width="50%" valign="top">
-        <pre lang="bash"><code>npx -y create-mcp-use-app@beta # create an MCP app</code></pre>
-        <p>Run <code>npm run dev</code> in the generated project.</p>
-        <p>Open <a href="http://localhost:3000/mcp/inspector"><code>http://localhost:3000/mcp/inspector</code></a></p>
-        <p><a href="https://mcp-use.com/docs/typescript/getting-started/quickstart">TS Docs</a></p>
-      </td>
-      <td width="50%" valign="top">
-        <pre lang="text"><code>Build an MCP server: https://mcp-use.com/prompt.md</code></pre>
-        <p><a href="https://mcp-use.com/prompt.md">Read the prompt →</a></p>
-      </td>
-    </tr>
-  </tbody>
-</table>
+### Start with your agent
+
+<details>
+<summary>Prompt for your agent</summary>
+
+```text
+Build an MCP server: https://mcp-use.com/prompt.md
+```
+
+</details>
+
+[Read the prompt →](https://mcp-use.com/prompt.md)
+
+### Start with code
+
+<details>
+<summary><code>npx -y create-mcp-use-app@beta</code></summary>
+
+```bash
+npx -y create-mcp-use-app@beta
+```
+
+</details>
+
+Run `npm run dev` in the generated project · open [`http://localhost:3000/mcp/inspector`](http://localhost:3000/mcp/inspector)
+
+[TS Docs](https://mcp-use.com/docs/typescript/getting-started/quickstart)
 
 ## Everything you need to ship MCP
 
