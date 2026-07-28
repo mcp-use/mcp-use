@@ -65,6 +65,19 @@ https://mcp-use.com/prompt.md</code></pre>
   </tbody>
 </table>
 
+## Migrate from v1
+
+Most existing v1 servers can upgrade to `mcp-use@beta` without code changes through the included compatibility layer. To get the full benefits of v2, we recommend migrating to the native v2 API.
+
+**Give it to your agent:**
+
+```text
+Migrate this mcp-use project to v2 following
+https://docs.mcp-use.com/v2/server/migration
+```
+
+[Read the migration guide →](https://docs.mcp-use.com/v2/server/migration)
+
 ## Everything you need to ship MCP
 
 <table>
