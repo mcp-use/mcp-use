@@ -12,7 +12,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-EXPECTED_DEFAULT_MCP_USE_VERSION="2.0.0-beta.36"
+EXPECTED_DEFAULT_MCP_USE_VERSION="$(node -e 'fetch("https://registry.npmjs.org/mcp-use", { headers: { Accept: "application/vnd.npm.install-v1+json" } }).then(response => { if (!response.ok) throw new Error(`npm registry returned ${response.status}`); return response.json(); }).then(metadata => process.stdout.write(metadata["dist-tags"].beta))')"
 
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
