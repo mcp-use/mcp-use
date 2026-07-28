@@ -1,0 +1,60 @@
+---
+title: "Elicitation"
+description: "Handle interactive user input requests from MCP servers"
+icon: "check"
+---
+
+Servers can ask the client for user input mid-tool-call via `elicitation/create`. Two modes:
+
+- **Form** — structured fields with a JSON schema
+- **URL** — redirect the user to an external page (required for credentials/OAuth)
+
+## Setup
+
+```typescript
+import {
+  acceptWithDefaults,
+  MCPClient,
+  type OnElicitationCallback,
+} from "@mcp-use/client";
+
+const onElicitation: OnElicitationCallback = async (params) => {
+  if (params.mode === "url") {
+    console.log(`Visit: ${params.url}`);
+    return { action: "accept" };
+  }
+  // Form mode — collect fields from params.requestedSchema
+  return acceptWithDefaults(params);
+};
+
+const client = new MCPClient(config, { onElicitation });
+```
+
+## Helpers
+
+Import from `@mcp-use/client`:
+
+| Helper | Purpose |
+| ------ | ------- |
+| `acceptWithDefaults(params)` | Accept using schema defaults |
+| `accept(content)` | Accept with user content |
+| `decline()`, `cancel()` | Reject or dismiss |
+| `validate(params, content)` | Client-side validation |
+| `getDefaults`, `applyDefaults` | Work with schema defaults |
+
+## React
+
+```tsx
+const mcp = useMcp({
+  url: "http://localhost:3000/mcp",
+  onElicitation: (params) => acceptWithDefaults(params),
+});
+```
+
+With the provider, use `pendingElicitationRequests` and `approveElicitation` / `rejectElicitation`.
+
+Without an `onElicitation` handler, tool calls that require input will fail.
+
+## Reference
+
+Server-side: [Elicitation](/v2/typescript/server/elicitation)

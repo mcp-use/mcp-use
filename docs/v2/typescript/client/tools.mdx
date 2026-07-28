@@ -1,0 +1,69 @@
+---
+title: "Tools"
+description: "List and call MCP server tools"
+icon: "wrench"
+---
+
+Use a ready `MCPConnection` to list and call tools.
+
+```typescript
+import { MCPClient } from "@mcp-use/client";
+
+const client = new MCPClient({
+  mcpServers: { demo: { url: "http://localhost:3000/mcp" } },
+});
+
+try {
+  const conn = await client.connect("demo");
+
+  const tools = await conn.listTools();
+  for (const tool of tools) {
+    console.log(tool.name, tool.description);
+  }
+
+  const result = await conn.callTool("read_file", { path: "/tmp/a.txt" });
+
+  if (result.isError) {
+    console.error(result.content);
+  } else {
+    for (const block of result.content) {
+      if (block.type === "text") console.log(block.text);
+    }
+  }
+} finally {
+  await client.close();
+}
+```
+
+## Timeouts
+
+Pass MCP request options as the third argument:
+
+```typescript
+const abortController = new AbortController();
+
+await conn.callTool(
+  "long_task",
+  { input: "data" },
+  {
+    timeout: 300_000,
+    resetTimeoutOnProgress: true,
+    maxTotalTimeout: 900_000,
+    signal: abortController.signal,
+  },
+);
+```
+
+## Lazy connect
+
+```typescript
+let conn = client.getSession("demo");
+if (!conn) conn = await client.connect("demo");
+await conn.callTool("echo", { message: "hello" });
+```
+
+`getSession` returns `null` when not connected. `requireSession` throws.
+
+## Reference
+
+[`MCPConnection`](https://mcp-use-typescript-api-reference.vercel.app/modules/_mcp-use_client.index.html#mcpconnection) — `listTools`, `callTool`, and request options.
