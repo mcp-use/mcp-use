@@ -1,17 +1,14 @@
 <div align="center">
   <a href="https://mcp-use.com">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="./static/logo_white.svg">
-      <source media="(prefers-color-scheme: light)" srcset="./static/logo_black.svg">
-      <img alt="mcp-use" src="./static/logo_black.svg" width="60%">
-    </picture>
+    <img alt="mcp-use" src="./docs/images/logo-mcp-use.svg" width="96">
   </a>
+</div>
 
-  <h1>Build MCP servers and apps that run anywhere.</h1>
+# The TypeScript framework to build ChatGPT plugins, Cloud connectors, and MCP servers.
 
+<div align="center">
   <p>
-    The TypeScript framework for building, testing, and shipping MCP on the official v2 SDK:
-    typed tools, interactive apps, a built-in Inspector, and stateless HTTP.
+    mcp-use is the most complete TypeScript framework for building, testing, and shipping ChatGPT apps and plugins, Cloud connectors, and MCP servers. Built on the new MCP v2 specification, it brings typed tools, interactive apps, a built-in Inspector, agent-first workflows, and headless automation into one framework.
   </p>
 
   <p>
@@ -19,11 +16,6 @@
     · <a href="https://inspector.mcp-use.com/inspector"><strong>Inspector</strong></a>
     · <a href="#examples"><strong>Examples</strong></a>
     · <a href="https://manufact.com"><strong>Deploy</strong></a>
-  </p>
-
-  <p>
-    <a href="#start-with-code"><strong>Start with code</strong></a>
-    · <a href="#start-with-your-agent"><strong>Start with your agent</strong></a>
   </p>
 
   <p>
@@ -42,39 +34,60 @@
 > [!NOTE]
 > **mcp-use v2 for TypeScript is in beta.** The examples below intentionally use the npm `beta` tag and require Node.js **22.22.2 or newer**. Python and the stable TypeScript v1 packages remain available through the [ecosystem links](#ecosystem).
 
-## Choose how you build
+## Get started
 
-Start from the terminal or give the same job to your coding agent. Both paths produce a typed MCP server with an interactive app, local Inspector, verification loop, and production deployment.
+<table>
+  <thead>
+    <tr>
+      <th width="50%">Start with code</th>
+      <th width="50%">Start with your agent</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td valign="top">
+        <pre lang="bash"><code>npx -y create-mcp-use-app@beta</code></pre>
+        <p>Run <code>npm run dev</code> in the generated project.</p>
+        <p>
+          <a href="http://localhost:3000/mcp"><code>localhost:3000/mcp</code></a>
+          · <a href="http://localhost:3000/mcp/inspector">Open Inspector →</a>
+        </p>
+        <p><a href="https://mcp-use.com/docs/typescript/getting-started/quickstart">Read the TypeScript docs →</a></p>
+      </td>
+      <td valign="top">
+        <pre lang="text"><code>Build an MCP server following https://mcp-use.com/prompt.md</code></pre>
+        <p><a href="https://mcp-use.com/prompt.md">Read the prompt →</a></p>
+      </td>
+    </tr>
+  </tbody>
+</table>
 
-### Start with code
+## Everything you need to ship MCP
 
-```bash
-npx -y create-mcp-use-app@beta
-```
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>Fully typed</h3>
+      <p>Zod schemas flow from tools to structured results, View props, and tool calls.</p>
+    </td>
+    <td width="50%" valign="top">
+      <h3>Native Views</h3>
+      <p>Bind React Views directly to tools and ship interactive apps without custom extension wiring.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>Agent-first and headless</h3>
+      <p>Scaffold, invoke, inspect, screenshot, and deploy through deterministic CLI workflows.</p>
+    </td>
+    <td width="50%" valign="top">
+      <h3>Built on the official SDK</h3>
+      <p>Protocol compatibility from the official TypeScript SDK, with an integrated stateless runtime and development workflow.</p>
+    </td>
+  </tr>
+</table>
 
-Follow the prompts, change into the generated project, and run `npm run dev`. Your MCP endpoint is then available at [`http://localhost:3000/mcp`](http://localhost:3000/mcp), with the Inspector at [`http://localhost:3000/mcp/inspector`](http://localhost:3000/mcp/inspector).
-
-[Read the TypeScript quickstart →](https://mcp-use.com/docs/typescript/getting-started/quickstart)
-
-### Start with your agent
-
-Paste this into Claude Code, Codex, Cursor, or any coding agent. **[Read the prompt →](https://mcp-use.com/prompt.md)**
-
-```text
-Build an MCP server following https://mcp-use.com/prompt.md
-```
-
-The public prompt owns the complete build, verification, and deployment workflow, so people and agents always inspect and follow the same instructions.
-
-## Why mcp-use v2
-
-- **Scale like ordinary HTTP.** The v2 transport is stateless per request, so MCP traffic can use normal round-robin routing without protocol-level sticky sessions or shared session storage.
-- **Keep tools and views typed together.** Exported tool references connect Zod input/output schemas to `useToolContext()` and `useCallTool()` in React.
-- **Build interactive MCP Apps.** Return structured results that compatible clients such as ChatGPT and Claude can render as responsive application views.
-- **Give humans and agents the same feedback loop.** Develop with hot reload, inspect visually, invoke tools from the terminal, capture view screenshots, and deploy from the same CLI.
-- **Stand on the official SDK.** mcp-use v2 is built on the [official Model Context Protocol TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk).
-
-## Quickstart: a typed MCP App
+## Quickstart
 
 The scaffold gives you the server, TypeScript configuration, development scripts, Inspector, and a React view pipeline. Start it once and the MCP endpoint also serves a client-ready landing page with its connection URL and setup instructions.
 
@@ -136,11 +149,9 @@ export const getWeather = server.tool(
 export default server;
 ```
 
-Assign statically declared tools to exported constants. The generated `mcp-env.d.ts` uses those `ToolRef` values to type the view and reject calls to tools that are not exported.
-
 [Explore MCP server tools →](https://mcp-use.com/docs/typescript/server/tools)
 
-## From tool to interactive app
+## Add Views to your tools
 
 Create `views/weather-card/view.tsx`. The directory name matches `view.name` on the tool:
 
@@ -175,35 +186,40 @@ export default function WeatherCard() {
 }
 ```
 
-The model reads the concise `content` result. The view reads the typed `structuredContent` through `useToolContext()`, and `useCallTool()` can invoke exported server tools without duplicating their input or output types. Run the tool and interact with the view in the Inspector before testing it in an MCP client.
-
 <p align="center">
-  <img src="./static/readme/chatgpt-hello-world.gif" alt="Opening the Hello World MCP App in ChatGPT" width="100%" />
+  <img src="./static/readme/chatgpt-hello-world.jpg" alt="Hello World MCP App rendered in a ChatGPT conversation" width="100%" />
   <br />
-  <sub>The same MCP App running inside ChatGPT.</sub>
+  <sub>A tool call returning an interactive View inside ChatGPT.</sub>
 </p>
 
 [Build your first MCP App →](https://mcp-use.com/docs/typescript/mcp-apps/quickstart)
 
-## Build, inspect, deploy
+## Build
 
-| Stage | Human workflow | Agent-friendly workflow |
-| --- | --- | --- |
-| **Build** | `npm run typecheck` and `npm run build` | The same commands return explicit exit codes and compiler errors |
-| **Inspect** | Open `http://localhost:3000/mcp/inspector` | Connect with `mcp-use client`, list tools, and invoke them from the terminal |
-| **Verify views** | Run tools and inspect the rendered app | Capture a PNG with `mcp-use screenshot` and inspect the image |
-| **Deploy** | Run `npm run deploy` | Use `mcp-use deploy --yes` and wait for a confirmed live state |
+Typecheck the project and create its production build:
 
-The Inspector discovers your tools, validates their inputs, and renders MCP App responses beside the request.
+```bash
+npm run typecheck
+npm run build
+```
+
+## Inspect
+
+Start development mode to serve the MCP endpoint at [`http://localhost:3000/mcp`](http://localhost:3000/mcp) and the built-in Inspector at [`http://localhost:3000/mcp/inspector`](http://localhost:3000/mcp/inspector):
+
+```bash
+npm run dev
+```
 
 <p align="center">
   <img src="./static/readme/inspector-hello-world.jpg" alt="Hello World MCP App rendered in the mcp-use Inspector" width="100%" />
   <br />
-  <sub>Invoke a tool and inspect its interactive view without leaving the development loop.</sub>
+  <sub>Invoke tools, validate inputs, and inspect interactive Views in the same development loop.</sub>
 </p>
 
+Inspect the same server headlessly from the terminal, invoke representative tools, and capture a View screenshot:
+
 ```bash
-# Terminal verification against a running local server
 npm install --save-dev @mcp-use/client@beta
 npx mcp-use client connect local http://localhost:3000/mcp
 npx mcp-use client local tools list
@@ -215,35 +231,27 @@ npx mcp-use screenshot \
   --output weather-card.png
 ```
 
-Deploy to [Manufact Cloud](https://manufact.com) for managed builds, preview deployments, analytics, evals, observability, and logs:
+## Deploy
+
+Ship to [Manufact Cloud](https://manufact.com):
 
 ```bash
 npm run deploy
 ```
 
+<p align="center">
+  <img src="./static/readme/manufact-dashboard.jpg" alt="Manufact Cloud server dashboard with deployment status, analytics, and operations" width="100%" />
+  <br />
+  <sub>Managed deployments, analytics, testing, observability, logs, and publishing in one dashboard.</sub>
+</p>
+
 Prefer to run it yourself? Follow the [self-hosting guide →](https://mcpuse-codex-v1-v2-docs-split.mintlify.site/v2/typescript/server/deployment/runtime-patterns).
 
 ## How mcp-use compares
 
-mcp-use v2 keeps the official TypeScript SDK v2 as its protocol foundation, then adds a full-stack runtime designed to improve the developer and coding-agent experience.
+mcp-use builds on the official TypeScript SDK v2 and adds first-class Views, typed tool-to-UI contracts, an optimized stateless runtime, the Inspector, screenshot verification, agent-first CLI workflows, and deployment.
 
-**How does mcp-use build on the official TypeScript SDK?**
-
-mcp-use uses the official `@modelcontextprotocol/core`, `server`, and `client` packages for protocol compatibility. On top, it adds one typed server API, generated tool-to-view contracts, deterministic CLI feedback, scaffolding, Inspector, screenshot verification, deployment adapters, and workflows that agents can execute end to end.
-
-**What does mcp-use add for MCP Apps?**
-
-The official SDK does not include a native, end-to-end MCP Apps workflow in its server package; Apps are added through the separate `@modelcontextprotocol/ext-apps` extension and custom resource, metadata, build, and type wiring. mcp-use makes Views a first-class server feature: bind a `view` directly to an exported tool, share its schemas with React hooks, build it with the server, preview it in the Inspector, and verify it with the built-in screenshot tool.
-
-**What about performance?**
-
-mcp-use adds custom stateless request handling and optimized response paths on top of the official SDK. Those framework-level improvements measured **10,982 median operations per second**, compared with **8,050** for the equivalent official SDK v2 fixture: about **36% higher throughput** in our benchmark.
-
-**How does it compare with other TypeScript MCP frameworks?**
-
-mcp-use v2 had the smallest equivalent development stack tested: **74.4 MiB** across **51 installed packages**. That is 57% fewer packages than the equivalent official SDK stack and 83% fewer than Skybridge.
-
-Green cells mark the category leader. ✅ means the full capability is built into the framework, ◐ means related primitives or a limited capability set is included, and ❌ means it requires an external implementation. Compared here: the [official TypeScript SDK v2](https://github.com/modelcontextprotocol/typescript-sdk), [xmcp](https://github.com/basementstudio/xmcp), [Skybridge](https://github.com/alpic-ai/skybridge), and [mcp-handler](https://github.com/vercel/mcp-handler).
+In our benchmark, mcp-use v2 reached **10,982 median operations per second** and used **74.4 MiB across 51 installed packages**. Green cells mark the category leader; ◐ means partial support. Compared here: the [official TypeScript SDK v2](https://github.com/modelcontextprotocol/typescript-sdk), [xmcp](https://github.com/basementstudio/xmcp), [Skybridge](https://github.com/alpic-ai/skybridge), and [mcp-handler](https://github.com/vercel/mcp-handler).
 
 ```mermaid
 block-beta
