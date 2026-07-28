@@ -249,7 +249,7 @@ Green cells mark the category leader. ✅ means the full capability is built int
 block-beta
   columns 6
 
-  metric["Metric"] mcp["mcp-use v2"] official["Official SDK v2"] xmcp["xmcp"] skybridge["Skybridge"] handler["mcp-handler"]
+  metric["Metric"] mcp["mcp-use v2"] official["Official SDK v2*"] xmcp["xmcp"] skybridge["Skybridge"] handler["mcp-handler"]
 
   speed["Speed"] speedMcp["10,982 ops/s"] speedOfficial["8,050 ops/s"] speedXmcp["6,585 ops/s"] speedSkybridge["8,116 ops/s"] speedHandler["6,324 ops/s"]
   install["Clean install"] installMcp["74.4 MiB"] installOfficial["99.0 MiB"] installXmcp["121.9 MiB"] installSkybridge["137.5 MiB"] installHandler["388.0 MiB"]
@@ -278,6 +278,8 @@ block-beta
   class viewsOfficial,oauthOfficial,inspectorSkybridge partial
   class viewsHandler,nativeViewsOfficial,nativeViewsXmcp,nativeViewsSkybridge,nativeViewsHandler,oauthHandler,protocolXmcp,protocolSkybridge,protocolHandler,screenshotOfficial,screenshotXmcp,screenshotSkybridge,screenshotHandler,tunnelOfficial,tunnelXmcp,tunnelHandler,inspectorOfficial,inspectorXmcp,inspectorHandler unavailable
 ```
+
+<sub>* The Official SDK comparison includes `@modelcontextprotocol/ext-apps`, Vite, and zod, plus their required React, TypeScript, and SDK dependencies, so the size figures compare MCP Apps-capable development stacks across approaches.</sub>
 
 Speed uses the benchmark's median operations per second; mcp-use leads this selected comparison and the frameworks with native Views. Clean install measures fresh `node_modules` on disk. Installed packages counts the dependency paths reported by `npm ls --all --parseable` for the same clean installs. The stacks are `mcp-use + zod`; official v2 server and Node packages + Apps extension and its required SDK peer + React, Vite, TypeScript, and zod; `xmcp + zod`; `Skybridge + zod`; and `mcp-handler` + Next.js, its SDK peer, React, TypeScript, and zod.
 
