@@ -30,6 +30,12 @@ import {
   updateIndexTs,
   updatePackageJson,
 } from "./utils.js";
+import {
+  getSkillsCloneArgs,
+  SKILLS_AGENT_DIRS,
+  SKILLS_MANUAL_INSTALL_CMD,
+  SKILLS_SPARSE_PATH,
+} from "./skills-config.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -202,12 +208,6 @@ function sendInstallTelemetryEvent(agents: string, skills: string): void {
   }
 }
 
-const SKILLS_REPO = "https://github.com/mcp-use/mcp-use.git";
-const SKILLS_SPARSE_PATH = "skills/mcp-apps-builder";
-const SKILLS_AGENT_DIRS = [".cursor", ".claude", ".agent"] as const;
-const SKILLS_MANUAL_INSTALL_CMD =
-  "npx --yes skills add mcp-use/mcp-use --yes --skill mcp-apps-builder -a cursor -a claude-code -a codex";
-
 function isGitAvailable(): boolean {
   const result = spawnSync("git", ["--version"], {
     stdio: "ignore",
@@ -229,20 +229,10 @@ async function installSkills(projectPath: string): Promise<void> {
   const repoDir = join(tempDir, "repo");
 
   try {
-    const clone = spawnSync(
-      "git",
-      [
-        "clone",
-        "--depth",
-        "1",
-        "--filter=blob:none",
-        "--sparse",
-        "--single-branch",
-        SKILLS_REPO,
-        repoDir,
-      ],
-      { stdio: "ignore", shell: false }
-    );
+    const clone = spawnSync("git", getSkillsCloneArgs(repoDir), {
+      stdio: "ignore",
+      shell: false,
+    });
     if (clone.status !== 0 || clone.error) {
       throw new Error("git clone failed");
     }
