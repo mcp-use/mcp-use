@@ -244,9 +244,9 @@ npm run deploy
 ```
 
 <p align="center">
-  <img src="./static/readme/manufact-dashboard.jpg" alt="Manufact Cloud server dashboard with deployment status, analytics, and operations" width="100%" />
+  <img src="./static/readme/manufact-dashboard.png" alt="Manufact Cloud server dashboard with deployment status, analytics, and operations" width="100%" />
   <br />
-  <sub>Managed deployments, analytics, testing, observability, logs, and publishing in one dashboard.</sub>
+  <sub>Manage your MCP server through Manufact MCP Server 🤯 · <a href="https://mcp.manufact.com/mcp">mcp.manufact.com/mcp</a></sub>
 </p>
 
 Prefer to run it yourself? Follow the [self-hosting guide →](https://mcpuse-codex-v1-v2-docs-split.mintlify.site/v2/typescript/server/deployment/runtime-patterns).
