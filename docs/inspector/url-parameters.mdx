@@ -10,14 +10,14 @@ Use URL parameters when you need a link that opens the Inspector on a specific s
 
 ## Parameters
 
-| Parameter        | Purpose                                                                                                                           | Values                                                                                                                        |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `server`         | Select an existing connection by server ID or URL. If no saved connection matches and the value is an HTTP(S) URL, connect to it. | Connection ID or URL string                                                                                                   |
-| `autoConnect`    | Connect to a server when the Inspector loads.                                                                                     | URL string or URL-encoded JSON config                                                                                         |
-| `tab`            | Open a specific server tab.                                                                                                       | `tools`, `prompts`, `resources`, `chat`, `sampling`, `elicitation`, `notifications`, `server-metadata`, `connection-settings` |
-| `tunnelUrl`      | Preserve a tunnel URL while navigating. Usually set by the CLI.                                                                   | URL string                                                                                                                    |
-| `embedded`       | Use embedded mode with reduced page chrome.                                                                                       | `true`                                                                                                                        |
-| `embeddedConfig` | Configure embedded styling.                                                                                                       | URL-encoded JSON config                                                                                                       |
+| Parameter | Purpose | Values |
+| --- | --- | --- |
+| `server` | Select an existing connection by server ID or URL. If no saved connection matches and the value is an HTTP(S) URL, connect to it. | Connection ID or URL string |
+| `autoConnect` | Connect to a server when the Inspector loads. | URL string or URL-encoded JSON config |
+| `tab` | Open a specific server tab. | `tools`, `prompts`, `resources`, `chat`, `sampling`, `elicitation`, `notifications`, `playground` |
+| `tunnelUrl` | Preserve a tunnel URL while navigating. Usually set by the CLI. | URL string |
+| `embedded` | Use embedded mode with reduced page chrome. | `true` |
+| `embeddedConfig` | Configure embedded styling. | URL-encoded JSON config |
 
 ## Select or connect to a server
 
@@ -45,20 +45,14 @@ For advanced connection options, pass a URL-encoded JSON object. The `url` field
   "name": "Example server",
   "transportType": "http",
   "connectionMode": "auto",
-  "connectionType": "Direct",
-  "protocolNegotiation": "auto"
+  "connectionType": "Direct"
 }
 ```
 
-Supported JSON fields are `url` (required), `name`, `transportType` (`"http"` or `"sse"`), `connectionMode` (`"auto"`, `"direct"`, or `"proxy"`), `autoProxyFallback`, `protocolNegotiation`, `connectionType`, `customHeaders`, `auth`, `requestTimeout`, `resetTimeoutOnProgress`, and `maxTotalTimeout`.
-
-Use `"auto"` for `protocolNegotiation`, `"legacy"` for the legacy protocol, or `{ "pin": "<protocol-version>" }` to pin a protocol version. The older `connectionType` field maps `"Via Proxy"` to Proxy mode and `"Direct"` to Auto mode.
-
-`auth` supplies an existing OAuth token to an auto-connect link. It requires `access_token` and accepts `token_type`, `expires_at`, `refresh_token`, and `scope`. This differs from the `oauth` static-client settings in a configuration copied from the connection form.
+Supported JSON fields are `url` (required), `name`, `transportType` (`"http"` or `"sse"`), `connectionMode` (`"auto"`, `"direct"`, or `"proxy"`), `autoProxyFallback`, `connectionType` (`"Direct"` or `"Via Proxy"` for older links), `customHeaders`, `auth`, `requestTimeout`, `resetTimeoutOnProgress`, and `maxTotalTimeout`.
 
 <Tip>
-  When passing a JSON object for **autoConnect**, URL-encode the value so
-  special characters are valid in the query string.
+  When passing a JSON object for **autoConnect**, URL-encode the value so special characters are valid in the query string.
 </Tip>
 
 ## Open a tab
@@ -79,55 +73,25 @@ Use `embedded=true` when the Inspector is hosted inside another UI, such as an i
 /?embedded=true
 ```
 
-Use `embeddedConfig` with a URL-encoded JSON object to configure the embedded Inspector. `defaultTab` takes precedence over the `tab` query parameter.
+Use `embeddedConfig` with a URL-encoded JSON object when the embedded host needs styling overrides.
 
 ```json
 {
   "backgroundColor": "#f5f5f5",
-  "padding": "16px",
-  "visibleTabs": ["chat"],
-  "defaultTab": "chat"
+  "padding": "16px"
 }
 ```
-
-`embeddedConfig` accepts these fields:
-
-| Field                         | Type                                                  | Purpose                                                                                                                         |
-| ----------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `backgroundColor`             | string                                                | Embedded container background color.                                                                                            |
-| `padding`                     | string                                                | Embedded container padding (ignored when `singleTab` is `true`).                                                                |
-| `singleTab`                   | boolean                                               | Show one tab without the header or tab chrome.                                                                                  |
-| `visibleTabs`                 | array of tab IDs                                      | Limit visible tabs. Use the tab IDs listed above.                                                                               |
-| `defaultTab`                  | tab ID                                                | Initial tab; overrides `tab`.                                                                                                   |
-| `chatApiUrl`                  | string                                                | API URL for server-side chat streaming.                                                                                         |
-| `chatStreamProtocol`          | `"sse"` or `"data-stream"`                            | Wire protocol for `chatApiUrl`.                                                                                                 |
-| `chatCredentials`             | fetch credentials value                               | Credentials policy for chat requests.                                                                                           |
-| `managedLlmConfig`            | object                                                | Externally managed chat configuration: `provider`, `apiKey`, `model`, and optional `temperature`, `baseUrl`, and `credentials`. |
-| `chatEnableFreeTierUpgrade`   | boolean                                               | Enable the chat free-tier sign-in and upgrade UI.                                                                               |
-| `chatHideTitle`               | boolean                                               | Hide the Chat title.                                                                                                            |
-| `chatHideModelBadge`          | boolean                                               | Hide the model badge.                                                                                                           |
-| `chatHideServerUrl`           | boolean                                               | Hide the MCP server URL.                                                                                                        |
-| `chatHideConfigButton`        | boolean                                               | Hide chat provider/API-key configuration.                                                                                       |
-| `chatClearButtonLabel`        | string                                                | Label for the clear/new-chat button.                                                                                            |
-| `chatClearButtonHideIcon`     | boolean                                               | Hide the clear/new-chat button icon.                                                                                            |
-| `chatClearButtonHideShortcut` | boolean                                               | Hide the shortcut label on the clear/new-chat button.                                                                           |
-| `chatClearButtonVariant`      | `"default"`, `"secondary"`, `"ghost"`, or `"outline"` | Button style.                                                                                                                   |
-| `chatQuickQuestions`          | array of strings                                      | Initial questions below the landing input.                                                                                      |
-| `chatFollowups`               | array of strings                                      | Initial follow-up suggestions above the input.                                                                                  |
-| `chatHideClearButton`         | boolean                                               | Hide the clear/new-chat button.                                                                                                 |
-| `chatHideToolSelector`        | boolean                                               | Hide the tool selector in chat input.                                                                                           |
-| `forceConnected`              | boolean                                               | Render Chat as connected without a client-side MCP server; use with `chatApiUrl` when the backend manages MCP connections.      |
 
 ## Example links
 
 Open the hosted Inspector and connect to a server:
 
 ```text
-https://inspector.mcp-use.com/inspector?autoConnect=https://your-server.com/mcp
+https://inspector.mcp-use.com/inspect?autoConnect=https://your-server.com/mcp
 ```
 
 Open the hosted Inspector, connect to a server, and show Tools:
 
 ```text
-https://inspector.mcp-use.com/inspector?server=https://your-server.com/mcp&tab=tools
+https://inspector.mcp-use.com/inspect?server=https://your-server.com/mcp&tab=tools
 ```

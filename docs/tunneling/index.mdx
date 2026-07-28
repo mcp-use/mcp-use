@@ -1,36 +1,20 @@
 ---
 title: "MCP Server Tunneling"
-description: "Expose a local HTTP MCP endpoint through a public HTTPS tunnel for testing in ChatGPT, Claude, and other remote MCP clients."
+description: "Expose a local MCP server through a public /mcp URL for testing in ChatGPT, Claude, and other remote MCP clients."
 icon: "train-front-tunnel"
 ---
 
 Use a tunnel when ChatGPT, Claude, or another remote MCP client needs to reach a server running on your machine. The tunnel gives you a public HTTPS URL that forwards to your local MCP endpoint.
 
-The tunnel URL is a public **origin**, not necessarily the MCP endpoint. Give
-clients the public origin plus an MCP path that the tunnel permits. The default
-`mcp-use` endpoint is `/mcp`:
+With `mcp-use`, start the server with `--tunnel`, then copy the printed `Tunnel` URL. The URL you give to clients must include `/mcp`.
 
 ```text
 https://<subdomain>.local.mcp-use.run/mcp
 ```
 
-The hosted tunnel service forwards paths beginning with `/mcp` or `/mcp-use`.
-For example, a server with `basePath: "/mcp/private"` has this public endpoint:
-
-```text
-https://<subdomain>.local.mcp-use.run/mcp/private
-```
-
-Other paths require a tunnel deployment configured to permit them.
-
 Keep the terminal process running while you test. The public URL stops working when the process exits.
 
-## Tunnel a TypeScript server with the mcp-use CLI
-
-The `mcp-use dev` and `mcp-use start` commands below are the TypeScript CLI
-workflow. They create the public tunnel after the local listener is ready and
-print the complete public MCP endpoint, including the server's configured base
-path.
+## Start a tunnel with mcp-use
 
 Use `mcp-use dev --tunnel` while you are developing:
 
@@ -45,28 +29,23 @@ mcp-use build
 mcp-use start --port 3000 --tunnel
 ```
 
-In development, successful output includes the local and public MCP endpoints:
+Successful output includes a tunnel endpoint:
 
 ```text
-[mcp-use] dev server ready
-  ➜ MCP endpoint:  http://localhost:3000/mcp
-  ➜ Inspector:     http://localhost:3000/mcp/inspector
-  ➜ Tunnel:        https://happy-blue.local.mcp-use.run/mcp
+Starting tunnel for port 3000...
+✓ Tunnel established: https://happy-blue.local.mcp-use.run/mcp
+
+Local:    http://localhost:3000
+MCP:      http://localhost:3000/mcp
+Tunnel:   https://happy-blue.local.mcp-use.run/mcp
+Inspector: http://localhost:3000/inspector?autoConnect=...
 ```
 
-Copy the value after `Tunnel:` into your remote MCP client. `mcp-use start
---tunnel` reports the same endpoint after `mcp-use public MCP URL:`. Both
-commands print the server's configured path. Paths outside `/mcp**` and
-`/mcp-use**` require a tunnel deployment configured to permit them.
+Copy the value after `Tunnel:` into your remote MCP client. Do not copy only `https://happy-blue.local.mcp-use.run`; the client URL must end with `/mcp`.
 
-If the tunnel relay drops while either CLI command is still running, the CLI
-restarts it and reuses the same subdomain when possible.
+## Tunnel any server on /mcp
 
-## Tunnel another local HTTP server
-
-Use the standalone tunnel package when your local MCP server is not started by
-the TypeScript CLI. The package forwards the local HTTP service on the port you
-pass and prints its public origin.
+Use the standalone tunnel package when your local MCP server is not started by `mcp-use`. The server must already be running locally and serving MCP over HTTP at `/mcp`.
 
 For a server on port `3000`, run:
 
@@ -74,27 +53,24 @@ For a server on port `3000`, run:
 npx @mcp-use/tunnel 3000
 ```
 
-On success, the command reports the public origin:
+Successful output prints a public URL:
 
 ```text
-✔ Local MCP server available at
+╭────────────────────────────────────╮
+│  Tunnel Created Successfully!      │
+╰────────────────────────────────────╯
 
-  https://happy-blue.local.mcp-use.run
+Public URL:
+  https://happy-blue.local.mcp-use.run/mcp
+
+Local Port: 3000
 ```
 
-The published standalone tunnel defaults to allowing `/mcp**` and
-`/mcp-use**` paths. Combine the public origin with an allowed MCP path that your
-local server exposes. For example, if the local endpoint is
-`http://localhost:3000/mcp/private`, connect the remote client to
-`https://happy-blue.local.mcp-use.run/mcp/private`.
-
-If your MCP endpoint uses another path, use a tunnel deployment configured to
-permit it.
+Copy the full public URL, including `/mcp`, into ChatGPT, Claude, or your other remote MCP client.
 
 ## Verify the tunnel
 
-For a TypeScript CLI workflow, verify the public MCP endpoint with
-`mcp-use client`:
+Verify the public URL with the `mcp-use client` CLI:
 
 ```bash
 npx mcp-use client connect tunnel-test https://happy-blue.local.mcp-use.run/mcp
@@ -114,14 +90,15 @@ When you started the tunnel with `mcp-use dev --tunnel` or `mcp-use start --tunn
 Tunnels are for local testing before deployment:
 
 - The tunnel is active only while the command is running.
-- With `mcp-use dev --tunnel` or `mcp-use start --tunnel`, a dropped tunnel registration is re-established automatically while the command runs.
 - Tunnels expire after 24 hours.
 - Inactive tunnels are cleaned up after 1 hour without activity.
+- Each IP address can create up to 10 tunnels per hour.
+- Each IP address can have up to 5 active tunnels at a time.
 
 For a stable public URL, deploy the server instead of relying on a local tunnel.
 
 ## Next steps
 
-- Use the [TypeScript quickstart](/v2/typescript/getting-started/quickstart) to create a server for the `mcp-use` CLI workflow.
-- Use the [Python quickstart](/python/getting-started/quickstart) to create and run a Python server, then tunnel its listening port with the standalone package.
-- Use [Build your first MCP App](/v2/typescript/mcp-apps/quickstart) to test TypeScript Views in a remote client.
+- Use the [TypeScript quickstart](/typescript/getting-started/quickstart) to create a local MCP server.
+- Use [Build your first MCP App](/typescript/mcp-apps/quickstart) to test widgets in a remote client.
+- Use [Deploy to Manufact Cloud](/typescript/server/deployment/mcp-use) when you are ready for a hosted MCP endpoint.

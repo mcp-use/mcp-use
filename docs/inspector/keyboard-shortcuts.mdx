@@ -10,29 +10,28 @@ Use keyboard shortcuts to move between Inspector views without leaving the curre
 
 ## Shortcuts
 
-| Shortcut           | Action                                                   | Works while typing? |
-| ------------------ | -------------------------------------------------------- | ------------------- |
-| `Cmd/Ctrl + K`     | Open the command palette.                                | Yes                 |
-| `Cmd/Ctrl + O`     | Start a new chat when Chat is available.                 | Yes                 |
-| `Cmd/Ctrl + Enter` | Run the selected tool or prompt.                         | Yes                 |
-| `Esc`              | Cancel a running tool, or clear the focused UI state.    | Yes                 |
-| `t`                | Open the Tools tab.                                      | No                  |
-| `p`                | Open the Prompts tab.                                    | No                  |
-| `r`                | Open the Resources tab.                                  | No                  |
-| `c`                | Open the Chat tab.                                       | No                  |
-| `h`                | Return to the dashboard.                                 | No                  |
-| `f`                | Focus search in the current tab when the tab has search. | No                  |
+| Shortcut | Action | Works while typing? |
+| --- | --- | --- |
+| `Cmd/Ctrl + K` | Open the command palette. | Yes |
+| `Cmd/Ctrl + O` | Start a new chat. | No |
+| `Esc` | Close overlays, close dialogs, or blur the focused element. | Yes |
+| `t` | Open the Tools tab. | No |
+| `p` | Open the Prompts tab. | No |
+| `r` | Open the Resources tab. | No |
+| `c` | Open the Chat tab. | No |
+| `h` | Return to the dashboard. | No |
+| `f` | Focus search in the current tab when the tab has search. | No |
 
-Modifier shortcuts work while an input field is focused. Single-letter shortcuts are disabled while you type in inputs, textareas, and content-editable elements. The command palette handles `Esc` itself to close the palette.
+`Cmd/Ctrl + K` is the only shortcut that intentionally works while an input field is focused. Single-letter shortcuts are disabled while you type in inputs, textareas, and content-editable elements.
 
 ## Command palette keys
 
 After opening the command palette:
 
-| Key           | Action                                                |
-| ------------- | ----------------------------------------------------- |
-| `Up` / `Down` | Move through results.                                 |
-| `Enter`       | Open the selected result or run the selected command. |
-| `Esc`         | Close the command palette.                            |
+| Key | Action |
+| --- | --- |
+| `Up` / `Down` | Move through results. |
+| `Enter` | Open the selected result or run the selected command. |
+| `Esc` | Close the command palette. |
 
 See [Command Palette](/inspector/command-palette) for what you can search and open.

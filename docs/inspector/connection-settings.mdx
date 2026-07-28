@@ -6,35 +6,17 @@ icon: "settings"
 
 {/* TODO: Add Inspector media when a screenshot or short clip would clarify the workflow. */}
 
-Most servers work with only an HTTP endpoint URL. The Inspector uses HTTP transport and defaults to **Auto** connection and protocol modes. Change settings when the browser cannot reach the server directly, when you need a particular protocol compatibility mode, when OAuth needs pre-registered credentials, or when long-running tools need more time.
+Most servers work with only a transport and URL. Change connection settings when the browser cannot reach the server directly, when you want clearer names for saved servers, when OAuth needs pre-registered credentials, or when long-running tools need more time.
 
-## Choose a connection mode
+## Choose Auto, Direct, or Via Proxy
 
 The Inspector uses **Auto** mode by default: it tries a direct browser connection first, then falls back to the configured Inspector proxy if direct access fails because of CORS or network policy.
 
-| Connection mode | Use it when                                                                        | Avoid it when                                                     |
-| --------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| **Auto**        | You want the Inspector to try Direct first and fall back to the proxy when needed. | You need to test one specific connection path.                    |
-| **Direct**      | The server is local, public, or reachable from your browser.                       | The browser blocks the request because of CORS or network policy. |
-| **Proxy**       | The browser is blocked by CORS, or you need to test proxy behavior.                | The server works directly; proxying adds another moving part.     |
-
-## Choose a protocol mode
-
-The Protocol control defaults to **Auto (recommended)**. It probes for the current protocol and falls back to the legacy initialize flow when necessary.
-
-| Protocol option           | Behavior                                                                              |
-| ------------------------- | ------------------------------------------------------------------------------------- |
-| **Auto (recommended)**    | Probe for the current protocol, then fall back to the legacy initialize flow.         |
-| **Force v1 (2024/2025)**  | Use the legacy protocol only. The connection fails if the server is incompatible.     |
-| **Force v2 (2026-07-28)** | Pin the protocol to `2026-07-28`. The connection fails if the server is incompatible. |
-
-## Set the proxy endpoint
-
-**Proxy Endpoint** is the Inspector proxy URL. It defaults to the proxy route configured for the Inspector instance.
-
-- In **Proxy** mode, every MCP request uses this endpoint.
-- In **Auto** mode, the Inspector uses it only after the direct connection fails.
-- In **Direct** mode, the Inspector bypasses it.
+| Connection mode | Use it when | Avoid it when |
+| --- | --- | --- |
+| **Auto** | You want the Inspector to try Direct first and fall back to the proxy when needed. | You need to test one specific connection path. |
+| **Direct** | The server is local, public, or reachable from your browser. | The browser blocks the request because of CORS or network policy. |
+| **Via Proxy** | The browser is blocked by CORS, or you need to test proxy behavior. | The server works directly; proxying adds another moving part. |
 
 ## Name saved servers
 
@@ -46,53 +28,36 @@ Changing only the display name updates labels in the dashboard, server list, hea
 
 Use custom headers for server-specific requirements such as bearer tokens, API keys, or version headers.
 
-Header values are used for the live connection only. They are intentionally not
-saved or restored after a reload, so supply them again at runtime. Prefer OAuth
-when the server supports it.
+Header values are stored in browser storage for that Inspector instance. Prefer OAuth when the server supports it.
 
 <Warning>
-  Copy Config includes current form values. Remove OAuth tokens, API keys, and
-  other secrets before sharing exported configuration.
+  Custom headers are stored in browser storage. Never include sensitive credentials that should not be stored locally. Use OAuth for secure authentication instead.
 </Warning>
 
 ## Configure OAuth
 
-Leave the Authentication fields empty when the authorization server supports Dynamic Client Registration (DCR). The Inspector then registers as needed with the authorization server. OAuth does not start automatically: when authentication is required, click **Authenticate** and complete the provider flow.
+By default the inspector relies on Dynamic Client Registration (DCR), so no credentials are needed. Use the Authentication dialog when the upstream auth server doesn't expose `registration_endpoint` (common for proxy-mode servers fronting Slack, WorkOS, or GitHub) or when the provider requires a confidential client without PKCE.
 
-Use the Authentication dialog to provide a pre-registered client when the authorization server does not expose a `registration_endpoint`. This is common for servers backed by providers such as Slack, WorkOS, or GitHub. Client secrets are runtime-only and are not restored after a reload.
-
-| Field         | When to set it                                                                    |
-| ------------- | --------------------------------------------------------------------------------- |
-| Client ID     | Use a pre-registered OAuth client instead of DCR.                                 |
+| Field | When to set it |
+| --- | --- |
+| Client ID | Use a pre-registered OAuth client instead of DCR. |
 | Client Secret | Use a confidential client; the SDK switches token endpoint auth away from `none`. |
-| Scope         | Request a provider-specific space-separated scope list.                           |
+| Scope | Request a provider-specific space-separated scope list. |
 
 When a server requires OAuth, the connection enters `pending_auth`. Click **Authenticate**, complete the provider flow, and return to the Inspector. If a popup is blocked, use the open-auth-page fallback link.
 
-Browser OAuth session values are encrypted at rest with AES-256-GCM. The
-non-extractable origin key is kept in IndexedDB, while versioned ciphertext
-envelopes remain in localStorage so popup storage events and reload persistence
-continue to work.
-
 ## Configuration Import/Export
 
-Use **Copy Config** to export the current connection form as JSON. Paste the JSON into the URL field to populate a form in another Inspector instance. The export always identifies the transport as `http`; `name` is included only when you set an alias.
+Use **Copy Config** to export the current connection form as JSON. Paste JSON into the URL field to populate the form in another Inspector instance.
 
 Example configuration:
 
 ```json
 {
   "url": "https://mcp.example.com/mcp",
-  "name": "Example MCP server",
   "transportType": "http",
   "connectionMode": "auto",
-  "protocolNegotiation": "auto",
-  "connectionType": "Direct",
-  "autoProxyFallback": {
-    "enabled": true,
-    "proxyAddress": "https://inspector.example.com/mcp/inspector/api/proxy"
-  },
-  "customHeaders": {
+  "headers": {
     "Authorization": "Bearer token123"
   },
   "requestTimeout": 10000,
@@ -106,27 +71,8 @@ Example configuration:
 }
 ```
 
-The export has this shape:
-
-| Field                    | Included when                    | Meaning                                                                   |
-| ------------------------ | -------------------------------- | ------------------------------------------------------------------------- |
-| `url`                    | Always                           | MCP endpoint URL.                                                         |
-| `name`                   | An alias is set                  | Display name.                                                             |
-| `transportType`          | Always                           | Always `http`.                                                            |
-| `connectionMode`         | Always                           | `auto`, `direct`, or `proxy`.                                             |
-| `protocolNegotiation`    | Always                           | `auto`, `legacy` for Force v1, or `{ "pin": "2026-07-28" }` for Force v2. |
-| `connectionType`         | Always                           | `Direct` or `Via Proxy`; retained in copied configs for compatibility.    |
-| `proxyConfig`            | Proxy mode with a proxy endpoint | Contains `proxyAddress` and `customHeaders`.                              |
-| `autoProxyFallback`      | Auto mode with a proxy endpoint  | Contains `enabled` and `proxyAddress`.                                    |
-| `customHeaders`          | Always                           | Custom MCP request headers.                                               |
-| `requestTimeout`         | Always                           | Per-request timeout in milliseconds.                                      |
-| `resetTimeoutOnProgress` | Always                           | Whether progress notifications reset the request timeout.                 |
-| `maxTotalTimeout`        | Always                           | Maximum total time in milliseconds.                                       |
-| `oauth`                  | A client ID or scope is set      | OAuth `clientId`, optional `clientSecret`, and `scope`.                   |
-
 <Note>
-  The paste detection only works in the URL field. Remove OAuth tokens, API
-  keys, and other secrets before sharing a copied config.
+  The paste detection only works in the URL field. Remove OAuth tokens, API keys, and other secrets before sharing a copied config.
 </Note>
 
 ## URL and tabs
@@ -137,10 +83,9 @@ The Inspector keeps the active tab in the page URL (`?tab=...`). Switching tabs 
 
 Use timeout settings only when a valid tool call or resource read needs more time.
 
-| Setting                   | Default    | What it controls                                                                                                                                       |
-| ------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Request timeout           | `10000` ms | Time allowed for one request.                                                                                                                          |
-| Reset timeout on progress | `true`     | Reset the request timeout whenever the server sends a progress notification. This also sends the progress token needed to receive those notifications. |
-| Maximum total timeout     | `60000` ms | Total time allowed across retries and progress updates.                                                                                                |
+| Setting | Default | What it controls |
+| --- | --- | --- |
+| Request timeout | `10000` ms | Time allowed for one request. |
+| Maximum total timeout | `60000` ms | Total time allowed across retries and progress updates. |
 
 If a request times out, first confirm the server eventually responds. Then raise the timeout to match the expected tool runtime.
