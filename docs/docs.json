@@ -16,7 +16,7 @@
   },
   "favicon": "/favicon.svg",
   "banner": {
-    "content": "mcp-use v2 is in beta and the API is subject to change.",
+    "content": "mcp-use v2 is now in beta! Check it out [here](https://docs.mcp-use.com/v2/typescript/getting-started/welcome)",
     "dismissible": false,
     "type": "warning"
   },
