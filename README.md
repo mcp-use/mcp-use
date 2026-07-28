@@ -5,13 +5,11 @@
       <img alt="mcp-use" src="./docs/logo/light.svg" width="240">
     </picture>
   </a>
-</div>
 
-# The TypeScript framework to build ChatGPT plugins, Cloud connectors, and MCP servers.
+  <h1>The TypeScript framework for MCP.</h1>
 
-<div align="center">
   <p>
-    mcp-use is the most complete TypeScript framework for building, testing, and shipping ChatGPT apps and plugins, Cloud connectors, and MCP servers. Built on the new MCP v2 specification, it brings typed tools, interactive apps, a built-in Inspector, agent-first workflows, and headless automation into one framework.
+    Build, test, and ship MCP servers, ChatGPT plugins, Claude connectors, and interactive apps—with typed tools, native Views, and a built-in Inspector.
   </p>
 
   <p>
@@ -35,7 +33,7 @@
 </div>
 
 > [!NOTE]
-> **mcp-use v2 for TypeScript is in beta.** The examples below intentionally use the npm `beta` tag and require Node.js **22.22.2 or newer**. Python and the stable TypeScript v1 packages remain available through the [ecosystem links](#ecosystem).
+> **TypeScript v2 is in beta.** Use the npm `beta` channel with Node.js **22.22.2 or newer**. [Python and TypeScript v1 →](#ecosystem)
 
 ## Get started
 
