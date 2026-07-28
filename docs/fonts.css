@@ -41,6 +41,18 @@ html:not([data-current-path^="/v2/typescript/"]) #banner {
   pointer-events: none !important;
 }
 
+html[data-current-path^="/v2/typescript/"] #banner {
+  background: #60a5fa !important;
+}
+
+[data-component-part="products-selector-trigger"] {
+  order: 1;
+}
+
+div:has(> [data-component-part="version-select-trigger"]) {
+  order: 2;
+}
+
 html[data-current-path^="/v2/typescript/"]
   [data-component-part="version-select-trigger"]
   > span::after {
