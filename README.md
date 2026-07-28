@@ -1,15 +1,14 @@
 <div align="center">
   <a href="https://mcp-use.com">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="./docs/logo/dark.svg">
-      <img alt="mcp-use" src="./docs/logo/light.svg" width="60%">
-    </picture>
+    <img alt="mcp-use" src="./docs/logo/banner-mcp-use.webp" width="100%">
   </a>
+  <br /><br />
 
   <h1>The TypeScript framework for MCP</h1>
 
   <p>
-    Build, test, and ship MCP servers, ChatGPT plugins, Claude connectors, and interactive apps with typed tools, native Views, and a built-in Inspector.
+    Build, test, and ship MCP servers, ChatGPT plugins, Claude connectors,
+    and interactive apps <br />with typed tools, native Views, and a built-in Inspector.
   </p>
 
   <p>
@@ -21,15 +20,22 @@
 
   <p>
     <a href="https://www.npmjs.com/package/mcp-use">
-      <img src="https://img.shields.io/npm/v/mcp-use/beta.svg?label=v2%20beta" alt="mcp-use v2 beta">
+      <img src="https://img.shields.io/npm/v/mcp-use/beta.svg?label=npm&amp;color=orange" alt="npm beta version">
+    </a>
+    <a href="https://www.npmjs.com/package/mcp-use">
+      <img src="https://img.shields.io/npm/dw/mcp-use.svg" alt="npm downloads">
+    </a>
+    <a href="https://manufact.com">
+      <img src="https://img.shields.io/badge/made%20by-manufact.com-blue" alt="made by manufact.com">
     </a>
     <a href="https://github.com/mcp-use/mcp-use/blob/main/LICENSE">
       <img src="https://img.shields.io/github/license/mcp-use/mcp-use" alt="MIT license">
     </a>
     <a href="https://discord.gg/XkNkSkMz3V">
-      <img src="https://dcbadge.limes.pink/api/server/XkNkSkMz3V?style=flat&amp;compact=true" alt="Discord">
+      <img src="https://dcbadge.limes.pink/api/server/XkNkSkMz3V?style=flat" alt="Discord">
     </a>
   </p>
+  <br /><br />
 </div>
 
 > [!NOTE]
