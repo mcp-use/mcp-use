@@ -237,17 +237,11 @@ npx mcp-use screenshot \
 
 ## Deploy
 
-Ship to [Manufact Cloud](https://manufact.com):
+Ship to [Manufact](https://manufact.com) and get observability, analytics, evals, submission readiness, and Git-based preview environments for free.
 
 ```bash
 npm run deploy
 ```
-
-<p align="center">
-  <img src="./static/readme/manufact-dashboard.png" alt="Manufact Cloud server dashboard with deployment status, analytics, and operations" width="100%" />
-  <br />
-  <sub>Manage your MCP server through Manufact MCP Server 🤯 · <a href="https://mcp.manufact.com/mcp">mcp.manufact.com/mcp</a></sub>
-</p>
 
 Prefer to run it yourself? Follow the [self-hosting guide →](https://mcpuse-codex-v1-v2-docs-split.mintlify.site/v2/typescript/server/deployment/runtime-patterns).
 
