@@ -27,7 +27,7 @@
       <img src="https://img.shields.io/github/license/mcp-use/mcp-use" alt="MIT license">
     </a>
     <a href="https://discord.gg/XkNkSkMz3V">
-      <img src="https://dcbadge.limes.pink/api/server/XkNkSkMz3V?style=flat" alt="Discord">
+      <img src="https://dcbadge.limes.pink/api/server/XkNkSkMz3V?style=flat&amp;compact=true" alt="Discord">
     </a>
   </p>
 </div>
