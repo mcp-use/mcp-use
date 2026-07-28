@@ -34,6 +34,7 @@
     "client-sdk-v2-migration",
     "codeql-security-hardening",
     "create-app-sdk-version",
+    "declarative-model-context",
     "default-inspector-hosted-chat",
     "dev-port-probe-envdir",
     "dialect-json-schema-validator",
