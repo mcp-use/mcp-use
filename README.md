@@ -34,10 +34,21 @@
 
 > [!NOTE]
 > **TypeScript v2 is in beta.** Use the npm `beta` channel with Node.js **22.22.2 or newer**. [Python and TypeScript v1 →](#ecosystem)
+>
+> **Migrating from v1?** Most existing v1 servers can upgrade to `mcp-use@beta` without code changes through the included compatibility layer. To get the full benefits of v2, we recommend migrating to the native v2 API.
+>
+> **Give it to your agent:**
+>
+> ```text
+> Migrate this mcp-use project to v2 following
+> https://docs.mcp-use.com/v2/server/migration
+> ```
+>
+> [Read the migration guide →](https://docs.mcp-use.com/v2/server/migration)
 
 ## Get started
 
-<table width="100%">
+<table width="100%" style="width: 100%; table-layout: fixed;">
   <colgroup>
     <col width="50%">
     <col width="50%">
@@ -64,19 +75,6 @@ https://mcp-use.com/prompt.md</code></pre>
     </tr>
   </tbody>
 </table>
-
-## Migrate from v1
-
-Most existing v1 servers can upgrade to `mcp-use@beta` without code changes through the included compatibility layer. To get the full benefits of v2, we recommend migrating to the native v2 API.
-
-**Give it to your agent:**
-
-```text
-Migrate this mcp-use project to v2 following
-https://docs.mcp-use.com/v2/server/migration
-```
-
-[Read the migration guide →](https://docs.mcp-use.com/v2/server/migration)
 
 ## Everything you need to ship MCP
 
