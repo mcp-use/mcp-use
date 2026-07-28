@@ -1,6 +1,9 @@
 <div align="center">
   <a href="https://mcp-use.com">
-    <img alt="mcp-use" src="./docs/images/logo-mcp-use.svg" width="96">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="./docs/logo/dark.svg">
+      <img alt="mcp-use" src="./docs/logo/light.svg" width="240">
+    </picture>
   </a>
 </div>
 
