@@ -13,7 +13,7 @@ Use model context to give the next model turn the information it needs without d
 | Return a concise tool result                  | A text `content` block                                         |
 | Send structured render data to the view       | Tool-result `structuredContent`, read through `useToolContext` |
 | Keep structured user choices model-visible    | `useViewState`                                                 |
-| Describe what the user currently sees         | `<ModelContext>` or `modelContext.set()`                       |
+| Describe what the user currently sees         | `<ModelContext>`                                               |
 | Keep ephemeral UI state private to the iframe | React `useState`                                               |
 | Persist durable business data                 | Your backend                                                   |
 
@@ -67,13 +67,22 @@ Nested components serialize into an indented tree:
   - Three alerts are unresolved
 ```
 
-Use the imperative API when an annotation does not map cleanly to JSX:
+For annotations produced by event handlers or other callbacks, store the
+description in React state and render it declaratively:
 
-```ts
-import { modelContext } from "mcp-use/react";
+```tsx
+function ProductPicker() {
+  const [selection, setSelection] = useState<string | null>(null);
 
-modelContext.set("selected-product", "Selected Wireless Headphones");
-modelContext.remove("selected-product");
+  return (
+    <>
+      {selection && <ModelContext content={`Selected ${selection}`} />}
+      <button onClick={() => setSelection("Wireless Headphones")}>
+        Select headphones
+      </button>
+    </>
+  );
+}
 ```
 
 ## Understand the merged snapshot
@@ -103,5 +112,5 @@ const [hoveredId, setHoveredId] = useState<string | null>(null);
 ## Next steps
 
 - Read the [`useViewState` API reference](https://mcp-use-typescript-api-reference.vercel.app/modules/mcp-use.react.html#useviewstate) for signatures, errors, and host behavior.
-- Read the [`ModelContext` API reference](https://mcp-use-typescript-api-reference.vercel.app/modules/mcp-use.react.html#modelcontext) for nesting and imperative entries.
+- Read the [`ModelContext` API reference](https://mcp-use-typescript-api-reference.vercel.app/modules/mcp-use.react.html#modelcontext) for lifecycle and nesting.
 - Use [Interactivity](/v2/typescript/mcp-apps/interactivity) for tool calls and follow-up messages.
