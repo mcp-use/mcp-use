@@ -15,7 +15,7 @@ mutation, or interactive script.
 
 ```bash
 npm install
-MCP_URL=https://<ref>.supabase.co/functions/v1/mcp \
+MCP_URL=https://<ref>.supabase.co \
 MCP_ASSETS_URL=https://<ref>.supabase.co/functions/v1 \
 npm run deploy:edge -- --project-ref <ref>
 ```
@@ -23,7 +23,9 @@ npm run deploy:edge -- --project-ref <ref>
 The command builds `.mcp-use/build/views/`, stages it beneath the function,
 and uses Supabase's `static_files` configuration to bundle it. The function
 maps `/functions/v1/mcp/_mcp-use/*` to that generated tree and forwards every
-other request to `server.fetch`.
+other request to `server.fetch`. Configure the server with
+`basePath: "/functions/v1/mcp"` so the SDK derives the full endpoint from the
+origin exactly once.
 
 Verify the actual View after deploying:
 

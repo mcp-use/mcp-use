@@ -8,7 +8,9 @@ Content Security Policy (CSP) controls which domains your views can fetch from, 
 
 ## Server and asset origins
 
-Set **`MCP_URL`** to your server's public origin (OAuth resource URL, API calls, CSP `connectDomains`):
+Set **`MCP_URL`** to your server's public origin. The SDK combines it with
+`basePath` for the OAuth resource URL and default `ui.domain`; its origin is
+also added to CSP `connectDomains`:
 
 ```env
 MCP_URL=https://myserver.com
@@ -19,6 +21,11 @@ Set **`MCP_ASSETS_URL`** when view JS/CSS and `public/` files are served from a 
 ```env
 MCP_ASSETS_URL=https://cdn.example.com/storage/v1/object/public/widgets
 ```
+
+For example, `MCP_URL=https://myserver.com` with `basePath: "/api/mcp"`
+produces the full endpoint and default `ui.domain`
+`https://myserver.com/api/mcp`. An explicit `view.domain` overrides that
+default.
 
 When `MCP_ASSETS_URL` is unset, assets use the same origin as `MCP_URL` (or the request origin behind a proxy).
 
@@ -79,7 +86,7 @@ CSP_BASE_URI_DOMAINS=https://myserver.com
 When assets live on static storage and the MCP server runs elsewhere:
 
 ```env
-MCP_URL=https://PROJECT.supabase.co/functions/v1/mcp-server
+MCP_URL=https://PROJECT.supabase.co
 MCP_ASSETS_URL=https://PROJECT.supabase.co/storage/v1/object/public/widgets
 CSP_URLS=https://PROJECT.supabase.co
 ```

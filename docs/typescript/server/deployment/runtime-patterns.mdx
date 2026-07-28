@@ -7,10 +7,12 @@ description: Deploy mcp-use Views with server.fetch on Node and edge runtimes.
 your MCP route; no framework-specific handler is required. Views add one
 deployment concern: their generated files live in `.mcp-use/build/views/`.
 
-Run the build with the public MCP endpoint before deploying:
+Run the build with the public origin before deploying. The server combines
+this origin with its configured `basePath` (default `/mcp`) for the full MCP
+endpoint:
 
 ```bash
-MCP_URL=https://api.example.com/mcp mcp-use build
+MCP_URL=https://api.example.com mcp-use build
 ```
 
 ## Node and filesystem runtimes
@@ -42,7 +44,7 @@ example, publishes `.mcp-use/build/views/` at
 Set `MCP_ASSETS_URL` to the public CDN or bucket prefix before building:
 
 ```bash
-MCP_URL=https://api.example.com/mcp \
+MCP_URL=https://api.example.com \
 MCP_ASSETS_URL=https://cdn.example.com/mcp-assets \
 mcp-use build
 ```

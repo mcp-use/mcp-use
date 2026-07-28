@@ -1,5 +1,6 @@
 import type { MetaObject } from "@modelcontextprotocol/server";
 
+import { resolveMcpEndpointUrl } from "../mcp-url.js";
 import type { ViewManifestEntry, ViewResourceFacts } from "./types.js";
 import {
   UI_META_KEY,
@@ -121,6 +122,12 @@ export interface BuildResourceUiMetaOptions {
   /** Explicit assets URL prefix (overrides request resolution). */
   assetsBase?: string;
   /**
+   * Exact MCP endpoint path. When provided, the canonical endpoint derived
+   * from the resolved server origin becomes `ui.domain` unless the author set
+   * an explicit domain.
+   */
+  basePath?: string;
+  /**
    * When true, append the server origin's websocket variant to
    * `csp.connectDomains` for Vite HMR under host-enforced CSP.
    */
@@ -156,15 +163,21 @@ export function buildResourceUiMeta(
   authorFacts: ViewResourceFacts | undefined,
   options?: BuildResourceUiMetaOptions
 ): Record<string, unknown> {
-  const csp = buildMergedResourceCsp(authorFacts, resolveCspOptions(options));
+  const cspOptions = resolveCspOptions(options);
+  const csp = buildMergedResourceCsp(authorFacts, cspOptions);
 
   const ui: Record<string, unknown> = { csp };
 
   if (authorFacts?.permissions !== undefined) {
     ui["permissions"] = authorFacts.permissions;
   }
-  if (authorFacts?.domain !== undefined) {
-    ui["domain"] = authorFacts.domain;
+  const domain =
+    authorFacts?.domain ??
+    (options?.basePath !== undefined && cspOptions.serverOrigin !== ""
+      ? resolveMcpEndpointUrl(cspOptions.serverOrigin, options.basePath).href
+      : undefined);
+  if (domain !== undefined) {
+    ui["domain"] = domain;
   }
   if (authorFacts?.prefersBorder !== undefined) {
     ui["prefersBorder"] = authorFacts.prefersBorder;

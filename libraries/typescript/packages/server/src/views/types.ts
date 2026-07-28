@@ -30,7 +30,8 @@ export interface ViewResourceFacts {
   permissions?: UiPermissions;
   /**
    * Dedicated origin hint for hosts that render views on a separate domain →
-   * `_meta.ui.domain`.
+   * `_meta.ui.domain`. Defaults to the canonical MCP endpoint derived from
+   * `MCP_URL` plus `basePath`.
    */
   domain?: string;
   /** Ask the host to draw a border around the view → `_meta.ui.prefersBorder`. */

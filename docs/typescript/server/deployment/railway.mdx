@@ -7,12 +7,12 @@ Railway is a Node/filesystem runtime. Build `.mcp-use/build` with the server;
 `server.fetch` then serves MCP and View assets from the same origin.
 
 ```bash
-MCP_URL=https://<service>.up.railway.app/mcp npm run build
+MCP_URL=https://<service>.up.railway.app npm run build
 railway up
 ```
 
-Set Railway's public endpoint as `MCP_URL` and bind the application to
-`0.0.0.0:$PORT`. Point the service at its `/mcp` endpoint.
+Set Railway's public origin as `MCP_URL` and bind the application to
+`0.0.0.0:$PORT`. The default `basePath` makes the full endpoint `/mcp`.
 
 ```bash
 npx --yes mcp-use@beta screenshot \

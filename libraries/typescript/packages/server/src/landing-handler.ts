@@ -6,6 +6,7 @@ import {
   type LandingPageTool,
 } from "./landing.js";
 import type { ServerBranding } from "./branding.js";
+import { resolveMcpEndpointUrl } from "./mcp-url.js";
 import { resolveServerOrigin } from "./views/origin.js";
 
 /**
@@ -35,7 +36,7 @@ export function createLandingPageResponse(
   resources: Iterable<{ definition: LandingPageResource }>
 ): Response {
   const origin = resolveServerOrigin(request);
-  const url = new URL(basePath, `${origin}/`).href;
+  const url = resolveMcpEndpointUrl(origin, basePath).href;
   const html = generateLandingPage({
     ...config,
     url,

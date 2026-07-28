@@ -1947,12 +1947,10 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     const authorFacts = this.#viewResourceFacts(
       this.#viewBindings.get(viewName)?.config
     );
-    const resourceConfig = viewResourceConfig(
-      viewName,
-      entry,
-      authorFacts,
-      metaOptions
-    );
+    const resourceConfig = viewResourceConfig(viewName, entry, authorFacts, {
+      ...metaOptions,
+      basePath,
+    });
     server.registerResource(
       viewName,
       uri,
@@ -1963,11 +1961,12 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           req !== undefined
             ? {
                 request: req,
+                basePath,
                 ...(metaOptions.hmrWs === true ? { hmrWs: true } : {}),
               }
             : metaOptions.hmrWs === true
-              ? { hmrWs: true }
-              : {};
+              ? { basePath, hmrWs: true }
+              : { basePath };
         const assetsBase =
           req !== undefined
             ? resolveAssetsBase(req)

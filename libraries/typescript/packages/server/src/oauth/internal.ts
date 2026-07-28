@@ -9,6 +9,7 @@ import {
   isRecord,
   parseAbsoluteUrl,
 } from "./guards.js";
+import { resolveMcpEndpointUrl } from "../mcp-url.js";
 import { invalidToken } from "./errors.js";
 import type { OAuthExtra, OAuthProvider } from "./provider.js";
 
@@ -31,7 +32,7 @@ export function resolveConfiguredOAuthResource<TUser>(options: {
   }
   if (options.mcpUrl !== undefined) {
     return validateOAuthResource(
-      appendBasePath(
+      resolveMcpEndpointUrl(
         requireAbsoluteOrigin(options.mcpUrl, "MCP_URL"),
         basePath
       ),
@@ -53,7 +54,7 @@ export function resolveLocalOAuthResource(
     );
   }
   return validateOAuthResource(
-    appendBasePath(listenOriginUrl, normalizeBasePath(basePath)),
+    resolveMcpEndpointUrl(listenOriginUrl, normalizeBasePath(basePath)),
     basePath
   );
 }
@@ -244,12 +245,6 @@ function requireAbsoluteOrigin(value: string | URL, name: string): URL {
     throw new Error(`${name} must be an absolute origin without a path`);
   }
   return url;
-}
-
-function appendBasePath(origin: URL, basePath: string): URL {
-  const resource = new URL(origin.origin);
-  resource.pathname = basePath;
-  return resource;
 }
 
 function normalizeBasePath(basePath: string): string {

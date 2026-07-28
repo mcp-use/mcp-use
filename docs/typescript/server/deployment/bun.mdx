@@ -8,11 +8,10 @@ Bun is a Node-compatible filesystem runtime. Build and deploy
 The generated `_mcp-use` asset subtree must reach the same handler.
 
 ```bash
-MCP_URL=https://api.example.com/mcp npm run build
+MCP_URL=https://api.example.com npm run build
 bun run bun-server.ts
 ```
 
 Before release, call a tool and capture `ui://views/my-view.html` with
 `mcp-use@beta screenshot`; a successful HTTP status alone does not validate
 the streamable MCP response or rendered View.
-

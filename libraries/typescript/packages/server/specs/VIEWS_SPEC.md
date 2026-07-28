@@ -118,13 +118,13 @@ Emitted by this package (constants inlined; names are the spec's):
 | resource (`resources/list` entry)                                  | `mimeType`         | `text/html;profile=mcp-app`                                                                                                                                                                                                                                                      |
 | resource (`resources/list` entry) `_meta`                          | `ui.csp`           | `{ connectDomains, resourceDomains, … }` — author and CSP-environment domains, plus the server origin in `connectDomains` and the assets origin in `resourceDomains`; in dev, the server origin's websocket variant (`ws://`/`wss://`) is also appended to `connectDomains`      |
 | resource (`resources/list` entry) `_meta`                          | `ui.permissions`   | from the bound tool's `view.permissions` when set                                                                                                                                                                                                                                |
-| resource (`resources/list` entry) `_meta`                          | `ui.domain`        | from the bound tool's `view.domain` when set                                                                                                                                                                                                                                     |
+| resource (`resources/list` entry) `_meta`                          | `ui.domain`        | from the bound tool's `view.domain` when set; otherwise the canonical MCP endpoint derived from the public server origin plus `basePath`                                                                                                                                          |
 | resource (`resources/list` entry) `_meta`                          | `ui.prefersBorder` | from the bound tool's `view.prefersBorder` when set                                                                                                                                                                                                                              |
 | resource content item (`resources/read` `contents[]`)              | `mimeType`         | `text/html;profile=mcp-app`                                                                                                                                                                                                                                                      |
 | resource content item (`resources/read` `contents[]`)              | `text`             | synthesized HTML document (origin-resolved per request)                                                                                                                                                                                                                          |
 | resource content item (`resources/read` `contents[]`) `_meta`      | `ui.csp`           | same shape as the list entry; **content-item value takes precedence** per MCP Apps spec and uses the current request to resolve server/assets origins and the dev HMR websocket origin                                                                                           |
 | resource content item (`resources/read` `contents[]`) `_meta`      | `ui.permissions`   | same as list entry when set                                                                                                                                                                                                                                                      |
-| resource content item (`resources/read` `contents[]`) `_meta`      | `ui.domain`        | same as list entry when set                                                                                                                                                                                                                                                      |
+| resource content item (`resources/read` `contents[]`) `_meta`      | `ui.domain`        | same as the list entry; an explicit author value wins the canonical MCP endpoint default                                                                                                                                                                                         |
 | resource content item (`resources/read` `contents[]`) `_meta`      | `ui.prefersBorder` | same as list entry when set                                                                                                                                                                                                                                                      |
 
 Authors may also provide custom tool definition `_meta`. The registration boundary shallow-copies it and merges the framework-owned tool keys deterministically. The framework owns nested `ui.resourceUri`, nested `ui.visibility`, and legacy flat `"ui/resourceUri"`: a declared `view`/`visibility` supplies the canonical value and wins a collision; when the corresponding field is absent, a user-supplied value for that owned key is removed rather than advertising a contract the tool did not declare. Other top-level vendor keys and other fields of an object-valued `ui` entry are preserved. The merge never mutates the caller's object, never recursively assigns user keys into an existing target, and treats keys such as `__proto__` as data. This definition merge affects only `tools/list`; tool-result `_meta` retains the separate result-stamping rules below.
@@ -214,7 +214,7 @@ view: {
     resourceDomains?: string[];
   };
   permissions?: UiPermissions;     // → resource _meta.ui.permissions
-  domain?: string;                  // → resource _meta.ui.domain
+  domain?: string;                  // → resource _meta.ui.domain; default = MCP_URL origin + basePath
   prefersBorder?: boolean;         // → resource _meta.ui.prefersBorder
 }
 ```
@@ -346,7 +346,7 @@ and `resources/list` carries:
 }
 ```
 
-Resource `_meta.ui` carries author facts from the bound tool's `view:` config plus the framework-resolved server origin in `csp.connectDomains` and assets origin in `csp.resourceDomains`. Fields the author did not set (`permissions`, `domain`, …) are omitted. The list entry and each read content item emit the same author facts; the read-time copy resolves origins per request so CSP matches the synthesized HTML. Clients without the UI extension still receive `ui.*` metadata on view resources, view-bound tools, and every tool on `tools/list` (including tools with top-level `visibility: "app"`, which carry `_meta.ui.visibility: ["app"]` for the host to filter).
+Resource `_meta.ui` carries author facts from the bound tool's `view:` config plus the framework-resolved server origin in `csp.connectDomains` and assets origin in `csp.resourceDomains`. `ui.domain` defaults to the canonical MCP endpoint (`MCP_URL` origin plus `basePath`) when the author omits it; other unset author facts (`permissions`, `prefersBorder`, …) are omitted. The list entry and each read content item emit the same facts; the read-time copy resolves origins per request so CSP and the default domain match the synthesized HTML. Clients without the UI extension still receive `ui.*` metadata on view resources, view-bound tools, and every tool on `tools/list` (including tools with top-level `visibility: "app"`, which carry `_meta.ui.visibility: ["app"]` for the host to filter).
 
 ---
 
@@ -478,7 +478,7 @@ Every branch includes `__mcpUseViewConfig`, whose `publicBase` is resolved per r
 
 **Origin resolution is request-scoped** — applied at `resources/read` emission time:
 
-- **`MCP_URL`** — server public origin (`.origin` only): OAuth resource URL, CSP `connectDomains`, dev HMR websocket host.
+- **`MCP_URL`** — server public origin (`.origin` only): combined with `basePath` for the canonical MCP endpoint and default `ui.domain`; its origin is also used for CSP `connectDomains` and the dev HMR websocket host.
 - **`MCP_ASSETS_URL`** — assets URL prefix (origin + optional path): view JS/CSS hrefs and `__mcpUseViewConfig.publicBase`. Falls back to `MCP_URL` origin, then `Forwarded` / request origin.
 - **CSP env** — `CSP_URLS` (shortcut for all four MCP Apps categories) and `CSP_*_DOMAINS` per-category overrides merge with author `view.csp` before MCP auto-append. Env vars rank above MCP auto-append.
 

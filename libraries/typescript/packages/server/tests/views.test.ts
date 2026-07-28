@@ -514,7 +514,7 @@ describe("views server core (e2e over HTTP)", () => {
     expect(domains?.some((d) => d.includes("localhost"))).toBe(true);
   });
 
-  it("omits unset resource facts from resources/read content _meta.ui", async () => {
+  it("defaults domain while omitting other unset facts on resources/read", async () => {
     const read = await plainClient.readResource({
       uri: "ui://views/app-only-view.html",
     });
@@ -530,11 +530,11 @@ describe("views server core (e2e over HTTP)", () => {
       },
     });
     expect(ui).not.toHaveProperty("permissions");
-    expect(ui).not.toHaveProperty("domain");
+    expect(ui?.domain).toBe(url);
     expect(ui).not.toHaveProperty("prefersBorder");
   });
 
-  it("emits auto CSP only for unbound views on resources/read", async () => {
+  it("emits auto CSP and domain for unbound views on resources/read", async () => {
     const read = await uiClient.readResource({
       uri: "ui://views/orphan-view.html",
     });
@@ -550,7 +550,7 @@ describe("views server core (e2e over HTTP)", () => {
       | Record<string, unknown>
       | undefined;
     expect(ui).not.toHaveProperty("permissions");
-    expect(ui).not.toHaveProperty("domain");
+    expect(ui?.domain).toBe(url);
     expect(ui).not.toHaveProperty("prefersBorder");
   });
 
@@ -568,7 +568,7 @@ describe("views server core (e2e over HTTP)", () => {
     expect(domains?.some((d) => d.includes("localhost"))).toBe(true);
   });
 
-  it("omits unset resource facts from _meta.ui", async () => {
+  it("defaults domain while omitting other unset resource facts", async () => {
     const { resources } = await uiClient.listResources();
     const appOnly = resources.find(
       (r) => r.uri === "ui://views/app-only-view.html"
@@ -584,11 +584,11 @@ describe("views server core (e2e over HTTP)", () => {
       },
     });
     expect(ui).not.toHaveProperty("permissions");
-    expect(ui).not.toHaveProperty("domain");
+    expect(ui?.domain).toBe(url);
     expect(ui).not.toHaveProperty("prefersBorder");
   });
 
-  it("emits auto CSP only for unbound views", async () => {
+  it("emits auto CSP and domain for unbound views", async () => {
     const { resources } = await uiClient.listResources();
     const orphan = resources.find(
       (r) => r.uri === "ui://views/orphan-view.html"
@@ -604,7 +604,7 @@ describe("views server core (e2e over HTTP)", () => {
     });
     const ui = orphan?._meta?.["ui"] as Record<string, unknown> | undefined;
     expect(ui).not.toHaveProperty("permissions");
-    expect(ui).not.toHaveProperty("domain");
+    expect(ui?.domain).toBe(url);
     expect(ui).not.toHaveProperty("prefersBorder");
   });
 
@@ -1479,7 +1479,8 @@ describe("views env URL / CSP (e2e)", () => {
   async function handlerMcp(
     handler: (request: Request) => Promise<Response>,
     method: string,
-    params: Record<string, unknown> = {}
+    params: Record<string, unknown> = {},
+    endpointPath = "/mcp"
   ): Promise<Record<string, unknown>> {
     const headers: Record<string, string> = {
       "content-type": "application/json",
@@ -1491,7 +1492,7 @@ describe("views env URL / CSP (e2e)", () => {
       headers["mcp-name"] = params["uri"];
     }
     const response = await handler(
-      new Request("http://127.0.0.1:3000/mcp", {
+      new Request(`http://127.0.0.1:3000${endpointPath}`, {
         method: "POST",
         headers,
         body: JSON.stringify({
@@ -1509,8 +1510,8 @@ describe("views env URL / CSP (e2e)", () => {
     process.env = env;
   });
 
-  it("uses MCP_ASSETS_URL for asset hrefs and MCP_URL for connect CSP", async () => {
-    process.env.MCP_URL = "https://server.example.com/mcp";
+  it("derives ui.domain from MCP_URL plus basePath and keeps assets separate", async () => {
+    process.env.MCP_URL = "https://server.example.com";
     process.env.MCP_ASSETS_URL =
       "https://cdn.example.com/storage/v1/object/public/widgets";
     delete process.env.CSP_URLS;
@@ -1518,7 +1519,7 @@ describe("views env URL / CSP (e2e)", () => {
     const server = new MCPServer({
       name: "env-split-test",
       version: "1.0.0",
-      basePath: "/mcp",
+      basePath: "/api/mcp",
     });
     server[registerViews]({
       "product-search-result": {
@@ -1541,24 +1542,34 @@ describe("views env URL / CSP (e2e)", () => {
     );
 
     const handler = server.fetch;
-    const readBody = await handlerMcp(handler, "resources/read", {
-      uri: "ui://views/product-search-result.html",
-    });
+    const readBody = await handlerMcp(
+      handler,
+      "resources/read",
+      {
+        uri: "ui://views/product-search-result.html",
+      },
+      "/api/mcp"
+    );
     const content = (
       readBody["result"] as {
         contents: {
           text: string;
-          _meta?: { ui?: { csp?: Record<string, string[]> } };
+          _meta?: {
+            ui?: { csp?: Record<string, string[]>; domain?: string };
+          };
         }[];
       }
     ).contents[0]!;
     expect(content.text).toContain(
-      "https://cdn.example.com/storage/v1/object/public/widgets/mcp/_mcp-use/views/product-search-result/assets/demo.js"
+      "https://cdn.example.com/storage/v1/object/public/widgets/api/mcp/_mcp-use/views/product-search-result/assets/demo.js"
     );
     const csp = content._meta?.ui?.csp;
     expect(csp?.connectDomains).toContain("https://server.example.com");
     expect(csp?.resourceDomains).toContain("https://cdn.example.com");
     expect(csp?.resourceDomains).not.toContain("https://server.example.com");
+    expect(content._meta?.ui?.domain).toBe(
+      "https://server.example.com/api/mcp"
+    );
   });
 
   it("applies CSP_URLS to all four categories before MCP auto-append", async () => {

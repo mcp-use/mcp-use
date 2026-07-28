@@ -40,7 +40,8 @@ export interface ToolViewConfig {
   permissions?: UiPermissions;
   /**
    * Dedicated origin hint for hosts that render views on a separate domain →
-   * resource `_meta.ui.domain`.
+   * resource `_meta.ui.domain`. Defaults to the canonical MCP endpoint derived
+   * from `MCP_URL` plus the server's `basePath`.
    */
   domain?: string;
   /**
