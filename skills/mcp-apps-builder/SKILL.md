@@ -9,7 +9,7 @@ mcp-use is the full stack TypeScript framework for building MCP servers and MCP 
 
 Use it to build fully typed MCP servers with tools, resources, prompts, 1 line oauth authentication adapters, middleware, production transports, a built-in Inspector, and headless tooling.
 
-mcp-use has native first class support for mcp views with support for HMR both at the server and mcp app/view level to live preview the changes on clients like chatgpt
+mcp-use has native first class support for MCP Apps with support for HMR both at the server and MCP App level to live preview the changes on clients like ChatGPT
 
 ## Get started
 
