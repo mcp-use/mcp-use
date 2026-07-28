@@ -36,10 +36,6 @@
       "node": "./dist/index-node.js",
       "import": "./dist/index.js"
     },
-    "./server": {
-      "types": "./dist/compat-v1.d.ts",
-      "import": "./dist/compat-v1.js"
-    },
     "./react": {
       "types": "./dist/react/index.d.ts",
       "import": "./dist/react/index.js"

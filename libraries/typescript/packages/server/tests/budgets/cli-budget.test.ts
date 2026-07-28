@@ -16,6 +16,15 @@ interface ModuleGraph {
 }
 
 describe("published CLI boundaries", () => {
+  it("does not publish the removed v1 compatibility surface", async () => {
+    expect(packageJson.exports).not.toHaveProperty("./server");
+    expect(
+      (await readdir(DIST, { recursive: true })).filter((file) =>
+        file.includes("compat-v1")
+      )
+    ).toEqual([]);
+  });
+
   it("keeps the complete edge graph free of static node and toolchain leaks", async () => {
     const graph = await buildStaticGraph(new URL("index.js", DIST));
     const proxyTypes = await readFile(new URL("mcp-proxy.d.ts", DIST), "utf8");

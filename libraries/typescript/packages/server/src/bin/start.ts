@@ -128,32 +128,16 @@ export async function runStart(options: StartOptions): Promise<StartedServer> {
 
   const entryPath = join(buildDir, entryPoint);
   const entryUrl = pathToFileURL(entryPath).href;
-  const compatGlobal = "__mcpUseV1CompatServer";
-  delete (globalThis as Record<string, unknown>)[compatGlobal];
-  const previousCliImport = process.env["MCP_USE_CLI_IMPORT"];
-  let entryModule: { default?: unknown };
-  try {
-    process.env["MCP_USE_CLI_IMPORT"] = "1";
-    entryModule = (await import(entryUrl)) as { default?: unknown };
-  } finally {
-    if (previousCliImport === undefined) {
-      delete process.env["MCP_USE_CLI_IMPORT"];
-    } else {
-      process.env["MCP_USE_CLI_IMPORT"] = previousCliImport;
-    }
-  }
+  const entryModule = (await import(entryUrl)) as { default?: unknown };
 
-  const exported =
-    entryModule.default ??
-    (globalThis as Record<string, unknown>)[compatGlobal];
-  if (exported === undefined) {
+  if (!("default" in entryModule) || entryModule.default === undefined) {
     throw new Error(
       `The built entry (${entryPath}) has no default export.\n` +
         `The server entry must \`export default\` its MCPServer instance ` +
         `(see the mcp-use entry contract).`
     );
   }
-  const candidate = exported;
+  const candidate = entryModule.default;
   if (!isListenable(candidate)) {
     throw new Error(
       `The default export of ${entryPath} is not an MCPServer: it has no ` +

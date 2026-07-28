@@ -7,8 +7,8 @@ icon: "list-checks"
 <Callout type="warn" title="Removed in v2">
   v1 enum elicitation helpers (`enumSchema`, `untitledEnum`, `titledEnum`,
   `legacyEnum`, `untitledMultiEnum`, `titledMultiEnum`, and related types) are
-  not exported from `mcp-use` or the temporary `mcp-use/server` compatibility
-  entry. Use Zod schemas with [`ctx.elicit()`](/typescript/api-reference/server/tool-context#elicit)
+  not exported from `mcp-use` v2. Use Zod schemas with
+  [`ctx.elicit()`](/typescript/api-reference/server/tool-context#elicit)
   instead.
 </Callout>
 
@@ -25,14 +25,14 @@ shows keyed form and URL flows on the native v2 API.
 
 ## Migration map
 
-| v1 helper | v2 replacement |
-| --- | --- |
-| `untitledEnum(["a", "b"])` | `z.enum(["a", "b"])` |
+| v1 helper                                         | v2 replacement                                                                                                      |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `untitledEnum(["a", "b"])`                        | `z.enum(["a", "b"])`                                                                                                |
 | `titledEnum([{ value: "a", title: "Option A" }])` | `z.enum(["a", "b"]).describe("Human-readable label for the field")` — put display copy on the field or tool message |
-| `legacyEnum([{ value: "a", name: "Option A" }])` | `z.enum(["a", "b"])` — legacy `enumNames` are not emitted; prefer field `.describe()` |
-| `untitledMultiEnum(["a", "b"])` | `z.array(z.enum(["a", "b"]))` |
-| `titledMultiEnum([{ value, title }])` | `z.array(z.enum(["a", "b"]))` with a descriptive field `.describe()` |
-| `enumSchema({ plan, features })` | `z.object({ plan, features })` |
+| `legacyEnum([{ value: "a", name: "Option A" }])`  | `z.enum(["a", "b"])` — legacy `enumNames` are not emitted; prefer field `.describe()`                               |
+| `untitledMultiEnum(["a", "b"])`                   | `z.array(z.enum(["a", "b"]))`                                                                                       |
+| `titledMultiEnum([{ value, title }])`             | `z.array(z.enum(["a", "b"]))` with a descriptive field `.describe()`                                                |
+| `enumSchema({ plan, features })`                  | `z.object({ plan, features })`                                                                                      |
 
 ## Example
 
@@ -105,10 +105,18 @@ validates accepted responses and infers TypeScript types from the schema.
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Elicitation guide" icon="check" href="/typescript/server/elicitation">
+  <Card
+    title="Elicitation guide"
+    icon="check"
+    href="/typescript/server/elicitation"
+  >
     When to use form vs URL mode and how to handle user decisions.
   </Card>
-  <Card title="Tool context: elicit" icon="terminal" href="/typescript/api-reference/server/tool-context#elicit">
+  <Card
+    title="Tool context: elicit"
+    icon="terminal"
+    href="/typescript/api-reference/server/tool-context#elicit"
+  >
     Overloads, result types, timeouts, and validation errors.
   </Card>
 </CardGroup>

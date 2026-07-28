@@ -24,7 +24,6 @@ import {
   useViewState,
   useViewTheme,
   useViewTool,
-  useWidget,
   ViewControls,
 } from "../src/react/index.js";
 import { _resetBootstrapRootsForTesting } from "../src/react/runtime/bootstrap-view.js";
@@ -219,9 +218,6 @@ describe("react bridge runtime", () => {
     await waitFor(() => {
       expect(screen.getByTestId("lifecycle").textContent).toBe("pending|a");
     });
-    expect(_getRuntimeForTesting()?.getToolSnapshot().isToolInputPartial).toBe(
-      true
-    );
 
     await bridge.sendToolInputPartial({ arguments: { query: "ap" } });
     await waitFor(() => {
@@ -232,9 +228,6 @@ describe("react bridge runtime", () => {
     await waitFor(() => {
       expect(screen.getByTestId("lifecycle").textContent).toBe("pending|apple");
     });
-    expect(_getRuntimeForTesting()?.getToolSnapshot().isToolInputPartial).toBe(
-      false
-    );
 
     await bridge.sendToolResult({
       content: [{ type: "text", text: "ok" }],
@@ -244,87 +237,6 @@ describe("react bridge runtime", () => {
     await waitFor(() => {
       expect(screen.getByTestId("lifecycle").textContent).toBe("ready|apple");
     });
-  });
-
-  it("preserves legacy streaming and unconstrained-height semantics", async () => {
-    resetRuntime();
-    const { bridge, init } = await startHost();
-
-    function View() {
-      const widget = useWidget();
-      const partial = widget.partialToolInput as { query?: string } | null;
-      return (
-        <div data-testid="legacy-widget">
-          {String(widget.isStreaming)}|{partial?.query ?? ""}|{widget.maxHeight}
-        </div>
-      );
-    }
-
-    bootstrapView({ default: View as ComponentType });
-    await init;
-    await waitFor(() => {
-      expect(screen.getByTestId("legacy-widget").textContent).toBe(
-        "false||600"
-      );
-    });
-
-    await bridge.sendToolInputPartial({ arguments: { query: "ap" } });
-    await waitFor(() => {
-      expect(screen.getByTestId("legacy-widget").textContent).toBe(
-        "true|ap|600"
-      );
-    });
-
-    await bridge.sendToolInput({ arguments: { query: "apple" } });
-    await waitFor(() => {
-      expect(screen.getByTestId("legacy-widget").textContent).toBe(
-        "false||600"
-      );
-    });
-  });
-
-  it("serializes back-to-back legacy functional state updates", async () => {
-    resetRuntime();
-    const { init, modelContextUpdates } = await startHost();
-
-    function View() {
-      const widget = useWidget<Record<string, never>, { count: number }>();
-      return (
-        <button
-          data-testid="legacy-state"
-          type="button"
-          onClick={() => {
-            void Promise.all([
-              widget.setState((previous) => ({
-                count: (previous?.count ?? 0) + 1,
-              })),
-              widget.setState((previous) => ({
-                count: (previous?.count ?? 0) + 1,
-              })),
-            ]);
-          }}
-        >
-          {widget.state?.count ?? 0}
-        </button>
-      );
-    }
-
-    bootstrapView({ default: View as ComponentType });
-    await init;
-    await waitFor(() => {
-      expect(screen.getByTestId("legacy-state").textContent).toBe("0");
-    });
-    await act(async () => {
-      screen.getByTestId("legacy-state").click();
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("legacy-state").textContent).toBe("2");
-      expect(modelContextUpdates).toHaveLength(2);
-    });
-    expect(
-      modelContextUpdates.map((update) => update.structuredContent)
-    ).toEqual([{ count: 1 }, { count: 2 }]);
   });
 
   it("leaves the progressive pending snapshot unchanged on cancellation", async () => {

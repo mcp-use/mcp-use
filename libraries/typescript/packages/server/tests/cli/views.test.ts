@@ -45,22 +45,15 @@ describe("discoverViews", () => {
     ]);
   });
 
-  it("discovers legacy resources/<name>/widget.tsx entries only when enabled", () => {
+  it("does not discover legacy resources/ paths", () => {
     const cwd = tempProject();
     mkdirSync(join(cwd, "resources", "legacy"), { recursive: true });
     writeFileSync(
-      join(cwd, "resources", "legacy", "widget.tsx"),
+      join(cwd, "resources", "legacy", "view.tsx"),
       "export default () => null;"
     );
 
     expect(discoverViews(cwd)).toEqual([]);
-    expect(discoverViews(cwd, undefined, { includeLegacy: true })).toEqual([
-      {
-        name: "legacy",
-        entryPath: join(cwd, "resources", "legacy", "widget.tsx"),
-        legacy: true,
-      },
-    ]);
   });
 
   it("discovers an explicit views directory relative to the project root", () => {
@@ -78,13 +71,13 @@ describe("discoverViews", () => {
 });
 
 describe("isViewPath", () => {
-  it("matches paths under native views and legacy resources", () => {
+  it("matches paths under views/<name>/", () => {
     const cwd = "/project";
     expect(isViewPath("/project/views/demo/view.tsx", cwd)).toBe(true);
     expect(isViewPath("/project/views/demo/components/Card.tsx", cwd)).toBe(
       true
     );
-    expect(isViewPath("/project/resources/demo/widget.tsx", cwd)).toBe(true);
+    expect(isViewPath("/project/resources/demo/view.tsx", cwd)).toBe(false);
   });
 
   it("matches paths under a custom views directory", () => {
@@ -102,15 +95,12 @@ describe("isViewPath", () => {
 });
 
 describe("isViewEntryPath", () => {
-  it("matches native view and legacy widget entries", () => {
+  it("matches only views/<name>/view.tsx", () => {
     const cwd = "/project";
     expect(isViewEntryPath("/project/views/demo/view.tsx", cwd)).toBe(true);
     expect(isViewEntryPath("/project/views/demo/index.tsx", cwd)).toBe(false);
     expect(isViewEntryPath("/project/resources/demo/view.tsx", cwd)).toBe(
       false
-    );
-    expect(isViewEntryPath("/project/resources/demo/widget.tsx", cwd)).toBe(
-      true
     );
   });
 

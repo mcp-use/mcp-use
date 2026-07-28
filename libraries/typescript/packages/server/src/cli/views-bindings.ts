@@ -5,8 +5,6 @@
 import { createServerModuleRunner, type DevEnvironment } from "vite";
 
 import type { ViewsManifest } from "../views/types.js";
-import { legacyWidgetMetadataId } from "./legacy-widget-metadata.js";
-import type { DiscoveredView } from "./views.js";
 
 const DEFAULT_BASE_PATH = "/mcp";
 
@@ -22,44 +20,6 @@ interface ServerLike {
   __mount(): void;
   __primeViews(views: ViewsManifest, options?: { dev?: boolean }): void;
   basePath?: string;
-  __registerLegacyViews?(widgets: Record<string, unknown>): void;
-}
-
-const COMPAT_GLOBAL = "__mcpUseV1CompatServer";
-
-function capturedCompatServer(): ServerLike | undefined {
-  return (globalThis as Record<string, unknown>)[COMPAT_GLOBAL] as
-    | ServerLike
-    | undefined;
-}
-
-async function registerLegacyViews(
-  runner: ReturnType<typeof createServerModuleRunner>,
-  server: ServerLike,
-  views: readonly DiscoveredView[]
-): Promise<void> {
-  const legacy = views.filter((view) => view.legacy === true);
-  if (legacy.length === 0) return;
-  if (typeof server.__registerLegacyViews !== "function") {
-    throw new Error(
-      "Legacy resources/*/widget.tsx views require the temporary mcp-use/server compatibility entry."
-    );
-  }
-  const modules: Record<string, unknown> = {};
-  for (const view of legacy) {
-    modules[view.name] = await runner.import(
-      legacyWidgetMetadataId(view.entryPath)
-    );
-  }
-  server.__registerLegacyViews(modules);
-}
-
-/** Build-time facts discovered by evaluating only the server entry. */
-export interface BuildEntryInspection {
-  /** Configured MCP route. */
-  basePath: string;
-  /** Whether the entry captured the deprecated v1 compatibility server. */
-  supportsLegacyViews: boolean;
 }
 
 /**
@@ -70,49 +30,37 @@ export interface BuildEntryInspection {
  *
  * @internal
  */
-export async function inspectBuildEntry(
+async function inspectBuildEntry(
   environment: DevEnvironment,
   entry: string
-): Promise<BuildEntryInspection> {
+): Promise<string> {
   const runner = createServerModuleRunner(environment, {
     hmr: false,
     sourcemapInterceptor: "node",
   });
 
   const previousMcpUrl = process.env["MCP_URL"];
-  const previousCliImport = process.env["MCP_USE_CLI_IMPORT"];
   try {
-    process.env["MCP_USE_CLI_IMPORT"] = "1";
     if (previousMcpUrl === undefined) {
       process.env["MCP_URL"] = BUILD_ENTRY_MCP_URL;
     }
 
-    delete (globalThis as Record<string, unknown>)[COMPAT_GLOBAL];
     const serverModule = (await runner.import(entry)) as {
       default?: ServerLike;
     };
-    const server = serverModule.default ?? capturedCompatServer();
+    const server = serverModule.default;
     if (server === null || typeof server !== "object") {
       throw new Error(
         "The server entry must default-export the MCPServer instance."
       );
     }
 
-    return {
-      basePath: server.basePath ?? DEFAULT_BASE_PATH,
-      supportsLegacyViews: typeof server.__registerLegacyViews === "function",
-    };
+    return server.basePath ?? DEFAULT_BASE_PATH;
   } finally {
-    delete (globalThis as Record<string, unknown>)[COMPAT_GLOBAL];
     if (previousMcpUrl === undefined) {
       delete process.env["MCP_URL"];
     } else {
       process.env["MCP_URL"] = previousMcpUrl;
-    }
-    if (previousCliImport === undefined) {
-      delete process.env["MCP_USE_CLI_IMPORT"];
-    } else {
-      process.env["MCP_USE_CLI_IMPORT"] = previousCliImport;
     }
     await runner.close();
   }
@@ -127,7 +75,7 @@ export async function resolveBuildBasePath(
   environment: DevEnvironment,
   entry: string
 ): Promise<string> {
-  return (await inspectBuildEntry(environment, entry)).basePath;
+  return inspectBuildEntry(environment, entry);
 }
 
 /**
@@ -147,26 +95,22 @@ export async function resolveBuildBasePath(
 export async function validateViewBindingsAtBuild(
   environment: DevEnvironment,
   entry: string,
-  viewsManifest: ViewsManifest,
-  views: readonly DiscoveredView[] = []
+  viewsManifest: ViewsManifest
 ): Promise<void> {
   const runner = createServerModuleRunner(environment, {
     hmr: false,
     sourcemapInterceptor: "node",
   });
-  const previousCliImport = process.env["MCP_USE_CLI_IMPORT"];
   const previousMcpUrl = process.env["MCP_URL"];
 
   try {
-    process.env["MCP_USE_CLI_IMPORT"] = "1";
     if (previousMcpUrl === undefined) {
       process.env["MCP_URL"] = BUILD_ENTRY_MCP_URL;
     }
-    delete (globalThis as Record<string, unknown>)[COMPAT_GLOBAL];
     const serverModule = (await runner.import(entry)) as {
       default?: ServerLike;
     };
-    const server = serverModule.default ?? capturedCompatServer();
+    const server = serverModule.default;
     if (server === null || typeof server !== "object") {
       throw new Error(
         "The server entry must default-export the MCPServer instance."
@@ -178,16 +122,9 @@ export async function validateViewBindingsAtBuild(
         "The entry's default export does not support __primeViews."
       );
     }
-    await registerLegacyViews(runner, server, views);
     server.__primeViews(viewsManifest);
     server.__mount();
   } finally {
-    delete (globalThis as Record<string, unknown>)[COMPAT_GLOBAL];
-    if (previousCliImport === undefined) {
-      delete process.env["MCP_USE_CLI_IMPORT"];
-    } else {
-      process.env["MCP_USE_CLI_IMPORT"] = previousCliImport;
-    }
     if (previousMcpUrl === undefined) {
       delete process.env["MCP_URL"];
     } else {
