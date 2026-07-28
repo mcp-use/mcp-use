@@ -2,7 +2,6 @@
 
 # Dependencies
 *.tsbuildinfo
-.typedoc/
 dist/
 node_modules
 .pnpm-store/
