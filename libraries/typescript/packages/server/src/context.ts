@@ -166,12 +166,13 @@ export type ElicitationResult<T = never> =
 /**
  * Requests or reads one keyed elicitation in a multi-round-trip tool callback.
  *
- * The explicit key correlates the request with the client's response on
- * re-entry. On the first entry, or after an invalid form response, this returns
- * `{ status: "required", result }`; return that result from the tool. On
- * re-entry it returns `accept`, `decline`, or `cancel` and validates accepted
- * Standard Schema form data before exposing it. Validation may be synchronous
- * or asynchronous.
+ * The explicit key is scoped to the current logical MCP operation before it is
+ * placed on the wire, so a response attached to a different tool, resource,
+ * prompt, or parameter set is ignored. On the first entry, or after an invalid
+ * or mismatched response, this returns `{ status: "required", result }`; return
+ * that result from the tool. On re-entry it returns `accept`, `decline`, or
+ * `cancel` and validates accepted Standard Schema form data before exposing it.
+ * Validation may be synchronous or asynchronous.
  *
  * @example
  * ```ts
@@ -443,8 +444,43 @@ function toClientContext(ctx: ServerContext): RequestClientContext {
   };
 }
 
+function canonicalRequestIdentity(value: unknown): string {
+  if (value === null || typeof value !== "object") {
+    const encoded = JSON.stringify(value);
+    return encoded ?? "null";
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalRequestIdentity).join(",")}]`;
+  }
+  const entries = Object.entries(value as Record<string, unknown>)
+    .filter(([, entry]) => entry !== undefined)
+    .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
+  return `{${entries
+    .map(
+      ([key, entry]) =>
+        `${JSON.stringify(key)}:${canonicalRequestIdentity(entry)}`
+    )
+    .join(",")}}`;
+}
+
+async function elicitationResponseKey(
+  key: string,
+  requestIdentity: unknown,
+  mode: "form" | "url"
+): Promise<string> {
+  const source = canonicalRequestIdentity({ key, mode, requestIdentity });
+  const digest = await globalThis.crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(source)
+  );
+  return `mcp-use.elicit.${[...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("")}`;
+}
+
 function createElicit(
-  inputResponses: ServerContext["mcpReq"]["inputResponses"]
+  inputResponses: ServerContext["mcpReq"]["inputResponses"],
+  requestIdentity: unknown
 ): Elicit {
   return async function elicit(
     key: string,
@@ -453,13 +489,16 @@ function createElicit(
   ): Promise<ElicitationResult<unknown> | ElicitationResult> {
     let request: InputRequest;
     let formSchema: StandardSchemaWithJSON | undefined;
+    let mode: "form" | "url";
 
     if (typeof schemaOrUrl === "string") {
+      mode = "url";
       request = inputRequired.elicitUrl({
         message,
         url: schemaOrUrl,
       });
     } else if (schemaOrUrl !== undefined) {
+      mode = "form";
       formSchema = schemaOrUrl;
       request = inputRequired.elicit({
         message,
@@ -471,7 +510,12 @@ function createElicit(
       );
     }
 
-    const response = inputResponse(inputResponses, key);
+    const responseKey = await elicitationResponseKey(
+      key,
+      requestIdentity,
+      mode
+    );
+    const response = inputResponse(inputResponses, responseKey);
     if (response.kind === "elicit") {
       if (response.action !== "accept") {
         return { status: response.action };
@@ -491,7 +535,7 @@ function createElicit(
 
     return {
       status: "required",
-      result: inputRequired({ inputRequests: { [key]: request } }),
+      result: inputRequired({ inputRequests: { [responseKey]: request } }),
     };
   } as Elicit;
 }
@@ -503,7 +547,8 @@ function createElicit(
  * @internal
  */
 export function toRequestContext<TEnv extends Env = Env>(
-  ctx: ServerContext
+  ctx: ServerContext,
+  requestIdentity: unknown = { method: ctx.mcpReq.method }
 ): RequestContext<never, false, TEnv> {
   const rawRequest = ctx.http?.req;
   const http =
@@ -522,7 +567,7 @@ export function toRequestContext<TEnv extends Env = Env>(
       inputResponses: ctx.mcpReq.inputResponses,
     }),
     client: toClientContext(ctx),
-    elicit: createElicit(ctx.mcpReq.inputResponses),
+    elicit: createElicit(ctx.mcpReq.inputResponses, requestIdentity),
     requestState: <T = unknown>() => ctx.mcpReq.requestState<T>(),
     async sendNotification(
       method: string,
@@ -577,11 +622,12 @@ export function toRequestContext<TEnv extends Env = Env>(
 
 /** @internal Projects mapped OAuth auth information into callback context. */
 export function toAuthenticatedRequestContext<TUser, TEnv extends Env = Env>(
-  ctx: ServerContext
+  ctx: ServerContext,
+  requestIdentity?: unknown
 ): RequestContext<TUser, true, TEnv> {
   const authInfo = ctx.http?.authInfo;
   requireOAuthAuthInfo<TUser>(authInfo);
-  return Object.assign(toRequestContext<TEnv>(ctx), {
+  return Object.assign(toRequestContext<TEnv>(ctx, requestIdentity), {
     auth: {
       user: authInfo.extra.user,
       payload: authInfo.extra.payload,

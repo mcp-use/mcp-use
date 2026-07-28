@@ -1638,7 +1638,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     params: MiddlewareContext<M, TEnv>["params"],
     ctx: ServerContext
   ): MiddlewareContext<M, TEnv> {
-    const requestContext = toRequestContext<TEnv>(ctx);
+    const requestContext = toRequestContext<TEnv>(ctx, { method, params });
     return Object.assign(requestContext, {
       method,
       params,
@@ -1904,7 +1904,11 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         >;
         const result = await callback(
           effectiveArgs,
-          this.#toRequestContext(ctx)
+          this.#toRequestContext(ctx, {
+            method: "tools/call",
+            name: definition.name,
+            arguments: effectiveArgs,
+          })
         );
         if (
           isInputRequiredResult(result) ||
@@ -2027,7 +2031,13 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         );
         const innerFn = async () =>
           toResourceResult(
-            await callback(uri, this.#toRequestContext(ctx)),
+            await callback(
+              uri,
+              this.#toRequestContext(ctx, {
+                method: "resources/read",
+                uri: uri.href,
+              })
+            ),
             uri.href
           );
         return await this.#runMcpHook("resources/read", mwCtx, innerFn);
@@ -2075,7 +2085,10 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
             await callback(
               uri,
               variables as Record<string, TemplateVariableValue>,
-              this.#toRequestContext(ctx)
+              this.#toRequestContext(ctx, {
+                method: "resources/read",
+                uri: uri.href,
+              })
             ),
             uri.href
           );
@@ -2134,7 +2147,14 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           unknown
         >;
         return toPromptResult(
-          await callback(effectiveArgs, this.#toRequestContext(ctx))
+          await callback(
+            effectiveArgs,
+            this.#toRequestContext(ctx, {
+              method: "prompts/get",
+              name: definition.name,
+              arguments: effectiveArgs,
+            })
+          )
         );
       };
       return await this.#runMcpHook("prompts/get", mwCtx, innerFn);
@@ -2157,19 +2177,19 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   }
 
   #toRequestContext(
-    ctx: ServerContext
+    ctx: ServerContext,
+    requestIdentity: unknown
   ): RequestContext<TUser, HasOAuth<TUser>, TEnv> {
     if (this.#config.oauth === undefined) {
-      return toRequestContext<TEnv>(ctx) as RequestContext<
+      return toRequestContext<TEnv>(ctx, requestIdentity) as RequestContext<
         TUser,
         HasOAuth<TUser>,
         TEnv
       >;
     }
-    return toAuthenticatedRequestContext<TUser, TEnv>(ctx) as RequestContext<
-      TUser,
-      HasOAuth<TUser>,
-      TEnv
-    >;
+    return toAuthenticatedRequestContext<TUser, TEnv>(
+      ctx,
+      requestIdentity
+    ) as RequestContext<TUser, HasOAuth<TUser>, TEnv>;
   }
 }

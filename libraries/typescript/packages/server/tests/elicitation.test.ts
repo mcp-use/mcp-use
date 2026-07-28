@@ -8,7 +8,7 @@ import {
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { MCPServer } from "../src/index.js";
+import { isInputRequiredResult, MCPServer } from "../src/index.js";
 
 const confirmationSchema = z.object({ confirm: z.boolean() });
 const asyncConfirmationSchema = confirmationSchema.superRefine(
@@ -40,6 +40,7 @@ describe("elicitation and input_required", () => {
     version: "1.0.0",
   });
   let client: Client;
+  let manualClient: Client;
   let asyncFormAttempts = 0;
   let invalidFormAttempts = 0;
 
@@ -101,7 +102,7 @@ describe("elicitation and input_required", () => {
           type: "text",
           text:
             authorization.status === "accept"
-              ? "Account linked"
+              ? "Authorization page opened"
               : "Account not linked",
         },
       ],
@@ -165,9 +166,21 @@ describe("elicitation and input_required", () => {
     await client.connect(
       new StreamableHTTPClientTransport(new URL(started.url))
     );
+    manualClient = new Client(
+      { name: "elicitation-manual-client", version: "1.0.0" },
+      {
+        capabilities: { elicitation: { form: {}, url: {} } },
+        versionNegotiation: { mode: { pin: "2026-07-28" } },
+        inputRequired: { autoFulfill: false },
+      }
+    );
+    await manualClient.connect(
+      new StreamableHTTPClientTransport(new URL(started.url))
+    );
   });
 
   afterAll(async () => {
+    await manualClient.close();
     await client.close();
     await server.close();
   });
@@ -195,7 +208,7 @@ describe("elicitation and input_required", () => {
 
     expect(result.content).toContainEqual({
       type: "text",
-      text: "Account linked",
+      text: "Authorization page opened",
     });
     expect(seenRequests).toContainEqual(
       expect.objectContaining({
@@ -204,6 +217,48 @@ describe("elicitation and input_required", () => {
         url: "https://example.com/authorize",
       })
     );
+  });
+
+  it("does not accept a response attached to a different logical request", async () => {
+    const original = await manualClient.callTool(
+      {
+        name: "deploy",
+        arguments: { environment: "production" },
+      },
+      { allowInputRequired: true }
+    );
+    expect(isInputRequiredResult(original)).toBe(true);
+    if (
+      !isInputRequiredResult(original) ||
+      original.inputRequests === undefined
+    )
+      throw new Error("Expected an input_required result");
+
+    const [responseKey] = Object.keys(original.inputRequests);
+    if (responseKey === undefined)
+      throw new Error("Expected an elicitation response key");
+
+    type RetriedCall = Parameters<Client["callTool"]>[0] & {
+      inputResponses: Record<string, unknown>;
+    };
+    const crossedRequest: RetriedCall = {
+      name: "deploy",
+      arguments: { environment: "staging" },
+      inputResponses: {
+        [responseKey]: {
+          action: "accept",
+          content: { confirm: true },
+        },
+      },
+    };
+    const crossed = await manualClient.callTool(crossedRequest, {
+      allowInputRequired: true,
+    });
+
+    expect(isInputRequiredResult(crossed)).toBe(true);
+    if (!isInputRequiredResult(crossed) || crossed.inputRequests === undefined)
+      throw new Error("Expected the crossed response to be re-requested");
+    expect(Object.keys(crossed.inputRequests)).not.toContain(responseKey);
   });
 
   it("sends a custom notification on the originating request", async () => {

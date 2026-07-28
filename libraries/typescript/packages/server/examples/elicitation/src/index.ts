@@ -128,7 +128,12 @@ server.tool(
     }
 
     return {
-      content: [{ type: "text", text: `Connected ${service}.` }],
+      content: [
+        {
+          type: "text",
+          text: `Authorization page opened for ${service}. Verify the backend callback before treating the service as connected.`,
+        },
+      ],
     };
   }
 );

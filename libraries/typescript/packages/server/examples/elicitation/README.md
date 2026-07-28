@@ -41,10 +41,13 @@ The accepted `data` type is inferred from the schema. Accepted content is also
 validated against it; invalid client data results in another `input_required`
 round instead of reaching the side effect.
 
-The key (`deployment-approval` above) must remain stable across retries. It
-correlates the embedded request with its response. Advanced tools that need
-several sequential rounds should also carry their current step in verified
-`requestState`.
+The key (`deployment-approval` above) must remain stable across retries.
+`mcp-use` scopes it to the logical MCP method, target, and parameters before
+placing it on the wire, so a response accidentally attached to a different
+request is ignored. This is correlation, not authorization or replay
+protection: destructive, multi-step, or identity-sensitive flows should carry
+their phase, authenticated principal, originating request digest, and expiry in
+integrity-protected `requestState`.
 
 ## URL elicitation
 
@@ -73,7 +76,10 @@ Use URL mode for authentication, credentials, payment details, or other
 sensitive interactions whose submitted values should stay on the external
 site instead of passing through the model or MCP client. In a real
 authorization flow, verify the callback and state on your backend; the
-client's `accept` action alone is not proof that authorization succeeded.
+client's `accept` action means only that the user consented to open the URL. It
+is not proof that authorization succeeded, and the tool must not report the
+service as connected until backend state bound to the authenticated user
+confirms completion.
 
 ## Run the example
 
