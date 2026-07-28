@@ -13,8 +13,8 @@ import type { ConnectorInitOptions } from "./base.js";
 import { BaseConnector } from "./base.js";
 
 /**
- * Detect a 401 anywhere in an error / cause chain. Under `versionNegotiation:
- * "auto"` a connect-time 401 can surface wrapped as
+ * Detect a 401 anywhere in an error / cause chain. Under
+ * `versionNegotiation: "auto"` a connect-time 401 can surface wrapped as
  * `SdkError(EraNegotiationFailed)` with the `UnauthorizedError` at
  * `error.data.cause` (rather than a bare `SdkHttpError`), so we walk the chain.
  */
@@ -32,24 +32,40 @@ function detectUnauthorized(err: unknown, depth = 0): boolean {
   return false;
 }
 
+/** Client identity advertised to an MCP server during connection setup. */
 export type ClientInfo = {
+  /** Stable programmatic client name. */
   name: string;
+  /** Optional human-readable client title. */
   title?: string;
+  /** Client version string. */
   version: string;
+  /** Human-readable client description. */
   description?: string;
+  /** Icons representing the client. */
   icons?: Array<{
+    /** Icon URL. */
     src: string;
+    /** Icon media type. */
     mimeType?: string;
+    /** Supported icon sizes, such as `"48x48"`. */
     sizes?: string[];
   }>;
+  /** Public website describing the client. */
   websiteUrl?: string;
 };
 
+/** HTTP-specific connector options. */
 interface HttpConnectorOptions extends ConnectorInitOptions {
+  /** Bearer token added to the `Authorization` header. */
   authToken?: string;
+  /** Fetch implementation used by transport requests. */
   fetch?: typeof fetch;
+  /** Additional transport request headers. */
   headers?: Record<string, string>;
-  timeout?: number; // HTTP request timeout (ms)
+  /** Connection timeout in milliseconds. Defaults to `10000`. */
+  timeout?: number;
+  /** Client identity advertised to the server. */
   clientInfo?: ClientInfo;
   /**
    * Protocol version negotiation mode passed to the SDK `Client`.
@@ -64,12 +80,19 @@ interface HttpConnectorOptions extends ConnectorInitOptions {
    * - `{ pin: "2026-07-28" }`: modern era only, no fallback.
    */
   protocolNegotiation?: VersionNegotiationMode;
-  gatewayUrl?: string; // Optional gateway URL to route requests through
-  serverId?: string; // Optional server ID for gateway observability
+  /** Gateway endpoint through which MCP transport requests are routed. */
+  gatewayUrl?: string;
+  /** Server identifier forwarded to the gateway for observability. */
+  serverId?: string;
+  /** Retry settings for streamable HTTP reconnection. */
   reconnectionOptions?: {
+    /** Maximum delay between reconnection attempts in milliseconds. */
     maxReconnectionDelay?: number;
+    /** Delay before the first reconnection attempt in milliseconds. */
     initialReconnectionDelay?: number;
+    /** Multiplier applied after each failed attempt. */
     reconnectionDelayGrowFactor?: number;
+    /** Maximum number of reconnection attempts. */
     maxRetries?: number;
   };
 }
@@ -123,6 +146,12 @@ function createMcpProxyFetch(
   };
 }
 
+/**
+ * Connects to an MCP server using streamable HTTP.
+ *
+ * The connector negotiates modern and legacy protocol eras by default and can
+ * route transport requests through an HTTP gateway.
+ */
 export class HttpConnector extends BaseConnector {
   private readonly baseUrl: string;
   private readonly headers: Record<string, string>;
@@ -136,6 +165,12 @@ export class HttpConnector extends BaseConnector {
   private transportType: "streamable-http" | null = null;
   private streamableTransport: StreamableHTTPClientTransport | null = null;
 
+  /**
+   * Creates an HTTP connector.
+   *
+   * @param baseUrl - MCP endpoint URL.
+   * @param opts - Authentication, transport, SDK, and reconnection options.
+   */
   constructor(baseUrl: string, opts: HttpConnectorOptions = {}) {
     super(opts);
 
@@ -292,7 +327,12 @@ export class HttpConnector extends BaseConnector {
     return { fallbackReason, is401Error, httpStatusCode };
   }
 
-  /** Establish connection to the MCP implementation via streamable HTTP. */
+  /**
+   * Establishes a streamable HTTP connection to the MCP server.
+   *
+   * @returns A promise that resolves after protocol negotiation completes.
+   * @throws An error with `code: 401` when authentication is required.
+   */
   async connect(): Promise<void> {
     if (this.connected) {
       logger.debug("Already connected to MCP implementation");
@@ -604,6 +644,11 @@ export class HttpConnector extends BaseConnector {
     }
   }
 
+  /**
+   * Returns fields that identify the endpoint and negotiated transport.
+   *
+   * @returns HTTP connector identity metadata.
+   */
   get publicIdentifier(): Record<string, string> {
     return {
       type: "http",
@@ -613,7 +658,11 @@ export class HttpConnector extends BaseConnector {
     };
   }
 
-  /** Get the active transport type (`streamable-http` once connected). */
+  /**
+   * Returns the active transport type.
+   *
+   * @returns `"streamable-http"` after connection, otherwise `null`.
+   */
   getTransportType(): "streamable-http" | null {
     return this.transportType;
   }

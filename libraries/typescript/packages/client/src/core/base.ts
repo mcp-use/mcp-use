@@ -34,7 +34,7 @@ function isOAuthClientProvider(
  * sessions, and configurations. It works in both Node.js and browser environments
  * by delegating platform-specific operations to concrete implementations.
  *
- * Platform-specific implementations (like {@link MCPClient} for Node.js) should
+ * Platform-specific implementations such as the Node.js `MCPClient` should
  * extend this class and override the abstract {@link createConnectorFromConfig}
  * method to provide environment-specific connector creation.
  *
@@ -53,19 +53,16 @@ function isOAuthClientProvider(
  * });
  * ```
  *
- * @see {@link MCPClient} for Node.js-specific implementation
  * @see {@link MCPSession} for session management
  */
 export abstract class BaseMCPClient {
   /**
    * Internal configuration object containing MCP server definitions.
-   * @protected
    */
   protected config: MCPClientConfigShape = {};
 
   /**
    * Map of server names to their active sessions.
-   * @protected
    */
   protected sessions: Record<string, MCPSession> = {};
 
@@ -112,7 +109,7 @@ export abstract class BaseMCPClient {
    *
    * @param _cfg - Configuration dictionary
    * @returns Client instance
-   * @throws {Error} If called on the base class instead of a concrete implementation
+   * @throws If called on the base class instead of a concrete implementation
    *
    * @example
    * ```typescript
@@ -256,7 +253,6 @@ export abstract class BaseMCPClient {
    *
    * @param serverConfig - Server configuration object
    * @returns Platform-specific connector instance
-   * @protected
    */
   protected abstract createConnectorFromConfig(
     serverConfig: ServerConfig
@@ -287,7 +283,7 @@ export abstract class BaseMCPClient {
    * @param serverName - The name of the server as defined in the client configuration
    * @param autoInitialize - Whether to automatically initialize the session (default: true)
    * @returns A promise that resolves to the created MCPSession instance
-   * @throws {Error} If the server is not found in the configuration
+   * @throws If the server is not found in the configuration
    *
    * @example
    * ```typescript
@@ -493,7 +489,7 @@ export abstract class BaseMCPClient {
    *
    * @param serverName - Name of the server
    * @returns The session instance
-   * @throws {Error} If the session is not found
+   * @throws If the session is not found
    *
    * @example
    * ```typescript

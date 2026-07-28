@@ -1,3 +1,9 @@
+/**
+ * Verify WorkOS AuthKit access tokens for an mcp-use resource server.
+ *
+ * @packageDocumentation
+ */
+
 import type { AuthInfo, OAuthMetadata } from "@modelcontextprotocol/server";
 
 import {
@@ -19,21 +25,33 @@ import {
 
 /** Verified WorkOS user and organization claims exposed to authenticated MCP callbacks. */
 export interface WorkOSOAuthUser {
+  /** WorkOS subject identifier. */
   id: string;
+  /** Primary email address, when included in the access token. */
   email?: string;
+  /** Whether WorkOS has verified {@link WorkOSOAuthUser.email}. */
   emailVerified?: boolean;
+  /** Display name, when included in the access token. */
   name?: string;
+  /** Preferred username, when included in the access token. */
   preferredUsername?: string;
+  /** Given name, when included in the access token. */
   firstName?: string;
+  /** Family name, when included in the access token. */
   lastName?: string;
+  /** Profile image URL, when included in the access token. */
   picture?: string;
+  /** Roles from the access token's `roles` claim. */
   roles: string[];
+  /** Active WorkOS organization identifier. */
   organizationId?: string;
+  /** WorkOS session identifier. */
   sessionId?: string;
 }
 
 /** Configures WorkOS JWT verification and protected-resource metadata. */
 export interface WorkOSOAuthProviderOptions extends OAuthResourceOptions {
+  /** AuthKit subdomain, with or without the `https://` scheme. */
   subdomain: string;
 }
 
@@ -42,6 +60,16 @@ export interface WorkOSOAuthProviderOptions extends OAuthResourceOptions {
  *
  * @param options - WorkOS AuthKit origin and resource-server settings.
  * @returns A provider that rejects tokens not issued for the resolved MCP resource.
+ * @throws A `TypeError` if `subdomain` is empty or uses a non-HTTPS URL.
+ *
+ * @example
+ * ```ts
+ * import { oauthWorkOSProvider } from "mcp-use/oauth/workos";
+ *
+ * const oauth = oauthWorkOSProvider({
+ *   subdomain: "example.authkit.app",
+ * });
+ * ```
  */
 export function oauthWorkOSProvider(
   options: WorkOSOAuthProviderOptions

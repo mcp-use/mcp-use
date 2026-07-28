@@ -15,11 +15,13 @@ function sanitizeToolName(name: string): string {
     .replace(/^_+|_+$/g, "");
 }
 
+/** Native tool definition paired with its internal dispatch route. */
 export interface NativeToolEntry extends ProviderTool {
   /** Internal dispatch key (may differ from MCP name after dedup). */
   dispatchKey: string;
 }
 
+/** Invokes a native adapter tool by its exposed name. */
 export type NativeCallToolFn = (
   name: string,
   args: Record<string, unknown>
@@ -33,17 +35,28 @@ interface ToolHandler {
 }
 
 /**
- * Converts MCP tools/resources/prompts to provider-neutral ProviderTool[]
- * and a matching callTool dispatcher backed by @mcp-use/client connectors.
+ * Converts MCP tools, resources, and prompts into provider-neutral tools.
+ *
+ * The adapter also creates a dispatcher that routes model tool calls back to
+ * the connector that supplied each tool.
  */
 export class NativeAdapter extends BaseAdapter<NativeToolEntry> {
   private usedToolNames = new Set<string>();
   private handlers = new Map<string, ToolHandler>();
 
+  /**
+   * @param disallowedTools - MCP tool names to omit during conversion.
+   */
   constructor(disallowedTools: string[] = []) {
     super(disallowedTools);
   }
 
+  /**
+   * Converts MCP tools from all connectors and resets the dispatch table.
+   *
+   * @param connectors - Connected MCP connectors.
+   * @returns Provider-neutral tool entries.
+   */
   public override async createToolsFromConnectors(
     connectors: BaseConnector[]
   ): Promise<NativeToolEntry[]> {
@@ -52,6 +65,12 @@ export class NativeAdapter extends BaseAdapter<NativeToolEntry> {
     return super.createToolsFromConnectors(connectors);
   }
 
+  /**
+   * Creates a dispatcher for the entries loaded by this adapter.
+   *
+   * @returns A function that invokes tools, reads resources, or gets prompts.
+   * @throws Error if the requested exposed tool name is unknown.
+   */
   createCallTool(): NativeCallToolFn {
     const handlers = this.handlers;
     return async (name, args) => {
@@ -75,6 +94,12 @@ export class NativeAdapter extends BaseAdapter<NativeToolEntry> {
     };
   }
 
+  /**
+   * Removes internal dispatch metadata from native tool entries.
+   *
+   * @param entries - Entries created by this adapter.
+   * @returns Provider-neutral definitions safe to send to an LLM provider.
+   */
   toProviderTools(entries: NativeToolEntry[]): ProviderTool[] {
     return entries.map(({ name, description, inputSchema }) => ({
       name,

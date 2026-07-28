@@ -1,3 +1,9 @@
+/**
+ * Verify Keycloak access tokens for an mcp-use resource server.
+ *
+ * @packageDocumentation
+ */
+
 import type { AuthInfo, OAuthMetadata } from "@modelcontextprotocol/server";
 
 import { isRecord } from "./guards.js";
@@ -21,21 +27,33 @@ import {
 
 /** Verified Keycloak user and role claims exposed to authenticated MCP callbacks. */
 export interface KeycloakOAuthUser {
+  /** Keycloak subject identifier. */
   id: string;
+  /** Primary email address, when included in the access token. */
   email?: string;
+  /** Display name, when included in the access token. */
   name?: string;
+  /** Preferred username, when included in the access token. */
   preferredUsername?: string;
+  /** Given name, when included in the access token. */
   givenName?: string;
+  /** Family name, when included in the access token. */
   familyName?: string;
+  /** Whether Keycloak has verified {@link KeycloakOAuthUser.email}. */
   emailVerified?: boolean;
+  /** Realm roles from `realm_access.roles`. */
   roles: string[];
+  /** Unmodified `realm_access` claim, when present. */
   realmAccess?: Record<string, unknown>;
+  /** Unmodified `resource_access` claim, when present. */
   resourceAccess?: Record<string, unknown>;
 }
 
 /** Configures Keycloak JWT verification and protected-resource metadata. */
 export interface KeycloakOAuthProviderOptions extends OAuthResourceOptions {
+  /** Base URL of the Keycloak server. */
   serverUrl: URL | string;
+  /** Keycloak realm that issues accepted access tokens. */
   realm: string;
 }
 
@@ -44,6 +62,17 @@ export interface KeycloakOAuthProviderOptions extends OAuthResourceOptions {
  *
  * @param options - Keycloak server URL, realm, and resource-server settings.
  * @returns A provider that rejects tokens not issued for the resolved MCP resource.
+ * @throws A `TypeError` if `serverUrl` or `realm` is invalid.
+ *
+ * @example
+ * ```ts
+ * import { oauthKeycloakProvider } from "mcp-use/oauth/keycloak";
+ *
+ * const oauth = oauthKeycloakProvider({
+ *   serverUrl: "https://keycloak.example.com",
+ *   realm: "production",
+ * });
+ * ```
  */
 export function oauthKeycloakProvider(
   options: KeycloakOAuthProviderOptions

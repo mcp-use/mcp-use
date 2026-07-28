@@ -1,0 +1,13 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "name": "mcp-use TypeScript API",
+  "entryPointStrategy": "packages",
+  "entryPoints": ["packages/server", "packages/client", "packages/agent"],
+  "plugin": ["./scripts/typedoc-navigation-plugin.mjs"],
+  "theme": "mcp-use",
+  "out": ".typedoc",
+  "readme": "none",
+  "includeVersion": false,
+  "cleanOutputDir": true,
+  "githubPages": false
+}

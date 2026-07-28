@@ -1,3 +1,9 @@
+/**
+ * Verify Auth0 access tokens for an mcp-use resource server.
+ *
+ * @packageDocumentation
+ */
+
 import type { AuthInfo, OAuthMetadata } from "@modelcontextprotocol/server";
 
 import {
@@ -19,18 +25,27 @@ import {
 
 /** Verified Auth0 user claims exposed to authenticated MCP callbacks. */
 export interface Auth0OAuthUser {
+  /** Auth0 subject identifier. */
   id: string;
+  /** Primary email address, when included in the access token. */
   email?: string;
+  /** Display name, when included in the access token. */
   name?: string;
+  /** Auth0 nickname, when included in the access token. */
   nickname?: string;
+  /** Profile image URL, when included in the access token. */
   picture?: string;
+  /** Whether Auth0 has verified {@link Auth0OAuthUser.email}. */
   emailVerified?: boolean;
+  /** ISO timestamp for the most recent profile update. */
   updatedAt?: string;
+  /** Roles from the access token's `roles` claim. */
   roles: string[];
 }
 
 /** Configures Auth0 JWT verification and protected-resource metadata. */
 export interface Auth0OAuthProviderOptions extends OAuthResourceOptions {
+  /** Auth0 tenant domain or issuer URL. */
   domain: URL | string;
 }
 
@@ -39,6 +54,16 @@ export interface Auth0OAuthProviderOptions extends OAuthResourceOptions {
  *
  * @param options - Auth0 domain and resource-server settings.
  * @returns A provider that rejects tokens not issued for the resolved MCP resource.
+ * @throws A `TypeError` if `domain` is not a valid HTTP or HTTPS URL.
+ *
+ * @example
+ * ```ts
+ * import { oauthAuth0Provider } from "mcp-use/oauth/auth0";
+ *
+ * const oauth = oauthAuth0Provider({
+ *   domain: "https://example.us.auth0.com",
+ * });
+ * ```
  */
 export function oauthAuth0Provider(
   options: Auth0OAuthProviderOptions

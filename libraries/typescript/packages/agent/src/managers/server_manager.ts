@@ -54,15 +54,27 @@ function isEqual(a: any, b: any): boolean {
   return false;
 }
 
+/** Selects an active MCP server and exposes its LangChain tools. */
 export class ServerManager implements IServerManager {
+  /** Whether capabilities have been loaded for each configured server. */
   public readonly initializedServers: Record<string, boolean> = {};
+  /** Cached LangChain tools, resources, and prompts by server name. */
   public readonly serverTools: Record<string, StructuredToolInterface[]> = {};
 
+  /** MCP client that owns server configurations and sessions. */
   public readonly client: MCPClient;
+  /** Adapter used to create LangChain tools. */
   public readonly adapter: LangChainAdapter;
+  /** Server whose cached tools are currently exposed. */
   public activeServer: string | null = null;
   private overrideManagementTools?: StructuredToolInterface[];
 
+  /**
+   * @param client - MCP client that owns the managed servers.
+   * @param adapter - Adapter used to convert MCP capabilities.
+   * @param managementTools - Optional replacement for the built-in server
+   * management tools.
+   */
   constructor(
     client: MCPClient,
     adapter: LangChainAdapter,
@@ -73,6 +85,11 @@ export class ServerManager implements IServerManager {
     this.overrideManagementTools = managementTools;
   }
 
+  /**
+   * Replaces the management tools returned by {@link ServerManager.tools}.
+   *
+   * @param tools - Complete replacement tool list.
+   */
   public setManagementTools(tools: StructuredToolInterface[]): void {
     this.overrideManagementTools = tools;
     logger.debug(
@@ -80,6 +97,11 @@ export class ServerManager implements IServerManager {
     );
   }
 
+  /**
+   * Writes current connection and tool-cache state at debug level.
+   *
+   * @param context - Label describing why the state was logged.
+   */
   public logState(context: string): void {
     const allServerNames = this.client.getServerNames();
     const activeSessionNames = Object.keys(this.client.getAllActiveSessions());
@@ -101,6 +123,7 @@ export class ServerManager implements IServerManager {
     console.table(tableData);
   }
 
+  /** Validates that the client contains at least one server configuration. */
   initialize(): void {
     const serverNames = this.client.getServerNames?.();
     if (serverNames.length === 0) {
@@ -108,6 +131,10 @@ export class ServerManager implements IServerManager {
     }
   }
 
+  /**
+   * Connects configured servers as needed and caches all tools, resources, and
+   * prompts.
+   */
   async prefetchServerTools(): Promise<void> {
     const servers: string[] = this.client.getServerNames();
 
@@ -180,6 +207,9 @@ export class ServerManager implements IServerManager {
     }
   }
 
+  /**
+   * @returns Management tools plus cached tools from the active server, if any.
+   */
   get tools(): StructuredToolInterface[] {
     if (logger.level === "debug") {
       this.logState("Providing tools to agent");

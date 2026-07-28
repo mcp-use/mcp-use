@@ -19,9 +19,11 @@ const DEFAULT_PORT = 33418;
 const PORT_RANGE = 10;
 const DEFAULT_AUTH_TIMEOUT_MS = 5 * 60_000;
 
+/** Configures OAuth authorization for Node.js and CLI clients. */
 export interface NodeOAuthOptions extends OAuthSessionStoreOptions {
   /** Preferred loopback port. Default 33418. Walks up by `portRange` on EADDRINUSE. */
   preferredPort?: number;
+  /** Number of consecutive loopback ports to try. Defaults to `10`. */
   portRange?: number;
   /** Override the on-disk store directory (mostly for tests). */
   baseDir?: string;
@@ -33,9 +35,24 @@ export interface NodeOAuthOptions extends OAuthSessionStoreOptions {
   openBrowser?: (url: string) => Promise<void> | void;
 }
 
+/**
+ * Error reported by the local OAuth callback flow.
+ *
+ * The {@link OAuthFlowError.code} value is a stable OAuth or local-flow error
+ * code such as `"timeout"` or `"cancelled"`.
+ */
 export class OAuthFlowError extends Error {
+  /** OAuth or local-flow error code. */
   readonly code: string;
+  /** Optional human-readable error description. */
   readonly description?: string;
+
+  /**
+   * Creates an OAuth flow error.
+   *
+   * @param code - OAuth or local-flow error code.
+   * @param description - Optional human-readable description.
+   */
   constructor(code: string, description?: string) {
     super(description ? `${code}: ${description}` : code);
     this.code = code;
@@ -123,7 +140,9 @@ h1{font-size:20px;margin:0 0 12px;color:#b00020}p{line-height:1.5}code{backgroun
  * port reservation is async.
  */
 export class NodeOAuthClientProvider implements OAuthClientProvider {
+  /** Protected MCP server URL associated with this provider. */
   readonly serverUrl: string;
+  /** Reserved localhost callback port. */
   readonly port: number;
 
   private session: OAuthSessionStore;
@@ -155,6 +174,13 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
     this.openBrowserOverride = options.openBrowser;
   }
 
+  /**
+   * Creates a Node OAuth provider and reserves a localhost callback port.
+   *
+   * @param serverUrl - Protected MCP server URL.
+   * @param options - OAuth metadata, storage, loopback, and browser options.
+   * @returns A provider ready to participate in the SDK OAuth flow.
+   */
   static async create(
     serverUrl: string,
     options: NodeOAuthOptions = {}
@@ -205,34 +231,51 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
 
   // --- Identity passthroughs (parallel to BrowserOAuthClientProvider) ---
 
+  /** Prefix used for persisted OAuth session keys. */
   get storageKeyPrefix(): string {
     return this.session.storageKeyPrefix;
   }
 
+  /** Stable hash of the protected server URL used to namespace storage. */
   get serverUrlHash(): string {
     return this.session.serverUrlHash;
   }
 
   // --- SDK Interface (delegated to OAuthSessionStore) ---
 
+  /** Loopback redirect URL registered for this provider. */
   get redirectUrl(): string {
     return this.session.redirectUrl;
   }
 
+  /** OAuth client metadata presented during registration. */
   get clientMetadata(): OAuthClientMetadata {
     return this.session.clientMetadata;
   }
 
+  /** OAuth Client ID Metadata Document URL, when configured. */
   get clientMetadataUrl(): string | undefined {
     return this.session.clientMetadataUrl;
   }
 
+  /**
+   * Loads saved OAuth tokens.
+   *
+   * @param ctx - Optional client registration context.
+   * @returns Saved tokens, or `undefined` when none exist.
+   */
   tokens(
     ctx?: OAuthClientInformationContext
   ): Promise<OAuthTokens | undefined> {
     return this.session.tokens(ctx);
   }
 
+  /**
+   * Persists OAuth tokens.
+   *
+   * @param tokens - Tokens to save.
+   * @param ctx - Optional client registration context.
+   */
   saveTokens(
     tokens: OAuthTokens,
     ctx?: OAuthClientInformationContext
@@ -240,12 +283,24 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
     return this.session.saveTokens(tokens, ctx);
   }
 
+  /**
+   * Loads saved OAuth client registration information.
+   *
+   * @param ctx - Optional registration context.
+   * @returns Saved registration information, or `undefined`.
+   */
   clientInformation(
     ctx?: OAuthClientInformationContext
   ): Promise<OAuthClientInformation | undefined> {
     return this.session.clientInformation(ctx);
   }
 
+  /**
+   * Persists OAuth client registration information.
+   *
+   * @param info - Client information to save.
+   * @param ctx - Optional registration context.
+   */
   saveClientInformation(
     info: OAuthClientInformation,
     ctx?: OAuthClientInformationContext
@@ -253,26 +308,49 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
     return this.session.saveClientInformation(info, ctx);
   }
 
+  /**
+   * Loads the saved PKCE code verifier.
+   *
+   * @returns The saved verifier.
+   */
   codeVerifier(): Promise<string> {
     return this.session.codeVerifier();
   }
 
+  /**
+   * Persists a PKCE code verifier.
+   *
+   * @param codeVerifier - Verifier to save.
+   */
   saveCodeVerifier(codeVerifier: string): Promise<void> {
     return this.session.saveCodeVerifier(codeVerifier);
   }
 
+  /**
+   * Invalidates selected persisted OAuth credentials.
+   *
+   * @param scope - Credential group to remove.
+   */
   invalidateCredentials(
     scope: "all" | "client" | "tokens" | "verifier" | "discovery"
   ): Promise<void> {
     return this.session.invalidateCredentials(scope);
   }
 
-  /** Persist OAuth discovery state (SEP-2352). Delegated to the session store. */
+  /**
+   * Persists OAuth discovery state.
+   *
+   * @param state - Discovery state to save.
+   */
   saveDiscoveryState(state: OAuthDiscoveryState): Promise<void> {
     return this.session.saveDiscoveryState(state);
   }
 
-  /** Return previously saved OAuth discovery state, or `undefined`. */
+  /**
+   * Returns previously saved OAuth discovery state.
+   *
+   * @returns Saved discovery state, or `undefined`.
+   */
   discoveryState(): Promise<OAuthDiscoveryState | undefined> {
     return this.session.discoveryState();
   }
@@ -281,6 +359,10 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
    * Bind the loopback server, set up the pending-code deferred, and ask the
    * platform to open the user's browser. Does NOT await the code; the
    * orchestrator awaits via `getAuthorizationCode()`.
+   *
+   * @param authorizationUrl - Authorization URL generated by the SDK.
+   * @returns A promise that resolves once the loopback listener is ready and
+   * the browser-open attempt completes.
    */
   async redirectToAuthorization(authorizationUrl: URL): Promise<void> {
     if (this.pending) {
@@ -336,6 +418,8 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
    * Must be called after `redirectToAuthorization()`. Returns the same
    * promise whether the callback has fired or not — callers may subscribe
    * before or after.
+   *
+   * @returns The authorization code received by the loopback callback.
    */
   getAuthorizationCode(): Promise<string> {
     return this.getAuthorizationResponse().then((response) => response.code);
@@ -344,6 +428,9 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
   /**
    * Resolves with the authorization code and RFC 9207 issuer captured by the
    * loopback callback.
+   *
+   * @returns The loopback authorization response.
+   * @throws When called before {@link NodeOAuthClientProvider.redirectToAuthorization}.
    */
   getAuthorizationResponse(): Promise<NodeOAuthAuthorizationResponse> {
     if (!this.lastFlow) {
@@ -358,6 +445,9 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
 
   /**
    * Cancel an in-progress flow (timeout, SIGINT, etc.) and close the loopback.
+   *
+   * Pending calls to {@link NodeOAuthClientProvider.getAuthorizationResponse}
+   * reject with an {@link OAuthFlowError} whose code is `"cancelled"`.
    */
   dispose(): void {
     if (this.pending) {
@@ -367,7 +457,7 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
     }
   }
 
-  /** Best-effort port for tests / status output. */
+  /** Local callback port, useful for status output and tests. */
   get callbackPort(): number {
     return this.port;
   }
@@ -498,7 +588,11 @@ async function defaultOpener(url: string): Promise<void> {
 }
 
 /**
- * Creates the Node OAuth provider used by the root client entry.
+ * Creates a Node OAuth provider for an MCP server.
+ *
+ * @param serverUrl - Protected MCP server URL.
+ * @param options - OAuth metadata, storage, loopback, and browser options.
+ * @returns A provider compatible with the MCP SDK OAuth flow.
  */
 export async function createOAuthProvider(
   serverUrl: string,

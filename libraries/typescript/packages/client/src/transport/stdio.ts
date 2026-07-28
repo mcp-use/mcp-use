@@ -16,7 +16,9 @@ import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { BaseConnector } from "./base.js";
 import type { ClientInfo } from "./http.js";
 
+/** Stdio-specific connector options. */
 interface StdioConnectorOptions extends ConnectorInitOptions {
+  /** Client identity advertised to the server. */
   clientInfo?: ClientInfo;
   /**
    * Protocol version negotiation mode. Defaults to `"legacy"` for stdio: the
@@ -28,6 +30,9 @@ interface StdioConnectorOptions extends ConnectorInitOptions {
   protocolNegotiation?: VersionNegotiationMode;
 }
 
+/**
+ * Launches and connects to a local MCP server over standard input and output.
+ */
 export class StdioConnector extends BaseConnector {
   private readonly command: string;
   private readonly args: string[];
@@ -37,6 +42,11 @@ export class StdioConnector extends BaseConnector {
   private readonly clientInfo: ClientInfo;
   private readonly protocolNegotiation: VersionNegotiationMode;
 
+  /**
+   * Creates a stdio connector.
+   *
+   * @param options - Process launch, client identity, and shared connector options.
+   */
   constructor({
     command = "npx",
     args = [],
@@ -64,7 +74,11 @@ export class StdioConnector extends BaseConnector {
     this.protocolNegotiation = rest.protocolNegotiation ?? "legacy";
   }
 
-  /** Establish connection to the MCP implementation. */
+  /**
+   * Starts the child process and establishes an MCP connection.
+   *
+   * @returns A promise that resolves after protocol negotiation completes.
+   */
   async connect(): Promise<void> {
     if (this.connected) {
       logger.debug("Already connected to MCP implementation");
@@ -187,6 +201,11 @@ export class StdioConnector extends BaseConnector {
     }
   }
 
+  /**
+   * Returns fields identifying the launched command and arguments.
+   *
+   * @returns Stdio connector identity metadata.
+   */
   get publicIdentifier(): Record<string, string> {
     return {
       type: "stdio",
@@ -195,11 +214,20 @@ export class StdioConnector extends BaseConnector {
   }
 }
 
+/**
+ * Owns the lifecycle of a stdio client transport.
+ */
 export class StdioConnectionManager extends ConnectionManager<StdioClientTransport> {
   private readonly serverParams: StdioServerParameters;
   private readonly errlog: Writable;
   private _transport: StdioClientTransport | null = null;
 
+  /**
+   * Creates a connection manager for a local server process.
+   *
+   * @param serverParams - Process parameters passed to the SDK transport.
+   * @param errlog - Destination for the child process's standard error stream.
+   */
   constructor(
     serverParams: StdioServerParameters,
     errlog: Writable = process.stderr
