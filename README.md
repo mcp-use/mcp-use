@@ -2,14 +2,14 @@
   <a href="https://mcp-use.com">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="./docs/logo/dark.svg">
-      <img alt="mcp-use" src="./docs/logo/light.svg" width="240">
+      <img alt="mcp-use" src="./docs/logo/light.svg" width="60%">
     </picture>
   </a>
 
   <h1>The TypeScript framework for MCP.</h1>
 
   <p>
-    Build, test, and ship MCP servers, ChatGPT plugins, Claude connectors, and interactive apps—with typed tools, native Views, and a built-in Inspector.
+    Build, test, and ship MCP servers, ChatGPT plugins, Claude connectors, and interactive apps with typed tools, native Views, and a built-in Inspector.
   </p>
 
   <p>
@@ -37,7 +37,11 @@
 
 ## Get started
 
-<table>
+<table width="100%">
+  <colgroup>
+    <col width="50%">
+    <col width="50%">
+  </colgroup>
   <thead>
     <tr>
       <th width="50%">Start with code</th>
@@ -46,17 +50,15 @@
   </thead>
   <tbody>
     <tr>
-      <td valign="top">
+      <td width="50%" valign="top">
         <pre lang="bash"><code>npx -y create-mcp-use-app@beta</code></pre>
         <p>Run <code>npm run dev</code> in the generated project.</p>
-        <p>
-          <a href="http://localhost:3000/mcp"><code>localhost:3000/mcp</code></a>
-          · <a href="http://localhost:3000/mcp/inspector">Open Inspector →</a>
-        </p>
-        <p><a href="https://mcp-use.com/docs/typescript/getting-started/quickstart">Read the TypeScript docs →</a></p>
+        <p>Open <a href="http://localhost:3000/mcp/inspector"><code>http://localhost:3000/mcp/inspector</code></a></p>
+        <p><a href="https://mcp-use.com/docs/typescript/getting-started/quickstart">TS Docs</a></p>
       </td>
-      <td valign="top">
-        <pre lang="text"><code>Build an MCP server following https://mcp-use.com/prompt.md</code></pre>
+      <td width="50%" valign="top">
+        <pre lang="text"><code>Build an MCP server following
+https://mcp-use.com/prompt.md</code></pre>
         <p><a href="https://mcp-use.com/prompt.md">Read the prompt →</a></p>
       </td>
     </tr>
@@ -79,11 +81,11 @@
   <tr>
     <td width="50%" valign="top">
       <h3>Agent-first and headless</h3>
-      <p>Scaffold, invoke, inspect, screenshot, and deploy through deterministic CLI workflows.</p>
+      <p>Scaffold, invoke, inspect, screenshot, and deploy through your agent.</p>
     </td>
     <td width="50%" valign="top">
-      <h3>Built on the official SDK</h3>
-      <p>Protocol compatibility from the official TypeScript SDK, with an integrated stateless runtime and development workflow.</p>
+      <h3>Built-in debugging tools</h3>
+      <p>Inspect tools and Views in the browser or headlessly through the CLI.</p>
     </td>
   </tr>
 </table>
@@ -160,14 +162,16 @@ Create `views/weather-card/view.tsx`. The directory name matches `view.name` on 
 import { useCallTool, useToolContext } from "mcp-use/react";
 
 export default function WeatherCard() {
-  const view = useToolContext<"get-weather">();
+  const { status, toolOutput, toolInput } =
+    useToolContext<"get-weather">();
   const refresh = useCallTool("get-weather");
 
-  if (view.status === "pending") return <p>Checking the weather…</p>;
-  if (view.status === "error") return <p>{view.error.message}</p>;
+  if (status === "pending") {
+    return <p>Checking the weather in {toolInput?.city ?? "your city"}…</p>;
+  }
+  if (status === "error") return <p>Could not load the weather.</p>;
 
-  const weather =
-    refresh.data?.structuredContent ?? view.toolOutput;
+  const weather = refresh.data?.structuredContent ?? toolOutput;
 
   return (
     <main style={{ padding: 24 }}>
@@ -190,23 +194,22 @@ export default function WeatherCard() {
 <p align="center">
   <img src="./static/readme/chatgpt-hello-world.jpg" alt="Hello World MCP App rendered in a ChatGPT conversation" width="100%" />
   <br />
-  <sub>A tool call returning an interactive View inside ChatGPT.</sub>
+  <sub>Build interactive UI experiences within ChatGPT with mcp-use.</sub>
 </p>
 
 [Build your first MCP App →](https://mcp-use.com/docs/typescript/mcp-apps/quickstart)
 
 ## Build
 
-Typecheck the project and create its production build:
+Create the production build:
 
 ```bash
-npm run typecheck
 npm run build
 ```
 
 ## Inspect
 
-Start development mode to serve the MCP endpoint at [`http://localhost:3000/mcp`](http://localhost:3000/mcp) and the built-in Inspector at [`http://localhost:3000/mcp/inspector`](http://localhost:3000/mcp/inspector):
+Start development mode to serve the MCP endpoint at [`http://localhost:3000/mcp`](http://localhost:3000/mcp). The Inspector is automatically available at [`http://localhost:3000/mcp/inspector`](http://localhost:3000/mcp/inspector):
 
 ```bash
 npm run dev
@@ -252,7 +255,7 @@ Prefer to run it yourself? Follow the [self-hosting guide →](https://mcpuse-co
 
 mcp-use builds on the official TypeScript SDK v2 and adds first-class Views, typed tool-to-UI contracts, an optimized stateless runtime, the Inspector, screenshot verification, agent-first CLI workflows, and deployment.
 
-In our benchmark, mcp-use v2 reached **10,982 median operations per second** and used **74.4 MiB across 51 installed packages**. Green cells mark the category leader; ◐ means partial support. Compared here: the [official TypeScript SDK v2](https://github.com/modelcontextprotocol/typescript-sdk), [xmcp](https://github.com/basementstudio/xmcp), [Skybridge](https://github.com/alpic-ai/skybridge), and [mcp-handler](https://github.com/vercel/mcp-handler).
+In our benchmark, mcp-use v2 reached **10,982 median operations per second** and used **74.4 MiB across 51 installed packages**.
 
 ```mermaid
 block-beta
