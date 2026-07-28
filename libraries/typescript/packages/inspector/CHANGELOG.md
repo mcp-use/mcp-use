@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 20.0.0-beta.55
+
+### Patch Changes
+
+- c4ac07a: Keep the Inspector chat composer available over fullscreen MCP Apps, with a compact input and collapsible transcript drawer.
+  - mcp-use@2.0.0-beta.63
+
 ## 20.0.0-beta.54
 
 ### Patch Changes
