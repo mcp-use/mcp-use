@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 2.0.0-beta.14
+
+### Patch Changes
+
+- f3187f9: Resolve the current `mcp-use` beta dist-tag when scaffolding a project so generated package manifests no longer pin a stale beta version.
+
 ## 2.0.0-beta.13
 
 ### Patch Changes
