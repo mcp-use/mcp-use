@@ -24,6 +24,10 @@ export to excalidraw.com.
   invalid JSON.
 - **Model context** — `<ModelContext>` plus imperative `modelContext.set` for
   user edit summaries from fullscreen.
+- **In-place model edits** — the mounted view registers `edit_drawing` with
+  `useViewTool`. Structured create/update/move/delete/replace operations apply
+  to the current scene, update the same checkpoint, and keep the same iframe
+  and canvas mounted.
 - **External assets CSP** — Excalidraw CSS/fonts load from `https://esm.sh`
   via `view.csp`.
 
@@ -39,9 +43,31 @@ replace the diagram or checkpoint id.
 | --- | --- | --- |
 | `read_me` | model | Element format cheat sheet (call before drawing) |
 | `create_view` | model + view | Stream/render diagram; returns `checkpointId` |
+| `edit_drawing` | model (view tool) | Edit the currently mounted canvas in place |
 | `export_to_excalidraw` | app | Upload encrypted scene to excalidraw.com |
 | `save_checkpoint` | app | Persist fullscreen user edits |
 | `read_checkpoint` | app | Restore checkpoint base while streaming |
+
+## Create, then refine the same canvas
+
+Start with a prompt that creates the initial view:
+
+> Draw a three-step checkout flow in Excalidraw.
+
+Once it is visible, refinements should use the canvas's `edit_drawing` view
+tool rather than calling `create_view` again:
+
+> On this same canvas, move the payment step 80px to the right, make it light
+> yellow, and add a red "Payment failed" branch.
+
+> Keep this drawing open and rename the selected box to "Fraud review".
+
+The edit tool accepts up to 100 sequential operations per call. Each operation
+can create shorthand elements, update safe visual/geometry fields, move targets
+by a delta, delete targets, or replace targets. Targets use the stable IDs from
+the initial drawing and can also include the user's current fullscreen
+selection with `selected: true`. A successful call saves the complete updated
+scene under the original checkpoint before it reports success.
 
 ## Run locally
 

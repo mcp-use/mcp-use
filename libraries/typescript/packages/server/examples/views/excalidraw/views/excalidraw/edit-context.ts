@@ -112,6 +112,47 @@ export function getLatestEditedElements(): Record<string, unknown>[] | null {
 }
 
 /**
+ * Persist a model-authored scene immediately and make it the new manual-edit
+ * baseline.
+ *
+ * Unlike the debounced fullscreen handler, a view-tool call must not report
+ * success until the existing checkpoint contains the same scene as the live
+ * canvas.
+ *
+ * @param elements - Complete non-deleted Excalidraw scene after the edit.
+ * @throws When the initial drawing has not produced a checkpoint yet.
+ */
+export async function commitModelEditedElements(
+  elements: readonly Record<string, unknown>[]
+): Promise<void> {
+  if (!checkpointId || !saveCheckpointFn) {
+    throw new Error("The drawing checkpoint is not ready yet.");
+  }
+
+  if (timer) {
+    clearTimeout(timer);
+    timer = null;
+  }
+
+  const live = [...elements].filter((element) => !element.isDeleted);
+  latestEditedElements = live;
+  captureInitialElements(live);
+
+  if (storageKey) {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(live));
+    } catch {
+      // The server checkpoint remains authoritative if local storage is full.
+    }
+  }
+
+  await saveCheckpointFn({
+    id: checkpointId,
+    data: JSON.stringify({ elements: live }),
+  });
+}
+
+/**
  * Excalidraw onChange handler. Persists to localStorage, syncs checkpoint to
  * the server, and reports a compact edit summary to the owning React view.
  */

@@ -59,9 +59,9 @@ export const createView = server.tool(
   {
     name: "create_view",
     title: "Draw Diagram",
-    description: `Renders a hand-drawn diagram using Excalidraw elements.
+    description: `Creates a new hand-drawn diagram using Excalidraw elements.
 Elements stream in one by one with draw-on animations.
-Call read_me first to learn the element format.`,
+Call read_me first to learn the element format. After the drawing is displayed, refine that same canvas with its edit_drawing view tool instead of calling create_view again.`,
     inputSchema: z.object({
       elements: z
         .string()
@@ -190,11 +190,8 @@ Call read_me first to learn the element format.`,
           type: "text",
           text: `Diagram displayed! Checkpoint id: "${checkpointId}".
 If the user asks to create a new diagram, simply start a new one from scratch.
-If the user instead wants to edit this diagram ("${checkpointId}"), first check this conversation for a "User edited diagram (checkpoint: ${checkpointId})…" note — the view automatically reports any manual edits the user made in fullscreen as extra context here, with no tool call needed on your part. If no such note is present, no manual edits were made.
-Then decide whether you want to make a new diagram from scratch OR use this one as your starting checkpoint:
-  simply start from the first element [{"type":"restoreCheckpoint","id":"${checkpointId}"}, ...your new elements...]
-  this restores the same diagram state the user currently sees, including any manual edits reported above, allowing you to add elements on top.
-  To remove elements, use: {"type":"delete","ids":"<id1>,<id2>"}${ratioHint}`,
+If the user wants to refine or edit this diagram, call the edit_drawing view tool registered by this live canvas. It can create, update, move, delete, or replace elements by their stable IDs and persists this same checkpoint. Do NOT call create_view again for a refinement, because that creates a replacement view.
+Before editing, check this conversation for a "User edited diagram (checkpoint: ${checkpointId})…" note — the view automatically reports manual fullscreen edits as extra context. The edit_drawing tool always applies to the latest live scene, including those manual edits.${ratioHint}`,
         },
       ],
       structuredContent: { checkpointId },
