@@ -5,6 +5,7 @@
   <br /><br />
 
   <h1>The TypeScript framework for MCP</h1>
+  <h3>For Claude Connectors & ChatGPT Plugins</h3>
 
   <p>
     Build, test, and ship MCP servers, ChatGPT plugins, Claude connectors,
