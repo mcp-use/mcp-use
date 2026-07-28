@@ -944,6 +944,7 @@ const discordIcon = (
 );
 
 export default function ExcalidrawView() {
+  const [editSummary, setEditSummary] = useState("");
   const toolCtx = useToolContext<"create_view">();
   const { displayMode, requestDisplayMode } = useDisplayMode();
   const { maxHeight, safeArea } = useHostContext();
@@ -1156,7 +1157,9 @@ export default function ExcalidrawView() {
           : undefined
       }
     >
-      <ModelContext content={modelContextText} />
+      <ModelContext content={modelContextText}>
+        <ModelContext content={editSummary} />
+      </ModelContext>
       {errorBanner !== undefined && displayMode === "inline" && (
         <div className="error-banner" role="alert">
           <p className="error-banner-title">{errorBanner.title}</p>
@@ -1204,7 +1207,7 @@ export default function ExcalidrawView() {
             initialData={{ elements: elements as any, scrollToContent: true }}
             theme="light"
             onChange={(els: readonly Record<string, unknown>[]) =>
-              onEditorChange(els as any)
+              onEditorChange(els as any, setEditSummary)
             }
             renderTopRightUI={
               isNarrow

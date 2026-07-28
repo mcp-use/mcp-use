@@ -1,6 +1,6 @@
 /**
- * ModelContext: React component and module-level API for annotating view UI
- * with contextual information the model can see.
+ * ModelContext: React component for annotating view UI with contextual
+ * information the model can see.
  */
 
 import {
@@ -11,7 +11,6 @@ import {
   useId,
 } from "react";
 
-import type { ModelContextStore } from "../runtime/model-context-store.js";
 import {
   _resetModelContextUnsupportedWarnedForTesting,
   type ModelContextParams,
@@ -26,21 +25,6 @@ interface ModelContextProps {
   content: string;
   /** Optional children — acts as a scope boundary for nested context nodes. */
   children?: ReactNode;
-}
-
-/**
- * Resolve the active runtime's {@link ModelContextStore}.
- *
- * @throws When no view runtime is mounted.
- */
-function requireActiveModelContextStore(): ModelContextStore {
-  const runtime = getActiveRuntime();
-  if (!runtime) {
-    throw new Error(
-      "modelContext requires a browser view mounted by bootstrapView"
-    );
-  }
-  return runtime.modelContextStore;
 }
 
 /**
@@ -101,62 +85,6 @@ export function ModelContext({ content, children }: ModelContextProps) {
     </ParentIdContext.Provider>
   );
 }
-
-/**
- * Imperative model-context API for non-React call sites (event handlers,
- * stores).
- *
- * Delegates to the active document runtime's {@link ModelContextStore}.
- * Strings register as root-level nodes in the same tree {@link ModelContext}
- * builds. Every push merges the complete tree under `_uiContext` beside the
- * current `useViewState` object. Updates batch per microtask and use the same
- * async flush pump as the component API.
- *
- * @throws When no view runtime is mounted (`bootstrapView` has not activated a
- *   runtime, or it has been disposed).
- *
- * @example
- * ```ts
- * modelContext.set("active-item", `Viewing ${item.name}`);
- * modelContext.remove("active-item");
- * modelContext.clear();
- * ```
- */
-export const modelContext = {
-  /**
-   * Register or update a named root-level text context entry.
-   *
-   * @param key - Stable key for this entry (replaces any prior value under the same key).
-   * @param content - Text describing what the user is seeing.
-   * @throws When no view runtime is mounted.
-   */
-  set(key: string, content: string): void {
-    requireActiveModelContextStore().setNode({
-      id: key,
-      parentId: null,
-      content,
-    });
-  },
-
-  /**
-   * Remove the entry registered under `key`.
-   *
-   * @param key - Key previously passed to {@link modelContext.set}.
-   * @throws When no view runtime is mounted.
-   */
-  remove(key: string): void {
-    requireActiveModelContextStore().removeNode(key);
-  },
-
-  /**
-   * Remove all context entries.
-   *
-   * @throws When no view runtime is mounted.
-   */
-  clear(): void {
-    requireActiveModelContextStore().clear();
-  },
-} as const;
 
 /**
  * @internal Reset model-context warn-once flag and the active runtime's store

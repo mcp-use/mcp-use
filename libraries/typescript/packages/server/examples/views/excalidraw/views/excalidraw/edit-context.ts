@@ -1,5 +1,3 @@
-import { modelContext } from "mcp-use/react";
-
 const DEBOUNCE_MS = 2000;
 let timer: ReturnType<typeof setTimeout> | null = null;
 let initialSnapshot: string | null = null;
@@ -115,15 +113,23 @@ export function getLatestEditedElements(): Record<string, unknown>[] | null {
 
 /**
  * Excalidraw onChange handler. Persists to localStorage, syncs checkpoint to
- * the server, and pushes a compact edit summary via {@link modelContext}.
+ * the server, and reports a compact edit summary to the owning React view.
  */
 export function onEditorChange(
-  elements: readonly Record<string, unknown>[]
+  elements: readonly Record<string, unknown>[],
+  setEditSummary: (summary: string) => void
 ): void {
   const currentSnapshot = JSON.stringify(
     elements.map((el) => `${el.id}:${(el.version as number | undefined) ?? 0}`)
   );
-  if (currentSnapshot === initialSnapshot) return;
+  if (currentSnapshot === initialSnapshot) {
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    setEditSummary("");
+    return;
+  }
 
   const live = [...elements].filter((el) => !el.isDeleted);
   latestEditedElements = live;
@@ -143,9 +149,6 @@ export function onEditorChange(
         data: JSON.stringify({ elements: live }),
       }).catch(() => {});
     }
-    const diff = computeDiff(live);
-    if (diff) {
-      modelContext.set("excalidraw-edits", diff);
-    }
+    setEditSummary(computeDiff(live));
   }, DEBOUNCE_MS);
 }
