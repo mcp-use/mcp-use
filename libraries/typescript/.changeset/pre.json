@@ -91,6 +91,7 @@
     "track-v2-server-usage",
     "ts7-stable-node20-scaffold",
     "typed-mcp-middleware-results",
+    "typedoc-public-agent-types",
     "v1-drop-in-compat",
     "v2-server-scaffold",
     "view-code-split-inspector-boot",

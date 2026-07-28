@@ -1,5 +1,11 @@
 # @mcp-use/agent
 
+## 2.0.0-beta.19
+
+### Patch Changes
+
+- 8d856b6: Export the public option, event, adapter, provider, server-manager, and observability types referenced by the agent entrypoints.
+
 ## 2.0.0-beta.18
 
 ### Minor Changes
