@@ -15,8 +15,8 @@ importers:
         specifier: ^1.25.0
         version: 1.29.0(zod@4.4.3)
       '@modelcontextprotocol/server':
-        specifier: 2.0.0-beta.5
-        version: 2.0.0-beta.5
+        specifier: 2.0.0
+        version: 2.0.0
       express:
         specifier: ^5.1.0
         version: 5.2.1
@@ -198,8 +198,8 @@ packages:
     peerDependencies:
       hono: ^4
 
-  '@modelcontextprotocol/core@2.0.0-beta.5':
-    resolution: {integrity: sha512-HKbY9XTbsDy1Y6r2I55TGE3JEapM0vg96e1MUmBIF9LGjos5gjhcIrTz1yvBPLg2aFKHjwhUAQfRdrCEnPxNew==}
+  '@modelcontextprotocol/core@2.0.0':
+    resolution: {integrity: sha512-pJCEwGG7Lfr/+PQp9ZTwKXNeO5wzbfKL7H3MYpCorM4oFBoQrdjnBgEoqG+RjhsvS1FKrDbKux+M1HhlnGWqcA==}
     engines: {node: '>=20'}
 
   '@modelcontextprotocol/sdk@1.29.0':
@@ -212,8 +212,8 @@ packages:
       '@cfworker/json-schema':
         optional: true
 
-  '@modelcontextprotocol/server@2.0.0-beta.5':
-    resolution: {integrity: sha512-i1E5l75rQKsgY/AKAIspgMBH1vEL7dqiK7tHr0L+raYcb0SWOziqNGJXGIG6NY4AlXDWIKGJQGB7Nqfs3oUi5g==}
+  '@modelcontextprotocol/server@2.0.0':
+    resolution: {integrity: sha512-YhHWdHfpFMQfd0prsEnxKeS3Qz3ytIGmsS0sth4KDjnacIT7hxk6hXHkJ9KysxlkvTM+WZAtQbbcUhdoP4Hvtw==}
     engines: {node: '>=20'}
 
   '@types/body-parser@1.19.6':
@@ -702,7 +702,7 @@ snapshots:
     dependencies:
       hono: 4.12.30
 
-  '@modelcontextprotocol/core@2.0.0-beta.5':
+  '@modelcontextprotocol/core@2.0.0':
     dependencies:
       zod: 4.4.3
 
@@ -728,9 +728,9 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@modelcontextprotocol/server@2.0.0-beta.5':
+  '@modelcontextprotocol/server@2.0.0':
     dependencies:
-      '@modelcontextprotocol/core': 2.0.0-beta.5
+      '@modelcontextprotocol/core': 2.0.0
       zod: 4.4.3
 
   '@types/body-parser@1.19.6':

@@ -110,4 +110,4 @@ allowBuilds:
   unrs-resolver: true
 
 patchedDependencies:
-  "@modelcontextprotocol/server@2.0.0-beta.5": patches/@modelcontextprotocol__server@2.0.0-beta.5.patch
+  "@modelcontextprotocol/server@2.0.0": patches/@modelcontextprotocol__server@2.0.0.patch
