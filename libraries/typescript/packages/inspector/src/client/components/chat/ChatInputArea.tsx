@@ -22,6 +22,7 @@ import { SystemPromptButton } from "./SystemPromptButton";
 import type { ChatSystemPromptProvider } from "./system-prompt/types";
 
 interface ChatInputAreaProps {
+  variant?: "default" | "fullscreen";
   inputValue: string;
   isConnected: boolean;
   isLoading: boolean;
@@ -77,6 +78,7 @@ interface ChatInputAreaProps {
 }
 
 export function ChatInputArea({
+  variant = "default",
   inputValue,
   isConnected,
   isLoading,
@@ -114,6 +116,7 @@ export function ChatInputArea({
   onRejectElicitation,
   systemPromptProvider,
 }: ChatInputAreaProps) {
+  const isFullscreen = variant === "fullscreen";
   const canSend =
     inputValue.trim() || promptResults.length > 0 || attachments.length > 0;
   const hasPendingElicitation = (pendingElicitationRequests?.length ?? 0) > 0;
@@ -145,9 +148,20 @@ export function ChatInputArea({
     ) : null;
 
   return (
-    <div className="w-full flex shrink-0 flex-col items-center px-2 pb-2 pt-0 sm:px-4 sm:pb-2 text-foreground">
-      <div className="relative w-full max-w-3xl backdrop-blur-xl">
-        {hasPendingElicitation &&
+    <div
+      className={cn(
+        "w-full flex shrink-0 flex-col items-center px-2 pt-0 sm:px-4 text-foreground",
+        isFullscreen ? "pb-4 sm:pb-4" : "pb-2 sm:pb-2"
+      )}
+    >
+      <div
+        className={cn(
+          "relative w-full max-w-3xl",
+          !isFullscreen && "backdrop-blur-xl"
+        )}
+      >
+        {!isFullscreen &&
+          hasPendingElicitation &&
           onApproveElicitation &&
           onRejectElicitation && (
             <FloatingChatElicitation
@@ -156,7 +170,7 @@ export function ChatInputArea({
               onReject={onRejectElicitation}
             />
           )}
-        {followups.length > 0 && (
+        {!isFullscreen && followups.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-2">
             {followups.map((followup) => (
               <Button
@@ -173,19 +187,24 @@ export function ChatInputArea({
             ))}
           </div>
         )}
-        <PromptsDropdown
-          isOpen={promptsDropdownOpen}
-          prompts={prompts}
-          selectedPrompt={selectedPrompt}
-          focusedIndex={promptFocusedIndex}
-          onPromptSelect={onPromptSelect}
-        />
-        <PromptResultsList
-          promptResults={promptResults}
-          onDeletePromptResult={onDeletePromptResult}
-        />
+        {!isFullscreen && (
+          <>
+            <PromptsDropdown
+              isOpen={promptsDropdownOpen}
+              prompts={prompts}
+              selectedPrompt={selectedPrompt}
+              focusedIndex={promptFocusedIndex}
+              onPromptSelect={onPromptSelect}
+            />
+            <PromptResultsList
+              promptResults={promptResults}
+              onDeletePromptResult={onDeletePromptResult}
+            />
+          </>
+        )}
 
         <ChatInput
+          variant={variant}
           inputValue={inputValue}
           isConnected={isConnected}
           isLoading={isLoading}
@@ -194,11 +213,14 @@ export function ChatInputArea({
           placeholder="Ask a question or request an action..."
           className={cn(
             "bg-white/80 dark:text-white dark:bg-black backdrop-blur-sm border-gray-200 dark:border-zinc-800",
-            promptResults.length > 0 && "pt-16"
+            !isFullscreen && promptResults.length > 0 && "pt-16"
           )}
-          tools={tools}
-          disabledTools={disabledTools}
-          onDisabledToolsChange={onDisabledToolsChange}
+          showAttachButton={!isFullscreen}
+          tools={isFullscreen ? undefined : tools}
+          disabledTools={isFullscreen ? undefined : disabledTools}
+          onDisabledToolsChange={
+            isFullscreen ? undefined : onDisabledToolsChange
+          }
           onInputChange={onInputChange}
           onKeyDown={onKeyDown}
           onKeyUp={onKeyUp}
@@ -206,7 +228,7 @@ export function ChatInputArea({
           onAttachmentAdd={onAttachmentAdd}
           onAttachmentRemove={onAttachmentRemove}
           inlineControls={
-            llmConfig && systemPromptProvider ? (
+            !isFullscreen && llmConfig && systemPromptProvider ? (
               <SystemPromptButton
                 compact
                 value={systemPromptProvider.prompt}
@@ -220,7 +242,7 @@ export function ChatInputArea({
           }
           trailingControls={
             <>
-              {modelBadge}
+              {!isFullscreen && modelBadge}
               <Button
                 type="button"
                 size="sm"
