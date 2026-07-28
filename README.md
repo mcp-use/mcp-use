@@ -221,6 +221,8 @@ npm run dev
   <sub>Invoke tools, validate inputs, and inspect interactive Views in the same development loop.</sub>
 </p>
 
+Start a tunnel from the Inspector UI or run `mcp-use dev --tunnel` to get a public URL for your local MCP server and test it with ChatGPT and Claude before deployment. [Learn more about tunneling →](https://docs.mcp-use.com/tunneling)
+
 Inspect the same server headlessly from the terminal, invoke representative tools, and capture a View screenshot:
 
 ```bash
