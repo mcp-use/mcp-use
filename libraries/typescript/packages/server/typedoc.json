@@ -17,7 +17,7 @@
   "entryPointStrategy": "resolve",
   "tsconfig": "tsconfig.json",
   "readme": "none",
-  "exclude": ["src/compat-v1.ts", "src/vite-client.ts"],
+  "exclude": ["src/vite-client.ts"],
   "excludePrivate": true,
   "excludeProtected": true,
   "excludeInternal": true,

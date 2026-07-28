@@ -1,8 +1,11 @@
 # mcp-use SDK v2 benchmarks
 
-This report compares the published `mcp-use@2.0.0-beta.61` package with
-mcp-use v1, the official TypeScript SDK, and representative TypeScript MCP
-frameworks. It was recorded on July 27, 2026 using Node.js 24.15.0.
+This report compares `mcp-use` v2 with mcp-use v1, the official TypeScript SDK,
+and representative TypeScript MCP frameworks. Performance, install, and App
+build results use the published `mcp-use@2.0.0-beta.61` package. The npm
+tarball was remeasured from the `2.0.0-beta.64` package candidate after removing
+the temporary v1 compatibility layer. Measurements were recorded on July 27–28,
+2026 using Node.js 24.15.0.
 
 ## Results at a glance
 
@@ -12,7 +15,7 @@ Compared with mcp-use v1, v2 measured:
 - **55% lower cold-launch time:** 151.603 → 68.145 ms
 - **82% smaller clean install:** 404.6 → 74.4 MiB
 - **84% fewer installed packages:** 365 → 57
-- **70% smaller npm tarball:** 1,155 → 346 KiB
+- **74% smaller npm tarball:** 1,155 → 302 KiB
 - **36% smaller equivalent MCP App build:** 1.289 → 0.828 MB
 
 ## Throughput
@@ -52,16 +55,16 @@ Custom stateless request handling and optimized response paths on top of the
 official SDK made mcp-use v2 the fastest TypeScript framework with native MCP
 Apps support in this test.
 
-| Framework | Version | Protocol | Median ops/s | p95 | p99 | Stability |
-| --- | --- | --- | ---: | ---: | ---: | ---: |
-| tmcp | 1.19.4 | 2025-06-18 | 18,424.5 | 2 ms | 3 ms | 100 |
-| **mcp-use v2** | **2.0.0-beta.61** | **2026-07-28** | **10,982.2** | **4 ms** | **6 ms** | **100** |
-| mcp-use v1 | 1.34.5 | 2025-11-25 | 8,615.0 | 4 ms | 6 ms | 100 |
-| Skybridge | 1.2.6 | 2025-11-25 | 8,116.4 | 4 ms | 6 ms | 100 |
-| Official SDK v2 | 2.0.0-beta.5 | 2026-07-28 | 8,049.8 | 5 ms | 7 ms | 100 |
-| Official SDK v1 | 1.29.0 | 2025-11-25 | 6,914.1 | 5 ms | 7 ms | 100 |
-| xmcp | 0.6.13 | 2025-11-25 | 6,585.1 | 6 ms | 8 ms | 100 |
-| mcp-handler | 1.1.0 | 2025-11-25 | 6,324.4 | 6 ms | 9 ms | 100 |
+| Framework       | Version           | Protocol       | Median ops/s |      p95 |      p99 | Stability |
+| --------------- | ----------------- | -------------- | -----------: | -------: | -------: | --------: |
+| tmcp            | 1.19.4            | 2025-06-18     |     18,424.5 |     2 ms |     3 ms |       100 |
+| **mcp-use v2**  | **2.0.0-beta.61** | **2026-07-28** | **10,982.2** | **4 ms** | **6 ms** |   **100** |
+| mcp-use v1      | 1.34.5            | 2025-11-25     |      8,615.0 |     4 ms |     6 ms |       100 |
+| Skybridge       | 1.2.6             | 2025-11-25     |      8,116.4 |     4 ms |     6 ms |       100 |
+| Official SDK v2 | 2.0.0-beta.5      | 2026-07-28     |      8,049.8 |     5 ms |     7 ms |       100 |
+| Official SDK v1 | 1.29.0            | 2025-11-25     |      6,914.1 |     5 ms |     7 ms |       100 |
+| xmcp            | 0.6.13            | 2025-11-25     |      6,585.1 |     6 ms |     8 ms |       100 |
+| mcp-handler     | 1.1.0             | 2025-11-25     |      6,324.4 |     6 ms |     9 ms |       100 |
 
 ## Cold launch
 
@@ -93,16 +96,16 @@ xychart
   bar [67.839, 0, 68.814, 77.740, 108.039, 151.603, 158.498, 168.260]
 ```
 
-| Framework | Median | Interquartile range |
-| --- | ---: | ---: |
-| Official SDK v2 | 67.839 ms | 66.881–69.522 ms |
-| **mcp-use v2** | **68.145 ms** | **67.049–69.306 ms** |
-| xmcp | 68.814 ms | 67.894–70.376 ms |
-| tmcp | 77.740 ms | 76.678–79.388 ms |
-| Official SDK v1 | 108.039 ms | 106.498–110.417 ms |
-| mcp-use v1 | 151.603 ms | 149.258–154.942 ms |
-| mcp-handler | 158.498 ms | 155.539–162.677 ms |
-| Skybridge | 168.260 ms | 166.513–171.449 ms |
+| Framework       |        Median |  Interquartile range |
+| --------------- | ------------: | -------------------: |
+| Official SDK v2 |     67.839 ms |     66.881–69.522 ms |
+| **mcp-use v2**  | **68.145 ms** | **67.049–69.306 ms** |
+| xmcp            |     68.814 ms |     67.894–70.376 ms |
+| tmcp            |     77.740 ms |     76.678–79.388 ms |
+| Official SDK v1 |    108.039 ms |   106.498–110.417 ms |
+| mcp-use v1      |    151.603 ms |   149.258–154.942 ms |
+| mcp-handler     |    158.498 ms |   155.539–162.677 ms |
+| Skybridge       |    168.260 ms |   166.513–171.449 ms |
 
 The mcp-use v2 and official SDK v2 distributions overlap. Their 0.306 ms
 median difference is measurement noise, not a meaningful product advantage.
@@ -142,12 +145,12 @@ xychart
   bar [0, 121.9, 137.5, 404.6]
 ```
 
-| Framework | Direct install set | Disk | Installed packages |
-| --- | --- | ---: | ---: |
-| **mcp-use v2** | `mcp-use + zod` | **74.4 MiB** | **57** |
-| xmcp | `xmcp + zod` | 121.9 MiB | 171 |
-| Skybridge | `skybridge + zod` | 137.5 MiB | 300 |
-| mcp-use v1 baseline | `mcp-use + zod` | 404.6 MiB | 365 |
+| Framework           | Direct install set |         Disk | Installed packages |
+| ------------------- | ------------------ | -----------: | -----------------: |
+| **mcp-use v2**      | `mcp-use + zod`    | **74.4 MiB** |             **57** |
+| xmcp                | `xmcp + zod`       |    121.9 MiB |                171 |
+| Skybridge           | `skybridge + zod`  |    137.5 MiB |                300 |
+| mcp-use v1 baseline | `mcp-use + zod`    |    404.6 MiB |                365 |
 
 mcp-use v2 had the smallest clean install among the tested full-stack native
 MCP Apps frameworks. The mcp-use v1 row is a migration baseline, not a native
@@ -155,8 +158,11 @@ Apps peer.
 
 ## Package and MCP App build size
 
-The published `mcp-use` v2 npm tarball measured **346 KiB compressed**, 70.0%
-smaller than v1's 1,155 KiB tarball.
+The packed `mcp-use@2.0.0-beta.64` candidate measured **302 KiB compressed**
+(309,027 bytes), 73.9% smaller than v1's 1,155 KiB tarball. Removing the
+temporary v1 facade and legacy widget adapters reduced the candidate from
+349 KiB (357,628 bytes) to 302 KiB, a 13.6% reduction. Its unpacked contents
+fell from 1,417,415 bytes across 125 files to 1,249,746 bytes across 116 files.
 
 For the application build, both versions used the same React launch card, CSS,
 and one echo tool.
@@ -186,10 +192,10 @@ xychart
   bar [0, 1.289]
 ```
 
-| Version | Raw build | gzip archive | Files |
-| --- | ---: | ---: | ---: |
-| **mcp-use v2** | **0.828 MB** | **214 KiB** | **4** |
-| mcp-use v1 | 1.289 MB | 351 KiB | 12 |
+| Version        |    Raw build | gzip archive | Files |
+| -------------- | -----------: | -----------: | ----: |
+| **mcp-use v2** | **0.828 MB** |  **214 KiB** | **4** |
+| mcp-use v1     |     1.289 MB |      351 KiB |    12 |
 
 v2 was 35.8% smaller raw and 39.1% smaller after gzip. We do not present a
 cross-framework build-size leaderboard because the other projects emit
@@ -217,7 +223,8 @@ equivalent official SDK v2 fixture in this benchmark.
 
 ### Load workload
 
-- Published packages were tested instead of local source builds.
+- Published packages were tested instead of local source builds, except for the
+  explicitly identified `2.0.0-beta.64` package-candidate tarball measurement.
 - The load generator was MCP Drill at source commit
   `284244af63efb109959ccf3cecea0000bad3bfe3`.
 - Every server exposed the same `benchmark_echo` tool.
@@ -243,7 +250,7 @@ equivalent official SDK v2 fixture in this benchmark.
 
 - Clean install size is the on-disk dependency tree after installing the direct
   package set shown in the table.
-- Tarball size is the compressed size reported from the published npm package.
+- Tarball size is the compressed size of the package produced by `pnpm pack`.
 - The v1 and v2 App builds use equivalent source content and production build
   settings.
 

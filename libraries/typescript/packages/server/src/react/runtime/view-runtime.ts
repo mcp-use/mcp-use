@@ -41,8 +41,6 @@ export interface ToolSnapshot {
    * notifications replace the same snapshot; last write wins.
    */
   toolInput: Record<string, unknown> | undefined;
-  /** Whether the latest pending input notification was progressive/partial. */
-  isToolInputPartial: boolean;
   /** View-only result `_meta` channel. */
   meta: Record<string, unknown> | undefined;
   /**
@@ -247,7 +245,6 @@ const defaultToolSnapshot: ToolSnapshot = {
   toolOutput: undefined,
   content: undefined,
   toolInput: undefined,
-  isToolInputPartial: false,
   meta: undefined,
   error: undefined,
 };
@@ -484,18 +481,12 @@ export function createMcpAppRuntime(
     // lifecycle notifications must not mutate the View context.
     app.ontoolinput = (params) => {
       if (disposed || toolSnapshot.status !== "pending") return;
-      patchTool({
-        toolInput: params.arguments ?? {},
-        isToolInputPartial: false,
-      });
+      patchTool({ toolInput: params.arguments ?? {} });
     };
 
     app.ontoolinputpartial = (params) => {
       if (disposed || toolSnapshot.status !== "pending") return;
-      patchTool({
-        toolInput: params.arguments ?? {},
-        isToolInputPartial: true,
-      });
+      patchTool({ toolInput: params.arguments ?? {} });
     };
 
     app.ontoolresult = (params) => {
@@ -526,7 +517,6 @@ export function createMcpAppRuntime(
           toolOutput: undefined,
           content,
           meta,
-          isToolInputPartial: false,
         });
         return;
       }
@@ -537,7 +527,6 @@ export function createMcpAppRuntime(
         toolOutput: params.structuredContent,
         content,
         meta,
-        isToolInputPartial: false,
       });
     };
 
