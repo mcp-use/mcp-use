@@ -279,44 +279,13 @@ block-beta
   class viewsHandler,nativeViewsOfficial,nativeViewsXmcp,nativeViewsSkybridge,nativeViewsHandler,oauthHandler,protocolXmcp,protocolSkybridge,protocolHandler,screenshotOfficial,screenshotXmcp,screenshotSkybridge,screenshotHandler,tunnelOfficial,tunnelXmcp,tunnelHandler,inspectorOfficial,inspectorXmcp,inspectorHandler unavailable
 ```
 
-<sub>* The Official SDK comparison includes `@modelcontextprotocol/ext-apps`, Vite, and zod, plus their required React, TypeScript, and SDK dependencies, so the size figures compare MCP Apps-capable development stacks across approaches.</sub>
+<sub>* Includes `@modelcontextprotocol/ext-apps`, Vite, and zod for an MCP Apps-capable stack.</sub>
 
-Speed uses the benchmark's median operations per second; mcp-use leads this selected comparison and the frameworks with native Views. Clean install measures fresh `node_modules` on disk. Installed packages counts the dependency paths reported by `npm ls --all --parseable` for the same clean installs. The stacks are `mcp-use + zod`; official v2 server and Node packages + Apps extension and its required SDK peer + React, Vite, TypeScript, and zod; `xmcp + zod`; `Skybridge + zod`; and `mcp-handler` + Next.js, its SDK peer, React, TypeScript, and zod.
-
-“Views” means native framework support for MCP Apps; the official SDK's partial result requires its separate Apps extension plus application-specific resource, metadata, build, and type wiring. “Native Views on MCP 2026” requires both a native View abstraction and support for the MCP 2026 protocol generation. “One-line OAuth adapters” means provider-specific helpers that plug into the framework with one configuration call; identity-provider setup is still required. The official SDK's partial result provides generic bearer middleware, metadata helpers, and verifier interfaces, but no provider adapter. “Built-in View screenshot CLI” means the framework itself can invoke a View-backed tool and save the rendered result as an image; Skybridge delegates screenshots to external Chrome DevTools MCP. “Built-in tunneling” means the framework's development command can expose its local MCP endpoint directly. “Built-in Inspector” means the framework ships its own full protocol UI for tools, resources, prompts, Views, sampling, elicitation, and notifications; Skybridge's limited result covers tools and Views through its DevTools, not the full protocol surface.
-
-**Lower is better.** Black is mcp-use v2; gray represents the migration baseline and other fixtures.
-
-```mermaid
----
-config:
-  themeVariables:
-    xyChart:
-      backgroundColor: "#ffffff"
-      titleColor: "#0c0c0c"
-      xAxisLabelColor: "#0c0c0c"
-      xAxisTitleColor: "#0c0c0c"
-      xAxisTickColor: "#0c0c0c"
-      xAxisLineColor: "#0c0c0c"
-      yAxisLabelColor: "#0c0c0c"
-      yAxisTitleColor: "#0c0c0c"
-      yAxisTickColor: "#0c0c0c"
-      yAxisLineColor: "#0c0c0c"
-      plotColorPalette: "#0c0c0c, #d4d4d8"
----
-xychart
-  title "Clean production install in MiB"
-  x-axis ["mcp-use v2", "xmcp", "Skybridge", "mcp-use v1"]
-  y-axis "MiB on disk" 0 --> 450
-  bar [74.4, 0, 0, 0]
-  bar [0, 121.9, 137.5, 404.6]
-```
+**[Read the detailed benchmark report →](./benchmark.md)**
 
 **Does mcp-use lock deployment to Manufact Cloud?**
 
 No. Manufact Cloud is the managed path for deployment, analytics, evals, observability, and logs. To run the same stateless server on your own infrastructure, follow the [self-hosting guide →](https://mcpuse-codex-v1-v2-docs-split.mintlify.site/v2/typescript/server/deployment/runtime-patterns).
-
-**[Read the detailed benchmark report →](./benchmark.md)** for the exact fixture versions, methodology, result tables, Mermaid charts, and claim boundaries.
 
 ## Examples
 
