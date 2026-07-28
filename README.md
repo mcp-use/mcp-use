@@ -243,7 +243,7 @@ mcp-use adds custom stateless request handling and optimized response paths on t
 
 mcp-use v2 had the smallest equivalent development stack tested: **74.4 MiB** across **51 installed packages**. That is 57% fewer packages than the equivalent official SDK stack and 83% fewer than Skybridge.
 
-Green cells mark the category leader. ✅ means the capability is built into the framework, ◐ means it is available through a separate extension and custom wiring, and ❌ means it requires an external implementation. Compared here: the [official TypeScript SDK v2](https://github.com/modelcontextprotocol/typescript-sdk), [xmcp](https://github.com/basementstudio/xmcp), [Skybridge](https://github.com/alpic-ai/skybridge), and [mcp-handler](https://github.com/vercel/mcp-handler).
+Green cells mark the category leader. ✅ means the full capability is built into the framework, ◐ means related primitives or a limited capability set is included, and ❌ means it requires an external implementation. Compared here: the [official TypeScript SDK v2](https://github.com/modelcontextprotocol/typescript-sdk), [xmcp](https://github.com/basementstudio/xmcp), [Skybridge](https://github.com/alpic-ai/skybridge), and [mcp-handler](https://github.com/vercel/mcp-handler).
 
 ```mermaid
 block-beta
@@ -254,14 +254,13 @@ block-beta
   speed["Speed"] speedMcp["10,982 ops/s"] speedOfficial["8,050 ops/s"] speedXmcp["6,585 ops/s"] speedSkybridge["8,116 ops/s"] speedHandler["6,324 ops/s"]
   install["Clean install"] installMcp["74.4 MiB"] installOfficial["99.0 MiB"] installXmcp["121.9 MiB"] installSkybridge["137.5 MiB"] installHandler["388.0 MiB"]
   packages["Installed<br/>packages"] packagesMcp["51"] packagesOfficial["119"] packagesXmcp["171"] packagesSkybridge["300"] packagesHandler["130"]
-  stars["GitHub stars"] starsMcp["10,400"] starsOfficial["12,965"] starsXmcp["1,295"] starsSkybridge["1,952"] starsHandler["629"]
   views["Views"] viewsMcp["✅"] viewsOfficial["◐ Extension"] viewsXmcp["✅"] viewsSkybridge["✅"] viewsHandler["❌"]
   nativeViews["Native Views<br/>on MCP 2026"] nativeViewsMcp["✅"] nativeViewsOfficial["❌"] nativeViewsXmcp["❌"] nativeViewsSkybridge["❌"] nativeViewsHandler["❌"]
-  oauth["One-line<br/>OAuth adapters"] oauthMcp["✅"] oauthOfficial["❌"] oauthXmcp["✅"] oauthSkybridge["✅"] oauthHandler["❌"]
+  oauth["One-line<br/>OAuth adapters"] oauthMcp["✅"] oauthOfficial["◐ Primitives"] oauthXmcp["✅"] oauthSkybridge["✅"] oauthHandler["❌"]
   protocol["MCP 2026<br/>protocol"] protocolMcp["✅"] protocolOfficial["✅"] protocolXmcp["❌"] protocolSkybridge["❌"] protocolHandler["❌"]
   screenshot["Built-in View<br/>screenshot CLI"] screenshotMcp["✅"] screenshotOfficial["❌"] screenshotXmcp["❌"] screenshotSkybridge["❌"] screenshotHandler["❌"]
   tunnel["Built-in<br/>tunneling"] tunnelMcp["✅"] tunnelOfficial["❌"] tunnelXmcp["❌"] tunnelSkybridge["✅"] tunnelHandler["❌"]
-  inspector["Built-in<br/>Inspector"] inspectorMcp["✅"] inspectorOfficial["❌"] inspectorXmcp["❌"] inspectorSkybridge["❌"] inspectorHandler["❌"]
+  inspector["Built-in<br/>Inspector"] inspectorMcp["✅"] inspectorOfficial["❌"] inspectorXmcp["❌"] inspectorSkybridge["◐ Limited"] inspectorHandler["❌"]
 
   classDef label fill:#f6f8fa,stroke:#d0d7de,color:#1f2328,font-weight:bold
   classDef brand fill:#dcfce7,stroke:#16a34a,color:#166534,font-weight:bold
@@ -271,18 +270,18 @@ block-beta
   classDef partial fill:#fff8c5,stroke:#d4a72c,color:#633c01,font-weight:bold
   classDef unavailable fill:#f6f8fa,stroke:#d0d7de,color:#6e7781
 
-  class metric,speed,install,packages,stars,views,nativeViews,oauth,protocol,screenshot,tunnel,inspector label
+  class metric,speed,install,packages,views,nativeViews,oauth,protocol,screenshot,tunnel,inspector label
   class mcp brand
   class official,xmcp,skybridge,handler header
-  class speedOfficial,speedXmcp,speedSkybridge,speedHandler,installOfficial,installXmcp,installSkybridge,installHandler,packagesOfficial,packagesXmcp,packagesSkybridge,packagesHandler,starsMcp,starsXmcp,starsSkybridge,starsHandler value
-  class speedMcp,installMcp,packagesMcp,starsOfficial,viewsMcp,viewsXmcp,viewsSkybridge,nativeViewsMcp,oauthMcp,oauthXmcp,oauthSkybridge,protocolMcp,protocolOfficial,screenshotMcp,tunnelMcp,tunnelSkybridge,inspectorMcp leader
-  class viewsOfficial partial
-  class viewsHandler,nativeViewsOfficial,nativeViewsXmcp,nativeViewsSkybridge,nativeViewsHandler,oauthOfficial,oauthHandler,protocolXmcp,protocolSkybridge,protocolHandler,screenshotOfficial,screenshotXmcp,screenshotSkybridge,screenshotHandler,tunnelOfficial,tunnelXmcp,tunnelHandler,inspectorOfficial,inspectorXmcp,inspectorSkybridge,inspectorHandler unavailable
+  class speedOfficial,speedXmcp,speedSkybridge,speedHandler,installOfficial,installXmcp,installSkybridge,installHandler,packagesOfficial,packagesXmcp,packagesSkybridge,packagesHandler value
+  class speedMcp,installMcp,packagesMcp,viewsMcp,viewsXmcp,viewsSkybridge,nativeViewsMcp,oauthMcp,oauthXmcp,oauthSkybridge,protocolMcp,protocolOfficial,screenshotMcp,tunnelMcp,tunnelSkybridge,inspectorMcp leader
+  class viewsOfficial,oauthOfficial,inspectorSkybridge partial
+  class viewsHandler,nativeViewsOfficial,nativeViewsXmcp,nativeViewsSkybridge,nativeViewsHandler,oauthHandler,protocolXmcp,protocolSkybridge,protocolHandler,screenshotOfficial,screenshotXmcp,screenshotSkybridge,screenshotHandler,tunnelOfficial,tunnelXmcp,tunnelHandler,inspectorOfficial,inspectorXmcp,inspectorHandler unavailable
 ```
 
-Speed uses the benchmark's median operations per second; mcp-use leads this selected comparison and the frameworks with native Views. Clean install measures fresh `node_modules` on disk. Installed packages counts the dependency paths reported by `npm ls --all --parseable` for the same clean installs. The stacks are `mcp-use + zod`; official v2 server and Node packages + Apps extension and its required SDK peer + React, Vite, TypeScript, and zod; `xmcp + zod`; `Skybridge + zod`; and `mcp-handler` + Next.js, its SDK peer, React, TypeScript, and zod. Stars are a July 27, 2026 snapshot.
+Speed uses the benchmark's median operations per second; mcp-use leads this selected comparison and the frameworks with native Views. Clean install measures fresh `node_modules` on disk. Installed packages counts the dependency paths reported by `npm ls --all --parseable` for the same clean installs. The stacks are `mcp-use + zod`; official v2 server and Node packages + Apps extension and its required SDK peer + React, Vite, TypeScript, and zod; `xmcp + zod`; `Skybridge + zod`; and `mcp-handler` + Next.js, its SDK peer, React, TypeScript, and zod.
 
-“Views” means native framework support for MCP Apps; the official SDK's partial result requires its separate Apps extension plus application-specific resource, metadata, build, and type wiring. “Native Views on MCP 2026” requires both a native View abstraction and support for the MCP 2026 protocol generation. “One-line OAuth adapters” means provider-specific helpers that plug into the framework with one configuration call; identity-provider setup is still required. “Built-in View screenshot CLI” means the framework itself can invoke a View-backed tool and save the rendered result as an image; external browser automation does not count. “Built-in tunneling” means the framework's development command can expose its local MCP endpoint directly. “Built-in Inspector” means the framework ships its own full protocol UI for tools, resources, prompts, Views, sampling, elicitation, and notifications; a framework-specific View emulator does not count.
+“Views” means native framework support for MCP Apps; the official SDK's partial result requires its separate Apps extension plus application-specific resource, metadata, build, and type wiring. “Native Views on MCP 2026” requires both a native View abstraction and support for the MCP 2026 protocol generation. “One-line OAuth adapters” means provider-specific helpers that plug into the framework with one configuration call; identity-provider setup is still required. The official SDK's partial result provides generic bearer middleware, metadata helpers, and verifier interfaces, but no provider adapter. “Built-in View screenshot CLI” means the framework itself can invoke a View-backed tool and save the rendered result as an image; Skybridge delegates screenshots to external Chrome DevTools MCP. “Built-in tunneling” means the framework's development command can expose its local MCP endpoint directly. “Built-in Inspector” means the framework ships its own full protocol UI for tools, resources, prompts, Views, sampling, elicitation, and notifications; Skybridge's limited result covers tools and Views through its DevTools, not the full protocol surface.
 
 **Lower is better.** Black is mcp-use v2; gray represents the migration baseline and other fixtures.
 
