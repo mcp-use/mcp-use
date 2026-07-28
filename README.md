@@ -270,8 +270,6 @@ Prefer to run it yourself? Follow the [self-hosting guide →](https://mcpuse-co
 
 mcp-use builds on the official TypeScript SDK v2 and adds first-class Views, typed tool-to-UI contracts, an optimized stateless runtime, the Inspector, screenshot verification, agent-first CLI workflows, and deployment.
 
-In our benchmark, mcp-use v2 reached **10,982 median operations per second** and used **74.4 MiB across 51 installed packages**.
-
 ```mermaid
 block-beta
   columns 6
@@ -309,10 +307,6 @@ block-beta
 <sub>* Includes `@modelcontextprotocol/ext-apps`, Vite, and zod for an MCP Apps-capable stack.</sub>
 
 **[Read the detailed benchmark report →](./benchmark.md)**
-
-**Does mcp-use lock deployment to Manufact Cloud?**
-
-No. Manufact Cloud is the managed path for deployment, analytics, evals, observability, and logs. To run the same stateless server on your own infrastructure, follow the [self-hosting guide →](https://mcpuse-codex-v1-v2-docs-split.mintlify.site/v2/typescript/server/deployment/runtime-patterns).
 
 ## Examples
 
