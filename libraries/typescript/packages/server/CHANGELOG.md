@@ -1,5 +1,12 @@
 # mcp-use
 
+## 2.0.0-beta.64
+
+### Patch Changes
+
+- f3ec4c5: Update the official MCP split SDK dependencies and the temporary ext-apps PR #720 build to stable 2.0.0 releases.
+  - @mcp-use/inspector@20.0.0-beta.56
+
 ## 2.0.0-beta.63
 
 ### Patch Changes
