@@ -293,24 +293,6 @@ const packageJson = JSON.parse(
   readFileSync(join(__dirname, "../package.json"), "utf-8")
 );
 
-// TODO(stable release): Change this back to "latest" before publishing create-mcp-use-app 2.0.0.
-const DEFAULT_MCP_USE_VERSION = "2.0.0-beta.36";
-
-function getCurrentPackageVersions(
-  isDevelopment: boolean = false,
-  sdkVersion?: string
-): Record<string, string> {
-  if (isDevelopment) {
-    return {
-      "mcp-use": "workspace:*",
-    };
-  }
-  const requestedSdk = sdkVersion ?? DEFAULT_MCP_USE_VERSION;
-  return {
-    "mcp-use": requestedSdk,
-  };
-}
-
 function processTemplateFile(
   filePath: string,
   versions: Record<string, string>,
@@ -327,9 +309,7 @@ function processTemplateFile(
     );
   }
 
-  const mcpUseVersion = isDevelopment
-    ? "workspace:*"
-    : versions["mcp-use"] || DEFAULT_MCP_USE_VERSION;
+  const mcpUseVersion = isDevelopment ? "workspace:*" : versions["mcp-use"];
 
   if (isDevelopment) {
     processedContent = processedContent.replace(
@@ -914,14 +894,42 @@ async function main(): Promise<void> {
       );
       process.exit(1);
     }
+  }
 
+  let mcpUseVersion: string;
+  if (options.dev) {
+    mcpUseVersion = "workspace:*";
+  } else if (options.sdkVersion) {
+    mcpUseVersion = options.sdkVersion;
+  } else {
+    const response = await fetch("https://registry.npmjs.org/mcp-use", {
+      headers: { Accept: "application/vnd.npm.install-v1+json" },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) {
+      throw new Error(
+        `Failed to resolve the mcp-use beta dist-tag from npm (${response.status})`
+      );
+    }
+
+    const metadata = (await response.json()) as {
+      "dist-tags"?: { beta?: string };
+    };
+    const betaVersion = metadata["dist-tags"]?.beta;
+    if (!betaVersion) {
+      throw new Error("npm did not return a beta version for mcp-use");
+    }
+    mcpUseVersion = betaVersion;
+  }
+  const versions = { "mcp-use": mcpUseVersion };
+
+  if (!useCurrentDir) {
     mkdirSync(projectPath, { recursive: true });
   }
 
   console.log(ansi.cyan(`🚀 Creating MCP server "${displayName}"...`));
 
   const validatedTemplate = validateTemplateName(selectedTemplate);
-  const versions = getCurrentPackageVersions(options.dev, options.sdkVersion);
 
   await copyTemplate(projectPath, validatedTemplate, versions, options.dev);
 
