@@ -6,8 +6,6 @@ icon: "rocket"
 
 Create a TypeScript MCP App, run it locally, and verify that a tool returns a React view in the Inspector.
 
-If you want a plain MCP server without views, use the [TypeScript quickstart](/v2/typescript/getting-started/quickstart) instead.
-
 ## What you'll build
 
 This guide creates a local server with:
@@ -29,7 +27,6 @@ Run the MCP Apps template:
 ```bash
 npx create-mcp-use-app my-widget-server --template mcp-apps
 cd my-widget-server
-npm install
 ```
 
 The template creates more files for assets, view components, and local tooling. These are the files you edit most often:
@@ -41,7 +38,6 @@ my-widget-server/
 ├── views/
 │   └── product-search-result/
 │       ├── view.tsx
-│       ├── view.css
 │       ├── components/
 │       └── hooks/
 ├── public/
@@ -64,7 +60,7 @@ This starts the MCP server, view build pipeline, and Inspector. Keep the process
 
 ## Inspect the view tool
 
-Open `index.ts` and find the `search-fruits` tool. The template includes server branding, 16 fruits, a loading delay demo, and a second `get-fruit-details` tool. This excerpt shows the view-bound path you need to understand first.
+Open `index.ts` and find the `search-fruits` tool. The template includes server branding, 16 fruits, and a second `get-fruit-details` tool. This excerpt shows the view-bound path you need to understand first.
 
 ```typescript
 // index.ts excerpt; server, fruits, and z are defined above.
@@ -96,22 +92,13 @@ export const searchFruits = server.tool(
       prefersBorder: true,
     },
   },
-  async ({ query = "" }, ctx) => {
+  ({ query = "" }) => {
     const results = fruits.filter(
       (fruit) =>
         query === "" || fruit.fruit.toLowerCase().includes(query.toLowerCase()),
     );
 
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
     const data = { query, results };
-
-    if (!ctx.client.supportsViews()) {
-      return {
-        content: [{ type: "text", text: renderAsMarkdownTable(results) }],
-        structuredContent: data,
-      };
-    }
 
     return {
       content: [
@@ -142,17 +129,17 @@ The generated view includes a carousel, detail panel, display-mode controls, fav
 import { useToolContext } from "mcp-use/react";
 
 export default function ProductSearchResult() {
-  const view = useToolContext<"search-fruits">();
+  const { status, error, toolOutput } = useToolContext<"search-fruits">();
 
-  if (view.status === "pending") {
+  if (status === "pending") {
     return <div className="p-4">Searching…</div>;
   }
 
-  if (view.status === "error") {
-    return <div className="p-4">{view.error.message}</div>;
+  if (status === "error") {
+    return <div className="p-4">{error.message}</div>;
   }
 
-  const { query, results } = view.toolOutput;
+  const { query, results } = toolOutput;
 
   return (
     <div className="p-4">
@@ -165,7 +152,7 @@ export default function ProductSearchResult() {
 }
 ```
 
-Views can render before the tool finishes. Check `view.status === "pending"` before reading `view.toolOutput`.
+Views can render before the tool finishes. Check `status === "pending"` before reading `toolOutput`.
 
 ## Verify in the Inspector
 
@@ -175,7 +162,7 @@ Use the Inspector to confirm that the server and view work.
 2. Go to the **Tools** tab.
 3. Select `search-fruits`.
 4. Run the tool with `{ "query": "a" }` or `{}`.
-5. Confirm that the view renders below the tool result after the loading skeleton.
+5. Confirm that the view renders below the tool result.
 
 If the tool runs but no view appears, check that `view.name` exactly matches the folder under `views/` and that the handler returns `structuredContent`.
 

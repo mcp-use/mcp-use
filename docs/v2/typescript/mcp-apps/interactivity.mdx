@@ -1,87 +1,78 @@
 ---
 title: "Interactivity"
-description: "Add tool calls, widget state, follow-up messages, and display controls to MCP Apps widgets."
+description: "Let a View call tools, send follow-up messages, open links, change display modes, and expose actions to the model."
 icon: "mouse-pointer-click"
 ---
 
-Interactive widgets can call tools, save UI state, send follow-up messages, and request a larger display mode. Use these APIs for user actions that should happen inside the widget instead of requiring another prompt.
+Interactions in a View can target the MCP server, the model, the host, or the mounted UI. Choose the API based on where the action should happen.
 
-This guide assumes your widget already renders with `useWidget()`. See [Build widgets](/v2/typescript/mcp-apps/widgets) first if you still need the server and widget setup.
+| You want to...                             | Use                 |
+| ------------------------------------------ | ------------------- |
+| Call a server tool from the View           | `useCallTool()`     |
+| Ask the model to continue the conversation | `useSendFollowUp()` |
+| Open a URL through the host                | `useOpenExternal()` |
+| Change how the host displays the View      | `useDisplayMode()`  |
+| Let the model act on the mounted View      | `useViewTool()`     |
 
-## Call tools from a widget
+## Call a server tool
 
-Use `useCallTool()` when a button or form should call another MCP tool. The hook gives you loading, success, and error state.
+Use `useCallTool()` when a button, form, or other control should call an MCP tool. The hook provides the last successful result, the latest error, and the current pending state.
+
+Export the tool reference returned by `server.tool()` so TypeScript can infer its input and output types in the View.
 
 ```tsx
 import { useCallTool } from "mcp-use/react";
 
-function DetailsButton({ productId }: { productId: string }) {
-  const { callTool, data, isPending, isError } = useCallTool("get-product");
+export function FruitDetailsButton({ fruit }: { fruit: string }) {
+  const { callTool, data, error, isPending } = useCallTool("get-fruit-details");
+
+  async function loadFruitDetails() {
+    try {
+      await callTool({ fruit });
+    } catch {
+      // The hook exposes the failure through `error`.
+    }
+  }
 
   return (
     <section>
-      <button onClick={() => callTool({ productId })} disabled={isPending}>
+      <button type="button" disabled={isPending} onClick={loadFruitDetails}>
         {isPending ? "Loading..." : "View details"}
       </button>
 
-      {isError && <p>Could not load product details.</p>}
+      {error && <p role="alert">{error.message}</p>}
+
       {data && <pre>{JSON.stringify(data.structuredContent, null, 2)}</pre>}
     </section>
   );
 }
 ```
 
-Prefer `useCallTool()` for user-facing actions. Use `useWidget().callTool` only for small one-off calls where you do not need hook-managed state.
+`callTool()` rejects when the tool returns an error or the request fails. The hook also places that failure in `error` so the View can render it.
 
-## Save widget state
+## Ask the model to continue
 
-Use `setState` for UI state that should survive re-renders and be available to future model turns.
+Use `useSendFollowUp()` when an action requires a new model turn. The prompt appears as a user-authored message in the conversation.
 
 ```tsx
-import { useWidget } from "mcp-use/react";
+import { useHostContext, useSendFollowUp } from "mcp-use/react";
 
-type FavoritesState = {
-  favorites: string[];
-};
+export function CompareButton({ fruit }: { fruit: string }) {
+  const { hostCapabilities } = useHostContext();
+  const sendFollowUp = useSendFollowUp();
 
-function FavoriteButton({ id }: { id: string }) {
-  const { state, setState } = useWidget<{}, FavoritesState>();
-  const favorites = state?.favorites ?? [];
-  const isFavorite = favorites.includes(id);
-
-  async function toggleFavorite() {
-    await setState({
-      favorites: isFavorite
-        ? favorites.filter((favoriteId) => favoriteId !== id)
-        : [...favorites, id],
-    });
+  if (hostCapabilities?.message === undefined) {
+    return null;
   }
 
   return (
-    <button onClick={toggleFavorite}>
-      {isFavorite ? "Remove favorite" : "Save favorite"}
-    </button>
-  );
-}
-```
-
-Use widget state for view state and user choices. Do not use widget state as your database.
-
-## Send a follow-up message
-
-Use `sendFollowUpMessage` when a widget action should ask the model to continue the conversation.
-
-```tsx
-import { useWidget } from "mcp-use/react";
-
-function ExplainButton({ productName }: { productName: string }) {
-  const { sendFollowUpMessage } = useWidget();
-
-  return (
     <button
-      onClick={() =>
-        sendFollowUpMessage(`Compare ${productName} with similar products.`)
-      }
+      type="button"
+      onClick={() => {
+        void sendFollowUp({
+          prompt: `Compare ${fruit} with similar fruits.`,
+        });
+      }}
     >
       Compare
     </button>
@@ -89,44 +80,113 @@ function ExplainButton({ productName }: { productName: string }) {
 }
 ```
 
-Follow-up messages create a new model turn. Use them for actions that need model reasoning, not for local UI updates.
+The promise resolves when the host accepts the message, not when the model responds. Use `useCallTool()` instead when the View already knows which server operation to perform.
 
-## Request display modes
+## Open an external link
 
-Use `requestDisplayMode` when a widget needs more room.
+Views run in a sandbox. Use `useOpenExternal()` to ask the host to open a URL outside the View.
 
 ```tsx
-import { useWidget } from "mcp-use/react";
+import { useHostContext, useOpenExternal } from "mcp-use/react";
 
-function DisplayModeControls() {
-  const { displayMode, requestDisplayMode } = useWidget();
-  const expanded = displayMode === "fullscreen" || displayMode === "pip";
+export function ProducerLink({ url }: { url: string }) {
+  const { hostCapabilities } = useHostContext();
+  const openExternal = useOpenExternal();
+
+  if (hostCapabilities?.openLinks === undefined) {
+    return null;
+  }
 
   return (
     <button
-      onClick={() => requestDisplayMode(expanded ? "inline" : "fullscreen")}
+      type="button"
+      onClick={() => {
+        void openExternal({ url });
+      }}
     >
-      {expanded ? "Exit" : "Expand"}
+      Visit producer
     </button>
   );
 }
 ```
 
-The host may grant a different mode than requested. Read `displayMode` for the actual current mode.
+The host decides whether and how to open the URL. It may ask the user for confirmation.
 
-## Combine actions carefully
+## Change the display mode
 
-A single click should usually do one main thing. For example:
+Use `useDisplayMode()` when a View needs more or less space. Only offer modes included in `availableDisplayModes`.
 
-- call a tool to fetch more data
-- update widget state after a user choice
-- send a follow-up message for model reasoning
-- request fullscreen for a larger view
+```tsx
+import { useDisplayMode } from "mcp-use/react";
 
-If one action must do multiple things, update local widget state first so the UI responds immediately, then call the tool or send the follow-up message.
+export function ExpandButton() {
+  const { displayMode, availableDisplayModes, requestDisplayMode } =
+    useDisplayMode();
+
+  if (
+    displayMode === "fullscreen" ||
+    !availableDisplayModes.includes("fullscreen")
+  ) {
+    return null;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void requestDisplayMode({ mode: "fullscreen" });
+      }}
+    >
+      Expand
+    </button>
+  );
+}
+```
+
+A display-mode request is advisory. Read `displayMode` for the mode the host actually applies.
+
+## Let the model act on the View
+
+Use `useViewTool()` to expose an action that operates on the mounted UI. The tool exists while the component is mounted and its handler receives the latest React state.
+
+```tsx
+import { useViewTool } from "mcp-use/react";
+import { useState } from "react";
+import { z } from "zod";
+
+export function FruitResults() {
+  const [selectedFruit, setSelectedFruit] = useState<string>();
+
+  useViewTool(
+    {
+      name: "highlight-fruit",
+      description: "Highlight a fruit in the current results",
+      inputSchema: z.object({
+        fruit: z.string(),
+      }),
+    },
+    async ({ fruit }) => {
+      setSelectedFruit(fruit);
+
+      return {
+        content: [{ type: "text", text: `Highlighted ${fruit}` }],
+      };
+    },
+  );
+
+  return (
+    <p>
+      {selectedFruit === undefined
+        ? "No fruit selected"
+        : `Selected: ${selectedFruit}`}
+    </p>
+  );
+}
+```
+
+`useCallTool()` lets the View call the server. `useViewTool()` lets the host or model call the mounted View.
 
 ## Next steps
 
-- Use [Model context](/v2/typescript/mcp-apps/model-context) to decide what the model should know about these interactions.
-- Use [`useCallTool()`](https://mcp-use-typescript-api-reference.vercel.app/modules/mcp-use.react.html#usecalltool) for full call state and typing details.
-- Use [`useWidget()`](https://mcp-use-typescript-api-reference.vercel.app/modules/mcp-use.react.html#usewidget) for all host actions and display-mode behavior.
+- Use [Model context](/v2/typescript/mcp-apps/model-context) to share View state and visible UI information with the model.
+- Configure [Content Security Policy](/v2/typescript/mcp-apps/content-security-policy) before connecting to external APIs or loading external assets.

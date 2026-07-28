@@ -403,10 +403,8 @@
                     "pages": [
                       "v2/typescript/mcp-apps",
                       "v2/typescript/mcp-apps/quickstart",
-                      "v2/typescript/mcp-apps/widgets",
-                      "v2/typescript/mcp-apps/model-context",
                       "v2/typescript/mcp-apps/interactivity",
-                      "v2/typescript/mcp-apps/apps-sdk-compatibility",
+                      "v2/typescript/mcp-apps/model-context",
                       "v2/typescript/mcp-apps/content-security-policy"
                     ]
                   },
@@ -958,6 +956,10 @@
     {
       "source": "/typescript/server/content-security-policy",
       "destination": "/typescript/mcp-apps/content-security-policy"
+    },
+    {
+      "source": "/v2/typescript/mcp-apps/widgets",
+      "destination": "/v2/typescript/mcp-apps/quickstart"
     },
     {
       "source": "/guides/chatgpt-apps-flow",

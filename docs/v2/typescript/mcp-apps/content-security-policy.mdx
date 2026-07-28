@@ -51,7 +51,9 @@ server.tool(
       },
     },
   },
-  async () => ({ /* ... */ })
+  async () => ({
+    /* ... */
+  }),
 );
 ```
 
@@ -94,11 +96,11 @@ The mcp-use Inspector provides a **CSP Mode Toggle** for testing:
 - **Widget-Declared**: Enforces the view's declared CSP (production-like)
 
 <Warning>
-CSP violations are logged in the console. Use Widget-Declared mode to catch CSP issues before production deployment.
+  CSP violations are logged in the console. Use Widget-Declared mode to catch
+  CSP issues before production deployment.
 </Warning>
 
 ## Next Steps
 
 - [MCP Apps](/v2/typescript/mcp-apps): View overview and routing
-- [Apps SDK compatibility](/v2/typescript/mcp-apps/apps-sdk-compatibility): ChatGPT compatibility and host extensions
 - [Supabase Deployment](/v2/typescript/server/deployment/supabase): Static deployment with CSP
