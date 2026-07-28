@@ -8,11 +8,11 @@
   <ul align="center" style="list-style: none;">
     <summary>
       <h1>The TypeScript framework for MCP</h1>
-    <h3>Build, test, and ship MCP servers, ChatGPT plugins, Claude connectors</h3>
     </summary>
   </ul>
 </div>
   
+  <h3>Build, test, and ship MCP servers, ChatGPT plugins, Claude connectors</h3>
 
   <p>
     Fully Typed, native Views and MCP Apps support, built-in Inspector and first class Agent experience.
