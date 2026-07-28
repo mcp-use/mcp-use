@@ -4,7 +4,13 @@
  * Follows the CLI entry contract: default-export the MCPServer instance;
  * `mcp-use dev` / `build` / `start` own the socket and view priming.
  */
-import { completable, inputRequired, inputResponse, MCPServer } from "mcp-use";
+import {
+  acceptedContent,
+  completable,
+  inputRequired,
+  inputResponse,
+  MCPServer,
+} from "mcp-use";
 import { z } from "zod";
 
 const BASE_PATH = "/mcp";
@@ -268,29 +274,40 @@ export const collectUserInfo = server.tool(
     outputSchema: z.object({ name: z.string(), age: z.number() }),
   },
   async (_input, ctx) => {
-    const form = await ctx.elicit(
-      "profile",
-      "Provide a profile for the client example",
-      z.object({
-        name: z.string().default("Anonymous"),
-        age: z.number().default(0),
-      })
-    );
-    if (form.status === "required") return form.result;
-    if (form.status === "accept") {
+    const schema = z.object({
+      name: z.string().default("Anonymous"),
+      age: z.number().default(0),
+    });
+    // The handler is re-entered from the top, so first determine whether this
+    // invocation is the initial call or a retry with a terminal response.
+    const response = inputResponse(ctx.inputResponses, "profile");
+    if (response.kind === "elicit" && response.action !== "accept") {
       return {
-        content: [
-          {
-            type: "text",
-            text: `Received ${form.data.name}, age ${form.data.age}`,
-          },
-        ],
-        structuredContent: form.data,
+        isError: true,
+        content: [{ type: "text", text: `Input ${response.action}` }],
       };
     }
+    const form = acceptedContent(ctx.inputResponses, "profile", schema);
+    // Ask only when this round has no accepted, schema-valid profile.
+    if (form === undefined) {
+      return inputRequired({
+        inputRequests: {
+          profile: inputRequired.elicit({
+            message: "Provide a profile for the client example",
+            requestedSchema: schema,
+          }),
+        },
+      });
+    }
+    // Successful work happens only after the response has been validated.
     return {
-      isError: true,
-      content: [{ type: "text", text: `Input ${form.status}` }],
+      content: [
+        {
+          type: "text",
+          text: `Received ${form.name}, age ${form.age}`,
+        },
+      ],
+      structuredContent: form,
     };
   }
 );

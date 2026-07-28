@@ -6,7 +6,13 @@
  *
  * Default-export the server; `mcp-use dev` / `build` / `start` own the socket.
  */
-import { completable, inputRequired, inputResponse, MCPServer } from "mcp-use";
+import {
+  acceptedContent,
+  completable,
+  inputRequired,
+  inputResponse,
+  MCPServer,
+} from "mcp-use";
 import { z } from "zod";
 
 const sleep = (ms: number) =>
@@ -250,29 +256,47 @@ server.tool(
     description: "A tool that uses elicitation to get user input",
   },
   async (_input, ctx) => {
-    const form = await ctx.elicit(
-      "elicitation",
-      "Please provide your information",
-      z.object({
-        name: z.string().default("Anonymous"),
-        age: z.number().default(0),
-      })
-    );
-    if (form.status === "required") return form.result;
-    if (form.status === "accept") {
+    const schema = z.object({
+      name: z.string().default("Anonymous"),
+      age: z.number().default(0),
+    });
+    // A stateless callback starts from the top for both initial calls and
+    // retries, so handle decline/cancel before deciding input is still needed.
+    const response = inputResponse(ctx.inputResponses, "elicitation");
+    if (response.kind === "elicit" && response.action !== "accept") {
       return {
         content: [
           {
             type: "text",
-            text: `Received: ${form.data.name}, age ${form.data.age}`,
+            text:
+              response.action === "decline"
+                ? "User declined"
+                : "Operation cancelled",
           },
         ],
       };
     }
-    if (form.status === "decline") {
-      return { content: [{ type: "text", text: "User declined" }] };
+    const form = acceptedContent(ctx.inputResponses, "elicitation", schema);
+    // Missing or invalid accepted data means this round must request it.
+    if (form === undefined) {
+      return inputRequired({
+        inputRequests: {
+          elicitation: inputRequired.elicit({
+            message: "Please provide your information",
+            requestedSchema: schema,
+          }),
+        },
+      });
     }
-    return { content: [{ type: "text", text: "Operation cancelled" }] };
+    // Produce the successful result only from accepted, validated input.
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Received: ${form.name}, age ${form.age}`,
+        },
+      ],
+    };
   }
 );
 
@@ -283,37 +307,49 @@ server.tool(
       "A tool that uses elicitation with default values for all primitive types (SEP-1034)",
   },
   async (_input, ctx) => {
-    const form = await ctx.elicit(
-      "elicitation-sep1034",
-      "Please provide your information",
-      z.object({
-        name: z.string().default("John Doe"),
-        age: z.number().int().default(30),
-        score: z.number().default(95.5),
-        status: z.enum(["active", "inactive", "pending"]).default("active"),
-        verified: z.boolean().default(true),
-      })
-    );
-    if (form.status === "required") return form.result;
-    if (form.status === "accept") {
+    const schema = z.object({
+      name: z.string().default("John Doe"),
+      age: z.number().int().default(30),
+      score: z.number().default(95.5),
+      status: z.enum(["active", "inactive", "pending"]).default("active"),
+      verified: z.boolean().default(true),
+    });
+    // Each invocation may be the initial call or a retry; inspect this round's
+    // response before falling back to input_required.
+    const response = inputResponse(ctx.inputResponses, "elicitation-sep1034");
+    if (response.kind === "elicit" && response.action !== "accept") {
       return {
         content: [
           {
             type: "text",
-            text: `Elicitation completed: action=accept, content=${JSON.stringify(form.data)}`,
+            text: `Elicitation completed: action=${response.action}`,
           },
         ],
       };
     }
-    if (form.status === "decline") {
-      return {
-        content: [
-          { type: "text", text: "Elicitation completed: action=decline" },
-        ],
-      };
+    const form = acceptedContent(
+      ctx.inputResponses,
+      "elicitation-sep1034",
+      schema
+    );
+    // Re-request when accepted content is absent or fails schema validation.
+    if (form === undefined) {
+      return inputRequired({
+        inputRequests: {
+          "elicitation-sep1034": inputRequired.elicit({
+            message: "Please provide your information",
+            requestedSchema: schema,
+          }),
+        },
+      });
     }
     return {
-      content: [{ type: "text", text: "Elicitation completed: action=cancel" }],
+      content: [
+        {
+          type: "text",
+          text: `Elicitation completed: action=accept, content=${JSON.stringify(form)}`,
+        },
+      ],
     };
   }
 );
@@ -326,37 +362,49 @@ server.tool(
   },
   async (_input, ctx) => {
     // ponytail: z.enum stand-ins for v1 enumSchema variants; titles/names not preserved
-    const form = await ctx.elicit(
-      "elicitation-sep1330",
-      "Please choose your options",
-      z.object({
-        untitledSingle: z.enum(["option1", "option2", "option3"]),
-        titledSingle: z.enum(["value1", "value2", "value3"]),
-        legacyEnum: z.enum(["opt1", "opt2", "opt3"]),
-        untitledMulti: z.array(z.enum(["option1", "option2", "option3"])),
-        titledMulti: z.array(z.enum(["value1", "value2", "value3"])),
-      })
-    );
-    if (form.status === "required") return form.result;
-    if (form.status === "accept") {
+    const schema = z.object({
+      untitledSingle: z.enum(["option1", "option2", "option3"]),
+      titledSingle: z.enum(["value1", "value2", "value3"]),
+      legacyEnum: z.enum(["opt1", "opt2", "opt3"]),
+      untitledMulti: z.array(z.enum(["option1", "option2", "option3"])),
+      titledMulti: z.array(z.enum(["value1", "value2", "value3"])),
+    });
+    // Stateless retries re-enter here, so consume any terminal response before
+    // deciding that this round still needs user input.
+    const response = inputResponse(ctx.inputResponses, "elicitation-sep1330");
+    if (response.kind === "elicit" && response.action !== "accept") {
       return {
         content: [
           {
             type: "text",
-            text: `Elicitation completed: action=accept, content=${JSON.stringify(form.data)}`,
+            text: `Elicitation completed: action=${response.action}`,
           },
         ],
       };
     }
-    if (form.status === "decline") {
-      return {
-        content: [
-          { type: "text", text: "Elicitation completed: action=decline" },
-        ],
-      };
+    const form = acceptedContent(
+      ctx.inputResponses,
+      "elicitation-sep1330",
+      schema
+    );
+    // Only missing or schema-invalid accepted data should request another round.
+    if (form === undefined) {
+      return inputRequired({
+        inputRequests: {
+          "elicitation-sep1330": inputRequired.elicit({
+            message: "Please choose your options",
+            requestedSchema: schema,
+          }),
+        },
+      });
     }
     return {
-      content: [{ type: "text", text: "Elicitation completed: action=cancel" }],
+      content: [
+        {
+          type: "text",
+          text: `Elicitation completed: action=accept, content=${JSON.stringify(form)}`,
+        },
+      ],
     };
   }
 );
