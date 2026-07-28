@@ -44,7 +44,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const b = Number(request.params.arguments?.b);
   if (Number.isNaN(a) || Number.isNaN(b)) {
     return {
-      content: [{ type: "text", text: "Error: both arguments must be numbers" }],
+      content: [
+        { type: "text", text: "Error: both arguments must be numbers" },
+      ],
       isError: true,
     };
   }

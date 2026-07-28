@@ -74,6 +74,7 @@
     "request-scoped-client-context",
     "request-scoped-server-notifications",
     "resource-template-completion",
+    "runtime-first-deployment",
     "scoped-client-command-help",
     "separate-oauth-audiences",
     "skip-dev-info-standalone-probe",
