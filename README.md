@@ -58,27 +58,17 @@
 
 ### Start with your agent
 
-<details>
-<summary>Prompt for your agent</summary>
-
 ```text
 Build an MCP server: https://mcp-use.com/prompt.md
 ```
-
-</details>
 
 [Read the prompt →](https://mcp-use.com/prompt.md)
 
 ### Start with code
 
-<details>
-<summary><code>npx -y create-mcp-use-app@beta</code></summary>
-
 ```bash
 npx -y create-mcp-use-app@beta
 ```
-
-</details>
 
 Run `npm run dev` in the generated project · open [`http://localhost:3000/mcp/inspector`](http://localhost:3000/mcp/inspector)
 
@@ -114,6 +104,10 @@ Run `npm run dev` in the generated project · open [`http://localhost:3000/mcp/i
 The scaffold gives you the server, TypeScript configuration, development scripts, Inspector, and a React view pipeline. Start it once and the MCP endpoint also serves a client-ready landing page with its connection URL and setup instructions.
 
 Replace its `index.ts` with a view-bound tool like this:
+
+<table><tr><td>
+<details>
+<summary><strong><code>index.ts</code></strong> — Server entry file for tool definition and metadata</summary>
 
 ```typescript
 import { MCPServer } from "mcp-use";
@@ -171,11 +165,18 @@ export const getWeather = server.tool(
 export default server;
 ```
 
+</details>
+</td></tr></table>
+
 [Explore MCP server tools →](https://mcp-use.com/docs/typescript/server/tools)
 
 ## Add Views to your tools
 
 Create `views/weather-card/view.tsx`. The directory name matches `view.name` on the tool:
+
+<table><tr><td>
+<details>
+<summary><strong><code>view.tsx</code></strong> — Return a view from your tools: React weather card</summary>
 
 ```tsx
 import { useCallTool, useToolContext } from "mcp-use/react";
@@ -209,6 +210,9 @@ export default function WeatherCard() {
   );
 }
 ```
+
+</details>
+</td></tr></table>
 
 <p align="center">
   <img src="./static/readme/chatgpt-hello-world.jpg" alt="Hello World MCP App rendered in a ChatGPT conversation" width="100%" />
