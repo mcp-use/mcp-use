@@ -29,9 +29,6 @@
   },
   "treatWarningsAsErrors": true,
   "intentionallyNotDocumented": [
-    "index.ElicitationResult.__type.data",
-    "index.ElicitationResult.__type.result",
-    "index.ElicitationResult.__type.status",
     "index.InferPromptInput.__type.schema",
     "index.InferTemplateParams.__type.uriTemplate",
     "index.InferToolInput.__type.inputSchema",

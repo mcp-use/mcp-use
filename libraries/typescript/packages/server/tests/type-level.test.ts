@@ -19,8 +19,10 @@ import type {
 } from "@modelcontextprotocol/server";
 
 import {
+  acceptedContent,
   createMcpEventListenerEntry,
   createMcpMiddlewareEntry,
+  inputRequired,
   MCPServer,
   text,
 } from "../src/index.js";
@@ -308,22 +310,26 @@ describe("tool registration return-position checks", () => {
       isError: true,
     }));
     server.tool({ name: "interactive", outputSchema }, async (_params, ctx) => {
-      const answer = await ctx.elicit(
+      const answerSchema = z.object({ answer: z.number() });
+      const answer = acceptedContent(
+        ctx.inputResponses,
         "answer",
-        "Provide an answer",
-        z.object({ answer: z.number() })
+        answerSchema
       );
-      if (answer.status === "required") return answer.result;
-      if (answer.status !== "accept") {
-        return {
-          content: [{ type: "text", text: answer.status }],
-          isError: true,
-        };
+      if (answer === undefined) {
+        return inputRequired({
+          inputRequests: {
+            answer: inputRequired.elicit({
+              message: "Provide an answer",
+              requestedSchema: answerSchema,
+            }),
+          },
+        });
       }
-      expectTypeOf(answer.data).toEqualTypeOf<{ answer: number }>();
+      expectTypeOf(answer).toEqualTypeOf<{ answer: number }>();
       return {
-        content: [{ type: "text", text: String(answer.data.answer) }],
-        structuredContent: answer.data,
+        content: [{ type: "text", text: String(answer.answer) }],
+        structuredContent: answer,
       };
     });
     expect(true).toBe(true); // assertions above are compile-time
@@ -382,27 +388,36 @@ describe("tool registration return-position checks", () => {
   });
 });
 
-describe("elicitation context", () => {
-  it("infers form data and supports URL mode", () => {
+describe("input_required context", () => {
+  it("infers form data, supports URL mode, and omits ctx.elicit", () => {
     const server = new MCPServer({ name: "types", version: "0.0.0" });
     server.tool({ name: "elicit-types" }, async (_params, ctx) => {
-      const form = await ctx.elicit(
+      const profileSchema = z.object({ name: z.string() });
+      const form = acceptedContent(
+        ctx.inputResponses,
         "profile",
-        "Your profile",
-        z.object({ name: z.string() })
+        profileSchema
       );
-      const url = await ctx.elicit(
-        "signin",
-        "Sign in",
-        "https://example.com/sign-in"
-      );
-      if (form.status === "accept") {
-        expectTypeOf(form.data).toEqualTypeOf<{ name: string }>();
+      expectTypeOf(form).toEqualTypeOf<{ name: string } | undefined>();
+
+      // @ts-expect-error — ctx.elicit was removed; use input_required helpers.
+      void ctx.elicit;
+
+      if (form !== undefined) {
+        return { content: [{ type: "text", text: form.name }] };
       }
-      expect(url).toBeDefined();
-      return form.status === "required"
-        ? form.result
-        : { content: [{ type: "text", text: form.status }] };
+      return inputRequired({
+        inputRequests: {
+          profile: inputRequired.elicit({
+            message: "Your profile",
+            requestedSchema: profileSchema,
+          }),
+          signin: inputRequired.elicitUrl({
+            message: "Sign in",
+            url: "https://example.com/sign-in",
+          }),
+        },
+      });
     });
     expect(true).toBe(true);
   });

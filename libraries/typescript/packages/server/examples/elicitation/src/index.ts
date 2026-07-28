@@ -1,4 +1,9 @@
-import { MCPServer } from "mcp-use";
+import {
+  acceptedContent,
+  inputRequired,
+  inputResponse,
+  MCPServer,
+} from "mcp-use";
 import { z } from "zod";
 
 const server = new MCPServer({
@@ -37,25 +42,14 @@ server.tool(
     annotations: { destructiveHint: true },
   },
   async ({ environment }, ctx) => {
-    const confirmation = await ctx.elicit(
-      "deployment-approval",
-      `Deploy to ${environment}?`,
-      deploymentApproval
-    );
-
-    // On the first invocation this is an InputRequiredResult. The client
-    // collects input and retries this same tool call with the response.
-    if (confirmation.status === "required") {
-      return confirmation.result;
-    }
-
-    if (confirmation.status !== "accept") {
+    const response = inputResponse(ctx.inputResponses, "deployment-approval");
+    if (response.kind === "elicit" && response.action !== "accept") {
       return {
         content: [
           {
             type: "text",
             text:
-              confirmation.status === "decline"
+              response.action === "decline"
                 ? "Deployment declined by the user."
                 : "Deployment cancelled by the user.",
           },
@@ -64,7 +58,24 @@ server.tool(
       };
     }
 
-    if (!confirmation.data.approve) {
+    const confirmation = acceptedContent(
+      ctx.inputResponses,
+      "deployment-approval",
+      deploymentApproval
+    );
+
+    if (confirmation === undefined) {
+      return inputRequired({
+        inputRequests: {
+          "deployment-approval": inputRequired.elicit({
+            message: `Deploy to ${environment}?`,
+            requestedSchema: deploymentApproval,
+          }),
+        },
+      });
+    }
+
+    if (!confirmation.approve) {
       return {
         content: [{ type: "text", text: "Deployment was not approved." }],
         isError: true,
@@ -76,8 +87,8 @@ server.tool(
     const result = {
       environment,
       deployed: true,
-      ...(confirmation.data.note !== undefined && {
-        note: confirmation.data.note,
+      ...(confirmation.note !== undefined && {
+        note: confirmation.note,
       }),
     };
 
@@ -102,23 +113,25 @@ server.tool(
     const authorizationUrl = new URL("https://example.com/authorize");
     authorizationUrl.searchParams.set("service", service);
 
-    const authorization = await ctx.elicit(
-      "service-authorization",
-      `Authorize access to ${service}`,
-      authorizationUrl.href
-    );
-
-    if (authorization.status === "required") {
-      return authorization.result;
+    const response = inputResponse(ctx.inputResponses, "service-authorization");
+    if (response.kind === "missing") {
+      return inputRequired({
+        inputRequests: {
+          "service-authorization": inputRequired.elicitUrl({
+            message: `Authorize access to ${service}`,
+            url: authorizationUrl.href,
+          }),
+        },
+      });
     }
 
-    if (authorization.status !== "accept") {
+    if (response.kind !== "elicit" || response.action !== "accept") {
       return {
         content: [
           {
             type: "text",
             text:
-              authorization.status === "decline"
+              response.kind === "elicit" && response.action === "decline"
                 ? "Authorization declined by the user."
                 : "Authorization cancelled by the user.",
           },
