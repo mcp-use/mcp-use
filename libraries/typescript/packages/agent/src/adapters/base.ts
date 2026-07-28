@@ -20,9 +20,6 @@ export abstract class BaseAdapter<T> {
    */
   private readonly connectorToolMap: Map<BaseConnector, T[]> = new Map();
 
-  /**
-   * @param disallowedTools - MCP tool names to omit during conversion.
-   */
   constructor(disallowedTools?: string[]) {
     this.disallowedTools = disallowedTools ?? [];
   }
@@ -33,9 +30,9 @@ export abstract class BaseAdapter<T> {
    * This is the recommended way to create tools from an MCPClient, as it handles
    * session creation and connector extraction automatically.
    *
-   * @param client - The MCPClient to extract tools from.
-   * @param disallowedTools - Optional list of tool names to exclude.
-   * @returns A promise that resolves with a list of converted tools.
+   * @param client          The MCPClient to extract tools from.
+   * @param disallowedTools Optional list of tool names to exclude.
+   * @returns               A promise that resolves with a list of converted tools.
    */
   static async createTools<TTool, TAdapter extends BaseAdapter<TTool>>(
     this: new (disallowedTools?: string[]) => TAdapter,
@@ -69,8 +66,8 @@ export abstract class BaseAdapter<T> {
   /**
    * Dynamically load tools for a specific connector.
    *
-   * @param connector - The connector to load tools for.
-   * @returns The list of tools that were loaded in the target framework's format.
+   * @param connector The connector to load tools for.
+   * @returns         The list of tools that were loaded in the target framework's format.
    */
   async loadToolsForConnector(connector: BaseConnector): Promise<T[]> {
     // Return cached tools if we already processed this connector
@@ -112,9 +109,9 @@ export abstract class BaseAdapter<T> {
   /**
    * Convert an MCP tool to the target framework's tool format.
    *
-   * @param mcpTool - The MCP tool definition to convert.
-   * @param connector - The connector that provides this tool.
-   * @returns The converted tool, or null / undefined if no tool should be produced.
+   * @param mcpTool   The MCP tool definition to convert.
+   * @param connector The connector that provides this tool.
+   * @returns         The converted tool, or null / undefined if no tool should be produced.
    */
   protected abstract convertTool(
     mcpTool: Record<string, any>,
@@ -124,9 +121,9 @@ export abstract class BaseAdapter<T> {
   /**
    * Convert an MCP resource to the target framework's tool format.
    *
-   * @param mcpResource - The MCP resource definition to convert.
-   * @param connector - The connector that provides this resource.
-   * @returns The converted resource as a tool, or null / undefined if no tool should be produced.
+   * @param mcpResource The MCP resource definition to convert.
+   * @param connector    The connector that provides this resource.
+   * @returns            The converted resource as a tool, or null / undefined if no tool should be produced.
    */
   protected abstract convertResource?(
     mcpResource: Record<string, any>,
@@ -136,9 +133,9 @@ export abstract class BaseAdapter<T> {
   /**
    * Convert an MCP prompt to the target framework's tool format.
    *
-   * @param mcpPrompt - The MCP prompt definition to convert.
-   * @param connector - The connector that provides this prompt.
-   * @returns The converted prompt as a tool, or null / undefined if no tool should be produced.
+   * @param mcpPrompt The MCP prompt definition to convert.
+   * @param connector The connector that provides this prompt.
+   * @returns         The converted prompt as a tool, or null / undefined if no tool should be produced.
    */
   protected abstract convertPrompt?(
     mcpPrompt: Record<string, any>,
@@ -148,8 +145,8 @@ export abstract class BaseAdapter<T> {
   /**
    * Create tools from MCP tools in all provided connectors.
    *
-   * @param connectors - List of MCP connectors to create tools from.
-   * @returns A promise that resolves with all converted tools.
+   * @param connectors List of MCP connectors to create tools from.
+   * @returns         A promise that resolves with all converted tools.
    */
   public async createToolsFromConnectors(
     connectors: BaseConnector[]
@@ -167,8 +164,8 @@ export abstract class BaseAdapter<T> {
   /**
    * Dynamically load resources for a specific connector.
    *
-   * @param connector - The connector to load resources for.
-   * @returns The list of resources that were loaded in the target framework's format.
+   * @param connector The connector to load resources for.
+   * @returns         The list of resources that were loaded in the target framework's format.
    */
   async loadResourcesForConnector(connector: BaseConnector): Promise<T[]> {
     const connectorResources: T[] = [];
@@ -209,8 +206,8 @@ export abstract class BaseAdapter<T> {
   /**
    * Dynamically load prompts for a specific connector.
    *
-   * @param connector - The connector to load prompts for.
-   * @returns The list of prompts that were loaded in the target framework's format.
+   * @param connector The connector to load prompts for.
+   * @returns         The list of prompts that were loaded in the target framework's format.
    */
   async loadPromptsForConnector(connector: BaseConnector): Promise<T[]> {
     const connectorPrompts: T[] = [];
@@ -251,8 +248,8 @@ export abstract class BaseAdapter<T> {
   /**
    * Create resources from MCP resources in all provided connectors.
    *
-   * @param connectors - List of MCP connectors to create resources from.
-   * @returns A promise that resolves with all converted resources.
+   * @param connectors List of MCP connectors to create resources from.
+   * @returns         A promise that resolves with all converted resources.
    */
   public async createResourcesFromConnectors(
     connectors: BaseConnector[]
@@ -271,8 +268,8 @@ export abstract class BaseAdapter<T> {
   /**
    * Create prompts from MCP prompts in all provided connectors.
    *
-   * @param connectors - List of MCP connectors to create prompts from.
-   * @returns A promise that resolves with all converted prompts.
+   * @param connectors List of MCP connectors to create prompts from.
+   * @returns         A promise that resolves with all converted prompts.
    */
   public async createPromptsFromConnectors(
     connectors: BaseConnector[]
@@ -290,8 +287,8 @@ export abstract class BaseAdapter<T> {
   /**
    * Check if a connector is initialized and has tools.
    *
-   * @param connector - The connector to check.
-   * @returns True if the connector is initialized and has tools, false otherwise.
+   * @param connector The connector to check.
+   * @returns         True if the connector is initialized and has tools, false otherwise.
    */
   private checkConnectorInitialized(connector: BaseConnector): boolean {
     return Boolean(connector.tools && connector.tools.length);
@@ -300,8 +297,8 @@ export abstract class BaseAdapter<T> {
   /**
    * Ensure a connector is initialized.
    *
-   * @param connector - The connector to initialize.
-   * @returns True if initialization succeeded, false otherwise.
+   * @param connector The connector to initialize.
+   * @returns         True if initialization succeeded, false otherwise.
    */
   private async ensureConnectorInitialized(
     connector: BaseConnector

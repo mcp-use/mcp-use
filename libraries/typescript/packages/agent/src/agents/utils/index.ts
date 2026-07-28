@@ -11,5 +11,4 @@ export {
   parseLLMString,
   type LLMConfig,
   type LLMProvider,
-  type ParsedLLMString,
 } from "./llm_provider.js";

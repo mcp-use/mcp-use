@@ -18,39 +18,25 @@ import type { ClientInfo } from "../transport/http.js";
 import { HttpConnector } from "../transport/http.js";
 import { getPackageVersion } from "../utils/version.js";
 
-/** Parameters accepted by the MCP `sampling/createMessage` request. */
+/** Params for `sampling/createMessage` (avoids deprecated `CreateMessageRequest`). */
 export type SamplingCreateMessageParams =
   RequestTypeMap["sampling/createMessage"]["params"];
 
-/** Result returned for the MCP `sampling/createMessage` request. */
+/** Result for `sampling/createMessage` (avoids deprecated `CreateMessageResult`). */
 export type SamplingCreateMessageResult =
   ResultTypeMap["sampling/createMessage"];
 
-/**
- * Handles a sampling request initiated by an MCP server.
- *
- * @param params - Sampling request parameters supplied by the server.
- * @returns The model-generated sampling result.
- */
+/** Callback for sampling requests (canonical name). */
 export type OnSamplingCallback = (
   params: SamplingCreateMessageParams
 ) => Promise<SamplingCreateMessageResult>;
 
-/**
- * Handles a form or URL elicitation request initiated by an MCP server.
- *
- * @param params - Elicitation request parameters supplied by the server.
- * @returns The user's elicitation decision and optional content.
- */
+/** Callback for elicitation requests (canonical name). */
 export type OnElicitationCallback = (
   params: ElicitRequestFormParams | ElicitRequestURLParams
 ) => Promise<ElicitResult>;
 
-/**
- * Handles a notification sent by an MCP server.
- *
- * @param notification - The notification envelope supplied by the server.
- */
+/** Callback for notifications (canonical name). */
 export type OnNotificationCallback = (
   notification: Notification
 ) => void | Promise<void>;
@@ -73,21 +59,14 @@ export interface CallbackConfig {
 }
 
 /**
- * Resolves callback handlers, preferring per-server values over global values.
- *
- * @param perServer - Callback overrides for one server.
- * @param globalDefaults - Fallback callbacks shared by all servers.
- * @returns The effective callbacks for the server.
+ * Resolves effective callbacks from per-server and global config.
  */
 export function resolveCallbacks(
   perServer: CallbackConfig | undefined,
   globalDefaults: CallbackConfig | undefined
 ): {
-  /** Effective sampling callback. */
   onSampling?: OnSamplingCallback;
-  /** Effective elicitation callback. */
   onElicitation?: OnElicitationCallback;
-  /** Effective notification callback. */
   onNotification?: OnNotificationCallback;
 } {
   const pickSampling = perServer?.onSampling ?? globalDefaults?.onSampling;
@@ -106,9 +85,7 @@ export function resolveCallbacks(
 /**
  * Base server configuration with common optional fields
  */
-/** Options shared by HTTP and stdio server configurations. */
 interface BaseServerConfig extends CallbackConfig {
-  /** Client identity advertised to the server. */
   clientInfo?: ClientInfo;
   /** Initial roots advertised to the server. */
   roots?: Root[];
@@ -119,16 +96,12 @@ interface BaseServerConfig extends CallbackConfig {
 }
 
 /**
- * Configures a local MCP server launched over standard input and output.
+ * Server configuration for STDIO connectors
  */
 export interface StdioServerConfig extends BaseServerConfig {
-  /** Executable used to start the server. */
   command: string;
-  /** Arguments passed to {@link StdioServerConfig.command}. */
   args: string[];
-  /** Environment variables merged with the current process environment. */
   env?: Record<string, string>;
-  /** Working directory used to launch the server process. */
   cwd?: string;
   /**
    * Protocol version negotiation mode. Defaults to `"legacy"` for stdio (the
@@ -145,27 +118,20 @@ export interface StdioServerConfig extends BaseServerConfig {
  * by the other runtime.
  */
 export interface AutoOAuthOptions {
-  /** Prefix used for persisted OAuth session keys. */
   storageKeyPrefix?: string;
-  /** OAuth client display name. */
   clientName?: string;
-  /** Public URL describing the OAuth client. */
   clientUri?: string;
-  /** Public URL for the OAuth client logo. */
   logoUri?: string;
-  /** OAuth redirect URI. The platform provider supplies a default when omitted. */
   callbackUrl?: string;
-  /** URL of an OAuth Client ID Metadata Document. */
   clientMetadataUrl?: string;
-  /** Space-delimited OAuth scopes to request. */
   scope?: string;
   /** Pre-registered public client id (skips DCR). */
   staticClientInfo?: OAuthClientInformation;
-  /** Preferred Node loopback port. Defaults to `33418`. */
+  /** Node: preferred loopback port. */
   preferredPort?: number;
-  /** Number of Node loopback ports to try. Defaults to `10`. */
+  /** Node: ports to walk on EADDRINUSE. */
   portRange?: number;
-  /** Node loopback callback timeout in milliseconds. Defaults to five minutes. */
+  /** Node: loopback wait timeout in ms. */
   authTimeoutMs?: number;
   /** Node: override browser launch (CLI prints the URL instead). */
   openBrowser?: (url: string) => void | Promise<void>;
@@ -175,25 +141,20 @@ export interface AutoOAuthOptions {
   useRedirectFlow?: boolean;
   /** Browser: same-origin OAuth BFF base URL. */
   oauthProxyUrl?: string;
-  /** Whether browser OAuth HTTP uses `oauthProxyUrl`. Defaults to `true` when the URL is set. */
+  /** Browser: route OAuth HTTP through `oauthProxyUrl` (default true when set). */
   proxyOAuthRequests?: boolean;
 }
 
 /**
- * Configures a remote MCP server accessed with streamable HTTP.
+ * Server configuration for HTTP connectors
  */
 export interface HttpServerConfig extends BaseServerConfig {
-  /** MCP endpoint URL. */
   url: string;
-  /** Headers included with MCP transport requests. */
   headers?: Record<string, string>;
-  /** Fetch implementation used by the HTTP transport. */
   fetch?: typeof fetch;
-  /** Bearer token added as the `Authorization` header. */
   authToken?: string;
   /** Connection timeout in milliseconds. */
   timeout?: number;
-  /** OAuth provider used when the server requires authorization. */
   authProvider?: AuthProvider | OAuthClientProvider;
   /**
    * Auto-OAuth options for HTTP servers.
@@ -212,12 +173,7 @@ export interface HttpServerConfig extends BaseServerConfig {
   protocolNegotiation?: VersionNegotiationMode;
 }
 
-/**
- * Tests whether the client should create an OAuth provider for an HTTP server.
- *
- * @param serverConfig - Server configuration to inspect.
- * @returns `true` for an HTTP configuration without explicit authorization.
- */
+/** True when the client should auto-create an OAuth provider for this server. */
 export function shouldAutoProvisionOAuth(
   serverConfig: ServerConfig
 ): serverConfig is HttpServerConfig {
@@ -237,19 +193,17 @@ export function shouldAutoProvisionOAuth(
 }
 
 /**
- * Configuration for either a local stdio server or a remote HTTP server.
+ * Discriminated union of all supported server configuration types
  */
 export type ServerConfig = StdioServerConfig | HttpServerConfig;
 
 /**
- * Top-level MCP client configuration.
- *
- * Callback and client identity values act as defaults for individual servers.
+ * Top-level MCP client configuration shape.
+ * May include global callback defaults and clientInfo applied when per-server config omits them.
  */
 export interface MCPClientConfigShape extends CallbackConfig {
-  /** Default client identity for all servers; overridable per server. */
+  /** Default clientInfo for all servers; overridable per server. */
   clientInfo?: ClientInfo;
-  /** Server configurations keyed by the name used in client methods. */
   mcpServers?: Record<string, ServerConfig>;
 }
 
@@ -273,11 +227,8 @@ function getDefaultClientInfo(): ClientInfo {
 }
 
 /**
- * Normalizes a client identity and fills optional metadata with package defaults.
- *
- * @param input - Candidate client identity.
- * @returns The supplied identity merged with defaults, or the complete default
- * identity when `input` does not contain both `name` and `version`.
+ * Normalizes and validates clientInfo from config.
+ * Ensures required fields (name, version) are present and merges with defaults.
  */
 export function normalizeClientInfo(input: unknown): ClientInfo {
   const fallback = getDefaultClientInfo();
@@ -288,12 +239,7 @@ export function normalizeClientInfo(input: unknown): ClientInfo {
   return { ...fallback, ...ci };
 }
 
-/**
- * Expands the `capabilities.views` shorthand into the MCP Apps extension.
- *
- * @param clientOptions - SDK client options to normalize.
- * @returns Normalized options, or `undefined` when no options were supplied.
- */
+/** Resolve SDK client options, expanding the MCP Apps `views` capability shorthand. */
 export function resolveClientOptions(
   clientOptions: ClientOptions | undefined
 ): ClientOptions | undefined {
@@ -324,14 +270,6 @@ export function resolveClientOptions(
   };
 }
 
-/**
- * Creates an HTTP connector from a runtime-neutral server configuration.
- *
- * @param serverConfig - Server configuration to convert.
- * @param connectorOptions - Connector options that override derived values.
- * @returns An HTTP connector for the configured endpoint.
- * @throws When `serverConfig` is a stdio configuration or has no recognized transport.
- */
 export function createConnectorFromConfig(
   serverConfig: ServerConfig,
   connectorOptions?: Partial<ConnectorInitOptions>

@@ -12,105 +12,85 @@ import type { BaseConnector } from "@mcp-use/client";
 import type { ServerManager } from "../managers/server_manager.js";
 import type { LLMConfig } from "./utils/llm_provider.js";
 
-/** LangChain message types accepted as conversation history. */
 export type BaseMessage =
   | AIMessage
   | HumanMessage
   | ToolMessage
   | SystemMessage;
 
-/** A LangChain-compatible chat model accepted by the agent. */
+/**
+ * Language model type that accepts any LangChain chat model.
+ * Any is used to avoid TypeScript structural typing issues with protected properties until langchain fixes the issue.
+ */
 export type LanguageModel = any;
 
-/** MCP server transport configuration used in simplified mode. */
+/**
+ * Configuration for MCP servers in simplified mode
+ */
 export interface MCPServerConfig {
-  /** Executable for a stdio server. */
   command?: string;
-  /** Arguments passed to the stdio executable. */
   args?: string[];
-  /** Environment variables passed to the stdio process. */
   env?: Record<string, string>;
-  /** URL for a remote MCP transport. */
   url?: string;
-  /** HTTP headers sent to a remote MCP server. */
   headers?: Record<string, string>;
-  /** Legacy snake-case authentication token. */
   auth_token?: string;
-  /** Authentication token sent to a remote MCP server. */
   authToken?: string;
 }
 
-/** Options shared by explicit and simplified LangChain agents. */
-export interface CommonAgentOptions {
-  /** Maximum model calls per run. Defaults to `5`. */
+/**
+ * Common options shared between both explicit and simplified modes
+ */
+interface CommonAgentOptions {
   maxSteps?: number;
-  /** Initializes the agent on its first run. Defaults to `false`. */
   autoInitialize?: boolean;
-  /** Retains conversation history between runs. Defaults to `true`. */
   memoryEnabled?: boolean;
-  /** Complete system instruction override. */
   systemPrompt?: string | null;
-  /** Template used to build the system instruction from available tools. */
   systemPromptTemplate?: string | null;
-  /** Instructions appended to the generated system message. */
   additionalInstructions?: string | null;
-  /** MCP tool names to omit from the agent. */
   disallowedTools?: string[];
-  /** Additional LangChain tools exposed alongside MCP tools. */
   additionalTools?: StructuredToolInterface[];
-  /** Mutable array populated with tool names used during execution. */
   toolsUsedNames?: string[];
-  /** Exposes MCP resources as tools. Defaults to `true`. */
   exposeResourcesAsTools?: boolean;
-  /** Exposes MCP prompts as tools. Defaults to `true`. */
   exposePromptsAsTools?: boolean;
-  /** Enables dynamic server-selection tools. */
   useServerManager?: boolean;
-  /** Enables detailed execution logging. */
   verbose?: boolean;
-  /** Enables observability callbacks. Defaults to `true`. */
   observe?: boolean;
-  /** Adapter used to create LangChain tools. */
   adapter?: LangChainAdapter;
-  /** Factory used to customize server management. */
   serverManagerFactory?: (client: MCPClient) => ServerManager;
-  /** Custom LangChain observability callbacks. */
   callbacks?: BaseCallbackHandler[];
-  /** Hosted agent identifier for remote execution. */
+  // Remote agent parameters
   agentId?: string;
-  /** Remote API key. Defaults to `MCP_USE_API_KEY`. */
   apiKey?: string;
-  /** Remote API origin. */
   baseUrl?: string;
 }
 
-/** Options for a pre-instantiated LangChain model and MCP client/connectors. */
+/**
+ * Explicit mode: User provides pre-instantiated LLM and client/connectors
+ * This is the traditional initialization pattern with full control
+ */
 export interface ExplicitModeOptions extends CommonAgentOptions {
-  /** Pre-instantiated LangChain chat model. */
   llm: LanguageModel;
-  /** Existing MCP client. */
   client?: MCPClient;
-  /** Existing MCP connectors. */
   connectors?: BaseConnector[];
-  /** Simplified server configurations are not accepted in explicit mode. */
+  // Simplified mode options should not be present
   mcpServers?: never;
-  /** Simplified model configuration is not accepted in explicit mode. */
   llmConfig?: never;
 }
 
-/** Options for an agent that creates its model and MCP client from config. */
+/**
+ * Simplified mode: User provides LLM string and mcpServers config
+ * The agent handles client creation and LLM instantiation internally
+ */
 export interface SimplifiedModeOptions extends CommonAgentOptions {
-  /** Model identifier in `"provider/model"` format. */
-  llm: string;
-  /** Provider credentials and model constructor settings. */
+  llm: string; // Format: "provider/model" (e.g., "openai/gpt-4")
   llmConfig?: LLMConfig;
-  /** Named MCP server transport configurations. */
   mcpServers: Record<string, MCPServerConfig>;
-  /** Existing clients are not accepted in simplified mode. */
+  // Explicit mode options should not be present
   client?: never;
-  /** Existing connectors are not accepted in simplified mode. */
   connectors?: never;
 }
 
-/** Constructor options for the LangChain MCP agent. */
+/**
+ * MCPAgent constructor options - supports both explicit and simplified modes
+ */
 export type MCPAgentOptions = ExplicitModeOptions | SimplifiedModeOptions;

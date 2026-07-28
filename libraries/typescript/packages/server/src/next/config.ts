@@ -15,39 +15,21 @@ interface NextHeaderRule {
 export interface NextConfigLike {
   /** Preserve arbitrary Next.js settings while augmenting the fields we use. */
   [key: string]: unknown;
-  /** Next.js response-header callback augmented with MCP CORS headers. */
   headers?: () => NextHeaderRule[] | Promise<NextHeaderRule[]>;
-  /** Next.js output tracing globs augmented with compiled MCP view assets. */
   outputFileTracingIncludes?: Record<string, string[]>;
 }
 
 /** Options for {@link withMcpUse}. */
 export interface WithMcpUseOptions {
-  /**
-   * Authored MCP server entry, relative to `projectRoot`.
-   *
-   * @defaultValue `"mcp/server.ts"`
-   */
+  /** Authored MCP server entry, relative to `projectRoot`. */
   entry?: string;
-  /**
-   * Conventional MCP source directory containing the entry and `views/`.
-   *
-   * @defaultValue `"mcp"`
-   */
+  /** Conventional MCP source directory containing the entry and `views/`. */
   mcpDir?: string;
   /** Explicit views directory, relative to `projectRoot`. */
   viewsDir?: string;
-  /**
-   * MCP route mounted by the application.
-   *
-   * @defaultValue `"/api/mcp"`
-   */
+  /** MCP route mounted by the application. Defaults to `/api/mcp`. */
   basePath?: string;
-  /**
-   * Next.js project root.
-   *
-   * @defaultValue `process.cwd()`
-   */
+  /** Next.js project root. Defaults to `process.cwd()`. */
   projectRoot?: string;
 }
 
@@ -170,17 +152,6 @@ export function composeNextConfig<T extends NextConfigLike>(
  *
  * The MCP build runs when Next evaluates `next.config`, for both development
  * and production builds. This removes the need for a separate prebuild script.
- *
- * @param nextConfig - Existing Next.js configuration to augment.
- * @param options - MCP source, route, and project-root settings.
- * @returns The augmented configuration after the MCP project is built.
- *
- * @example
- * ```ts
- * import { withMcpUse } from "mcp-use/next";
- *
- * export default withMcpUse();
- * ```
  */
 export async function withMcpUse<T extends NextConfigLike = NextConfigLike>(
   nextConfig: T = {} as T,

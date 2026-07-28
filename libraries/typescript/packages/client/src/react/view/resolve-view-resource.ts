@@ -5,23 +5,12 @@ import type {
 } from "./ext-apps-bridge.js";
 import type { ResolvedViewResource, ViewCspMode } from "./types.js";
 
-/** MCP App UI metadata read from a resource listing or content block. */
 type UiMeta = {
   csp?: McpUiResourceCsp;
   permissions?: McpUiResourcePermissions;
   prefersBorder?: boolean;
 };
 
-/**
- * Normalizes a resource response into HTML and effective MCP App policy.
- *
- * Content-level UI metadata overrides listing metadata. In permissive mode the
- * declared CSP is reported but not enforced.
- *
- * @param options - Resource response, listing metadata, CSP policy, and URI.
- * @returns The normalized view resource.
- * @throws When the first content block contains no text or base64 HTML.
- */
 export function resolveViewResource(options: {
   resourceResult: unknown;
   listingResource?: { _meta?: { ui?: unknown } } | null;

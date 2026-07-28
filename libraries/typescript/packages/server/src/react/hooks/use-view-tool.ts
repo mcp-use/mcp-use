@@ -29,7 +29,7 @@ export type ViewToolDefinition = Pick<
   enabled?: boolean;
 };
 
-/** Internal registration handle retained while a view tool is mounted. */
+/** Handle returned by {@link McpAppRuntime.registerViewTool}. */
 type RegisteredViewTool = ReturnType<McpAppRuntime["registerViewTool"]>;
 
 /**
@@ -47,9 +47,9 @@ type RegisteredViewTool = ReturnType<McpAppRuntime["registerViewTool"]>;
  * the ext-apps handle's `update()`, passing explicit `undefined` so omitted
  * fields are cleared. Toggling `enabled` calls `enable()` / `disable()`
  * without re-registering. The handler is kept in a ref so calls always see
- * current React state. Registration goes through the document runtime rather
- * than the guest App directly, allowing the runtime to perform the
- * empty-handler handoff on first registration.
+ * current React state. Registration goes through
+ * {@link McpAppRuntime.registerViewTool} (never `app.registerTool` directly)
+ * so the runtime can perform the empty-handler handoff on first registration.
  *
  * Cleanup captures the registration handle inside the effect so an older
  * cleanup cannot remove a newer registration (e.g. after a rapid `name`

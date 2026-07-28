@@ -1,9 +1,3 @@
-/**
- * Verify Clerk access tokens for an mcp-use resource server.
- *
- * @packageDocumentation
- */
-
 import type { AuthInfo, OAuthMetadata } from "@modelcontextprotocol/server";
 
 import {
@@ -25,31 +19,20 @@ import {
 
 /** Verified Clerk user and organization claims exposed to authenticated MCP callbacks. */
 export interface ClerkOAuthUser {
-  /** Clerk subject identifier. */
   id: string;
-  /** Primary email address, when included in the access token. */
   email?: string;
-  /** Display name, when included in the access token. */
   name?: string;
-  /** Clerk username, when included in the access token. */
   username?: string;
-  /** Profile image URL, when included in the access token. */
   picture?: string;
-  /** Whether Clerk has verified {@link ClerkOAuthUser.email}. */
   emailVerified?: boolean;
-  /** Active Clerk organization identifier. */
   organizationId?: string;
-  /** Role in the active Clerk organization. */
   organizationRole?: string;
-  /** Slug of the active Clerk organization. */
   organizationSlug?: string;
-  /** Active organization role as a normalized list. */
   roles: string[];
 }
 
 /** Configures Clerk JWT verification and protected-resource metadata. */
 export interface ClerkOAuthProviderOptions extends OAuthResourceOptions {
-  /** Clerk Frontend API URL used as the token issuer. */
   frontendApiUrl: URL | string;
   /** Expected Clerk access-token audience, when the application emits one. */
   audience?: string;
@@ -60,16 +43,6 @@ export interface ClerkOAuthProviderOptions extends OAuthResourceOptions {
  *
  * @param options - Clerk frontend API URL, optional token audience, and resource-server settings.
  * @returns A provider that verifies Clerk-issued access tokens and explicit resource claims.
- * @throws A `TypeError` if `frontendApiUrl` is invalid or `audience` is empty.
- *
- * @example
- * ```ts
- * import { oauthClerkProvider } from "mcp-use/oauth/clerk";
- *
- * const oauth = oauthClerkProvider({
- *   frontendApiUrl: "https://example.clerk.accounts.dev",
- * });
- * ```
  */
 export function oauthClerkProvider(
   options: ClerkOAuthProviderOptions

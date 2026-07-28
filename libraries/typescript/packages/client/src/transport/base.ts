@@ -41,15 +41,12 @@ import { trackConnectorTelemetry } from "../telemetry/connector-telemetry.js";
 import type { MCPServerInfo } from "../core/session.js";
 
 /**
- * Handles a notification received from an MCP server.
- *
- * @param notification - Notification envelope supplied by the server.
+ * Handler function for server notifications
  */
 export type NotificationHandler = (
   notification: Notification
 ) => void | Promise<void>;
 
-/** Shared initialization options for all connector transports. */
 export interface ConnectorInitOptions {
   /**
    * Options forwarded to the underlying MCP `Client` instance.
@@ -112,23 +109,15 @@ export interface ConnectorInitOptions {
    * Controls retry behavior of the underlying `StreamableHTTPClientTransport`.
    */
   reconnectionOptions?: {
-    /** Maximum delay between reconnection attempts in milliseconds. */
     maxReconnectionDelay?: number;
-    /** Delay before the first reconnection attempt in milliseconds. */
     initialReconnectionDelay?: number;
-    /** Multiplier applied to the delay after each failed attempt. */
     reconnectionDelayGrowFactor?: number;
-    /** Maximum number of reconnection attempts. */
     maxRetries?: number;
   };
 }
 
 /**
- * Implements protocol operations shared by MCP transport connectors.
- *
- * Subclasses provide transport-specific connection setup and a public
- * identifier. Call {@link BaseConnector.connect}, then
- * {@link BaseConnector.initialize}, before invoking protocol operations.
+ * Base class for MCP connectors.
  */
 export abstract class BaseConnector {
   protected client: Client | null = null;
@@ -144,11 +133,6 @@ export abstract class BaseConnector {
     NonNullable<RequestOptions["onprogress"]>
   >();
 
-  /**
-   * Creates a connector with shared SDK and callback options.
-   *
-   * @param opts - Connector initialization options.
-   */
   constructor(opts: ConnectorInitOptions = {}) {
     this.opts = opts;
     // Initialize roots from options
@@ -379,9 +363,7 @@ export abstract class BaseConnector {
   }
 
   /**
-   * Returns the roots currently advertised to the server.
-   *
-   * @returns A copy of the configured roots.
+   * Get the current roots.
    */
   getRoots(): Root[] {
     return [...this.rootsCache];
@@ -460,25 +442,13 @@ export abstract class BaseConnector {
     );
   }
 
-  /**
-   * Establishes the transport connection and creates the SDK client.
-   *
-   * @returns A promise that resolves when the connector is connected.
-   */
+  /** Establish the connection and create the SDK client. */
   abstract connect(): Promise<void>;
 
-  /**
-   * Returns transport-specific fields suitable for logs and telemetry.
-   *
-   * @returns A record identifying the connector without exposing credentials.
-   */
+  /** Get the identifier for the connector. */
   abstract get publicIdentifier(): Record<string, string>;
 
-  /**
-   * Disconnects the SDK client and releases transport resources.
-   *
-   * @returns A promise that resolves after cleanup completes.
-   */
+  /** Disconnect and release resources. */
   async disconnect(): Promise<void> {
     if (!this.connected) {
       logger.debug("Not connected to MCP implementation");
@@ -491,7 +461,7 @@ export abstract class BaseConnector {
     logger.debug("Disconnected from MCP implementation");
   }
 
-  /** Whether an SDK client currently exists for this connector. */
+  /** Check if the client is connected */
   get isClientConnected(): boolean {
     return this.client != null;
   }
@@ -502,10 +472,6 @@ export abstract class BaseConnector {
    * In the SDK, `Client.connect(transport)` automatically performs the
    * protocol‑level `initialize` handshake, so we only need to cache the list of
    * tools and expose some server info.
-   *
-   * @param defaultRequestOptions - Options used while fetching the initial tool list.
-   * @returns The capabilities advertised by the server.
-   * @throws When {@link BaseConnector.connect} has not completed.
    */
   async initialize(
     defaultRequestOptions: RequestOptions = this.opts.defaultRequestOptions ??
@@ -560,11 +526,7 @@ export abstract class BaseConnector {
     return capabilities;
   }
 
-  /**
-   * Returns the tool list cached during initialization.
-   *
-   * @throws When {@link BaseConnector.initialize} has not completed.
-   */
+  /** Lazily expose the cached tools list. */
   get tools(): Tool[] {
     if (!this.toolsCache) {
       throw new Error("MCP client is not initialized; call initialize() first");
@@ -572,12 +534,12 @@ export abstract class BaseConnector {
     return this.toolsCache;
   }
 
-  /** Capabilities cached during initialization, or an empty object. */
+  /** Expose cached server capabilities. */
   get serverCapabilities(): Record<string, unknown> {
     return this.capabilitiesCache || {};
   }
 
-  /** Server identity cached during initialization, or `null`. */
+  /** Expose cached server info. */
   get serverInfo(): MCPServerInfo | null {
     return this.serverInfoCache;
   }
@@ -602,15 +564,7 @@ export abstract class BaseConnector {
     return this.client?.getNegotiatedProtocolVersion?.();
   }
 
-  /**
-   * Calls a tool on the connected server.
-   *
-   * @param name - Tool name.
-   * @param args - Tool arguments.
-   * @param options - Per-request timeout, cancellation, and progress options.
-   * @returns The tool result returned by the server.
-   * @throws When the connector is not connected or the tool call fails.
-   */
+  /** Call a tool on the server. */
   async callTool(
     name: string,
     args: Record<string, any>,
@@ -697,10 +651,7 @@ export abstract class BaseConnector {
    * @param options - Request options
    * @returns Complete list of all resources
    */
-  async listAllResources(options?: RequestOptions): Promise<{
-    /** Resources returned across all result pages. */
-    resources: any[];
-  }> {
+  async listAllResources(options?: RequestOptions) {
     if (!this.client) {
       throw new Error("MCP client is not connected");
     }
@@ -772,13 +723,7 @@ export abstract class BaseConnector {
     return result;
   }
 
-  /**
-   * Reads a resource by URI.
-   *
-   * @param uri - Resource URI to read.
-   * @param options - Per-request options.
-   * @returns The resource contents returned by the server.
-   */
+  /** Read a resource by URI. */
   async readResource(uri: string, options?: RequestOptions) {
     if (!this.client) {
       throw new Error("MCP client is not connected");
@@ -819,11 +764,6 @@ export abstract class BaseConnector {
     return await this.client.unsubscribeResource({ uri }, options);
   }
 
-  /**
-   * Lists prompts exposed by the server.
-   *
-   * @returns The prompt list, or an empty list when prompts are unsupported.
-   */
   async listPrompts() {
     if (!this.client) {
       throw new Error("MCP client is not connected");
@@ -849,13 +789,6 @@ export abstract class BaseConnector {
     }
   }
 
-  /**
-   * Gets a prompt with the supplied arguments.
-   *
-   * @param name - Prompt name.
-   * @param args - Prompt arguments.
-   * @returns The rendered prompt returned by the server.
-   */
   async getPrompt(name: string, args: Record<string, any>) {
     if (!this.client) {
       throw new Error("MCP client is not connected");
@@ -865,14 +798,7 @@ export abstract class BaseConnector {
     return await this.client.getPrompt({ name, arguments: args });
   }
 
-  /**
-   * Sends a raw, potentially non-standard request through the SDK client.
-   *
-   * @param method - JSON-RPC method name.
-   * @param params - Request parameters. Defaults to an empty object.
-   * @param options - Per-request options.
-   * @returns The unvalidated result returned by the server.
-   */
+  /** Send a raw request through the client. */
   async request(
     method: string,
     params: Record<string, any> | null = null,

@@ -35,7 +35,7 @@ export abstract class ConnectionManager<T = any> {
    * This method should be implemented by subclasses to close the specific type
    * of connection.
    *
-   * @param connection - The connection to close.
+   * @param connection The connection to close.
    */
   protected abstract closeConnection(connection: T): Promise<void>;
 

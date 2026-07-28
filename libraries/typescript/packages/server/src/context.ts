@@ -200,15 +200,10 @@ export interface Elicit {
  * Per-request context passed to tool/resource/prompt callbacks.
  */
 export type OAuthAuth<TUser> = {
-  /** Authenticated application user mapped by the OAuth provider. */
   user: TUser;
-  /** Verified access-token claims or introspection data. */
   payload: Record<string, unknown>;
-  /** Raw bearer token for authenticated downstream requests. */
   accessToken: string;
-  /** OAuth scopes granted to the access token. */
   scopes: string[];
-  /** Provider-normalized permissions granted to the user. */
   permissions: string[];
   /**
    * The OAuth client identifier from the token's `client_id` or `azp` claim;
@@ -216,9 +211,7 @@ export type OAuthAuth<TUser> = {
    * (e.g. WorkOS AuthKit, Supabase).
    */
   clientId?: string;
-  /** Access-token expiration as Unix time in seconds. */
   expiresAt: number;
-  /** Resource audience the access token authorizes, when supplied. */
   resource?: URL;
 };
 

@@ -41,46 +41,28 @@ export type McpMiddlewareParams<M extends McpMiddlewareMethod> =
  * transformed array.
  */
 export interface McpMiddlewareOperationMap {
-  /** Tool invocation parameters and handler result. */
   "tools/call": {
-    /** Parameters for the tool invocation. */
     params: McpMiddlewareParams<"tools/call">;
-    /** Tool invocation result passed through the middleware chain. */
     result: HandlerResultTypeMap["tools/call"];
   };
-  /** Tool-list parameters and list items. */
   "tools/list": {
-    /** Parameters for the tool-list request. */
     params: McpMiddlewareParams<"tools/list">;
-    /** Tool descriptors returned by the list request. */
     result: ResultTypeMap["tools/list"]["tools"];
   };
-  /** Resource-read parameters and handler result. */
   "resources/read": {
-    /** Parameters identifying the resource to read. */
     params: McpMiddlewareParams<"resources/read">;
-    /** Resource contents returned by the handler. */
     result: HandlerResultTypeMap["resources/read"];
   };
-  /** Resource-list parameters and list items. */
   "resources/list": {
-    /** Parameters for the resource-list request. */
     params: McpMiddlewareParams<"resources/list">;
-    /** Resource descriptors returned by the list request. */
     result: ResultTypeMap["resources/list"]["resources"];
   };
-  /** Prompt-read parameters and handler result. */
   "prompts/get": {
-    /** Parameters identifying the prompt and its arguments. */
     params: McpMiddlewareParams<"prompts/get">;
-    /** Prompt messages returned by the handler. */
     result: HandlerResultTypeMap["prompts/get"];
   };
-  /** Prompt-list parameters and list items. */
   "prompts/list": {
-    /** Parameters for the prompt-list request. */
     params: McpMiddlewareParams<"prompts/list">;
-    /** Prompt descriptors returned by the list request. */
     result: ResultTypeMap["prompts/list"]["prompts"];
   };
 }

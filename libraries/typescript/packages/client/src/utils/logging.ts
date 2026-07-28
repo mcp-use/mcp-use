@@ -147,5 +147,4 @@ export class Logger {
   }
 }
 
-/** Default package logger used by client and connector operations. */
 export const logger = Logger.get();

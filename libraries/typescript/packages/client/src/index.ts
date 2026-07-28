@@ -1,5 +1,5 @@
 /**
- * `@mcp-use/client` — MCP client for connecting to Model Context Protocol servers.
+ * @mcp-use/client — MCP client for connecting to Model Context Protocol servers.
  *
  * Connectors, protocol-neutral MCP connections, project configuration, OAuth,
  * and code-mode helpers. The SDK negotiates legacy sessionful and modern

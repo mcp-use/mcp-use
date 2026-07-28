@@ -1,10 +1,10 @@
 /**
- * Adapt Web-standard MCP handlers to Node.js HTTP request and response objects.
+ * Vendored from `@modelcontextprotocol/node` `toNodeHandler.ts` (SDK 2.0.0-beta.4).
+ * ponytail: track upstream SSE/backpressure fixes when bumping `@modelcontextprotocol/server`.
  *
- * @packageDocumentation
+ * @internal Bundled into the Node root; remains free of runtime Node imports
+ * so the generic edge graph can reuse the response adapter safely.
  */
-// Vendored from @modelcontextprotocol/node toNodeHandler.ts (SDK 2.0.0-beta.4).
-// Track upstream SSE and backpressure fixes with SDK upgrades.
 import type {
   AuthInfo,
   McpHandlerRequestOptions,
@@ -16,33 +16,23 @@ import { isBufferedResponse } from "./buffered-response.js";
 export interface NodeIncomingMessageLike extends AsyncIterable<
   Uint8Array | string
 > {
-  /** HTTP method. Defaults to `GET` when omitted. */
   method?: string | undefined;
-  /** Request target. Defaults to `/` when omitted. */
   url?: string | undefined;
-  /** Incoming HTTP headers, including `host` or `:authority` when available. */
   headers: Record<string, string | string[] | undefined>;
-  /** Verified authentication information forwarded to the Fetch handler. */
   auth?: AuthInfo;
 }
 
 /** Minimal duck-typed shape of a Node.js `ServerResponse`. */
 export interface NodeServerResponseLike {
-  /** Writes the HTTP status and response headers. */
   writeHead(statusCode: number, headers?: Record<string, string>): unknown;
-  /** Writes a response-body chunk and returns `false` when backpressure applies. */
   write(chunk: string | Uint8Array): unknown;
-  /** Completes the response, optionally with a final body chunk. */
   end(chunk?: string | Uint8Array): unknown;
-  /** Subscribes to response lifecycle events such as `close` and `drain`. */
   on(event: string, listener: (...args: unknown[]) => void): unknown;
-  /** Whether the underlying response stream has already been destroyed. */
   destroyed?: boolean;
 }
 
 /** Web-standard fetch face accepted by {@link toNodeHandler}. */
 export interface FetchLikeHandler {
-  /** Handles a converted Web-standard request. */
   fetch: (
     request: Request,
     options?: McpHandlerRequestOptions
@@ -58,7 +48,6 @@ export type NodeRequestHandler = (
 
 /** Options for {@link toNodeHandler}. */
 export interface ToNodeHandlerOptions {
-  /** Observes conversion or handler errors before a JSON-RPC error is returned. */
   onerror?: (error: Error) => void;
 }
 
@@ -67,17 +56,6 @@ export interface ToNodeHandlerOptions {
  *
  * @param handler - Handler whose `fetch` receives converted `Request` objects.
  * @param opts - Optional adapter error observer.
- * @returns A Node-compatible asynchronous request handler.
- *
- * @example
- * ```ts
- * import { createServer } from "node:http";
- * import { MCPServer } from "mcp-use";
- * import { toNodeHandler } from "mcp-use/node";
- *
- * const server = new MCPServer({ name: "example", version: "1.0.0" });
- * createServer(toNodeHandler(server)).listen(3000);
- * ```
  */
 export function toNodeHandler(
   handler: FetchLikeHandler,
@@ -182,7 +160,6 @@ export function toNodeHandler(
 
 /** Options for {@link toWebRequest}. */
 export interface ToWebRequestOptions {
-  /** Signal that aborts the constructed request. */
   signal?: AbortSignal;
 }
 
@@ -192,14 +169,6 @@ export interface ToWebRequestOptions {
  * @param req - Node `IncomingMessage` (or Express `req`).
  * @param parsedBody - Optional pre-parsed JSON body.
  * @param options - Optional abort signal for the constructed request.
- * @returns A Web-standard request with the Node headers and body.
- *
- * @example
- * ```ts
- * import { toWebRequest } from "mcp-use/node";
- *
- * const request = await toWebRequest(incomingMessage);
- * ```
  */
 export async function toWebRequest(
   req: NodeIncomingMessageLike,

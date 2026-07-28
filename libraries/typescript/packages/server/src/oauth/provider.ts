@@ -42,7 +42,7 @@ export interface CustomOAuthProviderOptions<
   mapAuthInfo: (authInfo: OAuthAuthInfo) => OAuthExtra<TUser>;
 }
 
-/** OAuth resource-server provider accepted by the mcp-use server constructor. */
+/** OAuth resource-server provider accepted by {@link MCPServer}. */
 export type OAuthProvider<TUser> = CustomOAuthProviderOptions<TUser>;
 
 /**
@@ -51,22 +51,6 @@ export type OAuthProvider<TUser> = CustomOAuthProviderOptions<TUser>;
  * @typeParam TUser - Application user type exposed to authenticated callbacks.
  * @param options - Token verification, discovery metadata, and identity mapping.
  * @returns A provider for an OAuth-enabled MCP server.
- * @throws A `TypeError` if provider metadata or resource settings are invalid.
- *
- * @example
- * ```ts
- * import { oauthCustomProvider } from "mcp-use/oauth";
- *
- * const oauth = oauthCustomProvider({
- *   createTokenVerifier: (resource) => tokenVerifierFor(resource),
- *   oauthMetadata,
- *   mapAuthInfo: (authInfo) => ({
- *     user: { id: authInfo.clientId },
- *     payload: {},
- *     permissions: [],
- *   }),
- * });
- * ```
  */
 export function oauthCustomProvider<TUser>(
   options: CustomOAuthProviderOptions<TUser>

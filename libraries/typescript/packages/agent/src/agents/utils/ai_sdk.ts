@@ -8,11 +8,8 @@
 import type { StreamEvent } from "@langchain/core/tracers/log_stream";
 
 /**
- * Converts LangChain model stream events to text chunks.
- *
- * @param streamEvents - Events returned by the LangChain agent's
- * `streamEvents` method.
- * @returns An async generator containing only model text chunks.
+ * Converts streamEvents to AI SDK compatible stream (basic version)
+ * Only yields the actual content tokens from chat model streams
  */
 export async function* streamEventsToAISDK(
   streamEvents: AsyncGenerator<StreamEvent, void, void>
@@ -28,10 +25,7 @@ export async function* streamEventsToAISDK(
 }
 
 /**
- * Wraps an async text generator in a web `ReadableStream`.
- *
- * @param generator - Async text generator to consume.
- * @returns A stream that enqueues each generated string and forwards errors.
+ * Converts async generator to ReadableStream for AI SDK compatibility
  */
 export function createReadableStreamFromGenerator(
   generator: AsyncGenerator<string, void, void>
@@ -51,11 +45,8 @@ export function createReadableStreamFromGenerator(
 }
 
 /**
- * Converts LangChain events to text and inserts tool lifecycle messages.
- *
- * @param streamEvents - Events returned by the LangChain agent's
- * `streamEvents` method.
- * @returns Model text interleaved with human-readable tool start/end messages.
+ * Enhanced adapter that includes tool information along with chat content
+ * Yields both content tokens and tool usage notifications
  */
 export async function* streamEventsToAISDKWithTools(
   streamEvents: AsyncGenerator<StreamEvent, void, void>

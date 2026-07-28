@@ -65,15 +65,14 @@ function useFillHostDocument(fillHost: boolean): void {
 /**
  * Applies host theme, style variables, and fonts to the document root.
  *
- * Subscribes to the runtime's host-context channel for theme,
- * `styles.variables`, and `styles.css.fonts`. Theme-only consumers should use
- * {@link useViewTheme} so locale and dimension updates do not rerender them.
+ * Subscribes to the host channel (theme, `styles.variables`, `styles.css.fonts`)
+ * via {@link useHostContextSubscription}. Theme-only consumers should use
+ * {@link useViewTheme} instead so locale/dimension updates do not rerender them.
  *
  * MCP App views render in srcdoc iframes; the document canvas stays transparent
  * by default so rounded cards do not expose an opaque `color-scheme` backdrop.
  */
 export const ThemeProvider: React.FC<{
-  /** View subtree that receives the host theme. */
   children: React.ReactNode;
   /** Set `color-scheme` on the document root to match the active theme. */
   colorScheme?: boolean;

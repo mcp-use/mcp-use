@@ -29,13 +29,9 @@ function sanitizeToolName(name: string): string {
     .replace(/^_+|_+$/g, "");
 }
 
-/** Converts MCP tools, resources, and prompts into LangChain structured tools. */
 export class LangChainAdapter extends BaseAdapter<StructuredToolInterface> {
   private usedToolNames: Set<string> = new Set();
 
-  /**
-   * @param disallowedTools - MCP tool names to omit during conversion.
-   */
   constructor(disallowedTools: string[] = []) {
     super(disallowedTools);
   }
@@ -66,12 +62,6 @@ export class LangChainAdapter extends BaseAdapter<StructuredToolInterface> {
     return fallback;
   }
 
-  /**
-   * Converts MCP tools from all connectors and resets name deduplication.
-   *
-   * @param connectors - Connected MCP connectors.
-   * @returns LangChain structured tools.
-   */
   public override async createToolsFromConnectors(
     connectors: BaseConnector[]
   ): Promise<StructuredToolInterface[]> {

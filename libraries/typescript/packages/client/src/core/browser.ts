@@ -13,11 +13,13 @@ import { getPackageVersion } from "../utils/version.js";
 import { BaseMCPClient } from "./base.js";
 
 /**
- * Manages MCP server connections in browsers and other Web API runtimes.
+ * Browser-compatible MCPClient implementation
  *
- * The browser client supports HTTP servers and the connection-management
- * operations inherited from its runtime-neutral base client. It does not spawn local
- * processes or read configuration files.
+ * This client works in both browser and Node.js environments by avoiding
+ * Node.js-specific APIs (like fs, path). It supports:
+ * - Multiple servers via addServer()
+ * - HTTP connector
+ * - All base client functionality
  */
 function trackBrowserClientInit(config: Record<string, any>): void {
   const servers = Object.keys(config.mcpServers ?? {});
@@ -38,30 +40,18 @@ function trackBrowserClientInit(config: Record<string, any>): void {
 
 export class BrowserMCPClient extends BaseMCPClient {
   /**
-   * Returns the installed `@mcp-use/client` package version.
-   *
-   * @returns The package version string.
+   * Get the mcp-use package version.
+   * Works in all environments (Node.js, browser, Cloudflare Workers, Deno, etc.)
    */
   public static getPackageVersion(): string {
     return getPackageVersion();
   }
 
-  /**
-   * Creates a browser MCP client.
-   *
-   * @param config - Client configuration containing an optional `mcpServers` map.
-   */
   constructor(config?: Record<string, any>) {
     super(config);
     trackBrowserClientInit(this.config);
   }
 
-  /**
-   * Creates a browser client from an inline configuration object.
-   *
-   * @param cfg - Client configuration containing an optional `mcpServers` map.
-   * @returns A browser client initialized with `cfg`.
-   */
   public static fromDict(cfg: Record<string, any>): BrowserMCPClient {
     return new BrowserMCPClient(cfg);
   }

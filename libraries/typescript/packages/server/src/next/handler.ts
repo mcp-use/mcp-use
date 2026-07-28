@@ -6,13 +6,9 @@ import type { ViewManifestEntry, ViewsManifest } from "../views/types.js";
 
 /** Route Handler exports returned by {@link createNextHandler}. */
 export interface NextMcpHandlers {
-  /** Handles MCP GET requests. */
   GET(request: Request): Promise<Response>;
-  /** Handles MCP POST requests. */
   POST(request: Request): Promise<Response>;
-  /** Handles MCP DELETE requests. */
   DELETE(request: Request): Promise<Response>;
-  /** Handles CORS preflight requests. */
   OPTIONS(request: Request): Promise<Response>;
 }
 
@@ -72,18 +68,6 @@ function parseBuildManifest(raw: string, manifestPath: string): ViewsManifest {
  * The generated artifact contains only view registration data; application
  * source continues to import its own server module. Initialization is lazy so
  * importing a route during `next build` does not perform filesystem I/O.
- *
- * @typeParam TUser - Authenticated application user type.
- * @param server - MCP server mounted by the route.
- * @returns App Router method exports for the MCP endpoint.
- *
- * @example
- * ```ts
- * import { server } from "@/mcp/server";
- * import { createNextHandler } from "mcp-use/next";
- *
- * export const { GET, POST, DELETE, OPTIONS } = createNextHandler(server);
- * ```
  */
 export function createNextHandler<TUser>(
   server: MCPServer<TUser>
