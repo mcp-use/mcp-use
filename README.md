@@ -310,6 +310,8 @@ block-beta
 
 <sub>* Includes `@modelcontextprotocol/ext-apps`, Vite, and zod for an MCP Apps-capable stack.</sub>
 
+<sub>Clean install is actual `node_modules` disk usage after a normal npm install, including required peer dependencies; it is not npmx's peer-excluding modeled size.</sub>
+
 **[Read the detailed benchmark report →](./benchmark.md)**
 
 ## Examples

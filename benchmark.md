@@ -113,6 +113,10 @@ median difference is measurement noise, not a meaningful product advantage.
 full-stack frameworks tested with a native MCP Apps build workflow. Low-level
 libraries with a narrower scope are not equivalent install targets.
 
+Clean install measures the actual `node_modules` directory after a normal npm
+install, including required peer dependencies and filesystem allocation. It
+therefore differs from npmx's modeled size, which excludes peer dependencies.
+
 ```mermaid
 ---
 config:
