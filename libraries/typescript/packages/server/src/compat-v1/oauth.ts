@@ -29,10 +29,10 @@ import {
   oauthWorkOSProvider as nativeWorkOSProvider,
   type WorkOSOAuthProviderOptions,
 } from "../oauth/workos.js";
+import { oauthEnvironmentValue } from "../oauth/environment.js";
 
 function env(name: string): string | undefined {
-  const value = process.env[name];
-  return value === undefined || value.trim() === "" ? undefined : value;
+  return oauthEnvironmentValue(name);
 }
 
 function rejectVerifyJwt(options: unknown): void {

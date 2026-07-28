@@ -6,6 +6,7 @@
 
 import type { AuthInfo, OAuthMetadata } from "@modelcontextprotocol/server";
 
+import { oauthEnvironmentValue } from "./environment.js";
 import {
   booleanValue,
   createJwtVerifier,
@@ -49,8 +50,12 @@ export interface ClerkOAuthUser {
 
 /** Configures Clerk JWT verification and protected-resource metadata. */
 export interface ClerkOAuthProviderOptions extends OAuthResourceOptions {
-  /** Clerk Frontend API URL used as the token issuer. */
-  frontendApiUrl: URL | string;
+  /**
+   * Clerk Frontend API URL used as the token issuer.
+   *
+   * @defaultValue `MCP_USE_OAUTH_CLERK_FRONTEND_API_URL`
+   */
+  frontendApiUrl?: URL | string;
   /** Expected Clerk access-token audience, when the application emits one. */
   audience?: string;
 }
@@ -58,9 +63,9 @@ export interface ClerkOAuthProviderOptions extends OAuthResourceOptions {
 /**
  * Creates a provider that verifies Clerk access tokens and maps their claims.
  *
- * @param options - Clerk frontend API URL, optional token audience, and resource-server settings.
+ * @param options - Clerk frontend API URL, optional token audience, and resource-server settings. Defaults to v1 environment variables.
  * @returns A provider that verifies Clerk-issued access tokens and explicit resource claims.
- * @throws A `TypeError` if `frontendApiUrl` is invalid or `audience` is empty.
+ * @throws An `Error` if no frontend API URL is configured, or a `TypeError` if it is invalid or `audience` is empty.
  *
  * @example
  * ```ts
@@ -72,7 +77,7 @@ export interface ClerkOAuthProviderOptions extends OAuthResourceOptions {
  * ```
  */
 export function oauthClerkProvider(
-  options: ClerkOAuthProviderOptions
+  options: ClerkOAuthProviderOptions = {}
 ): OAuthProvider<ClerkOAuthUser> {
   if (
     options.audience !== undefined &&
@@ -81,8 +86,14 @@ export function oauthClerkProvider(
   ) {
     throw new TypeError("Clerk audience must be non-empty");
   }
+  const frontendApiUrl =
+    options.frontendApiUrl ??
+    oauthEnvironmentValue("MCP_USE_OAUTH_CLERK_FRONTEND_API_URL");
+  if (frontendApiUrl === undefined) {
+    throw new Error("Clerk frontendApiUrl is required.");
+  }
   const issuer = normalizedProviderUrl(
-    options.frontendApiUrl,
+    frontendApiUrl,
     "Clerk frontendApiUrl"
   ).href.replace(/\/$/, "");
   return oauthCustomProvider<ClerkOAuthUser>({

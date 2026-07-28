@@ -446,6 +446,25 @@ oauthBetterAuthProvider(...)
 oauthCustomProvider(...)
 ```
 
+The built-in provider factories also preserve the v1 zero-config environment
+contract. Explicit options take precedence over environment values:
+
+- Auth0: `MCP_USE_OAUTH_AUTH0_DOMAIN` and
+  `MCP_USE_OAUTH_AUTH0_AUDIENCE`
+- Clerk: `MCP_USE_OAUTH_CLERK_FRONTEND_API_URL`
+- Keycloak: `MCP_USE_OAUTH_KEYCLOAK_SERVER_URL`,
+  `MCP_USE_OAUTH_KEYCLOAK_REALM`, and `MCP_USE_OAUTH_KEYCLOAK_AUDIENCE`
+- Supabase: `MCP_USE_OAUTH_SUPABASE_PROJECT_ID`,
+  `MCP_USE_OAUTH_SUPABASE_URL`, and
+  `MCP_USE_OAUTH_SUPABASE_JWT_SECRET`
+- WorkOS: `MCP_USE_OAUTH_WORKOS_SUBDOMAIN`
+- Better Auth: `MCP_USE_OAUTH_BETTER_AUTH_URL`
+
+For Auth0 and Keycloak, the v1 audience environment value supplies the
+provider's configured `resource` only when an explicit `resource` is absent.
+It does not weaken or replace v2 token verification or canonical resource
+binding. No environment setting enables `verifyJwt: false`.
+
 `oauthCustomProvider` validates the provider options and defensively copies array configuration. The verifier must return verified SDK-native fields, including `token`, `clientId`, `scopes`, and a valid future numeric `expiresAt`. Decode-only tokens, `verifyJwt: false`, and equivalent bypasses are forbidden.
 
 Before calling `requireBearerAuth`, mcp-use wraps the provider with
