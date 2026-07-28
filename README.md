@@ -51,8 +51,11 @@
 > **Migrating from v1? Give it to your agent:** [Read the migration guide →](https://docs.mcp-use.com/v2/server/migration)
 >
 > ```text
-> Migrate this mcp-use project to v2 following https://docs.mcp-use.com/v2/server/migration
+> Migrate this mcp-use project to v2 following
+> https://docs.mcp-use.com/v2/typescript/server/migration
 > ```
+>
+> [Read the migration guide →](https://docs.mcp-use.com/v2/typescript/server/migration)
 
 ## Get started
 

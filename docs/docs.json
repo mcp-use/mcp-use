@@ -15,6 +15,11 @@
     }
   },
   "favicon": "/favicon.svg",
+  "banner": {
+    "content": "mcp-use v2 is now in beta! Check it out [here](https://docs.mcp-use.com/v2/typescript/getting-started/welcome)",
+    "dismissible": false,
+    "type": "warning"
+  },
   "contextual": {
     "options": [
       "copy",
@@ -63,259 +68,426 @@
       },
       {
         "product": "TypeScript SDK",
-        "description": "TypeScript SDK description",
+        "description": "TypeScript SDK documentation for V1 and V2",
         "icon": "/images/typescriptlogo.svg",
-        "tabs": [
+        "versions": [
           {
-            "tab": "Docs",
-            "icon": "book",
-            "groups": [
+            "version": "V1",
+            "default": true,
+            "tabs": [
               {
-                "group": "Get Started",
-                "pages": [
-                  "typescript/getting-started/welcome",
-                  "typescript/getting-started/quickstart",
-                  "typescript/getting-started/installation",
-                  "typescript/changelog/changelog",
-                  "inspector/changelog"
-                ]
-              },
-              {
-                "group": "MCP Server",
-                "icon": "server",
-                "pages": [
-                  "typescript/server/index",
-                  "typescript/server/examples",
+                "tab": "Docs",
+                "icon": "book",
+                "groups": [
                   {
-                    "group": "Core Components",
-                    "icon": "box",
+                    "group": "Get Started",
                     "pages": [
-                      "typescript/server/tools",
-                      "typescript/server/resources",
-                      "typescript/server/prompts",
-                      "typescript/server/response-helpers"
+                      "typescript/getting-started/welcome",
+                      "typescript/getting-started/quickstart",
+                      "typescript/getting-started/installation",
+                      "typescript/changelog/changelog",
+                      "inspector/changelog"
                     ]
                   },
                   {
-                    "group": "Session Management",
-                    "icon": "key-round",
+                    "group": "MCP Server",
+                    "icon": "server",
                     "pages": [
-                      "typescript/server/session-management/memory-storage",
-                      "typescript/server/session-management/filesystem-storage",
-                      "typescript/server/session-management/redis-storage"
-                    ]
-                  },
-                  {
-                    "group": "Authorization",
-                    "icon": "shield",
-                    "pages": [
-                      "typescript/server/authentication/index",
-                      "typescript/server/authentication/user-context",
+                      "typescript/server/index",
+                      "typescript/server/examples",
                       {
-                        "group": "OAuth Providers",
-                        "icon": "plug",
+                        "group": "Core Components",
+                        "icon": "box",
                         "pages": [
-                          "typescript/server/authentication/providers/auth0",
-                          "typescript/server/authentication/providers/better-auth",
-                          "typescript/server/authentication/providers/clerk",
-                          "typescript/server/authentication/providers/keycloak",
-                          "typescript/server/authentication/providers/supabase",
-                          "typescript/server/authentication/providers/workos",
-                          "typescript/server/authentication/providers/oauth-proxy",
-                          "typescript/server/authentication/providers/custom"
+                          "typescript/server/tools",
+                          "typescript/server/resources",
+                          "typescript/server/prompts",
+                          "typescript/server/response-helpers"
+                        ]
+                      },
+                      {
+                        "group": "Session Management",
+                        "icon": "key-round",
+                        "pages": [
+                          "typescript/server/session-management/memory-storage",
+                          "typescript/server/session-management/filesystem-storage",
+                          "typescript/server/session-management/redis-storage"
+                        ]
+                      },
+                      {
+                        "group": "Authorization",
+                        "icon": "shield",
+                        "pages": [
+                          "typescript/server/authentication/index",
+                          "typescript/server/authentication/user-context",
+                          {
+                            "group": "OAuth Providers",
+                            "icon": "plug",
+                            "pages": [
+                              "typescript/server/authentication/providers/auth0",
+                              "typescript/server/authentication/providers/better-auth",
+                              "typescript/server/authentication/providers/clerk",
+                              "typescript/server/authentication/providers/keycloak",
+                              "typescript/server/authentication/providers/supabase",
+                              "typescript/server/authentication/providers/workos",
+                              "typescript/server/authentication/providers/oauth-proxy",
+                              "typescript/server/authentication/providers/custom"
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "group": "Deployment",
+                        "icon": "rocket",
+                        "pages": [
+                          "typescript/server/deployment/mcp-use",
+                          "typescript/server/deployment/google",
+                          "typescript/server/deployment/supabase"
+                        ]
+                      },
+                      "typescript/server/proxy",
+                      "typescript/server/openapi",
+                      "typescript/server/nextjs-drop-in",
+                      {
+                        "group": "Advanced Features",
+                        "icon": "sparkle",
+                        "pages": [
+                          "typescript/server/middleware",
+                          "typescript/server/elicitation",
+                          "typescript/server/sampling",
+                          "typescript/server/subscriptions",
+                          "typescript/server/notifications"
                         ]
                       }
                     ]
                   },
                   {
-                    "group": "Deployment",
-                    "icon": "rocket",
+                    "group": "MCP Apps",
+                    "icon": "app-window-mac",
                     "pages": [
-                      "typescript/server/deployment/runtime-patterns",
-                      "typescript/server/deployment/mcp-use",
-                      "typescript/server/deployment/railway",
-                      "typescript/server/deployment/hono",
-                      "typescript/server/deployment/vercel",
-                      "typescript/server/deployment/cloudflare-workers",
-                      "typescript/server/deployment/deno",
-                      "typescript/server/deployment/bun",
-                      "typescript/server/deployment/google",
-                      "typescript/server/deployment/supabase"
+                      "typescript/mcp-apps",
+                      "typescript/mcp-apps/quickstart",
+                      "typescript/mcp-apps/widgets",
+                      "typescript/mcp-apps/model-context",
+                      "typescript/mcp-apps/interactivity",
+                      "typescript/mcp-apps/apps-sdk-compatibility",
+                      "typescript/mcp-apps/content-security-policy"
                     ]
                   },
-                  "typescript/server/proxy",
-                  "typescript/server/openapi",
-                  "typescript/server/nextjs-drop-in",
                   {
-                    "group": "Advanced Features",
-                    "icon": "sparkle",
+                    "group": "MCP Client",
+                    "icon": "router",
                     "pages": [
-                      "typescript/server/middleware",
-                      "typescript/server/elicitation",
-                      "typescript/server/sampling",
-                      "typescript/server/subscriptions",
-                      "typescript/server/notifications"
+                      "typescript/client/index",
+                      "typescript/client/environments",
+                      {
+                        "group": "Core Components",
+                        "icon": "box",
+                        "pages": [
+                          "typescript/client/tools",
+                          "typescript/client/resources",
+                          "typescript/client/prompts"
+                        ]
+                      },
+                      {
+                        "group": "Advanced Features",
+                        "icon": "sparkle",
+                        "pages": [
+                          "typescript/client/sampling",
+                          "typescript/client/elicitation",
+                          "typescript/client/completion",
+                          "typescript/client/notifications"
+                        ]
+                      },
+                      "typescript/client/authentication",
+                      "typescript/client/usemcp",
+                      "typescript/client/code-mode"
+                    ]
+                  },
+                  {
+                    "group": "MCP Agent",
+                    "icon": "brain",
+                    "pages": [
+                      "typescript/agent/index",
+                      "typescript/agent/llm-integration",
+                      "typescript/agent/memory-management",
+                      "typescript/agent/server-manager",
+                      "typescript/agent/structured-output",
+                      "typescript/agent/streaming",
+                      "typescript/agent/observability"
+                    ]
+                  },
+                  {
+                    "group": "Tooling",
+                    "icon": "wrench",
+                    "pages": [
+                      "typescript/tooling/client-cli",
+                      {
+                        "group": "Inspector",
+                        "icon": "bug-play",
+                        "pages": [
+                          "inspector/index",
+                          "inspector/cli",
+                          "inspector/connection-settings",
+                          "inspector/url-parameters",
+                          "inspector/keyboard-shortcuts",
+                          "inspector/command-palette",
+                          "inspector/integration",
+                          "inspector/self-hosting",
+                          "inspector/debugging-chatgpt-apps"
+                        ]
+                      },
+                      "tunneling/index"
                     ]
                   }
                 ]
               },
               {
-                "group": "MCP Apps",
-                "icon": "app-window-mac",
-                "pages": [
-                  "typescript/mcp-apps",
-                  "typescript/mcp-apps/quickstart",
-                  "typescript/mcp-apps/widgets",
-                  "typescript/mcp-apps/model-context",
-                  "typescript/mcp-apps/interactivity",
-                  "typescript/mcp-apps/apps-sdk-compatibility",
-                  "typescript/mcp-apps/content-security-policy"
-                ]
-              },
-              {
-                "group": "MCP Client",
-                "icon": "router",
-                "pages": [
-                  "typescript/client/index",
-                  "typescript/client/migration",
-                  "typescript/client/environments",
+                "tab": "API Reference",
+                "icon": "terminal",
+                "groups": [
                   {
-                    "group": "Core Components",
-                    "icon": "box",
+                    "group": "Overview",
                     "pages": [
-                      "typescript/client/tools",
-                      "typescript/client/resources",
-                      "typescript/client/prompts"
+                      "typescript/api-reference/overview",
+                      "typescript/api-reference/cli-reference"
                     ]
                   },
                   {
-                    "group": "Advanced Features",
-                    "icon": "sparkle",
+                    "group": "Server",
+                    "icon": "server",
                     "pages": [
-                      "typescript/client/sampling",
-                      "typescript/client/elicitation",
-                      "typescript/client/completion",
-                      "typescript/client/notifications"
+                      "typescript/api-reference/server/mcp-server",
+                      "typescript/api-reference/server/server-config",
+                      {
+                        "group": "Tools, resources & prompts",
+                        "icon": "box",
+                        "pages": [
+                          "typescript/api-reference/server/tools",
+                          "typescript/api-reference/server/resources",
+                          "typescript/api-reference/server/prompts"
+                        ]
+                      },
+                      "typescript/api-reference/server/tool-context",
+                      "typescript/api-reference/server/response-helpers",
+                      "typescript/api-reference/server/elicitation-schemas",
+                      {
+                        "group": "Authentication",
+                        "icon": "shield",
+                        "pages": [
+                          "typescript/api-reference/server/auth",
+                          "typescript/api-reference/server/auth-providers"
+                        ]
+                      },
+                      "typescript/api-reference/server/sessions",
+                      "typescript/api-reference/server/middleware",
+                      "typescript/api-reference/server/widgets"
                     ]
                   },
-                  "typescript/client/authentication",
-                  "typescript/client/usemcp",
-                  "typescript/client/code-mode"
-                ]
-              },
-              {
-                "group": "MCP Agent",
-                "icon": "brain",
-                "pages": [
-                  "typescript/agent/index",
-                  "typescript/agent/llm-integration",
-                  "typescript/agent/memory-management",
-                  "typescript/agent/server-manager",
-                  "typescript/agent/structured-output",
-                  "typescript/agent/streaming",
-                  "typescript/agent/observability"
-                ]
-              },
-              {
-                "group": "Tooling",
-                "icon": "wrench",
-                "pages": [
-                  "typescript/tooling/client-cli",
                   {
-                    "group": "Inspector",
-                    "icon": "bug-play",
+                    "group": "React",
+                    "icon": "atom",
                     "pages": [
-                      "inspector/index",
-                      "inspector/cli",
-                      "inspector/connection-settings",
-                      "inspector/url-parameters",
-                      "inspector/keyboard-shortcuts",
-                      "inspector/command-palette",
-                      "inspector/integration",
-                      "inspector/self-hosting",
-                      "inspector/debugging-chatgpt-apps"
+                      "typescript/api-reference/react/usewidget",
+                      "typescript/api-reference/react/usecalltool",
+                      "typescript/api-reference/react/usefiles",
+                      "typescript/api-reference/react/mcpuseprovider",
+                      "typescript/api-reference/react/widgetcontrols",
+                      "typescript/api-reference/react/themeprovider",
+                      "typescript/api-reference/react/errorboundary",
+                      "typescript/api-reference/react/image",
+                      "typescript/api-reference/react/modelcontext"
                     ]
                   },
-                  "tunneling/index"
+                  {
+                    "group": "Client",
+                    "icon": "router",
+                    "pages": [
+                      "typescript/api-reference/client/mcp-client",
+                      "typescript/api-reference/client/mcp-session",
+                      "typescript/api-reference/client/code-mode",
+                      "typescript/api-reference/client/react-client",
+                      "typescript/api-reference/client/inspector-chat-components"
+                    ]
+                  },
+                  {
+                    "group": "Agent",
+                    "icon": "brain",
+                    "pages": [
+                      "typescript/api-reference/agent/mcp-agent"
+                    ]
+                  }
                 ]
               }
             ]
           },
           {
-            "tab": "API Reference",
-            "icon": "terminal",
-            "groups": [
+            "version": "V2",
+            "tag": "Beta",
+            "tabs": [
               {
-                "group": "Overview",
-                "pages": [
-                  "typescript/api-reference/overview",
-                  "typescript/api-reference/cli-reference"
-                ]
-              },
-              {
-                "group": "Server",
-                "icon": "server",
-                "pages": [
-                  "typescript/api-reference/server/mcp-server",
-                  "typescript/api-reference/server/server-config",
+                "tab": "Docs",
+                "icon": "book",
+                "groups": [
                   {
-                    "group": "Tools, resources & prompts",
-                    "icon": "box",
+                    "group": "Get Started",
                     "pages": [
-                      "typescript/api-reference/server/tools",
-                      "typescript/api-reference/server/resources",
-                      "typescript/api-reference/server/prompts"
+                      "v2/typescript/getting-started/welcome",
+                      "v2/typescript/getting-started/quickstart"
                     ]
                   },
-                  "typescript/api-reference/server/tool-context",
-                  "typescript/api-reference/server/response-helpers",
-                  "typescript/api-reference/server/elicitation-schemas",
                   {
-                    "group": "Authentication",
-                    "icon": "shield",
+                    "group": "MCP Server",
+                    "icon": "server",
                     "pages": [
-                      "typescript/api-reference/server/auth",
-                      "typescript/api-reference/server/auth-providers"
+                      "v2/typescript/server/index",
+                      "v2/typescript/server/migration",
+                      "v2/typescript/server/examples",
+                      {
+                        "group": "Core Components",
+                        "icon": "box",
+                        "pages": [
+                          "v2/typescript/server/tools",
+                          "v2/typescript/server/resources",
+                          "v2/typescript/server/prompts"
+                        ]
+                      },
+                      {
+                        "group": "Authorization",
+                        "icon": "shield",
+                        "pages": [
+                          "v2/typescript/server/authentication/index",
+                          "v2/typescript/server/authentication/user-context",
+                          {
+                            "group": "OAuth Providers",
+                            "icon": "plug",
+                            "pages": [
+                              "v2/typescript/server/authentication/providers/auth0",
+                              "v2/typescript/server/authentication/providers/better-auth",
+                              "v2/typescript/server/authentication/providers/clerk",
+                              "v2/typescript/server/authentication/providers/keycloak",
+                              "v2/typescript/server/authentication/providers/supabase",
+                              "v2/typescript/server/authentication/providers/workos",
+                              "v2/typescript/server/authentication/providers/custom"
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "group": "Deployment",
+                        "icon": "rocket",
+                        "pages": [
+                          "v2/typescript/server/deployment/mcp-use",
+                          "v2/typescript/server/deployment/google",
+                          "v2/typescript/server/deployment/supabase"
+                        ]
+                      },
+                      "v2/typescript/server/proxy",
+                      "v2/typescript/server/openapi",
+                      "v2/typescript/server/nextjs-drop-in",
+                      {
+                        "group": "Advanced Features",
+                        "icon": "sparkle",
+                        "pages": [
+                          "v2/typescript/server/middleware",
+                          "v2/typescript/server/elicitation",
+                          "v2/typescript/server/subscriptions",
+                          "v2/typescript/server/notifications"
+                        ]
+                      }
                     ]
                   },
-                  "typescript/api-reference/server/sessions",
-                  "typescript/api-reference/server/middleware",
-                  "typescript/api-reference/server/widgets"
+                  {
+                    "group": "MCP Apps",
+                    "icon": "app-window-mac",
+                    "pages": [
+                      "v2/typescript/mcp-apps",
+                      "v2/typescript/mcp-apps/quickstart",
+                      "v2/typescript/mcp-apps/interactivity",
+                      "v2/typescript/mcp-apps/model-context",
+                      "v2/typescript/mcp-apps/content-security-policy"
+                    ]
+                  },
+                  {
+                    "group": "MCP Client",
+                    "icon": "router",
+                    "pages": [
+                      "v2/typescript/client/index",
+                      "v2/typescript/client/migration",
+                      "v2/typescript/client/environments",
+                      {
+                        "group": "Core Components",
+                        "icon": "box",
+                        "pages": [
+                          "v2/typescript/client/tools",
+                          "v2/typescript/client/resources",
+                          "v2/typescript/client/prompts"
+                        ]
+                      },
+                      {
+                        "group": "Advanced Features",
+                        "icon": "sparkle",
+                        "pages": [
+                          "v2/typescript/client/sampling",
+                          "v2/typescript/client/elicitation",
+                          "v2/typescript/client/completion",
+                          "v2/typescript/client/notifications"
+                        ]
+                      },
+                      "v2/typescript/client/authentication",
+                      "v2/typescript/client/usemcp",
+                      "v2/typescript/client/code-mode"
+                    ]
+                  },
+                  {
+                    "group": "MCP Agent",
+                    "icon": "brain",
+                    "pages": [
+                      "v2/typescript/agent/index",
+                      "v2/typescript/agent/llm-providers",
+                      "v2/typescript/agent/memory-management",
+                      "v2/typescript/agent/streaming",
+                      {
+                        "group": "LangChain integration",
+                        "pages": [
+                          "v2/typescript/agent/langchain/index",
+                          "v2/typescript/agent/langchain/structured-output",
+                          "v2/typescript/agent/langchain/server-manager",
+                          "v2/typescript/agent/langchain/observability"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "group": "Tooling",
+                    "icon": "wrench",
+                    "pages": [
+                      "v2/typescript/tooling/client-cli",
+                      "v2/typescript/api-reference/cli-reference",
+                      {
+                        "group": "Inspector",
+                        "icon": "bug-play",
+                        "pages": [
+                          "inspector/index",
+                          "inspector/cli",
+                          "inspector/connection-settings",
+                          "inspector/url-parameters",
+                          "inspector/keyboard-shortcuts",
+                          "inspector/command-palette",
+                          "inspector/integration",
+                          "inspector/self-hosting",
+                          "inspector/debugging-chatgpt-apps"
+                        ]
+                      },
+                      "tunneling/index"
+                    ]
+                  }
                 ]
               },
               {
-                "group": "React",
-                "icon": "atom",
-                "pages": [
-                  "typescript/api-reference/react/usewidget",
-                  "typescript/api-reference/react/useviewstate",
-                  "typescript/api-reference/react/usecalltool",
-                  "typescript/api-reference/react/usefiles",
-                  "typescript/api-reference/react/mcpuseprovider",
-                  "typescript/api-reference/react/widgetcontrols",
-                  "typescript/api-reference/react/themeprovider",
-                  "typescript/api-reference/react/errorboundary",
-                  "typescript/api-reference/react/image",
-                  "typescript/api-reference/react/modelcontext"
-                ]
-              },
-              {
-                "group": "Client",
-                "icon": "router",
-                "pages": [
-                  "typescript/api-reference/client/mcp-client",
-                  "typescript/api-reference/client/mcp-session",
-                  "typescript/api-reference/client/code-mode",
-                  "typescript/api-reference/client/react-client",
-                  "typescript/api-reference/client/inspector-chat-components"
-                ]
-              },
-              {
-                "group": "Agent",
-                "icon": "brain",
-                "pages": [
-                  "typescript/api-reference/agent/mcp-agent"
-                ]
+                "tab": "API Reference",
+                "icon": "terminal",
+                "href": "https://api-reference.mcp-use.com"
               }
             ]
           }
@@ -704,6 +876,7 @@
         "product": "Inspector",
         "description": "Debug and test MCP Apps & Servers",
         "icon": "/images/inspector-logo.svg",
+        "href": "/inspector/index",
         "groups": [
           {
             "group": "Inspector",
@@ -724,6 +897,22 @@
     ]
   },
   "redirects": [
+    {
+      "source": "/v2/typescript/agent/llm-integration",
+      "destination": "/v2/typescript/agent/llm-providers"
+    },
+    {
+      "source": "/v2/typescript/agent/structured-output",
+      "destination": "/v2/typescript/agent/langchain/structured-output"
+    },
+    {
+      "source": "/v2/typescript/agent/server-manager",
+      "destination": "/v2/typescript/agent/langchain/server-manager"
+    },
+    {
+      "source": "/v2/typescript/agent/observability",
+      "destination": "/v2/typescript/agent/langchain/observability"
+    },
     {
       "source": "/typescript/getting-started",
       "destination": "/typescript/getting-started/quickstart"
@@ -767,6 +956,10 @@
     {
       "source": "/typescript/server/content-security-policy",
       "destination": "/typescript/mcp-apps/content-security-policy"
+    },
+    {
+      "source": "/v2/typescript/mcp-apps/widgets",
+      "destination": "/v2/typescript/mcp-apps/quickstart"
     },
     {
       "source": "/guides/chatgpt-apps-flow",
