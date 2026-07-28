@@ -1,16 +1,11 @@
 import {
   CLIENT_CAPABILITIES_META_KEY,
   CLIENT_INFO_META_KEY,
-  inputRequired,
-  inputResponse,
   type AuthInfo,
   type ClientCapabilities,
   type Implementation,
-  type InputRequest,
-  type InputRequiredResult,
   type RequestStateAccessor,
   type ServerContext,
-  type StandardSchemaWithJSON,
 } from "@modelcontextprotocol/server";
 import type { Context, Env, HonoRequest as HonoRequestType } from "hono";
 import { HonoRequest } from "hono/request";
@@ -149,54 +144,6 @@ export interface RequestClientContext {
 }
 
 /**
- * Result of a {@link Elicit} call.
- *
- * `required` means the callback must return `result`; the client then gathers
- * input and retries the tool. Accepted form results carry schema-validated,
- * inferred `data`. URL acceptances and declined/cancelled results carry no
- * data.
- */
-export type ElicitationResult<T = never> =
-  | { status: "required"; result: InputRequiredResult }
-  | { status: "decline" | "cancel" }
-  | ([T] extends [never]
-      ? { status: "accept" }
-      : { status: "accept"; data: T });
-
-/**
- * Requests or reads one keyed elicitation in a multi-round-trip tool callback.
- *
- * The explicit key correlates the request with the client's response on
- * re-entry. On the first entry, or after an invalid form response, this returns
- * `{ status: "required", result }`; return that result from the tool. On
- * re-entry it returns `accept`, `decline`, or `cancel` and validates accepted
- * Standard Schema form data before exposing it. Validation may be synchronous
- * or asynchronous.
- *
- * @example
- * ```ts
- * const confirmation = await ctx.elicit(
- *   "confirm",
- *   "Deploy to production?",
- *   schema,
- * );
- * if (confirmation.status === "required") {
- *   return confirmation.result;
- * }
- * ```
- */
-export interface Elicit {
-  /** Request or read a typed form-mode elicitation. */
-  <S extends StandardSchemaWithJSON>(
-    key: string,
-    message: string,
-    schema: S
-  ): Promise<ElicitationResult<StandardSchemaWithJSON.InferOutput<S>>>;
-  /** Request or read a URL-mode elicitation. */
-  (key: string, message: string, url: string): Promise<ElicitationResult>;
-}
-
-/**
  * Per-request context passed to tool/resource/prompt callbacks.
  */
 export type OAuthAuth<TUser> = {
@@ -235,8 +182,6 @@ type RequestContextBase<TEnv extends Env> = Omit<Context<TEnv>, "req"> & {
   req?: HonoRequestType;
   /** Per-request client capability queries. */
   client: RequestClientContext;
-  /** Request or read a keyed form- or URL-mode elicitation. */
-  elicit: Elicit;
   /**
    * Bare responses supplied when the client retries an `input_required`
    * round. Values are client input; validate them before use.
@@ -443,59 +388,6 @@ function toClientContext(ctx: ServerContext): RequestClientContext {
   };
 }
 
-function createElicit(
-  inputResponses: ServerContext["mcpReq"]["inputResponses"]
-): Elicit {
-  return async function elicit(
-    key: string,
-    message: string,
-    schemaOrUrl?: StandardSchemaWithJSON | string
-  ): Promise<ElicitationResult<unknown> | ElicitationResult> {
-    let request: InputRequest;
-    let formSchema: StandardSchemaWithJSON | undefined;
-
-    if (typeof schemaOrUrl === "string") {
-      request = inputRequired.elicitUrl({
-        message,
-        url: schemaOrUrl,
-      });
-    } else if (schemaOrUrl !== undefined) {
-      formSchema = schemaOrUrl;
-      request = inputRequired.elicit({
-        message,
-        requestedSchema: schemaOrUrl,
-      });
-    } else {
-      throw new TypeError(
-        "ctx.elicit(key, message, value) requires a form schema or URL string"
-      );
-    }
-
-    const response = inputResponse(inputResponses, key);
-    if (response.kind === "elicit") {
-      if (response.action !== "accept") {
-        return { status: response.action };
-      }
-      if (formSchema === undefined) {
-        return { status: "accept" };
-      }
-      if (response.content !== undefined) {
-        const outcome = await formSchema["~standard"].validate(
-          response.content
-        );
-        if (outcome.issues === undefined) {
-          return { status: "accept", data: outcome.value };
-        }
-      }
-    }
-
-    return {
-      status: "required",
-      result: inputRequired({ inputRequests: { [key]: request } }),
-    };
-  } as Elicit;
-}
-
 /**
  * Derive the callback-facing {@link RequestContext} from the SDK's
  * per-request `ServerContext`.
@@ -522,7 +414,6 @@ export function toRequestContext<TEnv extends Env = Env>(
       inputResponses: ctx.mcpReq.inputResponses,
     }),
     client: toClientContext(ctx),
-    elicit: createElicit(ctx.mcpReq.inputResponses),
     requestState: <T = unknown>() => ctx.mcpReq.requestState<T>(),
     async sendNotification(
       method: string,

@@ -8,20 +8,16 @@ import {
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { MCPServer } from "../src/index.js";
+import {
+  acceptedContent,
+  inputRequired,
+  inputResponse,
+  MCPServer,
+} from "../src/index.js";
 
 const confirmationSchema = z.object({ confirm: z.boolean() });
-const asyncConfirmationSchema = confirmationSchema.superRefine(
-  async ({ confirm }, refinement) => {
-    await Promise.resolve();
-    if (!confirm) {
-      refinement.addIssue({
-        code: "custom",
-        message: "Confirmation is required",
-      });
-    }
-  }
-);
+const projectSchema = z.object({ project: z.string() });
+const regionSchema = z.object({ region: z.string() });
 
 describe("elicitation and input_required", () => {
   const seenRequests: Array<{
@@ -40,7 +36,7 @@ describe("elicitation and input_required", () => {
     version: "1.0.0",
   });
   let client: Client;
-  let asyncFormAttempts = 0;
+  let batchedToolEntries = 0;
   let invalidFormAttempts = 0;
 
   server.tool(
@@ -53,25 +49,31 @@ describe("elicitation and input_required", () => {
       }),
     },
     async ({ environment }, ctx) => {
-      const confirmation = await ctx.elicit(
-        "confirm",
-        `Deploy to ${environment}?`,
-        environment === "async-invalid-first"
-          ? asyncConfirmationSchema
-          : confirmationSchema
-      );
-      if (confirmation.status === "required") {
-        return confirmation.result;
-      }
-      if (confirmation.status !== "accept") {
+      const response = inputResponse(ctx.inputResponses, "confirm");
+      if (response.kind === "elicit" && response.action !== "accept") {
         return {
-          content: [
-            { type: "text", text: `Deployment ${confirmation.status}` },
-          ],
+          content: [{ type: "text", text: `Deployment ${response.action}` }],
           isError: true,
         };
       }
-      if (confirmation.data.confirm !== true) {
+
+      const confirmation = acceptedContent(
+        ctx.inputResponses,
+        "confirm",
+        confirmationSchema
+      );
+
+      if (confirmation === undefined) {
+        return inputRequired({
+          inputRequests: {
+            confirm: inputRequired.elicit({
+              message: `Deploy to ${environment}?`,
+              requestedSchema: confirmationSchema,
+            }),
+          },
+        });
+      }
+      if (confirmation.confirm !== true) {
         return {
           content: [{ type: "text", text: "Deployment not confirmed" }],
           isError: true,
@@ -87,25 +89,64 @@ describe("elicitation and input_required", () => {
   );
 
   server.tool({ name: "link-account" }, async (_params, ctx) => {
-    const authorization = await ctx.elicit(
-      "authorize",
-      "Sign in to link your account",
-      "https://example.com/authorize"
-    );
-    if (authorization.status === "required") {
-      return authorization.result;
+    const response = inputResponse(ctx.inputResponses, "authorize");
+    if (response.kind === "missing") {
+      return inputRequired({
+        inputRequests: {
+          authorize: inputRequired.elicitUrl({
+            message: "Sign in to link your account",
+            url: "https://example.com/authorize",
+          }),
+        },
+      });
     }
     return {
       content: [
         {
           type: "text",
           text:
-            authorization.status === "accept"
+            response.kind === "elicit" && response.action === "accept"
               ? "Account linked"
               : "Account not linked",
         },
       ],
-      ...(authorization.status !== "accept" ? { isError: true as const } : {}),
+      ...(response.kind !== "elicit" || response.action !== "accept"
+        ? { isError: true as const }
+        : {}),
+    };
+  });
+
+  server.tool({ name: "batch-profile" }, async (_params, ctx) => {
+    batchedToolEntries += 1;
+    const project = acceptedContent(
+      ctx.inputResponses,
+      "project",
+      projectSchema
+    );
+    const region = acceptedContent(ctx.inputResponses, "region", regionSchema);
+
+    if (project === undefined || region === undefined) {
+      return inputRequired({
+        inputRequests: {
+          project: inputRequired.elicit({
+            message: "Project name?",
+            requestedSchema: projectSchema,
+          }),
+          region: inputRequired.elicit({
+            message: "Deployment region?",
+            requestedSchema: regionSchema,
+          }),
+        },
+      });
+    }
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Provision ${project.project} in ${region.region}`,
+        },
+      ],
     };
   });
 
@@ -144,11 +185,11 @@ describe("elicitation and input_required", () => {
           ? { action: "accept", content: { confirm: "yes" } }
           : { action: "accept", content: { confirm: true } };
       }
-      if (request.params.message === "Deploy to async-invalid-first?") {
-        asyncFormAttempts += 1;
-        return asyncFormAttempts === 1
-          ? { action: "accept", content: { confirm: false } }
-          : { action: "accept", content: { confirm: true } };
+      if (request.params.message === "Project name?") {
+        return { action: "accept", content: { project: "apollo" } };
+      }
+      if (request.params.message === "Deployment region?") {
+        return { action: "accept", content: { region: "us-west-2" } };
       }
       return { action: "accept", content: { confirm: true } };
     });
@@ -172,7 +213,7 @@ describe("elicitation and input_required", () => {
     await server.close();
   });
 
-  it("round-trips a v1-style form elicitation and returns the final tool result", async () => {
+  it("round-trips a form input_required result and returns the final tool result", async () => {
     const result = await client.callTool({
       name: "deploy",
       arguments: { environment: "production" },
@@ -190,7 +231,7 @@ describe("elicitation and input_required", () => {
     );
   });
 
-  it("round-trips a v1-style URL elicitation", async () => {
+  it("round-trips a URL input_required result", async () => {
     const result = await client.callTool({ name: "link-account" });
 
     expect(result.content).toContainEqual({
@@ -203,6 +244,28 @@ describe("elicitation and input_required", () => {
         message: "Sign in to link your account",
         url: "https://example.com/authorize",
       })
+    );
+  });
+
+  it("fulfills multiple input requests in one round before re-entering the tool", async () => {
+    const entriesBefore = batchedToolEntries;
+    const requestsBefore = seenRequests.length;
+
+    const result = await client.callTool({ name: "batch-profile" });
+
+    expect(result.content).toContainEqual({
+      type: "text",
+      text: "Provision apollo in us-west-2",
+    });
+    expect(batchedToolEntries - entriesBefore).toBe(2);
+    expect(seenRequests.slice(requestsBefore)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ mode: "form", message: "Project name?" }),
+        expect.objectContaining({
+          mode: "form",
+          message: "Deployment region?",
+        }),
+      ])
     );
   });
 
@@ -250,18 +313,5 @@ describe("elicitation and input_required", () => {
       deployed: true,
     });
     expect(invalidFormAttempts).toBe(2);
-  });
-
-  it("awaits asynchronous Standard Schema validation", async () => {
-    const result = await client.callTool({
-      name: "deploy",
-      arguments: { environment: "async-invalid-first" },
-    });
-
-    expect(result.structuredContent).toEqual({
-      environment: "async-invalid-first",
-      deployed: true,
-    });
-    expect(asyncFormAttempts).toBe(2);
   });
 });
