@@ -7,7 +7,7 @@ import type {
 } from "@mcp-use/client/react";
 import { buildViewSandboxUrl, useMcpClient } from "@mcp-use/client/react";
 import type { Tool } from "@mcp-use/client/react";
-import { Minimize2 } from "lucide-react";
+import { X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { consoleLogBus } from "@/client/console-log-bus";
 import { Button } from "@/client/components/ui/button";
@@ -20,6 +20,7 @@ import { useMcpAppsHostContext } from "@/client/hooks/useMcpAppsHostContext";
 import { useMcpAppsHostActions } from "@/client/hooks/useMcpAppsHostActions";
 import { buildCspAuditRecord } from "@/client/mcp-apps/csp-audit";
 import { getPackageVersion } from "@/client/telemetry/utils";
+import { getServerDisplayName, getServerIconUrl } from "@/client/utils/servers";
 import {
   normalizeWidgetModelContext,
   serializeWidgetModelContexts,
@@ -336,6 +337,14 @@ export function useViewHostProps(options: {
     [resourceUri]
   );
 
+  const fullscreenHeader = useMemo(
+    () => ({
+      title: server ? getServerDisplayName(server) : "MCP Server",
+      iconUrl: server ? getServerIconUrl(server) : null,
+    }),
+    [server]
+  );
+
   const renderFullscreenClose = useCallback(
     ({
       onClick,
@@ -355,7 +364,7 @@ export function useViewHostProps(options: {
         aria-label={ariaLabel}
         onClick={onClick}
       >
-        <Minimize2 />
+        <X />
       </Button>
     ),
     []
@@ -393,7 +402,7 @@ export function useViewHostProps(options: {
     chromeless,
     onReady,
     mockOpenAiFileApis: true,
-    fullscreenHeader: false,
+    fullscreenHeader,
     renderFullscreenClose,
   };
 }
