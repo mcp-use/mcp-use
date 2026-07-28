@@ -4,12 +4,18 @@
   </a>
   <br /><br />
 
-  <h1>The TypeScript framework for MCP</h1>
-  <h3>For Claude Connectors & ChatGPT Plugins</h3>
+<div id="user-content-toc">
+  <ul align="center" style="list-style: none;">
+    <summary>
+      <h1>The TypeScript framework for MCP</h1>
+    </summary>
+  </ul>
+</div>
+  
+  <h3>Build, test, and ship MCP servers, ChatGPT plugins, Claude connectors</h3>
 
   <p>
-    Build, test, and ship MCP servers, ChatGPT plugins, Claude connectors,
-    and interactive apps <br />with typed tools, native Views, and a built-in Inspector.
+    Fully Typed, native Views and MCP Apps support, built-in Inspector and first class Agent experience.
   </p>
 
   <p>
