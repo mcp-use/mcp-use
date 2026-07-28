@@ -131,8 +131,6 @@ export type {
   OpenAPIExcludeRule,
 } from "./openapi/index.js";
 export type {
-  Elicit,
-  ElicitationResult,
   OAuthAuth,
   RequestClientContext,
   RequestContext,
