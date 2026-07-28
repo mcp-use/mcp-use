@@ -8,10 +8,15 @@ import { Logger } from "../utils/logging.js";
 
 const logger = Logger.get("RpcLogger");
 
+/** One JSON-RPC message captured by the React transport logger. */
 export interface RpcLogEntry {
+  /** Identifier of the server that sent or received the message. */
   serverId: string;
+  /** Message direction relative to the client. */
   direction: "send" | "receive";
+  /** ISO 8601 timestamp recorded when the message was observed. */
   timestamp: string;
+  /** Captured JSON-RPC message. */
   message: JSONRPCMessage;
 }
 

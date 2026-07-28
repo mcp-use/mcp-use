@@ -424,7 +424,7 @@ export class Telemetry {
   }
 }
 
-/** @alias */
+/** Backward-compatible name for {@link Telemetry}. */
 export const Tel = Telemetry;
 
 export function setTelemetrySource(source: string): void {

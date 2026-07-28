@@ -30,15 +30,23 @@ function trimTrailingSlashes(value: string): string {
   return value.slice(0, end);
 }
 
-/** Options for the browser implementation of {@link OAuthClientProvider}. */
+/** Options for the browser implementation of the SDK `OAuthClientProvider`. */
 export interface BrowserOAuthOptions {
+  /** Prefix used for persisted OAuth keys. */
   storageKeyPrefix?: string;
+  /** Human-readable OAuth client name. */
   clientName?: string;
+  /** Public website describing the OAuth client. */
   clientUri?: string;
+  /** Public OAuth client logo URL. */
   logoUri?: string;
+  /** OAuth redirect URI. */
   callbackUrl?: string;
+  /** Whether initial connection waits for an explicit authentication action. */
   preventAutoAuth?: boolean;
+  /** Whether authorization uses a full-page redirect instead of a popup. */
   useRedirectFlow?: boolean;
+  /** Same-origin proxy endpoint for OAuth HTTP requests. */
   oauthProxyUrl?: string;
   /** MCP proxy URL the transport connected to, used to re-anchor discovery. */
   connectionUrl?: string;
@@ -63,6 +71,7 @@ export interface BrowserOAuthOptions {
   staticClientInfo?: OAuthClientInformation;
   /** OAuth scope string forwarded to the SDK via clientMetadata.scope. */
   scope?: string;
+  /** Called immediately before the provider opens an authorization popup. */
   onPopupWindow?: (
     url: string,
     features: string,
@@ -74,12 +83,15 @@ export interface BrowserOAuthOptions {
  * Browser-compatible OAuth client provider for MCP using localStorage.
  */
 export class BrowserOAuthClientProvider implements OAuthClientProvider {
+  /** Protected MCP server URL associated with this provider. */
   readonly serverUrl: string;
+  /** Pre-registered public client information, when configured. */
   readonly staticClientInfo?: OAuthClientInformation;
   private session: OAuthSessionStore;
   private readonly storage: LocalStorageKVStore;
 
   // Browser-only state
+  /** Whether initial connection waits for explicit authentication. */
   readonly preventAutoAuth?: boolean;
   private useRedirectFlow?: boolean;
   private oauthProxyUrl?: string;
@@ -87,6 +99,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   private proxyOAuthRequests: boolean;
   private lastAttemptedAuthUrl: string | null = null;
   private authorizationPending = false;
+  /** Callback invoked immediately before an authorization popup opens. */
   readonly onPopupWindow:
     | ((
         url: string,
@@ -119,30 +132,37 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
 
   // --- Identity / key fields exposed for callback handling ---
 
+  /** Prefix used for persisted OAuth keys. */
   get storageKeyPrefix(): string {
     return this.session.storageKeyPrefix;
   }
 
+  /** Stable hash used to namespace storage for this server. */
   get serverUrlHash(): string {
     return this.session.serverUrlHash;
   }
 
+  /** Human-readable OAuth client name. */
   get clientName(): string {
     return this.session.clientName;
   }
 
+  /** Public website describing the OAuth client. */
   get clientUri(): string {
     return this.session.clientUri;
   }
 
+  /** Public OAuth client logo URL. */
   get logoUri(): string {
     return this.session.logoUri;
   }
 
+  /** OAuth redirect URI. */
   get callbackUrl(): string {
     return this.session.callbackUrl;
   }
 
+  /** Space-delimited OAuth scopes requested by the client. */
   get scope(): string | undefined {
     return this.session.scope;
   }
@@ -151,14 +171,22 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     return this.session.clientMetadataUrl;
   }
 
+  /**
+   * Returns a provider-scoped storage key.
+   *
+   * @param keySuffix - Suffix identifying the stored value.
+   * @returns Namespaced storage key.
+   */
   getKey(keySuffix: string): string {
     return this.session.getKey(keySuffix);
   }
 
+  /** Whether an authorization flow is awaiting completion. */
   get hasPendingFlow(): boolean {
     return this.authorizationPending;
   }
 
+  /** Marks the current authorization flow as complete. */
   markFlowComplete(): void {
     this.authorizationPending = false;
   }
@@ -419,6 +447,12 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     return this.session.saveTokens(tokens, ctx);
   }
 
+  /**
+   * Returns the configured or dynamically registered OAuth client information.
+   *
+   * @param ctx - Optional registration context.
+   * @returns OAuth client information, or `undefined` when not registered.
+   */
   async clientInformation(
     ctx?: OAuthClientInformationContext
   ): Promise<OAuthClientInformation | undefined> {
@@ -430,6 +464,15 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     return this.session.clientInformation(ctx);
   }
 
+  /**
+   * Persists public OAuth client registration information.
+   *
+   * Static client configuration takes precedence, and browser providers discard
+   * any client secret returned for a public client.
+   *
+   * @param clientInformation - Registration information to save.
+   * @param ctx - Optional registration context.
+   */
   async saveClientInformation(
     clientInformation: OAuthClientInformation,
     ctx?: OAuthClientInformationContext
@@ -504,6 +547,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
    * client secrets.
    */
   async getClientCredentials(): Promise<{
+    /** Public OAuth client identifier. */
     client_id: string;
   } | null> {
     const info = await this.clientInformation();
@@ -542,7 +586,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
 
   /**
    * Redirects the user agent to the authorization URL, storing necessary state.
-   * @param authorizationUrl The fully constructed authorization URL from the SDK.
+   * @param authorizationUrl - The fully constructed authorization URL from the SDK.
    */
   async redirectToAuthorization(authorizationUrl: URL): Promise<void> {
     const sanitizedAuthUrl =
@@ -604,6 +648,11 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     return this.lastAttemptedAuthUrl;
   }
 
+  /**
+   * Removes OAuth state stored for this server.
+   *
+   * @returns The number of storage entries removed.
+   */
   clearStorage(): number {
     this.lastAttemptedAuthUrl = null;
     this.authorizationPending = false;

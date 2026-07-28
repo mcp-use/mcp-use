@@ -1,12 +1,19 @@
 import { logger } from "@mcp-use/client";
 import type { ProviderConfig, ProviderName } from "./types.js";
 
+/** Optional credentials and request settings for a string model identifier. */
 export interface NativeLLMConfig {
+  /** Provider API key. When omitted, the provider environment variable is used. */
   apiKey?: string;
+  /** Sampling temperature forwarded to the provider. */
   temperature?: number;
+  /** Maximum number of output tokens requested from the provider. */
   maxTokens?: number;
+  /** Provider API base URL override. */
   baseUrl?: string;
+  /** Additional HTTP headers sent with every request. */
   extraHeaders?: Record<string, string>;
+  /** Fetch credentials mode used for provider requests. */
   credentials?: RequestCredentials;
 }
 
@@ -37,7 +44,15 @@ function resolveApiKey(provider: string, config?: NativeLLMConfig): string {
   throw new Error(`API key not found for provider '${provider}'. Set ${hint}.`);
 }
 
-/** Parse "provider/model" into native ProviderConfig (no LangChain). */
+/**
+ * Parses a `"provider/model"` identifier into a provider configuration.
+ *
+ * @param llmString - Provider and model separated by the first slash.
+ * @param config - Optional credentials and request overrides.
+ * @returns A complete provider configuration.
+ * @throws Error if the identifier is invalid, the provider is unsupported, or
+ * no required API key is available.
+ */
 export function parseLLMStringToProviderConfig(
   llmString: string,
   config?: NativeLLMConfig
@@ -75,6 +90,15 @@ export function parseLLMStringToProviderConfig(
   };
 }
 
+/**
+ * Builds a provider configuration from separate provider and model values.
+ *
+ * @param provider - Provider implementation to use.
+ * @param model - Provider-specific model identifier.
+ * @param config - Optional credentials and request overrides.
+ * @returns A complete provider configuration.
+ * @throws Error if no required API key is available.
+ */
 export function providerConfigFromOptions(
   provider: ProviderName,
   model: string,

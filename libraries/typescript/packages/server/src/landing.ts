@@ -1,8 +1,10 @@
 /**
- * Landing page generator for MCP server endpoints
+ * Generate an HTML landing page for an MCP server endpoint.
  *
- * Generates SEO-friendly HTML with connection instructions for MCP servers
- * from Claude Code, Cursor, VS Code, ChatGPT, and Manufact Inspector (hosted).
+ * The rendered page includes server metadata and connection instructions for
+ * supported MCP clients.
+ *
+ * @packageDocumentation
  */
 
 /**
@@ -339,7 +341,18 @@ export interface LandingPageOptions {
  * for Claude Code, Cursor, VS Code, ChatGPT, and Manufact Inspector.
  *
  * @param options - Server identity, endpoint, icon, and primitive metadata.
- * @returns HTML landing page with connection instructions
+ * @returns HTML landing page with connection instructions.
+ *
+ * @example
+ * ```ts
+ * import { generateLandingPage } from "mcp-use/landing";
+ *
+ * const html = generateLandingPage({
+ *   name: "weather",
+ *   version: "1.0.0",
+ *   url: "https://example.com/mcp",
+ * });
+ * ```
  */
 export function generateLandingPage(options: LandingPageOptions): string {
   const {

@@ -1,6 +1,7 @@
 import React from "react";
 
 interface ErrorBoundaryProps {
+  /** View subtree protected by the boundary. */
   children: React.ReactNode;
   /** Custom fallback when an error is caught. */
   fallback?: React.ReactNode | ((error: Error) => React.ReactNode);
@@ -21,6 +22,7 @@ export class ErrorBoundary extends React.Component<
     this.state = { hasError: false, error: null };
   }
 
+  /** Records a render failure for the fallback render pass. */
   static getDerivedStateFromError(error: Error) {
     return { hasError: true, error };
   }
@@ -30,6 +32,7 @@ export class ErrorBoundary extends React.Component<
     this.props.onError?.(error, errorInfo);
   }
 
+  /** Renders the child tree or the configured error fallback. */
   override render() {
     if (this.state.hasError && this.state.error) {
       if (this.props.fallback !== undefined) {

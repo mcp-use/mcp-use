@@ -7,21 +7,31 @@ import { logger } from "@mcp-use/client";
 import { MCPServerTool } from "./base.js";
 
 const ConnectMCPServerSchema = z.object({
+  /** Name of a configured MCP server. */
   serverName: z.string().describe("The name of the MCP server."),
 });
 
+/** Activates a configured MCP server and exposes its capabilities. */
 export class ConnectMCPServerTool extends MCPServerTool<
   typeof ConnectMCPServerSchema
 > {
+  /** Tool name exposed to the model. */
   override name = "connect_to_mcp_server";
+  /** Tool description exposed to the model. */
   override description =
     "Connect to a specific MCP (Model Context Protocol) server to use its tools. Use this tool to connect to a specific server and use its tools.";
+  /** Input schema containing the server name. */
   override schema = ConnectMCPServerSchema;
 
   constructor(manager: IServerManager) {
     super(manager);
   }
 
+  /**
+   * Activates a configured server and loads its capabilities if needed.
+   *
+   * @returns A human-readable success or error message.
+   */
   async _call({ serverName }: SchemaOutputT<typeof ConnectMCPServerSchema>) {
     const serverNames = this.manager.client.getServerNames();
 

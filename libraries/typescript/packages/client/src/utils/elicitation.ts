@@ -21,7 +21,9 @@ export type ElicitContent = Record<
 
 /** Result of validate(params, content). */
 export type ElicitValidationResult = {
+  /** Whether the submitted content satisfies the requested schema. */
   valid: boolean;
+  /** Validation error messages when `valid` is `false`. */
   errors?: string[];
 };
 
@@ -88,7 +90,7 @@ export function accept(content: ElicitContent): ElicitResult {
 
 /**
  * Return an ElicitResult that declines the elicitation (user chose not to provide).
- * Optional reason is for logging; the SDK result is { action: "decline" }.
+ * Optional reason is for logging; the SDK result is `{ action: "decline" }`.
  */
 export function decline(_reason?: string): ElicitResult {
   return { action: "decline" };
@@ -105,7 +107,7 @@ export function cancel(): ElicitResult {
  * Validate content against the request's requestedSchema using Zod.
  * Converts requestedSchema (JSON Schema) via `z.fromJSONSchema`, then
  * safeParse(content). If conversion fails, returns
- * { valid: false, errors: ["Unsupported or invalid schema"] }.
+ * `{ valid: false, errors: ["Unsupported or invalid schema"] }`.
  */
 export function validate(
   params: ElicitParams,

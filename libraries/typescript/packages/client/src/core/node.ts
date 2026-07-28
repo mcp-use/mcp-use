@@ -185,7 +185,7 @@ export type {
  * Node.js-specific MCP client implementation with advanced features.
  *
  * The MCPClient class provides a complete MCP client implementation for Node.js
- * environments, extending {@link BaseMCPClient} with platform-specific capabilities:
+ * environments, extending the runtime-neutral `BaseMCPClient` with platform-specific capabilities:
  *
  * - **All Connector Types**: Supports Stdio, HTTP, and WebSocket connectors
  * - **Code Execution Mode**: Execute code dynamically using VM or E2B sandboxes
@@ -228,7 +228,6 @@ export type {
  * const result = await client.executeCode('console.log("Hello!")');
  * ```
  *
- * @see {@link BaseMCPClient} for base client functionality
  * @see {@link MCPSession} for session management
  */
 export class MCPClient extends BaseMCPClient {
@@ -283,9 +282,7 @@ export class MCPClient extends BaseMCPClient {
    * @param config - Configuration object or path to JSON config file. If omitted,
    *                 starts with empty configuration
    * @param options - Optional client behavior configuration
-   * @param options.codeMode - Enable code execution mode (boolean or advanced config)
-   * @param options.onSampling - Callback for handling sampling requests from servers
-   * @param options.onElicitation - Callback for handling elicitation requests
+   * Options can enable code mode or provide sampling and elicitation callbacks.
    *
    * @example
    * ```typescript
@@ -400,7 +397,7 @@ export class MCPClient extends BaseMCPClient {
    * });
    * ```
    *
-   * @see {@link constructor} for direct instantiation
+   * @see {@link MCPClient} for direct instantiation
    * @see {@link fromConfigFile} for loading from file
    */
   public static fromDict(
@@ -419,7 +416,7 @@ export class MCPClient extends BaseMCPClient {
    * @param path - Path to the JSON configuration file
    * @param options - Optional client behavior configuration
    * @returns New MCPClient instance
-   * @throws {Error} If the file cannot be read or parsed
+   * @throws If the file cannot be read or parsed
    *
    * @example
    * ```typescript
@@ -435,7 +432,7 @@ export class MCPClient extends BaseMCPClient {
    * });
    * ```
    *
-   * @see {@link constructor} for direct instantiation
+   * @see {@link MCPClient} for direct instantiation
    * @see {@link fromDict} for inline configuration
    */
   public static fromConfigFile(
@@ -617,7 +614,7 @@ export class MCPClient extends BaseMCPClient {
    * @param code - JavaScript/TypeScript code to execute
    * @param timeout - Optional execution timeout in milliseconds
    * @returns Execution result with output, errors, and return value
-   * @throws {Error} If code mode is not enabled
+   * @throws If code mode is not enabled
    *
    * @example
    * ```typescript
@@ -671,7 +668,7 @@ export class MCPClient extends BaseMCPClient {
    * @param query - Optional search query to filter tools (defaults to empty string for all tools)
    * @param detailLevel - Level of detail to return: "names", "descriptions", or "full"
    * @returns Tool search results with matching tools
-   * @throws {Error} If code mode is not enabled
+   * @throws If code mode is not enabled
    *
    * @example
    * ```typescript

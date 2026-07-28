@@ -199,12 +199,12 @@ export function bootstrapView(
 }
 
 /**
- * Unmount the document's view and dispose its {@link McpAppRuntime}.
+ * Unmount the document's view and dispose its guest MCP App runtime.
  *
  * React unmounts first so hook cleanup (e.g. {@link useViewTool} removal) can
  * run while the App connection still exists; then the runtime closes the App
- * and transport. After this resolves, {@link bootstrapView} may create a
- * fresh runtime.
+ * and transport. After this resolves, the view bootstrap can create a fresh
+ * runtime.
  *
  * No-ops when nothing is mounted.
  *

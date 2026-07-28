@@ -32,6 +32,7 @@ const providerLogger = Logger.get("McpClientProvider");
  * Context value for multi-server management
  */
 export interface McpClientContextType {
+  /** Managed servers and their current reactive state. */
   servers: McpServer[];
   /** Idempotent — safe to call multiple times with the same id; duplicates are silently ignored. */
   addServer: (id: string, config: McpServerConfig) => void;
@@ -50,14 +51,17 @@ export interface McpClientContextType {
     id: string,
     opts?: { clearCredentials?: boolean }
   ) => Promise<void>;
+  /** Updates cached presentation metadata for a managed server. */
   updateServerMetadata: (
     id: string,
     metadata: { name: string }
   ) => Promise<void>;
+  /** Merges configuration changes into a managed server. */
   updateServer: (
     id: string,
     options: Partial<McpServerConfig>
   ) => Promise<void>;
+  /** Returns a managed server by ID. */
   getServer: (id: string) => McpServer | undefined;
   /** Whether storage has finished loading (true if no storage provider) */
   storageLoaded: boolean;
@@ -427,6 +431,7 @@ function McpServerWrapper({
  * Props for McpClientProvider
  */
 export interface McpClientProviderProps {
+  /** React subtree that can access the MCP client context. */
   children: ReactNode;
 
   /**
@@ -452,7 +457,9 @@ export interface McpClientProviderProps {
    * Can be overridden per-server in addServer() options
    */
   defaultProxyConfig?: {
+    /** Default MCP proxy endpoint. */
     proxyAddress?: string;
+    /** Default headers sent to the MCP proxy. */
     headers?: Record<string, string>;
   };
 
@@ -465,7 +472,9 @@ export interface McpClientProviderProps {
   defaultAutoProxyFallback?:
     | boolean
     | {
+        /** Whether automatic proxy fallback is enabled. */
         enabled?: boolean;
+        /** Proxy endpoint used after direct connection fails. */
         proxyAddress?: string;
       };
 
@@ -495,8 +504,11 @@ export interface McpClientProviderProps {
     description?: string;
     /** Client icons (first icon used as logo_uri for OAuth) */
     icons?: Array<{
+      /** Icon URL. */
       src: string;
+      /** Icon media type. */
       mimeType?: string;
+      /** Supported icon sizes, such as `"48x48"`. */
       sizes?: string[];
     }>;
     /** Client website URL (used as client_uri for OAuth) */
@@ -549,11 +561,11 @@ export interface McpClientProviderProps {
 
   /**
    * Callback when a sampling request is received from any server
-   * @param request The sampling request details
-   * @param serverId The ID of the server that sent the request
-   * @param serverName The name of the server
-   * @param approve Function to approve the request
-   * @param reject Function to reject the request
+   * @param request - The sampling request details
+   * @param serverId - The ID of the server that sent the request
+   * @param serverName - The name of the server
+   * @param approve - Function to approve the request
+   * @param reject - Function to reject the request
    */
   onSamplingRequest?: (
     request: PendingSamplingRequest,
@@ -565,11 +577,11 @@ export interface McpClientProviderProps {
 
   /**
    * Callback when an elicitation request is received from any server
-   * @param request The elicitation request details
-   * @param serverId The ID of the server that sent the request
-   * @param serverName The name of the server
-   * @param approve Function to approve the request
-   * @param reject Function to reject the request
+   * @param request - The elicitation request details
+   * @param serverId - The ID of the server that sent the request
+   * @param serverName - The name of the server
+   * @param approve - Function to approve the request
+   * @param reject - Function to reject the request
    */
   onElicitationRequest?: (
     request: PendingElicitationRequest,

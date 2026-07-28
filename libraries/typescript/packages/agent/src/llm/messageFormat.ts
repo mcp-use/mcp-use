@@ -2,26 +2,42 @@ import { isToolResultError, toolResultToContent } from "./toolResultParts.js";
 import type { ContentPart, ProviderMessage } from "./types.js";
 import type { BaseMessage } from "../agents/types.js";
 
-interface InspectorAttachment {
+/** Attachment accepted by {@link convertMessagesToProvider}. */
+export interface InspectorAttachment {
+  /** Attachment kind. Files that are not images are ignored. */
   type: "image" | "file";
+  /** Base64-encoded attachment bytes. */
   data: string;
+  /** MIME type for the encoded bytes. */
   mimeType: string;
 }
 
-interface InspectorMessagePart {
+/** Text or completed tool invocation in an inspector message. */
+export interface InspectorMessagePart {
+  /** Message part kind. */
   type: "text" | "tool-invocation";
+  /** Text content when `type` is `"text"`. */
   text?: string;
+  /** Invocation details when `type` is `"tool-invocation"`. */
   toolInvocation?: {
+    /** Tool name. */
     toolName: string;
+    /** Tool arguments. */
     args: Record<string, unknown>;
+    /** Completed result. Omit while the invocation is pending. */
     result?: unknown;
   };
 }
 
-interface InspectorMessageLike {
+/** Structural inspector message accepted by {@link convertMessagesToProvider}. */
+export interface InspectorMessageLike {
+  /** Author of the message. */
   role: "user" | "assistant";
+  /** Plain text or framework-specific content. */
   content: unknown;
+  /** Optional message attachments. */
   attachments?: InspectorAttachment[];
+  /** Optional AI SDK-style message parts. */
   parts?: InspectorMessagePart[];
 }
 
@@ -66,7 +82,13 @@ function langChainMessageType(message: LangChainMessageLike): string {
   return message.type ?? "";
 }
 
-/** Convert legacy LangChain external history for the native agent runtime. */
+/**
+ * Converts LangChain messages into provider-neutral history.
+ *
+ * @param messages - LangChain history in conversation order.
+ * @returns Equivalent provider messages.
+ * @throws TypeError if a message has an unsupported or unknown role.
+ */
 export function convertExternalHistoryToProvider(
   messages: BaseMessage[]
 ): ProviderMessage[] {
@@ -137,6 +159,10 @@ function extractText(m: InspectorMessageLike): string {
  * assistant message (bearing `toolCalls`) followed by one `tool` message per
  * invocation carrying the serialized result. This mirrors what the inspector
  * previously built using LangChain's AIMessage + ToolMessage pair.
+ *
+ * @param messages - Inspector messages in conversation order.
+ * @returns Provider-neutral messages, including completed tool call/result
+ * pairs.
  */
 export function convertMessagesToProvider(
   messages: InspectorMessageLike[]
@@ -235,7 +261,12 @@ export function extractSystem(messages: ProviderMessage[]): {
   };
 }
 
-/** Parse a `data:...;base64,...` URL. */
+/**
+ * Parses a base64 data URL.
+ *
+ * @param url - URL in `data:<mime>;base64,<payload>` form.
+ * @returns The MIME type and base64 payload, or `null` for another URL form.
+ */
 export function parseDataUrl(
   url: string
 ): { mimeType: string; data: string } | null {

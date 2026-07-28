@@ -1,3 +1,9 @@
+/**
+ * Verify Supabase access tokens for an mcp-use resource server.
+ *
+ * @packageDocumentation
+ */
+
 import type { AuthInfo, OAuthMetadata } from "@modelcontextprotocol/server";
 
 import { isRecord } from "./guards.js";
@@ -19,30 +25,49 @@ import {
 
 /** Verified Supabase user claims exposed to authenticated MCP callbacks. */
 export interface SupabaseOAuthUser {
+  /** Supabase user identifier. */
   id: string;
+  /** Primary email address, when included in the access token. */
   email?: string;
+  /** Display name from `user_metadata.name`. */
   name?: string;
+  /** Full name from `user_metadata.full_name`. */
   fullName?: string;
+  /** Username from `user_metadata.username`. */
   username?: string;
+  /** Profile image URL from `user_metadata.avatar_url`. */
   avatarUrl?: string;
+  /** Supabase Postgres role from the access token. */
   role?: string;
+  /** Authenticator assurance level for the session. */
   aal?: string;
+  /** Authentication methods used for the session. */
   amr: SupabaseAmr[];
+  /** Supabase session identifier. */
   sessionId?: string;
 }
 
 /** A verified Supabase authentication-method reference. */
 export interface SupabaseAmr {
+  /** Authentication method name, such as `password` or `totp`. */
   method: string;
+  /** Unix timestamp at which the authentication method was completed. */
   timestamp?: number;
 }
 
 /** Configures Supabase JWT verification and protected-resource metadata. */
 export interface SupabaseOAuthProviderOptions extends OAuthResourceOptions {
+  /** Supabase project identifier used to derive `supabaseUrl`. */
   projectId?: string;
+  /** Full Supabase project URL. Takes precedence over `projectId`. */
   supabaseUrl?: URL | string;
+  /** Legacy HS256 JWT secret. Omit to verify ES256 tokens against project JWKS. */
   jwtSecret?: string;
-  /** Expected access-token audience. Defaults to Supabase's `authenticated`. */
+  /**
+   * Expected access-token audience.
+   *
+   * @defaultValue `"authenticated"`
+   */
   audience?: string;
 }
 
@@ -51,6 +76,17 @@ export interface SupabaseOAuthProviderOptions extends OAuthResourceOptions {
  *
  * @param options - Supabase project or URL, optional JWT secret/audience, and resource-server settings.
  * @returns A provider that rejects tokens without a valid configured Supabase signature and issuer.
+ * @throws A `TypeError` if project settings are invalid, `audience` is empty,
+ * or `jwtSecret` is shorter than 32 bytes.
+ *
+ * @example
+ * ```ts
+ * import { oauthSupabaseProvider } from "mcp-use/oauth/supabase";
+ *
+ * const oauth = oauthSupabaseProvider({
+ *   projectId: "example-project",
+ * });
+ * ```
  */
 export function oauthSupabaseProvider(
   options: SupabaseOAuthProviderOptions

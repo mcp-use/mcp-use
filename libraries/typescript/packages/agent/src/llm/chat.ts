@@ -1,7 +1,14 @@
 import { createLlmDriver } from "./driver.js";
 import type { ProviderConfig, ProviderMessage } from "./types.js";
 
-/** Single-shot chat completion without tools (sampling, props generation). */
+/**
+ * Runs one provider chat completion without exposing tools.
+ *
+ * @param params - Provider configuration, messages, and optional cancellation
+ * signal.
+ * @returns The assistant's final text.
+ * @throws {@link LlmRequestError} when the provider rejects the HTTP request.
+ */
 export async function completeChat(params: {
   config: ProviderConfig;
   messages: ProviderMessage[];
