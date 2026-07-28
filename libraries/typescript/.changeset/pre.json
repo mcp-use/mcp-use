@@ -73,6 +73,7 @@
     "registry-mcp-v2-dependencies",
     "release-node-bundle-budget",
     "remove-cli-skills-command",
+    "remove-v1-compat",
     "rename-starter-mcp-server-template",
     "request-scoped-client-context",
     "request-scoped-server-notifications",

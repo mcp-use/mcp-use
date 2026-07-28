@@ -1,5 +1,15 @@
 # mcp-use
 
+## 2.0.0-beta.65
+
+### Patch Changes
+
+- 67b4a27: Remove the temporary v1 compatibility layer from the v2 beta:
+  - Remove the `mcp-use/server` export and legacy v1 server facade.
+  - Remove legacy `resources/<name>/widget.tsx` discovery and React widget adapters.
+  - Keep the v2 package, CLI, docs, and examples focused on the native `mcp-use` API.
+  - @mcp-use/inspector@20.0.0-beta.57
+
 ## 2.0.0-beta.64
 
 ### Patch Changes
