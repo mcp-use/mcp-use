@@ -1,0 +1,107 @@
+---
+title: "OAuth"
+description: "Choose and configure OAuth authentication for MCP servers."
+icon: "shield-check"
+---
+
+Configure an OAuth provider when an MCP server must identify callers or authorize access by user, organization, role, scope, or permission. `MCPServer` protects the transport, publishes discovery metadata, verifies bearer tokens, and exposes the verified identity on `ctx.auth`.
+
+## Choose a provider
+
+mcp-use supports resource-server providers whose authorization server supports Dynamic Client Registration (DCR).
+
+| Identity system                          | Provider                                                                  |
+| ---------------------------------------- | ------------------------------------------------------------------------- |
+| Auth0                                    | [Auth0](/v2/typescript/server/authentication/providers/auth0)             |
+| Better Auth                              | [Better Auth](/v2/typescript/server/authentication/providers/better-auth) |
+| Clerk                                    | [Clerk](/v2/typescript/server/authentication/providers/clerk)             |
+| Keycloak                                 | [Keycloak](/v2/typescript/server/authentication/providers/keycloak)       |
+| Supabase                                 | [Supabase](/v2/typescript/server/authentication/providers/supabase)       |
+| WorkOS                                   | [WorkOS](/v2/typescript/server/authentication/providers/workos)           |
+| Another DCR-capable authorization server | [Custom Provider](/v2/typescript/server/authentication/providers/custom)  |
+
+The MCP client registers and performs the authorization flow directly with the authorization server. Your MCP server does not handle authorization codes or exchange them for tokens.
+
+## Configure the server
+
+Import the server from `mcp-use` and the provider from its dedicated OAuth entry point. Provider configuration is explicit; mcp-use does not read provider-specific environment variables.
+
+```typescript
+import { MCPServer } from "mcp-use";
+import { oauthAuth0Provider } from "mcp-use/oauth/auth0";
+
+const domain = process.env.AUTH0_DOMAIN;
+if (!domain) throw new Error("AUTH0_DOMAIN is required");
+
+const server = new MCPServer({
+  name: "secure-server",
+  version: "1.0.0",
+  oauth: oauthAuth0Provider({ domain }),
+});
+
+export default server;
+```
+
+The provider binds token verification to the resolved MCP resource. Set `MCP_URL` to the public server origin in production, or pass the provider's `resource` option when you need an explicit canonical MCP endpoint.
+
+## Authorize a tool
+
+An OAuth-configured server gives tool callbacks a provider-specific `ctx.auth.user`. All providers normalize the stable subject to `id`; additional fields depend on the provider.
+
+```typescript
+server.tool(
+  {
+    name: "get_profile",
+    description: "Return the authenticated caller.",
+  },
+  async (_args, ctx) => {
+    const profile = {
+      id: ctx.auth.user.id,
+      email: ctx.auth.user.email ?? null,
+      scopes: ctx.auth.scopes,
+      permissions: ctx.auth.permissions,
+    };
+
+    return {
+      content: [{ type: "text", text: JSON.stringify(profile) }],
+    };
+  },
+);
+```
+
+`scopes` come from the verified SDK auth information. `permissions` and `user` come from the provider's verified claim mapping. Use [User Context](/v2/typescript/server/authentication/user-context) for the complete shape and authorization patterns.
+
+## What OAuth changes
+
+When `oauth` is configured:
+
+- protected-resource and authorization-server metadata are published for clients;
+- MCP transport requests require a bearer token;
+- invalid, expired, incorrectly resourced tokens, and tokens missing configured `requiredScopes` are rejected before tool code runs;
+- callbacks receive the verified access token, identity, scopes, permissions, expiry, client ID when present, and resource.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="User Context"
+    icon="user"
+    href="/v2/typescript/server/authentication/user-context"
+  >
+    Use verified identity and authorization data inside callbacks.
+  </Card>
+  <Card
+    title="Custom Provider"
+    icon="code"
+    href="/v2/typescript/server/authentication/providers/custom"
+  >
+    Integrate another DCR-capable authorization server.
+  </Card>
+  <Card
+    title="Client Authentication"
+    icon="router"
+    href="/v2/typescript/client/authentication"
+  >
+    Connect a TypeScript MCP client to an OAuth-protected server.
+  </Card>
+</CardGroup>

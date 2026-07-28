@@ -1,0 +1,114 @@
+---
+title: "Server Manager"
+description: "Let LangChainMCPAgent load one MCP server's tools on demand."
+icon: "server"
+---
+
+Server Manager gives `LangChainMCPAgent` management tools first, then exposes the active MCP server's tools after the model selects a server. Use it when loading every tool from every configured server would create an oversized or confusing tool list.
+
+## Enable Server Manager
+
+Server Manager requires explicit mode with an `MCPClient`. It cannot run with connectors alone.
+
+```typescript
+import { ChatOpenAI } from "@langchain/openai";
+import { MCPClient } from "@mcp-use/client";
+import { LangChainMCPAgent } from "@mcp-use/agent/langchain";
+
+async function main() {
+  const client = new MCPClient({
+    mcpServers: {
+      filesystem: {
+        command: "npx",
+        args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+      },
+      browser: {
+        command: "npx",
+        args: ["@playwright/mcp@latest"],
+      },
+    },
+  });
+
+  const agent = new LangChainMCPAgent({
+    llm: new ChatOpenAI({ model: "gpt-4o", temperature: 0 }),
+    client,
+    useServerManager: true,
+    maxSteps: 12,
+  });
+
+  try {
+    await agent.initialize();
+    const result = await agent.run({
+      prompt:
+        "List the available MCP servers, select the filesystem server, and summarize /tmp.",
+    });
+    console.log(result);
+  } finally {
+    await agent.close();
+  }
+}
+
+main().catch(console.error);
+```
+
+A successful run lists the configured servers, activates `filesystem`, and uses its tools. The agent rebuilds its LangChain executor when the active tool set changes.
+
+## Understand the management tools
+
+| Tool | Behavior |
+| --- | --- |
+| `list_mcp_servers` | Lists configured server names and cached item counts. Counts can be zero before tools are loaded or prefetched. |
+| `connect_to_mcp_server` | Reuses or creates a session, activates the server, and loads its tools, resources, and prompts when not cached. |
+| `get_active_mcp_server` | Reports the selected active server without changing it. |
+| `disconnect_from_mcp_server` | Releases the active selection so its cached tools are no longer exposed. |
+| `add_mcp_server_from_config` | Adds a server, creates its session, loads its tools, and makes it active. |
+
+Only one server is active at a time. The five management tools remain available alongside the active server's cached tools.
+
+<Note>
+  `add_mcp_server_from_config` loads tools only.
+  `connect_to_mcp_server` loads tools, resources, and prompts when it first
+  caches a configured server.
+</Note>
+
+## Release a server without closing its session
+
+Despite its tool name, `disconnect_from_mcp_server` does not close the underlying MCP session. It sets the active server to `null`; the session and cached tools remain available for later selection.
+
+Use `await agent.close()` to finish the agent lifecycle. `LangChainMCPAgent` shuts down observability, clears its executor and tools, and closes the `MCPClient` sessions.
+
+## Customize the manager
+
+Import `ServerManager` and `LangChainAdapter` from the LangChain subpath. Use `serverManagerFactory` when you need to prefetch tools or provide a custom manager instance.
+
+```typescript
+import {
+  LangChainAdapter,
+  LangChainMCPAgent,
+  ServerManager,
+} from "@mcp-use/agent/langchain";
+
+const agent = new LangChainMCPAgent({
+  llm,
+  client,
+  useServerManager: true,
+  serverManagerFactory: (managerClient) => {
+    const adapter = new LangChainAdapter();
+    return new ServerManager(managerClient, adapter);
+  },
+});
+
+await agent.initialize();
+await agent.close();
+```
+
+`prefetchServerTools()` caches tools, resources, and prompts for configured servers. It can create sessions and leaves those sessions open until client cleanup.
+
+## Know when to skip it
+
+For one or two small servers, load tools normally. Server Manager adds a model decision before the first server tool call and can restart execution when the exposed tool set changes.
+
+## Next steps
+
+- [Set up LangChainMCPAgent](/v2/typescript/agent/langchain/index)
+- [Trace Server Manager runs](/v2/typescript/agent/langchain/observability)
