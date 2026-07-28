@@ -60,9 +60,9 @@
     "test:run": "vitest run"
   },
   "dependencies": {
-    "@modelcontextprotocol/client": "2.0.0-beta.5",
-    "@modelcontextprotocol/core": "2.0.0-beta.5",
-    "@modelcontextprotocol/ext-apps": "npm:@mcp-use/ext-apps@1.7.4-pr720.0"
+    "@modelcontextprotocol/client": "2.0.0",
+    "@modelcontextprotocol/core": "2.0.0",
+    "@modelcontextprotocol/ext-apps": "npm:@mcp-use/ext-apps@1.7.4-pr720.1"
   },
   "peerDependencies": {
     "@e2b/code-interpreter": "^2.6.1",

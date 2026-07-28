@@ -111,10 +111,10 @@
   "dependencies": {
     "@mcp-use/cli": "workspace:*",
     "@mcp-use/inspector": "workspace:*",
-    "@modelcontextprotocol/client": "2.0.0-beta.5",
-    "@modelcontextprotocol/core": "2.0.0-beta.5",
-    "@modelcontextprotocol/ext-apps": "npm:@mcp-use/ext-apps@1.7.4-pr720.0",
-    "@modelcontextprotocol/server": "2.0.0-beta.5",
+    "@modelcontextprotocol/client": "2.0.0",
+    "@modelcontextprotocol/core": "2.0.0",
+    "@modelcontextprotocol/ext-apps": "npm:@mcp-use/ext-apps@1.7.4-pr720.1",
+    "@modelcontextprotocol/server": "2.0.0",
     "hono": "^4.12.27",
     "jose": "^6.1.3"
   },

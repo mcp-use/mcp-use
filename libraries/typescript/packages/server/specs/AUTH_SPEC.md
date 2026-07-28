@@ -4,7 +4,7 @@
 
 > **Implementation phase note:** OAuth proxy mode is deferred and must not be implemented in the current auth implementation phase. Its detailed future design remains in this document. Direct resource-server mode follows [AUTH_IMPLEMENTATION.md](./AUTH_IMPLEMENTATION.md).
 
-**Protocol basis:** Current [MCP authorization](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization) (revision 2025-11-25) and [MCP security guidance](https://modelcontextprotocol.io/docs/tutorials/security/security_best_practices), OAuth 2.1 resource-server guidance, and `@modelcontextprotocol/server@2.0.0-beta.5`. Beta.5 provides runtime-neutral resource-server helpers in server core; it does not provide authorization-server primitives.
+**Protocol basis:** Current [MCP authorization](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization) (revision 2025-11-25) and [MCP security guidance](https://modelcontextprotocol.io/docs/tutorials/security/security_best_practices), OAuth 2.1 resource-server guidance, and `@modelcontextprotocol/server@2.0.0`. The stable release provides runtime-neutral resource-server helpers in server core; it does not provide authorization-server primitives.
 
 **Scope:** This is the v2 resource-server contract. Direct external-authorization-server mode is the default. mcp-use verifies an access token when its external authorization server is advertised for the canonical MCP resource and the token is issued specifically for that resource. This is direct mode, not proxy pass-through.
 
@@ -918,7 +918,7 @@ The first release has no `/revoke` endpoint and does not advertise `revocation_e
 
 ## Meet the SDK dependency prerequisite
 
-`@modelcontextprotocol/server`, `@modelcontextprotocol/core`, and `@modelcontextprotocol/client` use coordinated `2.0.0-beta.5` pins.
+`@modelcontextprotocol/server`, `@modelcontextprotocol/core`, and `@modelcontextprotocol/client` use coordinated stable `2.0.0` pins.
 
 ## Verify the implementation
 
