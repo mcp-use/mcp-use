@@ -62,13 +62,13 @@
   <tbody>
     <tr>
       <td width="50%" valign="top">
-        <pre lang="bash"><code>npx -y create-mcp-use-app@beta</code></pre>
+        <pre lang="bash"><code>npx -y create-mcp-use-app@beta # create an MCP app</code></pre>
         <p>Run <code>npm run dev</code> in the generated project.</p>
         <p>Open <a href="http://localhost:3000/mcp/inspector"><code>http://localhost:3000/mcp/inspector</code></a></p>
         <p><a href="https://mcp-use.com/docs/typescript/getting-started/quickstart">TS Docs</a></p>
       </td>
       <td width="50%" valign="top">
-        <pre lang="text"><code>Build an MCP server following the instructions at https://mcp-use.com/prompt.md</code></pre>
+        <pre lang="text"><code>Build an MCP server: https://mcp-use.com/prompt.md</code></pre>
         <p><a href="https://mcp-use.com/prompt.md">Read the prompt →</a></p>
       </td>
     </tr>
