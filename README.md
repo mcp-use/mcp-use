@@ -19,7 +19,7 @@
   </p>
 
   <p>
-    <a href="https://mcp-use.com/docs/typescript/getting-started/quickstart"><strong>Documentation</strong></a>
+    <a href="https://docs.mcp-use.com/v2/typescript/getting-started/welcome"><strong>Documentation</strong></a>
     · <a href="https://inspector.mcp-use.com/inspector"><strong>Inspector</strong></a>
     · <a href="#examples"><strong>Examples</strong></a>
     · <a href="https://manufact.com"><strong>Deploy</strong></a>
@@ -62,10 +62,10 @@
 ### Start with your agent
 
 ```text
-Build an MCP server: https://mcp-use.com/prompt.md
+Build an MCP server: https://mcp-use.com/prompt@beta.md
 ```
 
-[Read the prompt →](https://mcp-use.com/prompt.md)
+[Read the prompt →](https://mcp-use.com/prompt@beta.md)
 
 ### Start with code
 
@@ -75,7 +75,7 @@ npx -y create-mcp-use-app@beta
 
 Run `npm run dev` in the generated project · open [`http://localhost:3000/mcp/inspector`](http://localhost:3000/mcp/inspector)
 
-[TS Docs](https://mcp-use.com/docs/typescript/getting-started/quickstart)
+[TS Docs](https://docs.mcp-use.com/v2/typescript/getting-started/welcome)
 
 ## Everything you need to ship MCP
 
