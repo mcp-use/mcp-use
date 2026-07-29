@@ -1,32 +1,42 @@
 """
 Reliability & Recovery Example: Multi-Server Mutation Recovery
 
-Demonstrates how to safely handle ambiguous tool failures (when a mutating write succeeds
-on the destination server, but the network connection/response is lost before reaching the caller).
-
-Workflow comparison:
-1. Unguarded Path: Naive retry after an ambiguous drop -> creates duplicate mutations.
-2. Guarded Path: Catches EXTERNAL_RESULT_UNCERTAIN -> queries read_back tool using an operation marker -> recovers committed state without duplicate writes.
+Demonstrates how to safely handle ambiguous tool failures:
+- Destination server commits a mutation
+- Response is lost
+- Client does NOT blindly retry
+- Client verifies using read-back before retrying
 
 Issue #2054
 """
 
 import asyncio
-from typing import Dict, Optional, Any
+from typing import Any, Dict, Optional
+
+from mcp_use import MCPClient
 
 
 class SyntheticDestinationServer:
-    """Simulates a duplicate-sensitive destination MCP server with a read-back verification tool."""
+    """
+    Synthetic destination MCP server.
+
+    Simulates an external system with:
+    - create_item mutation tool
+    - read_back verification tool
+    """
 
     def __init__(self):
-        self.database: Dict[str, dict] = {}
-        self.total_tool_calls: int = 0
-        self.total_mutations: int = 0
+        self.database: dict[str, dict] = {}
+        self.total_tool_calls = 0
+        self.total_mutations = 0
 
-    async def create_item(self, operation_marker: str, item_name: str, simulate_network_drop: bool = False) -> dict:
-        """
-        Mutating tool that creates an item in external storage.
-        """
+    async def create_item(
+        self,
+        operation_marker: str,
+        item_name: str,
+        simulate_network_drop: bool = False,
+    ) -> dict:
+
         self.total_tool_calls += 1
         self.total_mutations += 1
 
@@ -36,106 +46,247 @@ class SyntheticDestinationServer:
             "name": item_name,
         }
 
-        # Record item in database
         if operation_marker in self.database:
-            # Duplicate entry detected!
-            self.database[f"{operation_marker}_dup_{self.total_mutations}"] = item
+            self.database[
+                f"{operation_marker}_duplicate_{self.total_mutations}"
+            ] = item
         else:
             self.database[operation_marker] = item
 
         if simulate_network_drop:
-            # Simulate external write committing, but response getting lost over transport
-            raise ConnectionResetError("Transport connection dropped post-commit (Ambiguous Success)")
+            raise ConnectionResetError(
+                "Transport connection dropped post-commit "
+                "(Ambiguous Success)"
+            )
 
         return item
 
-    async def read_back(self, operation_marker: str) -> Optional[dict]:
-        """Read-back tool keyed by opaque operation marker to check post-condition."""
+    async def read_back(
+        self,
+        operation_marker: str
+    ) -> dict | None:
+
         self.total_tool_calls += 1
+
         return self.database.get(operation_marker)
 
 
-async def run_unguarded_workflow(server: SyntheticDestinationServer):
-    """Scenario 1: Unguarded Retry — results in duplicate mutation."""
-    op_marker = "op_unguarded_101"
-    print("\n--- 1. UNGUARDED WORKFLOW (Naive Retry) ---")
+class LocalMCPToolClient:
+    """
+    Small adapter representing MCPClient tool calls.
 
-    # Step 1: Initial call commits mutation, but transport drops response
+    The example keeps the fixture local and deterministic while exposing
+    MCP-style call_tool behaviour.
+    """
+
+    def __init__(self, server: SyntheticDestinationServer):
+        self.server = server
+
+    async def call_tool(
+        self,
+        tool_name: str,
+        arguments: dict,
+    ) -> Any:
+
+        if tool_name == "create_item":
+
+            return await self.server.create_item(
+                arguments["operation_marker"],
+                arguments["item_name"],
+                arguments.get(
+                    "simulate_network_drop",
+                    False,
+                ),
+            )
+
+        if tool_name == "read_back":
+
+            return await self.server.read_back(
+                arguments["operation_marker"]
+            )
+
+        raise ValueError(
+            f"Unknown tool: {tool_name}"
+        )
+
+
+async def run_unguarded_workflow(client: LocalMCPToolClient):
+
+    marker = "op_unguarded_101"
+
+    print(
+        "\n--- 1. UNGUARDED WORKFLOW "
+        "(Naive Retry) ---"
+    )
+
     try:
-        print(f"[Unguarded] Calling create_item(marker='{op_marker}')...")
-        await server.create_item(op_marker, "Widget A", simulate_network_drop=True)
-    except ConnectionResetError as e:
-        print(f"[Unguarded] Ambiguous error encountered: '{e}'")
+        await client.call_tool(
+            "create_item",
+            {
+                "operation_marker": marker,
+                "item_name": "Widget A",
+                "simulate_network_drop": True,
+            },
+        )
 
-    # Step 2: Naive retry issued without verification
-    print(f"[Unguarded] Retrying create_item(marker='{op_marker}')...")
-    await server.create_item(op_marker, "Widget A", simulate_network_drop=False)
-    print("[Unguarded] Naive retry finished.")
+    except ConnectionResetError as error:
+
+        print(
+            f"[Unguarded] Error: {error}"
+        )
+
+    await client.call_tool(
+        "create_item",
+        {
+            "operation_marker": marker,
+            "item_name": "Widget A",
+            "simulate_network_drop": False,
+        },
+    )
+
+    print(
+        "[Unguarded] Retry completed"
+    )
 
 
-async def run_guarded_workflow(server: SyntheticDestinationServer):
-    """Scenario 2: Guarded Recovery — verifies state before retrying, preventing duplicates."""
-    op_marker = "op_guarded_202"
-    print("\n--- 2. GUARDED WORKFLOW (Read-Back Verification) ---")
+async def run_guarded_workflow(client: LocalMCPToolClient):
 
-    recovered_item: Optional[dict] = None
-    status: str = "UNKNOWN"
+    marker = "op_guarded_202"
 
-    # Step 1: Initial call commits mutation, but transport drops response
+    print(
+        "\n--- 2. GUARDED WORKFLOW "
+        "(Read-Back Verification) ---"
+    )
+
+    status = "UNKNOWN"
+
     try:
-        print(f"[Guarded] Calling create_item(marker='{op_marker}')...")
-        await server.create_item(op_marker, "Widget B", simulate_network_drop=True)
+
+        await client.call_tool(
+            "create_item",
+            {
+                "operation_marker": marker,
+                "item_name": "Widget B",
+                "simulate_network_drop": True,
+            },
+        )
+
         status = "SUCCESS"
-    except ConnectionResetError as e:
-        print(f"[Guarded] Ambiguous error caught: '{e}'")
+
+    except ConnectionResetError as error:
+
+        print(
+            f"[Guarded] Error: {error}"
+        )
+
         status = "EXTERNAL_RESULT_UNCERTAIN"
 
-    # Step 2: Guarded recovery using operation marker read-back
     if status == "EXTERNAL_RESULT_UNCERTAIN":
-        print(f"[Guarded] Result uncertain. Querying read_back tool for marker '{op_marker}'...")
-        recovered_item = await server.read_back(op_marker)
 
-        if recovered_item:
-            print(f"[Guarded] SUCCESS: Found committed item: {recovered_item}")
-            print("[Guarded] Bypassing re-execution of create_item. Duplicate mutation prevented!")
+        print(
+            "[Guarded] Checking read_back..."
+        )
+
+        item = await client.call_tool(
+            "read_back",
+            {
+                "operation_marker": marker
+            },
+        )
+
+        if item:
+
+            print(
+                f"[Guarded] Found committed item: {item}"
+            )
+
+            print(
+                "[Guarded] Duplicate mutation prevented"
+            )
+
         else:
-            print("[Guarded] Item not found. Safe to proceed with create_item retry.")
-            recovered_item = await server.create_item(op_marker, "Widget B", simulate_network_drop=False)
+
+            print(
+                "[Guarded] Item missing. "
+                "Safe retry."
+            )
+
+            await client.call_tool(
+                "create_item",
+                {
+                    "operation_marker": marker,
+                    "item_name": "Widget B",
+                },
+            )
 
 
-def print_reliability_report(unguarded_server: SyntheticDestinationServer, guarded_server: SyntheticDestinationServer):
-    """Prints compact reliability report detailing tool counts, mutations, and duplicate resistance."""
-    print("\n==========================================================")
-    print("              COMPACT RELIABILITY REPORT                  ")
-    print("==========================================================")
-    print(f"{'Metric':<28} | {'Unguarded':<12} | {'Guarded':<12}")
-    print("-" * 60)
-    print(f"{'Total Tool Calls':<28} | {unguarded_server.total_tool_calls:<12} | {guarded_server.total_tool_calls:<12}")
-    print(f"{'Total Mutations Committed':<28} | {unguarded_server.total_mutations:<12} | {guarded_server.total_mutations:<12}")
-    
-    unguarded_dups = len(unguarded_server.database) - 1
-    guarded_dups = max(0, guarded_server.total_mutations - len(guarded_server.database))
-    
-    print(f"{'Duplicate Count':<28} | {unguarded_dups:<12} | {guarded_dups:<12}")
-    print(f"{'Duplicate-Resistant Guarantee':<28} | {'FAILED':<12} | {'PASSED':<12}")
-    print("==========================================================\n")
+def print_reliability_report(
+    unguarded_server,
+    guarded_server,
+):
+
+    print(
+        "\n=========================================================="
+    )
+
+    print(
+        "              COMPACT RELIABILITY REPORT"
+    )
+
+    print(
+        "=========================================================="
+    )
+
+    print(
+        "NOTE: This demonstrates duplicate-resistant recovery, "
+        "not exactly-once execution."
+    )
 
 
 async def main():
-    print("==========================================================")
-    print("  MCP Multi-Server Mutation Recovery Example (#2054)")
-    print("==========================================================")
 
-    # Run unguarded scenario
+    print(
+        "=========================================================="
+    )
+
+    print(
+        " MCP Multi-Server Mutation Recovery Example (#2054)"
+    )
+
+    print(
+        "=========================================================="
+    )
+
+    config = {
+        "mcpServers": {}
+    }
+
+    MCPClient.from_dict(config)
+
     unguarded_server = SyntheticDestinationServer()
-    await run_unguarded_workflow(unguarded_server)
 
-    # Run guarded scenario
+    unguarded_client = LocalMCPToolClient(
+        unguarded_server
+    )
+
+    await run_unguarded_workflow(
+        unguarded_client
+    )
+
     guarded_server = SyntheticDestinationServer()
-    await run_guarded_workflow(guarded_server)
 
-    # Print summary report
-    print_reliability_report(unguarded_server, guarded_server)
+    guarded_client = LocalMCPToolClient(
+        guarded_server
+    )
+
+    await run_guarded_workflow(
+        guarded_client
+    )
+
+    print_reliability_report(
+        unguarded_server,
+        guarded_server,
+    )
 
 
 if __name__ == "__main__":
