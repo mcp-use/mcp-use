@@ -22,12 +22,16 @@ Set **`MCP_ASSETS_URL`** when view JS/CSS and `public/` files are served from a 
 MCP_ASSETS_URL=https://cdn.example.com/storage/v1/object/public/widgets
 ```
 
+This is the complete asset prefix. The SDK appends only `/_mcp-use/...`;
+it does not combine `MCP_ASSETS_URL` with the server's `basePath`.
+
 For example, `MCP_URL=https://myserver.com` with `basePath: "/api/mcp"`
 produces the full endpoint and default `ui.domain`
 `https://myserver.com/api/mcp`. An explicit `view.domain` overrides that
 default.
 
-When `MCP_ASSETS_URL` is unset, assets use the same origin as `MCP_URL` (or the request origin behind a proxy).
+When `MCP_ASSETS_URL` is unset, assets use the same origin and `basePath` as
+the MCP server (`MCP_URL`, or the request origin behind a proxy).
 
 At **`mcp-use build`**, `MCP_ASSETS_URL` rewrites manifest paths to full `https://` URLs for static upload workflows.
 
@@ -58,7 +62,9 @@ server.tool(
       },
     },
   },
-  async () => ({ /* ... */ })
+  async () => ({
+    /* ... */
+  }),
 );
 ```
 
@@ -101,7 +107,8 @@ The mcp-use Inspector provides a **CSP Mode Toggle** for testing:
 - **Widget-Declared**: Enforces the view's declared CSP (production-like)
 
 <Warning>
-CSP violations are logged in the console. Use Widget-Declared mode to catch CSP issues before production deployment.
+  CSP violations are logged in the console. Use Widget-Declared mode to catch
+  CSP issues before production deployment.
 </Warning>
 
 ## Next Steps

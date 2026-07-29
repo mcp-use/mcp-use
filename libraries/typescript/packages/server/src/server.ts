@@ -113,6 +113,7 @@ import {
   createViewPublicHandler,
   createViewAssetsHandler,
   registerViews,
+  hasExplicitAssetsBase,
   resolveAssetsBase,
   synthesizeViewDocument,
   viewResourceConfig,
@@ -1977,7 +1978,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           entry,
           assetsBase,
           basePath,
-          viewName
+          viewName,
+          hasExplicitAssetsBase()
         );
         return {
           contents: [

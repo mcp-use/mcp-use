@@ -482,12 +482,12 @@ Every branch includes `__mcpUseViewConfig`, whose `publicBase` is resolved per r
 - **`MCP_ASSETS_URL`** — assets URL prefix (origin + optional path): view JS/CSS hrefs and `__mcpUseViewConfig.publicBase`. Falls back to `MCP_URL` origin, then `Forwarded` / request origin.
 - **CSP env** — `CSP_URLS` (shortcut for all four MCP Apps categories) and `CSP_*_DOMAINS` per-category overrides merge with author `view.csp` before MCP auto-append. Env vars rank above MCP auto-append.
 
-At build time, a valid `MCP_ASSETS_URL` rewrites production view `entry`, `css`, and `scripts` paths to full URLs using the server entry's `basePath`. The rewritten registry is embedded in `index.js`; the CLI does not upload files.
+At build time, a valid `MCP_ASSETS_URL` rewrites production view `entry`, `css`, and `scripts` paths beneath that complete prefix. It is independent of the MCP route, so the server entry's `basePath` is not appended. The rewritten registry is embedded in `index.js`; the CLI does not upload files.
 
 To deploy those URLs, upload the contents of `.mcp-use/build/views/` and configure the static host so:
 
-- `${MCP_ASSETS_URL}${basePath}/_mcp-use/views/<name>/<path>` serves `.mcp-use/build/views/<name>/<path>`.
-- `${MCP_ASSETS_URL}${basePath}/_mcp-use/public/<path>` serves `.mcp-use/build/views/public/<path>`.
+- `${MCP_ASSETS_URL}/_mcp-use/views/<name>/<path>` serves `.mcp-use/build/views/<name>/<path>`.
+- `${MCP_ASSETS_URL}/_mcp-use/public/<path>` serves `.mcp-use/build/views/public/<path>`.
 
 Keep `MCP_ASSETS_URL` set at runtime when `publicBase` should also point at that static host. The full production view bundle URLs remain embedded even if the runtime variable is absent.
 

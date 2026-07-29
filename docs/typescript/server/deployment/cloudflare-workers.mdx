@@ -4,17 +4,17 @@ description: Serve mcp-use Views through a Cloudflare Workers static binding.
 ---
 
 Workers are an edge runtime, so serve generated View files through the
-Workers static-assets binding. Route `/mcp/_mcp-use/*` to that binding and all
+Workers static-assets binding. Route `/assets/_mcp-use/*` to that binding and all
 other requests to `server.fetch`.
 
 ```bash
 MCP_URL=https://<worker>.<account>.workers.dev \
-MCP_ASSETS_URL=https://<worker>.<account>.workers.dev \
+MCP_ASSETS_URL=https://<worker>.<account>.workers.dev/assets \
 npm run deploy
 ```
 
 Configure the asset directory as `.mcp-use/build`. The route adapter removes
-the `/mcp/_mcp-use/` prefix before requesting the binding, which maps it to
+the `/assets/_mcp-use/` prefix before requesting the binding, which maps it to
 the generated `views/` directory.
 
 ```bash

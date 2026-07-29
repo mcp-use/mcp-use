@@ -45,7 +45,8 @@ export function resolveExternalAssetUrl(
   assetPath: string,
   assetsBase: string,
   basePath: string,
-  viewName: string
+  viewName: string,
+  explicitAssetsBase = false
 ): string {
   if (
     assetPath.startsWith("http://") ||
@@ -57,7 +58,11 @@ export function resolveExternalAssetUrl(
   if (assetPath.startsWith("/")) {
     return resolveAssetUrl(assetPath, assetsBase);
   }
-  return `${assetsBase}${viewAssetsBasePath(basePath, viewName)}${assetPath.replace(/^\/+/, "")}`;
+  const assetPathPrefix = viewAssetsBasePath(
+    explicitAssetsBase ? "/" : basePath,
+    viewName
+  );
+  return `${assetsBase}${assetPathPrefix}${assetPath.replace(/^\/+/, "")}`;
 }
 
 /**
@@ -69,9 +74,13 @@ export function resolveExternalAssetUrl(
  */
 export function resolvePublicBase(
   assetsBase: string,
-  basePath: string
+  basePath: string,
+  explicitAssetsBase = false
 ): string {
-  return `${assetsBase}${pathUnderBase(basePath, "_mcp-use/public")}/`;
+  return `${assetsBase}${pathUnderBase(
+    explicitAssetsBase ? "/" : basePath,
+    "_mcp-use/public"
+  )}/`;
 }
 
 /**
@@ -136,10 +145,11 @@ export function synthesizeViewDocument(
   entry: ViewManifestEntry,
   assetsBase: string,
   basePath: string,
-  viewName?: string
+  viewName?: string,
+  explicitAssetsBase = false
 ): string {
   const viewConfig: McpUseViewConfig = {
-    publicBase: resolvePublicBase(assetsBase, basePath),
+    publicBase: resolvePublicBase(assetsBase, basePath, explicitAssetsBase),
   };
   const configScript = `<script>globalThis.__mcpUseViewConfig=${JSON.stringify(viewConfig)};</script>`;
 
@@ -173,14 +183,14 @@ ${moduleScript}
   const cssLinks = entry.css
     .map(
       (path) =>
-        `<link rel="stylesheet" href="${escapeHtml(resolveExternalAssetUrl(path, assetsBase, basePath, viewName))}">`
+        `<link rel="stylesheet" href="${escapeHtml(resolveExternalAssetUrl(path, assetsBase, basePath, viewName, explicitAssetsBase))}">`
     )
     .join("\n");
 
   const scriptTags = (entry.scripts ?? [])
     .map(
       (path) =>
-        `<script type="module" src="${escapeHtml(resolveExternalAssetUrl(path, assetsBase, basePath, viewName))}"></script>`
+        `<script type="module" src="${escapeHtml(resolveExternalAssetUrl(path, assetsBase, basePath, viewName, explicitAssetsBase))}"></script>`
     )
     .join("\n");
 
@@ -188,7 +198,8 @@ ${moduleScript}
     entry.entry,
     assetsBase,
     basePath,
-    viewName
+    viewName,
+    explicitAssetsBase
   );
 
   return `<!doctype html>

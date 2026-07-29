@@ -168,7 +168,7 @@ mcp-use build --path ./my-server
 - Pass `--inline` to embed each view's bundled JavaScript and CSS directly in the HTML returned by `resources/read`. There is no `--no-inline`; omit `--inline` to use external assets.
 - The build is transpile-only. Run `mcp-use typecheck` as a separate project script when type checking is required.
 - TypeScript path aliases come from the selected project's `tsconfig.json`.
-- If `MCP_ASSETS_URL` is set for an external build, view paths are rewritten to that asset origin using the server's `basePath`. Inline view bundles are not rewritten.
+- If `MCP_ASSETS_URL` is set for an external build, view paths are rewritten beneath that complete asset prefix. The server's `basePath` is not appended. Inline view bundles are not rewritten.
 - The selected project's `public/` directory is copied to `.mcp-use/build/views/public/`.
 
 ## `start`
@@ -629,7 +629,7 @@ mcp-use generate-types --server src/server.ts
 | `HOST`                      | `dev`, `start`, server runtime            | Bind host when `--host` is not provided. `start` and direct `listen()` fall back to `config.host` before `127.0.0.1`.                                                                                       | `127.0.0.1`                         |
 | `NODE_ENV`                  | `dev`, `start`, widget builds             | Runtime environment. `dev` sets `development`; `start` sets `production`.                                                                                                                                   | Command-specific                    |
 | `MCP_URL`                   | `dev`, `start`, server runtime            | **Server public origin** (`.origin` only). Combined with `basePath` for the OAuth resource URL and default `ui.domain`; its origin feeds CSP `connectDomains` and dev HMR websocket. Lower priority than `CSP_URLS`. Preserved when already set. | Local server or tunnel origin       |
-| `MCP_ASSETS_URL`            | `build`, server runtime                   | **Assets URL prefix** (origin + optional path) for view JS/CSS and `public/`. Falls back to `MCP_URL` origin. When set at build, manifest paths become full CDN URLs (path segment from server `basePath`). | None (falls back to server origin)  |
+| `MCP_ASSETS_URL`            | `build`, server runtime                   | **Complete assets URL prefix** (origin + optional path) for view JS/CSS and `public/`. The SDK appends only `/_mcp-use/...`, never the server `basePath`. When unset, assets fall back to the MCP server origin plus `basePath`. | None (falls back to server route)  |
 | `CSP_URLS`                  | server runtime                            | Comma-separated CSP domain shortcut — applied to all four MCP Apps categories when per-category vars are unset. Higher priority than `MCP_URL` auto-append.                                                 | None                                |
 | `CSP_CONNECT_DOMAINS`       | server runtime                            | Overrides `CSP_URLS` for `connectDomains`                                                                                                                                                                   | None                                |
 | `CSP_RESOURCE_DOMAINS`      | server runtime                            | Overrides `CSP_URLS` for `resourceDomains`                                                                                                                                                                  | None                                |

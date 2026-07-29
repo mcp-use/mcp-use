@@ -342,6 +342,38 @@ describe("server branding", () => {
     }
   });
 
+  it("keeps an explicit assets prefix independent from basePath for local icons", async () => {
+    const previousAssetsUrl = process.env.MCP_ASSETS_URL;
+    process.env.MCP_ASSETS_URL = "https://cdn.example.test/widgets/app-a";
+    const root = project({ "icon.png": "png" });
+    const server = new MCPServer({
+      name: "independent-assets-prefix",
+      version: "1.0.0",
+      basePath: "/api/mcp",
+      icons: [{ src: "icon.png", mimeType: "image/png" }],
+    });
+    primeDev(server, root);
+
+    try {
+      const started = await server.listen(0);
+      const client = makeClient();
+      await client.connect(
+        new StreamableHTTPClientTransport(new URL(started.url))
+      );
+      expect(client.getServerVersion()?.icons?.[0]?.src).toBe(
+        "https://cdn.example.test/widgets/app-a/_mcp-use/public/icon.png"
+      );
+      await client.close();
+    } finally {
+      await server.close();
+      if (previousAssetsUrl === undefined) {
+        delete process.env.MCP_ASSETS_URL;
+      } else {
+        process.env.MCP_ASSETS_URL = previousAssetsUrl;
+      }
+    }
+  });
+
   it("coexists with OAuth metadata while the exact MCP route stays gated", async () => {
     const root = project({ "oauth-icon.svg": "<svg></svg>" });
     const oauth = oauthCustomProvider({

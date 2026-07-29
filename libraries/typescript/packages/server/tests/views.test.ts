@@ -1296,6 +1296,30 @@ describe("views document synthesis", () => {
     );
   });
 
+  it("does not append basePath to an explicit assets prefix", () => {
+    const html = synthesizeViewDocument(
+      {
+        kind: "external",
+        entry: "assets/entry.js",
+        css: ["assets/style.css"],
+      },
+      "https://cdn.example.com/widgets/app-a",
+      "/api/mcp",
+      "demo-view",
+      true
+    );
+    expect(html).toContain(
+      'src="https://cdn.example.com/widgets/app-a/_mcp-use/views/demo-view/assets/entry.js"'
+    );
+    expect(html).toContain(
+      'href="https://cdn.example.com/widgets/app-a/_mcp-use/views/demo-view/assets/style.css"'
+    );
+    expect(html).toContain(
+      '"publicBase":"https://cdn.example.com/widgets/app-a/_mcp-use/public/"'
+    );
+    expect(html).not.toContain("/api/mcp/_mcp-use/");
+  });
+
   it("requires viewName for external entries without origin-absolute paths", () => {
     expect(() =>
       synthesizeViewDocument(
@@ -1561,7 +1585,7 @@ describe("views env URL / CSP (e2e)", () => {
       }
     ).contents[0]!;
     expect(content.text).toContain(
-      "https://cdn.example.com/storage/v1/object/public/widgets/api/mcp/_mcp-use/views/product-search-result/assets/demo.js"
+      "https://cdn.example.com/storage/v1/object/public/widgets/_mcp-use/views/product-search-result/assets/demo.js"
     );
     const csp = content._meta?.ui?.csp;
     expect(csp?.connectDomains).toContain("https://server.example.com");

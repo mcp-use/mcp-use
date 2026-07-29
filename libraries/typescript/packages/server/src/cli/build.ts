@@ -29,10 +29,7 @@ import {
 } from "./next-compat.js";
 import { mcpUseViewsPlugin } from "./views-plugin.js";
 import { syncMcpEnvDeclaration } from "./mcp-env-declaration.js";
-import {
-  resolveBuildBasePath,
-  validateViewBindingsAtBuild,
-} from "./views-bindings.js";
+import { validateViewBindingsAtBuild } from "./views-bindings.js";
 import {
   createBindingValidationServer,
   discoverViews,
@@ -131,31 +128,27 @@ function readBuildAssetsBase(): string | undefined {
 function toCdnAssetUrl(
   relativePath: string,
   viewName: string,
-  assetsBase: string,
-  basePath: string
+  assetsBase: string
 ): string {
   const clean = relativePath.replace(/^\/+/, "");
-  return `${assetsBase}${viewAssetsBasePath(basePath, viewName)}${clean}`;
+  return `${assetsBase}${viewAssetsBasePath("/", viewName)}${clean}`;
 }
 
 function applyBuildAssetsPrefix(
   entry: ViewsManifest[string],
   viewName: string,
-  assetsBase: string,
-  basePath: string
+  assetsBase: string
 ): ViewsManifest[string] {
   if (entry.kind !== "external") {
     return entry;
   }
   return {
     ...entry,
-    entry: toCdnAssetUrl(entry.entry, viewName, assetsBase, basePath),
-    css: entry.css.map((path) =>
-      toCdnAssetUrl(path, viewName, assetsBase, basePath)
-    ),
+    entry: toCdnAssetUrl(entry.entry, viewName, assetsBase),
+    css: entry.css.map((path) => toCdnAssetUrl(path, viewName, assetsBase)),
     ...(entry.scripts !== undefined && {
       scripts: entry.scripts.map((path) =>
-        toCdnAssetUrl(path, viewName, assetsBase, basePath)
+        toCdnAssetUrl(path, viewName, assetsBase)
       ),
     }),
   };
@@ -419,15 +412,9 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     paths.cache,
     false
   );
-  let buildBasePath: string;
   const viewsManifest: ViewsManifest = {};
   const buildAssetsBase = readBuildAssetsBase();
   try {
-    buildBasePath = await resolveBuildBasePath(
-      bindingServer.environments.ssr,
-      entry
-    );
-
     for (const view of views) {
       let manifestEntry = await buildView(view, {
         cwd: options.cwd,
@@ -441,8 +428,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
         manifestEntry = applyBuildAssetsPrefix(
           manifestEntry,
           view.name,
-          buildAssetsBase,
-          buildBasePath
+          buildAssetsBase
         );
       }
       viewsManifest[view.name] = manifestEntry;
@@ -450,18 +436,13 @@ export async function runBuild(options: BuildOptions): Promise<void> {
 
     if (buildAssetsBase !== undefined && !inline) {
       const assetPath = `${buildAssetsBase}${viewAssetsBasePath(
-        buildBasePath,
+        "/",
         "<view-name>"
       )}`;
       console.log(
         `[mcp-use] MCP_ASSETS_URL set — publish ` +
           `${relative(options.cwd, viewsOutDir)}/ at ${assetPath}`
       );
-      if (buildBasePath !== "/mcp") {
-        console.log(
-          `[mcp-use] CDN manifest uses basePath ${buildBasePath} from server entry`
-        );
-      }
     }
 
     await copyPublicAssets(options.cwd, join(viewsOutDir, "public"));

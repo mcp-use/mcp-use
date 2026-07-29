@@ -807,7 +807,7 @@ describe("runBuild (views)", () => {
       const entryCode = readFileSync(join(buildDir, "index.js"), "utf8");
       expect(entryCode).toContain("https://cdn.example.com");
       expect(entryCode).toContain(
-        "/mcp/_mcp-use/views/product-search-result/assets/"
+        "/storage/v1/object/public/widgets/_mcp-use/views/product-search-result/assets/"
       );
     } finally {
       if (previous === undefined) {
@@ -818,7 +818,7 @@ describe("runBuild (views)", () => {
     }
   }, 60_000);
 
-  it("uses server basePath in CDN manifest when MCP_ASSETS_URL is set", async () => {
+  it("keeps MCP_ASSETS_URL independent of the server basePath", async () => {
     const cwd = copyFixture("build-views-cdn-basepath", "views");
     dirs.push(cwd);
     const indexPath = join(cwd, "src/index.ts");
@@ -837,10 +837,10 @@ describe("runBuild (views)", () => {
       const buildDir = join(cwd, WORKSPACE_DIR_NAME, "build");
       const entryCode = readFileSync(join(buildDir, "index.js"), "utf8");
       expect(entryCode).toContain(
-        "https://cdn.example.com/storage/v1/object/public/widgets/api/mcp/_mcp-use/views/product-search-result/assets/"
+        "https://cdn.example.com/storage/v1/object/public/widgets/_mcp-use/views/product-search-result/assets/"
       );
       expect(entryCode).not.toContain(
-        "https://cdn.example.com/storage/v1/object/public/widgets/mcp/_mcp-use/"
+        "https://cdn.example.com/storage/v1/object/public/widgets/api/mcp/_mcp-use/"
       );
     } finally {
       if (previous === undefined) {

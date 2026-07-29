@@ -31,13 +31,14 @@ export default server.fetch;
 Use this for Workers and Edge Functions. Build once, publish
 `.mcp-use/build` through the platform's static asset binding, and route:
 
-- `<basePath>/_mcp-use/*` to static assets
+- `<assetsPrefix>/_mcp-use/*` to static assets
 - every other request to `server.fetch(request)`
 
-When the static assets are hosted on the same public origin, set
-`MCP_ASSETS_URL` to that origin at build time. A Worker mounted at `/mcp`, for
-example, publishes `.mcp-use/build/views/` at
-`/mcp/_mcp-use/views/`.
+Set `MCP_ASSETS_URL` to the complete public prefix that owns the
+`_mcp-use` subtree. A Worker whose MCP endpoint is mounted at `/mcp`, for
+example, can use `MCP_ASSETS_URL=https://worker.example.com/assets` and publish
+`.mcp-use/build/views/` at `/assets/_mcp-use/views/`. The asset prefix is
+independent from the MCP `basePath`.
 
 ## Edge runtime with external assets
 
@@ -50,7 +51,7 @@ mcp-use build
 ```
 
 The build prints the exact destination, such as
-`https://cdn.example.com/mcp-assets/mcp/_mcp-use/views/<view-name>/`. Publish
+`https://cdn.example.com/mcp-assets/_mcp-use/views/<view-name>/`. Publish
 the contents of `.mcp-use/build/views/` at that prefix. The asset host must
 allow the View iframe's CORS and CSP requirements.
 

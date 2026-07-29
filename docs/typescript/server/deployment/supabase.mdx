@@ -16,16 +16,26 @@ mutation, or interactive script.
 ```bash
 npm install
 MCP_URL=https://<ref>.supabase.co \
-MCP_ASSETS_URL=https://<ref>.supabase.co/functions/v1 \
+MCP_ASSETS_URL=https://<ref>.supabase.co/functions/v1/mcp/assets \
 npm run deploy:edge -- --project-ref <ref>
+```
+
+Persist the same public URLs in the Edge Function runtime:
+
+```bash
+supabase secrets set --project-ref <ref> \
+  MCP_URL=https://<ref>.supabase.co \
+  MCP_ASSETS_URL=https://<ref>.supabase.co/functions/v1/mcp/assets
 ```
 
 The command builds `.mcp-use/build/views/`, stages it beneath the function,
 and uses Supabase's `static_files` configuration to bundle it. The function
-maps `/functions/v1/mcp/_mcp-use/*` to that generated tree and forwards every
-other request to `server.fetch`. Configure the server with
+maps `/functions/v1/mcp/assets/_mcp-use/*` to that generated tree and forwards
+every other request to `server.fetch`. Configure the server with
 `basePath: "/functions/v1/mcp"` so the SDK derives the full endpoint from the
-origin exactly once.
+origin exactly once. `MCP_ASSETS_URL` is the independent, complete prefix for
+the co-located `_mcp-use` asset subtree; its `/assets` folder is not part of
+the MCP server `basePath`.
 
 Verify the actual View after deploying:
 

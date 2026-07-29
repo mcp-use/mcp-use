@@ -3,16 +3,47 @@ title: Vercel Functions
 description: Deploy an mcp-use server with Views as a Vercel Function.
 ---
 
-For a non-Next Vercel Function, include `.mcp-use/build/views/**` in the
-function bundle and rewrite both the MCP route and its nested asset paths to a
-catch-all function entrypoint.
+For a non-Next Vercel Function, build locally, use a JavaScript function entry
+that imports the generated server, include `.mcp-use/build/views/**` in the
+function bundle, and rewrite nested asset paths to that entry.
+
+```js api/mcp.js
+import server from "../.mcp-use/build/index.js";
+
+export default server;
+```
+
+```json vercel.json
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "echo 'Using prebuilt .mcp-use artifacts'",
+  "functions": {
+    "api/mcp.js": {
+      "includeFiles": ".mcp-use/build/views/**"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/mcp/:path*",
+      "destination": "/api/mcp"
+    }
+  ]
+}
+```
+
+The scaffold ignores `.mcp-use/` from Git, so add a `.vercelignore` that does
+not exclude the generated build:
+
+```text .vercelignore
+node_modules
+.vercel
+```
 
 ```bash
 MCP_URL=https://<project>.vercel.app npm run build
 vercel --prod
 ```
 
-The example's `vercel.json` supplies the `includeFiles` and rewrite rules.
 Configure `basePath: "/api/mcp"` so the SDK derives the full endpoint from
 the public origin, then verify the rendered resource:
 

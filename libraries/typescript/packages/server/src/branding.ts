@@ -1,7 +1,7 @@
 import type { Icon } from "@modelcontextprotocol/server";
 
 import type { FetchHandler } from "./fetch-app.js";
-import { resolveAssetsBase } from "./views/origin.js";
+import { hasExplicitAssetsBase, resolveAssetsBase } from "./views/origin.js";
 import {
   resolvePublicFilePath,
   servePublicFile,
@@ -272,7 +272,10 @@ export function resolveImplementationIcons(
     ...icon,
     src:
       request !== undefined && isLocalPublicSource(icon.src)
-        ? `${resolveAssetsBase(request)}${publicAssetPath(basePath, icon.src)}`
+        ? `${resolveAssetsBase(request)}${publicAssetPath(
+            hasExplicitAssetsBase() ? "/" : basePath,
+            icon.src
+          )}`
         : icon.src,
     ...(icon.sizes !== undefined && { sizes: [...icon.sizes] }),
   }));
