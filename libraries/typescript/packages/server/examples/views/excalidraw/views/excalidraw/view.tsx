@@ -25,11 +25,13 @@ import {
   useHostContext,
   useOpenExternal,
   useToolContext,
+  useViewTool,
   type ViewConfig,
 } from "mcp-use/react";
 import { initPencilAudio, playStroke } from "./pencil-audio.js";
 import {
   captureInitialElements,
+  commitModelEditedElements,
   onEditorChange,
   setStorageKey,
   loadPersistedElements,
@@ -37,6 +39,12 @@ import {
   setCheckpointId,
   setSaveCheckpoint,
 } from "./edit-context.js";
+import {
+  applyDrawingChanges,
+  editDrawingInputSchema,
+  editDrawingOutputSchema,
+  type SceneElement,
+} from "./edit-operations.js";
 import "./view.css";
 
 /**
@@ -1116,6 +1124,108 @@ export default function ExcalidrawView() {
       setUserEdits(persisted);
     }
   }, [checkpointId]);
+
+  useViewTool(
+    {
+      name: "edit_drawing",
+      title: "Edit current Excalidraw drawing",
+      description:
+        "Modify the currently displayed Excalidraw canvas in place. Apply sequential create, update, move, delete, or replace changes using the stable element IDs from create_view. Target selected:true to operate on the user's current fullscreen selection. Use this tool for refinements; do not call create_view again.",
+      inputSchema: editDrawingInputSchema,
+      outputSchema: editDrawingOutputSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+      },
+      enabled: checkpointId !== undefined,
+    },
+    async (input) => {
+      if (!checkpointId) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: "The initial drawing is still loading. Wait for create_view to finish before editing it.",
+            },
+          ],
+        };
+      }
+
+      try {
+        const currentElements = (
+          excalidrawApi?.getSceneElements() ??
+          getLatestEditedElements() ??
+          elementsRef.current
+        ).filter(
+          (element: SceneElement) => !element.isDeleted
+        ) as SceneElement[];
+        const selectedIds = excalidrawApi
+          ? Object.entries(excalidrawApi.getAppState().selectedElementIds ?? {})
+              .filter(([, selected]) => selected)
+              .map(([id]) => id)
+          : [];
+        const applied = applyDrawingChanges(
+          currentElements,
+          input,
+          selectedIds,
+          (rawElements) =>
+            convertRawElements(rawElements).filter(
+              (element) =>
+                element.type !== "cameraUpdate" &&
+                element.type !== "delete" &&
+                element.type !== "restoreCheckpoint"
+            ) as SceneElement[]
+        );
+        const normalized = restore(
+          { elements: applied.elements as any },
+          null,
+          null,
+          { refreshDimensions: true }
+        ).elements as unknown as SceneElement[];
+
+        // Persist before reporting success so the live scene and the original
+        // checkpoint always advance together.
+        await commitModelEditedElements(normalized);
+
+        elementsRef.current = normalized;
+        setElements(normalized);
+        setUserEdits(normalized);
+        if (excalidrawApi) {
+          excalidrawApi.updateScene({
+            elements: normalized,
+            captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+          });
+        }
+
+        const elementIds = normalized.map((element) => element.id);
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Updated the current canvas in place with ${input.changes.length} change${input.changes.length === 1 ? "" : "s"}. The view and checkpoint "${checkpointId}" were preserved. Current element IDs: ${elementIds.join(", ") || "(none)"}.`,
+            },
+          ],
+          structuredContent: {
+            checkpointId,
+            appliedChanges: input.changes.length,
+            elementIds,
+          },
+        };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: `Could not edit the current canvas: ${(error as Error).message}`,
+            },
+          ],
+        };
+      }
+    }
+  );
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 640px)");
