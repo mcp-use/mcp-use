@@ -278,6 +278,8 @@ export const collectUserInfo = server.tool(
       name: z.string().default("Anonymous"),
       age: z.number().default(0),
     });
+    // The handler is re-entered from the top, so first determine whether this
+    // invocation is the initial call or a retry with a terminal response.
     const response = inputResponse(ctx.inputResponses, "profile");
     if (response.kind === "elicit" && response.action !== "accept") {
       return {
@@ -286,6 +288,7 @@ export const collectUserInfo = server.tool(
       };
     }
     const form = acceptedContent(ctx.inputResponses, "profile", schema);
+    // Ask only when this round has no accepted, schema-valid profile.
     if (form === undefined) {
       return inputRequired({
         inputRequests: {
@@ -296,6 +299,7 @@ export const collectUserInfo = server.tool(
         },
       });
     }
+    // Successful work happens only after the response has been validated.
     return {
       content: [
         {

@@ -260,6 +260,8 @@ server.tool(
       name: z.string().default("Anonymous"),
       age: z.number().default(0),
     });
+    // A stateless callback starts from the top for both initial calls and
+    // retries, so handle decline/cancel before deciding input is still needed.
     const response = inputResponse(ctx.inputResponses, "elicitation");
     if (response.kind === "elicit" && response.action !== "accept") {
       return {
@@ -275,6 +277,7 @@ server.tool(
       };
     }
     const form = acceptedContent(ctx.inputResponses, "elicitation", schema);
+    // Missing or invalid accepted data means this round must request it.
     if (form === undefined) {
       return inputRequired({
         inputRequests: {
@@ -285,6 +288,7 @@ server.tool(
         },
       });
     }
+    // Produce the successful result only from accepted, validated input.
     return {
       content: [
         {
@@ -310,6 +314,8 @@ server.tool(
       status: z.enum(["active", "inactive", "pending"]).default("active"),
       verified: z.boolean().default(true),
     });
+    // Each invocation may be the initial call or a retry; inspect this round's
+    // response before falling back to input_required.
     const response = inputResponse(ctx.inputResponses, "elicitation-sep1034");
     if (response.kind === "elicit" && response.action !== "accept") {
       return {
@@ -326,6 +332,7 @@ server.tool(
       "elicitation-sep1034",
       schema
     );
+    // Re-request when accepted content is absent or fails schema validation.
     if (form === undefined) {
       return inputRequired({
         inputRequests: {
@@ -362,6 +369,8 @@ server.tool(
       untitledMulti: z.array(z.enum(["option1", "option2", "option3"])),
       titledMulti: z.array(z.enum(["value1", "value2", "value3"])),
     });
+    // Stateless retries re-enter here, so consume any terminal response before
+    // deciding that this round still needs user input.
     const response = inputResponse(ctx.inputResponses, "elicitation-sep1330");
     if (response.kind === "elicit" && response.action !== "accept") {
       return {
@@ -378,6 +387,7 @@ server.tool(
       "elicitation-sep1330",
       schema
     );
+    // Only missing or schema-invalid accepted data should request another round.
     if (form === undefined) {
       return inputRequired({
         inputRequests: {

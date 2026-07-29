@@ -42,6 +42,8 @@ server.tool(
     annotations: { destructiveHint: true },
   },
   async ({ environment }, ctx) => {
+    // A stateless handler starts from the top on both the initial call and
+    // every retry. Inspect this round's response before deciding to ask again.
     const response = inputResponse(ctx.inputResponses, "deployment-approval");
     if (response.kind === "elicit" && response.action !== "accept") {
       return {
@@ -63,7 +65,8 @@ server.tool(
       "deployment-approval",
       deploymentApproval
     );
-
+    // Missing or invalid accepted content means this invocation still needs
+    // input, so return input_required instead of continuing.
     if (confirmation === undefined) {
       return inputRequired({
         inputRequests: {
@@ -82,8 +85,8 @@ server.tool(
       };
     }
 
-    // Put side effects after elicitation is accepted: the callback runs again
-    // for every input_required round.
+    // Side effects belong after accepted, validated input because every
+    // input_required round invokes this callback again from the beginning.
     const result = {
       environment,
       deployed: true,
@@ -113,25 +116,16 @@ server.tool(
     const authorizationUrl = new URL("https://example.com/authorize");
     authorizationUrl.searchParams.set("service", service);
 
+    // This is either the initial call (missing) or a fresh retry. Resolve the
+    // retry response first; only the missing case should request input.
     const response = inputResponse(ctx.inputResponses, "service-authorization");
-    if (response.kind === "missing") {
-      return inputRequired({
-        inputRequests: {
-          "service-authorization": inputRequired.elicitUrl({
-            message: `Authorize access to ${service}`,
-            url: authorizationUrl.href,
-          }),
-        },
-      });
-    }
-
-    if (response.kind !== "elicit" || response.action !== "accept") {
+    if (response.kind === "elicit" && response.action !== "accept") {
       return {
         content: [
           {
             type: "text",
             text:
-              response.kind === "elicit" && response.action === "decline"
+              response.action === "decline"
                 ? "Authorization declined by the user."
                 : "Authorization cancelled by the user.",
           },
@@ -140,9 +134,25 @@ server.tool(
       };
     }
 
-    return {
-      content: [{ type: "text", text: `Connected ${service}.` }],
-    };
+    if (response.kind === "elicit" && response.action === "accept") {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Authorization page opened for ${service}. Verify the backend callback before treating the service as connected.`,
+          },
+        ],
+      };
+    }
+
+    return inputRequired({
+      inputRequests: {
+        "service-authorization": inputRequired.elicitUrl({
+          message: `Authorize access to ${service}`,
+          url: authorizationUrl.href,
+        }),
+      },
+    });
   }
 );
 
