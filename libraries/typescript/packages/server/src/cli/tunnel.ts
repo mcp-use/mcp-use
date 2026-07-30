@@ -21,6 +21,8 @@ const MAX_CONTROL_MESSAGE_BYTES = 64 * 1024;
 const MAX_BODY_FRAME_BYTES = 256 * 1024;
 const MAX_BUFFERED_SOCKET_BYTES = 1024 * 1024;
 const MAX_LOCAL_REQUESTS = 100;
+const KEEPALIVE_INTERVAL_MS = 25_000;
+const REATTACH_ATTEMPTS = 5;
 const REQUEST_BODY_FRAME = 1;
 const RESPONSE_BODY_FRAME = 2;
 const PUBLIC_WEBSOCKET_TEXT_FRAME = 3;
@@ -45,6 +47,10 @@ interface TunnelStateFile {
   subdomain: string;
   /** Bearer credential used to reclaim and release the tunnel. */
   token?: string;
+  /** Relay WebSocket URL for reattaching after a transient disconnect. */
+  connect_url?: string;
+  /** Stable public URL for the reservation. */
+  public_url?: string;
 }
 
 interface TunnelReservation {
@@ -59,6 +65,7 @@ interface TunnelConnection {
   subdomain: string;
   token: string;
   socket: WebSocket;
+  reservation: TunnelReservation;
 }
 
 interface LocalRequestState {
@@ -110,6 +117,7 @@ interface WebSocketCloseMessage {
 type RelayControlMessage =
   | { type: "auth-required" }
   | { type: "ready" }
+  | { type: "pong" }
   | RequestStartMessage
   | RequestEndMessage
   | WebSocketOpenMessage
@@ -150,6 +158,12 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
+}
+
+function tunnelDebug(message: string): void {
+  if (process.env["MCP_USE_TUNNEL_DEBUG"] === "1") {
+    console.log(`[mcp-use] ${message}`);
+  }
 }
 
 function isRequestId(value: unknown): value is string {
@@ -303,7 +317,7 @@ async function releaseTunnel(state: TunnelStateFile): Promise<void> {
 async function connectTunnel(
   port: number,
   reservation: TunnelReservation,
-  onUnexpectedClose: () => void
+  onUnexpectedClose: (event: CloseEvent) => void
 ): Promise<TunnelConnection> {
   const socket = new WebSocket(reservation.connect_url);
   socket.binaryType = "arraybuffer";
@@ -311,6 +325,8 @@ async function connectTunnel(
   const webSockets = new Map<string, LocalWebSocketState>();
   let ready = false;
   let intentionalClose = false;
+  let awaitingPong = false;
+  let keepalive: ReturnType<typeof setInterval> | undefined;
 
   const failLocalRequest = (requestId: string, error: unknown): void => {
     const state = requests.get(requestId);
@@ -600,8 +616,22 @@ async function connectTunnel(
         if (!ready) {
           ready = true;
           clearTimeout(timeout);
+          keepalive = setInterval(() => {
+            if (socket.readyState !== WebSocket.OPEN) return;
+            if (awaitingPong) {
+              socket.close(1011, "Tunnel keepalive timed out");
+              return;
+            }
+            awaitingPong = true;
+            sendControl(socket, { type: "ping" });
+          }, KEEPALIVE_INTERVAL_MS);
+          keepalive.unref();
           resolve();
         }
+        return;
+      }
+      if (message.type === "pong") {
+        awaitingPong = false;
         return;
       }
       if (message.type === "request-start") {
@@ -648,7 +678,8 @@ async function connectTunnel(
     );
   });
 
-  socket.addEventListener("close", () => {
+  socket.addEventListener("close", (event) => {
+    if (keepalive !== undefined) clearInterval(keepalive);
     for (const [requestId, state] of requests) {
       requests.delete(requestId);
       state.request.destroy();
@@ -657,7 +688,7 @@ async function connectTunnel(
     for (const requestId of webSockets.keys()) {
       closeLocalWebSocket(requestId, 1011, "Tunnel disconnected");
     }
-    if (!intentionalClose && ready) onUnexpectedClose();
+    if (!intentionalClose && ready) onUnexpectedClose(event);
   });
 
   await readyPromise;
@@ -671,6 +702,7 @@ async function connectTunnel(
     subdomain: reservation.tunnel_id,
     token: reservation.token,
     socket,
+    reservation,
   };
 }
 
@@ -703,6 +735,8 @@ export function createTunnelManager(stateFilePath: string): TunnelManager {
   let intentionalStop = false;
   let respawnInFlight: Promise<void> | undefined;
   let respawnBackoffMs = RESPAWN_BACKOFF_INITIAL_MS;
+  let reattachReservation: TunnelReservation | undefined;
+  let reattachFailures = 0;
 
   const loadState = async (): Promise<TunnelStateFile | undefined> => {
     try {
@@ -712,6 +746,12 @@ export function createTunnelManager(stateFilePath: string): TunnelManager {
         ? {
             subdomain: state.subdomain,
             ...(typeof state.token === "string" && { token: state.token }),
+            ...(typeof state.connect_url === "string" && {
+              connect_url: state.connect_url,
+            }),
+            ...(typeof state.public_url === "string" && {
+              public_url: state.public_url,
+            }),
           }
         : undefined;
     } catch {
@@ -737,17 +777,60 @@ export function createTunnelManager(stateFilePath: string): TunnelManager {
 
   let scheduleRespawn: () => void = () => {};
 
+  const reservationFromState = (
+    state: TunnelStateFile | undefined
+  ): TunnelReservation | undefined =>
+    state?.token !== undefined &&
+    state.connect_url !== undefined &&
+    state.public_url !== undefined
+      ? {
+          tunnel_id: state.subdomain,
+          token: state.token,
+          connect_url: state.connect_url,
+          public_url: state.public_url,
+        }
+      : undefined;
+
+  const stateFromReservation = (
+    reservation: TunnelReservation
+  ): TunnelStateFile => ({
+    subdomain: reservation.tunnel_id,
+    token: reservation.token,
+    connect_url: reservation.connect_url,
+    public_url: reservation.public_url,
+  });
+
+  const persistConnection = async (next: TunnelConnection): Promise<void> => {
+    await persistState(stateFromReservation(next.reservation));
+  };
+
+  const attach = async (
+    port: number,
+    reservation: TunnelReservation
+  ): Promise<TunnelConnection> =>
+    connectTunnel(port, reservation, (event) => {
+      connection = undefined;
+      currentUrl = null;
+      const terminal =
+        event.code === 1008 ||
+        event.reason === "Tunnel expired" ||
+        event.reason === "Tunnel deleted";
+      reattachReservation = terminal ? undefined : reservation;
+      tunnelDebug(
+        `tunnel connection closed (${event.code}${
+          event.reason === "" ? "" : `: ${event.reason}`
+        }); ${terminal ? "allocating a replacement" : "reattaching"}`
+      );
+      scheduleRespawn();
+    });
+
   const open = async (
     port: number,
     requestedSubdomain?: string
   ): Promise<TunnelConnection> => {
     console.log(`[mcp-use] starting tunnel for port ${port}…`);
     const reservation = await reserveTunnel(requestedSubdomain);
-    return connectTunnel(port, reservation, () => {
-      connection = undefined;
-      currentUrl = null;
-      scheduleRespawn();
-    });
+    return attach(port, reservation);
   };
 
   scheduleRespawn = (): void => {
@@ -765,10 +848,43 @@ export function createTunnelManager(stateFilePath: string): TunnelManager {
         activePort !== undefined &&
         currentUrl === null
       ) {
-        console.log("[mcp-use] tunnel disconnected, restarting…");
-        const saved = await loadState();
-        if (saved !== undefined) await releaseTunnel(saved);
         try {
+          if (
+            reattachReservation !== undefined &&
+            reattachFailures < REATTACH_ATTEMPTS
+          ) {
+            try {
+              const reattached = await attach(activePort, reattachReservation);
+              connection = reattached;
+              currentUrl = reattached.url;
+              reattachFailures = 0;
+              respawnBackoffMs = RESPAWN_BACKOFF_INITIAL_MS;
+              await persistConnection(reattached);
+              tunnelDebug("tunnel reattached");
+              return;
+            } catch (error) {
+              reattachFailures += 1;
+              tunnelDebug(
+                `tunnel reattach attempt ${reattachFailures} failed: ${
+                  error instanceof Error ? error.message : String(error)
+                }`
+              );
+              if (reattachFailures < REATTACH_ATTEMPTS) {
+                await sleep(respawnBackoffMs);
+                respawnBackoffMs = Math.min(
+                  respawnBackoffMs * 2,
+                  RESPAWN_BACKOFF_MAX_MS
+                );
+                continue;
+              }
+            }
+          }
+
+          const saved = await loadState();
+          if (saved !== undefined) await releaseTunnel(saved);
+          reattachReservation = undefined;
+          reattachFailures = 0;
+
           let next: TunnelConnection;
           try {
             next = await open(activePort, saved?.subdomain);
@@ -781,10 +897,7 @@ export function createTunnelManager(stateFilePath: string): TunnelManager {
           }
           connection = next;
           currentUrl = next.url;
-          await persistState({
-            subdomain: next.subdomain,
-            token: next.token,
-          });
+          await persistConnection(next);
           respawnBackoffMs = RESPAWN_BACKOFF_INITIAL_MS;
           return;
         } catch (error) {
@@ -818,20 +931,39 @@ export function createTunnelManager(stateFilePath: string): TunnelManager {
       }
 
       const saved = await loadState();
-      if (saved !== undefined) await releaseTunnel(saved);
       let next: TunnelConnection;
-      try {
-        next = await open(port, saved?.subdomain);
-      } catch (error) {
-        if (saved?.subdomain === undefined) throw error;
-        console.log(
-          `[mcp-use] tunnel "${saved.subdomain}" unavailable, requesting a new one…`
-        );
-        next = await open(port);
+      const savedReservation = reservationFromState(saved);
+      if (savedReservation !== undefined) {
+        try {
+          next = await attach(port, savedReservation);
+        } catch {
+          await releaseTunnel(stateFromReservation(savedReservation));
+          next = await open(port, savedReservation.tunnel_id).catch(
+            async () => {
+              console.log(
+                `[mcp-use] tunnel "${savedReservation.tunnel_id}" unavailable, requesting a new one…`
+              );
+              return open(port);
+            }
+          );
+        }
+      } else {
+        if (saved !== undefined) await releaseTunnel(saved);
+        try {
+          next = await open(port, saved?.subdomain);
+        } catch (error) {
+          if (saved?.subdomain === undefined) throw error;
+          console.log(
+            `[mcp-use] tunnel "${saved.subdomain}" unavailable, requesting a new one…`
+          );
+          next = await open(port);
+        }
       }
       connection = next;
       currentUrl = next.url;
-      await persistState({ subdomain: next.subdomain, token: next.token });
+      reattachReservation = next.reservation;
+      reattachFailures = 0;
+      await persistConnection(next);
       return { url: next.url, subdomain: next.subdomain };
     },
 
@@ -839,16 +971,18 @@ export function createTunnelManager(stateFilePath: string): TunnelManager {
       intentionalStop = true;
       if (respawnInFlight !== undefined) await respawnInFlight;
       const active = connection;
+      const releasable = active?.reservation ?? reattachReservation;
       connection = undefined;
       currentUrl = null;
       activePort = undefined;
       respawnBackoffMs = RESPAWN_BACKOFF_INITIAL_MS;
+      reattachReservation = undefined;
+      reattachFailures = 0;
+      if (releasable !== undefined) {
+        await releaseTunnel(stateFromReservation(releasable));
+      }
       if (active !== undefined) {
         markIntentionalClose(active.socket);
-        await releaseTunnel({
-          subdomain: active.subdomain,
-          token: active.token,
-        });
         active.socket.close(1000, "Client shutdown");
       }
     },
