@@ -8,6 +8,7 @@ import { useState, type ComponentType, type SetStateAction } from "react";
 import {
   bootstrapView,
   disposeView,
+  getPublicBaseUrl,
   Image,
   ModelContext,
   ToolError,
@@ -2670,6 +2671,25 @@ describe("react bridge runtime", () => {
     expect(screen.getByTestId("absolute").getAttribute("src")).toBe(
       "https://cdn.example.com/logo.svg"
     );
+  });
+
+  it("exposes the request-resolved public base URL", () => {
+    const previousConfig = globalThis.__mcpUseViewConfig;
+
+    try {
+      globalThis.__mcpUseViewConfig = {
+        publicBase: "https://assets.example.com/mcp/_mcp-use/public/",
+      };
+
+      expect(getPublicBaseUrl()).toBe(
+        "https://assets.example.com/mcp/_mcp-use/public/"
+      );
+
+      globalThis.__mcpUseViewConfig = undefined;
+      expect(getPublicBaseUrl()).toBe("");
+    } finally {
+      globalThis.__mcpUseViewConfig = previousConfig;
+    }
   });
 
   it("same-root HMR bootstrap reuses the runtime without reconnecting", async () => {

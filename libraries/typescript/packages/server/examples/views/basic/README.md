@@ -153,6 +153,17 @@ Static files in the project-root `public/` folder are served under
 synthesized view document injects the request-resolved public base so URLs stay
 absolute inside `srcdoc` iframes (which have no document base URL).
 
+For other public files, use `getPublicBaseUrl()` and append a path without a
+leading slash. The returned URL always has a trailing slash:
+
+```tsx
+import { getPublicBaseUrl } from "mcp-use/react";
+
+const publicBaseUrl = getPublicBaseUrl();
+const stylesheetUrl = `${publicBaseUrl}assets/vendor.css`;
+const wasmUrl = `${publicBaseUrl}wasm/module.wasm`;
+```
+
 This example keeps fruit WebP images in `public/fruits/` and references them as
 `<Image src={`/fruits/${id}.webp`} …>`. Same-origin public assets are
 automatically covered by the framework's serving-origin CSP entry on view

@@ -512,7 +512,7 @@ v1 parity: authors drop static files in a project-root `public/` directory and r
 </script>
 ```
 
-`publicBase` is request-scoped (computed per request), not boot-time baked — the v1 mistake of baking origin at startup remains dead. `<Image>` reads this global (the one public consumer; the internal `publicAsset()` resolver is not exported — v1 shipped the same posture, an `<Image>` component over injected globals with no standalone resolver): root-relative `src` values resolve to `${publicBase}<path-without-leading-slash>`; absolute `http(s):` and `data:` URLs pass through; fully-relative paths (no leading `/`) are left alone. Non-`<img>` consumers (CSS backgrounds, `<video>`) can be served by exporting the resolver later — additive, deferred until asked for. `import.meta.url` relative resolution was rejected for public assets because the dev virtual entry URL (`/@id/__x00__virtual:mcp-use/views/<name>`) has no stable sibling `public/` segment — the injected config works identically in dev and production.
+`publicBase` is request-scoped (computed per request), not boot-time baked — the v1 mistake of baking origin at startup remains dead. `getPublicBaseUrl()` exposes that absolute, trailing-slash URL from `mcp-use/react` so non-image consumers can append public-folder paths without depending on framework globals. It returns `""` outside a synthesized browser view document. `<Image>` reads the same base through the internal `publicAsset()` resolver: root-relative `src` values resolve to `${publicBase}<path-without-leading-slash>`; absolute `http(s):` and `data:` URLs pass through; fully-relative paths (no leading `/`) are left alone. `import.meta.url` relative resolution was rejected for public assets because the dev virtual entry URL (`/@id/__x00__virtual:mcp-use/views/<name>`) has no stable sibling `public/` segment — the injected config works identically in dev and production.
 
 ### Dev
 
@@ -909,6 +909,9 @@ function useToolContext<
 **Helpers**
 
 ```ts
+/** Request-resolved URL for the project's public folder, with a trailing slash. */
+function getPublicBaseUrl(): string;
+
 /** Concatenated text content of a tool result, or undefined when it has none. */
 function toolResultText(
   result: Pick<CallToolResult, "content">
@@ -1208,6 +1211,7 @@ Everything result-shaped enters through `useToolContext` (typed by the server's 
 | `<ModelContext>` / `modelContext` | kept; nested text tree merges under `_uiContext` beside `useViewState` | `App.updateModelContext` or ChatGPT `setWidgetState` |
 | `<ErrorBoundary>` | kept (bootstrap provides the required top-level boundary) | unchanged |
 | `<Image>` | kept — resolves root-relative `src` via `__mcpUseViewConfig.publicBase` (Public assets) | `<img>` with absolute URL |
+| _(no v1 equivalent)_ | `getPublicBaseUrl()` — request-resolved, trailing-slash URL for scripts, stylesheets, WASM, and other project-public files | `__mcpUseViewConfig.publicBase` |
 | `generateHelpers()` | dropped | subsumed by `Register` typing |
 
 ### Host-specific gaps
@@ -1245,7 +1249,7 @@ The full build/serve contract is "Build system & serving", above; it extends the
 8. `window.openai` is consumed only for capabilities without a standard restoration channel: files and ChatGPT-persisted `useViewState`. All other baseline view behavior continues through MCP Apps.
 9. Tool config `invoking`/`invoked`/`widgetAccessible` removed (openai overlay, no spec equivalent; `visibility` covers app/model narrowing).
 10. Views work against the stateless 2026-07-28 wire; nothing view-related depends on sessions.
-11. Asset routes move from `${basePath}/mcp-use/widgets/…` to two framework-owned spaces: `${basePath}/_mcp-use/views/<name>/…` for default hashed production bundles and `${basePath}/_mcp-use/public/…` for project-public files. Each view has an independent client build with no shared chunks. Hosts obtain the HTML document only through `resources/read`; by default it loads external JS/CSS from the view route or full CDN URLs embedded when `MCP_ASSETS_URL` is set at build time, while `build --inline` places JS/CSS directly in the document. `MCP_URL` selects the server origin, while `MCP_ASSETS_URL` selects the external asset prefix and may include a path. One request-scoped `globalThis.__mcpUseViewConfig` supplies `publicBase`; no origin is baked into that runtime config at server startup.
+11. Asset routes move from `${basePath}/mcp-use/widgets/…` to two framework-owned spaces: `${basePath}/_mcp-use/views/<name>/…` for default hashed production bundles and `${basePath}/_mcp-use/public/…` for project-public files. Each view has an independent client build with no shared chunks. Hosts obtain the HTML document only through `resources/read`; by default it loads external JS/CSS from the view route or full CDN URLs embedded when `MCP_ASSETS_URL` is set at build time, while `build --inline` places JS/CSS directly in the document. `MCP_URL` selects the server origin, while `MCP_ASSETS_URL` selects the external asset prefix and may include a path. One request-scoped `globalThis.__mcpUseViewConfig` supplies `publicBase`; `getPublicBaseUrl()` exposes it to view code, and no origin is baked into that runtime config at server startup.
 12. Registration no longer happens inside `listen()` or first-request setup (v1's async `mountWidgets` → `server.uiResource()`): the build primes the instance through a generated wrapper entry, and `resources/read` synthesizes the document from embedded registry data instead of reading built HTML from disk. `server.uiResource()` has no v2 equivalent, and neither do v1's `exposeAsTool` / hand-built `uiResource` registrations — at most one tool binds a view via `view: { name }`, and an unbound view warns (decision 10).
 13. Ambient hooks split by concern: `useHostContext()`, `useSendFollowUp()`, `useOpenExternal()`, `useDisplayMode()`, `useSendSizeChanged()` — split-by-concern is the design; each hook rerenders only on its channel (action hooks return stable runtime-owned callbacks). v1's aggregate `<McpUseProvider autoSize>` is replaced by `viewConfig.autoResize` plus direct composition of `ThemeProvider` / `ViewControls`.
 

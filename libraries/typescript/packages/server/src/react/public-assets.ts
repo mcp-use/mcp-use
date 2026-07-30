@@ -25,14 +25,30 @@ declare global {
 }
 
 /**
- * Read the injected public asset base URL, if present.
+ * Return the request-resolved base URL for files in the project's `public/`
+ * directory.
  *
- * @returns The request-resolved `publicBase`, or an empty string outside a
- *   synthesized view document.
+ * @remarks
+ * The returned URL always includes a trailing slash. Append public-folder
+ * paths without a leading slash. The URL is resolved for the current request,
+ * so it remains correct behind proxies, tunnels, and `MCP_ASSETS_URL`.
  *
- * @internal
+ * Outside a synthesized browser view document, the function returns an empty
+ * string.
+ *
+ * @example
+ * ```ts
+ * import { getPublicBaseUrl } from "mcp-use/react";
+ *
+ * const publicBaseUrl = getPublicBaseUrl();
+ * const stylesheetUrl = `${publicBaseUrl}assets/vendor.css`;
+ * const wasmUrl = `${publicBaseUrl}doom/websockets-doom.wasm`;
+ * ```
+ *
+ * @returns The absolute public-folder base URL with a trailing slash, or an
+ *   empty string when no injected view configuration is available.
  */
-export function getPublicBase(): string {
+export function getPublicBaseUrl(): string {
   if (typeof globalThis === "undefined") {
     return "";
   }
@@ -67,7 +83,7 @@ export function publicAsset(path: string): string {
     return path;
   }
   if (path.startsWith("/")) {
-    const publicBase = getPublicBase();
+    const publicBase = getPublicBaseUrl();
     if (publicBase === "") {
       return path;
     }
