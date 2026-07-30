@@ -11,6 +11,7 @@ import { join } from "node:path";
 
 const root = process.cwd();
 const planFile = join(root, "v1-release-plan.json");
+const distTag = "legacy-v1";
 const packageDirectory = join(root, "packages");
 const allowedLines = new Map([
   ["mcp-use", /^1\./],
@@ -131,14 +132,17 @@ function sleep(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
-function sameNonV1Tags(before, after) {
-  const withoutV1 = (tags) =>
+function sameNonMaintenanceTags(before, after) {
+  const withoutMaintenanceTag = (tags) =>
     Object.fromEntries(
       Object.entries(tags)
-        .filter(([tag]) => tag !== "v1")
+        .filter(([tag]) => tag !== distTag)
         .sort(([left], [right]) => left.localeCompare(right))
     );
-  return JSON.stringify(withoutV1(before)) === JSON.stringify(withoutV1(after));
+  return (
+    JSON.stringify(withoutMaintenanceTag(before)) ===
+    JSON.stringify(withoutMaintenanceTag(after))
+  );
 }
 
 async function verifyRelease(release) {
@@ -156,8 +160,8 @@ async function verifyRelease(release) {
     const tags = npmJson(["view", release.name, "dist-tags", "--json"], {});
     if (
       version === release.version &&
-      tags.v1 === release.version &&
-      sameNonV1Tags(release.tagsBefore, tags)
+      tags[distTag] === release.version &&
+      sameNonMaintenanceTags(release.tagsBefore, tags)
     ) {
       return;
     }
@@ -211,12 +215,14 @@ async function publishPlan() {
             `packed identity mismatch for ${release.name}@${release.version}`
           );
         }
-        console.log(`publishing ${release.name}@${release.version} under v1`);
+        console.log(
+          `publishing ${release.name}@${release.version} under ${distTag}`
+        );
         run("npm", [
           "publish",
           packed.filename,
           "--tag",
-          "v1",
+          distTag,
           "--access",
           "public",
           "--provenance",

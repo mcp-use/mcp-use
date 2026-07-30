@@ -34,10 +34,11 @@ We have a quick list of common questions to get you started engaging with this p
 1. Branch from `v1` and add a patch changeset
 2. Open a pull request back to `v1`
 3. CI creates or updates the v1 version pull request
-4. Merge the version pull request to publish with the `v1` npm dist-tag
+4. Merge the version pull request to publish with the `legacy-v1` npm dist-tag
 
 V1 publication verifies that every other npm dist-tag, including `latest`,
-remains unchanged. Do not publish v1 packages manually.
+remains unchanged. (`v1` itself cannot be an npm dist-tag because npm treats it
+as a semantic-version range.) Do not publish v1 packages manually.
 
 ---
 
