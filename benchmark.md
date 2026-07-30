@@ -1,81 +1,23 @@
 # mcp-use SDK v2 benchmarks
 
 This report compares `mcp-use` v2 with mcp-use v1, the official TypeScript SDK,
-and representative TypeScript MCP frameworks. The original performance,
-install, and App build results use the published `mcp-use@2.0.0-beta.61`
-package. The npm tarball was remeasured from the `2.0.0-beta.64` package
-candidate after removing the temporary v1 compatibility layer. Measurements
-were recorded on July 27–28, 2026 using Node.js 24.15.0. A July 30 addendum
-compares the released `mcp-use@2.0.0-beta.65` package with
-`@prefecthq/fastmcp-ts@1.2.0`.
+and representative TypeScript MCP frameworks, including FastMCP TypeScript.
+The unified performance and launch matrix uses the published
+`mcp-use@2.0.0-beta.65` package and was recorded on July 30, 2026 using Node.js
+24.15.0. Install and App build measurements were recorded on July 27–30. The
+npm tarball was measured from the `2.0.0-beta.64` package candidate after
+removing the temporary v1 compatibility layer.
 
 ## Results at a glance
 
 Compared with mcp-use v1, v2 measured:
 
-- **27% higher median throughput:** 8,615.0 → 10,982.2 operations per second
-- **55% lower cold-launch time:** 151.603 → 68.145 ms
+- **79% higher median throughput:** 5,423.6 → 9,681.9 operations per second
+- **53% lower cold-launch time:** 146.440 → 68.592 ms
 - **82% smaller clean install:** 404.6 → 74.4 MiB
 - **84% fewer installed packages:** 365 → 57
 - **74% smaller npm tarball:** 1,155 → 302 KiB
 - **36% smaller equivalent MCP App build:** 1.289 → 0.828 MB
-
-## FastMCP TypeScript addendum
-
-FastMCP TypeScript 1.2.0 was released after the original eight-fixture matrix.
-It was measured in a fresh paired comparison against the then-current
-`mcp-use@2.0.0-beta.65`, rather than inserting its score into the historical
-July 27–28 ranking. Absolute localhost throughput drifts enough across run
-windows that an interpolated rank would not be defensible.
-
-Both fixtures exposed the same `benchmark_echo` tool on `/mcp`, used Zod 4.4.3,
-negotiated strict protocol `2026-07-28`, and ran without authentication or user
-middleware. Three rounds alternated framework order; every slot used a fresh
-framework process and fresh MCP Drill control and worker containers.
-
-| Framework                      | Median ops/s |      p50 |      p95 |      p99 | Median error rate | Stability |
-| ------------------------------ | -----------: | -------: | -------: | -------: | ----------------: | --------: |
-| **mcp-use v2 `2.0.0-beta.65`** |  **9,278.3** | **1 ms** | **4 ms** | **7 ms** |       **0.0219%** |   **100** |
-| FastMCP TypeScript `1.2.0`     |      6,155.6 |     1 ms |     6 ms |     8 ms |           0.0319% |       100 |
-
-mcp-use delivered 50.7% higher median throughput in this paired modern-v2 run.
-The individual samples were 9,278.3, 9,152.2, and 9,413.3 ops/s for mcp-use
-and 6,150.8, 6,471.2, and 6,155.6 ops/s for FastMCP.
-
-The launch check recorded 100 starts per framework after 10 warmups and rotated
-order on every round:
-
-| Framework          | Median launch |  Interquartile range |
-| ------------------ | ------------: | -------------------: |
-| **mcp-use v2**     | **69.334 ms** | **68.484–70.292 ms** |
-| FastMCP TypeScript |    140.722 ms |   139.128–143.179 ms |
-
-The same-day clean install used
-`npm install --omit=dev @prefecthq/fastmcp-ts@1.2.0 zod@4.4.3`. Its
-`node_modules` tree occupied **45.0 MiB** on disk and contained **147 installed
-package entries**. The published FastMCP tarball measured **1,613 KiB
-compressed** (1,651,357 bytes), **7.934 MiB unpacked** (8,318,944 bytes), and
-16 files.
-
-FastMCP's documented feature surface explains its README comparison cells:
-
-| Capability                      | FastMCP TypeScript 1.2.0                                                   |
-| ------------------------------- | -------------------------------------------------------------------------- |
-| Views / MCP Apps                | Native Apps component API                                                  |
-| Native Apps on MCP `2026-07-28` | Yes; advertised through `server/discover`                                  |
-| OAuth                           | Built-in provider and proxy primitives, not named hosted-provider adapters |
-| MCP 2026 protocol               | Yes                                                                        |
-| View screenshot CLI             | No documented command                                                      |
-| Built-in tunneling              | No documented command                                                      |
-| Inspector                       | `fastmcp dev inspector` launches the official MCP Inspector                |
-
-Sources: [Apps overview][fastmcp-apps], [protocol eras][fastmcp-protocol],
-[OAuth][fastmcp-oauth], and [CLI reference][fastmcp-cli].
-
-The initial FastMCP compatibility smoke sample was excluded. A first mcp-use
-diagnostic was also excluded because its loopback-only bind was unreachable
-from MCP Drill's Docker worker; the retained fixtures explicitly bound both
-servers to `0.0.0.0`.
 
 ## Throughput
 
@@ -85,29 +27,31 @@ second series contains the other TypeScript fixtures.
 ```mermaid
 xychart
   title "Median operations per second"
-  x-axis ["tmcp", "mcp-use v2", "mcp-use v1", "Skybridge", "Official v2", "Official v1", "xmcp", "mcp-handler"]
+  x-axis ["tmcp", "mcp-use v2", "Official v2", "Skybridge", "Official v1", "FastMCP TS", "mcp-handler", "xmcp", "mcp-use v1"]
   y-axis "operations per second" 0 --> 20000
-  bar [0, 10982, 0, 0, 0, 0, 0, 0]
-  bar [18425, 0, 8615, 8116, 8050, 6914, 6585, 6324]
+  bar [0, 9682, 0, 0, 0, 0, 0, 0, 0]
+  bar [18562, 0, 7943, 7773, 6871, 6628, 6416, 5585, 5424]
 ```
 
-mcp-use v2 delivered **10,982.2 median operations per second**, 27.5% above
-mcp-use v1 and 36.4% above the equivalent official TypeScript SDK v2 fixture.
+mcp-use v2 delivered **9,681.9 median operations per second**, 78.5% above
+mcp-use v1, 21.9% above the equivalent official TypeScript SDK v2 fixture, and
+46.1% above FastMCP TypeScript.
 
 Custom stateless request handling and optimized response paths on top of the
 official SDK made mcp-use v2 the fastest TypeScript framework with native MCP
 Apps support in this test.
 
-| Framework       | Version           | Protocol       | Median ops/s |      p95 |      p99 | Stability |
-| --------------- | ----------------- | -------------- | -----------: | -------: | -------: | --------: |
-| tmcp            | 1.19.4            | 2025-06-18     |     18,424.5 |     2 ms |     3 ms |       100 |
-| **mcp-use v2**  | **2.0.0-beta.61** | **2026-07-28** | **10,982.2** | **4 ms** | **6 ms** |   **100** |
-| mcp-use v1      | 1.34.5            | 2025-11-25     |      8,615.0 |     4 ms |     6 ms |       100 |
-| Skybridge       | 1.2.6             | 2025-11-25     |      8,116.4 |     4 ms |     6 ms |       100 |
-| Official SDK v2 | 2.0.0-beta.5      | 2026-07-28     |      8,049.8 |     5 ms |     7 ms |       100 |
-| Official SDK v1 | 1.29.0            | 2025-11-25     |      6,914.1 |     5 ms |     7 ms |       100 |
-| xmcp            | 0.6.13            | 2025-11-25     |      6,585.1 |     6 ms |     8 ms |       100 |
-| mcp-handler     | 1.1.0             | 2025-11-25     |      6,324.4 |     6 ms |     9 ms |       100 |
+| Framework           | Version           | Protocol       | Median ops/s |      p95 |      p99 | Stability |
+| ------------------- | ----------------- | -------------- | -----------: | -------: | -------: | --------: |
+| tmcp                | 1.19.4            | 2025-06-18     |     18,562.0 |     2 ms |     3 ms |       100 |
+| **mcp-use v2**      | **2.0.0-beta.65** | **2026-07-28** |  **9,681.9** | **4 ms** | **6 ms** |   **100** |
+| Official SDK v2     | 2.0.0-beta.5      | 2026-07-28     |      7,942.9 |     5 ms |     7 ms |       100 |
+| Skybridge           | 1.2.6             | 2025-11-25     |      7,772.9 |     5 ms |     7 ms |       100 |
+| Official SDK v1     | 1.29.0            | 2025-11-25     |      6,870.8 |     6 ms |     8 ms |       100 |
+| FastMCP TypeScript  | 1.2.0             | 2026-07-28     |      6,628.2 |     6 ms |     8 ms |       100 |
+| mcp-handler         | 1.1.0             | 2025-11-25     |      6,416.2 |     6 ms |     9 ms |       100 |
+| xmcp                | 0.6.13            | 2025-11-25     |      5,584.7 |     6 ms |     8 ms |       100 |
+| mcp-use v1          | 1.34.3            | 2025-11-25     |      5,423.6 |     7 ms |    10 ms |       100 |
 
 ## Cold launch
 
@@ -117,25 +61,27 @@ after 10 warmups, with launch order rotated across all targets.
 ```mermaid
 xychart
   title "Median cold launch in milliseconds"
-  x-axis ["Official v2", "mcp-use v2", "xmcp", "tmcp", "Official v1", "mcp-use v1", "mcp-handler", "Skybridge"]
+  x-axis ["Official v2", "mcp-use v2", "xmcp", "tmcp", "Official v1", "FastMCP TS", "mcp-use v1", "mcp-handler", "Skybridge"]
   y-axis "milliseconds" 0 --> 180
-  bar [0, 68.145, 0, 0, 0, 0, 0, 0]
-  bar [67.839, 0, 68.814, 77.740, 108.039, 151.603, 158.498, 168.260]
+  bar [0, 68.592, 0, 0, 0, 0, 0, 0, 0]
+  bar [67.931, 0, 68.641, 74.945, 109.358, 139.123, 146.440, 163.733, 168.794]
 ```
 
-| Framework       |        Median |  Interquartile range |
-| --------------- | ------------: | -------------------: |
-| Official SDK v2 |     67.839 ms |     66.881–69.522 ms |
-| **mcp-use v2**  | **68.145 ms** | **67.049–69.306 ms** |
-| xmcp            |     68.814 ms |     67.894–70.376 ms |
-| tmcp            |     77.740 ms |     76.678–79.388 ms |
-| Official SDK v1 |    108.039 ms |   106.498–110.417 ms |
-| mcp-use v1      |    151.603 ms |   149.258–154.942 ms |
-| mcp-handler     |    158.498 ms |   155.539–162.677 ms |
-| Skybridge       |    168.260 ms |   166.513–171.449 ms |
+| Framework          |        Median |  Interquartile range |
+| ------------------ | ------------: | -------------------: |
+| Official SDK v2    |     67.931 ms |     66.816–69.421 ms |
+| **mcp-use v2**     | **68.592 ms** | **67.691–69.889 ms** |
+| xmcp               |     68.641 ms |     68.010–70.107 ms |
+| tmcp               |     74.945 ms |     74.053–76.464 ms |
+| Official SDK v1    |    109.358 ms |   108.061–112.630 ms |
+| FastMCP TypeScript |    139.123 ms |   136.750–142.884 ms |
+| mcp-use v1         |    146.440 ms |   144.477–149.963 ms |
+| mcp-handler        |    163.733 ms |   161.870–165.948 ms |
+| Skybridge          |    168.794 ms |   166.524–172.288 ms |
 
-The mcp-use v2 and official SDK v2 distributions overlap. Their 0.306 ms
-median difference is measurement noise, not a meaningful product advantage.
+The mcp-use v2, official SDK v2, and xmcp distributions overlap. Their
+sub-millisecond ordering is measurement noise, not a meaningful product
+advantage.
 
 ## Install footprint
 
@@ -219,7 +165,7 @@ the tool definition through React and the Inspector.
 
 mcp-use adds framework-level performance improvements on top of the official
 SDK, including custom stateless request handling and optimized response paths.
-Those improvements delivered **36.4% higher median throughput** than the
+Those improvements delivered **21.9% higher median throughput** than the
 equivalent official SDK v2 fixture in this benchmark.
 
 ## Methodology
@@ -239,7 +185,7 @@ equivalent official SDK v2 fixture in this benchmark.
   process and fresh MCP Drill control and worker containers.
 - Reported throughput and latency values are medians across the three accepted
   rounds.
-- All eight TypeScript targets received MCP Drill's stability score of 100.
+- All nine TypeScript targets received MCP Drill's stability score of 100.
 
 ### Launch workload
 
@@ -269,15 +215,9 @@ equivalent official SDK v2 fixture in this benchmark.
   equivalent.
 - Production builds are compared only between mcp-use v1 and v2 because the
   other frameworks emit different artifact boundaries.
-- Two incomplete controller-capacity attempts were rejected and excluded from
-  every result above.
+- Incomplete diagnostic and fixture-reconstruction attempts were rejected
+  before aggregation; only the three complete rotations appear above.
 - There is no composite “overall score.”
 
 Use the scoped result: **fastest TypeScript framework with native MCP Apps
-support in the original eight-fixture test, and faster than FastMCP TypeScript
-in the separate paired addendum**.
-
-[fastmcp-apps]: https://github.com/PrefectHQ/fastmcp-ts/blob/v1.2.0/docs/apps/overview.mdx
-[fastmcp-protocol]: https://github.com/PrefectHQ/fastmcp-ts/blob/v1.2.0/docs/concepts/protocol-eras.mdx
-[fastmcp-oauth]: https://github.com/PrefectHQ/fastmcp-ts/blob/v1.2.0/docs/servers/auth/oauth.mdx
-[fastmcp-cli]: https://github.com/PrefectHQ/fastmcp-ts/blob/v1.2.0/docs/cli.mdx
+support in this unified nine-framework test**.

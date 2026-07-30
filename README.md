@@ -281,9 +281,9 @@ mcp-use builds on the official TypeScript SDK v2 and adds first-class Views, typ
 block-beta
   columns 7
 
-  metric["Metric"] mcp["mcp-use v2"] fastmcp["FastMCP TS†"] official["Official SDK v2*"] xmcp["xmcp"] skybridge["Skybridge"] handler["mcp-handler"]
+  metric["Metric"] mcp["mcp-use v2"] fastmcp["FastMCP TS"] official["Official SDK v2*"] xmcp["xmcp"] skybridge["Skybridge"] handler["mcp-handler"]
 
-  speed["Speed"] speedMcp["10,982 ops/s"] speedFast["6,156 ops/s†"] speedOfficial["8,050 ops/s"] speedXmcp["6,585 ops/s"] speedSkybridge["8,116 ops/s"] speedHandler["6,324 ops/s"]
+  speed["Speed"] speedMcp["9,682 ops/s"] speedFast["6,628 ops/s"] speedOfficial["7,943 ops/s"] speedXmcp["5,585 ops/s"] speedSkybridge["7,773 ops/s"] speedHandler["6,416 ops/s"]
   install["Clean install"] installMcp["74.4 MiB"] installFast["45.0 MiB"] installOfficial["99.0 MiB"] installXmcp["121.9 MiB"] installSkybridge["137.5 MiB"] installHandler["388.0 MiB"]
   packages["Installed<br/>packages"] packagesMcp["51"] packagesFast["147"] packagesOfficial["119"] packagesXmcp["171"] packagesSkybridge["300"] packagesHandler["130"]
   views["Views"] viewsMcp["✅"] viewsFast["✅"] viewsOfficial["◐ Extension"] viewsXmcp["✅"] viewsSkybridge["✅"] viewsHandler["❌"]
@@ -312,8 +312,6 @@ block-beta
 ```
 
 <sub>* Includes `@modelcontextprotocol/ext-apps`, Vite, and zod for an MCP Apps-capable stack.</sub>
-
-<sub>† FastMCP TypeScript 1.2.0 was measured in a separate July 30 paired modern-v2 run against `mcp-use@2.0.0-beta.65`; see the detailed report before comparing absolute throughput across run windows.</sub>
 
 <sub>Clean install is actual `node_modules` disk usage after a normal npm install, including required peer dependencies; it is not npmx's peer-excluding modeled size.</sub>
 
