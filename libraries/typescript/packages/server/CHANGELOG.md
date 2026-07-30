@@ -1,5 +1,13 @@
 # mcp-use
 
+## 2.0.0-beta.66
+
+### Patch Changes
+
+- ccbbc08: Expose `getPublicBaseUrl()` from `mcp-use/react` for resolving public scripts,
+  stylesheets, WASM modules, and other static assets inside MCP App views.
+  - @mcp-use/inspector@20.0.0-beta.58
+
 ## 2.0.0-beta.65
 
 ### Patch Changes

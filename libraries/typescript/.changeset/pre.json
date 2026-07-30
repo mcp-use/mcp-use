@@ -40,6 +40,7 @@
     "dialect-json-schema-validator",
     "eager-inspector-ui",
     "enable-sdk-logging-capability",
+    "expose-public-base-url",
     "faster-node-runtime",
     "fix-beta-scaffold-templates",
     "fix-cli-package-verifier-windows",
