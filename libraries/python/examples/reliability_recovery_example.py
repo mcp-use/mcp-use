@@ -16,7 +16,6 @@ Issue #2054
 """
 
 import asyncio
-from typing import Dict, Optional
 
 
 class SyntheticDestinationServer:
@@ -25,7 +24,7 @@ class SyntheticDestinationServer:
     """
 
     def __init__(self):
-        self.database: Dict[str, dict] = {}
+        self.database: dict[str, dict] = {}
         self.total_tool_calls: int = 0
         self.total_mutations: int = 0
 
@@ -77,7 +76,7 @@ class SyntheticDestinationServer:
     async def read_back(
         self,
         operation_marker: str,
-    ) -> Optional[dict]:
+    ) -> dict | None:
         """
         Checks whether mutation already happened.
         """
