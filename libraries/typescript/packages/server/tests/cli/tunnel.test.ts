@@ -37,6 +37,7 @@ class MockWebSocket extends EventTarget {
   static readonly CLOSING = 2;
   static readonly CLOSED = 3;
   static readonly instances: MockWebSocket[] = [];
+  static keepaliveSupported = true;
 
   readonly sent: string[] = [];
   binaryType = "blob";
@@ -57,7 +58,14 @@ class MockWebSocket extends EventTarget {
     const message = JSON.parse(data) as { type?: string };
     if (message.type === "authenticate") {
       queueMicrotask(() => {
-        this.dispatchEvent(messageEvent(JSON.stringify({ type: "ready" })));
+        this.dispatchEvent(
+          messageEvent(
+            JSON.stringify({
+              type: "ready",
+              ...(MockWebSocket.keepaliveSupported && { keepalive: true }),
+            })
+          )
+        );
       });
     } else if (message.type === "ping") {
       queueMicrotask(() => {
@@ -90,6 +98,7 @@ describe("createTunnelManager", () => {
     createRequests = 0;
     deleteRequests = 0;
     MockWebSocket.instances.length = 0;
+    MockWebSocket.keepaliveSupported = true;
     vi.stubGlobal("WebSocket", MockWebSocket);
     vi.stubGlobal(
       "fetch",
@@ -138,6 +147,22 @@ describe("createTunnelManager", () => {
     await vi.advanceTimersByTimeAsync(25_000);
 
     expect(MockWebSocket.instances[0]?.sent).toContain(
+      JSON.stringify({ type: "ping" })
+    );
+    expect(tunnel.status().url).toBe(reservation.public_url);
+
+    await tunnel.stop();
+  });
+
+  it("does not send keepalives to a relay that did not negotiate them", async () => {
+    vi.useFakeTimers();
+    MockWebSocket.keepaliveSupported = false;
+    const tunnel = createTunnelManager(stateFilePath);
+    await tunnel.start(3000);
+
+    await vi.advanceTimersByTimeAsync(50_000);
+
+    expect(MockWebSocket.instances[0]?.sent).not.toContain(
       JSON.stringify({ type: "ping" })
     );
     expect(tunnel.status().url).toBe(reservation.public_url);

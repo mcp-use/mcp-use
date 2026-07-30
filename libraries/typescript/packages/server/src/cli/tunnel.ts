@@ -116,7 +116,7 @@ interface WebSocketCloseMessage {
 
 type RelayControlMessage =
   | { type: "auth-required" }
-  | { type: "ready" }
+  | { type: "ready"; keepalive?: boolean }
   | { type: "pong" }
   | RequestStartMessage
   | RequestEndMessage
@@ -616,16 +616,18 @@ async function connectTunnel(
         if (!ready) {
           ready = true;
           clearTimeout(timeout);
-          keepalive = setInterval(() => {
-            if (socket.readyState !== WebSocket.OPEN) return;
-            if (awaitingPong) {
-              socket.close(1011, "Tunnel keepalive timed out");
-              return;
-            }
-            awaitingPong = true;
-            sendControl(socket, { type: "ping" });
-          }, KEEPALIVE_INTERVAL_MS);
-          keepalive.unref();
+          if (message.keepalive === true) {
+            keepalive = setInterval(() => {
+              if (socket.readyState !== WebSocket.OPEN) return;
+              if (awaitingPong) {
+                socket.close(1011, "Tunnel keepalive timed out");
+                return;
+              }
+              awaitingPong = true;
+              sendControl(socket, { type: "ping" });
+            }, KEEPALIVE_INTERVAL_MS);
+            keepalive.unref();
+          }
           resolve();
         }
         return;
