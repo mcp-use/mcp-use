@@ -48,9 +48,9 @@ permissions:
 
 on:
   push:
-    branches: [main, canary]
+    branches: [main, canary, v1]
   pull_request:
-    branches: [main, canary]
+    branches: [main, canary, v1]
   workflow_call:
     inputs:
       ref:
@@ -833,7 +833,7 @@ jobs:
         run: |
           if [ -n "$(ls -A .changeset/*.md 2>/dev/null | grep -v README.md)" ]; then
             echo "✅ Changeset found"
-            pnpm changeset status --since=origin/main
+            pnpm changeset status --since="origin/${GITHUB_BASE_REF}"
           else
             echo "⚠️ No changeset found. If this PR includes changes that should be published, please add a changeset:"
             echo "  pnpm changeset"

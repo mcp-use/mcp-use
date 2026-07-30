@@ -29,6 +29,16 @@ We have a quick list of common questions to get you started engaging with this p
 2. Push to canary branch
 3. CI automatically publishes as `x.y.z-canary.N`
 
+#### V1 Branch (Maintenance Releases)
+
+1. Branch from `v1` and add a patch changeset
+2. Open a pull request back to `v1`
+3. CI creates or updates the v1 version pull request
+4. Merge the version pull request to publish with the `v1` npm dist-tag
+
+V1 publication verifies that every other npm dist-tag, including `latest`,
+remains unchanged. Do not publish v1 packages manually.
+
 ---
 
 ## Quick Start
