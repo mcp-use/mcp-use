@@ -1,11 +1,13 @@
 # mcp-use SDK v2 benchmarks
 
 This report compares `mcp-use` v2 with mcp-use v1, the official TypeScript SDK,
-and representative TypeScript MCP frameworks. Performance, install, and App
-build results use the published `mcp-use@2.0.0-beta.61` package. The npm
-tarball was remeasured from the `2.0.0-beta.64` package candidate after removing
-the temporary v1 compatibility layer. Measurements were recorded on July 27–28,
-2026 using Node.js 24.15.0.
+and representative TypeScript MCP frameworks. The original performance,
+install, and App build results use the published `mcp-use@2.0.0-beta.61`
+package. The npm tarball was remeasured from the `2.0.0-beta.64` package
+candidate after removing the temporary v1 compatibility layer. Measurements
+were recorded on July 27–28, 2026 using Node.js 24.15.0. A July 30 addendum
+compares the released `mcp-use@2.0.0-beta.65` package with
+`@prefecthq/fastmcp-ts@1.2.0`.
 
 ## Results at a glance
 
@@ -18,28 +20,69 @@ Compared with mcp-use v1, v2 measured:
 - **74% smaller npm tarball:** 1,155 → 302 KiB
 - **36% smaller equivalent MCP App build:** 1.289 → 0.828 MB
 
+## FastMCP TypeScript addendum
+
+FastMCP TypeScript 1.2.0 was released after the original eight-fixture matrix.
+It was measured in a fresh paired comparison against the then-current
+`mcp-use@2.0.0-beta.65`, rather than inserting its score into the historical
+July 27–28 ranking. Absolute localhost throughput drifts enough across run
+windows that an interpolated rank would not be defensible.
+
+Both fixtures exposed the same `benchmark_echo` tool on `/mcp`, used Zod 4.4.3,
+negotiated strict protocol `2026-07-28`, and ran without authentication or user
+middleware. Three rounds alternated framework order; every slot used a fresh
+framework process and fresh MCP Drill control and worker containers.
+
+| Framework                      | Median ops/s |      p50 |      p95 |      p99 | Median error rate | Stability |
+| ------------------------------ | -----------: | -------: | -------: | -------: | ----------------: | --------: |
+| **mcp-use v2 `2.0.0-beta.65`** |  **9,278.3** | **1 ms** | **4 ms** | **7 ms** |       **0.0219%** |   **100** |
+| FastMCP TypeScript `1.2.0`     |      6,155.6 |     1 ms |     6 ms |     8 ms |           0.0319% |       100 |
+
+mcp-use delivered 50.7% higher median throughput in this paired modern-v2 run.
+The individual samples were 9,278.3, 9,152.2, and 9,413.3 ops/s for mcp-use
+and 6,150.8, 6,471.2, and 6,155.6 ops/s for FastMCP.
+
+The launch check recorded 100 starts per framework after 10 warmups and rotated
+order on every round:
+
+| Framework          | Median launch |  Interquartile range |
+| ------------------ | ------------: | -------------------: |
+| **mcp-use v2**     | **69.334 ms** | **68.484–70.292 ms** |
+| FastMCP TypeScript |    140.722 ms |   139.128–143.179 ms |
+
+The same-day clean install used
+`npm install --omit=dev @prefecthq/fastmcp-ts@1.2.0 zod@4.4.3`. Its
+`node_modules` tree occupied **45.0 MiB** on disk and contained **147 installed
+package entries**. The published FastMCP tarball measured **1,613 KiB
+compressed** (1,651,357 bytes), **7.934 MiB unpacked** (8,318,944 bytes), and
+16 files.
+
+FastMCP's documented feature surface explains its README comparison cells:
+
+| Capability                      | FastMCP TypeScript 1.2.0                                                   |
+| ------------------------------- | -------------------------------------------------------------------------- |
+| Views / MCP Apps                | Native Apps component API                                                  |
+| Native Apps on MCP `2026-07-28` | Yes; advertised through `server/discover`                                  |
+| OAuth                           | Built-in provider and proxy primitives, not named hosted-provider adapters |
+| MCP 2026 protocol               | Yes                                                                        |
+| View screenshot CLI             | No documented command                                                      |
+| Built-in tunneling              | No documented command                                                      |
+| Inspector                       | `fastmcp dev inspector` launches the official MCP Inspector                |
+
+Sources: [Apps overview][fastmcp-apps], [protocol eras][fastmcp-protocol],
+[OAuth][fastmcp-oauth], and [CLI reference][fastmcp-cli].
+
+The initial FastMCP compatibility smoke sample was excluded. A first mcp-use
+diagnostic was also excluded because its loopback-only bind was unreachable
+from MCP Drill's Docker worker; the retained fixtures explicitly bound both
+servers to `0.0.0.0`.
+
 ## Throughput
 
-**Higher is better.** Black is mcp-use v2; gray represents the other
-TypeScript fixtures.
+**Higher is better.** mcp-use v2 is isolated in the first chart series; the
+second series contains the other TypeScript fixtures.
 
 ```mermaid
----
-config:
-  themeVariables:
-    xyChart:
-      backgroundColor: "#ffffff"
-      titleColor: "#0c0c0c"
-      xAxisLabelColor: "#0c0c0c"
-      xAxisTitleColor: "#0c0c0c"
-      xAxisTickColor: "#0c0c0c"
-      xAxisLineColor: "#0c0c0c"
-      yAxisLabelColor: "#0c0c0c"
-      yAxisTitleColor: "#0c0c0c"
-      yAxisTickColor: "#0c0c0c"
-      yAxisLineColor: "#0c0c0c"
-      plotColorPalette: "#0c0c0c, #d4d4d8"
----
 xychart
   title "Median operations per second"
   x-axis ["tmcp", "mcp-use v2", "mcp-use v1", "Skybridge", "Official v2", "Official v1", "xmcp", "mcp-handler"]
@@ -72,22 +115,6 @@ Apps support in this test.
 after 10 warmups, with launch order rotated across all targets.
 
 ```mermaid
----
-config:
-  themeVariables:
-    xyChart:
-      backgroundColor: "#ffffff"
-      titleColor: "#0c0c0c"
-      xAxisLabelColor: "#0c0c0c"
-      xAxisTitleColor: "#0c0c0c"
-      xAxisTickColor: "#0c0c0c"
-      xAxisLineColor: "#0c0c0c"
-      yAxisLabelColor: "#0c0c0c"
-      yAxisTitleColor: "#0c0c0c"
-      yAxisTickColor: "#0c0c0c"
-      yAxisLineColor: "#0c0c0c"
-      plotColorPalette: "#0c0c0c, #d4d4d8"
----
 xychart
   title "Median cold launch in milliseconds"
   x-axis ["Official v2", "mcp-use v2", "xmcp", "tmcp", "Official v1", "mcp-use v1", "mcp-handler", "Skybridge"]
@@ -121,40 +148,26 @@ install, including required peer dependencies and filesystem allocation. It
 therefore differs from npmx's modeled size, which excludes peer dependencies.
 
 ```mermaid
----
-config:
-  themeVariables:
-    xyChart:
-      backgroundColor: "#ffffff"
-      titleColor: "#0c0c0c"
-      xAxisLabelColor: "#0c0c0c"
-      xAxisTitleColor: "#0c0c0c"
-      xAxisTickColor: "#0c0c0c"
-      xAxisLineColor: "#0c0c0c"
-      yAxisLabelColor: "#0c0c0c"
-      yAxisTitleColor: "#0c0c0c"
-      yAxisTickColor: "#0c0c0c"
-      yAxisLineColor: "#0c0c0c"
-      plotColorPalette: "#0c0c0c, #d4d4d8"
----
 xychart
   title "Clean production install in MiB"
-  x-axis ["mcp-use v2", "xmcp", "Skybridge", "mcp-use v1"]
+  x-axis ["FastMCP TS", "mcp-use v2", "xmcp", "Skybridge", "mcp-use v1"]
   y-axis "MiB on disk" 0 --> 450
-  bar [74.4, 0, 0, 0]
-  bar [0, 121.9, 137.5, 404.6]
+  bar [0, 74.4, 0, 0, 0]
+  bar [45.0, 0, 121.9, 137.5, 404.6]
 ```
 
-| Framework           | Direct install set |         Disk | Installed packages |
-| ------------------- | ------------------ | -----------: | -----------------: |
-| **mcp-use v2**      | `mcp-use + zod`    | **74.4 MiB** |             **57** |
-| xmcp                | `xmcp + zod`       |    121.9 MiB |                171 |
-| Skybridge           | `skybridge + zod`  |    137.5 MiB |                300 |
-| mcp-use v1 baseline | `mcp-use + zod`    |    404.6 MiB |                365 |
+| Framework           | Direct install set            |         Disk | Installed packages |
+| ------------------- | ----------------------------- | -----------: | -----------------: |
+| FastMCP TypeScript  | `@prefecthq/fastmcp-ts + zod` |     45.0 MiB |                147 |
+| **mcp-use v2**      | `mcp-use + zod`               | **74.4 MiB** |             **57** |
+| xmcp                | `xmcp + zod`                  |    121.9 MiB |                171 |
+| Skybridge           | `skybridge + zod`             |    137.5 MiB |                300 |
+| mcp-use v1 baseline | `mcp-use + zod`               |    404.6 MiB |                365 |
 
-mcp-use v2 had the smallest clean install among the tested full-stack native
-MCP Apps frameworks. The mcp-use v1 row is a migration baseline, not a native
-Apps peer.
+FastMCP TypeScript had the smallest measured clean install. mcp-use v2
+installed fewer package entries and remained substantially smaller than the
+other previously tested native Apps frameworks. The mcp-use v1 row is a
+migration baseline, not a native Apps peer.
 
 ## Package and MCP App build size
 
@@ -164,26 +177,16 @@ temporary v1 facade and legacy widget adapters reduced the candidate from
 349 KiB (357,628 bytes) to 302 KiB, a 13.6% reduction. Its unpacked contents
 fell from 1,417,415 bytes across 125 files to 1,249,746 bytes across 116 files.
 
+For package-artifact context, published
+`@prefecthq/fastmcp-ts@1.2.0` measured 1,613 KiB compressed and 7.934 MiB
+unpacked across 16 files. This package comparison does not imply an equivalent
+application build: FastMCP's server-side Apps component model and mcp-use's
+React/Vite View build emit different boundaries.
+
 For the application build, both versions used the same React launch card, CSS,
 and one echo tool.
 
 ```mermaid
----
-config:
-  themeVariables:
-    xyChart:
-      backgroundColor: "#ffffff"
-      titleColor: "#0c0c0c"
-      xAxisLabelColor: "#0c0c0c"
-      xAxisTitleColor: "#0c0c0c"
-      xAxisTickColor: "#0c0c0c"
-      xAxisLineColor: "#0c0c0c"
-      yAxisLabelColor: "#0c0c0c"
-      yAxisTitleColor: "#0c0c0c"
-      yAxisTickColor: "#0c0c0c"
-      yAxisLineColor: "#0c0c0c"
-      plotColorPalette: "#0c0c0c, #d4d4d8"
----
 xychart
   title "Equivalent MCP App production build"
   x-axis ["mcp-use v2", "mcp-use v1"]
@@ -250,6 +253,8 @@ equivalent official SDK v2 fixture in this benchmark.
 
 - Clean install size is the on-disk dependency tree after installing the direct
   package set shown in the table.
+- Installed-package counts are the physical package entries reported by
+  `npm ls --all --parseable`, excluding the fixture root.
 - Tarball size is the compressed size of the package produced by `pnpm pack`.
 - The v1 and v2 App builds use equivalent source content and production build
   settings.
@@ -269,4 +274,10 @@ equivalent official SDK v2 fixture in this benchmark.
 - There is no composite “overall score.”
 
 Use the scoped result: **fastest TypeScript framework with native MCP Apps
-support in this eight-fixture test**.
+support in the original eight-fixture test, and faster than FastMCP TypeScript
+in the separate paired addendum**.
+
+[fastmcp-apps]: https://github.com/PrefectHQ/fastmcp-ts/blob/v1.2.0/docs/apps/overview.mdx
+[fastmcp-protocol]: https://github.com/PrefectHQ/fastmcp-ts/blob/v1.2.0/docs/concepts/protocol-eras.mdx
+[fastmcp-oauth]: https://github.com/PrefectHQ/fastmcp-ts/blob/v1.2.0/docs/servers/auth/oauth.mdx
+[fastmcp-cli]: https://github.com/PrefectHQ/fastmcp-ts/blob/v1.2.0/docs/cli.mdx
