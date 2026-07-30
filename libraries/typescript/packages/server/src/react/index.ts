@@ -18,6 +18,7 @@ export { Image } from "./components/image.js";
 export { ModelContext } from "./components/model-context.js";
 export { ThemeProvider } from "./components/theme-provider.js";
 export { ViewControls } from "./components/view-controls.js";
+export { getPublicBaseUrl } from "./public-assets.js";
 export {
   useCallTool,
   useDynamicTool,
