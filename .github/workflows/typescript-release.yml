@@ -614,7 +614,7 @@ jobs:
         uses: changesets/action@v1
         with:
           cwd: libraries/typescript
-          version: pnpm version
+          version: pnpm run version
           commit: "chore(release-v1): version packages"
           title: "chore(release-v1): version packages"
           createGithubReleases: false
