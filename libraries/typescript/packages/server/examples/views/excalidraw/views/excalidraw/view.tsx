@@ -49,12 +49,12 @@ import "./view.css";
 
 /**
  * Fixed aspect-ratio SVG preview collapses under ext-apps auto-resize
- * (`height: max-content`); report size manually instead. Only inline and
- * fullscreen are supported — PiP is not a useful mode for the canvas editor.
+ * (`height: max-content`); report size manually instead. PiP keeps the compact
+ * SVG preview visible while fullscreen provides the editable canvas.
  */
 export const viewConfig = {
   autoResize: false,
-  displayModes: ["inline", "fullscreen"],
+  displayModes: ["inline", "fullscreen", "pip"],
 } satisfies ViewConfig;
 
 // ============================================================
@@ -205,6 +205,22 @@ const ExpandIcon = () => (
     <path d="M5.5 12.5H1.5V8.5" />
     <path d="M12.5 1.5L8 6" />
     <path d="M1.5 12.5L6 8" />
+  </svg>
+);
+
+const PictureInPictureIcon = () => (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 14 14"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="1.5" y="2" width="11" height="9" rx="1.5" />
+    <rect x="7" y="6.5" width="4" height="3" rx="0.5" />
   </svg>
 );
 
@@ -954,7 +970,8 @@ const discordIcon = (
 export default function ExcalidrawView() {
   const [editSummary, setEditSummary] = useState("");
   const toolCtx = useToolContext<"create_view">();
-  const { displayMode, requestDisplayMode } = useDisplayMode();
+  const { displayMode, availableDisplayModes, requestDisplayMode } =
+    useDisplayMode();
   const { maxHeight, safeArea } = useHostContext();
   const openExternal = useOpenExternal();
   const { callTool: exportToExcalidrawTool } = useCallTool(
@@ -1287,6 +1304,22 @@ export default function ExcalidrawView() {
               );
             }}
           />
+
+          {availableDisplayModes.includes("pip") && (
+            <button
+              className="app-button"
+              onClick={() => {
+                void requestDisplayMode({ mode: "pip" }).catch((err) => {
+                  fsLog(`requestDisplayMode(pip) FAILED: ${err}`);
+                });
+              }}
+              title="Open picture in picture"
+              type="button"
+            >
+              <span>PIP</span>
+              <PictureInPictureIcon />
+            </button>
+          )}
 
           <button
             className="app-button"
