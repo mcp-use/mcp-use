@@ -53,7 +53,7 @@ for (let i = 0; i < args.length; i++) {
     process.exit(0);
   } else if (args[i] === "--help" || args[i] === "-h") {
     console.log(`
-MCP Inspector - Inspect and debug MCP servers
+MCP Inspector v${getInspectorVersion()} - Inspect and debug MCP servers
 
 Usage:
   npx @mcp-use/inspector [options]

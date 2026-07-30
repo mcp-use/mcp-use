@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - canary
+      - v1
     paths:
       - "libraries/typescript/**"
       - ".github/workflows/typescript-release.yml"
@@ -21,6 +22,7 @@ concurrency: ${{ github.workflow }}-${{ github.ref }}
 jobs:
   release:
     name: Release
+    if: github.ref != 'refs/heads/v1'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -568,3 +570,66 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WEBHOOK_URL: ${{ secrets.DISCORD_RELEASE_CHANNEL_WEBHOOK_URL }}
+
+  release-v1:
+    name: Release v1 maintenance
+    if: github.ref == 'refs/heads/v1'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+    steps:
+      - name: Checkout v1
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.30.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: "pnpm"
+          cache-dependency-path: libraries/typescript/pnpm-lock.yaml
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Update npm for trusted publishing
+        run: npm install --global npm@latest
+
+      - name: Install dependencies
+        working-directory: libraries/typescript
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        working-directory: libraries/typescript
+        run: pnpm build
+
+      - name: Create or update v1 version PR
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          cwd: libraries/typescript
+          version: pnpm version
+          commit: "chore(release-v1): version packages"
+          title: "chore(release-v1): version packages"
+          createGithubReleases: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Plan v1 publication
+        if: steps.changesets.outputs.hasChangesets == 'false'
+        working-directory: libraries/typescript
+        run: node scripts/v1-release.mjs plan
+
+      - name: Publish and verify v1 packages
+        if: steps.changesets.outputs.hasChangesets == 'false'
+        working-directory: libraries/typescript
+        env:
+          VERIFY_ATTEMPTS: 12
+          VERIFY_DELAY_SECONDS: 10
+        run: node scripts/v1-release.mjs publish
