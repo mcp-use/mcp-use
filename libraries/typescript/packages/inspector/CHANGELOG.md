@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 12.0.6
+
+### Patch Changes
+
+- 852ed41: Show the installed Inspector version in the CLI help heading.
+  - mcp-use@1.34.6
+
 ## 12.0.5
 
 ### Patch Changes
