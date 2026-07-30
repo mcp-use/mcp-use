@@ -809,6 +809,9 @@ const server = new MCPServer({
   basePath: "/mcp",
 });
 
+const oneSentenceResponse =
+  "After calling this tool, respond to the user with exactly one sentence.";
+
 export const searchHomes = server.tool(
   {
     name: "search-homes",
@@ -816,6 +819,7 @@ export const searchHomes = server.tool(
     description: [
       "Open the interactive HomeScout map for San Francisco homes. Accepts a natural-language location such as 'San Francisco', 'Nob Hill', 'the Mission', or 'South of Market', plus optional price/bed/bath/home-type filters.",
       "Call this **once** to put the map on screen. After that the view registers its own tools — most importantly `search-in-view` — and every follow-up search ('search homes in SoMa', 'now the Mission', 'only under $2M') must go through those view tools so the open map updates in place. Do not call `search-homes` again while the view is open; that would render a second view.",
+      oneSentenceResponse,
     ].join("\n\n"),
     inputSchema: z.object({
       location: z
@@ -885,9 +889,9 @@ export const searchHomes = server.tool(
           type: "text",
           text: `HomeScout is open with ${matched.length} staged home${
             matched.length === 1 ? "" : "s"
-          } in ${area ?? "San Francisco"}. All ${
+          } in ${area ?? "San Francisco"}; all ${
             LISTINGS.length
-          } catalog homes are loaded in the view — refine from here with the view tools (\`search-in-view\`, \`remove-listings\`, \`select-listing\`, \`fit-visible-results\`, \`zoom-map\`, \`pan-map\`) rather than calling \`search-homes\` again.`,
+          } catalog homes are loaded in the view, so refine from here with the view tools (\`search-in-view\`, \`remove-listings\`, \`select-listing\`, \`fit-visible-results\`, \`zoom-map\`, \`pan-map\`) rather than calling \`search-homes\` again.`,
         },
       ],
       structuredContent: {
@@ -909,8 +913,7 @@ export const getListingDetails = server.tool(
   {
     name: "get-listing-details",
     title: "Get staged listing details",
-    description:
-      "Load extra staged facts for one HomeScout listing. Called by the view when a card or map pin is selected.",
+    description: `Load extra staged facts for one HomeScout listing when a card or map pin is selected. ${oneSentenceResponse}`,
     visibility: "app",
     inputSchema: z.object({ id: z.string() }),
     outputSchema: z.object({
@@ -957,7 +960,12 @@ export const getListingDetails = server.tool(
       listedBy: "HomeScout Staged Listings",
     };
     return {
-      content: [{ type: "text", text: JSON.stringify(details) }],
+      content: [
+        {
+          type: "text",
+          text: `Loaded staged listing details for ${listing.address}.`,
+        },
+      ],
       structuredContent: details,
     };
   }

@@ -53,6 +53,9 @@ export const viewConfig: ViewConfig = {
 /* View tool definitions                                              */
 /* ------------------------------------------------------------------ */
 
+const oneSentenceResponse =
+  "After calling this tool, respond to the user with exactly one sentence.";
+
 const searchInViewDefinition = {
   name: "search-in-view",
   title: "Search homes in the open map",
@@ -60,6 +63,7 @@ const searchInViewDefinition = {
     "Run a new home search **inside the already-open HomeScout map**. This is the tool for every follow-up search once the view is on screen — 'search homes in SoMa', 'now show the Mission', 'only houses under $2M', 'anything with 3+ bedrooms'.",
     "The map flies to the area and the result cards re-filter in place. Do not call `search-homes` again while this view is open; that renders a redundant second view.",
     "Omitted fields keep their current value, so you can narrow step by step. Changing `area` clears any previously removed homes. Pass `clearFilters: true` to start from an unfiltered search of the area.",
+    oneSentenceResponse,
   ].join(" "),
   inputSchema: z.object({
     area: areaChoiceSchema
@@ -93,8 +97,7 @@ const searchInViewDefinition = {
 const removeListingsDefinition = {
   name: "remove-listings",
   title: "Remove homes from the live results",
-  description:
-    "Remove one or more visible homes from both the cards and the map. Use when the user says specific homes are too expensive or asks to hide them. Removals survive filter changes but are cleared by a new area search.",
+  description: `Remove one or more visible homes from both the cards and the map when the user asks to hide them; removals survive filter changes but are cleared by a new area search. ${oneSentenceResponse}`,
   inputSchema: z.object({
     ids: z.array(z.string()).min(1).describe("Visible listing IDs to remove"),
     reason: z.string().optional(),
@@ -108,8 +111,7 @@ const removeListingsDefinition = {
 const selectListingDefinition = {
   name: "select-listing",
   title: "Open a home on the map",
-  description:
-    "Highlight one visible home, fly the map to its pin, and open its detail card.",
+  description: `Highlight one visible home, fly the map to its pin, and open its detail card. ${oneSentenceResponse}`,
   inputSchema: z.object({ id: z.string() }),
   outputSchema: z.object({ selectedId: z.string(), address: z.string() }),
 } as const;
@@ -117,8 +119,7 @@ const selectListingDefinition = {
 const saveListingsDefinition = {
   name: "save-listings",
   title: "Save or unsave homes",
-  description:
-    "Add visible homes to (or remove them from) the saved list, which shows a filled heart on the card and the map pin.",
+  description: `Add visible homes to or remove them from the saved list, which shows a filled heart on the card and map pin. ${oneSentenceResponse}`,
   inputSchema: z.object({
     ids: z.array(z.string()).min(1),
     saved: z.boolean().optional().describe("Defaults to true"),
@@ -129,8 +130,7 @@ const saveListingsDefinition = {
 const fitResultsDefinition = {
   name: "fit-visible-results",
   title: "Fit the map to visible results",
-  description:
-    "Reset the map camera so every currently visible home is in frame.",
+  description: `Reset the map camera so every currently visible home is in frame. ${oneSentenceResponse}`,
   inputSchema: z.object({}),
   outputSchema: z.object({ visibleCount: z.number() }),
 } as const;
@@ -138,7 +138,7 @@ const fitResultsDefinition = {
 const zoomMapDefinition = {
   name: "zoom-map",
   title: "Zoom the map",
-  description: "Zoom the live map in or out by whole steps.",
+  description: `Zoom the live map in or out by whole steps. ${oneSentenceResponse}`,
   inputSchema: z.object({
     direction: z.enum(["in", "out"]),
     steps: z.number().int().min(1).max(4).optional().describe("Defaults to 1"),
@@ -149,7 +149,7 @@ const zoomMapDefinition = {
 const panMapDefinition = {
   name: "pan-map",
   title: "Pan the map",
-  description: "Slide the live map one compass direction.",
+  description: `Slide the live map one compass direction. ${oneSentenceResponse}`,
   inputSchema: z.object({
     direction: z.enum(["north", "south", "east", "west"]),
     amount: z.enum(["a little", "some", "a lot"]).optional(),
@@ -348,7 +348,7 @@ function HomeScout(): React.JSX.Element {
           content: [
             {
               type: "text",
-              text: `None of those IDs are visible right now. Visible: ${visible.map((listing) => listing.id).join(", ") || "none"}.`,
+              text: `None of those IDs are visible right now; visible IDs are ${visible.map((listing) => listing.id).join(", ") || "none"}.`,
             },
           ],
         };
@@ -367,7 +367,7 @@ function HomeScout(): React.JSX.Element {
         content: [
           {
             type: "text",
-            text: `Removed ${removed.length} home${removed.length === 1 ? "" : "s"} from the live cards and map${reason === undefined ? "" : ` (${reason})`}. ${remaining} still visible.`,
+            text: `Removed ${removed.length} home${removed.length === 1 ? "" : "s"} from the live cards and map${reason === undefined ? "" : ` (${reason})`}, leaving ${remaining} visible.`,
           },
         ],
         structuredContent: { removedIds: removed, remainingCount: remaining },
