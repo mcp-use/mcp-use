@@ -184,6 +184,24 @@ ${moduleScript}
     )
     .join("\n");
 
+  // Dev view modules contain Vite's root-relative imports. MCP App hosts load
+  // the synthesized document in an opaque-origin srcdoc iframe, where those
+  // specifiers do not inherit the public tunnel origin for CSP matching.
+  // Map the root prefix to the request-resolved asset base before any module
+  // executes. Production bundles use view-relative asset entries and do not
+  // receive this development-only map.
+  const devImportMap =
+    entry.entry.startsWith("/") &&
+    (entry.scripts ?? []).includes("/@vite/client")
+      ? `<script type="importmap">${escapeInlineScript(
+          JSON.stringify({
+            imports: {
+              "/": `${assetsBase.replace(/\/+$/, "")}/`,
+            },
+          })
+        )}</script>`
+      : "";
+
   const entryUrl = resolveExternalAssetUrl(
     entry.entry,
     assetsBase,
@@ -196,6 +214,7 @@ ${moduleScript}
 <head>
 <meta charset="utf-8">
 ${configScript}
+${devImportMap}
 ${VIEW_BOOTSTRAP_STYLE}
 ${cssLinks}
 </head>

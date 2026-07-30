@@ -1277,6 +1277,9 @@ describe("views document synthesis", () => {
       'src="http://localhost:3000/@id/__x00__virtual:mcp-use/views/demo"'
     );
     expect(html).toContain('src="http://localhost:3000/@vite/client"');
+    expect(html).toContain(
+      '<script type="importmap">{"imports":{"/":"http://localhost:3000/"}}</script>'
+    );
     expect(html).toContain('<div id="root" data-mcp-use-loading></div>');
   });
 
@@ -1294,6 +1297,7 @@ describe("views document synthesis", () => {
     expect(html).toContain(
       'src="http://localhost:3000/mcp/_mcp-use/views/demo-view/assets/entry.js"'
     );
+    expect(html).not.toContain('type="importmap"');
   });
 
   it("requires viewName for external entries without origin-absolute paths", () => {

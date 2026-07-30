@@ -9,12 +9,14 @@ Use a tunnel when ChatGPT, Claude, or another remote MCP client needs to reach a
 With `mcp-use`, start the server with `--tunnel`, then copy the printed `Tunnel` URL. The URL you give to clients must include `/mcp`.
 
 ```text
-https://<subdomain>.local.mcp-use.run/mcp
+https://<adjective>-<color>.tunnel.mcp-use.run/mcp
 ```
 
 Keep the terminal process running while you test. The public URL stops working when the process exits.
 
-With `mcp-use dev --tunnel` or `mcp-use start --tunnel`, if the tunnel relay drops the registration while the command is still running, the tunnel restarts automatically and reuses the same subdomain when possible.
+With `mcp-use dev --tunnel` or `mcp-use start --tunnel`, the framework connects directly to the relay over WebSocket. It does not install or execute a native tunnel binary or a separate tunnel package. If the relay connection drops while the command is still running, the tunnel reconnects automatically and reuses the same identifier when possible.
+
+The relay forwards both HTTP requests and WebSocket upgrades. In development, MCP App views loaded from the public tunnel keep Vite HMR: editing a local view updates the remote Inspector or client without restarting the tunnel.
 
 ## Start a tunnel with mcp-use
 
@@ -36,42 +38,17 @@ After the production server binds, successful output includes the local and publ
 ```text
 [mcp-use] starting tunnel for port 3000…
 mcp-use server running at http://localhost:3000/mcp
-mcp-use public MCP URL: https://happy-blue.local.mcp-use.run/mcp
+mcp-use public MCP URL: https://proper-black.tunnel.mcp-use.run/mcp
 ```
 
-Copy the value after `mcp-use public MCP URL:` into your remote MCP client. Do not copy only `https://happy-blue.local.mcp-use.run`; the client URL must end with `/mcp`.
-
-## Tunnel any server on /mcp
-
-Use the standalone tunnel package when your local MCP server is not started by `mcp-use`. The server must already be running locally and serving MCP over HTTP at `/mcp`.
-
-For a server on port `3000`, run:
-
-```bash
-npx @mcp-use/tunnel 3000
-```
-
-Successful output prints a public URL:
-
-```text
-╭────────────────────────────────────╮
-│  Tunnel Created Successfully!      │
-╰────────────────────────────────────╯
-
-Public URL:
-  https://happy-blue.local.mcp-use.run/mcp
-
-Local Port: 3000
-```
-
-Copy the full public URL, including `/mcp`, into ChatGPT, Claude, or your other remote MCP client.
+Copy the value after `mcp-use public MCP URL:` into your remote MCP client. Do not copy only the tunnel origin; the client URL must end with `/mcp`.
 
 ## Verify the tunnel
 
 Verify the public URL with the `mcp-use client` CLI:
 
 ```bash
-npx mcp-use client connect tunnel-test https://happy-blue.local.mcp-use.run/mcp
+npx mcp-use client connect tunnel-test https://proper-black.tunnel.mcp-use.run/mcp
 npx mcp-use client tunnel-test tools list
 ```
 
@@ -81,7 +58,7 @@ The `connect` command performs the MCP handshake and saves the tunnel under the 
 
 Press `Ctrl+C` in the terminal running the tunnel.
 
-When you started the tunnel with `mcp-use dev --tunnel` or `mcp-use start --tunnel`, stopping the command stops both the local server process and the tunnel. When you started the tunnel with `npx @mcp-use/tunnel 3000`, stopping that command closes only the tunnel; your local server keeps running until you stop it separately.
+When you started the tunnel with `mcp-use dev --tunnel` or `mcp-use start --tunnel`, stopping the command stops both the local server process and the tunnel.
 
 ## Lifetime and limits
 
@@ -89,10 +66,11 @@ Tunnels are for local testing before deployment:
 
 - The tunnel is active only while the command is running.
 - With `mcp-use dev --tunnel` or `mcp-use start --tunnel`, a dropped tunnel registration is re-established automatically while the command runs.
-- Tunnels expire after 24 hours.
+- Reservations that never connect expire after 5 minutes.
+- Connected tunnels expire after 24 hours.
 - Inactive tunnels are cleaned up after 1 hour without activity.
-- Each IP address can create up to 10 tunnels per hour.
-- Each IP address can have up to 5 active tunnels at a time.
+- Each source IP can create up to 10 tunnels per hour.
+- Each source IP can have up to 5 active tunnels at a time.
 
 For a stable public URL, deploy the server instead of relying on a local tunnel.
 

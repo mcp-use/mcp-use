@@ -779,6 +779,15 @@ export async function runDev(options: DevOptions): Promise<void> {
         tunnelActive: tunnelManager.status().url !== null,
         localhostBind,
       });
+      const tunnelRequest =
+        tunnelHostname !== null && requestHostname === tunnelHostname;
+      // Vite performs its own static Host check after our dynamic validator.
+      // Its allowlist cannot be updated when the tunnel starts at runtime, so
+      // pass the already-validated active tunnel request through as localhost.
+      // The same rewrite is applied to HMR upgrades above.
+      if (tunnelRequest) {
+        req.headers.host = `localhost:${port}`;
+      }
       vite.middlewares(req, res, () => {
         void nodeListener(req, res);
       });

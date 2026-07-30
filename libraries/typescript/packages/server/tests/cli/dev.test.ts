@@ -22,8 +22,8 @@ import {
   waitFor,
 } from "./helpers.js";
 
-// Controllable tunnel state: the real manager spawns `npx @mcp-use/tunnel`.
-// Tests flip `url` to pin the tunnel-gated CORS contract on Vite module URLs.
+// Controllable tunnel state. Tests flip `url` to pin the tunnel-gated CORS
+// contract on Vite module URLs.
 const tunnelState = vi.hoisted(() => ({ url: null as string | null }));
 vi.mock("../../src/cli/tunnel.js", () => ({
   createTunnelManager: () => ({
@@ -775,6 +775,23 @@ async function rawStatus(
   });
 }
 
+/** Issue a raw GET with an explicit Host header and return its body. */
+async function rawGetBody(
+  target: string,
+  headers: Record<string, string>
+): Promise<string> {
+  const { request } = await import("node:http");
+  return new Promise((resolve, reject) => {
+    const req = request(target, { method: "GET", headers }, (res) => {
+      const chunks: Buffer[] = [];
+      res.on("data", (chunk: Buffer) => chunks.push(chunk));
+      res.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    });
+    req.on("error", reject);
+    req.end();
+  });
+}
+
 describe("runDev (views)", () => {
   it("serves view documents, virtual entries, and reloads on view add", async () => {
     const cwd = copyFixture("dev-views", "views");
@@ -812,6 +829,20 @@ describe("runDev (views)", () => {
     expect(virtualJs).toMatch(/bootstrapView/);
     expect(virtualJs).toContain("import * as viewModule from");
     expect(virtualJs).toContain("bootstrapView(viewModule)");
+
+    // The tunnel hostname becomes known after Vite starts. The framework's
+    // dynamic Host validator authorizes it, then presents it to Vite as the
+    // already-allowed localhost host so module requests are not blocked by
+    // Vite's static allowlist.
+    tunnelState.url = "https://fake.local.mcp-use.run";
+    const tunnelViteClient = await rawGetBody(`${base}/@vite/client`, {
+      host: "fake.local.mcp-use.run",
+      origin: "null",
+    });
+    expect(tunnelViteClient).toContain("createHotContext");
+    expect(tunnelViteClient).toContain("updateStyle");
+    expect(tunnelViteClient).toContain("new WebSocket");
+    tunnelState.url = null;
 
     // Vite module CORS (CLI_SPEC.md § DNS-rebinding protection):
     // without a tunnel, a validated loopback Origin is reflected exactly
