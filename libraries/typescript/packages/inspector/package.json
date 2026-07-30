@@ -39,7 +39,7 @@
     "dist"
   ],
   "scripts": {
-    "dev": "rimraf node_modules/.vite && VITE_MANUFACT_CHAT_URL=${VITE_MANUFACT_CHAT_URL:-http://localhost:8000/api/v1/inspector/chat/stream} vite --strictPort",
+    "dev": "rimraf node_modules/.vite && vite --strictPort",
     "dev:client": "pnpm run dev",
     "dev:server": "VITE_DEV=true tsx watch src/server/server.ts",
     "dev:standalone": "tsx watch src/server/server.ts",
