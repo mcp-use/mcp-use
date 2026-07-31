@@ -36,6 +36,10 @@ function run(command, args, options = {}) {
   return result.stdout.trim();
 }
 
+function singleJsonValue(parsed) {
+  return Array.isArray(parsed) && parsed.length === 1 ? parsed[0] : parsed;
+}
+
 function npmJson(args, fallback) {
   const result = spawnSync("npm", args, {
     cwd: root,
@@ -45,15 +49,23 @@ function npmJson(args, fallback) {
   if (result.status !== 0) return fallback;
   const output = result.stdout.trim();
   if (!output) return fallback;
-  const parsed = JSON.parse(output);
-  return Array.isArray(parsed) && parsed.length === 1 ? parsed[0] : parsed;
+  return singleJsonValue(JSON.parse(output));
 }
 
 function packJson(output) {
-  const objectStart = output.lastIndexOf("\n{");
-  return JSON.parse(
-    objectStart === -1 ? output : output.slice(objectStart + 1)
-  );
+  const lineStarts = [0];
+  for (let index = output.indexOf("\n"); index !== -1; ) {
+    lineStarts.push(index + 1);
+    index = output.indexOf("\n", index + 1);
+  }
+  for (const start of lineStarts.reverse()) {
+    try {
+      return singleJsonValue(JSON.parse(output.slice(start).trim()));
+    } catch {
+      // Lifecycle output may precede pnpm's final JSON result.
+    }
+  }
+  throw new Error("pnpm pack did not produce a trailing JSON result");
 }
 
 function manifestAt(revision, relativePath) {
