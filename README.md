@@ -279,41 +279,41 @@ mcp-use builds on the official TypeScript SDK v2 and adds first-class Views, typ
 
 ```mermaid
 block-beta
-  columns 6
+  columns 7
 
-  metric["Metric"] mcp["mcp-use v2"] official["Official SDK v2*"] xmcp["xmcp"] skybridge["Skybridge"] handler["mcp-handler"]
+  metric["Metric"] mcp["mcp-use v2"] fastmcp["FastMCP TS"] official["Official SDK v2*"] xmcp["xmcp"] skybridge["Skybridge"] handler["mcp-handler"]
 
-  speed["Speed"] speedMcp["10,982 ops/s"] speedOfficial["8,050 ops/s"] speedXmcp["6,585 ops/s"] speedSkybridge["8,116 ops/s"] speedHandler["6,324 ops/s"]
-  install["Clean install"] installMcp["74.4 MiB"] installOfficial["99.0 MiB"] installXmcp["121.9 MiB"] installSkybridge["137.5 MiB"] installHandler["388.0 MiB"]
-  packages["Installed<br/>packages"] packagesMcp["51"] packagesOfficial["119"] packagesXmcp["171"] packagesSkybridge["300"] packagesHandler["130"]
-  views["Views"] viewsMcp["✅"] viewsOfficial["◐ Extension"] viewsXmcp["✅"] viewsSkybridge["✅"] viewsHandler["❌"]
-  nativeViews["Native Views<br/>on MCP 2026"] nativeViewsMcp["✅"] nativeViewsOfficial["❌"] nativeViewsXmcp["❌"] nativeViewsSkybridge["❌"] nativeViewsHandler["❌"]
-  oauth["One-line<br/>OAuth adapters"] oauthMcp["✅"] oauthOfficial["◐ Primitives"] oauthXmcp["✅"] oauthSkybridge["✅"] oauthHandler["❌"]
-  protocol["MCP 2026<br/>protocol"] protocolMcp["✅"] protocolOfficial["✅"] protocolXmcp["❌"] protocolSkybridge["❌"] protocolHandler["❌"]
-  screenshot["Built-in View<br/>screenshot CLI"] screenshotMcp["✅"] screenshotOfficial["❌"] screenshotXmcp["❌"] screenshotSkybridge["❌"] screenshotHandler["❌"]
-  tunnel["Built-in<br/>tunneling"] tunnelMcp["✅"] tunnelOfficial["❌"] tunnelXmcp["❌"] tunnelSkybridge["✅"] tunnelHandler["❌"]
-  inspector["Built-in<br/>Inspector"] inspectorMcp["✅"] inspectorOfficial["❌"] inspectorXmcp["❌"] inspectorSkybridge["◐ Limited"] inspectorHandler["❌"]
+  speed["Speed"] speedMcp["10,982 ops/s"] speedFast["6,628 ops/s"] speedOfficial["8,050 ops/s"] speedXmcp["6,585 ops/s"] speedSkybridge["8,116 ops/s"] speedHandler["6,324 ops/s"]
+  install["MCP App<br/>dev stack"] installMcp["74.4 MiB"] installFast["122.5 MiB"] installOfficial["99.0 MiB"] installXmcp["121.9 MiB"] installSkybridge["137.5 MiB"] installHandler["388.0 MiB"]
+  packages["Installed<br/>packages"] packagesMcp["51"] packagesFast["180"] packagesOfficial["119"] packagesXmcp["171"] packagesSkybridge["300"] packagesHandler["130"]
+  views["Views"] viewsMcp["✅"] viewsFast["✅"] viewsOfficial["◐ Extension"] viewsXmcp["✅"] viewsSkybridge["✅"] viewsHandler["❌"]
+  nativeViews["Native Views<br/>on MCP 2026"] nativeViewsMcp["✅"] nativeViewsFast["✅"] nativeViewsOfficial["❌"] nativeViewsXmcp["❌"] nativeViewsSkybridge["❌"] nativeViewsHandler["❌"]
+  oauth["One-line<br/>OAuth adapters"] oauthMcp["✅"] oauthFast["◐ Provider/proxy"] oauthOfficial["◐ Primitives"] oauthXmcp["✅"] oauthSkybridge["✅"] oauthHandler["❌"]
+  protocol["MCP 2026<br/>protocol"] protocolMcp["✅"] protocolFast["✅"] protocolOfficial["✅"] protocolXmcp["❌"] protocolSkybridge["❌"] protocolHandler["❌"]
+  screenshot["Built-in View<br/>screenshot CLI"] screenshotMcp["✅"] screenshotFast["❌"] screenshotOfficial["❌"] screenshotXmcp["❌"] screenshotSkybridge["❌"] screenshotHandler["❌"]
+  tunnel["Built-in<br/>tunneling"] tunnelMcp["✅"] tunnelFast["❌"] tunnelOfficial["❌"] tunnelXmcp["❌"] tunnelSkybridge["✅"] tunnelHandler["❌"]
+  inspector["Built-in<br/>Inspector"] inspectorMcp["✅"] inspectorFast["✅"] inspectorOfficial["❌"] inspectorXmcp["❌"] inspectorSkybridge["◐ Limited"] inspectorHandler["❌"]
 
-  classDef label fill:#f6f8fa,stroke:#d0d7de,color:#1f2328,font-weight:bold
-  classDef brand fill:#dcfce7,stroke:#16a34a,color:#166534,font-weight:bold
-  classDef header fill:#f6f8fa,stroke:#d0d7de,color:#1f2328,font-weight:bold
-  classDef value fill:#ffffff,stroke:#d0d7de,color:#1f2328
-  classDef leader fill:#dcfce7,stroke:#16a34a,color:#166534,font-weight:bold
-  classDef partial fill:#fff8c5,stroke:#d4a72c,color:#633c01,font-weight:bold
-  classDef unavailable fill:#f6f8fa,stroke:#d0d7de,color:#6e7781
+  classDef metricLabel fill:#6e76811a,font-weight:bold
+  classDef brand fill:#2ea04333,stroke:#2da44e,stroke-width:3px,font-weight:bold
+  classDef header fill:#6e76811a,font-weight:bold
+  classDef value fill:#6e76810f,stroke-width:1px
+  classDef leader fill:#2ea0432e,stroke:#2da44e,stroke-width:2px,font-weight:bold
+  classDef partial fill:#bb80092e,stroke:#bf8700,stroke-width:2px,font-weight:bold
+  classDef unavailable fill:#6e76810f,opacity:0.72
 
-  class metric,speed,install,packages,views,nativeViews,oauth,protocol,screenshot,tunnel,inspector label
+  class metric,speed,install,packages,views,nativeViews,oauth,protocol,screenshot,tunnel,inspector metricLabel
   class mcp brand
-  class official,xmcp,skybridge,handler header
-  class speedOfficial,speedXmcp,speedSkybridge,speedHandler,installOfficial,installXmcp,installSkybridge,installHandler,packagesOfficial,packagesXmcp,packagesSkybridge,packagesHandler value
-  class speedMcp,installMcp,packagesMcp,viewsMcp,viewsXmcp,viewsSkybridge,nativeViewsMcp,oauthMcp,oauthXmcp,oauthSkybridge,protocolMcp,protocolOfficial,screenshotMcp,tunnelMcp,tunnelSkybridge,inspectorMcp leader
-  class viewsOfficial,oauthOfficial,inspectorSkybridge partial
-  class viewsHandler,nativeViewsOfficial,nativeViewsXmcp,nativeViewsSkybridge,nativeViewsHandler,oauthHandler,protocolXmcp,protocolSkybridge,protocolHandler,screenshotOfficial,screenshotXmcp,screenshotSkybridge,screenshotHandler,tunnelOfficial,tunnelXmcp,tunnelHandler,inspectorOfficial,inspectorXmcp,inspectorHandler unavailable
+  class fastmcp,official,xmcp,skybridge,handler header
+  class speedFast,speedOfficial,speedXmcp,speedSkybridge,speedHandler,installFast,installOfficial,installXmcp,installSkybridge,installHandler,packagesFast,packagesOfficial,packagesXmcp,packagesSkybridge,packagesHandler value
+  class speedMcp,installMcp,packagesMcp,viewsMcp,viewsFast,viewsXmcp,viewsSkybridge,nativeViewsMcp,nativeViewsFast,oauthMcp,oauthXmcp,oauthSkybridge,protocolMcp,protocolFast,protocolOfficial,screenshotMcp,tunnelMcp,tunnelSkybridge,inspectorMcp,inspectorFast leader
+  class oauthFast,viewsOfficial,oauthOfficial,inspectorSkybridge partial
+  class viewsHandler,nativeViewsOfficial,nativeViewsXmcp,nativeViewsSkybridge,nativeViewsHandler,oauthHandler,protocolXmcp,protocolSkybridge,protocolHandler,screenshotFast,screenshotOfficial,screenshotXmcp,screenshotSkybridge,screenshotHandler,tunnelFast,tunnelOfficial,tunnelXmcp,tunnelHandler,inspectorOfficial,inspectorXmcp,inspectorHandler unavailable
 ```
 
 <sub>* Includes `@modelcontextprotocol/ext-apps`, Vite, and zod for an MCP Apps-capable stack.</sub>
 
-<sub>Clean install is actual `node_modules` disk usage after a normal npm install, including required peer dependencies; it is not npmx's peer-excluding modeled size.</sub>
+<sub>Install rows compare custom React MCP App development stacks. FastMCP therefore includes the Apps extension, React, Vite React plugin, Vite, TypeScript, and zod rather than only its narrower server-side component workflow. Size is actual `node_modules` disk usage after a normal npm install, including required peer dependencies.</sub>
 
 **[Read the detailed benchmark report →](./benchmark.md)**
 
