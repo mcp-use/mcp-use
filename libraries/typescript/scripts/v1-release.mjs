@@ -49,6 +49,13 @@ function npmJson(args, fallback) {
   return Array.isArray(parsed) && parsed.length === 1 ? parsed[0] : parsed;
 }
 
+function packJson(output) {
+  const objectStart = output.lastIndexOf("\n{");
+  return JSON.parse(
+    objectStart === -1 ? output : output.slice(objectStart + 1)
+  );
+}
+
 function manifestAt(revision, relativePath) {
   const result = spawnSync(
     "git",
@@ -230,7 +237,7 @@ async function publishPlan() {
   try {
     for (const release of releases) {
       if (!release.published) {
-        const packed = JSON.parse(
+        const packed = packJson(
           run("pnpm", [
             "--filter",
             release.name,
