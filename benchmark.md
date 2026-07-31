@@ -85,9 +85,11 @@ median difference is measurement noise, not a meaningful product advantage.
 
 ## Install footprint
 
-**Lower is better.** This comparison is intentionally limited to the
-full-stack frameworks tested with a native MCP Apps build workflow. Low-level
-libraries with a narrower scope are not equivalent install targets.
+**Lower is better.** Every row represents a development stack capable of
+authoring and building a custom React MCP App, not merely installing the server
+framework. Frameworks that do not include that workflow receive the same Apps,
+React, Vite, and TypeScript dependencies required by the equivalent official
+SDK stack.
 
 Clean install measures the actual `node_modules` directory after a normal npm
 install, including required peer dependencies and filesystem allocation. It
@@ -95,25 +97,27 @@ therefore differs from npmx's modeled size, which excludes peer dependencies.
 
 ```mermaid
 xychart
-  title "Clean production install in MiB"
+  title "Custom MCP App development stack in MiB"
   x-axis ["FastMCP TS", "mcp-use v2", "xmcp", "Skybridge", "mcp-use v1"]
   y-axis "MiB on disk" 0 --> 450
   bar [0, 74.4, 0, 0, 0]
-  bar [45.0, 0, 121.9, 137.5, 404.6]
+  bar [122.5, 0, 121.9, 137.5, 404.6]
 ```
 
-| Framework           | Direct install set            |         Disk | Installed packages |
-| ------------------- | ----------------------------- | -----------: | -----------------: |
-| FastMCP TypeScript  | `@prefecthq/fastmcp-ts + zod` |     45.0 MiB |                147 |
-| **mcp-use v2**      | `mcp-use + zod`               | **74.4 MiB** |             **57** |
-| xmcp                | `xmcp + zod`                  |    121.9 MiB |                171 |
-| Skybridge           | `skybridge + zod`             |    137.5 MiB |                300 |
-| mcp-use v1 baseline | `mcp-use + zod`               |    404.6 MiB |                365 |
+| Framework           | Direct install set                              |         Disk | Installed packages |
+| ------------------- | ----------------------------------------------- | -----------: | -----------------: |
+| **mcp-use v2**      | `mcp-use + zod`                                 | **74.4 MiB** |             **57** |
+| xmcp                | `xmcp + zod`                                    |    121.9 MiB |                171 |
+| FastMCP TypeScript  | FastMCP + Apps extension + React/Vite build set |    122.5 MiB |                180 |
+| Skybridge           | `skybridge + zod`                               |    137.5 MiB |                300 |
+| mcp-use v1 baseline | `mcp-use + zod`                                 |    404.6 MiB |                365 |
 
-FastMCP TypeScript had the smallest measured clean install. mcp-use v2
-installed fewer package entries and remained substantially smaller than the
-other previously tested native Apps frameworks. The mcp-use v1 row is a
-migration baseline, not a native Apps peer.
+mcp-use v2 had the smallest measured equivalent App development stack and the
+fewest installed package entries. FastMCP's framework-only component workflow
+does not require a browser build, but its earlier 45.0 MiB figure was excluded
+because it did not include the custom React MCP App build system represented by
+the other rows. The mcp-use v1 row is a migration baseline, not a native Apps
+peer.
 
 ## Package and MCP App build size
 
@@ -200,6 +204,9 @@ equivalent official SDK v2 fixture in this benchmark.
 
 - Clean install size is the on-disk dependency tree after installing the direct
   package set shown in the table.
+- FastMCP's equivalent stack pins `@prefecthq/fastmcp-ts@1.2.0`,
+  `@modelcontextprotocol/ext-apps@1.7.5`, `@vitejs/plugin-react@6.0.4`,
+  React and React DOM 19.2.8, TypeScript 7.0.2, Vite 8.1.5, and zod 4.4.3.
 - Installed-package counts are the physical package entries reported by
   `npm ls --all --parseable`, excluding the fixture root.
 - Tarball size is the compressed size of the package produced by `pnpm pack`.

@@ -284,8 +284,8 @@ block-beta
   metric["Metric"] mcp["mcp-use v2"] fastmcp["FastMCP TS"] official["Official SDK v2*"] xmcp["xmcp"] skybridge["Skybridge"] handler["mcp-handler"]
 
   speed["Speed"] speedMcp["10,982 ops/s"] speedFast["6,628 ops/s"] speedOfficial["8,050 ops/s"] speedXmcp["6,585 ops/s"] speedSkybridge["8,116 ops/s"] speedHandler["6,324 ops/s"]
-  install["Clean install"] installMcp["74.4 MiB"] installFast["45.0 MiB"] installOfficial["99.0 MiB"] installXmcp["121.9 MiB"] installSkybridge["137.5 MiB"] installHandler["388.0 MiB"]
-  packages["Installed<br/>packages"] packagesMcp["51"] packagesFast["147"] packagesOfficial["119"] packagesXmcp["171"] packagesSkybridge["300"] packagesHandler["130"]
+  install["MCP App<br/>dev stack"] installMcp["74.4 MiB"] installFast["122.5 MiB"] installOfficial["99.0 MiB"] installXmcp["121.9 MiB"] installSkybridge["137.5 MiB"] installHandler["388.0 MiB"]
+  packages["Installed<br/>packages"] packagesMcp["51"] packagesFast["180"] packagesOfficial["119"] packagesXmcp["171"] packagesSkybridge["300"] packagesHandler["130"]
   views["Views"] viewsMcp["✅"] viewsFast["✅"] viewsOfficial["◐ Extension"] viewsXmcp["✅"] viewsSkybridge["✅"] viewsHandler["❌"]
   nativeViews["Native Views<br/>on MCP 2026"] nativeViewsMcp["✅"] nativeViewsFast["✅"] nativeViewsOfficial["❌"] nativeViewsXmcp["❌"] nativeViewsSkybridge["❌"] nativeViewsHandler["❌"]
   oauth["One-line<br/>OAuth adapters"] oauthMcp["✅"] oauthFast["◐ Provider/proxy"] oauthOfficial["◐ Primitives"] oauthXmcp["✅"] oauthSkybridge["✅"] oauthHandler["❌"]
@@ -305,15 +305,15 @@ block-beta
   class metric,speed,install,packages,views,nativeViews,oauth,protocol,screenshot,tunnel,inspector metricLabel
   class mcp brand
   class fastmcp,official,xmcp,skybridge,handler header
-  class speedFast,speedOfficial,speedXmcp,speedSkybridge,speedHandler,installOfficial,installXmcp,installSkybridge,installHandler,packagesFast,packagesOfficial,packagesXmcp,packagesSkybridge,packagesHandler value
-  class speedMcp,installMcp,installFast,packagesMcp,viewsMcp,viewsFast,viewsXmcp,viewsSkybridge,nativeViewsMcp,nativeViewsFast,oauthMcp,oauthXmcp,oauthSkybridge,protocolMcp,protocolFast,protocolOfficial,screenshotMcp,tunnelMcp,tunnelSkybridge,inspectorMcp,inspectorFast leader
+  class speedFast,speedOfficial,speedXmcp,speedSkybridge,speedHandler,installFast,installOfficial,installXmcp,installSkybridge,installHandler,packagesFast,packagesOfficial,packagesXmcp,packagesSkybridge,packagesHandler value
+  class speedMcp,installMcp,packagesMcp,viewsMcp,viewsFast,viewsXmcp,viewsSkybridge,nativeViewsMcp,nativeViewsFast,oauthMcp,oauthXmcp,oauthSkybridge,protocolMcp,protocolFast,protocolOfficial,screenshotMcp,tunnelMcp,tunnelSkybridge,inspectorMcp,inspectorFast leader
   class oauthFast,viewsOfficial,oauthOfficial,inspectorSkybridge partial
   class viewsHandler,nativeViewsOfficial,nativeViewsXmcp,nativeViewsSkybridge,nativeViewsHandler,oauthHandler,protocolXmcp,protocolSkybridge,protocolHandler,screenshotFast,screenshotOfficial,screenshotXmcp,screenshotSkybridge,screenshotHandler,tunnelFast,tunnelOfficial,tunnelXmcp,tunnelHandler,inspectorOfficial,inspectorXmcp,inspectorHandler unavailable
 ```
 
 <sub>* Includes `@modelcontextprotocol/ext-apps`, Vite, and zod for an MCP Apps-capable stack.</sub>
 
-<sub>Clean install is actual `node_modules` disk usage after a normal npm install, including required peer dependencies; it is not npmx's peer-excluding modeled size.</sub>
+<sub>Install rows compare custom React MCP App development stacks. FastMCP therefore includes the Apps extension, React, Vite React plugin, Vite, TypeScript, and zod rather than only its narrower server-side component workflow. Size is actual `node_modules` disk usage after a normal npm install, including required peer dependencies.</sub>
 
 **[Read the detailed benchmark report →](./benchmark.md)**
 
