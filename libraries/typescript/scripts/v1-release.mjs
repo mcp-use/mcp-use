@@ -65,13 +65,38 @@ function currentManifest(relativePath) {
   return JSON.parse(readFileSync(join(root, relativePath), "utf8"));
 }
 
-function packagePathsChangedByReleaseCommit() {
+function latestVersionCommit() {
+  const result = spawnSync(
+    "git",
+    [
+      "log",
+      "-1",
+      "--format=%H",
+      "--fixed-strings",
+      "--grep=chore(release-v1): version packages",
+    ],
+    {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    }
+  );
+  if (result.status !== 0) {
+    throw new Error(`failed to locate v1 version commit: ${result.stderr}`);
+  }
+  return result.stdout.trim() || undefined;
+}
+
+function packagePathsChangedByLatestVersionCommit() {
+  const versionCommit = latestVersionCommit();
+  if (!versionCommit) return [];
+
   const paths = run("git", [
     "diff",
     "--relative",
     "--name-only",
-    "HEAD^",
-    "HEAD",
+    `${versionCommit}^`,
+    versionCommit,
     "--",
     "packages/*/package.json",
   ])
@@ -79,9 +104,13 @@ function packagePathsChangedByReleaseCommit() {
     .filter(Boolean);
 
   return paths.filter((relativePath) => {
-    const before = manifestAt("HEAD^", relativePath);
-    const after = currentManifest(relativePath);
-    return before?.version !== after.version;
+    const before = manifestAt(`${versionCommit}^`, relativePath);
+    const released = manifestAt(versionCommit, relativePath);
+    const current = currentManifest(relativePath);
+    return (
+      before?.version !== released?.version &&
+      released?.version === current.version
+    );
   });
 }
 
@@ -96,32 +125,34 @@ function assertMaintenanceState() {
 
 function createPlan() {
   assertMaintenanceState();
-  const releases = packagePathsChangedByReleaseCommit().map((relativePath) => {
-    const manifest = currentManifest(relativePath);
-    const line = allowedLines.get(manifest.name);
-    if (!line) {
-      throw new Error(
-        `package ${manifest.name} is not in the v1 release allowlist`
-      );
-    }
-    if (!line.test(manifest.version)) {
-      throw new Error(
-        `${manifest.name}@${manifest.version} is outside its v1 maintenance line`
-      );
-    }
+  const releases = packagePathsChangedByLatestVersionCommit().map(
+    (relativePath) => {
+      const manifest = currentManifest(relativePath);
+      const line = allowedLines.get(manifest.name);
+      if (!line) {
+        throw new Error(
+          `package ${manifest.name} is not in the v1 release allowlist`
+        );
+      }
+      if (!line.test(manifest.version)) {
+        throw new Error(
+          `${manifest.name}@${manifest.version} is outside its v1 maintenance line`
+        );
+      }
 
-    const publishedVersion = npmJson(
-      ["view", `${manifest.name}@${manifest.version}`, "version", "--json"],
-      undefined
-    );
-    return {
-      name: manifest.name,
-      version: manifest.version,
-      relativePath,
-      published: publishedVersion === manifest.version,
-      tagsBefore: npmJson(["view", manifest.name, "dist-tags", "--json"], {}),
-    };
-  });
+      const publishedVersion = npmJson(
+        ["view", `${manifest.name}@${manifest.version}`, "version", "--json"],
+        undefined
+      );
+      return {
+        name: manifest.name,
+        version: manifest.version,
+        relativePath,
+        published: publishedVersion === manifest.version,
+        tagsBefore: npmJson(["view", manifest.name, "dist-tags", "--json"], {}),
+      };
+    }
+  );
 
   writeFileSync(planFile, `${JSON.stringify({ releases }, null, 2)}\n`);
   console.log(JSON.stringify({ releases }, null, 2));
@@ -188,7 +219,7 @@ async function publishPlan() {
   const { releases } = JSON.parse(readFileSync(planFile, "utf8"));
   if (releases.length === 0) {
     console.log(
-      "No package versions changed in this commit; nothing to publish."
+      "No package versions found in the latest v1 version commit; nothing to publish."
     );
     return;
   }
