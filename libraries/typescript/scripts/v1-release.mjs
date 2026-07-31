@@ -51,7 +51,9 @@ function npmJson(args, fallback) {
 
 function packJson(output) {
   const objectStart = output.lastIndexOf("\n{");
-  return JSON.parse(objectStart === -1 ? output : output.slice(objectStart + 1));
+  return JSON.parse(
+    objectStart === -1 ? output : output.slice(objectStart + 1)
+  );
 }
 
 function manifestAt(revision, relativePath) {
