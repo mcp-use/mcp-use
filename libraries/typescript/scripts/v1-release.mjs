@@ -44,7 +44,9 @@ function npmJson(args, fallback) {
   });
   if (result.status !== 0) return fallback;
   const output = result.stdout.trim();
-  return output ? JSON.parse(output) : fallback;
+  if (!output) return fallback;
+  const parsed = JSON.parse(output);
+  return Array.isArray(parsed) && parsed.length === 1 ? parsed[0] : parsed;
 }
 
 function manifestAt(revision, relativePath) {
