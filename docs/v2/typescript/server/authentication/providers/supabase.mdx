@@ -1,0 +1,133 @@
+---
+title: "Supabase Provider"
+description: "Configure Supabase OAuth 2.1 server authentication for an MCP server."
+icon: "/images/icons/supabase.svg"
+---
+
+Use `oauthSupabaseProvider` when Supabase Auth is the authorization server. Supabase handles login, consent, client registration, and token issuance; mcp-use verifies the resulting access token.
+
+## Configure Supabase
+
+In the [Supabase Dashboard](https://app.supabase.com/):
+
+1. Enable the OAuth 2.1 server and Dynamic OAuth Apps.
+2. Configure a consent-screen route implemented by your application.
+3. Enable at least one user sign-in method.
+4. Copy the project ID and publishable key.
+
+The maintained example includes a consent route and is the best starting point for a complete application.
+
+## Configure the server
+
+Pass either `projectId` for hosted Supabase or `supabaseUrl` for local or self-hosted Supabase. Environment names belong to your application; the provider does not read them.
+
+```bash
+SUPABASE_PROJECT_ID=your-project-ref
+SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+```
+
+```typescript
+import { MCPServer } from "mcp-use";
+import { oauthSupabaseProvider } from "mcp-use/oauth/supabase";
+
+const projectId = process.env.SUPABASE_PROJECT_ID;
+if (!projectId) throw new Error("SUPABASE_PROJECT_ID is required");
+
+const server = new MCPServer({
+  name: "supabase-server",
+  version: "1.0.0",
+  oauth: oauthSupabaseProvider({ projectId }),
+});
+
+export default server;
+```
+
+By default the provider expects audience `authenticated`. Modern Supabase tokens use ES256 and are verified through the project JWKS. For a legacy HS256 project, pass its secret explicitly:
+
+```typescript
+oauthSupabaseProvider({
+  supabaseUrl: process.env.SUPABASE_URL!,
+  jwtSecret: process.env.SUPABASE_JWT_SECRET,
+  // audience: "authenticated",
+});
+```
+
+`jwtSecret` selects HS256 verification and must be at least 32 bytes. Without it, the provider selects ES256/JWKS verification.
+
+## Use mapped identity
+
+Supabase maps the subject to `id` and can map `email`, `name`, `fullName`, `username`, `avatarUrl`, `role`, `aal`, `amr`, and `sessionId`. It maps the assurance level to top-level permission `aal:<level>`.
+
+## Use Row Level Security
+
+Create the Supabase client per request with the verified access token:
+
+```typescript
+import { createClient } from "@supabase/supabase-js";
+
+const supabaseUrl =
+  process.env.SUPABASE_URL ??
+  `https://${process.env.SUPABASE_PROJECT_ID}.supabase.co`;
+
+server.tool(
+  {
+    name: "list_notes",
+    description: "Return notes visible under Supabase RLS.",
+  },
+  async (_args, ctx) => {
+    const supabase = createClient(
+      supabaseUrl,
+      process.env.SUPABASE_PUBLISHABLE_KEY!,
+      {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+        },
+        global: {
+          headers: {
+            Authorization: `Bearer ${ctx.auth.accessToken}`,
+          },
+        },
+      },
+    );
+
+    const { data, error } = await supabase.from("notes").select();
+    if (error) {
+      return {
+        isError: true,
+        content: [{ type: "text", text: error.message }],
+      };
+    }
+    return {
+      content: [{ type: "text", text: JSON.stringify(data) }],
+    };
+  },
+);
+```
+
+Use this token-forwarding pattern only for user-scoped operations. Server-owned operations should use a separate credential and explicit authorization.
+
+<CardGroup cols={2}>
+  <Card
+    title="Runnable Supabase example"
+    icon="github"
+    href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/auth/supabase"
+  >
+    Start from the maintained server and consent UI.
+  </Card>
+  <Card
+    title="Supabase MCP Authentication"
+    icon="book-open"
+    href="https://supabase.com/docs/guides/auth/oauth-server/mcp-authentication"
+  >
+    Configure Supabase OAuth for MCP.
+  </Card>
+  <Card
+    title="User Context"
+    icon="user"
+    href="/v2/typescript/server/authentication/user-context"
+  >
+    Use mapped Supabase identity and token metadata.
+  </Card>
+</CardGroup>

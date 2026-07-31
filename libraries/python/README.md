@@ -92,7 +92,7 @@ mcp-use for Python provides three main capabilities:
     <td>Build your own agents with any framework using the LangChain adapter or create new adapters</td>
   </tr>
   <tr>
-    <td>❓ <a href="https://mcp-use.com/what-should-we-build-next"><strong>What should we build next</strong></a></td>
+    <td>❓ <a href="https://github.com/mcp-use/mcp-use/issues"><strong>What should we build next</strong></a></td>
     <td>Let us know what you'd like us to build next</td>
   </tr>
 </table>

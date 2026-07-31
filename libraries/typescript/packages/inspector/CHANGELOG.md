@@ -1,5 +1,58 @@
 # @mcp-use/inspector
 
+## 12.0.5
+
+### Patch Changes
+
+- Updated dependencies [616cf28]
+  - mcp-use@1.34.5
+
+## 12.0.5-canary.0
+
+### Patch Changes
+
+- Updated dependencies [de5ff9c]
+  - mcp-use@1.34.5-canary.0
+
+## 12.0.4
+
+### Patch Changes
+
+- f952fe0: Fix dead documentation links flagged by the link checker: the CLI client example and inspector README pointed at docs pages that no longer exist.
+- Updated dependencies [f952fe0]
+- Updated dependencies [f952fe0]
+- Updated dependencies [f952fe0]
+  - mcp-use@1.34.4
+
+## 12.0.4-canary.1
+
+### Patch Changes
+
+- Updated dependencies [79df5e4]
+  - mcp-use@1.34.4-canary.1
+
+## 12.0.4-canary.0
+
+### Patch Changes
+
+- 199365c: Fix dead documentation links flagged by the link checker: the CLI client example and inspector README pointed at docs pages that no longer exist.
+- Updated dependencies [199365c]
+  - mcp-use@1.34.4-canary.0
+
+## 12.0.3
+
+### Patch Changes
+
+- 6231261: Fix broken tunneling docs link in the tunnel popover. The "Docs" link pointed to https://manufact.com/docs/tunneling, which returns a 404; it now points to https://mcp-use.com/docs/tunneling.
+  - mcp-use@1.34.3
+
+## 12.0.3-canary.0
+
+### Patch Changes
+
+- 744b8e5: Fix broken tunneling docs link in the tunnel popover. The "Docs" link pointed to https://manufact.com/docs/tunneling, which returns a 404; it now points to https://mcp-use.com/docs/tunneling.
+  - mcp-use@1.34.3-canary.0
+
 ## 12.0.2
 
 ### Patch Changes

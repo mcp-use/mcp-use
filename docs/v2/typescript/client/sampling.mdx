@@ -1,0 +1,100 @@
+---
+title: "Sampling compatibility"
+description: "Handle sampling requests from compatible MCP server flows"
+icon: "pipette"
+---
+
+Sampling is a compatibility capability, not a primary capability of the current
+sessionless MCP protocol. Configure it only when a server flow requires the
+client to provide model output.
+
+The client can invoke `onSampling` in two cases:
+
+- A legacy sessionful server sends a `sampling/createMessage` request.
+- A sessionless server enters the temporary `input_required` multi-round-trip
+  compatibility flow.
+
+Sampling is deprecated by the current sessionless protocol. Prefer server and
+tool designs that do not depend on client-provided sampling when you control
+both sides.
+
+## Handle a request
+
+```typescript
+import {
+  MCPClient,
+  type OnSamplingCallback,
+  type SamplingCreateMessageParams,
+} from "@mcp-use/client";
+
+async function completeWithModel(
+  params: SamplingCreateMessageParams
+): Promise<string> {
+  // Send params.messages and the other sampling constraints to your model.
+  throw new Error(`Connect a model for ${params.messages.length} messages`);
+}
+
+const onSampling: OnSamplingCallback = async (params) => {
+  const text = await completeWithModel(params);
+
+  return {
+    role: "assistant",
+    content: { type: "text", text },
+    model: "your-model",
+    stopReason: "endTurn",
+  };
+};
+
+const client = new MCPClient({
+  mcpServers: {
+    demo: {
+      url: "http://localhost:3000/mcp",
+      onSampling,
+    },
+  },
+});
+
+try {
+  await client.connect("demo");
+  // A compatible server flow can now call onSampling.
+} finally {
+  await client.close();
+}
+```
+
+`OnSamplingCallback` receives the protocol parameters for
+`sampling/createMessage` and must return a
+`SamplingCreateMessageResult`. Setting the callback also advertises the
+sampling capability where the negotiated protocol supports it.
+
+## Global and per-server handlers
+
+Set `onSampling` at the top level of the `MCPClient` configuration to use it as
+a global default. An `onSampling` callback on an individual server
+configuration takes precedence over that default. The Node client also accepts
+the global callback in its second constructor argument.
+
+## React
+
+`useMcp({ onSampling })` handles compatible requests directly with your
+callback.
+
+`McpClientProvider` instead installs a handler that queues each request on the
+managed server:
+
+- `server.pendingSamplingRequests` contains the requests awaiting a decision.
+- `server.approveSampling(requestId, result)` resolves a request with a complete
+  `SamplingCreateMessageResult`.
+- `server.rejectSampling(requestId, error?)` rejects it.
+- `onSamplingRequest` on the server configuration can notify your UI when a
+  request is added to the queue.
+
+Queued requests remain pending until they are approved, rejected, disconnected,
+or timed out.
+
+## Runnable example
+
+The maintained
+[sampling client example](https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/client/examples/node/communication/sampling-client.ts)
+exercises both the legacy push request and the sessionless
+`input_required` compatibility flow.

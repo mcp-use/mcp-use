@@ -37,6 +37,9 @@
 </p>
 </div>
 
+> [!TIP]
+> **Try the new beta v2** with [`create-mcp-use-app@beta`](https://www.npmjs.com/package/create-mcp-use-app): `npx create-mcp-use-app@beta`. See the [beta README](https://github.com/mcp-use/mcp-use/blob/beta/README.md).
+
 ##  About
 
   <b>mcp-use</b> is the fullstack MCP framework
