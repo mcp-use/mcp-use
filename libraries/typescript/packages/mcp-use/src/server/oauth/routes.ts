@@ -9,7 +9,8 @@
  *
  * 2. **Proxy mode (OAuthProxy):** For providers that don't support DCR
  *    (e.g., Google, GitHub). The MCP server:
- *    - Exposes /register returning the configured clientId
+ *    - Exposes /register issuing local public client registrations
+ *    - Binds /authorize redirects to those registrations
  *    - Redirects /authorize to upstream, brokering the callback through its
  *      own /oauth/callback so only `<baseUrl>/oauth/callback` needs to be
  *      registered with the upstream provider
@@ -20,6 +21,10 @@
 import type { Context, Hono, Next } from "hono";
 import { cors } from "hono/cors";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
+import {
+  createOAuthProxyClientRegistration,
+  verifyOAuthProxyClientRegistration,
+} from "./oauth-proxy.js";
 import type { OAuthProvider, OAuthProxy } from "./providers/types.js";
 import {
   buildLocalOAuthAuthorizationServerPath,
@@ -46,6 +51,8 @@ export function isOAuthProxy(
  * stateless — it survives restarts and multi-instance deployments.
  */
 interface CallbackTxn {
+  /** Signed local client registration ID */
+  clientId: string;
   /** Client's original redirect_uri */
   redirectUri: string;
   /** Client's original state, if any */
@@ -79,12 +86,14 @@ function decodeCallbackTxn(value: string): CallbackTxn | null {
   try {
     const parsed = JSON.parse(base64UrlDecode(value));
     if (
+      typeof parsed?.clientId !== "string" ||
       typeof parsed?.redirectUri !== "string" ||
       !isValidRedirectUri(parsed.redirectUri)
     ) {
       return null;
     }
     return {
+      clientId: parsed.clientId,
       redirectUri: parsed.redirectUri,
       state: typeof parsed.state === "string" ? parsed.state : undefined,
     };
@@ -96,7 +105,16 @@ function decodeCallbackTxn(value: string): CallbackTxn | null {
 function isValidRedirectUri(value: string): boolean {
   try {
     const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
+    const scheme = url.protocol.slice(0, -1).toLowerCase();
+    if (url.hash) return false;
+    if (
+      ["javascript", "data", "file", "vbscript", "about", "blob"].includes(
+        scheme
+      )
+    ) {
+      return false;
+    }
+    return /^[a-z][a-z0-9+.-]*$/.test(scheme);
   } catch {
     return false;
   }
@@ -152,10 +170,31 @@ function createAuthorizeHandler(
       return c.json(
         {
           error: "invalid_request",
-          error_description: "redirect_uri must be a valid http(s) URL",
+          error_description: "redirect_uri must be a valid absolute URI",
         },
         400
       );
+    }
+
+    if (isOAuthProxy(oauth)) {
+      const registration = await verifyOAuthProxyClientRegistration(
+        oauth,
+        baseUrl,
+        clientId as string
+      );
+      if (
+        !registration ||
+        !registration.redirectUris.includes(redirectUri as string)
+      ) {
+        return c.json(
+          {
+            error: "invalid_request",
+            error_description:
+              "redirect_uri does not match the client registration",
+          },
+          400
+        );
+      }
     }
 
     // Get authorization endpoint - uniform for both provider and proxy
@@ -181,6 +220,7 @@ function createAuthorizeHandler(
       authUrl.searchParams.set(
         "state",
         encodeCallbackTxn({
+          clientId: clientId as string,
           redirectUri: redirectUri as string,
           state: state ? (state as string) : undefined,
         })
@@ -222,10 +262,10 @@ function createAuthorizeHandler(
  *
  * @returns Hono handler that redirects back to the MCP client's callback
  */
-function createCallbackHandler(): (
-  c: Context,
-  next: Next
-) => Promise<Response | void> {
+function createCallbackHandler(
+  oauth: OAuthProxy,
+  baseUrl: string
+): (c: Context, next: Next) => Promise<Response | void> {
   return async (c: Context, next: Next) => {
     const query = c.req.query();
 
@@ -237,6 +277,21 @@ function createCallbackHandler(): (
       // the proxy to handle this redirect, the upstream provider isn't
       // echoing back the `state` the proxy sent at /authorize.
       return next();
+    }
+
+    const registration = await verifyOAuthProxyClientRegistration(
+      oauth,
+      baseUrl,
+      txn.clientId
+    );
+    if (!registration || !registration.redirectUris.includes(txn.redirectUri)) {
+      return c.json(
+        {
+          error: "invalid_request",
+          error_description: "OAuth callback client registration is invalid",
+        },
+        400
+      );
     }
 
     const redirect = new URL(txn.redirectUri);
@@ -361,7 +416,7 @@ function createTokenHandler(
  * - /authorize and /token are dormant (clients reach upstream directly)
  *
  * **Proxy mode (OAuthProxy):**
- * - POST /register - Returns configured clientId (fake DCR endpoint)
+ * - POST /register - Issues a signed local public client ID
  * - GET/POST /authorize - Redirects to upstream, brokering the callback locally
  * - GET /oauth/callback - Receives the upstream redirect and forwards the
  *   code to the MCP client's original redirect_uri
@@ -419,15 +474,15 @@ export function setupOAuthRoutes(
   app.post("/authorize", handleAuthorize);
   app.post("/token", createTokenHandler(oauth, baseUrl));
 
-  // In proxy mode, add /register endpoint that returns the configured clientId
-  // This allows MCP clients to "register" even though the client is pre-registered
+  // In proxy mode, add a local DCR endpoint. The downstream client registration
+  // is separate from the fixed upstream application credentials.
   if (proxyMode) {
     const proxy = oauth as OAuthProxy;
 
     // Brokered upstream callback. This is a top-level browser navigation
     // (no CORS needed) — register `<baseUrl>/oauth/callback` as the only
     // redirect URI on the upstream provider.
-    app.get("/oauth/callback", createCallbackHandler());
+    app.get("/oauth/callback", createCallbackHandler(proxy, baseUrl));
 
     app.use(
       "/register",
@@ -441,19 +496,44 @@ export function setupOAuthRoutes(
 
     app.post("/register", async (c: Context) => {
       const body = await c.req.json().catch(() => ({}));
+      const redirectUris = Array.isArray(body.redirect_uris)
+        ? body.redirect_uris
+        : [];
 
-      // Return a fake registration response with the configured clientId
-      // This satisfies MCP clients that expect DCR to work
+      if (
+        redirectUris.length === 0 ||
+        redirectUris.some(
+          (redirectUri: unknown) =>
+            typeof redirectUri !== "string" || !isValidRedirectUri(redirectUri)
+        )
+      ) {
+        return c.json(
+          {
+            error: "invalid_client_metadata",
+            error_description:
+              "redirect_uris must contain valid absolute URIs without fragments",
+          },
+          400
+        );
+      }
+
+      const localClientId = await createOAuthProxyClientRegistration(
+        proxy,
+        baseUrl,
+        redirectUris
+      );
+
+      // The downstream MCP client is public. The proxy keeps the upstream
+      // confidential credentials private and injects them only when it
+      // forwards the token request.
       return c.json(
         {
-          client_id: proxy.clientId,
+          client_id: localClientId,
           client_name: body.client_name || "MCP Client",
-          redirect_uris: body.redirect_uris || [],
+          redirect_uris: redirectUris,
           grant_types: oauth.getGrantTypesSupported(),
           response_types: ["code"],
-          token_endpoint_auth_method: proxy.clientSecret
-            ? "client_secret_post"
-            : "none",
+          token_endpoint_auth_method: "none",
         },
         201
       );
@@ -461,7 +541,6 @@ export function setupOAuthRoutes(
   }
 
   const synthesizeProxyMetadata = () => {
-    const proxy = oauth as OAuthProxy;
     console.log(`[OAuth] Returning proxy mode metadata`);
 
     return {
@@ -472,9 +551,7 @@ export function setupOAuthRoutes(
       scopes_supported: oauth.getScopesSupported(),
       response_types_supported: ["code"],
       grant_types_supported: oauth.getGrantTypesSupported(),
-      token_endpoint_auth_methods_supported: proxy.clientSecret
-        ? ["client_secret_post", "none"]
-        : ["none"],
+      token_endpoint_auth_methods_supported: ["none"],
       code_challenge_methods_supported: ["S256"],
     };
   };

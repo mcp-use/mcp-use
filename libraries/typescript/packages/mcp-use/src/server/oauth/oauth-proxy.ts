@@ -9,8 +9,104 @@
  * IdPs that require pre-registered applications.
  */
 
-import { jwtVerify, createRemoteJWKSet } from "jose";
+import { SignJWT, jwtVerify, createRemoteJWKSet } from "jose";
 import type { OAuthProxy, UserInfo } from "./providers/types.js";
+
+const CLIENT_REGISTRATION_ISSUER = "urn:mcp-use:oauth-proxy";
+const CLIENT_REGISTRATION_KEY_CONTEXT =
+  "mcp-use/oauth-proxy/client-registration/v1";
+
+interface OAuthProxyClientRegistration {
+  redirectUris: string[];
+}
+
+const clientRegistrationKeys = new WeakMap<OAuthProxy, Promise<Uint8Array>>();
+
+async function deriveClientRegistrationKey(
+  secret: string | Uint8Array,
+  upstreamClientId: string
+): Promise<Uint8Array> {
+  const secretBytes =
+    typeof secret === "string" ? new TextEncoder().encode(secret) : secret;
+  const contextBytes = new TextEncoder().encode(
+    `${CLIENT_REGISTRATION_KEY_CONTEXT}\0${upstreamClientId}\0`
+  );
+  const keyMaterial = new Uint8Array(contextBytes.length + secretBytes.length);
+  keyMaterial.set(contextBytes);
+  keyMaterial.set(secretBytes, contextBytes.length);
+  return new Uint8Array(await crypto.subtle.digest("SHA-256", keyMaterial));
+}
+
+function getClientRegistrationKey(oauth: OAuthProxy): Promise<Uint8Array> {
+  const existing = clientRegistrationKeys.get(oauth);
+  if (existing) return existing;
+
+  const ephemeralSecret = crypto.getRandomValues(new Uint8Array(32));
+  const key = deriveClientRegistrationKey(
+    oauth.clientSecret ?? ephemeralSecret,
+    oauth.clientId
+  );
+  clientRegistrationKeys.set(oauth, key);
+  return key;
+}
+
+/**
+ * Issue a signed local client ID whose claims contain the redirect
+ * URIs accepted during Dynamic Client Registration.
+ *
+ * This keeps proxy registration stateless and prevents the configured
+ * upstream client ID from being exposed as the local public client ID.
+ * @internal
+ */
+export async function createOAuthProxyClientRegistration(
+  oauth: OAuthProxy,
+  baseUrl: string,
+  redirectUris: string[]
+): Promise<string> {
+  return new SignJWT({ redirect_uris: redirectUris })
+    .setProtectedHeader({
+      alg: "HS256",
+      typ: "oauth-client-registration+jwt",
+    })
+    .setIssuer(CLIENT_REGISTRATION_ISSUER)
+    .setAudience(baseUrl)
+    .setIssuedAt()
+    .setJti(crypto.randomUUID())
+    .sign(await getClientRegistrationKey(oauth));
+}
+
+/**
+ * Verify and decode a local proxy client ID.
+ * @internal
+ */
+export async function verifyOAuthProxyClientRegistration(
+  oauth: OAuthProxy,
+  baseUrl: string,
+  clientId: string
+): Promise<OAuthProxyClientRegistration | null> {
+  try {
+    const { payload } = await jwtVerify(
+      clientId,
+      await getClientRegistrationKey(oauth),
+      {
+        algorithms: ["HS256"],
+        issuer: CLIENT_REGISTRATION_ISSUER,
+        audience: baseUrl,
+      }
+    );
+    const redirectUris = payload.redirect_uris;
+    if (
+      !Array.isArray(redirectUris) ||
+      redirectUris.length === 0 ||
+      redirectUris.some((value) => typeof value !== "string")
+    ) {
+      return null;
+    }
+    return { redirectUris };
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Token verification function.
@@ -59,6 +155,15 @@ export interface OAuthProxyConfig {
    * Pre-registered OAuth client secret (optional for public clients)
    */
   clientSecret?: string;
+
+  /**
+   * Secret used to sign stateless local Dynamic Client Registration records.
+   *
+   * Defaults to a key derived from `clientSecret`. Set this explicitly when
+   * the upstream client has no secret and registrations must survive restarts
+   * or validate across multiple server instances.
+   */
+  registrationSecret?: string;
 
   /**
    * OAuth scopes to request
@@ -182,7 +287,8 @@ function defaultGetUserInfo(payload: Record<string, unknown>): UserInfo {
  * Create an OAuth proxy for providers without DCR support
  *
  * The proxy:
- * - Exposes a /register endpoint that returns the configured clientId
+ * - Exposes a /register endpoint that issues a signed local public client ID
+ * - Binds each local client ID to its registered redirect URIs
  * - Injects clientId/clientSecret at token exchange
  * - Verifies tokens via the supplied `verifyToken` function
  * - Passes through upstream tokens (no token minting)
@@ -230,6 +336,9 @@ export function oauthProxy(config: OAuthProxyConfig): OAuthProxy {
       "oauthProxy: verifyToken is required (use `jwksVerifier()` for JWT/JWKS providers)"
     );
   }
+  if (config.registrationSecret !== undefined && !config.registrationSecret) {
+    throw new Error("oauthProxy: registrationSecret must not be empty");
+  }
 
   const scopes = config.scopes ?? ["openid", "email", "profile"];
   const grantTypes = config.grantTypes ?? [
@@ -238,7 +347,7 @@ export function oauthProxy(config: OAuthProxyConfig): OAuthProxy {
   ];
   const customGetUserInfo = config.getUserInfo ?? defaultGetUserInfo;
 
-  return {
+  const proxy: OAuthProxy = {
     // Proxy-specific fields
     type: "proxy",
     clientId: config.clientId,
@@ -258,4 +367,15 @@ export function oauthProxy(config: OAuthProxyConfig): OAuthProxy {
       return customGetUserInfo(payload);
     },
   };
+
+  const registrationSecret =
+    config.registrationSecret ??
+    config.clientSecret ??
+    crypto.getRandomValues(new Uint8Array(32));
+  clientRegistrationKeys.set(
+    proxy,
+    deriveClientRegistrationKey(registrationSecret, config.clientId)
+  );
+
+  return proxy;
 }

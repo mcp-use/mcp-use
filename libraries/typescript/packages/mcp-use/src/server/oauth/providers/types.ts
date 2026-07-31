@@ -79,7 +79,8 @@ export interface OAuthProvider {
  * OAuthProxy:
  * - Implements the full OAuthProvider interface (getter methods)
  * - Adds proxy-specific fields: type, clientId, clientSecret, extraAuthorizeParams
- * - Exposes /register endpoint returning the configured clientId
+ * - Exposes /register endpoint issuing a signed local public client ID
+ * - Keeps the configured upstream client credentials private
  * - Injects clientId/clientSecret at token exchange
  * - Passes through upstream JWT tokens (no token minting)
  */

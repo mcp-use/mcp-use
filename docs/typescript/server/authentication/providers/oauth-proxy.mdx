@@ -94,15 +94,20 @@ Use `jwksVerifier` only for providers that issue JWT access tokens and publish a
 In proxy mode, the MCP server acts as the OAuth-facing server for MCP clients.
 
 1. The MCP client calls the MCP server's `/register` endpoint.
-2. The MCP server returns the pre-registered upstream `clientId`.
+2. The MCP server issues a local public `client_id` bound to the client's registered redirect URIs. The upstream client credentials remain private.
 3. The client starts PKCE authorization through the MCP server's `/authorize` endpoint.
-4. The upstream provider redirects to the MCP server's `/oauth/callback`.
+4. The MCP server verifies that the authorization redirect exactly matches the local client registration, then replaces it with the MCP server's `/oauth/callback` before redirecting upstream.
 5. The MCP server forwards the authorization code to the client's original redirect URI.
 6. During token exchange, the MCP server injects the upstream `clientId` and `clientSecret`.
 7. The client calls `/mcp/*` with the upstream access token.
 8. The MCP server verifies the token with your `verifyToken` function.
 
 The proxy passes upstream tokens through. It does not mint its own access tokens.
+
+When the upstream application has a `clientSecret`, `oauthProxy` derives the
+local-registration signing key from it, so registrations work across restarts
+and server instances. For an upstream public client without a secret, set
+`registrationSecret` to the same private value on every server instance.
 
 ## Handle opaque tokens
 

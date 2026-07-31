@@ -14,7 +14,7 @@ These factory functions build the `oauth` value you pass to [`new MCPServer({ ..
 There are two integration modes:
 
 - **DCR-direct providers** (`oauthAuth0Provider`, `oauthBetterAuthProvider`, `oauthClerkProvider`, `oauthKeycloakProvider`, `oauthSupabaseProvider`, `oauthWorkOSProvider`, `oauthCustomProvider`). The MCP server proxies metadata discovery to the upstream authorization server and verifies tokens. Clients communicate directly with the upstream for authorize, token, and register.
-- **Proxy mode** (`oauthProxy`) for providers without Dynamic Client Registration support (Google, GitHub, Okta, Microsoft Entra ID, and enterprise IdPs). The server mediates the flow: it exposes a `/register` endpoint returning the configured `clientId`, injects `clientId`/`clientSecret` at token exchange, and passes upstream tokens through without minting its own.
+- **Proxy mode** (`oauthProxy`) for providers without Dynamic Client Registration support (Google, GitHub, Okta, Microsoft Entra ID, and enterprise IdPs). The server mediates the flow: it issues local public client registrations bound to their redirect URIs, injects the private upstream `clientId`/`clientSecret` at token exchange, and passes upstream tokens through without minting its own.
 
 All factories import from `mcp-use/server`.
 
@@ -324,7 +324,7 @@ Create an OAuth proxy for providers without Dynamic Client Registration.
 import { oauthProxy, jwksVerifier } from "mcp-use/server"
 ```
 
-Builds an `OAuthProxy` for providers that lack DCR support (Google OAuth, GitHub OAuth, Okta, Microsoft Entra ID, and enterprise IdPs). The proxy exposes a `/register` endpoint that returns the configured `clientId`, injects `clientId`/`clientSecret` at token exchange, verifies tokens via the supplied `verifyToken` function, and passes upstream tokens through without minting its own. `scopes` defaults to `["openid", "email", "profile"]` and `grantTypes` defaults to `["authorization_code", "refresh_token"]`. When `getUserInfo` is omitted, a default extractor reads the standard OIDC claims (`sub`, `email`, `name`, `picture`) and splits the `scope` claim into `scopes`.
+Builds an `OAuthProxy` for providers that lack DCR support (Google OAuth, GitHub OAuth, Okta, Microsoft Entra ID, and enterprise IdPs). The proxy exposes a `/register` endpoint that issues a signed local public client ID, validates exact registered redirect URIs at `/authorize`, injects the private upstream `clientId`/`clientSecret` at token exchange, verifies tokens via the supplied `verifyToken` function, and passes upstream tokens through without minting its own. `scopes` defaults to `["openid", "email", "profile"]` and `grantTypes` defaults to `["authorization_code", "refresh_token"]`. When `getUserInfo` is omitted, a default extractor reads the standard OIDC claims (`sub`, `email`, `name`, `picture`) and splits the `scope` claim into `scopes`.
 
 Throws `Error` if any of `authEndpoint`, `tokenEndpoint`, `issuer`, `clientId`, or `verifyToken` is missing. The verifyToken error message points you to `jwksVerifier()` for JWT/JWKS providers.
 
@@ -617,12 +617,13 @@ The proxy-mode provider returned by `oauthProxy`.
 import type { OAuthProxy } from "mcp-use/server"
 ```
 
-Extends `OAuthProvider` with proxy-specific fields for providers without DCR support. Implements the full provider interface (the getter methods plus `verifyToken`/`getUserInfo`) and adds a `type` discriminator, pre-registered client credentials, and optional extra authorize params. The proxy exposes a `/register` endpoint returning the configured `clientId`, injects `clientId`/`clientSecret` at token exchange, and passes upstream JWTs through without minting tokens.
+Extends `OAuthProvider` with proxy-specific fields for providers without DCR support. Implements the full provider interface (the getter methods plus `verifyToken`/`getUserInfo`) and adds a `type` discriminator, pre-registered client credentials, and optional extra authorize params. The proxy exposes a `/register` endpoint that issues local public client IDs bound to the client's redirect URIs, keeps the configured upstream credentials private, injects them at token exchange, and passes upstream JWTs through without minting tokens.
 
 **Properties**
 ><ParamField body="type" type='"proxy"' required="True" >   Discriminator used to detect proxy providers in the provider union. </ParamField>
 ><ParamField body="clientId" type="string" required="True" >   Pre-registered OAuth client ID. </ParamField>
 ><ParamField body="clientSecret" type="string" >   Pre-registered OAuth client secret (optional for public clients). </ParamField>
+><ParamField body="registrationSecret" type="string" >   Secret used to sign stateless local client registrations. Defaults to a key derived from `clientSecret`; set it explicitly for upstream public clients that must work across restarts or multiple instances. </ParamField>
 ><ParamField body="extraAuthorizeParams" type="Record<string, string>" >   Extra parameters appended to authorize requests. </ParamField>
 
 **Signature**
@@ -666,6 +667,7 @@ interface OAuthProxyConfig {
   verifyToken: VerifyToken
   clientId: string
   clientSecret?: string
+  registrationSecret?: string
   scopes?: string[]
   grantTypes?: string[]
   extraAuthorizeParams?: Record<string, string>

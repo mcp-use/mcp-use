@@ -21,6 +21,23 @@ import { oauthCustomProvider } from "../../src/server/oauth/providers.js";
 // the verification path (routes, metadata, registration).
 const stubVerifyToken = async () => ({ payload: {} });
 
+async function registerOAuthProxyClient(
+  baseUrl: string,
+  redirectUris: string[]
+): Promise<{ client_id: string; token_endpoint_auth_method: string }> {
+  const response = await fetch(`${baseUrl}/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      client_name: "Test MCP Client",
+      redirect_uris: redirectUris,
+      token_endpoint_auth_method: "none",
+    }),
+  });
+  expect(response.status).toBe(201);
+  return response.json();
+}
+
 async function listenOnRandomPort(
   app: Hono
 ): Promise<{ baseUrl: string; close: () => void }> {
@@ -70,6 +87,7 @@ describe("server OAuth integration", () => {
     expect(metadata.authorization_endpoint).toBe(`${svc.baseUrl}/authorize`);
     expect(metadata.token_endpoint).toBe(`${svc.baseUrl}/token`);
     expect(metadata.registration_endpoint).toBe(`${svc.baseUrl}/register`);
+    expect(metadata.token_endpoint_auth_methods_supported).toEqual(["none"]);
     // In proxy mode, the issuer is the local server URL
     expect(metadata.issuer).toBe(svc.baseUrl);
   });
@@ -157,12 +175,15 @@ describe("server OAuth integration", () => {
 
     setupOAuthRoutes(app, proxy, svc.baseUrl);
 
+    const clientRedirectUri =
+      "https://client.example.com/inspector/oauth/callback?session=42";
+    const registration = await registerOAuthProxyClient(svc.baseUrl, [
+      clientRedirectUri,
+    ]);
+
     const authorizeUrl = new URL(`${svc.baseUrl}/authorize`);
-    authorizeUrl.searchParams.set("client_id", "dcr-cached-client");
-    authorizeUrl.searchParams.set(
-      "redirect_uri",
-      "https://client.example.com/inspector/oauth/callback?session=42"
-    );
+    authorizeUrl.searchParams.set("client_id", registration.client_id);
+    authorizeUrl.searchParams.set("redirect_uri", clientRedirectUri);
     authorizeUrl.searchParams.set("response_type", "code");
     authorizeUrl.searchParams.set("code_challenge", "challenge-abc");
     authorizeUrl.searchParams.set("code_challenge_method", "S256");
@@ -217,12 +238,14 @@ describe("server OAuth integration", () => {
 
     setupOAuthRoutes(app, proxy, svc.baseUrl);
 
+    const clientRedirectUri = "https://client.example.com/callback";
+    const registration = await registerOAuthProxyClient(svc.baseUrl, [
+      clientRedirectUri,
+    ]);
+
     const authorizeUrl = new URL(`${svc.baseUrl}/authorize`);
-    authorizeUrl.searchParams.set("client_id", "client");
-    authorizeUrl.searchParams.set(
-      "redirect_uri",
-      "https://client.example.com/callback"
-    );
+    authorizeUrl.searchParams.set("client_id", registration.client_id);
+    authorizeUrl.searchParams.set("redirect_uri", clientRedirectUri);
     authorizeUrl.searchParams.set("response_type", "code");
     authorizeUrl.searchParams.set("code_challenge", "challenge");
     authorizeUrl.searchParams.set("state", "client-state");
@@ -604,7 +627,7 @@ describe("server OAuth integration", () => {
     });
   });
 
-  it("returns configured clientId from /register endpoint", async () => {
+  it("returns a local public client registration from /register", async () => {
     const app = new Hono();
 
     const proxy = oauthProxy({
@@ -633,8 +656,201 @@ describe("server OAuth integration", () => {
     expect(response.status).toBe(201);
 
     const registration = await response.json();
-    expect(registration.client_id).toBe("pre-registered-client-id");
+    expect(registration.client_id).not.toBe("pre-registered-client-id");
     expect(registration.client_name).toBe("My MCP Client");
-    expect(registration.token_endpoint_auth_method).toBe("client_secret_post");
+    expect(registration.client_secret).toBeUndefined();
+    expect(registration.token_endpoint_auth_method).toBe("none");
+  });
+
+  it("brokers a dynamically registered MCP client without upstream redirect allowlisting", async () => {
+    const tokenSpy = vi.fn();
+    const upstream = new Hono();
+    upstream.post("/oauth/token", async (c) => {
+      tokenSpy(await c.req.parseBody());
+      return c.json({
+        access_token: "upstream-access-token",
+        token_type: "Bearer",
+      });
+    });
+    const upstreamSvc = await listenOnRandomPort(upstream);
+    closers.push(upstreamSvc.close);
+
+    const app = new Hono();
+
+    const proxy = oauthProxy({
+      issuer: upstreamSvc.baseUrl,
+      authEndpoint: `${upstreamSvc.baseUrl}/oauth/authorize`,
+      tokenEndpoint: `${upstreamSvc.baseUrl}/oauth/token`,
+      clientId: "upstream-pre-registered-client",
+      clientSecret: "upstream-client-secret",
+      verifyToken: stubVerifyToken,
+    });
+
+    const svc = await listenOnRandomPort(app);
+    closers.push(svc.close);
+
+    setupOAuthRoutes(app, proxy, svc.baseUrl);
+
+    const clientRedirectUri =
+      "https://new-mcp-client.example.com/oauth/callback";
+    const registrationResponse = await fetch(`${svc.baseUrl}/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        client_name: "Previously Unknown MCP Client",
+        redirect_uris: [clientRedirectUri],
+        token_endpoint_auth_method: "none",
+      }),
+    });
+
+    expect(registrationResponse.status).toBe(201);
+    const registration = await registrationResponse.json();
+    expect(registration.client_id).not.toBe("upstream-pre-registered-client");
+    expect(registration.client_secret).toBeUndefined();
+    expect(registration.token_endpoint_auth_method).toBe("none");
+
+    const authorizeUrl = new URL(`${svc.baseUrl}/authorize`);
+    authorizeUrl.searchParams.set("client_id", registration.client_id);
+    authorizeUrl.searchParams.set("redirect_uri", clientRedirectUri);
+    authorizeUrl.searchParams.set("response_type", "code");
+    authorizeUrl.searchParams.set("code_challenge", "client-pkce-challenge");
+    authorizeUrl.searchParams.set("code_challenge_method", "S256");
+    authorizeUrl.searchParams.set("state", "client-state");
+
+    const authorizeResponse = await fetch(authorizeUrl, {
+      redirect: "manual",
+    });
+    expect(authorizeResponse.status).toBe(302);
+
+    const upstreamAuthorizeUrl = new URL(
+      authorizeResponse.headers.get("location")!
+    );
+    expect(upstreamAuthorizeUrl.searchParams.get("client_id")).toBe(
+      "upstream-pre-registered-client"
+    );
+    expect(upstreamAuthorizeUrl.searchParams.get("redirect_uri")).toBe(
+      `${svc.baseUrl}/oauth/callback`
+    );
+
+    const callbackUrl = new URL(`${svc.baseUrl}/oauth/callback`);
+    callbackUrl.searchParams.set("code", "upstream-code");
+    callbackUrl.searchParams.set(
+      "state",
+      upstreamAuthorizeUrl.searchParams.get("state")!
+    );
+    const callbackResponse = await fetch(callbackUrl, {
+      redirect: "manual",
+    });
+
+    expect(callbackResponse.status).toBe(302);
+    const finalRedirect = new URL(callbackResponse.headers.get("location")!);
+    expect(finalRedirect.origin + finalRedirect.pathname).toBe(
+      clientRedirectUri
+    );
+    expect(finalRedirect.searchParams.get("code")).toBe("upstream-code");
+    expect(finalRedirect.searchParams.get("state")).toBe("client-state");
+
+    const tokenResponse = await fetch(`${svc.baseUrl}/token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        client_id: registration.client_id,
+        code: "upstream-code",
+        code_verifier: "client-pkce-verifier",
+        redirect_uri: clientRedirectUri,
+      }),
+    });
+    expect(tokenResponse.status).toBe(200);
+    expect(await tokenResponse.json()).toMatchObject({
+      access_token: "upstream-access-token",
+    });
+    expect(tokenSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        grant_type: "authorization_code",
+        client_id: "upstream-pre-registered-client",
+        client_secret: "upstream-client-secret",
+        code: "upstream-code",
+        code_verifier: "client-pkce-verifier",
+        redirect_uri: `${svc.baseUrl}/oauth/callback`,
+      })
+    );
+
+    const mismatchedAuthorizeUrl = new URL(authorizeUrl);
+    mismatchedAuthorizeUrl.searchParams.set(
+      "redirect_uri",
+      "https://attacker.example.com/callback"
+    );
+    const mismatchedResponse = await fetch(mismatchedAuthorizeUrl, {
+      redirect: "manual",
+    });
+    expect(mismatchedResponse.status).toBe(400);
+    expect(await mismatchedResponse.json()).toMatchObject({
+      error: "invalid_request",
+    });
+
+    const nativeRedirectUri = "cursor://anysphere.cursor-mcp/oauth/callback";
+    const nativeRegistration = await registerOAuthProxyClient(svc.baseUrl, [
+      nativeRedirectUri,
+    ]);
+    const nativeAuthorizeUrl = new URL(`${svc.baseUrl}/authorize`);
+    nativeAuthorizeUrl.searchParams.set(
+      "client_id",
+      nativeRegistration.client_id
+    );
+    nativeAuthorizeUrl.searchParams.set("redirect_uri", nativeRedirectUri);
+    nativeAuthorizeUrl.searchParams.set("response_type", "code");
+    nativeAuthorizeUrl.searchParams.set(
+      "code_challenge",
+      "native-client-challenge"
+    );
+
+    const nativeAuthorizeResponse = await fetch(nativeAuthorizeUrl, {
+      redirect: "manual",
+    });
+    expect(nativeAuthorizeResponse.status).toBe(302);
+  });
+
+  it("validates stateless registrations across proxy instances", async () => {
+    const baseUrl = "https://mcp.example.com";
+    const createProxy = () =>
+      oauthProxy({
+        issuer: "https://issuer.example.com",
+        authEndpoint: "https://issuer.example.com/oauth/authorize",
+        tokenEndpoint: "https://issuer.example.com/oauth/token",
+        clientId: "upstream-public-client",
+        registrationSecret: "shared-registration-secret",
+        verifyToken: stubVerifyToken,
+      });
+
+    const registrationApp = new Hono();
+    setupOAuthRoutes(registrationApp, createProxy(), baseUrl);
+    const registrationResponse = await registrationApp.request(
+      `${baseUrl}/register`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          client_name: "Distributed MCP Client",
+          redirect_uris: ["https://client.example.com/callback"],
+        }),
+      }
+    );
+    expect(registrationResponse.status).toBe(201);
+    const registration = await registrationResponse.json();
+
+    const authorizationApp = new Hono();
+    setupOAuthRoutes(authorizationApp, createProxy(), baseUrl);
+    const authorizeUrl = new URL(`${baseUrl}/authorize`);
+    authorizeUrl.searchParams.set("client_id", registration.client_id);
+    authorizeUrl.searchParams.set(
+      "redirect_uri",
+      "https://client.example.com/callback"
+    );
+    authorizeUrl.searchParams.set("response_type", "code");
+    authorizeUrl.searchParams.set("code_challenge", "challenge");
+
+    const authorizeResponse = await authorizationApp.request(authorizeUrl);
+    expect(authorizeResponse.status).toBe(302);
   });
 });
