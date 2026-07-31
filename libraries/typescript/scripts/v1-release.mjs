@@ -251,6 +251,7 @@ async function publishPlan() {
       if (!release.published) {
         const packed = packJson(
           run("pnpm", [
+            "--config.ignore-scripts=true",
             "--filter",
             release.name,
             "pack",
