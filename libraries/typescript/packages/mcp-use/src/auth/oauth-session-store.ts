@@ -65,6 +65,7 @@ export class OAuthSessionStore {
   private store: KVStore;
   private _cachedAuthServerUrl: string | null = null;
   private _cachedMetadata: AuthorizationServerMetadata | null = null;
+  private _cachedResource: URL | null = null;
   private _refreshPromise: Promise<OAuthTokens | null> | null = null;
 
   constructor(
@@ -129,19 +130,26 @@ export class OAuthSessionStore {
     if (!data) return undefined;
     try {
       const tokens = JSON.parse(data) as OAuthTokens;
-      if (tokens.access_token && tokens.refresh_token) {
+      if (tokens.access_token) {
+        let expiresAt: number | undefined;
         try {
           const payload = JSON.parse(atob(tokens.access_token.split(".")[1]));
-          if (payload.exp && Date.now() >= (payload.exp - 30) * 1000) {
-            console.log("[tokens] Access token expiring soon, refreshing...");
-            const refreshed = await this._dedupedRefresh(tokens);
-            if (refreshed) {
-              console.log("[tokens] Refreshed successfully");
-              return refreshed;
-            }
-          }
+          expiresAt =
+            typeof payload.exp === "number" ? payload.exp * 1000 : undefined;
         } catch {
           // Can't decode JWT, return as-is
+          return tokens;
+        }
+        if (expiresAt && Date.now() >= expiresAt - 30_000) {
+          if (!tokens.refresh_token) return undefined;
+          console.log("[tokens] Access token expiring soon, refreshing...");
+          const refreshed = await this._dedupedRefresh(tokens);
+          if (refreshed) {
+            console.log("[tokens] Refreshed successfully");
+            return refreshed;
+          }
+          // Never return a token that is already expired (or about to be).
+          return undefined;
         }
       }
       return tokens;
@@ -306,6 +314,7 @@ export class OAuthSessionStore {
         if (!metadata) return null;
         this._cachedAuthServerUrl = authServerUrl;
         this._cachedMetadata = metadata as AuthorizationServerMetadata;
+        this._cachedResource = this.resourceUrl(resourceMetadata.resource);
       }
 
       const clientInfo = await this.clientInformation();
@@ -315,9 +324,16 @@ export class OAuthSessionStore {
         metadata: this._cachedMetadata,
         clientInformation: clientInfo,
         refreshToken: tokens.refresh_token!,
+        resource: this._cachedResource ?? undefined,
       });
-      await this.saveTokens(newTokens);
-      return newTokens;
+      // Some authorization servers do not return a refresh_token on every
+      // exchange. Keep the existing one in that case; persist a rotated one.
+      const persistedTokens = {
+        ...newTokens,
+        refresh_token: newTokens.refresh_token ?? tokens.refresh_token,
+      };
+      await this.saveTokens(persistedTokens);
+      return persistedTokens;
     } catch {
       return null;
     }
@@ -400,11 +416,35 @@ export class OAuthSessionStore {
       if (!metadata?.token_endpoint) return null;
       this._cachedAuthServerUrl = authServerUrl;
       this._cachedMetadata = metadata as AuthorizationServerMetadata;
+      this._cachedResource = this.resourceUrl(resourceMetadata.resource);
       await this.store.set(
         this.getKey("token_endpoint"),
         metadata.token_endpoint
       );
       return metadata.token_endpoint;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Return the canonical protected-resource URL used for token exchanges. */
+  async getResource(): Promise<string | null> {
+    if (this._cachedResource) return this._cachedResource.href;
+    try {
+      const resourceMetadata = await discoverOAuthProtectedResourceMetadata(
+        this.serverUrl
+      );
+      this._cachedResource = this.resourceUrl(resourceMetadata.resource);
+      return this._cachedResource?.href ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  private resourceUrl(resource: unknown): URL | null {
+    if (typeof resource !== "string") return null;
+    try {
+      return new URL(resource);
     } catch {
       return null;
     }
