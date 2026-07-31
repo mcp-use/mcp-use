@@ -1,10 +1,9 @@
 # mcp-use SDK v2 benchmarks
 
 This report compares `mcp-use` v2 with mcp-use v1, the official TypeScript SDK,
-and representative TypeScript MCP frameworks, including FastMCP TypeScript.
+and representative TypeScript MCP frameworks.
 The established performance and launch figures use the published
-`mcp-use@2.0.0-beta.61` package and were recorded on July 27–28, 2026.
-FastMCP TypeScript was measured with the same harness and workload on July 30.
+`mcp-use@2.0.0-beta.64` package and were recorded on July 27–28, 2026.
 All measurements used Node.js 24.15.0. The npm tarball was measured from the
 `2.0.0-beta.64` package candidate after removing the temporary v1 compatibility
 layer.
@@ -112,12 +111,8 @@ xychart
 | Skybridge           | `skybridge + zod`                               |    137.5 MiB |                300 |
 | mcp-use v1 baseline | `mcp-use + zod`                                 |    404.6 MiB |                365 |
 
-mcp-use v2 had the smallest measured equivalent App development stack and the
-fewest installed package entries. FastMCP's framework-only component workflow
-does not require a browser build, but its earlier 45.0 MiB figure was excluded
-because it did not include the custom React MCP App build system represented by
-the other rows. The mcp-use v1 row is a migration baseline, not a native Apps
-peer.
+mcp-use v2 had the smallest measured equivalent MCP App development stack and the
+fewest installed package entries. 
 
 ## Package and MCP App build size
 
@@ -126,12 +121,6 @@ The packed `mcp-use@2.0.0-beta.64` candidate measured **302 KiB compressed**
 temporary v1 facade and legacy widget adapters reduced the candidate from
 349 KiB (357,628 bytes) to 302 KiB, a 13.6% reduction. Its unpacked contents
 fell from 1,417,415 bytes across 125 files to 1,249,746 bytes across 116 files.
-
-For package-artifact context, published
-`@prefecthq/fastmcp-ts@1.2.0` measured 1,613 KiB compressed and 7.934 MiB
-unpacked across 16 files. This package comparison does not imply an equivalent
-application build: FastMCP's server-side Apps component model and mcp-use's
-React/Vite View build emit different boundaries.
 
 For the application build, both versions used the same React launch card, CSS,
 and one echo tool.
