@@ -20,7 +20,10 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    "mcp>=1.24.0",
+    # Capped below 2.0: mcp 2.0.0 removed RequestContext from mcp.shared.context,
+    # which mcp_use imports in client/connectors/base.py, so a fresh install
+    # fails at import time. Lift the cap together with the v2 migration.
+    "mcp>=1.24.0,<2",
     "langchain>=1.0.0",
     "websockets>=15.0",
     "httpx>=0.27.1",
