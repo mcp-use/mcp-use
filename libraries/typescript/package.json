@@ -68,6 +68,7 @@
       "mcp-use": "workspace:*",
       "@mcp-use/inspector": "workspace:*",
       "@mcp-use/cli": "workspace:*",
+      "@mcp-use/evals": "workspace:*",
       "create-mcp-use-app": "workspace:*",
       "@langchain/core": "^1.1.8",
       "@langchain/anthropic": "^1.0.0",

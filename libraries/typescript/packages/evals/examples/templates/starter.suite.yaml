@@ -1,0 +1,31 @@
+apiVersion: mcp-use.com/evals/v1
+kind: EvalSuite
+
+name: starter-template-smoke
+intent: Deterministic checks for create-mcp-use-app starter template
+
+server:
+  url: ${MCP_SERVER_URL}
+
+flows:
+  - id: smoke
+    type: agent
+    checks:
+      - id: config-resource
+        call:
+          resource: config://settings
+        assert:
+          - kind: contains
+            path: $.contents[0].text
+            contains: dark
+      - id: fetch-weather-paris
+        call:
+          tool: fetch-weather
+          args:
+            city: paris
+        assert:
+          - kind: outputSchemaValid
+          - kind: jsonpath
+            path: $.structuredContent.city
+            equals: paris
+    scenarios: []

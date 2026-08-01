@@ -28,6 +28,16 @@
     "./client": {
       "types": "./dist/client/index.d.ts",
       "import": "./dist/client/index.js"
+    },
+    "./llm/toolLoop": {
+      "types": "./dist/llm/toolLoop.d.ts",
+      "import": "./dist/llm/toolLoop.js",
+      "default": "./dist/llm/toolLoop.js"
+    },
+    "./llm/types": {
+      "types": "./dist/llm/types.d.ts",
+      "import": "./dist/llm/types.js",
+      "default": "./dist/llm/types.js"
     }
   },
   "main": "./dist/server/index.js",
@@ -47,7 +57,7 @@
     "build:cdn": "vite build --config vite.cdn.config.ts",
     "build:client": "vite build",
     "build:client-exports": "tsup --config tsup.client.ts && tsc -p tsconfig.client.json --emitDeclarationOnly --declaration",
-    "build:server": "tsup src/server/*.ts --format esm --out-dir dist/server && tsc -p tsconfig.server.json --emitDeclarationOnly --declaration",
+    "build:server": "tsup src/server/*.ts --format esm --out-dir dist/server && tsup --config tsup.llm.ts && tsc -p tsconfig.server.json --emitDeclarationOnly --declaration",
     "build:cli": "tsup src/server/cli.ts --format esm --out-dir dist/",
     "prepublishOnly": "pnpm --filter mcp-use build && pnpm build",
     "start": "node dist/server/server.js",

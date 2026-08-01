@@ -1,0 +1,93 @@
+name: "MCP Server Evals"
+description: "Run mcp-use.com/evals/v1 LLM-as-judge evaluations against any MCP server."
+author: "mcp-use"
+branding:
+  icon: "check-circle"
+  color: "purple"
+
+inputs:
+  eval_suite:
+    description: "Path to the eval suite YAML (mcp-use.com/evals/v1)."
+    required: true
+  openrouter_api_key:
+    description: "OpenRouter API key, used for both the agent and the LLM judge."
+    required: true
+  server_url:
+    description: "Remote MCP server URL (overrides the suite's server block)."
+    required: false
+    default: ""
+  server_config:
+    description: 'MCP server config JSON: {"url": "..."} or {"command": "...", "args": [...], "env": {...}}.'
+    required: false
+    default: ""
+  filter:
+    description: "Only run scenarios whose id contains this substring."
+    required: false
+    default: ""
+  models:
+    description: "Comma-separated OpenRouter model ids overriding the suite's clients."
+    required: false
+    default: ""
+  judge_model:
+    description: "Judge model override (OpenRouter id)."
+    required: false
+    default: ""
+  max_steps:
+    description: "Maximum agent steps (tool calls) per scenario."
+    required: false
+    default: ""
+  output_dir:
+    description: "Directory for results.json and report.md."
+    required: false
+    default: "eval-results"
+  evals_version:
+    description: "Version/tag of @mcp-use/evals to run (e.g. latest, canary, or a pinned version)."
+    required: false
+    default: "latest"
+  node_version:
+    description: "Node.js version to set up."
+    required: false
+    default: "20"
+
+outputs:
+  results_json:
+    description: "Path to results.json (full structured results)."
+    value: ${{ steps.run.outputs.results_json }}
+  report_md:
+    description: "Path to report.md (markdown report for PR comments)."
+    value: ${{ steps.run.outputs.report_md }}
+  passed:
+    description: "'true' if all evals passed, otherwise 'false'."
+    value: ${{ steps.run.outputs.passed }}
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node_version }}
+    - id: run
+      shell: bash
+      # Inputs are passed via env (never interpolated into the script body) to
+      # avoid shell injection from untrusted suite/config values.
+      env:
+        OPENROUTER_API_KEY: ${{ inputs.openrouter_api_key }}
+        EVAL_SUITE: ${{ inputs.eval_suite }}
+        SERVER_URL: ${{ inputs.server_url }}
+        SERVER_CONFIG: ${{ inputs.server_config }}
+        FILTER: ${{ inputs.filter }}
+        MODELS: ${{ inputs.models }}
+        JUDGE_MODEL: ${{ inputs.judge_model }}
+        MAX_STEPS: ${{ inputs.max_steps }}
+        OUTPUT_DIR: ${{ inputs.output_dir }}
+        EVALS_VERSION: ${{ inputs.evals_version }}
+      run: |
+        set -euo pipefail
+        args=(run --eval-suite "$EVAL_SUITE" --output "$OUTPUT_DIR")
+        if [ -n "$SERVER_URL" ]; then args+=(--server-url "$SERVER_URL"); fi
+        if [ -n "$SERVER_CONFIG" ]; then args+=(--server-config "$SERVER_CONFIG"); fi
+        if [ -n "$FILTER" ]; then args+=(--filter "$FILTER"); fi
+        if [ -n "$MODELS" ]; then args+=(--models "$MODELS"); fi
+        if [ -n "$JUDGE_MODEL" ]; then args+=(--judge-model "$JUDGE_MODEL"); fi
+        if [ -n "$MAX_STEPS" ]; then args+=(--max-steps "$MAX_STEPS"); fi
+        npx -y "@mcp-use/evals@${EVALS_VERSION}" "${args[@]}"

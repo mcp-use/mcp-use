@@ -1,0 +1,585 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "const": "mcp-use.com/evals/v1"
+    },
+    "kind": {
+      "type": "string",
+      "const": "EvalSuite"
+    },
+    "name": {
+      "type": "string"
+    },
+    "intent": {
+      "type": "string"
+    },
+    "triggers": {
+      "type": "object",
+      "properties": {
+        "manual": {
+          "type": "boolean"
+        },
+        "ci": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "branches": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "watchPaths": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "cron": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "schedule": {
+              "type": "string"
+            },
+            "branch": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "server": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "command": {
+          "type": "string"
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "env": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "defaults": {
+      "type": "object",
+      "properties": {
+        "timeoutMs": {
+          "type": "number"
+        },
+        "maxAgentSteps": {
+          "type": "number"
+        },
+        "judgeModel": {
+          "type": "string"
+        },
+        "rubricThreshold": {
+          "type": "number"
+        },
+        "client": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "collect": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "report": {
+          "type": "string"
+        },
+        "gates": {
+          "type": "object",
+          "properties": {
+            "toolErrorRateMax": {
+              "type": "number"
+            },
+            "agentStepsP95Max": {
+              "type": "number"
+            },
+            "tokensPerSuccessP95Max": {
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "ci": {
+      "type": "object",
+      "properties": {
+        "failOn": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "parallelCases": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "flows": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "const": "agent"
+          },
+          "clients": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "target": {
+                  "type": "string",
+                  "enum": [
+                    "mcp-use",
+                    "inspector",
+                    "chatgpt",
+                    "ai-sdk",
+                    "claude-agent-sdk"
+                  ]
+                },
+                "framework": {
+                  "type": "string"
+                },
+                "models": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "disallowedTools": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "runOn": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "ci",
+                      "manual",
+                      "release",
+                      "cron"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "target"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "systemPrompts": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "call": {
+                  "type": "object",
+                  "properties": {
+                    "tool": {
+                      "type": "string"
+                    },
+                    "resource": {
+                      "type": "string"
+                    },
+                    "mcp": {
+                      "type": "string",
+                      "enum": [
+                        "listTools",
+                        "listResources",
+                        "listPrompts"
+                      ]
+                    },
+                    "args": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "assert": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/__schema0"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "call",
+                "assert"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "scenarios": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "turns": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "user": {
+                        "type": "string"
+                      },
+                      "expect": {
+                        "type": "object",
+                        "properties": {
+                          "tools": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string"
+                                },
+                                "args": {
+                                  "type": "object",
+                                  "propertyNames": {
+                                    "type": "string"
+                                  },
+                                  "additionalProperties": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "boolean"
+                                      },
+                                      {
+                                        "type": "string",
+                                        "const": "any"
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "contains": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "contains"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "pattern": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "pattern"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "any": {
+                                            "type": "boolean",
+                                            "const": true
+                                          },
+                                          "requirePresent": {
+                                            "type": "boolean",
+                                            "const": true
+                                          }
+                                        },
+                                        "required": [
+                                          "any",
+                                          "requirePresent"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "propertyNames": {
+                                          "type": "string"
+                                        },
+                                        "additionalProperties": {}
+                                      }
+                                    ]
+                                  }
+                                },
+                                "afterTurn": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "name"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "result": {
+                            "type": "object",
+                            "properties": {
+                              "tool": {
+                                "type": "string"
+                              },
+                              "assert": {
+                                "type": "array",
+                                "items": {
+                                  "$ref": "#/definitions/__schema0"
+                                }
+                              }
+                            },
+                            "required": [
+                              "tool",
+                              "assert"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "widget": {
+                            "type": "object",
+                            "properties": {
+                              "fields": {
+                                "type": "object",
+                                "propertyNames": {
+                                  "type": "string"
+                                },
+                                "additionalProperties": {}
+                              },
+                              "screenshot": {
+                                "type": "object",
+                                "properties": {
+                                  "rubric": {
+                                    "type": "string"
+                                  },
+                                  "threshold": {
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "maximum": 1
+                                  },
+                                  "tool": {
+                                    "type": "string"
+                                  },
+                                  "args": {
+                                    "type": "object",
+                                    "propertyNames": {
+                                      "type": "string"
+                                    },
+                                    "additionalProperties": {}
+                                  }
+                                },
+                                "required": [
+                                  "rubric"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "user"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "expect": {
+                  "type": "object",
+                  "properties": {
+                    "judge": {
+                      "type": "object",
+                      "properties": {
+                        "rubric": {
+                          "type": "string"
+                        },
+                        "threshold": {
+                          "default": 0.7,
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "screenshot": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "rubric",
+                        "threshold"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "tools": {
+                      "type": "object",
+                      "properties": {
+                        "forbidden": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "id",
+                "turns"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "scenarios"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "name",
+    "flows"
+  ],
+  "additionalProperties": false,
+  "definitions": {
+    "__schema0": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "executionError",
+            "outputSchemaValid",
+            "jsonpath",
+            "equals",
+            "contains",
+            "pattern",
+            "schema",
+            "resource",
+            "widget"
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "equals": {},
+        "contains": {
+          "type": "string"
+        },
+        "pattern": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "uri": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "assert": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#/definitions/__schema0"
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

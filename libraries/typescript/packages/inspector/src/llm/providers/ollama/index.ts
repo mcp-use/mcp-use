@@ -1,5 +1,5 @@
-import { parseDataUrl } from "@/llm/messageFormat";
-import { parseNDJSON } from "@/llm/ndjson";
+import { parseDataUrl } from "../../messageFormat";
+import { parseNDJSON } from "../../ndjson";
 import type {
   ContentPart,
   LlmStreamEvent,

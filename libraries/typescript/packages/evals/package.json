@@ -1,0 +1,51 @@
+{
+  "name": "@mcp-use/evals",
+  "type": "module",
+  "version": "0.1.0",
+  "description": "MCP eval suite runner — mcp-use.com/evals/v1 YAML spec",
+  "author": "Manufact, Inc.",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "types": "./dist/evals.d.ts",
+      "import": "./dist/evals.js"
+    },
+    "./screenshot": {
+      "types": "./dist/screenshot.d.ts",
+      "import": "./dist/screenshot.js"
+    }
+  },
+  "bin": {
+    "mcp-use-evals": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "examples"
+  ],
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "scripts": {
+    "build": "tsup && tsc --emitDeclarationOnly --declaration",
+    "export-schema": "tsx scripts/export-json-schema.ts",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:templates": "vitest run tests/template-verification.test.ts"
+  },
+  "dependencies": {
+    "@mcp-use/inspector": "^11.0.0",
+    "mcp-use": "^1.33.0",
+    "ws": "^8.19.0",
+    "yaml": "^2.8.3",
+    "zod": "4.3.5"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1",
+    "create-mcp-use-app": "^0.14.17",
+    "vitest": "^4.1.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -105,6 +105,8 @@ export async function* streamChat(
     model: config.model,
     messages: toOpenAIMessages(messages),
     stream: true,
+    // Ask OpenAI/OpenRouter to include a final usage chunk in the stream.
+    stream_options: { include_usage: true },
   };
   if (config.temperature !== undefined) body.temperature = config.temperature;
   if (config.maxTokens !== undefined) body.max_tokens = config.maxTokens;
@@ -148,6 +150,18 @@ export async function* streamChat(
       parsed = JSON.parse(ev.data);
     } catch {
       continue;
+    }
+    // The usage chunk arrives last and (for OpenAI) carries an empty
+    // `choices` array, so handle it before the choice guard below.
+    if (parsed?.usage) {
+      yield {
+        type: "usage",
+        promptTokens: parsed.usage.prompt_tokens,
+        completionTokens: parsed.usage.completion_tokens,
+        totalTokens: parsed.usage.total_tokens,
+        costUsd:
+          typeof parsed.usage.cost === "number" ? parsed.usage.cost : undefined,
+      };
     }
     const choice = parsed?.choices?.[0];
     if (!choice) continue;

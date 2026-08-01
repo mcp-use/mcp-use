@@ -9,7 +9,7 @@ vi.mock("node:fs", async () => {
 });
 
 import { accessSync } from "node:fs";
-import { findChrome, resolveChromePath } from "../src/utils/chrome-path.js";
+import { findChrome, resolveChromePath } from "../src/commands/screenshot.js";
 
 const mockAccessOnly = (paths: string[]) => {
   vi.mocked(accessSync).mockImplementation(((p: string) => {

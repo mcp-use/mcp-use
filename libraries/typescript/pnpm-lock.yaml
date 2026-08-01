@@ -8,6 +8,7 @@ overrides:
   mcp-use: workspace:*
   '@mcp-use/inspector': workspace:*
   '@mcp-use/cli': workspace:*
+  '@mcp-use/evals': workspace:*
   create-mcp-use-app: workspace:*
   '@langchain/core': ^1.1.8
   '@langchain/anthropic': ^1.0.0
@@ -124,6 +125,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@mcp-use/evals':
+        specifier: workspace:*
+        version: link:../evals
       '@mcp-use/inspector':
         specifier: workspace:*
         version: link:../inspector
@@ -333,6 +337,34 @@ importers:
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
+
+  packages/evals:
+    dependencies:
+      '@mcp-use/inspector':
+        specifier: workspace:*
+        version: link:../inspector
+      mcp-use:
+        specifier: workspace:*
+        version: link:../mcp-use
+      ws:
+        specifier: '>=8.20.1'
+        version: 8.21.0
+      yaml:
+        specifier: '>=2.8.3'
+        version: 2.8.3
+      zod:
+        specifier: 4.3.5
+        version: 4.3.5
+    devDependencies:
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
+      create-mcp-use-app:
+        specifier: workspace:*
+        version: link:../create-mcp-use-app
+      vitest:
+        specifier: '>=4.1.0'
+        version: 4.1.8(@opentelemetry/api@1.9.0)(@types/node@25.6.0)(@vitest/coverage-v8@4.1.8)(jsdom@27.4.0(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.6.0)(esbuild@0.27.1)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
 
   packages/inspector:
     dependencies:
@@ -1410,6 +1442,43 @@ importers:
       vite:
         specifier: '>=8.0.5'
         version: 8.0.16(@types/node@25.3.0)(esbuild@0.27.1)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3)
+
+  test_app:
+    dependencies:
+      mcp-use:
+        specifier: workspace:*
+        version: link:../packages/mcp-use
+      react:
+        specifier: ^19.2.0
+        version: 19.2.4
+      react-dom:
+        specifier: ^19.2.0
+        version: 19.2.4(react@19.2.4)
+      react-router:
+        specifier: ^7.15.0
+        version: 7.16.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      tailwindcss:
+        specifier: ^4.2.0
+        version: 4.2.0
+      zod:
+        specifier: 4.3.5
+        version: 4.3.5
+    devDependencies:
+      '@types/node':
+        specifier: ^25.3.0
+        version: 25.6.0
+      '@types/react':
+        specifier: ^19.2.7
+        version: 19.2.17
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.3(@types/react@19.2.17)
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
 
 packages:
 
@@ -11083,7 +11152,6 @@ snapshots:
   '@types/react-dom@19.2.3(@types/react@19.2.17)':
     dependencies:
       '@types/react': 19.2.17
-    optional: true
 
   '@types/react-syntax-highlighter@15.5.13':
     dependencies:
