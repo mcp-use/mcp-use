@@ -5,8 +5,8 @@ This document describes how mcp-use manages its dependencies for the Python SDK.
 ## Python Version Support
 
 - **Minimum supported**: Python 3.11
-- **Tested on CI**: Python 3.11, 3.12
-- **Policy**: We support the two most recent minor Python versions. When a new Python version is released, we add support within one release cycle and may drop the oldest supported version with a major version bump.
+- **Tested on CI**: Python 3.11, 3.12, 3.13, 3.14
+- **Policy**: We keep the published `requires-python` range aligned with CI coverage. When a new Python version is released, we add CI coverage within one release cycle. Dropping an older supported version requires a major version bump.
 
 ## MCP SDK (`mcp` package)
 
