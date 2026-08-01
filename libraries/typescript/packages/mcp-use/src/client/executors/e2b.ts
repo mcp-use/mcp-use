@@ -135,22 +135,29 @@ global.search_tools = async (query, detailLevel = 'full') => {
       // Create safe server name for JS identifier (replace hyphens etc)
       const safeServerName = serverName.replace(/[^a-zA-Z0-9_]/g, "_");
 
+      // Serialize values as safe JavaScript string literals using JSON.stringify
+      const escapedServerName = JSON.stringify(serverName);
+      const escapedSafeServerName = JSON.stringify(safeServerName);
+
       shim += `
-global['${serverName}'] = {`;
+global[${escapedServerName}] = {`;
 
       for (const tool of serverTools) {
+        const escapedToolName = JSON.stringify(tool.name);
         shim += `
-    '${tool.name}': async (args) => await global.__callMcpTool('${serverName}', '${tool.name}', args),`;
+    [${escapedToolName}]: async (args) => await global.__callMcpTool(${escapedServerName}, ${escapedToolName}, args),`;
       }
 
       shim += `
 };
-
-// Also expose as safe name if different
-if ('${safeServerName}' !== '${serverName}') {
-    global['${safeServerName}'] = global['${serverName}'];
-}
 `;
+
+      if (safeServerName !== serverName) {
+        shim += `
+// Also expose as safe name if different
+global[${escapedSafeServerName}] = global[${escapedServerName}];
+`;
+      }
     }
 
     return shim;
