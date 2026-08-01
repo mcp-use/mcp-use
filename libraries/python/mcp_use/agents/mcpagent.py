@@ -46,6 +46,7 @@ from mcp_use.agents.prompts.templates import (
     SERVER_MANAGER_SYSTEM_PROMPT_TEMPLATE,
 )
 from mcp_use.agents.remote import RemoteAgent
+from mcp_use.agents.run_trace import AgentRunTrace
 from mcp_use.client import MCPClient
 from mcp_use.client.connectors.base import BaseConnector
 from mcp_use.logging import logger
@@ -173,6 +174,7 @@ class MCPAgent:
         self._agent_executor = None
         self._system_message: SystemMessage | None = None
         self._tools: list[BaseTool] = []
+        self._last_run_trace: AgentRunTrace | None = None
 
         # Track model info for telemetry
         self._model_provider, self._model_name = extract_model_info(self.llm)
@@ -398,6 +400,22 @@ class MCPAgent:
             The list of conversation messages.
         """
         return self._conversation_history
+
+    def get_last_run_trace(self) -> AgentRunTrace | None:
+        """Return the trace from the most recent local run or stream call."""
+        return self._last_run_trace
+
+    def get_last_tool_calls(self) -> list[dict[str, Any]]:
+        """Return the most recent run's tool calls as JSON-serializable records."""
+        if self._last_run_trace is None:
+            return []
+        return [record.as_dict() for record in self._last_run_trace.tool_calls]
+
+    def get_last_tool_outputs(self) -> dict[str, list[Any]]:
+        """Return the most recent run's tool outputs grouped by tool name."""
+        if self._last_run_trace is None:
+            return {}
+        return self._last_run_trace.outputs_by_tool()
 
     def clear_conversation_history(self) -> None:
         """Clear the conversation history."""
@@ -691,6 +709,8 @@ class MCPAgent:
         success = False
         final_output = None
         steps_taken = 0
+        run_trace = AgentRunTrace(query=self._message_text(human_query))
+        self._last_run_trace = run_trace
 
         try:
             # 1. Initialize if needed
@@ -805,6 +825,12 @@ class MCPAgent:
 
                                         self.tools_used_names.append(tool_name)
                                         steps_taken += 1
+                                        run_trace.record_tool_call(
+                                            tool=tool_name,
+                                            tool_call_id=tool_call_id,
+                                            tool_input=tool_input,
+                                            log=log_text,
+                                        )
 
                                         tool_input_str = str(tool_input)
                                         if len(tool_input_str) > 100:
@@ -814,6 +840,7 @@ class MCPAgent:
                                 if isinstance(message, ToolMessage):
                                     observation = message.content
                                     tool_call_id = message.tool_call_id
+                                    run_trace.record_tool_result(tool_call_id=tool_call_id, output=observation)
 
                                     if tool_call_id and tool_call_id in pending_tool_calls:
                                         action = pending_tool_calls.pop(tool_call_id)
@@ -904,6 +931,7 @@ class MCPAgent:
 
                     logger.info("✅ Structured output successful")
                     success = True
+                    run_trace.complete(final_output=str(structured_result))
                     yield structured_result
                     return
                 except Exception as e:
@@ -913,10 +941,12 @@ class MCPAgent:
             # 6. Yield final result
             logger.info(f"🎉 Agent execution complete in {time.time() - start_time:.2f} seconds")
             success = True
+            run_trace.complete(final_output=final_output)
             yield final_output or "No output generated"
 
         except Exception as e:
             logger.error(f"❌ Error running query: {e}")
+            run_trace.complete(final_output=final_output, error=str(e))
             if initialized_here and manage_connector:
                 logger.info("🧹 Cleaning up resources after error")
                 await self.close()

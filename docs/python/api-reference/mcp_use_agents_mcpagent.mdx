@@ -154,6 +154,54 @@ def get_disallowed_tools():
 </Card>
 
 <Card type="info">
+### `method` get_last_run_trace
+
+Return the trace from the most recent local run or stream call.
+
+
+**Returns**
+><ResponseField name="returns" type="mcp_use.agents.run_trace.AgentRunTrace | None" />
+
+**Signature**
+```python wrap
+def get_last_run_trace():
+```
+
+</Card>
+
+<Card type="info">
+### `method` get_last_tool_calls
+
+Return the most recent run's tool calls as JSON-serializable records.
+
+
+**Returns**
+><ResponseField name="returns" type="list[dict[str, Any]]" />
+
+**Signature**
+```python wrap
+def get_last_tool_calls():
+```
+
+</Card>
+
+<Card type="info">
+### `method` get_last_tool_outputs
+
+Return the most recent run's tool outputs grouped by tool name.
+
+
+**Returns**
+><ResponseField name="returns" type="dict[str, list[Any]]" />
+
+**Signature**
+```python wrap
+def get_last_tool_outputs():
+```
+
+</Card>
+
+<Card type="info">
 ### `method` get_system_message
 
 Get the current system message.

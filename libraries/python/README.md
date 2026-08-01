@@ -249,6 +249,22 @@ if __name__ == "__main__":
 
 This streaming interface is ideal for applications that require real-time updates, such as chatbots, dashboards, or interactive notebooks.
 
+## Inspect Tool Calls After a Run
+
+After `agent.run(...)` or `agent.stream(...)`, you can inspect the last run without parsing logs or relying on the final LLM answer:
+
+```python
+result = await agent.run("Compare the files in this repo")
+
+trace = agent.get_last_run_trace()
+if trace:
+    print(trace.tool_counts())
+    for call in trace.tool_calls:
+        print(call.tool, call.input, call.output_preview)
+```
+
+For dashboards or debugging UIs, use `agent.get_last_tool_calls()` to get JSON-serializable records, or `agent.get_last_tool_outputs()` to group raw tool outputs by tool name. This is useful when you need to verify how many MCP tools were actually called and what each tool returned before the model summarized the result.
+
 # Example Use Cases
 
 ## Web Browsing with Playwright
