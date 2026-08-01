@@ -368,6 +368,7 @@
                               "v2/typescript/server/authentication/providers/keycloak",
                               "v2/typescript/server/authentication/providers/supabase",
                               "v2/typescript/server/authentication/providers/workos",
+                              "v2/typescript/server/authentication/providers/oauth-proxy",
                               "v2/typescript/server/authentication/providers/custom"
                             ]
                           }
@@ -391,6 +392,7 @@
                         "pages": [
                           "v2/typescript/server/middleware",
                           "v2/typescript/server/elicitation",
+                          "v2/typescript/server/sampling",
                           "v2/typescript/server/subscriptions",
                           "v2/typescript/server/notifications"
                         ]
