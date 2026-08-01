@@ -1,0 +1,18 @@
+---
+title: "OAuth Proxy support boundary"
+description: "Understand the support boundary for fixed-client OAuth providers."
+icon: "shuffle"
+---
+
+mcp-use does not provide a server-side OAuth proxy factory or implement authorization, callback, token-exchange, or fixed-client brokering routes. This page is intentionally excluded from navigation.
+
+If your identity provider supports Dynamic Client Registration, use a [built-in provider](/v2/typescript/server/authentication/index) or [Custom Provider](/v2/typescript/server/authentication/providers/custom). The MCP client then registers directly with the authorization server, while mcp-use acts only as the protected resource server.
+
+If the provider gives you only a fixed `clientId` and `clientSecret`, deploy a standards-compliant external authorization server or broker that:
+
+- publishes OAuth authorization-server metadata, including a registration endpoint;
+- registers MCP clients and enforces redirect URI and PKCE requirements;
+- performs the upstream authorization and token exchange without exposing the fixed secret;
+- issues or validates tokens bound to the MCP resource.
+
+Point a custom provider at that external authorization server and implement resource-bound token verification. mcp-use has no server-side fixed-client brokering equivalent.
