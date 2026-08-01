@@ -91,6 +91,7 @@
     "strict-exported-tool-refs",
     "strip-tools-list-schema-dialect",
     "tidy-inspector-runtime",
+    "tidy-shims-quote-names",
     "tight-beta-boundaries",
     "track-v2-server-usage",
     "ts7-stable-node20-scaffold",

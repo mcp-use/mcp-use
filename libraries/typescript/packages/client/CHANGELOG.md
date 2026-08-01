@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.0.0-beta.18
+
+### Patch Changes
+
+- a6ec149: Fix code-mode shim generation for server and tool names containing quotes or other special characters.
+
 ## 2.0.0-beta.17
 
 ### Patch Changes
