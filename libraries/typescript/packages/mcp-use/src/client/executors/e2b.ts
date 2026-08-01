@@ -58,7 +58,8 @@ export class E2BCodeExecutor extends BaseCodeExecutor {
 
     return this.codeExecSandbox;
   }
-    /**
+
+  /**
    * Generate the shim code that exposes tools to the sandbox environment.
    * Creates a bridge that intercepts tool calls and sends them back to host.
    */
@@ -149,12 +150,14 @@ global[${escapedServerName}] = {`;
 
       shim += `
 };
-
-// Also expose as safe name if different
-if (${escapedSafeServerName} !== ${escapedServerName}) {
-    global[${escapedSafeServerName}] = global[${escapedServerName}];
-}
 `;
+
+      if (safeServerName !== serverName) {
+        shim += `
+// Also expose as safe name if different
+global[${escapedSafeServerName}] = global[${escapedServerName}];
+`;
+      }
     }
 
     return shim;
