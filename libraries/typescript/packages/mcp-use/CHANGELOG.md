@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.34.5-canary.2
+
+### Patch Changes
+
+- fb1f39c: Fix E2B shim generation to safely escape server and tool names when building the sandbox tool bridge
+  - @mcp-use/cli@3.6.6-canary.2
+  - @mcp-use/inspector@12.0.5-canary.2
+
 ## 1.34.5-canary.1
 
 ### Patch Changes
