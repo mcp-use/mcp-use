@@ -138,11 +138,22 @@ function resolveInstalledVersion(
 /**
  * Check npm for a newer version of `mcp-use` and print a notification when
  * one is available. Runs silently on any error so it never interrupts the CLI.
+ *
+ * Skipped in CI, when explicitly disabled, or when stdout is not a TTY so
+ * piped and scripted consumers get clean machine-readable output.
  */
 export async function notifyIfUpdateAvailable(
   projectPath: string | undefined
 ): Promise<void> {
   try {
+    if (
+      process.env.CI === "true" ||
+      process.env.MCP_USE_SKIP_UPDATE_CHECK === "1" ||
+      !process.stdout.isTTY
+    ) {
+      return;
+    }
+
     const installed = resolveInstalledVersion(projectPath);
     if (!installed) return;
 

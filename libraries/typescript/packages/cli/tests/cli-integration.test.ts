@@ -36,6 +36,8 @@ async function runCLI(
         NO_COLOR: "1", // Disable colors for easier testing
         HOME: FAKE_HOME,
         USERPROFILE: FAKE_HOME,
+        // Keep stdout free of update banners in assertions / CI.
+        MCP_USE_SKIP_UPDATE_CHECK: "1",
       },
     });
 
