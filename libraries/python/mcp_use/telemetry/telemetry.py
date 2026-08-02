@@ -93,7 +93,11 @@ def telemetry(event_name: str, additional_properties: dict[str, Any] | None = No
 
                 try:
                     return await func(self, *args, **kwargs)
-                except Exception as e:
+                except (Exception, asyncio.CancelledError) as e:
+                    # asyncio.CancelledError is a BaseException, not an Exception, so it
+                    # must be listed explicitly or a cancelled call is recorded as a
+                    # success. It's re-raised unconditionally below, so cancellation
+                    # still propagates normally.
                     success = False
                     error_type = type(e).__name__
                     raise

@@ -28,6 +28,10 @@ class DummyAsyncTarget:
         await asyncio.sleep(0.05)
         raise ValueError("boom")
 
+    @telemetry("test_async_event_cancel")
+    async def do_slow_work(self) -> None:
+        await asyncio.sleep(10)
+
 
 class DummySyncTarget:
     """A stand-in for sync methods decorated with @telemetry(...), to guard
@@ -87,6 +91,28 @@ class TestTelemetryDecoratorAsync:
         assert event.EVENT_NAME == "test_async_event_error"
         assert event.success is False
         assert event.error_type == "ValueError"
+
+    @pytest.mark.asyncio
+    async def test_async_cancellation_is_captured_as_failure_and_propagates(self):
+        """Regression test: asyncio.CancelledError is a BaseException, not an
+        Exception, so a bare `except Exception` silently misses it and would
+        record a cancelled call as a success. Cancellation must still
+        propagate to the caller."""
+        target = DummyAsyncTarget()
+
+        task = asyncio.ensure_future(target.do_slow_work())
+        await asyncio.sleep(0)  # let the task actually start
+        task.cancel()
+
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+        assert task.cancelled()
+        target.telemetry.capture.assert_called_once()
+        event = target.telemetry.capture.call_args.kwargs["event"]
+        assert event.EVENT_NAME == "test_async_event_cancel"
+        assert event.success is False
+        assert event.error_type == "CancelledError"
 
 
 class TestTelemetryDecoratorSync:
