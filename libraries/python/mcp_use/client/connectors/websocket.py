@@ -42,6 +42,8 @@ class WebSocketConnector(BaseConnector):
                 - A dict: Not supported for WebSocket (will log warning)
                 - An httpx.Auth object: Not supported for WebSocket (will log warning)
         """
+        super().__init__()
+
         self.url = url
         self.headers = headers or {}
 
@@ -255,3 +257,13 @@ class WebSocketConnector(BaseConnector):
     def public_identifier(self) -> str:
         """Get the identifier for the connector."""
         return f"websocket:{self.url}"
+
+    @property
+    def is_connected(self) -> bool:
+        """Check if the connector is actually connected.
+
+        WebSocketConnector manages the connection over raw WebSocket messages
+        rather than an MCP ClientSession, so unlike the base implementation this
+        does not depend on ``client_session``.
+        """
+        return self._connected
