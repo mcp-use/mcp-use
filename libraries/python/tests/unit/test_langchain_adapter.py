@@ -9,6 +9,8 @@ from mcp.types import (
     CallToolResult,
     EmbeddedResource,
     ImageContent,
+    ReadResourceResult,
+    Resource,
     TextContent,
     TextResourceContents,
     Tool,
@@ -112,3 +114,44 @@ class TestLangChainAdapterToolExecution:
         assert result["details"] == "tool failed"
         assert result["tool"] == "failing_tool"
         assert result["tool_content"] == "tool failed"
+
+    @pytest.mark.asyncio
+    async def test_resource_tool_returns_all_content_blocks(self):
+        """Regression test: previously the resource tool's _arun loop overwrote its
+        accumulator each iteration, so only the last content block survived and earlier
+        blocks were silently dropped."""
+        adapter = LangChainAdapter()
+        connector = MagicMock()
+        connector.read_resource = AsyncMock(
+            return_value=ReadResourceResult(
+                contents=[
+                    TextResourceContents(uri="file:///tmp/doc.txt", text="page 1"),
+                    TextResourceContents(uri="file:///tmp/doc.txt", text="page 2"),
+                    TextResourceContents(uri="file:///tmp/doc.txt", text="page 3"),
+                ]
+            )
+        )
+
+        resource = Resource(uri="file:///tmp/doc.txt", name="doc")
+        resource_tool = adapter._convert_resource(resource, connector)
+
+        result = await resource_tool._arun()
+
+        assert "page 1" in result
+        assert "page 2" in result
+        assert "page 3" in result
+
+    @pytest.mark.asyncio
+    async def test_resource_tool_empty_contents_returns_empty_string(self):
+        """Regression test: an empty contents list used to raise UnboundLocalError
+        instead of returning gracefully."""
+        adapter = LangChainAdapter()
+        connector = MagicMock()
+        connector.read_resource = AsyncMock(return_value=ReadResourceResult(contents=[]))
+
+        resource = Resource(uri="file:///tmp/empty.txt", name="empty")
+        resource_tool = adapter._convert_resource(resource, connector)
+
+        result = await resource_tool._arun()
+
+        assert result == ""
