@@ -238,7 +238,13 @@ export class StdioConnectionManager extends ConnectionManager<StdioClientTranspo
   }
 
   protected async establishConnection(): Promise<StdioClientTransport> {
-    this._transport = new StdioClientTransport(this.serverParams);
+    // Default stderr to "pipe" so the forwarding below can reach `errlog`.
+    // The SDK defaults to "inherit", which leaves `transport.stderr` null and
+    // makes that block dead code. An explicit mode in serverParams still wins.
+    this._transport = new StdioClientTransport({
+      stderr: "pipe",
+      ...this.serverParams,
+    });
 
     if (
       this._transport.stderr &&
