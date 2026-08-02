@@ -59,24 +59,16 @@ export class StdioConnector extends BaseConnector {
     try {
       // 1. Build server parameters for the transport
 
-      // Merge env with process.env, filtering out undefined values
-      let mergedEnv: Record<string, string> | undefined;
-      if (this.env) {
-        mergedEnv = {};
-        // First add process.env values (excluding undefined)
-        for (const [key, value] of Object.entries(process.env)) {
-          if (value !== undefined) {
-            mergedEnv[key] = value;
-          }
-        }
-        // Then override with provided env
-        Object.assign(mergedEnv, this.env);
-      }
-
+      // Pass env directly without inheriting the full process.env.
+      // When env is undefined, the MCP SDK applies its own default environment
+      // (HOME, PATH, etc.) via getDefaultEnvironment(), matching the Python
+      // connector behavior. This avoids silently leaking parent secrets
+      // (API keys, cloud credentials) into the child process when the user
+      // configures even a single env var. See GHSA discussion on #1901.
       const serverParams: StdioServerParameters = {
         command: this.command,
         args: this.args,
-        env: mergedEnv,
+        env: this.env,
         cwd: this.cwd,
       };
 
