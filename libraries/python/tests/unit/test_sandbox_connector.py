@@ -2,6 +2,7 @@
 Unit tests for the SandboxConnector class.
 """
 
+import logging
 import os
 import sys
 from unittest.mock import ANY, AsyncMock, MagicMock, Mock, patch
@@ -220,6 +221,30 @@ class TestSandboxConnectorConnection:
 
         # Verify state
         assert connector._connected is False
+
+
+class TestSandboxConnectorLogging:
+    """Tests for SandboxConnector stdout/stderr logging callbacks."""
+
+    def test_handle_stdout_and_stderr_do_not_raise_with_debug_logging(self, mock_sandbox_modules):
+        """Regression test: _handle_stdout/_handle_stderr used to call
+        logger.debug(msg, end="", flush=True) / logger.debug(msg, file=..., end="", flush=True),
+        passing print()-style kwargs that logging.Logger.debug() doesn't accept. That only
+        surfaces once the logger's effective level lets DEBUG records through, so this test
+        uses a real Logger with DEBUG enabled rather than the module's autouse mock."""
+        sandbox_options = SandboxOptions(api_key="test-api-key")
+        connector = SandboxConnector("npx", ["test-command"], e2b_options=sandbox_options)
+
+        real_logger = logging.getLogger("mcp_use_sandbox_connector_test")
+        real_logger.setLevel(logging.DEBUG)
+        real_logger.addHandler(logging.NullHandler())
+
+        with patch("mcp_use.client.connectors.sandbox.logger", real_logger):
+            connector._handle_stdout("some output\n")
+            connector._handle_stderr("some error\n")
+
+        assert connector.stdout_lines == ["some output\n"]
+        assert connector.stderr_lines == ["some error\n"]
 
 
 class TestSandboxConnectorCleanup:
