@@ -2,11 +2,12 @@
 Unit tests for the MCPAgent class.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from langchain_core.agents import AgentFinish
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from pydantic import BaseModel
 
 from mcp_use.agents.mcpagent import MCPAgent
 from mcp_use.client import MCPClient
@@ -383,3 +384,63 @@ class TestMCPAgentStreamEvents:
         assert any(isinstance(message, AIMessage) and message.content == ai_message.content for message in history), (
             "Final AI message should be stored by stream_events()"
         )
+
+
+class SampleOutputSchema(BaseModel):
+    """Schema with one required field (no default) and one optional field (default=None),
+    used to verify required-field detection is not inverted."""
+
+    name: str
+    nickname: str | None = None
+
+
+class TestMCPAgentStructuredOutputRequiredFields:
+    """Tests for MCPAgent's required-vs-optional field detection in structured output."""
+
+    def _mock_llm(self):
+        llm = MagicMock()
+        llm._llm_type = "test-provider"
+        llm._identifying_params = {"model": "test-model"}
+        return llm
+
+    def test_enhance_query_with_schema_marks_fields_correctly(self):
+        """A field with no default must be marked required; a field with default=None
+        must be marked optional."""
+        agent = MCPAgent(llm=self._mock_llm(), client=MagicMock(spec=MCPClient))
+
+        enhanced = agent._enhance_query_with_schema("do the task", SampleOutputSchema)
+
+        assert "- name: name (required)" in enhanced
+        assert "- nickname: nickname (optional)" in enhanced
+
+    @pytest.mark.asyncio
+    async def test_attempt_structured_output_accepts_missing_optional_field(self):
+        """A missing optional field (nickname=None) must not raise, since it isn't required."""
+        agent = MCPAgent(llm=self._mock_llm(), client=MagicMock(spec=MCPClient))
+        structured_llm = MagicMock()
+        structured_llm.ainvoke = AsyncMock(return_value=SampleOutputSchema(name="Ada", nickname=None))
+
+        result = await agent._attempt_structured_output(
+            raw_result="Ada",
+            structured_llm=structured_llm,
+            output_schema=SampleOutputSchema,
+            schema_description="- name: name (required)\n- nickname: nickname (optional)",
+        )
+
+        assert result.name == "Ada"
+        assert result.nickname is None
+
+    @pytest.mark.asyncio
+    async def test_attempt_structured_output_rejects_missing_required_field(self):
+        """A missing required field (empty name) must raise so retry logic kicks in."""
+        agent = MCPAgent(llm=self._mock_llm(), client=MagicMock(spec=MCPClient))
+        structured_llm = MagicMock()
+        structured_llm.ainvoke = AsyncMock(return_value=SampleOutputSchema(name="", nickname="Ace"))
+
+        with pytest.raises(ValueError, match="Required field 'name' is missing or empty"):
+            await agent._attempt_structured_output(
+                raw_result="",
+                structured_llm=structured_llm,
+                output_schema=SampleOutputSchema,
+                schema_description="- name: name (required)\n- nickname: nickname (optional)",
+            )
