@@ -1,8 +1,8 @@
 <div align="center" style="margin: 0 auto; max-width: 80%;">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./packages/mcp-use/static/logo_white.svg">
-    <source media="(prefers-color-scheme: light)" srcset="./packages/mcp-use/static/logo_black.svg">
-    <img alt="mcp use logo" src="./packages/mcp-use/static/logo_white.svg" width="80%" style="margin: 20px auto;">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/mcp-use/mcp-use/main/static/logo_white.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/mcp-use/mcp-use/main/static/logo_black.svg">
+    <img alt="mcp use logo" src="https://raw.githubusercontent.com/mcp-use/mcp-use/main/static/logo_white.svg" width="80%" style="margin: 20px auto;">
   </picture>
 </div>
 
@@ -316,7 +316,7 @@ export default function AnalyticsDashboard() {
 }
 ```
 
-[**Full mcp-use Documentation →**](./packages/mcp-use)
+[**Full mcp-use Documentation →**](./packages/server)
 
 ---
 
