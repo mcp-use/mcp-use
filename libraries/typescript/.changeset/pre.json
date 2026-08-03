@@ -42,6 +42,7 @@
     "enable-sdk-logging-capability",
     "expose-public-base-url",
     "faster-node-runtime",
+    "final-v2-release-guards",
     "fix-beta-scaffold-templates",
     "fix-cli-package-verifier-windows",
     "fix-cli-runtime-build-pipeline",

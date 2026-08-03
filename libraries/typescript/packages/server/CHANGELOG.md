@@ -1,5 +1,17 @@
 # mcp-use
 
+## 2.0.0-beta.68
+
+### Patch Changes
+
+- f06deff: Harden the v2 beta release train and package boundaries before GA.
+  - Reject prerelease plans that would reuse or lag an npm beta version, and keep Inspector versioned with the exact `mcp-use` beta it supports.
+  - Use the modern Langfuse LangChain adapter so the Agent's optional LangChain and observability peers resolve together.
+  - Keep Inspector framework peers optional for standalone installs and refresh public v2 server and MCP Apps documentation.
+
+- Updated dependencies [f06deff]
+  - @mcp-use/inspector@20.0.0-beta.60
+
 ## 2.0.0-beta.67
 
 ### Patch Changes
