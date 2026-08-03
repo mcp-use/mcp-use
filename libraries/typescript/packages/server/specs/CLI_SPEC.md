@@ -264,7 +264,7 @@ Rules, all inherited from v1 and locked:
 
 ### `mcp-use typecheck` (in `src/cli/typecheck.ts`, dispatched from the bin)
 
-Discovers the server entry with the same `--path`, `--entry`, and `--mcp-dir` rules as `dev`/`build`, reconciles the managed root `mcp-env.d.ts`, then resolves `typescript` from the selected project and invokes its `tsc` binary with `--noEmit`. This preserves the project's compiler version and plugins; the CLI does not bundle TypeScript. Arguments after `--` are forwarded to `tsc`, and the command returns the compiler's exit code. Missing TypeScript or entry discovery failures exit `1` with an actionable error.
+Discovers the server entry with the same `--path`, `--entry`, and `--mcp-dir` rules as `dev`/`build`, reconciles the managed root `mcp-env.d.ts`, then resolves `typescript` from the selected project and invokes its `tsc` binary with `--noEmit`. This preserves the project's compiler version and plugins; the CLI does not bundle TypeScript. Arguments after `--` are forwarded to `tsc`, and the command returns the compiler's exit code. A clean run prints `[mcp-use] no type errors (<duration>ms)` to stdout, because `tsc --noEmit` is otherwise silent on success and a silent exit is indistinguishable from a hang. Failing runs add nothing to the compiler's own diagnostics. Missing TypeScript or entry discovery failures exit `1` with an actionable error.
 
 The command does not inspect or execute the server and does not generate tool-specific types. Its only type preparation is keeping the constant `typeof import("./entry.js")` bridge current. Templates commit that bridge, so editor typechecking and a direct `tsc --noEmit` also work before any mcp-use command has run. No install or postinstall lifecycle hook is involved.
 
