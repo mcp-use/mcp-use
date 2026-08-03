@@ -2,4 +2,4 @@
 "mcp-use": patch
 ---
 
-Say what happened to the Inspector on `mcp-use start`. Plain `start` now prints `mcp-use inspector not mounted (dev only by default); pass --with-inspector to serve it here`, so the `404` at `${basePath}/inspector` — advertised by `mcp-use dev` and silently absent in production — no longer reads as a broken build. `mcp-use start --with-inspector` prints the mounted Inspector URL instead of saying nothing at all.
+Print the mounted Inspector URL on `mcp-use start --with-inspector`, which previously said nothing at all about the Inspector it had just mounted. Plain `mcp-use start` is unchanged and stays silent.

@@ -560,7 +560,7 @@ describe("main", () => {
     }
   });
 
-  it("explains that the inspector is opt-in under start", async () => {
+  it("says nothing about the inspector when start does not mount it", async () => {
     const cwd = await makeProject({ entrySource: ECHO_ENTRY });
     const logs = vi.spyOn(console, "log").mockImplementation(() => {});
     const signals = captureSignalListeners();
@@ -569,10 +569,7 @@ describe("main", () => {
       await expect(
         main(["start", "--path", cwd, "--port", "4567"])
       ).resolves.toBe(0);
-      expect(logs.mock.calls.flat().join("\n")).toContain(
-        "mcp-use inspector not mounted (dev only by default); " +
-          "pass --with-inspector to serve it here"
-      );
+      expect(logs.mock.calls.flat().join("\n")).not.toContain("inspector");
     } finally {
       signals.release();
     }
@@ -594,7 +591,6 @@ describe("main", () => {
       expect(output).toContain(
         "mcp-use inspector at http://localhost:4567/api/mcp/inspector"
       );
-      expect(output).not.toContain("not mounted");
     } finally {
       signals.release();
     }

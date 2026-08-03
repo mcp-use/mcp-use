@@ -289,11 +289,6 @@ async function startCommand(args: ParsedArgs): Promise<number> {
     console.log(
       `mcp-use inspector at ${started.url.replace(/\/$/, "")}/inspector`
     );
-  } else {
-    console.log(
-      "mcp-use inspector not mounted (dev only by default); " +
-        "pass --with-inspector to serve it here"
-    );
   }
   if (started.tunnelUrl !== undefined) {
     console.log(`mcp-use public MCP URL: ${started.tunnelUrl}`);
