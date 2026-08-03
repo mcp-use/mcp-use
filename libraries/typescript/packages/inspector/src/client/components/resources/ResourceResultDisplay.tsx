@@ -12,17 +12,12 @@ import {
   Zap,
 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
-import {
-  ViewRenderer,
-  isViewResource,
-  isViewTool,
-} from "@mcp-use/client/react";
-import { useViewHostProps } from "@/client/hooks/useViewHostProps";
+import { isViewResource, isViewTool } from "@mcp-use/client/react";
 import type { LLMConfig } from "../chat/types";
 import { MCPAppsDebugControls } from "../MCPAppsDebugControls";
+import { McpAppsViewPanel } from "../mcp-apps/McpAppsViewPanel";
 import { JSONDisplay } from "../shared/JSONDisplay";
 import { Spinner } from "../ui/spinner";
-import { WidgetWrapper } from "../ui/WidgetWrapper";
 
 export interface ResourceResult {
   uri: string;
@@ -80,74 +75,6 @@ function extractErrorMessage(
   return "An error occurred";
 }
 
-function ResourceViewPanel({
-  serverId,
-  viewId,
-  resourceUri,
-  toolOutput,
-  toolMetadata,
-  readResource,
-  customProps,
-  displayMode,
-  onDisplayModeChange,
-}: {
-  serverId: string;
-  viewId: string;
-  resourceUri: string;
-  toolOutput?: unknown;
-  toolMetadata?: Record<string, unknown>;
-  readResource: (uri: string) => Promise<unknown>;
-  customProps?: Record<string, string>;
-  displayMode: "inline" | "pip" | "fullscreen";
-  onDisplayModeChange: (mode: "inline" | "pip" | "fullscreen") => void;
-}) {
-  const emptyToolInput = useMemo(() => ({}), []);
-  const hostProps = useViewHostProps({
-    serverId,
-    viewId,
-    resourceUri,
-    toolName: resourceUri,
-    toolInput: emptyToolInput,
-    toolOutput,
-    toolMetadata,
-    readResource,
-    displayMode,
-    onDisplayModeChange,
-  });
-
-  if (!hostProps) {
-    return (
-      <WidgetWrapper className="w-full h-full min-h-[240px]">
-        <Spinner className="size-5" />
-      </WidgetWrapper>
-    );
-  }
-
-  const viewRendererClassName =
-    displayMode === "inline"
-      ? "w-full h-full flex items-center justify-center relative p-4 min-h-0"
-      : "w-full h-full relative p-4";
-
-  const propsRenderKey = customProps
-    ? JSON.stringify(customProps)
-    : "no-custom-props";
-
-  return (
-    <WidgetWrapper className="w-full h-full min-h-[240px]">
-      <ViewRenderer
-        key={propsRenderKey}
-        viewId={viewId}
-        toolName={resourceUri}
-        toolInput={emptyToolInput}
-        toolOutput={toolOutput}
-        customProps={customProps}
-        className={viewRendererClassName}
-        {...hostProps}
-      />
-    </WidgetWrapper>
-  );
-}
-
 export function ResourceResultDisplay({
   result,
   isLoading,
@@ -176,6 +103,7 @@ export function ResourceResultDisplay({
   const [mcpAppsDisplayMode, setMcpAppsDisplayMode] = useState<
     "inline" | "pip" | "fullscreen"
   >("inline");
+  const emptyToolInput = useMemo(() => ({}), []);
 
   // Extract complete metadata from result contents for props configuration
   const contentMetadata =
@@ -382,16 +310,19 @@ export function ResourceResultDisplay({
                       </p>
                     </div>
                   ) : (
-                    <ResourceViewPanel
+                    <McpAppsViewPanel
                       serverId={serverId}
                       viewId={`resource-${result.timestamp}`}
+                      toolName={mcpAppsResourceUri}
                       resourceUri={mcpAppsResourceUri}
+                      toolInput={emptyToolInput}
                       toolOutput={result.result}
                       toolMetadata={combinedAnnotations}
                       readResource={readResource}
                       customProps={activeProps || undefined}
                       displayMode={mcpAppsDisplayMode}
                       onDisplayModeChange={setMcpAppsDisplayMode}
+                      llmConfig={llmConfig}
                     />
                   )}
                 </div>

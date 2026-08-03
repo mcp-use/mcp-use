@@ -1,126 +1,172 @@
 /**
- * Unit tests for tunnel manager auto-respawn during `mcp-use dev`.
+ * Unit tests for the WebSocket tunnel lifecycle.
  */
-import { EventEmitter } from "node:events";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const spawnMock = vi.hoisted(() => vi.fn());
-
-vi.mock("node:child_process", () => ({
-  spawn: spawnMock,
-}));
-
 import { createTunnelManager } from "../../src/cli/tunnel.js";
 
-type MockChild = EventEmitter & {
-  stdout: EventEmitter;
-  stderr: EventEmitter;
-  kill: ReturnType<typeof vi.fn>;
+const reservation = {
+  tunnel_id: "quiet-amber",
+  token: "test-token",
+  connect_url: "wss://api.tunnel.test/connect/quiet-amber",
+  public_url: "https://quiet-amber.tunnel.test",
 };
 
-function createMockChild(): MockChild {
-  const stdout = new EventEmitter();
-  const stderr = new EventEmitter();
-  const child = new EventEmitter() as MockChild;
-  child.stdout = stdout;
-  child.stderr = stderr;
-  child.kill = vi.fn();
-  return child;
+function closeEvent(code: number, reason: string): CloseEvent {
+  const event = new Event("close") as CloseEvent;
+  Object.defineProperties(event, {
+    code: { value: code },
+    reason: { value: reason },
+    wasClean: { value: code !== 1006 },
+  });
+  return event;
 }
 
-function emitTunnelReady(
-  child: MockChild,
-  url = "https://my-tunnel.local.mcp-use.run"
-): void {
-  child.stdout.emit("data", Buffer.from(`\n  ${url}\n`));
+function messageEvent(data: string): MessageEvent {
+  const event = new Event("message") as MessageEvent;
+  Object.defineProperty(event, "data", { value: data });
+  return event;
 }
 
-function spawnArgsForCall(index: number): string[] {
-  return spawnMock.mock.calls[index]?.[1] as string[];
+class MockWebSocket extends EventTarget {
+  static readonly CONNECTING = 0;
+  static readonly OPEN = 1;
+  static readonly CLOSING = 2;
+  static readonly CLOSED = 3;
+  static readonly instances: MockWebSocket[] = [];
+  static keepaliveSupported = true;
+
+  readonly sent: string[] = [];
+  binaryType = "blob";
+  readyState = MockWebSocket.CONNECTING;
+
+  constructor(readonly url: string) {
+    super();
+    MockWebSocket.instances.push(this);
+    queueMicrotask(() => {
+      this.readyState = MockWebSocket.OPEN;
+      this.dispatchEvent(new Event("open"));
+    });
+  }
+
+  send(data: string | ArrayBuffer): void {
+    if (typeof data !== "string") return;
+    this.sent.push(data);
+    const message = JSON.parse(data) as { type?: string };
+    if (message.type === "authenticate") {
+      queueMicrotask(() => {
+        this.dispatchEvent(
+          messageEvent(
+            JSON.stringify({
+              type: "ready",
+              ...(MockWebSocket.keepaliveSupported && { keepalive: true }),
+            })
+          )
+        );
+      });
+    } else if (message.type === "ping") {
+      queueMicrotask(() => {
+        this.dispatchEvent(messageEvent(JSON.stringify({ type: "pong" })));
+      });
+    }
+  }
+
+  close(code = 1000, reason = ""): void {
+    if (this.readyState === MockWebSocket.CLOSED) return;
+    this.readyState = MockWebSocket.CLOSED;
+    this.dispatchEvent(closeEvent(code, reason));
+  }
+
+  disconnect(code = 1012, reason = "Worker deployment"): void {
+    this.close(code, reason);
+  }
 }
 
 describe("createTunnelManager", () => {
   let stateFilePath: string;
+  let createRequests: number;
+  let deleteRequests: number;
 
   beforeEach(() => {
+    stateFilePath = join(
+      mkdtempSync(join(tmpdir(), "mcp-use-tunnel-test-")),
+      "tunnel.json"
+    );
+    createRequests = 0;
+    deleteRequests = 0;
+    MockWebSocket.instances.length = 0;
+    MockWebSocket.keepaliveSupported = true;
+    vi.stubGlobal("WebSocket", MockWebSocket);
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => new Response(null, { status: 200 }))
+      vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+        if (init?.method === "DELETE") {
+          deleteRequests += 1;
+          return Response.json({ deleted: true });
+        }
+        createRequests += 1;
+        return Response.json(reservation, { status: 201 });
+      })
     );
-    const dir = mkdtempSync(join(tmpdir(), "mcp-use-tunnel-test-"));
-    stateFilePath = join(dir, "tunnel.json");
-    writeFileSync(
-      stateFilePath,
-      JSON.stringify({ subdomain: "my-tunnel" }, null, 2)
-    );
-    spawnMock.mockReset();
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
-  it("respawns the tunnel child with the saved subdomain after unexpected exit", async () => {
-    const first = createMockChild();
-    const second = createMockChild();
-    spawnMock.mockImplementation(() => {
-      if (spawnMock.mock.calls.length === 1) {
-        return first;
-      }
-      return second;
-    });
-
+  it("reattaches the same reservation after a deployment disconnect", async () => {
     const tunnel = createTunnelManager(stateFilePath);
-    const startPromise = tunnel.start(3000);
-    await vi.waitFor(() => {
-      expect(spawnMock).toHaveBeenCalledTimes(1);
-    });
-    emitTunnelReady(first);
-    await startPromise;
-
-    expect(spawnMock).toHaveBeenCalledTimes(1);
-    expect(spawnArgsForCall(0)).toEqual(
-      expect.arrayContaining(["--subdomain", "my-tunnel"])
-    );
-    expect(tunnel.status().url).toBe("https://my-tunnel.local.mcp-use.run");
-
-    first.emit("exit", 0);
-    await vi.waitFor(() => {
-      expect(spawnMock).toHaveBeenCalledTimes(2);
+    await expect(tunnel.start(3000)).resolves.toEqual({
+      url: reservation.public_url,
+      subdomain: reservation.tunnel_id,
     });
 
-    emitTunnelReady(second);
-    await vi.waitFor(() => {
-      expect(tunnel.status().url).toBe("https://my-tunnel.local.mcp-use.run");
-    });
-    expect(spawnArgsForCall(1)).toEqual(
-      expect.arrayContaining(["--subdomain", "my-tunnel"])
-    );
-  });
+    MockWebSocket.instances[0]?.disconnect();
 
-  it("does not respawn after an intentional stop", async () => {
-    const child = createMockChild();
-    spawnMock.mockImplementation(() => child);
-
-    const tunnel = createTunnelManager(stateFilePath);
-    const startPromise = tunnel.start(3000);
     await vi.waitFor(() => {
-      expect(spawnMock).toHaveBeenCalledTimes(1);
+      expect(MockWebSocket.instances).toHaveLength(2);
+      expect(tunnel.status().url).toBe(reservation.public_url);
     });
-    emitTunnelReady(child);
-    await startPromise;
+    expect(createRequests).toBe(1);
+    expect(deleteRequests).toBe(0);
+    expect(MockWebSocket.instances[1]?.url).toBe(reservation.connect_url);
 
     await tunnel.stop();
-    child.emit("exit", 0);
+    expect(deleteRequests).toBe(1);
+  });
 
-    await new Promise((resolve) => {
-      setTimeout(resolve, 50);
-    });
+  it("keeps an idle relay connection alive with ping and pong", async () => {
+    vi.useFakeTimers();
+    const tunnel = createTunnelManager(stateFilePath);
+    await tunnel.start(3000);
 
-    expect(spawnMock).toHaveBeenCalledTimes(1);
-    expect(tunnel.status().url).toBeNull();
+    await vi.advanceTimersByTimeAsync(25_000);
+
+    expect(MockWebSocket.instances[0]?.sent).toContain(
+      JSON.stringify({ type: "ping" })
+    );
+    expect(tunnel.status().url).toBe(reservation.public_url);
+
+    await tunnel.stop();
+  });
+
+  it("does not send keepalives to a relay that did not negotiate them", async () => {
+    vi.useFakeTimers();
+    MockWebSocket.keepaliveSupported = false;
+    const tunnel = createTunnelManager(stateFilePath);
+    await tunnel.start(3000);
+
+    await vi.advanceTimersByTimeAsync(50_000);
+
+    expect(MockWebSocket.instances[0]?.sent).not.toContain(
+      JSON.stringify({ type: "ping" })
+    );
+    expect(tunnel.status().url).toBe(reservation.public_url);
+
+    await tunnel.stop();
   });
 });

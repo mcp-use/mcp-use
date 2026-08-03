@@ -15,6 +15,7 @@ import type { TabType } from "@/client/context/InspectorContext";
 import { isInspectorSamplingAvailable } from "@/client/utils/samplingProtocol";
 import { isLocalhostServerUrl } from "@/client/utils/servers";
 import {
+  FALLBACK_MANAGED_MODEL_ID,
   buildManagedAuthHeaders,
   buildManagedLlmProxyConfig,
   shouldUseManagedClientSide,
@@ -114,8 +115,8 @@ export function LayoutContent({
     : (embeddedConfig.managedLlmConfig ??
       (chatApiUrl && !isLoopbackServer
         ? {
-            provider: "anthropic" as const,
-            model: "claude-haiku-4-5",
+            provider: "openai-compatible" as const,
+            model: FALLBACK_MANAGED_MODEL_ID,
             apiKey: "server-managed",
           }
         : undefined));
@@ -152,8 +153,8 @@ export function LayoutContent({
         credentials={managedCredentials}
         managedLlmConfig={
           embeddedConfig.managedLlmConfig ?? {
-            provider: "anthropic",
-            model: "claude-haiku-4-5",
+            provider: "openai-compatible",
+            model: FALLBACK_MANAGED_MODEL_ID,
             apiKey: "server-managed",
           }
         }

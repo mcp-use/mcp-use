@@ -117,21 +117,37 @@ export function ToolExecutionPanel({
     }
   };
 
-  // Handle Cmd/Ctrl + Enter keyboard shortcut
+  // Execute from a single-line tool argument with Enter. Textareas keep Enter
+  // for newlines and continue to use Cmd/Ctrl + Enter for execution.
   useEffect(() => {
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
-      // Check if Cmd/Ctrl + Enter is pressed
-      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-        // Only execute if a tool is selected and not already executing
-        if (selectedTool && !isExecuting && isConnected) {
-          event.preventDefault();
-          onExecute();
-        }
-      }
-      // Escape key to cancel execution
       if (event.key === "Escape" && isExecuting && onCancel) {
         event.preventDefault();
         onCancel();
+        return;
+      }
+
+      if (event.key !== "Enter") return;
+
+      const isCommandEnter = event.metaKey || event.ctrlKey;
+      const isBareEnter =
+        !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey;
+      const target = event.target;
+      const isToolArgumentInput =
+        target instanceof HTMLInputElement &&
+        target.dataset.toolArgumentInput === "true";
+
+      // Only execute if a tool is selected and not already executing. Bare
+      // Enter is limited to single-line argument inputs; Command/Ctrl + Enter
+      // remains available everywhere, including textareas.
+      if (
+        (isCommandEnter || (isBareEnter && isToolArgumentInput)) &&
+        selectedTool &&
+        !isExecuting &&
+        isConnected
+      ) {
+        event.preventDefault();
+        onExecute();
       }
     };
 

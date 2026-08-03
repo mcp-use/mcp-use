@@ -481,7 +481,7 @@ test.describe("Inspector Chat Tests - hosted mode + localhost server", () => {
     expect(llmCalls.length).toBeGreaterThan(0);
   });
 
-  test("anonymous send offers delegated cloud sign-in on 429", async ({
+  test("anonymous send opens chat configuration with cloud sign-in on 429", async ({
     page,
   }) => {
     await page.unroute(
@@ -504,15 +504,15 @@ test.describe("Inspector Chat Tests - hosted mode + localhost server", () => {
     await page.getByTestId("chat-input").fill("hello");
     await page.getByTestId("chat-send-button").click();
 
+    await expect(page.getByTestId("chat-config-dialog")).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(page.getByTestId("chat-config-sign-in-card")).toBeVisible();
     await expect(
       page.getByText(
         "Sign in through Manufact Cloud to continue with managed chat."
       )
-    ).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole("dialog")).not.toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Sign in" }).last()
-    ).toBeVisible();
+    ).not.toBeVisible();
   });
 
   test("delegates OAuth to cloud and sends its bearer token", async ({

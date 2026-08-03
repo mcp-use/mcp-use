@@ -22,8 +22,8 @@ import {
   waitFor,
 } from "./helpers.js";
 
-// Controllable tunnel state: the real manager spawns `npx @mcp-use/tunnel`.
-// Tests flip `url` to pin the tunnel-gated CORS contract on Vite module URLs.
+// Controllable tunnel state. Tests flip `url` to pin the tunnel-gated CORS
+// contract on Vite module URLs.
 const tunnelState = vi.hoisted(() => ({ url: null as string | null }));
 vi.mock("../../src/cli/tunnel.js", () => ({
   createTunnelManager: () => ({
@@ -202,6 +202,26 @@ export default new MCPServer({
 }
 
 describe("runDev", () => {
+  it("ignores duplicate shutdown signals until async teardown finishes", async () => {
+    const cwd = copyFixture("dev-duplicate-shutdown-signal");
+    cleanups.push(() => removeDir(cwd));
+
+    const existingSigint = new Set(process.listeners("SIGINT"));
+    const dev = await startDev(cwd, await getFreePort());
+    cleanups.push(dev.stop);
+    const sigint = process
+      .listeners("SIGINT")
+      .find((listener) => !existingSigint.has(listener));
+    expect(sigint).toBeDefined();
+
+    sigint?.("SIGINT");
+    expect(process.listeners("SIGINT")).toContain(sigint);
+    sigint?.("SIGINT");
+
+    await dev.stop();
+    expect(process.listeners("SIGINT")).not.toContain(sigint);
+  });
+
   it("mounts the project-local Inspector on the existing dev listener", async () => {
     const cwd = copyFixture("dev-inspector-installed");
     cleanups.push(() => removeDir(cwd));
@@ -775,7 +795,81 @@ async function rawStatus(
   });
 }
 
+/** Issue a raw GET with an explicit Host header and return its body. */
+async function rawGetBody(
+  target: string,
+  headers: Record<string, string>
+): Promise<string> {
+  const { request } = await import("node:http");
+  return new Promise((resolve, reject) => {
+    const req = request(target, { method: "GET", headers }, (res) => {
+      const chunks: Buffer[] = [];
+      res.on("data", (chunk: Buffer) => chunks.push(chunk));
+      res.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    });
+    req.on("error", reject);
+    req.end();
+  });
+}
+
 describe("runDev (views)", () => {
+  it("shuts down with active MCP subscriptions and HMR WebSockets", async () => {
+    const cwd = copyFixture("dev-active-connections-shutdown", "views");
+    cleanups.push(() => removeDir(cwd));
+
+    const port = await getFreePort();
+    const dev = await startDev(cwd, port);
+    cleanups.push(dev.stop);
+
+    const client = new Client(
+      { name: "dev-shutdown-test", version: "1.0.0" },
+      {
+        versionNegotiation: { mode: { pin: "2026-07-28" } },
+        listChanged: {
+          tools: {
+            autoRefresh: true,
+            debounceMs: 0,
+            onChanged: () => {},
+          },
+        },
+      }
+    );
+    await client.connect(new StreamableHTTPClientTransport(new URL(dev.url)));
+    cleanups.push(() => client.close().catch(() => {}));
+    await waitFor(async () =>
+      dev.logs.some((line) => line.includes("subscriptions/listen"))
+        ? true
+        : undefined
+    );
+
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/`, "vite-hmr");
+    await new Promise<void>((resolve, reject) => {
+      ws.addEventListener("open", () => resolve(), { once: true });
+      ws.addEventListener(
+        "error",
+        () => reject(new Error("HMR websocket failed to connect")),
+        { once: true }
+      );
+    });
+    cleanups.push(() => ws.close());
+    const wsClosed = new Promise<void>((resolve) => {
+      ws.addEventListener("close", () => resolve(), { once: true });
+    });
+
+    const shutdown = await Promise.race([
+      dev.stop().then(() => "stopped" as const),
+      new Promise<"timed-out">((resolve) => {
+        setTimeout(() => resolve("timed-out"), 5_000);
+      }),
+    ]);
+
+    expect(shutdown).toBe("stopped");
+    await expect(wsClosed).resolves.toBeUndefined();
+
+    const rebound = await occupyPort(port);
+    await new Promise<void>((resolve) => rebound.close(() => resolve()));
+  }, 30_000);
+
   it("serves view documents, virtual entries, and reloads on view add", async () => {
     const cwd = copyFixture("dev-views", "views");
     cleanups.push(() => removeDir(cwd));
@@ -812,6 +906,20 @@ describe("runDev (views)", () => {
     expect(virtualJs).toMatch(/bootstrapView/);
     expect(virtualJs).toContain("import * as viewModule from");
     expect(virtualJs).toContain("bootstrapView(viewModule)");
+
+    // The tunnel hostname becomes known after Vite starts. The framework's
+    // dynamic Host validator authorizes it, then presents it to Vite as the
+    // already-allowed localhost host so module requests are not blocked by
+    // Vite's static allowlist.
+    tunnelState.url = "https://fake.local.mcp-use.run";
+    const tunnelViteClient = await rawGetBody(`${base}/@vite/client`, {
+      host: "fake.local.mcp-use.run",
+      origin: "null",
+    });
+    expect(tunnelViteClient).toContain("createHotContext");
+    expect(tunnelViteClient).toContain("updateStyle");
+    expect(tunnelViteClient).toContain("new WebSocket");
+    tunnelState.url = null;
 
     // Vite module CORS (CLI_SPEC.md § DNS-rebinding protection):
     // without a tunnel, a validated loopback Origin is reflected exactly

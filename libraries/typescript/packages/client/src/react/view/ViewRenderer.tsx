@@ -168,7 +168,6 @@ function ViewRendererBase({
   const [activeSandboxUrl, setActiveSandboxUrl] = useState<URL | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [initCount, setInitCount] = useState(0);
-  const [showSpinner, setShowSpinner] = useState(true);
   const [inlineHeight, setInlineHeight] = useState<number>(
     VIEW_DIMENSIONS.DEFAULT_HEIGHT
   );
@@ -809,12 +808,6 @@ function ViewRendererBase({
     onReadyRef.current?.();
   }, [initCount]);
 
-  useEffect(() => {
-    if (initCount === 0 || !showSpinner) return;
-    const timer = setTimeout(() => setShowSpinner(false), 300);
-    return () => clearTimeout(timer);
-  }, [initCount, showSpinner]);
-
   const showHostBorder =
     resolved !== null && resolved.prefersBorder && displayMode !== "fullscreen";
 
@@ -944,11 +937,6 @@ function ViewRendererBase({
               : "relative w-full flex flex-1 justify-center items-center"
         }
       >
-        {showSpinner && (
-          <div className="flex absolute inset-0 items-center justify-center z-10">
-            <span className="text-sm text-muted-foreground">Loading…</span>
-          </div>
-        )}
         {!isPip && !isFullscreen && (invoking || invoked) && (
           <div className="absolute -top-8 left-2 z-10 whitespace-nowrap pointer-events-none text-xs text-muted-foreground">
             {invoking && !toolOutput ? invoking : invoked}

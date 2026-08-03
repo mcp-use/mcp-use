@@ -113,8 +113,8 @@ function escapeHtml(value: string): string {
 const VIEW_BOOTSTRAP_STYLE = `<style>
 html,body,#root{background:transparent}
 html,body{margin:0}
-#root[data-mcp-use-loading]{display:flex;min-height:100vh;align-items:center;justify-content:center;flex-direction:column;gap:10px}
-#root[data-mcp-use-loading]::before{width:24px;height:24px;box-sizing:border-box;border:2px solid rgba(127,127,127,.28);border-top-color:rgba(127,127,127,.9);border-radius:50%;content:"";animation:mcp-use-view-spin .7s linear infinite}
+#root[data-mcp-use-loading]{display:flex;min-height:100vh;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:rgba(127,127,127,.9)}
+#root[data-mcp-use-loading]::before{width:20px;height:20px;box-sizing:border-box;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;content:"";animation:mcp-use-view-spin .7s linear infinite}
 #root[data-mcp-use-loading]::after{color:rgba(127,127,127,.9);content:"Compiling...";font:500 13px/1.2 ui-sans-serif,system-ui,sans-serif}
 @keyframes mcp-use-view-spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){#root[data-mcp-use-loading]::before{animation-duration:1.4s}}
@@ -184,6 +184,24 @@ ${moduleScript}
     )
     .join("\n");
 
+  // Dev view modules contain Vite's root-relative imports. MCP App hosts load
+  // the synthesized document in an opaque-origin srcdoc iframe, where those
+  // specifiers do not inherit the public tunnel origin for CSP matching.
+  // Map the root prefix to the request-resolved asset base before any module
+  // executes. Production bundles use view-relative asset entries and do not
+  // receive this development-only map.
+  const devImportMap =
+    entry.entry.startsWith("/") &&
+    (entry.scripts ?? []).includes("/@vite/client")
+      ? `<script type="importmap">${escapeInlineScript(
+          JSON.stringify({
+            imports: {
+              "/": `${assetsBase.replace(/\/+$/, "")}/`,
+            },
+          })
+        )}</script>`
+      : "";
+
   const entryUrl = resolveExternalAssetUrl(
     entry.entry,
     assetsBase,
@@ -196,6 +214,7 @@ ${moduleScript}
 <head>
 <meta charset="utf-8">
 ${configScript}
+${devImportMap}
 ${VIEW_BOOTSTRAP_STYLE}
 ${cssLinks}
 </head>

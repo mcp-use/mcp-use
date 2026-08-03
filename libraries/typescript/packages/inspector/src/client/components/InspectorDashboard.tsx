@@ -29,7 +29,6 @@ import {
 } from "@/client/telemetry";
 import {
   AlertCircle,
-  CircleMinus,
   Copy,
   Info,
   Loader2,
@@ -37,6 +36,7 @@ import {
   RotateCcw,
   Settings,
   Terminal,
+  Trash2,
 } from "lucide-react";
 import {
   useMcpClient,
@@ -713,29 +713,6 @@ export function InspectorDashboard() {
                           <p>Edit connection settings</p>
                         </TooltipContent>
                       </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger
-                          render={
-                            <Button
-                              data-testid="server-tile-remove"
-                              variant="secondary"
-                              size="sm"
-                              onClick={(e) =>
-                                handleActionClick(e, () =>
-                                  handleRemoveConnection(connection.id)
-                                )
-                              }
-                              className="h-8 w-8 p-0"
-                            >
-                              <CircleMinus className="w-4 h-4" />
-                            </Button>
-                          }
-                          nativeButton
-                        />
-                        <TooltipContent>
-                          <p>Remove connection</p>
-                        </TooltipContent>
-                      </Tooltip>
                       {(connection.state === "ready" ||
                         connection.state === "failed" ||
                         connection.state === "discovering") && (
@@ -769,6 +746,29 @@ export function InspectorDashboard() {
                           </TooltipContent>
                         </Tooltip>
                       )}
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <Button
+                              data-testid="server-tile-remove"
+                              variant="secondary"
+                              size="sm"
+                              onClick={(e) =>
+                                handleActionClick(e, () =>
+                                  handleRemoveConnection(connection.id)
+                                )
+                              }
+                              className="h-8 w-8 p-0"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          }
+                          nativeButton
+                        />
+                        <TooltipContent>
+                          <p>Remove connection</p>
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
                     {/* Mobile: Show 3-dots overflow menu */}
                     <div className="lg:hidden flex-shrink-0">
@@ -844,7 +844,7 @@ export function InspectorDashboard() {
                             }}
                             className="text-destructive focus:text-destructive"
                           >
-                            <CircleMinus className="h-4 w-4 mr-2" />
+                            <Trash2 className="h-4 w-4 mr-2" />
                             Remove connection
                           </DropdownMenuItem>
                         </DropdownMenuContent>

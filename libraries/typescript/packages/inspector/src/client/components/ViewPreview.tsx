@@ -24,6 +24,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 import { useViewHostProps } from "@/client/hooks/useViewHostProps";
 import { getBasePath } from "@/client/utils/basePath";
+import { Spinner } from "@/client/components/ui/spinner";
 
 const PREVIEW_SERVER_ID = "preview-default";
 
@@ -409,7 +410,7 @@ function ViewPreviewLive({ view }: { view: string }) {
           color: "var(--muted-foreground, #888)",
         }}
       >
-        Loading…
+        <Spinner className="size-5" />
       </div>
     );
   }
