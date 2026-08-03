@@ -27,8 +27,7 @@
 
 | Package                                                                                                    | Description             | Version                                                                                                         |
 | ---------------------------------------------------------------------------------------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------- |
-| [mcp-use](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use)              | Core MCP framework      | [![npm](https://img.shields.io/npm/v/mcp-use.svg)](https://www.npmjs.com/package/mcp-use)                       |
-| [@mcp-use/cli](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/cli)             | Build tool for MCP apps | [![npm](https://img.shields.io/npm/v/@mcp-use/cli.svg)](https://www.npmjs.com/package/@mcp-use/cli)             |
+| [mcp-use](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server)               | MCP framework and CLI   | [![npm](https://img.shields.io/npm/v/mcp-use.svg)](https://www.npmjs.com/package/mcp-use)                       |
 | [@mcp-use/inspector](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/inspector) | Web-based MCP inspector | [![npm](https://img.shields.io/npm/v/@mcp-use/inspector.svg)](https://www.npmjs.com/package/@mcp-use/inspector) |
 
 ---
@@ -66,16 +65,16 @@ my-mcp-server/
 
 ### Pre-configured Features
 
-| Feature                 | Description                                       |
-| ----------------------- | ------------------------------------------------- |
-| **📝 TypeScript**       | Full TypeScript setup with proper types           |
-| **🔥 Hot Reload**       | Auto-restart on code changes during development   |
-| **🔍 Auto Inspector**   | Inspector UI opens automatically in dev mode      |
-| **🎨 MCP Apps Views**   | React views discovered and bundled by the CLI      |
-| **🛠️ Example Tools**    | Sample MCP tools, resources, and prompts          |
-| **📦 Build Scripts**    | Ready-to-use development and production scripts   |
+| Feature                 | Description                                          |
+| ----------------------- | ---------------------------------------------------- |
+| **📝 TypeScript**       | Full TypeScript setup with proper types              |
+| **🔥 Hot Reload**       | Auto-restart on code changes during development      |
+| **🔍 Auto Inspector**   | Inspector UI opens automatically in dev mode         |
+| **🎨 MCP Apps Views**   | React views discovered and bundled by the CLI        |
+| **🛠️ Example Tools**    | Sample MCP tools, resources, and prompts             |
+| **📦 Build Scripts**    | Ready-to-use development and production scripts      |
 | **✅ Type Checking**    | Refreshes MCP view types, then runs local TypeScript |
-| **🚀 Production Ready** | Optimized build configuration                     |
+| **🚀 Production Ready** | Optimized build configuration                        |
 
 ---
 
@@ -507,8 +506,8 @@ See our [contributing guide](https://github.com/mcp-use/mcp-use/blob/main/CONTRI
 
 - [mcp-use Documentation](https://github.com/mcp-use/mcp-use)
 - [Model Context Protocol Spec](https://modelcontextprotocol.io)
-- [Creating MCP Tools](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use#-mcp-server-framework)
-- [Building UI Widgets](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/cli#-creating-ui-widgets)
+- [Creating MCP Tools](https://mcp-use.com/docs/typescript/server/tools)
+- [Building MCP App Views](https://mcp-use.com/docs/typescript/mcp-apps)
 - [Using the Inspector](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/inspector)
 - [Supabase Edge Functions](https://supabase.com/docs/guides/functions)
 

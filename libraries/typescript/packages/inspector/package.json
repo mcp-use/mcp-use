@@ -122,6 +122,9 @@
     "markdown-to-jsx": {
       "optional": true
     },
+    "mcp-use": {
+      "optional": true
+    },
     "motion": {
       "optional": true
     },

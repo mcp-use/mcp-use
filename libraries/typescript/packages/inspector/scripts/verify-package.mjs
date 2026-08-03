@@ -6,6 +6,19 @@ const root = new URL("../", import.meta.url).pathname;
 const dist = join(root, "dist");
 const files = walk(dist);
 const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+if (Object.keys(manifest.dependencies ?? {}).length !== 0) {
+  throw new Error(
+    "Inspector package must not install framework runtime dependencies"
+  );
+}
+for (const peer of ["mcp-use", "@mcp-use/client", "@mcp-use/agent"]) {
+  if (manifest.peerDependencies?.[peer] === undefined) {
+    throw new Error(`Missing framework peer declaration: ${peer}`);
+  }
+  if (manifest.peerDependenciesMeta?.[peer]?.optional !== true) {
+    throw new Error(`Framework peer must be optional: ${peer}`);
+  }
+}
 for (const file of files) {
   if (
     file.startsWith("dist/web/") ||

@@ -11,6 +11,11 @@ import { join } from "node:path";
 
 import semver from "semver";
 
+import {
+  fetchRegistryMetadata,
+  validateBetaVersionPlan,
+} from "./beta-version-guard.mjs";
+
 const workspaceRoot = process.cwd();
 const changesetDirectory = join(workspaceRoot, ".changeset");
 const packageDirectory = join(workspaceRoot, "packages");
@@ -73,6 +78,41 @@ function normalizedWorkspaceRange(range, dependencyVersion) {
   return workspaceRange;
 }
 
+function addInspectorSyncChangeset(plan) {
+  const frameworkRelease = plan.releases.find(
+    (release) => release.name === "mcp-use"
+  );
+  const inspectorRelease = plan.releases.some(
+    (release) => release.name === "@mcp-use/inspector"
+  );
+  if (!frameworkRelease || inspectorRelease) return false;
+
+  const inspector = readJson(
+    join(packageDirectory, "inspector", "package.json")
+  );
+  const current = semver.parse(inspector.version);
+  if (!current)
+    throw new Error(`invalid Inspector version ${inspector.version}`);
+  const newVersion =
+    current.prerelease[0] === "beta" && Number.isInteger(current.prerelease[1])
+      ? `${current.major}.${current.minor}.${current.patch}-beta.${current.prerelease[1] + 1}`
+      : `${semver.inc(inspector.version, "patch")}-beta.0`;
+
+  const id = `inspector-sync-${frameworkRelease.newVersion.replaceAll(".", "-")}`;
+  writeFileSync(
+    join(changesetDirectory, `${id}.md`),
+    `---\n"@mcp-use/inspector": patch\n---\n\nKeep Inspector synchronized with mcp-use ${frameworkRelease.newVersion}.\n`
+  );
+  plan.releases.push({
+    name: "@mcp-use/inspector",
+    type: "patch",
+    oldVersion: inspector.version,
+    changesets: [id],
+    newVersion,
+  });
+  return true;
+}
+
 function updateInternalPeerRanges(releases, mode) {
   const manifests = packageManifests();
   const packages = new Map(
@@ -95,18 +135,30 @@ function updateInternalPeerRanges(releases, mode) {
       const release = releases.get(dependency);
 
       if (mode === "pre" && release && semver.prerelease(release.newVersion)) {
-        const parsed = semver.parse(release.newVersion);
-        const stableTarget = `${parsed.major}.${parsed.minor}.${parsed.patch}`;
-        const comparableRange = normalizedWorkspaceRange(
-          baseRange,
-          internalDependency.manifest.version
-        );
+        // workspace:* is packed as an exact internal version. After the first
+        // beta bump, keep advancing that exact prerelease instead of stripping
+        // it as though it were a temporary compatibility suffix.
         if (
-          semver.satisfies(stableTarget, comparableRange) &&
-          !semver.satisfies(release.newVersion, comparableRange)
+          currentRange.startsWith("workspace:") ||
+          (baseRange === "" && semver.prerelease(currentRange) !== null)
         ) {
-          desiredRange = `${baseRange} || ${release.newVersion}`;
+          desiredRange = release.newVersion;
+        } else {
+          const parsed = semver.parse(release.newVersion);
+          const stableTarget = `${parsed.major}.${parsed.minor}.${parsed.patch}`;
+          const comparableRange = normalizedWorkspaceRange(
+            baseRange,
+            internalDependency.manifest.version
+          );
+          if (
+            semver.satisfies(stableTarget, comparableRange) &&
+            !semver.satisfies(release.newVersion, comparableRange)
+          ) {
+            desiredRange = `${baseRange} || ${release.newVersion}`;
+          }
         }
+      } else if (mode === "exit" && baseRange === "") {
+        desiredRange = "workspace:*";
       }
 
       if (desiredRange !== currentRange) {
@@ -136,6 +188,27 @@ if (preState?.mode === "pre") {
   }
   try {
     const plan = readJson(planFile);
+    const manifests = new Map(
+      packageManifests().map((file) => {
+        const manifest = readJson(file);
+        return [manifest.name, manifest];
+      })
+    );
+    const metadata = await fetchRegistryMetadata(
+      plan.releases.map((release) => release.name)
+    );
+    validateBetaVersionPlan({ manifests, metadata, releases: plan.releases });
+    if (addInspectorSyncChangeset(plan)) {
+      const inspectorRelease = plan.releases.at(-1);
+      const inspectorMetadata = await fetchRegistryMetadata([
+        inspectorRelease.name,
+      ]);
+      validateBetaVersionPlan({
+        manifests,
+        metadata: inspectorMetadata,
+        releases: [inspectorRelease],
+      });
+    }
     updateInternalPeerRanges(
       new Map(plan.releases.map((release) => [release.name, release])),
       "pre"

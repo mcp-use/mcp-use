@@ -12,11 +12,11 @@ This guide focuses on when and how to register resources. Use the [Resources API
 
 Use a static resource for one known URI. Use a resource template when the URI contains a variable segment.
 
-| Need | Use |
-| --- | --- |
-| Current app settings, service status, latest report | `server.resource()` |
-| Files by path, users by ID, records by key | `server.resourceTemplate()` |
-| Interactive UI rendered in a client | [MCP Apps](/typescript/mcp-apps) |
+| Need                                                | Use                               |
+| --------------------------------------------------- | --------------------------------- |
+| Current app settings, service status, latest report | `server.resource()`               |
+| Files by path, users by ID, records by key          | `server.resourceTemplate()`       |
+| Interactive UI rendered in a client                 | [MCP Apps](/typescript/mcp-apps)  |
 | An operation that changes state or calls a workflow | [Tools](/typescript/server/tools) |
 
 Resources are best for readable content. If the model should decide to perform work, use a tool instead.
@@ -26,7 +26,7 @@ Resources are best for readable content. If the model should decide to perform w
 Register a static resource when the URI is fixed and the callback can return the current content for that URI.
 
 ```typescript
-import { MCPServer, object } from "mcp-use/server";
+import { MCPServer, object } from "mcp-use";
 
 const server = new MCPServer({
   name: "inventory-server",
@@ -56,7 +56,7 @@ Use stable URI schemes that describe your domain, such as `inventory://`, `docs:
 Register a resource template when clients should read many related resources through one URI pattern.
 
 ```typescript
-import { text } from "mcp-use/server";
+import { text } from "mcp-use";
 
 server.resourceTemplate(
   {
@@ -79,7 +79,7 @@ Template parameters are extracted from the URI and passed to the callback. Keep 
 Use completion callbacks when a client can help users choose valid URI values.
 
 ```typescript
-import { text } from "mcp-use/server";
+import { text } from "mcp-use";
 
 server.resourceTemplate(
   {
@@ -111,7 +111,7 @@ Use list-based completion for small fixed sets. Use callback-based completion wh
 Use response helpers to return resource content. They set the MCP-compatible content shape and MIME metadata for common cases.
 
 ```typescript
-import { image, markdown, mix, object } from "mcp-use/server";
+import { image, markdown, mix, object } from "mcp-use";
 
 server.resource(
   {
@@ -161,13 +161,26 @@ Open `http://localhost:3000/mcp/inspector`, select the Resources tab, read each 
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Resources API reference" icon="terminal" href="/typescript/api-reference/server/resources">
-    Look up resource definitions, callback signatures, template types, and annotations.
+  <Card
+    title="Resources API reference"
+    icon="terminal"
+    href="/typescript/api-reference/server/resources"
+  >
+    Look up resource definitions, callback signatures, template types, and
+    annotations.
   </Card>
-  <Card title="Response Helpers" icon="drill" href="/typescript/server/response-helpers">
+  <Card
+    title="Response Helpers"
+    icon="drill"
+    href="/typescript/server/response-helpers"
+  >
     Choose helpers for text, JSON, Markdown, media, and mixed content.
   </Card>
-  <Card title="Resource Subscriptions" icon="rss" href="/typescript/server/subscriptions">
+  <Card
+    title="Resource Subscriptions"
+    icon="rss"
+    href="/typescript/server/subscriptions"
+  >
     Notify subscribed clients when resource content changes.
   </Card>
   <Card title="Tools" icon="wrench" href="/typescript/server/tools">
