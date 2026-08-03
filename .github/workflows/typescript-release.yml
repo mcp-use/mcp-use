@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       force_publish:
-        description: 'Force publish packages'
+        description: "Force publish packages"
         required: false
         type: boolean
         default: false
@@ -125,11 +125,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          
+
           # Ensure we're on the latest commit (commits were pushed in previous step)
           git fetch --tags --force
           git pull origin canary
-          
+
           cd libraries/typescript
           pnpm changeset tag
           cd ../..
@@ -359,8 +359,8 @@ jobs:
 
       - name: Publish packages (Main)
         if: github.ref == 'refs/heads/main' &&
-            steps.check-prerelease.outputs.in_prerelease == 'false' &&
-            steps.check-release.outputs.should_publish == 'true'
+          steps.check-prerelease.outputs.in_prerelease == 'false' &&
+          steps.check-release.outputs.should_publish == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -375,7 +375,7 @@ jobs:
           git fetch --tags --force
           git checkout main
           git pull origin main
-          
+
           # Publish to npm using trusted publishing (OIDC) - no token needed
           cd libraries/typescript
           pnpm changeset publish
@@ -384,12 +384,12 @@ jobs:
           # Capture new tags created by changeset before pushing
           cd ../..
           NEW_TAGS=$(git tag --points-at HEAD)
-          
+
           if [ -z "$NEW_TAGS" ]; then
             echo "❌ No tags were created by changeset tag - packages were published to npm but tagging failed"
             exit 1
           fi
-          
+
           echo "📦 Tags created: $NEW_TAGS"
 
           # Save tags to a file for the next step
@@ -407,16 +407,16 @@ jobs:
 
       - name: Create deployment marker (Main)
         if: github.ref == 'refs/heads/main' &&
-            steps.check-prerelease.outputs.in_prerelease == 'false' &&
-            steps.check-release.outputs.should_publish == 'true'
+          steps.check-prerelease.outputs.in_prerelease == 'false' &&
+          steps.check-release.outputs.should_publish == 'true'
         run: |
           echo "packages_published=true" > .railway-deploy-marker
           echo "branch=main" >> .railway-deploy-marker
 
       - name: Upload deployment marker (Main)
         if: github.ref == 'refs/heads/main' &&
-            steps.check-prerelease.outputs.in_prerelease == 'false' &&
-            steps.check-release.outputs.should_publish == 'true'
+          steps.check-prerelease.outputs.in_prerelease == 'false' &&
+          steps.check-release.outputs.should_publish == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: railway-deploy-marker

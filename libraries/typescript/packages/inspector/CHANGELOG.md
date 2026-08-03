@@ -7,6 +7,38 @@
 - Updated dependencies [4c1dd8d]
   - mcp-use@2.0.1-canary.0
 
+## 20.0.4
+
+### Patch Changes
+
+- Use stable absolute URLs for README images and repository links so npm renders the published package documentation correctly.
+- Updated dependencies
+  - mcp-use@2.0.4
+
+## 20.0.3
+
+### Patch Changes
+
+- Publish a package-root README that npm can record reliably, and verify it stays synchronized with the repository README before packing.
+- Updated dependencies
+  - mcp-use@2.0.3
+
+## 20.0.2
+
+### Patch Changes
+
+- Prepare the package README before publication so npm records and displays the stable documentation metadata.
+- Updated dependencies
+  - mcp-use@2.0.2
+
+## 20.0.1
+
+### Patch Changes
+
+- Include the current repository README in the published `mcp-use` package so npm displays the stable documentation.
+- Updated dependencies
+  - mcp-use@2.0.1
+
 ## 20.0.0
 
 ### Major Changes
