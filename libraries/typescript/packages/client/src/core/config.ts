@@ -16,6 +16,7 @@ import type {
 import type { BaseConnector, ConnectorInitOptions } from "../transport/base.js";
 import type { ClientInfo } from "../transport/http.js";
 import { HttpConnector } from "../transport/http.js";
+import type { StdioStderrMode } from "../transport/stdio.js";
 import { getPackageVersion } from "../utils/version.js";
 
 /** Parameters accepted by the MCP `sampling/createMessage` request. */
@@ -130,6 +131,13 @@ export interface StdioServerConfig extends BaseServerConfig {
   env?: Record<string, string>;
   /** Working directory used to launch the server process. */
   cwd?: string;
+  /**
+   * How the server process's standard error is handled. Defaults to `"pipe"`,
+   * which forwards it to the connector's `errlog`. Use `"inherit"` to give the
+   * child the parent's stderr file descriptor instead, preserving TTY
+   * detection and colorization, or `"ignore"` to discard it.
+   */
+  stderr?: StdioStderrMode;
   /**
    * Protocol version negotiation mode. Defaults to `"legacy"` for stdio (the
    * SDK advises against probing for spawn-per-invocation tools). See
