@@ -1,5 +1,226 @@
 # @mcp-use/inspector
 
+## 20.0.0
+
+### Major Changes
+
+- a9ba017: Migrate the client stack to the official MCP TypeScript SDK v2 (`@modelcontextprotocol/client@2.0.0-beta.2`).
+  - `@mcp-use/client` now depends on `@modelcontextprotocol/client` instead of `@modelcontextprotocol/sdk`. Both `@mcp-use/client` and `@mcp-use/agent` are ESM-only (Node 22.22.2+); CommonJS `require()` entry points and builds are no longer published. All connectors, sessions, OAuth, and the React `useMcp` hook were ported to the v2 API surface (method-string handlers, `SdkHttpError`/`SdkError`, `OAuthError`, `Headers`, `client/stdio` subpath).
+  - Automatic protocol negotiation: HTTP connections default to `versionNegotiation: "auto"` (probe with `server/discover`, transparently falling back to the 2025 `initialize` handshake against v1 servers); stdio defaults to the SDK's v1 mode. The negotiated generation/version is exposed on the connection and `useMcp` result as `protocolEra: "legacy" | "modern"` and `protocolVersion`.
+  - OAuth: consolidated `OAuthError`, issuer-stamp round-tripping, `discoveryState()` / `saveDiscoveryState()`, and `iss` validation on the callback (SEP-2352 / RFC 9207).
+  - The root `@mcp-use/client` export now selects a browser-safe HTTP implementation outside Node and a Node-enabled implementation under Node. `@mcp-use/client/browser`, `@mcp-use/client/auth`, and `@mcp-use/client/auth/node` were removed; use the root `MCPClient`, `createOAuthProvider`, and React entry instead.
+  - Breaking: the Node root entry no longer re-exports `BrowserOAuthClientProvider`, `BrowserOAuthOptions`, or `onMcpAuthorization` (those pull browser/`localStorage` code into the Node graph). Import them from `@mcp-use/client` in a browser bundler (default export condition) or from `@mcp-use/client/react` for the callback helper.
+  - `MCPClient.connect()` / `createSession()` auto-provisions OAuth for HTTP servers (via the entry’s `createOAuthProvider`) when no bearer/`authProvider` is set, completes the 401 → consent dance, and retries. Pass `oauth` options or `oauth: false` on the server config; `authProvider` remains an escape hatch. The CLI connect path uses this instead of hand-wiring `NodeOAuthClientProvider`.
+  - Breaking: removed v1 aliases (`samplingCallback`, `elicitationCallback`, `auth_token`, `customHeaders`, `clientConfig`, `debug`, `BrowserTelemetry`, and `ResourceTemplate`). Use `onSampling`, `onElicitation`, `authToken`, `headers`, `clientInfo`, `logLevel`, `Telemetry`, and `ResourceTemplateType`.
+  - Dependency slimming: removed `posthog-js` / `posthog-node` in favor of a `fetch`-only PostHog capture (no SDK), and dropped `@modelcontextprotocol/ext-apps` (a single MIME-type constant was inlined). `@mcp-use/client` now has a single runtime dependency (`@modelcontextprotocol/client`).
+  - The v2 packages use commit-pinned MCP SDK preview builds required by this beta; `@mcp-use/agent` no longer carries the unused v1 `@modelcontextprotocol/sdk`.
+  - Runtime verification now covers Node, Deno, browser, and React against real v1 and v2 servers. Browser fetch is explicitly bound, Deno logging does not require env permission, and `useMcp` reaches `ready` only after normalized metadata is populated.
+  - Client examples now run against a four-server matrix (official SDK stateful v1/stateless v2 plus mcp-use v1/v2 servers with MCP Apps) and cover notifications, roots, sampling, elicitation, completion, capability negotiation, OAuth, and rendered widgets. HTTP/stdio config now forwards initial roots, SDK client options, default request options, and HTTP connection timeouts to connectors.
+  - Fixed legacy Streamable HTTP reverse RPC and notifications: streaming responses are no longer consumed by request logging, and sampling/elicitation use the active request transport. The v2 client auto-opens list-change subscriptions and preserves progress across MRTR retry rounds.
+  - `McpClientProvider` now propagates negotiated v1/v2 metadata, auth state, resource templates, and reverse-request queues consistently. Its configured display label is now `displayName`; `name` remains the negotiated server identity.
+  - React connections are HTTP-only, reconnect automatically, suppress console logging, and wait for explicit OAuth authentication by default. `clientOptions.capabilities.views: true` advertises MCP Apps support without hand-writing extension capabilities.
+  - OAuth and transport proxies now preserve the upstream MCP URL as the SDK resource identity. Removed metadata/resource rewrite shims and gateway-derived OAuth URLs; MCP and OAuth bytes use separate injected fetch adapters.
+  - Browser OAuth supports CIMD through `clientMetadataUrl`, keeps DCR as SDK-managed compatibility fallback, stores credentials per authorization-server issuer, and rejects browser client secrets.
+  - The Inspector OAuth BFF now binds requests to SDK-discovered metadata/endpoints, fails closed on SSRF/private targets and redirects, caps bodies/timeouts, strips unsafe headers, and restricts CORS origins.
+  - Breaking: `@mcp-use/client` and `@mcp-use/agent` are ESM-only. Use ESM `import` or dynamic `import()` from a CommonJS host; direct `require()` is unsupported. The client no longer re-exports Zod `*Schema` constants (use `isSpecType` / `specTypeSchemas`). The exported `telFetch` is now a plain non-throwing `fetch` wrapper `(url, init) => Promise<void>` (previously a PostHog `fetch` override). Removed the vendored `JSONSchemaToZod` helper — use Zod 4's native `z.fromJSONSchema()` instead.
+  - The inspector and CLI were updated to consume the v2 client; the CLI gains a `--negotiate` flag on `client connect`. The CLI binary is now ESM (`dist/index.js`) since `@mcp-use/client` is ESM-only (`npx mcp-use` is unaffected).
+  - Internal `@mcp-use/client` src layout reorganized into semantic folders (`transport/`, flat root client API, `code-mode/`, slim `auth/`, collapsed `react/`); public package exports (`.` and `./react`) and symbol names are unchanged.
+
+### Minor Changes
+
+- b4c192e: Enable localhost managed inspector chat via browser MCPAgent and the cloud LLM proxy. Anonymous users must sign in; authenticated usage draws from Autumn `llm_tokens` credits.
+
+### Patch Changes
+
+- 6827ab2: Resolve the current Inspector beta once per page load, then load the entry script, stylesheet, and lazy chunks from the same immutable release. This prevents mixed-version CDN 404s while keeping embedded inspectors on the latest beta.
+- c878835: Fix duplicated public assets in production builds and remove Scarf telemetry.
+
+  **mcp-use**
+  - Set `publicDir: false` on all Vite build steps so project `public/` is copied only to `.mcp-use/build/views/public/` (not duplicated at the build root or inside each view outDir).
+  - Raise the view client build `chunkSizeWarningLimit` to reduce noisy warnings for large view bundles.
+
+  **@mcp-use/client**
+  - Remove Scarf download telemetry (`captureScarf`, beacon helpers, and related storage); PostHog remains the sole telemetry provider.
+
+  **@mcp-use/inspector**
+  - Drop inspector package-download Scarf tracking on init; update README and e2e docs to reflect PostHog-only telemetry.
+
+- 3aca19c: Prefer Bun over Yarn in the scaffold CLI and docs, and make production source maps opt-in.
+
+  **mcp-use**
+  - Add `--source-maps` so `mcp-use build` emits source maps only when requested (server and view bundles default to no maps).
+  - Widen `NextConfigLike` with an index signature so `withMcpUse` accepts arbitrary Next.js config fields.
+
+  **create-mcp-use-app**
+  - Replace `--yarn` with `--bun`, detect Bun from the user agent, and install/run with Bun when selected.
+
+  **@mcp-use/agent / @mcp-use/client**
+  - Point missing-optional-dependency errors at npm, pnpm, or Bun instead of Yarn.
+
+  **@mcp-use/inspector**
+  - Drop Yarn-specific install/lint scripts from the package scripts surface.
+
+- 24d2024: Make MCP Apps Chat messages await delivery, scope widget model context to the active Chat surface, and keep app-only tools out of model tool registries.
+- ac3d1eb: Harden browser launching, Inspector routes, and browser persistence. OAuth
+  session values are encrypted at rest, secret connection fields are no longer
+  persisted, Inspector assets and proxy/OAuth APIs are rate-limited, and CLI
+  browser opening now validates HTTP(S) targets and uses shell-free launchers.
+- fa40e85: Default hosted chat and Manufact sign-in to the Manufact Cloud endpoint when no runtime or build-time chat URL is configured. Remove the dark-mode border from the sign-in card and render the Manufact wordmark in white.
+- b7ce16f: Bundle Inspector tabs and routes into a single JavaScript entry point so tab navigation does not wait for lazy CDN chunks.
+- f06deff: Harden the v2 beta release train and package boundaries before GA.
+  - Reject prerelease plans that would reuse or lag an npm beta version, and keep Inspector versioned with the exact `mcp-use` beta it supports.
+  - Use the modern Langfuse LangChain adapter so the Agent's optional LangChain and observability peers resolve together.
+  - Keep Inspector framework peers optional for standalone installs and refresh public v2 server and MCP Apps documentation.
+
+- c4ac07a: Keep the Inspector chat composer available over fullscreen MCP Apps, with a compact input and collapsible transcript drawer.
+- eedeb4f: Restore complete Inspector relay support for MCP transport and OAuth discovery, registration, and token exchange. Keep confidential dynamic-client secrets in the server-side BFF, recover stale per-server browser OAuth and connection storage safely, isolate callback exchange from background reconnects, and tolerate unsupported optional inventory methods.
+
+  Improve Inspector diagnostics and connection-list behavior with inline error details, a localhost recovery command for hosted callback rejections, newest-first servers, bottom scroll spacing, reliable favicon loading, and versioned revalidated standalone assets.
+
+  Make the Inspector project-pinned local development tooling. Generated projects install `@mcp-use/inspector` as a dev dependency, and `mcp-use dev` dynamically calls its framework-neutral `mountInspector()` on the existing listener. The installed package now owns the only MCP/OAuth proxy and serves its `dist/app` browser bundle locally with no remote application fallback; production handlers no longer expose an Inspector shell or duplicate proxy implementation.
+
+- e497782: Fix managed chat OAuth forwarding and polish chat UI.
+
+  **@mcp-use/inspector**
+  - Fix server-side chat for OAuth MCP servers (e.g. Linear): forward live connection tokens when saved auth config is `none`, so hosted chat no longer 401s while Tools stay connected.
+  - Add a top scroll fade on the chat message list so content softens under the floating header when scrolling.
+  - Center the Manufact cloud / API key tabs in Configure Chat and tighten spacing below them.
+
+- a3d8591: Make Inspector connection modes authoritative for MCP proxy routing. Auto mode now attempts a direct browser connection before falling back to the configured CORS proxy, Direct mode never uses or falls back to the proxy, and Proxy mode uses it immediately. Clear stale proxy settings when an existing Inspector connection changes modes, keep the server's built-in Inspector on direct origin-level OAuth metadata discovery when no proxy backend is mounted, bypass the browser HTTP cache for OAuth metadata so Origin-specific CORS responses cannot be reused across Inspector origins, make the server-tile Authenticate action clear stored OAuth discovery before starting a fresh flow, and discard authorization-server-generated client secrets from public browser DCR results instead of persisting them.
+- af09aee: Enable server-to-client sampling for legacy stateful MCP connections. Hide the
+  sampling content, disable its navigation tab with an explanatory tooltip, and
+  omit the sampling client capability on modern stateless connections.
+- c7accd6: Fix standalone Inspector OAuth and CDN delivery.
+
+  **@mcp-use/inspector**
+  - Serve the built UI from `dist/cdn/` locally in standalone mode (`pnpm start` / `npx`); embedded mounts still default to jsDelivr `@beta`.
+  - Point `pnpm start` at `dist/cli.js` so standalone runs the full proxy + OAuth BFF shell.
+  - Skip `dev/info` tunnel probes in standalone mode (route exists only under `mcp-use dev`).
+  - Simplify e2e matrix: builtin/prod modes rely on in-process static assets instead of a separate CDN fixture server.
+  - Document jsDelivr-first embedding vs local standalone in `docs/inspector/integration.mdx`.
+
+  **@mcp-use/client**
+  - Fix Linear (and other OAuth) redirect flows: do not auto-connect saved MCP servers on `/oauth/callback`, which overwrote the PKCE verifier before token exchange.
+  - Stop HEAD health-check polling after a 405/404 from servers that only accept POST (reduces console noise for providers like Linear).
+
+- b47e268: Raise the Node.js engine floor from `>=20.19.0` to `>=22.13.0` across published packages, scaffolds, examples, CI, Docker, and esbuild/tsup build targets. Use `@types/node` `^22.13.0`. Required for pnpm 11.13 in GitHub Actions and unblocks the beta release workflow.
+- 1579839: Raise the Node.js engine floor to `>=22.22.2` (post–March 2026 security release) and pin CI to Node 22.23.1 so trusted npm 12 publishing works.
+- c1c6c2b: Publish the optimized standalone Inspector and CLI packaging: ordinary mcp-use installs avoid the Inspector UI dependency graph, while Inspector, client tooling, and production opt-ins remain available on demand.
+- d9c2023: Skip `dev/info` tunnel probes unless `mcp-use dev` injects `window.__MCP_DEV_CLI__`.
+
+  **@mcp-use/inspector**
+  - Gate tunnel metadata probes on `window.__MCP_DEV_CLI__ === true` instead of treating a missing `__MCP_INSPECTOR_MODE__` as non-standalone.
+
+  **mcp-use**
+  - Set `MCP_USE_DEV_CLI` in the dev CLI and inject `window.__MCP_DEV_CLI__ = true` into the inspector CDN shell so embedded dev sessions still sync tunnel state.
+
+- 042a082: Use the standard OAuth consent flow when signing in to hosted Inspector chat.
+- da86879: Keep MCP Apps widgets mounted while Chat state changes, deliver complete tool lifecycle notifications, isolate sandbox origins, and support host-confirmed sampling, downloads, context updates, and app-provided tools.
+- 3294086: Stream partial tool-call arguments into the Inspector drawer and MCP App view while the model is generating them. Anthropic tool requests now opt into eager input streaming, partial JSON healing handles code and SVG strings correctly, hosted chat accepts tool-call start/delta frames, and the view host no longer overwrites newer partial input with a stale complete-input notification.
+- be2dd8e: Expose the dependency-free sandbox document builder as a focused client
+  subpath and bundle it into the Inspector's Node entry so the zero-dependency
+  Inspector package loads in clean installations.
+- fe4d3b2: Enable MCP view JS code splitting and polish inspector boot UX.
+
+  **mcp-use**
+  - Enable rolldown code splitting for per-view client builds (`chunkFileNames` alongside the entry chunk); update `VIEWS_SPEC.md` for external assets and split chunks.
+  - Paint a centered boot spinner in the managed inspector shell while the CDN bundle downloads.
+
+  **@mcp-use/inspector**
+  - Match the boot spinner placeholder in the CDN inspector shell.
+  - Add top margin to tool error banners in the result panel.
+
+  **create-mcp-use-app**
+  - Fix scaffold README inspector links to `${basePath}/inspector` (`/mcp/inspector` by default).
+  - Align the mcp-apps `mcp-env.d.ts` template comment with the auto-generated shim.
+
+- f259641: Align view authoring layout, typing shims, and local dev host behavior across the v2 stack.
+
+  **mcp-use**
+  - Move file-based view sources from `resources/` to `views/` (wire exposure stays MCP resources).
+  - Replace root `tools.d.ts` with `mcp-env.d.ts`, adding CSS module typing plus the live `Register` import shim; dev/build create it exclusively when absent.
+  - Simplify favicon selection to the first icon (or explicit `favicon` config).
+  - Auto-respawn the dev tunnel on disconnect with exponential backoff and subdomain fallback.
+
+  **@mcp-use/client**
+  - Add `mockOpenAiFileApis` on `ViewRenderer` and export `injectOpenAiFileApis` so `useFiles()` works in inspector and other local hosts.
+  - Advertise host `message` capability by default.
+
+  **@mcp-use/inspector**
+  - Enable `mockOpenAiFileApis` in view preview and standalone host props.
+
+  **create-mcp-use-app**
+  - Refresh starter, blank, and MCP Apps scaffolds for `views/`, `mcp-env.d.ts`, webp demo assets, and the expanded product-search carousel template.
+
+- Updated dependencies [6827ab2]
+- Updated dependencies [eabae55]
+- Updated dependencies [fa57403]
+- Updated dependencies [8456b15]
+- Updated dependencies [c878835]
+- Updated dependencies [4f11e03]
+- Updated dependencies [3aca19c]
+- Updated dependencies [e451e20]
+- Updated dependencies [34a5c81]
+- Updated dependencies [adebe07]
+- Updated dependencies [54567d5]
+- Updated dependencies [14ae280]
+- Updated dependencies [4810321]
+- Updated dependencies [e53c958]
+- Updated dependencies [20d8f85]
+- Updated dependencies [44182d0]
+- Updated dependencies [e802317]
+- Updated dependencies [a9ba017]
+- Updated dependencies [ac3d1eb]
+- Updated dependencies [399fc40]
+- Updated dependencies [2ee60d0]
+- Updated dependencies [686a5e2]
+- Updated dependencies [ccbbc08]
+- Updated dependencies [a7dd305]
+- Updated dependencies [f06deff]
+- Updated dependencies [a4c9c35]
+- Updated dependencies [9eb99e4]
+- Updated dependencies [69d5da9]
+- Updated dependencies [044962e]
+- Updated dependencies [192d193]
+- Updated dependencies [eedeb4f]
+- Updated dependencies [786dbf6]
+- Updated dependencies [a3d8591]
+- Updated dependencies [b4c192e]
+- Updated dependencies [6737ecc]
+- Updated dependencies [c6043e4]
+- Updated dependencies [a3edf35]
+- Updated dependencies [7826695]
+- Updated dependencies [b47e268]
+- Updated dependencies [1579839]
+- Updated dependencies [4b9e621]
+- Updated dependencies [389c7b8]
+- Updated dependencies [c1c6c2b]
+- Updated dependencies [a0501f8]
+- Updated dependencies [066f449]
+- Updated dependencies [95d286e]
+- Updated dependencies [1dd88c2]
+- Updated dependencies [c991412]
+- Updated dependencies [67b4a27]
+- Updated dependencies [23bba3b]
+- Updated dependencies [c8c4174]
+- Updated dependencies [4054510]
+- Updated dependencies [ef8187a]
+- Updated dependencies [6a647f9]
+- Updated dependencies [ae9065a]
+- Updated dependencies [d9c2023]
+- Updated dependencies [f3ec4c5]
+- Updated dependencies [8259292]
+- Updated dependencies [192d193]
+- Updated dependencies [0d9dd27]
+- Updated dependencies [1a9b6fb]
+- Updated dependencies [5d70398]
+- Updated dependencies [50df3a1]
+- Updated dependencies [6aa0857]
+- Updated dependencies [137a936]
+- Updated dependencies [fe4d3b2]
+- Updated dependencies [f259641]
+  - mcp-use@2.0.0
+
 ## 20.0.0-beta.60
 
 ### Patch Changes
