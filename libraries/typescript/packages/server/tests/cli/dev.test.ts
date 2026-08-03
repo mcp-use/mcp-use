@@ -202,6 +202,26 @@ export default new MCPServer({
 }
 
 describe("runDev", () => {
+  it("ignores duplicate shutdown signals until async teardown finishes", async () => {
+    const cwd = copyFixture("dev-duplicate-shutdown-signal");
+    cleanups.push(() => removeDir(cwd));
+
+    const existingSigint = new Set(process.listeners("SIGINT"));
+    const dev = await startDev(cwd, await getFreePort());
+    cleanups.push(dev.stop);
+    const sigint = process
+      .listeners("SIGINT")
+      .find((listener) => !existingSigint.has(listener));
+    expect(sigint).toBeDefined();
+
+    sigint?.("SIGINT");
+    expect(process.listeners("SIGINT")).toContain(sigint);
+    sigint?.("SIGINT");
+
+    await dev.stop();
+    expect(process.listeners("SIGINT")).not.toContain(sigint);
+  });
+
   it("mounts the project-local Inspector on the existing dev listener", async () => {
     const cwd = copyFixture("dev-inspector-installed");
     cleanups.push(() => removeDir(cwd));
@@ -793,6 +813,63 @@ async function rawGetBody(
 }
 
 describe("runDev (views)", () => {
+  it("shuts down with active MCP subscriptions and HMR WebSockets", async () => {
+    const cwd = copyFixture("dev-active-connections-shutdown", "views");
+    cleanups.push(() => removeDir(cwd));
+
+    const port = await getFreePort();
+    const dev = await startDev(cwd, port);
+    cleanups.push(dev.stop);
+
+    const client = new Client(
+      { name: "dev-shutdown-test", version: "1.0.0" },
+      {
+        versionNegotiation: { mode: { pin: "2026-07-28" } },
+        listChanged: {
+          tools: {
+            autoRefresh: true,
+            debounceMs: 0,
+            onChanged: () => {},
+          },
+        },
+      }
+    );
+    await client.connect(new StreamableHTTPClientTransport(new URL(dev.url)));
+    cleanups.push(() => client.close().catch(() => {}));
+    await waitFor(async () =>
+      dev.logs.some((line) => line.includes("subscriptions/listen"))
+        ? true
+        : undefined
+    );
+
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/`, "vite-hmr");
+    await new Promise<void>((resolve, reject) => {
+      ws.addEventListener("open", () => resolve(), { once: true });
+      ws.addEventListener(
+        "error",
+        () => reject(new Error("HMR websocket failed to connect")),
+        { once: true }
+      );
+    });
+    cleanups.push(() => ws.close());
+    const wsClosed = new Promise<void>((resolve) => {
+      ws.addEventListener("close", () => resolve(), { once: true });
+    });
+
+    const shutdown = await Promise.race([
+      dev.stop().then(() => "stopped" as const),
+      new Promise<"timed-out">((resolve) => {
+        setTimeout(() => resolve("timed-out"), 5_000);
+      }),
+    ]);
+
+    expect(shutdown).toBe("stopped");
+    await expect(wsClosed).resolves.toBeUndefined();
+
+    const rebound = await occupyPort(port);
+    await new Promise<void>((resolve) => rebound.close(() => resolve()));
+  }, 30_000);
+
   it("serves view documents, virtual entries, and reloads on view add", async () => {
     const cwd = copyFixture("dev-views", "views");
     cleanups.push(() => removeDir(cwd));

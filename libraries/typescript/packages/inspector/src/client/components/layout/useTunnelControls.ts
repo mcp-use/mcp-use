@@ -28,19 +28,16 @@ async function fetchDevInfo(): Promise<DevInfo | null> {
 export function useTunnelControls({
   tunnelUrl,
   setTunnelUrl,
-  isTunnelStarting,
   setIsTunnelStarting,
   onTunnelStarted,
 }: {
   tunnelUrl: string | null;
   setTunnelUrl: (url: string | null) => void;
-  isTunnelStarting: boolean;
   setIsTunnelStarting: (starting: boolean) => void;
   onTunnelStarted?: () => void;
 }) {
   const [devFromCli, setDevFromCli] = useState<boolean | null>(null);
   const [mcpUrl, setMcpUrl] = useState<string | null>(null);
-  const [waitTicks, setWaitTicks] = useState(0);
 
   const applyDevInfo = useCallback(
     (info: DevInfo, options?: { syncTunnel?: boolean }) => {
@@ -63,19 +60,6 @@ export function useTunnelControls({
     },
     [setTunnelUrl]
   );
-
-  useEffect(() => {
-    if (!isTunnelStarting) {
-      setWaitTicks(20);
-      return;
-    }
-    setWaitTicks(20);
-    const id = setInterval(
-      () => setWaitTicks((t) => (t > 0 ? t - 1 : 0)),
-      1000
-    );
-    return () => clearInterval(id);
-  }, [isTunnelStarting]);
 
   useEffect(() => {
     let cancelled = false;
@@ -182,7 +166,6 @@ export function useTunnelControls({
   return {
     devFromCli,
     mcpUrl,
-    waitTicks,
     handleStartTunnel,
     handleStopTunnel,
   };

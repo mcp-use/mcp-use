@@ -108,7 +108,7 @@ describe("buildManagedLlmProxyConfig", () => {
       )
     ).toEqual({
       provider: "openai-compatible",
-      model: "anthropic/claude-sonnet-4.6",
+      model: "openai/gpt-5.6-luna",
       apiKey: "access-token",
       baseUrl: "http://localhost:8000/api/v1/inspector/llm",
     });

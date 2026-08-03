@@ -247,6 +247,7 @@ export function ToolInputForm({
             <Input
               id={key}
               data-testid={`tool-param-${key}`}
+              data-tool-argument-input="true"
               value={stringValue}
               onChange={(e) => onArgChange(key, e.target.value)}
               onPaste={(e) => handlePaste(e, key)}

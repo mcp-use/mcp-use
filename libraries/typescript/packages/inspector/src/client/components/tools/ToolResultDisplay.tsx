@@ -14,19 +14,12 @@ import {
   Play,
   Zap,
 } from "lucide-react";
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { getViewResourceUri, isViewTool } from "@mcp-use/client/react";
 import { McpAppsViewPanel } from "../mcp-apps/McpAppsViewPanel";
 import { MCPAppsDebugControls } from "../MCPAppsDebugControls";
 import { JSONDisplay } from "../shared/JSONDisplay";
 import { NotFound } from "../ui/not-found";
-import { Spinner } from "../ui/spinner";
 import { WidgetWrapper } from "../ui/WidgetWrapper";
 
 export interface ToolResult {
@@ -393,16 +386,13 @@ export function ToolResultDisplay({
 }: ToolResultDisplayProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [formattedMode, setFormattedMode] = useState(true); // true = formatted, false = raw
-  const [viewMode, setViewMode] = useState<ViewMode | null>(null); // Let effect initialize
+  const [viewMode, setViewMode] = useState<ViewMode>("json");
   const [mcpAppsDisplayMode, setMcpAppsDisplayMode] = useState<
     "inline" | "pip" | "fullscreen"
   >("inline");
   const [activeProps, setActiveProps] = useState<Record<string, string> | null>(
     null
   );
-
-  // Track if we've ever seen component views available (to handle async resource loading)
-  const hasSeenComponentViewRef = useRef(false);
 
   // Get the most recent result to determine which tool we're viewing
   const currentResult = results[0];
@@ -435,12 +425,6 @@ export function ToolResultDisplay({
       setSelectedIndex(0);
     }
   }, [toolResults.length, selectedIndex]);
-
-  // Reset view mode tracking when tool changes
-  useEffect(() => {
-    hasSeenComponentViewRef.current = false;
-    setViewMode(null);
-  }, [currentResult?.toolName]);
 
   // Memoize result.args and result.result to prevent unnecessary re-renders
   // in MCPAppsRenderer when only relativeTime changes
@@ -479,6 +463,10 @@ export function ToolResultDisplay({
     () => widgetProtocol === "mcp-apps" && !!mcpAppsResourceUri,
     [widgetProtocol, mcpAppsResourceUri]
   );
+
+  useEffect(() => {
+    setViewMode(hasMcpAppsResource ? "mcp-apps" : "json");
+  }, [currentResult?.toolName, hasMcpAppsResource]);
 
   // Check if result contains content - BEFORE early return
   const content = useMemo(() => result?.result?.content || [], [result]);
@@ -519,34 +507,10 @@ export function ToolResultDisplay({
   useEffect(() => {
     if (availableViews.length === 0) return;
 
-    const isCurrentModeAvailable =
-      viewMode && availableViews.some((v) => v.mode === viewMode);
-    const firstComponentView = availableViews.find((v) => v.mode !== "json");
-
-    // Track if component views are now available
-    if (firstComponentView) {
-      const wasComponentViewAvailable = hasSeenComponentViewRef.current;
-      hasSeenComponentViewRef.current = true;
-
-      // Initialize if null, fix if current mode isn't available,
-      // OR switch from JSON to component when component FIRST becomes available
-      // (handles async resource loading where JSON was the only option initially)
-      // Only auto-switch once - after that, respect user's choice
-      if (
-        !viewMode ||
-        !isCurrentModeAvailable ||
-        (viewMode === "json" && !wasComponentViewAvailable)
-      ) {
-        setViewMode(firstComponentView.mode);
-        return;
-      }
-    } else {
-      // No component views available
-      if (!viewMode || !isCurrentModeAvailable) {
-        setViewMode("json");
-      }
+    if (!availableViews.some((view) => view.mode === viewMode)) {
+      setViewMode(hasMcpAppsResource ? "mcp-apps" : "json");
     }
-  }, [availableViews, viewMode]);
+  }, [availableViews, hasMcpAppsResource, viewMode]);
 
   useEffect(() => {
     if (!onWidgetHeightChange) return;
@@ -751,15 +715,6 @@ export function ToolResultDisplay({
 
             // Render based on selected view mode
             const widgetContent = (() => {
-              // Show loading state while view mode is initializing
-              if (!viewMode) {
-                return (
-                  <div className="flex items-center justify-center w-full h-[200px]">
-                    <Spinner className="size-5" />
-                  </div>
-                );
-              }
-
               switch (viewMode) {
                 case "mcp-apps": {
                   // MCP Apps (SEP-1865) Component view

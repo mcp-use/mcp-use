@@ -3,6 +3,7 @@ import type {
   ViewConnection,
   ViewCspMode,
   ViewDisplayMode,
+  ViewLifecycleEvent,
   ViewRendererProps,
 } from "@mcp-use/client/react";
 import { buildViewSandboxUrl, useMcpClient } from "@mcp-use/client/react";
@@ -83,6 +84,7 @@ export function useViewHostProps(options: {
   modelContextScope?: string;
   llmConfig?: LLMConfig | null;
   onReady?: () => void;
+  onLifecycleChange?: (event: ViewLifecycleEvent) => void;
 }): Pick<
   ViewRendererProps,
   | "source"
@@ -104,6 +106,7 @@ export function useViewHostProps(options: {
   | "inlineMaxWidth"
   | "chromeless"
   | "onReady"
+  | "onLifecycleChange"
   | "mockOpenAiFileApis"
   | "fullscreenHeader"
   | "renderFullscreenClose"
@@ -125,6 +128,7 @@ export function useViewHostProps(options: {
     modelContextScope,
     llmConfig,
     onReady,
+    onLifecycleChange,
   } = options;
 
   const { resolvedTheme } = useTheme();
@@ -401,6 +405,7 @@ export function useViewHostProps(options: {
     inlineMaxWidth: resolvedInlineMaxWidth,
     chromeless,
     onReady,
+    onLifecycleChange,
     mockOpenAiFileApis: true,
     fullscreenHeader,
     renderFullscreenClose,

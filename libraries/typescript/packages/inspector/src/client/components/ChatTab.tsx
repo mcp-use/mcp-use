@@ -565,10 +565,24 @@ export function ChatTab({
   const isHostedAuthenticated = hostedUser != null;
 
   useEffect(() => {
-    if (isHostedAuthenticated && managedChatNotice?.kind === "login_required") {
+    if (managedChatNotice?.kind !== "login_required") return;
+
+    if (isHostedAuthenticated) {
       clearManagedChatNotice();
+      return;
     }
-  }, [clearManagedChatNotice, isHostedAuthenticated, managedChatNotice?.kind]);
+
+    if (enableFreeTierUpgrade) {
+      clearManagedChatNotice();
+      setConfigDialogOpen(true);
+    }
+  }, [
+    clearManagedChatNotice,
+    enableFreeTierUpgrade,
+    isHostedAuthenticated,
+    managedChatNotice?.kind,
+    setConfigDialogOpen,
+  ]);
 
   const freeTierInfo =
     enableFreeTierUpgrade && !isHostedAuthenticated
@@ -1413,22 +1427,24 @@ export function ChatTab({
     [postBridgeEvent, sendMessage, llmConfig, isConnected]
   );
 
-  const managedChatNoticeNode = managedChatNotice ? (
-    <ChatManagedNotice
-      notice={managedChatNotice}
-      onConfigureApiKey={handleConfigureFromNotice}
-      onSignIn={
-        managedChatNotice.kind === "login_required"
-          ? chatApiUrl
-            ? handleOpenLogin
-            : () => {
-                window.location.href = managedChatNotice.loginUrl;
-              }
-          : undefined
-      }
-      authorizing={authorizing}
-    />
-  ) : null;
+  const managedChatNoticeNode =
+    managedChatNotice &&
+    !(enableFreeTierUpgrade && managedChatNotice.kind === "login_required") ? (
+      <ChatManagedNotice
+        notice={managedChatNotice}
+        onConfigureApiKey={handleConfigureFromNotice}
+        onSignIn={
+          managedChatNotice.kind === "login_required"
+            ? chatApiUrl
+              ? handleOpenLogin
+              : () => {
+                  window.location.href = managedChatNotice.loginUrl;
+                }
+            : undefined
+        }
+        authorizing={authorizing}
+      />
+    ) : null;
 
   // Show landing form when there are no messages and LLM is configured
   if (llmConfig && messages.length === 0) {

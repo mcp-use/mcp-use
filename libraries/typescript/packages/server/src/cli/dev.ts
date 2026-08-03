@@ -709,9 +709,20 @@ export async function runDev(options: DevOptions): Promise<void> {
     vite.watcher.off("add", onFileAddOrUnlink);
     vite.watcher.off("unlink", onFileAddOrUnlink);
     await tunnelManager.stop();
-    await new Promise<void>((done) => httpServer.close(() => done()));
+    // Stop accepting new connections first, then terminate the long-lived
+    // transports that would otherwise keep the close callback pending:
+    // closeAllConnections() ends active MCP subscription streams, while
+    // vite.close() below owns upgraded HMR WebSockets.
+    const httpClosed = new Promise<void>((resolve, reject) => {
+      httpServer.close((error) => {
+        if (error !== undefined) reject(error);
+        else resolve();
+      });
+    });
+    httpServer.closeAllConnections();
     await runner.close();
     await vite.close();
+    await httpClosed;
   };
 
   const devFetch = createDevApiHandler(
@@ -852,16 +863,25 @@ export async function runDev(options: DevOptions): Promise<void> {
   }
 
   // --- Graceful shutdown (SIGINT/SIGTERM or options.signal). ---------------
-  await new Promise<void>((resolve) => {
+  await new Promise<void>((resolve, reject) => {
     let closing = false;
     const shutdown = (): void => {
       if (closing) return;
       closing = true;
-      process.off("SIGINT", shutdown);
-      process.off("SIGTERM", shutdown);
       void (async () => {
-        await teardown();
-        resolve();
+        try {
+          await teardown();
+          resolve();
+        } catch (error) {
+          reject(error);
+        } finally {
+          // Package managers may forward the terminal signal to their child
+          // after the whole foreground process group already received it.
+          // Keep swallowing duplicates until asynchronous teardown (notably
+          // tunnel release) finishes, then restore the default signal action.
+          process.off("SIGINT", shutdown);
+          process.off("SIGTERM", shutdown);
+        }
       })();
     };
     process.on("SIGINT", shutdown);

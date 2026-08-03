@@ -1,12 +1,16 @@
 import { ViewRenderer } from "@mcp-use/client/react";
-import type { ViewDisplayMode, ViewRendererProps } from "@mcp-use/client/react";
+import type {
+  ViewDisplayMode,
+  ViewLifecycleEvent,
+  ViewRendererProps,
+} from "@mcp-use/client/react";
 import { useViewHostProps } from "@/client/hooks/useViewHostProps";
 import type { MessageContentBlock } from "@/client/types/message-content-block";
 import { WidgetWrapper } from "@/client/components/ui/WidgetWrapper";
-import { Spinner } from "@/client/components/ui/spinner";
 import { cn } from "@/client/lib/utils";
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { LLMConfig } from "@/client/components/chat/types";
+import { Spinner } from "@/client/components/ui/spinner";
 
 const CHAT_MESSAGE_CAPABILITIES = { text: {}, image: {} } as const;
 
@@ -59,6 +63,24 @@ export function McpAppsViewPanel({
   noWrapper = false,
   className,
 }: McpAppsViewPanelProps) {
+  const propsRenderKey = customProps
+    ? JSON.stringify(customProps)
+    : "no-custom-props";
+  const [showHostSpinner, setShowHostSpinner] = useState(true);
+
+  useEffect(() => {
+    setShowHostSpinner(true);
+  }, [propsRenderKey, resourceUri, viewId]);
+
+  const onLifecycleChange = useCallback(
+    (event: ViewLifecycleEvent) => {
+      if (event.status === "sandbox-loading" || event.status === "error") {
+        setShowHostSpinner(false);
+      }
+    },
+    [viewId]
+  );
+
   const hostProps = useViewHostProps({
     serverId,
     viewId,
@@ -72,7 +94,17 @@ export function McpAppsViewPanel({
     onDisplayModeChange,
     modelContextScope,
     llmConfig,
+    onLifecycleChange,
   });
+
+  const loadingOverlay = showHostSpinner ? (
+    <div
+      className="absolute inset-0 z-20 flex items-center justify-center"
+      data-testid="mcp-apps-loading-overlay"
+    >
+      <Spinner className="size-5" />
+    </div>
+  ) : null;
 
   const handleMessage = useCallback(
     (content: Parameters<NonNullable<ViewRendererProps["onMessage"]>>[0]) => {
@@ -85,17 +117,18 @@ export function McpAppsViewPanel({
   );
 
   if (!hostProps) {
-    const loading = <Spinner className="size-5" />;
     if (noWrapper) {
       return (
-        <div className="flex h-full w-full min-h-0 flex-1 items-center justify-center">
-          {loading}
+        <div className="relative flex h-full w-full min-h-0 flex-1 items-center justify-center">
+          {loadingOverlay}
         </div>
       );
     }
     return (
       <WidgetWrapper className="w-full h-full min-h-[240px]">
-        {loading}
+        <div className="relative flex h-full w-full items-center justify-center">
+          {loadingOverlay}
+        </div>
       </WidgetWrapper>
     );
   }
@@ -106,10 +139,6 @@ export function McpAppsViewPanel({
       : "w-full h-full relative p-4",
     className
   );
-
-  const propsRenderKey = customProps
-    ? JSON.stringify(customProps)
-    : "no-custom-props";
 
   const view = (
     <ViewRenderer
@@ -135,13 +164,19 @@ export function McpAppsViewPanel({
 
   if (noWrapper) {
     return (
-      <div className="flex h-full w-full min-h-0 flex-1 flex-col">{view}</div>
+      <div className="relative flex h-full w-full min-h-0 flex-1 flex-col">
+        {view}
+        {loadingOverlay}
+      </div>
     );
   }
 
   return (
     <WidgetWrapper className="w-full h-full min-h-[240px]">
-      {view}
+      <div className="relative flex h-full w-full flex-col">
+        {view}
+        {loadingOverlay}
+      </div>
     </WidgetWrapper>
   );
 }

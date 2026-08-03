@@ -4,12 +4,10 @@ import { ChevronsLeftRightEllipsis, Loader2 } from "lucide-react";
 export function TunnelStartButton({
   devFromCli,
   isTunnelStarting,
-  waitTicks,
   onStart,
 }: {
   devFromCli: boolean | null;
   isTunnelStarting: boolean;
-  waitTicks: number;
   onStart: () => void | Promise<void>;
 }) {
   if (isTunnelStarting) {
@@ -20,7 +18,7 @@ export function TunnelStartButton({
       >
         <Loader2 className="size-3 text-violet-500 dark:text-violet-400 animate-spin" />
         <span className="text-xs font-medium text-violet-600 dark:text-violet-300 hidden lg:inline">
-          Start Tunnel <span className="tabular-nums">{waitTicks}s</span>
+          Start Tunnel
         </span>
       </button>
     );

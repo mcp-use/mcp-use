@@ -10,7 +10,7 @@
  */
 import type { LLMConfig } from "./types";
 
-export const FALLBACK_MANAGED_MODEL_ID = "anthropic/claude-sonnet-4.6";
+export const FALLBACK_MANAGED_MODEL_ID = "openai/gpt-5.6-luna";
 
 interface FreeTierVisibilityInput {
   /** Chat is using the server-managed (Manufact) LLM, not a BYOK key. */

@@ -64,7 +64,6 @@ export function LayoutHeader({
   const tunnel = useTunnelControls({
     tunnelUrl,
     setTunnelUrl,
-    isTunnelStarting,
     setIsTunnelStarting,
     onTunnelStarted: tunnelPopover.openWithAutoCopy,
   });
@@ -128,7 +127,6 @@ export function LayoutHeader({
           <TunnelStartButton
             devFromCli={tunnel.devFromCli}
             isTunnelStarting={isTunnelStarting}
-            waitTicks={tunnel.waitTicks}
             onStart={tunnel.handleStartTunnel}
           />
         )}
