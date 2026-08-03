@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 20.0.3
+
+### Patch Changes
+
+- Publish a package-root README that npm can record reliably, and verify it stays synchronized with the repository README before packing.
+- Updated dependencies
+  - mcp-use@2.0.3
+
 ## 20.0.2
 
 ### Patch Changes
