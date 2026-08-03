@@ -26,6 +26,12 @@
       "browser": "./dist/internal/node-http-unavailable.js",
       "node": "./dist/internal/node-http.js",
       "default": "./dist/internal/node-http-unavailable.js"
+    },
+    "#mcp-use-skills-loader": {
+      "workerd": "./dist/internal/skills-loader-unavailable.js",
+      "browser": "./dist/internal/skills-loader-unavailable.js",
+      "node": "./dist/internal/skills-loader.js",
+      "default": "./dist/internal/skills-loader-unavailable.js"
     }
   },
   "exports": {
@@ -112,7 +118,8 @@
     "@modelcontextprotocol/ext-apps": "npm:@mcp-use/ext-apps@1.7.4-pr720.1",
     "@modelcontextprotocol/server": "2.0.0",
     "hono": "^4.12.27",
-    "jose": "^6.1.3"
+    "jose": "^6.1.3",
+    "yaml": "^2.8.3"
   },
   "peerDependencies": {
     "@mcp-use/client": "^2.0.0-alpha.0",

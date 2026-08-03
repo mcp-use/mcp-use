@@ -20,3 +20,11 @@ Follow the guides at <https://docs.mcp-use.com/v2>.
 Consult the TSDoc bundled in the installed package and the TypeScript source
 comments on disk. Inspect the project's installed `mcp-use` version, generated
 types, and existing Views before choosing APIs or patterns.
+
+## Agent Skills
+
+Put reusable agent workflows in `skills/<name>/SKILL.md`; the directory is
+served automatically, so normally omit the `skills` server option. Use
+`skills: false` to disable it or `skills: { directory: "server-skills" }` to
+override the project-relative directory. Keep supporting references, scripts,
+templates, and assets in the skill instead of inflating tool descriptions.

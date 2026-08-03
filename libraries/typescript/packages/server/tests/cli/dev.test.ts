@@ -222,6 +222,50 @@ describe("runDev", () => {
     expect(process.listeners("SIGINT")).not.toContain(sigint);
   });
 
+  it("reloads skill edits and keeps the last valid snapshot", async () => {
+    const cwd = copyFixture("dev-skills");
+    const skillDir = join(cwd, "skills", "refunds");
+    mkdirSync(skillDir, { recursive: true });
+    const skillFile = join(skillDir, "SKILL.md");
+    writeFileSync(
+      skillFile,
+      "---\nname: refunds\ndescription: Process refunds\n---\n# v1\n"
+    );
+    const dev = await startDev(cwd, await getFreePort(), undefined, false);
+    cleanups.push(dev.stop, () => removeDir(cwd));
+
+    expect(await mcpRequest(dev.url, "skills/list")).toMatchObject({
+      result: { skills: [{ uri: "skill://refunds/SKILL.md" }] },
+    });
+
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    writeFileSync(skillFile, "---\nname: wrong\ndescription: Invalid\n---\n");
+    await waitFor(async () =>
+      errorSpy.mock.calls.some((call) =>
+        String(call[0]).includes("reload failed")
+      )
+        ? true
+        : undefined
+    );
+    expect(await mcpRequest(dev.url, "skills/list")).toMatchObject({
+      result: { skills: [{ frontmatter: { name: "refunds" } }] },
+    });
+
+    writeFileSync(
+      skillFile,
+      "---\nname: refunds\ndescription: Updated refunds\n---\n# v2\n"
+    );
+    await waitFor(async () => {
+      const body = await mcpRequest(dev.url, "skills/list");
+      const result = body["result"] as {
+        skills?: Array<{ frontmatter?: { description?: string } }>;
+      };
+      return result.skills?.[0]?.frontmatter?.description === "Updated refunds"
+        ? true
+        : undefined;
+    });
+  });
+
   it("mounts the project-local Inspector on the existing dev listener", async () => {
     const cwd = copyFixture("dev-inspector-installed");
     cleanups.push(() => removeDir(cwd));

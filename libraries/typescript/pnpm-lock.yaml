@@ -533,6 +533,9 @@ importers:
       jose:
         specifier: ^6.1.3
         version: 6.1.3
+      yaml:
+        specifier: '>=2.8.3'
+        version: 2.8.3
     devDependencies:
       '@mcp-use/client':
         specifier: workspace:*

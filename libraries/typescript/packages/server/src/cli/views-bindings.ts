@@ -5,6 +5,7 @@
 import { createServerModuleRunner, type DevEnvironment } from "vite";
 
 import type { ViewsManifest } from "../views/types.js";
+import type { SkillsOptions, SkillsSnapshot } from "../skills/types.js";
 
 const DEFAULT_BASE_PATH = "/mcp";
 
@@ -19,7 +20,51 @@ const BUILD_ENTRY_MCP_URL = "http://localhost:3000";
 interface ServerLike {
   __mount(): void;
   __primeViews(views: ViewsManifest, options?: { dev?: boolean }): void;
+  __primeSkills(snapshot: SkillsSnapshot | undefined): void;
+  __discoverSkills(
+    projectRoot: string,
+    conventionalDirectory?: string
+  ): Promise<SkillsSnapshot | undefined>;
+  __skillsConfig(): boolean | SkillsOptions | undefined;
   basePath?: string;
+}
+
+/** Discover and validate the entry's configured skills for embedding. */
+export async function discoverSkillsAtBuild(
+  environment: DevEnvironment,
+  entry: string,
+  projectRoot: string,
+  conventionalDirectory: string
+): Promise<SkillsSnapshot | undefined> {
+  const runner = createServerModuleRunner(environment, {
+    hmr: false,
+    sourcemapInterceptor: "node",
+  });
+  try {
+    const serverModule = (await runner.import(entry)) as {
+      default?: ServerLike;
+    };
+    const server = serverModule.default;
+    if (server === null || typeof server !== "object") {
+      throw new Error(
+        "The server entry must default-export the MCPServer instance."
+      );
+    }
+    if (typeof server.__skillsConfig !== "function") {
+      throw new Error(
+        "The entry's default export does not support Skills over MCP."
+      );
+    }
+    const { discoverConfiguredSkills } =
+      await import("../skills/node-loader.js");
+    return discoverConfiguredSkills(
+      server.__skillsConfig(),
+      projectRoot,
+      conventionalDirectory
+    );
+  } finally {
+    await runner.close();
+  }
 }
 
 /**
@@ -95,7 +140,8 @@ export async function resolveBuildBasePath(
 export async function validateViewBindingsAtBuild(
   environment: DevEnvironment,
   entry: string,
-  viewsManifest: ViewsManifest
+  viewsManifest: ViewsManifest,
+  skillsSnapshot?: SkillsSnapshot
 ): Promise<void> {
   const runner = createServerModuleRunner(environment, {
     hmr: false,
@@ -123,6 +169,7 @@ export async function validateViewBindingsAtBuild(
       );
     }
     server.__primeViews(viewsManifest);
+    server.__primeSkills(skillsSnapshot);
     server.__mount();
   } finally {
     if (previousMcpUrl === undefined) {

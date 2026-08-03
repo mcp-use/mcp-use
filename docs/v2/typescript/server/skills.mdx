@@ -1,0 +1,109 @@
+---
+title: "Skills over MCP"
+description: "Ship Agent Skills with your MCP server using automatic directory discovery."
+---
+
+<Warning>
+  Skills over MCP follows the draft SEP-2640 extension. The wire contract may
+  change before the extension becomes final. Only serve skills you trust, and
+  hosts should require user approval before activating a skill or its allowed
+  tools.
+</Warning>
+
+Skills let an MCP server ship its operating manual alongside its tools. Hosts
+can first inspect the small skill catalog, then read `SKILL.md` and only the
+supporting references, scripts, templates, or assets needed for the task.
+
+## Zero-configuration setup
+
+Create a conventional `skills/` directory next to your server project. Its
+presence enables Skills over MCP automatically; no server option is required.
+
+```text
+skills/
+  refunds/
+    SKILL.md
+    references/
+      policy.md
+    templates/
+      confirmation.md
+```
+
+```ts
+import { MCPServer } from "mcp-use";
+
+const server = new MCPServer({
+  name: "shop",
+  version: "1.0.0",
+});
+
+export default server;
+```
+
+Every skill needs a `SKILL.md` whose `name` matches its directory:
+
+```md
+---
+name: refunds
+description: Check eligibility and process customer refunds safely
+license: Apache-2.0
+compatibility: Requires the shop refund tools
+metadata:
+  owner: support-platform
+---
+
+# Refund orders
+
+Read `references/policy.md` before deciding whether an order is eligible.
+Use `templates/confirmation.md` when the refund succeeds.
+```
+
+All frontmatter fields are preserved. Supporting text, scripts, data, and
+binary files are exposed as individual MCP resources with raw-byte SHA-256
+digests. Nested directories containing their own `SKILL.md` are published as
+independent skills as well as supporting content of their parent skill.
+
+## Configure discovery
+
+```ts
+// Require the conventional skills/ directory to exist.
+new MCPServer({ name: "shop", version: "1.0.0", skills: true });
+
+// Ignore skills/ even when it exists.
+new MCPServer({ name: "shop", version: "1.0.0", skills: false });
+
+// Require a project-relative custom directory.
+new MCPServer({
+  name: "shop",
+  version: "1.0.0",
+  skills: { directory: "server-skills" },
+});
+```
+
+With `mcp-use dev --mcp-dir src/mcp`, the conventional directory becomes
+`src/mcp/skills`. An explicit `skills.directory` remains relative to the
+project root. Missing directories are silent only for automatic discovery;
+`true`, `{}`, and custom configuration fail with an actionable error.
+
+## What hosts discover
+
+When skills are enabled the server declares
+`io.modelcontextprotocol/skills` with directory reads. Hosts use:
+
+- `skills/list` for the deterministic skill catalog and complete digest sets.
+- `skills/get` to refresh or retrieve one skill by its `SKILL.md` URI.
+- `resources/read` for individual text or binary files.
+- `resources/directory/read` to inspect one directory level at a time.
+
+The SDK does not inject skill text into server instructions or tool
+descriptions. Progressive disclosure and activation remain host decisions.
+
+`mcp-use dev` revalidates skills while the server runs and keeps the last
+valid server when an edit is invalid. `mcp-use build` embeds the validated
+snapshot, so the production server does not need the source skill directory.
+
+## Specifications
+
+- [Skills over MCP Working Group](https://modelcontextprotocol.io/community/working-groups/skills-over-mcp)
+- [SEP-2640 draft](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2640)
+- [Agent Skills specification](https://agentskills.io/specification)

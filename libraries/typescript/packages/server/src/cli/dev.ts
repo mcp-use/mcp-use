@@ -70,6 +70,7 @@ import {
   type DiscoveredView,
 } from "./views.js";
 import type { ViewsManifest } from "../views/types.js";
+import type { SkillsSnapshot } from "../skills/types.js";
 
 /** Canonical Web handler exposed by `MCPServer.fetch`. */
 type WebHandler = (request: Request) => Promise<Response>;
@@ -89,6 +90,10 @@ interface ServerLike {
     views: ViewsManifest,
     options?: { dev?: boolean; projectRoot?: string }
   ): void;
+  __discoverSkills(
+    projectRoot: string,
+    conventionalDirectory?: string
+  ): Promise<SkillsSnapshot | undefined>;
 }
 
 /**
@@ -370,6 +375,8 @@ export async function runDev(options: DevOptions): Promise<void> {
   const viewsDirectory =
     options.viewsDir ??
     (options.mcpDir === undefined ? undefined : join(options.mcpDir, "views"));
+  const conventionalSkillsDirectory =
+    options.mcpDir === undefined ? "skills" : join(options.mcpDir, "skills");
   if (!existsSync(resolveViewsDir(options.cwd, viewsDirectory))) {
     console.log("[mcp-use] views directory not configured.");
   }
@@ -462,6 +469,7 @@ export async function runDev(options: DevOptions): Promise<void> {
         unknown
       >;
       const server = serverFrom(moduleExports);
+      await server.__discoverSkills(options.cwd, conventionalSkillsDirectory);
       const viewsManifest = buildDevViewsManifest(currentViews);
       if (typeof server.__primeViews !== "function") {
         throw new Error(
@@ -590,6 +598,19 @@ export async function runDev(options: DevOptions): Promise<void> {
 
   const onSsrFileEvent = (file: string): void => {
     if (isViewPath(file, options.cwd, viewsDirectory)) {
+      return;
+    }
+    const normalizedFile = file.replaceAll("\\", "/");
+    const normalizedConventional = resolve(
+      options.cwd,
+      conventionalSkillsDirectory
+    ).replaceAll("\\", "/");
+    if (
+      normalizedFile === normalizedConventional ||
+      normalizedFile.startsWith(`${normalizedConventional}/`) ||
+      normalizedFile.endsWith("/SKILL.md")
+    ) {
+      reload();
       return;
     }
     const modules = ssrEnvironment.moduleGraph.getModulesByFile(file);

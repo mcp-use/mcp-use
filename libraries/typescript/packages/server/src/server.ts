@@ -107,6 +107,13 @@ import type {
 } from "./tools.js";
 import { resolveToolInputSchema } from "./tools.js";
 import { isUsageDisabled, recordUsage } from "./usage.js";
+import { registerSkillsRuntime } from "./skills/runtime.js";
+import {
+  registerSkills,
+  SKILLS_EXTENSION_ID,
+  type SkillsOptions,
+  type SkillsSnapshot,
+} from "./skills/types.js";
 import { supportsViews } from "./views/capabilities.js";
 import type { ViewResourceFacts } from "./views/types.js";
 import {
@@ -350,6 +357,9 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   >();
   readonly #prompts = new Map<string, PromptEntry<TUser, TEnv>>();
   readonly #views = new Map<string, ViewManifestEntry>();
+  #skills: SkillsSnapshot | undefined;
+  #skillsPrimed = false;
+  #skillsDiscovery: Promise<void> | undefined;
   /**
    * One-to-one tool→view bindings. Each view name maps to the single tool
    * that bound it; that tool's `view:` config is the sole source of
@@ -488,6 +498,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     this.delete = this.app.delete.bind(this.app) as Hono<TEnv>["delete"];
     this.all = this.app.all.bind(this.app) as Hono<TEnv>["all"];
     this.fetch = async (request, env, executionCtx) => {
+      await this.#ensureSkillsPrimed();
       this.#ensureMounted("handler");
       return this.#httpApp!.fetch(request, env, executionCtx);
     };
@@ -640,6 +651,62 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     options?: { dev?: boolean; projectRoot?: string }
   ): void {
     this[registerViews](views, options);
+  }
+
+  /**
+   * Prime an immutable Skills over MCP snapshot before the server starts.
+   *
+   * @param snapshot - Validated snapshot, or `undefined` when convention
+   * discovery found no skills directory.
+   * @throws If the server already started.
+   *
+   * @internal
+   */
+  [registerSkills](snapshot: SkillsSnapshot | undefined): void {
+    this.#assertNotStarted("skills", "snapshot");
+    this.#skills = snapshot;
+    this.#skillsPrimed = true;
+  }
+
+  /** String-keyed tooling alias for {@link registerSkills}. */
+  __primeSkills(snapshot: SkillsSnapshot | undefined): void {
+    this[registerSkills](snapshot);
+  }
+
+  /**
+   * Discover, validate, and prime skills using this server's configuration.
+   *
+   * @param projectRoot - Project root used for custom directory overrides.
+   * @param conventionalDirectory - Effective conventional directory, including
+   * an optional CLI `--mcp-dir` prefix.
+   * @returns The snapshot embedded by build tooling.
+   *
+   * @internal
+   */
+  __discoverSkills(
+    projectRoot: string,
+    conventionalDirectory = "skills"
+  ): Promise<SkillsSnapshot | undefined> {
+    return this.#discoverSkills(projectRoot, conventionalDirectory);
+  }
+
+  /** Return file-discovery configuration to Node build tooling. @internal */
+  __skillsConfig(): boolean | SkillsOptions | undefined {
+    return this.#config.skills;
+  }
+
+  async #discoverSkills(
+    projectRoot: string,
+    conventionalDirectory: string
+  ): Promise<SkillsSnapshot | undefined> {
+    const { discoverConfiguredSkills } = await import("#mcp-use-skills-loader");
+    const snapshot = discoverConfiguredSkills(
+      this.#config.skills,
+      projectRoot,
+      conventionalDirectory
+    );
+    this[registerSkills](snapshot);
+    return snapshot;
   }
 
   /** Register a static resource readable at `definition.uri`. */
@@ -876,6 +943,11 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
 
   /** Mount and validate the Hono/MCP application without serving a request. @internal */
   __mount(): void {
+    if (!this.#skillsPrimed) {
+      throw new Error(
+        "Cannot mount before skills discovery. CLI tooling must call __discoverSkills first."
+      );
+    }
     this.#ensureMounted("handler");
   }
 
@@ -888,6 +960,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    * ```
    */
   async notifyToolsChanged(): Promise<void> {
+    await this.#ensureSkillsPrimed();
     await this.#ensureMounted("handler").handler.notify.toolsChanged();
   }
 
@@ -900,6 +973,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    * ```
    */
   async notifyPromptsChanged(): Promise<void> {
+    await this.#ensureSkillsPrimed();
     await this.#ensureMounted("handler").handler.notify.promptsChanged();
   }
 
@@ -912,6 +986,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    * ```
    */
   async notifyResourcesChanged(): Promise<void> {
+    await this.#ensureSkillsPrimed();
     await this.#ensureMounted("handler").handler.notify.resourcesChanged();
   }
 
@@ -926,6 +1001,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    * ```
    */
   async notifyResourceUpdated(uri: string): Promise<void> {
+    await this.#ensureSkillsPrimed();
     await this.#ensureMounted("handler").handler.notify.resourceUpdated(uri);
   }
 
@@ -959,6 +1035,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     url: string;
   }> {
     this.#assertOpen("listen()");
+    await this.#ensureSkillsPrimed();
     const host = resolveListenHost(options.host, this.#config.host);
     const requestedPort = resolveListenPort(port, this.#config.port);
     this.#assertListenOAuthConfiguration(host);
@@ -1250,6 +1327,15 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         this.#proxyPromptsDiscovered += prompts;
       },
     };
+  }
+
+  async #ensureSkillsPrimed(): Promise<void> {
+    if (this.#skillsPrimed) return;
+    this.#skillsDiscovery ??= this.#discoverSkills(
+      typeof process === "undefined" ? "." : process.cwd(),
+      "skills"
+    ).then(() => undefined);
+    await this.#skillsDiscovery;
   }
 
   /**
@@ -1592,6 +1678,11 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           tools: { listChanged: true },
           prompts: { listChanged: true },
           resources: { listChanged: true, subscribe: true },
+          ...(this.#skills !== undefined && {
+            extensions: {
+              [SKILLS_EXTENSION_ID]: { directoryRead: true },
+            },
+          }),
         },
         ...(instructions !== undefined && { instructions }),
         ...(authInfo !== undefined && { authInfo }),
@@ -1628,6 +1719,9 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         viewMetaOptions,
         basePath
       );
+    }
+    if (this.#skills !== undefined) {
+      registerSkillsRuntime(server, this.#skills);
     }
     this.#wrapListHandlers(server);
     return server;

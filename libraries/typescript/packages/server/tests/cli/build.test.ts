@@ -4,6 +4,7 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
@@ -94,6 +95,36 @@ function listViewAssets(
 }
 
 describe("runBuild", () => {
+  it("embeds skills so the built server survives source removal", async () => {
+    const cwd = copyFixture("build-skills");
+    dirs.push(cwd);
+    const skillDir = join(cwd, "skills", "refunds");
+    mkdirSync(join(skillDir, "references"), { recursive: true });
+    writeFileSync(
+      join(skillDir, "SKILL.md"),
+      "---\nname: refunds\ndescription: Process refunds safely\n---\n# Refunds\n"
+    );
+    writeFileSync(join(skillDir, "references", "policy.md"), "Policy v1\n");
+
+    await runBuild({ cwd });
+    rmSync(join(cwd, "skills"), { recursive: true, force: true });
+
+    const entryFile = join(cwd, WORKSPACE_DIR_NAME, "build", "index.js");
+    const mod = (await import(`${pathToFileURL(entryFile).href}?skills=1`)) as {
+      default: { fetch(request: Request): Promise<Response> };
+    };
+    expect(await handlerMcp(mod.default.fetch, "skills/list")).toMatchObject({
+      result: { skills: [{ uri: "skill://refunds/SKILL.md" }] },
+    });
+    expect(
+      await handlerMcp(mod.default.fetch, "resources/read", {
+        uri: "skill://refunds/references/policy.md",
+      })
+    ).toMatchObject({
+      result: { contents: [{ text: "Policy v1\n" }] },
+    });
+  });
+
   it("emits an ESM bundle + manifest to .mcp-use/build and preserves the default export", async () => {
     const cwd = copyFixture("build");
     dirs.push(cwd);
