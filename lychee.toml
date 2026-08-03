@@ -38,6 +38,14 @@ exclude_path = [
   "libraries/typescript/packages/create-mcp-use-app/CHANGELOG\\.md$",
   "libraries/typescript/packages/inspector/CHANGELOG\\.md$",
   "libraries/typescript/packages/mcp-use/CHANGELOG\\.md$",
+
+  # v2 migration checklists link to Mintlify routes as root-relative paths
+  # (/v2/typescript/client/tools -> client/tools.mdx). lychee cannot resolve
+  # those: without --root-dir it reports "provide a root dir", and with one it
+  # looks for an extension-less file that does not exist. Both files contain
+  # only these links, so nothing checkable is skipped.
+  "docs/v2/typescript/MCP_CLIENT_MIGRATION_CHECKLIST\\.md$",
+  "docs/v2/typescript/MCP_SERVER_MIGRATION_CHECKLIST\\.md$",
 ]
 
 exclude_loopback = true
