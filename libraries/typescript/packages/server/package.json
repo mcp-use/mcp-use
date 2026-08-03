@@ -97,6 +97,7 @@
     "node": ">=22.22.2"
   },
   "scripts": {
+    "prepack": "node ../../scripts/package-readme.mjs verify",
     "build": "rimraf dist && tsup && tsc --emitDeclarationOnly --declaration && rimraf dist/.tsbuildinfo",
     "dev": "tsc --watch",
     "test": "vitest",
