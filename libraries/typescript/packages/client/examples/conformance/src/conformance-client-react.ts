@@ -13,9 +13,10 @@ import TestRenderer, { act } from "react-test-renderer";
 import {
   handleElicitation,
   isAuthScenario,
-  isScopeStepUpScenario,
   parseConformanceContext,
+  requiresOAuthRetryFetch,
   runScenario,
+  runWithScenarioTimeout,
   type ConformanceSession,
 } from "./conformance-shared.js";
 import { createOAuthRetryFetch } from "./oauth-retry-fetch.js";
@@ -151,15 +152,15 @@ async function main(): Promise<void> {
         preRegistrationContext: parseConformanceContext(),
       })
     : undefined;
-  // For scope-step-up we do not pre-auth; the OAuth retry fetch obtains the
-  // first token from the initial 401 so it has only mcp:basic, then handles 403.
+  // The retry fetch sees scopes carried by the initial WWW-Authenticate response
+  // and handles later 403 scope escalation without pre-authentication.
   const mcpServers: Record<string, any> = {
     test: {
       name: "test",
       url: serverUrl,
       authProvider,
       ...(authProvider &&
-        isScopeStepUpScenario(scenario) && {
+        requiresOAuthRetryFetch(scenario) && {
           fetch: createOAuthRetryFetch(fetch, serverUrl, authProvider, {
             max403Retries:
               scenario === "auth/scope-retry-limit" ? 3 : undefined,
@@ -212,7 +213,7 @@ async function main(): Promise<void> {
   }
 }
 
-main()
+runWithScenarioTimeout(process.env.MCP_CONFORMANCE_SCENARIO || "", main())
   .then(() => process.exit(0))
   .catch((err) => {
     console.error(err);
