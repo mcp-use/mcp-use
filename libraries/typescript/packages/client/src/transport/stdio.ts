@@ -89,24 +89,12 @@ export class StdioConnector extends BaseConnector {
     try {
       // 1. Build server parameters for the transport
 
-      // Merge env with process.env, filtering out undefined values
-      let mergedEnv: Record<string, string> | undefined;
-      if (this.env) {
-        mergedEnv = {};
-        // First add process.env values (excluding undefined)
-        for (const [key, value] of Object.entries(process.env)) {
-          if (value !== undefined) {
-            mergedEnv[key] = value;
-          }
-        }
-        // Then override with provided env
-        Object.assign(mergedEnv, this.env);
-      }
-
       const serverParams: StdioServerParameters = {
         command: this.command,
         args: this.args,
-        env: mergedEnv,
+        // The SDK layers explicit values over getDefaultEnvironment(). Passing
+        // the configured env through avoids exposing unrelated parent secrets.
+        env: this.env,
         cwd: this.cwd,
       };
 
