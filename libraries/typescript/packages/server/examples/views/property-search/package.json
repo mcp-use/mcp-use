@@ -1,0 +1,30 @@
+{
+  "name": "mcp-use-example-views-property-search",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "description": "MCP Apps V2 beta demo: Zillow-style San Francisco property search on an OpenStreetMap basemap.",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "scripts": {
+    "dev": "mcp-use dev",
+    "build": "mcp-use build",
+    "start": "mcp-use start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "leaflet": "^1.9.4",
+    "mcp-use": "workspace:*",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/leaflet": "^1.9.21",
+    "@types/node": "^22.20.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^7.0.2"
+  }
+}

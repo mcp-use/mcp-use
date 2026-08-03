@@ -1,9 +1,9 @@
-import { chat } from "@/llm/providers";
-import type { ProviderMessage } from "@/llm/types";
+import { completeChat } from "@mcp-use/agent";
+import type { ProviderMessage } from "@mcp-use/agent";
 import type {
   CreateMessageRequest,
   CreateMessageResult,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@mcp-use/client/react";
 import { useCallback } from "react";
 import type { LLMConfig } from "../chat/types";
 
@@ -53,7 +53,7 @@ export function useSamplingLLM({ llmConfig }: UseSamplingLLMProps) {
         );
       }
 
-      const { text } = await chat({
+      const text = await completeChat({
         config: {
           provider: llmConfig.provider,
           model: llmConfig.model,

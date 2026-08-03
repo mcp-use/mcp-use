@@ -1,14 +1,16 @@
 import { Button } from "@/client/components/ui/button";
 import { Textarea } from "@/client/components/ui/textarea";
 import { cn } from "@/client/lib/utils";
+import { useShape } from "@/client/lib/shape-context";
 import { Image as ImageIcon, Paperclip, X } from "lucide-react";
-import React, { useRef } from "react";
+import React, { useRef, type ReactNode } from "react";
 import type { ToolInfo } from "./ToolSelector";
 import { ToolSelector } from "./ToolSelector";
 import type { MessageAttachment } from "./types";
-import { formatFileSize } from "./utils";
+import { formatFileSize } from "@/client/utils/format";
 
 interface ChatInputProps {
+  variant?: "default" | "fullscreen";
   inputValue: string;
   isConnected: boolean;
   isLoading: boolean;
@@ -26,9 +28,14 @@ interface ChatInputProps {
   onClick: () => void;
   onAttachmentAdd: (file: File) => void;
   onAttachmentRemove: (index: number) => void;
+  /** Optional slot rendered inline with attach / tool controls. */
+  inlineControls?: ReactNode;
+  /** Optional slot on the bottom-right (e.g. model selector, submit). */
+  trailingControls?: ReactNode;
 }
 
 export function ChatInput({
+  variant = "default",
   inputValue,
   isConnected,
   isLoading,
@@ -46,8 +53,12 @@ export function ChatInput({
   onClick,
   onAttachmentAdd,
   onAttachmentRemove,
+  inlineControls,
+  trailingControls,
 }: ChatInputProps) {
+  const shape = useShape();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isFullscreen = variant === "fullscreen";
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -65,9 +76,9 @@ export function ChatInput({
   const hasAttachments = attachments.length > 0;
 
   return (
-    <div className="relative w-full">
+    <div className="relative w-full" data-chat-input-variant={variant}>
       {/* Attachment Previews */}
-      {hasAttachments && (
+      {!isFullscreen && hasAttachments && (
         <div className="absolute top-0 left-0 right-0 z-20 p-3 flex gap-2 flex-wrap">
           {attachments.map((attachment, index) => (
             <div
@@ -109,10 +120,14 @@ export function ChatInput({
         onClick={onClick}
         placeholder={isConnected ? placeholder : "Server not connected"}
         className={cn(
-          "p-4 min-h-[150px] max-h-[300px] rounded-xl",
-          hasAttachments && "pt-20",
+          isFullscreen
+            ? "field-sizing-fixed h-11 min-h-11 max-h-11 resize-none overflow-hidden py-2.5 pl-4 pr-12"
+            : "p-4 min-h-[150px] max-h-[300px]",
+          shape.container,
+          !isFullscreen && hasAttachments && "pt-20",
           className
         )}
+        rows={isFullscreen ? 1 : undefined}
         disabled={!isConnected || isLoading}
         data-testid="chat-input"
       />
@@ -128,34 +143,50 @@ export function ChatInput({
         aria-label="Upload images"
       />
 
-      {/* Bottom-left controls: attach + tool selector */}
-      <div className="absolute left-0 p-3 bottom-0 flex items-center gap-0.5">
-        {showAttachButton && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={!isConnected || isLoading}
-            className="h-auto w-auto aspect-square rounded-full p-2 text-muted-foreground hover:text-foreground"
-            title="Attach images"
-            type="button"
-            data-testid="chat-attach-button"
-          >
-            <Paperclip className="h-4 w-4" />
-          </Button>
-        )}
-        {tools &&
-          tools.length > 0 &&
-          disabledTools &&
-          onDisabledToolsChange && (
-            <ToolSelector
-              tools={tools}
-              disabledTools={disabledTools}
-              onDisabledToolsChange={onDisabledToolsChange}
-              disabled={!isConnected || isLoading}
-            />
-          )}
-      </div>
+      {isFullscreen ? (
+        trailingControls ? (
+          <div className="absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center">
+            {trailingControls}
+          </div>
+        ) : null
+      ) : (
+        /* Bottom toolbar: attach/tools left, trailing controls right */
+        <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 p-3">
+          <div className="flex min-w-0 flex-1 items-center gap-1">
+            {showAttachButton && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={!isConnected || isLoading}
+                className="h-auto w-auto aspect-square rounded-full p-2 text-muted-foreground hover:text-foreground"
+                title="Attach images"
+                type="button"
+                data-testid="chat-attach-button"
+              >
+                <Paperclip className="h-4 w-4" />
+              </Button>
+            )}
+            {tools &&
+              tools.length > 0 &&
+              disabledTools &&
+              onDisabledToolsChange && (
+                <ToolSelector
+                  tools={tools}
+                  disabledTools={disabledTools}
+                  onDisabledToolsChange={onDisabledToolsChange}
+                  disabled={!isConnected || isLoading}
+                />
+              )}
+            {inlineControls}
+          </div>
+          {trailingControls ? (
+            <div className="flex shrink-0 items-center gap-1.5">
+              {trailingControls}
+            </div>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }

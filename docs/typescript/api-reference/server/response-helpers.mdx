@@ -1,19 +1,23 @@
 ---
 title: "Response helpers"
-description: "Utility functions for building standardized MCP tool and resource responses API Documentation"
+description: "Deprecated helpers that build CallToolResult envelopes. Prefer raw MCP wire returns."
 icon: "reply"
-github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/utils/response-helpers.ts"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/server/src/response-helpers.ts"
 ---
 
 <Callout type="info" title="Source Code">
-View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/utils/response-helpers.ts' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/utils/response-helpers.ts</a>
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/server/src/response-helpers.ts' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/server/src/response-helpers.ts</a>
 </Callout>
 
-Response helpers are standalone functions that build `CallToolResult` objects for MCP tools, resources, and prompts. Instead of constructing content arrays and `_meta` MIME types by hand, you call a helper that produces the correct shape and content type. Every helper is importable from `mcp-use/server`. The server automatically converts the returned `CallToolResult` to `GetPromptResult` for prompts and `ReadResourceResult` for resources, so the same helper works across all three primitives.
+<Warning>
+**Deprecated.** Prefer returning raw MCP envelopes (`CallToolResult`, `ReadResourceResult`, `GetPromptResult`). These helpers remain for upgrade compatibility and map to those shapes. See [Response Helpers](/typescript/server/response-helpers) for the migration table.
+</Warning>
+
+Response helpers are standalone functions that build `CallToolResult` objects. Import them from `mcp-use`. Resource and prompt callbacks may still return helper results; the server converts them to `ReadResourceResult` / `GetPromptResult`.
 
 ```ts wrap
-import { text, markdown, html, xml, css, javascript, object, array, image, audio, binary, resource, mix, error, widget } from "mcp-use/server"
-import type { TypedCallToolResult, WidgetResponseConfig } from "mcp-use/server"
+import { text, markdown, html, xml, css, javascript, object, array, image, audio, binary, resource, mix, error, widget } from "mcp-use"
+import type { TypedCallToolResult, WidgetResponseConfig } from "mcp-use"
 ```
 
 ## Functions
@@ -23,13 +27,13 @@ import type { TypedCallToolResult, WidgetResponseConfig } from "mcp-use/server"
 Creates a plain text content response, the most common response type for tools and resources.
 
 ```ts
-import { text } from "mcp-use/server"
+import { text } from "mcp-use"
 ```
 
 Creates a plain text content response. The most common response type for tools and resources. Sets the `_meta.mimeType` to `text/plain`.
 
 ```ts wrap
-import { text } from "mcp-use/server"
+import { text } from "mcp-use"
 ```
 
 **Parameters**
@@ -45,7 +49,7 @@ function text(content: string): CallToolResult
 
 **Example**
 ```ts wrap
-import { MCPServer, text } from "mcp-use/server"
+import { MCPServer, text } from "mcp-use"
 import { z } from "zod"
 
 const server = new MCPServer({ name: "my-server", version: "1.0.0" })
@@ -64,7 +68,7 @@ server.tool(
 Creates a Markdown content response. Identical shape to [`text`](/typescript/api-reference/server/response-helpers), but sets the `_meta.mimeType` to `text/markdown` so clients render it as Markdown.
 
 ```ts wrap
-import { markdown } from "mcp-use/server"
+import { markdown } from "mcp-use"
 ```
 
 **Parameters**
@@ -80,7 +84,7 @@ function markdown(content: string): CallToolResult
 
 **Example**
 ```ts wrap
-import { MCPServer, markdown } from "mcp-use/server"
+import { MCPServer, markdown } from "mcp-use"
 import { z } from "zod"
 
 const server = new MCPServer({ name: "my-server", version: "1.0.0" })
@@ -99,7 +103,7 @@ server.tool(
 Creates an HTML content response for web display. Returns the HTML inside a `text` content item and sets `_meta.mimeType` to `text/html`.
 
 ```ts wrap
-import { html } from "mcp-use/server"
+import { html } from "mcp-use"
 ```
 
 **Parameters**
@@ -115,7 +119,7 @@ function html(content: string): CallToolResult
 
 **Example**
 ```ts wrap
-import { MCPServer, html } from "mcp-use/server"
+import { MCPServer, html } from "mcp-use"
 import { z } from "zod"
 
 const server = new MCPServer({ name: "my-server", version: "1.0.0" })
@@ -134,7 +138,7 @@ server.tool(
 Creates an XML content response. Returns the XML inside a `text` content item and sets `_meta.mimeType` to `text/xml`.
 
 ```ts wrap
-import { xml } from "mcp-use/server"
+import { xml } from "mcp-use"
 ```
 
 **Parameters**
@@ -150,7 +154,7 @@ function xml(content: string): CallToolResult
 
 **Example**
 ```ts wrap
-import { MCPServer, xml } from "mcp-use/server"
+import { MCPServer, xml } from "mcp-use"
 import { z } from "zod"
 
 const server = new MCPServer({ name: "my-server", version: "1.0.0" })
@@ -169,7 +173,7 @@ server.tool(
 Creates a CSS stylesheet content response. Returns the CSS inside a `text` content item and sets `_meta.mimeType` to `text/css`.
 
 ```ts wrap
-import { css } from "mcp-use/server"
+import { css } from "mcp-use"
 ```
 
 **Parameters**
@@ -185,7 +189,7 @@ function css(content: string): CallToolResult
 
 **Example**
 ```ts wrap
-import { MCPServer, css } from "mcp-use/server"
+import { MCPServer, css } from "mcp-use"
 import { z } from "zod"
 
 const server = new MCPServer({ name: "my-server", version: "1.0.0" })
@@ -204,7 +208,7 @@ server.tool(
 Creates a JavaScript code content response. Returns the source inside a `text` content item and sets `_meta.mimeType` to `text/javascript`.
 
 ```ts wrap
-import { javascript } from "mcp-use/server"
+import { javascript } from "mcp-use"
 ```
 
 **Parameters**
@@ -220,7 +224,7 @@ function javascript(content: string): CallToolResult
 
 **Example**
 ```ts wrap
-import { MCPServer, javascript } from "mcp-use/server"
+import { MCPServer, javascript } from "mcp-use"
 import { z } from "zod"
 
 const server = new MCPServer({ name: "my-server", version: "1.0.0" })
@@ -238,10 +242,10 @@ server.tool(
 ### object
 Creates a JSON object response that carries both a text representation and typed structured content. The text content is the pretty-printed JSON (`JSON.stringify(data, null, 2)`), `structuredContent` holds the typed data, and `_meta.mimeType` is set to `application/json`. The generic `T` flows through to the result type so callers get full type inference.
 
-If `data` is an array, `object` delegates to [`array`](/typescript/api-reference/server/response-helpers) internally and the result is wrapped in a `data` field. Note that the `_meta.mimeType` is only set on the non-array path.
+If `data` is an array, `object` delegates to [`array`](/typescript/api-reference/server/response-helpers) internally (array as `structuredContent` directly — no `{ data }` wrap). Note that the `_meta.mimeType` is only set on the non-array path.
 
 ```ts wrap
-import { object } from "mcp-use/server"
+import { object } from "mcp-use"
 ```
 
 **Parameters**
@@ -257,7 +261,7 @@ function object<T extends Record<string, any>>(data: T): TypedCallToolResult<T>
 
 **Example**
 ```ts wrap
-import { MCPServer, object } from "mcp-use/server"
+import { MCPServer, object } from "mcp-use"
 import { z } from "zod"
 
 const server = new MCPServer({ name: "my-server", version: "1.0.0" })
@@ -280,26 +284,28 @@ The `object()` helper includes both the stringified JSON (for backwards compatib
 </Tip>
 
 ### array
-Creates a JSON response for an array. Because the MCP `structuredContent` field must be an object, the array is wrapped in a `data` field. The text content is the pretty-printed JSON of the original array. Unlike the other JSON helper, `array` does not set a `_meta.mimeType`.
+**Deprecated.** Prefer `{ content: [{ type: "text", text: JSON.stringify(data) }], structuredContent: data }` — the 2026 wire accepts array roots (no `{ data }` wrap).
+
+Creates a JSON response for an array. The array is returned as `structuredContent` directly. The text content is the pretty-printed JSON of the original array. Unlike the other JSON helper, `array` does not set a `_meta.mimeType`.
 
 ```ts wrap
-import { array } from "mcp-use/server"
+import { array } from "mcp-use"
 ```
 
 **Parameters**
 ><ParamField body="data" type="T extends any[]" required="true" >   The array to return as JSON </ParamField>
 
 **Returns**
-><ResponseField name="returns" type="TypedCallToolResult<{ data: T }>" >   Result whose `structuredContent` is `{ data }` and whose text content is the pretty-printed array </ResponseField>
+><ResponseField name="returns" type="CallToolResult" >   Result whose `structuredContent` is the array and whose text content is the pretty-printed array </ResponseField>
 
 **Signature**
 ```ts wrap
-function array<T extends any[]>(data: T): TypedCallToolResult<{ data: T }>
+function array<T extends any[]>(data: T): CallToolResult
 ```
 
 **Example**
 ```ts wrap
-import { MCPServer, array } from "mcp-use/server"
+import { MCPServer, array } from "mcp-use"
 import { z } from "zod"
 
 const server = new MCPServer({ name: "my-server", version: "1.0.0" })
@@ -325,7 +331,7 @@ Arrays are automatically wrapped in an object with a `data` field. If you pass a
 Creates an image content response from base64 data or a data URL. Emits an `image` content item with `data` and `mimeType`, and sets `_meta` to `{ mimeType, isImage: true }`. The `mimeType` defaults to `image/png` when not provided.
 
 ```ts wrap
-import { image } from "mcp-use/server"
+import { image } from "mcp-use"
 ```
 
 **Parameters**
@@ -342,7 +348,7 @@ function image(data: string, mimeType?: string): CallToolResult
 
 **Example**
 ```ts wrap
-import { MCPServer, image } from "mcp-use/server"
+import { MCPServer, image } from "mcp-use"
 import { z } from "zod"
 
 const server = new MCPServer({ name: "my-server", version: "1.0.0" })
@@ -366,7 +372,7 @@ Creates an audio content response from either base64 data or a file path. The ar
 When a file path is read, the MIME type is taken from `mimeType` if provided, otherwise inferred from the file extension. The extension map covers `wav` (audio/wav), `mp3` (audio/mpeg), `ogg` (audio/ogg), `m4a` (audio/mp4), `webm` (audio/webm), `flac` (audio/flac), and `aac` (audio/aac), falling back to `audio/wav` for anything else. On the synchronous base64 path the MIME type defaults to `audio/wav`. The result emits an `audio` content item and sets `_meta` to `{ mimeType, isAudio: true }`.
 
 ```ts wrap
-import { audio } from "mcp-use/server"
+import { audio } from "mcp-use"
 ```
 
 **Parameters**
@@ -383,7 +389,7 @@ function audio(dataOrPath: string, mimeType?: string): CallToolResult | Promise<
 
 **Example**
 ```ts wrap
-import { MCPServer, audio } from "mcp-use/server"
+import { MCPServer, audio } from "mcp-use"
 import { z } from "zod"
 
 const server = new MCPServer({ name: "my-server", version: "1.0.0" })
@@ -409,7 +415,7 @@ When passing a file path, `await` the result. The file is read asynchronously an
 Creates a binary content response from base64-encoded data. The base64 string is placed in a `text` content item, `_meta.mimeType` is set to the provided MIME type, and `_meta.isBinary` is set to `true`. Unlike [`image`](/typescript/api-reference/server/response-helpers) and [`audio`](/typescript/api-reference/server/response-helpers), `mimeType` is required.
 
 ```ts wrap
-import { binary } from "mcp-use/server"
+import { binary } from "mcp-use"
 ```
 
 **Parameters**
@@ -426,7 +432,7 @@ function binary(base64Data: string, mimeType: string): CallToolResult
 
 **Example**
 ```ts wrap
-import { MCPServer, binary } from "mcp-use/server"
+import { MCPServer, binary } from "mcp-use"
 import { z } from "zod"
 
 const server = new MCPServer({ name: "my-server", version: "1.0.0" })
@@ -453,7 +459,7 @@ Creates an embedded resource content item. It supports two call patterns selecte
 The result is a single `resource` content item and does not set `_meta`.
 
 ```ts wrap
-import { resource } from "mcp-use/server"
+import { resource } from "mcp-use"
 ```
 
 **Parameters**
@@ -471,7 +477,7 @@ function resource(uri: string, mimeTypeOrContent: string | CallToolResult | Type
 
 **Example**
 ```ts wrap
-import { MCPServer, mix, text, resource } from "mcp-use/server"
+import { MCPServer, mix, text, resource } from "mcp-use"
 import { z } from "zod"
 
 const server = new MCPServer({ name: "my-server", version: "1.0.0" })
@@ -491,7 +497,7 @@ server.tool(
 Combines multiple helper results into a single response. The `content` arrays of all inputs are concatenated in order. The `structuredContent` objects from every input that has one are shallow-merged into a single object (added only if at least one input has `structuredContent`), and the `_meta` objects are shallow-merged the same way. Use it to return text alongside images, embedded resources, or several content items together.
 
 ```ts wrap
-import { mix } from "mcp-use/server"
+import { mix } from "mcp-use"
 ```
 
 **Parameters**
@@ -507,7 +513,7 @@ function mix(...results: CallToolResult[]): CallToolResult
 
 **Example**
 ```ts wrap
-import { MCPServer, mix, text, image, object, resource } from "mcp-use/server"
+import { MCPServer, mix, text, image, object, resource } from "mcp-use"
 import { z } from "zod"
 
 const server = new MCPServer({ name: "my-server", version: "1.0.0" })
@@ -534,7 +540,7 @@ server.tool(
 Creates an error response. Sets `isError: true` and returns the message as a single `text` content item. The return type is `TypedCallToolResult<never>` so it composes with tools that declare an output schema. Does not set `_meta`.
 
 ```ts wrap
-import { error } from "mcp-use/server"
+import { error } from "mcp-use"
 ```
 
 **Parameters**
@@ -550,7 +556,7 @@ function error(message: string): TypedCallToolResult<never>
 
 **Example**
 ```ts wrap
-import { MCPServer, error, text } from "mcp-use/server"
+import { MCPServer, error, text } from "mcp-use"
 import { z } from "zod"
 
 const server = new MCPServer({ name: "my-server", version: "1.0.0" })
@@ -593,7 +599,7 @@ The exact build behavior:
 - **structuredContent**: set to `output.structuredContent` when present, otherwise to the resolved props (`props` or its deprecated alias `data`) when those have at least one key.
 
 ```ts wrap
-import { widget } from "mcp-use/server"
+import { widget } from "mcp-use"
 ```
 
 **Parameters**
@@ -609,7 +615,7 @@ function widget(config: WidgetResponseConfig): CallToolResult
 
 **Example**
 ```ts wrap
-import { MCPServer, widget } from "mcp-use/server"
+import { MCPServer, widget } from "mcp-use"
 import { z } from "zod"
 
 const server = new MCPServer({ name: "my-server", version: "1.0.0" })
@@ -647,7 +653,7 @@ A typed `CallToolResult` that constrains `structuredContent` to a specific type 
 The properties are listed explicitly rather than via `extends Omit<CallToolResult, "structuredContent">` to avoid breaking type inference, a known interaction between Zod `.passthrough()` and TypeScript `Omit`.
 
 ```ts wrap
-import type { TypedCallToolResult } from "mcp-use/server"
+import type { TypedCallToolResult } from "mcp-use"
 ```
 
 **Type parameters**
@@ -673,8 +679,8 @@ interface TypedCallToolResult<T extends Record<string, unknown> = Record<string,
 
 **Example**
 ```ts wrap
-import { object } from "mcp-use/server"
-import type { TypedCallToolResult } from "mcp-use/server"
+import { object } from "mcp-use"
+import type { TypedCallToolResult } from "mcp-use"
 
 interface UserData {
   userId: string
@@ -691,7 +697,7 @@ function getUserResponse(user: UserData): TypedCallToolResult<UserData> {
 Runtime configuration passed to [`widget`](/typescript/api-reference/server/response-helpers). It carries only runtime data, not the widget's registration-time configuration. All fields are optional.
 
 ```ts wrap
-import type { WidgetResponseConfig } from "mcp-use/server"
+import type { WidgetResponseConfig } from "mcp-use"
 ```
 
 **Properties**
@@ -715,7 +721,7 @@ interface WidgetResponseConfig {
 
 **Example**
 ```ts wrap
-import { MCPServer, widget, text } from "mcp-use/server"
+import { MCPServer, widget, text } from "mcp-use"
 import { z } from "zod"
 
 const server = new MCPServer({ name: "my-server", version: "1.0.0" })

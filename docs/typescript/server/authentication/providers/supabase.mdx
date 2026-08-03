@@ -41,7 +41,8 @@ MCP_USE_OAUTH_SUPABASE_URL=http://localhost:54321
 ## Configure the MCP server
 
 ```typescript
-import { MCPServer, oauthSupabaseProvider } from "mcp-use/server";
+import { MCPServer } from "mcp-use";
+import { oauthSupabaseProvider } from "mcp-use/oauth/supabase";
 
 const server = new MCPServer({
   name: "supabase-server",
@@ -74,7 +75,7 @@ npm install @supabase/supabase-js
 
 ```typescript
 import { createClient } from "@supabase/supabase-js";
-import { error, object } from "mcp-use/server";
+import { error, object } from "mcp-use";
 
 const supabaseUrl =
   process.env.MCP_USE_OAUTH_SUPABASE_URL ??
@@ -136,16 +137,32 @@ Confirm these cases:
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Supabase OAuth template" icon="github" href="https://github.com/mcp-use/mcp-oauth-supabase-template">
+  <Card
+    title="Supabase OAuth template"
+    icon="github"
+    href="https://github.com/mcp-use/mcp-oauth-supabase-template"
+  >
     Start from a consent UI wired for mcp-use and Supabase.
   </Card>
-  <Card title="Supabase MCP Authentication" icon="book-open" href="https://supabase.com/docs/guides/auth/oauth-server/mcp-authentication">
+  <Card
+    title="Supabase MCP Authentication"
+    icon="book-open"
+    href="https://supabase.com/docs/guides/auth/oauth-server/mcp-authentication"
+  >
     Review Supabase's MCP authentication guide.
   </Card>
-  <Card title="User Context" icon="user" href="/typescript/server/authentication/user-context">
+  <Card
+    title="User Context"
+    icon="user"
+    href="/typescript/server/authentication/user-context"
+  >
     Use Supabase user data inside tools.
   </Card>
-  <Card title="Supabase provider API reference" icon="terminal" href="/typescript/api-reference/server/auth-providers#oauthsupabaseprovider">
+  <Card
+    title="Supabase provider API reference"
+    icon="terminal"
+    href="/typescript/api-reference/server/auth-providers#oauthsupabaseprovider"
+  >
     Look up exact provider options and defaults.
   </Card>
 </CardGroup>

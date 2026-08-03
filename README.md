@@ -1,483 +1,379 @@
 <div align="center">
-<div align="center">
   <a href="https://mcp-use.com">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="./static/logo_white.svg">
-      <source media="(prefers-color-scheme: light)" srcset="./static/logo_black.svg">
-      <img alt="mcp use logo" src="./static/logo_black.svg" width="60%" >
-    </picture>
+    <img alt="mcp-use" src="./docs/logo/banner-mcp-use.webp" width="100%">
   </a>
-</div>
-&nbsp;
+  <br /><br />
 
-<p align="center">
-    <a href="https://mcp-use.com/docs" alt="Documentation">
-        <img src="https://img.shields.io/badge/mcp--use-docs-blue?labelColor=white" /></a>
-    <a href="https://manufact.com" alt="Website">
-        <img src="https://img.shields.io/badge/made by-manufact.com-blue" /></a>
-    <a href="https://github.com/mcp-use/mcp-use/blob/main/LICENSE" alt="License">
-        <img src="https://img.shields.io/github/license/mcp-use/mcp-use" /></a>
-    <a href="https://discord.gg/XkNkSkMz3V" alt="Discord">
-        <img src="https://dcbadge.limes.pink/api/server/XkNkSkMz3V?style=flat" /></a>
-    <br/>
-    <a href="https://mcp-use.com/docs/python" alt="Python docs">
-        <img src="https://img.shields.io/badge/python-docs-blue?labelColor=white&logo=python" alt="Badge"></a>
-    <a href="https://pypi.org/project/mcp_use/" alt="PyPI Version">
-        <img src="https://img.shields.io/pypi/v/mcp_use.svg"/></a>
-    <a href="https://pypi.org/project/mcp_use/" alt="PyPI Downloads">
-        <img src="https://static.pepy.tech/badge/mcp-use" /></a>
-    <br/>
-    <a href="https://mcp-use.com/docs/typescript" alt="Typescript Documentation">
-        <img src="https://img.shields.io/badge/typescript-docs-blue?labelColor=white&logo=typescript" alt="Badge"></a>
-    <a href="https://www.npmjs.com/package/mcp-use" alt="NPM Version">
-        <img src="https://img.shields.io/npm/v/mcp-use.svg"/></a>
-    <a href="https://www.npmjs.com/package/mcp-use" alt="NPM Downloads">
-        <img src="https://img.shields.io/npm/dw/mcp-use.svg"/></a>
-    <br/>
-</p>
+<div id="user-content-toc">
+  <ul align="center" style="list-style: none;">
+    <summary>
+      <h1>The TypeScript framework for MCP</h1>
+    <h3>Build, test, and ship MCP servers, ChatGPT plugins, Claude connectors</h3>
+    </summary>
+  </ul>
 </div>
 
-> [!TIP]
-> **Try the new beta v2** with [`create-mcp-use-app@beta`](https://www.npmjs.com/package/create-mcp-use-app): `npx create-mcp-use-app@beta`. See the [beta README](https://github.com/mcp-use/mcp-use/blob/beta/README.md).
 
-##  About
+  <p>
+    Fully Typed, native Views and MCP Apps support, built-in Inspector and first class Agent experience.
+  </p>
 
-  <b>mcp-use</b> is the fullstack MCP framework
-  to build MCP Apps for ChatGPT / Claude & MCP Servers for AI Agents.
+  <p>
+    <a href="https://docs.mcp-use.com/v2/typescript/getting-started/welcome"><strong>Documentation</strong></a>
+    · <a href="https://inspector.mcp-use.com/inspector"><strong>Inspector</strong></a>
+    · <a href="#examples"><strong>Examples</strong></a>
+    · <a href="https://manufact.com"><strong>Deploy</strong></a>
+  </p>
 
-- **Build** with mcp-use SDK ([ts](https://www.npmjs.com/package/mcp-use) | [py](https://pypi.org/project/mcp_use/)): MCP Servers and MCP Apps
-- **Preview** on mcp-use MCP Inspector ([online](https://inspector.mcp-use.com/inspector) | [oss](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/inspector)): Test and debug your MCP Servers and Apps
-- **Deploy** on [Manufact MCP Cloud](https://manufact.com): Connect your GitHub repo and have your MCP Server and App up and running in production with observability, metrics, logs, branch-deployments, and more
+  <p>
+    <a href="https://www.npmjs.com/package/mcp-use">
+      <img src="https://img.shields.io/npm/v/mcp-use.svg?label=npm&amp;color=orange" alt="npm version">
+    </a>
+    <a href="https://www.npmjs.com/package/mcp-use">
+      <img src="https://img.shields.io/npm/dw/mcp-use.svg" alt="npm downloads">
+    </a>
+    <a href="https://manufact.com">
+      <img src="https://img.shields.io/badge/made%20by-manufact.com-blue" alt="made by manufact.com">
+    </a>
+    <a href="https://github.com/mcp-use/mcp-use/blob/main/LICENSE">
+      <img src="https://img.shields.io/github/license/mcp-use/mcp-use" alt="MIT license">
+    </a>
+    <a href="https://discord.gg/XkNkSkMz3V">
+      <img src="https://dcbadge.limes.pink/api/server/XkNkSkMz3V?style=flat" alt="Discord">
+    </a>
+  </p>
+  <br /><br />
+</div>
 
-## Documentation
-
-Visit our [docs](https://mcp-use.com/docs) or jump to a quickstart ([TypeScript](https://mcp-use.com/docs/typescript/getting-started/quickstart) | [Python](https://mcp-use.com/docs/python/getting-started/quickstart))
-
-### Skills for Coding Agents
-
-> **Using Claude Code, Codex, Cursor or other AI coding agents?**
+> [!NOTE]
+> **Migrating from v1? Give it to your agent:** [Read the migration guide →](https://docs.mcp-use.com/v2/server/migration)
 >
-> **[Install mcp-use skill for MCP Apps](https://skills.sh/mcp-use/mcp-use/mcp-apps-builder)**
+> ```text
+> Migrate this mcp-use project to v2 following
+> https://docs.mcp-use.com/v2/typescript/server/migration
+> ```
+>
+> [Read the migration guide →](https://docs.mcp-use.com/v2/typescript/server/migration)
 
-## Quickstart: MCP Servers and MCP Apps
+## Get started
 
-### <img src="./static/typescript.svg" height="14" style="margin-right:4px; top:-1px; position:relative;" align="center" /> TypeScript
+### Start with your agent
 
-Build your first MCP Server or MPC App:
+```text
+Build an MCP server: https://mcp-use.com/prompt.md
+```
+
+[Read the prompt →](https://mcp-use.com/prompt.md)
+
+### Start with code
 
 ```bash
-npx create-mcp-use-app@latest
+npx -y create-mcp-use-app@latest
 ```
 
-Or create a server manually:
+Run `npm run dev` in the generated project · open [`http://localhost:3000/mcp/inspector`](http://localhost:3000/mcp/inspector)
+
+[TS Docs](https://docs.mcp-use.com/v2/typescript/getting-started/welcome)
+
+## Everything you need to ship MCP
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>Fully typed</h3>
+      <p>Zod schemas flow from tools to structured results, View props, and tool calls.</p>
+    </td>
+    <td width="50%" valign="top">
+      <h3>Native Views</h3>
+      <p>Bind React Views directly to tools and ship interactive apps without custom extension wiring.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>Agent-first and headless</h3>
+      <p>Scaffold, invoke, inspect, screenshot, and deploy through your agent.</p>
+    </td>
+    <td width="50%" valign="top">
+      <h3>Built-in debugging tools</h3>
+      <p>Inspect tools and Views in the browser or headlessly through the CLI.</p>
+    </td>
+  </tr>
+</table>
+
+## Quickstart
+
+The scaffold gives you the server, TypeScript configuration, development scripts, Inspector, and a React view pipeline. Start it once and the MCP endpoint also serves a client-ready landing page with its connection URL and setup instructions.
+
+Replace its `index.ts` with a view-bound tool like this:
+
+<table><tr><td>
+<details>
+<summary><strong><code>index.ts</code></strong> — Server entry file for tool definition and metadata</summary>
 
 ```typescript
-import { MCPServer, text } from "mcp-use/server";
-import { z } from "zod";
-
-const server = new MCPServer({
-  name: "my-server",
-  version: "1.0.0",
-});
-
-server.tool({
-  name: "get_weather",
-  description: "Get weather for a city",
-  schema: z.object({ city: z.string() }),
-}, async ({ city }) => {
-  return text(`Temperature: 72°F, Condition: sunny, City: ${city}`);
-});
-
-await server.listen(3000);
-// Inspector at http://localhost:3000/inspector
-```
-
-[**→ Full TypeScript Server Documentation**](https://mcp-use.com/docs/typescript/server)
-
-## MCP Apps
-
-MCP Apps let you build interactive widgets that work across Claude, ChatGPT, and other MCP clients — write once, run everywhere.
-
-**Server**: define a tool and point it to a widget:
-
-```typescript
-import { MCPServer, widget } from "mcp-use/server";
+import { MCPServer } from "mcp-use";
 import { z } from "zod";
 
 const server = new MCPServer({
   name: "weather-app",
+  title: "Weather App",
   version: "1.0.0",
 });
 
-server.tool({
-  name: "get-weather",
-  description: "Get weather for a city",
-  schema: z.object({ city: z.string() }),
-  widget: "weather-display", // references resources/weather-display/widget.tsx
-}, async ({ city }) => {
-  return widget({
-    props: { city, temperature: 22, conditions: "Sunny" },
-    message: `Weather in ${city}: Sunny, 22°C`,
-  });
+const weatherInput = z.object({
+  city: z.string().describe("City to look up"),
 });
 
-await server.listen(3000);
-```
-
-**Widget**: create a React component in `resources/weather-display/widget.tsx`:
-
-```tsx
-import { useWidget, type WidgetMetadata } from "mcp-use/react";
-import { z } from "zod";
-
-const propSchema = z.object({
+const weatherOutput = z.object({
   city: z.string(),
   temperature: z.number(),
   conditions: z.string(),
 });
 
-export const widgetMetadata: WidgetMetadata = {
-  description: "Display weather information",
-  props: propSchema,
-};
+export const getWeather = server.tool(
+  {
+    name: "get-weather",
+    title: "Get weather",
+    description: "Get the current weather for a city",
+    inputSchema: weatherInput,
+    outputSchema: weatherOutput,
+    view: { name: "weather-card" },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: true,
+    },
+  },
+  async ({ city }) => {
+    const weather = {
+      city,
+      temperature: 22,
+      conditions: "Sunny",
+    };
 
-const WeatherDisplay: React.FC = () => {
-  const { props, isPending, theme } = useWidget<z.infer<typeof propSchema>>();
-  const isDark = theme === "dark";
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Weather in ${city}: ${weather.conditions}, ${weather.temperature}°C`,
+        },
+      ],
+      structuredContent: weather,
+    };
+  },
+);
 
-  if (isPending) return <div>Loading...</div>;
+export default server;
+```
+
+</details>
+</td></tr></table>
+
+[Explore MCP server tools →](https://mcp-use.com/docs/typescript/server/tools)
+
+## Add Views to your tools
+
+Create `views/weather-card/view.tsx`. The directory name matches `view.name` on the tool:
+
+<table><tr><td>
+<details>
+<summary><strong><code>view.tsx</code></strong> — Return a view from your tools: React weather card</summary>
+
+```tsx
+import { useCallTool, useToolContext } from "mcp-use/react";
+
+export default function WeatherCard() {
+  const { status, toolOutput, toolInput } =
+    useToolContext<"get-weather">();
+  const refresh = useCallTool("get-weather");
+
+  if (status === "pending") {
+    return <p>Checking the weather in {toolInput?.city ?? "your city"}…</p>;
+  }
+  if (status === "error") return <p>Could not load the weather.</p>;
+
+  const weather = refresh.data?.structuredContent ?? toolOutput;
 
   return (
-    <div style={{
-      background: isDark ? "#1a1a2e" : "#f0f4ff",
-      borderRadius: 16, padding: 24,
-    }}>
-      <h2>{props.city}</h2>
-      <p>{props.temperature}° — {props.conditions}</p>
-    </div>
+    <main style={{ padding: 24 }}>
+      <h2>{weather.city}</h2>
+      <p>
+        {weather.temperature}°C · {weather.conditions}
+      </p>
+      <button
+        disabled={refresh.isPending}
+        onClick={() => void refresh.callTool({ city: weather.city })}
+      >
+        {refresh.isPending ? "Refreshing…" : "Refresh"}
+      </button>
+      {refresh.error && <p>{refresh.error.message}</p>}
+    </main>
   );
-};
-
-export default WeatherDisplay;
+}
 ```
 
-Widgets in `resources/` are **auto-discovered** — no manual registration needed.
+</details>
+</td></tr></table>
 
-Visit [**MCP Apps Documentation**](https://mcp-use.com/docs/typescript/server/mcp-apps)
+<p align="center">
+  <img src="./static/readme/chatgpt-hello-world.jpg" alt="Hello World MCP App rendered in a ChatGPT conversation" width="100%" />
+  <br />
+  <sub>Build interactive UI experiences within ChatGPT with mcp-use.</sub>
+</p>
 
-## Templates
+[Build your first MCP App →](https://mcp-use.com/docs/typescript/mcp-apps/quickstart)
 
-Ready-to-use MCP Apps you can deploy in one click or remix as your own.
+## Build
 
-| Preview | Name | Tools | Demo URL | Repo | Deploy |
-| --- | --- | --- | --- | --- | --- |
-| ![Chart Builder](https://raw.githubusercontent.com/mcp-use/mcp-chart-builder/main/repo-assets/demo.gif) | Chart Builder | `create-chart` | [Open URL](https://yellow-shadow-21833.run.mcp-use.com/mcp) | [mcp-use/mcp-chart-builder](https://github.com/mcp-use/mcp-chart-builder) | [![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-chart-builder&branch=main&project-name=mcp-chart-builder&port=3000&runtime=node&base-image=node%3A20) |
-| ![Diagram Builder](https://raw.githubusercontent.com/mcp-use/mcp-diagram-builder/main/repo-assets/demo.gif) | Diagram Builder | `create-diagram`, `edit-diagram` | [Open URL](https://lucky-darkness-402ph.run.mcp-use.com/mcp) | [mcp-use/mcp-diagram-builder](https://github.com/mcp-use/mcp-diagram-builder) | [![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-diagram-builder&branch=main&project-name=mcp-diagram-builder&port=3000&runtime=node&base-image=node%3A20) |
-| ![Slide Deck](https://raw.githubusercontent.com/mcp-use/mcp-slide-deck/main/repo-assets/demo.gif) | Slide Deck | `create-slides`, `edit-slide` | [Open URL](https://solitary-block-r6m6x.run.mcp-use.com/mcp) | [mcp-use/mcp-slide-deck](https://github.com/mcp-use/mcp-slide-deck) | [![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-slide-deck&branch=main&project-name=mcp-slide-deck&port=3000&runtime=node&base-image=node%3A20) |
-| ![Maps Explorer](https://raw.githubusercontent.com/mcp-use/mcp-maps-explorer/main/repo-assets/demo.gif) | Maps Explorer | `show-map`, `get-place-details`, `add-markers` | [Open URL](https://super-night-ttde2.run.mcp-use.com/mcp) | [mcp-use/mcp-maps-explorer](https://github.com/mcp-use/mcp-maps-explorer) | [![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-maps-explorer&branch=main&project-name=mcp-maps-explorer&port=3000&runtime=node&base-image=node%3A20) |
-| ![Hugging Face Spaces](https://raw.githubusercontent.com/mcp-use/mcp-huggingface-spaces/main/repo-assets/demo.gif) | Hugging Face Spaces | `search-spaces`, `show-space`, `trending-spaces` | [Open URL](https://gentle-frost-pvxpk.run.mcp-use.com/mcp) | [mcp-use/mcp-huggingface-spaces](https://github.com/mcp-use/mcp-huggingface-spaces) | [![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-huggingface-spaces&branch=main&project-name=mcp-huggingface-spaces&port=3000&runtime=node&base-image=node%3A20) |
-| ![Recipe Finder](https://raw.githubusercontent.com/mcp-use/mcp-recipe-finder/main/repo-assets/demo.gif) | Recipe Finder | `search-recipes`, `get-recipe`, `meal-plan`, `recipe-suggestion` | [Open URL](https://bold-tree-1fe79.run.mcp-use.com/mcp) | [mcp-use/mcp-recipe-finder](https://github.com/mcp-use/mcp-recipe-finder) | [![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-recipe-finder&branch=main&project-name=mcp-recipe-finder&port=3000&runtime=node&base-image=node%3A20) |
-| ![Widget Gallery](https://raw.githubusercontent.com/mcp-use/mcp-widget-gallery/main/repo-assets/demo.gif) | Widget Gallery | `show-react-widget`, `html-greeting`, `mcp-ui-poll`, `programmatic-counter`, `detect-client` | [Open URL](https://wandering-lake-mmxhs.run.mcp-use.com/mcp) | [mcp-use/mcp-widget-gallery](https://github.com/mcp-use/mcp-widget-gallery) | [![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-widget-gallery&branch=main&project-name=mcp-widget-gallery&port=3000&runtime=node&base-image=node%3A20) |
-| ![Multi Server Hub](https://raw.githubusercontent.com/mcp-use/mcp-multi-server-hub/main/repo-assets/demo.gif) | Multi Server Hub | `hub-status`, `hub-config-example`, `audit-log` | [Open URL](https://soft-voice-4nxfi.run.mcp-use.com/mcp) | [mcp-use/mcp-multi-server-hub](https://github.com/mcp-use/mcp-multi-server-hub) | [![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-multi-server-hub&branch=main&project-name=mcp-multi-server-hub&port=3000&runtime=node&base-image=node%3A20) |
-| ![File Manager](https://raw.githubusercontent.com/mcp-use/mcp-file-manager/main/repo-assets/demo.gif) | File Manager | `open-vault`, `get-file`, `list-files` | [Open URL](https://muddy-pond-eyays.run.mcp-use.com/mcp) | [mcp-use/mcp-file-manager](https://github.com/mcp-use/mcp-file-manager) | [![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-file-manager&branch=main&project-name=mcp-file-manager&port=3000&runtime=node&base-image=node%3A20) |
-| ![Progress Demo](https://raw.githubusercontent.com/mcp-use/mcp-progress-demo/main/repo-assets/demo.gif) | Progress Demo | `process-data`, `fetch-report`, `delete-dataset`, `search-external`, `failing-tool` | [Open URL](https://crimson-river-pzsz1.run.mcp-use.com/mcp) | [mcp-use/mcp-progress-demo](https://github.com/mcp-use/mcp-progress-demo) | [![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-progress-demo&branch=main&project-name=mcp-progress-demo&port=3000&runtime=node&base-image=node%3A20) |
-| ![i18n Adaptive](https://raw.githubusercontent.com/mcp-use/mcp-i18n-adaptive/main/repo-assets/demo.gif) | i18n Adaptive | `show-context`, `detect-caller` | [Open URL](https://falling-grass-58yov.run.mcp-use.com/mcp) | [mcp-use/mcp-i18n-adaptive](https://github.com/mcp-use/mcp-i18n-adaptive) | [![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-i18n-adaptive&branch=main&project-name=mcp-i18n-adaptive&port=3000&runtime=node&base-image=node%3A20) |
-| ![Media Mixer](https://raw.githubusercontent.com/mcp-use/mcp-media-mixer/main/repo-assets/demo.gif) | Media Mixer | `generate-image`, `generate-audio`, `generate-pdf`, `get-report`, `get-html-snippet`, `get-xml-config`, `get-stylesheet`, `get-script`, `get-data-array` | [Open URL](https://wandering-breeze-nuipu.run.mcp-use.com/mcp) | [mcp-use/mcp-media-mixer](https://github.com/mcp-use/mcp-media-mixer) | [![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-media-mixer&branch=main&project-name=mcp-media-mixer&port=3000&runtime=node&base-image=node%3A20) |
-| ![Resource Watcher](https://raw.githubusercontent.com/mcp-use/mcp-resource-watcher/main/repo-assets/demo.gif) | Resource Watcher | `show-config`, `update-config`, `toggle-feature`, `list-roots` | [Open URL](https://fragrant-term-zmdks.run.mcp-use.com/mcp) | [mcp-use/mcp-resource-watcher](https://github.com/mcp-use/mcp-resource-watcher) | [![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-resource-watcher&branch=main&project-name=mcp-resource-watcher&port=3000&runtime=node&base-image=node%3A20) |
-
----
-### <img src="./static/python.svg" height="14" style="margin-right:4px; top:-1px; position:relative;" align="center" /> Python
+Create the production build:
 
 ```bash
-pip install mcp-use
+npm run build
 ```
 
-```python
-from typing import Annotated
+## Inspect
 
-from mcp.types import ToolAnnotations
-from pydantic import Field
-
-from mcp_use import MCPServer
-
-server = MCPServer(name="Weather Server", version="1.0.0")
-
-@server.tool(
-    name="get_weather",
-    description="Get current weather information for a location",
-    annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=True),
-)
-async def get_weather(
-    city: Annotated[str, Field(description="City name")],
-) -> str:
-    return f"Temperature: 72°F, Condition: sunny, City: {city}"
-
-# Start server with auto-inspector
-server.run(transport="streamable-http", port=8000)
-# 🎉 Inspector at http://localhost:8000/inspector
-```
-
-[**→ Full Python Server Documentation**](https://mcp-use.com/docs/python/server/index)
-
----
-
-## Inspector
-
-The mcp-use Inspector lets you test and debug your MCP servers interactively.
-
-**Auto-included** when using `server.listen()`:
-
-```typescript
-server.listen(3000);
-// Inspector at http://localhost:3000/inspector
-```
-
-**Online** when connecting to hosted MCP servers:
-<br>
->Visit https://inspector.mcp-use.com
-
-**Standalone**: inspect any MCP server:
+Start development mode to serve the MCP endpoint at [`http://localhost:3000/mcp`](http://localhost:3000/mcp). The Inspector is automatically available at [`http://localhost:3000/mcp/inspector`](http://localhost:3000/mcp/inspector):
 
 ```bash
-npx @mcp-use/inspector --url http://localhost:3000/mcp
+npm run dev
 ```
 
-Visit [**Inspector Documentation**](https://mcp-use.com/docs/inspector/index)
+<p align="center">
+  <img src="./static/readme/inspector-hello-world.jpg" alt="Hello World MCP App rendered in the mcp-use Inspector" width="100%" />
+  <br />
+  <sub>Invoke tools, validate inputs, and inspect interactive Views in the same development loop.</sub>
+</p>
 
----
+Start a tunnel from the Inspector UI or run `mcp-use dev --tunnel` to get a public URL for your local MCP server and test it with ChatGPT and Claude before deployment. [Learn more about tunneling →](https://docs.mcp-use.com/tunneling)
+
+Inspect the same server headlessly from the terminal, invoke representative tools, and capture a View screenshot:
+
+```bash
+npm install --save-dev @mcp-use/client
+npx mcp-use client connect local http://localhost:3000/mcp
+npx mcp-use client local tools list
+npx mcp-use client local tools call get-weather city=Tokyo
+npx mcp-use screenshot \
+  --server local \
+  --tool get-weather \
+  city=Tokyo \
+  --output weather-card.png
+```
 
 ## Deploy
 
-Deploy your MCP server to production:
+Ship to [Manufact](https://manufact.com) and get observability, analytics, evals, submission readiness, and Git-based preview environments for free.
 
 ```bash
-npx @mcp-use/cli login
-npx @mcp-use/cli deploy
+npm run deploy
 ```
 
-Or connect your GitHub repo on [manufact.com](https://manufact.com) — production-ready with observability, metrics, logs, and branch-deployments.
+Prefer to run it yourself? Follow the [self-hosting guide →](https://mcpuse-codex-v1-v2-docs-split.mintlify.site/v2/typescript/server/deployment/runtime-patterns).
 
----
+## How mcp-use compares
 
-## Package Overview
+mcp-use builds on the official TypeScript SDK v2 and adds first-class Views, typed tool-to-UI contracts, an optimized stateless runtime, the Inspector, screenshot verification, agent-first CLI workflows, and deployment.
 
-This monorepo contains multiple packages for both Python and TypeScript:
+```mermaid
+block-beta
+  columns 7
 
-### Python Packages
+  metric["Metric"] mcp["mcp-use v2"] fastmcp["FastMCP TS"] official["Official SDK v2*"] xmcp["xmcp"] skybridge["Skybridge"] handler["mcp-handler"]
 
-| Package     | Description                           | Version                                                                                 |
-| ----------- | ------------------------------------- | --------------------------------------------------------------------------------------- |
-| **mcp-use** | Complete MCP server and MCP agent SDK | [![PyPI](https://img.shields.io/pypi/v/mcp_use.svg)](https://pypi.org/project/mcp_use/) |
+  speed["Speed"] speedMcp["10,982 ops/s"] speedFast["6,628 ops/s"] speedOfficial["8,050 ops/s"] speedXmcp["6,585 ops/s"] speedSkybridge["8,116 ops/s"] speedHandler["6,324 ops/s"]
+  install["MCP App<br/>dev stack"] installMcp["74.4 MiB"] installFast["122.5 MiB"] installOfficial["99.0 MiB"] installXmcp["121.9 MiB"] installSkybridge["137.5 MiB"] installHandler["388.0 MiB"]
+  packages["Installed<br/>packages"] packagesMcp["51"] packagesFast["180"] packagesOfficial["119"] packagesXmcp["171"] packagesSkybridge["300"] packagesHandler["130"]
+  views["Views"] viewsMcp["✅"] viewsFast["✅"] viewsOfficial["◐ Extension"] viewsXmcp["✅"] viewsSkybridge["✅"] viewsHandler["❌"]
+  nativeViews["Native Views<br/>on MCP 2026"] nativeViewsMcp["✅"] nativeViewsFast["✅"] nativeViewsOfficial["❌"] nativeViewsXmcp["❌"] nativeViewsSkybridge["❌"] nativeViewsHandler["❌"]
+  oauth["One-line<br/>OAuth adapters"] oauthMcp["✅"] oauthFast["◐ Provider/proxy"] oauthOfficial["◐ Primitives"] oauthXmcp["✅"] oauthSkybridge["✅"] oauthHandler["❌"]
+  protocol["MCP 2026<br/>protocol"] protocolMcp["✅"] protocolFast["✅"] protocolOfficial["✅"] protocolXmcp["❌"] protocolSkybridge["❌"] protocolHandler["❌"]
+  screenshot["Built-in View<br/>screenshot CLI"] screenshotMcp["✅"] screenshotFast["❌"] screenshotOfficial["❌"] screenshotXmcp["❌"] screenshotSkybridge["❌"] screenshotHandler["❌"]
+  tunnel["Built-in<br/>tunneling"] tunnelMcp["✅"] tunnelFast["❌"] tunnelOfficial["❌"] tunnelXmcp["❌"] tunnelSkybridge["✅"] tunnelHandler["❌"]
+  inspector["Built-in<br/>Inspector"] inspectorMcp["✅"] inspectorFast["✅"] inspectorOfficial["❌"] inspectorXmcp["❌"] inspectorSkybridge["◐ Limited"] inspectorHandler["❌"]
 
-### TypeScript Packages
+  classDef metricLabel fill:#6e76811a,font-weight:bold
+  classDef brand fill:#2ea04333,stroke:#2da44e,stroke-width:3px,font-weight:bold
+  classDef header fill:#6e76811a,font-weight:bold
+  classDef value fill:#6e76810f,stroke-width:1px
+  classDef leader fill:#2ea0432e,stroke:#2da44e,stroke-width:2px,font-weight:bold
+  classDef partial fill:#bb80092e,stroke:#bf8700,stroke-width:2px,font-weight:bold
+  classDef unavailable fill:#6e76810f,opacity:0.72
 
-| Package                | Description                                     | Version                                                                                                         |
-| ---------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| **mcp-use**            | Core framework for MCP servers, MCP apps, and MCP agents | [![npm](https://img.shields.io/npm/v/mcp-use.svg)](https://www.npmjs.com/package/mcp-use)                       |
-| **@mcp-use/cli**       | Build tool with hot reload and auto-inspector   | [![npm](https://img.shields.io/npm/v/@mcp-use/cli.svg)](https://www.npmjs.com/package/@mcp-use/cli)             |
-| **@mcp-use/inspector** | Web-based previewer and debugger for MCP servers              | [![npm](https://img.shields.io/npm/v/@mcp-use/inspector.svg)](https://www.npmjs.com/package/@mcp-use/inspector) |
-| **create-mcp-use-app** | Project scaffolding tool                        | [![npm](https://img.shields.io/npm/v/create-mcp-use-app.svg)](https://www.npmjs.com/package/create-mcp-use-app) |
-
----
-
-## Also: MCP Agent & Client
-
-mcp-use also provides a full MCP Agent and Client implementation.
-
-<details>
-<summary>Build an AI Agent</summary>
-
-### <img src="./static/python.svg" height="14" style="margin-right:4px; top:-1px; position:relative;" align="center" /> Python
-
-```bash
-pip install mcp-use langchain-openai
+  class metric,speed,install,packages,views,nativeViews,oauth,protocol,screenshot,tunnel,inspector metricLabel
+  class mcp brand
+  class fastmcp,official,xmcp,skybridge,handler header
+  class speedFast,speedOfficial,speedXmcp,speedSkybridge,speedHandler,installFast,installOfficial,installXmcp,installSkybridge,installHandler,packagesFast,packagesOfficial,packagesXmcp,packagesSkybridge,packagesHandler value
+  class speedMcp,installMcp,packagesMcp,viewsMcp,viewsFast,viewsXmcp,viewsSkybridge,nativeViewsMcp,nativeViewsFast,oauthMcp,oauthXmcp,oauthSkybridge,protocolMcp,protocolFast,protocolOfficial,screenshotMcp,tunnelMcp,tunnelSkybridge,inspectorMcp,inspectorFast leader
+  class oauthFast,viewsOfficial,oauthOfficial,inspectorSkybridge partial
+  class viewsHandler,nativeViewsOfficial,nativeViewsXmcp,nativeViewsSkybridge,nativeViewsHandler,oauthHandler,protocolXmcp,protocolSkybridge,protocolHandler,screenshotFast,screenshotOfficial,screenshotXmcp,screenshotSkybridge,screenshotHandler,tunnelFast,tunnelOfficial,tunnelXmcp,tunnelHandler,inspectorOfficial,inspectorXmcp,inspectorHandler unavailable
 ```
 
-```python
-import asyncio
-from langchain_openai import ChatOpenAI
-from mcp_use import MCPAgent, MCPClient
+<sub>* Includes `@modelcontextprotocol/ext-apps`, Vite, and zod for an MCP Apps-capable stack.</sub>
 
-async def main():
-    config = {
-        "mcpServers": {
-            "filesystem": {
-                "command": "npx",
-                "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
-            }
-        }
-    }
+<sub>Install rows compare custom React MCP App development stacks. FastMCP therefore includes the Apps extension, React, Vite React plugin, Vite, TypeScript, and zod rather than only its narrower server-side component workflow. Size is actual `node_modules` disk usage after a normal npm install, including required peer dependencies.</sub>
 
-    client = MCPClient.from_dict(config)
-    llm = ChatOpenAI(model="gpt-4o")
-    agent = MCPAgent(llm=llm, client=client)
+**[Read the detailed benchmark report →](./benchmark.md)**
 
-    result = await agent.run("List all files in the directory")
-    print(result)
+## Examples
 
-asyncio.run(main())
-```
+Remix a complete MCP App, inspect the source, or deploy it as a starting point:
 
-[**→ Full Python Agent Documentation**](./libraries/python/README.md#quick-start)
+| Preview | App | What it demonstrates |
+| --- | --- | --- |
+| <img src="https://raw.githubusercontent.com/mcp-use/mcp-chart-builder/main/repo-assets/demo.gif" alt="Chart Builder demo" width="280"> | [Chart Builder](https://github.com/mcp-use/mcp-chart-builder) | Structured data rendered as interactive charts · [Open demo](https://yellow-shadow-21833.run.mcp-use.com/mcp) |
+| <img src="https://raw.githubusercontent.com/mcp-use/mcp-diagram-builder/main/repo-assets/demo.gif" alt="Diagram Builder demo" width="280"> | [Diagram Builder](https://github.com/mcp-use/mcp-diagram-builder) | Create and edit diagrams through MCP tools · [Open demo](https://lucky-darkness-402ph.run.mcp-use.com/mcp) |
+| <img src="https://raw.githubusercontent.com/mcp-use/mcp-maps-explorer/main/repo-assets/demo.gif" alt="Maps Explorer demo" width="280"> | [Maps Explorer](https://github.com/mcp-use/mcp-maps-explorer) | Search, detail tools, and an interactive map view · [Open demo](https://super-night-ttde2.run.mcp-use.com/mcp) |
 
-### <img src="./static/typescript.svg" height="14" style="margin-right:4px; top:-1px; position:relative;" align="center" /> TypeScript
+[Browse all TypeScript examples →](./libraries/typescript/packages/server/examples)
 
-```bash
-npm install mcp-use @langchain/openai
-```
+## Ecosystem
 
-```typescript
-import { ChatOpenAI } from "@langchain/openai";
-import { MCPAgent, MCPClient } from "mcp-use";
+| Package | Use it for |
+| --- | --- |
+| [`mcp-use`](https://www.npmjs.com/package/mcp-use) | TypeScript v2 server framework, React views, and CLI |
+| [`@mcp-use/client`](https://www.npmjs.com/package/@mcp-use/client) | Connect to MCP servers from Node.js, browsers, React, and sandboxes |
+| [`@mcp-use/agent`](https://www.npmjs.com/package/@mcp-use/agent) | Build model-powered agents on top of MCP clients |
+| [`@mcp-use/inspector`](https://www.npmjs.com/package/@mcp-use/inspector) | Inspect and debug MCP servers and apps |
+| [`create-mcp-use-app`](https://www.npmjs.com/package/create-mcp-use-app) | Scaffold servers and interactive apps |
+| [`mcp-use` for Python](https://pypi.org/project/mcp-use/) | Build Python MCP servers, clients, and agents |
 
-async function main() {
-  const config = {
-    mcpServers: {
-      filesystem: {
-        command: "npx",
-        args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
-      },
-    },
-  };
+- [TypeScript documentation](https://mcp-use.com/docs/typescript)
+- [Python documentation](https://mcp-use.com/docs/python)
+- [Inspector documentation](https://mcp-use.com/docs/inspector/index)
+- [Agent documentation](https://mcp-use.com/docs/typescript/agent/index)
+- [Client documentation](https://mcp-use.com/docs/typescript/client/index)
 
-  const client = MCPClient.fromDict(config);
-  const llm = new ChatOpenAI({ modelName: "gpt-4o" });
-  const agent = new MCPAgent({ llm, client });
-
-  const result = await agent.run("List all files in the directory");
-  console.log(result);
-}
-
-main();
-```
-
-[**→ Full TypeScript Agent Documentation**](./libraries/typescript/README.md#-quick-start)
-
-</details>
-
-<details>
-<summary>Use MCP Client</summary>
-
-### <img src="./static/python.svg" height="14" style="margin-right:4px; top:-1px; position:relative;" align="center" /> Python
-
-```python
-import asyncio
-from mcp_use import MCPClient
-
-async def main():
-    config = {
-        "mcpServers": {
-            "calculator": {
-                "command": "npx",
-                "args": ["-y", "@modelcontextprotocol/server-everything"]
-            }
-        }
-    }
-
-    client = MCPClient.from_dict(config)
-    await client.create_all_sessions()
-
-    session = client.get_session("calculator")
-    result = await session.call_tool(name="add", arguments={"a": 5, "b": 3})
-
-    print(f"Result: {result.content[0].text}")
-    await client.close_all_sessions()
-
-asyncio.run(main())
-```
-
-[**→ Python Client Documentation**](./libraries/python/README.md#direct-tool-calls-without-llm)
-
-### <img src="./static/typescript.svg" height="14" style="margin-right:4px; top:-1px; position:relative;" align="center" /> TypeScript
-
-```typescript
-import { MCPClient } from "mcp-use";
-
-async function main() {
-  const config = {
-    mcpServers: {
-      calculator: {
-        command: "npx",
-        args: ["-y", "@modelcontextprotocol/server-everything"],
-      },
-    },
-  };
-
-  const client = new MCPClient(config);
-  await client.createAllSessions();
-
-  const session = client.getSession("calculator");
-  const result = await session.callTool("add", { a: 5, b: 3 });
-
-  console.log(`Result: ${result.content[0].text}`);
-  await client.closeAllSessions();
-}
-
-main();
-```
-
-[**→ TypeScript Client Documentation**](./libraries/typescript/README.md#basic-usage)
-
-</details>
-
----
-
-## Conformance to Model Context Protocol
+## Protocol conformance
 
 <div align="center">
-    <a href="https://github.com/mcp-use/mcp-use/actions/workflows/conformance.yml" alt="Python MCP Conformance">
-        <img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/tonxxd/6edf670f0446dc9f7a1f32d6bfda2b70/raw/python-conformance.json" /></a>
-    <a href="https://github.com/mcp-use/mcp-use/actions/workflows/conformance.yml" alt="Python MCP Client Conformance">
-        <img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/tonxxd/6edf670f0446dc9f7a1f32d6bfda2b70/raw/python-client-conformance.json" /></a>
-    <a href="https://github.com/mcp-use/mcp-use/actions/workflows/conformance.yml" alt="TypeScript MCP Conformance">
-        <img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/tonxxd/6edf670f0446dc9f7a1f32d6bfda2b70/raw/typescript-conformance.json" /></a>
-    <a href="https://github.com/mcp-use/mcp-use/actions/workflows/conformance.yml" alt="TypeScript MCP Client Conformance">
-      <img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/tonxxd/6edf670f0446dc9f7a1f32d6bfda2b70/raw/typescript-node-client-conformance.json" /></a>
+  <a href="https://github.com/mcp-use/mcp-use/actions/workflows/conformance.yml">
+    <img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/tonxxd/6edf670f0446dc9f7a1f32d6bfda2b70/raw/python-conformance.json" alt="Python MCP conformance">
+  </a>
+  <a href="https://github.com/mcp-use/mcp-use/actions/workflows/conformance.yml">
+    <img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/tonxxd/6edf670f0446dc9f7a1f32d6bfda2b70/raw/python-client-conformance.json" alt="Python MCP client conformance">
+  </a>
+  <a href="https://github.com/mcp-use/mcp-use/actions/workflows/conformance.yml">
+    <img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/tonxxd/6edf670f0446dc9f7a1f32d6bfda2b70/raw/typescript-conformance.json" alt="TypeScript MCP conformance">
+  </a>
+  <a href="https://github.com/mcp-use/mcp-use/actions/workflows/conformance.yml">
+    <img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/tonxxd/6edf670f0446dc9f7a1f32d6bfda2b70/raw/typescript-node-client-conformance.json" alt="TypeScript MCP client conformance">
+  </a>
 </div>
 
----
+## Security and community
 
-## Security
-See [SECURITY.md](https://github.com/mcp-use/mcp-use/blob/main/SECURITY.md)
-
-## Community & Support
-
-- **Discord**: [Join our community](https://discord.gg/XkNkSkMz3V)
-- **GitHub Issues**: [Report bugs or request features](https://github.com/mcp-use/mcp-use/issues)
-- **Documentation**: [mcp-use.com/docs](https://mcp-use.com/docs)
-- **Website**: [manufact.com](https://manufact.com)
-- **X.com**: Follow [Manufact](https://x.com/manufact)
-- **Contributing**: See [CONTRIBUTING.md](https://github.com/mcp-use/mcp-use/blob/main/CONTRIBUTING.md)
-- **License**: MIT © [MCP-Use Contributors](https://github.com/mcp-use/mcp-use/graphs/contributors)
-
----
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=mcp-use/mcp-use&type=Date)](https://www.star-history.com/#mcp-use/mcp-use&Date)
-
----
+- [Security policy](./SECURITY.md)
+- [Contribution guide](./CONTRIBUTING.md)
+- [GitHub issues](https://github.com/mcp-use/mcp-use/issues)
+- [Discord community](https://discord.gg/XkNkSkMz3V)
+- [Manufact](https://manufact.com)
+- [MIT license](./LICENSE)
 
 ## Contributors
 
-Thanks to all our amazing contributors!
-
-### Core Contributors
-
-1. **Pietro** ([@pietrozullo](https://github.com/pietrozullo))
-2. **Luigi** ([@pederzh](https://github.com/pederzh))
-3. **Enrico** ([@tonxxd](https://github.com/tonxxd))
-
-<br>
+Built by [Pietro](https://github.com/pietrozullo), [Luigi](https://github.com/pederzh), [Enrico](https://github.com/tonxxd), and the mcp-use community.
 
 <a href="https://github.com/mcp-use/mcp-use/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=mcp-use/mcp-use" />
+  <img src="https://contrib.rocks/image?repo=mcp-use/mcp-use" alt="mcp-use contributors">
 </a>
-
----
-
-<div align="center">
-  <strong>Built with ❤️ by Manufact team and the mcp-use community</strong>
-  <br/>
-  <sub>San Francisco | Zürich</sub>
-</div>

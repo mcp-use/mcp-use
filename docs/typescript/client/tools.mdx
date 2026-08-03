@@ -1,113 +1,69 @@
 ---
 title: "Tools"
-description: "List and call MCP server tools from a TypeScript client session."
+description: "List and call MCP server tools"
 icon: "wrench"
 ---
 
-Tools are functions exposed by an MCP server. In the TypeScript client, you use an initialized `MCPSession` to list available tools and call a tool by name.
-
-If you want to define tools on a server, see [Server tools](/typescript/server/tools).
-
-## List tools
-
-Call `session.listTools()` after you open a session. It fetches the current tool list from the server.
+Use a ready `MCPConnection` to list and call tools.
 
 ```typescript
-import { MCPClient } from "mcp-use";
+import { MCPClient } from "@mcp-use/client";
 
 const client = new MCPClient({
-  mcpServers: {
-    demo: {
-      url: "http://localhost:3000/mcp",
-    },
-  },
+  mcpServers: { demo: { url: "http://localhost:3000/mcp" } },
 });
 
 try {
-  const session = await client.createSession("demo");
-  const tools = await session.listTools();
+  const conn = await client.connect("demo");
 
+  const tools = await conn.listTools();
   for (const tool of tools) {
     console.log(tool.name, tool.description);
-    console.log(tool.inputSchema);
+  }
+
+  const result = await conn.callTool("read_file", { path: "/tmp/a.txt" });
+
+  if (result.isError) {
+    console.error(result.content);
+  } else {
+    for (const block of result.content) {
+      if (block.type === "text") console.log(block.text);
+    }
   }
 } finally {
   await client.close();
 }
 ```
 
-Use `session.tools` only when you want the connector's cached tool list. Use `listTools()` when you want fresh data.
+## Timeouts
 
-## Call a tool
-
-Call `session.callTool(name, args)` with the tool name and an object that matches the tool's input schema.
+Pass MCP request options as the third argument:
 
 ```typescript
-const result = await session.callTool("read_file", {
-  path: "/tmp/report.txt",
-});
+const abortController = new AbortController();
 
-if (result.isError) {
-  console.error("Tool returned an error:", result.content);
-} else {
-  for (const block of result.content) {
-    if (block.type === "text") {
-      console.log(block.text);
-    }
-  }
-}
-```
-
-`callTool()` returns a `CallToolResult` from the MCP SDK. `content` is an array of typed content blocks, so narrow each block by `block.type` before reading fields such as `text`.
-
-## Set request timeouts
-
-Pass MCP request options as the third argument to `callTool()`.
-
-```typescript
-const result = await session.callTool(
-  "long_running_task",
-  { input: "large dataset" },
+await conn.callTool(
+  "long_task",
+  { input: "data" },
   {
     timeout: 300_000,
     resetTimeoutOnProgress: true,
     maxTotalTimeout: 900_000,
-  }
+    signal: abortController.signal,
+  },
 );
 ```
 
-Use these options for long-running tools:
-
-| Option | What it does |
-| --- | --- |
-| `timeout` | Maximum time, in milliseconds, for a request before it times out. |
-| `resetTimeoutOnProgress` | Resets the timeout when the server sends progress notifications. |
-| `maxTotalTimeout` | Sets an overall maximum time even when progress resets the timeout. |
-| `signal` | Cancels the request with an `AbortSignal`. |
-
-## Handle missing sessions
-
-`getSession(name)` returns `null` if the session has not been opened. Use `requireSession(name)` when a missing session should throw.
+## Lazy connect
 
 ```typescript
-let session = client.getSession("demo");
-
-if (!session) {
-  session = await client.createSession("demo");
-}
-
-const result = await session.callTool("echo", {
-  message: "hello",
-});
+let conn = client.getSession("demo");
+if (!conn) conn = await client.connect("demo");
+await conn.callTool("echo", { message: "hello" });
 ```
 
-## Next steps
+`getSession` returns `null` when not connected. `requireSession` throws.
 
-<CardGroup cols={2}>
-  <Card title="MCPClient reference" icon="router" href="/typescript/api-reference/client/mcp-client">
-    Configure HTTP and Standard I/O servers before opening sessions.
-  </Card>
-  <Card title="MCPSession reference" icon="cable" href="/typescript/api-reference/client/mcp-session">
-    Exact signatures for `listTools()`, `callTool()`, and request options.
-  </Card>
-</CardGroup>
+## Reference
+
+[`MCPConnection`](/typescript/api-reference/client/mcp-session) — `listTools`, `callTool`, request options.

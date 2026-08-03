@@ -1,113 +1,109 @@
 ---
-title: "Server Composition"
-description: "Compose multiple MCP servers into one unified aggregator server."
+title: "Compose MCP servers"
+description: "Proxy multiple MCP servers through one TypeScript MCP endpoint with server.proxy() and the optional @mcp-use/client package."
 icon: "git-merge"
 ---
 
-The `mcp-use` TypeScript SDK lets you proxy and compose multiple MCP servers into a single unified aggregator server.
+`server.proxy()` connects to multiple upstream HTTP MCP servers and exposes their tools, static resources, and prompts through one endpoint. Config-map keys and negotiated server names automatically namespace proxied capabilities.
 
-This is extremely useful when you have multiple microservices or specialized MCP servers (like a database server, a weather server, and an internal API server) and you want to expose all of their tools, resources, and prompts through a single unified endpoint.
+## Install the optional client
 
-## High-Level API (Config Object)
+Proxying requires `@mcp-use/client` v2. The package is an optional peer of `mcp-use`, so applications that do not call `server.proxy()` do not need to install it.
 
-The most elegant way to proxy servers is to pass a configuration object directly to `server.proxy()`. The keys of the object act as the **namespaces** for the child servers, preventing any naming collisions.
+```bash
+npm install mcp-use @mcp-use/client
+```
+
+If you call `server.proxy()` without the client installed, mcp-use throws an error with the install command. Importing or running a server without calling `proxy()` does not load the client package.
+
+## Proxy multiple servers
+
+Pass an object whose keys identify upstreams and whose values contain HTTP connection settings. The keys automatically become capability namespaces.
 
 ```typescript
-import { MCPServer, text } from "mcp-use/server";
-import path from "node:path";
+import { MCPServer } from "mcp-use";
 
-const server = new MCPServer({ name: "UnifiedServer", version: "1.0.0" });
+const server = new MCPServer({
+  name: "gateway",
+  version: "1.0.0",
+});
 
-// The SDK handles all connections, sessions, and synchronization automatically
 await server.proxy({
-  // Proxy a local TypeScript server (using the 'tsx' runner)
-  database: {
-    command: "tsx",
-    args: [path.resolve(__dirname, "./db-server.ts")]
-  },
-  
-  // Proxy a local Python FastMCP server
   weather: {
-    command: "uv",
-    args: ["run", "weather_server.py"],
-    env: { ...process.env, FASTMCP_LOG_LEVEL: "ERROR" }
+    url: "https://weather.example.com/mcp",
   },
-  
-  // Proxy a remote server over HTTP
-  manufact: {
-    url: "https://manufact.com/docs/mcp"
-  }
+  internal: {
+    url: "https://internal.example.com/mcp",
+    authToken: process.env.INTERNAL_MCP_TOKEN,
+  },
 });
 
-// Expose our own tools alongside the proxied ones
-server.tool({
-  name: "aggregator_status",
-  description: "Check aggregator status",
-}, async () => text("All systems operational"));
+server.tool({ name: "gateway_status" }, async () => ({
+  content: [{ type: "text", text: "Gateway is running" }],
+}));
 
-// Start the unified server
 await server.listen(3000);
 ```
 
-In the example above, the `database` tools will be prefixed with `database_` (e.g. `database_query`), the `weather` tools will be prefixed with `weather_` (e.g. `weather_get_forecast`), and so on.
+The gateway exposes upstream names with a `<namespace>_` prefix:
 
-## Low-Level API (Explicit Session)
+| Upstream capability            | Gateway capability  |
+| ------------------------------ | ------------------- |
+| `weather` prompt `forecast`    | `weather_forecast`  |
+| `internal` resource `handbook` | `internal_handbook` |
 
-For advanced use cases (such as dynamically determining auth headers, managing complex connection lifecycles, or using custom connectors), you can inject an explicit `MCPSession` directly into the `proxy` method using the `mcp-use` Client SDK.
+Static resource URIs use the `mcp-use-proxy` scheme. The gateway maps each proxy URI back to the original upstream URI when a client reads it.
+
+Call `proxy()` before `listen()` or the first `server.fetch` request. Registration is best-effort: a connection failure skips that upstream, an introspection failure skips only the affected capability kind, and a name collision skips only the colliding capability. Each failure is written to the server's diagnostics while other upstreams and capabilities remain available.
+
+Proxy config deliberately supports bearer tokens and explicit authentication headers, but not automatic OAuth. `server.proxy()` disables the client's browser-based OAuth flow, so starting the gateway never opens a browser. Obtain and refresh credentials in your application, then pass them with `authToken` or `headers`.
+
+## Mount an existing connection
+
+Pass a ready `MCPConnection` when your application creates the client itself. The upstream's negotiated server name automatically becomes the namespace.
 
 ```typescript
-import { MCPServer } from "mcp-use/server";
-import { MCPClient } from "mcp-use/client";
+import { MCPClient } from "@mcp-use/client";
+import { MCPServer } from "mcp-use";
 
-const server = new MCPServer({ name: "UnifiedServer", version: "1.0.0" });
-
-// Create a custom client orchestration
-const customClient = new MCPClient({
+const client = new MCPClient({
   mcpServers: {
-    secure_db: {
-      url: "https://secure-db.example.com/mcp"
-    }
-  }
+    secure_database: {
+      url: "https://database.example.com/mcp",
+      authToken: process.env.DATABASE_MCP_TOKEN,
+      oauth: false,
+    },
+  },
 });
 
-// Manage the session manually
-const dbSession = await customClient.createSession("secure_db");
+const connection = await client.connect("secure_database");
 
-// Proxy the active session, manually specifying the namespace
-await server.proxy(dbSession, { namespace: "secure_db" });
+const server = new MCPServer({
+  name: "gateway",
+  version: "1.0.0",
+});
 
+await server.proxy(connection);
 await server.listen(3000);
 ```
 
-## Example Usage
+The parent server owns connections it creates from a config object and closes them in `server.close()`. Your application remains responsible for an explicitly supplied connection:
 
-<Card title="Proxy Server Example" icon="github" href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/features/proxy">
-  See a fully working example of server composition in the mcp-use repository.
-</Card>
+```typescript
+await server.close();
+await client.close();
+```
 
-## How It Works
+## Forwarded behavior
 
-When you proxy a server, the `mcp-use` SDK automatically:
+The proxy introspects each upstream once during setup and forwards:
 
-1. **Introspects** the child server by calling `listTools()`, `listResources()`, and `listPrompts()`.
-2. **Translates** the raw JSON Schemas returned by the child server into runtime `Zod` schemas for perfect compatibility with the `mcp-use` validation pipeline.
-3. **Namespaces** the component names to prevent collisions.
-4. **Relays** execution. When a client calls a proxied tool, the Aggregator intercepts it and forwards the execution to the child server.
-5. **Synchronizes** state. The Aggregator listens to `notifications/tools/list_changed` (and other list_changed events) emitted by the child server and instantly forwards them to all clients connected to the Aggregator.
+- Tool metadata, input and output JSON Schemas, calls, structured content, error results, cancellation, and progress
+- Static resource metadata and reads
+- Prompt metadata, argument schemas, and prompt requests
 
-## Advanced Features
+The initial v2 implementation does not proxy resource templates, completions, subscriptions, upstream list-change re-synchronization, or legacy push-style sampling and elicitation callbacks.
 
-The `mcp-use` proxying system goes far beyond simple tool forwarding. It transparently supports the most advanced features of the Model Context Protocol:
+## Run the complete example
 
-### LLM Sampling & Elicitation 
-If a child server requests LLM Sampling (`sampling/createMessage`) or Elicitation (`elicitation/create`), the Aggregator automatically intercepts the out-of-band JSONRPC request, dynamically resolves the HTTP context of the specific user who triggered the tool, and routes the request back to that specific user's client.
-
-If a request context is somehow lost (e.g., executing a tool via a headless script), the Aggregator provides graceful fallbacks so the child server doesn't hang.
-
-### Progress Tracking
-If a child tool emits `notifications/progress` events, the Aggregator catches those events and pipes them directly through the unified `ToolContext` back to the parent client.
-
-### Resource URIs
-To prevent URI collisions across different servers, the proxy automatically prepends the namespace to the resource URI protocol.
-
-For example, if the `weather` server exposes a resource at `app://settings`, the Aggregator will expose it as `weather://app://settings`. When a client reads that resource, the Aggregator strips the prefix and requests the original URI from the child server.
+The [multiple-server proxy example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/proxy) starts two local upstream servers and proxies both through one gateway.
