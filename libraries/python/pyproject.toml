@@ -20,7 +20,10 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    "mcp>=1.24.0",
+    # The Python SDK has not yet migrated to the incompatible mcp 2.x API.
+    # Keep its legacy conformance fixture on the supported 1.x SDK line; the
+    # TypeScript v2 fixture is exercised separately in CI.
+    "mcp>=1.24.0,<2.0.0",
     "langchain>=1.0.0",
     "websockets>=15.0",
     "httpx>=0.27.1",
