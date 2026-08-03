@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 2.0.0-beta.16
+
+### Patch Changes
+
+- 34405ca: Resolve the default SDK and bundled MCP Apps skill from the matching release channel: beta builds use npm `beta` and the beta branch, while stable builds use npm `latest` and the main branch.
+
 ## 2.0.0-beta.15
 
 ### Patch Changes
