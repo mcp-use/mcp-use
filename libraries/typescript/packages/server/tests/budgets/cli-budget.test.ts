@@ -119,6 +119,20 @@ describe("published CLI boundaries", () => {
     expect(await directoryBytes(DIST)).toBeLessThanOrEqual(5 * 1024 * 1024);
   });
 
+  it("keeps skill discovery self-contained without a runtime dependency", async () => {
+    expect(packageJson.dependencies).not.toHaveProperty("yaml");
+
+    const graph = await buildStaticGraph(
+      new URL("internal/skills-loader.js", DIST)
+    );
+    expect(
+      [...graph.staticPackages].filter((specifier) => !isBuiltin(specifier))
+    ).toEqual([]);
+    const source = [...graph.files.values()].join("\n");
+    expect(source).not.toContain('from"yaml"');
+    expect(source).not.toContain("Dynamic require");
+  });
+
   it("declares every external package used by the Node bundle", async () => {
     const graph = await buildStaticGraph(new URL("index-node.js", DIST));
     const declaredRuntimePackages = new Set([

@@ -533,9 +533,6 @@ importers:
       jose:
         specifier: ^6.1.3
         version: 6.1.3
-      yaml:
-        specifier: '>=2.8.3'
-        version: 2.8.3
     devDependencies:
       '@mcp-use/client':
         specifier: workspace:*
@@ -585,6 +582,9 @@ importers:
       vitest:
         specifier: '>=4.1.9'
         version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@22.20.1)(happy-dom@20.10.6)(jsdom@27.4.0(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@22.20.1)(esbuild@0.27.1)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.3))
+      yaml:
+        specifier: '>=2.8.3'
+        version: 2.8.3
       zod:
         specifier: 4.4.3
         version: 4.4.3

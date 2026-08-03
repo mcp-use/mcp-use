@@ -9,6 +9,22 @@ const packageVersionDefine = {
   __MCP_USE_PACKAGE_VERSION__: JSON.stringify(frameworkPackage.version),
 };
 
+const yamlLicense = `/*!
+ * yaml 2.8.3, Copyright Eemeli Aro <eemeli@gmail.com>
+ *
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+ * SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
+ * OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
+ * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */`;
+
 function minifyFrameworkOutput(options: {
   minifySyntax?: boolean;
   minifyWhitespace?: boolean;
@@ -50,7 +66,6 @@ export default defineConfig([
       "node-bridge": "src/node-bridge.ts",
       "internal/node-http": "src/node-http.ts",
       "internal/node-http-unavailable": "src/node-http-unavailable.ts",
-      "internal/skills-loader": "src/skills/node-loader.ts",
       "internal/skills-loader-unavailable":
         "src/skills/node-loader-unavailable.ts",
       "next/index": "src/next/index.ts",
@@ -69,6 +84,29 @@ export default defineConfig([
       "#mcp-use-node-http",
       "#mcp-use-skills-loader",
     ],
+    define: packageVersionDefine,
+    esbuildOptions: minifyFrameworkOutput,
+  },
+  // Discovery remains a Node-only implementation detail. Bundle the YAML
+  // parser here so consumers do not install an extra runtime dependency and
+  // the edge graph cannot reach filesystem or parser code.
+  {
+    entry: {
+      "internal/skills-loader": "src/skills/node-loader.ts",
+    },
+    format: ["esm"],
+    // Resolve yaml's ESM default export while leaving Node builtins external.
+    // The package's Node condition is CommonJS and cannot be embedded in this
+    // ESM-only loader without a runtime require shim.
+    platform: "neutral",
+    target: "node22",
+    dts: false,
+    splitting: false,
+    sourcemap: false,
+    clean: false,
+    external: ["node:*"],
+    noExternal: ["yaml"],
+    banner: { js: yamlLicense },
     define: packageVersionDefine,
     esbuildOptions: minifyFrameworkOutput,
   },
