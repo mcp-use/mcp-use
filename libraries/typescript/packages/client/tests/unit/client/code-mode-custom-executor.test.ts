@@ -34,26 +34,67 @@ describe("codeMode with a custom executor function", () => {
     expect(fn).toHaveBeenCalledWith("return 1", 1234);
   });
 
-  it("supports searchTools when the executor is a custom function", async () => {
+  it("invokes the custom function with the client as `this`", async () => {
+    const seen: unknown[] = [];
+    const client = new MCPClient(
+      {},
+      {
+        codeMode: {
+          enabled: true,
+          executor: async function (this: unknown) {
+            seen.push(this);
+            return ok(null);
+          },
+        },
+      }
+    );
+
+    await client.executeCode("return 1");
+    expect(seen).toEqual([client]);
+  });
+
+  it("discovers tools via searchTools when the executor is a custom function", async () => {
     const client = new MCPClient(
       {},
       { codeMode: { enabled: true, executor: async () => ok(null) } }
     );
+    // Stand in for a connected server so searchTools has something to report.
+    client.sessions.fake = {
+      connector: {
+        tools: [
+          { name: "read_file", description: "Read a file", inputSchema: {} },
+        ],
+      },
+    } as never;
+    client.activeSessions.push("fake");
 
-    await expect(client.searchTools("")).resolves.toEqual({
-      meta: { total_tools: 0, namespaces: [], result_count: 0 },
-      results: [],
+    await expect(client.searchTools("read")).resolves.toEqual({
+      meta: { total_tools: 1, namespaces: ["fake"], result_count: 1 },
+      results: [
+        {
+          name: "read_file",
+          server: "fake",
+          description: "Read a file",
+          input_schema: {},
+        },
+      ],
     });
   });
 
-  it("close() cleans up a custom function executor", async () => {
+  it("close() runs cleanup on the custom function executor", async () => {
     const client = new MCPClient(
       {},
       { codeMode: { enabled: true, executor: async () => ok(null) } }
     );
 
     await client.executeCode("return 1");
-    await expect(client.close()).resolves.toBeUndefined();
+    const executor = (client as unknown as { _codeExecutor: BaseCodeExecutor })
+      ._codeExecutor;
+    expect(executor).toBeInstanceOf(BaseCodeExecutor);
+    const cleanup = vi.spyOn(executor, "cleanup");
+
+    await client.close();
+    expect(cleanup).toHaveBeenCalledTimes(1);
   });
 
   it("still supports a BaseCodeExecutor instance", async () => {

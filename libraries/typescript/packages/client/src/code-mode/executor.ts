@@ -209,6 +209,10 @@ export abstract class BaseCodeExecutor {
  * Adapts a plain `(code, timeout) => Promise<ExecutionResult>` function to the
  * {@link BaseCodeExecutor} interface so a custom executor participates in the
  * normal executor lifecycle (`searchTools`, `close()` cleanup).
+ *
+ * The function is invoked with the `MCPClient` as its `this`, matching how a
+ * custom executor was called before this adapter existed. Cleanup is a no-op:
+ * the caller owns whatever runtime the function wraps.
  */
 export class FunctionCodeExecutor extends BaseCodeExecutor {
   private fn: CodeExecutorFunction;
@@ -219,7 +223,7 @@ export class FunctionCodeExecutor extends BaseCodeExecutor {
   }
 
   async execute(code: string, timeout?: number): Promise<ExecutionResult> {
-    return this.fn(code, timeout);
+    return this.fn.call(this.client, code, timeout);
   }
 
   async cleanup(): Promise<void> {
