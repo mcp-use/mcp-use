@@ -10,6 +10,7 @@
     "mcp-use": "2.0.0"
   },
   "changesets": [
+    "mcp-2549-dev-forwarding",
     "start-inspector-hint",
     "typecheck-success-line"
   ]
