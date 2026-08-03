@@ -56,10 +56,12 @@ async function initializeLangfuse(
 ): Promise<void> {
   try {
     // Dynamically import to avoid errors if package not installed
-    const langfuseModule = await import("langfuse-langchain").catch(() => null);
+    const langfuseModule = await import("@langfuse/langchain").catch(
+      () => null
+    );
     if (!langfuseModule) {
       logger.debug(
-        "Langfuse package not installed - tracing disabled. Install with: npm install langfuse-langchain"
+        "Langfuse package not installed - tracing disabled. Install with: npm install @langfuse/langchain"
       );
       return;
     }

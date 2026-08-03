@@ -36,7 +36,8 @@ Your custom provider must verify access tokens and return the verified payload.
 
 ```typescript
 import { createRemoteJWKSet, jwtVerify } from "jose";
-import { MCPServer, oauthCustomProvider } from "mcp-use/server";
+import { MCPServer } from "mcp-use";
+import { oauthCustomProvider } from "mcp-use/oauth";
 
 const issuer = "https://auth.example.com";
 const jwks = createRemoteJWKSet(new URL(`${issuer}/.well-known/jwks.json`));
@@ -108,13 +109,25 @@ Confirm these cases:
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="OAuth Proxy" icon="shuffle" href="/typescript/server/authentication/providers/oauth-proxy">
+  <Card
+    title="OAuth Proxy"
+    icon="shuffle"
+    href="/typescript/server/authentication/providers/oauth-proxy"
+  >
     Use a provider that does not support Dynamic Client Registration.
   </Card>
-  <Card title="User Context" icon="user" href="/typescript/server/authentication/user-context">
+  <Card
+    title="User Context"
+    icon="user"
+    href="/typescript/server/authentication/user-context"
+  >
     Use normalized user claims inside tools.
   </Card>
-  <Card title="Custom provider API reference" icon="terminal" href="/typescript/api-reference/server/auth-providers#oauthcustomprovider">
+  <Card
+    title="Custom provider API reference"
+    icon="terminal"
+    href="/typescript/api-reference/server/auth-providers#oauthcustomprovider"
+  >
     Look up exact custom provider options and contracts.
   </Card>
   <Card title="jose" icon="key" href="https://github.com/panva/jose">

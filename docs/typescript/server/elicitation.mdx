@@ -12,10 +12,10 @@ This guide focuses on when to use elicitation and how to handle the user respons
 
 Use form mode for non-sensitive structured input. Use URL mode for sensitive or external flows.
 
-| Need | Mode |
-| --- | --- |
-| Ask for preferences, labels, confirmation fields, or non-sensitive details | Form mode |
-| Send the user through OAuth, payment, credential entry, or another sensitive flow | URL mode |
+| Need                                                                              | Mode      |
+| --------------------------------------------------------------------------------- | --------- |
+| Ask for preferences, labels, confirmation fields, or non-sensitive details        | Form mode |
+| Send the user through OAuth, payment, credential entry, or another sensitive flow | URL mode  |
 
 Never collect credentials, API keys, payment details, or OAuth secrets through form mode. Form responses pass through the MCP client.
 
@@ -26,7 +26,7 @@ Keep form schemas flat and simple. Use top-level primitive fields, enum fields, 
 Only use elicitation when the connected client supports the mode you need. Provide a fallback for clients that do not advertise that support.
 
 ```typescript
-import { error, text } from "mcp-use/server";
+import { error, text } from "mcp-use";
 import { z } from "zod";
 
 server.tool(
@@ -51,7 +51,9 @@ server.tool(
       return text("No contact details were provided.");
     }
 
-    return text(`Follow-up will go to ${result.data.name} at ${result.data.email}.`);
+    return text(
+      `Follow-up will go to ${result.data.name} at ${result.data.email}.`,
+    );
   },
 );
 ```
@@ -138,7 +140,10 @@ server.tool(
     }
 
     const authRequest = await githubAuth.createAuthorizationRequest();
-    const result = await ctx.elicit("Authorize GitHub access to continue.", authRequest.url);
+    const result = await ctx.elicit(
+      "Authorize GitHub access to continue.",
+      authRequest.url,
+    );
 
     if (result.action !== "accept") {
       return error("GitHub authorization was not completed.");
@@ -176,7 +181,9 @@ try {
 
   return text(`Deploying to ${result.data.environment}.`);
 } catch (err) {
-  return error(`Could not collect deployment input: ${err instanceof Error ? err.message : String(err)}`);
+  return error(
+    `Could not collect deployment input: ${err instanceof Error ? err.message : String(err)}`,
+  );
 }
 ```
 
@@ -197,16 +204,29 @@ Then open the Inspector, call a tool that uses elicitation, and verify accept, d
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Tool context API reference" icon="terminal" href="/typescript/api-reference/server/tool-context#elicit">
-    Look up `ctx.elicit()` overloads, result types, timeout options, and validation behavior.
+  <Card
+    title="Tool context API reference"
+    icon="terminal"
+    href="/typescript/api-reference/server/tool-context#elicit"
+  >
+    Look up `ctx.elicit()` overloads, result types, timeout options, and
+    validation behavior.
   </Card>
-  <Card title="Elicitation schemas (v1 migration)" icon="list-checks" href="/typescript/api-reference/server/elicitation-schemas">
+  <Card
+    title="Elicitation schemas (v1 migration)"
+    icon="list-checks"
+    href="/typescript/api-reference/server/elicitation-schemas"
+  >
     Map removed v1 enum helpers to Zod form schemas.
   </Card>
   <Card title="Sampling" icon="pipette" href="/typescript/server/sampling">
     Ask the client LLM for a completion during tool execution.
   </Card>
-  <Card title="Client elicitation" icon="monitor" href="/typescript/client/elicitation">
+  <Card
+    title="Client elicitation"
+    icon="monitor"
+    href="/typescript/client/elicitation"
+  >
     Handle elicitation requests in a TypeScript MCP client.
   </Card>
 </CardGroup>

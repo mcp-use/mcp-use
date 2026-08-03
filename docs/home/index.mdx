@@ -92,7 +92,7 @@ npx create-mcp-use-app@latest
 Or create a server manually:
 
 ```typescript
-import { MCPServer, text } from "mcp-use/server";
+import { MCPServer } from "mcp-use";
 import { z } from "zod";
 
 const server = new MCPServer({
@@ -104,15 +104,23 @@ server.tool(
   {
     name: "get_weather",
     description: "Get weather for a city",
-    schema: z.object({ city: z.string() }),
+    inputSchema: z.object({ city: z.string() }),
+    outputSchema: z.object({
+      temperature: z.number(),
+      conditions: z.string(),
+      city: z.string(),
+    }),
   },
   async ({ city }) => {
-    return text(`Temperature: 72°F, Condition: sunny, City: ${city}`);
+    const weather = { temperature: 72, conditions: "Sunny", city };
+    return {
+      content: [{ type: "text", text: JSON.stringify(weather) }],
+      structuredContent: weather,
+    };
   },
 );
 
-await server.listen(3000);
-// Inspector at http://localhost:3000/mcp/inspector
+export default server;
 ```
 
 <Card title="Full TypeScript Server Documentation" icon="arrow-right" href="/typescript/server" horizontal />
@@ -150,10 +158,10 @@ server.run(transport="streamable-http", port=8000)
 
 ## MCP Apps
 
-MCP Apps let you build interactive widgets that work across Claude, ChatGPT, and other MCP clients - write once, run everywhere.
+MCP Apps let you build interactive views that work across Claude, ChatGPT, and other MCP clients—write once, run everywhere.
 
 ```typescript
-import { MCPServer, widget } from "mcp-use/server";
+import { MCPServer } from "mcp-use";
 import { z } from "zod";
 
 const server = new MCPServer({ name: "weather-app", version: "1.0.0" });
@@ -162,21 +170,27 @@ server.tool(
   {
     name: "get-weather",
     description: "Get weather for a city",
-    schema: z.object({ city: z.string() }),
-    widget: "weather-display", // references resources/weather-display/widget.tsx
+    inputSchema: z.object({ city: z.string() }),
+    outputSchema: z.object({
+      city: z.string(),
+      temperature: z.number(),
+      conditions: z.string(),
+    }),
+    view: { name: "weather-display" }, // views/weather-display/view.tsx
   },
   async ({ city }) => {
-    return widget({
-      props: { city, temperature: 22, conditions: "Sunny" },
-      message: `Weather in ${city}: Sunny, 22°C`,
-    });
+    const weather = { city, temperature: 22, conditions: "Sunny" };
+    return {
+      content: [{ type: "text", text: `Weather in ${city}: Sunny, 22°C` }],
+      structuredContent: weather,
+    };
   },
 );
 
-await server.listen(3000);
+export default server;
 ```
 
-Widgets in `resources/` are **auto-discovered** - no manual registration needed.
+Views in `views/` are auto-discovered and receive typed tool results through `useToolContext()`.
 
 <CardGroup cols={2}>
   <Card
@@ -184,7 +198,7 @@ Widgets in `resources/` are **auto-discovered** - no manual registration needed.
     icon="app-window-mac"
     href="/typescript/mcp-apps"
   >
-    Build widgets with React, auto-discovery, and client-side hooks.
+    Build views with React, auto-discovery, and client-side hooks.
   </Card>
   <Card
     title="Apps SDK compatibility"

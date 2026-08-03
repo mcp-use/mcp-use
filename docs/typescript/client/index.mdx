@@ -16,13 +16,13 @@ Node.js 20+ required. The package is ESM-only.
 
 ## Entry points
 
-| Building | Import | Transports |
-| -------- | ------ | ---------- |
-| Node script, service, or agent | `@mcp-use/client` | HTTP, stdio |
-| Browser (no React) | `@mcp-use/client` | HTTP |
-| React app | `@mcp-use/client/react` | HTTP |
+| Building                       | Import                  | Transports  |
+| ------------------------------ | ----------------------- | ----------- |
+| Node script, service, or agent | `@mcp-use/client`       | HTTP, stdio |
+| Browser (no React)             | `@mcp-use/client`       | HTTP        |
+| React app                      | `@mcp-use/client/react` | HTTP        |
 
-Widget UI hooks (`useWidget`, `useCallTool`, …) live in `mcp-use/react`, not the client package.
+MCP App view hooks (`useToolContext`, `useCallTool`, …) live in `mcp-use/react`, not the client package.
 
 ## Quick start
 
@@ -84,16 +84,28 @@ Upgrading from v1? See the [v2 migration guide](/typescript/client/migration).
   <Card title="Tools" icon="wrench" href="/typescript/client/tools">
     List and call server tools.
   </Card>
-  <Card title="v2 Migration" icon="arrow-right-left" href="/typescript/client/migration">
+  <Card
+    title="v2 Migration"
+    icon="arrow-right-left"
+    href="/typescript/client/migration"
+  >
     Breaking changes and upgrade checklist.
   </Card>
-  <Card title="Authentication" icon="shield" href="/typescript/client/authentication">
+  <Card
+    title="Authentication"
+    icon="shield"
+    href="/typescript/client/authentication"
+  >
     OAuth and bearer tokens.
   </Card>
   <Card title="React" icon="react" href="/typescript/client/usemcp">
     `McpClientProvider` and hooks.
   </Card>
-  <Card title="Environments" icon="container" href="/typescript/client/environments">
+  <Card
+    title="Environments"
+    icon="container"
+    href="/typescript/client/environments"
+  >
     Node, browser, and React differences.
   </Card>
 </CardGroup>

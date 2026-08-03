@@ -14,7 +14,7 @@ OpenAI's Apps SDK remains supported, and ChatGPT also implements the MCP Apps UI
 
 In practice:
 
-- Use `widget: { name }` and `widget({ props, output })` on the server.
+- Bind the tool with `view: { name }`, declare `outputSchema`, and return raw `content` plus `structuredContent`.
 - Use `useToolContext()`, `useViewState()`, and `useCallTool()` in React views.
 - Let `mcp-use` translate compatibility metadata for ChatGPT.
 - Reach for Apps SDK extensions only when a ChatGPT-specific capability has no shared MCP Apps equivalent yet.

@@ -92,34 +92,33 @@ See [React integration](https://mcp-use.com/docs/typescript/client/usemcp).
 
 ## Features
 
-| Feature | Description |
-| --- | --- |
-| **HTTP + stdio** | Streamable HTTP everywhere; stdio on Node |
-| **Protocol negotiation** | Automatic legacy / modern MCP handling |
-| **OAuth** | Browser and Node providers, callback helpers |
-| **React** | `useMcp`, `McpClientProvider`, storage adapters |
-| **Code mode** | Optional sandboxed tool execution (VM / E2B) |
-| **Callbacks** | Sampling, elicitation, notifications |
+| Feature                  | Description                                     |
+| ------------------------ | ----------------------------------------------- |
+| **HTTP + stdio**         | Streamable HTTP everywhere; stdio on Node       |
+| **Protocol negotiation** | Automatic legacy / modern MCP handling          |
+| **OAuth**                | Browser and Node providers, callback helpers    |
+| **React**                | `useMcp`, `McpClientProvider`, storage adapters |
+| **Code mode**            | Optional sandboxed tool execution (VM / E2B)    |
+| **Callbacks**            | Sampling, elicitation, notifications            |
 
 ---
 
 ## Package entry points
 
-| Import | Environment |
-| --- | --- |
-| `@mcp-use/client` | Node (HTTP + stdio, code mode, file config) |
-| `@mcp-use/client` (browser bundlers) | Browser / workers (HTTP only) |
-| `@mcp-use/client/react` | React hooks and provider |
+| Import                               | Environment                                 |
+| ------------------------------------ | ------------------------------------------- |
+| `@mcp-use/client`                    | Node (HTTP + stdio, code mode, file config) |
+| `@mcp-use/client` (browser bundlers) | Browser / workers (HTTP only)               |
+| `@mcp-use/client/react`              | React hooks and provider                    |
 
 ---
 
 ## Related packages
 
-| Package | Description |
-| --- | --- |
-| [mcp-use](https://www.npmjs.com/package/mcp-use) | Full framework (server + agent + client re-exports) |
-| [@mcp-use/inspector](https://www.npmjs.com/package/@mcp-use/inspector) | Web-based MCP debugger |
-| [@mcp-use/cli](https://www.npmjs.com/package/@mcp-use/cli) | Dev server and widget build tool |
+| Package                                                                | Description              |
+| ---------------------------------------------------------------------- | ------------------------ |
+| [mcp-use](https://www.npmjs.com/package/mcp-use)                       | Server framework and CLI |
+| [@mcp-use/inspector](https://www.npmjs.com/package/@mcp-use/inspector) | Web-based MCP debugger   |
 
 ---
 

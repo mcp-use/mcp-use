@@ -27,7 +27,7 @@ MCP middleware patterns use the `mcp:` prefix. Register Hono middleware directly
 Register MCP middleware with `server.use("mcp:<pattern>", handler)`. The handler receives a context object and a `next()` function.
 
 ```typescript
-import { MCPServer, text } from "mcp-use/server";
+import { MCPServer, text } from "mcp-use";
 import { z } from "zod";
 
 const server = new MCPServer({ name: "my-server", version: "1.0.0" });
@@ -43,7 +43,7 @@ server.tool(
   {
     name: "greet",
     description: "Say hello.",
-    schema: z.object({ name: z.string() }),
+    inputSchema: z.object({ name: z.string() }),
   },
   async ({ name }) => text(`Hello, ${name}!`),
 );

@@ -35,7 +35,8 @@ Use the full AuthKit domain as the subdomain value.
 ## Configure the MCP server
 
 ```typescript
-import { MCPServer, oauthWorkOSProvider } from "mcp-use/server";
+import { MCPServer } from "mcp-use";
+import { oauthWorkOSProvider } from "mcp-use/oauth/workos";
 
 const server = new MCPServer({
   name: "workos-server",
@@ -61,7 +62,7 @@ If your tools call the WorkOS Management API, store that API key separately. It 
 WorkOS can include organization context in the token. Use it to filter tenant-specific data.
 
 ```typescript
-import { error, object } from "mcp-use/server";
+import { error, object } from "mcp-use";
 
 server.tool(
   {
@@ -109,16 +110,32 @@ Confirm these cases:
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Runnable WorkOS example" icon="github" href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/workos">
+  <Card
+    title="Runnable WorkOS example"
+    icon="github"
+    href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/workos"
+  >
     Compare your setup with a working mcp-use WorkOS server.
   </Card>
-  <Card title="WorkOS AuthKit MCP guide" icon="book-open" href="https://workos.com/docs/authkit/mcp">
+  <Card
+    title="WorkOS AuthKit MCP guide"
+    icon="book-open"
+    href="https://workos.com/docs/authkit/mcp"
+  >
     Review WorkOS AuthKit MCP setup.
   </Card>
-  <Card title="User Context" icon="user" href="/typescript/server/authentication/user-context">
+  <Card
+    title="User Context"
+    icon="user"
+    href="/typescript/server/authentication/user-context"
+  >
     Use WorkOS identity and organization data inside tools.
   </Card>
-  <Card title="WorkOS provider API reference" icon="terminal" href="/typescript/api-reference/server/auth-providers#oauthworkosprovider">
+  <Card
+    title="WorkOS provider API reference"
+    icon="terminal"
+    href="/typescript/api-reference/server/auth-providers#oauthworkosprovider"
+  >
     Look up exact provider options and defaults.
   </Card>
 </CardGroup>

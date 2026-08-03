@@ -12,12 +12,12 @@ This guide focuses on the server workflow. Use the [MCPServer API reference](/ty
 
 Subscriptions are for resource content changes, not general status events.
 
-| Need | Use |
-| --- | --- |
-| Tell clients a known resource URI changed | Resource subscription |
-| Broadcast a job status event | [Notifications](/typescript/server/notifications) |
-| Tell clients the resource list changed | `server.sendResourcesListChanged()` |
-| Return fresh data immediately | A tool or resource read |
+| Need                                      | Use                                               |
+| ----------------------------------------- | ------------------------------------------------- |
+| Tell clients a known resource URI changed | Resource subscription                             |
+| Broadcast a job status event              | [Notifications](/typescript/server/notifications) |
+| Tell clients the resource list changed    | `server.sendResourcesListChanged()`               |
+| Return fresh data immediately             | A tool or resource read                           |
 
 Clients subscribe to a resource URI. Your server notifies subscribers after that resource changes. Clients then read the resource again.
 
@@ -26,7 +26,7 @@ Clients subscribe to a resource URI. Your server notifies subscribers after that
 Start with a resource that returns the current content for a stable URI.
 
 ```typescript
-import { MCPServer, object, text } from "mcp-use/server";
+import { MCPServer, object, text } from "mcp-use";
 import { z } from "zod";
 
 const server = new MCPServer({
@@ -61,7 +61,7 @@ server.tool(
   {
     name: "update_settings",
     description: "Update application settings.",
-    schema: z.object({
+    inputSchema: z.object({
       theme: z.enum(["light", "dark"]).optional(),
       language: z.string().optional(),
     }),
@@ -133,16 +133,32 @@ Verify these cases:
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Resources" icon="folder-open" href="/typescript/server/resources">
+  <Card
+    title="Resources"
+    icon="folder-open"
+    href="/typescript/server/resources"
+  >
     Create static resources and resource templates.
   </Card>
-  <Card title="Notifications" icon="bell" href="/typescript/server/notifications">
+  <Card
+    title="Notifications"
+    icon="bell"
+    href="/typescript/server/notifications"
+  >
     Send custom status, progress, and list-changed notifications.
   </Card>
-  <Card title="MCPServer API reference" icon="server" href="/typescript/api-reference/server/mcp-server">
+  <Card
+    title="MCPServer API reference"
+    icon="server"
+    href="/typescript/api-reference/server/mcp-server"
+  >
     Look up `notifyResourceUpdated()` and resource notification methods.
   </Card>
-  <Card title="MCP resources specification" icon="book-open" href="https://modelcontextprotocol.io/specification/2025-11-25/server/resources#subscriptions">
+  <Card
+    title="MCP resources specification"
+    icon="book-open"
+    href="https://modelcontextprotocol.io/specification/2025-11-25/server/resources#subscriptions"
+  >
     Read the protocol-level subscription behavior.
   </Card>
 </CardGroup>

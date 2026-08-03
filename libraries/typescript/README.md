@@ -46,16 +46,15 @@ mcp-use for TypeScript provides the complete MCP stack:
 - **[Main Repository](../../README.md)** - Overview of the entire mcp-use ecosystem
 - **[Python Version](../python/README.md)** - Python implementation for agents and clients
 - **[Inspector Documentation](./packages/inspector/README.md)** - Debug your MCP servers
-- **[CLI Documentation](./packages/cli/README.md)** - Build tool for MCP apps
+- **[Server and CLI Documentation](https://mcp-use.com/docs/typescript/server)** - Build and run MCP apps
 
 ## 📦 Packages Overview
 
-| Package                                       | Description                                   | Version                                                                                                         | Downloads                                                                                                        |
-| --------------------------------------------- | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| **[mcp-use](#mcp-use-core-framework)**        | Core framework for MCP clients and servers    | [![npm](https://img.shields.io/npm/v/mcp-use.svg)](https://www.npmjs.com/package/mcp-use)                       | [![npm](https://img.shields.io/npm/dw/mcp-use.svg)](https://www.npmjs.com/package/mcp-use)                       |
-| **[@mcp-use/cli](#mcp-use-cli)**              | Build tool with hot reload and auto-inspector | [![npm](https://img.shields.io/npm/v/@mcp-use/cli.svg)](https://www.npmjs.com/package/@mcp-use/cli)             | [![npm](https://img.shields.io/npm/dw/@mcp-use/cli.svg)](https://www.npmjs.com/package/@mcp-use/cli)             |
-| **[@mcp-use/inspector](#mcp-use-inspector)**  | Web-based debugger for MCP servers            | [![npm](https://img.shields.io/npm/v/@mcp-use/inspector.svg)](https://www.npmjs.com/package/@mcp-use/inspector) | [![npm](https://img.shields.io/npm/dw/@mcp-use/inspector.svg)](https://www.npmjs.com/package/@mcp-use/inspector) |
-| **[create-mcp-use-app](#create-mcp-use-app)** | Project scaffolding tool                      | [![npm](https://img.shields.io/npm/v/create-mcp-use-app.svg)](https://www.npmjs.com/package/create-mcp-use-app) | [![npm](https://img.shields.io/npm/dw/create-mcp-use-app.svg)](https://www.npmjs.com/package/create-mcp-use-app) |
+| Package                                       | Description                                | Version                                                                                                         | Downloads                                                                                                        |
+| --------------------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **[mcp-use](#mcp-use-core-framework)**        | Core framework for MCP clients and servers | [![npm](https://img.shields.io/npm/v/mcp-use.svg)](https://www.npmjs.com/package/mcp-use)                       | [![npm](https://img.shields.io/npm/dw/mcp-use.svg)](https://www.npmjs.com/package/mcp-use)                       |
+| **[@mcp-use/inspector](#mcp-use-inspector)**  | Web-based debugger for MCP servers         | [![npm](https://img.shields.io/npm/v/@mcp-use/inspector.svg)](https://www.npmjs.com/package/@mcp-use/inspector) | [![npm](https://img.shields.io/npm/dw/@mcp-use/inspector.svg)](https://www.npmjs.com/package/@mcp-use/inspector) |
+| **[create-mcp-use-app](#create-mcp-use-app)** | Project scaffolding tool                   | [![npm](https://img.shields.io/npm/v/create-mcp-use-app.svg)](https://www.npmjs.com/package/create-mcp-use-app) | [![npm](https://img.shields.io/npm/dw/create-mcp-use-app.svg)](https://www.npmjs.com/package/create-mcp-use-app) |
 
 ---
 
@@ -321,7 +320,7 @@ export default function AnalyticsDashboard() {
 
 ---
 
-### @mcp-use/cli
+### mcp-use CLI
 
 Powerful build and development tool for MCP applications with integrated inspector.
 
@@ -627,7 +626,6 @@ git commit -m "feat: your feature description"
 ```bash
 # Install canary versions
 npm install mcp-use@canary
-npm install @mcp-use/cli@canary
 ```
 
 ---
