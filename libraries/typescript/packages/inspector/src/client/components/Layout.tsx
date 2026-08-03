@@ -6,32 +6,47 @@ import {
   type TabType,
 } from "@/client/context/InspectorContext";
 import { useAutoConnect } from "@/client/hooks/useAutoConnect";
+import { cn } from "@/client/lib/utils";
 import { useKeyboardShortcuts } from "@/client/hooks/useKeyboardShortcuts";
 import { useSavedRequests } from "@/client/hooks/useSavedRequests";
 import {
   MCPCommandPaletteOpenEvent,
   MCPTabNavigationEvent,
   MCPSessionDurationEvent,
-  Telemetry,
+  captureInspectorEvent,
 } from "@/client/telemetry";
 import {
   getDefaultInspectorProxyAddress,
   getStoredConnectionConfig,
   isAliasOnlyConnectionUpdate,
   normalizeConnectionMode,
-  type ConnectionMode,
+  protocolModeFromNegotiation,
+  protocolNegotiationForMode,
+  saveStoredConnectionConfig,
+  toMcpServerConfig,
   type EditableConnectionConfig,
-  type OAuthStaticConfig,
 } from "@/client/utils/connectionUpdates";
-import { useMcpClient, type McpServer } from "mcp-use/react";
-import type { ReactNode } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { isInspectorSamplingAvailable } from "@/client/utils/samplingProtocol";
+import { getServerDisplayName } from "@/client/utils/servers";
+import { useMcpClient, type McpServer } from "@mcp-use/client/react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { flushSync } from "react-dom";
 import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 import { CommandPalette } from "./CommandPalette";
 import { LayoutContent } from "./LayoutContent";
 import { LayoutHeader } from "./LayoutHeader";
-import { ServerConnectionModal } from "./ServerConnectionModal";
+import { InspectorSidebar } from "./layout/sidebar/InspectorSidebar";
+import { SidebarRpcPanel } from "./layout/sidebar/SidebarRpcPanel";
+import { MobileInspectorToolbar } from "./layout/mobile/MobileInspectorToolbar";
+import { useTunnelConnectionSync } from "./layout/useTunnelConnectionSync";
 
 interface LayoutProps {
   children: ReactNode;
@@ -41,8 +56,7 @@ interface LayoutProps {
  * Render the application layout that orchestrates header, main content, command palette, and server connection modal.
  *
  * This component wires MCP client and inspector state, synchronizes URL query parameters (server, tab, tunnelUrl, embedded),
- * manages keyboard shortcuts, auto-connect flow, aggregated tool/prompt/resource lists, and provides adapters for legacy
- * connection APIs while preserving backward compatibility.
+ * manages keyboard shortcuts, auto-connect flow, aggregated tool/prompt/resource lists.
  *
  * @param children - The main content to render within the layout's content area.
  * @returns The React element representing the application layout.
@@ -59,52 +73,11 @@ export function Layout({ children }: LayoutProps) {
     storageLoaded: configLoaded,
   } = useMcpClient();
 
-  // Adapter functions for backward compatibility
-  const addConnection = useCallback(
-    (
-      url: string,
-      name?: string,
-      proxyConfig?: any,
-      transportType?: "http" | "sse",
-      oauth?: OAuthStaticConfig,
-      connectionMode: ConnectionMode = proxyConfig?.proxyAddress
-        ? "proxy"
-        : "auto",
-      autoProxyFallback:
-        | boolean
-        | {
-            enabled?: boolean;
-            proxyAddress?: string;
-          } = proxyConfig?.proxyAddress ? false : false
-    ) => {
-      addServer(url, {
-        url,
-        name,
-        connectionMode,
-        proxyConfig,
-        transportType,
-        preventAutoAuth: true,
-        useRedirectFlow: true,
-        autoProxyFallback,
-        clientOptions: {
-          capabilities: {
-            extensions: {
-              "io.modelcontextprotocol/ui": {
-                mimeTypes: ["text/html;profile=mcp-app"],
-              },
-            },
-          },
-        },
-        ...(oauth ? { oauth } : {}),
-      });
-    },
-    [addServer]
-  );
-
   const updateConnectionConfig = useCallback(
-    async (id: string, config: any) => {
+    async (id: string, config: EditableConnectionConfig) => {
       try {
-        await updateServer(id, config);
+        await updateServer(id, toMcpServerConfig(config));
+        saveStoredConnectionConfig(id, config);
       } catch (error) {
         console.error(`[Layout] Failed to update connection ${id}:`, error);
       }
@@ -139,10 +112,39 @@ export function Layout({ children }: LayoutProps) {
   } = useInspector();
 
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
-  const [editingConnectionId, setEditingConnectionId] = useState<string | null>(
-    null
-  );
-  const savedRequests = useSavedRequests();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("inspector-sidebar-collapsed") === "true";
+    } catch {
+      return false;
+    }
+  });
+  const [rpcLoggerOpen, setRpcLoggerOpen] = useState(() => {
+    try {
+      return localStorage.getItem("inspector-rpc-logger-open") === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "inspector-sidebar-collapsed",
+        sidebarCollapsed ? "true" : "false"
+      );
+    } catch {
+      // ignore
+    }
+  }, [sidebarCollapsed]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("inspector-rpc-logger-open", String(rpcLoggerOpen));
+    } catch {
+      // Storage is optional.
+    }
+  }, [rpcLoggerOpen]);
+  const { savedRequests } = useSavedRequests();
 
   // Initialize embedded mode from URL params once on mount
   useEffect(() => {
@@ -171,8 +173,10 @@ export function Layout({ children }: LayoutProps) {
   // Read tunnelUrl from query parameters and store in context
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
-    const tunnelUrl = urlParams.get("tunnelUrl");
-    setTunnelUrl(tunnelUrl);
+    const tunnelUrlParam = urlParams.get("tunnelUrl");
+    if (tunnelUrlParam !== null) {
+      setTunnelUrl(tunnelUrlParam);
+    }
   }, [location.search, setTunnelUrl]);
 
   // Read tab from query parameters and set active tab
@@ -189,6 +193,8 @@ export function Layout({ children }: LayoutProps) {
         "sampling",
         "elicitation",
         "notifications",
+        "server-metadata",
+        "connection-settings",
       ];
       if (validTabs.includes(tab as TabType)) {
         setActiveTab(tab as TabType);
@@ -218,15 +224,13 @@ export function Layout({ children }: LayoutProps) {
         const durationSeconds = Math.round(
           (Date.now() - sessionStartRef.current) / 1000
         );
-        Telemetry.getInstance()
-          .capture(
-            new MCPSessionDurationEvent({
-              durationSeconds,
-              tabsVisited: tabsVisitedRef.current.size,
-              toolsExecuted: toolsExecutedRef.current,
-            })
-          )
-          .catch(() => {});
+        captureInspectorEvent(
+          new MCPSessionDurationEvent({
+            durationSeconds,
+            tabsVisited: tabsVisitedRef.current.size,
+            toolsExecuted: toolsExecutedRef.current,
+          })
+        ).catch(() => {});
       } catch {
         // ignore telemetry errors
       }
@@ -239,14 +243,12 @@ export function Layout({ children }: LayoutProps) {
   const handleTabChange = useCallback(
     (tab: TabType) => {
       try {
-        Telemetry.getInstance()
-          .capture(
-            new MCPTabNavigationEvent({
-              tab,
-              previousTab: previousTabRef.current,
-            })
-          )
-          .catch(() => {});
+        captureInspectorEvent(
+          new MCPTabNavigationEvent({
+            tab,
+            previousTab: previousTabRef.current,
+          })
+        ).catch(() => {});
       } catch {
         // ignore telemetry errors
       }
@@ -261,6 +263,21 @@ export function Layout({ children }: LayoutProps) {
     [setActiveTab, navigate, location.search]
   );
 
+  // A bookmarked sampling URL can be restored before protocol negotiation
+  // finishes. Once a modern connection is known, move to a supported tab.
+  useEffect(() => {
+    const selectedServer = connections.find(
+      (connection) => connection.id === selectedServerId
+    );
+    if (
+      activeTab === "sampling" &&
+      selectedServer &&
+      !isInspectorSamplingAvailable(selectedServer)
+    ) {
+      handleTabChange("tools");
+    }
+  }, [activeTab, connections, selectedServerId, handleTabChange]);
+
   // Listen for custom navigation events from toast (for sampling and elicitation requests)
   useEffect(() => {
     const handleNavigateToSampling = (event: globalThis.Event) => {
@@ -269,8 +286,16 @@ export function Layout({ children }: LayoutProps) {
       }>;
       const requestId = customEvent.detail.requestId;
 
-      // Switch to sampling tab and auto-select the request
-      if (selectedServerId) {
+      const selectedServer = connections.find(
+        (connection) => connection.id === selectedServerId
+      );
+
+      // Modern connections neither advertise nor expose legacy sampling.
+      if (
+        selectedServerId &&
+        selectedServer &&
+        isInspectorSamplingAvailable(selectedServer)
+      ) {
         navigateToItem(selectedServerId, "sampling", requestId);
       }
     };
@@ -326,7 +351,7 @@ export function Layout({ children }: LayoutProps) {
         handleNavigateToToolResult
       );
     };
-  }, [selectedServerId, handleTabChange, navigateToItem]);
+  }, [selectedServerId, connections, handleTabChange, navigateToItem]);
 
   // Refs for search inputs in tabs
   const toolsSearchRef = useRef<{
@@ -345,25 +370,40 @@ export function Layout({ children }: LayoutProps) {
   // Auto-connect handling extracted to custom hook
   const { isAutoConnecting } = useAutoConnect({
     connections,
-    addConnection,
+    addServer,
     removeConnection,
     configLoaded,
     embedded: isEmbedded,
   });
 
+  // Shell inline style can stay #0c0c0d until a full reload; match VT backdrop for crossfade.
+  useEffect(() => {
+    const syncPageBg = () => {
+      const bg = document.documentElement.classList.contains("dark")
+        ? "#000000"
+        : "#f3f3f3";
+      document.documentElement.style.backgroundColor = bg;
+      document.body.style.backgroundColor = bg;
+    };
+    syncPageBg();
+    const observer = new MutationObserver(syncPageBg);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => observer.disconnect();
+  }, []);
+
   // Track command palette open
   const handleCommandPaletteOpen = useCallback(
     (trigger: "keyboard" | "button") => {
-      const telemetry = Telemetry.getInstance();
-      telemetry
-        .capture(
-          new MCPCommandPaletteOpenEvent({
-            trigger,
-          })
-        )
-        .catch(() => {
-          // Silently fail - telemetry should not break the application
-        });
+      captureInspectorEvent(
+        new MCPCommandPaletteOpenEvent({
+          trigger,
+        })
+      ).catch(() => {
+        // Silently fail - telemetry should not break the application
+      });
       setIsCommandPaletteOpen(true);
     },
     []
@@ -371,10 +411,7 @@ export function Layout({ children }: LayoutProps) {
 
   const handleServerSelect = (serverId: string) => {
     const server = connections.find((c) => c.id === serverId);
-    if (!server || server.state !== "ready") {
-      toast.error("Server is not connected and cannot be inspected");
-      return;
-    }
+    if (!server) return;
     setSelectedServerId(serverId);
     // Preserve tunnelUrl and tab parameters if present
     const urlParams = new URLSearchParams(location.search);
@@ -387,83 +424,38 @@ export function Layout({ children }: LayoutProps) {
     navigate(`/?${params.toString()}`);
   };
 
-  const handleOpenConnectionOptions = useCallback(
-    (connectionId: string | null) => {
-      setEditingConnectionId(connectionId);
-    },
-    []
-  );
-
   const handleUpdateConnection = useCallback(
     (config: EditableConnectionConfig) => {
-      if (!editingConnectionId) return;
+      if (!selectedServerId) return;
 
       const currentConnection =
-        getStoredConnectionConfig<EditableConnectionConfig>(
-          editingConnectionId
-        ) ||
+        getStoredConnectionConfig<EditableConnectionConfig>(selectedServerId) ||
         connections.find(
-          (connection: McpServer) => connection.id === editingConnectionId
+          (connection: McpServer) => connection.id === selectedServerId
         );
 
-      // If the URL changed, we need to remove the old one and add a new one
-      if (config.url !== editingConnectionId) {
-        removeConnection(editingConnectionId);
-        addConnection(
-          config.url,
-          config.name,
-          config.proxyConfig,
-          config.transportType,
-          config.oauth,
-          config.connectionMode,
-          config.connectionMode === "auto"
-            ? (config.autoProxyFallback ??
-                (config.proxyConfig?.proxyAddress
-                  ? {
-                      enabled: true,
-                      proxyAddress: config.proxyConfig.proxyAddress,
-                    }
-                  : false))
-            : false
-        );
+      if (config.url !== selectedServerId) {
+        removeConnection(selectedServerId);
+        addServer(config.url, toMcpServerConfig(config));
       } else if (
         currentConnection &&
         isAliasOnlyConnectionUpdate(currentConnection, config)
       ) {
-        updateConnectionMetadata(editingConnectionId, {
+        updateConnectionMetadata(selectedServerId, {
           name: config.name || config.url,
         });
+        saveStoredConnectionConfig(selectedServerId, config);
       } else {
-        // Otherwise just update the existing connection
-        updateConnectionConfig(editingConnectionId, {
-          name: config.name,
-          connectionMode: config.connectionMode,
-          proxyConfig: config.proxyConfig,
-          transportType: config.transportType,
-          oauth: config.oauth,
-          autoProxyFallback:
-            config.connectionMode === "auto"
-              ? (config.autoProxyFallback ??
-                (config.proxyConfig?.proxyAddress
-                  ? {
-                      enabled: true,
-                      proxyAddress: config.proxyConfig.proxyAddress,
-                    }
-                  : false))
-              : false,
-        });
+        updateConnectionConfig(selectedServerId, config);
       }
-
-      // Close the modal
-      setEditingConnectionId(null);
 
       toast.success("Connection settings updated");
     },
     [
-      editingConnectionId,
+      selectedServerId,
       connections,
       removeConnection,
-      addConnection,
+      addServer,
       updateConnectionMetadata,
       updateConnectionConfig,
     ]
@@ -525,6 +517,16 @@ export function Layout({ children }: LayoutProps) {
 
   const selectedServer = connections.find((c) => c.id === selectedServerId);
 
+  const isTunnelConnecting = useTunnelConnectionSync({
+    tunnelUrl,
+    selectedServerId,
+    selectedServer,
+    configLoaded,
+    removeConnection,
+    updateConnection: updateServer,
+    connections,
+  });
+
   // Aggregate tools, prompts, and resources from all connected servers
   // When a server is selected, use only that server's items
   // When no server is selected, aggregate from all ready servers and add server metadata
@@ -538,7 +540,7 @@ export function Layout({ children }: LayoutProps) {
           ? conn.tools.map((tool) => ({
               ...tool,
               _serverId: conn.id,
-              _serverName: conn.name,
+              _serverName: getServerDisplayName(conn),
             }))
           : []
       );
@@ -553,7 +555,7 @@ export function Layout({ children }: LayoutProps) {
           ? conn.prompts.map((prompt) => ({
               ...prompt,
               _serverId: conn.id,
-              _serverName: conn.name,
+              _serverName: getServerDisplayName(conn),
             }))
           : []
       );
@@ -568,13 +570,15 @@ export function Layout({ children }: LayoutProps) {
           ? conn.resources.map((resource) => ({
               ...resource,
               _serverId: conn.id,
-              _serverName: conn.name,
+              _serverName: getServerDisplayName(conn),
             }))
           : []
       );
 
   // Sync URL query params with selected server state
   useEffect(() => {
+    if (isTunnelConnecting) return;
+
     const searchParams = new URLSearchParams(location.search);
     // Note: searchParams.get() already URL-decodes, no need for decodeURIComponent
     const serverId = searchParams.get("server");
@@ -608,31 +612,26 @@ export function Layout({ children }: LayoutProps) {
     setSelectedServerId,
     connections,
     navigate,
+    isTunnelConnecting,
   ]);
 
-  // Handle failed server connections - redirect to home
+  // Handle missing server connections - redirect to home when URL points at unknown server
   useEffect(() => {
+    if (isTunnelConnecting) return;
+
     const searchParams = new URLSearchParams(location.search);
     const serverId = searchParams.get("server");
     if (!serverId) {
       return;
     }
 
-    // Note: searchParams.get() already URL-decodes, no need for decodeURIComponent
     const serverConnection = connections.find((conn) => conn.id === serverId);
 
-    // No connection found - wait for auto-connect, then redirect
     if (!serverConnection) {
       const timeoutId = setTimeout(() => navigate("/"), 3000);
       return () => clearTimeout(timeoutId);
     }
-
-    // Connection failed - redirect after short delay
-    if (serverConnection.state === "failed") {
-      const timeoutId = setTimeout(() => navigate("/"), 2000);
-      return () => clearTimeout(timeoutId);
-    }
-  }, [location.search, navigate, connections]);
+  }, [location.search, navigate, connections, isTunnelConnecting]);
 
   // Handle mcp-inspector:connect_servers postMessage from parent frame.
   // Allows a host page to securely pass server configs (incl. auth) without
@@ -653,17 +652,15 @@ export function Layout({ children }: LayoutProps) {
 
         const url: string = srv.url;
         const name: string = srv.name ?? "Server";
-        const transportType: "http" | "sse" = srv.transportType ?? "http";
 
-        // Build custom headers from auth config (same logic as useAutoConnect)
-        const customHeaders: Record<string, string> = {
+        const headers: Record<string, string> = {
           ...(srv.headers ?? {}),
         };
         if (srv.auth?.access_token) {
           const tokenType = srv.auth.token_type || "bearer";
           const formatted =
             tokenType.charAt(0).toUpperCase() + tokenType.slice(1);
-          customHeaders.Authorization = `${formatted} ${srv.auth.access_token}`;
+          headers.Authorization = `${formatted} ${srv.auth.access_token}`;
         }
 
         const explicitProxyAddress =
@@ -685,34 +682,32 @@ export function Layout({ children }: LayoutProps) {
           srv.connectionType,
           !!explicitProxyAddress
         );
-        const proxyConfig =
-          connectionMode === "proxy" && proxyAddress
-            ? {
-                proxyAddress,
-                ...(Object.keys(customHeaders).length > 0 && {
-                  headers: customHeaders,
-                }),
-              }
-            : Object.keys(customHeaders).length > 0
-              ? { headers: customHeaders }
-              : undefined;
-        const autoProxyFallback =
-          connectionMode === "auto" && proxyAddress
-            ? { enabled: true, proxyAddress }
-            : false;
+        const serverOptions = toMcpServerConfig({
+          url,
+          name,
+          transportType: "http",
+          connectionMode,
+          protocolNegotiation: protocolNegotiationForMode(
+            protocolModeFromNegotiation(srv.protocolNegotiation)
+          ),
+          connectionType: connectionMode === "proxy" ? "Via Proxy" : "Direct",
+          proxyConfig:
+            connectionMode === "proxy" && proxyAddress
+              ? {
+                  proxyAddress,
+                  ...(Object.keys(headers).length > 0 ? { headers } : {}),
+                }
+              : undefined,
+          headers,
+          autoProxyFallback:
+            connectionMode === "auto" && proxyAddress
+              ? { enabled: true, proxyAddress }
+              : false,
+        });
 
-        // Avoid duplicates
         const existing = connections.find((c) => c.url === url);
         if (!existing) {
-          addConnection(
-            url,
-            name,
-            proxyConfig,
-            transportType,
-            undefined,
-            connectionMode,
-            autoProxyFallback
-          );
+          addServer(url, serverOptions);
         }
 
         if (!firstServerId) {
@@ -734,7 +729,7 @@ export function Layout({ children }: LayoutProps) {
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [isEmbedded, connections, addConnection]);
+  }, [isEmbedded, connections, addServer]);
 
   // Auto-select the first ready server when new servers connect via postMessage.
   // This handles the case where connect_servers adds servers and we need to
@@ -809,19 +804,36 @@ export function Layout({ children }: LayoutProps) {
     },
   });
 
-  // Show loading spinner during auto-connection
-  if (isAutoConnecting) {
-    return (
-      <div className="h-screen bg-white dark:bg-zinc-900 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Spinner className="h-8 w-8 text-zinc-600 dark:text-zinc-400" />
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Connecting to MCP server...
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // Show loading until auto-connect finishes or saved connections hydrate a ?server= link
+  const urlServerId = new URLSearchParams(location.search).get("server");
+  const isBootstrappingServer =
+    !configLoaded &&
+    !!urlServerId &&
+    !urlServerId.startsWith("http://") &&
+    !urlServerId.startsWith("https://");
+  const showBootScreen =
+    isAutoConnecting || isBootstrappingServer || isTunnelConnecting;
+  const layoutViewKey = selectedServer?.id ?? "home";
+  const viewTransitionKey = showBootScreen ? "boot" : layoutViewKey;
+  const [displayKey, setDisplayKey] = useState(viewTransitionKey);
+
+  useLayoutEffect(() => {
+    if (viewTransitionKey === displayKey) return;
+
+    const apply = () => flushSync(() => setDisplayKey(viewTransitionKey));
+
+    if (typeof document.startViewTransition === "function") {
+      document.startViewTransition(apply);
+    } else {
+      apply();
+    }
+  }, [viewTransitionKey, displayKey]);
+
+  const showDisplayBoot = displayKey === "boot";
+  const displayServer =
+    showDisplayBoot || displayKey === "home"
+      ? undefined
+      : connections.find((c) => c.id === displayKey);
 
   // Apply embedded styling
   const isSingleTab = isEmbedded && embeddedConfig.singleTab;
@@ -837,73 +849,108 @@ export function Layout({ children }: LayoutProps) {
     ? isSingleTab
       ? "h-screen flex flex-col"
       : "h-screen flex flex-col gap-2 sm:gap-4"
-    : "h-screen bg-[#f3f3f3] dark:bg-black flex flex-col px-2 py-2 sm:px-4 sm:py-4 gap-2 sm:gap-4";
+    : "h-screen bg-[#f3f3f3] dark:bg-black flex flex-col overflow-x-hidden px-4 lg:px-0 pb-[calc(var(--mobile-toolbar-height)+env(safe-area-inset-bottom))] lg:pb-4";
 
   const mainClassName = isSingleTab
     ? "flex-1 w-full bg-white dark:bg-black p-0 overflow-auto"
-    : "flex-1 w-full mx-auto bg-white dark:bg-black rounded-2xl border border-zinc-200 dark:border-zinc-700 p-0 overflow-auto";
+    : cn(
+        "flex-1 min-h-0 min-w-0 max-w-full w-full bg-white dark:bg-black rounded-2xl border border-zinc-200 dark:border-zinc-700 overflow-x-hidden overflow-y-auto",
+        !displayServer && "lg:mx-4",
+        displayServer && "lg:mr-4"
+      );
+
+  const bodyClassName = isSingleTab
+    ? "flex-1 min-h-0"
+    : "flex min-w-0 flex-1 min-h-0 overflow-hidden";
+
+  const headerProps = {
+    connections,
+    selectedServer: displayServer,
+    activeTab,
+    onServerSelect: handleServerSelect,
+    onTabChange: handleTabChange,
+    embedded: isEmbedded,
+    sidebarCollapsed,
+  };
 
   return (
     <TooltipProvider>
-      <div className={containerClassName} style={containerStyle}>
-        {/* Header - hidden in single-tab mode */}
-        {!isSingleTab && (
-          <LayoutHeader
-            connections={connections}
-            selectedServer={selectedServer}
-            activeTab={activeTab}
-            onServerSelect={handleServerSelect}
-            onTabChange={handleTabChange}
-            onCommandPaletteOpen={() => handleCommandPaletteOpen("button")}
-            onOpenConnectionOptions={handleOpenConnectionOptions}
-            embedded={isEmbedded}
-          />
+      <div className="inspector-view-transition h-screen overflow-x-hidden bg-[#f3f3f3] dark:bg-black">
+        {showDisplayBoot ? (
+          <div className="flex h-full items-center justify-center bg-[#f3f3f3] dark:bg-black">
+            <div className="flex flex-col items-center gap-4">
+              <Spinner className="h-8 w-8 text-zinc-600 dark:text-zinc-400" />
+              <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                Connecting to MCP server...
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className={containerClassName} style={containerStyle}>
+            {/* Header - hidden in single-tab mode */}
+            {!isSingleTab && <LayoutHeader {...headerProps} />}
+
+            <div className={bodyClassName}>
+              {displayServer && !isSingleTab && (
+                <InspectorSidebar
+                  activeTab={activeTab}
+                  onTabChange={handleTabChange}
+                  selectedServer={displayServer}
+                  visibleTabs={embeddedConfig.visibleTabs}
+                  collapsed={sidebarCollapsed}
+                  onCollapsedChange={setSidebarCollapsed}
+                  rpcLoggerOpen={rpcLoggerOpen}
+                  onRpcLoggerOpenChange={setRpcLoggerOpen}
+                  onCommandPaletteOpen={() =>
+                    handleCommandPaletteOpen("button")
+                  }
+                />
+              )}
+              <main className={mainClassName}>
+                <LayoutContent
+                  selectedServer={displayServer}
+                  activeTab={activeTab}
+                  toolsSearchRef={toolsSearchRef}
+                  promptsSearchRef={promptsSearchRef}
+                  resourcesSearchRef={resourcesSearchRef}
+                  onUpdateConnection={handleUpdateConnection}
+                >
+                  {children}
+                </LayoutContent>
+              </main>
+              {displayServer && !isSingleTab && (
+                <SidebarRpcPanel
+                  serverId={displayServer.id}
+                  open={rpcLoggerOpen}
+                />
+              )}
+            </div>
+          </div>
         )}
-
-        {/* Main Content */}
-        <main className={mainClassName}>
-          <LayoutContent
-            selectedServer={selectedServer}
-            activeTab={activeTab}
-            toolsSearchRef={toolsSearchRef}
-            promptsSearchRef={promptsSearchRef}
-            resourcesSearchRef={resourcesSearchRef}
-          >
-            {children}
-          </LayoutContent>
-        </main>
-
-        {/* Command Palette */}
-        <CommandPalette
-          isOpen={isCommandPaletteOpen}
-          onOpenChange={setIsCommandPaletteOpen}
-          tools={aggregatedTools}
-          prompts={aggregatedPrompts}
-          resources={aggregatedResources}
-          savedRequests={savedRequests}
-          connections={connections}
-          selectedServer={selectedServer}
-          tunnelUrl={tunnelUrl}
-          onNavigate={handleCommandPaletteNavigate}
-          onServerSelect={handleServerSelect}
-        />
-
-        {/* Connection Options Dialog */}
-        <ServerConnectionModal
-          connection={
-            editingConnectionId
-              ? connections.find((c) => c.id === editingConnectionId) || null
-              : null
-          }
-          open={editingConnectionId !== null}
-          onOpenChange={(open) => {
-            if (!open) {
-              setEditingConnectionId(null);
-            }
-          }}
-          onConnect={handleUpdateConnection}
-        />
       </div>
+
+      {!isSingleTab && !showDisplayBoot && (
+        <MobileInspectorToolbar
+          serverId={displayServer?.id}
+          rpcLoggerOpen={rpcLoggerOpen}
+          onRpcLoggerOpenChange={setRpcLoggerOpen}
+        />
+      )}
+
+      {/* Command Palette */}
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onOpenChange={setIsCommandPaletteOpen}
+        tools={aggregatedTools}
+        prompts={aggregatedPrompts}
+        resources={aggregatedResources}
+        savedRequests={savedRequests}
+        connections={connections}
+        selectedServer={selectedServer}
+        tunnelUrl={tunnelUrl}
+        onNavigate={handleCommandPaletteNavigate}
+        onServerSelect={handleServerSelect}
+      />
     </TooltipProvider>
   );
 }

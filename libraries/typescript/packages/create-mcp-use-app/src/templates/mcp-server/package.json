@@ -1,0 +1,37 @@
+{
+  "name": "mcp-use server",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "version": "1.0.0",
+  "description": "an mcp-use server",
+  "author": "mcp-use",
+  "license": "MIT",
+  "homepage": "https://github.com/mcp-use/mcp-use",
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "chatgpt plugins",
+    "claude connector",
+    "mcp-app",
+    "mcp-use",
+    "manufact"
+  ],
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "mcp-use build",
+    "dev": "mcp-use dev",
+    "start": "mcp-use start",
+    "deploy": "mcp-use deploy",
+    "typecheck": "mcp-use typecheck"
+  },
+  "dependencies": {
+    "mcp-use": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "typescript": "^7.0.2"
+  }
+}

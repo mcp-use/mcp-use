@@ -35,7 +35,7 @@ This example asks an agent to inspect files and return a typed summary.
 
 ```typescript
 import { z } from "zod";
-import { MCPAgent } from "mcp-use";
+import { MCPAgent } from "@mcp-use/agent";
 
 const ProjectSummary = z.object({
   packageName: z.string().nullable(),

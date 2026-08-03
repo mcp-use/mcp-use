@@ -94,7 +94,7 @@ export function updatePackageJson(projectPath: string, projectName: string) {
   const packageJsonContent = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
 
   packageJsonContent.name = projectName;
-  packageJsonContent.description = `MCP server: ${projectName}`;
+  packageJsonContent.description = `${projectName}: an mcp-use server`;
 
   writeFileSync(packageJsonPath, JSON.stringify(packageJsonContent, null, 2));
 }

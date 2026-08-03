@@ -18,7 +18,8 @@ Use streaming when you need progress while an agent works. `MCPAgent` exposes th
 
 ```typescript
 import { ChatOpenAI } from "@langchain/openai";
-import { MCPAgent, MCPClient } from "mcp-use";
+import { MCPAgent } from "@mcp-use/agent";
+import { MCPClient } from "@mcp-use/client";
 
 async function stepStreamingExample() {
   const client = new MCPClient({
@@ -64,7 +65,8 @@ Use `streamEvents()` for token-level model output, tool lifecycle events, and cu
 
 ```typescript
 import { ChatOpenAI } from "@langchain/openai";
-import { MCPAgent, MCPClient } from "mcp-use";
+import { MCPAgent } from "@mcp-use/agent";
+import { MCPClient } from "@mcp-use/client";
 
 async function eventStreamingExample() {
   const client = new MCPClient({
@@ -105,8 +107,9 @@ eventStreamingExample().catch(console.error);
   version and LLM provider. Check both properties for compatibility:
 
 ```typescript
-const text = event.data?.chunk?.text || event.data?.chunk?.content
+const text = event.data?.chunk?.text || event.data?.chunk?.content;
 ```
+
 </Note>
 
 ## Print formatted terminal output
@@ -129,7 +132,7 @@ const text = event.data?.chunk?.text || event.data?.chunk?.content
 </video>
 
 ```typescript
-import { MCPAgent } from "mcp-use";
+import { MCPAgent } from "@mcp-use/agent";
 
 async function prettyStreamExample() {
   const agent = new MCPAgent({

@@ -1,0 +1,227 @@
+import type { McpUseViewConfig } from "../react/public-assets.js";
+import { pathUnderBase } from "../fetch-app.js";
+import type { ViewManifestEntry } from "./types.js";
+
+/**
+ * Resolve a registry asset path to an absolute URL for embedding in the
+ * synthesized view document.
+ *
+ * Dev external registry paths are origin-absolute and `/`-prefixed.
+ *
+ * @param assetPath - Origin-absolute dev path starting with `/`.
+ * @param origin - Request-resolved public origin.
+ * @returns Absolute URL `${origin}${assetPath}`.
+ * @throws When `assetPath` does not start with `/`.
+ */
+export function resolveAssetUrl(assetPath: string, origin: string): string {
+  if (!assetPath.startsWith("/")) {
+    throw new Error(
+      `View manifest asset path must be origin-absolute (start with "/"); got ${JSON.stringify(assetPath)}`
+    );
+  }
+  return `${origin}${assetPath}`;
+}
+
+/**
+ * Build the HTTP path prefix for a view's built assets (no origin).
+ *
+ * @param basePath - MCP mount prefix (e.g. `/mcp`).
+ * @param viewName - View directory / registry key.
+ */
+export function viewAssetsBasePath(basePath: string, viewName: string): string {
+  return `${pathUnderBase(basePath, `_mcp-use/views/${viewName}`)}/`;
+}
+
+/**
+ * Resolve a production or dev external asset path to an absolute URL.
+ *
+ * @param assetPath - Full CDN URL, origin-absolute dev path (`/…`), or
+ *   view-relative production path (`assets/…`).
+ * @param assetsBase - Assets URL prefix (origin + optional path).
+ * @param basePath - MCP mount prefix.
+ * @param viewName - View directory / registry key (required for view-relative paths).
+ */
+export function resolveExternalAssetUrl(
+  assetPath: string,
+  assetsBase: string,
+  basePath: string,
+  viewName: string
+): string {
+  if (
+    assetPath.startsWith("http://") ||
+    assetPath.startsWith("https://") ||
+    assetPath.startsWith("data:")
+  ) {
+    return assetPath;
+  }
+  if (assetPath.startsWith("/")) {
+    return resolveAssetUrl(assetPath, assetsBase);
+  }
+  return `${assetsBase}${viewAssetsBasePath(basePath, viewName)}${assetPath.replace(/^\/+/, "")}`;
+}
+
+/**
+ * Resolve the absolute URL prefix for the project's `public/` directory.
+ *
+ * @param assetsBase - Assets URL prefix (origin + optional path).
+ * @param basePath - MCP mount prefix (e.g. `/mcp`).
+ * @returns Absolute prefix with trailing slash.
+ */
+export function resolvePublicBase(
+  assetsBase: string,
+  basePath: string
+): string {
+  return `${assetsBase}${pathUnderBase(basePath, "_mcp-use/public")}/`;
+}
+
+/**
+ * Escape view JS so it can sit inside a HTML `<script>` element without
+ * premature termination or comment-open sequences.
+ *
+ * @param code - Raw module source.
+ */
+function escapeInlineScript(code: string): string {
+  return code
+    .replaceAll(/<\/script/gi, "<\\/script")
+    .replaceAll("<!--", "\\x3C!--");
+}
+
+/**
+ * Escape CSS so it can sit inside a HTML `<style>` element without premature
+ * termination.
+ *
+ * @param css - Raw stylesheet text.
+ */
+function escapeInlineStyle(css: string): string {
+  return css.replaceAll(/<\/style/gi, "<\\/style");
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+/**
+ * Transparent iframe canvas plus a zero-dependency loading indicator.
+ *
+ * The bootstrap removes the loading attribute immediately before React
+ * renders, so the indicator cannot overlap the mounted app.
+ */
+const VIEW_BOOTSTRAP_STYLE = `<style>
+html,body,#root{background:transparent}
+html,body{margin:0}
+#root[data-mcp-use-loading]{display:flex;min-height:100vh;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:rgba(127,127,127,.9)}
+#root[data-mcp-use-loading]::before{width:20px;height:20px;box-sizing:border-box;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;content:"";animation:mcp-use-view-spin .7s linear infinite}
+#root[data-mcp-use-loading]::after{color:rgba(127,127,127,.9);content:"Compiling...";font:500 13px/1.2 ui-sans-serif,system-ui,sans-serif}
+@keyframes mcp-use-view-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){#root[data-mcp-use-loading]::before{animation-duration:1.4s}}
+</style>`;
+
+/**
+ * Synthesize a complete HTML document for a view from registry data.
+ *
+ * Production (`kind: "external"`) loads built assets over HTTP with absolute
+ * URLs. Production `kind: "inline"` embeds JS/CSS directly. Dev uses Vite module
+ * URLs (`kind: "external"` with origin-absolute paths).
+ *
+ * @param entry - Primed registry entry for the view.
+ * @param assetsBase - Request-resolved assets URL prefix for absolute asset URLs.
+ * @param basePath - MCP mount prefix (e.g. `/mcp`).
+ * @param viewName - View directory / registry key (required for production external paths).
+ */
+export function synthesizeViewDocument(
+  entry: ViewManifestEntry,
+  assetsBase: string,
+  basePath: string,
+  viewName?: string
+): string {
+  const viewConfig: McpUseViewConfig = {
+    publicBase: resolvePublicBase(assetsBase, basePath),
+  };
+  const configScript = `<script>globalThis.__mcpUseViewConfig=${JSON.stringify(viewConfig)};</script>`;
+
+  if (entry.kind === "inline") {
+    const styleTag =
+      entry.css.length > 0
+        ? `<style>${escapeInlineStyle(entry.css)}</style>`
+        : "";
+    const moduleScript = `<script type="module">${escapeInlineScript(entry.js)}</script>`;
+    return `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+${configScript}
+${VIEW_BOOTSTRAP_STYLE}
+${styleTag}
+</head>
+<body>
+<div id="root" data-mcp-use-loading></div>
+${moduleScript}
+</body>
+</html>`;
+  }
+
+  if (viewName === undefined) {
+    throw new Error(
+      "viewName is required when synthesizing an external view document."
+    );
+  }
+
+  const cssLinks = entry.css
+    .map(
+      (path) =>
+        `<link rel="stylesheet" href="${escapeHtml(resolveExternalAssetUrl(path, assetsBase, basePath, viewName))}">`
+    )
+    .join("\n");
+
+  const scriptTags = (entry.scripts ?? [])
+    .map(
+      (path) =>
+        `<script type="module" src="${escapeHtml(resolveExternalAssetUrl(path, assetsBase, basePath, viewName))}"></script>`
+    )
+    .join("\n");
+
+  // Dev view modules contain Vite's root-relative imports. MCP App hosts load
+  // the synthesized document in an opaque-origin srcdoc iframe, where those
+  // specifiers do not inherit the public tunnel origin for CSP matching.
+  // Map the root prefix to the request-resolved asset base before any module
+  // executes. Production bundles use view-relative asset entries and do not
+  // receive this development-only map.
+  const devImportMap =
+    entry.entry.startsWith("/") &&
+    (entry.scripts ?? []).includes("/@vite/client")
+      ? `<script type="importmap">${escapeInlineScript(
+          JSON.stringify({
+            imports: {
+              "/": `${assetsBase.replace(/\/+$/, "")}/`,
+            },
+          })
+        )}</script>`
+      : "";
+
+  const entryUrl = resolveExternalAssetUrl(
+    entry.entry,
+    assetsBase,
+    basePath,
+    viewName
+  );
+
+  return `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+${configScript}
+${devImportMap}
+${VIEW_BOOTSTRAP_STYLE}
+${cssLinks}
+</head>
+<body>
+<div id="root" data-mcp-use-loading></div>
+${scriptTags}
+<script type="module" src="${escapeHtml(entryUrl)}"></script>
+</body>
+</html>`;
+}

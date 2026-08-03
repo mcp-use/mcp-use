@@ -10,7 +10,7 @@ let page: Page;
 
 test.describe("Inspector Command Palette Tests", () => {
   // Note: To run these tests with a real MCP server:
-  // 1. cd packages/mcp-use/examples/server/features/conformance
+  // 1. cd packages/server/examples/conformance
   // 2. pnpm build && pnpm start --port 3002
   // Then run: pnpm test:e2e tests/e2e/command-palette.test.ts
 
@@ -22,7 +22,7 @@ test.describe("Inspector Command Palette Tests", () => {
     const { usesBuiltinInspector, inspectorUrl } = getTestMatrix();
     if (usesBuiltinInspector) {
       await goToInspectorWithAutoConnectAndOpenTools(page, {
-        waitForWidgets: true,
+        waitForViews: true,
       });
     } else {
       await page.goto(inspectorUrl);
@@ -55,10 +55,6 @@ test.describe("Inspector Command Palette Tests", () => {
   });
 
   test("should open command palette with button click", async () => {
-    // Open the Settings dropdown (command palette trigger moved there)
-    await page.getByRole("button", { name: "Settings", exact: true }).click();
-
-    // Click the Command Palette menu item
     await page.getByTestId("command-palette-trigger-button").click();
 
     // Verify command palette dialog opens

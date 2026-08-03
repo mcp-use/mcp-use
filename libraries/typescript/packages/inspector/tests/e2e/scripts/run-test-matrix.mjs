@@ -10,10 +10,8 @@
  * - mix: Built server on port 3002, dev inspector on port 3000
  */
 
-import { createServer } from "node:http";
-import { readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
-import { dirname, extname, join, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import waitOn from "wait-on";
 
@@ -47,33 +45,16 @@ if (additionalArgs.length > 0) {
 const inspectorDir = resolve(__dirname, "../../..");
 const conformanceServerDir = resolve(
   inspectorDir,
-  "../mcp-use/examples/server/features/conformance"
+  "../server/examples/conformance"
 );
+const builtinPort = Number(process.env.TEST_PORT || 3000);
 
-// Track child processes and servers for cleanup
+// Track child processes for cleanup
 const childProcesses = [];
-let cdnServer = null;
-
-// Simple HTML escape to safely include user input in responses
-function escapeHtml(str) {
-  return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
 
 // Cleanup handler
 function cleanup() {
   console.log("\n🧹 Cleaning up processes...");
-  if (cdnServer) {
-    try {
-      cdnServer.close();
-    } catch {
-      /* ignore */
-    }
-  }
   childProcesses.forEach((proc) => {
     try {
       proc.kill("SIGTERM");
@@ -82,68 +63,6 @@ function cleanup() {
     }
   });
   process.exit(0);
-}
-
-/**
- * Start a local static file server for dist/cdn/ so tests don't depend on
- * the real inspector-cdn.mcp-use.com being reachable.
- *
- * Handles versioned filename requests:
- *   /inspector@VERSION.js  → dist/cdn/inspector.js
- *   /inspector@VERSION.css → dist/cdn/inspector.css
- * All other paths are served as-is (favicons, provider images, etc.)
- */
-function startLocalCdnServer(cdnDistDir) {
-  return new Promise((resolve, reject) => {
-    const CONTENT_TYPES = {
-      ".js": "application/javascript",
-      ".css": "text/css",
-      ".svg": "image/svg+xml",
-      ".png": "image/png",
-    };
-
-    const server = createServer((req, res) => {
-      let urlPath = (req.url ?? "/").split("?")[0];
-      // /inspector@VERSION.js|css  →  /inspector.js|css
-      urlPath = urlPath.replace(
-        /^\/inspector@.+?(\.(?:js|css))$/,
-        "/inspector$1"
-      );
-      // Normalize path and ensure it stays within cdnDistDir to prevent traversal
-      if (urlPath.startsWith("/")) {
-        urlPath = urlPath.slice(1);
-      }
-      const file = resolve(cdnDistDir, urlPath);
-      const rootWithSep =
-        cdnDistDir.endsWith("/") || cdnDistDir.endsWith("\\")
-          ? cdnDistDir
-          : cdnDistDir + (process.platform === "win32" ? "\\" : "/");
-      if (!file.startsWith(rootWithSep)) {
-        res.writeHead(404);
-        res.end(`Not found: ${escapeHtml(urlPath)}`);
-        return;
-      }
-      try {
-        const data = readFileSync(file);
-        const ct = CONTENT_TYPES[extname(file)] ?? "application/octet-stream";
-        res.writeHead(200, {
-          "Content-Type": ct,
-          "Access-Control-Allow-Origin": "*",
-        });
-        res.end(data);
-      } catch {
-        res.writeHead(404);
-        res.end(`Not found: ${escapeHtml(urlPath)}`);
-      }
-    });
-
-    server.listen(0, "127.0.0.1", () => {
-      const { port } = server.address();
-      resolve({ server, port });
-    });
-
-    server.on("error", reject);
-  });
 }
 
 process.on("SIGINT", cleanup);
@@ -236,7 +155,7 @@ async function main() {
     // Step 1: Build conformance server (needed for all modes)
     await runCommand(
       "pnpm",
-      ["--filter", "conformance-server", "build"],
+      ["build"],
       conformanceServerDir,
       "Building conformance server"
     );
@@ -248,17 +167,12 @@ async function main() {
       NODE_ENV: "test",
     };
 
-    // Start a local CDN server for modes that use the built inspector (builtin, prod).
-    // This avoids a hard dependency on inspector-cdn.mcp-use.com being reachable in CI,
-    // particularly for canary versions that haven't been deployed to CDN yet.
-    if (mode === "builtin" || mode === "prod") {
-      const cdnDistDir = resolve(inspectorDir, "dist/cdn");
-      const result = await startLocalCdnServer(cdnDistDir);
-      cdnServer = result.server;
-      const cdnPort = result.port;
-      playwrightEnv.INSPECTOR_CDN_BASE = `http://127.0.0.1:${cdnPort}`;
-      console.log(
-        `📦 Local CDN server started at http://127.0.0.1:${cdnPort}\n`
+    if (mode === "builtin") {
+      await runCommand(
+        "pnpm",
+        ["--filter", "@mcp-use/client", "build"],
+        inspectorDir,
+        "Building MCP client"
       );
     }
 
@@ -272,14 +186,17 @@ async function main() {
       // Start conformance server in dev mode (includes built-in inspector)
       await startBackgroundProcess(
         "pnpm",
-        ["--filter", "conformance-server", "dev", "--no-open"],
+        ["dev", "--port", String(builtinPort), "--no-open"],
         conformanceServerDir,
         "Starting conformance server with built-in inspector",
         playwrightEnv
       );
 
-      // Wait for the built-in inspector to be ready
-      await waitForUrl("http://localhost:3000/inspector", "Built-in inspector");
+      // Wait for the built-in inspector to be ready (mounted under /mcp basePath)
+      await waitForUrl(
+        `http://localhost:${builtinPort}/mcp/inspector`,
+        "Built-in inspector"
+      );
     } else if (mode === "prod") {
       // Prod mode: Built server on port 3002, built inspector on port 3000
       playwrightEnv = {
@@ -294,7 +211,7 @@ async function main() {
       // Start conformance server on port 3002
       await startBackgroundProcess(
         "pnpm",
-        ["--filter", "conformance-server", "start", "--port", "3002"],
+        ["start", "--port", "3002"],
         conformanceServerDir,
         "Starting conformance server on port 3002",
         playwrightEnv
@@ -313,7 +230,7 @@ async function main() {
       // Start conformance server on port 3002
       await startBackgroundProcess(
         "pnpm",
-        ["--filter", "conformance-server", "start", "--port", "3002"],
+        ["start", "--port", "3002"],
         conformanceServerDir,
         "Starting conformance server on port 3002",
         playwrightEnv
@@ -387,21 +304,6 @@ async function main() {
     childProcesses.push(playwrightProc);
 
     playwrightProc.on("close", async (code) => {
-      // Restore modified files after HMR tests (whether they pass or fail)
-      if (isRunningHmrTests) {
-        console.log("\n🔄 Restoring modified conformance server files...");
-        try {
-          await runCommand(
-            "git",
-            ["restore", "."],
-            conformanceServerDir,
-            "Restoring conformance server files"
-          );
-        } catch (err) {
-          console.log("⚠️  Warning: Could not restore files:", err.message);
-        }
-      }
-
       if (code === 0) {
         console.log("\n✅ All tests passed!\n");
       } else {

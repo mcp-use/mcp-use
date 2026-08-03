@@ -28,15 +28,18 @@ Changing only the display name updates labels in the dashboard, server list, hea
 
 Use custom headers for server-specific requirements such as bearer tokens, API keys, or version headers.
 
-Header values are stored in browser storage for that Inspector instance. Prefer OAuth when the server supports it.
+Header values are used for the live connection only. They are intentionally not
+saved or restored after a reload, so supply them again at runtime. Prefer OAuth
+when the server supports it.
 
 <Warning>
-  Custom headers are stored in browser storage. Never include sensitive credentials that should not be stored locally. Use OAuth for secure authentication instead.
+  Copy Config includes current form values. Remove OAuth tokens, API keys, and
+  other secrets before sharing exported configuration.
 </Warning>
 
 ## Configure OAuth
 
-By default the inspector relies on Dynamic Client Registration (DCR), so no credentials are needed. Use the Authentication dialog when the upstream auth server doesn't expose `registration_endpoint` (common for proxy-mode servers fronting Slack, WorkOS, or GitHub) or when the provider requires a confidential client without PKCE.
+By default the inspector relies on Dynamic Client Registration (DCR), so no credentials are needed. Use the Authentication dialog when the upstream auth server doesn't expose `registration_endpoint` (common for proxy-mode servers fronting Slack, WorkOS, or GitHub). OAuth client secrets are runtime-only and are not restored after a reload.
 
 | Field | When to set it |
 | --- | --- |
@@ -45,6 +48,11 @@ By default the inspector relies on Dynamic Client Registration (DCR), so no cred
 | Scope | Request a provider-specific space-separated scope list. |
 
 When a server requires OAuth, the connection enters `pending_auth`. Click **Authenticate**, complete the provider flow, and return to the Inspector. If a popup is blocked, use the open-auth-page fallback link.
+
+Browser OAuth session values are encrypted at rest with AES-256-GCM. The
+non-extractable origin key is kept in IndexedDB, while versioned ciphertext
+envelopes remain in localStorage so popup storage events and reload persistence
+continue to work.
 
 ## Configuration Import/Export
 

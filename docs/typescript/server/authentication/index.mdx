@@ -12,12 +12,12 @@ This guide helps you choose the right authentication path. Use the [auth provide
 
 Most MCP servers should use a Dynamic Client Registration provider. Use OAuth Proxy only when the upstream identity provider cannot register MCP clients dynamically.
 
-| Situation | Use |
-| --- | --- |
-| You use Auth0, Better Auth, Clerk, Keycloak, Supabase, or WorkOS | A built-in provider |
-| Your provider advertises a `registration_endpoint` | [Custom Provider](/typescript/server/authentication/providers/custom) |
+| Situation                                                            | Use                                                                    |
+| -------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| You use Auth0, Better Auth, Clerk, Keycloak, Supabase, or WorkOS     | A built-in provider                                                    |
+| Your provider advertises a `registration_endpoint`                   | [Custom Provider](/typescript/server/authentication/providers/custom)  |
 | Your provider only gives you one fixed `clientId` and `clientSecret` | [OAuth Proxy](/typescript/server/authentication/providers/oauth-proxy) |
-| You only need local development without identity | No OAuth provider |
+| You only need local development without identity                     | No OAuth provider                                                      |
 
 With a Dynamic Client Registration provider, clients register directly with the upstream identity provider. Your MCP server exposes discovery metadata and verifies bearer tokens. It does not handle the authorization code or token exchange.
 
@@ -40,7 +40,8 @@ Choose the provider that matches your identity system:
 Pass the selected provider to `MCPServer`.
 
 ```typescript
-import { MCPServer, oauthAuth0Provider } from "mcp-use/server";
+import { MCPServer } from "mcp-use";
+import { oauthAuth0Provider } from "mcp-use/oauth/auth0";
 
 const server = new MCPServer({
   name: "secure-server",
@@ -58,7 +59,7 @@ Provider pages show the required dashboard steps and environment variables. The 
 When OAuth is configured and the request is authenticated, tools can read `ctx.auth`.
 
 ```typescript
-import { error, object } from "mcp-use/server";
+import { error, object } from "mcp-use";
 
 server.tool(
   {
@@ -96,16 +97,32 @@ Keep provider-specific setup in the provider page. Keep authorization decisions 
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="User Context" icon="user" href="/typescript/server/authentication/user-context">
+  <Card
+    title="User Context"
+    icon="user"
+    href="/typescript/server/authentication/user-context"
+  >
     Read identity, scopes, roles, and permissions inside tools.
   </Card>
-  <Card title="Auth providers API reference" icon="terminal" href="/typescript/api-reference/server/auth-providers">
+  <Card
+    title="Auth providers API reference"
+    icon="terminal"
+    href="/typescript/api-reference/server/auth-providers"
+  >
     Look up exact provider options, defaults, and verification behavior.
   </Card>
-  <Card title="Client Authentication" icon="router" href="/typescript/client/authentication">
+  <Card
+    title="Client Authentication"
+    icon="router"
+    href="/typescript/client/authentication"
+  >
     Connect a TypeScript MCP client to an OAuth-protected server.
   </Card>
-  <Card title="OAuth Proxy" icon="shuffle" href="/typescript/server/authentication/providers/oauth-proxy">
+  <Card
+    title="OAuth Proxy"
+    icon="shuffle"
+    href="/typescript/server/authentication/providers/oauth-proxy"
+  >
     Bridge providers that do not support Dynamic Client Registration.
   </Card>
 </CardGroup>

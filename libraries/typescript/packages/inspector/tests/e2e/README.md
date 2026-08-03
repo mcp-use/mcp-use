@@ -16,7 +16,7 @@ npx playwright install
 
 These commands automatically build and start the conformance server before running tests.
 
-**Note:** Telemetry (Scarf and PostHog) is automatically disabled during test runs to prevent network errors and tracking.
+**Note:** Telemetry (PostHog) is automatically disabled during test runs to prevent network errors and tracking.
 
 ```bash
 # Built-in mode: Server dev with built-in inspector (port 3000, for HMR testing)
@@ -200,7 +200,7 @@ The conformance server provides:
 **Manual setup (only for manual testing):** If using `pnpm test:e2e` directly without the automated commands, start the conformance server manually:
 
 ```bash
-cd packages/mcp-use/examples/server/features/conformance
+cd packages/server/examples/conformance
 pnpm build
 pnpm start --port 3002
 ```

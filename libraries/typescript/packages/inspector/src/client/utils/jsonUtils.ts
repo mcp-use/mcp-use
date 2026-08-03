@@ -2,6 +2,8 @@
  * Utility functions for handling large JSON objects in the inspector
  */
 
+import { formatBytes } from "./format";
+
 // Size threshold in bytes (100KB)
 const LARGE_JSON_THRESHOLD = 100 * 1024;
 
@@ -50,6 +52,18 @@ function truncatePropertyValues(obj: any, maxLength: number): any {
 }
 
 /**
+ * Data object safe to render in the inspector (truncates large string values).
+ */
+export function getJsonDisplayData(data: unknown): unknown {
+  const full = JSON.stringify(data, null, 2);
+  const size = new TextEncoder().encode(full).length;
+  if (size > LARGE_JSON_THRESHOLD) {
+    return truncatePropertyValues(data, MAX_VALUE_LENGTH);
+  }
+  return data;
+}
+
+/**
  * Check if a JSON object is too large and get preview information
  */
 export function analyzeJSON(data: any): LargeJSONInfo {
@@ -77,17 +91,6 @@ export function analyzeJSON(data: any): LargeJSONInfo {
     preview,
     full,
   };
-}
-
-/**
- * Format bytes to human-readable string
- */
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 Bytes";
-  const k = 1024;
-  const sizes = ["Bytes", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
 }
 
 /**

@@ -2,9 +2,9 @@ import { BlurFade } from "@/client/components/ui/blur-fade";
 import { RandomGradientBackground } from "@/client/components/ui/random-gradient-background";
 import { Spinner } from "@/client/components/ui/spinner";
 import { cn } from "@/client/lib/utils";
-import { getServerDisplayName } from "@/client/utils/serverNames";
-import type { UseMcpResult } from "mcp-use/react";
-import { useEffect, useState } from "react";
+import { getServerDisplayName } from "@/client/utils/servers";
+import type { UseMcpResult } from "@mcp-use/client/react";
+import { useState } from "react";
 
 interface ServerIconProps {
   server: UseMcpResult;
@@ -24,8 +24,10 @@ export function ServerIcon({
   className,
   size = "md",
 }: ServerIconProps) {
-  const [imageLoading, setImageLoading] = useState(true);
-  const [imageError, setImageError] = useState(false);
+  const [imageResult, setImageResult] = useState<{
+    url: string;
+    status: "loaded" | "error";
+  } | null>(null);
 
   const sizeClasses = {
     sm: "w-6 h-6",
@@ -51,11 +53,14 @@ export function ServerIcon({
     return null;
   })();
 
-  // Reset loading and error states when iconUrl changes
-  useEffect(() => {
-    setImageLoading(iconUrl !== null);
-    setImageError(false);
-  }, [iconUrl]);
+  // Track the result by URL rather than resetting it in an effect. Data URLs can
+  // finish loading before effects run, so an effect-based reset can overwrite
+  // the onLoad result and leave the spinner visible forever.
+  const imageLoading = iconUrl !== null && imageResult?.url !== iconUrl;
+  const imageError =
+    iconUrl !== null &&
+    imageResult?.url === iconUrl &&
+    imageResult.status === "error";
 
   // Get server display name
   const displayName = getServerDisplayName(server);
@@ -63,7 +68,7 @@ export function ServerIcon({
   // If no icon available, show gradient with initials
   if (!iconUrl || imageError) {
     return (
-      <BlurFade delay={0.05}>
+      <BlurFade delay={0.05} offset={0}>
         <RandomGradientBackground
           className={cn(
             "flex items-center justify-center rounded-full overflow-hidden",
@@ -77,7 +82,7 @@ export function ServerIcon({
 
   // Show image icon
   return (
-    <BlurFade delay={0.05}>
+    <BlurFade delay={0.05} offset={0}>
       <div
         className={cn(
           "rounded-md overflow-hidden flex items-center justify-center bg-white dark:bg-zinc-800 relative",
@@ -94,11 +99,8 @@ export function ServerIcon({
           src={iconUrl}
           alt={displayName}
           className={cn("object-contain", sizeClasses[size])}
-          onLoad={() => setImageLoading(false)}
-          onError={() => {
-            setImageLoading(false);
-            setImageError(true);
-          }}
+          onLoad={() => setImageResult({ url: iconUrl, status: "loaded" })}
+          onError={() => setImageResult({ url: iconUrl, status: "error" })}
           style={{
             imageRendering: "-webkit-optimize-contrast",
             display: imageLoading ? "none" : "block",

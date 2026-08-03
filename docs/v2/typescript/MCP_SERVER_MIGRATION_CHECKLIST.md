@@ -45,7 +45,7 @@ API-reference pages are also outside this migration checklist.
   - [x] Map native user fields with `id` and return `{ user, payload, permissions }`.
   - [x] Explain that the verifier receives the resolved MCP resource and that fixed-client proxying is external.
 - [x] [Google Cloud deployment](/v2/typescript/server/deployment/google)
-  - [x] Rebuild setup around `create-mcp-use-app@beta --template mcp-server` and its generated scripts.
+  - [x] Rebuild setup around `create-mcp-use-app@latest --template mcp-server` and its generated scripts.
   - [x] Convert the zoo server to root imports, `inputSchema`/`outputSchema`, raw results, and a default server export.
   - [x] Replace the legacy widget section with `views/<name>/view.tsx`, tool `view`, and `structuredContent`.
   - [x] Bind to `0.0.0.0`, use Cloud Run's injected `PORT`, and preserve IAM flags on redeploys.
@@ -68,7 +68,7 @@ API-reference pages are also outside this migration checklist.
   - [x] Group examples by protocol feature, Views, authentication, runtime, and deployment.
   - [x] Separate external showcases from canonical repository examples and verify every hosted endpoint.
   - [x] Add stateless lifecycle, notifications/subscriptions, and sampling-boundary examples prominently.
-  - [x] Use `create-mcp-use-app@beta` with explicit `mcp-server` or `mcp-apps` templates.
+  - [x] Use `create-mcp-use-app@latest` with explicit `mcp-server` or `mcp-apps` templates.
 - [x] [Elicitation](/v2/typescript/server/elicitation)
   - [x] Rewrite every call to `ctx.elicit(key, message, schemaOrUrl)` with a stable correlation key.
   - [x] Replace `result.action` with `result.status`.

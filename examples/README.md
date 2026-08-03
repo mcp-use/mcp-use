@@ -11,7 +11,7 @@ The examples below are **in-repo code samples** meant to illustrate specific API
 ## Quick Links
 
 - **[Python Examples](../libraries/python/examples/)** - Python client, server, and agent examples
-- **[TypeScript Examples](../libraries/typescript/packages/mcp-use/examples/)** - TypeScript/JavaScript examples
+- **[TypeScript Examples](../libraries/typescript/packages/client/examples/)** - TypeScript/JavaScript examples (see also [agent](../libraries/typescript/packages/agent/examples/) and [server](../libraries/typescript/packages/server/examples/))
 
 ## Local Development
 
@@ -84,36 +84,37 @@ When you clone this repository locally, you'll find `python/` and `typescript/` 
   - [DNS Rebinding](../libraries/typescript/packages/mcp-use/examples/server/features/dns-rebinding/) - DNS rebinding protection
 - **[OAuth Examples](../libraries/typescript/packages/mcp-use/examples/server/oauth/)** - OAuth implementations
   - [Auth0](../libraries/typescript/packages/mcp-use/examples/server/oauth/auth0/)
-  - [Better Auth](../libraries/typescript/packages/mcp-use/examples/server/oauth/better-auth/)
+  - [Better Auth (v2 + Hono)](../libraries/typescript/packages/server/examples/auth/better-auth/)
   - [Supabase](../libraries/typescript/packages/mcp-use/examples/server/oauth/supabase/)
   - [WorkOS](../libraries/typescript/packages/mcp-use/examples/server/oauth/workos/)
 - **[Deployment](../libraries/typescript/packages/mcp-use/examples/server/deployment/)** - Deployment examples
-- **[UI Examples](../libraries/typescript/packages/mcp-use/examples/server/ui/)** — MCP Apps widgets
-  - **[MCP Apps (recommended)](../libraries/typescript/packages/mcp-use/examples/server/ui/mcp-apps/)** - Dual-protocol widgets with React auto-discovery
-  - [MCP Apps Gallery](../libraries/typescript/packages/mcp-use/examples/server/ui/mcp-ui/) - Three programmatic widgets via `server.uiResource({ type: "mcpApps" })`
-  - [Files](../libraries/typescript/packages/mcp-use/examples/server/ui/files/) - File-manager widget using `useFiles`
-  - [Model Context](../libraries/typescript/packages/mcp-use/examples/server/ui/model-context/) - Widgets reading host context (theme, locale, safe area)
-  - [Apps SDK (legacy)](../libraries/typescript/packages/mcp-use/examples/server/ui/mcp-apps/apps-sdk/) - ChatGPT Apps SDK only — prefer the dual-protocol **MCP Apps** example above
+- **[MCP Apps view examples](../libraries/typescript/packages/server/examples/views/)** — current `view` API and React hooks
+  - **[Basic](../libraries/typescript/packages/server/examples/views/basic/)** - Typed tool output, view tools, host context, and display modes
+  - [File Upload](../libraries/typescript/packages/server/examples/views/file-upload/) - File-manager view using `useFiles`
+  - [Story Writer](../libraries/typescript/packages/server/examples/views/story-writer/) - Interactive story-writing view
+  - [Tic-tac-toe](../libraries/typescript/packages/server/examples/views/tic-tac-toe/) - Stateful game UI
+  - [Excalidraw](../libraries/typescript/packages/server/examples/views/excalidraw/) - Canvas-based view
 
 ### Agent Examples
-- **[Basic Examples](../libraries/typescript/packages/mcp-use/examples/agent/basic/)** - Basic agent patterns
-  - [Chat Example](../libraries/typescript/packages/mcp-use/examples/agent/basic/chat_example.ts)
-  - [MCP Everything](../libraries/typescript/packages/mcp-use/examples/agent/basic/mcp_everything.ts)
-  - [Simplified Agent](../libraries/typescript/packages/mcp-use/examples/agent/basic/simplified_agent_example.ts)
-- **[Advanced Examples](../libraries/typescript/packages/mcp-use/examples/agent/advanced/)** - Advanced patterns
-  - [Observability](../libraries/typescript/packages/mcp-use/examples/agent/advanced/observability.ts)
-  - [Streaming](../libraries/typescript/packages/mcp-use/examples/agent/advanced/stream_example.ts)
-  - [Structured Output](../libraries/typescript/packages/mcp-use/examples/agent/advanced/structured_output.ts)
-- **[Code Mode](../libraries/typescript/packages/mcp-use/examples/agent/code-mode/)** - Code execution
-  - [Basic Code Mode](../libraries/typescript/packages/mcp-use/examples/agent/code-mode/code_mode_example.ts)
-  - [E2B Code Mode](../libraries/typescript/packages/mcp-use/examples/agent/code-mode/code_mode_e2b_example.ts)
-- **[Frameworks](../libraries/typescript/packages/mcp-use/examples/agent/frameworks/)** - Framework integrations
-  - [AI SDK Example](../libraries/typescript/packages/mcp-use/examples/agent/frameworks/ai_sdk_example.ts)
-- **[Integrations](../libraries/typescript/packages/mcp-use/examples/agent/integrations/)** - MCP server integrations
-  - [Airbnb](../libraries/typescript/packages/mcp-use/examples/agent/integrations/airbnb_use.ts)
-  - [Blender](../libraries/typescript/packages/mcp-use/examples/agent/integrations/blender_use.ts)
-  - [Browser](../libraries/typescript/packages/mcp-use/examples/agent/integrations/browser_use.ts)
-  - [Filesystem](../libraries/typescript/packages/mcp-use/examples/agent/integrations/filesystem_use.ts)
-- **[Server Management](../libraries/typescript/packages/mcp-use/examples/agent/server-management/)** - Dynamic server management
-  - [Add Server Tool](../libraries/typescript/packages/mcp-use/examples/agent/server-management/add_server_tool.ts)
-  - [Multi-Server](../libraries/typescript/packages/mcp-use/examples/agent/server-management/multi_server_example.ts)
+- **[Agent examples](../libraries/typescript/packages/agent/examples/)** — native and LangChain MCP agents
+- **[Basic Examples](../libraries/typescript/packages/agent/examples/basic/)** - Basic agent patterns
+  - [Chat Example](../libraries/typescript/packages/agent/examples/basic/chat_example.ts)
+  - [MCP Everything](../libraries/typescript/packages/agent/examples/basic/mcp_everything.ts)
+  - [Simplified Agent](../libraries/typescript/packages/agent/examples/basic/simplified_agent_example.ts)
+- **[Advanced Examples](../libraries/typescript/packages/agent/examples/advanced/)** - Advanced patterns
+  - [Observability](../libraries/typescript/packages/agent/examples/advanced/observability.ts)
+  - [Streaming](../libraries/typescript/packages/agent/examples/advanced/stream_example.ts)
+  - [Structured Output](../libraries/typescript/packages/agent/examples/advanced/structured_output.ts)
+- **[Code Mode](../libraries/typescript/packages/agent/examples/code-mode/)** - Code execution
+  - [Basic Code Mode](../libraries/typescript/packages/agent/examples/code-mode/code_mode_example.ts)
+  - [E2B Code Mode](../libraries/typescript/packages/agent/examples/code-mode/code_mode_e2b_example.ts)
+- **[Frameworks](../libraries/typescript/packages/agent/examples/frameworks/)** - Framework integrations
+  - [AI SDK Example](../libraries/typescript/packages/agent/examples/frameworks/ai_sdk_example.ts)
+- **[Integrations](../libraries/typescript/packages/agent/examples/integrations/)** - MCP server integrations
+  - [Airbnb](../libraries/typescript/packages/agent/examples/integrations/airbnb_use.ts)
+  - [Blender](../libraries/typescript/packages/agent/examples/integrations/blender_use.ts)
+  - [Browser](../libraries/typescript/packages/agent/examples/integrations/browser_use.ts)
+  - [Filesystem](../libraries/typescript/packages/agent/examples/integrations/filesystem_use.ts)
+- **[Server Management](../libraries/typescript/packages/agent/examples/server-management/)** - Dynamic server management
+  - [Add Server Tool](../libraries/typescript/packages/agent/examples/server-management/add_server_tool.ts)
+  - [Multi-Server](../libraries/typescript/packages/agent/examples/server-management/multi_server_example.ts)

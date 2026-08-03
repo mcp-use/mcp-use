@@ -8,16 +8,19 @@ icon: "brain"
 mcp-use is a fullstack MCP (Model Context Protocol) framework for Python and TypeScript.
 
 **Install:**
+
 - Python: `pip install mcp-use` (agent also requires a LangChain LLM provider, e.g. `pip install langchain-openai`)
 - TypeScript: `npm install mcp-use`
 
 **Core classes:** `MCPServer`, `MCPClient`, `MCPAgent`
 
 **Key imports:**
+
 - Python server: `from mcp_use import MCPServer`
 - Python client/agent: `from mcp_use import MCPClient, MCPAgent`
 - TypeScript server: `import { MCPServer } from "mcp-use/server"`
-- TypeScript client/agent: `import { MCPClient, MCPAgent } from "mcp-use"`
+- TypeScript client/agent: `import { MCPClient } from "@mcp-use/client"` and `import { MCPAgent } from "@mcp-use/agent"`
+
 </Visibility>
 
 ## What is MCP?
@@ -28,18 +31,55 @@ The **Model Context Protocol (MCP)** is an open standard (introduced by Anthropi
 
 Chat interfaces are becoming how most products are used. The major AI platforms now ship official MCP stores where you can publish your server and reach users directly inside their chat interface - no app install, no separate login. Together, these platforms give you access to roughly **1 billion weekly active users**. Publishing on these stores is becoming one of the most powerful distribution channels for any product.
 
-<div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginTop: '16px'}}>
-  <a href="https://claude.ai/directory/connectors" style={{textDecoration: 'none'}}>
+<div
+  style={{
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: "12px",
+    marginTop: "16px",
+  }}
+>
+  <a
+    href="https://claude.ai/directory/connectors"
+    style={{ textDecoration: "none" }}
+  >
     <img src="/images/stores/claude.png" alt="Claude" noZoom />
-    <p style={{textAlign: 'center', marginTop: '8px', fontSize: '0.875rem', fontWeight: '500'}}>Claude</p>
+    <p
+      style={{
+        textAlign: "center",
+        marginTop: "8px",
+        fontSize: "0.875rem",
+        fontWeight: "500",
+      }}
+    >
+      Claude
+    </p>
   </a>
-  <a href="https://chatgpt.com/apps" style={{textDecoration: 'none'}}>
+  <a href="https://chatgpt.com/apps" style={{ textDecoration: "none" }}>
     <img src="/images/stores/chat.png" alt="ChatGPT" noZoom />
-    <p style={{textAlign: 'center', marginTop: '8px', fontSize: '0.875rem', fontWeight: '500'}}>ChatGPT</p>
+    <p
+      style={{
+        textAlign: "center",
+        marginTop: "8px",
+        fontSize: "0.875rem",
+        fontWeight: "500",
+      }}
+    >
+      ChatGPT
+    </p>
   </a>
-  <a href="https://cursor.com/marketplace" style={{textDecoration: 'none'}}>
+  <a href="https://cursor.com/marketplace" style={{ textDecoration: "none" }}>
     <img src="/images/stores/cursor.png" alt="Cursor" noZoom />
-    <p style={{textAlign: 'center', marginTop: '8px', fontSize: '0.875rem', fontWeight: '500'}}>Cursor</p>
+    <p
+      style={{
+        textAlign: "center",
+        marginTop: "8px",
+        fontSize: "0.875rem",
+        fontWeight: "500",
+      }}
+    >
+      Cursor
+    </p>
   </a>
 </div>
 
@@ -47,11 +87,11 @@ Chat interfaces are becoming how most products are used. The major AI platforms 
 
 MCP uses a client-server model with three roles:
 
-| Role | Responsibility |
-|------|---------------|
-| **Host** | The AI-powered application (your product, Claude Desktop, Cursor, ChatGPT) |
-| **Client** | Runs inside the host; discovers and calls capabilities on MCP servers |
-| **Server** | Exposes tools, resources, and prompts to any connected client |
+| Role       | Responsibility                                                             |
+| ---------- | -------------------------------------------------------------------------- |
+| **Host**   | The AI-powered application (your product, Claude Desktop, Cursor, ChatGPT) |
+| **Client** | Runs inside the host; discovers and calls capabilities on MCP servers      |
+| **Server** | Exposes tools, resources, and prompts to any connected client              |
 
 ```
 Host
@@ -66,15 +106,15 @@ A single host can connect to many servers simultaneously. The client discovers w
 
 An MCP server exposes three primitives:
 
-| Primitive | Controlled by | Purpose |
-|-----------|--------------|---------|
-| **Tools** | Model | Functions the LLM calls to take actions |
-| **Resources** | Application | Read-only data the client fetches on demand |
-| **Prompts** | User | Reusable prompt templates and slash commands |
+| Primitive     | Controlled by | Purpose                                      |
+| ------------- | ------------- | -------------------------------------------- |
+| **Tools**     | Model         | Functions the LLM calls to take actions      |
+| **Resources** | Application   | Read-only data the client fetches on demand  |
+| **Prompts**   | User          | Reusable prompt templates and slash commands |
 
 ### Tools
 
-The most common primitive. The model decides when to call a tool and with what arguments  -  the server executes it and returns a result.
+The most common primitive. The model decides when to call a tool and with what arguments - the server executes it and returns a result.
 
 <CodeGroup>
 ```typescript TypeScript
@@ -82,26 +122,28 @@ import { MCPServer, text } from "mcp-use/server";
 import { z } from "zod";
 
 server.tool({
-  name: "get_weather",
-  description: "Get weather for a city",
-  schema: z.object({ city: z.string() }),
+name: "get_weather",
+description: "Get weather for a city",
+schema: z.object({ city: z.string() }),
 }, async ({ city }) => {
-  return text(`Sunny, 22°C in ${city}`);
+return text(`Sunny, 22°C in ${city}`);
 });
-```
+
+````
 ```python Python
 @server.tool()
 def get_weather(city: str) -> str:
     """Get weather for a city"""
     return f"Sunny, 22°C in {city}"
-```
+````
+
 </CodeGroup>
 
 See [TypeScript Tools](/typescript/server/tools) and [Python Tools](/python/server/tools).
 
 ### Resources
 
-Read-only data identified by a URI (`file:///example.txt`, `db://users/123`). The client application decides when to fetch them  -  not the model. Useful for surfacing context like file contents or query results.
+Read-only data identified by a URI (`file:///example.txt`, `db://users/123`). The client application decides when to fetch them - not the model. Useful for surfacing context like file contents or query results.
 
 <CodeGroup>
 ```typescript TypeScript
@@ -132,19 +174,21 @@ Templated instructions the user can invoke (think slash commands). The server de
 import { z } from "zod";
 
 server.prompt({
-  name: "code_review",
-  description: "Generate a code review prompt",
-  schema: z.object({ language: z.string(), focus: z.string().default("general") }),
+name: "code_review",
+description: "Generate a code review prompt",
+schema: z.object({ language: z.string(), focus: z.string().default("general") }),
 }, async ({ language, focus }) => ({
-  messages: [{ role: "user", content: `Review this ${language} code for ${focus}.` }]
+messages: [{ role: "user", content: `Review this ${language} code for ${focus}.` }]
 }));
-```
+
+````
 ```python Python
 @server.prompt(name="code_review", description="Generate a code review prompt")
 def code_review(language: str, focus: str = "general") -> str:
     """Generate a code review prompt"""
     return f"Review this {language} code for {focus}."
-```
+````
+
 </CodeGroup>
 
 See [TypeScript Prompts](/typescript/server/prompts) and [Python Prompts](/python/server/prompts).
@@ -157,52 +201,71 @@ See [TypeScript Prompts](/typescript/server/prompts) and [Python Prompts](/pytho
 import { MCPServer, widget } from "mcp-use/server";
 import { z } from "zod";
 
-server.tool({
-  name: "get_weather",
-  description: "Get weather for a city",
-  schema: z.object({ city: z.string() }),
-  widget: "weather-display", // references resources/weather-display/widget.tsx
-}, async ({ city }) => {
-  return widget({
-    props: { city, temperature: 22, conditions: "Sunny" },
-    message: `Weather in ${city}: Sunny, 22°C`,
-  });
-});
+server.tool(
+  {
+    name: "get_weather",
+    description: "Get weather for a city",
+    schema: z.object({ city: z.string() }),
+    widget: "weather-display", // references resources/weather-display/widget.tsx
+  },
+  async ({ city }) => {
+    return widget({
+      props: { city, temperature: 22, conditions: "Sunny" },
+      message: `Weather in ${city}: Sunny, 22°C`,
+    });
+  },
+);
 ```
 
 Widgets live in a `resources/` folder and are auto-discovered - no manual registration needed. They communicate with the server over JSON-RPC and have full access to MCP tools and resources from the client side.
 
 <CardGroup cols={2}>
-  <Card title="MCP Apps Guide" icon="app-window-mac" href="/typescript/mcp-apps">
+  <Card
+    title="MCP Apps Guide"
+    icon="app-window-mac"
+    href="/typescript/mcp-apps"
+  >
     Widgets, auto-discovery, props, and client-side hooks.
   </Card>
-  <Card title="Creating an MCP Apps Server" icon="circle-play" href="/typescript/mcp-apps/quickstart">
+  <Card
+    title="Creating an MCP Apps Server"
+    icon="circle-play"
+    href="/typescript/mcp-apps/quickstart"
+  >
     Step-by-step: scaffold and ship your first widget.
   </Card>
-  <Card title="Apps SDK compatibility" icon="message-square" href="/typescript/mcp-apps/apps-sdk-compatibility">
+  <Card
+    title="Apps SDK compatibility"
+    icon="message-square"
+    href="/typescript/mcp-apps/apps-sdk-compatibility"
+  >
     Understand how MCP Apps run in ChatGPT.
   </Card>
-  <Card title="Debugging Widgets" icon="bug-play" href="/inspector/debugging-chatgpt-apps">
+  <Card
+    title="Debugging Widgets"
+    icon="bug-play"
+    href="/inspector/debugging-chatgpt-apps"
+  >
     Use the Inspector to test and debug your widgets.
   </Card>
 </CardGroup>
 
 ## MCP Client
 
-Any application that speaks the MCP protocol is an MCP client  -  Claude Desktop, Cursor, ChatGPT, or your own product. Clients connect to servers, list their capabilities, and call tools on behalf of the model or user.
+Any application that speaks the MCP protocol is an MCP client - Claude Desktop, Cursor, ChatGPT, or your own product. Clients connect to servers, list their capabilities, and call tools on behalf of the model or user.
 
-The **[MCP Inspector](/inspector/index)** is a good concrete example: it is an MCP client that connects to any server and lets you browse tools, call them manually, inspect resources, and monitor the protocol exchange in real time. It ships built-in with every mcp-use server at `/inspector`.
+The **[MCP Inspector](/inspector/index)** is a good concrete example: it is an MCP client that connects to any server and lets you browse tools, call them manually, inspect resources, and monitor the protocol exchange in real time. It ships built-in with every mcp-use server at `/mcp/inspector`.
 
 With mcp-use, `MCPClient` gives you a programmatic MCP client in Python and TypeScript:
 
 <CodeGroup>
 ```typescript TypeScript
-import { MCPClient } from "mcp-use";
+import { MCPClient } from "@mcp-use/client";
 
 const client = new MCPClient({
-  mcpServers: {
-    everything: { command: "npx", args: ["-y", "@modelcontextprotocol/server-everything"] }
-  }
+mcpServers: {
+everything: { command: "npx", args: ["-y", "@modelcontextprotocol/server-everything"] }
+}
 });
 
 await client.createAllSessions();
@@ -210,16 +273,18 @@ const session = client.getSession("everything");
 const tools = await session.listTools();
 const result = await session.callTool("add", { a: 1, b: 2 });
 await client.closeAllSessions();
-```
+
+````
 ```typescript React
-import { useMcp } from "mcp-use/react";
+import { useMcp } from "@mcp-use/client/react";
 
 const { tools, callTool } = useMcp({
   url: "http://localhost:3000/mcp"
 });
 
 const result = await callTool("add", { a: 1, b: 2 });
-```
+````
+
 ```python Python
 from mcp_use import MCPClient
 
@@ -235,20 +300,21 @@ tools = await session.list_tools()
 result = await session.call_tool("add", {"a": 1, "b": 2})
 await client.close_all_sessions()
 ```
+
 </CodeGroup>
 
 See [TypeScript Client](/typescript/client/index) and [Python Client](/python/client/client-configuration).
 
 ### Client Primitives
 
-Clients can also implement primitives that reverse the flow  -  the server initiates a request back through the client:
+Clients can also implement primitives that reverse the flow - the server initiates a request back through the client:
 
-| Primitive | Flow | Purpose |
-|-----------|------|---------|
-| **Sampling** | Server - LLM | Server asks the client to run an LLM completion |
-| **Elicitation** | Server - User | Server asks the user for input mid-workflow |
-| **Roots** | Server - Filesystem | Server requests access to specific paths |
-| **Notifications** | Server - Client | Server sends real-time progress or status updates |
+| Primitive         | Flow                | Purpose                                           |
+| ----------------- | ------------------- | ------------------------------------------------- |
+| **Sampling**      | Server - LLM        | Server asks the client to run an LLM completion   |
+| **Elicitation**   | Server - User       | Server asks the user for input mid-workflow       |
+| **Roots**         | Server - Filesystem | Server requests access to specific paths          |
+| **Notifications** | Server - Client     | Server sends real-time progress or status updates |
 
 See [Sampling](/typescript/client/sampling), [Elicitation](/typescript/client/elicitation), and [Notifications](/typescript/client/notifications).
 
@@ -258,19 +324,21 @@ An MCP Agent wraps an LLM around an MCP client: the model reasons about a task, 
 
 <CodeGroup>
 ```typescript TypeScript
-import { MCPAgent, MCPClient } from "mcp-use";
+import { MCPAgent } from "@mcp-use/agent";
+import { MCPClient } from "@mcp-use/client";
 import { ChatOpenAI } from "@langchain/openai";
 
 const client = new MCPClient({
-  mcpServers: {
-    playwright: { command: "npx", args: ["@playwright/mcp@latest"] }
-  }
+mcpServers: {
+playwright: { command: "npx", args: ["@playwright/mcp@latest"] }
+}
 });
 
 const agent = new MCPAgent({ llm: new ChatOpenAI({ model: "gpt-5.5" }), client });
 const result = await agent.run({ prompt: "Find the best restaurant in San Francisco" });
 await client.closeAllSessions();
-```
+
+````
 ```python Python
 from mcp_use import MCPAgent, MCPClient
 from langchain_openai import ChatOpenAI
@@ -284,7 +352,8 @@ client = MCPClient({
 agent = MCPAgent(llm=ChatOpenAI(model="gpt-5.5"), client=client)
 result = await agent.run("Find the best restaurant in San Francisco")
 await client.close_all_sessions()
-```
+````
+
 </CodeGroup>
 
 See [Python Agent](/python/agent/agent-configuration) and [TypeScript Agent](/typescript/agent/index).
@@ -313,7 +382,11 @@ For a deep dive into the protocol itself, see the [official MCP documentation](h
   <Card title="MCP Agent" icon="brain" href="/typescript/agent/index">
     AI agents that use MCP servers to complete tasks.
   </Card>
-  <Card title="Examples" icon="code" href="https://github.com/mcp-use/mcp-use/tree/main/examples">
+  <Card
+    title="Examples"
+    icon="code"
+    href="https://github.com/mcp-use/mcp-use/tree/main/examples"
+  >
     Runnable samples for Python and TypeScript.
   </Card>
 </CardGroup>

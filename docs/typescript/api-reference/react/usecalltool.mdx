@@ -11,7 +11,15 @@ View the source code for this module on GitHub: <a href='https://github.com/mcp-
 
 `useCallTool` is a React hook for calling MCP tools from inside a widget. It manages the call with a discriminated union state machine (idle, pending, success, error) similar to TanStack Query, and exposes two ways to invoke the tool: `callTool` (fire-and-forget with optional side effect callbacks) and `callToolAsync` (returns a `Promise`).
 
-Types are inferred automatically from the tool name when running `mcp-use dev`, which generates `ToolRegistry` augmentations in `.mcp-use/tool-registry.d.ts`. For setups without the dev server, use [`generateHelpers()`](#generatehelpers) to bind the hook to an explicit tool map.
+Types are inferred from the `ToolRef` values exported by your server entry. The project's `mcp-env.d.ts` registers that module with `mcp-use/react`; it does not generate tool-specific types or require the server to be running.
+
+Declare static tools as exported constants:
+
+```ts
+export const searchFlights = server.tool(/* ... */);
+```
+
+Once `mcp-env.d.ts` is present, calling `useCallTool("search-flights")` is a TypeScript error if the matching tool ref is not exported. Use `useDynamicTool<Args, Result>("name")` only when the tool is genuinely registered at runtime and cannot have an exported ref.
 
 <Info>
 `useCallTool` runs only in a browser environment. Calling it outside the browser (for example, during server-side rendering) throws `Error("useCallTool can only be used in browser environment")`.
@@ -27,33 +35,35 @@ import { useCallTool } from "mcp-use/react";
 
 Hook for calling MCP tools with TanStack Query-like state management.
 
-The hook is declared with two overloads. The first is type-safe and resolves input and output types from the augmented `ToolRegistry` based on the tool `name`. The second is a fallback that lets you supply explicit generics when a tool is not in the registry. The runtime detects the protocol automatically: in MCP Apps clients it uses JSON-RPC over `postMessage`, and in the ChatGPT Apps SDK it uses `window.openai.callTool()`. Your code is identical in both cases.
+The hook accepts either an exported tool name from `RegisteredTools` or a `ToolRef` value. Both forms infer the tool input and output types. The runtime detects the protocol automatically: in MCP Apps clients it uses JSON-RPC over `postMessage`, and in the ChatGPT Apps SDK it uses `window.openai.callTool()`. Your code is identical in both cases.
 
-When `name` is a key of `ToolRegistry`, input arguments and the response `structuredContent` are fully typed from your server's tool definition. The hook tracks the latest call with an internal counter, so if you fire a new call before a previous one resolves, only the most recent call updates state (responses from stale calls are ignored).
+When `name` is a key of `RegisteredTools`, input arguments and the response `structuredContent` are fully typed from your server's tool definition. The hook tracks the latest call with an internal counter, so if you fire a new call before a previous one resolves, only the most recent call updates state (responses from stale calls are ignored).
 
 ```ts
 import { useCallTool } from "mcp-use/react";
 ```
 
-**Type Parameters (overload 1)**
-><ParamField body="TName" type="keyof ToolRegistry" required="True" >   The tool name. Constrained to the keys of the augmented `ToolRegistry`, which gives autocomplete for available tool names. </ParamField>
+**Type Parameters (name overload)**
+><ParamField body="Name" type="keyof RegisteredTools" required="True" >   The tool name, constrained to exported tool refs from the registered server entry. </ParamField>
 
-**Type Parameters (overload 2)**
-><ParamField body="TArgs" type="UnknownObject | null" default="null" >   The shape of the tool input arguments. Use `null` when the tool takes no arguments. </ParamField>
-><ParamField body="TResponse" type="Partial<CallToolResponse>" default="CallToolResponse" >   The shape of the tool response. </ParamField>
+**Type Parameters (ref overload)**
+><ParamField body="R" type="ToolRef&lt;string, unknown, unknown&gt;" required="True" >   A tool ref value carrying its name, input, and output types. </ParamField>
 
 **Parameters**
-><ParamField body="name" type="TName | string" required="True" >   The name of the tool to call. Auto-typed from `ToolRegistry` in the first overload, or a plain `string` in the fallback overload. </ParamField>
+><ParamField body="nameOrRef" type="keyof RegisteredTools | ToolRef" required="True" >   The exported name or tool ref to call. </ParamField>
 
 **Returns**
-><ResponseField name="returns" type="UseCallToolReturn<TArgs, TResponse>" >   The current call state spread with the `callTool` and `callToolAsync` methods. See [`UseCallToolReturn`](#usecalltoolreturn). </ResponseField>
+><ResponseField name="returns" type="CallToolHandle&lt;Args, Result&gt;" >   The call function and its latest data, error, and pending state. </ResponseField>
 
 **Signature**
 ```ts wrap
-// Overload 1: type-safe with ToolRegistry
-export function useCallTool<TName extends keyof ToolRegistry>(name: TName): UseCallToolReturn<ResolveInput<TName>, ResolveOutput<TName>>;
-// Overload 2: fallback with explicit generics
-export function useCallTool<TArgs extends UnknownObject | null = null, TResponse extends Partial<CallToolResponse> = CallToolResponse>(name: string): UseCallToolReturn<TArgs, TResponse>;
+export function useCallTool<Name extends keyof RegisteredTools>(name: Name):
+  CallToolHandle<RegisteredTools[Name]["input"], RegisteredTools[Name]["output"]>;
+export function useCallTool<R extends ToolRef<string, unknown, unknown>>(ref: R):
+  CallToolHandle<
+    R extends ToolRef<string, infer Input, unknown> ? Input : never,
+    R extends ToolRef<string, unknown, infer Output> ? Output : never
+  >;
 ```
 
 ### Returns
@@ -493,43 +503,34 @@ const handleSearch = async () => {
 };
 ```
 
-### Explicit generics (escape hatch)
+### Dynamic tools (escape hatch)
 
-When a tool is not in the registry, supply input and response types directly with the fallback overload.
+When a tool is registered from runtime data, a loop, or an OpenAPI document, supply its input and result types explicitly with `useDynamicTool`. Do not use this to hide a missing export on a statically declared tool.
 
 ```ts wrap
-const { callTool } = useCallTool<{ query: string }, { results: string[] }>(
-  "custom-tool"
-);
+import { useDynamicTool } from "mcp-use/react";
+
+const { callTool } = useDynamicTool<
+  { query: string },
+  { results: string[] }
+>("custom-tool");
 ```
 
-### Manual typing with generateHelpers
+### How registration works
 
-For setups without `mcp-use dev`, bind the hooks to an explicit tool map.
+The root `mcp-env.d.ts` points at the server entry in type space. Exported `ToolRef` values become the `useCallTool` name union automatically, including refs re-exported from split tool modules.
 
 ```ts wrap
-import { generateHelpers } from "mcp-use/react";
-
-type MyToolMap = {
-  "search-flights": {
-    input: { destination: string; date?: string };
-    output: { flights: Array<{ id: string; price: number }> };
-  };
-  "book-flight": {
-    input: { flightId: string };
-    output: { confirmation: string };
-  };
-};
-
-const { useCallTool } = generateHelpers<MyToolMap>();
-
-// useCallTool is now typed against MyToolMap
-const { callTool, data } = useCallTool("search-flights");
+declare module "mcp-use/react" {
+  interface Register {
+    tools: typeof import("./index.js");
+  }
+}
 ```
 
 ### Server tool definition
 
-The tool names and schemas registered on the server drive the generated types. Define tools with `new MCPServer({ ... })` and a Zod `schema`.
+The exported tool refs and their schemas drive the inferred types. Define tools with `new MCPServer({ ... })` and a Zod `schema`.
 
 ```ts wrap
 import { MCPServer, widget } from "mcp-use/server";
@@ -540,7 +541,7 @@ const server = new MCPServer({
   version: "1.0.0",
 });
 
-server.tool(
+export const getWeather = server.tool(
   {
     name: "get-weather",
     description: "Get current weather for a city",
