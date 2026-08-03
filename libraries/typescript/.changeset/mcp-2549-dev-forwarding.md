@@ -2,4 +2,4 @@
 "@mcp-use/cli": patch
 ---
 
-fix(cli): accept package-manager argument forwarding for `mcp-use dev`
+fix(cli): accept package-manager argument forwarding across commands

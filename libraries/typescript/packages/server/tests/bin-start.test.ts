@@ -269,14 +269,13 @@ describe("parseArgs", () => {
     expect(parseArgs(["-v"]).version).toBe(true);
   });
 
-  it("forwards arguments after -- only for typecheck", () => {
+  it("forwards typecheck args while consuming the separator for CLI options", () => {
     expect(
       parseArgs(["typecheck", "--", "--project", "tsconfig.check.json"])
         .passthrough
     ).toEqual(["--project", "tsconfig.check.json"]);
-    expect(() => parseArgs(["build", "--", "--pretty", "false"])).toThrow(
-      /only available for typecheck/i
-    );
+    expect(parseArgs(["start", "--", "--port", "8080"]).port).toBe(8080);
+    expect(parseArgs(["build", "--", "--source-maps"]).sourceMaps).toBe(true);
   });
 
   it("rejects invalid ports", () => {
@@ -607,6 +606,7 @@ describe("main", () => {
       .spyOn(process.stdout, "write")
       .mockImplementation(() => true);
     await expect(main(["client", "--help"])).resolves.toBe(0);
+    await expect(main(["client", "--", "--help"])).resolves.toBe(0);
     const output = stdout.mock.calls.flat().join("");
     expect(output).toContain("connect <name> <url>");
     expect(output).toContain("remove <name>");
