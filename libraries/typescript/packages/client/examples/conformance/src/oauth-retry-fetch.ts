@@ -13,6 +13,8 @@ import {
 export type OAuthRetryFetchOptions = {
   /** Max number of 403 retries (for auth/scope-retry-limit). Omit for scope-step-up. */
   max403Retries?: number;
+  /** Accept legacy authorization metadata whose issuer is path-qualified. */
+  skipIssuerMetadataValidation?: boolean;
 };
 
 type AuthProviderWithCode = OAuthClientProvider & {
@@ -28,12 +30,14 @@ async function runAuthFlow(
   provider: AuthProviderWithCode,
   serverUrl: string | URL,
   resourceMetadataUrl: URL | undefined,
-  scope: string | undefined
+  scope: string | undefined,
+  skipIssuerMetadataValidation = false
 ): Promise<void> {
   const authResult = await auth(provider, {
     serverUrl: typeof serverUrl === "string" ? serverUrl : serverUrl.toString(),
     resourceMetadataUrl,
     scope,
+    skipIssuerMetadataValidation,
   });
   if (authResult === "REDIRECT") {
     const authCode = await provider.getAuthorizationCode();
@@ -42,6 +46,7 @@ async function runAuthFlow(
         typeof serverUrl === "string" ? serverUrl : serverUrl.toString(),
       resourceMetadataUrl,
       scope,
+      skipIssuerMetadataValidation,
       authorizationCode: authCode,
     });
   }
@@ -57,7 +62,7 @@ export function createOAuthRetryFetch(
   authProvider: AuthProviderWithCode,
   options: OAuthRetryFetchOptions = {}
 ): typeof fetch {
-  const { max403Retries } = options;
+  const { max403Retries, skipIssuerMetadataValidation } = options;
 
   return async function oauthRetryFetch(
     input: RequestInfo | URL,
@@ -114,7 +119,13 @@ export function createOAuthRetryFetch(
       const { resourceMetadataUrl, scope } =
         extractWWWAuthenticateParams(response);
 
-      await runAuthFlow(authProvider, serverUrl, resourceMetadataUrl, scope);
+      await runAuthFlow(
+        authProvider,
+        serverUrl,
+        resourceMetadataUrl,
+        scope,
+        skipIssuerMetadataValidation
+      );
 
       const tokens = await authProvider.tokens();
       const accessToken = tokens?.access_token;

@@ -7,6 +7,7 @@ import { MCPClient } from "@mcp-use/client";
 import {
   handleElicitation,
   isAuthScenario,
+  isLegacyOAuthMetadataScenario,
   parseConformanceContext,
   requiresOAuthRetryFetch,
   runScenario,
@@ -54,12 +55,14 @@ async function main(): Promise<void> {
     } else {
       const authResult = await auth(authProvider, {
         serverUrl,
+        skipIssuerMetadataValidation: isLegacyOAuthMetadataScenario(scenario),
       });
       if (authResult === "REDIRECT") {
         const authCode = await authProvider.getAuthorizationCode();
         await auth(authProvider, {
           serverUrl,
           authorizationCode: authCode,
+          skipIssuerMetadataValidation: isLegacyOAuthMetadataScenario(scenario),
         });
       }
     }

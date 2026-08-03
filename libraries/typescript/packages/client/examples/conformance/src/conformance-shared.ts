@@ -61,8 +61,16 @@ export function isScopeStepUpScenario(scenario: string): boolean {
 export function requiresOAuthRetryFetch(scenario: string): boolean {
   return (
     isScopeStepUpScenario(scenario) ||
-    scenario === "auth/scope-from-www-authenticate"
+    scenario === "auth/scope-from-www-authenticate" ||
+    // This scenario only advertises its non-standard PRM endpoint in the
+    // initial challenge. Discovering before the first MCP request loses the
+    // tenant-qualified authorization-server URL and falls back to /register.
+    scenario === "auth/metadata-var3"
   );
+}
+
+export function isLegacyOAuthMetadataScenario(scenario: string): boolean {
+  return scenario === "auth/2025-03-26-oauth-metadata-backcompat";
 }
 
 const CONFORMANCE_SCENARIO_TIMEOUT_MS = 45_000;

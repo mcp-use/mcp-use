@@ -530,7 +530,7 @@ let subscribableResourceValue = "Initial value";
 server.resource(
   {
     name: "subscribable_resource",
-    uri: "test://subscribable",
+    uri: "test://watched-resource",
     title: "Subscribable Resource",
     description: "A resource that supports subscriptions and can be updated",
     mimeType: "text/plain",
@@ -556,7 +556,7 @@ server.tool(
   },
   async ({ newValue }) => {
     subscribableResourceValue = newValue;
-    await server.notifyResourceUpdated("test://subscribable");
+    await server.notifyResourceUpdated("test://watched-resource");
     return {
       content: [{ type: "text", text: `Resource updated to: ${newValue}` }],
     };

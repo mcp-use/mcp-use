@@ -8,11 +8,13 @@
 
 import React, { useEffect, useRef } from "react";
 import { JSDOM } from "jsdom";
+import { auth } from "@modelcontextprotocol/client";
 import { McpClientProvider, useMcpClient } from "@mcp-use/client/react";
 import TestRenderer, { act } from "react-test-renderer";
 import {
   handleElicitation,
   isAuthScenario,
+  isLegacyOAuthMetadataScenario,
   parseConformanceContext,
   requiresOAuthRetryFetch,
   runScenario,
@@ -152,6 +154,19 @@ async function main(): Promise<void> {
         preRegistrationContext: parseConformanceContext(),
       })
     : undefined;
+  if (authProvider && isLegacyOAuthMetadataScenario(scenario)) {
+    const authResult = await auth(authProvider, {
+      serverUrl,
+      skipIssuerMetadataValidation: true,
+    });
+    if (authResult === "REDIRECT") {
+      await auth(authProvider, {
+        serverUrl,
+        authorizationCode: await authProvider.getAuthorizationCode(),
+        skipIssuerMetadataValidation: true,
+      });
+    }
+  }
   // The retry fetch sees scopes carried by the initial WWW-Authenticate response
   // and handles later 403 scope escalation without pre-authentication.
   const mcpServers: Record<string, any> = {
