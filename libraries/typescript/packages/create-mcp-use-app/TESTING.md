@@ -55,25 +55,19 @@ This creates `create-mcp-use-app-X.X.X.tgz`
 npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app my-test-app --template ui
 ```
 
-**Using yarn:**
-```bash
-yarn dlx -p ./create-mcp-use-app-0.4.3.tgz create-mcp-use-app my-test-app --template ui
-```
-
 **Using pnpm:**
 ```bash
 pnpm --package=./create-mcp-use-app-0.4.3.tgz dlx create-mcp-use-app my-test-app --template ui
 ```
 
+**Using Bun:**
+```bash
+bunx --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app my-test-app --template ui
+```
+
 ### 3. Test Package Manager Flags
 
 Test that the correct package manager commands are shown in the output:
-
-**Test --yarn flag:**
-```bash
-npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-yarn --template ui --yarn
-# Should show: "yarn dev" and "yarn" commands
-```
 
 **Test --npm flag:**
 ```bash
@@ -99,9 +93,9 @@ cat package.json | grep "mcp-use"
 # Should show: "mcp-use": "workspace:*"
 ```
 
-**Test --canary flag:**
+**Test --sdk-version flag:**
 ```bash
-npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-canary --template ui --canary
+npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-canary --template ui --sdk-version canary
 cd test-canary
 cat package.json | grep "mcp-use"
 # Should show: "mcp-use": "canary"
@@ -133,10 +127,10 @@ npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-mcp-a
 Test with actual dependency installation (takes longer):
 
 ```bash
-npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-full --template ui --yarn
+npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-full --template ui --bun
 
 cd test-full
-yarn build  # Verify it builds
+bun run build  # Verify it builds
 ```
 
 ## CI Testing
@@ -147,14 +141,14 @@ The project includes a comprehensive GitHub Actions workflow (`.github/workflows
 
 **Test Matrix:**
 - **Operating Systems:** Ubuntu, macOS, Windows
-- **Package Managers:** npm, yarn, pnpm
+- **Package Managers:** npm, pnpm, Bun
 - **Templates:** ui, uiresource, apps_sdk
-- **Flags:** default, --yarn, --npm, --pnpm, --dev, --canary
+- **Flags:** default, --npm, --pnpm, --bun, --dev, --sdk-version
 
 **Test Types:**
 1. **Basic Tests** - Create project without installing dependencies
 2. **Package Manager Flag Tests** - Verify package manager detection and flags work correctly
-3. **Version Flag Tests** - Verify --dev, --canary flags set correct package versions
+3. **Version Flag Tests** - Verify --dev, --sdk-version flags set correct package versions
 4. **Full Installation Tests** - Create and install dependencies (slower, runs on subset of matrix)
 5. **Build Tests** - Verify the created project can be built
 
@@ -179,17 +173,17 @@ You can also manually trigger the workflow from the GitHub Actions tab.
 
 ### Package Manager Detection
 
-- ✅ `--yarn` flag shows "yarn dev" and "yarn" commands
 - ✅ `--npm` flag shows "npm run dev" and "npm install" commands
 - ✅ `--pnpm` flag shows "pnpm dev" and "pnpm install" commands
-- ✅ Auto-detection works when run via npx/yarn/pnpm
-- ✅ No spinner shown for yarn and npm (they have their own progress)
+- ✅ `--bun` flag shows "bun run dev" and "bun install" commands
+- ✅ Auto-detection works when run via npx/pnpm/Bun
+- ✅ No spinner shown for npm and Bun (they have their own progress)
 - ✅ Spinner shown for pnpm
 
 ### Package Version Management
 
 - ✅ `--dev` flag creates projects with `workspace:*` versions
-- ✅ `--canary` flag creates projects with `canary` versions
+- ✅ `--sdk-version <version>` flag pins `mcp-use` to the given npm version or dist-tag
 - ✅ Default (no flag) creates projects with `latest` or specific versions
 - ✅ All package dependencies use correct version format
 
@@ -258,13 +252,12 @@ KEEP_TEST_DIR=yes ./test-cli.sh
 ### Example:
 
 ```bash
-run_test "My-New-Test" npm ui "--yarn" ""
+run_test "My-New-Test" npm ui "--bun" ""
 ```
 
 Parameters:
 1. Test name
-2. Package manager to run with (npm/yarn/pnpm)
+2. Package manager to run with (npm/pnpm/bun)
 3. Template name
 4. Flag (or "" for none)
 5. Whether to install ("yes" or "")
-

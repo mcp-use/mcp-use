@@ -1,0 +1,20 @@
+---
+title: Deno Deploy
+description: Deploy an mcp-use server and Views on Deno Deploy.
+---
+
+Deno is an edge-style runtime. Do not grant write permission for telemetry.
+Use the co-located or external static-asset pattern from the
+[runtime deployment guide](/typescript/server/deployment/runtime-patterns);
+the Deno server receives only `--allow-env`, `--allow-net`, and
+`--allow-read` for a local filesystem fixture.
+
+```bash
+MCP_URL=https://<project>.deno.dev/mcp \
+MCP_ASSETS_URL=https://<asset-origin> \
+mcp-use build
+```
+
+Publish `.mcp-use/build/views/` at the path printed by the build, then capture
+`ui://views/my-view.html` with `mcp-use screenshot` before advertising
+the deployment.

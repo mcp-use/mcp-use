@@ -1,12 +1,5 @@
-import type { Resource } from "@modelcontextprotocol/sdk/types.js";
-import {
-  Database,
-  File,
-  FileCode,
-  FileImage,
-  FileText,
-  Globe,
-} from "lucide-react";
+import type { Resource } from "@mcp-use/client/react";
+import { Database } from "lucide-react";
 import { ListItem } from "@/client/components/shared";
 
 interface ResourcesListProps {
@@ -14,31 +7,6 @@ interface ResourcesListProps {
   selectedResource: Resource | null;
   onResourceSelect: (resource: Resource) => void;
   focusedIndex: number;
-}
-
-function getResourceIcon(mimeType?: string, uri?: string) {
-  if (!mimeType && !uri) return <File className="h-5 w-5" />;
-
-  const type = (mimeType || uri || "").toLowerCase();
-
-  if (type.includes("image")) {
-    return <FileImage className="h-5 w-5" />;
-  }
-  if (
-    type.includes("json") ||
-    type.includes("javascript") ||
-    type.includes("typescript")
-  ) {
-    return <FileCode className="h-5 w-5" />;
-  }
-  if (type.includes("html") || type.includes("xml")) {
-    return <Globe className="h-5 w-5" />;
-  }
-  if (type.includes("database") || type.includes("sql")) {
-    return <Database className="h-5 w-5" />;
-  }
-
-  return <FileText className="h-5 w-5" />;
 }
 
 export function ResourcesList({
@@ -49,7 +17,7 @@ export function ResourcesList({
 }: ResourcesListProps) {
   if (resources.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-4 text-center">
+      <div className="flex flex-1 flex-col items-center justify-center p-4 text-center">
         <Database className="h-12 w-12 text-gray-400 dark:text-gray-600 mb-3" />
         <p className="text-gray-500 dark:text-gray-400">
           No resources available
@@ -59,9 +27,8 @@ export function ResourcesList({
   }
 
   return (
-    <div className="overflow-y-auto flex-1 overscroll-contain">
+    <div>
       {resources.map((resource, index) => {
-        const icon = getResourceIcon(resource.mimeType, resource.uri);
         const description = [
           resource.description,
           resource.mimeType && (
@@ -78,7 +45,6 @@ export function ResourcesList({
             data-testid={`resource-item-${resource.name}`}
             isSelected={selectedResource?.uri === resource.uri}
             isFocused={focusedIndex === index}
-            icon={icon}
             title={resource.name}
             description={
               description.length > 0 ? (

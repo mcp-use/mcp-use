@@ -522,7 +522,7 @@ for (const op of operations) {
 const port = process.env.PORT ? Number(process.env.PORT) : 3000;
 server.listen(port);
 console.log(`MCP:       http://localhost:${port}/mcp`);
-console.log(`Inspector: http://localhost:${port}/inspector`);
+console.log(`Inspector: http://localhost:${port}/mcp/inspector`);
 ```
 
 Two practical notes:

@@ -1,8 +1,14 @@
-import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
+import type { Prompt } from "@mcp-use/client/react";
 import { Play, Save } from "lucide-react";
 import { useEffect } from "react";
-import { Button } from "@/client/components/ui/button";
+import {
+  Button,
+  buttonExecuteClass,
+  buttonShortcutClass,
+  buttonToolbarClass,
+} from "@/client/components/ui/button";
 import { Spinner } from "@/client/components/ui/spinner";
+import { cn } from "@/client/lib/utils";
 import { PromptInputForm } from "./PromptInputForm";
 
 interface PromptExecutionPanelProps {
@@ -67,21 +73,19 @@ export function PromptExecutionPanel({
                 onClick={onExecute}
                 disabled={isExecuting || !isConnected}
                 size="sm"
-                className="lg:size-default pr-1! gap-0"
+                className={buttonExecuteClass}
                 data-testid="prompt-execute-button"
               >
                 {isExecuting ? (
                   <>
-                    <Spinner className="mr-2" />
+                    <Spinner />
                     <span className="hidden sm:inline">Executing...</span>
                   </>
                 ) : (
                   <>
-                    <Play className="h-4 w-4 sm:mr-2" />
+                    <Play />
                     <span className="hidden sm:inline">Execute</span>
-                    <span className="hidden sm:inline text-[12px] border text-zinc-300 p-1 rounded-full border-zinc-300 dark:text-zinc-600 dark:border-zinc-500 ml-2">
-                      ⌘↵
-                    </span>
+                    <span className={buttonShortcutClass}>⌘↵</span>
                   </>
                 )}
               </Button>
@@ -90,9 +94,9 @@ export function PromptExecutionPanel({
                 onClick={onSave}
                 disabled={isExecuting}
                 size="sm"
-                className="lg:size-default gap-2"
+                className={cn(buttonToolbarClass, "gap-2")}
               >
-                <Save className="h-4 w-4" />
+                <Save />
                 <span className="hidden sm:inline">Save</span>
               </Button>
             </div>

@@ -10,11 +10,6 @@ registrations, request context, security configuration, and widgets.
 Most server registrations keep the same concepts and require small syntax
 changes. Widgets require a complete rewrite as MCP App Views.
 
-<Warning>
-  v2 is in beta. Some v1 capabilities do not have v2 equivalents yet. Review the
-  current limitations before upgrading a production server.
-</Warning>
-
 ## Migration checklist
 
 <Steps>
@@ -45,7 +40,7 @@ changes. Widgets require a complete rewrite as MCP App Views.
 The current v2 beta requires Node.js `>=22.22.2` and ESM.
 
 ```bash
-npm install mcp-use@beta
+npm install mcp-use
 ```
 
 Import server APIs from `mcp-use`:

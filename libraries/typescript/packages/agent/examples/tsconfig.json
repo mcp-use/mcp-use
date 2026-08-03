@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["node"],
+    "paths": {
+      "@mcp-use/agent": ["../dist/index.d.ts"],
+      "@mcp-use/agent/langchain": ["../dist/langchain.d.ts"],
+      "@mcp-use/client": ["../../client/dist/index.d.ts"]
+    }
+  },
+  "include": ["**/*.ts"]
+}

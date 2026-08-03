@@ -14,11 +14,11 @@ Sampling is useful when the connected client already has the right model, creden
 
 Good fits:
 
-| Need | Why sampling fits |
-| --- | --- |
-| Summarize text returned by a tool | The client model can transform the result before the tool responds. |
-| Classify or rank user-provided content | The server avoids a separate LLM provider dependency. |
-| Generate a draft that depends on client policy | The client's model and policy stay in control. |
+| Need                                           | Why sampling fits                                                   |
+| ---------------------------------------------- | ------------------------------------------------------------------- |
+| Summarize text returned by a tool              | The client model can transform the result before the tool responds. |
+| Classify or rank user-provided content         | The server avoids a separate LLM provider dependency.               |
+| Generate a draft that depends on client policy | The client's model and policy stay in control.                      |
 
 Do not use sampling for deterministic server logic, authorization decisions, or work that must succeed in clients without sampling support.
 
@@ -27,7 +27,7 @@ Do not use sampling for deterministic server logic, authorization decisions, or 
 Only call `ctx.sample()` when the client advertises the `sampling` capability. Provide a deterministic fallback.
 
 ```typescript
-import { MCPServer, text } from "mcp-use/server";
+import { MCPServer, text } from "mcp-use";
 import { z } from "zod";
 
 const server = new MCPServer({
@@ -45,14 +45,19 @@ server.tool(
   },
   async ({ text: input }, ctx) => {
     if (!ctx.client.can("sampling")) {
-      return text(`Received ${input.length} characters. Sampling is not available.`);
+      return text(
+        `Received ${input.length} characters. Sampling is not available.`,
+      );
     }
 
     const response = await ctx.sample(
       `Classify this text as positive, negative, or neutral. Return one word.\n\n${input}`,
     );
-    const content = Array.isArray(response.content) ? response.content[0] : response.content;
-    const sentiment = content?.type === "text" ? content.text.trim() : "unknown";
+    const content = Array.isArray(response.content)
+      ? response.content[0]
+      : response.content;
+    const sentiment =
+      content?.type === "text" ? content.text.trim() : "unknown";
 
     return text(`Sentiment: ${sentiment}`);
   },
@@ -125,8 +130,12 @@ Sampling can fail when the client rejects the request, disconnects, times out, o
 
 ```typescript
 try {
-  const response = await ctx.sample("Summarize this text in one sentence:\n\n" + input);
-  const content = Array.isArray(response.content) ? response.content[0] : response.content;
+  const response = await ctx.sample(
+    "Summarize this text in one sentence:\n\n" + input,
+  );
+  const content = Array.isArray(response.content)
+    ? response.content[0]
+    : response.content;
 
   if (content?.type !== "text") {
     return text("The client returned a non-text sampling result.");
@@ -134,7 +143,9 @@ try {
 
   return text(content.text);
 } catch (err) {
-  return text(`Sampling was unavailable: ${err instanceof Error ? err.message : String(err)}`);
+  return text(
+    `Sampling was unavailable: ${err instanceof Error ? err.message : String(err)}`,
+  );
 }
 ```
 
@@ -155,16 +166,29 @@ In the Inspector, call the sampling tool, approve the sampling request, and veri
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Tool context API reference" icon="terminal" href="/typescript/api-reference/server/tool-context#sample">
-    Look up `ctx.sample()` overloads, options, progress behavior, and return shapes.
+  <Card
+    title="Tool context API reference"
+    icon="terminal"
+    href="/typescript/api-reference/server/tool-context#sample"
+  >
+    Look up `ctx.sample()` overloads, options, progress behavior, and return
+    shapes.
   </Card>
   <Card title="Elicitation" icon="check" href="/typescript/server/elicitation">
     Ask the user for input during tool execution.
   </Card>
-  <Card title="Notifications" icon="bell" href="/typescript/server/notifications">
+  <Card
+    title="Notifications"
+    icon="bell"
+    href="/typescript/server/notifications"
+  >
     Send status, progress, and custom notifications to connected clients.
   </Card>
-  <Card title="Client sampling" icon="monitor" href="/typescript/client/sampling">
+  <Card
+    title="Client sampling"
+    icon="monitor"
+    href="/typescript/client/sampling"
+  >
     Configure sampling support in a TypeScript MCP client.
   </Card>
 </CardGroup>

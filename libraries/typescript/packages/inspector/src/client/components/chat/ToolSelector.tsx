@@ -70,30 +70,36 @@ export function ToolSelector({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <Tooltip>
-        <TooltipTrigger asChild>
-          <PopoverTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={disabled}
-              className={cn(
-                "h-auto w-auto aspect-square rounded-full p-2 relative",
-                someDisabled
-                  ? "text-amber-500 dark:text-amber-400"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-              type="button"
-              data-testid="chat-tool-selector"
-            >
-              <Wrench className="h-4 w-4" />
-              {someDisabled && (
-                <span className="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-white leading-none">
-                  {enabledCount}
-                </span>
-              )}
-            </Button>
-          </PopoverTrigger>
-        </TooltipTrigger>
+        <TooltipTrigger
+          render={
+            <PopoverTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={disabled}
+                  className={cn(
+                    "h-auto gap-1 rounded-full px-2 py-2",
+                    someDisabled
+                      ? "text-amber-500 dark:text-amber-400"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                  type="button"
+                  data-testid="chat-tool-selector"
+                >
+                  <Wrench className="h-4 w-4 shrink-0" />
+                  {someDisabled && (
+                    <span className="flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-amber-500 px-1 text-[9px] font-bold leading-none text-white">
+                      {enabledCount}
+                    </span>
+                  )}
+                </Button>
+              }
+              nativeButton
+            />
+          }
+          nativeButton
+        />
         <TooltipContent side="top">
           <p>
             Tools ({enabledCount}/{tools.length})
@@ -102,7 +108,7 @@ export function ToolSelector({
       </Tooltip>
 
       <PopoverContent
-        className="w-72 p-0"
+        className="w-72 gap-0 p-0"
         align="start"
         side="top"
         sideOffset={8}
@@ -121,7 +127,7 @@ export function ToolSelector({
             {allEnabled ? "Disable All" : "Enable All"}
           </Button>
         </div>
-        <div className="max-h-64 overflow-y-auto py-1">
+        <div className="max-h-64 overflow-y-auto">
           {sortedTools.map((tool) => {
             const isEnabled = !disabledTools.has(tool.name);
             return (
@@ -136,14 +142,9 @@ export function ToolSelector({
                   className="pointer-events-none"
                   tabIndex={-1}
                 />
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-mono truncate">{tool.name}</div>
-                  {tool.description && (
-                    <div className="text-[11px] text-muted-foreground truncate">
-                      {tool.description}
-                    </div>
-                  )}
-                </div>
+                <span className="min-w-0 flex-1 truncate text-sm font-mono">
+                  {tool.name}
+                </span>
               </button>
             );
           })}

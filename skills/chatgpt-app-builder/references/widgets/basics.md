@@ -617,7 +617,7 @@ export default function GoodWidget() {
 ### Option 1: Inspector (interactive)
 
 1. Start dev server: `npm run dev`
-2. Open inspector: `http://localhost:3000/inspector`
+2. Open inspector: `http://localhost:3000/mcp/inspector`
 3. Click "List Tools" → Find your tool
 4. Click "Call Tool" → Enter test input
 5. Widget renders in inspector

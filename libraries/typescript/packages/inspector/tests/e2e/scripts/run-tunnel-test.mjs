@@ -6,7 +6,7 @@
  * 1. Spawn conformance server with `dev --tunnel`, capture output, poll for tunnel URL, kill.
  * 2. Build conformance server, spawn with `start --tunnel`, same poll-for-URL check.
  *
- * Uses the conformance server from packages/mcp-use/examples/server/features/conformance.
+ * Uses the conformance server from packages/server/examples/conformance.
  * Must be run from libraries/typescript (monorepo root) so pnpm --filter works.
  */
 
@@ -29,7 +29,7 @@ const inspectorDir = resolve(__dirname, "../../..");
 const typescriptRoot = resolve(inspectorDir, "../..");
 const conformanceServerDir = resolve(
   inspectorDir,
-  "../mcp-use/examples/server/features/conformance"
+  "../server/examples/conformance"
 );
 
 const TUNNEL_URL_REGEX = /https:\/\/[a-z0-9-]+\.[a-z0-9.-]+\/mcp/i;

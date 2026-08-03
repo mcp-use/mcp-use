@@ -10,7 +10,9 @@ const __dirname = path.dirname(__filename);
 const sourceDir = path.join(__dirname, "..", "src", "templates");
 const targetDir = path.join(__dirname, "..", "dist", "templates");
 
-async function copyDir(src, dest, excludeDirs = ["node_modules"]) {
+const excludedDirectories = new Set(["node_modules", ".mcp-use", "dist"]);
+
+async function copyDir(src, dest) {
   try {
     await fs.mkdir(dest, { recursive: true });
 
@@ -21,13 +23,13 @@ async function copyDir(src, dest, excludeDirs = ["node_modules"]) {
       const destPath = path.join(dest, entry.name);
 
       // Skip excluded directories
-      if (entry.isDirectory() && excludeDirs.includes(entry.name)) {
+      if (entry.isDirectory() && excludedDirectories.has(entry.name)) {
         console.log(`Skipping ${entry.name}/`);
         continue;
       }
 
       if (entry.isDirectory()) {
-        await copyDir(srcPath, destPath, excludeDirs);
+        await copyDir(srcPath, destPath);
       } else {
         await fs.copyFile(srcPath, destPath);
         console.log(`Copied ${entry.name}`);

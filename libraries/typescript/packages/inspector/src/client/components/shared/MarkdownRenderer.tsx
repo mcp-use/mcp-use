@@ -1,9 +1,7 @@
 import { Check, Copy } from "lucide-react";
 import Markdown from "markdown-to-jsx";
-import { copyToClipboard } from "@/client/utils/clipboard";
+import { copyToClipboard } from "@/client/utils/browser";
 import { useState } from "react";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { usePrismTheme } from "@/client/hooks/usePrismTheme";
 import { Checkbox } from "@/client/components/ui/checkbox";
 import {
   Table,
@@ -30,23 +28,16 @@ function CodeBlock({
   children: string;
   className?: string;
 }) {
-  const { prismStyle } = usePrismTheme();
-  // Handle both "lang-" and "language-" prefixes, and extract just the language name
-  // className can be like "lang-typescript", "language-typescript", or even "bash lang-bash"
   let language = "text";
   if (className) {
-    // Try to extract language from patterns like "lang-X" or "language-X"
     const match = className.match(/(?:lang(?:uage)?-)(\w+)/);
     if (match) {
       language = match[1];
     } else {
-      // Fallback: just use the className as-is after removing common prefixes
       language = className.replace(/^(lang-|language-)\s*/, "").trim();
     }
   }
   const [isCopied, setIsCopied] = useState(false);
-
-  // Ensure children is a string
   const codeContent = String(children).trim();
 
   const handleCopy = async () => {
@@ -57,7 +48,6 @@ function CodeBlock({
 
   return (
     <div className="my-4 relative group/code bg-muted rounded-md p-0">
-      {/* Language badge and copy button */}
       <div className="flex items-center justify-between mb-2 absolute top-0 left-0 w-full">
         <div className="text-[10px] font-mono text-muted-foreground/50 bg-transparent px-2 py-0 rounded">
           {language}
@@ -75,21 +65,12 @@ function CodeBlock({
         </button>
       </div>
 
-      <SyntaxHighlighter
-        language={language}
-        style={prismStyle}
-        customStyle={{
-          margin: 0,
-          padding: "1rem",
-          paddingTop: "2rem",
-          borderRadius: "0.5rem",
-          fontSize: "0.875rem",
-          background: "var(--muted)",
-        }}
-        className="text-sm"
+      <pre
+        className="text-sm m-0 p-4 pt-8 rounded-lg font-mono overflow-x-auto"
+        style={{ background: "var(--muted)" }}
       >
-        {codeContent}
-      </SyntaxHighlighter>
+        <code>{codeContent}</code>
+      </pre>
     </div>
   );
 }
@@ -183,6 +164,7 @@ function ListItem({ children }: { children: React.ReactNode }) {
 
 interface MarkdownRendererProps {
   content: string;
+  className?: string;
 }
 
 /**
@@ -193,8 +175,11 @@ interface MarkdownRendererProps {
  * @param content - The Markdown source to render
  * @returns The rendered React element tree representing the parsed Markdown content
  */
-export function MarkdownRenderer({ content }: MarkdownRendererProps) {
-  return (
+export function MarkdownRenderer({
+  content,
+  className,
+}: MarkdownRendererProps) {
+  const rendered = (
     <Markdown
       options={{
         overrides: {
@@ -308,4 +293,9 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
       {content}
     </Markdown>
   );
+
+  if (className) {
+    return <div className={className}>{rendered}</div>;
+  }
+  return rendered;
 }

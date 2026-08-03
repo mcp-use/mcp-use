@@ -69,7 +69,7 @@ npx create-mcp-use-app@latest <project-name> --template mcp-apps
 
 Let the scaffold install dependencies and `git init` — both are useful (`npm install` runs `mcp-use generate-types` postinstall, and a git repo is required by `npm run deploy` later). The skill installs companion coding-agent skills by default too; that's fine.
 
-Verify the template catalog with `npx create-mcp-use-app@latest --list-templates` if it's been a while — the available set is `blank`, `starter`, `mcp-apps` as of this writing. `starter` includes sample tools you'd rip out, so we don't recommend it here.
+Verify the template catalog with `npx create-mcp-use-app@latest --list-templates` if it's been a while — the available set is `blank`, `mcp-server`, `mcp-apps` as of this writing. Use `blank` for OpenAPI-first servers; `mcp-server` includes sample tools you'd rip out.
 
 After scaffolding, add the two extra deps the OpenAPI flow needs:
 
@@ -190,7 +190,7 @@ for (const op of operations) {
 
 // Streamable HTTP transport — the only supported transport for this skill.
 // MCP endpoint: POST http://localhost:<port>/mcp
-// Inspector:    http://localhost:<port>/inspector
+// Inspector:    http://localhost:<port>/mcp/inspector
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 server.listen(PORT);
 ```
@@ -234,7 +234,7 @@ For CI / scripted tests, add `--json` and pipe to `jq`. If `tools list` returns 
 **Layer 2 — Inspector chat (the real LLM loop).** Layer 1 proves the server works. The inspector proves the **LLM can use it** — that the tool description is descriptive enough for the model to pick the right tool, that the zod schema has enough hints to fill args correctly, that the response shape isn't so weird the model can't summarize it.
 
 ```
-http://localhost:<PORT>/inspector?server=http%3A%2F%2Flocalhost%3A<PORT>%2Fmcp&tab=chat
+http://localhost:<PORT>/mcp/inspector?server=http%3A%2F%2Flocalhost%3A<PORT>%2Fmcp&tab=chat
 ```
 
 Test both force-invocation ("Use `list_pets` with limit 5.") and free-form discovery ("Show me the first 5 pets in the store.") — the second is harder and the one that catches description quality.

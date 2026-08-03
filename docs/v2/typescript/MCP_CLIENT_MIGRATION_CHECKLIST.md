@@ -19,8 +19,8 @@ of a migration from an older release.
 - Use version labels such as "v1" and "v2" only when a version distinction is
   required for protocol compatibility, the dedicated migration guide, or a
   temporary beta-period instruction.
-- During the beta period, use explicit `@beta` install commands and mention the
-  beta only where readers need that information to install or select a version.
+- Use stable, tagless install commands unless documenting a specific historical
+  prerelease.
 - Describe current names and behavior directly. Do not frame them as "new,"
   "renamed," or replacements for old concepts outside the migration guide.
 - Use MCP Apps and Views terminology. Do not present widgets or deprecated
@@ -51,7 +51,7 @@ of a migration from an older release.
 
 - [x] [MCP Client overview](/v2/typescript/client/index)
   - [x] Change the Node.js requirement from 20+ to `>=22.22.2`.
-  - [x] Use `@mcp-use/client@beta` in the install command while the release is in beta.
+  - [x] Use the stable `@mcp-use/client` install command.
   - [x] Replace widget-first terminology with MCP Apps and Views terminology.
   - [x] Describe `mcp-use/react` through its current View hooks, such as
         `useToolContext`, `useCallTool`, and `useViewState`, rather than deprecated
@@ -62,7 +62,7 @@ of a migration from an older release.
         `connect()`, and `close()` signatures.
 - [x] [Environments](/v2/typescript/client/environments)
   - [x] Change the Node.js requirement from 20+ to `>=22.22.2`.
-  - [x] Use `@mcp-use/client@beta` in the React installation example during beta.
+  - [x] Use the stable `@mcp-use/client` React installation example.
   - [x] Explain the root package's Node and browser conditional exports without
         presenting the package split as a migration.
   - [x] Distinguish `@mcp-use/client/react` connection-management APIs from
@@ -135,8 +135,7 @@ of a migration from an older release.
 - [x] [Client migration guide](/v2/typescript/client/migration)
   - [x] Keep version-comparison language confined to this migration guide.
   - [x] Change the Node.js requirement to `>=22.22.2`.
-  - [x] Use `@mcp-use/client@beta` and `@mcp-use/agent@beta` while the release is
-        in beta.
+  - [x] Use stable `@mcp-use/client` and `@mcp-use/agent` install commands.
   - [x] Replace `versionNegotiation` with `protocolNegotiation`.
   - [x] Replace the nonexistent `mcp-use client connect --negotiate` example
         with `--protocol auto|legacy|modern`.

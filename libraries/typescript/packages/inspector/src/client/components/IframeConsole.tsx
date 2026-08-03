@@ -1,5 +1,5 @@
 import { cn } from "@/client/lib/utils";
-import { copyToClipboard } from "@/client/utils/clipboard";
+import { copyToClipboard } from "@/client/utils/browser";
 import {
   ChevronDown,
   ChevronRight,
@@ -51,6 +51,59 @@ function formatArg(arg: unknown): string {
   return String(arg);
 }
 
+/** Apply browser-style console format specifiers (%o, %s, …) when present. */
+function normalizeConsoleArgs(args: unknown[]): string[] {
+  if (args.length === 0) return [];
+  const head = args[0];
+  if (typeof head !== "string" || !/%[oOdisfc]/.test(head)) {
+    return args.map(formatArg);
+  }
+
+  const formatArgs = args.slice(1);
+  let argIndex = 0;
+  let message = "";
+  for (let i = 0; i < head.length; i++) {
+    const ch = head[i];
+    if (ch === "%" && i + 1 < head.length) {
+      const spec = head[i + 1];
+      const arg = formatArgs[argIndex++];
+      switch (spec) {
+        case "o":
+        case "O":
+          message += formatArg(arg);
+          i++;
+          break;
+        case "s":
+          message += arg === undefined ? "undefined" : String(arg);
+          i++;
+          break;
+        case "d":
+        case "i":
+          message += String(Number.parseInt(String(arg ?? ""), 10) || 0);
+          i++;
+          break;
+        case "f":
+          message += String(Number.parseFloat(String(arg ?? "")) || 0);
+          i++;
+          break;
+        case "c":
+          i++;
+          break;
+        default:
+          message += ch;
+      }
+      continue;
+    }
+    message += ch;
+  }
+
+  const lines = [message.trim()];
+  while (argIndex < formatArgs.length) {
+    lines.push(formatArg(formatArgs[argIndex++]));
+  }
+  return lines.filter((line) => line.length > 0);
+}
+
 function LogLevelBadge({ level }: { level: ConsoleLogEntry["level"] }) {
   const colors = {
     log: "bg-zinc-500",
@@ -85,20 +138,24 @@ function LogEntry({ log }: { log: ConsoleLogEntry }) {
     }
   }, [log.timestamp]);
 
+  const displayLines = useMemo(
+    () => normalizeConsoleArgs(log.args),
+    [log.args]
+  );
+
   const inlinePreview = useMemo(() => {
-    if (log.args.length === 0) return "";
-    const first = formatArg(log.args[0]);
-    const singleLine = first.replace(/\s*\n\s*/g, " ").trim();
+    if (displayLines.length === 0) return "";
+    const singleLine = displayLines[0].replace(/\s*\n\s*/g, " ").trim();
     const truncated =
       singleLine.length > 120 ? singleLine.slice(0, 120) + "…" : singleLine;
-    const extra = log.args.length > 1 ? ` +${log.args.length - 1}` : "";
+    const extra = displayLines.length > 1 ? ` +${displayLines.length - 1}` : "";
     return truncated + extra;
-  }, [log.args]);
+  }, [displayLines]);
 
   const copyLog = async (e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      const text = log.args.map(formatArg).join("\n");
+      const text = displayLines.join("\n");
       await copyToClipboard(text);
       toast.success("Copied to clipboard");
     } catch {
@@ -178,7 +235,7 @@ function LogEntry({ log }: { log: ConsoleLogEntry }) {
       {/* Expanded body — text is selectable, clicks don't collapse */}
       {expanded && (
         <div className="pl-8 pr-2 pb-2 select-text">
-          {log.args.map((arg, idx) => (
+          {displayLines.map((line, idx) => (
             <pre
               key={idx}
               className={cn(
@@ -190,7 +247,7 @@ function LogEntry({ log }: { log: ConsoleLogEntry }) {
                   "text-zinc-700 dark:text-zinc-300"
               )}
             >
-              {formatArg(arg)}
+              {line}
             </pre>
           ))}
         </div>
@@ -334,7 +391,7 @@ export function IframeConsole({
     const q = searchQuery.trim().toLowerCase();
     if (q) {
       result = result.filter((log) => {
-        const argsText = log.args.map(formatArg).join(" ").toLowerCase();
+        const argsText = normalizeConsoleArgs(log.args).join(" ").toLowerCase();
         const urlText = (log.url ?? "").toLowerCase();
         return argsText.includes(q) || urlText.includes(q);
       });
@@ -358,7 +415,7 @@ export function IframeConsole({
           const timestamp = new Date(log.timestamp).toLocaleTimeString();
           const level = log.level.toUpperCase();
           const url = log.url ? ` ${log.url}` : "";
-          const args = log.args.map(formatArg).join("\n");
+          const args = normalizeConsoleArgs(log.args).join("\n");
           return `[${level}] ${timestamp}${url}\n${args}`;
         })
         .join("\n\n");
@@ -372,50 +429,56 @@ export function IframeConsole({
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
-      <SheetTrigger asChild>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className="relative bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
-              onClick={() => setIsOpen(true)}
-            >
-              <TerminalIcon className="size-4" />
-              {totalCount > 0 && (
-                <span
-                  className={cn(
-                    "ml-2 px-1.5 py-0.5 text-xs rounded-full text-white font-semibold",
-                    badgeColor
-                  )}
+      <SheetTrigger
+        render={
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="relative bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
+                  onClick={() => setIsOpen(true)}
                 >
-                  {totalCount}
-                </span>
-              )}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <div className="text-xs space-y-1">
-              <p className="font-semibold">
-                {totalCount} console {totalCount === 1 ? "log" : "logs"}
-              </p>
-              {errorCount > 0 && (
-                <p className="text-red-400">
-                  {errorCount} error{errorCount !== 1 ? "s" : ""}
+                  <TerminalIcon className="size-4" />
+                  {totalCount > 0 && (
+                    <span
+                      className={cn(
+                        "ml-2 px-1.5 py-0.5 text-xs rounded-full text-white font-semibold",
+                        badgeColor
+                      )}
+                    >
+                      {totalCount}
+                    </span>
+                  )}
+                </Button>
+              }
+              nativeButton
+            />
+            <TooltipContent>
+              <div className="text-xs space-y-1">
+                <p className="font-semibold">
+                  {totalCount} console {totalCount === 1 ? "log" : "logs"}
                 </p>
-              )}
-              {warnCount > 0 && (
-                <p className="text-yellow-400">
-                  {warnCount} warning{warnCount !== 1 ? "s" : ""}
-                </p>
-              )}
-              {infoCount > 0 && (
-                <p className="text-zinc-400">{infoCount} info</p>
-              )}
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      </SheetTrigger>
+                {errorCount > 0 && (
+                  <p className="text-red-400">
+                    {errorCount} error{errorCount !== 1 ? "s" : ""}
+                  </p>
+                )}
+                {warnCount > 0 && (
+                  <p className="text-yellow-400">
+                    {warnCount} warning{warnCount !== 1 ? "s" : ""}
+                  </p>
+                )}
+                {infoCount > 0 && (
+                  <p className="text-zinc-400">{infoCount} info</p>
+                )}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        }
+        nativeButton={false}
+      />
       <SheetContent
         side="bottom"
         className="flex flex-col p-0 transition-none m-0 gap-0"
