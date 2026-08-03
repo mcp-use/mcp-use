@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getSkillsCloneArgs,
+  SKILLS_AGENT_DIRS,
   SKILLS_BRANCH,
   SKILLS_MANUAL_INSTALL_CMD,
 } from "../skills-config.js";
@@ -18,5 +19,10 @@ describe("beta skill source configuration", () => {
 
   it("keeps the manual fallback pinned to beta", () => {
     expect(SKILLS_MANUAL_INSTALL_CMD).toContain("mcp-use/mcp-use#beta");
+  });
+
+  it("installs the Codex skill in the standard project directory", () => {
+    expect(SKILLS_AGENT_DIRS).toContain(".agents");
+    expect(SKILLS_AGENT_DIRS).not.toContain(".agent");
   });
 });

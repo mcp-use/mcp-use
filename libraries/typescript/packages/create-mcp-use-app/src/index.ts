@@ -1056,7 +1056,7 @@ async function main(): Promise<void> {
   console.log(ansi.bold("📁 Project structure:"));
   console.log(`   ${useCurrentDir ? "." : displayName}/`);
   if (skillsInstalled) {
-    console.log("   ├── .agent/skills/");
+    console.log("   ├── .agents/skills/");
     console.log("   ├── .claude/skills/");
     console.log("   ├── .cursor/skills/");
   }
