@@ -217,6 +217,21 @@ type RequestContextBase<TEnv extends Env> = Omit<Context<TEnv>, "req"> & {
     params?: Record<string, unknown>
   ): Promise<void>;
   /**
+   * Send a request to the connected client and await its response.
+   *
+   * This is the request/response counterpart to {@link sendNotification} for
+   * legacy server-initiated MCP operations such as `sampling/createMessage`
+   * and `elicitation/create`. The client must have advertised and implemented
+   * the relevant capability; callers should handle a rejected request.
+   *
+   * Requests are scoped to the callback's originating MCP exchange and must
+   * be awaited before the callback returns.
+   */
+  sendRequest<TResult = unknown>(
+    method: string,
+    params?: Record<string, unknown>
+  ): Promise<TResult>;
+  /**
    * Report request-scoped progress when the caller supplied a progress token.
    *
    * @returns `true` when a notification was sent, `false` when the caller did
@@ -423,6 +438,22 @@ export function toRequestContext<TEnv extends Env = Env>(
         method,
         ...(params !== undefined && { params }),
       });
+    },
+    async sendRequest<TResult = unknown>(
+      method: string,
+      params?: Record<string, unknown>
+    ): Promise<TResult> {
+      // The SDK owns request correlation and response validation here. Keep
+      // the public mcp-use surface JSON-serializable rather than exposing its
+      // internal request object to application callbacks.
+      const send = ctx.mcpReq.send as unknown as (request: {
+        method: string;
+        params?: Record<string, unknown>;
+      }) => Promise<unknown>;
+      return (await send({
+        method,
+        ...(params !== undefined && { params }),
+      })) as TResult;
     },
     async reportProgress(
       progress: number,

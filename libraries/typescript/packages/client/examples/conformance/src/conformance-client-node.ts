@@ -6,6 +6,7 @@ import { auth } from "@modelcontextprotocol/client";
 import { MCPClient } from "@mcp-use/client";
 import {
   handleElicitation,
+  handleSampling,
   isAuthScenario,
   parseConformanceContext,
   requiresOAuthRetryFetch,
@@ -57,6 +58,7 @@ async function main(): Promise<void> {
         await auth(authProvider, {
           serverUrl,
           authorizationCode: authCode,
+          iss: authProvider.getIssuer(),
         });
       }
     }
@@ -70,6 +72,7 @@ async function main(): Promise<void> {
     },
     {
       onElicitation: handleElicitation,
+      onSampling: handleSampling,
     }
   );
 

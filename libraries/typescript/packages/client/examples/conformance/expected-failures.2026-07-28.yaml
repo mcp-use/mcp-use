@@ -1,0 +1,25 @@
+# The 2026 protocol leg uses a separate baseline because a scenario can pass
+# on the legacy wire but fail under the modern per-request envelope.
+# Stale entries fail the runner and must be removed as support lands.
+#
+# Baseline target: @modelcontextprotocol/conformance 0.2.0-alpha.10.
+client: []
+server:
+  # The mcp-use fixture implements the stable surface on the 2026 handler,
+  # but has not yet ported the official stateless diagnostic, JSON Schema
+  # 2020-12, custom-header annotation, or complete MRTR fixture families.
+  - server-stateless
+  - json-schema-2020-12
+  - http-custom-header-server-validation
+  - input-required-result-basic-elicitation
+  - input-required-result-basic-sampling
+  - input-required-result-basic-list-roots
+  - input-required-result-request-state
+  - input-required-result-multiple-input-requests
+  - input-required-result-multi-round
+  - input-required-result-missing-input-response
+  - input-required-result-non-tool-request
+  - input-required-result-result-type
+  - input-required-result-tampered-state
+  - input-required-result-capability-check
+  - input-required-result-ignore-extra-params

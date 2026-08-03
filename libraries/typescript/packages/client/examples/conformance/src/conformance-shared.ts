@@ -2,6 +2,7 @@ import type {
   ElicitRequestFormParams,
   ElicitRequestURLParams,
   ElicitResult,
+  CreateMessageResult,
 } from "@modelcontextprotocol/client";
 import { acceptWithDefaults } from "@mcp-use/client";
 
@@ -98,6 +99,16 @@ export async function handleElicitation(
   params: ElicitRequestFormParams | ElicitRequestURLParams
 ): Promise<ElicitResult> {
   return acceptWithDefaults(params);
+}
+
+/** Deterministic response used to exercise direct server-to-client sampling. */
+export async function handleSampling(): Promise<CreateMessageResult> {
+  return {
+    role: "assistant",
+    content: { type: "text", text: "Conformance sampling response" },
+    model: "mcp-use-conformance-client",
+    stopReason: "endTurn",
+  };
 }
 
 function buildToolArgs(tool: Tool): Record<string, unknown> {

@@ -1592,6 +1592,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           tools: { listChanged: true },
           prompts: { listChanged: true },
           resources: { listChanged: true, subscribe: true },
+          completions: {},
         },
         ...(instructions !== undefined && { instructions }),
         ...(authInfo !== undefined && { authInfo }),
@@ -1629,6 +1630,13 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         basePath
       );
     }
+    // The v2 subscriptions/listen surface is handled by the mounted event
+    // bus. Retain the legacy subscribe verbs as successful no-ops so 2025
+    // clients can negotiate the advertised resources.subscribe capability.
+    // They deliberately do not create modern listeners: those are scoped to
+    // subscriptions/listen and are torn down with that request.
+    server.server.setRequestHandler("resources/subscribe", async () => ({}));
+    server.server.setRequestHandler("resources/unsubscribe", async () => ({}));
     this.#wrapListHandlers(server);
     return server;
   }

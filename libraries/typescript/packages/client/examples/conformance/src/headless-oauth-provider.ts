@@ -3,6 +3,7 @@ import type {
   OAuthClientInformation,
   OAuthClientInformationFull,
   OAuthClientMetadata,
+  OAuthDiscoveryState,
   OAuthTokens,
 } from "@modelcontextprotocol/client";
 import type { PreRegistrationContext } from "./conformance-shared.js";
@@ -12,6 +13,8 @@ export class HeadlessConformanceOAuthProvider implements OAuthClientProvider {
   private tokenData?: OAuthTokens;
   private storedCodeVerifier?: string;
   private authorizationCode?: string;
+  private authorizationIssuer?: string;
+  private storedDiscoveryState?: OAuthDiscoveryState;
 
   constructor(
     private readonly redirectUri: string,
@@ -49,6 +52,27 @@ export class HeadlessConformanceOAuthProvider implements OAuthClientProvider {
     this.tokenData = tokens;
   }
 
+  async discoveryState(): Promise<OAuthDiscoveryState | undefined> {
+    return this.storedDiscoveryState;
+  }
+
+  async saveDiscoveryState(state: OAuthDiscoveryState): Promise<void> {
+    this.storedDiscoveryState = state;
+  }
+
+  async invalidateCredentials(
+    scope: "all" | "client" | "tokens" | "verifier" | "discovery"
+  ): Promise<void> {
+    if (scope === "all" || scope === "client") this.clientInfo = undefined;
+    if (scope === "all" || scope === "tokens") this.tokenData = undefined;
+    if (scope === "all" || scope === "verifier") {
+      this.storedCodeVerifier = undefined;
+    }
+    if (scope === "all" || scope === "discovery") {
+      this.storedDiscoveryState = undefined;
+    }
+  }
+
   async redirectToAuthorization(authorizationUrl: URL): Promise<void> {
     const response = await fetch(authorizationUrl.toString(), {
       redirect: "manual",
@@ -58,15 +82,20 @@ export class HeadlessConformanceOAuthProvider implements OAuthClientProvider {
     if (location) {
       const redirected = new URL(location, authorizationUrl);
       const code = redirected.searchParams.get("code");
+      this.authorizationIssuer =
+        redirected.searchParams.get("iss") ?? undefined;
       if (code) {
         this.authorizationCode = code;
         return;
       }
     }
 
-    const fallbackCode = new URL(response.url).searchParams.get("code");
+    const fallbackRedirect = new URL(response.url);
+    const fallbackCode = fallbackRedirect.searchParams.get("code");
     if (fallbackCode) {
       this.authorizationCode = fallbackCode;
+      this.authorizationIssuer =
+        fallbackRedirect.searchParams.get("iss") ?? undefined;
       return;
     }
 
@@ -89,6 +118,11 @@ export class HeadlessConformanceOAuthProvider implements OAuthClientProvider {
       throw new Error("No OAuth authorization code captured");
     }
     return this.authorizationCode;
+  }
+
+  /** RFC 9207 issuer returned alongside the authorization code, if present. */
+  getIssuer(): string | undefined {
+    return this.authorizationIssuer;
   }
 
   /**

@@ -12,6 +12,7 @@ import { McpClientProvider, useMcpClient } from "@mcp-use/client/react";
 import TestRenderer, { act } from "react-test-renderer";
 import {
   handleElicitation,
+  handleSampling,
   isAuthScenario,
   parseConformanceContext,
   requiresOAuthRetryFetch,
@@ -33,6 +34,7 @@ function ScenarioDriver({ scenario, resolve, reject }: DriverProps): null {
   const doneRef = useRef(false);
   const scenarioStartedRef = useRef(false);
   const handledElicitationIdsRef = useRef<Set<string>>(new Set());
+  const handledSamplingIdsRef = useRef<Set<string>>(new Set());
   const authTriggeredRef = useRef(false);
 
   useEffect(() => {
@@ -50,6 +52,18 @@ function ScenarioDriver({ scenario, resolve, reject }: DriverProps): null {
           .then((result) => server.approveElicitation(pending.id, result))
           .catch((error) =>
             server.rejectElicitation(
+              pending.id,
+              error instanceof Error ? error.message : String(error)
+            )
+          );
+      }
+      for (const pending of server.pendingSamplingRequests) {
+        if (handledSamplingIdsRef.current.has(pending.id)) continue;
+        handledSamplingIdsRef.current.add(pending.id);
+        handleSampling()
+          .then((result) => server.approveSampling(pending.id, result))
+          .catch((error) =>
+            server.rejectSampling(
               pending.id,
               error instanceof Error ? error.message : String(error)
             )

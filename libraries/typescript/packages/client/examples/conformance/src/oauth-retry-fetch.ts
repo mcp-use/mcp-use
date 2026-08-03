@@ -6,7 +6,9 @@
 
 import {
   auth,
+  computeScopeUnion,
   extractWWWAuthenticateParams,
+  isStrictScopeSuperset,
   type OAuthClientProvider,
 } from "@modelcontextprotocol/client";
 
@@ -17,6 +19,10 @@ export type OAuthRetryFetchOptions = {
 
 type AuthProviderWithCode = OAuthClientProvider & {
   getAuthorizationCode(): Promise<string>;
+  getIssuer(): string | undefined;
+  invalidateCredentials?: (
+    scope: "all" | "client" | "tokens" | "verifier" | "discovery"
+  ) => Promise<void>;
 };
 
 function isInsufficientScope(response: Response): boolean {
@@ -28,12 +34,24 @@ async function runAuthFlow(
   provider: AuthProviderWithCode,
   serverUrl: string | URL,
   resourceMetadataUrl: URL | undefined,
-  scope: string | undefined
+  challengedScope: string | undefined,
+  status: number
 ): Promise<void> {
+  const previousTokens = await provider.tokens();
+  // Preserve existing permissions during a 403 step-up. This keeps the
+  // WWW-Authenticate scope behavior while avoiding a narrowed retry token.
+  const scope =
+    status === 403
+      ? computeScopeUnion(previousTokens?.scope, challengedScope)
+      : challengedScope;
+  if (status === 401) {
+    await provider.invalidateCredentials?.("discovery");
+  }
   const authResult = await auth(provider, {
     serverUrl: typeof serverUrl === "string" ? serverUrl : serverUrl.toString(),
     resourceMetadataUrl,
     scope,
+    forceReauthorization: isStrictScopeSuperset(scope, previousTokens?.scope),
   });
   if (authResult === "REDIRECT") {
     const authCode = await provider.getAuthorizationCode();
@@ -43,6 +61,7 @@ async function runAuthFlow(
       resourceMetadataUrl,
       scope,
       authorizationCode: authCode,
+      iss: provider.getIssuer(),
     });
   }
 }
@@ -114,7 +133,13 @@ export function createOAuthRetryFetch(
       const { resourceMetadataUrl, scope } =
         extractWWWAuthenticateParams(response);
 
-      await runAuthFlow(authProvider, serverUrl, resourceMetadataUrl, scope);
+      await runAuthFlow(
+        authProvider,
+        serverUrl,
+        resourceMetadataUrl,
+        scope,
+        response.status
+      );
 
       const tokens = await authProvider.tokens();
       const accessToken = tokens?.access_token;

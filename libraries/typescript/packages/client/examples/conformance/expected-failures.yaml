@@ -1,0 +1,20 @@
+# Expected failures are deliberately explicit: the conformance referee exits
+# non-zero when an entry becomes stale. Update this file in the same change as
+# the exact conformance package version whenever its scenario set changes.
+#
+# Baseline target: @modelcontextprotocol/conformance 0.2.0-alpha.10.
+client:
+  # This auth-server metadata variant intentionally omits CIMD and rejects
+  # dynamic client registration. The mcp-use wrapper currently cannot supply
+  # the variant's alternate registration path.
+  - auth/metadata-var3
+server:
+  # The current mcp-use HTTP runtime does not carry client capabilities across
+  # the legacy 2025 session, so these MRTR elicitation legs correctly reject
+  # before asking the client. The 2026 handler is exercised separately.
+  - elicitation-sep1034-defaults
+  - elicitation-sep1330-enums
+  # The referee currently reports this intentionally skipped scenario through
+  # its expected-failure path; keep the entry so a future runnable check is
+  # surfaced as stale rather than silently ignored.
+  - server-sse-multiple-streams

@@ -18,6 +18,27 @@ import { z } from "zod";
 const sleep = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+/** Keep a reverse-RPC transport regression from wedging the conformance run. */
+async function withRequestTimeout<T>(
+  request: Promise<T>,
+  timeoutMs = 5_000
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      request,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`Client request exceeded ${timeoutMs}ms`)),
+          timeoutMs
+        );
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 const RED_PIXEL_PNG =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==";
 
@@ -214,39 +235,42 @@ server.tool(
     }),
   },
   async ({ prompt = "Hello" }, ctx) => {
-    const response = inputResponse(ctx.inputResponses, "sample");
-    if (response.kind === "missing") {
-      return inputRequired({
-        inputRequests: {
-          sample: inputRequired.createMessage({
-            messages: [
-              { role: "user", content: { type: "text", text: prompt } },
-            ],
-            maxTokens: 100,
-          }),
-        },
-      });
-    }
-    if (response.kind === "sampling") {
-      const blocks = Array.isArray(response.result.content)
-        ? response.result.content
-        : [response.result.content];
+    try {
+      const response = await withRequestTimeout(
+        ctx.sendRequest<{
+          content?:
+            | { type?: string; text?: string }
+            | Array<{ type?: string; text?: string }>;
+          message?: { content?: { type?: string; text?: string } };
+        }>("sampling/createMessage", {
+          messages: [{ role: "user", content: { type: "text", text: prompt } }],
+          maxTokens: 100,
+        })
+      );
+      const content = response.content ?? response.message?.content;
+      const blocks = Array.isArray(content)
+        ? content
+        : content
+          ? [content]
+          : [];
       const text = blocks
-        .map((block) =>
-          block.type === "text" ? block.text : JSON.stringify(block)
-        )
+        .map((block) => (block.type === "text" ? block.text : undefined))
+        .filter((value): value is string => value !== undefined)
         .join("\n");
-      return { content: [{ type: "text", text: text || "No response" }] };
+      return {
+        content: [{ type: "text", text: text || "No response" }],
+      };
+    } catch (error) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: `Sampling request failed: ${error instanceof Error ? error.message : String(error)}`,
+          },
+        ],
+      };
     }
-    return {
-      isError: true,
-      content: [
-        {
-          type: "text",
-          text: `Sampling error: Expected a sampling response, got ${response.kind}`,
-        },
-      ],
-    };
   }
 );
 
@@ -256,47 +280,46 @@ server.tool(
     description: "A tool that uses elicitation to get user input",
   },
   async (_input, ctx) => {
-    const schema = z.object({
-      name: z.string().default("Anonymous"),
-      age: z.number().default(0),
-    });
-    // A stateless callback starts from the top for both initial calls and
-    // retries, so handle decline/cancel before deciding input is still needed.
-    const response = inputResponse(ctx.inputResponses, "elicitation");
-    if (response.kind === "elicit" && response.action !== "accept") {
+    try {
+      const response = await withRequestTimeout(
+        ctx.sendRequest<{
+          action: "accept" | "decline" | "cancel";
+          content?: { name?: string; age?: number };
+        }>("elicitation/create", {
+          message: "Please provide your information",
+          requestedSchema: {
+            type: "object",
+            properties: {
+              name: { type: "string", default: "Anonymous" },
+              age: { type: "number", default: 0 },
+            },
+          },
+        })
+      );
+      if (response.action !== "accept") {
+        return {
+          content: [{ type: "text", text: `Elicitation ${response.action}` }],
+        };
+      }
       return {
         content: [
           {
             type: "text",
-            text:
-              response.action === "decline"
-                ? "User declined"
-                : "Operation cancelled",
+            text: `Received: ${response.content?.name ?? "Anonymous"}, age ${response.content?.age ?? 0}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: `Elicitation request failed: ${error instanceof Error ? error.message : String(error)}`,
           },
         ],
       };
     }
-    const form = acceptedContent(ctx.inputResponses, "elicitation", schema);
-    // Missing or invalid accepted data means this round must request it.
-    if (form === undefined) {
-      return inputRequired({
-        inputRequests: {
-          elicitation: inputRequired.elicit({
-            message: "Please provide your information",
-            requestedSchema: schema,
-          }),
-        },
-      });
-    }
-    // Produce the successful result only from accepted, validated input.
-    return {
-      content: [
-        {
-          type: "text",
-          text: `Received: ${form.name}, age ${form.age}`,
-        },
-      ],
-    };
   }
 );
 
@@ -509,6 +532,9 @@ server.resourceTemplate(
     title: "Template Resource",
     description: "A templated resource",
     mimeType: "application/json",
+    complete: {
+      id: ["alpha", "beta", "gamma"],
+    },
   },
   async (uri, params) => ({
     contents: [

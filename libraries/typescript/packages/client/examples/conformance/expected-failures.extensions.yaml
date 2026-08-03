@@ -1,0 +1,42 @@
+# Draft and extension scenarios intentionally remain separate from the stable
+# baseline. The referee rejects stale entries, so this list documents exactly
+# the unsupported surface at @modelcontextprotocol/conformance 0.2.0-alpha.10.
+client:
+  - auth/metadata-var3
+  - auth/authorization-server-migration
+  - auth/client-credentials-jwt
+  - auth/client-credentials-basic
+  - auth/enterprise-managed-authorization
+  - auth/dpop
+  - auth/dpop-nonce
+  - auth/wif-jwt-bearer
+  - http-custom-headers
+server:
+  - server-stateless
+  - json-schema-2020-12
+  - elicitation-sep1034-defaults
+  - server-sse-polling
+  - server-sse-multiple-streams
+  - elicitation-sep1330-enums
+  - http-custom-header-server-validation
+  - tasks-lifecycle
+  - tasks-capability-negotiation
+  - tasks-wire-fields
+  - tasks-request-state-removal
+  - tasks-mrtr-input
+  - tasks-request-headers
+  - tasks-dispatch-and-envelope
+  - tasks-required-task-error
+  - tasks-mrtr-composition
+  - input-required-result-basic-elicitation
+  - input-required-result-basic-sampling
+  - input-required-result-basic-list-roots
+  - input-required-result-request-state
+  - input-required-result-multiple-input-requests
+  - input-required-result-multi-round
+  - input-required-result-missing-input-response
+  - input-required-result-non-tool-request
+  - input-required-result-result-type
+  - input-required-result-tampered-state
+  - input-required-result-capability-check
+  - input-required-result-ignore-extra-params
