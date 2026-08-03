@@ -1,4 +1,4 @@
-import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
+import type { Prompt } from "@mcp-use/client/react";
 import { Input } from "@/client/components/ui/input";
 import { Label } from "@/client/components/ui/label";
 import { Textarea } from "@/client/components/ui/textarea";
@@ -34,23 +34,25 @@ export function PromptInputForm({
     if (arg.type === "boolean") {
       return (
         <div key={key} className="space-y-2">
-          <Label htmlFor={key} className="text-sm font-medium">
-            {key}
-            {arg.required && <span className="text-red-500 ml-1">*</span>}
-          </Label>
-          <div className="flex items-center space-x-2">
-            <input
-              id={key}
-              type="checkbox"
-              checked={Boolean(value)}
-              onChange={(e) => onArgChange(key, e.target.checked)}
-              className="rounded"
-              aria-label={`Toggle ${key}`}
-            />
-            <span className="text-sm text-gray-600 dark:text-gray-400">
-              {arg.description}
-            </span>
+          <div>
+            <Label htmlFor={key} className="text-sm font-medium">
+              {key}
+              {arg.required && <span className="text-red-500 ml-1">*</span>}
+            </Label>
+            {arg.description && (
+              <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                {arg.description}
+              </p>
+            )}
           </div>
+          <input
+            id={key}
+            type="checkbox"
+            checked={Boolean(value)}
+            onChange={(e) => onArgChange(key, e.target.checked)}
+            className="rounded"
+            aria-label={`Toggle ${key}`}
+          />
         </div>
       );
     }
@@ -58,22 +60,24 @@ export function PromptInputForm({
     if (arg.type === "number") {
       return (
         <div key={key} className="space-y-2">
-          <Label htmlFor={key} className="text-sm font-medium">
-            {key}
-            {arg.required && <span className="text-red-500 ml-1">*</span>}
-          </Label>
+          <div>
+            <Label htmlFor={key} className="text-sm font-medium">
+              {key}
+              {arg.required && <span className="text-red-500 ml-1">*</span>}
+            </Label>
+            {arg.description && (
+              <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                {arg.description}
+              </p>
+            )}
+          </div>
           <Input
             id={key}
             type="number"
             value={Number(value) || 0}
             onChange={(e) => onArgChange(key, Number(e.target.value))}
-            placeholder={arg.description || `Enter ${key}`}
+            placeholder={`Enter ${key}`}
           />
-          {arg.description && (
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              {arg.description}
-            </p>
-          )}
         </div>
       );
     }
@@ -81,10 +85,17 @@ export function PromptInputForm({
     if (arg.type === "array" || arg.type === "object") {
       return (
         <div key={key} className="space-y-2">
-          <Label htmlFor={key} className="text-sm font-medium">
-            {key}
-            {arg.required && <span className="text-red-500 ml-1">*</span>}
-          </Label>
+          <div>
+            <Label htmlFor={key} className="text-sm font-medium">
+              {key}
+              {arg.required && <span className="text-red-500 ml-1">*</span>}
+            </Label>
+            {arg.description && (
+              <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                {arg.description}
+              </p>
+            )}
+          </div>
           <Textarea
             id={key}
             value={stringValue}
@@ -96,36 +107,33 @@ export function PromptInputForm({
                 onArgChange(key, e.target.value);
               }
             }}
-            placeholder={arg.description || `Enter ${key} as JSON`}
+            placeholder={`Enter ${key} as JSON`}
             className="font-mono text-sm min-h-[100px]"
           />
-          {arg.description && (
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              {arg.description}
-            </p>
-          )}
         </div>
       );
     }
 
     return (
       <div key={key} className="space-y-2">
-        <Label htmlFor={key} className="text-sm font-medium">
-          {key}
-          {arg.required && <span className="text-red-500 ml-1">*</span>}
-        </Label>
+        <div>
+          <Label htmlFor={key} className="text-sm font-medium">
+            {key}
+            {arg.required && <span className="text-red-500 ml-1">*</span>}
+          </Label>
+          {arg.description && (
+            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+              {arg.description}
+            </p>
+          )}
+        </div>
         <Input
           id={key}
           data-testid={`prompt-param-${key}`}
           value={stringValue}
           onChange={(e) => onArgChange(key, e.target.value)}
-          placeholder={arg.description || `Enter ${key}`}
+          placeholder={`Enter ${key}`}
         />
-        {arg.description && (
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            {arg.description}
-          </p>
-        )}
       </div>
     );
   };

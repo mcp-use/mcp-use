@@ -5,9 +5,8 @@ icon: "download"
 ---
 
 <Info>
-  **Prerequisites**:
-  - Install [Node.js](https://nodejs.org/) (version 20.19 or higher, or 22.12 or higher)
-  - npm, pnpm, or yarn package manager
+  **Prerequisites**: - Install [Node.js](https://nodejs.org/) (version 22.22.2
+  or higher) - npm, pnpm, or Bun package manager
 </Info>
 
 ### MCP Servers
@@ -27,14 +26,16 @@ cd my-mcp-server
 pnpm dev
 ```
 
-```bash yarn
-yarn create mcp-use-app my-mcp-server
+```bash bun
+bunx create-mcp-use-app my-mcp-server
 cd my-mcp-server
-yarn dev
+bun run dev
 ```
+
 </CodeGroup>
 
 This command will:
+
 - Create a new directory with your project name
 - Initialize a TypeScript project with mcp-use configured
 - Set up a basic MCP server template with example tools
@@ -42,7 +43,8 @@ This command will:
 - Optionally install skills for agent support
 
 <Tip>
-Check out [UI Widgets](/typescript/mcp-apps) with support to MCP-UI and OpenAI Apps SDK for ChatGPT.
+  Check out [UI Widgets](/typescript/mcp-apps) with support to MCP-UI and OpenAI
+  Apps SDK for ChatGPT.
 </Tip>
 
 ### Server Metadata
@@ -56,6 +58,7 @@ The generated project includes pre-configured server metadata that is visible in
 - **Favicon**: Included for browser display
 
 These settings appear in:
+
 - MCP Inspector UI (server dropdown and "View server info" modal)
 - MCP clients that support server metadata
 - ChatGPT when using your server as an app
@@ -66,28 +69,34 @@ Open `index.ts` in your project to customize:
 
 ```typescript
 const server = new MCPServer({
-  name: 'my-project',          // Set by create-mcp-use-app
-  title: 'My Custom Title',    // display name - shown in clients
-  version: '1.0.0',
-  description: 'My awesome server',
-  instructions: 'Use lookup tools before write tools; ask for confirmation before changes.',
-  websiteUrl: 'https://my-site.com',  // Your website or docs
-  favicon: 'favicon.ico',      // Already in public/ folder
+  name: "my-project", // Set by create-mcp-use-app
+  title: "My Custom Title", // display name - shown in clients
+  version: "1.0.0",
+  description: "My awesome server",
+  instructions:
+    "Use lookup tools before write tools; ask for confirmation before changes.",
+  websiteUrl: "https://my-site.com", // Your website or docs
+  favicon: "favicon.ico", // Already in public/ folder
   icons: [
     {
-      src: 'my-icon.svg',      // Add custom icon to public/ folder
-      mimeType: 'image/svg+xml',
-      sizes: ['512x512']
-    }
-  ]
-})
+      src: "my-icon.svg", // Add custom icon to public/ folder
+      mimeType: "image/svg+xml",
+      sizes: ["512x512"],
+    },
+  ],
+});
 ```
 
-**Note:** Icon paths (like `icon.svg`) are automatically converted to absolute URLs (e.g., `http://localhost:3000/mcp-use/public/icon.svg`) when `baseUrl` is configured.
+**Note:** Icon paths (like `icon.svg`) are resolved from `public/` against the
+incoming request origin. With `basePath: "/mcp"`, for example, `icon.svg` is
+served from `http://localhost:3000/mcp/_mcp-use/public/icon.svg`. In hosted
+environments, `MCP_URL` sets the public origin while `basePath` continues to
+own the endpoint path.
 
 ---
 
 You can also install mcp-use as a library and build your own MCP server from scratch.
+
 <CodeGroup>
 ```bash npm
 npm install mcp-use
@@ -97,13 +106,14 @@ npm install mcp-use
 pnpm add mcp-use
 ```
 
-```bash yarn
-yarn add mcp-use
+```bash bun
+bun add mcp-use
 ```
+
 </CodeGroup>
 
 ```typescript
-import { MCPServer } from "mcp-use/server";
+import { MCPServer } from "mcp-use";
 import { z } from "zod";
 
 const server = new MCPServer({
@@ -117,47 +127,62 @@ const server = new MCPServer({
     {
       src: "icon.svg",
       mimeType: "image/svg+xml",
-      sizes: ["512x512"]
-    }
-  ]
+      sizes: ["512x512"],
+    },
+  ],
 });
 
 // Define a tool
-server.tool({
-  name: "get_weather",
-  description: "Get weather for a city",
-  schema: z.object({
-    city: z.string().describe("City name"),
-  }),
-}, async ({ city }) => {
-  return { temperature: 72, condition: "sunny", city };
-});
+server.tool(
+  {
+    name: "get_weather",
+    description: "Get weather for a city",
+    inputSchema: z.object({
+      city: z.string().describe("City name"),
+    }),
+    outputSchema: z.object({
+      temperature: z.number(),
+      condition: z.string(),
+      city: z.string(),
+    }),
+  },
+  async ({ city }) => {
+    const weather = { temperature: 72, condition: "sunny", city };
+    return {
+      content: [{ type: "text", text: JSON.stringify(weather) }],
+      structuredContent: weather,
+    };
+  },
+);
 
-// Start server with auto-inspector
+// Start the MCP server
 server.listen(3000);
-// 🎉 Inspector at http://localhost:3000/inspector
 ```
 
-Check out the examples [here](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server).
+For the local Inspector, run `mcp-use dev`; to mount it on a production build
+for internal testing, use `mcp-use start --with-inspector`.
+
+Check out the examples [here](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples).
 
 Visit the [MCP Server](/typescript/server) documentation for more details.
 
 ### MCP Agent & Client
 
-Install mcp_use using your preferred package manager:
+Install the client and Agent packages using your preferred package manager:
 
 <CodeGroup>
 ```bash npm
-npm install mcp-use
+npm install @mcp-use/client @mcp-use/agent
 ```
 
 ```bash pnpm
-pnpm add mcp-use
+pnpm add @mcp-use/client @mcp-use/agent
 ```
 
-```bash yarn
-yarn add mcp-use
+```bash bun
+bun add @mcp-use/client @mcp-use/agent
 ```
+
 </CodeGroup>
 
 ## Next Steps
@@ -170,10 +195,12 @@ yarn add mcp-use
     A full featured MCP Client implementation for TypeScript
   </Card>
   <Card title="Server" icon="server" href="/typescript/server">
-    The MCP Server framework implementation for TypeScript, with Apps SDK and MCP-UI support
+    The MCP Server framework implementation for TypeScript, with Apps SDK and
+    MCP-UI support
   </Card>
 </CardGroup>
 
 <Tip>
-**Need Help?** Join our [Discord](https://discord.gg/XkNkSkMz3V) or [Github](https://github.com/mcp-use/mcp-use) communities.
+  **Need Help?** Join our [Discord](https://discord.gg/XkNkSkMz3V) or
+  [Github](https://github.com/mcp-use/mcp-use) communities.
 </Tip>

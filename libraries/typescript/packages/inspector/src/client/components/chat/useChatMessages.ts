@@ -1,24 +1,46 @@
 import { useCallback, useRef, useState } from "react";
+import { inspectorApi } from "@/client/utils/basePath";
 import type { PromptResult } from "../../hooks/useMCPPrompts";
-import { convertPromptResultsToMessages } from "./conversion";
+import {
+  convertMessagesToProvider,
+  convertPromptResultsToMessages,
+} from "./conversion";
 import type {
   AuthConfig,
+  ChatBodyBuilder,
   LLMConfig,
   Message,
   MessageAttachment,
+  SendMessageOptions,
   StreamProtocol,
 } from "./types";
 import { fileToAttachment, hashString, isValidTotalSize } from "./utils";
-
-interface WidgetModelContext {
-  content?: Array<{ type: string; text: string }>;
-  structuredContent?: Record<string, unknown>;
-}
+import {
+  appendTraceEvent,
+  EMPTY_TRACE_STATE,
+  inspectorTokenUsageFromUnknown,
+  redactSensitiveRequestFields,
+  type InspectorTraceEvent,
+  type InspectorTraceEventInput,
+} from "./trace";
+import {
+  isCloudFetchFailure,
+  managedNoticeFromHttpResponse,
+  type ManagedChatNotice,
+} from "./managedChatNotice";
+import { parsePartialToolArgs } from "./partialToolArgs";
+import {
+  serializeWidgetModelContexts,
+  widgetModelContextProviderMessage,
+  type WidgetModelContext,
+} from "./widget-model-context";
 
 interface UseChatMessagesProps {
   mcpServerUrl: string;
   llmConfig: LLMConfig | null;
   authConfig: AuthConfig | null;
+  /** Live OAuth tokens from the active MCP connection (preferred over saved authConfig). */
+  mcpAuthTokens?: AuthConfig["oauthTokens"];
   isConnected: boolean;
   /** Custom API endpoint URL for chat streaming. Defaults to "/inspector/api/chat/stream". */
   chatApiUrl?: string;
@@ -45,17 +67,17 @@ interface UseChatMessagesProps {
    * object that will be JSON-stringified as the request body.
    * When omitted, the default body includes `mcpServerUrl`, `llmConfig`,
    * `authConfig`, and `messages`.
-   * Use this to send only `{ messages }` to a server-managed backend.
+   * The second argument contains the effective disabled tools and serialized
+   * scoped widget context.
    */
-  body?: (
-    messages: Array<{ role: string; content: unknown; attachments?: unknown }>
-  ) => unknown;
+  body?: ChatBodyBuilder;
 }
 
 export function useChatMessages({
   mcpServerUrl,
   llmConfig,
   authConfig,
+  mcpAuthTokens,
   isConnected,
   chatApiUrl,
   waitForChatApiUrl,
@@ -70,20 +92,32 @@ export function useChatMessages({
   const [messages, setMessages] = useState<Message[]>(initialMessages ?? []);
   const [isLoading, setIsLoading] = useState(false);
   const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
-  const [rateLimitInfo, setRateLimitInfo] = useState<{
-    loginUrl: string;
-  } | null>(null);
+  const [traceState, setTraceState] = useState(EMPTY_TRACE_STATE);
+  const [managedChatNotice, setManagedChatNotice] =
+    useState<ManagedChatNotice | null>(null);
   const [mcpServerAuthRequired, setMcpServerAuthRequired] = useState<{
     mcpServerUrl: string;
     message?: string;
   } | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const sendInProgressRef = useRef(false);
+  const traceIdRef = useRef(0);
+
+  const recordTrace = useCallback((event: InspectorTraceEventInput) => {
+    const next = {
+      ...event,
+      id: `trace-${++traceIdRef.current}`,
+      timestamp: Date.now(),
+    } as InspectorTraceEvent;
+    setTraceState((state) => appendTraceEvent(state, next));
+  }, []);
 
   const sendMessage = useCallback(
     async (
       userInput: string,
       promptResults: PromptResult[],
-      extraAttachments?: MessageAttachment[]
+      extraAttachments?: MessageAttachment[],
+      options?: SendMessageOptions
     ) => {
       const allAttachments = [...attachments, ...(extraAttachments ?? [])];
       // Can send if there's text, prompt results, or attachments
@@ -91,9 +125,28 @@ export function useChatMessages({
         userInput.trim() ||
         promptResults.length > 0 ||
         allAttachments.length > 0;
-      if (!hasContent || !llmConfig || !isConnected) {
+      const rejectOrReturn = (message: string) => {
+        if (options?.throwOnError) {
+          throw new Error(message);
+        }
+      };
+      if (!hasContent) {
+        rejectOrReturn("Chat message must include content");
         return;
       }
+      if (!llmConfig) {
+        rejectOrReturn("Chat is not configured");
+        return;
+      }
+      if (!isConnected) {
+        rejectOrReturn("The MCP server is not connected");
+        return;
+      }
+      if (sendInProgressRef.current) {
+        rejectOrReturn("Chat is busy with another turn");
+        return;
+      }
+      sendInProgressRef.current = true;
 
       const promptResultsMessages =
         convertPromptResultsToMessages(promptResults);
@@ -123,62 +176,51 @@ export function useChatMessages({
       abortControllerRef.current = new AbortController();
 
       try {
-        // If using OAuth, retrieve tokens from localStorage
+        // Server-side chat must forward the same OAuth credentials as the browser
+        // MCP connection. Saved authConfig often stays "none" after BYOK setup.
         let authConfigWithTokens = authConfig;
-        if (authConfig?.type === "oauth") {
-          try {
-            // Get OAuth tokens from localStorage (same pattern as BrowserOAuthClientProvider)
-            // The key format is: `${storageKeyPrefix}_${serverUrlHash}_tokens`
-            const storageKeyPrefix = "mcp:auth";
-            const serverUrlHash = hashString(mcpServerUrl);
-            const storageKey = `${storageKeyPrefix}_${serverUrlHash}_tokens`;
-            const tokensStr = localStorage.getItem(storageKey);
-            if (tokensStr) {
-              const tokens = JSON.parse(tokensStr);
-              authConfigWithTokens = {
-                ...authConfig,
-                oauthTokens: tokens,
-              };
-            } else {
-              console.warn(
-                "No OAuth tokens found in localStorage for key:",
-                storageKey
-              );
+        const hasExplicitBearer =
+          authConfig?.type === "bearer" && Boolean(authConfig.token);
+        const hasExplicitBasic =
+          authConfig?.type === "basic" &&
+          Boolean(authConfig.username || authConfig.password);
+
+        if (!hasExplicitBearer && !hasExplicitBasic) {
+          if (mcpAuthTokens?.access_token) {
+            authConfigWithTokens = {
+              type: "oauth",
+              oauthTokens: mcpAuthTokens,
+            };
+          } else {
+            try {
+              const storageKeyPrefix = "mcp:auth";
+              const serverUrlHash = hashString(mcpServerUrl);
+              const storageKey = `${storageKeyPrefix}_${serverUrlHash}_tokens`;
+              const tokensStr = localStorage.getItem(storageKey);
+              if (tokensStr) {
+                const tokens = JSON.parse(
+                  tokensStr
+                ) as AuthConfig["oauthTokens"];
+                if (tokens?.access_token) {
+                  authConfigWithTokens = { type: "oauth", oauthTokens: tokens };
+                }
+              }
+            } catch (error) {
+              console.warn("Failed to retrieve OAuth tokens:", error);
             }
-          } catch (error) {
-            console.warn("Failed to retrieve OAuth tokens:", error);
           }
         }
 
-        // Build widget state context messages (per SEP-1865 ui/update-model-context)
-        // These inform the LLM about current widget UI state so it can reason about what the user sees.
-        const widgetContextMessages: Array<{ role: string; content: string }> =
-          [];
-        if (widgetModelContexts && widgetModelContexts.size > 0) {
-          const parts: string[] = [];
-          for (const [, ctx] of widgetModelContexts) {
-            if (!ctx) continue;
-            if (ctx.content?.length) {
-              parts.push(ctx.content.map((c) => c.text).join("\n"));
-            } else if (ctx.structuredContent) {
-              parts.push(JSON.stringify(ctx.structuredContent));
-            }
-          }
-          if (parts.length > 0) {
-            widgetContextMessages.push({
-              role: "user",
-              content: `[Current Widget State]\n${parts.join("\n")}`,
-            });
-          }
-        }
-
-        const resolvedUrl =
-          chatApiUrl ??
-          (waitForChatApiUrl ? await waitForChatApiUrl() : undefined) ??
-          "/inspector/api/chat/stream";
-
+        const historyMessages = [...messages, ...userMessages];
+        const serializedWidgetContext = serializeWidgetModelContexts(
+          widgetModelContexts ?? new Map()
+        );
+        const widgetContextMessage = widgetModelContextProviderMessage(
+          serializedWidgetContext
+        );
         const serialisedMessages = [
-          ...[...messages, ...userMessages].map((m) => ({
+          ...(widgetContextMessage ? [widgetContextMessage] : []),
+          ...historyMessages.map((m) => ({
             role: m.role,
             content:
               m.content ||
@@ -189,8 +231,57 @@ export function useChatMessages({
                 ""),
             attachments: m.attachments,
           })),
-          ...widgetContextMessages,
         ];
+        const resolvedUrl =
+          chatApiUrl ??
+          (waitForChatApiUrl ? await waitForChatApiUrl() : undefined) ??
+          inspectorApi("chat/stream");
+
+        const disabledToolNames = [...(disabledTools ?? [])].sort();
+        const bodyContext = {
+          disabledTools: disabledToolNames,
+          ...(serializedWidgetContext
+            ? { widgetModelContext: serializedWidgetContext }
+            : {}),
+        };
+        const requestBody = bodyBuilder
+          ? bodyBuilder(serialisedMessages, bodyContext)
+          : {
+              mcpServerUrl,
+              llmConfig,
+              authConfig: authConfigWithTokens,
+              messages: serialisedMessages,
+              ...(disabledToolNames.length > 0
+                ? { disabledTools: disabledToolNames }
+                : {}),
+            };
+        const requestEnvelope = bodyBuilder
+          ? redactSensitiveRequestFields(requestBody)
+          : {
+              mcpServerUrl,
+              llmConfig: {
+                provider: llmConfig.provider,
+                model: llmConfig.model,
+                temperature: llmConfig.temperature,
+                baseUrl: llmConfig.baseUrl,
+              },
+              messages: serialisedMessages,
+              ...(disabledToolNames.length > 0
+                ? { disabledTools: disabledToolNames }
+                : {}),
+            };
+        recordTrace({
+          type: "request",
+          request: {
+            url: resolvedUrl,
+            protocol: streamProtocol,
+            envelope: requestEnvelope,
+            providerMessages: [
+              ...(widgetContextMessage ? [widgetContextMessage] : []),
+              ...convertMessagesToProvider(historyMessages),
+            ],
+          },
+        });
 
         const response = await fetch(resolvedUrl, {
           method: "POST",
@@ -200,46 +291,42 @@ export function useChatMessages({
           },
           signal: abortControllerRef.current.signal,
           ...(credentials ? { credentials } : {}),
-          body: JSON.stringify(
-            bodyBuilder
-              ? bodyBuilder(serialisedMessages)
-              : {
-                  mcpServerUrl,
-                  llmConfig,
-                  authConfig: authConfigWithTokens,
-                  messages: serialisedMessages,
-                  ...(disabledTools && disabledTools.size > 0
-                    ? { disabledTools: [...disabledTools] }
-                    : {}),
-                }
-          ),
+          body: JSON.stringify(requestBody),
         });
 
         if (!response.ok) {
-          if (response.status === 429) {
-            const errBody = await response.json().catch(() => null);
-            if (errBody?.loginRequired && errBody?.loginUrl) {
-              setRateLimitInfo({ loginUrl: errBody.loginUrl as string });
-            }
-            // Remove the empty assistant message added optimistically
-            setMessages((prev) =>
-              prev.filter((m) => m.id !== `assistant-${Date.now()}`)
+          const errBody = await response.json().catch(() => null);
+          if (chatApiUrl) {
+            const notice = managedNoticeFromHttpResponse(
+              response.status,
+              errBody
             );
-            return;
+            if (notice) {
+              setManagedChatNotice(notice);
+              if (options?.throwOnError) {
+                throw new Error(
+                  `Chat request failed with HTTP ${response.status}`
+                );
+              }
+              return;
+            }
           }
           if (response.status === 401) {
-            const errBody = await response.json().catch(() => null);
             if (errBody?.error === "mcp_auth_required") {
               setMcpServerAuthRequired({
                 mcpServerUrl:
                   (errBody.mcpServerUrl as string | undefined) ?? mcpServerUrl,
                 message: errBody.message as string | undefined,
               });
+              if (options?.throwOnError) {
+                throw new Error("The MCP server requires authentication");
+              }
               return;
             }
           }
           throw new Error(`HTTP error! status: ${response.status}`);
         }
+        options?.onAccepted?.();
 
         // Create assistant message that will be updated with streaming content
         const assistantMessageId = `assistant-${Date.now()}`;
@@ -248,10 +335,12 @@ export function useChatMessages({
           type: "text" | "tool-invocation";
           text?: string;
           toolInvocation?: {
+            toolCallId: string;
             toolName: string;
             args: Record<string, unknown>;
             result?: any;
-            state?: "pending" | "result" | "error";
+            state?: "pending" | "streaming" | "result" | "error";
+            partialArgs?: Record<string, unknown>;
           };
         }> = [];
 
@@ -304,15 +393,68 @@ export function useChatMessages({
           }
           updateParts();
         };
+        // Streaming protocol state shared by data-stream and Inspector SSE.
+        const toolCallIdToIndex = new Map<string, number>();
+        const toolCallArgBuffers = new Map<string, string>();
+
+        const appendToolCallStart = (toolCallId: string, toolName: string) => {
+          if (currentTextPart) currentTextPart = "";
+          if (toolCallIdToIndex.has(toolCallId)) return;
+          parts.push({
+            type: "tool-invocation",
+            toolInvocation: {
+              toolCallId,
+              toolName,
+              args: {},
+              state: "streaming",
+              partialArgs: {},
+            },
+          });
+          toolCallIdToIndex.set(toolCallId, parts.length - 1);
+          toolCallArgBuffers.set(toolCallId, "");
+          updateParts();
+        };
+        const appendToolCallDelta = (toolCallId: string, argsDelta: string) => {
+          const idx = toolCallIdToIndex.get(toolCallId);
+          if (idx === undefined || !argsDelta) return;
+          const accumulated =
+            (toolCallArgBuffers.get(toolCallId) ?? "") + argsDelta;
+          toolCallArgBuffers.set(toolCallId, accumulated);
+          const partialArgs = parsePartialToolArgs(accumulated);
+          const invocation = parts[idx]?.toolInvocation;
+          if (!partialArgs || !invocation) return;
+          invocation.partialArgs = partialArgs;
+          updateParts();
+        };
         const appendToolCall = (
+          toolCallId: string,
           toolName: string,
           args: Record<string, unknown>
         ) => {
           if (currentTextPart) currentTextPart = "";
-          parts.push({
-            type: "tool-invocation",
-            toolInvocation: { toolName, args, state: "pending" },
-          });
+          const existingIndex = toolCallIdToIndex.get(toolCallId);
+          const existingInvocation =
+            existingIndex === undefined
+              ? undefined
+              : parts[existingIndex]?.toolInvocation;
+          if (existingInvocation) {
+            existingInvocation.toolName = toolName;
+            existingInvocation.args = args;
+            existingInvocation.state = "pending";
+            existingInvocation.partialArgs = undefined;
+          } else {
+            parts.push({
+              type: "tool-invocation",
+              toolInvocation: {
+                toolCallId,
+                toolName,
+                args,
+                state: "pending",
+              },
+            });
+            toolCallIdToIndex.set(toolCallId, parts.length - 1);
+          }
+          toolCallArgBuffers.delete(toolCallId);
           updateParts();
         };
         const resolveToolResult = (
@@ -340,9 +482,6 @@ export function useChatMessages({
             updateParts();
           }
         };
-
-        // data-stream protocol state: maps toolCallId → parts array index
-        const toolCallIdToIndex = new Map<string, number>();
 
         let buffer = "";
         while (true) {
@@ -377,7 +516,33 @@ export function useChatMessages({
 
                 switch (code) {
                   case "0": {
-                    appendText(typeof val === "string" ? val : String(val));
+                    const delta = typeof val === "string" ? val : String(val);
+                    recordTrace({ type: "text-delta", delta, raw: val });
+                    appendText(delta);
+                    break;
+                  }
+                  case "b": {
+                    const tc = val as Record<string, unknown>;
+                    const toolCallId = String(
+                      tc.toolCallId ?? `tool-${parts.length}`
+                    );
+                    const toolName = String(tc.toolName ?? "");
+                    recordTrace({
+                      type: "tool-call-start",
+                      toolCallId,
+                      toolName,
+                      raw: val,
+                    });
+                    appendToolCallStart(toolCallId, toolName);
+                    break;
+                  }
+                  case "c": {
+                    const tc = val as Record<string, unknown>;
+                    const toolCallId = String(tc.toolCallId ?? "");
+                    const argsDelta = String(
+                      tc.argsTextDelta ?? tc.argsDelta ?? ""
+                    );
+                    appendToolCallDelta(toolCallId, argsDelta);
                     break;
                   }
                   case "9": {
@@ -396,13 +561,26 @@ export function useChatMessages({
                         /* keep original */
                       }
                     }
-                    appendToolCall(String(tc.toolName ?? ""), args);
-                    if (tc.toolCallId) {
-                      toolCallIdToIndex.set(
-                        tc.toolCallId as string,
-                        parts.length - 1
-                      );
+                    const toolCallId = String(
+                      tc.toolCallId ?? `tool-${parts.length}`
+                    );
+                    const toolName = String(tc.toolName ?? "");
+                    if (!toolCallIdToIndex.has(toolCallId)) {
+                      recordTrace({
+                        type: "tool-call-start",
+                        toolCallId,
+                        toolName,
+                        raw: val,
+                      });
                     }
+                    recordTrace({
+                      type: "tool-call-args",
+                      toolCallId,
+                      toolName,
+                      args,
+                      raw: val,
+                    });
+                    appendToolCall(toolCallId, toolName, args);
                     break;
                   }
                   case "a": {
@@ -427,15 +605,45 @@ export function useChatMessages({
                       }
                     }
                     if (idx !== undefined) {
+                      recordTrace({
+                        type: "tool-result",
+                        toolCallId: String(tr.toolCallId ?? ""),
+                        toolName:
+                          parts[idx]?.toolInvocation?.toolName ?? "Tool",
+                        result,
+                        isError: Boolean(
+                          result &&
+                          typeof result === "object" &&
+                          (result as Record<string, unknown>).isError
+                        ),
+                        raw: val,
+                      });
                       resolveToolResult({ by: "index", index: idx }, result);
                     }
                     break;
                   }
                   case "d": {
+                    const envelope =
+                      val && typeof val === "object"
+                        ? (val as Record<string, unknown>)
+                        : undefined;
+                    const usage = inspectorTokenUsageFromUnknown(
+                      envelope?.usage
+                    );
+                    if (usage) {
+                      recordTrace({ type: "usage", usage, raw: val });
+                    }
+                    recordTrace({ type: "done", raw: val });
                     finalizeParts();
                     break;
                   }
                   case "3": {
+                    recordTrace({
+                      type: "error",
+                      message:
+                        typeof val === "string" ? val : JSON.stringify(val),
+                      raw: val,
+                    });
                     throw new Error(
                       typeof val === "string" ? val : JSON.stringify(val)
                     );
@@ -451,17 +659,83 @@ export function useChatMessages({
                 if (event.type === "message") {
                   // Stream start — no UI update needed
                 } else if (event.type === "text") {
+                  recordTrace({
+                    type: "text-delta",
+                    delta: event.content,
+                    raw: event,
+                  });
                   appendText(event.content);
+                } else if (event.type === "tool-call-start") {
+                  const toolCallId = event.toolCallId ?? `tool-${parts.length}`;
+                  recordTrace({
+                    type: "tool-call-start",
+                    toolCallId,
+                    toolName: event.toolName,
+                    raw: event,
+                  });
+                  appendToolCallStart(toolCallId, event.toolName);
+                } else if (
+                  event.type === "tool-call-delta" ||
+                  event.type === "tool-call-args-delta"
+                ) {
+                  appendToolCallDelta(
+                    event.toolCallId,
+                    event.argsDelta ?? event.argsTextDelta ?? ""
+                  );
                 } else if (event.type === "tool-call") {
-                  appendToolCall(event.toolName, event.args);
+                  const toolCallId = event.toolCallId ?? `tool-${parts.length}`;
+                  if (!toolCallIdToIndex.has(toolCallId)) {
+                    recordTrace({
+                      type: "tool-call-start",
+                      toolCallId,
+                      toolName: event.toolName,
+                      raw: event,
+                    });
+                  }
+                  recordTrace({
+                    type: "tool-call-args",
+                    toolCallId,
+                    toolName: event.toolName,
+                    args: event.args,
+                    raw: event,
+                  });
+                  appendToolCall(toolCallId, event.toolName, event.args);
                 } else if (event.type === "tool-result") {
+                  recordTrace({
+                    type: "tool-result",
+                    toolCallId: event.toolCallId,
+                    toolName: event.toolName,
+                    result: event.result,
+                    isError: event.isError ?? event.result?.isError,
+                    raw: event,
+                  });
+                  const resultIndex = toolCallIdToIndex.get(event.toolCallId);
                   resolveToolResult(
-                    { by: "toolName", toolName: event.toolName },
+                    resultIndex === undefined
+                      ? { by: "toolName", toolName: event.toolName }
+                      : { by: "index", index: resultIndex },
                     event.result
                   );
                 } else if (event.type === "done") {
+                  const usage = inspectorTokenUsageFromUnknown(event.usage);
+                  if (usage) {
+                    recordTrace({ type: "usage", usage, raw: event });
+                  }
+                  recordTrace({ type: "done", raw: event });
                   finalizeParts();
+                } else if (event.type === "usage") {
+                  const usage = inspectorTokenUsageFromUnknown(
+                    event.usage ?? event
+                  );
+                  if (usage) {
+                    recordTrace({ type: "usage", usage, raw: event });
+                  }
                 } else if (event.type === "error") {
+                  recordTrace({
+                    type: "error",
+                    message: event.message || "Streaming error",
+                    raw: event,
+                  });
                   throw new Error(event.message || "Streaming error");
                 }
               }
@@ -487,7 +761,8 @@ export function useChatMessages({
           for (const part of parts) {
             if (
               part.type === "tool-invocation" &&
-              part.toolInvocation?.state === "pending"
+              (part.toolInvocation?.state === "pending" ||
+                part.toolInvocation?.state === "streaming")
             ) {
               part.toolInvocation.state = "error";
               part.toolInvocation.result = "Cancelled by user";
@@ -510,6 +785,17 @@ export function useChatMessages({
       } catch (error) {
         // Don't show Abort Error
         if (error instanceof DOMException && error.name === "AbortError") {
+          if (options?.throwOnError) {
+            throw new Error("Chat turn was cancelled");
+          }
+          return;
+        }
+
+        if (chatApiUrl && isCloudFetchFailure(error)) {
+          setManagedChatNotice({ kind: "cloud_unavailable" });
+          if (options?.throwOnError) {
+            throw new Error("Chat service is unavailable");
+          }
           return;
         }
 
@@ -537,9 +823,13 @@ export function useChatMessages({
           timestamp: Date.now(),
         };
         setMessages((prev) => [...prev, errorMessage]);
+        if (options?.throwOnError) {
+          throw new Error(errorDetail);
+        }
       } finally {
         setIsLoading(false);
         abortControllerRef.current = null;
+        sendInProgressRef.current = false;
       }
     },
     [
@@ -548,6 +838,7 @@ export function useChatMessages({
       mcpServerUrl,
       messages,
       authConfig,
+      mcpAuthTokens,
       attachments,
       chatApiUrl,
       waitForChatApiUrl,
@@ -557,18 +848,26 @@ export function useChatMessages({
       credentials,
       extraHeaders,
       bodyBuilder,
+      recordTrace,
     ]
   );
 
   const clearMessages = useCallback(() => {
     setMessages([]);
-    setRateLimitInfo(null);
+    setManagedChatNotice(null);
     setMcpServerAuthRequired(null);
+    setTraceState(EMPTY_TRACE_STATE);
   }, []);
 
-  const clearRateLimitInfo = useCallback(() => {
-    setRateLimitInfo(null);
+  const clearManagedChatNotice = useCallback(() => {
+    setManagedChatNotice(null);
   }, []);
+
+  const showManagedChatNotice = useCallback((notice: ManagedChatNotice) => {
+    setManagedChatNotice(notice);
+  }, []);
+
+  const clearTrace = useCallback(() => setTraceState(EMPTY_TRACE_STATE), []);
 
   const clearMcpServerAuthRequired = useCallback(() => {
     setMcpServerAuthRequired(null);
@@ -616,16 +915,20 @@ export function useChatMessages({
     messages,
     isLoading,
     attachments,
-    rateLimitInfo,
+    managedChatNotice,
     mcpServerAuthRequired,
     sendMessage,
     clearMessages,
-    clearRateLimitInfo,
+    clearManagedChatNotice,
+    showManagedChatNotice,
     clearMcpServerAuthRequired,
     setMessages,
     stop,
     addAttachment,
     removeAttachment,
     clearAttachments,
+    clearTrace,
+    traceEvents: traceState.events,
+    tokenUsage: traceState.usage,
   };
 }

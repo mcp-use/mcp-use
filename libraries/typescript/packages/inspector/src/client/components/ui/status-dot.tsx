@@ -3,51 +3,52 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
+import { cn } from "@/client/lib/utils";
 
 interface StatusDotProps {
   status: string;
+  className?: string;
 }
 
-export function StatusDot({ status }: StatusDotProps) {
-  const getStatusInfo = (statusValue: string) => {
-    switch (statusValue) {
-      case "ready":
-        return {
-          color: "bg-emerald-500",
-          ringColor: "ring-emerald-500",
-          tooltip: "Connected",
-        };
-      case "failed":
-        return {
-          color: "bg-red-500",
-          ringColor: "ring-red-500",
-          tooltip: "Failed",
-        };
-      default:
-        return {
-          color: "bg-yellow-500",
-          ringColor: "ring-yellow-500",
-          tooltip: statusValue,
-        };
-    }
-  };
+function getStatusDotClass(status: string): string {
+  switch (status) {
+    case "ready":
+      return "bg-emerald-600 animate-status-pulse";
+    case "failed":
+      return "bg-rose-600 animate-status-pulse-red";
+    default:
+      return "bg-yellow-500 animate-status-pulse-yellow";
+  }
+}
 
-  const { color, ringColor, tooltip } = getStatusInfo(status);
+function getStatusTooltip(status: string): string {
+  switch (status) {
+    case "ready":
+      return "Connected";
+    case "failed":
+      return "Failed";
+    default:
+      return status;
+  }
+}
 
+export function StatusDot({ status, className }: StatusDotProps) {
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
-        <div className="relative">
-          {/* Pulsing ring */}
+      <TooltipTrigger
+        render={
           <div
-            className={`absolute w-2 h-2 rounded-full ${ringColor} animate-ping`}
+            className={cn(
+              "w-2 h-2 rounded-full shrink-0",
+              getStatusDotClass(status),
+              className
+            )}
           />
-          {/* Solid dot */}
-          <div className={`relative w-2 h-2 rounded-full ${color}`} />
-        </div>
-      </TooltipTrigger>
+        }
+        nativeButton={false}
+      />
       <TooltipContent>
-        <p>{tooltip}</p>
+        <p>{getStatusTooltip(status)}</p>
       </TooltipContent>
     </Tooltip>
   );

@@ -149,21 +149,14 @@ from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from mcp_use import MCPAgent, MCPClient
 
+
 async def main():
     # Load environment variables
     load_dotenv()
 
     # Create configuration dictionary
     config = {
-      "mcpServers": {
-        "playwright": {
-          "command": "npx",
-          "args": ["@playwright/mcp@latest"],
-          "env": {
-            "DISPLAY": ":1"
-          }
-        }
-      }
+        "mcpServers": {"playwright": {"command": "npx", "args": ["@playwright/mcp@latest"], "env": {"DISPLAY": ":1"}}}
     }
 
     # Create MCPClient from configuration dictionary
@@ -181,6 +174,7 @@ async def main():
     )
     print(f"\nResult: {result}")
 
+
 if __name__ == "__main__":
     asyncio.run(main())
 ```
@@ -188,9 +182,7 @@ if __name__ == "__main__":
 You can also add the servers configuration from a config file like this:
 
 ```python
-client = MCPClient.from_config_file(
-        os.path.join("browser_mcp.json")
-    )
+client = MCPClient.from_config_file(os.path.join("browser_mcp.json"))
 ```
 
 Example configuration file (`browser_mcp.json`):
@@ -235,6 +227,7 @@ from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from mcp_use import MCPAgent, MCPClient
 
+
 async def main():
     load_dotenv()
     client = MCPClient.from_config_file("browser_mcp.json")
@@ -242,6 +235,7 @@ async def main():
     agent = MCPAgent(llm=llm, client=client, max_steps=30)
     async for chunk in agent.stream("Look for job at nvidia for machine learning engineer."):
         print(chunk["messages"], end="", flush=True)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -260,14 +254,13 @@ from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from mcp_use import MCPAgent, MCPClient
 
+
 async def main():
     # Load environment variables
     load_dotenv()
 
     # Create MCPClient from config file
-    client = MCPClient.from_config_file(
-        os.path.join(os.path.dirname(__file__), "browser_mcp.json")
-    )
+    client = MCPClient.from_config_file(os.path.join(os.path.dirname(__file__), "browser_mcp.json"))
 
     # Create LLM
     llm = ChatOpenAI(model="gpt-4o")
@@ -285,6 +278,7 @@ async def main():
     )
     print(f"\nResult: {result}")
 
+
 if __name__ == "__main__":
     asyncio.run(main())
 ```
@@ -298,14 +292,13 @@ from dotenv import load_dotenv
 from langchain_anthropic import ChatAnthropic
 from mcp_use import MCPAgent, MCPClient
 
+
 async def run_airbnb_example():
     # Load environment variables
     load_dotenv()
 
     # Create MCPClient with Airbnb configuration
-    client = MCPClient.from_config_file(
-        os.path.join(os.path.dirname(__file__), "airbnb_mcp.json")
-    )
+    client = MCPClient.from_config_file(os.path.join(os.path.dirname(__file__), "airbnb_mcp.json"))
 
     # Create LLM - you can choose between different models
     llm = ChatAnthropic(model="claude-3-5-sonnet-20240620")
@@ -326,6 +319,7 @@ async def run_airbnb_example():
         # Ensure we clean up resources properly
         if client.sessions:
             await client.close_all_sessions()
+
 
 if __name__ == "__main__":
     asyncio.run(run_airbnb_example())
@@ -351,6 +345,7 @@ import asyncio
 from dotenv import load_dotenv
 from langchain_anthropic import ChatAnthropic
 from mcp_use import MCPAgent, MCPClient
+
 
 async def run_blender_example():
     # Load environment variables
@@ -378,6 +373,7 @@ async def run_blender_example():
         if client.sessions:
             await client.close_all_sessions()
 
+
 if __name__ == "__main__":
     asyncio.run(run_blender_example())
 ```
@@ -397,18 +393,13 @@ from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from mcp_use import MCPAgent, MCPClient
 
+
 async def main():
     """Run the example using a configuration file."""
     # Load environment variables
     load_dotenv()
 
-    config = {
-        "mcpServers": {
-            "http": {
-                "url": "http://localhost:8931/sse"
-            }
-        }
-    }
+    config = {"mcpServers": {"http": {"url": "http://localhost:8931/sse"}}}
 
     # Create MCPClient from config file
     client = MCPClient.from_dict(config)
@@ -425,6 +416,7 @@ async def main():
         max_steps=30,
     )
     print(f"\nResult: {result}")
+
 
 if __name__ == "__main__":
     # Run the appropriate example
@@ -469,12 +461,12 @@ By default, the agent will have access to tools from all configured servers. If 
 # Example: Manually selecting a server for a specific task
 result = await agent.run(
     "Search for Airbnb listings in Barcelona",
-    server_name="airbnb" # Explicitly use the airbnb server
+    server_name="airbnb",  # Explicitly use the airbnb server
 )
 
 result_google = await agent.run(
     "Find restaurants near the first result using Google Search",
-    server_name="playwright" # Explicitly use the playwright server
+    server_name="playwright",  # Explicitly use the playwright server
 )
 ```
 
@@ -489,6 +481,7 @@ import asyncio
 from mcp_use import MCPClient, MCPAgent
 from langchain_anthropic import ChatAnthropic
 
+
 async def main():
     # Create client with multiple servers
     client = MCPClient.from_config_file("multi_server_config.json")
@@ -497,7 +490,7 @@ async def main():
     agent = MCPAgent(
         llm=ChatAnthropic(model="claude-3-5-sonnet-20240620"),
         client=client,
-        use_server_manager=True  # Enable the Server Manager
+        use_server_manager=True,  # Enable the Server Manager
     )
 
     try:
@@ -510,6 +503,7 @@ async def main():
     finally:
         # Clean up all sessions
         await client.close_all_sessions()
+
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -524,6 +518,7 @@ import asyncio
 from mcp_use import MCPAgent, MCPClient
 from langchain_openai import ChatOpenAI
 
+
 async def main():
     # Create client
     client = MCPClient.from_config_file("config.json")
@@ -532,17 +527,16 @@ async def main():
     agent = MCPAgent(
         llm=ChatOpenAI(model="gpt-4"),
         client=client,
-        disallowed_tools=["file_system", "network"]  # Restrict potentially dangerous tools
+        disallowed_tools=["file_system", "network"],  # Restrict potentially dangerous tools
     )
 
     # Run a query with restricted tool access
-    result = await agent.run(
-        "Find the best restaurant in San Francisco"
-    )
+    result = await agent.run("Find the best restaurant in San Francisco")
     print(result)
 
     # Clean up
     await client.close_all_sessions()
+
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -578,6 +572,7 @@ from langchain_openai import ChatOpenAI
 from mcp_use import MCPAgent, MCPClient
 from mcp_use.types.sandbox import SandboxOptions
 
+
 async def main():
     # Load environment variables (needs E2B_API_KEY)
     load_dotenv()
@@ -603,7 +598,6 @@ async def main():
         config=server_config,
         sandbox=True,
         sandbox_options=sandbox_options,
-
     )
 
     # Create agent with the sandboxed client
@@ -616,6 +610,7 @@ async def main():
 
     # Clean up
     await client.close_all_sessions()
+
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -652,6 +647,7 @@ You can call MCP server tools directly without an LLM when you need programmatic
 import asyncio
 from mcp_use import MCPClient
 
+
 async def call_tool_example():
     config = {
         "mcpServers": {
@@ -669,15 +665,13 @@ async def call_tool_example():
         session = client.get_session("everything")
 
         # Call tool directly
-        result = await session.call_tool(
-            name="add",
-            arguments={"a": 1, "b": 2}
-        )
+        result = await session.call_tool(name="add", arguments={"a": 1, "b": 2})
 
         print(f"Result: {result.content[0].text}")  # Output: 3
 
     finally:
         await client.close_all_sessions()
+
 
 if __name__ == "__main__":
     asyncio.run(call_tool_example())
@@ -717,8 +711,6 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
-
 ```
 
 ---
@@ -735,10 +727,12 @@ server = MCPServer(
     version="1.0.0",
 )
 
+
 @server.tool()
 def get_weather(city: str) -> dict:
     """Get weather for a city"""
     return {"temperature": 72, "condition": "sunny", "city": city}
+
 
 if __name__ == "__main__":
     server.run()
@@ -797,7 +791,7 @@ If you only want to see debug information from the agent without enabling full d
 agent = MCPAgent(
     llm=your_llm,
     client=your_client,
-    verbose=True  # Only shows debug messages from the agent
+    verbose=True,  # Only shows debug messages from the agent
 )
 ```
 

@@ -121,15 +121,15 @@ The built entry keeps its package imports external. Replace
 ```json
 {
   "imports": {
-    "mcp-use": "npm:mcp-use@beta",
-    "mcp-use/": "npm:mcp-use@beta/",
+    "mcp-use": "npm:mcp-use@latest",
+    "mcp-use/": "npm:mcp-use@latest/",
     "zod": "npm:zod@^4.4.3"
   }
 }
 ```
 
 The import map makes Deno resolve the built server's `mcp-use` imports through
-the `npm:mcp-use@beta` package entry point.
+the `npm:mcp-use@latest` package entry point.
 
 Pin the `npm:mcp-use` version to the same version used by the project when
 reproducible builds are required.

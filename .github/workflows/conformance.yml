@@ -18,12 +18,14 @@ on:
       - 'libraries/python/mcp_use/server/**'
       - 'libraries/python/mcp_use/client/**'
       - 'libraries/python/pyproject.toml'
-      - 'libraries/typescript/packages/mcp-use/src/server/**'
-      - 'libraries/typescript/packages/mcp-use/package.json'
+      - 'libraries/typescript/packages/server/src/**'
+      - 'libraries/typescript/packages/server/package.json'
+      - 'libraries/typescript/packages/client/src/**'
+      - 'libraries/typescript/packages/client/package.json'
       - 'libraries/python/tests/integration/servers_for_testing/conformance_server.py'
       - 'libraries/python/tests/integration/clients_for_testing/conformance_client.py'
-      - 'libraries/typescript/packages/mcp-use/examples/server/features/conformance/**'
-      - 'libraries/typescript/packages/mcp-use/examples/client/conformance/**'
+      - 'libraries/typescript/packages/server/examples/conformance/**'
+      - 'libraries/typescript/packages/client/examples/conformance/**'
       - '.github/workflows/conformance.yml'
   pull_request:
     branches:
@@ -33,13 +35,14 @@ on:
       - 'libraries/python/mcp_use/server/**'
       - 'libraries/python/mcp_use/client/**'
       - 'libraries/python/pyproject.toml'
-      - 'libraries/typescript/packages/mcp-use/src/server/**'
-      - 'libraries/typescript/packages/mcp-use/src/client/**'
-      - 'libraries/typescript/packages/mcp-use/package.json'
+      - 'libraries/typescript/packages/server/src/**'
+      - 'libraries/typescript/packages/server/package.json'
+      - 'libraries/typescript/packages/client/src/**'
+      - 'libraries/typescript/packages/client/package.json'
       - 'libraries/python/tests/integration/servers_for_testing/conformance_server.py'
       - 'libraries/python/tests/integration/clients_for_testing/conformance_client.py'
-      - 'libraries/typescript/packages/mcp-use/examples/server/features/conformance/**'
-      - 'libraries/typescript/packages/mcp-use/examples/client/conformance/**'
+      - 'libraries/typescript/packages/server/examples/conformance/**'
+      - 'libraries/typescript/packages/client/examples/conformance/**'
       - '.github/workflows/conformance.yml'
 
 permissions:
@@ -118,7 +121,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '22.23.1'
 
       - name: Install pnpm
         if: needs.detect-changes.outputs.typescript == 'true'
@@ -143,12 +146,12 @@ jobs:
 
       - name: Install TypeScript conformance server dependencies
         if: needs.detect-changes.outputs.typescript == 'true'
-        working-directory: libraries/typescript/packages/mcp-use/examples/server/features/conformance
+        working-directory: libraries/typescript/packages/server/examples/conformance
         run: pnpm install
 
       - name: Install TypeScript conformance client dependencies
         if: needs.detect-changes.outputs.typescript == 'true'
-        working-directory: libraries/typescript/packages/mcp-use/examples/client/conformance
+        working-directory: libraries/typescript/packages/client/examples/conformance
         run: pnpm install
 
       - name: Build server list
@@ -165,7 +168,7 @@ jobs:
             if [[ $SERVERS != '[' ]]; then
               SERVERS+=','
             fi
-            SERVERS+='{"name":"typescript","start-command":"PORT=3000 npx tsx src/server.ts","url":"http://localhost:3000/mcp","working-directory":"libraries/typescript/packages/mcp-use/examples/server/features/conformance"}'
+            SERVERS+='{"name":"typescript","start-command":"PORT=3000 node ../../dist/bin.js dev --no-open","url":"http://localhost:3000/mcp","working-directory":"libraries/typescript/packages/server/examples/conformance"}'
           fi
           SERVERS+=']'
           echo "servers=$SERVERS" >> $GITHUB_OUTPUT
@@ -184,11 +187,11 @@ jobs:
             if [[ $CLIENTS != '[' ]]; then
               CLIENTS+=','
             fi
-            CLIENTS+='{"name":"typescript-node-client","command":"libraries/typescript/packages/mcp-use/examples/client/conformance/run-conformance-client-node.sh"}'
+            CLIENTS+='{"name":"typescript-node-client","command":"libraries/typescript/packages/client/examples/conformance/run-conformance-client-node.sh"}'
             CLIENTS+=','
-            CLIENTS+='{"name":"typescript-browser-client","command":"libraries/typescript/packages/mcp-use/examples/client/conformance/run-conformance-client-browser.sh"}'
+            CLIENTS+='{"name":"typescript-browser-client","command":"libraries/typescript/packages/client/examples/conformance/run-conformance-client-browser.sh"}'
             CLIENTS+=','
-            CLIENTS+='{"name":"typescript-react-client","command":"libraries/typescript/packages/mcp-use/examples/client/conformance/run-conformance-client-react.sh"}'
+            CLIENTS+='{"name":"typescript-react-client","command":"libraries/typescript/packages/client/examples/conformance/run-conformance-client-react.sh"}'
           fi
           CLIENTS+=']'
           echo "clients=$CLIENTS" >> $GITHUB_OUTPUT

@@ -11,9 +11,11 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000/inspector](http://localhost:3000/inspector) with your browser to test your server.
+Open [http://localhost:3000/mcp/inspector](http://localhost:3000/mcp/inspector) with your browser to test your server.
 
 You can start building by editing the entry file. Add tools, resources, and prompts — the server auto-reloads as you edit.
+
+Run `npm run typecheck` to refresh MCP view types and check the project with its local TypeScript compiler.
 
 ## Learn More
 

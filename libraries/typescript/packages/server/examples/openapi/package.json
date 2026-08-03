@@ -1,0 +1,23 @@
+{
+  "name": "mcp-use-example-openapi",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Example: generate an MCP server from the National Weather Service OpenAPI document.",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "scripts": {
+    "dev": "mcp-use dev",
+    "build": "mcp-use build",
+    "start": "mcp-use start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "mcp-use": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "typescript": "^7.0.2"
+  }
+}
