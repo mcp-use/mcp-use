@@ -138,6 +138,26 @@ async function makeProject(options?: {
   return cwd;
 }
 
+/**
+ * Snapshot the shutdown signal listeners so the ones a `main(["start", ...])`
+ * call registers can be removed again without going through process.exit.
+ */
+function captureSignalListeners(): { release(): void } {
+  const before = {
+    SIGINT: new Set(process.listeners("SIGINT")),
+    SIGTERM: new Set(process.listeners("SIGTERM")),
+  } as const;
+  return {
+    release() {
+      for (const signal of ["SIGINT", "SIGTERM"] as const) {
+        for (const listener of process.listeners(signal)) {
+          if (!before[signal].has(listener)) process.off(signal, listener);
+        }
+      }
+    },
+  };
+}
+
 afterAll(async () => {
   await Promise.all(
     tempDirs.map((dir) => rm(dir, { recursive: true, force: true }))
@@ -537,6 +557,46 @@ describe("main", () => {
     } finally {
       if (sigint !== undefined) process.off("SIGINT", sigint);
       if (sigterm !== undefined) process.off("SIGTERM", sigterm);
+    }
+  });
+
+  it("explains that the inspector is opt-in under start", async () => {
+    const cwd = await makeProject({ entrySource: ECHO_ENTRY });
+    const logs = vi.spyOn(console, "log").mockImplementation(() => {});
+    const signals = captureSignalListeners();
+
+    try {
+      await expect(
+        main(["start", "--path", cwd, "--port", "4567"])
+      ).resolves.toBe(0);
+      expect(logs.mock.calls.flat().join("\n")).toContain(
+        "mcp-use inspector not mounted (dev only by default); " +
+          "pass --with-inspector to serve it here"
+      );
+    } finally {
+      signals.release();
+    }
+  });
+
+  it("prints the inspector URL when start mounts it", async () => {
+    mountInspector.mockImplementation(
+      () => async () => new Response("inspector")
+    );
+    const cwd = await makeProject({ entrySource: INSPECTOR_ENTRY });
+    const logs = vi.spyOn(console, "log").mockImplementation(() => {});
+    const signals = captureSignalListeners();
+
+    try {
+      await expect(
+        main(["start", "--path", cwd, "--port", "4567", "--with-inspector"])
+      ).resolves.toBe(0);
+      const output = logs.mock.calls.flat().join("\n");
+      expect(output).toContain(
+        "mcp-use inspector at http://localhost:4567/api/mcp/inspector"
+      );
+      expect(output).not.toContain("not mounted");
+    } finally {
+      signals.release();
     }
   });
 
