@@ -31,9 +31,10 @@ import {
   updatePackageJson,
 } from "./utils.js";
 import {
+  getDefaultDistTag,
   getSkillsCloneArgs,
+  getSkillsManualInstallCommand,
   SKILLS_AGENT_DIRS,
-  SKILLS_MANUAL_INSTALL_CMD,
   SKILLS_SPARSE_PATH,
 } from "./skills-config.js";
 
@@ -221,7 +222,11 @@ function warnSkillsInstallFailed(missingGit: boolean): void {
     ? "Failed to install skills: git is not installed or not in PATH."
     : "Failed to install skills.";
   console.log(ansi.yellow(`⚠️  ${reason}`));
-  console.log(ansi.yellow(`   Run manually: ${SKILLS_MANUAL_INSTALL_CMD}`));
+  console.log(
+    ansi.yellow(
+      `   Run manually: ${getSkillsManualInstallCommand(packageJson.version)}`
+    )
+  );
 }
 
 async function installSkills(projectPath: string): Promise<void> {
@@ -229,10 +234,14 @@ async function installSkills(projectPath: string): Promise<void> {
   const repoDir = join(tempDir, "repo");
 
   try {
-    const clone = spawnSync("git", getSkillsCloneArgs(repoDir), {
-      stdio: "ignore",
-      shell: false,
-    });
+    const clone = spawnSync(
+      "git",
+      getSkillsCloneArgs(repoDir, packageJson.version),
+      {
+        stdio: "ignore",
+        shell: false,
+      }
+    );
     if (clone.status !== 0 || clone.error) {
       throw new Error("git clone failed");
     }
@@ -892,24 +901,27 @@ async function main(): Promise<void> {
   } else if (options.sdkVersion) {
     mcpUseVersion = options.sdkVersion;
   } else {
+    const defaultDistTag = getDefaultDistTag(packageJson.version);
     const response = await fetch("https://registry.npmjs.org/mcp-use", {
       headers: { Accept: "application/vnd.npm.install-v1+json" },
       signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok) {
       throw new Error(
-        `Failed to resolve the mcp-use beta dist-tag from npm (${response.status})`
+        `Failed to resolve the mcp-use ${defaultDistTag} dist-tag from npm (${response.status})`
       );
     }
 
     const metadata = (await response.json()) as {
-      "dist-tags"?: { beta?: string };
+      "dist-tags"?: Record<string, string>;
     };
-    const betaVersion = metadata["dist-tags"]?.beta;
-    if (!betaVersion) {
-      throw new Error("npm did not return a beta version for mcp-use");
+    const defaultVersion = metadata["dist-tags"]?.[defaultDistTag];
+    if (!defaultVersion) {
+      throw new Error(
+        `npm did not return a ${defaultDistTag} version for mcp-use`
+      );
     }
-    mcpUseVersion = betaVersion;
+    mcpUseVersion = defaultVersion;
   }
   const versions = { "mcp-use": mcpUseVersion };
 

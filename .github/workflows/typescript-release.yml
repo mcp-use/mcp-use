@@ -35,9 +35,9 @@ jobs:
           fetch-depth: 0
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v4
         with:
-          version: 10.6.1
+          version: 11.13.1
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -54,7 +54,7 @@ jobs:
 
       - name: Install Dependencies
         working-directory: libraries/typescript
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Build Packages
         working-directory: libraries/typescript
@@ -301,6 +301,10 @@ jobs:
           # Version packages
           echo "Versioning packages..."
           pnpm changeset version
+
+          # changeset version updates workspace dependency metadata. Refresh the
+          # lockfile now so the release PR is reproducible and main remains clean.
+          pnpm install --no-frozen-lockfile
 
           # Go back to repo root for git operations
           cd ../..

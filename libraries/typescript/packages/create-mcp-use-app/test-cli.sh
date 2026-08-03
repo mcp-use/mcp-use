@@ -12,7 +12,13 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-EXPECTED_DEFAULT_MCP_USE_VERSION="$(node -e 'fetch("https://registry.npmjs.org/mcp-use", { headers: { Accept: "application/vnd.npm.install-v1+json" } }).then(response => { if (!response.ok) throw new Error(`npm registry returned ${response.status}`); return response.json(); }).then(metadata => process.stdout.write(metadata["dist-tags"].beta))')"
+PACKAGE_VERSION="$(node -p 'require("./package.json").version')"
+if [[ "$PACKAGE_VERSION" == *-beta.* ]]; then
+    EXPECTED_DEFAULT_DIST_TAG="beta"
+else
+    EXPECTED_DEFAULT_DIST_TAG="latest"
+fi
+EXPECTED_DEFAULT_MCP_USE_VERSION="$(node -e 'const tag = process.argv[1]; fetch("https://registry.npmjs.org/mcp-use", { headers: { Accept: "application/vnd.npm.install-v1+json" } }).then(response => { if (!response.ok) throw new Error(`npm registry returned ${response.status}`); return response.json(); }).then(metadata => process.stdout.write(metadata["dist-tags"][tag]))' "$EXPECTED_DEFAULT_DIST_TAG")"
 
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -233,11 +239,11 @@ run_test "Version-Sdk-Canary" npm mcp-server "--sdk-version canary" ""
 echo ""
 run_test "Version-Sdk-Semver" npm mcp-server "--sdk-version 1.0.0" ""
 echo ""
-run_test "Version-Default-Beta-Server" npm mcp-server "" ""
+run_test "Version-Default-Channel-Server" npm mcp-server "" ""
 echo ""
-run_test "Version-Default-Beta-Apps" npm mcp-apps "" ""
+run_test "Version-Default-Channel-Apps" npm mcp-apps "" ""
 echo ""
-run_test "Version-Default-Beta-Blank" npm blank "" ""
+run_test "Version-Default-Channel-Blank" npm blank "" ""
 echo ""
 
 # Optional: Test with installation (slower)

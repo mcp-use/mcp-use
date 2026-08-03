@@ -27,7 +27,7 @@
 
   <p>
     <a href="https://www.npmjs.com/package/mcp-use">
-      <img src="https://img.shields.io/npm/v/mcp-use/beta.svg?label=npm&amp;color=orange" alt="npm beta version">
+      <img src="https://img.shields.io/npm/v/mcp-use.svg?label=npm&amp;color=orange" alt="npm version">
     </a>
     <a href="https://www.npmjs.com/package/mcp-use">
       <img src="https://img.shields.io/npm/dw/mcp-use.svg" alt="npm downloads">
@@ -46,8 +46,6 @@
 </div>
 
 > [!NOTE]
-> **TypeScript v2 is in beta.** It's a major improvement over v1. Use the npm `beta` tag. [Python and TypeScript v1 →](#ecosystem)
->
 > **Migrating from v1? Give it to your agent:** [Read the migration guide →](https://docs.mcp-use.com/v2/server/migration)
 >
 > ```text
@@ -62,15 +60,15 @@
 ### Start with your agent
 
 ```text
-Build an MCP server: https://mcp-use.com/prompt@beta.md
+Build an MCP server: https://mcp-use.com/prompt.md
 ```
 
-[Read the prompt →](https://mcp-use.com/prompt@beta.md)
+[Read the prompt →](https://mcp-use.com/prompt.md)
 
 ### Start with code
 
 ```bash
-npx -y create-mcp-use-app@beta
+npx -y create-mcp-use-app@latest
 ```
 
 Run `npm run dev` in the generated project · open [`http://localhost:3000/mcp/inspector`](http://localhost:3000/mcp/inspector)
@@ -252,7 +250,7 @@ Start a tunnel from the Inspector UI or run `mcp-use dev --tunnel` to get a publ
 Inspect the same server headlessly from the terminal, invoke representative tools, and capture a View screenshot:
 
 ```bash
-npm install --save-dev @mcp-use/client@beta
+npm install --save-dev @mcp-use/client
 npx mcp-use client connect local http://localhost:3000/mcp
 npx mcp-use client local tools list
 npx mcp-use client local tools call get-weather city=Tokyo

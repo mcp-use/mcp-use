@@ -10,7 +10,7 @@ Treat the installed `mcp-use` package, its generated types, and the project's ex
 ## Workflow
 
 1. Inspect `package.json`, the server entry, exported tool refs, `views/`, and the installed `mcp-use` version.
-2. Scaffold a new project with `npx create-mcp-use-app@beta`; do not hand-build framework boilerplate.
+2. Scaffold a new project with `npx create-mcp-use-app@latest`; do not hand-build framework boilerplate.
 3. Read only the references needed for the task:
    - [Server primitives](references/server.md) for tools, resources, prompts, middleware, and result envelopes.
    - [Views](references/views.md) for interactive MCP Apps and React hooks.
