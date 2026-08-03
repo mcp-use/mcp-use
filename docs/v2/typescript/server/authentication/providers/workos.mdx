@@ -1,0 +1,97 @@
+---
+title: "WorkOS Provider"
+description: "Configure WorkOS AuthKit authentication for an MCP server."
+icon: "/images/workos.svg"
+---
+
+Use `oauthWorkOSProvider` when WorkOS AuthKit is the authorization server. MCP clients register with WorkOS, and mcp-use verifies AuthKit access tokens against the resolved MCP resource.
+
+## Configure WorkOS
+
+In the [WorkOS Dashboard](https://dashboard.workos.com/):
+
+1. Enable Dynamic Client Registration.
+2. Enable Client ID Metadata Document if your MCP clients use it.
+3. Add the canonical MCP endpoint as a Resource Indicator.
+
+For example, if the deployed origin is `https://mcp.example.com` and the default base path is `/mcp`, the resource is `https://mcp.example.com/mcp`.
+
+## Configure the server
+
+Pass the AuthKit subdomain explicitly. The provider does not read WorkOS environment variables and does not accept a separate `audience` option.
+
+```bash
+WORKOS_SUBDOMAIN=your-company.authkit.app
+MCP_URL=https://mcp.example.com
+```
+
+```typescript
+import { MCPServer } from "mcp-use";
+import { oauthWorkOSProvider } from "mcp-use/oauth/workos";
+
+const subdomain = process.env.WORKOS_SUBDOMAIN;
+if (!subdomain) throw new Error("WORKOS_SUBDOMAIN is required");
+
+const server = new MCPServer({
+  name: "workos-server",
+  version: "1.0.0",
+  oauth: oauthWorkOSProvider({ subdomain }),
+});
+
+export default server;
+```
+
+## Scope data by organization
+
+WorkOS maps `org_id` to `organizationId` and the subject to `id`.
+
+```typescript
+server.tool(
+  {
+    name: "list_documents",
+    description: "List documents for the WorkOS organization.",
+  },
+  async (_args, ctx) => {
+    const organizationId = ctx.auth.user.organizationId;
+    if (!organizationId) {
+      return {
+        isError: true,
+        content: [{ type: "text", text: "Organization context required" }],
+      };
+    }
+
+    const documents = await db.documents.findMany({
+      where: { organizationId },
+    });
+    return {
+      content: [{ type: "text", text: JSON.stringify(documents) }],
+    };
+  },
+);
+```
+
+The mapped user also includes optional `email`, `emailVerified`, `name`, `preferredUsername`, `firstName`, `lastName`, `picture`, and `sessionId`, plus `roles`. Verified WorkOS permissions are top-level `ctx.auth.permissions`.
+
+<CardGroup cols={2}>
+  <Card
+    title="Runnable WorkOS example"
+    icon="github"
+    href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/auth/workos"
+  >
+    Compare with the maintained WorkOS example.
+  </Card>
+  <Card
+    title="WorkOS AuthKit MCP guide"
+    icon="book-open"
+    href="https://workos.com/docs/authkit/mcp"
+  >
+    Configure AuthKit for MCP.
+  </Card>
+  <Card
+    title="User Context"
+    icon="user"
+    href="/v2/typescript/server/authentication/user-context"
+  >
+    Use WorkOS identity, organization, and permissions.
+  </Card>
+</CardGroup>

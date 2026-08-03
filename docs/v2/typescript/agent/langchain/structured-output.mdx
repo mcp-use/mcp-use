@@ -1,0 +1,143 @@
+---
+title: "Structured output"
+description: "Convert LangChainMCPAgent results into validated Zod data."
+icon: "braces"
+---
+
+Pass a Zod `schema` to `LangChainMCPAgent` when you need validated data. The agent completes the task first, then asks the model to convert the final text and validates the result with Zod.
+
+## Return a typed result
+
+Install `zod`, set `OPENAI_API_KEY`, and run:
+
+```typescript
+import { ChatOpenAI } from "@langchain/openai";
+import { MCPClient } from "@mcp-use/client";
+import { LangChainMCPAgent } from "@mcp-use/agent/langchain";
+import { z } from "zod";
+
+const ProjectSummary = z.object({
+  packageName: z.string().nullable(),
+  scripts: z.array(z.string()),
+  hasTests: z.boolean(),
+  notes: z.string(),
+});
+
+async function main() {
+  const client = new MCPClient({
+    mcpServers: {
+      filesystem: {
+        command: "npx",
+        args: ["-y", "@modelcontextprotocol/server-filesystem", "./"],
+      },
+    },
+  });
+
+  const agent = new LangChainMCPAgent({
+    llm: new ChatOpenAI({ model: "gpt-4o", temperature: 0 }),
+    client,
+    maxSteps: 8,
+  });
+
+  try {
+    await agent.initialize();
+    const summary = await agent.run({
+      prompt: "Inspect package.json and summarize the project.",
+      schema: ProjectSummary,
+    });
+
+    console.log(summary.scripts);
+  } finally {
+    await agent.close();
+  }
+}
+
+main().catch(console.error);
+```
+
+A successful call returns `z.infer<typeof ProjectSummary>`. It does not return the raw final text.
+
+## Choose a structured-output method
+
+| Method | During agent execution | Structured result | Conversion failure |
+| --- | --- | --- | --- |
+| `run()` | Does not yield progress | Resolves to the validated value | Rejects with `Failed to generate structured output: ...` |
+| `stream()` | Yields tool-call `AgentStep` values | Returns the validated value from the generator | Throws from the generator |
+| `streamEvents()` | Yields LangChain v2 events | Emits `on_structured_output` after the LangChain stream | Emits `on_structured_output_error`; it does not return the value |
+
+`run()` consumes `stream()` internally, so both methods use the same conversion path.
+
+## Read the return value from `stream()`
+
+A `for await` loop cannot read an async generator's return value. Call `next()` until `done` when you need the validated result:
+
+```typescript
+const stream = agent.stream({
+  prompt: "Inspect package.json and summarize the project.",
+  schema: ProjectSummary,
+});
+
+while (true) {
+  const next = await stream.next();
+
+  if (next.done) {
+    console.log(next.value.scripts);
+    break;
+  }
+
+  console.log(`Called ${next.value.action.tool}`);
+}
+```
+
+Tool steps are yielded before conversion. Conversion begins only after the agent produces non-empty final text.
+
+## Handle structured events
+
+`streamEvents()` adds the schema description to the task so the agent gathers the required fields. It yields the underlying LangChain v2 events first, then custom conversion events:
+
+```typescript
+for await (const event of agent.streamEvents({
+  prompt: "Inspect package.json and summarize the project.",
+  schema: ProjectSummary,
+})) {
+  if (event.event === "on_structured_output_progress") {
+    console.log(event.data?.message);
+  }
+
+  if (event.event === "on_structured_output") {
+    const summary = ProjectSummary.parse(event.data?.output);
+    console.log(summary.scripts);
+  }
+
+  if (event.event === "on_structured_output_error") {
+    throw new Error(String(event.data?.error));
+  }
+}
+```
+
+Progress events are emitted every two seconds while conversion is still running. `streamEvents()` returns `void`; store the `on_structured_output` payload yourself.
+
+## Handle validation boundaries
+
+`LangChainMCPAgent` uses `withStructuredOutput(schema)` when the model implements it. Otherwise, it prompts the same model to format JSON. It validates the result and retries conversion up to three times, including the previous validation error in later attempts.
+
+After three failures, the conversion error includes:
+
+```text
+Failed to generate valid structured output after 3 attempts. Last error: ...
+```
+
+`run()` and `stream()` wrap that message in `Failed to generate structured output: ...`. `streamEvents()` emits the message in `on_structured_output_error`.
+
+Required fields fail validation when they are `null`, `undefined`, an empty string, or an empty array, even if a broad Zod schema would otherwise accept the empty value. Mark genuinely missing values as optional or nullable.
+
+<Warning>
+  Conversion runs only when the agent produces non-empty final text. If no final
+  text exists, `run()` and `stream()` currently return `"No output generated"`
+  even when `schema` is set. Treat that string as an unsuccessful structured
+  result.
+</Warning>
+
+## Next steps
+
+- [Trace LangChain runs](/v2/typescript/agent/langchain/observability)
