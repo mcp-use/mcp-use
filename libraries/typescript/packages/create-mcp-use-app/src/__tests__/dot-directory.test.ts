@@ -194,6 +194,29 @@ describe("template file updates against a tmpdir fixture", () => {
     expect(indexContent).not.toContain("{{PROJECT_NAME}}");
   });
 
+  it("keeps the template's description instead of overwriting it", () => {
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify(
+        {
+          name: "placeholder",
+          description:
+            "an mcp-use server with example tools and zod validated input",
+        },
+        null,
+        2
+      )
+    );
+
+    updatePackageJson(dir, "my-app");
+
+    const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf-8"));
+    expect(pkg.name).toBe("my-app");
+    expect(pkg.description).toBe(
+      "an mcp-use server with example tools and zod validated input"
+    );
+  });
+
   it("regression: a basename with quotes flows the sanitized name into index.ts (not the raw one)", () => {
     // Before the fix, updateIndexTs received the raw displayName, so a cwd
     // basename like 'My "App"' produced index.ts content `name: "My "App""` —
