@@ -10,6 +10,7 @@
     "mcp-use": "2.0.0"
   },
   "changesets": [
+    "start-inspector-hint",
     "typecheck-success-line"
   ]
 }

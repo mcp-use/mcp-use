@@ -1,5 +1,12 @@
 # mcp-use
 
+## 2.0.1-canary.1
+
+### Patch Changes
+
+- f1ed431: Print the mounted Inspector URL on `mcp-use start --with-inspector`, which previously said nothing at all about the Inspector it had just mounted. Plain `mcp-use start` is unchanged and stays silent.
+  - @mcp-use/inspector@20.0.1-canary.1
+
 ## 2.0.1-canary.0
 
 ### Patch Changes
