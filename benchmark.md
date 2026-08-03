@@ -112,7 +112,7 @@ xychart
 | mcp-use v1 baseline | `mcp-use + zod`                                 |    404.6 MiB |                365 |
 
 mcp-use v2 had the smallest measured equivalent MCP App development stack and the
-fewest installed package entries. 
+fewest installed package entries.
 
 ## Package and MCP App build size
 

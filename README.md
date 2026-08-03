@@ -12,7 +12,7 @@
     </summary>
   </ul>
 </div>
-  
+
 
   <p>
     Fully Typed, native Views and MCP Apps support, built-in Inspector and first class Agent experience.
