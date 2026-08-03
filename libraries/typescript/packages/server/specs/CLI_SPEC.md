@@ -298,6 +298,11 @@ A single long-lived process. It:
 3. Binds **one** Node HTTP listener (vendored `toNodeHandler` bridge) that delegates every request to the current handler.
 4. Unless `--no-inspector` is set, resolves `@mcp-use/inspector` from the project and calls its framework-neutral `mountInspector()` on that same listener. Missing optional tooling does not stop the MCP server; one package-manager-aware install hint is printed instead.
 
+The CLI accepts a package-manager script forwarding separator before dev flags,
+so `pnpm dev -- --port 3050 --no-open` and the equivalent npm form parse the
+same as direct `mcp-use dev --port 3050 --no-open` invocation. The separator is
+consumed by the CLI; the flags remain owned by `mcp-use dev`.
+
 On file change (only files in the entry's module graph count): Vite invalidates, dev re-imports the entry through the runner, and swaps the handler reference. There is no registration diffing: the next request hits the new handler, which is correct by construction under the stateless model. Every handler generation shares one process-scoped SDK `ServerEventBus`; after a successful swap, dev publishes `tools/list_changed`, `prompts/list_changed`, and `resources/list_changed`. Modern clients with an open `subscriptions/listen` stream therefore refetch the authoritative lists from the new handler. Publishing all three is deliberate invalidation, not change detection — the protocol carries no delta, and avoiding schema/function comparison keeps server reload independent of registry internals. A failed reload keeps the old handler and publishes nothing. Stateless legacy clients receive no push but remain correct on their next manual list request.
 
 - **Port:** `--port`, else integer `PORT` env, else `3000`; if the preferred port cannot be bound on the listen host, or (on localhost-class binds) something already accepts connections on loopback, probe upward.

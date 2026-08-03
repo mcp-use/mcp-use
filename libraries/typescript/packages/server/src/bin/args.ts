@@ -85,6 +85,13 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
     if (token === undefined) continue;
 
     if (token === "--") {
+      if (args.command === "dev") {
+        // Package managers commonly leave their script forwarding separator
+        // in argv (for example, `pnpm dev -- --port 3050`). The dev command
+        // owns the forwarded CLI flags, so ignore the separator and continue
+        // parsing them normally.
+        continue;
+      }
       if (args.command !== "typecheck") {
         throw new Error(
           "TypeScript argument forwarding is only available for typecheck"

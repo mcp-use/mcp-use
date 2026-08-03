@@ -198,6 +198,12 @@ describe("parseArgs", () => {
     expect(parseArgs(["start", "--port=8080"]).port).toBe(8080);
   });
 
+  it("accepts the package-manager forwarding separator for dev flags", () => {
+    const args = parseArgs(["dev", "--", "--port", "3050", "--no-open"]);
+    expect(args.port).toBe(3050);
+    expect(args.open).toBe(false);
+  });
+
   it("parses --entry and --host", () => {
     const args = parseArgs(["dev", "--entry", "src/app.ts", "--host", "::1"]);
     expect(args.entry).toBe("src/app.ts");
