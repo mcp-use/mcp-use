@@ -51,7 +51,7 @@
     "test:beta-release": "pnpm test:release-versioning && pnpm --filter @mcp-use/client test:run && pnpm --filter @mcp-use/agent test:unit && pnpm --filter @mcp-use/cli test && pnpm --filter create-mcp-use-app test"
   },
   "devDependencies": {
-    "@changesets/cli": "^2.30.0",
+    "@changesets/cli": "^2.31.1",
     "@types/node": "^25.6.0",
     "@types/react": "19.2.17",
     "@types/react-dom": "^19.2.3",
