@@ -16,6 +16,18 @@ import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { BaseConnector } from "./base.js";
 import type { ClientInfo } from "./http.js";
 
+/**
+ * How a spawned server's standard error is handled.
+ *
+ * - `"pipe"` forwards the child's stderr to the connector's `errlog`.
+ * - `"inherit"` hands the parent's stderr file descriptor to the child, which
+ *   preserves TTY detection and colorization but bypasses `errlog`.
+ * - `"ignore"` discards it.
+ *
+ * @defaultValue `"pipe"`
+ */
+export type StdioStderrMode = "pipe" | "inherit" | "ignore";
+
 /** Stdio-specific connector options. */
 interface StdioConnectorOptions extends ConnectorInitOptions {
   /** Client identity advertised to the server. */
@@ -39,6 +51,7 @@ export class StdioConnector extends BaseConnector {
   private readonly env?: Record<string, string>;
   private readonly cwd?: string;
   private readonly errlog: Writable;
+  private readonly stderr: StdioStderrMode;
   private readonly clientInfo: ClientInfo;
   private readonly protocolNegotiation: VersionNegotiationMode;
 
@@ -52,12 +65,20 @@ export class StdioConnector extends BaseConnector {
     args = [],
     env,
     errlog = process.stderr,
+    stderr = "pipe",
     ...rest
   }: {
     command?: string;
     args?: string[];
     env?: Record<string, string>;
     errlog?: Writable;
+    /**
+     * How the child's standard error is handled. Defaults to `"pipe"` so
+     * {@link StdioStderrMode} forwarding to `errlog` works without extra
+     * configuration; pass `"inherit"` to keep the child on the parent's
+     * stderr file descriptor.
+     */
+    stderr?: StdioStderrMode;
     cwd?: string;
   } & StdioConnectorOptions = {}) {
     super(rest);
@@ -66,6 +87,7 @@ export class StdioConnector extends BaseConnector {
     this.args = args;
     this.env = env;
     this.errlog = errlog;
+    this.stderr = stderr;
     this.clientInfo = rest.clientInfo ?? {
       name: "stdio-connector",
       version: "1.0.0",
@@ -108,6 +130,7 @@ export class StdioConnector extends BaseConnector {
         args: this.args,
         env: mergedEnv,
         cwd: this.cwd,
+        stderr: this.stderr,
       };
 
       // 2. Start the connection manager -> returns a live transport
@@ -221,6 +244,7 @@ export class StdioConnectionManager extends ConnectionManager<StdioClientTranspo
   private readonly serverParams: StdioServerParameters;
   private readonly errlog: Writable;
   private _transport: StdioClientTransport | null = null;
+  private _stderrSource: NodeJS.ReadableStream | null = null;
 
   /**
    * Creates a connection manager for a local server process.
@@ -238,21 +262,28 @@ export class StdioConnectionManager extends ConnectionManager<StdioClientTranspo
   }
 
   protected async establishConnection(): Promise<StdioClientTransport> {
-    // Default stderr to "pipe" so the forwarding below can reach `errlog`.
-    // The SDK defaults to "inherit", which leaves `transport.stderr` null and
-    // makes that block dead code. An explicit mode in serverParams still wins.
+    // The SDK defaults stderr to "inherit", which leaves `transport.stderr`
+    // null and makes the forwarding below dead code. Default to "pipe" so
+    // `errlog` works without extra configuration. The coalesce is applied
+    // after the spread on purpose: an explicit `stderr: undefined` in
+    // serverParams would otherwise defeat the default.
+    const stderr = this.serverParams.stderr ?? "pipe";
     this._transport = new StdioClientTransport({
-      stderr: "pipe",
       ...this.serverParams,
+      stderr,
     });
 
-    if (
-      this._transport.stderr &&
-      typeof (this._transport.stderr as any).pipe === "function"
-    ) {
-      (this._transport.stderr as unknown as NodeJS.ReadableStream).pipe(
-        this.errlog
-      );
+    // Only "pipe" leaves a readable stream; "inherit" and "ignore" do not.
+    const childStderr = this._transport.stderr;
+    if (stderr === "pipe" && childStderr && "pipe" in childStderr) {
+      this._stderrSource = childStderr as unknown as NodeJS.ReadableStream;
+      // `errlog` is caller-owned and may be reused across reconnects, so the
+      // child exiting must not end it. Without a handler, a destroyed errlog
+      // would surface as an unhandled 'error' event.
+      this._stderrSource.on("error", (error) => {
+        logger.warn(`Error forwarding child stderr: ${error}`);
+      });
+      this._stderrSource.pipe(this.errlog, { end: false });
     }
 
     logger.debug(`${this.constructor.name} connected successfully`);
@@ -262,6 +293,10 @@ export class StdioConnectionManager extends ConnectionManager<StdioClientTranspo
   protected async closeConnection(
     _connection: StdioClientTransport
   ): Promise<void> {
+    if (this._stderrSource) {
+      this._stderrSource.unpipe(this.errlog);
+      this._stderrSource = null;
+    }
     if (this._transport) {
       try {
         await this._transport.close();
