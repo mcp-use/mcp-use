@@ -5,7 +5,8 @@ icon: "rocket"
 ---
 
 <Visibility for="agents">
-For the complete documentation index, see [llms.txt](https://mcp-use.com/docs/llms.txt).
+  For the complete documentation index, see
+  [llms.txt](https://mcp-use.com/docs/llms.txt).
 </Visibility>
 
 Use this quickstart to scaffold a working TypeScript MCP server, run it locally, and verify it with the Inspector.
@@ -14,11 +15,12 @@ Use this quickstart to scaffold a working TypeScript MCP server, run it locally,
 This quickstart covers the **mcp-use Server** SDK.
 
 Building an AI agent or MCP Client instead? Head to the [MCP Agent](/typescript/agent/index) or [MCP Client](/typescript/client/index) introductions instead.
+
 </Note>
 
 ## Prerequisites
 
-- **Node.js** 20.19+ or 22.12+
+- **Node.js** 22.22.2+
 - Basic familiarity with React and TypeScript
 
 ## Create your server
@@ -34,13 +36,13 @@ The CLI asks four questions. The first needs an answer; the rest have a default 
 1. **What is your project name?** Sets the folder name and the server's `name`. Enter `.` to scaffold into the current directory.
 2. **Select a template:** Pick one of the three below with the arrow keys. `mcp-apps` is highlighted by default.
 3. **Install AI coding skills for Cursor, Claude Code, and Codex?** Adds mcp-use skills so your coding agent understands the framework. Defaults to yes.
-4. **Install dependencies?** Installs with the package manager you ran the command with (npm, pnpm, or yarn). Defaults to yes.
+4. **Install dependencies?** Installs with the package manager you ran the command with (npm, pnpm, or Bun). Defaults to yes.
 
-| Template | What you get |
-|----------|--------------|
+| Template             | What you get                                                              |
+| -------------------- | ------------------------------------------------------------------------- |
 | `mcp-apps` (default) | A server plus an example React widget that renders in ChatGPT and Claude. |
-| `starter` | A server with an example tool, resource, and prompt. |
-| `blank` | A minimal server with no examples. |
+| `mcp-server`         | A server with an example tool and prompt.                                 |
+| `blank`              | A minimal server with no examples.                                        |
 
 To skip the questions, pass the name and template as arguments:
 
@@ -58,8 +60,8 @@ npm run dev
 `npm run dev` runs `mcp-use dev`, which:
 
 - serves the MCP endpoint at `http://localhost:3000/mcp`
-- opens the **Inspector** at `http://localhost:3000/inspector`
-- hot-reloads tools, resources, prompts, and widgets as you edit, with no restart and no dropped connections
+- opens the **Inspector** at `http://localhost:3000/mcp/inspector`
+- hot-reloads tools, resources, prompts, and views as you edit; the next stateless request uses the refreshed server
 
 Open the Inspector, go to the **Tools** tab, and run a tool to see it respond. With the `mcp-apps` template, calling `search-tools` renders the widget inline.
 
@@ -76,52 +78,59 @@ The first command saves the server under the name `local`; later commands addres
 
 ```
 my-server/
-├── resources/                  # React widgets, auto-discovered
+├── views/                      # React MCP App views, auto-discovered
 │   └── greeting-card/
-│       └── widget.tsx
+│       └── view.tsx
 ├── public/                     # Static assets (icons, images)
 ├── index.ts                    # Server entry: tools, resources, prompts
+├── mcp-env.d.ts                # Managed server-to-view typing bridge
 ├── package.json
 └── tsconfig.json
 ```
 
-`index.ts` is where you register your tools, resources, and prompts. Each folder under `resources/` is a widget; its folder name matches the `widget.name` a tool references.
+`index.ts` is where you register your tools, resources, and prompts. Each folder under `views/` is an MCP App view; its folder name matches the `view.name` a tool references.
 
 ## Add a tool
 
-Open `index.ts` and add a tool to the existing `server`. `text`, `widget`, and `z` are already imported at the top of the file:
+Open `index.ts` and add a tool to the existing `server`:
 
 ```typescript
-server.tool(
+export const greetingCard = server.tool(
   {
     name: "greeting-card",
     description: "Create a greeting card for someone",
-    schema: z.object({
+    inputSchema: z.object({
       name: z.string().describe("Who to greet"),
       message: z.string().describe("The message inside the card"),
     }),
-    widget: {
+    outputSchema: z.object({
+      name: z.string(),
+      message: z.string(),
+    }),
+    view: {
       name: "greeting-card",
-      invoking: "Designing the card...",
-      invoked: "Card ready",
+      description: "An interactive greeting card",
     },
   },
-  async ({ name, message }) =>
-    widget({
-      props: { name, message },
-      output: text(`Made a card for ${name}`),
-    })
+  async ({ name, message }) => ({
+    content: [{ type: "text", text: `Made a card for ${name}` }],
+    structuredContent: { name, message },
+  }),
 );
 ```
 
-Instead of returning plain text, this tool returns a widget. `widget.name` (`greeting-card`) points at a folder under `resources/`, and `widget({ props })` passes that data to the widget's `useWidget().props`. The widget doesn't exist yet, so build it next.
+Keep statically declared tools in exported constants. The generated `mcp-env.d.ts` uses those exported tool refs to type calls from your widget, so TypeScript will flag a `useCallTool("greeting-card")` call when its matching ref is not exported.
 
-## Add a widget
+Run `npm run typecheck` after editing tools or views. The scaffolded script refreshes `mcp-env.d.ts` for the server entry, then runs the project's own TypeScript compiler with `--noEmit`.
 
-Create `resources/greeting-card/widget.tsx`. The folder name must match the tool's `widget.name`:
+The tool's `view.name` points at a folder under `views/`. Its validated `structuredContent` becomes the view's typed tool output.
+
+## Add a view
+
+Create `views/greeting-card/view.tsx`. The folder name must match the tool's `view.name`:
 
 ```tsx
-import { McpUseProvider, useWidget } from "mcp-use/react";
+import { ThemeProvider, useToolContext } from "mcp-use/react";
 
 interface GreetingCardProps {
   name: string;
@@ -129,23 +138,31 @@ interface GreetingCardProps {
 }
 
 export default function GreetingCard() {
-  const { props } = useWidget<GreetingCardProps>();
+  const view = useToolContext<"greeting-card">();
+
+  if (view.status === "pending") return <p>Designing the card…</p>;
+  if (view.status === "error") return <p>{view.error.message}</p>;
+
+  const card = view.toolOutput as GreetingCardProps;
 
   return (
-    <McpUseProvider autoSize>
+    <ThemeProvider>
       <div style={{ padding: "2rem", textAlign: "center" }}>
-        <h2>Hello, {props.name}!</h2>
-        <p>{props.message}</p>
+        <h2>Hello, {card.name}!</h2>
+        <p>{card.message}</p>
       </div>
-    </McpUseProvider>
+    </ThemeProvider>
   );
 }
 ```
 
-Save the file. The dev server discovers the new widget and hot-reloads, so reload the **Tools** tab in the Inspector and call `greeting-card` with `{ name: "Ada", message: "Welcome aboard!" }`. The card renders inline.
+Save the file. The dev server discovers the new view and hot-reloads it. Call `greeting-card` with `{ name: "Ada", message: "Welcome aboard!" }`; the card renders inline.
 
 <Tip>
-See [Tools](/typescript/server/tools), [Resources](/typescript/server/resources), and [Prompts](/typescript/server/prompts) for the full API, and [MCP Apps](/typescript/mcp-apps) to build widgets.
+  See [Tools](/typescript/server/tools),
+  [Resources](/typescript/server/resources), and
+  [Prompts](/typescript/server/prompts) for the full API, and [MCP
+  Apps](/typescript/mcp-apps) to build widgets.
 </Tip>
 
 ## Deploy to Manufact Cloud
@@ -158,7 +175,12 @@ npm run deploy
 
 This runs `mcp-use deploy`, which builds your server and deploys it to [Manufact Cloud](https://manufact.com) with a public MCP URL, logs, and metrics. The first run walks you through logging in and connecting your project.
 
-<Card title="Deployment guide" icon="rocket" href="/typescript/server/deployment/mcp-use" horizontal>
+<Card
+  title="Deployment guide"
+  icon="rocket"
+  href="/typescript/server/deployment/mcp-use"
+  horizontal
+>
   GitHub connection, environment variables, regions, and redeploys.
 </Card>
 
@@ -180,5 +202,6 @@ This runs `mcp-use deploy`, which builds your server and deploys it to [Manufact
 </CardGroup>
 
 <Tip>
-**Need help?** Join our [Discord](https://discord.gg/XkNkSkMz3V) or check out [GitHub](https://github.com/mcp-use/mcp-use).
+  **Need help?** Join our [Discord](https://discord.gg/XkNkSkMz3V) or check out
+  [GitHub](https://github.com/mcp-use/mcp-use).
 </Tip>

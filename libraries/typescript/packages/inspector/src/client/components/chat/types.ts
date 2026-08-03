@@ -1,5 +1,4 @@
-import { DEFAULT_OLLAMA_BASE_URL } from "@/llm/providers/ollama/utils";
-import type { ProviderName } from "@/llm/types";
+import { DEFAULT_OLLAMA_BASE_URL, type ProviderName } from "@mcp-use/agent";
 
 export interface MessageAttachment {
   type: "image" | "file";
@@ -19,6 +18,7 @@ export interface Message {
     type: "text" | "tool-invocation";
     text?: string;
     toolInvocation?: {
+      toolCallId?: string;
       toolName: string;
       args: Record<string, unknown>;
       result?: any;
@@ -34,12 +34,34 @@ export interface Message {
   }>;
 }
 
+export interface ChatSerializedMessage {
+  role: string;
+  content: unknown;
+  attachments?: unknown;
+}
+
+export interface ChatBodyContext {
+  disabledTools: string[];
+  widgetModelContext?: string;
+}
+
+export type ChatBodyBuilder = (
+  messages: ChatSerializedMessage[],
+  context: ChatBodyContext
+) => unknown;
+
+export interface SendMessageOptions {
+  throwOnError?: boolean;
+  onAccepted?: () => void;
+}
+
 export interface LLMConfig {
   provider: ProviderName;
   apiKey: string;
   model: string;
   temperature?: number;
   baseUrl?: string;
+  credentials?: RequestCredentials;
 }
 
 export interface AuthConfig {
@@ -73,7 +95,7 @@ export interface MCPConfig {
 export type StreamProtocol = "sse" | "data-stream";
 
 export const DEFAULT_MODELS: Record<ProviderName, string> = {
-  openai: "gpt-4o",
+  openai: "gpt-5.6-terra",
   "openai-compatible": "",
   anthropic: "claude-haiku-4-5-20251001",
   google: "gemini-2.5-flash",

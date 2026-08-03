@@ -20,7 +20,8 @@ export LANGFUSE_HOST="https://cloud.langfuse.com"
 ```
 
 ```typescript
-import { MCPAgent, MCPClient } from "mcp-use";
+import { MCPAgent } from "@mcp-use/agent";
+import { MCPClient } from "@mcp-use/client";
 import { ChatOpenAI } from "@langchain/openai";
 
 const client = new MCPClient({
@@ -58,7 +59,8 @@ Call `flush()` before a serverless function exits so buffered traces have time t
 Use metadata for trace attributes and tags for filtering. Metadata keys are sanitized, object values must be serializable, and large serialized values are truncated.
 
 ```typescript
-import { MCPAgent, MCPClient } from "mcp-use";
+import { MCPAgent } from "@mcp-use/agent";
+import { MCPClient } from "@mcp-use/client";
 
 const agent = new MCPAgent({
   llm,
@@ -86,7 +88,7 @@ Pass custom LangChain callbacks when you want to use your own Langfuse handler o
 
 ```typescript
 import { CallbackHandler } from "langfuse-langchain";
-import { MCPAgent } from "mcp-use";
+import { MCPAgent } from "@mcp-use/agent";
 
 const customHandler = new CallbackHandler({
   publicKey: "pk-lf-custom",

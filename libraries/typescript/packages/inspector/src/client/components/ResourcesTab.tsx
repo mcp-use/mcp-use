@@ -5,10 +5,13 @@ import {
   ResizablePanelGroup,
 } from "@/client/components/ui/resizable";
 import { useInspector } from "@/client/context/InspectorContext";
-import { MCPResourceReadEvent, Telemetry } from "@/client/telemetry";
-import type { Resource } from "@modelcontextprotocol/sdk/types.js";
+import {
+  MCPResourceReadEvent,
+  captureInspectorEvent,
+} from "@/client/telemetry";
+import type { Resource } from "@mcp-use/client/react";
 import { AnimatePresence, motion } from "motion/react";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, FolderOpen } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -17,15 +20,15 @@ import {
   useRef,
   useState,
 } from "react";
-import type { ResourceResult } from "./resources";
+import type { ResourceResult } from "./resources/ResourceResultDisplay";
+import { ResourceResultDisplay } from "./resources/ResourceResultDisplay";
+import { ResourcesList } from "./resources/ResourcesList";
 import {
-  ResourceResultDisplay,
-  ResourcesList,
-  ResourcesTabHeader,
-} from "./resources";
-import { RpcPanel } from "./shared";
+  InspectorScrollArea,
+  SearchTabHeader,
+} from "@/client/components/shared";
 import { useConfig } from "./chat/useConfig";
-import { copyToClipboard } from "@/client/utils/clipboard";
+import { copyToClipboard } from "@/client/utils/browser";
 
 export interface ResourcesTabRef {
   focusSearch: () => void;
@@ -167,18 +170,15 @@ export function ResourcesTab({
           const result = await readResource(resource.uri);
 
           // Track successful resource read
-          const telemetry = Telemetry.getInstance();
-          telemetry
-            .capture(
-              new MCPResourceReadEvent({
-                resourceUri: resource.uri,
-                serverId,
-                success: true,
-              })
-            )
-            .catch(() => {
-              // Silently fail - telemetry should not break the application
-            });
+          captureInspectorEvent(
+            new MCPResourceReadEvent({
+              resourceUri: resource.uri,
+              serverId,
+              success: true,
+            })
+          ).catch(() => {
+            // Silently fail - telemetry should not break the application
+          });
 
           setCurrentResult({
             uri: resource.uri,
@@ -191,19 +191,16 @@ export function ResourcesTab({
           });
         } catch (error) {
           // Track failed resource read
-          const telemetry = Telemetry.getInstance();
-          telemetry
-            .capture(
-              new MCPResourceReadEvent({
-                resourceUri: resource.uri,
-                serverId,
-                success: false,
-                error: error instanceof Error ? error.message : "Unknown error",
-              })
-            )
-            .catch(() => {
-              // Silently fail - telemetry should not break the application
-            });
+          captureInspectorEvent(
+            new MCPResourceReadEvent({
+              resourceUri: resource.uri,
+              serverId,
+              success: false,
+              error: error instanceof Error ? error.message : "Unknown error",
+            })
+          ).catch(() => {
+            // Silently fail - telemetry should not break the application
+          });
 
           setCurrentResult({
             uri: resource.uri,
@@ -424,29 +421,35 @@ export function ResourcesTab({
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
                 className="absolute inset-0 flex flex-col bg-background z-0"
               >
-                <ResourcesTabHeader
-                  activeTab={activeTab}
-                  isSearchExpanded={isSearchExpanded}
-                  searchQuery={searchQuery}
-                  filteredResourcesCount={filteredResources.length}
-                  onSearchExpand={() => setIsSearchExpanded(true)}
-                  onSearchChange={setSearchQuery}
-                  onSearchBlur={handleSearchBlur}
-                  onTabSwitch={() => {}}
-                  searchInputRef={
-                    searchInputRef as React.RefObject<HTMLInputElement>
-                  }
-                  onRefresh={refreshResources ? handleRefresh : undefined}
-                  isRefreshing={isRefreshing}
-                />
-                <div className="flex flex-col h-full">
-                  <ResourcesList
-                    resources={filteredResources}
-                    selectedResource={selectedResource}
-                    onResourceSelect={handleResourceSelect}
-                    focusedIndex={focusedIndex}
-                  />
-                </div>
+                <InspectorScrollArea>
+                  {(isScrolled) => (
+                    <>
+                      <SearchTabHeader
+                        isScrolled={isScrolled}
+                        title="Resources"
+                        icon={FolderOpen}
+                        count={filteredResources.length}
+                        isSearchExpanded={isSearchExpanded}
+                        searchQuery={searchQuery}
+                        searchPlaceholder="Search resources..."
+                        onSearchExpand={() => setIsSearchExpanded(true)}
+                        onSearchChange={setSearchQuery}
+                        onSearchBlur={handleSearchBlur}
+                        searchInputRef={
+                          searchInputRef as React.RefObject<HTMLInputElement>
+                        }
+                        onRefresh={refreshResources ? handleRefresh : undefined}
+                        isRefreshing={isRefreshing}
+                      />
+                      <ResourcesList
+                        resources={filteredResources}
+                        selectedResource={selectedResource}
+                        onResourceSelect={handleResourceSelect}
+                        focusedIndex={focusedIndex}
+                      />
+                    </>
+                  )}
+                </InspectorScrollArea>
               </motion.div>
             )}
 
@@ -486,41 +489,38 @@ export function ResourcesTab({
   return (
     <ResizablePanelGroup orientation="horizontal" className="h-full">
       <ResizablePanel defaultSize="33%">
-        <ResizablePanelGroup
-          orientation="vertical"
-          className="h-full border-r dark:border-zinc-700"
-        >
-          <ResizablePanel minSize="30%">
-            <div className="flex flex-col h-full overflow-hidden">
-              <ResourcesTabHeader
-                activeTab={activeTab}
-                isSearchExpanded={isSearchExpanded}
-                searchQuery={searchQuery}
-                filteredResourcesCount={filteredResources.length}
-                onSearchExpand={() => setIsSearchExpanded(true)}
-                onSearchChange={setSearchQuery}
-                onSearchBlur={handleSearchBlur}
-                onTabSwitch={() => {}}
-                searchInputRef={
-                  searchInputRef as React.RefObject<HTMLInputElement>
-                }
-                onRefresh={refreshResources ? handleRefresh : undefined}
-                isRefreshing={isRefreshing}
-              />
+        <div className="flex h-full flex-col overflow-hidden border-r dark:border-zinc-700">
+          <InspectorScrollArea>
+            {(isScrolled) => (
+              <>
+                <SearchTabHeader
+                  isScrolled={isScrolled}
+                  title="Resources"
+                  icon={FolderOpen}
+                  count={filteredResources.length}
+                  isSearchExpanded={isSearchExpanded}
+                  searchQuery={searchQuery}
+                  searchPlaceholder="Search resources..."
+                  onSearchExpand={() => setIsSearchExpanded(true)}
+                  onSearchChange={setSearchQuery}
+                  onSearchBlur={handleSearchBlur}
+                  searchInputRef={
+                    searchInputRef as React.RefObject<HTMLInputElement>
+                  }
+                  onRefresh={refreshResources ? handleRefresh : undefined}
+                  isRefreshing={isRefreshing}
+                />
 
-              <ResourcesList
-                resources={filteredResources}
-                selectedResource={selectedResource}
-                onResourceSelect={handleResourceSelect}
-                focusedIndex={focusedIndex}
-              />
-            </div>
-          </ResizablePanel>
-
-          <ResizableHandle withHandle />
-
-          <RpcPanel serverId={serverId} />
-        </ResizablePanelGroup>
+                <ResourcesList
+                  resources={filteredResources}
+                  selectedResource={selectedResource}
+                  onResourceSelect={handleResourceSelect}
+                  focusedIndex={focusedIndex}
+                />
+              </>
+            )}
+          </InspectorScrollArea>
+        </div>
       </ResizablePanel>
 
       <ResizableHandle />

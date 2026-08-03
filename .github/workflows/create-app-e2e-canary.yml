@@ -91,9 +91,9 @@ jobs:
         with:
           node-version: 22
       
-      - name: Create app with npm and canary flag
+      - name: Create app with npm and sdk-version canary
         run: |
-          npx create-mcp-use-app@canary test-app-${{ matrix.template }} --template ${{ matrix.template }} --canary
+          npx create-mcp-use-app@canary test-app-${{ matrix.template }} --template ${{ matrix.template }} --sdk-version canary
           echo "Project created successfully"
       
       - name: Install dependencies
@@ -134,9 +134,9 @@ jobs:
       - name: Setup Yarn
         run: corepack enable
       
-      - name: Create app with yarn and canary flag
+      - name: Create app with yarn and sdk-version canary
         run: |
-          yarn dlx create-mcp-use-app@canary test-app-${{ matrix.template }} --template ${{ matrix.template }} --canary
+          yarn dlx create-mcp-use-app@canary test-app-${{ matrix.template }} --template ${{ matrix.template }} --sdk-version canary
           echo "Project created successfully"
       
       - name: Install dependencies

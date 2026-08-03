@@ -1,0 +1,21 @@
+{
+  "name": "mcp-use-example-vercel",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Example: mcp-use on Vercel via the server's web-standard fetch handler.",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "mcp-use": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "typescript": "^7.0.2"
+  }
+}

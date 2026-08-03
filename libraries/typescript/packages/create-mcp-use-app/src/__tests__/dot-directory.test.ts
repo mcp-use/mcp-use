@@ -186,7 +186,7 @@ describe("template file updates against a tmpdir fixture", () => {
 
     const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf-8"));
     expect(pkg.name).toBe("my-app");
-    expect(pkg.description).toBe("MCP server: my-app");
+    expect(pkg.description).toBe("my-app: an mcp-use server");
 
     const indexContent = readFileSync(join(dir, "index.ts"), "utf-8");
     expect(indexContent).toContain('name: "my-app"');

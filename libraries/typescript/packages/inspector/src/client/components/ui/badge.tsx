@@ -1,47 +1,134 @@
-import type { VariantProps } from "class-variance-authority";
-import { Slot } from "@radix-ui/react-slot";
-import { cva } from "class-variance-authority";
-import * as React from "react";
+"use client";
 
+import { forwardRef, type HTMLAttributes, type ReactNode } from "react";
+import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/client/lib/utils";
+import { useShape } from "@/client/lib/shape-context";
+
+const badgeColors = {
+  gray: "#a3a3a3",
+  red: "#ef4444",
+  orange: "#f97316",
+  amber: "#f59e0b",
+  yellow: "#eab308",
+  lime: "#84cc16",
+  green: "#22c55e",
+  emerald: "#10b981",
+  teal: "#14b8a6",
+  cyan: "#06b6d4",
+  blue: "#3b82f6",
+  indigo: "#6366f1",
+  violet: "#8b5cf6",
+  purple: "#a855f7",
+  fuchsia: "#d946ef",
+  pink: "#ec4899",
+  rose: "#f43f5e",
+} as const;
+
+type BadgeColor = keyof typeof badgeColors;
 
 const badgeVariants = cva(
-  "inline-flex items-center justify-center rounded-full border px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-[color,box-shadow] overflow-hidden",
+  "inline-flex items-center font-medium whitespace-nowrap",
   {
     variants: {
       variant: {
-        default:
-          "border-transparent bg-primary text-primary-foreground [a&]:hover:bg-primary/90",
-        secondary:
-          "border-transparent bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90",
-        destructive:
-          "border-transparent bg-destructive text-white [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
-        outline:
-          "text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
+        solid: "",
+        outline: "border border-border text-foreground",
+      },
+      size: {
+        sm: "h-5 px-2 text-[11px] gap-1",
+        md: "h-6 px-2.5 text-[12px] gap-1.5",
+        lg: "h-7 px-3 text-[13px] gap-1.5",
       },
     },
     defaultVariants: {
-      variant: "default",
+      variant: "solid",
+      size: "md",
     },
   }
 );
 
-const Badge = React.forwardRef<
-  HTMLSpanElement,
-  React.ComponentProps<"span"> &
-    VariantProps<typeof badgeVariants> & { asChild?: boolean }
->(({ className, variant, asChild = false, ...props }, ref) => {
-  const Comp = asChild ? Slot : "span";
+type LegacyBadgeVariant = "default" | "secondary" | "destructive" | "outline";
 
-  return (
-    <Comp
-      ref={ref as any}
-      data-slot="badge"
-      className={cn(badgeVariants({ variant }), className)}
-      {...props}
-    />
-  );
-});
+const legacyBadgeVariantMap: Record<
+  LegacyBadgeVariant,
+  { variant: "solid" | "outline"; color: BadgeColor }
+> = {
+  default: { variant: "solid", color: "blue" },
+  secondary: { variant: "solid", color: "green" },
+  destructive: { variant: "solid", color: "red" },
+  outline: { variant: "outline", color: "gray" },
+};
+
+interface BadgeProps
+  extends
+    Omit<HTMLAttributes<HTMLSpanElement>, "color">,
+    Omit<VariantProps<typeof badgeVariants>, "variant"> {
+  color?: BadgeColor;
+  variant?: VariantProps<typeof badgeVariants>["variant"] | LegacyBadgeVariant;
+}
+
+function isPlainBadgeContent(value: ReactNode): value is string | number {
+  return typeof value === "string" || typeof value === "number";
+}
+
+function BadgeContent({ children }: { children: ReactNode }) {
+  if (isPlainBadgeContent(children)) {
+    return (
+      <span className="[text-box:trim-both_cap_alphabetic]">{children}</span>
+    );
+  }
+
+  return <span className="inline-flex items-center gap-1">{children}</span>;
+}
+
+const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
+  (
+    {
+      className,
+      variant: variantProp = "solid",
+      size = "md",
+      color: colorProp,
+      children,
+      style,
+      ...props
+    },
+    ref
+  ) => {
+    const legacy =
+      variantProp && variantProp in legacyBadgeVariantMap
+        ? legacyBadgeVariantMap[variantProp as LegacyBadgeVariant]
+        : null;
+    const variant = (legacy?.variant ?? variantProp) as VariantProps<
+      typeof badgeVariants
+    >["variant"];
+    const color = colorProp ?? legacy?.color ?? "gray";
+    const shape = useShape();
+    const colorValue = badgeColors[color];
+    const isSolid = variant === "solid";
+
+    const colorStyle = isSolid
+      ? color === "gray"
+        ? { backgroundColor: "var(--accent)", color: "var(--foreground)" }
+        : {
+            color: "var(--foreground)",
+            backgroundColor: `color-mix(in srgb, ${colorValue} 15%, var(--background))`,
+          }
+      : {};
+
+    return (
+      <span
+        ref={ref}
+        className={cn(badgeVariants({ variant, size }), shape.item, className)}
+        style={{ ...colorStyle, ...style }}
+        {...props}
+      >
+        <BadgeContent>{children}</BadgeContent>
+      </span>
+    );
+  }
+);
+
 Badge.displayName = "Badge";
 
 export { Badge };

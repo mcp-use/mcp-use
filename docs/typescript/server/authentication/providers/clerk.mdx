@@ -34,7 +34,8 @@ MCP_USE_OAUTH_CLERK_FRONTEND_API_URL=https://verb-noun-42.clerk.accounts.dev
 ## Configure the MCP server
 
 ```typescript
-import { MCPServer, oauthClerkProvider } from "mcp-use/server";
+import { MCPServer } from "mcp-use";
+import { oauthClerkProvider } from "mcp-use/oauth/clerk";
 
 const server = new MCPServer({
   name: "clerk-server",
@@ -67,7 +68,7 @@ oauth: oauthClerkProvider({
 When you use Clerk Organizations, Clerk can include `org_id` in the token. This requires Organizations to be enabled, the `user:org:read` scope to be available to the OAuth app, and the client to request that scope.
 
 ```typescript
-import { error, object } from "mcp-use/server";
+import { error, object } from "mcp-use";
 
 server.tool(
   {
@@ -115,16 +116,32 @@ Confirm these cases:
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Runnable Clerk example" icon="github" href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/clerk">
+  <Card
+    title="Runnable Clerk example"
+    icon="github"
+    href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/clerk"
+  >
     Compare your setup with a working mcp-use Clerk server.
   </Card>
-  <Card title="Clerk OAuth documentation" icon="book-open" href="https://clerk.com/docs/guides/configure/auth-strategies/oauth/how-clerk-implements-oauth">
+  <Card
+    title="Clerk OAuth documentation"
+    icon="book-open"
+    href="https://clerk.com/docs/guides/configure/auth-strategies/oauth/how-clerk-implements-oauth"
+  >
     Review Clerk's OAuth behavior.
   </Card>
-  <Card title="User Context" icon="user" href="/typescript/server/authentication/user-context">
+  <Card
+    title="User Context"
+    icon="user"
+    href="/typescript/server/authentication/user-context"
+  >
     Use Clerk identity and organization data inside tools.
   </Card>
-  <Card title="Clerk provider API reference" icon="terminal" href="/typescript/api-reference/server/auth-providers#oauthclerkprovider">
+  <Card
+    title="Clerk provider API reference"
+    icon="terminal"
+    href="/typescript/api-reference/server/auth-providers#oauthclerkprovider"
+  >
     Look up exact provider options and defaults.
   </Card>
 </CardGroup>

@@ -41,7 +41,8 @@ If you set an audience but Keycloak does not emit that `aud` value, valid-lookin
 ## Configure the MCP server
 
 ```typescript
-import { MCPServer, oauthKeycloakProvider } from "mcp-use/server";
+import { MCPServer } from "mcp-use";
+import { oauthKeycloakProvider } from "mcp-use/oauth/keycloak";
 
 const server = new MCPServer({
   name: "keycloak-server",
@@ -66,7 +67,7 @@ oauth: oauthKeycloakProvider({
 The provider maps Keycloak realm roles onto `ctx.auth.user.roles`. It maps resource roles onto `ctx.auth.user.permissions` as `client:role` strings.
 
 ```typescript
-import { error, text } from "mcp-use/server";
+import { error, text } from "mcp-use";
 
 server.tool(
   {
@@ -116,16 +117,32 @@ Before deploying:
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Runnable Keycloak example" icon="github" href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/keycloak">
+  <Card
+    title="Runnable Keycloak example"
+    icon="github"
+    href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/keycloak"
+  >
     Compare your setup with a working mcp-use Keycloak server.
   </Card>
-  <Card title="Keycloak Client Registration" icon="book-open" href="https://www.keycloak.org/securing-apps/client-registration">
+  <Card
+    title="Keycloak Client Registration"
+    icon="book-open"
+    href="https://www.keycloak.org/securing-apps/client-registration"
+  >
     Review Keycloak Dynamic Client Registration.
   </Card>
-  <Card title="User Context" icon="user" href="/typescript/server/authentication/user-context">
+  <Card
+    title="User Context"
+    icon="user"
+    href="/typescript/server/authentication/user-context"
+  >
     Use Keycloak roles and permissions inside tools.
   </Card>
-  <Card title="Keycloak provider API reference" icon="terminal" href="/typescript/api-reference/server/auth-providers#oauthkeycloakprovider">
+  <Card
+    title="Keycloak provider API reference"
+    icon="terminal"
+    href="/typescript/api-reference/server/auth-providers#oauthkeycloakprovider"
+  >
     Look up exact provider options and defaults.
   </Card>
 </CardGroup>

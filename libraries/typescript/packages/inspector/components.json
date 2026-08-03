@@ -1,6 +1,6 @@
 {
   "$schema": "https://ui.shadcn.com/schema.json",
-  "style": "new-york",
+  "style": "base-vega",
   "rsc": false,
   "tsx": true,
   "tailwind": {
@@ -11,14 +11,17 @@
     "prefix": ""
   },
   "iconLibrary": "lucide",
+  "rtl": false,
   "aliases": {
-    "components": "@/components",
-    "utils": "@/lib/utils",
-    "ui": "@/components/ui",
-    "lib": "@/lib",
-    "hooks": "@/hooks"
+    "components": "@/client/components",
+    "utils": "@/client/lib/utils",
+    "ui": "@/client/components/ui",
+    "lib": "@/client/lib",
+    "hooks": "@/client/hooks"
   },
+  "menuColor": "default",
+  "menuAccent": "subtle",
   "registries": {
-    "@magicui": "https://magicui.design/r/{name}.json"
+    "@fluid": "https://www.fluidfunctionalism.com/r/{name}.json"
   }
 }

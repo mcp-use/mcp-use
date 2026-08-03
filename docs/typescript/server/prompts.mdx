@@ -12,12 +12,12 @@ This guide focuses on prompt design and common patterns. Use the [Prompts API re
 
 Use prompts when the client needs a structured instruction with optional arguments. Use tools when the server should run code, call an API, or change state.
 
-| Need | Use |
-| --- | --- |
-| Generate a repeatable model instruction | Prompt |
-| Run server-side logic or call an API | Tool |
-| Expose readable content by URI | Resource |
-| Display interactive UI | [Tool with an MCP App widget](/typescript/mcp-apps) |
+| Need                                    | Use                                                 |
+| --------------------------------------- | --------------------------------------------------- |
+| Generate a repeatable model instruction | Prompt                                              |
+| Run server-side logic or call an API    | Tool                                                |
+| Expose readable content by URI          | Resource                                            |
+| Display interactive UI                  | [Tool with an MCP App widget](/typescript/mcp-apps) |
 
 A good prompt has a task-shaped name, a clear description, typed arguments, and output that is ready for the model.
 
@@ -26,7 +26,7 @@ A good prompt has a task-shaped name, a clear description, typed arguments, and 
 Define a prompt with `server.prompt()`. The schema describes arguments the client can collect before requesting the prompt.
 
 ```typescript
-import { MCPServer, text } from "mcp-use/server";
+import { MCPServer, text } from "mcp-use";
 import { z } from "zod";
 
 const server = new MCPServer({
@@ -85,7 +85,7 @@ server.prompt(
 For simple prompts, response helpers keep the callback shorter:
 
 ```typescript
-import { mix, object, text } from "mcp-use/server";
+import { mix, object, text } from "mcp-use";
 
 server.prompt(
   {
@@ -115,7 +115,7 @@ schema: z.object({
   tone: z.enum(["concise", "technical", "executive"]).default("concise"),
   audience: z.string().describe("Who will read the generated content"),
   includeRisks: z.boolean().default(true),
-})
+});
 ```
 
 Avoid using prompt arguments as hidden configuration. If the value affects model behavior, make the field name and description visible.
@@ -125,7 +125,7 @@ Avoid using prompt arguments as hidden configuration. If the value affects model
 Use `completable()` when clients can suggest valid values while the user fills in prompt arguments.
 
 ```typescript
-import { completable } from "mcp-use/server";
+import { completable } from "mcp-use";
 
 server.prompt(
   {
@@ -152,7 +152,7 @@ Use list-based completion for small fixed sets. Use callback-based completion wh
 When OAuth is configured, prompt callbacks can read verified user information from `ctx.auth`.
 
 ```typescript
-import { text } from "mcp-use/server";
+import { text } from "mcp-use";
 
 server.prompt(
   {
@@ -200,21 +200,34 @@ Run the development server and request the prompt from the Inspector.
 npm run dev
 ```
 
-Open `http://localhost:3000/inspector`, select the Prompts tab, enter argument values, and verify the generated prompt content.
+Open `http://localhost:3000/mcp/inspector`, select the Prompts tab, enter argument values, and verify the generated prompt content.
 
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Prompts API reference" icon="terminal" href="/typescript/api-reference/server/prompts">
-    Look up prompt definitions, callback signatures, completion helpers, and return types.
+  <Card
+    title="Prompts API reference"
+    icon="terminal"
+    href="/typescript/api-reference/server/prompts"
+  >
+    Look up prompt definitions, callback signatures, completion helpers, and
+    return types.
   </Card>
-  <Card title="Response Helpers" icon="drill" href="/typescript/server/response-helpers">
+  <Card
+    title="Response Helpers"
+    icon="drill"
+    href="/typescript/server/response-helpers"
+  >
     Choose helpers for text, JSON, Markdown, and mixed prompt content.
   </Card>
   <Card title="Tools" icon="wrench" href="/typescript/server/tools">
     Use tools when the server should run code or call external systems.
   </Card>
-  <Card title="Resources" icon="folder-open" href="/typescript/server/resources">
+  <Card
+    title="Resources"
+    icon="folder-open"
+    href="/typescript/server/resources"
+  >
     Expose readable content by URI.
   </Card>
 </CardGroup>

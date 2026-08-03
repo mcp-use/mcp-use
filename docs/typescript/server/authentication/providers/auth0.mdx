@@ -52,7 +52,8 @@ The domain is your Auth0 tenant domain. The audience must match the API identifi
 ## Configure the MCP server
 
 ```typescript
-import { MCPServer, oauthAuth0Provider } from "mcp-use/server";
+import { MCPServer } from "mcp-use";
+import { oauthAuth0Provider } from "mcp-use/oauth/auth0";
 
 const server = new MCPServer({
   name: "auth0-server",
@@ -77,14 +78,14 @@ oauth: oauthAuth0Provider({
 Auth0 permissions are available on `ctx.auth.permissions` when they are present in the access token.
 
 ```typescript
-import { error, text } from "mcp-use/server";
+import { error, text } from "mcp-use";
 import { z } from "zod";
 
 server.tool(
   {
     name: "delete_document",
     description: "Delete a document when the caller has Auth0 permission.",
-    schema: z.object({
+    inputSchema: z.object({
       documentId: z.string(),
     }),
   },
@@ -123,16 +124,32 @@ Confirm these cases:
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Runnable Auth0 example" icon="github" href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/auth0">
+  <Card
+    title="Runnable Auth0 example"
+    icon="github"
+    href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/auth0"
+  >
     Compare your setup with a working mcp-use Auth0 server.
   </Card>
-  <Card title="Auth0 MCP Authorization Guide" icon="book-open" href="https://auth0.com/ai/docs/mcp/get-started/authorization-for-your-mcp-server">
+  <Card
+    title="Auth0 MCP Authorization Guide"
+    icon="book-open"
+    href="https://auth0.com/ai/docs/mcp/get-started/authorization-for-your-mcp-server"
+  >
     Review Auth0's MCP authorization setup.
   </Card>
-  <Card title="User Context" icon="user" href="/typescript/server/authentication/user-context">
+  <Card
+    title="User Context"
+    icon="user"
+    href="/typescript/server/authentication/user-context"
+  >
     Read Auth0 user and permission data inside tools.
   </Card>
-  <Card title="Auth0 provider API reference" icon="terminal" href="/typescript/api-reference/server/auth-providers#oauthauth0provider">
+  <Card
+    title="Auth0 provider API reference"
+    icon="terminal"
+    href="/typescript/api-reference/server/auth-providers#oauthauth0provider"
+  >
     Look up exact provider options and defaults.
   </Card>
 </CardGroup>

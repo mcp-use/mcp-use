@@ -132,8 +132,12 @@ export async function addCustomHeader(
  * Open connection settings for a server
  */
 export async function openConnectionSettings(page: Page, serverUrl: string) {
-  // Find and click the settings button for the server
-  await page.getByTestId(`server-tile-settings-${serverUrl}`).click();
+  await page.goto("http://localhost:3000/inspector");
+  await page.getByTestId("server-tile-settings").click();
+  await expect(page.getByTestId("connection-form-url-input")).toBeVisible();
+  await expect(page.getByTestId("connection-form-url-input")).toHaveValue(
+    serverUrl
+  );
 }
 
 /**

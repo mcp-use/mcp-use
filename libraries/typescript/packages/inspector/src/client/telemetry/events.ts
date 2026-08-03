@@ -1,4 +1,4 @@
-import type { ProviderName } from "@/llm/types";
+import type { ProviderName } from "@mcp-use/agent";
 
 export interface BaseTelemetryEvent {
   name: string;

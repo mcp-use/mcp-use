@@ -1,37 +1,36 @@
 {
   "name": "mcp-use server",
   "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
   "version": "1.0.0",
-  "description": "Blank mcp-use server",
-  "author": "",
+  "description": "an mcp-use server",
+  "author": "mcp-use",
   "license": "MIT",
+  "homepage": "https://github.com/mcp-use/mcp-use",
   "keywords": [
     "mcp",
-    "server",
-    "blank",
-    "mcp-use"
+    "mcp-server",
+    "chatgpt plugins",
+    "claude connector",
+    "mcp-app",
+    "mcp-use",
+    "manufact"
   ],
   "main": "dist/index.js",
   "scripts": {
-    "postinstall": "mcp-use generate-types || exit 0",
     "build": "mcp-use build",
     "dev": "mcp-use dev",
     "start": "mcp-use start",
-    "deploy": "mcp-use deploy"
+    "deploy": "mcp-use deploy",
+    "typecheck": "mcp-use typecheck"
   },
   "dependencies": {
-    "mcp-use": "workspace:*",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
-    "react-router": "^7.13.0",
-    "tailwindcss": "^4.2.0",
-    "zod": "4.3.5"
+    "mcp-use": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^25.3.0",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "@types/node": "^22.20.0",
+    "typescript": "^7.0.2"
   }
 }

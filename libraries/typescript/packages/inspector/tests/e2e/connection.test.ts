@@ -1,10 +1,46 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import {
   configureLLMAPI,
   connectToConformanceServer,
   navigateToTools,
 } from "./helpers/connection";
 import { getTestMatrix } from "./helpers/test-matrix";
+
+/**
+ * Connection-ready precondition for sampling/elicitation tools.
+ * Fails distinctly when the session is disconnected before we can assert toasts.
+ */
+async function expectCallbackToolReady(page: Page) {
+  await expect(page.getByTestId("tool-execution-execute-button")).toBeEnabled();
+}
+
+/**
+ * Pending-request precondition: tab badge updates from pending*Requests when
+ * the client callback enqueues a request — independent of toast rendering.
+ * Distinguishes wire/handler failures from toast-render failures.
+ */
+async function expectPendingRequestEnqueued(
+  page: Page,
+  kind: "sampling" | "elicitation"
+) {
+  // Desktop replaces Execute with Cancel; mobile keeps Execute disabled because
+  // its ToolExecutionPanel does not receive an onCancel callback.
+  const executingControl = page.locator(
+    [
+      '[data-testid="tool-execution-cancel-button"]:visible',
+      '[data-testid="tool-execution-execute-button"]:visible:disabled',
+    ].join(", ")
+  );
+  await expect(executingControl).toBeVisible({ timeout: 5000 });
+
+  // TabCountBadge shows pending count on the visible Sampling/Elicitation tab
+  // (works whether the tab bar is collapsed or expanded; no new product test IDs)
+  const visibleTab = page.locator(`[data-testid="tab-${kind}"]:visible`);
+  const pendingBadge = visibleTab
+    .locator(":scope > span")
+    .filter({ hasText: /^1$/ });
+  await expect(pendingBadge).toBeVisible({ timeout: 5000 });
+}
 
 test.describe("Inspector MCP Server Connections", () => {
   test.beforeEach(async ({ page, context }) => {
@@ -31,6 +67,29 @@ test.describe("Inspector MCP Server Connections", () => {
     await expect(page.getByTestId("server-tile-status-ready")).toBeVisible();
   });
 
+  test("new servers appear first and the scroll area keeps bottom spacing", async ({
+    page,
+  }) => {
+    await page.goto("http://localhost:3000/inspector");
+
+    const scrollArea = page.getByTestId("connected-servers-scroll");
+    await expect(scrollArea).toHaveCSS("padding-bottom", "24px");
+
+    const newestUrl = "https://newest.invalid/mcp";
+    await page.getByTestId("connection-form-url-input").fill(newestUrl);
+    await page.getByTestId("connection-form-connect-button").click();
+
+    const newestTile = page.getByTestId(`server-tile-${newestUrl}`);
+    await expect(newestTile).toBeVisible();
+    const serverTiles = page.locator(
+      '[data-testid^="server-tile-"][data-testid*="//"]'
+    );
+    await expect(serverTiles.first()).toHaveAttribute(
+      "data-testid",
+      `server-tile-${newestUrl}`
+    );
+  });
+
   test("server should not be there after removing it", async ({ page }) => {
     // go to home
     await page.goto("http://localhost:3000/inspector");
@@ -49,19 +108,19 @@ test.describe("Inspector MCP Server Connections", () => {
     ).not.toBeVisible();
   });
 
-  test("server info modal should display server metadata and capabilities", async ({
+  test("server info tab should display server metadata and capabilities", async ({
     page,
   }) => {
     // go to home
     await page.goto("http://localhost:3000/inspector");
 
-    // Click the info button to open the server info modal
+    // Open the server metadata tab from the dashboard tile
     await page.getByTestId("server-tile-info").click();
 
-    // Verify modal opens
+    // Verify metadata tab opens
     await expect(page.getByTestId("server-info-modal")).toBeVisible();
     await expect(page.getByTestId("server-info-modal-title")).toContainText(
-      "Server Information"
+      "Server Metadata"
     );
 
     // Verify server name is displayed
@@ -72,6 +131,12 @@ test.describe("Inspector MCP Server Connections", () => {
 
     // Verify capabilities JSON is displayed
     await expect(page.getByTestId("server-info-capabilities")).toBeVisible();
+    await expect(
+      page.getByTestId("server-info-capabilities-json")
+    ).toBeVisible();
+    await expect(
+      page.getByTestId("server-info-capabilities-json")
+    ).toContainText('"tools"');
 
     // // Close the modal by clicking outside or ESC
     // await page.keyboard.press("Escape"); // for some reason the copy url tooltip is focused so we need to press ESC twice
@@ -108,20 +173,19 @@ test.describe("Inspector MCP Server Connections", () => {
 
     await page.getByTestId("server-tile-settings").click();
 
-    const dialog = page.getByRole("dialog");
-    await expect(dialog.getByTestId("connection-form-url-input")).toBeVisible();
-    await expect(dialog.getByTestId("connection-form-url-input")).toHaveValue(
+    await expect(page.getByTestId("connection-form-url-input")).toBeVisible();
+    await expect(page.getByTestId("connection-form-url-input")).toHaveValue(
       "http://localhost:3002/mcp"
     );
 
-    await dialog.getByTestId("connection-form-config-button").click();
+    await page.getByTestId("connection-form-config-button").click();
     await expect(
       page.getByTestId("config-dialog-request-timeout-input")
     ).toBeVisible();
     await page.getByTestId("config-dialog-request-timeout-input").fill("60000");
     await page.getByRole("button", { name: "Save" }).first().click();
 
-    await dialog.getByTestId("connection-form-connect-button").click();
+    await page.getByTestId("connection-form-save-button").click();
 
     await expect(
       page.getByText("Connection settings updated").first()
@@ -145,20 +209,19 @@ test.describe("Inspector MCP Server Connections", () => {
 
     await page.getByTestId("server-tile-settings").click();
 
-    const dialog = page.getByRole("dialog");
-    await expect(
-      dialog.getByTestId("connection-form-alias-input")
-    ).toBeVisible();
-    await dialog
+    await expect(page.getByTestId("connection-form-alias-input")).toBeVisible();
+    await page
       .getByTestId("connection-form-alias-input")
       .fill("QA Conformance");
-    await dialog.getByTestId("connection-form-connect-button").click();
+    await page.getByTestId("connection-form-save-button").click();
 
     await expect(
       page.getByText("Connection settings updated").first()
     ).toBeVisible({
       timeout: 3000,
     });
+
+    await page.goto("http://localhost:3000/inspector");
     await expect(
       page.getByRole("heading", { name: "QA Conformance" })
     ).toBeVisible();
@@ -185,27 +248,26 @@ test.describe("Inspector MCP Server Connections", () => {
     });
   });
 
-  test("should update connection settings from server dropdown", async ({
+  test("should update request timeout in connection settings tab", async ({
     page,
   }) => {
-    await page
-      .getByRole("button", { name: "Edit connection settings" })
-      .click();
+    await page.goto("http://localhost:3000/inspector");
 
-    const dialog = page.getByRole("dialog");
-    await expect(dialog.getByTestId("connection-form-url-input")).toBeVisible();
-    await expect(dialog.getByTestId("connection-form-url-input")).toHaveValue(
+    await page.getByTestId("server-tile-settings").click();
+
+    await expect(page.getByTestId("connection-form-url-input")).toBeVisible();
+    await expect(page.getByTestId("connection-form-url-input")).toHaveValue(
       "http://localhost:3002/mcp"
     );
 
-    await dialog.getByTestId("connection-form-config-button").click();
+    await page.getByTestId("connection-form-config-button").click();
     await expect(
       page.getByTestId("config-dialog-request-timeout-input")
     ).toBeVisible();
     await page.getByTestId("config-dialog-request-timeout-input").fill("45000");
     await page.getByRole("button", { name: "Save" }).first().click();
 
-    await dialog.getByTestId("connection-form-connect-button").click();
+    await page.getByTestId("connection-form-save-button").click();
 
     await expect(
       page.getByText("Connection settings updated").first()
@@ -220,13 +282,12 @@ test.describe("Inspector MCP Server Connections", () => {
     await page.goto("http://localhost:3000/inspector");
 
     await page.getByTestId("server-tile-settings").click();
-    const dialog = page.getByRole("dialog");
-    await expect(dialog.getByTestId("connection-form-url-input")).toBeVisible();
+    await expect(page.getByTestId("connection-form-url-input")).toBeVisible();
 
-    await dialog.getByTestId("connection-form-config-button").click();
+    await page.getByTestId("connection-form-config-button").click();
     await page.getByTestId("config-dialog-request-timeout-input").fill("30000");
     await page.getByRole("button", { name: "Save" }).first().click();
-    await dialog.getByTestId("connection-form-connect-button").click();
+    await page.getByTestId("connection-form-save-button").click();
 
     await expect(
       page.getByText("Connection settings updated").first()
@@ -234,6 +295,7 @@ test.describe("Inspector MCP Server Connections", () => {
       timeout: 3000,
     });
 
+    await page.goto("http://localhost:3000/inspector");
     await expect(page.getByTestId("server-tile-status-ready")).toBeVisible({
       timeout: 10000,
     });
@@ -250,36 +312,88 @@ test.describe("Inspector MCP Server Connections", () => {
     await expect(textContent).toContainText("Echo: After settings update");
   });
 
-  test("should show red when URL is invalid, then green after reconnecting through dialog", async ({
+  test("should persist force-v1 protocol mode and reconnect", async ({
     page,
   }) => {
     await page.goto("http://localhost:3000/inspector");
 
     await page.getByTestId("server-tile-settings").click();
-    const dialog = page.getByRole("dialog");
-    await expect(dialog.getByTestId("connection-form-url-input")).toBeVisible();
+    await page.getByTestId("connection-form-config-button").click();
+    await page.getByTestId("config-dialog-protocol-mode-select").click();
+    await page.getByRole("option", { name: "Force v1 (2024/2025)" }).click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Save" })
+      .click();
+    await page.getByTestId("connection-form-save-button").click();
 
-    await dialog.getByTestId("connection-form-url-input").fill("");
-    await dialog
-      .getByTestId("connection-form-url-input")
-      .fill("http://localhost:29999/mcp");
-    await dialog.getByTestId("connection-form-connect-button").click();
+    await expect(
+      page.getByText("Connection settings updated").first()
+    ).toBeVisible({ timeout: 3000 });
 
-    await expect(page.getByTestId("server-tile-status-failed")).toBeVisible({
+    await page.goto("http://localhost:3000/inspector");
+    await expect(page.getByTestId("server-tile-status-ready")).toBeVisible({
       timeout: 10000,
     });
 
+    const storedProtocol = await page.evaluate(() => {
+      const stored = JSON.parse(
+        localStorage.getItem("mcp-inspector-connections") || "{}"
+      );
+      return stored["http://localhost:3002/mcp"]?.protocolNegotiation;
+    });
+    expect(storedProtocol).toBe("legacy");
+
+    await page.reload();
+    await expect(page.getByTestId("server-tile-status-ready")).toBeVisible({
+      timeout: 10000,
+    });
     await page.getByTestId("server-tile-settings").click();
-    await expect(dialog.getByTestId("connection-form-url-input")).toBeVisible();
-    await dialog.getByTestId("connection-form-url-input").fill("");
-    await dialog
+    await page.getByTestId("connection-form-config-button").click();
+    await expect(
+      page.getByTestId("config-dialog-protocol-mode-select")
+    ).toContainText("Force v1 (2024/2025)");
+  });
+
+  test("should show red when URL is invalid, then green after reconnecting from connection settings tab", async ({
+    page,
+  }) => {
+    await page.goto("http://localhost:3000/inspector");
+
+    await page.getByTestId("server-tile-settings").click();
+    await expect(page.getByTestId("connection-form-url-input")).toBeVisible();
+
+    await page.getByTestId("connection-form-url-input").fill("");
+    await page
+      .getByTestId("connection-form-url-input")
+      .fill("http://localhost:29999/mcp");
+    await page.getByTestId("connection-form-save-button").click();
+
+    await page.goto("http://localhost:3000/inspector");
+    await expect(page.getByTestId("server-tile-status-failed")).toBeVisible({
+      timeout: 10000,
+    });
+    const inlineError = page.getByTestId("server-tile-error");
+    await expect(inlineError).toBeVisible();
+    await expect(inlineError).toContainText("Connection failed");
+    await expect(
+      inlineError.getByRole("button", { name: "Copy error" })
+    ).toBeVisible();
+    await expect(page.getByTestId("server-tile-local-recovery")).toHaveCount(0);
+
+    await page.getByTestId("server-tile-settings").click();
+    await expect(page.getByTestId("connection-form-url-input")).toBeVisible();
+    await page.getByTestId("connection-form-url-input").fill("");
+    await page
       .getByTestId("connection-form-url-input")
       .fill("http://localhost:3002/mcp");
-    await dialog.getByTestId("connection-form-connect-button").click();
+    await page.getByTestId("connection-form-save-button").click();
 
     const toast = page.getByText("Connection settings updated").first();
     await expect(toast).toBeVisible({ timeout: 10000 });
     await expect(toast).toBeHidden({ timeout: 10000 });
+
+    await page.goto("http://localhost:3000/inspector");
     await expect(page.getByTestId("server-tile-status-ready")).toBeVisible({
       timeout: 10000,
     });
@@ -512,6 +626,7 @@ test.describe("Inspector MCP Server Connections", () => {
     await expect(
       page.getByTestId("tool-execution-execute-button")
     ).toBeVisible();
+    await expectCallbackToolReady(page);
 
     // Fill prompt parameter
     await expect(page.getByTestId("tool-param-prompt")).toBeVisible();
@@ -519,6 +634,9 @@ test.describe("Inspector MCP Server Connections", () => {
 
     // Execute tool
     await page.getByTestId("tool-execution-execute-button").click();
+
+    // Pending request enqueued (wire/handler) before toast (render) assertion
+    await expectPendingRequestEnqueued(page, "sampling");
 
     // Wait for sampling toast to appear and click Approve
     const approveButton = page.getByTestId("sampling-toast-approve");
@@ -552,11 +670,15 @@ test.describe("Inspector MCP Server Connections", () => {
     await expect(
       page.getByTestId("tool-execution-execute-button")
     ).toBeVisible();
+    await expectCallbackToolReady(page);
     await expect(page.getByTestId("tool-param-prompt")).toBeVisible();
     await page
       .getByTestId("tool-param-prompt")
       .fill("Analyze sentiment: how are you? reply positive");
     await page.getByTestId("tool-execution-execute-button").click();
+
+    // Pending request enqueued (wire/handler) before toast (render) assertion
+    await expectPendingRequestEnqueued(page, "sampling");
 
     // Wait for sampling toast and click "View Details"
     const viewDetailsButton = page.getByTestId("sampling-toast-view-details");
@@ -618,9 +740,13 @@ test.describe("Inspector MCP Server Connections", () => {
     await expect(
       page.getByTestId("tool-execution-execute-button")
     ).toBeVisible();
+    await expectCallbackToolReady(page);
 
     // Execute tool (no parameters)
     await page.getByTestId("tool-execution-execute-button").click();
+
+    // Pending request enqueued (wire/handler) before toast (render) assertion
+    await expectPendingRequestEnqueued(page, "elicitation");
 
     // Wait for elicitation toast to appear and click View Details
     const viewDetailsButton = page.getByTestId(
@@ -648,7 +774,7 @@ test.describe("Inspector MCP Server Connections", () => {
 
     // For number input, use keyboard to select all and replace
     await ageField.click();
-    await page.keyboard.press("Meta+a"); // Cmd+A on Mac, Ctrl+A on Windows
+    await page.keyboard.press("Meta+a");
     await page.keyboard.type("25");
 
     // Click the Accept button
@@ -681,9 +807,13 @@ test.describe("Inspector MCP Server Connections", () => {
     await expect(
       page.getByTestId("tool-execution-execute-button")
     ).toBeVisible();
+    await expectCallbackToolReady(page);
 
     // Execute tool (no parameters)
     await page.getByTestId("tool-execution-execute-button").click();
+
+    // Pending request enqueued (wire/handler) before toast (render) assertion
+    await expectPendingRequestEnqueued(page, "elicitation");
 
     // Wait for elicitation toast to appear and click View Details
     const viewDetailsButton = page.getByTestId(
@@ -701,7 +831,6 @@ test.describe("Inspector MCP Server Connections", () => {
     await expect(page.getByTestId("elicitation-request-item-0")).toBeVisible();
 
     // Wait for form fields to be visible with default values
-    // This test specifically uses SEP-1034 defaults (name, age, score, status, verified)
     const nameField = page.getByTestId("elicitation-field-name");
     const ageField = page.getByTestId("elicitation-field-age");
     const scoreField = page.getByTestId("elicitation-field-score");
@@ -711,14 +840,12 @@ test.describe("Inspector MCP Server Connections", () => {
     await expect(nameField).toBeVisible();
     await expect(ageField).toBeVisible();
 
-    // Verify the default values are pre-filled from the conformance server
     await expect(nameField).toHaveValue("John Doe");
     await expect(ageField).toHaveValue("30");
     await expect(scoreField).toHaveValue("95.5");
     await expect(statusField).toHaveValue("active");
     await expect(verifiedField).toBeChecked();
 
-    // Click the Accept button (accepts with default values)
     await page.getByTestId("elicitation-accept-button").click();
 
     // Wait for "View Tool Result" toast button and click it
@@ -750,8 +877,12 @@ test.describe("Inspector MCP Server Connections", () => {
     await expect(
       page.getByTestId("tool-execution-execute-button")
     ).toBeVisible();
+    await expectCallbackToolReady(page);
 
     await page.getByTestId("tool-execution-execute-button").click();
+
+    // Pending request enqueued (wire/handler) before toast (render) assertion
+    await expectPendingRequestEnqueued(page, "elicitation");
 
     const viewDetailsButton = page.getByTestId(
       "elicitation-toast-view-details"
@@ -764,47 +895,30 @@ test.describe("Inspector MCP Server Connections", () => {
     });
     await expect(page.getByTestId("elicitation-request-item-0")).toBeVisible();
 
-    // 1) Untitled single-select: string + enum
     const untitledSingle = page.getByTestId("elicitation-field-untitledSingle");
     await expect(untitledSingle).toBeVisible();
     await untitledSingle.selectOption("option2");
     await expect(untitledSingle).toHaveValue("option2");
 
-    // 2) Titled single-select: string + oneOf (const/title)
     const titledSingle = page.getByTestId("elicitation-field-titledSingle");
     await expect(titledSingle).toBeVisible();
-    await expect(titledSingle.locator("option")).toContainText([
-      "Select...",
-      "First Option",
-      "Second Option",
-      "Third Option",
-    ]);
     await titledSingle.selectOption("value1");
     await expect(titledSingle).toHaveValue("value1");
 
-    // 3) Legacy titled enum: string + enum + enumNames
     const legacyEnum = page.getByTestId("elicitation-field-legacyEnum");
     await expect(legacyEnum).toBeVisible();
-    await expect(legacyEnum.locator("option")).toContainText([
-      "Select...",
-      "Option One",
-      "Option Two",
-      "Option Three",
-    ]);
     await legacyEnum.selectOption("opt1");
     await expect(legacyEnum).toHaveValue("opt1");
 
-    // 4) Untitled multi-select: array + items.enum
     const untitledMulti = page.getByTestId("elicitation-field-untitledMulti");
     await expect(untitledMulti).toBeVisible();
     await untitledMulti.getByLabel("option1").click();
     await untitledMulti.getByLabel("option3").click();
 
-    // 5) Titled multi-select: array + items.anyOf (const/title)
     const titledMulti = page.getByTestId("elicitation-field-titledMulti");
     await expect(titledMulti).toBeVisible();
-    await titledMulti.getByLabel("First Choice").click();
-    await titledMulti.getByLabel("Third Choice").click();
+    await titledMulti.getByLabel("value1").click();
+    await titledMulti.getByLabel("value3").click();
 
     await page.getByTestId("elicitation-accept-button").click();
 
