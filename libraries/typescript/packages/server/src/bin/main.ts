@@ -285,6 +285,11 @@ async function startCommand(args: ParsedArgs): Promise<number> {
   }
 
   console.log(`mcp-use server running at ${started.url}`);
+  if (args.inspector === true) {
+    console.log(
+      `mcp-use inspector at ${started.url.replace(/\/$/, "")}/inspector`
+    );
+  }
   if (started.tunnelUrl !== undefined) {
     console.log(`mcp-use public MCP URL: ${started.tunnelUrl}`);
   }
