@@ -116,7 +116,6 @@ jobs:
         working-directory: libraries/typescript
         run: |
           # Using npm trusted publishing (OIDC) - no token needed
-          node scripts/package-readme.mjs prepare
           pnpm changeset publish
           echo "✅ Published canary packages to npm using trusted publishing"
 
@@ -379,7 +378,6 @@ jobs:
 
           # Publish to npm using trusted publishing (OIDC) - no token needed
           cd libraries/typescript
-          node scripts/package-readme.mjs prepare
           pnpm changeset publish
           pnpm changeset tag
 

@@ -1,7 +1,7 @@
 {
   "name": "mcp-use",
   "type": "module",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "MCP framework and CLI built on the official v2 SDK",
   "author": "mcp-use, Inc.",
   "license": "MIT",
@@ -97,8 +97,7 @@
     "node": ">=22.22.2"
   },
   "scripts": {
-    "prepack": "node ../../scripts/package-readme.mjs prepare",
-    "postpack": "node ../../scripts/package-readme.mjs cleanup",
+    "prepack": "node ../../scripts/package-readme.mjs verify",
     "build": "rimraf dist && tsup && tsc --emitDeclarationOnly --declaration && rimraf dist/.tsbuildinfo",
     "dev": "tsc --watch",
     "test": "vitest",
