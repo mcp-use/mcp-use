@@ -49,8 +49,8 @@
     "vite": "^8.0.16"
   },
   "peerDependencies": {
-    "@mcp-use/client": "^2.0.0",
-    "@mcp-use/inspector": "^20.0.0"
+    "@mcp-use/client": "^2.0.0-alpha.0",
+    "@mcp-use/inspector": "^20.0.0-beta.0"
   },
   "peerDependenciesMeta": {
     "@mcp-use/client": {
