@@ -300,7 +300,7 @@ jobs:
 
           # Version packages
           echo "Versioning packages..."
-          pnpm changeset version
+          node scripts/version-packages.mjs
 
           # changeset version updates workspace dependency metadata. Refresh the
           # lockfile now so the release PR is reproducible and main remains clean.
