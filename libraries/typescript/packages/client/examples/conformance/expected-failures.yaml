@@ -4,17 +4,45 @@
 #
 # Baseline target: @modelcontextprotocol/conformance 0.2.0-alpha.10.
 client:
-  # This auth-server metadata variant intentionally omits CIMD and rejects
-  # dynamic client registration. The mcp-use wrapper currently cannot supply
-  # the variant's alternate registration path.
+  # Advanced OAuth extensions which @mcp-use/client does not implement yet.
   - auth/metadata-var3
+  - auth/authorization-server-migration
+  - auth/client-credentials-jwt
+  - auth/client-credentials-basic
+  - auth/enterprise-managed-authorization
+  - auth/dpop
+  - auth/dpop-nonce
+  - auth/wif-jwt-bearer
+  - http-custom-headers
 server:
-  # The current mcp-use HTTP runtime does not carry client capabilities across
-  # the legacy 2025 session, so these MRTR elicitation legs correctly reject
-  # before asking the client. The 2026 handler is exercised separately.
+  # mcp-use has not ported these fixture-only modern diagnostics yet.
+  - server-stateless
+  - json-schema-2020-12
   - elicitation-sep1034-defaults
-  - elicitation-sep1330-enums
-  # The referee currently reports this intentionally skipped scenario through
-  # its expected-failure path; keep the entry so a future runnable check is
-  # surfaced as stale rather than silently ignored.
+  - server-sse-polling
   - server-sse-multiple-streams
+  - elicitation-sep1330-enums
+  - http-custom-header-server-validation
+  # SEP-2663 tasks is not implemented by mcp-use yet.
+  - tasks-lifecycle
+  - tasks-capability-negotiation
+  - tasks-wire-fields
+  - tasks-request-state-removal
+  - tasks-mrtr-input
+  - tasks-request-headers
+  - tasks-dispatch-and-envelope
+  - tasks-required-task-error
+  - tasks-mrtr-composition
+  # These MRTR diagnostic tools are not available from the mcp-use fixture.
+  - input-required-result-basic-elicitation
+  - input-required-result-basic-sampling
+  - input-required-result-basic-list-roots
+  - input-required-result-request-state
+  - input-required-result-multiple-input-requests
+  - input-required-result-multi-round
+  - input-required-result-missing-input-response
+  - input-required-result-non-tool-request
+  - input-required-result-result-type
+  - input-required-result-tampered-state
+  - input-required-result-capability-check
+  - input-required-result-ignore-extra-params

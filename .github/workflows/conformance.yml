@@ -22,6 +22,7 @@ on:
       - 'libraries/typescript/packages/server/package.json'
       - 'libraries/typescript/packages/client/src/**'
       - 'libraries/typescript/packages/client/package.json'
+      - 'libraries/typescript/pnpm-lock.yaml'
       - 'libraries/python/tests/integration/servers_for_testing/conformance_server.py'
       - 'libraries/python/tests/integration/clients_for_testing/conformance_client.py'
       - 'libraries/typescript/packages/server/examples/conformance/**'
@@ -39,6 +40,7 @@ on:
       - 'libraries/typescript/packages/server/package.json'
       - 'libraries/typescript/packages/client/src/**'
       - 'libraries/typescript/packages/client/package.json'
+      - 'libraries/typescript/pnpm-lock.yaml'
       - 'libraries/python/tests/integration/servers_for_testing/conformance_server.py'
       - 'libraries/python/tests/integration/clients_for_testing/conformance_client.py'
       - 'libraries/typescript/packages/server/examples/conformance/**'
@@ -98,7 +100,7 @@ jobs:
   conformance-test:
     name: Run Conformance Tests
     needs: detect-changes
-    if: needs.detect-changes.outputs.python == 'true' || needs.detect-changes.outputs.typescript == 'true'
+    if: needs.detect-changes.outputs.python == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -118,17 +120,6 @@ jobs:
         with:
           version: "latest"
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22.23.1'
-
-      - name: Install pnpm
-        if: needs.detect-changes.outputs.typescript == 'true'
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
       - name: Prepare Python
         if: needs.detect-changes.outputs.python == 'true'
         working-directory: libraries/python
@@ -137,38 +128,14 @@ jobs:
           source .venv/bin/activate
           uv pip install -e ".[dev]"
 
-      - name: Prepare TypeScript server
-        if: needs.detect-changes.outputs.typescript == 'true'
-        working-directory: libraries/typescript
-        run: |
-          pnpm install
-          pnpm build
-
-      - name: Install TypeScript conformance server dependencies
-        if: needs.detect-changes.outputs.typescript == 'true'
-        working-directory: libraries/typescript/packages/server/examples/conformance
-        run: pnpm install
-
-      - name: Install TypeScript conformance client dependencies
-        if: needs.detect-changes.outputs.typescript == 'true'
-        working-directory: libraries/typescript/packages/client/examples/conformance
-        run: pnpm install
-
       - name: Build server list
         id: build-servers
         env:
           NEEDS_PYTHON: ${{ needs.detect-changes.outputs.python }}
-          NEEDS_TYPESCRIPT: ${{ needs.detect-changes.outputs.typescript }}
         run: |
           SERVERS='['
           if [ "$NEEDS_PYTHON" = "true" ]; then
             SERVERS+='{"name":"python","start-command":"source .venv/bin/activate && python tests/integration/servers_for_testing/conformance_server.py --transport streamable-http --port 8000","url":"http://127.0.0.1:8000/mcp","working-directory":"libraries/python"}'
-          fi
-          if [ "$NEEDS_TYPESCRIPT" = "true" ]; then
-            if [[ $SERVERS != '[' ]]; then
-              SERVERS+=','
-            fi
-            SERVERS+='{"name":"typescript","start-command":"PORT=3000 node ../../dist/bin.js dev --no-open","url":"http://localhost:3000/mcp","working-directory":"libraries/typescript/packages/server/examples/conformance"}'
           fi
           SERVERS+=']'
           echo "servers=$SERVERS" >> $GITHUB_OUTPUT
@@ -177,21 +144,10 @@ jobs:
         id: build-clients
         env:
           NEEDS_PYTHON: ${{ needs.detect-changes.outputs.python }}
-          NEEDS_TYPESCRIPT: ${{ needs.detect-changes.outputs.typescript }}
         run: |
           CLIENTS='['
           if [ "$NEEDS_PYTHON" = "true" ]; then
             CLIENTS+='{"name":"python-client","command":".venv/bin/python tests/integration/clients_for_testing/conformance_client.py","working-directory":"libraries/python"}'
-          fi
-          if [ "$NEEDS_TYPESCRIPT" = "true" ]; then
-            if [[ $CLIENTS != '[' ]]; then
-              CLIENTS+=','
-            fi
-            CLIENTS+='{"name":"typescript-node-client","command":"libraries/typescript/packages/client/examples/conformance/run-conformance-client-node.sh"}'
-            CLIENTS+=','
-            CLIENTS+='{"name":"typescript-browser-client","command":"libraries/typescript/packages/client/examples/conformance/run-conformance-client-browser.sh"}'
-            CLIENTS+=','
-            CLIENTS+='{"name":"typescript-react-client","command":"libraries/typescript/packages/client/examples/conformance/run-conformance-client-react.sh"}'
           fi
           CLIENTS+=']'
           echo "clients=$CLIENTS" >> $GITHUB_OUTPUT
@@ -207,3 +163,37 @@ jobs:
           clients: ${{ steps.build-clients.outputs.clients }}
           badge-gist-id: ${{ secrets.CONFORMANCE_GIST_ID }}
           badge-gist-token: ${{ secrets.GIST_SECRET }}
+
+  typescript-v2-conformance:
+    name: Run TypeScript v2 Conformance Tests
+    needs: detect-changes
+    if: needs.detect-changes.outputs.typescript == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.1'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.13.1
+
+      - name: Install and build TypeScript packages
+        working-directory: libraries/typescript
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: Run current v2 conformance fixtures
+        working-directory: libraries/typescript/packages/client/examples/conformance
+        run: |
+          pnpm run test:conformance:all
+          pnpm run test:conformance:client:2026
+          pnpm run test:conformance:server:2026
