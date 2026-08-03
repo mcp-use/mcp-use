@@ -1,5 +1,13 @@
 # mcp-use
 
+## 2.0.1-canary.0
+
+### Patch Changes
+
+- 4c1dd8d: Print `[mcp-use] no type errors (<duration>ms)` when `mcp-use typecheck` passes. `tsc --noEmit` writes nothing on a clean project, so the command used to exit `0` with no output at all, which was indistinguishable from a hang or a silent failure. Failing runs are unchanged and still show only the compiler's own diagnostics.
+  - @mcp-use/inspector@20.0.1-canary.0
+  - @mcp-use/cli@4.0.1-canary.0
+
 ## 2.0.0
 
 ### Major Changes
