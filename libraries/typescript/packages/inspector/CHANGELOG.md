@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 20.0.2
+
+### Patch Changes
+
+- Prepare the package README before publication so npm records and displays the stable documentation metadata.
+- Updated dependencies
+  - mcp-use@2.0.2
+
 ## 20.0.1
 
 ### Patch Changes
