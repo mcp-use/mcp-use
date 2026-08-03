@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 20.0.4
+
+### Patch Changes
+
+- Use stable absolute URLs for README images and repository links so npm renders the published package documentation correctly.
+- Updated dependencies
+  - mcp-use@2.0.4
+
 ## 20.0.3
 
 ### Patch Changes
