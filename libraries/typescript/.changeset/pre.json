@@ -12,6 +12,7 @@
   "changesets": [
     "mcp-2549-dev-forwarding",
     "start-inspector-hint",
+    "stdio-env-leak",
     "template-main-and-descriptions",
     "typecheck-success-line"
   ]

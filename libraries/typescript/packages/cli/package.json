@@ -1,7 +1,7 @@
 {
   "name": "@mcp-use/cli",
   "type": "module",
-  "version": "4.0.1-canary.1",
+  "version": "4.0.1-canary.2",
   "description": "Prebuilt CLI, development server, and build pipeline for mcp-use",
   "author": "mcp-use, Inc.",
   "license": "MIT",
@@ -49,7 +49,7 @@
     "vite": "^8.0.16"
   },
   "peerDependencies": {
-    "@mcp-use/client": "^2.0.0",
+    "@mcp-use/client": "^2.0.1-canary.0",
     "@mcp-use/inspector": "^20.0.1-canary.0"
   },
   "peerDependenciesMeta": {

@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.0.1-canary.0
+
+### Patch Changes
+
+- 4ea75fd: Stop leaking the full parent process environment to stdio MCP servers when explicit environment variables are configured.
+
 ## 2.0.0
 
 ### Major Changes
