@@ -62,6 +62,7 @@ There are no `ls`, `rm`, `switch`, or `install` aliases in v2 alpha. The accepte
 - Successful finite commands exit `0`; empty lists and idempotent `logout`/`remove` operations are successful. Authentication, authorization, network, API, filesystem, build, MCP, browser, and remote-operation failures exit `1`. SIGINT exits `130` for finite commands; a graceful SIGINT/SIGTERM shutdown of the long-running `dev` and `start` commands exits `0`.
 - Human output is concise UTF-8 text on stdout. Errors and warnings go to stderr. ANSI styling is used only for a TTY and honors `NO_COLOR`; machine-readable output never contains ANSI.
 - Every data-returning command accepts `--json`. It emits exactly one JSON value followed by `\n`; errors emit `{"error":{"code":"...","message":"...","details":...}}` to stderr. `deployments logs --follow --json` remains silent while polling and emits one terminal object containing the collected logs. Prompts are disabled under `--json` and whenever stdin is not a TTY.
+- Every command accepts one package-manager script forwarding separator (`--`) before its options. The CLI consumes the separator before command-specific parsing; `typecheck` instead forwards the remaining tokens to the project's TypeScript compiler.
 - Destructive commands require an interactive confirmation or `--yes`. Cancellation is not an error and exits `0`; a non-TTY invocation without `--yes` is usage error `2`.
 - Cloud commands that accept `--org <id-or-slug>` use it for that invocation without changing the active organization. Otherwise they use the active organization, then the account default. Ambiguous names are rejected; organization names are display-only, not selectors.
 - IDs and slugs are passed as opaque strings. Pagination uses `--limit <1..100>` (default `30`) and `--skip <non-negative integer>` (default `0`). The API's returned order is preserved.
@@ -297,6 +298,11 @@ A single long-lived process. It:
 2. Grabs the default-exported `MCPServer`, injects the process-scoped event bus through its internal CLI lifecycle hook, and wraps `server.fetch` behind an **atomically swappable reference**.
 3. Binds **one** Node HTTP listener (vendored `toNodeHandler` bridge) that delegates every request to the current handler.
 4. Unless `--no-inspector` is set, resolves `@mcp-use/inspector` from the project and calls its framework-neutral `mountInspector()` on that same listener. Missing optional tooling does not stop the MCP server; one package-manager-aware install hint is printed instead.
+
+The CLI accepts a package-manager script forwarding separator before dev flags,
+so `pnpm dev -- --port 3050 --no-open` and the equivalent npm form parse the
+same as direct `mcp-use dev --port 3050 --no-open` invocation. The separator is
+consumed by the CLI; the flags remain owned by `mcp-use dev`.
 
 On file change (only files in the entry's module graph count): Vite invalidates, dev re-imports the entry through the runner, and swaps the handler reference. There is no registration diffing: the next request hits the new handler, which is correct by construction under the stateless model. Every handler generation shares one process-scoped SDK `ServerEventBus`; after a successful swap, dev publishes `tools/list_changed`, `prompts/list_changed`, and `resources/list_changed`. Modern clients with an open `subscriptions/listen` stream therefore refetch the authoritative lists from the new handler. Publishing all three is deliberate invalidation, not change detection — the protocol carries no delta, and avoiding schema/function comparison keeps server reload independent of registry internals. A failed reload keeps the old handler and publishes nothing. Stateless legacy clients receive no push but remain correct on their next manual list request.
 
