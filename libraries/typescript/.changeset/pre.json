@@ -61,6 +61,7 @@
     "inspector-standalone-oauth",
     "localhost-managed-inspector-chat",
     "mcp-middleware-cors-mounting",
+    "native-websocket-tunnel-relay",
     "neat-vite-client-types",
     "nextjs-drop-in",
     "node22-engine-floor",
