@@ -1,0 +1,116 @@
+---
+title: "Introduction"
+description: "Build a TypeScript MCP agent that calls tools from MCP servers."
+icon: "list-start"
+---
+
+`MCPAgent` from `@mcp-use/agent` connects a model to MCP tools, runs a bounded tool-calling loop, and returns the model's final answer.
+
+## Install the agent
+
+<CodeGroup>
+```bash npm
+npm install @mcp-use/agent @mcp-use/client
+```
+
+```bash pnpm
+pnpm add @mcp-use/agent @mcp-use/client
+```
+
+```bash bun
+bun add @mcp-use/agent @mcp-use/client
+```
+</CodeGroup>
+
+`@mcp-use/agent` requires Node.js 22.22.2 or later.
+
+## Run your first agent
+
+Set `OPENAI_API_KEY`, then run this example from a directory the filesystem server may read.
+
+```typescript
+import { MCPAgent } from "@mcp-use/agent";
+
+async function main() {
+  const agent = new MCPAgent({
+    llm: "openai/gpt-4o",
+    mcpServers: {
+      filesystem: {
+        command: "npx",
+        args: ["-y", "@modelcontextprotocol/server-filesystem", "./"],
+      },
+    },
+  });
+
+  try {
+    await agent.initialize();
+
+    const result = await agent.run({
+      prompt: "List the files in this directory, then summarize what the project does.",
+    });
+
+    console.log(result);
+  } finally {
+    await agent.close();
+  }
+}
+
+main().catch(console.error);
+```
+
+A successful run prints a text answer based on the files the MCP server returned.
+
+<Note>
+  Initialization is manual by default. Call `await agent.initialize()` before
+  `run()`, `stream()`, or `streamEvents()`. Set `autoInitialize: true` only when
+  you want the first call to initialize the agent for you.
+</Note>
+
+## Understand the runtime defaults
+
+`maxSteps` defaults to `10`. Override it for the agent or for one call:
+
+```typescript
+const agent = new MCPAgent({
+  llm: "openai/gpt-4o",
+  mcpServers,
+  maxSteps: 15,
+});
+
+await agent.initialize();
+const result = await agent.run({ prompt: "Complete the audit.", maxSteps: 20 });
+await agent.close();
+```
+
+Conversation memory is enabled by default. Memory stores the user prompt and final assistant text from successful `run()` and `stream()` calls. It does not store tool transcripts or `streamEvents()` output.
+
+When you pass `mcpServers`, the agent creates and owns its `MCPClient`; `close()` closes those sessions. If you pass an existing client or connectors, their lifecycle remains under your control.
+
+## Choose the next guide
+
+<CardGroup cols={2}>
+  <Card
+    title="LLM providers"
+    icon="brain-circuit"
+    href="/v2/typescript/agent/llm-providers"
+  >
+    Configure OpenAI, Anthropic, Google, OpenRouter, Ollama, or an OpenAI-compatible endpoint.
+  </Card>
+  <Card
+    title="Memory management"
+    icon="memory-stick"
+    href="/v2/typescript/agent/memory-management"
+  >
+    Inspect, disable, and clear conversation history.
+  </Card>
+  <Card title="Streaming" icon="wifi" href="/v2/typescript/agent/streaming">
+    Stream tool steps or provider-neutral events.
+  </Card>
+  <Card
+    title="LangChain integration"
+    icon="link"
+    href="/v2/typescript/agent/langchain/index"
+  >
+    Add LangChain models, structured output, Server Manager, and callbacks.
+  </Card>
+</CardGroup>

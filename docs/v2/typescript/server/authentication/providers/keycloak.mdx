@@ -1,0 +1,102 @@
+---
+title: "Keycloak Provider"
+description: "Configure Keycloak Dynamic Client Registration authentication for an MCP server."
+icon: "/images/icons/keycloak.svg"
+---
+
+Use `oauthKeycloakProvider` when a Keycloak realm is the authorization server. MCP clients register directly with Keycloak, and mcp-use verifies realm-issued access tokens against the resolved MCP resource.
+
+## Prepare Keycloak
+
+Configure Dynamic Client Registration for the hosts used by your MCP clients. Keep redirect URI policies strict, and add browser client origins when browser-based clients require them.
+
+For production, only require Initial Access Tokens after confirming that every intended MCP client can send one during registration. The mcp-use provider verifies tokens; it does not perform registration on the client's behalf.
+
+## Configure the server
+
+`serverUrl` and `realm` are required. They are not read from the environment by the provider.
+
+```bash
+KEYCLOAK_SERVER_URL=https://keycloak.example.com
+KEYCLOAK_REALM=mcp
+MCP_URL=https://mcp.example.com
+```
+
+```typescript
+import { MCPServer } from "mcp-use";
+import { oauthKeycloakProvider } from "mcp-use/oauth/keycloak";
+
+const serverUrl = process.env.KEYCLOAK_SERVER_URL;
+const realm = process.env.KEYCLOAK_REALM;
+if (!serverUrl || !realm) {
+  throw new Error("KEYCLOAK_SERVER_URL and KEYCLOAK_REALM are required");
+}
+
+const server = new MCPServer({
+  name: "keycloak-server",
+  version: "1.0.0",
+  oauth: oauthKeycloakProvider({ serverUrl, realm }),
+});
+
+export default server;
+```
+
+There is no Keycloak provider `audience` option. Verification is bound to the resolved MCP resource, so configure Keycloak to issue access tokens for that resource.
+
+## Use roles and permissions
+
+Realm roles are `ctx.auth.user.roles`. Resource roles are flattened into top-level permissions as `resource:role`.
+
+```typescript
+server.tool(
+  {
+    name: "admin_action",
+    description: "Run an operation for a Keycloak resource administrator.",
+  },
+  async (_args, ctx) => {
+    if (!ctx.auth.permissions.includes("mcp-api:admin")) {
+      return {
+        isError: true,
+        content: [{ type: "text", text: "Forbidden" }],
+      };
+    }
+
+    return {
+      content: [{ type: "text", text: `Allowed ${ctx.auth.user.id}` }],
+    };
+  },
+);
+```
+
+The mapped user also includes optional profile fields and the raw `realmAccess` and `resourceAccess` objects. Prefer normalized `roles` and `permissions`; inspect raw access objects only when the flattened form is insufficient.
+
+## Production checks
+
+- Serve both Keycloak and the MCP server over HTTPS.
+- Configure token audience/resource claims for the canonical MCP endpoint.
+- Restrict DCR according to the capabilities of your MCP clients.
+- Decide whether each tool uses realm roles, flattened resource permissions, or both.
+
+<CardGroup cols={2}>
+  <Card
+    title="Runnable Keycloak example"
+    icon="github"
+    href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/auth/keycloak"
+  >
+    Compare with the maintained Keycloak example.
+  </Card>
+  <Card
+    title="Keycloak Client Registration"
+    icon="book-open"
+    href="https://www.keycloak.org/securing-apps/client-registration"
+  >
+    Configure Dynamic Client Registration.
+  </Card>
+  <Card
+    title="User Context"
+    icon="user"
+    href="/v2/typescript/server/authentication/user-context"
+  >
+    Use Keycloak user fields, roles, and permissions.
+  </Card>
+</CardGroup>
