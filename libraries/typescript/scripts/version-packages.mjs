@@ -68,6 +68,13 @@ function basePeerRange(range) {
   return retained.join(" || ");
 }
 
+function stablePeerRange(range) {
+  return range.replace(
+    /([~^])(\d+\.\d+\.\d+)-(?:alpha|beta|canary)(?:\.[0-9A-Za-z.-]+)?/g,
+    "$1$2"
+  );
+}
+
 function normalizedWorkspaceRange(range, dependencyVersion) {
   if (!range.startsWith("workspace:")) return range;
   const workspaceRange = range.slice("workspace:".length);
@@ -157,8 +164,9 @@ function updateInternalPeerRanges(releases, mode) {
             desiredRange = `${baseRange} || ${release.newVersion}`;
           }
         }
-      } else if (mode === "exit" && baseRange === "") {
-        desiredRange = "workspace:*";
+      } else if (mode === "exit") {
+        desiredRange = stablePeerRange(baseRange);
+        if (desiredRange === "") desiredRange = "workspace:*";
       }
 
       if (desiredRange !== currentRange) {

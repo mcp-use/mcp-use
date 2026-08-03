@@ -55,10 +55,10 @@ allow the View iframe's CORS and CSP requirements.
 ## Verify the rendered View
 
 Checking CSS files alone is insufficient. After every deployment, capture the
-actual resource with the beta screenshot command:
+actual resource with the screenshot command:
 
 ```bash
-npx --yes mcp-use@beta screenshot \
+npx --yes mcp-use screenshot \
   --mcp https://api.example.com/mcp --tool show-app \
   --output live-view.png
 ```

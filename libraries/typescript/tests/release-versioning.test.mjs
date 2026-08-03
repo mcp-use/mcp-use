@@ -339,11 +339,11 @@ for (const scenario of [
         assert.equal(manifest(directory, "inspector").version, "20.0.1");
         assert.equal(
           manifest(directory, "server").peerDependencies["@mcp-use/client"],
-          "^2.0.0-alpha.0"
+          "^2.0.0"
         );
         assert.equal(
           manifest(directory, "inspector").peerDependencies["@mcp-use/client"],
-          "^2.0.0-alpha.0"
+          "^2.0.0"
         );
       }
     } finally {
