@@ -109,6 +109,35 @@ describe("StdioConnectionManager errlog", () => {
     expect(stream.writableEnded).toBe(false);
   });
 
+  it("handles errlog write failures and removes its listener on close", async () => {
+    const stream = new Writable({
+      write(_chunk, _enc, cb) {
+        cb(new Error("ERRLOG_WRITE_FAILED"));
+      },
+    });
+    const initialErrorListeners = stream.listenerCount("error");
+    const manager = new StdioConnectionManager(
+      { command: process.execPath, args: markerChild("ERR_MARKER_FAILURE") },
+      stream
+    );
+
+    try {
+      const transport = await manager.start();
+      expect(stream.listenerCount("error")).toBeGreaterThan(
+        initialErrorListeners
+      );
+      await transport.start();
+      await waitFor(
+        () => stream.destroyed,
+        () => "errlog never reported its write failure"
+      );
+    } finally {
+      await manager.stop();
+    }
+
+    expect(stream.listenerCount("error")).toBe(initialErrorListeners);
+  });
+
   for (const mode of ["inherit", "ignore"] as StdioStderrMode[]) {
     it(`does not forward to errlog when stderr is "${mode}"`, async () => {
       const { stream, data } = collector();

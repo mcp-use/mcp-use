@@ -245,6 +245,9 @@ export class StdioConnectionManager extends ConnectionManager<StdioClientTranspo
   private readonly errlog: Writable;
   private _transport: StdioClientTransport | null = null;
   private _stderrSource: NodeJS.ReadableStream | null = null;
+  private readonly _onErrlogError = (error: Error): void => {
+    logger.warn(`Error writing child stderr to errlog: ${error}`);
+  };
 
   /**
    * Creates a connection manager for a local server process.
@@ -283,6 +286,7 @@ export class StdioConnectionManager extends ConnectionManager<StdioClientTranspo
       this._stderrSource.on("error", (error) => {
         logger.warn(`Error forwarding child stderr: ${error}`);
       });
+      this.errlog.on("error", this._onErrlogError);
       this._stderrSource.pipe(this.errlog, { end: false });
     }
 
@@ -295,6 +299,7 @@ export class StdioConnectionManager extends ConnectionManager<StdioClientTranspo
   ): Promise<void> {
     if (this._stderrSource) {
       this._stderrSource.unpipe(this.errlog);
+      this.errlog.off("error", this._onErrlogError);
       this._stderrSource = null;
     }
     if (this._transport) {
