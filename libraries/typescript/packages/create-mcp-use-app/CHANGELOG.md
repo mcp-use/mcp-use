@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 2.0.0-beta.15
+
+### Patch Changes
+
+- a26bac6: Install the native v2 MCP Apps skill from the beta branch and use the standard `.agents/skills` project directory for Codex.
+
 ## 2.0.0-beta.14
 
 ### Patch Changes
