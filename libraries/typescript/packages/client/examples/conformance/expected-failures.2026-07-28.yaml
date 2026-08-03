@@ -3,7 +3,12 @@
 # Stale entries fail the runner and must be removed as support lands.
 #
 # Baseline target: @modelcontextprotocol/conformance 0.2.0-alpha.10.
-client: []
+client:
+  # These legacy OAuth/header scenarios are still selected by the 2026 run
+  # and fail for the same mcp-use client limitations as the all-suite leg.
+  - auth/metadata-var3
+  - auth/authorization-server-migration
+  - http-custom-headers
 server:
   # The mcp-use fixture implements the stable surface on the 2026 handler,
   # but has not yet ported the official stateless diagnostic, JSON Schema
