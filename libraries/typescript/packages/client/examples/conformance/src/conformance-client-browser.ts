@@ -7,9 +7,10 @@ import { MCPClient } from "@mcp-use/client";
 import {
   handleElicitation,
   isAuthScenario,
-  isScopeStepUpScenario,
   parseConformanceContext,
+  requiresOAuthRetryFetch,
   runScenario,
+  runWithScenarioTimeout,
   type ConformanceSession,
 } from "./conformance-shared.js";
 import { createOAuthRetryFetch } from "./oauth-retry-fetch.js";
@@ -39,9 +40,9 @@ async function main(): Promise<void> {
   if (authProvider) {
     serverConfig.authProvider = authProvider;
 
-    if (isScopeStepUpScenario(scenario)) {
-      // Do not pre-authenticate for scope-step-up so the first token has only
-      // the scope from the initial 401; the OAuth retry fetch handles 401 and 403.
+    if (requiresOAuthRetryFetch(scenario)) {
+      // Preserve a scope advertised by the initial 401; pre-authentication
+      // would not receive the WWW-Authenticate header that contains it.
       serverConfig.fetch = createOAuthRetryFetch(
         fetch,
         serverUrl,
@@ -80,7 +81,10 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((err) => {
+runWithScenarioTimeout(
+  process.env.MCP_CONFORMANCE_SCENARIO || "",
+  main()
+).catch((err) => {
   console.error(err);
   process.exit(1);
 });

@@ -7,9 +7,10 @@ import { MCPClient } from "@mcp-use/client";
 import {
   handleElicitation,
   isAuthScenario,
-  isScopeStepUpScenario,
   parseConformanceContext,
+  requiresOAuthRetryFetch,
   runScenario,
+  runWithScenarioTimeout,
   type ConformanceSession,
 } from "./conformance-shared.js";
 import { createOAuthRetryFetch } from "./oauth-retry-fetch.js";
@@ -34,12 +35,10 @@ async function main(): Promise<void> {
   if (authProvider) {
     serverConfig.authProvider = authProvider;
 
-    if (isScopeStepUpScenario(scenario)) {
-      // Do NOT pre-authenticate for scope-step-up: the first token must have
-      // only the scope from the initial 401 (mcp:basic). Pre-auth would get
-      // a token with all PRM scopes (mcp:basic mcp:write), so tools/call would
-      // never get 403 and the client would never make a second auth request.
-      // The OAuth retry fetch handles both 401 (initial) and 403 (escalation).
+    if (requiresOAuthRetryFetch(scenario)) {
+      // Preserve a scope advertised by the initial 401. Pre-authentication
+      // cannot see WWW-Authenticate, so it would request an incomplete token.
+      // The retry fetch handles the initial 401 and any later 403 escalation.
       serverConfig.fetch = createOAuthRetryFetch(
         fetch,
         serverUrl,
@@ -86,7 +85,10 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((err) => {
+runWithScenarioTimeout(
+  process.env.MCP_CONFORMANCE_SCENARIO || "",
+  main()
+).catch((err) => {
   console.error(err);
   process.exit(1);
 });
