@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 20.0.1
+
+### Patch Changes
+
+- Include the current repository README in the published `mcp-use` package so npm displays the stable documentation.
+- Updated dependencies
+  - mcp-use@2.0.1
+
 ## 20.0.0
 
 ### Major Changes

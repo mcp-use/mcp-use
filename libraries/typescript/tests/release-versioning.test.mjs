@@ -279,14 +279,14 @@ for (const scenario of [
     client: "2.0.1-beta.0",
     server: "2.0.1-beta.0",
     inspector: "20.0.1-beta.0",
-    inspectorClientPeer: "^2.0.0-alpha.0 || 2.0.1-beta.0",
+    inspectorClientPeer: "^2.0.0 || 2.0.1-beta.0",
   },
   {
     type: "minor",
     client: "2.1.0-beta.0",
     server: "2.0.1-beta.0",
     inspector: "20.0.1-beta.0",
-    inspectorClientPeer: "^2.0.0-alpha.0 || 2.1.0-beta.0",
+    inspectorClientPeer: "^2.0.0 || 2.1.0-beta.0",
   },
   {
     type: "major",
