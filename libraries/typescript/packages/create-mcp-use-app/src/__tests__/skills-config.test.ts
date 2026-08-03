@@ -1,24 +1,34 @@
 import { describe, expect, it } from "vitest";
 import {
+  getDefaultDistTag,
   getSkillsCloneArgs,
+  getSkillsBranch,
+  getSkillsManualInstallCommand,
   SKILLS_AGENT_DIRS,
-  SKILLS_BRANCH,
-  SKILLS_MANUAL_INSTALL_CMD,
 } from "../skills-config.js";
 
-describe("beta skill source configuration", () => {
-  it("clones the beta branch explicitly", () => {
-    const args = getSkillsCloneArgs("/tmp/skills-repo");
+describe("release-channel configuration", () => {
+  it.each([
+    ["2.0.0-beta.15", "beta", "beta"],
+    ["2.0.0", "latest", "main"],
+  ] as const)(
+    "maps create-mcp-use-app@%s to npm %s and skill branch %s",
+    (version, distTag, branch) => {
+      expect(getDefaultDistTag(version)).toBe(distTag);
+      expect(getSkillsBranch(version)).toBe(branch);
+      expect(getSkillsManualInstallCommand(version)).toContain(
+        `mcp-use/mcp-use#${branch}`
+      );
+    }
+  );
+
+  it("clones the release-appropriate branch explicitly", () => {
+    const args = getSkillsCloneArgs("/tmp/skills-repo", "2.0.0");
     const branchFlag = args.indexOf("--branch");
 
-    expect(SKILLS_BRANCH).toBe("beta");
     expect(branchFlag).toBeGreaterThan(-1);
-    expect(args[branchFlag + 1]).toBe(SKILLS_BRANCH);
+    expect(args[branchFlag + 1]).toBe("main");
     expect(args).toContain("--single-branch");
-  });
-
-  it("keeps the manual fallback pinned to beta", () => {
-    expect(SKILLS_MANUAL_INSTALL_CMD).toContain("mcp-use/mcp-use#beta");
   });
 
   it("installs the Codex skill in the standard project directory", () => {
