@@ -8,7 +8,7 @@ import type {
   ProviderTool,
   TokenUsage,
 } from "../types.js";
-import { tokenUsageFromRecord } from "../usage.js";
+import { mergeTokenUsage, tokenUsageFromRecord } from "../usage.js";
 
 interface ChatParams {
   config: ProviderConfig;
@@ -205,7 +205,24 @@ export async function* streamChat(
       usage = tokenUsageFromRecord(parsed?.message?.usage);
     } else if (t === "message_delta") {
       const deltaUsage = tokenUsageFromRecord(parsed?.usage);
-      if (deltaUsage) usage = { ...usage, ...deltaUsage };
+      if (deltaUsage) {
+        // `message_delta` carries `output_tokens` only. A spread merge replaced the input
+        // and cache counters captured at `message_start` with `undefined`, because
+        // `tokenUsageFromRecord` returns every key and sets absent ones to `undefined`.
+        usage = mergeTokenUsage(usage, deltaUsage);
+        if (usage) {
+          // Anthropic reports the cache counters outside `input_tokens` and bills all of
+          // them, so the total is the sum of every billed component.
+          usage = {
+            ...usage,
+            totalTokens:
+              (usage.inputTokens ?? 0) +
+              (usage.cachedInputTokens ?? 0) +
+              (usage.cacheCreationInputTokens ?? 0) +
+              (usage.outputTokens ?? 0),
+          };
+        }
+      }
     } else if (t === "content_block_start") {
       const idx = parsed.index as number;
       const cb = parsed.content_block ?? {};
