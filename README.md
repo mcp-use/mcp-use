@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://mcp-use.com">
-    <img alt="mcp-use" src="./docs/logo/banner-mcp-use.webp" width="100%">
+    <img alt="mcp-use" src="https://raw.githubusercontent.com/mcp-use/mcp-use/main/docs/logo/banner-mcp-use.webp" width="100%">
   </a>
   <br /><br />
 
@@ -216,7 +216,7 @@ export default function WeatherCard() {
 </td></tr></table>
 
 <p align="center">
-  <img src="./static/readme/chatgpt-hello-world.jpg" alt="Hello World MCP App rendered in a ChatGPT conversation" width="100%" />
+  <img src="https://raw.githubusercontent.com/mcp-use/mcp-use/main/static/readme/chatgpt-hello-world.jpg" alt="Hello World MCP App rendered in a ChatGPT conversation" width="100%" />
   <br />
   <sub>Build interactive UI experiences within ChatGPT with mcp-use.</sub>
 </p>
@@ -240,7 +240,7 @@ npm run dev
 ```
 
 <p align="center">
-  <img src="./static/readme/inspector-hello-world.jpg" alt="Hello World MCP App rendered in the mcp-use Inspector" width="100%" />
+  <img src="https://raw.githubusercontent.com/mcp-use/mcp-use/main/static/readme/inspector-hello-world.jpg" alt="Hello World MCP App rendered in the mcp-use Inspector" width="100%" />
   <br />
   <sub>Invoke tools, validate inputs, and inspect interactive Views in the same development loop.</sub>
 </p>
@@ -313,7 +313,7 @@ block-beta
 
 <sub>Install rows compare custom React MCP App development stacks. FastMCP therefore includes the Apps extension, React, Vite React plugin, Vite, TypeScript, and zod rather than only its narrower server-side component workflow. Size is actual `node_modules` disk usage after a normal npm install, including required peer dependencies.</sub>
 
-**[Read the detailed benchmark report →](./benchmark.md)**
+**[Read the detailed benchmark report →](https://github.com/mcp-use/mcp-use/blob/main/benchmark.md)**
 
 ## Examples
 
@@ -325,7 +325,7 @@ Remix a complete MCP App, inspect the source, or deploy it as a starting point:
 | <img src="https://raw.githubusercontent.com/mcp-use/mcp-diagram-builder/main/repo-assets/demo.gif" alt="Diagram Builder demo" width="280"> | [Diagram Builder](https://github.com/mcp-use/mcp-diagram-builder) | Create and edit diagrams through MCP tools · [Open demo](https://lucky-darkness-402ph.run.mcp-use.com/mcp) |
 | <img src="https://raw.githubusercontent.com/mcp-use/mcp-maps-explorer/main/repo-assets/demo.gif" alt="Maps Explorer demo" width="280"> | [Maps Explorer](https://github.com/mcp-use/mcp-maps-explorer) | Search, detail tools, and an interactive map view · [Open demo](https://super-night-ttde2.run.mcp-use.com/mcp) |
 
-[Browse all TypeScript examples →](./libraries/typescript/packages/server/examples)
+[Browse all TypeScript examples →](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples)
 
 ## Ecosystem
 
@@ -363,12 +363,12 @@ Remix a complete MCP App, inspect the source, or deploy it as a starting point:
 
 ## Security and community
 
-- [Security policy](./SECURITY.md)
-- [Contribution guide](./CONTRIBUTING.md)
+- [Security policy](https://github.com/mcp-use/mcp-use/blob/main/SECURITY.md)
+- [Contribution guide](https://github.com/mcp-use/mcp-use/blob/main/CONTRIBUTING.md)
 - [GitHub issues](https://github.com/mcp-use/mcp-use/issues)
 - [Discord community](https://discord.gg/XkNkSkMz3V)
 - [Manufact](https://manufact.com)
-- [MIT license](./LICENSE)
+- [MIT license](https://github.com/mcp-use/mcp-use/blob/main/LICENSE)
 
 ## Contributors
 
