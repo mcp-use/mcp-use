@@ -33,35 +33,6 @@
   "navigation": {
     "products": [
       {
-        "product": "Home",
-        "description": "Home",
-        "icon": "/images/mcp_use.svg",
-        "groups": [
-          {
-            "group": "Welcome",
-            "pages": [
-              "home/index",
-              "home/mcp101"
-            ]
-          },
-          {
-            "group": "Templates",
-            "icon": "layout-template",
-            "pages": [
-              "home/templates"
-            ]
-          },
-          {
-            "group": "Libraries",
-            "icon": "library",
-            "pages": [
-              "home/redirects/python",
-              "home/redirects/typescript"
-            ]
-          }
-        ]
-      },
-      {
         "product": "TypeScript SDK",
         "description": "TypeScript SDK documentation for V1 and V2",
         "icon": "/images/typescriptlogo.svg",
@@ -327,7 +298,8 @@
                     "group": "Get Started",
                     "pages": [
                       "v2/typescript/getting-started/welcome",
-                      "v2/typescript/getting-started/quickstart"
+                      "v2/typescript/getting-started/quickstart",
+                      "v2/typescript/getting-started/templates"
                     ]
                   },
                   {
@@ -865,32 +837,26 @@
             ]
           }
         ]
-      },
-      {
-        "product": "Inspector",
-        "description": "Debug and test MCP Apps & Servers",
-        "icon": "/images/inspector-logo.svg",
-        "href": "/inspector/index",
-        "groups": [
-          {
-            "group": "Inspector",
-            "pages": [
-              "inspector/index",
-              "inspector/cli",
-              "inspector/connection-settings",
-              "inspector/url-parameters",
-              "inspector/keyboard-shortcuts",
-              "inspector/command-palette",
-              "inspector/integration",
-              "inspector/self-hosting",
-              "inspector/debugging-chatgpt-apps"
-            ]
-          }
-        ]
       }
     ]
   },
   "redirects": [
+    {
+      "source": "/",
+      "destination": "/v2/typescript/getting-started/welcome"
+    },
+    {
+      "source": "/home",
+      "destination": "/v2/typescript/getting-started/welcome"
+    },
+    {
+      "source": "/home/index",
+      "destination": "/v2/typescript/getting-started/welcome"
+    },
+    {
+      "source": "/home/templates",
+      "destination": "/v2/typescript/getting-started/templates"
+    },
     {
       "source": "/v2/typescript/agent/llm-integration",
       "destination": "/v2/typescript/agent/llm-providers"
