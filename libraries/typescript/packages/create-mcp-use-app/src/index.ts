@@ -946,7 +946,7 @@ async function main(): Promise<void> {
       install = false;
     }
     if (skills === undefined) {
-      skills = true;
+      skills = validatedTemplate !== "blank";
     }
   } else if (!interactive) {
     if (install === undefined) {
