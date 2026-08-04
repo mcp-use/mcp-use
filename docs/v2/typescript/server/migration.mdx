@@ -551,27 +551,6 @@ explicit domain handle. Do not key business state to an MCP transport session.
 - Raw `uiResource`, `@mcp-ui/server` adapters, `exposeAsTool`, and a shared View
   bound to multiple server tools have no native equivalent.
 
-## The compatibility bridge is gone
-
-Earlier v2 betas shipped a deprecated `mcp-use/server` export that kept common
-v1 shapes working while you migrated. That bridge was removed before v2 became
-stable, along with the legacy v1 server facade, so the import no longer
-resolves:
-
-```typescript
-// No longer available. mcp-use has no "server" subpath in v2.
-import { MCPServer, text } from "mcp-use/server";
-```
-
-Import from the package root instead:
-
-```typescript
-import { MCPServer, text } from "mcp-use";
-```
-
-There is no staged path onto v2. Every v1 import has to move before the server
-will start.
-
 ## Verify the migration
 
 <Steps>
