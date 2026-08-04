@@ -55,6 +55,12 @@ class TestStdioConnectorInitialization:
         assert connector._tools is None
         assert connector._connected is False
 
+    def test_public_identifier_without_args(self):
+        """Test that the public identifier has no trailing space when args are omitted."""
+        connector = StdioConnector(command="python")
+
+        assert connector.public_identifier == "stdio:python"
+
 
 class TestStdioConnectorConnection:
     """Tests for StdioConnector connection methods."""

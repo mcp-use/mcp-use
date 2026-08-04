@@ -62,15 +62,16 @@ def create_connector_from_config(
 
     # Stdio connector (command-based)
     if is_stdio_server(server_config) and not sandbox:
+        args = server_config.get("args", [])
         _telemetry.track_connector_init(
             connector_type="stdio",
             server_command=server_config["command"],
-            server_args=server_config["args"],
-            public_identifier=f"stdio:{server_config['command']} {' '.join(server_config['args'])}",
+            server_args=args,
+            public_identifier=(f"stdio:{server_config['command']}" + (f" {' '.join(args)}" if args else "")),
         )
         return StdioConnector(
             command=server_config["command"],
-            args=server_config["args"],
+            args=args,
             env=server_config.get("env", None),
             sampling_callback=sampling_callback,
             elicitation_callback=elicitation_callback,
@@ -83,15 +84,16 @@ def create_connector_from_config(
 
     # Sandboxed connector
     elif is_stdio_server(server_config) and sandbox:
+        args = server_config.get("args", [])
         _telemetry.track_connector_init(
             connector_type="sandbox",
             server_command=server_config["command"],
-            server_args=server_config["args"],
-            public_identifier=f"sandbox:{server_config['command']} {' '.join(server_config['args'])}",
+            server_args=args,
+            public_identifier=(f"sandbox:{server_config['command']}" + (f" {' '.join(args)}" if args else "")),
         )
         return SandboxConnector(
             command=server_config["command"],
-            args=server_config["args"],
+            args=args,
             env=server_config.get("env", None),
             e2b_options=sandbox_options,
             sampling_callback=sampling_callback,

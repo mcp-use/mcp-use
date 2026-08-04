@@ -10,4 +10,4 @@ def is_stdio_server(server_config: dict[str, Any]) -> bool:
     Returns:
         True if the server is a stdio server, False otherwise
     """
-    return "command" in server_config and "args" in server_config
+    return "command" in server_config
