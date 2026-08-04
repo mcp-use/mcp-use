@@ -21,7 +21,8 @@
     "docs/tunneling",
     "examples",
     "libraries/python/examples",
-    "libraries/typescript/packages/mcp-use/examples"
+    "libraries/typescript/packages/client/examples",
+    "libraries/typescript/packages/server/examples"
   ],
   "excludeFolders": [
     "docs/snippets",
@@ -29,7 +30,7 @@
     "docs/home/redirects",
     "docs/typescript/changelog",
     "docs/python/changelog",
-    "libraries/typescript/packages/mcp-use/examples/client/conformance",
+    "libraries/typescript/packages/client/examples/conformance",
     "**/dist",
     "**/build",
     "**/coverage",

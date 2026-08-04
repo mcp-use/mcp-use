@@ -33,42 +33,12 @@
   "navigation": {
     "products": [
       {
-        "product": "Home",
-        "description": "Home",
-        "icon": "/images/mcp_use.svg",
-        "groups": [
-          {
-            "group": "Welcome",
-            "pages": [
-              "home/index",
-              "home/mcp101"
-            ]
-          },
-          {
-            "group": "Templates",
-            "icon": "layout-template",
-            "pages": [
-              "home/templates"
-            ]
-          },
-          {
-            "group": "Libraries",
-            "icon": "library",
-            "pages": [
-              "home/redirects/python",
-              "home/redirects/typescript"
-            ]
-          }
-        ]
-      },
-      {
         "product": "TypeScript SDK",
         "description": "TypeScript SDK documentation for V1 and V2",
         "icon": "/images/typescriptlogo.svg",
         "versions": [
           {
             "version": "V1",
-            "default": true,
             "tabs": [
               {
                 "tab": "Docs",
@@ -318,6 +288,7 @@
           },
           {
             "version": "V2",
+            "default": true,
             "tabs": [
               {
                 "tab": "Docs",
@@ -328,6 +299,7 @@
                     "pages": [
                       "v2/typescript/getting-started/welcome",
                       "v2/typescript/getting-started/quickstart",
+                      "v2/typescript/getting-started/templates",
                       "v2/typescript/changelog/changelog",
                       "v2/inspector/changelog"
                     ]
@@ -374,8 +346,7 @@
                         "icon": "rocket",
                         "pages": [
                           "v2/typescript/server/deployment/mcp-use",
-                          "v2/typescript/server/deployment/google",
-                          "v2/typescript/server/deployment/supabase"
+                          "v2/typescript/server/deployment/self-hosted"
                         ]
                       },
                       "v2/typescript/server/proxy",
@@ -867,32 +838,26 @@
             ]
           }
         ]
-      },
-      {
-        "product": "Inspector",
-        "description": "Debug and test MCP Apps & Servers",
-        "icon": "/images/inspector-logo.svg",
-        "href": "/inspector/index",
-        "groups": [
-          {
-            "group": "Inspector",
-            "pages": [
-              "inspector/index",
-              "inspector/cli",
-              "inspector/connection-settings",
-              "inspector/url-parameters",
-              "inspector/keyboard-shortcuts",
-              "inspector/command-palette",
-              "inspector/integration",
-              "inspector/self-hosting",
-              "inspector/debugging-chatgpt-apps"
-            ]
-          }
-        ]
       }
     ]
   },
   "redirects": [
+    {
+      "source": "/",
+      "destination": "/v2/typescript/getting-started/welcome"
+    },
+    {
+      "source": "/home",
+      "destination": "/v2/typescript/getting-started/welcome"
+    },
+    {
+      "source": "/home/index",
+      "destination": "/v2/typescript/getting-started/welcome"
+    },
+    {
+      "source": "/home/templates",
+      "destination": "/v2/typescript/getting-started/templates"
+    },
     {
       "source": "/v2/typescript/agent/llm-integration",
       "destination": "/v2/typescript/agent/llm-providers"
@@ -1209,7 +1174,7 @@
       "og:title": "mcp-use - The fullstack MCP framework to develop MCP Apps for ChatGPT / Claude and MCP Servers for AI Agents.",
       "og:type": "website",
       "og:url": "https://mcp-use.com",
-      "og:image": "https://raw.githubusercontent.com/mcp-use/mcp-use/refs/heads/main/static/og_image_docs.jpg",
+      "og:image": "https://cdn.mcp-use.com/og-image.png",
       "og:description": "The fullstack MCP framework to develop MCP Apps for ChatGPT / Claude and MCP Servers for AI Agents.",
       "og:site_name": "mcp-use",
       "og:locale": "en_US",
@@ -1218,7 +1183,7 @@
       "twitter:creator": "@manufact",
       "twitter:title": "mcp-use - The fullstack MCP framework to develop MCP Apps for ChatGPT / Claude and MCP Servers for AI Agents.",
       "twitter:description": "The fullstack MCP framework to develop MCP Apps for ChatGPT / Claude and MCP Servers for AI Agents.",
-      "twitter:image": "https://raw.githubusercontent.com/mcp-use/mcp-use/refs/heads/main/static/og_image_docs.jpg",
+      "twitter:image": "https://cdn.mcp-use.com/og-image.png",
       "twitter:image:alt": "mcp-use logo and interface showing MCP Apps for ChatGPT / Claude and MCP Servers for AI Agents.",
       "article:published_time": "2024-12-01T00:00:00+00:00",
       "article:modified_time": "2026-05-14T00:00:00+00:00",

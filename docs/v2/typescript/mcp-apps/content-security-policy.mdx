@@ -76,7 +76,7 @@ CSP_FRAME_DOMAINS=https://embed.example.com
 CSP_BASE_URI_DOMAINS=https://myserver.com
 ```
 
-## Static deployments (Supabase / CDN)
+## Static deployments
 
 When assets live on static storage and the MCP server runs elsewhere:
 
@@ -85,8 +85,6 @@ MCP_URL=https://PROJECT.supabase.co/functions/v1/mcp-server
 MCP_ASSETS_URL=https://PROJECT.supabase.co/storage/v1/object/public/widgets
 CSP_URLS=https://PROJECT.supabase.co
 ```
-
-See [Supabase deployment](/v2/typescript/server/deployment/supabase) for the full workflow.
 
 ## Verify CSP
 
@@ -103,4 +101,4 @@ The mcp-use Inspector provides a **CSP Mode Toggle** for testing:
 ## Next Steps
 
 - [MCP Apps](/v2/typescript/mcp-apps): View overview and routing
-- [Supabase Deployment](/v2/typescript/server/deployment/supabase): Static deployment with CSP
+- [Self hosted](/v2/typescript/server/deployment/self-hosted): Run an MCP server in Docker
