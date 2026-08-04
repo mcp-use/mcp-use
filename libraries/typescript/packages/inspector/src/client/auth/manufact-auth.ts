@@ -504,11 +504,6 @@ export async function authorizeManufact(
   const origin = authOrigin(chatApiUrl);
   pendingAuthorizeChatApiUrl = chatApiUrl;
   setSkipSharedSession(origin, false);
-  const popup = window.open(
-    "",
-    "manufact-oauth",
-    "width=600,height=700,resizable=yes,scrollbars=yes"
-  );
   emit(origin, { authorizing: true });
   try {
     const metadata = await discover(origin);
@@ -535,23 +530,12 @@ export async function authorizeManufact(
     // Inspector is a third-party OAuth client — always require explicit consent.
     // (Different dev ports do not imply consent; OAuth consent is per client grant.)
     url.searchParams.set("prompt", "consent");
-    if (popup) {
-      popup.location.href = url.toString();
-      const closePoll = window.setInterval(() => {
-        if (!popup.closed) return;
-        window.clearInterval(closePoll);
-        // ponytail: cross-origin OAuth redirects often null window.opener, so
-        // postMessage from the callback is unreliable — reload when popup closes.
-        void load(origin).finally(() => emit(origin, { authorizing: false }));
-      }, 500);
-    } else {
-      // Codex and other embedded browser hosts may block window.open. The
-      // OAuth state is already persisted, so continue in the current tab and
-      // let the callback return to the Inspector via PendingAuthorization.
-      window.location.href = url.toString();
-    }
+    // Use the current tab for Manufact auth. Opening a popup before OAuth
+    // discovery completes leaves a blank window behind when discovery or
+    // client registration fails, and embedded hosts may block popups anyway.
+    // The persisted state lets the callback return to the Inspector afterward.
+    window.location.href = url.toString();
   } catch (error) {
-    popup?.close();
     emit(origin, { authorizing: false });
     throw error;
   }
