@@ -327,7 +327,9 @@
                     "group": "Get Started",
                     "pages": [
                       "v2/typescript/getting-started/welcome",
-                      "v2/typescript/getting-started/quickstart"
+                      "v2/typescript/getting-started/quickstart",
+                      "v2/typescript/changelog/changelog",
+                      "v2/inspector/changelog"
                     ]
                   },
                   {
