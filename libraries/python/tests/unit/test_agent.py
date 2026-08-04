@@ -279,6 +279,40 @@ class TestMCPAgentStream:
         assert outputs[-1] == "4"
 
     @pytest.mark.asyncio
+    async def test_stream_resets_tools_used_names_between_calls(self):
+        """stream() should reset tools_used_names for each run."""
+        llm = self._mock_llm()
+        client = MagicMock(spec=MCPClient)
+        agent = MCPAgent(llm=llm, client=client, max_steps=5)
+        agent.callbacks = []
+        agent.telemetry = MagicMock()
+
+        executor = MagicMock()
+        agent._agent_executor = executor
+        agent._initialized = True
+
+        async def mock_astream(inputs, stream_mode=None, config=None):
+            yield {
+                "agent": {
+                    "messages": [
+                        AIMessage(content="", tool_calls=[{"name": "add", "args": {"a": 2, "b": 2}, "id": "call_1"}])
+                    ]
+                }
+            }
+            yield {"tools": {"messages": [ToolMessage(content="4", tool_call_id="call_1")]}}
+            yield {"agent": {"messages": [AIMessage(content="4")]}}
+
+        executor.astream = MagicMock(side_effect=mock_astream)
+
+        async for _ in agent.stream("Add 2 and 2", manage_connector=False):
+            pass
+        assert agent.tools_used_names == ["add"]
+
+        async for _ in agent.stream("Add 2 and 2 again", manage_connector=False):
+            pass
+        assert agent.tools_used_names == ["add"]
+
+    @pytest.mark.asyncio
     async def test_stream_handles_block_tool_results_without_losing_history(self):
         """stream() should tolerate LangChain ToolMessage block content produced by richer tool outputs."""
         llm = self._mock_llm()
@@ -383,3 +417,32 @@ class TestMCPAgentStreamEvents:
         assert any(isinstance(message, AIMessage) and message.content == ai_message.content for message in history), (
             "Final AI message should be stored by stream_events()"
         )
+
+    @pytest.mark.asyncio
+    async def test_stream_events_does_not_mutate_max_steps_between_calls(self):
+        """stream_events() should use per-call max_steps without mutating the agent default."""
+        llm = self._mock_llm()
+        client = MagicMock(spec=MCPClient)
+        agent = MCPAgent(llm=llm, client=client, max_steps=5, memory_enabled=True)
+        agent.callbacks = []
+        agent.telemetry = MagicMock()
+
+        executor = MagicMock()
+        agent._agent_executor = executor
+        agent._initialized = True
+
+        recursion_limits: list[int] = []
+
+        async def mock_astream_events(inputs, config=None):
+            recursion_limits.append(config["recursion_limit"])
+            yield {"event": "on_chat_model_end", "data": {"output": AIMessage(content="done")}}
+
+        executor.astream_events = MagicMock(side_effect=mock_astream_events)
+
+        async for _ in agent.stream_events("First call", max_steps=3, manage_connector=False):
+            pass
+        async for _ in agent.stream_events("Second call", manage_connector=False):
+            pass
+
+        assert recursion_limits == [6, 10]
+        assert agent.max_steps == 5
