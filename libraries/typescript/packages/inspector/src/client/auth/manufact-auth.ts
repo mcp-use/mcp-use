@@ -35,6 +35,7 @@ interface PendingAuthorization {
   authOrigin: string;
   clientId: string;
   redirectUri: string;
+  returnUrl?: string;
   codeVerifier: string;
   expiresAt: number;
 }
@@ -508,7 +509,6 @@ export async function authorizeManufact(
     "manufact-oauth",
     "width=600,height=700,resizable=yes,scrollbars=yes"
   );
-  if (!popup) throw new Error("Allow popups to sign in with Manufact");
   emit(origin, { authorizing: true });
   try {
     const metadata = await discover(origin);
@@ -520,6 +520,7 @@ export async function authorizeManufact(
       authOrigin: origin,
       clientId: client.client_id,
       redirectUri,
+      returnUrl: window.location.href,
       codeVerifier: verifier,
       expiresAt: Date.now() + 10 * 60 * 1000,
     } satisfies PendingAuthorization);
@@ -534,16 +535,23 @@ export async function authorizeManufact(
     // Inspector is a third-party OAuth client — always require explicit consent.
     // (Different dev ports do not imply consent; OAuth consent is per client grant.)
     url.searchParams.set("prompt", "consent");
-    popup.location.href = url.toString();
-    const closePoll = window.setInterval(() => {
-      if (!popup.closed) return;
-      window.clearInterval(closePoll);
-      // ponytail: cross-origin OAuth redirects often null window.opener, so
-      // postMessage from the callback is unreliable — reload when popup closes.
-      void load(origin).finally(() => emit(origin, { authorizing: false }));
-    }, 500);
+    if (popup) {
+      popup.location.href = url.toString();
+      const closePoll = window.setInterval(() => {
+        if (!popup.closed) return;
+        window.clearInterval(closePoll);
+        // ponytail: cross-origin OAuth redirects often null window.opener, so
+        // postMessage from the callback is unreliable — reload when popup closes.
+        void load(origin).finally(() => emit(origin, { authorizing: false }));
+      }, 500);
+    } else {
+      // Codex and other embedded browser hosts may block window.open. The
+      // OAuth state is already persisted, so continue in the current tab and
+      // let the callback return to the Inspector via PendingAuthorization.
+      window.location.href = url.toString();
+    }
   } catch (error) {
-    popup.close();
+    popup?.close();
     emit(origin, { authorizing: false });
     throw error;
   }
@@ -582,10 +590,16 @@ export async function completeManufactAuthorization(
     user,
     mode: "oauth",
   });
-  window.opener?.postMessage(
-    { type: "manufact:oauth-complete", authOrigin: pending.authOrigin },
-    window.location.origin
-  );
+  if (window.opener && !window.opener.closed) {
+    window.opener.postMessage(
+      { type: "manufact:oauth-complete", authOrigin: pending.authOrigin },
+      window.location.origin
+    );
+  } else if (pending.returnUrl) {
+    // Same-tab redirect fallback: return to the page that started sign-in so
+    // the normal session loader can render the authenticated Inspector.
+    window.location.href = pending.returnUrl;
+  }
 }
 
 function clearManufactAuthorization(chatApiUrl: string): void {
