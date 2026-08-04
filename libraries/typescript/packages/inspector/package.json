@@ -162,7 +162,7 @@
     "emulate": "0.5.0",
     "eslint": "^9.39.2",
     "express": "^5.2.1",
-    "hono": "^4.12.12",
+    "hono": "^4.12.34",
     "lucide-react": "^0.562.0",
     "markdown-to-jsx": "^9.7.4",
     "motion": "^12.34.2",

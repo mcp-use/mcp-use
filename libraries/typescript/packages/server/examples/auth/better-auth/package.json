@@ -19,7 +19,7 @@
     "@better-auth/oauth-provider": "^1.6.2",
     "@hono/node-server": "^1.19.13",
     "better-auth": "^1.6.2",
-    "hono": "^4.12.27",
+    "hono": "^4.12.34",
     "mcp-use": "workspace:*"
   },
   "devDependencies": {
