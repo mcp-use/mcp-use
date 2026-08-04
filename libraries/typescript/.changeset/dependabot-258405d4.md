@@ -1,0 +1,5 @@
+---
+"@mcp-use/client": patch
+---
+
+Updated dependency `hono` to `^4.12.34`.
