@@ -344,8 +344,7 @@
                         "icon": "rocket",
                         "pages": [
                           "v2/typescript/server/deployment/mcp-use",
-                          "v2/typescript/server/deployment/google",
-                          "v2/typescript/server/deployment/supabase"
+                          "v2/typescript/server/deployment/self-hosted"
                         ]
                       },
                       "v2/typescript/server/proxy",
