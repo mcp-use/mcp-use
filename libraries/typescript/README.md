@@ -54,6 +54,7 @@ mcp-use for TypeScript provides the complete MCP stack:
 | --------------------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | **[mcp-use](#mcp-use-core-framework)**        | Core framework for MCP clients and servers | [![npm](https://img.shields.io/npm/v/mcp-use.svg)](https://www.npmjs.com/package/mcp-use)                       | [![npm](https://img.shields.io/npm/dw/mcp-use.svg)](https://www.npmjs.com/package/mcp-use)                       |
 | **[@mcp-use/inspector](#mcp-use-inspector)**  | Web-based debugger for MCP servers         | [![npm](https://img.shields.io/npm/v/@mcp-use/inspector.svg)](https://www.npmjs.com/package/@mcp-use/inspector) | [![npm](https://img.shields.io/npm/dw/@mcp-use/inspector.svg)](https://www.npmjs.com/package/@mcp-use/inspector) |
+| **[@mcp-use/tunnel](#mcp-use-tunnel)**        | WebSocket tunnel client                    | [![npm](https://img.shields.io/npm/v/@mcp-use/tunnel.svg)](https://www.npmjs.com/package/@mcp-use/tunnel)       | [![npm](https://img.shields.io/npm/dw/@mcp-use/tunnel.svg)](https://www.npmjs.com/package/@mcp-use/tunnel)       |
 | **[create-mcp-use-app](#create-mcp-use-app)** | Project scaffolding tool                   | [![npm](https://img.shields.io/npm/v/create-mcp-use-app.svg)](https://www.npmjs.com/package/create-mcp-use-app) | [![npm](https://img.shields.io/npm/dw/create-mcp-use-app.svg)](https://www.npmjs.com/package/create-mcp-use-app) |
 
 ---
@@ -397,6 +398,19 @@ mountInspector(app, { basePath: "/debug" });
 ```
 
 [**Full Inspector Documentation →**](./packages/inspector)
+
+---
+
+### @mcp-use/tunnel
+
+The shared WebSocket tunnel client used by `mcp-use dev --tunnel`,
+`mcp-use start --tunnel`, and the standalone command:
+
+```bash
+npx @mcp-use/tunnel 3000
+```
+
+[**Full Tunnel Documentation →**](./packages/tunnel)
 
 ---
 

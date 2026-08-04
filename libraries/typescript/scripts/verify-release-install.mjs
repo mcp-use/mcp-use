@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import {
+  existsSync,
   mkdtempSync,
   mkdirSync,
   readFileSync,
@@ -23,6 +24,7 @@ const artifactDirectory = suppliedArtifactDirectory
   : join(scratch, "artifacts");
 const installDirectory = join(scratch, "install");
 const cliInstallDirectory = join(scratch, "cli-install");
+const tunnelInstallDirectory = join(scratch, "tunnel-install");
 const allowedExtraneous = new Set([
   "@emnapi/core",
   "@emnapi/runtime",
@@ -36,11 +38,13 @@ try {
   if (!suppliedArtifactDirectory) mkdirSync(artifactDirectory);
   mkdirSync(installDirectory);
   mkdirSync(cliInstallDirectory);
+  mkdirSync(tunnelInstallDirectory);
   const tarballs = new Map();
   for (const name of [
     "@mcp-use/client",
     "@mcp-use/cli",
     "@mcp-use/inspector",
+    "@mcp-use/tunnel",
     "mcp-use",
   ]) {
     if (suppliedArtifactDirectory) {
@@ -71,7 +75,16 @@ try {
   );
   const install = runResult(
     "npm",
-    ["install", "--omit=dev", ...tarballs.values()],
+    [
+      "install",
+      "--omit=dev",
+      ...[
+        "@mcp-use/client",
+        "@mcp-use/cli",
+        "@mcp-use/inspector",
+        "mcp-use",
+      ].map((name) => tarballs.get(name)),
+    ],
     installDirectory
   );
   assert.equal(install.status, 0, install.stderr || install.stdout);
@@ -94,9 +107,25 @@ try {
     ["install", "--omit=dev", tarballs.get("@mcp-use/cli")],
     cliInstallDirectory
   );
+  run(
+    "npm",
+    ["install", "--omit=dev", tarballs.get("@mcp-use/tunnel")],
+    tunnelInstallDirectory
+  );
   const cliManifest = readJson(
     join(cliInstallDirectory, "node_modules", "@mcp-use", "cli", "package.json")
   );
+  const tunnelManifest = readJson(
+    join(
+      tunnelInstallDirectory,
+      "node_modules",
+      "@mcp-use",
+      "tunnel",
+      "package.json"
+    )
+  );
+  assert.equal(frameworkManifest.dependencies?.["@mcp-use/tunnel"], undefined);
+  assert.equal(cliManifest.dependencies?.["@mcp-use/tunnel"], undefined);
   assert.notEqual(frameworkManifest.version, cliManifest.version);
   const frameworkBin = join(
     installDirectory,
@@ -127,6 +156,26 @@ try {
     ).trim(),
     cliManifest.version
   );
+  assert.equal(
+    run(
+      process.execPath,
+      [
+        "--input-type=module",
+        "--eval",
+        'const tunnel = await import("@mcp-use/tunnel"); console.log(typeof tunnel.createTunnelManager)',
+      ],
+      tunnelInstallDirectory
+    ).trim(),
+    "function"
+  );
+
+  for (const directory of [installDirectory, cliInstallDirectory]) {
+    assert.equal(
+      existsSync(join(directory, "node_modules", "@mcp-use", "tunnel")),
+      false,
+      "tunnel support must work without a separate @mcp-use/tunnel install"
+    );
+  }
 
   verifyDependencyGraph(installDirectory, frameworkManifest);
   verifyRuntimeImport(installDirectory, []);
@@ -177,6 +226,7 @@ try {
         npm: run("npm", ["--version"], installDirectory).trim(),
         frameworkVersion: frameworkManifest.version,
         cliVersion: cliManifest.version,
+        tunnelVersion: tunnelManifest.version,
         installedBytes,
         installedMiB: installedBytes / 1024 / 1024,
         toolBuildBytes: directoryBytes(buildDirectory),

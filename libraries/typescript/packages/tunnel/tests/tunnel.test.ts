@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createTunnelManager } from "../../src/cli/tunnel.js";
+import { createTunnelManager } from "../src/index.js";
 
 const reservation = {
   tunnel_id: "quiet-amber",
@@ -80,7 +80,7 @@ class MockWebSocket extends EventTarget {
     this.dispatchEvent(closeEvent(code, reason));
   }
 
-  disconnect(code = 1012, reason = "Worker deployment"): void {
+  disconnect(code = 1012, reason = "Relay restart"): void {
     this.close(code, reason);
   }
 }
@@ -89,6 +89,8 @@ describe("createTunnelManager", () => {
   let stateFilePath: string;
   let createRequests: number;
   let deleteRequests: number;
+  let requestUrl: string | undefined;
+  let requestBody: string | undefined;
 
   beforeEach(() => {
     stateFilePath = join(
@@ -97,20 +99,37 @@ describe("createTunnelManager", () => {
     );
     createRequests = 0;
     deleteRequests = 0;
+    requestUrl = undefined;
+    requestBody = undefined;
     MockWebSocket.instances.length = 0;
     MockWebSocket.keepaliveSupported = true;
     vi.stubGlobal("WebSocket", MockWebSocket);
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
         if (init?.method === "DELETE") {
           deleteRequests += 1;
           return Response.json({ deleted: true });
         }
         createRequests += 1;
+        requestUrl = input instanceof Request ? input.url : input.toString();
+        requestBody = typeof init?.body === "string" ? init.body : undefined;
         return Response.json(reservation, { status: 201 });
       })
     );
+  });
+
+  it("uses the configured relay and requested subdomain", async () => {
+    const tunnel = createTunnelManager(stateFilePath, {
+      relayUrl: "https://relay.example.com/base",
+      subdomain: "preferred-name",
+    });
+    await tunnel.start(3000);
+
+    expect(requestUrl).toBe("https://relay.example.com/api/tunnels/request");
+    expect(requestBody).toBe(JSON.stringify({ subdomain: "preferred-name" }));
+
+    await tunnel.stop();
   });
 
   afterEach(() => {

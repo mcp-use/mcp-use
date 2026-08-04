@@ -620,6 +620,9 @@ jobs:
       - name: Build Client Types
         run: pnpm build:client
 
+      - name: Build Tunnel Types
+        run: pnpm build:tunnel
+
       - name: Check Formatting
         run: pnpm format:check
 
@@ -696,6 +699,8 @@ jobs:
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
         run: pnpm --filter mcp-use --if-present test:unit
+      - name: Run @mcp-use/tunnel Tests
+        run: pnpm --filter @mcp-use/tunnel test
       - name: Run @mcp-use/agent Unit Tests
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
@@ -884,6 +889,9 @@ jobs:
       - name: Pack @mcp-use/inspector
         working-directory: libraries/typescript/packages/inspector
         run: npm pack
+      - name: Pack @mcp-use/tunnel
+        working-directory: libraries/typescript/packages/tunnel
+        run: npm pack
       - name: Pack mcp-use
         working-directory: libraries/typescript/packages/server
         run: npm pack
@@ -896,6 +904,7 @@ jobs:
             libraries/typescript/packages/server/mcp-use-*.tgz
             libraries/typescript/packages/cli/mcp-use-cli-*.tgz
             libraries/typescript/packages/inspector/mcp-use-inspector-*.tgz
+            libraries/typescript/packages/tunnel/mcp-use-tunnel-*.tgz
           retention-days: 1
 
   create-mcp-use-app-tests:

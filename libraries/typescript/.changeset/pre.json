@@ -7,6 +7,7 @@
     "@mcp-use/client": "2.0.0",
     "create-mcp-use-app": "2.0.0",
     "@mcp-use/inspector": "20.0.0",
+    "@mcp-use/tunnel": "0.1.6",
     "mcp-use": "2.0.0"
   },
   "changesets": [

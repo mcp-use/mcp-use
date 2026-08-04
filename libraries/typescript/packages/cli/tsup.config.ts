@@ -31,6 +31,8 @@ export default defineConfig({
   dts: false,
   // The build pipeline is installed with the CLI, not with generated apps.
   // Preserve its package-relative runtime lookups rather than rebundling it.
+  // Tunnel is intentionally bundled into lazy command chunks so mcp-use does
+  // not install a second runtime package for its built-in tunnel support.
   external: [
     "@mcp-use/client",
     "@mcp-use/inspector",

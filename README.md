@@ -335,6 +335,7 @@ Remix a complete MCP App, inspect the source, or deploy it as a starting point:
 | [`@mcp-use/client`](https://www.npmjs.com/package/@mcp-use/client) | Connect to MCP servers from Node.js, browsers, React, and sandboxes |
 | [`@mcp-use/agent`](https://www.npmjs.com/package/@mcp-use/agent) | Build model-powered agents on top of MCP clients |
 | [`@mcp-use/inspector`](https://www.npmjs.com/package/@mcp-use/inspector) | Inspect and debug MCP servers and apps |
+| [`@mcp-use/tunnel`](https://www.npmjs.com/package/@mcp-use/tunnel) | Expose local MCP servers through the WebSocket relay |
 | [`create-mcp-use-app`](https://www.npmjs.com/package/create-mcp-use-app) | Scaffold servers and interactive apps |
 | [`mcp-use` for Python](https://pypi.org/project/mcp-use/) | Build Python MCP servers, clients, and agents |
 

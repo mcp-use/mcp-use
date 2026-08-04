@@ -174,7 +174,7 @@ export async function runStart(options: StartOptions): Promise<StartedServer> {
       // Keep the tunnel process/state code outside the ordinary production
       // start evaluation graph. The listener must bind successfully before a
       // public route is created for it.
-      const { createTunnelManager } = await import("../cli/tunnel.js");
+      const { createTunnelManager } = await import("@mcp-use/tunnel");
       tunnel = createTunnelManager(
         join(options.cwd, WORKSPACE_DIR_NAME, "state", "tunnel.json")
       );

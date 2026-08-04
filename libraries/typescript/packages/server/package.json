@@ -133,6 +133,7 @@
   },
   "devDependencies": {
     "@mcp-use/client": "workspace:*",
+    "@mcp-use/tunnel": "workspace:*",
     "@tailwindcss/vite": "^4.2.0",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^22.20.0",

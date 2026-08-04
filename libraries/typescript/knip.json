@@ -39,10 +39,15 @@
       ],
       "project": ["src/**/*.ts", "tests/**/*.ts", "examples/**/*.ts"]
     },
+    "packages/tunnel": {
+      "entry": ["src/index.ts", "src/bin.ts", "tests/**/*.ts"],
+      "project": ["src/**/*.ts", "tests/**/*.ts"]
+    },
     "packages/cli": {
       "entry": ["src/index.ts", "tests/**/*.mjs"],
       "project": ["src/**/*.ts", "tests/**/*.mjs"],
       "ignoreDependencies": [
+        "@mcp-use/tunnel",
         "@modelcontextprotocol/server",
         "@tailwindcss/vite",
         "@vitejs/plugin-react",

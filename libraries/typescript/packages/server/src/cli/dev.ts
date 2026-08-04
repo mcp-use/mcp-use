@@ -24,6 +24,7 @@ import { networkInterfaces } from "node:os";
 import { join, resolve } from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
+import { createTunnelManager } from "@mcp-use/tunnel";
 import { createServer, createServerModuleRunner } from "vite";
 import {
   InMemoryServerEventBus,
@@ -54,7 +55,6 @@ import {
   type ProjectInspectorModule,
 } from "./inspector.js";
 import { isInspectorPath, isInspectorRequest } from "./inspector-route.js";
-import { createTunnelManager } from "./tunnel.js";
 import { syncMcpEnvDeclaration } from "./mcp-env-declaration.js";
 import { resolveWorkspacePaths } from "./workspace.js";
 import {
