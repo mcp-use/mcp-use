@@ -11,6 +11,7 @@
   },
   "changesets": [
     "client-stdio-errlog",
+    "inspector-proxy-loopback-default",
     "mcp-2549-dev-forwarding",
     "start-inspector-hint",
     "stdio-env-leak",
