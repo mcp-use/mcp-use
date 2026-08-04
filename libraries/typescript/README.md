@@ -609,13 +609,6 @@ git commit -m "feat: your feature description"
 - Merge the Version PR to publish stable versions
 - Packages published with `latest` tag on npm
 
-#### V2 Beta Prereleases (beta branch)
-
-- Merge a reviewed PR into `beta` to trigger the V2 beta release workflow
-- GitHub Actions publishes the versioned beta packages with OIDC trusted publishing
-- Versions use the `x.y.z-beta.N` form and npm's `beta` dist tag
-- The workflow verifies that `latest`, `canary`, and every other non-beta dist tag are unchanged
-
 #### Canary Prereleases (canary branch)
 
 - Push changes with changesets to `canary` branch

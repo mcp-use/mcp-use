@@ -50,7 +50,7 @@ on:
   push:
     branches: [main, canary]
   pull_request:
-    branches: [main, canary, beta]
+    branches: [main, canary]
   workflow_call:
     inputs:
       ref:
@@ -660,9 +660,6 @@ jobs:
       - name: Build Packages
         run: pnpm build
 
-      - name: Test release versioning
-        run: pnpm test:release-versioning
-
   typescript-test-mcp-use:
     needs: typescript-lint
     name: "typescript/mcp-use (node-${{ matrix.node-version }})"
@@ -813,7 +810,7 @@ jobs:
 
   typescript-changeset-check:
     needs: detect-changes
-    if: ${{ (github.event_name == 'workflow_call' && inputs.run_changeset_check) || (github.event_name == 'pull_request' && github.head_ref != 'beta' && github.base_ref != 'canary' && github.base_ref != 'beta' && needs.detect-changes.outputs.typescript == 'true') }}
+    if: ${{ (github.event_name == 'workflow_call' && inputs.run_changeset_check) || (github.event_name == 'pull_request' && github.base_ref != 'canary' && needs.detect-changes.outputs.typescript == 'true') }}
     runs-on: ubuntu-latest
     defaults:
       run:
