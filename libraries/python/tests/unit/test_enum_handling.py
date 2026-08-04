@@ -3,6 +3,7 @@ Unit tests for enum handling in LangChain adapter.
 """
 
 import unittest
+from copy import deepcopy
 from enum import Enum
 from unittest.mock import Mock
 
@@ -103,6 +104,30 @@ class TestEnumHandling(unittest.TestCase):
         nested_props = fixed_schema["properties"]["nested"]["properties"]
         self.assertIn("type", nested_props["code_type"])
         self.assertEqual(nested_props["code_type"]["type"], "string")
+
+    def test_fix_schema_does_not_mutate_original_schema(self):
+        """Test that schema fixing leaves the caller's schema unchanged."""
+        original_schema = {
+            "type": "object",
+            "properties": {
+                "nickname": {"type": ["string", "null"]},
+                "nested": {
+                    "type": "object",
+                    "properties": {"code_type": {"enum": ["a", "b", "c"]}},
+                },
+            },
+        }
+        expected_schema = deepcopy(original_schema)
+
+        fixed_schema = self.adapter.fix_schema(original_schema)
+
+        self.assertEqual(original_schema, expected_schema)
+        self.assertIsNot(fixed_schema, original_schema)
+        self.assertEqual(
+            fixed_schema["properties"]["nickname"]["anyOf"],
+            [{"type": "string"}, {"type": "null"}],
+        )
+        self.assertEqual(fixed_schema["properties"]["nested"]["properties"]["code_type"]["type"], "string")
 
 
 if __name__ == "__main__":
