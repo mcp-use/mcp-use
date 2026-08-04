@@ -75,13 +75,17 @@ describe("mergeTokenUsage", () => {
     const start = tokenUsageFromRecord({
       input_tokens: 3,
       cache_read_input_tokens: 20000,
+      cache_creation_input_tokens: 1500,
       output_tokens: 1,
     });
     const delta = tokenUsageFromRecord({ output_tokens: 500 });
 
+    // Cache creation is billed above the base rate, so it has to survive the merge for the
+    // same reason cache reads do.
     expect(mergeTokenUsage(start, delta)).toMatchObject({
       inputTokens: 3,
       cachedInputTokens: 20000,
+      cacheCreationInputTokens: 1500,
       outputTokens: 500,
     });
   });
