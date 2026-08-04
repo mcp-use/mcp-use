@@ -82,6 +82,46 @@ describe("protocol era exposure", () => {
     expect(session.supports("resources")).toBe(false);
   });
 
+  it.each([
+    {
+      description: "a top-level serverInfo field",
+      discover: (serverInfo: object) => ({ serverInfo }),
+    },
+    {
+      description: "result metadata",
+      discover: (serverInfo: object) => ({
+        _meta: { "io.modelcontextprotocol/serverInfo": serverInfo },
+      }),
+    },
+  ])(
+    "uses $description when a modern client has no server version",
+    async ({ discover }) => {
+      const serverInfo = {
+        name: "conformance",
+        version: "2.0.0",
+        description: "Modern conformance server",
+      };
+      const connector = new BaseConnector();
+      (connector as any).client = {
+        getProtocolEra: () => "modern",
+        getNegotiatedProtocolVersion: () => "2026-07-28",
+        getServerCapabilities: () => ({ tools: {} }),
+        getServerVersion: () => undefined,
+        getDiscoverResult: () => discover(serverInfo),
+        getInstructions: () => undefined,
+        listTools: async () => ({ tools: [] }),
+      };
+
+      await connector.initialize();
+
+      expect(new MCPSession(connector).info).toMatchObject({
+        protocolEra: "modern",
+        protocolVersion: "2026-07-28",
+        server: serverInfo,
+      });
+    }
+  );
+
   it("automatically negotiates the newest supported HTTP protocol", () => {
     const connector = new HttpConnector("https://example.com/mcp");
     expect((connector as any).protocolNegotiation).toBe("auto");

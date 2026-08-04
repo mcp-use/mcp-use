@@ -9,6 +9,7 @@
 import {
   acceptedContent,
   completable,
+  createRequestStateCodec,
   inputRequired,
   inputResponse,
   MCPServer,
@@ -34,6 +35,50 @@ const weatherOutputSchema = z.object({
   windSpeed: z.number(),
 });
 
+const conformanceRequestState = createRequestStateCodec<{
+  scenario: string;
+  round: number;
+}>({
+  // This is a deterministic fixture key, not an application secret. Its only
+  // purpose is to exercise the requestState integrity contract.
+  key: new Uint8Array(32).fill(17),
+  ttlSeconds: 60,
+});
+
+const nameSchema = z.object({ name: z.string() });
+const confirmationSchema = z.object({ ok: z.boolean() });
+const colorSchema = z.object({ color: z.string() });
+
+const jsonSchema202012ToolSchema = z
+  .object({
+    name: z.string().optional(),
+    address: z.object({ street: z.string(), city: z.string() }).optional(),
+    contactMethod: z.enum(["phone", "email"]).optional(),
+    phone: z.string().optional(),
+    email: z.string().optional(),
+  })
+  .meta({
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    $defs: {
+      address: {
+        $anchor: "addressDef",
+        type: "object",
+        properties: {
+          street: { type: "string" },
+          city: { type: "string" },
+        },
+      },
+    },
+    allOf: [{ anyOf: [{ required: ["phone"] }, { required: ["email"] }] }],
+    if: {
+      properties: { contactMethod: { const: "phone" } },
+      required: ["contactMethod"],
+    },
+    then: { required: ["phone"] },
+    else: { required: ["email"] },
+    additionalProperties: false,
+  });
+
 const server = new MCPServer({
   name: "ConformanceTestServer",
   version: "1.0.0",
@@ -48,6 +93,7 @@ const server = new MCPServer({
     },
   ],
   logging: { level: "debug" },
+  requestState: { verify: conformanceRequestState.verify },
 });
 
 // =============================================================================
@@ -461,6 +507,430 @@ server.tool(
 );
 
 // =============================================================================
+// STATELESS (2026-07-28) CONFORMANCE FIXTURES
+// =============================================================================
+
+server.tool(
+  {
+    name: "json_schema_2020_12_tool",
+    description: "Tool with JSON Schema 2020-12 features",
+    inputSchema: jsonSchema202012ToolSchema,
+  },
+  async () => ({ content: [{ type: "text", text: "JSON Schema accepted" }] })
+);
+
+server.tool(
+  {
+    name: "test_custom_header",
+    description: "Exercises the x-mcp-header transport parameter fixture",
+    inputSchema: z.object({
+      value: z.string().meta({ "x-mcp-header": "Conformance-Value" }),
+    }),
+  },
+  async ({ value }) => ({
+    content: [{ type: "text", text: `Custom header value: ${value}` }],
+  })
+);
+
+server.tool(
+  {
+    name: "test_input_required_result_elicitation",
+    description:
+      "Requests and validates an elicitation response across retries",
+  },
+  async (_input, ctx) => {
+    const form = acceptedContent(ctx.inputResponses, "user_name", nameSchema);
+    if (form === undefined) {
+      return inputRequired({
+        inputRequests: {
+          user_name: inputRequired.elicit({
+            message: "What is your name?",
+            requestedSchema: nameSchema,
+          }),
+        },
+      });
+    }
+    return { content: [{ type: "text", text: `Hello, ${form.name}!` }] };
+  }
+);
+
+server.tool(
+  {
+    name: "test_input_required_result_sampling",
+    description: "Requests a sampling response through an input_required retry",
+  },
+  async (_input, ctx) => {
+    const response = inputResponse(ctx.inputResponses, "capital_question");
+    if (response.kind !== "sampling") {
+      return inputRequired({
+        inputRequests: {
+          capital_question: inputRequired.createMessage({
+            messages: [
+              {
+                role: "user",
+                content: {
+                  type: "text",
+                  text: "What is the capital of France?",
+                },
+              },
+            ],
+            maxTokens: 100,
+          }),
+        },
+      });
+    }
+    const content = Array.isArray(response.result.content)
+      ? response.result.content
+      : [response.result.content];
+    const text = content
+      .map((block) =>
+        block.type === "text" ? block.text : JSON.stringify(block)
+      )
+      .join("\n");
+    return {
+      content: [{ type: "text", text: text || "No sampling response" }],
+    };
+  }
+);
+
+server.tool(
+  {
+    name: "test_input_required_result_list_roots",
+    description: "Requests the client's roots through an input_required retry",
+  },
+  async (_input, ctx) => {
+    const response = inputResponse(ctx.inputResponses, "client_roots");
+    if (response.kind !== "roots") {
+      return inputRequired({
+        inputRequests: { client_roots: inputRequired.listRoots() },
+      });
+    }
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Received ${response.roots.length} client root(s)`,
+        },
+      ],
+    };
+  }
+);
+
+server.tool(
+  {
+    name: "test_input_required_result_request_state",
+    description: "Verifies integrity-protected requestState round-tripping",
+  },
+  async (_input, ctx) => {
+    const state = ctx.requestState<{ scenario: string; round: number }>();
+    const confirmation = acceptedContent(
+      ctx.inputResponses,
+      "confirm",
+      confirmationSchema
+    );
+    if (
+      state?.scenario !== "request-state" ||
+      state.round !== 1 ||
+      confirmation === undefined
+    ) {
+      return inputRequired({
+        inputRequests: {
+          confirm: inputRequired.elicit({
+            message: "Please confirm",
+            requestedSchema: confirmationSchema,
+          }),
+        },
+        requestState: await conformanceRequestState.mint({
+          scenario: "request-state",
+          round: 1,
+        }),
+      });
+    }
+    return { content: [{ type: "text", text: "state-ok" }] };
+  }
+);
+
+server.tool(
+  {
+    name: "test_input_required_result_multiple_inputs",
+    description: "Requests elicitation, sampling, and roots in one retry",
+  },
+  async (_input, ctx) => {
+    const name = acceptedContent(ctx.inputResponses, "user_name", nameSchema);
+    const sample = inputResponse(ctx.inputResponses, "greeting");
+    const roots = inputResponse(ctx.inputResponses, "client_roots");
+    const state = ctx.requestState<{ scenario: string; round: number }>();
+    if (
+      state?.scenario !== "multiple-inputs" ||
+      name === undefined ||
+      sample.kind !== "sampling" ||
+      roots.kind !== "roots"
+    ) {
+      return inputRequired({
+        inputRequests: {
+          user_name: inputRequired.elicit({
+            message: "What is your name?",
+            requestedSchema: nameSchema,
+          }),
+          greeting: inputRequired.createMessage({
+            messages: [
+              {
+                role: "user",
+                content: { type: "text", text: "Generate a greeting" },
+              },
+            ],
+            maxTokens: 50,
+          }),
+          client_roots: inputRequired.listRoots(),
+        },
+        requestState: await conformanceRequestState.mint({
+          scenario: "multiple-inputs",
+          round: 1,
+        }),
+      });
+    }
+    return { content: [{ type: "text", text: `Hello, ${name.name}!` }] };
+  }
+);
+
+server.tool(
+  {
+    name: "test_input_required_result_multi_round",
+    description: "Runs a two-stage input_required elicitation flow",
+  },
+  async (_input, ctx) => {
+    const state = ctx.requestState<{ scenario: string; round: number }>();
+    if (state?.scenario !== "multi-round" || state.round === 1) {
+      const name = acceptedContent(ctx.inputResponses, "step1", nameSchema);
+      if (name !== undefined && state?.round === 1) {
+        return inputRequired({
+          inputRequests: {
+            step2: inputRequired.elicit({
+              message: "Step 2: What is your favorite color?",
+              requestedSchema: colorSchema,
+            }),
+          },
+          requestState: await conformanceRequestState.mint({
+            scenario: "multi-round",
+            round: 2,
+          }),
+        });
+      }
+      return inputRequired({
+        inputRequests: {
+          step1: inputRequired.elicit({
+            message: "Step 1: What is your name?",
+            requestedSchema: nameSchema,
+          }),
+        },
+        requestState: await conformanceRequestState.mint({
+          scenario: "multi-round",
+          round: 1,
+        }),
+      });
+    }
+    const color = acceptedContent(ctx.inputResponses, "step2", colorSchema);
+    if (color === undefined) {
+      return inputRequired({
+        inputRequests: {
+          step2: inputRequired.elicit({
+            message: "Step 2: What is your favorite color?",
+            requestedSchema: colorSchema,
+          }),
+        },
+        requestState: await conformanceRequestState.mint({
+          scenario: "multi-round",
+          round: 2,
+        }),
+      });
+    }
+    return { content: [{ type: "text", text: `Color: ${color.color}` }] };
+  }
+);
+
+server.tool(
+  {
+    name: "test_input_required_result_tampered_state",
+    description: "Rejects tampered requestState values before completing",
+  },
+  async (_input, ctx) => {
+    const state = ctx.requestState<{ scenario: string; round: number }>();
+    const confirmation = acceptedContent(
+      ctx.inputResponses,
+      "confirm",
+      confirmationSchema
+    );
+    if (
+      state?.scenario !== "tampered-state" ||
+      state.round !== 1 ||
+      confirmation === undefined
+    ) {
+      return inputRequired({
+        inputRequests: {
+          confirm: inputRequired.elicit({
+            message: "Confirm this request",
+            requestedSchema: confirmationSchema,
+          }),
+        },
+        requestState: await conformanceRequestState.mint({
+          scenario: "tampered-state",
+          round: 1,
+        }),
+      });
+    }
+    return { content: [{ type: "text", text: "confirmed" }] };
+  }
+);
+
+server.tool(
+  {
+    name: "test_input_required_result_capabilities",
+    description: "Only requests interactive methods declared by the client",
+  },
+  async (_input, ctx) => {
+    if (ctx.client.can("sampling")) {
+      return inputRequired({
+        inputRequests: {
+          sample: inputRequired.createMessage({
+            messages: [
+              { role: "user", content: { type: "text", text: "Say hello" } },
+            ],
+            maxTokens: 20,
+          }),
+        },
+      });
+    }
+    if (ctx.client.can("elicitation")) {
+      return inputRequired({
+        inputRequests: {
+          name: inputRequired.elicit({
+            message: "What is your name?",
+            requestedSchema: nameSchema,
+          }),
+        },
+      });
+    }
+    return { content: [{ type: "text", text: "No interactive capability" }] };
+  }
+);
+
+server.prompt(
+  {
+    name: "test_input_required_result_prompt",
+    description:
+      "Prompt fixture that requests elicited context before completion",
+  },
+  async (_args, ctx) => {
+    const context = acceptedContent(
+      ctx.inputResponses,
+      "user_context",
+      z.object({ context: z.string() })
+    );
+    if (context === undefined) {
+      return inputRequired({
+        inputRequests: {
+          user_context: inputRequired.elicit({
+            message: "What context should the prompt use?",
+            requestedSchema: z.object({ context: z.string() }),
+          }),
+        },
+      });
+    }
+    return {
+      messages: [
+        { role: "user", content: { type: "text", text: context.context } },
+      ],
+    };
+  }
+);
+
+server.tool(
+  {
+    name: "test_missing_capability",
+    description: "Exercises missing client-capability validation for sampling",
+  },
+  async (_input, ctx) => {
+    // Returning a sampling request delegates the -32021 capability error to
+    // the protocol runtime when this request did not advertise sampling.
+    if (!ctx.client.can("sampling")) {
+      return inputRequired({
+        inputRequests: {
+          sample: inputRequired.createMessage({
+            messages: [
+              {
+                role: "user",
+                content: { type: "text", text: "Capability check" },
+              },
+            ],
+            maxTokens: 20,
+          }),
+        },
+      });
+    }
+    return { content: [{ type: "text", text: "sampling available" }] };
+  }
+);
+
+server.tool(
+  {
+    name: "test_streaming_elicitation",
+    description:
+      "Produces an elicitation input_required result for stream checks",
+  },
+  async (_input, ctx) => {
+    if (
+      acceptedContent(ctx.inputResponses, "stream", nameSchema) === undefined
+    ) {
+      return inputRequired({
+        inputRequests: {
+          stream: inputRequired.elicit({
+            message: "Provide a streaming name",
+            requestedSchema: nameSchema,
+          }),
+        },
+      });
+    }
+    return { content: [{ type: "text", text: "stream completed" }] };
+  }
+);
+
+server.tool(
+  {
+    name: "test_logging_tool",
+    description:
+      "Diagnostic tool that completes without unsolicited log frames",
+  },
+  async (_input, ctx) => {
+    // Deliberately avoid emitting a protocol log here. The stateless scenario
+    // invokes this diagnostic without the per-request log-level descriptor.
+    void ctx;
+    return { content: [{ type: "text", text: "logging complete" }] };
+  }
+);
+
+server.tool(
+  {
+    name: "test_trigger_tool_change",
+    description: "Publishes a tools/list_changed subscription notification",
+  },
+  async () => {
+    await server.notifyToolsChanged();
+    return { content: [{ type: "text", text: "tool list changed" }] };
+  }
+);
+
+server.tool(
+  {
+    name: "test_trigger_prompt_change",
+    description: "Publishes a prompts/list_changed subscription notification",
+  },
+  async () => {
+    await server.notifyPromptsChanged();
+    return { content: [{ type: "text", text: "prompt list changed" }] };
+  }
+);
+
+// =============================================================================
 // RESOURCES
 // =============================================================================
 
@@ -590,8 +1060,8 @@ server.prompt(
     name: "test_prompt_with_arguments",
     description: "A prompt that accepts arguments",
     schema: z.object({
-      arg1: completable(z.string().optional(), () => ["default1"]),
-      arg2: completable(z.string().optional(), () => ["default2"]),
+      arg1: completable(z.string(), () => ["default1"]).optional(),
+      arg2: completable(z.string(), () => ["default2"]).optional(),
     }),
   },
   async ({ arg1 = "default1", arg2 = "default2" }) => ({

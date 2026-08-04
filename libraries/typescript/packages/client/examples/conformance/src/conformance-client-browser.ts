@@ -5,9 +5,11 @@
 import { auth } from "@modelcontextprotocol/client";
 import { MCPClient } from "@mcp-use/client";
 import {
+  conformanceClientOptions,
   handleElicitation,
   isAuthScenario,
   parseConformanceContext,
+  parsePreRegistrationContext,
   requiresOAuthRetryFetch,
   runScenario,
   runWithScenarioTimeout,
@@ -29,11 +31,13 @@ async function main(): Promise<void> {
   const serverConfig: Record<string, unknown> = {
     url: serverUrl,
     onElicitation: handleElicitation,
+    oauth: isAuthScenario(scenario) ? undefined : false,
+    clientOptions: conformanceClientOptions(),
   };
 
   const authProvider = isAuthScenario(scenario)
     ? await createHeadlessConformanceOAuthProvider({
-        preRegistrationContext: parseConformanceContext(),
+        preRegistrationContext: parsePreRegistrationContext(),
       })
     : undefined;
 
@@ -56,10 +60,11 @@ async function main(): Promise<void> {
         serverUrl,
       });
       if (authResult === "REDIRECT") {
-        const authCode = await authProvider.getAuthorizationCode();
+        const { code, iss } = await authProvider.getAuthorizationResponse();
         await auth(authProvider, {
           serverUrl,
-          authorizationCode: authCode,
+          authorizationCode: code,
+          ...(iss !== undefined && { iss }),
         });
       }
     }
@@ -75,7 +80,7 @@ async function main(): Promise<void> {
       listTools: () => session.listTools(),
       callTool: (name, args) => session.callTool(name, args),
     };
-    await runScenario(scenario, conformanceSession);
+    await runScenario(scenario, conformanceSession, parseConformanceContext());
   } finally {
     await client.closeAllSessions();
   }
