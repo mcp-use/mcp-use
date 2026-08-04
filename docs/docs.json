@@ -68,7 +68,6 @@
         "versions": [
           {
             "version": "V1",
-            "default": true,
             "tabs": [
               {
                 "tab": "Docs",
@@ -318,6 +317,7 @@
           },
           {
             "version": "V2",
+            "default": true,
             "tabs": [
               {
                 "tab": "Docs",
