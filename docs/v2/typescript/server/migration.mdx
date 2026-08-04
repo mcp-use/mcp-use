@@ -551,25 +551,26 @@ explicit domain handle. Do not key business state to an MCP transport session.
 - Raw `uiResource`, `@mcp-ui/server` adapters, `exposeAsTool`, and a shared View
   bound to multiple server tools have no native equivalent.
 
-## Use the compatibility bridge only for staging
+## The compatibility bridge is gone
 
-Existing servers can temporarily keep:
+Earlier v2 betas shipped a deprecated `mcp-use/server` export that kept common
+v1 shapes working while you migrated. That bridge was removed before v2 became
+stable, along with the legacy v1 server facade, so the import no longer
+resolves:
 
 ```typescript
+// No longer available. mcp-use has no "server" subpath in v2.
 import { MCPServer, text } from "mcp-use/server";
 ```
 
-The deprecated bridge supports common v1 tools, resources, prompts, middleware,
-direct built-in OAuth providers, OpenAPI servers, response helpers, and one
-tool per legacy widget.
+Import from the package root instead:
 
-The bridge does not provide sessions, sampling, post-response or
-session-targeted notifications, blocking elicitation, OAuth proxying, stdio
-proxying, raw UI resources, array-style schemas, unsigned-token bypasses, or a
-widget shared by multiple bound tools.
+```typescript
+import { MCPServer, text } from "mcp-use";
+```
 
-Treat every bridge import as unfinished migration work. The bridge is planned
-for removal in mcp-use v3.
+There is no staged path onto v2. Every v1 import has to move before the server
+will start.
 
 ## Verify the migration
 
@@ -602,9 +603,8 @@ for removal in mcp-use v3.
   </Step>
   <Step title="Remove v1 leftovers">
     Remove remaining v1 imports, helpers, widget files, session APIs, sampling
-    calls, stdio proxy configuration, and old security fields. Keep a
-    `mcp-use/server` import only when you intentionally use the temporary
-    compatibility bridge.
+    calls, stdio proxy configuration, and old security fields. No
+    `mcp-use/server` import can stay: that subpath does not exist in v2.
   </Step>
 </Steps>
 
