@@ -126,9 +126,10 @@ function registerInspectorRoutes(
 ): void {
   const routesConfig: InspectorProxyRoutesConfig = {
     oauthProxyAllowedOrigins: options?.oauthProxyAllowedOrigins ?? [],
-    // mountInspector is development tooling. Loopback is therefore useful and
-    // safe by default, while callers embedding it elsewhere can opt out.
-    oauthProxyAllowLoopback: options?.oauthProxyAllowLoopback ?? true,
+    // A mounted inspector can end up publicly reachable (hosted deployments),
+    // where loopback proxying is SSRF into the host's own services. Default to
+    // blocking loopback; local dev tooling opts in explicitly.
+    oauthProxyAllowLoopback: options?.oauthProxyAllowLoopback ?? false,
   };
   if (options?.autoConnectUrl !== undefined) {
     routesConfig.autoConnectUrl = options.autoConnectUrl;
