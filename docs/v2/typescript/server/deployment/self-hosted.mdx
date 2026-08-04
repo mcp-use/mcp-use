@@ -1,0 +1,99 @@
+---
+title: "Self hosted"
+description: "Run an MCP server in your own Docker environment"
+icon: "docker"
+---
+
+Run a built `mcp-use` server in Docker when you want to operate the server on
+your own infrastructure. Your platform is responsible for TLS, a public domain,
+authentication, and routing requests to the container.
+
+## Prerequisites
+
+- Docker installed locally, or a container platform that can build and run a
+  Docker image.
+- An `mcp-use` server that exports its `MCPServer` instance as the default
+  export.
+- An npm lockfile (`package-lock.json`).
+
+The generated `mcp-server` template already has the required `build` and
+`start` scripts. `mcp-use start` serves the production build at
+`.mcp-use/build/`.
+
+## Create a Dockerfile
+
+Add this `Dockerfile` at the project root:
+
+```dockerfile
+FROM node:22-slim AS build
+
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+RUN npm run typecheck && npm run build
+
+FROM node:22-slim
+
+WORKDIR /app
+ENV NODE_ENV=production
+ENV HOST=0.0.0.0
+ENV PORT=3000
+
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+COPY --from=build /app/.mcp-use ./.mcp-use
+
+EXPOSE 3000
+CMD ["npm", "start"]
+```
+
+`HOST=0.0.0.0` lets the container receive traffic through Docker's network.
+`PORT` can be changed to the port required by your container platform.
+
+Add a `.dockerignore` so the build context excludes local and secret files:
+
+```text
+node_modules
+.git
+.env
+.env.*
+.mcp-use
+```
+
+## Build and run locally
+
+Build the image and publish the container port locally:
+
+```bash
+docker build --tag my-mcp-server .
+docker run --rm --publish 3000:3000 --env-file .env my-mcp-server
+```
+
+The MCP endpoint is available at:
+
+```text
+http://localhost:3000/mcp
+```
+
+Verify it with the bundled client:
+
+```bash
+npx mcp-use client connect local http://localhost:3000/mcp
+npx mcp-use client local tools list
+```
+
+## Deploy the image
+
+Push the image to your container registry, then configure your container
+platform to run it. Set its public URL in `MCP_URL` and supply application
+secrets through the platform's secret manager rather than baking them into the
+image.
+
+```env
+MCP_URL=https://mcp.example.com
+```
+
+Configure the platform's health check and reverse proxy to forward requests to
+the same `/mcp` path. Terminate TLS at your platform or reverse proxy and use
+the resulting HTTPS URL in every MCP client.

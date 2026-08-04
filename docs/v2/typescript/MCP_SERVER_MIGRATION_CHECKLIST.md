@@ -44,13 +44,8 @@ API-reference pages are also outside this migration checklist.
   - [x] Supply `createTokenVerifier(resource)`, full `oauthMetadata`, and `mapAuthInfo(authInfo)`.
   - [x] Map native user fields with `id` and return `{ user, payload, permissions }`.
   - [x] Explain that the verifier receives the resolved MCP resource and that fixed-client proxying is external.
-- [x] [Google Cloud deployment](/v2/typescript/server/deployment/google)
-  - [x] Rebuild setup around `create-mcp-use-app@latest --template mcp-server` and its generated scripts.
-  - [x] Convert the zoo server to root imports, `inputSchema`/`outputSchema`, raw results, and a default server export.
-  - [x] Replace the legacy widget section with `views/<name>/view.tsx`, tool `view`, and `structuredContent`.
-  - [x] Bind to `0.0.0.0`, use Cloud Run's injected `PORT`, and preserve IAM flags on redeploys.
-  - [x] Materialize Google ID-token values instead of showing unexpanded shell variables in JSON.
-  - [x] Remove unsafe cleanup commands, dated model/log examples, and unsupported production-readiness or cost claims.
+- [x] [Self-hosted deployment](/v2/typescript/server/deployment/self-hosted)
+  - [x] Document a production Docker image, a local container run command, and the required public listener host.
 - [x] [Sampling](/v2/typescript/server/sampling)
   - [x] Replace the premise: native stateless v2 exposes no server-side `ctx.sample()` API.
   - [x] Remove all sampling overload, capability-gate, timeout, progress, response, and failure examples.
@@ -83,13 +78,6 @@ API-reference pages are also outside this migration checklist.
   - [x] Replace the flag catalog with the implemented v2 deploy flags.
   - [x] Remove unsupported `--watch-paths` and `--deploy-branches` guidance.
   - [x] Separate deploy creation from build-log following and verify all hosted URL examples.
-- [x] [Supabase deployment](/v2/typescript/server/deployment/supabase)
-  - [x] Use `npm:mcp-use`, raw tool results, and the server's Web `fetch` handler instead of `listen()`.
-  - [x] Rebuild deployment around `.mcp-use/build/index.js`, not the stale `dist` artifact layout.
-  - [x] Replace widget paths with `/_mcp-use/views/` and public assets with `/_mcp-use/public/`.
-  - [x] Clarify build-time and runtime `MCP_ASSETS_URL`, `MCP_URL`, and CSP responsibilities.
-  - [x] Remove or revalidate the old automated deployment script and fix the missing example link.
-  - [x] Resolve endpoint-path inconsistencies and remove obsolete widget metadata and Zod troubleshooting.
 
 ## Slight v2 migrations — complete
 
