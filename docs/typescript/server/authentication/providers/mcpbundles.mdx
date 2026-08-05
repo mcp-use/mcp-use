@@ -1,9 +1,10 @@
 ---
 title: "MCPBundles Provider"
 description: "Configure MCPBundles Connect Auth for a TypeScript MCP server on the vendor origin."
+icon: "/images/icons/mcpbundles.svg"
 ---
 
-Use `oauthMcpbundlesProvider` when your MCP server is published on MCPBundles with **Connect Auth** enabled and clients authenticate against the MCPBundles tenant authorization server. mcp-use verifies ES256 access tokens against the tenant JWKS and maps Connect Auth claims into `ctx.auth`.
+Use `oauthMcpbundlesProvider` when you manage an MCP server listing on MCPBundles with **Connect Auth** enabled and clients authenticate against the MCPBundles tenant authorization server. mcp-use verifies ES256 access tokens against the tenant JWKS and maps Connect Auth claims into `ctx.auth`.
 
 This guide covers the **vendor origin** path (Path A). Clients may also connect through the MCPBundles bundle proxy at `https://mcp.mcpbundles.com/bundle/{slug}` without running this provider.
 
@@ -13,7 +14,7 @@ See the [auth providers API reference](/typescript/api-reference/server/auth-pro
 
 In the [MCPBundles maintainer dashboard](https://www.mcpbundles.com):
 
-1. Publish your MCP listing with **Connect Auth** enabled.
+1. Create or claim an MCP listing and enable **Connect Auth** in maintainer settings.
 2. Set your federation sign-in URL on the listing.
 3. Save the federation secret on your **web app** (not on this MCP server).
 4. Note your listing slug and ensure the listing **base URL** matches your public MCP origin.
@@ -25,7 +26,7 @@ MCPBUNDLES_LISTING_SLUG=your-listing-slug
 MCP_URL=https://mcp.example.com
 ```
 
-`MCP_URL` is the public MCP server origin. For local development, `mcp-use dev` can supply a trusted localhost origin when `MCP_URL` is omitted.
+`MCP_URL` is the public MCP server origin. When omitted, the provider example uses the listing `origin_resource` from public-config — set `MCP_URL` explicitly when your runtime origin differs from the listing metadata.
 
 ## Configure the MCP server
 
@@ -41,8 +42,12 @@ import {
 const listingSlug = process.env.MCPBUNDLES_LISTING_SLUG;
 if (!listingSlug) throw new Error("MCPBUNDLES_LISTING_SLUG is required");
 
-const baseUrl = process.env.MCP_URL ?? "http://localhost:3000";
 const publicConfig = await fetchMcpbundlesPublicConfig({ listingSlug });
+const explicitBaseUrl = process.env.MCP_URL?.trim();
+const baseUrl =
+  explicitBaseUrl && explicitBaseUrl.length > 0
+    ? explicitBaseUrl
+    : publicConfig.origin_resource;
 
 const server = new MCPServer({
   name: "mcpbundles-server",

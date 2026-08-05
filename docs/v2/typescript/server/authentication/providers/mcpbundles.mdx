@@ -1,15 +1,16 @@
 ---
 title: "MCPBundles Provider"
 description: "Configure MCPBundles Connect Auth for an MCP server on the vendor origin."
+icon: "/images/icons/mcpbundles.svg"
 ---
 
-Use `oauthMcpbundlesProvider` when your MCP server is published on MCPBundles with **Connect Auth** enabled. MCP clients register with the MCPBundles tenant authorization server, and mcp-use verifies ES256 access tokens against the tenant JWKS.
+Use `oauthMcpbundlesProvider` when you manage an MCP server listing on MCPBundles with **Connect Auth** enabled. MCP clients register with the MCPBundles tenant authorization server, and mcp-use verifies ES256 access tokens against the tenant JWKS.
 
 This guide covers the **vendor origin** path. Clients may also use the bundle proxy at `https://mcp.mcpbundles.com/bundle/{slug}` without this provider.
 
 ## Configure MCPBundles
 
-1. Publish your listing with **Connect Auth** enabled.
+1. Create or claim an MCP listing and enable **Connect Auth** in maintainer settings.
 2. Set the federation sign-in URL in the maintainer dashboard.
 3. Save the federation secret on your **web app**, not on this MCP server.
 4. Ensure the listing base URL matches your public MCP origin.
@@ -33,8 +34,12 @@ import {
 const listingSlug = process.env.MCPBUNDLES_LISTING_SLUG;
 if (!listingSlug) throw new Error("MCPBUNDLES_LISTING_SLUG is required");
 
-const baseUrl = process.env.MCP_URL ?? "http://localhost:3000";
 const publicConfig = await fetchMcpbundlesPublicConfig({ listingSlug });
+const explicitBaseUrl = process.env.MCP_URL?.trim();
+const baseUrl =
+  explicitBaseUrl && explicitBaseUrl.length > 0
+    ? explicitBaseUrl
+    : publicConfig.origin_resource;
 
 const server = new MCPServer({
   name: "mcpbundles-server",
