@@ -551,26 +551,6 @@ explicit domain handle. Do not key business state to an MCP transport session.
 - Raw `uiResource`, `@mcp-ui/server` adapters, `exposeAsTool`, and a shared View
   bound to multiple server tools have no native equivalent.
 
-## Use the compatibility bridge only for staging
-
-Existing servers can temporarily keep:
-
-```typescript
-import { MCPServer, text } from "mcp-use/server";
-```
-
-The deprecated bridge supports common v1 tools, resources, prompts, middleware,
-direct built-in OAuth providers, OpenAPI servers, response helpers, and one
-tool per legacy widget.
-
-The bridge does not provide sessions, sampling, post-response or
-session-targeted notifications, blocking elicitation, OAuth proxying, stdio
-proxying, raw UI resources, array-style schemas, unsigned-token bypasses, or a
-widget shared by multiple bound tools.
-
-Treat every bridge import as unfinished migration work. The bridge is planned
-for removal in mcp-use v3.
-
 ## Verify the migration
 
 <Steps>
@@ -602,9 +582,8 @@ for removal in mcp-use v3.
   </Step>
   <Step title="Remove v1 leftovers">
     Remove remaining v1 imports, helpers, widget files, session APIs, sampling
-    calls, stdio proxy configuration, and old security fields. Keep a
-    `mcp-use/server` import only when you intentionally use the temporary
-    compatibility bridge.
+    calls, stdio proxy configuration, and old security fields. No
+    `mcp-use/server` import can stay: that subpath does not exist in v2.
   </Step>
 </Steps>
 
