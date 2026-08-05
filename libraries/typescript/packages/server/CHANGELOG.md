@@ -1,5 +1,16 @@
 # mcp-use
 
+## 2.0.2-canary.0
+
+### Patch Changes
+
+- 546d349: Fix MCP v2 server responses by preserving tool JSON Schema dialects and accepting input-required prompt results.
+- 52f535c: Allow modern MCP connections to remain ready when the server omits optional identity metadata. Direct proxy connections now report a clear error when an anonymous upstream cannot provide a namespace.
+- Updated dependencies [52f535c]
+  - @mcp-use/client@2.0.2-canary.0
+  - @mcp-use/inspector@20.0.2-canary.0
+  - @mcp-use/cli@4.0.2-canary.0
+
 ## 2.0.1
 
 ### Patch Changes

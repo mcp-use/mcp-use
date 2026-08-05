@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.0.2-canary.0
+
+### Patch Changes
+
+- 52f535c: Allow modern MCP connections to remain ready when the server omits optional identity metadata. Direct proxy connections now report a clear error when an anonymous upstream cannot provide a namespace.
+
 ## 2.0.1
 
 ### Patch Changes
