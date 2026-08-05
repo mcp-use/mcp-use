@@ -8,6 +8,7 @@ These examples use direct external authorization servers:
 - [Supabase](./supabase/)
 - [Keycloak](./keycloak/)
 - [Better Auth](./better-auth/)
+- [MCPBundles](./mcpbundles/)
 
 Each server exposes only the `get-user-info` tool. It never issues, proxies, or
 forwards access tokens. For public deployments, set `MCP_URL` to the server
