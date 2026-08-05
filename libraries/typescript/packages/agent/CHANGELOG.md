@@ -1,5 +1,13 @@
 # @mcp-use/agent
 
+## 2.0.1
+
+### Patch Changes
+
+- Updated dependencies [33e30cb]
+- Updated dependencies [33e30cb]
+  - @mcp-use/client@2.0.1
+
 ## 2.0.1-canary.1
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @mcp-use/cli
 
+## 4.0.1
+
+### Patch Changes
+
+- 33e30cb: fix(cli): accept package-manager argument forwarding across commands
+
 ## 4.0.1-canary.2
 
 ### Patch Changes
