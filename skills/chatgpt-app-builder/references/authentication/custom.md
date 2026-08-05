@@ -14,7 +14,8 @@ Two factories cover everything that isn't a built-in provider:
 Use this when your identity provider supports DCR and advertises a `registration_endpoint`. Clients discover the endpoints and register themselves against the upstream.
 
 ```typescript
-import { MCPServer, oauthCustomProvider, object } from "mcp-use/server";
+import { MCPServer, object } from "mcp-use";
+import { oauthCustomProvider } from "mcp-use/oauth";
 import { jwtVerify, createRemoteJWKSet } from "jose";
 
 const JWKS = createRemoteJWKSet(

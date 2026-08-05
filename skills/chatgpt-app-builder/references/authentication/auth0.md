@@ -36,7 +36,8 @@ Auth0's built-in DCR feature is currently in **Early Access**. MCP clients regis
 ### Quick Start
 
 ```typescript
-import { MCPServer, oauthAuth0Provider, object } from "mcp-use/server";
+import { MCPServer, object } from "mcp-use";
+import { oauthAuth0Provider } from "mcp-use/oauth/auth0";
 
 const server = new MCPServer({
   name: "my-server",

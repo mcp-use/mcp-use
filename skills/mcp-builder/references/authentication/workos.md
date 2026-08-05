@@ -9,7 +9,8 @@ Setting up OAuth with WorkOS AuthKit. DCR mode only — MCP clients register the
 ## Quick Start
 
 ```typescript
-import { MCPServer, oauthWorkOSProvider, object } from "mcp-use/server";
+import { MCPServer, object } from "mcp-use";
+import { oauthWorkOSProvider } from "mcp-use/oauth/workos";
 
 const server = new MCPServer({
   name: "my-server",

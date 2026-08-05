@@ -9,7 +9,8 @@ Setting up OAuth with Keycloak. Keycloak exposes full OAuth 2.1 + OIDC endpoints
 ## Quick Start
 
 ```typescript
-import { MCPServer, oauthKeycloakProvider, object } from "mcp-use/server";
+import { MCPServer, object } from "mcp-use";
+import { oauthKeycloakProvider } from "mcp-use/oauth/keycloak";
 
 const server = new MCPServer({
   name: "my-server",
