@@ -1,0 +1,107 @@
+---
+title: "MCPBundles Provider"
+description: "Configure MCPBundles Connect Auth for an MCP server on the vendor origin."
+---
+
+Use `oauthMcpbundlesProvider` when your MCP server is published on MCPBundles with **Connect Auth** enabled. MCP clients register with the MCPBundles tenant authorization server, and mcp-use verifies ES256 access tokens against the tenant JWKS.
+
+This guide covers the **vendor origin** path. Clients may also use the bundle proxy at `https://mcp.mcpbundles.com/bundle/{slug}` without this provider.
+
+## Configure MCPBundles
+
+1. Publish your listing with **Connect Auth** enabled.
+2. Set the federation sign-in URL in the maintainer dashboard.
+3. Save the federation secret on your **web app**, not on this MCP server.
+4. Ensure the listing base URL matches your public MCP origin.
+
+See the [MCP Connect Auth integration guide](https://www.mcpbundles.com/docs/integrations/mcp-connect-auth).
+
+## Configure the server
+
+```bash
+MCPBUNDLES_LISTING_SLUG=your-listing-slug
+MCP_URL=https://mcp.example.com
+```
+
+```typescript
+import { MCPServer } from "mcp-use";
+import {
+  fetchMcpbundlesPublicConfig,
+  oauthMcpbundlesProvider,
+} from "mcp-use/oauth/mcpbundles";
+
+const listingSlug = process.env.MCPBUNDLES_LISTING_SLUG;
+if (!listingSlug) throw new Error("MCPBUNDLES_LISTING_SLUG is required");
+
+const baseUrl = process.env.MCP_URL ?? "http://localhost:3000";
+const publicConfig = await fetchMcpbundlesPublicConfig({ listingSlug });
+
+const server = new MCPServer({
+  name: "mcpbundles-server",
+  version: "1.0.0",
+  oauth: oauthMcpbundlesProvider({
+    listingSlug,
+    baseUrl,
+    publicConfig,
+  }),
+});
+
+export default server;
+```
+
+## Scope data by organization
+
+Connect Auth maps `organization_id` to `organizationId` and the subject to `id`.
+
+```typescript
+server.tool(
+  {
+    name: "list_documents",
+    description: "List documents for the authenticated organization.",
+  },
+  async (_args, ctx) => {
+    const organizationId = ctx.auth.user.organizationId;
+    if (!organizationId) {
+      return {
+        isError: true,
+        content: [{ type: "text", text: "Organization context required" }],
+      };
+    }
+
+    const documents = await db.documents.findMany({
+      where: { organizationId },
+    });
+    return {
+      content: [{ type: "text", text: JSON.stringify(documents) }],
+    };
+  },
+);
+```
+
+Verified scopes are available on `ctx.auth.scopes`. The OAuth MCP client id is on `ctx.auth.clientId`, not on the user object. Optional `email` and `roles` are minted when you pass them to federation `complete`.
+
+See [Tool callback identity](https://www.mcpbundles.com/docs/integrations/mcp-connect-auth#tool-callback-identity) for the FastMCP ↔ mcp-use mapping table.
+
+<CardGroup cols={2}>
+  <Card
+    title="Runnable MCPBundles example"
+    icon="github"
+    href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/auth/mcpbundles"
+  >
+    Compare with the maintained Connect Auth example.
+  </Card>
+  <Card
+    title="MCP Connect Auth integration guide"
+    icon="book-open"
+    href="https://www.mcpbundles.com/docs/integrations/mcp-connect-auth"
+  >
+    Federation, publishing, and bundle URL setup.
+  </Card>
+  <Card
+    title="User Context"
+    icon="user"
+    href="/v2/typescript/server/authentication/user-context"
+  >
+    Use Connect Auth identity in tool callbacks.
+  </Card>
+</CardGroup>

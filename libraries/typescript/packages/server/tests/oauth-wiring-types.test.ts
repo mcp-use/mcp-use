@@ -11,6 +11,10 @@ import {
   oauthKeycloakProvider,
   type KeycloakOAuthUser,
 } from "../src/oauth/keycloak.js";
+import {
+  oauthMcpbundlesProvider,
+  type McpbundlesOAuthUser,
+} from "../src/oauth/mcpbundles.js";
 import { oauthCustomProvider } from "../src/oauth/provider.js";
 import {
   oauthSupabaseProvider,
@@ -160,6 +164,32 @@ function verifyOAuthCallbackTyping(): void {
     const sessionId: string | undefined = ctx.auth.user.sessionId;
     assertOAuthAuthFields(auth);
     void [user, sessionId];
+    return { content: [] };
+  });
+
+  const mcpbundles = new MCPServer({
+    name: "mcpbundles",
+    version: "1.0.0",
+    oauth: oauthMcpbundlesProvider({
+      listingSlug: "demo-listing",
+      baseUrl: "https://vendor.example.test/mcp",
+      publicConfig: {
+        issuer: "https://api.mcpbundles.test/connect-auth/tenants/demo-listing",
+        scopes_supported: ["read"],
+        origin_resource: "https://vendor.example.test/mcp",
+        bundle_proxy_resource:
+          "https://mcp.mcpbundles.test/bundle/demo-listing",
+      },
+    }),
+  });
+  mcpbundles.tool({ name: "mcpbundles-user" }, (_params, ctx) => {
+    const auth: OAuthAuth<McpbundlesOAuthUser> = ctx.auth;
+    const user: McpbundlesOAuthUser = ctx.auth.user;
+    const organizationId: string | undefined = ctx.auth.user.organizationId;
+    const email: string | undefined = ctx.auth.user.email;
+    const roles: string[] = ctx.auth.user.roles;
+    assertOAuthAuthFields(auth);
+    void [user, organizationId, email, roles];
     return { content: [] };
   });
 

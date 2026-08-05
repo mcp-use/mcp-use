@@ -1,17 +1,39 @@
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
 import { afterEach, describe, expect, it } from "vitest";
 
+import goldenAccessTokenFixture from "./fixtures/connect_auth/golden_access_token.json";
 import { oauthAuth0Provider } from "../src/oauth/auth0.js";
 import { oauthBetterAuthProvider } from "../src/oauth/better-auth.js";
 import { oauthClerkProvider } from "../src/oauth/clerk.js";
 import { wrapOAuthTokenVerifier } from "../src/oauth/internal.js";
 import { oauthKeycloakProvider } from "../src/oauth/keycloak.js";
+import {
+  fetchMcpbundlesPublicConfig,
+  McpbundlesPublicConfigError,
+  oauthMcpbundlesProvider,
+  publicConfigUrl,
+  type McpbundlesPublicConfig,
+} from "../src/oauth/mcpbundles.js";
 import { oauthSupabaseProvider } from "../src/oauth/supabase.js";
 import { oauthWorkOSProvider } from "../src/oauth/workos.js";
 
 const now = () => Math.floor(Date.now() / 1000);
 const originalFetch = globalThis.fetch;
 const protectedResource = new URL("https://api.example.test/mcp");
+
+const SAMPLE_LISTING_SLUG = "connect-auth-demo";
+const SAMPLE_API_BASE = "https://api.mcpbundles.test";
+const SAMPLE_ORIGIN_RESOURCE = "https://vendor.example.test/mcp";
+const SAMPLE_BUNDLE_RESOURCE = `https://mcp.mcpbundles.test/bundle/${SAMPLE_LISTING_SLUG}`;
+const SAMPLE_ISSUER = `${SAMPLE_API_BASE}/connect-auth/tenants/${SAMPLE_LISTING_SLUG}`;
+
+const SAMPLE_PUBLIC_CONFIG: McpbundlesPublicConfig = {
+  issuer: SAMPLE_ISSUER,
+  scopes_supported: ["read", "write"],
+  origin_resource: SAMPLE_ORIGIN_RESOURCE,
+  bundle_proxy_resource: SAMPLE_BUNDLE_RESOURCE,
+  telemetry_ingest_url: `${SAMPLE_ISSUER}/v1/telemetry/handshake`,
+};
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
@@ -553,6 +575,326 @@ describe("direct OAuth providers", () => {
     });
   });
 
+  it("verifies MCPBundles Connect Auth JWTs with dual audience and maps claims", async () => {
+    const { privateKey, publicKey } = await generateKeyPair("ES256");
+    const jwk = await exportJWK(publicKey);
+    jwk.kid = "mcpbundles-key";
+    globalThis.fetch = mcpbundlesFixture(jwk);
+
+    const originResource = new URL(SAMPLE_ORIGIN_RESOURCE);
+    const provider = oauthMcpbundlesProvider({
+      listingSlug: SAMPLE_LISTING_SLUG,
+      baseUrl: SAMPLE_ORIGIN_RESOURCE,
+      apiBaseUrl: SAMPLE_API_BASE,
+      publicConfig: { ...SAMPLE_PUBLIC_CONFIG },
+    });
+
+    expect(provider.oauthMetadata).toMatchObject({
+      issuer: SAMPLE_ISSUER,
+      authorization_endpoint: `${SAMPLE_ISSUER}/o/authorize/`,
+      token_endpoint: `${SAMPLE_ISSUER}/o/token/`,
+      registration_endpoint: `${SAMPLE_ISSUER}/o/register/`,
+      revocation_endpoint: `${SAMPLE_ISSUER}/o/revoke/`,
+      scopes_supported: ["read", "write"],
+    });
+
+    await expect(
+      wrapOAuthTokenVerifier(provider, originResource).verifyAccessToken(
+        await signedToken(
+          privateKey,
+          "mcpbundles-key",
+          SAMPLE_ISSUER,
+          SAMPLE_ORIGIN_RESOURCE,
+          {
+            sub: "user-1",
+            client_id: "client-1",
+            organization_id: "org-1",
+            email: "user@example.com",
+            scope: "read write",
+            roles: ["admin"],
+          },
+          "ES256"
+        )
+      )
+    ).resolves.toMatchObject({
+      clientId: "client-1",
+      scopes: ["read", "write"],
+      extra: {
+        user: {
+          id: "user-1",
+          organizationId: "org-1",
+          email: "user@example.com",
+          roles: ["admin"],
+        },
+      },
+    });
+
+    await expect(
+      wrapOAuthTokenVerifier(provider, originResource).verifyAccessToken(
+        await signedToken(
+          privateKey,
+          "mcpbundles-key",
+          SAMPLE_ISSUER,
+          SAMPLE_BUNDLE_RESOURCE,
+          {
+            sub: "user-2",
+            client_id: "client-2",
+          },
+          "ES256"
+        )
+      )
+    ).resolves.toMatchObject({
+      clientId: "client-2",
+      extra: { user: { id: "user-2" } },
+    });
+  });
+
+  it("maps golden Connect Auth fixture claims to WorkOS-shaped identity", async () => {
+    const fixture = goldenAccessTokenFixture;
+    globalThis.fetch = mcpbundlesFixture(fixture.jwks.keys[0]);
+
+    const provider = oauthMcpbundlesProvider({
+      listingSlug: "golden-demo",
+      baseUrl: fixture.origin_resource,
+      apiBaseUrl: "https://api.example.test",
+      publicConfig: {
+        issuer: fixture.issuer,
+        scopes_supported: ["read", "write"],
+        origin_resource: fixture.origin_resource,
+        bundle_proxy_resource: fixture.bundle_proxy_resource,
+      },
+    });
+
+    await expect(
+      wrapOAuthTokenVerifier(
+        provider,
+        new URL(fixture.origin_resource)
+      ).verifyAccessToken(fixture.token)
+    ).resolves.toMatchObject({
+      clientId: fixture.expected.client_id,
+      scopes: fixture.expected.scopes,
+      extra: {
+        user: {
+          id: fixture.expected.user_id,
+          organizationId: fixture.expected.organization_id,
+          email: fixture.expected.email,
+          roles: fixture.expected.roles,
+        },
+      },
+    });
+  });
+
+  it("rejects MCPBundles tokens with invalid audience or resource claims", async () => {
+    const { privateKey, publicKey } = await generateKeyPair("ES256");
+    const jwk = await exportJWK(publicKey);
+    jwk.kid = "mcpbundles-key";
+    globalThis.fetch = mcpbundlesFixture(jwk);
+    const originResource = new URL(SAMPLE_ORIGIN_RESOURCE);
+    const provider = oauthMcpbundlesProvider({
+      listingSlug: SAMPLE_LISTING_SLUG,
+      baseUrl: SAMPLE_ORIGIN_RESOURCE,
+      apiBaseUrl: SAMPLE_API_BASE,
+      publicConfig: { ...SAMPLE_PUBLIC_CONFIG },
+    });
+    const verifier = wrapOAuthTokenVerifier(provider, originResource);
+
+    await expect(
+      verifier.verifyAccessToken(
+        await signedToken(
+          privateKey,
+          "mcpbundles-key",
+          SAMPLE_ISSUER,
+          "https://other.example.test/mcp",
+          { sub: "user-1", client_id: "client-1" },
+          "ES256"
+        )
+      )
+    ).rejects.toMatchObject({ code: "invalid_token" });
+
+    await expect(
+      verifier.verifyAccessToken(
+        await signedToken(
+          privateKey,
+          "mcpbundles-key",
+          SAMPLE_ISSUER,
+          SAMPLE_ORIGIN_RESOURCE,
+          {
+            sub: "user-1",
+            client_id: "client-1",
+            resource: "https://other.example.test/mcp",
+          },
+          "ES256"
+        )
+      )
+    ).rejects.toMatchObject({ code: "invalid_token" });
+  });
+
+  it("retries MCPBundles JWKS lookup once when the token kid is missing", async () => {
+    const { privateKey, publicKey } = await generateKeyPair("ES256");
+    const jwk = await exportJWK(publicKey);
+    jwk.kid = "rotated-key";
+    let jwksRequests = 0;
+    globalThis.fetch = async (input) => {
+      const url = String(input);
+      if (url.includes("public-config")) {
+        return new Response(JSON.stringify(SAMPLE_PUBLIC_CONFIG), {
+          headers: { "content-type": "application/json" },
+        });
+      }
+      jwksRequests += 1;
+      const kid = jwksRequests === 1 ? "stale-key" : "rotated-key";
+      return new Response(JSON.stringify({ keys: [{ ...jwk, kid }] }), {
+        headers: { "content-type": "application/json" },
+      });
+    };
+
+    const provider = oauthMcpbundlesProvider({
+      listingSlug: SAMPLE_LISTING_SLUG,
+      baseUrl: SAMPLE_ORIGIN_RESOURCE,
+      apiBaseUrl: SAMPLE_API_BASE,
+      publicConfig: { ...SAMPLE_PUBLIC_CONFIG },
+    });
+
+    await expect(
+      wrapOAuthTokenVerifier(
+        provider,
+        new URL(SAMPLE_ORIGIN_RESOURCE)
+      ).verifyAccessToken(
+        await signedToken(
+          privateKey,
+          "rotated-key",
+          SAMPLE_ISSUER,
+          SAMPLE_ORIGIN_RESOURCE,
+          { sub: "user-1", client_id: "client-1" },
+          "ES256"
+        )
+      )
+    ).resolves.toMatchObject({ clientId: "client-1" });
+    expect(jwksRequests).toBe(2);
+  });
+
+  it("keeps OAuth client id on ctx.auth.clientId, not ctx.auth.user", async () => {
+    const { privateKey, publicKey } = await generateKeyPair("ES256");
+    const jwk = await exportJWK(publicKey);
+    jwk.kid = "mcpbundles-key";
+    globalThis.fetch = mcpbundlesFixture(jwk);
+    const provider = oauthMcpbundlesProvider({
+      listingSlug: SAMPLE_LISTING_SLUG,
+      baseUrl: SAMPLE_ORIGIN_RESOURCE,
+      apiBaseUrl: SAMPLE_API_BASE,
+      publicConfig: { ...SAMPLE_PUBLIC_CONFIG },
+    });
+
+    const authInfo = await wrapOAuthTokenVerifier(
+      provider,
+      new URL(SAMPLE_ORIGIN_RESOURCE)
+    ).verifyAccessToken(
+      await signedToken(
+        privateKey,
+        "mcpbundles-key",
+        SAMPLE_ISSUER,
+        SAMPLE_ORIGIN_RESOURCE,
+        {
+          sub: "user-1",
+          client_id: "client-1",
+          organization_id: "org-1",
+        },
+        "ES256"
+      )
+    );
+    expect(authInfo.clientId).toBe("client-1");
+    expect(authInfo.extra?.user).toEqual({
+      id: "user-1",
+      organizationId: "org-1",
+      roles: [],
+    });
+    expect(authInfo.extra?.user).not.toHaveProperty("clientId");
+  });
+
+  it("omits ctx.auth.clientId when the token lacks client_id (Connect Auth always sends it)", async () => {
+    const { privateKey, publicKey } = await generateKeyPair("ES256");
+    const jwk = await exportJWK(publicKey);
+    jwk.kid = "mcpbundles-key";
+    globalThis.fetch = mcpbundlesFixture(jwk);
+    const provider = oauthMcpbundlesProvider({
+      listingSlug: SAMPLE_LISTING_SLUG,
+      baseUrl: SAMPLE_ORIGIN_RESOURCE,
+      apiBaseUrl: SAMPLE_API_BASE,
+      publicConfig: { ...SAMPLE_PUBLIC_CONFIG },
+    });
+
+    await expect(
+      wrapOAuthTokenVerifier(
+        provider,
+        new URL(SAMPLE_ORIGIN_RESOURCE)
+      ).verifyAccessToken(
+        await signedToken(
+          privateKey,
+          "mcpbundles-key",
+          SAMPLE_ISSUER,
+          SAMPLE_ORIGIN_RESOURCE,
+          { sub: "user-1", organization_id: "org-1" },
+          "ES256"
+        )
+      )
+    ).resolves.toMatchObject({ clientId: "" });
+  });
+
+  it("parses MCPBundles public-config and rejects invalid payloads", async () => {
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify(SAMPLE_PUBLIC_CONFIG), {
+        headers: { "content-type": "application/json" },
+      });
+
+    await expect(
+      fetchMcpbundlesPublicConfig({
+        listingSlug: SAMPLE_LISTING_SLUG,
+        apiBaseUrl: SAMPLE_API_BASE,
+      })
+    ).resolves.toEqual({
+      ...SAMPLE_PUBLIC_CONFIG,
+    });
+    expect(publicConfigUrl(SAMPLE_LISTING_SLUG, SAMPLE_API_BASE)).toBe(
+      `${SAMPLE_ISSUER}/public-config`
+    );
+
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ issuer: SAMPLE_ISSUER }), {
+        headers: { "content-type": "application/json" },
+      });
+    await expect(
+      fetchMcpbundlesPublicConfig({
+        listingSlug: SAMPLE_LISTING_SLUG,
+        apiBaseUrl: SAMPLE_API_BASE,
+      })
+    ).rejects.toBeInstanceOf(McpbundlesPublicConfigError);
+  });
+
+  it("requires MCPBundles public-config and validates listing slug and baseUrl", () => {
+    expect(() =>
+      oauthMcpbundlesProvider({
+        listingSlug: "",
+        baseUrl: SAMPLE_ORIGIN_RESOURCE,
+      })
+    ).toThrow(/listingSlug/);
+
+    expect(() =>
+      oauthMcpbundlesProvider({
+        listingSlug: SAMPLE_LISTING_SLUG,
+        baseUrl: SAMPLE_ORIGIN_RESOURCE,
+      })
+    ).toThrow(/publicConfig is required/);
+
+    expect(() =>
+      oauthMcpbundlesProvider({
+        listingSlug: SAMPLE_LISTING_SLUG,
+        baseUrl: "https://other.example.test/mcp",
+        publicConfig: { ...SAMPLE_PUBLIC_CONFIG },
+        apiBaseUrl: SAMPLE_API_BASE,
+      })
+    ).toThrow(/origin_resource/);
+  });
+
   it("leaves unexpected JWKS network errors as ordinary errors", async () => {
     const { privateKey } = await generateKeyPair("RS256");
     globalThis.fetch = async () => {
@@ -583,6 +925,22 @@ function jwksFixture(jwk: Awaited<ReturnType<typeof exportJWK>>): typeof fetch {
     new Response(JSON.stringify({ keys: [jwk] }), {
       headers: { "content-type": "application/json" },
     });
+}
+
+function mcpbundlesFixture(
+  jwk: Awaited<ReturnType<typeof exportJWK>>
+): typeof fetch {
+  return async (input) => {
+    const url = String(input);
+    if (url.includes("public-config")) {
+      return new Response(JSON.stringify(SAMPLE_PUBLIC_CONFIG), {
+        headers: { "content-type": "application/json" },
+      });
+    }
+    return new Response(JSON.stringify({ keys: [jwk] }), {
+      headers: { "content-type": "application/json" },
+    });
+  };
 }
 
 function signedToken(

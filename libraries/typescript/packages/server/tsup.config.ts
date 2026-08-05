@@ -31,6 +31,7 @@ export default defineConfig([
       "oauth/workos": "src/oauth/workos.ts",
       "oauth/supabase": "src/oauth/supabase.ts",
       "oauth/keycloak": "src/oauth/keycloak.ts",
+      "oauth/mcpbundles": "src/oauth/mcpbundles.ts",
       "oauth/better-auth": "src/oauth/better-auth.ts",
       // Keep the OpenAPI integration in a sibling chunk. `MCPServer` imports
       // it synchronously so `fromOpenAPI()` stays a synchronous constructor,

@@ -10,6 +10,7 @@
     "src/oauth/workos.ts",
     "src/oauth/supabase.ts",
     "src/oauth/keycloak.ts",
+    "src/oauth/mcpbundles.ts",
     "src/oauth/better-auth.ts",
     "src/node-bridge.ts",
     "src/next/index.ts"

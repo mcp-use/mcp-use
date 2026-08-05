@@ -4,7 +4,8 @@ Org fork of [mcp-use/mcp-use](https://github.com/mcp-use/mcp-use) for MCPBundles
 
 Submodule path in MCPBundles monorepo: `public_github_repos/mcp-use`.
 
-**Execution checklist:** parent repo `product/mcp-connect-auth/coding-plan.md` § P7c.
+**Execution checklist:** parent repo `product/mcp-connect-auth/coding-plan.md` § P7c.  
+**Implementation plan:** `product/mcp-connect-auth/log/2026-08-05-p7c-mcp-use-plan.md`
 
 ## Remotes
 
@@ -23,10 +24,11 @@ git merge upstream/main   # or rebase feature branch onto upstream/main
 
 TypeScript **resource-server** OAuth provider for MCP Connect Auth — mirror WorkOS/Auth0 providers:
 
-- `libraries/typescript/packages/server/src/oauth/mcpbundles.ts` — `oauthMcpbundlesProvider()`
+- `libraries/typescript/packages/server/src/oauth/mcpbundles.ts` — `oauthMcpbundlesProvider()` **implemented locally**
 - Tests in `libraries/typescript/packages/server/tests/oauth-direct-providers.test.ts`
 - Example: `libraries/typescript/packages/server/examples/auth/mcpbundles/`
-- Docs: `docs/typescript/server/authentication/providers/mcpbundles.mdx`
+- Docs: `docs/typescript/.../mcpbundles.mdx` + `docs/v2/.../mcpbundles.mdx`
+- Changeset: `libraries/typescript/.changeset/mcpbundles-oauth-provider.md`
 
 Port JWT verify + `public-config` fetch from `@mcpbundles/mcp-connect-auth` (parent submodule `public_github_repos/mcp-connect-auth-js`).
 

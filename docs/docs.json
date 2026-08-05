@@ -93,6 +93,7 @@
                               "typescript/server/authentication/providers/better-auth",
                               "typescript/server/authentication/providers/clerk",
                               "typescript/server/authentication/providers/keycloak",
+                              "typescript/server/authentication/providers/mcpbundles",
                               "typescript/server/authentication/providers/supabase",
                               "typescript/server/authentication/providers/workos",
                               "typescript/server/authentication/providers/oauth-proxy",
@@ -332,6 +333,7 @@
                               "v2/typescript/server/authentication/providers/better-auth",
                               "v2/typescript/server/authentication/providers/clerk",
                               "v2/typescript/server/authentication/providers/keycloak",
+                              "v2/typescript/server/authentication/providers/mcpbundles",
                               "v2/typescript/server/authentication/providers/supabase",
                               "v2/typescript/server/authentication/providers/workos",
                               "v2/typescript/server/authentication/providers/custom"

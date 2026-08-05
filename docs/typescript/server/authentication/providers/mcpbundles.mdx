@@ -1,0 +1,123 @@
+---
+title: "MCPBundles Provider"
+description: "Configure MCPBundles Connect Auth for a TypeScript MCP server on the vendor origin."
+---
+
+Use `oauthMcpbundlesProvider` when your MCP server is published on MCPBundles with **Connect Auth** enabled and clients authenticate against the MCPBundles tenant authorization server. mcp-use verifies ES256 access tokens against the tenant JWKS and maps Connect Auth claims into `ctx.auth`.
+
+This guide covers the **vendor origin** path (Path A). Clients may also connect through the MCPBundles bundle proxy at `https://mcp.mcpbundles.com/bundle/{slug}` without running this provider.
+
+See the [auth providers API reference](/typescript/api-reference/server/auth-providers) for exact `oauthMcpbundlesProvider()` options, defaults, and errors.
+
+## Configure MCPBundles
+
+In the [MCPBundles maintainer dashboard](https://www.mcpbundles.com):
+
+1. Publish your MCP listing with **Connect Auth** enabled.
+2. Set your federation sign-in URL on the listing.
+3. Save the federation secret on your **web app** (not on this MCP server).
+4. Note your listing slug and ensure the listing **base URL** matches your public MCP origin.
+
+## Set environment variables
+
+```bash
+MCPBUNDLES_LISTING_SLUG=your-listing-slug
+MCP_URL=https://mcp.example.com
+```
+
+`MCP_URL` is the public MCP server origin. For local development, `mcp-use dev` can supply a trusted localhost origin when `MCP_URL` is omitted.
+
+## Configure the MCP server
+
+Load tenant public-config asynchronously, then construct the provider:
+
+```typescript
+import { MCPServer } from "mcp-use";
+import {
+  fetchMcpbundlesPublicConfig,
+  oauthMcpbundlesProvider,
+} from "mcp-use/oauth/mcpbundles";
+
+const listingSlug = process.env.MCPBUNDLES_LISTING_SLUG;
+if (!listingSlug) throw new Error("MCPBUNDLES_LISTING_SLUG is required");
+
+const baseUrl = process.env.MCP_URL ?? "http://localhost:3000";
+const publicConfig = await fetchMcpbundlesPublicConfig({ listingSlug });
+
+const server = new MCPServer({
+  name: "mcpbundles-server",
+  version: "1.0.0",
+  oauth: oauthMcpbundlesProvider({
+    listingSlug,
+    baseUrl,
+    publicConfig,
+  }),
+});
+
+export default server;
+```
+
+## Scope data by organization
+
+Connect Auth may include `organization_id` in the access token. Use it to filter tenant-specific data.
+
+```typescript
+server.tool(
+  {
+    name: "list_documents",
+    description: "List documents for the authenticated organization.",
+  },
+  async (_args, ctx) => {
+    const organizationId = ctx.auth.user.organizationId;
+    if (!organizationId) {
+      return {
+        isError: true,
+        content: [{ type: "text", text: "Organization context required" }],
+      };
+    }
+
+    const documents = await db.documents.findMany({
+      where: { organizationId },
+    });
+    return {
+      content: [{ type: "text", text: JSON.stringify(documents) }],
+    };
+  },
+);
+```
+
+The mapped user includes `id`, optional `organizationId`, optional `email`, and `roles` (empty when omitted). Pass `email` and `roles` in your federation `complete` call to mint them on the access token. The OAuth MCP client id remains on `ctx.auth.clientId`.
+
+For the full cross-framework mapping (FastMCP ↔ mcp-use), see [Tool callback identity](https://www.mcpbundles.com/docs/integrations/mcp-connect-auth#tool-callback-identity) in the MCPBundles integration guide.
+
+## Verify the integration
+
+After deploying, run the MCPBundles doctor against your listing origin surface:
+
+```bash
+mcpbundles connect doctor --listing your-listing-slug --surface origin
+```
+
+<CardGroup cols={2}>
+  <Card
+    title="Runnable MCPBundles example"
+    icon="github"
+    href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/auth/mcpbundles"
+  >
+    Compare with the maintained Connect Auth example.
+  </Card>
+  <Card
+    title="MCP Connect Auth integration guide"
+    icon="book-open"
+    href="https://www.mcpbundles.com/docs/integrations/mcp-connect-auth"
+  >
+    Federation, publishing, and bundle URL setup.
+  </Card>
+  <Card
+    title="User Context"
+    icon="user"
+    href="/typescript/server/authentication/user-context"
+  >
+    Use Connect Auth identity in tool callbacks.
+  </Card>
+</CardGroup>
