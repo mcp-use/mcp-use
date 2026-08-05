@@ -8,8 +8,8 @@ pnpm build
 
 # Four demo servers (separate terminals)
 cd examples/_demo-servers && pnpm install --ignore-workspace
-PORT=3101 pnpm official:v1
-PORT=3102 pnpm official:v2
+PORT=3101 pnpm mcp-use:v1
+PORT=3102 pnpm mcp-use:v2
 PORT=3103 pnpm ours:v1
 PORT=3104 pnpm ours:v2
 ```
