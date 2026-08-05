@@ -58,7 +58,7 @@
     "For views, prefer the MCP Apps flow using useToolContext, useViewState, useCallTool, useFiles, and ModelContext from mcp-use/react.",
     "For server examples, prefer MCPServer tools, resources, prompts, response helpers, OAuth providers, middleware, session management, Inspector, and deployment docs.",
     "Every tool should set explicit annotations readOnlyHint, openWorldHint, and destructiveHint; add outputSchema when returning structured content or widget props.",
-    "Import server APIs from mcp-use/server and React hooks/components from mcp-use/react; avoid internal package paths unless docs explicitly require them.",
+    "Import server APIs from the mcp-use package root and React hooks/components from mcp-use/react; there is no mcp-use/server subpath in v2. Avoid internal package paths unless docs explicitly require them.",
     "For new TypeScript MCP servers or apps, scaffold with npx create-mcp-use-app instead of hand-rolling MCPServer boilerplate, package.json, or widget build setup.",
     "Tool handlers should use Zod schemas with describe fields and return response helpers such as text(), object(), widget(), and error() instead of raw objects or thrown errors.",
     "Views should use useToolContext<Name>() and branch on pending, ready, or error before reading structured output.",
