@@ -51,8 +51,8 @@ export interface MCPConnectionInfo {
   protocolEra: MCPProtocolEra;
   /** Negotiated MCP protocol version. */
   protocolVersion: string;
-  /** Server identity reported during negotiation. */
-  server: MCPServerInfo;
+  /** Server identity reported during negotiation, when provided. */
+  server?: MCPServerInfo;
   /** Capabilities advertised by the server. */
   capabilities: Record<string, unknown>;
   /** Instructions advertised by the server. */
@@ -369,7 +369,7 @@ export class MCPConnection {
     const protocolVersion = this.negotiatedProtocolVersion;
     const server = this.serverInfo;
 
-    if (!protocolEra || !protocolVersion || !server) {
+    if (!protocolEra || !protocolVersion) {
       throw new Error("MCP connection is not initialized");
     }
 
@@ -384,7 +384,7 @@ export class MCPConnection {
     return {
       protocolEra,
       protocolVersion,
-      server,
+      ...(server ? { server } : {}),
       capabilities,
       instructions: this.connector.instructions,
       extensions,

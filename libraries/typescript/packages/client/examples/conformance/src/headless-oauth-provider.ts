@@ -1,17 +1,38 @@
 import type {
   OAuthClientProvider,
   OAuthClientInformation,
+  OAuthClientInformationContext,
   OAuthClientInformationFull,
   OAuthClientMetadata,
   OAuthTokens,
+  OAuthDiscoveryState,
 } from "@modelcontextprotocol/client";
 import type { PreRegistrationContext } from "./conformance-shared.js";
 
+/** Authorization response captured from the headless redirect. */
+export type HeadlessOAuthAuthorizationResponse = {
+  code: string;
+  /** RFC 9207 authorization-server issuer, when returned by the callback. */
+  iss?: string;
+};
+
 export class HeadlessConformanceOAuthProvider implements OAuthClientProvider {
-  private clientInfo?: OAuthClientInformationFull;
-  private tokenData?: OAuthTokens;
+  /**
+   * Pre-v2 credential storage did not have an issuer key. Keep one unbound
+   * entry only long enough for the SDK to stamp it on the first v2 read.
+   */
+  private legacyClientInfo?: OAuthClientInformationFull;
+  private legacyTokenData?: OAuthTokens;
+  private readonly clientInfoByIssuer = new Map<
+    string,
+    OAuthClientInformationFull
+  >();
+  private readonly tokensByIssuer = new Map<string, OAuthTokens>();
+  private latestTokenData?: OAuthTokens;
+  private savedDiscoveryState?: OAuthDiscoveryState;
   private storedCodeVerifier?: string;
-  private authorizationCode?: string;
+  private authorizationResponse?: HeadlessOAuthAuthorizationResponse;
+  private authorizationState?: string;
 
   constructor(
     private readonly redirectUri: string,
@@ -31,22 +52,75 @@ export class HeadlessConformanceOAuthProvider implements OAuthClientProvider {
     return this.metadataUrl;
   }
 
-  async clientInformation(): Promise<OAuthClientInformation | undefined> {
-    return this.clientInfo;
+  async clientInformation(
+    context?: OAuthClientInformationContext
+  ): Promise<OAuthClientInformation | undefined> {
+    if (!context) {
+      return (
+        this.legacyClientInfo ?? this.clientInfoByIssuer.values().next().value
+      );
+    }
+
+    // Returning the legacy entry here lets the v2 SDK stamp it with the
+    // issuer and re-save it. Once saved with an issuer it is never reused for
+    // a different AS, so a migration triggers fresh registration as required.
+    return this.clientInfoByIssuer.get(context.issuer) ?? this.legacyClientInfo;
   }
 
   async saveClientInformation(
-    clientInformation: OAuthClientInformationFull
+    clientInformation: OAuthClientInformationFull,
+    context?: OAuthClientInformationContext
   ): Promise<void> {
-    this.clientInfo = clientInformation;
+    if (context) {
+      this.clientInfoByIssuer.set(context.issuer, clientInformation);
+      this.legacyClientInfo = undefined;
+      return;
+    }
+
+    this.legacyClientInfo = clientInformation;
   }
 
-  async tokens(): Promise<OAuthTokens | undefined> {
-    return this.tokenData;
+  async tokens(
+    context?: OAuthClientInformationContext
+  ): Promise<OAuthTokens | undefined> {
+    if (!context) {
+      // Transport bearer-token reads are issuer-less. The SDK requires the
+      // most recently issued token in that case.
+      return this.latestTokenData ?? this.legacyTokenData;
+    }
+
+    return this.tokensByIssuer.get(context.issuer) ?? this.legacyTokenData;
   }
 
-  async saveTokens(tokens: OAuthTokens): Promise<void> {
-    this.tokenData = tokens;
+  async saveTokens(
+    tokens: OAuthTokens,
+    context?: OAuthClientInformationContext
+  ): Promise<void> {
+    this.latestTokenData = tokens;
+    if (context) {
+      this.tokensByIssuer.set(context.issuer, tokens);
+      this.legacyTokenData = undefined;
+      return;
+    }
+
+    this.legacyTokenData = tokens;
+  }
+
+  async saveDiscoveryState(state: OAuthDiscoveryState): Promise<void> {
+    // The headless callback happens in-process, but this must be retained
+    // alongside the verifier so the SDK can bind the callback to its issuer.
+    this.savedDiscoveryState = state;
+  }
+
+  async discoveryState(): Promise<OAuthDiscoveryState | undefined> {
+    return this.savedDiscoveryState;
+  }
+
+  async state(): Promise<string> {
+    // A distinct value is generated for each authorization attempt. The
+    // redirect handler verifies the returned value before exposing its code.
+    this.authorizationState = crypto.randomUUID();
+    return this.authorizationState;
   }
 
   async redirectToAuthorization(authorizationUrl: URL): Promise<void> {
@@ -57,18 +131,10 @@ export class HeadlessConformanceOAuthProvider implements OAuthClientProvider {
     const location = response.headers.get("location");
     if (location) {
       const redirected = new URL(location, authorizationUrl);
-      const code = redirected.searchParams.get("code");
-      if (code) {
-        this.authorizationCode = code;
-        return;
-      }
+      if (this.captureAuthorizationResponse(redirected)) return;
     }
 
-    const fallbackCode = new URL(response.url).searchParams.get("code");
-    if (fallbackCode) {
-      this.authorizationCode = fallbackCode;
-      return;
-    }
+    if (this.captureAuthorizationResponse(new URL(response.url))) return;
 
     throw new Error("Headless OAuth flow did not return an authorization code");
   }
@@ -84,11 +150,41 @@ export class HeadlessConformanceOAuthProvider implements OAuthClientProvider {
     return this.storedCodeVerifier;
   }
 
+  async invalidateCredentials(
+    scope: "all" | "client" | "tokens" | "verifier" | "discovery"
+  ): Promise<void> {
+    if (scope === "all" || scope === "client") {
+      this.legacyClientInfo = undefined;
+      this.clientInfoByIssuer.clear();
+    }
+    if (scope === "all" || scope === "tokens") {
+      this.legacyTokenData = undefined;
+      this.latestTokenData = undefined;
+      this.tokensByIssuer.clear();
+    }
+    if (scope === "all" || scope === "verifier") {
+      this.storedCodeVerifier = undefined;
+      this.authorizationResponse = undefined;
+      this.authorizationState = undefined;
+    }
+    if (scope === "all" || scope === "discovery") {
+      this.savedDiscoveryState = undefined;
+    }
+  }
+
   async getAuthorizationCode(): Promise<string> {
-    if (!this.authorizationCode) {
+    return (await this.getAuthorizationResponse()).code;
+  }
+
+  /**
+   * Returns the complete callback response so callers can pass the RFC 9207
+   * `iss` value to the SDK for authorization-server validation.
+   */
+  async getAuthorizationResponse(): Promise<HeadlessOAuthAuthorizationResponse> {
+    if (!this.authorizationResponse) {
       throw new Error("No OAuth authorization code captured");
     }
-    return this.authorizationCode;
+    return this.authorizationResponse;
   }
 
   /**
@@ -96,7 +192,8 @@ export class HeadlessConformanceOAuthProvider implements OAuthClientProvider {
    * This is called by the SDK's auth() function to get the authorization code.
    */
   async prepareTokenRequest(): Promise<URLSearchParams | undefined> {
-    if (!this.authorizationCode) {
+    const authorizationCode = this.authorizationResponse?.code;
+    if (!authorizationCode) {
       return undefined;
     }
     if (!this.storedCodeVerifier) {
@@ -105,10 +202,32 @@ export class HeadlessConformanceOAuthProvider implements OAuthClientProvider {
 
     const params = new URLSearchParams();
     params.set("grant_type", "authorization_code");
-    params.set("code", this.authorizationCode);
+    params.set("code", authorizationCode);
     params.set("code_verifier", this.storedCodeVerifier);
     params.set("redirect_uri", this.redirectUri);
     return params;
+  }
+
+  private captureAuthorizationResponse(callbackUrl: URL): boolean {
+    const code = callbackUrl.searchParams.get("code");
+    if (!code) return false;
+
+    const returnedState = callbackUrl.searchParams.get("state");
+    if (
+      this.authorizationState !== undefined &&
+      returnedState !== this.authorizationState
+    ) {
+      throw new Error(
+        "OAuth callback state did not match the authorization request"
+      );
+    }
+
+    const iss = callbackUrl.searchParams.get("iss") ?? undefined;
+    this.authorizationResponse = {
+      code,
+      ...(iss !== undefined ? { iss } : {}),
+    };
+    return true;
   }
 }
 

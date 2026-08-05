@@ -693,7 +693,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    * `@mcp-use/client` v2 peer. Each key automatically namespaces its mounted
    * tools, resources, and prompts. You may instead pass an existing ready
    * {@link ProxyConnection}; its negotiated server name becomes the namespace
-   * and the connection remains caller-owned.
+   * and the connection remains caller-owned. Anonymous connections cannot use
+   * this overload because they do not provide a namespace.
    *
    * Connection, introspection, and collision failures are diagnosed and
    * skipped without discarding capabilities that can be mounted.
@@ -718,8 +719,9 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    *
    * @param connection - Ready connection to introspect and forward through.
    * The connection's negotiated server name automatically namespaces every
-   * mounted capability. Introspection and collision failures are diagnosed and
-   * skipped without discarding capabilities that can be mounted.
+   * mounted capability. Anonymous connections are rejected because they do not
+   * provide a namespace. Introspection and collision failures are diagnosed
+   * and skipped without discarding capabilities that can be mounted.
    *
    * @throws If the server already started or closed.
    *
