@@ -421,12 +421,8 @@ function buildMcpbundlesJwtVerifier(options: {
 
 function enforceConnectAuthClientClaim(authInfo: AuthInfo): AuthInfo {
   const payload = payloadFromAuthInfo(authInfo);
-  const clientId = requiredString(payload, "client_id");
-  if (clientId === undefined || clientId.trim().length === 0) {
+  if (requiredString(payload, "client_id") === undefined) {
     throw invalidToken("Connect Auth token missing client_id");
-  }
-  if (authInfo.clientId !== clientId) {
-    return { ...authInfo, clientId };
   }
   return authInfo;
 }
