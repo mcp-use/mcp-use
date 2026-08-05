@@ -403,13 +403,32 @@ function buildMcpbundlesJwtVerifier(options: {
   resource: URL;
   audiences: string[];
 }) {
-  return createJwtVerifier({
+  const verifier = createJwtVerifier({
     issuer: options.issuer,
     jwksUrl: options.jwksUrl,
     resource: options.resource,
     audience: options.audiences,
     algorithms: ["ES256"],
   });
+
+  return {
+    async verifyAccessToken(token: string) {
+      const authInfo = await verifier.verifyAccessToken(token);
+      return enforceConnectAuthClientClaim(authInfo);
+    },
+  };
+}
+
+function enforceConnectAuthClientClaim(authInfo: AuthInfo): AuthInfo {
+  const payload = payloadFromAuthInfo(authInfo);
+  const clientId = requiredString(payload, "client_id");
+  if (clientId === undefined || clientId.trim().length === 0) {
+    throw invalidToken("Connect Auth token missing client_id");
+  }
+  if (authInfo.clientId !== clientId) {
+    return { ...authInfo, clientId };
+  }
+  return authInfo;
 }
 
 function mapMcpbundlesUser(

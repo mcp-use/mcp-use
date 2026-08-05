@@ -811,7 +811,7 @@ describe("direct OAuth providers", () => {
     expect(authInfo.extra?.user).not.toHaveProperty("clientId");
   });
 
-  it("omits ctx.auth.clientId when the token lacks client_id (Connect Auth always sends it)", async () => {
+  it("rejects MCPBundles tokens missing client_id", async () => {
     const { privateKey, publicKey } = await generateKeyPair("ES256");
     const jwk = await exportJWK(publicKey);
     jwk.kid = "mcpbundles-key";
@@ -837,7 +837,51 @@ describe("direct OAuth providers", () => {
           "ES256"
         )
       )
-    ).resolves.toMatchObject({ clientId: "" });
+    ).rejects.toMatchObject({ code: "invalid_token" });
+  });
+
+  it("rejects MCPBundles tokens that only carry azp", async () => {
+    const { privateKey, publicKey } = await generateKeyPair("ES256");
+    const jwk = await exportJWK(publicKey);
+    jwk.kid = "mcpbundles-key";
+    globalThis.fetch = mcpbundlesFixture(jwk);
+    const provider = oauthMcpbundlesProvider({
+      listingSlug: SAMPLE_LISTING_SLUG,
+      baseUrl: SAMPLE_ORIGIN_RESOURCE,
+      apiBaseUrl: SAMPLE_API_BASE,
+      publicConfig: { ...SAMPLE_PUBLIC_CONFIG },
+    });
+
+    await expect(
+      wrapOAuthTokenVerifier(
+        provider,
+        new URL(SAMPLE_ORIGIN_RESOURCE)
+      ).verifyAccessToken(
+        await signedToken(
+          privateKey,
+          "mcpbundles-key",
+          SAMPLE_ISSUER,
+          SAMPLE_ORIGIN_RESOURCE,
+          { sub: "user-1", azp: "client-1" },
+          "ES256"
+        )
+      )
+    ).rejects.toMatchObject({ code: "invalid_token" });
+  });
+
+  it("preserves trailing-slash issuer in OAuth metadata", async () => {
+    const issuerWithSlash = `${SAMPLE_ISSUER}/`;
+    const provider = oauthMcpbundlesProvider({
+      listingSlug: SAMPLE_LISTING_SLUG,
+      baseUrl: SAMPLE_ORIGIN_RESOURCE,
+      apiBaseUrl: SAMPLE_API_BASE,
+      publicConfig: {
+        ...SAMPLE_PUBLIC_CONFIG,
+        issuer: issuerWithSlash,
+      },
+    });
+
+    expect(provider.oauthMetadata.issuer).toBe(issuerWithSlash);
   });
 
   it("parses MCPBundles public-config and rejects invalid payloads", async () => {
