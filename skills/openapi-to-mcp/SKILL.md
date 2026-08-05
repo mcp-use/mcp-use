@@ -157,7 +157,7 @@ The registration loop is small. Pseudocode:
 
 ```ts
 import "dotenv/config";
-import { MCPServer, text } from "mcp-use/server";
+import { MCPServer, text } from "mcp-use";
 import { operations } from "./src/operations";
 import { callOperation } from "./src/client";
 import { operationToZod } from "./src/schema";
