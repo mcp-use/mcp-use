@@ -7,7 +7,11 @@
  */
 import { resolve } from "node:path";
 
-import { parseArgs, type ParsedArgs } from "./args.js";
+import {
+  parseArgs,
+  stripForwardingSeparator,
+  type ParsedArgs,
+} from "./args.js";
 
 // Node 25 exposes `localStorage` through a warning-producing lazy getter when
 // no --localstorage-file is configured. CLI/server code does not use that
@@ -188,33 +192,34 @@ export async function main(
   }
 
   const command = argv[0];
+  const commandArgs = stripForwardingSeparator(argv.slice(1));
   if (command === "login" || command === "logout" || command === "whoami") {
     const { runIdentity } = await import("../commands/identity.js");
-    return runIdentity(command, argv.slice(1));
+    return runIdentity(command, commandArgs);
   }
   if (command === "org") {
     const { runOrganizations } = await import("../commands/organizations.js");
-    return runOrganizations(argv.slice(1));
+    return runOrganizations(commandArgs);
   }
   if (command === "servers") {
     const { runServers } = await import("../commands/servers.js");
-    return runServers(argv.slice(1));
+    return runServers(commandArgs);
   }
   if (command === "deployments") {
     const { runDeployments } = await import("../commands/deployments.js");
-    return runDeployments(argv.slice(1));
+    return runDeployments(commandArgs);
   }
   if (command === "deploy") {
     const { runDeploy } = await import("../commands/deploy.js");
-    return runDeploy(argv.slice(1));
+    return runDeploy(commandArgs);
   }
   if (command === "client") {
     const { runClient } = await import("../commands/client.js");
-    return runClient(argv.slice(1));
+    return runClient(commandArgs);
   }
   if (command === "screenshot") {
     const { runScreenshot } = await import("../commands/screenshot.js");
-    return runScreenshot(argv.slice(1));
+    return runScreenshot(commandArgs);
   }
 
   let args: ParsedArgs;
@@ -285,6 +290,11 @@ async function startCommand(args: ParsedArgs): Promise<number> {
   }
 
   console.log(`mcp-use server running at ${started.url}`);
+  if (args.inspector === true) {
+    console.log(
+      `mcp-use inspector at ${started.url.replace(/\/$/, "")}/inspector`
+    );
+  }
   if (started.tunnelUrl !== undefined) {
     console.log(`mcp-use public MCP URL: ${started.tunnelUrl}`);
   }

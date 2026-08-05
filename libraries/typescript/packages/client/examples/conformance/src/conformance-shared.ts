@@ -53,6 +53,47 @@ export function isScopeStepUpScenario(scenario: string): boolean {
   );
 }
 
+/**
+ * Scenarios whose initial 401 carries the requested OAuth scope in
+ * WWW-Authenticate. They must let the retry fetch observe that response;
+ * pre-authenticating would lose the scope before the first MCP request.
+ */
+export function requiresOAuthRetryFetch(scenario: string): boolean {
+  return (
+    isScopeStepUpScenario(scenario) ||
+    scenario === "auth/scope-from-www-authenticate"
+  );
+}
+
+const CONFORMANCE_SCENARIO_TIMEOUT_MS = 45_000;
+
+/**
+ * Keep a broken fixture from consuming the workflow-level timeout. The process
+ * exits after this rejects, so a still-pending connection cannot keep CI alive.
+ */
+export async function runWithScenarioTimeout<T>(
+  scenario: string,
+  run: Promise<T>,
+  timeoutMs = CONFORMANCE_SCENARIO_TIMEOUT_MS
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(
+        new Error(
+          `Conformance scenario ${scenario || "unknown"} exceeded ${timeoutMs}ms`
+        )
+      );
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([run, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export async function handleElicitation(
   params: ElicitRequestFormParams | ElicitRequestURLParams
 ): Promise<ElicitResult> {

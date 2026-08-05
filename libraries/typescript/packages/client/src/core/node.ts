@@ -503,6 +503,7 @@ export class MCPClient extends BaseMCPClient {
         args: string[];
         env?: Record<string, string>;
         cwd?: string;
+        stderr?: import("../transport/stdio.js").StdioStderrMode;
         protocolNegotiation?: import("@modelcontextprotocol/client").VersionNegotiationMode;
       };
       return new StdioConnector({
@@ -510,6 +511,7 @@ export class MCPClient extends BaseMCPClient {
         args: stdioConfig.args,
         env: stdioConfig.env,
         cwd: stdioConfig.cwd,
+        ...(stdioConfig.stderr !== undefined && { stderr: stdioConfig.stderr }),
         protocolNegotiation: stdioConfig.protocolNegotiation,
         clientInfo: normalizeClientInfo(merged.clientInfo),
         roots: stdioConfig.roots,

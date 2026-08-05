@@ -16,7 +16,7 @@ const MCPTools: React.FC = () => {
     authenticate,
     clearStorage,
   } = useMcp({
-    // Default: local official-SDK demo (see examples/_demo-servers).
+    // Default: local mcp-use demo (see examples/_demo-servers).
     // OAuth servers: VITE_MCP_URL=https://mcp.linear.app/mcp pnpm dev
     url: import.meta.env.VITE_MCP_URL ?? "http://127.0.0.1:3102/mcp",
     enabled: enableConnection,

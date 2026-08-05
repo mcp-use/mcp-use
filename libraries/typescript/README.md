@@ -1,8 +1,8 @@
 <div align="center" style="margin: 0 auto; max-width: 80%;">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./packages/mcp-use/static/logo_white.svg">
-    <source media="(prefers-color-scheme: light)" srcset="./packages/mcp-use/static/logo_black.svg">
-    <img alt="mcp use logo" src="./packages/mcp-use/static/logo_white.svg" width="80%" style="margin: 20px auto;">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/mcp-use/mcp-use/main/static/logo_white.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/mcp-use/mcp-use/main/static/logo_black.svg">
+    <img alt="mcp use logo" src="https://raw.githubusercontent.com/mcp-use/mcp-use/main/static/logo_white.svg" width="80%" style="margin: 20px auto;">
   </picture>
 </div>
 
@@ -316,7 +316,7 @@ export default function AnalyticsDashboard() {
 }
 ```
 
-[**Full mcp-use Documentation →**](./packages/mcp-use)
+[**Full mcp-use Documentation →**](./packages/server)
 
 ---
 
@@ -608,13 +608,6 @@ git commit -m "feat: your feature description"
 - CI creates/updates a "Version Packages" PR automatically
 - Merge the Version PR to publish stable versions
 - Packages published with `latest` tag on npm
-
-#### V2 Beta Prereleases (beta branch)
-
-- Merge a reviewed PR into `beta` to trigger the V2 beta release workflow
-- GitHub Actions publishes the versioned beta packages with OIDC trusted publishing
-- Versions use the `x.y.z-beta.N` form and npm's `beta` dist tag
-- The workflow verifies that `latest`, `canary`, and every other non-beta dist tag are unchanged
 
 #### Canary Prereleases (canary branch)
 

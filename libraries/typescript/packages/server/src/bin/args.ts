@@ -85,13 +85,14 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
     if (token === undefined) continue;
 
     if (token === "--") {
-      if (args.command !== "typecheck") {
-        throw new Error(
-          "TypeScript argument forwarding is only available for typecheck"
-        );
+      if (args.command === "typecheck") {
+        args.passthrough = argv.slice(i + 1);
+        break;
       }
-      args.passthrough = argv.slice(i + 1);
-      break;
+
+      // Package managers commonly leave their script forwarding separator in
+      // argv. mcp-use-owned commands parse the remaining tokens themselves.
+      continue;
     }
 
     // Split `--flag=value` into flag + inline value.
@@ -173,6 +174,27 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
   }
 
   return args;
+}
+
+/**
+ * Remove a package-manager script forwarding separator from command-specific
+ * arguments.
+ *
+ * `typecheck` retains the separator so {@link parseArgs} can forward the
+ * remaining tokens to TypeScript; command families with their own parsers
+ * consume the separator before parsing their options.
+ *
+ * @param argv - Arguments following the top-level command.
+ * @returns The arguments with the first forwarding separator removed.
+ *
+ * @internal
+ */
+export function stripForwardingSeparator(
+  argv: readonly string[]
+): readonly string[] {
+  const separator = argv.indexOf("--");
+  if (separator === -1) return argv;
+  return [...argv.slice(0, separator), ...argv.slice(separator + 1)];
 }
 
 /**

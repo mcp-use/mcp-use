@@ -17,9 +17,9 @@ cleanup() {
 trap cleanup EXIT
 
 echo "Starting demo servers..."
-(cd examples/_demo-servers && PORT=3101 pnpm official:v1) &
+(cd examples/_demo-servers && PORT=3101 pnpm mcp-use:v1) &
 PIDS+=("$!")
-(cd examples/_demo-servers && PORT=3102 pnpm official:v2) &
+(cd examples/_demo-servers && PORT=3102 pnpm mcp-use:v2) &
 PIDS+=("$!")
 (cd examples/_demo-servers && PORT=3103 pnpm ours:v1) &
 PIDS+=("$!")
@@ -48,7 +48,7 @@ for url in \
 done
 
 fail=0
-# The official servers isolate protocol/transport compatibility.
+# The small mcp-use servers isolate protocol/transport compatibility.
 for url in http://127.0.0.1:3101/mcp http://127.0.0.1:3102/mcp; do
   echo ""
   echo "=== Node basic @ $url ==="

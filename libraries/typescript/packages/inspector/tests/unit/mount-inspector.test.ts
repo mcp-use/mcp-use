@@ -88,6 +88,34 @@ describe("mountInspector", () => {
     }
   });
 
+  it("blocks loopback proxy targets by default and allows them on explicit opt-in", async () => {
+    const secure = mountInspector({ basePath: "" });
+    const blocked = await secure(
+      new Request("http://localhost/inspector/api/proxy", {
+        method: "POST",
+        headers: { "X-Target-URL": "http://127.0.0.1:8080/" },
+      })
+    );
+    expect(blocked.status).toBe(403);
+    expect(await blocked.json()).toMatchObject({
+      error: "Invalid target URL",
+    });
+
+    // Explicit opt-in (local dev tooling): the request proceeds to the fetch
+    // layer and fails to connect (port 1 refuses) instead of being rejected.
+    const permissive = mountInspector({
+      basePath: "",
+      oauthProxyAllowLoopback: true,
+    });
+    const attempted = await permissive(
+      new Request("http://localhost/inspector/api/proxy", {
+        method: "POST",
+        headers: { "X-Target-URL": "http://127.0.0.1:1/" },
+      })
+    );
+    expect(attempted.status).not.toBe(403);
+  });
+
   it("can still register routes directly on a Hono app", async () => {
     const app = new Hono();
     app.get("/application", (c) => c.text("application route"));
@@ -164,7 +192,8 @@ describe("mountInspector", () => {
 
   it("keeps the Express adapter scoped to Inspector routes", async () => {
     const app = express();
-    mountInspector(app, { basePath: "/mcp" });
+    // Loopback opt-in: this test proxies to its own 127.0.0.1 echo server.
+    mountInspector(app, { basePath: "/mcp", oauthProxyAllowLoopback: true });
     app.get("/application", (_req, res) => res.send("application route"));
     app.post("/echo", express.text({ type: "*/*" }), (_req, res) =>
       res.type("text/plain").send("through-express")

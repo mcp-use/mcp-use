@@ -7,15 +7,16 @@ Run each command in a separate terminal:
 ```bash
 cd _demo-servers
 pnpm install --ignore-workspace
-PORT=3101 pnpm official:v1 # official SDK, legacy stateful HTTP
-PORT=3102 pnpm official:v2 # official SDK, modern stateless HTTP
-PORT=3103 pnpm ours:v1     # mcp-use v1, full features + MCP Apps
-PORT=3104 pnpm ours:v2     # mcp-use v2, modern features + MCP Apps
+PORT=3101 pnpm mcp-use:v1 # mcp-use, legacy-era stateless HTTP
+PORT=3102 pnpm mcp-use:v2 # mcp-use, modern stateless HTTP
+PORT=3103 pnpm ours:v1     # mcp-use conformance server
+PORT=3104 pnpm ours:v2     # mcp-use views server
 ```
 
-The official servers isolate protocol negotiation and transport behavior. The
-mcp-use servers reuse our full v1 conformance server and v2 MCP Apps reference
-server so feature examples exercise real framework implementations.
+The first two fixtures are intentionally small `mcp-use` servers: the legacy
+fixture exercises compatibility handling, while the modern fixture exercises
+the current stateless Streamable HTTP path. The other two reuse our full
+conformance and MCP Apps reference servers for feature-heavy examples.
 
 Run the complete matrix:
 

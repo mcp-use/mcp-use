@@ -1,5 +1,52 @@
 # mcp-use
 
+## 2.0.1-canary.5
+
+### Patch Changes
+
+- d54e195: Update runtime and bundled dependencies to patched stable releases and tighten transitive dependency resolutions. The Better Auth example remains on its stable 1.6.x provider with its single-audience mitigation.
+- Updated dependencies [d54e195]
+  - @mcp-use/inspector@20.0.1-canary.5
+
+## 2.0.1-canary.4
+
+### Patch Changes
+
+- Updated dependencies [355dea7]
+  - @mcp-use/inspector@20.0.1-canary.4
+
+## 2.0.1-canary.3
+
+### Patch Changes
+
+- Updated dependencies [4ea75fd]
+  - @mcp-use/client@2.0.1-canary.0
+  - @mcp-use/cli@4.0.1-canary.2
+  - @mcp-use/inspector@20.0.1-canary.3
+
+## 2.0.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [b4abd43]
+  - @mcp-use/cli@4.0.1-canary.1
+  - @mcp-use/inspector@20.0.1-canary.2
+
+## 2.0.1-canary.1
+
+### Patch Changes
+
+- f1ed431: Print the mounted Inspector URL on `mcp-use start --with-inspector`, which previously said nothing at all about the Inspector it had just mounted. Plain `mcp-use start` is unchanged and stays silent.
+  - @mcp-use/inspector@20.0.1-canary.1
+
+## 2.0.1-canary.0
+
+### Patch Changes
+
+- 4c1dd8d: Print `[mcp-use] no type errors (<duration>ms)` when `mcp-use typecheck` passes. `tsc --noEmit` writes nothing on a clean project, so the command used to exit `0` with no output at all, which was indistinguishable from a hang or a silent failure. Failing runs are unchanged and still show only the compiler's own diagnostics.
+  - @mcp-use/inspector@20.0.1-canary.0
+  - @mcp-use/cli@4.0.1-canary.0
+
 ## 2.0.4
 
 ### Patch Changes

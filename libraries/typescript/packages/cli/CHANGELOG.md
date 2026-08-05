@@ -1,5 +1,24 @@
 # @mcp-use/cli
 
+## 4.0.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [4ea75fd]
+  - @mcp-use/client@2.0.1-canary.0
+
+## 4.0.1-canary.1
+
+### Patch Changes
+
+- b4abd43: fix(cli): accept package-manager argument forwarding across commands
+
+## 4.0.1-canary.0
+
+### Patch Changes
+
+- @mcp-use/inspector@20.0.1-canary.0
+
 ## 4.0.0
 
 ### Major Changes

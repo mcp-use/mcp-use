@@ -138,6 +138,26 @@ async function makeProject(options?: {
   return cwd;
 }
 
+/**
+ * Snapshot the shutdown signal listeners so the ones a `main(["start", ...])`
+ * call registers can be removed again without going through process.exit.
+ */
+function captureSignalListeners(): { release(): void } {
+  const before = {
+    SIGINT: new Set(process.listeners("SIGINT")),
+    SIGTERM: new Set(process.listeners("SIGTERM")),
+  } as const;
+  return {
+    release() {
+      for (const signal of ["SIGINT", "SIGTERM"] as const) {
+        for (const listener of process.listeners(signal)) {
+          if (!before[signal].has(listener)) process.off(signal, listener);
+        }
+      }
+    },
+  };
+}
+
 afterAll(async () => {
   await Promise.all(
     tempDirs.map((dir) => rm(dir, { recursive: true, force: true }))
@@ -176,6 +196,12 @@ describe("parseArgs", () => {
     expect(parseArgs(["start", "--port", "8080"]).port).toBe(8080);
     expect(parseArgs(["start", "-p", "8080"]).port).toBe(8080);
     expect(parseArgs(["start", "--port=8080"]).port).toBe(8080);
+  });
+
+  it("accepts the package-manager forwarding separator for dev flags", () => {
+    const args = parseArgs(["dev", "--", "--port", "3050", "--no-open"]);
+    expect(args.port).toBe(3050);
+    expect(args.open).toBe(false);
   });
 
   it("parses --entry and --host", () => {
@@ -243,14 +269,13 @@ describe("parseArgs", () => {
     expect(parseArgs(["-v"]).version).toBe(true);
   });
 
-  it("forwards arguments after -- only for typecheck", () => {
+  it("forwards typecheck args while consuming the separator for CLI options", () => {
     expect(
       parseArgs(["typecheck", "--", "--project", "tsconfig.check.json"])
         .passthrough
     ).toEqual(["--project", "tsconfig.check.json"]);
-    expect(() => parseArgs(["build", "--", "--pretty", "false"])).toThrow(
-      /only available for typecheck/i
-    );
+    expect(parseArgs(["start", "--", "--port", "8080"]).port).toBe(8080);
+    expect(parseArgs(["build", "--", "--source-maps"]).sourceMaps).toBe(true);
   });
 
   it("rejects invalid ports", () => {
@@ -540,11 +565,48 @@ describe("main", () => {
     }
   });
 
+  it("says nothing about the inspector when start does not mount it", async () => {
+    const cwd = await makeProject({ entrySource: ECHO_ENTRY });
+    const logs = vi.spyOn(console, "log").mockImplementation(() => {});
+    const signals = captureSignalListeners();
+
+    try {
+      await expect(
+        main(["start", "--path", cwd, "--port", "4567"])
+      ).resolves.toBe(0);
+      expect(logs.mock.calls.flat().join("\n")).not.toContain("inspector");
+    } finally {
+      signals.release();
+    }
+  });
+
+  it("prints the inspector URL when start mounts it", async () => {
+    mountInspector.mockImplementation(
+      () => async () => new Response("inspector")
+    );
+    const cwd = await makeProject({ entrySource: INSPECTOR_ENTRY });
+    const logs = vi.spyOn(console, "log").mockImplementation(() => {});
+    const signals = captureSignalListeners();
+
+    try {
+      await expect(
+        main(["start", "--path", cwd, "--port", "4567", "--with-inspector"])
+      ).resolves.toBe(0);
+      const output = logs.mock.calls.flat().join("\n");
+      expect(output).toContain(
+        "mcp-use inspector at http://localhost:4567/api/mcp/inspector"
+      );
+    } finally {
+      signals.release();
+    }
+  });
+
   it("prints client help for client --help", async () => {
     const stdout = vi
       .spyOn(process.stdout, "write")
       .mockImplementation(() => true);
     await expect(main(["client", "--help"])).resolves.toBe(0);
+    await expect(main(["client", "--", "--help"])).resolves.toBe(0);
     const output = stdout.mock.calls.flat().join("");
     expect(output).toContain("connect <name> <url>");
     expect(output).toContain("remove <name>");

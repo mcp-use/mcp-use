@@ -1,5 +1,49 @@
 # @mcp-use/inspector
 
+## 20.0.1-canary.5
+
+### Patch Changes
+
+- d54e195: Update runtime and bundled dependencies to patched stable releases and tighten transitive dependency resolutions. The Better Auth example remains on its stable 1.6.x provider with its single-audience mitigation.
+- Updated dependencies [d54e195]
+  - mcp-use@2.0.1-canary.5
+
+## 20.0.1-canary.4
+
+### Patch Changes
+
+- 355dea7: Block loopback proxy targets by default. `mountInspector` now defaults `oauthProxyAllowLoopback` to `false` (previously `true`), so a publicly reachable embedded/hosted Inspector no longer proxies requests to the host's loopback services (SSRF). The standalone CLI keeps allowing loopback for local development, but defaults to blocking it when `NODE_ENV=production` (which the published Docker image sets); set `INSPECTOR_ALLOW_LOOPBACK=true` to override either way.
+  - mcp-use@2.0.1-canary.4
+
+## 20.0.1-canary.3
+
+### Patch Changes
+
+- Updated dependencies [4ea75fd]
+  - @mcp-use/client@2.0.1-canary.0
+  - @mcp-use/agent@2.0.1-canary.0
+  - mcp-use@2.0.1-canary.3
+
+## 20.0.1-canary.2
+
+### Patch Changes
+
+- mcp-use@2.0.1-canary.2
+
+## 20.0.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [f1ed431]
+  - mcp-use@2.0.1-canary.1
+
+## 20.0.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [4c1dd8d]
+  - mcp-use@2.0.1-canary.0
+
 ## 20.0.4
 
 ### Patch Changes
