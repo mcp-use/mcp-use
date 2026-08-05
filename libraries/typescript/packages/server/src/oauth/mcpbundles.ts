@@ -267,10 +267,9 @@ export function oauthMcpbundlesProvider(
     );
   }
 
-  const tenantBase = expectedIssuer;
   const audiences = audiencesFromPublicConfig(publicConfig);
   const oauthMetadata = buildTenantOAuthMetadata(
-    tenantBase,
+    publicConfig.issuer,
     publicConfig.scopes_supported
   );
   const documentationUrl = new URL(MCPBUNDLES_INTEGRATION_DOC_URL);
