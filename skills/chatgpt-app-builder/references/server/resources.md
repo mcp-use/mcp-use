@@ -9,7 +9,7 @@ Resources expose read-only data that clients can fetch. They don't take input pa
 ## Basic Resource
 
 ```typescript
-import { MCPServer, object, text, markdown } from "mcp-use/server";
+import { MCPServer, object, text, markdown } from "mcp-use";
 
 const server = new MCPServer({
   name: "my-server",
@@ -437,7 +437,7 @@ server.resource(
 ## Complete Example
 
 ```typescript
-import { MCPServer, object, markdown, error } from "mcp-use/server";
+import { MCPServer, object, markdown, error } from "mcp-use";
 
 const server = new MCPServer({
   name: "docs-server",

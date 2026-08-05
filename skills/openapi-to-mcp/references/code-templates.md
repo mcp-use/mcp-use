@@ -481,7 +481,7 @@ Replace the scaffolded `index.ts` with this — preserving the MCPServer fields 
 
 ```ts
 import "dotenv/config";              // load .env into process.env
-import { MCPServer, text } from "mcp-use/server";
+import { MCPServer, text } from "mcp-use";
 import { operations } from "./src/operations";
 import { callOperation } from "./src/client";
 import { operationToZod } from "./src/schema";
