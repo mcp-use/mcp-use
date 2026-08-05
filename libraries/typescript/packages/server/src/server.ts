@@ -277,33 +277,6 @@ export interface ListenOptions {
   host?: string;
 }
 
-function omitRootSchemaDialect<T>(schema: T): T {
-  if (
-    typeof schema !== "object" ||
-    schema === null ||
-    Array.isArray(schema) ||
-    !("$schema" in schema)
-  ) {
-    return schema;
-  }
-
-  const emittedSchema = { ...schema } as T & Record<string, unknown>;
-  delete emittedSchema["$schema"];
-  return emittedSchema;
-}
-
-function omitToolSchemaDialects(
-  tools: McpMiddlewareResult<"tools/list">
-): McpMiddlewareResult<"tools/list"> {
-  return tools.map((tool) => ({
-    ...tool,
-    inputSchema: omitRootSchemaDialect(tool.inputSchema),
-    ...(tool.outputSchema === undefined
-      ? {}
-      : { outputSchema: omitRootSchemaDialect(tool.outputSchema) }),
-  }));
-}
-
 function registerFetchMiddleware<TEnv extends Env>(
   app: Hono<TEnv>,
   middleware: FetchMiddleware
@@ -1850,7 +1823,9 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       handlers.set(method, wrapped);
     };
 
-    wrapListMethod("tools/list", "tools", omitToolSchemaDialects);
+    // JSON Schema's root `$schema` declaration selects the dialect used for
+    // validation. Do not normalize it away from a tool descriptor.
+    wrapListMethod("tools/list", "tools");
     wrapListMethod("resources/list", "resources");
     wrapListMethod("prompts/list", "prompts");
   }

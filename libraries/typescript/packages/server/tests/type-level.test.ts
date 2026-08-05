@@ -693,3 +693,25 @@ describe("deprecated helper returns on resource/prompt callbacks", () => {
     expect(server).toBeDefined();
   });
 });
+
+describe("prompt input_required return-position checks", () => {
+  it("accepts InputRequiredResult from a prompt callback", () => {
+    const server = new MCPServer({ name: "types", version: "0.0.0" });
+    server.prompt({ name: "interactive-prompt" }, async () =>
+      inputRequired({
+        inputRequests: {
+          follow_up: inputRequired.createMessage({
+            messages: [
+              {
+                role: "user",
+                content: { type: "text", text: "Need more context" },
+              },
+            ],
+            maxTokens: 32,
+          }),
+        },
+      })
+    );
+    expect(server).toBeDefined();
+  });
+});
