@@ -26,7 +26,7 @@ MCPBUNDLES_LISTING_SLUG=your-listing-slug
 MCP_URL=https://mcp.example.com
 ```
 
-`MCP_URL` is the public MCP server origin. When omitted, the provider example uses the listing `origin_resource` from public-config — set `MCP_URL` explicitly when your runtime origin differs from the listing metadata.
+`MCP_URL` must match the listing `origin_resource` from public-config — `oauthMcpbundlesProvider` validates them at construction and throws if they differ. When omitted, use `origin_resource` from the fetched public-config (as in the example below).
 
 ## Configure the MCP server
 
