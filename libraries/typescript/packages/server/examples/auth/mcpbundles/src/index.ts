@@ -28,10 +28,14 @@ function requireEnv(name: string): string {
   return value;
 }
 
-const listingSlug = requireEnv("MCPBUNDLES_LISTING_SLUG");
-const baseUrl = process.env.MCP_URL?.trim() ?? "http://localhost:3000";
+function optionalEnv(name: string): string | undefined {
+  const value = process.env[name]?.trim();
+  return value && value.length > 0 ? value : undefined;
+}
 
+const listingSlug = requireEnv("MCPBUNDLES_LISTING_SLUG");
 const publicConfig = await fetchMcpbundlesPublicConfig({ listingSlug });
+const baseUrl = optionalEnv("MCP_URL") ?? publicConfig.origin_resource;
 
 const server = new MCPServer({
   name: "mcpbundles-auth-example",
