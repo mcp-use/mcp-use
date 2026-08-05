@@ -41,8 +41,6 @@ import type { ConnectorInitEventData } from "../telemetry/events.js";
 import { trackConnectorTelemetry } from "../telemetry/connector-telemetry.js";
 import type { MCPServerInfo } from "../core/session.js";
 
-const SERVER_INFO_META_KEY = "io.modelcontextprotocol/serverInfo";
-
 /**
  * Handles a notification received from an MCP server.
  *
@@ -524,20 +522,9 @@ export abstract class BaseConnector {
     const capabilities = this.client.getServerCapabilities();
     this.capabilitiesCache = (capabilities as Record<string, unknown>) || null;
 
-    // Legacy servers report their identity in the initialize response. Modern
-    // servers report it through server/discover; alpha.10 uses a top-level
-    // field while the current revision places it in result metadata. Prefer
-    // the SDK's normalized accessor when it is available.
-    const discover = this.client.getDiscoverResult() as
-      | {
-          serverInfo?: ReturnType<Client["getServerVersion"]>;
-          _meta?: Record<string, ReturnType<Client["getServerVersion"]>>;
-        }
-      | undefined;
-    const serverInfo =
-      this.client.getServerVersion() ??
-      discover?.serverInfo ??
-      discover?._meta?.[SERVER_INFO_META_KEY];
+    // The SDK normalizes identity from legacy initialize responses and modern
+    // result metadata. Modern servers may remain anonymous.
+    const serverInfo = this.client.getServerVersion();
     this.serverInfoCache = serverInfo
       ? {
           name: serverInfo.name,

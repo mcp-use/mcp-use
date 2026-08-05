@@ -25,6 +25,7 @@ describe("protocol era exposure", () => {
         extensions: { "com.example/feature": { enabled: true } },
       }),
       getInstructions: () => "Use the server carefully.",
+      listTools: async () => ({ tools: [] }),
     };
     (connector as any).serverInfoCache = server ?? null;
     (connector as any).capabilitiesCache = {
@@ -82,45 +83,17 @@ describe("protocol era exposure", () => {
     expect(session.supports("resources")).toBe(false);
   });
 
-  it.each([
-    {
-      description: "a top-level serverInfo field",
-      discover: (serverInfo: object) => ({ serverInfo }),
-    },
-    {
-      description: "result metadata",
-      discover: (serverInfo: object) => ({
-        _meta: { "io.modelcontextprotocol/serverInfo": serverInfo },
-      }),
-    },
-  ])(
-    "uses $description when a modern client has no server version",
-    async ({ discover }) => {
-      const serverInfo = {
-        name: "conformance",
-        version: "2.0.0",
-        description: "Modern conformance server",
-      };
-      const connector = new BaseConnector();
-      (connector as any).client = {
-        getProtocolEra: () => "modern",
-        getNegotiatedProtocolVersion: () => "2026-07-28",
-        getServerCapabilities: () => ({ tools: {} }),
-        getServerVersion: () => undefined,
-        getDiscoverResult: () => discover(serverInfo),
-        getInstructions: () => undefined,
-        listTools: async () => ({ tools: [] }),
-      };
+  it("treats an anonymous modern server as initialized", async () => {
+    const connector = connectorWithClient("modern", "2026-07-28");
+    await connector.initialize();
+    const info = new MCPSession(connector).info;
 
-      await connector.initialize();
-
-      expect(new MCPSession(connector).info).toMatchObject({
-        protocolEra: "modern",
-        protocolVersion: "2026-07-28",
-        server: serverInfo,
-      });
-    }
-  );
+    expect(info).toMatchObject({
+      protocolEra: "modern",
+      protocolVersion: "2026-07-28",
+    });
+    expect(info).not.toHaveProperty("server");
+  });
 
   it("automatically negotiates the newest supported HTTP protocol", () => {
     const connector = new HttpConnector("https://example.com/mcp");
