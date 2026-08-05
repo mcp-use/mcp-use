@@ -200,7 +200,7 @@ async function verifyWithClient(cwd, example, packageJson) {
 
 async function assertConnection(connection, example, origin, websiteOrigin) {
   // `info` proves initialize completed through mcp-use's normal negotiation.
-  if (!connection.info.server.name || !connection.info.protocolVersion) {
+  if (!connection.info.server?.name || !connection.info.protocolVersion) {
     throw new Error("Client completed initialization without server metadata.");
   }
   await assertNamed(() => connection.listTools(), example.tools, "tool");
