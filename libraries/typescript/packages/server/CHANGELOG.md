@@ -1,5 +1,18 @@
 # mcp-use
 
+## 2.0.1
+
+### Patch Changes
+
+- 33e30cb: Update runtime and bundled dependencies to patched stable releases and tighten transitive dependency resolutions. The Better Auth example remains on its stable 1.6.x provider with its single-audience mitigation.
+- 33e30cb: Print the mounted Inspector URL on `mcp-use start --with-inspector`, which previously said nothing at all about the Inspector it had just mounted. Plain `mcp-use start` is unchanged and stays silent.
+- 33e30cb: Print `[mcp-use] no type errors (<duration>ms)` when `mcp-use typecheck` passes. `tsc --noEmit` writes nothing on a clean project, so the command used to exit `0` with no output at all, which was indistinguishable from a hang or a silent failure. Failing runs are unchanged and still show only the compiler's own diagnostics.
+- Updated dependencies [33e30cb]
+- Updated dependencies [33e30cb]
+- Updated dependencies [33e30cb]
+  - @mcp-use/inspector@20.0.1
+  - @mcp-use/cli@4.0.1
+
 ## 2.0.1-canary.5
 
 ### Patch Changes

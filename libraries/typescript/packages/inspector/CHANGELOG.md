@@ -1,5 +1,16 @@
 # @mcp-use/inspector
 
+## 20.0.1
+
+### Patch Changes
+
+- 33e30cb: Block loopback proxy targets by default. `mountInspector` now defaults `oauthProxyAllowLoopback` to `false` (previously `true`), so a publicly reachable embedded/hosted Inspector no longer proxies requests to the host's loopback services (SSRF). The standalone CLI keeps allowing loopback for local development, but defaults to blocking it when `NODE_ENV=production` (which the published Docker image sets); set `INSPECTOR_ALLOW_LOOPBACK=true` to override either way.
+- 33e30cb: Update runtime and bundled dependencies to patched stable releases and tighten transitive dependency resolutions. The Better Auth example remains on its stable 1.6.x provider with its single-audience mitigation.
+- Updated dependencies [33e30cb]
+- Updated dependencies [33e30cb]
+- Updated dependencies [33e30cb]
+  - mcp-use@2.0.1
+
 ## 20.0.1-canary.5
 
 ### Patch Changes
