@@ -7,6 +7,7 @@ import { MCPClient } from "@mcp-use/client";
 import {
   conformanceClientOptions,
   handleElicitation,
+  handleSampling,
   isAuthScenario,
   parseConformanceContext,
   parsePreRegistrationContext,
@@ -31,6 +32,7 @@ async function main(): Promise<void> {
   const serverConfig: Record<string, unknown> = {
     url: serverUrl,
     onElicitation: handleElicitation,
+    onSampling: handleSampling,
     oauth: isAuthScenario(scenario) ? undefined : false,
     clientOptions: conformanceClientOptions(),
   };
@@ -79,6 +81,10 @@ async function main(): Promise<void> {
     const conformanceSession: ConformanceSession = {
       listTools: () => session.listTools(),
       callTool: (name, args) => session.callTool(name, args),
+      listResources: async () => (await session.listResources()).resources,
+      readResource: (uri) => session.readResource(uri),
+      listPrompts: async () => (await session.listPrompts()).prompts,
+      getPrompt: (name, args) => session.getPrompt(name, args),
     };
     await runScenario(scenario, conformanceSession, parseConformanceContext());
   } finally {

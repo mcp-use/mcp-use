@@ -12,9 +12,24 @@ type Tool = {
   };
 };
 
+type Resource = {
+  uri: string;
+};
+
+type Prompt = {
+  name: string;
+  arguments?: Array<{
+    name: string;
+  }>;
+};
+
 export type ConformanceSession = {
   listTools: () => Promise<Tool[]>;
   callTool: (name: string, args: Record<string, unknown>) => Promise<unknown>;
+  listResources: () => Promise<Resource[]>;
+  readResource: (uri: string) => Promise<unknown>;
+  listPrompts: () => Promise<Prompt[]>;
+  getPrompt: (name: string, args: Record<string, string>) => Promise<unknown>;
 };
 
 export type PreRegistrationContext = {
@@ -139,6 +154,18 @@ export async function handleElicitation(
   return acceptWithDefaults(params);
 }
 
+export async function handleSampling() {
+  return {
+    role: "assistant" as const,
+    content: {
+      type: "text" as const,
+      text: "Conformance sampling response",
+    },
+    model: "mcp-use-conformance",
+    stopReason: "endTurn" as const,
+  };
+}
+
 function buildToolArgs(tool: Tool): Record<string, unknown> {
   const args: Record<string, unknown> = {};
   const properties = tool.inputSchema?.properties || {};
@@ -168,6 +195,39 @@ export async function runToolsCall(session: ConformanceSession): Promise<void> {
       // Some conformance tools intentionally return errors.
     }
   }
+}
+
+async function runResourceCalls(session: ConformanceSession): Promise<void> {
+  const resources = await session.listResources();
+  for (const resource of resources) {
+    try {
+      await session.readResource(resource.uri);
+    } catch {
+      // The request still exercises transport metadata when the fixture rejects a read.
+    }
+  }
+}
+
+async function runPromptCalls(session: ConformanceSession): Promise<void> {
+  const prompts = await session.listPrompts();
+  for (const prompt of prompts) {
+    const args = Object.fromEntries(
+      (prompt.arguments ?? []).map((argument) => [argument.name, "test"])
+    );
+    try {
+      await session.getPrompt(prompt.name, args);
+    } catch {
+      // The request still exercises transport metadata when the fixture rejects arguments.
+    }
+  }
+}
+
+async function runStandardHeaderCalls(
+  session: ConformanceSession
+): Promise<void> {
+  await runToolsCall(session);
+  await runResourceCalls(session);
+  await runPromptCalls(session);
 }
 
 export async function runElicitationDefaults(
@@ -235,9 +295,11 @@ export async function runScenario(
       // external $ref look like an argument-validation failure.
       await runToolsList(session);
       return;
+    case "http-standard-headers":
+      await runStandardHeaderCalls(session);
+      return;
     case "request-metadata":
     case "sep-2322-client-request-state":
-    case "http-standard-headers":
       await runToolsCall(session);
       return;
     default:

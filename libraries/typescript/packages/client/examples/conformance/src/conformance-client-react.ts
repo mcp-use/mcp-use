@@ -97,6 +97,16 @@ function ScenarioDriver({ scenario, resolve, reject }: DriverProps): null {
     const conformanceSession: ConformanceSession = {
       listTools: async () => server.tools as any[],
       callTool: (name, args) => server.callTool(name, args),
+      listResources: async () => {
+        await server.listResources();
+        return server.resources;
+      },
+      readResource: (uri) => server.readResource(uri),
+      listPrompts: async () => {
+        await server.listPrompts();
+        return server.prompts;
+      },
+      getPrompt: (name, args) => server.getPrompt(name, args),
     };
 
     runScenario(scenario, conformanceSession, parseConformanceContext())

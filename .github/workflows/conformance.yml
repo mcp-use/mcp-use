@@ -147,7 +147,7 @@ jobs:
           badge-gist-token: ${{ secrets.GIST_SECRET }}
 
   typescript-v2-conformance-test:
-    name: TypeScript Conformance Tests (v2)
+    name: TypeScript Conformance Tests (legacy + modern)
     needs: detect-changes
     if: needs.detect-changes.outputs.typescript == 'true'
     runs-on: ubuntu-latest
@@ -173,11 +173,13 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm build
 
-      - name: Run TypeScript v2 conformance tests
+      - name: Run TypeScript conformance tests
         env:
           # Pin the v2 runner independently from the v1 action used above.
           CONFORMANCE_RUNNER: '@modelcontextprotocol/conformance@0.2.0-alpha.10'
-          SPEC_VERSION: '2026-07-28'
+          # Dated versions intentionally exclude off-timeline extensions such as tasks.
+          SPEC_VERSIONS: '2025-11-25 2026-07-28'
+          LEGACY_SERVER_EXPECTED_FAILURES: 'libraries/typescript/packages/server/examples/conformance/expected-failures.yml'
         run: |
           set +e
           exit_code=0
@@ -205,34 +207,62 @@ jobs:
             sleep 1
           done
 
-          if [ "$server_ready" = true ]; then
-            pnpm dlx "$CONFORMANCE_RUNNER" server \
-              --url http://127.0.0.1:3000/mcp \
-              --suite all \
-              --spec-version "$SPEC_VERSION" \
-              --output-dir "$results_dir/server" || exit_code=1
-          else
+          if [ "$server_ready" != true ]; then
             echo 'TypeScript conformance server did not become ready within 60 seconds.'
             exit_code=1
           fi
 
-          pnpm dlx "$CONFORMANCE_RUNNER" client \
-            --command 'cd libraries/typescript/packages/client/examples/conformance && ./run-conformance-client-node.sh' \
-            --suite all \
-            --spec-version "$SPEC_VERSION" \
-            --output-dir "$results_dir/client-node" || exit_code=1
+          for spec_version in $SPEC_VERSIONS; do
+            version_results_dir="$results_dir/$spec_version"
+            mkdir -p "$version_results_dir"
 
-          pnpm dlx "$CONFORMANCE_RUNNER" client \
-            --command 'cd libraries/typescript/packages/client/examples/conformance && ./run-conformance-client-browser.sh' \
-            --suite all \
-            --spec-version "$SPEC_VERSION" \
-            --output-dir "$results_dir/client-browser" || exit_code=1
+            if [ "$server_ready" = true ]; then
+              expected_failure_args=()
+              if [ "$spec_version" = '2025-11-25' ]; then
+                expected_failure_args=(--expected-failures "$LEGACY_SERVER_EXPECTED_FAILURES")
+              fi
 
-          pnpm dlx "$CONFORMANCE_RUNNER" client \
-            --command 'cd libraries/typescript/packages/client/examples/conformance && ./run-conformance-client-react.sh' \
-            --suite all \
-            --spec-version "$SPEC_VERSION" \
-            --output-dir "$results_dir/client-react" || exit_code=1
+              pnpm dlx "$CONFORMANCE_RUNNER" server \
+                --url http://127.0.0.1:3000/mcp \
+                --suite all \
+                --spec-version "$spec_version" \
+                --output-dir "$version_results_dir/server" \
+                "${expected_failure_args[@]}" || exit_code=1
+
+              if [ "$spec_version" = '2025-11-25' ]; then
+                printf '%s\n' \
+                  '### TypeScript legacy server exclusions' \
+                  '' \
+                  '- `tools-call-sampling` — stateless legacy HTTP has no client session for sampling.' \
+                  '- `tools-call-elicitation` — stateless legacy HTTP has no client session for elicitation.' \
+                  '- `elicitation-sep1034-defaults` — stateless legacy HTTP has no client session for elicitation.' \
+                  '- `elicitation-sep1330-enums` — stateless legacy HTTP has no client session for elicitation.' \
+                  '- `server-sse-polling` — stateless legacy HTTP has no session or SSE resumability.' \
+                  '- `server-sse-multiple-streams` — stateless legacy HTTP has no session for multiple SSE streams.' \
+                  '- `resources-subscribe` — stateless legacy HTTP does not retain resource subscriptions.' \
+                  '- `resources-unsubscribe` — stateless legacy HTTP does not retain resource subscriptions.' \
+                  >> "$GITHUB_STEP_SUMMARY"
+              fi
+            fi
+
+            pnpm dlx "$CONFORMANCE_RUNNER" client \
+              --command 'cd libraries/typescript/packages/client/examples/conformance && ./run-conformance-client-node.sh' \
+              --suite all \
+              --spec-version "$spec_version" \
+              --output-dir "$version_results_dir/client-node" || exit_code=1
+
+            pnpm dlx "$CONFORMANCE_RUNNER" client \
+              --command 'cd libraries/typescript/packages/client/examples/conformance && ./run-conformance-client-browser.sh' \
+              --suite all \
+              --spec-version "$spec_version" \
+              --output-dir "$version_results_dir/client-browser" || exit_code=1
+
+            pnpm dlx "$CONFORMANCE_RUNNER" client \
+              --command 'cd libraries/typescript/packages/client/examples/conformance && ./run-conformance-client-react.sh' \
+              --suite all \
+              --spec-version "$spec_version" \
+              --output-dir "$version_results_dir/client-react" || exit_code=1
+          done
 
           exit "$exit_code"
 
