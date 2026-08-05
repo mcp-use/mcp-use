@@ -13,6 +13,7 @@
     "client-stdio-errlog",
     "inspector-proxy-loopback-default",
     "mcp-2549-dev-forwarding",
+    "security-dependency-updates",
     "start-inspector-hint",
     "stdio-env-leak",
     "template-main-and-descriptions",

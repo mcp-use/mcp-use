@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 20.0.1-canary.5
+
+### Patch Changes
+
+- d54e195: Update runtime and bundled dependencies to patched stable releases and tighten transitive dependency resolutions. The Better Auth example remains on its stable 1.6.x provider with its single-audience mitigation.
+- Updated dependencies [d54e195]
+  - mcp-use@2.0.1-canary.5
+
 ## 20.0.1-canary.4
 
 ### Patch Changes
