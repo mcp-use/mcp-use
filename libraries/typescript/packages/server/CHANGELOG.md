@@ -1,5 +1,17 @@
 # mcp-use
 
+## 2.0.5-canary.3
+
+### Patch Changes
+
+- 668a312: Publish the authenticated WebSocket tunnel client as a standalone package and
+  bundle the same implementation into `mcp-use dev/start --tunnel`. This removes
+  native tunnel binaries and adds bounded HTTP, streaming, MCP JSON-RPC, and
+  public WebSocket forwarding without adding a runtime dependency to `mcp-use`.
+- Updated dependencies [668a312]
+  - @mcp-use/cli@4.0.2-canary.3
+  - @mcp-use/inspector@20.0.5-canary.3
+
 ## 2.0.5-canary.2
 
 ### Patch Changes
