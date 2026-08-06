@@ -34,7 +34,6 @@ export default defineConfig({
   external: [
     "@mcp-use/client",
     "@mcp-use/inspector",
-    "@modelcontextprotocol/server",
     "@tailwindcss/vite",
     "@vitejs/plugin-react",
     "tailwindcss",

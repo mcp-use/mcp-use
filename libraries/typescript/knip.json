@@ -43,7 +43,6 @@
       "entry": ["src/index.ts", "tests/**/*.{mjs,ts,tsx}"],
       "project": ["src/**/*.{ts,tsx}", "tests/**/*.{mjs,ts,tsx}"],
       "ignoreDependencies": [
-        "@modelcontextprotocol/server",
         "@tailwindcss/vite",
         "@vitejs/plugin-react",
         "@types/react-dom",

@@ -106,7 +106,7 @@ try {
     "bin.js"
   );
   const installedFrameworkBin = installedBin(installDirectory, "mcp-use");
-  const installedCliBin = installedBin(cliInstallDirectory, "mcp-use-cli");
+  const installedCliBin = installedBin(cliInstallDirectory, "mcp-use");
   assert.equal(
     runInstalledBin(
       installedFrameworkBin,

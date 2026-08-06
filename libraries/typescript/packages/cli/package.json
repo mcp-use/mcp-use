@@ -20,7 +20,7 @@
     "cli"
   ],
   "bin": {
-    "mcp-use-cli": "./dist/bin.js"
+    "mcp-use": "./dist/bin.js"
   },
   "exports": {
     ".": {
@@ -47,7 +47,6 @@
   "dependencies": {
     "@tailwindcss/vite": "^4.2.0",
     "@vitejs/plugin-react": "^6.0.3",
-    "@modelcontextprotocol/server": "2.0.0",
     "tailwindcss": "^4.2.0",
     "vite": "^8.0.16"
   },
@@ -66,6 +65,7 @@
   "devDependencies": {
     "@mcp-use/client": "workspace:*",
     "@modelcontextprotocol/client": "2.0.0",
+    "@modelcontextprotocol/server": "2.0.0",
     "@types/node": "^22.20.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
