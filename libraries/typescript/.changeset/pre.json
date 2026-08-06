@@ -10,6 +10,7 @@
     "mcp-use": "2.0.4"
   },
   "changesets": [
+    "bright-widgets-bridge",
     "calm-owls-prompt",
     "quiet-lions-connect",
     "repair-canary-baseline",
