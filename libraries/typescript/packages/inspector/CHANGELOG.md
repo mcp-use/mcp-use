@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 20.0.5-canary.0
+
+### Patch Changes
+
+- Restore the canary release baseline after the stable 2.0.4 hotfix train.
+- Updated dependencies
+  - mcp-use@2.0.5-canary.0
+
 ## 20.0.2-canary.1
 
 ### Patch Changes
