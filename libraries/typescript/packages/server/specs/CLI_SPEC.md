@@ -2,7 +2,7 @@
 
 **Status:** Implemented.
 **Scope:** the complete first-party `mcp-use` CLI: `dev`, `build`, `typecheck`, `start`, cloud auth, organizations, servers, deployments, deploy, client, and screenshot; plus optional Inspector mounting in `dev` and production `start`.
-**Package:** `mcp-use@2`, published from `packages/server`. The package owns the bin, runtime, command chunks, and toolchain. The development Inspector remains independently published. There is no separate CLI implementation, devkit, or config package. `@mcp-use/cli@4` is a compatibility-only proxy for the historical install command.
+**Package:** `mcp-use@2`, published from `packages/server`. The package owns the bin, runtime, command chunks, and toolchain. The development Inspector remains independently published. There is no separate CLI implementation, devkit, or config package. `@mcp-use/cli@4` is a compatibility-only prebuilt of this CLI, kept for the historical install command.
 
 ## Goals
 
@@ -49,10 +49,17 @@ The first-party command contract belongs to `mcp-use`:
 - Local and integration workflows: `client`, `screenshot`.
 
 For users and automation that still invoke `npx @mcp-use/cli`, the separately
-published `@mcp-use/cli@4` package contains only a bin shim. It depends on the
-matching `mcp-use@2` release and delegates to the framework's shipped binary.
-It owns no command code or behavior; `mcp-use` remains the canonical
-package and executable implementation.
+published `@mcp-use/cli@4` package ships a prebuilt copy of this CLI. It
+bundles the same command chunks from `packages/server` behind the same
+`mcp-use` bin, and carries the build toolchain (`vite`, `@vitejs/plugin-react`,
+`tailwindcss`, `@tailwindcss/vite`) as runtime dependencies so the pipeline is
+installed with the CLI rather than with generated apps. `@mcp-use/client` and
+`@mcp-use/inspector` stay optional peers, as they are for `mcp-use`.
+
+It adds no command code of its own: every entry re-exports from
+`packages/server`, so `mcp-use` remains the canonical package and the source of
+record for behavior. The compatibility package exists for the historical
+install command only, and new projects should depend on `mcp-use`.
 
 There are no `ls`, `rm`, `switch`, or `install` aliases in v2 alpha. The accepted names below are the complete public surface. Cloud commands use native `fetch`, filesystem, and child-process APIs where adequate. Command-local parsing uses `node:util.parseArgs`; the package does not recreate a global Commander tree.
 
