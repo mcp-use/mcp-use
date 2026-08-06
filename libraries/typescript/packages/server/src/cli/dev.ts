@@ -74,6 +74,9 @@ import type { ViewsManifest } from "../views/types.js";
 /** Canonical Web handler exposed by `MCPServer.fetch`. */
 type WebHandler = (request: Request) => Promise<Response>;
 
+/** Coalesce one editor save burst before reconciling a project generation. */
+const RELOAD_SETTLE_MS = 50;
+
 /**
  * The duck-typed shape the entry's default export must satisfy: an
  * `MCPServer` instance (checked structurally so the runner may load its own
@@ -455,14 +458,16 @@ export async function runDev(options: DevOptions): Promise<void> {
     sourcemapInterceptor: "node",
   });
 
-  const importServer = async (): Promise<ServerLike> => {
+  const importServer = async (
+    viewsSnapshot: DiscoveredView[]
+  ): Promise<ServerLike> => {
     const load = async (): Promise<ServerLike> => {
       const moduleExports = (await runner.import(entry)) as Record<
         string,
         unknown
       >;
       const server = serverFrom(moduleExports);
-      const viewsManifest = buildDevViewsManifest(currentViews);
+      const viewsManifest = buildDevViewsManifest(viewsSnapshot);
       if (typeof server.__primeViews !== "function") {
         throw new Error(
           "Loaded MCPServer instance does not support __primeViews."
@@ -501,7 +506,7 @@ export async function runDev(options: DevOptions): Promise<void> {
   let currentHandler: WebHandler;
   let basePath: string;
   try {
-    const server = await importServer();
+    const server = await importServer(currentViews);
     server.__setEventBus(eventBus);
     server.__mount();
     currentHandler = async (request) => server.fetch(request);
@@ -551,41 +556,66 @@ export async function runDev(options: DevOptions): Promise<void> {
     throw error;
   }
 
-  let reloading = false;
-  let dirty = false;
-  const reload = (): void => {
-    if (reloading) {
-      dirty = true;
-      return;
-    }
-    reloading = true;
-    void (async () => {
-      do {
-        dirty = false;
+  let desiredRevision = 0;
+  let reconciling = false;
+  let reloadTimer: ReturnType<typeof setTimeout> | undefined;
+  const isAborted = (): boolean => options.signal?.aborted === true;
+
+  /**
+   * Reconcile one immutable project generation. A candidate prepared from an
+   * older watcher revision is discarded before it can swap the active handler,
+   * publish catalog invalidations, or report a terminal failure.
+   */
+  const reconcile = async (): Promise<void> => {
+    if (reconciling) return;
+    reconciling = true;
+    try {
+      while (!isAborted()) {
+        const revision = desiredRevision;
+        const viewsSnapshot = discoverViews(options.cwd, viewsDirectory);
         try {
           runner.evaluatedModules.clear();
-          const server = await importServer();
+          const server = await importServer(viewsSnapshot);
           server.__setEventBus(eventBus);
           server.__mount();
+
+          if (isAborted()) return;
+          if (revision !== desiredRevision) continue;
+
           const nextHandler: WebHandler = async (request) =>
             server.fetch(request);
           const nextBasePath = server.basePath ?? "/mcp";
           mountDevInspector(nextBasePath);
+          currentViews = [...viewsSnapshot];
           currentHandler = nextHandler;
           basePath = nextBasePath;
           eventBus.publish({ kind: "tools_list_changed" });
           eventBus.publish({ kind: "prompts_list_changed" });
           eventBus.publish({ kind: "resources_list_changed" });
           console.log("[mcp-use] reloaded server entry");
+          return;
         } catch (error) {
+          if (isAborted()) return;
+          if (revision !== desiredRevision) continue;
           console.error(
             "[mcp-use] reload failed — keeping the previous server:\n",
             error
           );
+          return;
         }
-      } while (dirty);
-      reloading = false;
-    })();
+      }
+    } finally {
+      reconciling = false;
+    }
+  };
+
+  const scheduleReconcile = (): void => {
+    desiredRevision += 1;
+    if (reloadTimer !== undefined) clearTimeout(reloadTimer);
+    reloadTimer = setTimeout(() => {
+      reloadTimer = undefined;
+      void reconcile();
+    }, RELOAD_SETTLE_MS);
   };
 
   const onSsrFileEvent = (file: string): void => {
@@ -599,7 +629,7 @@ export async function runDev(options: DevOptions): Promise<void> {
     for (const mod of modules) {
       ssrEnvironment.moduleGraph.invalidateModule(mod);
     }
-    reload();
+    scheduleReconcile();
   };
 
   const onViewFilesystemEvent = (file: string): void => {
@@ -607,20 +637,7 @@ export async function runDev(options: DevOptions): Promise<void> {
       return;
     }
 
-    const previousViews = currentViews;
-    currentViews = discoverViews(options.cwd, viewsDirectory);
-
-    const viewsChanged =
-      previousViews.length !== currentViews.length ||
-      previousViews.some(
-        (v, i) =>
-          v.name !== currentViews[i]?.name ||
-          v.entryPath !== currentViews[i]?.entryPath
-      );
-
-    if (viewsChanged) {
-      reload();
-    }
+    scheduleReconcile();
   };
 
   const onFileAddOrUnlink = (file: string): void => {
@@ -708,6 +725,7 @@ export async function runDev(options: DevOptions): Promise<void> {
     vite.watcher.off("change", onSsrFileEvent);
     vite.watcher.off("add", onFileAddOrUnlink);
     vite.watcher.off("unlink", onFileAddOrUnlink);
+    if (reloadTimer !== undefined) clearTimeout(reloadTimer);
     await tunnelManager.stop();
     // Stop accepting new connections first, then terminate the long-lived
     // transports that would otherwise keep the close callback pending:
