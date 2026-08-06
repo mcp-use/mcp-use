@@ -1,0 +1,16 @@
+server:
+  # Stateless legacy HTTP cannot send server-to-client requests.
+  - tools-call-sampling
+  - tools-call-elicitation
+  - elicitation-sep1034-defaults
+  - elicitation-sep1330-enums
+
+  # Stateless legacy HTTP has no session or SSE resumability.
+  - server-sse-polling:server-sse-polling-session
+  - server-sse-polling:server-sse-priming-event
+  - server-sse-polling:server-sse-retry-field
+  - server-sse-multiple-streams:server-sse-multiple-streams-session
+
+  # Stateless legacy HTTP does not retain resource subscriptions.
+  - resources-subscribe
+  - resources-unsubscribe

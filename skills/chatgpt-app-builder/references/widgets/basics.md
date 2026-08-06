@@ -29,7 +29,7 @@ Widgets are React components that provide visual UI for MCP tools. They let user
 
 ```typescript
 // index.ts
-import { MCPServer, widget, text } from "mcp-use/server";
+import { MCPServer, widget, text } from "mcp-use";
 import { z } from "zod";
 
 const server = new MCPServer({
@@ -655,7 +655,7 @@ Equivalently, `mcp-use client <name> tools call <tool> ... --screenshot` calls t
 
 ```typescript
 // index.ts
-import { MCPServer, widget, text } from "mcp-use/server";
+import { MCPServer, widget, text } from "mcp-use";
 import { z } from "zod";
 
 const server = new MCPServer({

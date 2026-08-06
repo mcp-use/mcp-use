@@ -20,6 +20,8 @@ jobs:
 
     steps:
       - name: Download conformance results
+        id: download-results
+        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: conformance-results
@@ -28,6 +30,7 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
 
       - name: Post comment using action
+        if: steps.download-results.outcome == 'success'
         uses: mcp-use/mcp-conformance-action@v1
         with:
           mode: comment

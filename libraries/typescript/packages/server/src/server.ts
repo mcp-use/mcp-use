@@ -277,33 +277,6 @@ export interface ListenOptions {
   host?: string;
 }
 
-function omitRootSchemaDialect<T>(schema: T): T {
-  if (
-    typeof schema !== "object" ||
-    schema === null ||
-    Array.isArray(schema) ||
-    !("$schema" in schema)
-  ) {
-    return schema;
-  }
-
-  const emittedSchema = { ...schema } as T & Record<string, unknown>;
-  delete emittedSchema["$schema"];
-  return emittedSchema;
-}
-
-function omitToolSchemaDialects(
-  tools: McpMiddlewareResult<"tools/list">
-): McpMiddlewareResult<"tools/list"> {
-  return tools.map((tool) => ({
-    ...tool,
-    inputSchema: omitRootSchemaDialect(tool.inputSchema),
-    ...(tool.outputSchema === undefined
-      ? {}
-      : { outputSchema: omitRootSchemaDialect(tool.outputSchema) }),
-  }));
-}
-
 function registerFetchMiddleware<TEnv extends Env>(
   app: Hono<TEnv>,
   middleware: FetchMiddleware
@@ -720,7 +693,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    * `@mcp-use/client` v2 peer. Each key automatically namespaces its mounted
    * tools, resources, and prompts. You may instead pass an existing ready
    * {@link ProxyConnection}; its negotiated server name becomes the namespace
-   * and the connection remains caller-owned.
+   * and the connection remains caller-owned. Anonymous connections cannot use
+   * this overload because they do not provide a namespace.
    *
    * Connection, introspection, and collision failures are diagnosed and
    * skipped without discarding capabilities that can be mounted.
@@ -745,8 +719,9 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    *
    * @param connection - Ready connection to introspect and forward through.
    * The connection's negotiated server name automatically namespaces every
-   * mounted capability. Introspection and collision failures are diagnosed and
-   * skipped without discarding capabilities that can be mounted.
+   * mounted capability. Anonymous connections are rejected because they do not
+   * provide a namespace. Introspection and collision failures are diagnosed
+   * and skipped without discarding capabilities that can be mounted.
    *
    * @throws If the server already started or closed.
    *
@@ -1850,7 +1825,9 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       handlers.set(method, wrapped);
     };
 
-    wrapListMethod("tools/list", "tools", omitToolSchemaDialects);
+    // JSON Schema's root `$schema` declaration selects the dialect used for
+    // validation. Do not normalize it away from a tool descriptor.
+    wrapListMethod("tools/list", "tools");
     wrapListMethod("resources/list", "resources");
     wrapListMethod("prompts/list", "prompts");
   }

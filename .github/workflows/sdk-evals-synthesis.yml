@@ -1,0 +1,150 @@
+name: SDK eval weekly synthesis
+
+on:
+  schedule:
+    # Sunday 13:00 UTC, after the week's final Friday eval batch.
+    - cron: "0 13 * * 0"
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "Window size in days"
+        required: false
+        type: string
+        default: "7"
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  synthesize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check credentials
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          set -euo pipefail
+          [ -n "$OPENAI_API_KEY" ] || { echo "::error::OPENAI_API_KEY is required for GPT-5.6 Sol synthesis."; exit 1; }
+
+      - name: Check out the evaluator
+        uses: actions/checkout@v4
+        with:
+          repository: mcp-use/mcp-use-evals
+          ref: main
+          path: evaluator
+
+      - name: Download recent evaluation artifacts
+        uses: actions/github-script@v7
+        env:
+          DAYS: ${{ github.event.inputs.days || '7' }}
+        with:
+          script: |
+            const fs = require("fs");
+            const path = require("path");
+            const days = Number(process.env.DAYS);
+            if (!Number.isFinite(days) || days <= 0) {
+              core.setFailed(`Invalid window size: ${process.env.DAYS}`);
+              return;
+            }
+
+            // Fetch the current and preceding windows so synthesis can
+            // calculate week-over-week comparisons.
+            const since = new Date(Date.now() - days * 2 * 86_400_000);
+            const runs = await github.paginate(
+              github.rest.actions.listWorkflowRuns,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: "sdk-evals.yml",
+                status: "completed",
+                created: `>=${since.toISOString().slice(0, 10)}`,
+                per_page: 100,
+              }
+            );
+
+            const outDir = path.join(process.env.GITHUB_WORKSPACE, "eval-artifacts");
+            fs.mkdirSync(outDir, { recursive: true });
+            let downloaded = 0;
+
+            for (const run of runs) {
+              const artifacts = await github.paginate(
+                github.rest.actions.listWorkflowRunArtifacts,
+                {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  run_id: run.id,
+                  per_page: 100,
+                }
+              );
+
+              for (const artifact of artifacts) {
+                if (artifact.expired || !artifact.name.startsWith("sdk-evals-")) {
+                  continue;
+                }
+                const archive = await github.rest.actions.downloadArtifact({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  artifact_id: artifact.id,
+                  archive_format: "zip",
+                });
+                fs.writeFileSync(
+                  path.join(outDir, `${artifact.id}-${artifact.name}.zip`),
+                  Buffer.from(archive.data)
+                );
+                downloaded += 1;
+              }
+            }
+
+            core.info(`Downloaded ${downloaded} evaluation artifact(s) from ${runs.length} completed workflow run(s).`);
+            if (downloaded === 0) {
+              core.setFailed("No unexpired SDK evaluation artifacts were found for the synthesis windows.");
+            }
+
+      - name: Assemble evaluator result history
+        run: |
+          set -euo pipefail
+          mkdir -p synthesis-input/runs
+          for archive in eval-artifacts/*.zip; do
+            artifact="$(basename "$archive" .zip)"
+            extracted="$(mktemp -d)"
+            unzip -q "$archive" -d "$extracted"
+            while IFS= read -r -d '' manifest; do
+              run_dir="$(dirname "$manifest")"
+              run_name="$(basename "$run_dir")"
+              cp -R "$run_dir" "synthesis-input/runs/${artifact}--${run_name}"
+            done < <(find "$extracted" -name run.json -print0)
+          done
+          count="$(find synthesis-input/runs -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
+          [ "$count" -gt 0 ] || { echo "::error::Downloaded artifacts contained no run.json files."; exit 1; }
+          echo "Assembled $count evaluator run(s)."
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Install evaluator dependencies
+        working-directory: evaluator
+        run: corepack prepare --activate "$(node -p "require('./package.json').packageManager")" && pnpm install --frozen-lockfile
+
+      - name: Run GPT-5.6 Sol synthesis
+        working-directory: evaluator
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          pnpm synthesize \
+            --days "${{ github.event.inputs.days || '7' }}" \
+            --results-dir ../synthesis-input/runs \
+            --model gpt-5.6-sol
+
+      - name: Upload synthesis report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdk-eval-synthesis-${{ github.run_id }}
+          path: evaluator/results/synthesis/*.md
+          if-no-files-found: error
+          retention-days: 30

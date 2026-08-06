@@ -15,7 +15,7 @@ Adding OAuth 2.0/2.1 authentication to your MCP server.
 Pass an OAuth provider to the `oauth` option on `MCPServer`:
 
 ```typescript
-import { MCPServer } from "mcp-use/server";
+import { MCPServer } from "mcp-use";
 
 const server = new MCPServer({
   name: "my-server",
