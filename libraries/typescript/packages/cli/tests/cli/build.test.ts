@@ -489,7 +489,9 @@ describe("runBuild (views)", () => {
 
     const publicFile = join(buildDir, "views", "public", "test.txt");
     expect(existsSync(publicFile)).toBe(true);
-    expect(readFileSync(publicFile, "utf8")).toBe("public-fixture\n");
+    expect(readFileSync(publicFile, "utf8")).toBe(
+      readFileSync(join(cwd, "public", "test.txt"), "utf8")
+    );
     expect(existsSync(join(buildDir, "test.txt"))).toBe(false);
     expect(
       existsSync(join(buildDir, "views", "product-search-result", "test.txt"))
@@ -569,7 +571,9 @@ describe("runBuild (views)", () => {
       expect(publicOk.headers.get("cache-control")).toBe(
         "public, max-age=0, must-revalidate"
       );
-      expect(await publicOk.text()).toBe("public-fixture\n");
+      expect(await publicOk.text()).toBe(
+        readFileSync(join(cwd, "public", "test.txt"), "utf8")
+      );
 
       const publicTraversal = await handler(
         new Request("http://localhost/mcp/_mcp-use/public/../index.js")

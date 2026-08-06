@@ -9,7 +9,7 @@ import {
 } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { gunzipSync } from "node:zlib";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -359,7 +359,7 @@ describe("deploy agent contract", () => {
     const entries = await archiveEntries(form.get("sourceFile") as Blob);
     expect(entries).toContain("app/index.ts");
     expect(entries).toContain("app/src/nested.ts");
-    expect(entries).toContain(`app/${longRelativePath}`);
+    expect(entries).toContain(`app/${longRelativePath.split(sep).join("/")}`);
     expect(entries).not.toContain("app/.env");
     expect(entries).not.toContain("app/.envrc");
     expect(entries).not.toContain("app/.pytest_cache/state");
@@ -428,6 +428,9 @@ describe("deploy agent contract", () => {
   });
 
   it("reports unexpected read-only Git probe failures without guessing state", async () => {
+    // This fixture is a POSIX shell wrapper; Windows Git behavior is covered
+    // by the remaining deploy contract tests.
+    if (process.platform === "win32") return;
     const directory = await project("probe-failure");
     initializeRepository(directory);
     const bin = join(directory, "fake-bin");
