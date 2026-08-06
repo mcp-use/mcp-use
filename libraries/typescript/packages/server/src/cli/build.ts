@@ -1,11 +1,10 @@
 /**
  * `mcp-use build` — Vite SSR/node build of the user's server entry into the
- * `.mcp-use/build/` workspace directory (CLI_SPEC.md § Commands → build).
+ * `.mcp-use/build/` workspace directory.
  *
  * When views exist (under `views/<name>/view.tsx`), also runs a client-environment
  * build per view (hashed assets on disk), validates bindings, and emits a
- * wrapper entry that primes views before re-exporting the server (VIEWS_SPEC.md §
- * Build system).
+ * wrapper entry that primes views before re-exporting the server.
  *
  * Vite is regular framework implementation machinery, but this module is
  * reached only through the bin's lazy build command. Library imports and
@@ -92,7 +91,7 @@ export interface BuildOptions {
 
 /**
  * Emit a short-lived wrapper module under `.mcp-use/cache/` that primes views
- * before re-exporting the user's entry (VIEWS_SPEC.md § Registration mechanism).
+ * before re-exporting the user's entry.
  */
 async function writeWrapperEntry(
   cacheDir: string,

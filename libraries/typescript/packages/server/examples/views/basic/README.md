@@ -1,8 +1,7 @@
 # Views example (Fruit Store)
 
-Reference MCP Apps views server for `mcp-use`. It follows the
-[Views spec](../../../specs/VIEWS_SPEC.md) fruit-store shape: view-bound tools,
-view components under `views/`, typed tool I/O via exported tool refs, and
+Reference MCP Apps views server for `mcp-use`: view-bound tools, view
+components under `views/`, typed tool I/O via exported tool refs, and
 the full React runtime surface (`useToolContext`, `useCallTool`, `useViewTool`,
 and the per-action hooks).
 
@@ -36,8 +35,7 @@ and the per-action hooks).
 - **Tailwind CSS v4** — styling is the project's own declaration via
   `vite.config.ts` (`@tailwindcss/vite`) and `@import "tailwindcss"` in each
   view's `view.css`. The CLI's client build picks up the project Vite config
-  automatically (see
-  [Views spec — User Vite config](../../../specs/VIEWS_SPEC.md#one-client-build-n-entries)).
+  automatically.
 
 ## Run locally
 
@@ -80,8 +78,7 @@ Export tool refs from `src/index.ts` (`export const searchFruits = …`,
 `useCallTool("get-fruit-details")`, and related hooks infer input/output types
 from those refs.
 
-See [Views spec — Typing](../../../specs/VIEWS_SPEC.md#typing-toolref--register-zero-codegen)
-for the full contract.
+The `Register` declaration derives the mapping from those exported refs.
 
 ## Result channels
 
@@ -110,8 +107,7 @@ The first structured result or tool error is latched. Content-only ambient
 results are valid and ignored; later lifecycle notifications cannot replace
 the initial View context. Host environment comes from `useHostContext()` /
 `useViewTheme()`; actions from `useCallTool`, `useSendFollowUp()`,
-`useOpenExternal()`, and `useDisplayMode()`. See
-[Views spec — Channel visibility](../../../specs/VIEWS_SPEC.md#channel-visibility-what-the-model-sees-vs-what-the-view-sees).
+`useOpenExternal()`, and `useDisplayMode()`.
 
 ## Definition metadata versus result metadata
 

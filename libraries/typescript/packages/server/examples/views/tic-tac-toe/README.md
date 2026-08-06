@@ -85,8 +85,7 @@ export {};
 Export the tool ref from `src/index.ts` (`export const startGame = …`). Then
 `useToolContext<"start-game">()` infers input/output types from that ref.
 
-See [Views spec — Typing](../../../specs/VIEWS_SPEC.md#typing-toolref--register-zero-codegen)
-for the full contract.
+The `Register` declaration derives the mapping from those exported refs.
 
 ## Typecheck
 

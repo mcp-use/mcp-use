@@ -1,7 +1,7 @@
 /**
  * View discovery for `mcp-use build` / `mcp-use dev`.
  *
- * Views live under `views/<name>/view.tsx` (VIEWS_SPEC.md § File-based views).
+ * Views live under `views/<name>/view.tsx`.
  */
 
 import { existsSync, readdirSync } from "node:fs";
