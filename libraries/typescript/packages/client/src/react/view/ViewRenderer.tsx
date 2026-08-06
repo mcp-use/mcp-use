@@ -436,13 +436,13 @@ function ViewRendererBase({
       }
 
       if (event.data?.type === "iframe-console-log") {
+        // Console records share the iframe postMessage channel with MCP Apps
+        // JSON-RPC. Consume them before PostMessageTransport sees them.
+        event.stopImmediatePropagation();
         onLogRef.current?.({
           level: event.data.level ?? "log",
           data: event.data.args,
         });
-        // Console records share the iframe postMessage channel with MCP Apps
-        // JSON-RPC. Consume them before PostMessageTransport sees them.
-        event.stopImmediatePropagation();
         return;
       }
     };
