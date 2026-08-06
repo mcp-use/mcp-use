@@ -845,8 +845,18 @@ jobs:
       - name: Check for Changesets
         env:
           BASE_REF: ${{ github.base_ref || 'main' }}
+          HEAD_REF: ${{ github.head_ref }}
         run: |
-          if [ -n "$(ls -A .changeset/*.md 2>/dev/null | grep -v README.md)" ]; then
+          if [ "$BASE_REF" = "main" ] && [ "$HEAD_REF" = "canary" ]; then
+            pending_changesets="$(node scripts/release-channel.mjs pending)"
+            if [ -n "$pending_changesets" ]; then
+              echo "✅ Pending changeset found"
+              printf '%s\n' "$pending_changesets"
+              pnpm changeset status --since="origin/${BASE_REF}"
+            else
+              echo "✅ No pending changesets; prerelease changesets are already applied"
+            fi
+          elif [ -n "$(ls -A .changeset/*.md 2>/dev/null | grep -v README.md)" ]; then
             echo "✅ Changeset found"
             pnpm changeset status --since="origin/${BASE_REF}"
           else
