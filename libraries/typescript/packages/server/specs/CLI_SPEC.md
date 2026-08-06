@@ -2,7 +2,7 @@
 
 **Status:** Implemented.
 **Scope:** the complete first-party `mcp-use` CLI: `dev`, `build`, `typecheck`, `start`, cloud auth, organizations, servers, deployments, deploy, client, and screenshot; plus optional Inspector mounting in `dev` and production `start`.
-**Package:** `mcp-use@2`, published from `packages/server`. The package owns the bin, runtime, command chunks, and toolchain. The development Inspector remains independently published. There is no separate CLI implementation, devkit, or config package. `@mcp-use/cli@4` is a compatibility-only prebuilt of this CLI, kept for the historical install command.
+**Package:** `mcp-use@2`, published from `packages/server`. The package owns the bin and the runtime, and is the source of record for every command; the prebuilt command chunks and the build toolchain ship in `@mcp-use/cli`, which the bin loads. The development Inspector remains independently published. There is no separate CLI implementation, devkit, or config package. `@mcp-use/cli@4` carries the prebuilt implementation that the `mcp-use` bin loads at runtime.
 
 ## Goals
 
@@ -58,9 +58,12 @@ installed with the CLI rather than with generated apps. `@mcp-use/client` and
 installed unless the project asks for it.
 
 It adds no command code of its own: every entry re-exports from
-`packages/server`, so `mcp-use` remains the canonical package and the source of
-record for behavior. The compatibility package exists for the historical
-install command only, and new projects should depend on `mcp-use`.
+`packages/server`, which stays the source of record for behavior.
+
+`mcp-use` remains the public binary owner and declares the `mcp-use` bin, but
+that bin dynamically imports `@mcp-use/cli` so the prebuilt implementation can
+be budgeted independently. `npx @mcp-use/cli` therefore keeps working for the
+historical install command, and new projects should still depend on `mcp-use`.
 
 There are no `ls`, `rm`, `switch`, or `install` aliases in v2. The accepted names below are the complete public surface. Cloud commands use native `fetch`, filesystem, and child-process APIs where adequate. Command-local parsing uses `node:util.parseArgs`; the package does not recreate a global Commander tree.
 
