@@ -837,6 +837,10 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --no-frozen-lockfile
 
+      - name: Prevent canary-to-main version regression
+        if: github.event_name == 'pull_request' && github.base_ref == 'main' && github.head_ref == 'canary'
+        run: pnpm release-channel preflight --channel stable
+
       - name: Check for Changesets
         env:
           BASE_REF: ${{ github.base_ref || 'main' }}

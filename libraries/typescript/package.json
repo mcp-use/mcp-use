@@ -36,6 +36,8 @@
     "changeset": "changeset",
     "version": "changeset version && pnpm install --no-frozen-lockfile",
     "version:exit-prerelease": "node scripts/version-packages.mjs",
+    "release-channel": "node scripts/release-channel.mjs",
+    "test:release-channel": "node --test scripts/release-channel.test.mjs",
     "release": "pnpm build && changeset publish",
     "version:check": "changeset status",
     "verify:release-install": "node scripts/verify-release-install.mjs",
