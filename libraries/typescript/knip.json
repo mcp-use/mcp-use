@@ -17,7 +17,8 @@
     },
     "packages/server": {
       "entry": ["src/oauth/**/*.ts", "tests/**/*.{ts,tsx}"],
-      "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"]
+      "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"],
+      "ignoreUnresolved": ["#mcp-use-node-http"]
     },
     "packages/agent": {
       "entry": ["tests/**/*.ts", "examples/**/*.ts"],
