@@ -89,6 +89,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
+          fetch-depth: 0
       - uses: dorny/paths-filter@v3
         id: filter
         if: github.event_name != 'workflow_call'
@@ -836,6 +837,10 @@ jobs:
 
       - name: Install Dependencies
         run: pnpm install --no-frozen-lockfile
+
+      - name: Prevent canary-to-main version regression
+        if: github.event_name == 'pull_request' && github.base_ref == 'main' && github.head_ref == 'canary'
+        run: pnpm release-channel preflight --channel stable
 
       - name: Check for Changesets
         env:
