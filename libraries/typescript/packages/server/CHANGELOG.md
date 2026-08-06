@@ -1,5 +1,29 @@
 # mcp-use
 
+## 2.0.5-canary.6
+
+### Patch Changes
+
+- Updated dependencies [4574f32]
+  - @mcp-use/inspector@20.0.5-canary.6
+
+## 2.0.5-canary.5
+
+### Patch Changes
+
+- Updated dependencies [06ec118]
+  - @mcp-use/cli@4.0.2-canary.5
+  - @mcp-use/inspector@20.0.5-canary.5
+
+## 2.0.5-canary.4
+
+### Patch Changes
+
+- c94028c: Make `mcp-use dev` reconcile server and V2 view changes as coherent project generations. Reload candidates now use immutable view snapshots, and stale candidates cannot replace the active handler, publish catalog changes, or report superseded failures.
+- Updated dependencies [c94028c]
+  - @mcp-use/cli@4.0.2-canary.4
+  - @mcp-use/inspector@20.0.5-canary.4
+
 ## 2.0.5-canary.3
 
 ### Patch Changes

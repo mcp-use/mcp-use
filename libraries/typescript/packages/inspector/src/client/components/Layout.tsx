@@ -46,6 +46,7 @@ import { LayoutHeader } from "./LayoutHeader";
 import { InspectorSidebar } from "./layout/sidebar/InspectorSidebar";
 import { SidebarRpcPanel } from "./layout/sidebar/SidebarRpcPanel";
 import { MobileInspectorToolbar } from "./layout/mobile/MobileInspectorToolbar";
+import { getInspectorBodyClassName } from "./layout/inspectorLayoutClasses";
 import { useTunnelConnectionSync } from "./layout/useTunnelConnectionSync";
 
 interface LayoutProps {
@@ -855,7 +856,7 @@ export function Layout({ children }: LayoutProps) {
       : displayServer;
 
   // Apply embedded styling
-  const isSingleTab = isEmbedded && embeddedConfig.singleTab;
+  const isSingleTab = isEmbedded && embeddedConfig.singleTab === true;
 
   const containerStyle: React.CSSProperties = isEmbedded
     ? {
@@ -878,9 +879,7 @@ export function Layout({ children }: LayoutProps) {
         displayServerWithStableMetadata && "lg:mr-4"
       );
 
-  const bodyClassName = isSingleTab
-    ? "flex-1 min-h-0"
-    : "flex min-w-0 flex-1 min-h-0 overflow-hidden";
+  const bodyClassName = getInspectorBodyClassName(isSingleTab);
 
   const headerProps = {
     connections,
@@ -920,6 +919,7 @@ export function Layout({ children }: LayoutProps) {
                   onCollapsedChange={setSidebarCollapsed}
                   rpcLoggerOpen={rpcLoggerOpen}
                   onRpcLoggerOpenChange={setRpcLoggerOpen}
+                  embedded={isEmbedded}
                   onCommandPaletteOpen={() =>
                     handleCommandPaletteOpen("button")
                   }

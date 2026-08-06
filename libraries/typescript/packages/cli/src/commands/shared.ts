@@ -9,7 +9,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { openBrowser as launchBrowser } from "../cli/open-browser.js";
 
@@ -180,7 +180,7 @@ export async function writePrivateJson(
   await chmod(parent, 0o700);
   const temporary = join(
     parent,
-    `.${path.slice(path.lastIndexOf("/") + 1)}.${process.pid}.${Date.now()}.tmp`
+    `.${basename(path)}.${process.pid}.${Date.now()}.tmp`
   );
   await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, {
     mode: 0o600,

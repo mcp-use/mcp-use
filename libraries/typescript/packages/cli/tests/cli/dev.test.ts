@@ -1076,7 +1076,9 @@ describe("runDev (views)", () => {
     expect(publicResponse.headers.get("cache-control")).toBe(
       "public, max-age=0, must-revalidate"
     );
-    expect(await publicResponse.text()).toBe("public-fixture\n");
+    expect(await publicResponse.text()).toBe(
+      readFileSync(join(cwd, "public", "test.txt"), "utf8")
+    );
 
     const docConfigMatch =
       /__mcpUseViewConfig=\{[^}]*"publicBase":"([^"]+)"/.exec(docHtml);
@@ -1136,6 +1138,136 @@ describe("runDev (views)", () => {
       ).resources.map((r) => r.uri);
       return uris.includes("ui://views/extra-view.html") ? true : undefined;
     });
+  }, 60_000);
+
+  it("reconciles adjacent server and view events as one project generation", async () => {
+    const cwd = copyFixture("dev-view-bind-before-add", "views");
+    cleanups.push(() => removeDir(cwd));
+
+    const dev = await startDev(cwd, await getFreePort());
+    cleanups.push(dev.stop);
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    cleanups.push(() => errorSpy.mockRestore());
+
+    const entry = join(cwd, "src", "index.ts");
+    const source = readFileSync(entry, "utf8");
+    writeFileSync(
+      entry,
+      source.replace('name: "product-search-result"', 'name: "late-view"')
+    );
+
+    // Editors emit separate watcher events for a multi-file save. The entry
+    // and view manifest must be reconciled as one immutable generation.
+    mkdirSync(join(cwd, "views", "late-view"), { recursive: true });
+    writeFileSync(
+      join(cwd, "views", "late-view", "view.tsx"),
+      `export default function LateView() { return <div>late</div>; }\n`
+    );
+
+    await waitFor(async () => {
+      const list = await mcpRequest(
+        dev.url,
+        "resources/list",
+        {},
+        { ui: true }
+      );
+      const uris = (
+        list["result"] as { resources: { uri: string }[] }
+      ).resources.map((resource) => resource.uri);
+      return uris.includes("ui://views/late-view.html") ? true : undefined;
+    });
+
+    const tools = await mcpRequest(dev.url, "tools/list", {}, { ui: true });
+    const searchTool = (
+      tools["result"] as {
+        tools: { name: string; _meta?: Record<string, unknown> }[];
+      }
+    ).tools.find((tool) => tool.name === "search-products");
+    expect(searchTool?._meta?.["ui"]).toMatchObject({
+      resourceUri: "ui://views/late-view.html",
+    });
+    expect(
+      errorSpy.mock.calls.some((call) =>
+        String(call[0]).includes("reload failed")
+      )
+    ).toBe(false);
+  }, 60_000);
+
+  it("reports a missing view in the latest settled generation and keeps the previous handler", async () => {
+    const cwd = copyFixture("dev-view-missing-after-reload", "views");
+    cleanups.push(() => removeDir(cwd));
+
+    const dev = await startDev(cwd, await getFreePort());
+    cleanups.push(dev.stop);
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    cleanups.push(() => errorSpy.mockRestore());
+
+    const entry = join(cwd, "src", "index.ts");
+    const source = readFileSync(entry, "utf8");
+    writeFileSync(
+      entry,
+      source.replace('name: "product-search-result"', 'name: "missing-view"')
+    );
+
+    await waitFor(async () =>
+      errorSpy.mock.calls.some((call) =>
+        call
+          .map(String)
+          .join(" ")
+          .includes("which is not in the primed views registry")
+      )
+        ? true
+        : undefined
+    );
+
+    const tools = await mcpRequest(dev.url, "tools/list", {}, { ui: true });
+    const searchTool = (
+      tools["result"] as {
+        tools: { name: string; _meta?: Record<string, unknown> }[];
+      }
+    ).tools.find((tool) => tool.name === "search-products");
+    expect(searchTool?._meta?.["ui"]).toMatchObject({
+      resourceUri: "ui://views/product-search-result.html",
+    });
+  }, 60_000);
+
+  it("discards a candidate superseded while its server entry is evaluating", async () => {
+    const cwd = copyFixture("dev-stale-reload-generation", "views");
+    cleanups.push(() => removeDir(cwd));
+
+    const dev = await startDev(cwd, await getFreePort());
+    cleanups.push(dev.stop);
+
+    const entry = join(cwd, "src", "index.ts");
+    const marker = join(cwd, ".stale-generation-started");
+    const source = readFileSync(entry, "utf8");
+    writeFileSync(
+      entry,
+      [
+        `import { writeFileSync as markGeneration } from "node:fs";`,
+        `markGeneration(${JSON.stringify(marker)}, "started");`,
+        `await new Promise((resolve) => setTimeout(resolve, 250));`,
+        source.replace("Search products", "Stale description"),
+      ].join("\n")
+    );
+
+    await waitFor(async () => (existsSync(marker) ? true : undefined));
+    writeFileSync(
+      entry,
+      source.replace("Search products", "Latest description")
+    );
+
+    await waitFor(async () => {
+      const body = await mcpRequest(dev.url, "tools/list", {}, { ui: true });
+      const tool = (
+        body["result"] as { tools: { name: string; description?: string }[] }
+      ).tools.find((candidate) => candidate.name === "search-products");
+      return tool?.description === "Latest description" ? true : undefined;
+    });
+
+    expect(
+      dev.logs.filter((line) => line === "[mcp-use] reloaded server entry")
+    ).toHaveLength(1);
   }, 60_000);
 
   it("hot-updates a view.tsx edit without a full document reload", async () => {

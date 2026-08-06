@@ -1,5 +1,18 @@
 # @mcp-use/cli
 
+## 4.0.2-canary.5
+
+### Patch Changes
+
+- 06ec118: Use cross-platform filesystem paths for private CLI state, view discovery, and
+  public asset tests so the CLI build and test suite work on Windows.
+
+## 4.0.2-canary.4
+
+### Patch Changes
+
+- c94028c: Make `mcp-use dev` reconcile server and V2 view changes as coherent project generations. Reload candidates now use immutable view snapshots, and stale candidates cannot replace the active handler, publish catalog changes, or report superseded failures.
+
 ## 4.0.2-canary.3
 
 ### Patch Changes
