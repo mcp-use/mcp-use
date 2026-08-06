@@ -61,8 +61,7 @@ Returns `ToolSearchResponse` with `results` and `meta` (counts, namespaces).
 | ---- | ------------- | ----- |
 | VM | `"vm"` (default) | `VMCodeExecutor`, `isVMAvailable()` |
 | E2B | `"e2b"` | `E2BCodeExecutor`, requires `@e2b/code-interpreter` peer |
-| Custom class | `BaseCodeExecutor` subclass | Implement `execute()` + `cleanup()` |
-| Custom function | `CodeExecutorFunction` | `(code, timeout?) => Promise<ExecutionResult>`, called with the client as `this`; owns its own runtime cleanup |
+| Custom | `BaseCodeExecutor` subclass or async function | Implement `execute()` + `cleanup()` |
 
 `CodeModeConnector` exposes internal `execute_code` and `search_tools` MCP tools.
 
@@ -74,11 +73,6 @@ interface CodeModeConfig {
   executor?: "vm" | "e2b" | CodeExecutorFunction | BaseCodeExecutor;
   executorOptions?: VMExecutorOptions | E2BExecutorOptions;
 }
-
-type CodeExecutorFunction = (
-  code: string,
-  timeout?: number,
-) => Promise<ExecutionResult>;
 
 interface VMExecutorOptions {
   timeoutMs?: number;      // default 30000
