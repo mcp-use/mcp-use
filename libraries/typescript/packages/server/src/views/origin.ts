@@ -9,7 +9,7 @@
  */
 
 /** Strip trailing slashes from a URL prefix. */
-export function stripTrailingSlashes(value: string): string {
+function stripTrailingSlashes(value: string): string {
   return value.replace(/\/+$/, "");
 }
 
@@ -117,13 +117,6 @@ export function resolveAssetsBase(request: Request): string {
       // Fall through when MCP_ASSETS_URL is malformed.
     }
   }
-  return resolveServerOrigin(request);
-}
-
-/**
- * @deprecated Alias for {@link resolveServerOrigin} — kept for OAuth callers.
- */
-export function resolveRequestOrigin(request: Request): string {
   return resolveServerOrigin(request);
 }
 

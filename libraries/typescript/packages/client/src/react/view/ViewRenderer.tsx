@@ -1028,7 +1028,6 @@ export {
   buildViewSandboxBlobUrl,
   buildViewSandboxUrl,
 } from "./sandbox-blob-url.js";
-export { injectOpenAiFileApis } from "./inject-openai-file-apis.js";
 export type {
   ViewConnection,
   ViewDisplayMode,

@@ -1,4 +1,4 @@
-export const SKILLS_REPO = "https://github.com/mcp-use/mcp-use.git";
+const SKILLS_REPO = "https://github.com/mcp-use/mcp-use.git";
 export const SKILLS_SPARSE_PATH = "skills/mcp-apps-builder";
 export const SKILLS_AGENT_DIRS = [".cursor", ".claude", ".agents"] as const;
 

@@ -13,7 +13,7 @@ import {
 } from "./shared.js";
 
 /** Runtime surface loaded from the independently published client SDK. */
-export type ClientPackage = typeof import("@mcp-use/client");
+type ClientPackage = typeof import("@mcp-use/client");
 
 const CLIENT_SDK_DIR = join(GLOBAL_STATE_DIR, "client-sdk");
 const CLIENT_PACKAGE = "@mcp-use/client";
@@ -35,9 +35,7 @@ const INSTALL_HINT = [
  * Walk upward from `startDir` for the nearest directory containing
  * `package.json`.
  */
-export async function findProjectRoot(
-  startDir: string
-): Promise<string | undefined> {
+async function findProjectRoot(startDir: string): Promise<string | undefined> {
   let current = resolve(startDir);
   for (;;) {
     if (await pathExists(join(current, "package.json"))) return current;

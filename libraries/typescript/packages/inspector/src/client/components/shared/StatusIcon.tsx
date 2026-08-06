@@ -15,7 +15,7 @@ const STATUS_ICON_TONE = {
 
 const CIRCLE_ICON = "size-4 shrink-0 rounded-full border p-0.5";
 
-export type StatusIconState = "success" | "failed" | "warning" | "loading";
+type StatusIconState = "success" | "failed" | "warning" | "loading";
 
 /**
  * Reusable status glyph (build logs drawer style): emerald check, red X,

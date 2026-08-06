@@ -16,7 +16,7 @@ const CONNECT_PROBE_MS = 300;
  *
  * @internal
  */
-export interface ResolvedPort {
+interface ResolvedPort {
   /** The free port to bind. */
   port: number;
   /** The port that was originally requested (differs when probing moved on). */
