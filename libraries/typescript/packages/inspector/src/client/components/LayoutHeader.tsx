@@ -24,6 +24,7 @@ import { AddToClientDropdown } from "./AddToClientDropdown";
 import LogoAnimated from "./LogoAnimated";
 import { ServerDropdown } from "./ServerDropdown";
 import { getTabCount, isMcpUseTunnelUrl } from "./layout/layoutHeaderUtils";
+import { getInspectorHeaderClassName } from "./layout/inspectorLayoutClasses";
 import { LAYOUT_TABS } from "./layout/layoutTabs";
 import { ServerUrlChip } from "./layout/ServerUrlChip";
 import { TunnelStartButton } from "./layout/TunnelBadge";
@@ -213,7 +214,7 @@ export function LayoutHeader({
     ) : null;
 
   return (
-    <header className="w-full min-w-0 shrink-0 overflow-hidden">
+    <header className={getInspectorHeaderClassName(embedded)}>
       <div className="hidden lg:flex h-(--header-height) items-center justify-between gap-3 px-4 md:pl-0 md:pr-6">
         <div className="flex items-center gap-3 min-w-0 flex-1">
           {!embedded && (
