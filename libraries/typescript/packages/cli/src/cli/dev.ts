@@ -27,6 +27,9 @@ import { pathToFileURL } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { createServer, createServerModuleRunner } from "vite";
+// Bundled into the lazy dev chunk; keeping this build input in devDependencies
+// prevents the standalone CLI from installing the full SDK dependency tree.
+// eslint-disable-next-line import/no-extraneous-dependencies
 import {
   InMemoryServerEventBus,
   localhostAllowedHostnames,
