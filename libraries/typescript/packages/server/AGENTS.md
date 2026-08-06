@@ -12,6 +12,7 @@ Every design decision lives in the package's `specs/` directory (paths below are
 | `specs/CLI_SPEC.md` | Complete `mcp-use` CLI, lazy command layout, workspace/storage, output/error rules, inspector shell, and budgets | Implemented |
 | `specs/VIEWS_SPEC.md` | Views (MCP Apps): `view()` helper, resources + wire metadata, `mcp-use/react`, typing, build/serve/dev | Alpha implemented |
 | `specs/AUTH_SPEC.md` | OAuth resource-server posture, `ctx.auth`, provider adapters, RFC 9728 discovery | Direct resource-server mode implemented; proxy mode deferred |
+| `specs/AUTH_IMPLEMENTATION.md` | The auth scope being built now: external-authorization-server token verification, no token issuance, storage, refresh, or proxying | Approved implementation scope |
 
 Decision records (`type_proposals.md`, `view_lifecycle_proposals.md` in the package root) preserve the rejected alternatives and evidence behind the specs' choices. They are history, not contract — where they differ from a spec, the spec wins.
 
