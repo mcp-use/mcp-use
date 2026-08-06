@@ -1,7 +1,7 @@
 {
   "name": "@mcp-use/cli",
   "type": "module",
-  "version": "4.0.2-canary.1",
+  "version": "4.0.2-canary.2",
   "description": "Prebuilt CLI, development server, and build pipeline for mcp-use",
   "author": "mcp-use, Inc.",
   "license": "MIT",

@@ -1,5 +1,11 @@
 # @mcp-use/cli
 
+## 4.0.2-canary.2
+
+### Patch Changes
+
+- e0ac78e: Move the CLI implementation and its tests into `@mcp-use/cli` while preserving the existing `mcp-use` command and server API.
+
 ## 4.0.2-canary.1
 
 ### Patch Changes
