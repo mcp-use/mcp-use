@@ -32,6 +32,17 @@ describe("buildViewSandboxBlobUrl", () => {
       buildSandboxProxyBlobHtml(search)
     );
   });
+
+  it("allows eval while retaining widget-declared domain restrictions", () => {
+    const sandboxHtml = buildSandboxProxyBlobHtml("?csp_mode=widget-declared");
+
+    expect(sandboxHtml).toContain(
+      `const scriptSrcParts = ["'unsafe-inline'", "'unsafe-eval'", resourceSrc];`
+    );
+    expect(sandboxHtml).toContain(
+      `const connectSrc = connectDomains.length > 0 ? connectDomains.join(" ") : "'none'";`
+    );
+  });
 });
 
 describe("buildViewSandboxUrl", () => {
