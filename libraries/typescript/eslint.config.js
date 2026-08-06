@@ -266,11 +266,7 @@ export default [
   },
   // CLI packages
   {
-    files: [
-      "packages/create-mcp-use-app/**/*.ts",
-      "packages/server/src/bin/**/*.ts",
-      "packages/server/src/commands/**/*.ts",
-    ],
+    files: ["packages/create-mcp-use-app/**/*.ts", "packages/cli/src/**/*.ts"],
     rules: {
       "no-console": "off",
       "no-process-exit": "off",
@@ -288,20 +284,22 @@ export default [
       "tsdoc/syntax": "error",
     },
   },
-  // mcp-use (includes the folded-in CLI and dev/build
-  // toolchain under src/cli/) — strictest type safety, no escape hatches.
+  // mcp-use server and @mcp-use/cli — strictest type safety, no escape hatches.
   // `any` is banned outright; `unknown` is allowed only at real boundaries
   // and must be narrowed before use (the no-unsafe-* rules enforce this).
   // Doc comments must be valid TSDoc (see packages/server/CLAUDE.md).
   {
-    files: ["packages/server/src/**/*.ts"],
+    files: ["packages/server/src/**/*.ts", "packages/cli/src/**/*.ts"],
     languageOptions: {
       parser: tsparser,
       parserOptions: {
         ecmaVersion: 2022,
         sourceType: "module",
         projectService: false,
-        project: ["./packages/server/tsconfig.test.json"],
+        project: [
+          "./packages/server/tsconfig.test.json",
+          "./packages/cli/tsconfig.test.json",
+        ],
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -347,20 +345,6 @@ export default [
         "error",
         { devDependencies: false },
       ],
-    },
-  },
-  // The production declaration build deliberately excludes the Vite-only
-  // dev/build commands. Lint those files against the test config, where their
-  // types are included, and permit their development-only toolchain imports.
-  {
-    files: [
-      "packages/server/src/cli/build.ts",
-      "packages/server/src/cli/dev.ts",
-      "packages/server/src/cli/views-bindings.ts",
-      "packages/server/src/cli/views.ts",
-    ],
-    rules: {
-      "import/no-extraneous-dependencies": ["error", { devDependencies: true }],
     },
   },
   // Test files

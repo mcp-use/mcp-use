@@ -105,26 +105,18 @@ try {
     "dist",
     "bin.js"
   );
+  const installedFrameworkBin = installedBin(installDirectory, "mcp-use");
+  const installedCliBin = installedBin(cliInstallDirectory, "mcp-use");
   assert.equal(
-    run(process.execPath, [frameworkBin, "--version"], installDirectory).trim(),
+    runInstalledBin(
+      installedFrameworkBin,
+      ["--version"],
+      installDirectory
+    ).trim(),
     frameworkManifest.version
   );
   assert.equal(
-    run(
-      process.execPath,
-      [
-        join(
-          cliInstallDirectory,
-          "node_modules",
-          "@mcp-use",
-          "cli",
-          "dist",
-          "bin.js"
-        ),
-        "--version",
-      ],
-      cliInstallDirectory
-    ).trim(),
+    runInstalledBin(installedCliBin, ["--version"], cliInstallDirectory).trim(),
     cliManifest.version
   );
 
@@ -374,6 +366,30 @@ function runResult(command, args, cwd, extraEnv = {}) {
     stdio: ["ignore", "pipe", "pipe"],
     maxBuffer: 20 * 1024 * 1024,
   });
+}
+
+function installedBin(directory, name) {
+  return join(
+    directory,
+    "node_modules",
+    ".bin",
+    process.platform === "win32" ? `${name}.cmd` : name
+  );
+}
+
+function runInstalledBin(command, args, cwd) {
+  if (process.platform !== "win32") return run(command, args, cwd);
+  const result = spawnSync(command, args, {
+    cwd,
+    env: process.env,
+    encoding: "utf8",
+    shell: true,
+    stdio: ["ignore", "pipe", "pipe"],
+    maxBuffer: 20 * 1024 * 1024,
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) throw new Error(result.stderr || result.stdout);
+  return result.stdout;
 }
 
 function readJson(file) {

@@ -807,7 +807,7 @@ jobs:
       - name: Run CLI Tests
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
-        run: pnpm --filter @mcp-use/cli --if-present test
+        run: pnpm --filter @mcp-use/cli --if-present test:run
 
   typescript-changeset-check:
     needs: detect-changes

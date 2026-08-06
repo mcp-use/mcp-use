@@ -100,7 +100,7 @@ export function originFromAssetsBase(assetsBase: string): string {
 /**
  * Normalize `MCP_ASSETS_URL` to a URL prefix without trailing slash.
  */
-export function normalizeAssetsBaseUrl(value: string): string {
+function normalizeAssetsBaseUrl(value: string): string {
   return stripTrailingSlashes(value);
 }
 

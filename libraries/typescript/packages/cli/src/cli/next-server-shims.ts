@@ -40,7 +40,9 @@ export function redirect(url: string | URL): never {
   Object.assign(error, { digest: `NEXT_REDIRECT;${String(url)}` });
   throw error;
 }
-export const permanentRedirect = redirect;
+export function permanentRedirect(url: string | URL): never {
+  return redirect(url);
+}
 
 export function notFound(): never {
   const error = new Error("notFound() called outside Next.js");

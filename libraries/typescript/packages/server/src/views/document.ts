@@ -28,7 +28,7 @@ function resolveAssetUrl(assetPath: string, origin: string): string {
  * @param basePath - MCP mount prefix (e.g. `/mcp`).
  * @param viewName - View directory / registry key.
  */
-export function viewAssetsBasePath(basePath: string, viewName: string): string {
+function viewAssetsBasePath(basePath: string, viewName: string): string {
   return `${pathUnderBase(basePath, `_mcp-use/views/${viewName}`)}/`;
 }
 

@@ -25,12 +25,14 @@
       "project": ["src/**/*.ts", "tests/**/*.ts", "examples/**/*.ts"]
     },
     "packages/cli": {
-      "entry": ["tests/**/*.mjs"],
-      "project": ["src/**/*.ts", "tests/**/*.mjs"],
+      "entry": ["tests/**/*.{mjs,ts,tsx}"],
+      "project": ["src/**/*.{ts,tsx}", "tests/**/*.{mjs,ts,tsx}"],
       "ignoreDependencies": [
-        "@modelcontextprotocol/server",
         "@tailwindcss/vite",
         "@vitejs/plugin-react",
+        "@types/react-dom",
+        "mcp-use",
+        "react-dom",
         "tailwindcss"
       ]
     },
