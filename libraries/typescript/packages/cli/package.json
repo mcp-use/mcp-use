@@ -20,7 +20,7 @@
     "cli"
   ],
   "bin": {
-    "mcp-use": "./dist/bin.js"
+    "mcp-use-cli": "./dist/bin.js"
   },
   "exports": {
     ".": {

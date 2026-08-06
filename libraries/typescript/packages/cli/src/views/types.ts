@@ -1,3 +1,5 @@
+// This structural build contract intentionally mirrors the server view
+// manifest. Keep both shapes aligned without adding a CLI-to-server import.
 /** View bundle embedded directly into a generated MCP resource. */
 export interface InlineViewManifestEntry {
   kind: "inline";

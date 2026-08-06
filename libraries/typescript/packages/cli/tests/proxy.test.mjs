@@ -22,11 +22,18 @@ test("runs the standalone prebuilt CLI with its own version", async () => {
 });
 
 test("runs the mcp-use compatibility bin with the framework version", async () => {
+  const cliPackage = JSON.parse(
+    await readFile(new URL("../package.json", import.meta.url), "utf8")
+  );
   const serverPackageUrl = new URL(
     "../../server/package.json",
     import.meta.url
   );
   const serverPackage = JSON.parse(await readFile(serverPackageUrl, "utf8"));
+
+  assert.deepEqual(serverPackage.bin, { "mcp-use": "./dist/bin.js" });
+  assert.deepEqual(cliPackage.bin, { "mcp-use-cli": "./dist/bin.js" });
+
   const { stdout, stderr } = await execFileAsync(
     process.execPath,
     [

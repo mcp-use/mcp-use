@@ -1,3 +1,5 @@
+// Keep these CLI-owned defaults and resolution rules aligned with the server's
+// public listen-address helpers without importing the server runtime.
 /** Default bind address for CLI-launched Node listeners. */
 export const DEFAULT_LISTEN_HOST = "127.0.0.1";
 
