@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { injectOpenAiFileApis } from "../../src/react/view/inject-openai-file-apis.js";
 
@@ -10,7 +10,7 @@ async function runInjectedFileApis(html: string) {
 
   const parsed = new DOMParser().parseFromString(injected, "text/html");
   const script = Array.from(parsed.scripts).find((candidate) =>
-    candidate.textContent?.includes("window.openai.uploadFile")
+    candidate.textContent?.includes("api.uploadFile")
   );
   expect(script?.textContent).toBeTruthy();
   // eslint-disable-next-line no-new-func
@@ -43,6 +43,40 @@ async function runInjectedFileApis(html: string) {
   Reflect.deleteProperty(window, "openai");
 }
 
+function mountInjectedBridge() {
+  const injected = injectOpenAiFileApis(
+    "<html><head></head><body></body></html>"
+  );
+  const parsed = new DOMParser().parseFromString(injected, "text/html");
+  const script = Array.from(parsed.scripts).find((candidate) =>
+    candidate.textContent?.includes("mcp-use-openai-compat")
+  );
+  expect(script?.textContent).toBeTruthy();
+
+  const iframe = document.createElement("iframe");
+  document.body.appendChild(iframe);
+  const guest = iframe.contentWindow!;
+  guest.setTimeout = window.setTimeout.bind(window);
+  guest.clearTimeout = window.clearTimeout.bind(window);
+  Object.defineProperty(guest.URL, "createObjectURL", {
+    configurable: true,
+    value: URL.createObjectURL.bind(URL),
+  });
+
+  guest.Function(script!.textContent!)();
+
+  return {
+    guest,
+    cleanup: () => iframe.remove(),
+  };
+}
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+  document.body.innerHTML = "";
+});
+
 describe("injectOpenAiFileApis", () => {
   it("injects into head and round-trips upload/download", async () => {
     await runInjectedFileApis("<html><head></head><body></body></html>");
@@ -60,6 +94,183 @@ describe("injectOpenAiFileApis", () => {
     expect(injected.indexOf("uploadFile")).toBeLessThan(
       injected.indexOf("</HeAd>")
     );
+  });
+
+  it("populates the complete window.openai compatibility surface", () => {
+    const { guest, cleanup } = mountInjectedBridge();
+    const openai = (guest as typeof guest & { openai: Record<string, unknown> })
+      .openai;
+
+    expect(openai).toMatchObject({
+      toolInput: {},
+      toolOutput: null,
+      toolResponseMetadata: null,
+      theme: "light",
+      displayMode: "inline",
+      locale: "en",
+    });
+    for (const method of [
+      "callTool",
+      "sendFollowUpMessage",
+      "openExternal",
+      "requestDisplayMode",
+      "setWidgetState",
+      "notifyIntrinsicHeight",
+      "uploadFile",
+      "getFileDownloadUrl",
+    ]) {
+      expect(openai[method]).toBeTypeOf("function");
+    }
+
+    cleanup();
+  });
+
+  it("maps MCP Apps lifecycle notifications to OpenAI globals", () => {
+    const { guest, cleanup } = mountInjectedBridge();
+    const openai = (
+      guest as typeof guest & {
+        openai: {
+          toolInput: unknown;
+          toolOutput: unknown;
+          toolResponseMetadata: unknown;
+          theme: unknown;
+          displayMode: unknown;
+          locale: unknown;
+        };
+      }
+    ).openai;
+    const globalsEvents: Record<string, unknown>[] = [];
+    guest.addEventListener("openai:set_globals", (event) => {
+      globalsEvents.push(
+        (event as CustomEvent<{ globals: Record<string, unknown> }>).detail
+          .globals
+      );
+    });
+
+    guest.dispatchEvent(
+      new guest.MessageEvent("message", {
+        source: guest.parent,
+        data: {
+          jsonrpc: "2.0",
+          method: "ui/notifications/tool-input",
+          params: { arguments: { question: "Choose" } },
+        },
+      })
+    );
+    guest.dispatchEvent(
+      new guest.MessageEvent("message", {
+        source: guest.parent,
+        data: {
+          jsonrpc: "2.0",
+          method: "ui/notifications/tool-result",
+          params: {
+            content: [],
+            structuredContent: { options: ["A", "B"] },
+            _meta: { source: "test" },
+          },
+        },
+      })
+    );
+    guest.dispatchEvent(
+      new guest.MessageEvent("message", {
+        source: guest.parent,
+        data: {
+          jsonrpc: "2.0",
+          method: "ui/notifications/host-context-changed",
+          params: {
+            theme: "dark",
+            displayMode: "fullscreen",
+            locale: "de-CH",
+          },
+        },
+      })
+    );
+
+    expect(openai.toolInput).toEqual({ question: "Choose" });
+    expect(openai.toolOutput).toMatchObject({
+      structuredContent: { options: ["A", "B"] },
+    });
+    expect(openai.toolResponseMetadata).toEqual({ source: "test" });
+    expect(openai.theme).toBe("dark");
+    expect(openai.displayMode).toBe("fullscreen");
+    expect(openai.locale).toBe("de-CH");
+    expect(globalsEvents).toHaveLength(3);
+
+    cleanup();
+  });
+
+  it("does not start a second handshake after a native V2 view connects", async () => {
+    vi.useFakeTimers();
+    const { guest, cleanup } = mountInjectedBridge();
+    const postMessage = vi.spyOn(guest.parent, "postMessage");
+
+    guest.dispatchEvent(
+      new guest.MessageEvent("message", {
+        source: guest.parent,
+        data: {
+          jsonrpc: "2.0",
+          id: 1,
+          result: {
+            hostInfo: { name: "Inspector", version: "test" },
+            hostContext: { theme: "light" },
+          },
+        },
+      })
+    );
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(postMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ method: "ui/initialize" }),
+      "*"
+    );
+    cleanup();
+  });
+
+  it("falls back to an MCP Apps handshake for legacy useWidget bundles", async () => {
+    vi.useFakeTimers();
+    const { guest, cleanup } = mountInjectedBridge();
+    const postMessage = vi.spyOn(guest.parent, "postMessage");
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jsonrpc: "2.0",
+        method: "ui/initialize",
+      }),
+      "*"
+    );
+
+    const initialize = postMessage.mock.calls.find(
+      ([message]) => (message as { method?: string }).method === "ui/initialize"
+    )?.[0] as { id: string };
+    guest.dispatchEvent(
+      new guest.MessageEvent("message", {
+        source: guest.parent,
+        data: {
+          jsonrpc: "2.0",
+          id: initialize.id,
+          result: {
+            hostInfo: { name: "Inspector", version: "test" },
+            hostContext: { theme: "dark" },
+          },
+        },
+      })
+    );
+    await Promise.resolve();
+
+    expect(postMessage).toHaveBeenCalledWith(
+      {
+        jsonrpc: "2.0",
+        method: "ui/notifications/initialized",
+        params: {},
+      },
+      "*"
+    );
+    expect(
+      (guest as typeof guest & { openai: { theme: string } }).openai.theme
+    ).toBe("dark");
+
+    cleanup();
   });
 });
 
