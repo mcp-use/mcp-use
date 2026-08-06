@@ -13,7 +13,7 @@ type FetchHandler = (request: Request) => Promise<Response>;
  *
  * @internal
  */
-export interface DevApiHandlerOptions {
+interface DevApiHandlerOptions {
   /** Returns the current MCP mount path (may change after a dev reload). */
   getBasePath: () => string;
   /** Port the dev HTTP listener is bound to. */
@@ -23,7 +23,7 @@ export interface DevApiHandlerOptions {
 }
 
 /** JSON body for `GET …/inspector/api/dev/info`. */
-export interface DevInfoResponse {
+interface DevInfoResponse {
   /** Full MCP endpoint URL when a tunnel is active; otherwise `null`. */
   mcpUrl: string | null;
   /** Port the dev server listens on. */

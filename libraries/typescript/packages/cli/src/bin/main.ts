@@ -35,7 +35,7 @@ if (nodeLocalStorage?.get !== undefined && nodeLocalStorage.configurable) {
  *
  * @internal
  */
-export interface CliCommandOptions {
+interface CliCommandOptions {
   /** Project root the command operates on (`process.cwd()`). */
   cwd: string;
   /** Server entry module override (`--entry`). */

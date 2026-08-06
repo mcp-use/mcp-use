@@ -70,7 +70,7 @@ export interface BuildManifest {
  *
  * @internal
  */
-export interface WorkspacePaths {
+interface WorkspacePaths {
   /** The project root (the directory containing `.mcp-use/`). */
   projectRoot: string;
   /** The `.mcp-use/` workspace directory. */

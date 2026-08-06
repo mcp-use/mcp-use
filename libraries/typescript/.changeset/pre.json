@@ -6,12 +6,15 @@
     "@mcp-use/cli": "4.0.1",
     "@mcp-use/client": "2.0.1",
     "create-mcp-use-app": "2.0.1",
-    "@mcp-use/inspector": "20.0.1",
-    "mcp-use": "2.0.1"
+    "@mcp-use/inspector": "20.0.4",
+    "mcp-use": "2.0.4"
   },
   "changesets": [
+    "bright-widgets-bridge",
     "calm-owls-prompt",
     "quiet-lions-connect",
-    "slick-nights-taste"
+    "repair-canary-baseline",
+    "slick-nights-taste",
+    "tidy-knip-exports"
   ]
 }

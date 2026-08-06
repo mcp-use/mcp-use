@@ -10,7 +10,6 @@ import {
 } from "../types/result-types.js";
 
 export type { CallToolSuccess } from "../types/result-types.js";
-export { ToolError } from "../types/result-types.js";
 
 /**
  * Typed server-tool call handle returned by {@link useCallTool} and

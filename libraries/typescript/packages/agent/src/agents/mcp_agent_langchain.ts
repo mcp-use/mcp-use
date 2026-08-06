@@ -56,8 +56,6 @@ export interface AgentStep {
 
 import type { RunOptions } from "./run_options.js";
 
-export type { RunOptions };
-
 /**
  * Helper function to normalize run options from either old-style positional arguments
  * or new-style options object

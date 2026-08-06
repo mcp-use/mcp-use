@@ -13,34 +13,19 @@
   ],
   "workspaces": {
     ".": {
-      "entry": ["scripts/version-packages.mjs"],
       "project": ["*.{js,ts}"]
     },
     "packages/server": {
-      "entry": [
-        "src/index.ts",
-        "src/bin.ts",
-        "src/react/index.ts",
-        "src/vite-client.ts",
-        "src/oauth/**/*.ts",
-        "tests/**/*.{ts,tsx}"
-      ],
+      "entry": ["src/oauth/**/*.ts", "tests/**/*.{ts,tsx}"],
       "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"],
-      "ignoreBinaries": ["npx"],
-      "ignoreUnresolved": ["#mcp-use-node-http"],
-      "ignoreDependencies": ["mcp-use"]
+      "ignoreUnresolved": ["#mcp-use-node-http"]
     },
     "packages/agent": {
-      "entry": [
-        "src/index.ts",
-        "src/langchain.ts",
-        "tests/**/*.ts",
-        "examples/**/*.ts"
-      ],
+      "entry": ["tests/**/*.ts", "examples/**/*.ts"],
       "project": ["src/**/*.ts", "tests/**/*.ts", "examples/**/*.ts"]
     },
     "packages/cli": {
-      "entry": ["src/index.ts", "tests/**/*.{mjs,ts,tsx}"],
+      "entry": ["tests/**/*.{mjs,ts,tsx}"],
       "project": ["src/**/*.{ts,tsx}", "tests/**/*.{mjs,ts,tsx}"],
       "ignoreDependencies": [
         "@tailwindcss/vite",
@@ -48,17 +33,11 @@
         "@types/react-dom",
         "mcp-use",
         "react-dom",
-        "tailwindcss",
-        "vite"
+        "tailwindcss"
       ]
     },
     "packages/client": {
-      "entry": [
-        "src/index.ts",
-        "src/index-browser.ts",
-        "src/react/index.ts",
-        "tests/**/*.{ts,tsx}"
-      ],
+      "entry": ["tests/**/*.{ts,tsx}"],
       "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"]
     },
     "packages/inspector": {
@@ -75,7 +54,7 @@
       ]
     },
     "packages/create-mcp-use-app": {
-      "entry": ["scripts/**/*.{js,mjs,ts}", "src/index.ts"],
+      "entry": ["scripts/**/*.{js,mjs,ts}"],
       "project": ["src/**/*.{ts,tsx}"]
     }
   }

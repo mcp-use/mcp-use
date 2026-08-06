@@ -13,7 +13,7 @@ interface HelpPage {
  *
  * @internal
  */
-export interface ClientHelpResult {
+interface ClientHelpResult {
   /** Rendered help, or `undefined` when the command path is not public. */
   text?: string;
   /** Invalid command path, suitable for a concise usage error. */

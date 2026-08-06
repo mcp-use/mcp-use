@@ -5,11 +5,7 @@
 import type { Plugin } from "vite";
 
 import type { DiscoveredView } from "./views.js";
-import {
-  VIRTUAL_VIEW_PREFIX,
-  VIRTUAL_VIEW_RESOLVED_PREFIX,
-  virtualViewId,
-} from "./views.js";
+import { VIRTUAL_VIEW_PREFIX, VIRTUAL_VIEW_RESOLVED_PREFIX } from "./views.js";
 
 const VIRTUAL_TAILWIND_ID = "virtual:mcp-use/tailwind.css";
 const VIRTUAL_TAILWIND_RESOLVED_ID = `\0${VIRTUAL_TAILWIND_ID}`;
@@ -33,7 +29,7 @@ export const VIEW_REACT_OPTIMIZE_DEPS = {
  *
  * @internal
  */
-export interface McpUseViewsPluginOptions {
+interface McpUseViewsPluginOptions {
   /** Static list or live getter (dev rediscovery). */
   getViews: () => DiscoveredView[];
   /**
@@ -146,19 +142,4 @@ export function mcpUseViewsPlugin(options: McpUseViewsPluginOptions): Plugin {
       return lines.join("\n");
     },
   };
-}
-
-/**
- * Rollup input map for a client views build (one entry per view).
- *
- * @internal
- */
-export function clientBuildInputs(
-  views: DiscoveredView[]
-): Record<string, string> {
-  const input: Record<string, string> = {};
-  for (const view of views) {
-    input[view.name] = virtualViewId(view.name);
-  }
-  return input;
 }

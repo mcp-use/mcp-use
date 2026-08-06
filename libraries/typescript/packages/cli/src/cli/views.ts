@@ -17,7 +17,7 @@ import {
 } from "./next-compat.js";
 
 /** Author-facing view source directory at the project root. */
-export const VIEWS_SOURCE_DIR = "views" as const;
+const VIEWS_SOURCE_DIR = "views" as const;
 
 /** Prefix for per-view virtual entry modules (`virtual:mcp-use/views/<name>`). */
 export const VIRTUAL_VIEW_PREFIX = "virtual:mcp-use/views/";
@@ -100,7 +100,7 @@ export function virtualViewId(name: string): string {
  *
  * @internal
  */
-export function devVirtualEntryPath(name: string): string {
+function devVirtualEntryPath(name: string): string {
   return `/@id/__x00__${VIRTUAL_VIEW_PREFIX}${name}`;
 }
 

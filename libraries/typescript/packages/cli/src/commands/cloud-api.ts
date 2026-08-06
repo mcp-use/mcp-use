@@ -21,7 +21,7 @@ export interface CloudOrganization {
 }
 
 /** Persisted cloud CLI state. */
-export interface CloudConfig {
+interface CloudConfig {
   /** Cloud API key. */
   apiKey?: string;
   /** Active organization id. */
@@ -33,7 +33,7 @@ export interface CloudConfig {
 }
 
 /** Authentication response normalized for CLI consumers. */
-export interface CloudIdentity {
+interface CloudIdentity {
   /** User id. */
   userId: string;
   /** User email address. */

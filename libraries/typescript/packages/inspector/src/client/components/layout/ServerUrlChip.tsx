@@ -21,7 +21,7 @@ function formatUrlChipLabel(url: string): string {
   }
 }
 
-export interface ServerUrlChipTunnelPopover {
+interface ServerUrlChipTunnelPopover {
   mcpUrl: string;
   onStop: () => void | Promise<void>;
   open: boolean;
