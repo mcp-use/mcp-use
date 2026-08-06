@@ -1,5 +1,16 @@
 # @mcp-use/agent
 
+## 2.0.2-canary.2
+
+### Patch Changes
+
+- 6985d78: chore: clear unused TypeScript export surface flagged by knip
+
+  Trim internal barrels, drop dead stubs and duplicate re-exports, and un-export file-local helpers so knip reports a clean export graph without changing published package entry APIs.
+
+- Updated dependencies [6985d78]
+  - @mcp-use/client@2.0.2-canary.2
+
 ## 2.0.2-canary.1
 
 ### Patch Changes

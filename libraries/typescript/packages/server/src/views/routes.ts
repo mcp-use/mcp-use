@@ -139,14 +139,3 @@ export function createViewPublicHandler(
     });
   };
 }
-
-/**
- * @deprecated Use {@link createViewPublicHandler}.
- *
- * @internal
- */
-export function mountViewRoutes(): void {
-  throw new Error(
-    "mountViewRoutes(app) was removed — use createViewPublicHandler"
-  );
-}

@@ -1,7 +1,7 @@
 {
   "name": "@mcp-use/cli",
   "type": "module",
-  "version": "4.0.2-canary.1",
+  "version": "4.0.2-canary.3",
   "description": "Prebuilt CLI, development server, and build pipeline for mcp-use",
   "author": "mcp-use, Inc.",
   "license": "MIT",
@@ -39,8 +39,10 @@
     "node": ">=22.22.2"
   },
   "scripts": {
-    "build": "rimraf dist && tsup --config tsup.config.ts && node scripts/verify-package.mjs",
-    "test": "node --test tests/proxy.test.mjs"
+    "build": "rimraf dist && tsup --config tsup.config.ts && node scripts/copy-third-party-licenses.mjs && node scripts/verify-package.mjs",
+    "test": "node --test tests/proxy.test.mjs && vitest run",
+    "test:run": "npm run typecheck && npm test",
+    "typecheck": "tsc -p tsconfig.test.json"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.2.0",
@@ -61,10 +63,20 @@
     }
   },
   "devDependencies": {
+    "@mcp-use/client": "workspace:*",
+    "@mcp-use/tunnel": "workspace:*",
+    "@modelcontextprotocol/client": "2.0.0",
     "@modelcontextprotocol/server": "2.0.0",
+    "@types/node": "^22.20.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "rimraf": "^6.1.3",
     "tsup": "^8.5.1",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.9",
+    "zod": "^4.4.3"
   },
   "publishConfig": {
     "access": "public"

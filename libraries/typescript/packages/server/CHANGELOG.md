@@ -1,5 +1,37 @@
 # mcp-use
 
+## 2.0.5-canary.3
+
+### Patch Changes
+
+- 668a312: Publish the authenticated WebSocket tunnel client as a standalone package and
+  bundle the same implementation into `mcp-use dev/start --tunnel`. This removes
+  native tunnel binaries and adds bounded HTTP, streaming, MCP JSON-RPC, and
+  public WebSocket forwarding without adding a runtime dependency to `mcp-use`.
+- Updated dependencies [668a312]
+  - @mcp-use/cli@4.0.2-canary.3
+  - @mcp-use/inspector@20.0.5-canary.3
+
+## 2.0.5-canary.2
+
+### Patch Changes
+
+- e0ac78e: Move the CLI implementation and its tests into `@mcp-use/cli` while preserving the existing `mcp-use` command and server API.
+- Updated dependencies [e0ac78e]
+  - @mcp-use/cli@4.0.2-canary.2
+  - @mcp-use/inspector@20.0.5-canary.2
+
+## 2.0.5-canary.1
+
+### Patch Changes
+
+- 6985d78: chore: clear unused TypeScript export surface flagged by knip
+
+  Trim internal barrels, drop dead stubs and duplicate re-exports, and un-export file-local helpers so knip reports a clean export graph without changing published package entry APIs.
+
+- Updated dependencies [6985d78]
+  - @mcp-use/inspector@20.0.5-canary.1
+
 ## 2.0.5-canary.0
 
 ### Patch Changes
@@ -325,7 +357,7 @@
 
 - a3d8591: Make Inspector connection modes authoritative for MCP proxy routing. Auto mode now attempts a direct browser connection before falling back to the configured CORS proxy, Direct mode never uses or falls back to the proxy, and Proxy mode uses it immediately. Clear stale proxy settings when an existing Inspector connection changes modes, keep the server's built-in Inspector on direct origin-level OAuth metadata discovery when no proxy backend is mounted, bypass the browser HTTP cache for OAuth metadata so Origin-specific CORS responses cannot be reused across Inspector origins, make the server-tile Authenticate action clear stored OAuth discovery before starting a fresh flow, and discard authorization-server-generated client secrets from public browser DCR results instead of persisting them.
 - b4c192e: Enable localhost managed inspector chat via browser MCPAgent and the cloud LLM proxy. Anonymous users must sign in; authenticated usage draws from Autumn `llm_tokens` credits.
-- c6043e4: Replace the packaged bore tunnel client with the hosted WebSocket relay used by `mcp-use dev --tunnel` and `mcp-use start --tunnel`.
+- c6043e4: Replace the packaged native TCP tunnel client with the hosted WebSocket relay used by `mcp-use dev --tunnel` and `mcp-use start --tunnel`.
 
   This removes the native tunnel binary and its runtime dependencies while preserving named tunnel reuse, Inspector access, MCP App props, and Vite HMR through the public tunnel. Relay keepalives and same-reservation reattachment keep tunnel URLs stable across transient disconnects and Worker deployments without consuming the tunnel creation quota.
 
@@ -439,7 +471,7 @@
 
 ### Patch Changes
 
-- c6043e4: Replace the packaged bore tunnel client with the hosted WebSocket relay used by `mcp-use dev --tunnel` and `mcp-use start --tunnel`.
+- c6043e4: Replace the packaged native TCP tunnel client with the hosted WebSocket relay used by `mcp-use dev --tunnel` and `mcp-use start --tunnel`.
 
   This removes the native tunnel binary and its runtime dependencies while preserving named tunnel reuse, Inspector access, MCP App props, and Vite HMR through the public tunnel. Relay keepalives and same-reservation reattachment keep tunnel URLs stable across transient disconnects and Worker deployments without consuming the tunnel creation quota.
   - @mcp-use/inspector@20.0.0-beta.59

@@ -1,7 +1,7 @@
 {
   "name": "mcp-use",
   "type": "module",
-  "version": "2.0.5-canary.0",
+  "version": "2.0.5-canary.3",
   "description": "MCP framework and CLI built on the official v2 SDK",
   "author": "mcp-use, Inc.",
   "license": "MIT",
@@ -77,7 +77,8 @@
     },
     "./node": {
       "types": "./dist/node-bridge.d.ts",
-      "import": "./dist/node-bridge.js"
+      "import": "./dist/node-bridge.js",
+      "default": "./dist/node-bridge.js"
     },
     "./next": {
       "types": "./dist/next/index.d.ts",
@@ -133,20 +134,15 @@
   },
   "devDependencies": {
     "@mcp-use/client": "workspace:*",
-    "@tailwindcss/vite": "^4.2.0",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^22.20.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.3",
     "es-module-lexer": "^2.3.0",
     "happy-dom": "^20.10.6",
-    "mcp-use": "workspace:*",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "tailwindcss": "^4.2.0",
     "typescript": "^7.0.2",
-    "vite": "^8.0.16",
     "vitest": "^4.1.9",
     "zod": "^4.4.3"
   },

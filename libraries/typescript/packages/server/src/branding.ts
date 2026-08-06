@@ -53,9 +53,7 @@ function isLocalPublicSource(source: string): boolean {
  *
  * @internal
  */
-export function selectFaviconFromIcons(
-  icons: readonly Icon[]
-): Icon | undefined {
+function selectFaviconFromIcons(icons: readonly Icon[]): Icon | undefined {
   return icons[0];
 }
 
