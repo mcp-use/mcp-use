@@ -2,7 +2,7 @@
 
 **Status:** Implemented.
 **Scope:** the complete first-party `mcp-use` CLI: `dev`, `build`, `typecheck`, `start`, cloud auth, organizations, servers, deployments, deploy, client, and screenshot; plus optional Inspector mounting in `dev` and production `start`.
-**Package:** `mcp-use@2`, published from `packages/server`. The package owns the bin, runtime, command chunks, and toolchain. The development Inspector remains independently published. There is no separate CLI implementation, devkit, or config package. `@mcp-use/cli@4` is a compatibility-only proxy for the historical install command.
+**Packages:** `mcp-use@2`, published from `packages/server`, owns the server API, runtime, and a tiny compatibility bin. `@mcp-use/cli@4`, published from `packages/cli`, owns the executable implementation, command chunks, and toolchain. `mcp-use` installs the CLI and delegates its bin to it, so the normal `mcp-use` installation and command remain unchanged. The development Inspector remains independently published.
 
 ## Goals
 
@@ -41,18 +41,19 @@ export default server;
 
 ## Command surface
 
-The first-party command contract belongs to `mcp-use`:
+The first-party command contract is exposed as `mcp-use` and implemented by `@mcp-use/cli`:
 
 - Runtime and toolchain: `dev`, `build`, `typecheck`, `start`.
 - Cloud identity: `login`, `logout`, `whoami`.
 - Cloud resources: `org`, `servers`, `deployments`, `deploy`.
 - Local and integration workflows: `client`, `screenshot`.
 
-For users and automation that still invoke `npx @mcp-use/cli`, the separately
-published `@mcp-use/cli@4` package contains only a bin shim. It depends on the
-matching `mcp-use@2` release and delegates to the framework's shipped binary.
-It owns no command code or behavior; `mcp-use` remains the canonical
-package and executable implementation.
+The separately published `@mcp-use/cli@4` package also supports direct
+`npx @mcp-use/cli` invocation. It contains the command implementation and has
+no runtime dependency on `mcp-use`; commands load the user's installed server
+package through the selected project when needed. This one-way dependency
+keeps the server package usable in edge runtimes without evaluating Node-only
+CLI implementation code.
 
 There are no `ls`, `rm`, `switch`, or `install` aliases in v2 alpha. The accepted names below are the complete public surface. Cloud commands use native `fetch`, filesystem, and child-process APIs where adequate. Command-local parsing uses `node:util.parseArgs`; the package does not recreate a global Commander tree.
 
@@ -207,7 +208,7 @@ The framework bin is a tiny proxy to the prebuilt `@mcp-use/cli` package. `@mcp-
 
 `mcp-use/dist/index.js`, `mcp-use/dist/react/index.js`, and the CLI `start` dispatch chunk have no static import path to Vite. The `start` dispatch chunk is an edge-safe dynamic bridge: its static graph also contains no Node builtins, Client SDK, v1 SDK, or unrelated command. The Node-only production listener is loaded only after `start` is invoked. Vite imports live only in the CLI command chunks that use them; `dev` and `build` are separate so loading one does not evaluate the other. Structural build-output tests enforce these boundaries rather than relying on source naming.
 
-`mcp-use` owns the server build configuration. When views are present, it loads the project's optional `vite.config.*` for the views client environment only, then injects the framework's built-in Tailwind, React, and views plugins. Every virtual view entry imports the framework's virtual Tailwind stylesheet, so utility classes work without a project CSS import, dependency, or config. A project config is only for additional client plugins and aliases and cannot alter the server build.
+`@mcp-use/cli` owns the server build configuration. When views are present, it loads the project's optional `vite.config.*` for the views client environment only, then injects the framework's built-in Tailwind, React, and views plugins. Every virtual view entry imports the framework's virtual Tailwind stylesheet, so utility classes work without a project CSS import, dependency, or config. A project config is only for additional client plugins and aliases and cannot alter the server build.
 
 Vite is a **regular dependency** of `@mcp-use/cli`, which is a regular dependency of `mcp-use`:
 
@@ -238,7 +239,7 @@ Target user `package.json` shape:
 }
 ```
 
-**Workspace self-reference.** Until cutover, `packages/server/package.json` and in-workspace fixtures use the private name `mcp-use`; its self-referencing devDependency is `"mcp-use": "workspace:*"`. Clean-pack tests rewrite/publish the candidate as `mcp-use` and exercise the target public imports from an external temporary project. Relative fixture imports and test-only Vite aliases are forbidden because they bypass package resolution.
+**Workspace package resolution.** CLI fixtures receive a local `node_modules/mcp-use` link to the workspace server package, reproducing an installed consumer without adding a circular CLI-to-server workspace dependency. Clean-pack tests publish the candidate as `mcp-use` and exercise the public imports from an external temporary project. Relative fixture imports and test-only Vite aliases are forbidden because they bypass package resolution.
 
 ## Workspace layout (`.mcp-use/`)
 
@@ -258,18 +259,18 @@ This contract writes `build/` (using `cache/` as Vite's `cacheDir`), `state/tunn
 Rules, all inherited from v1 and locked:
 
 - **No config file.** There is deliberately no `mcp-use.json` and no `outDir` knob: runtime/project configuration lives on the `MCPServer` constructor (tooling reads it by importing the entry and introspecting the instance); the `.mcp-use/` layout is fixed convention, not configuration.
-- **Same names, re-declared.** The manifest basename is `manifest.json` (v1's `BUILD_MANIFEST_NAME`), the workspace dir `.mcp-use` (v1's `WORKSPACE_DIR_NAME`). `src/cli/workspace.ts` **re-declares** these constants itself — it must not import them from the old `mcp-use` package (no dependency on the old package).
+- **Same names, re-declared.** The manifest basename is `manifest.json` (v1's `BUILD_MANIFEST_NAME`), the workspace dir `.mcp-use` (v1's `WORKSPACE_DIR_NAME`). `packages/cli/src/cli/workspace.ts` **re-declares** these constants itself — it must not import them from the server package.
 - **Per-project, not global.** Project build/linkage state lives in `.mcp-use/`; cloud identity and saved-client state live in the explicitly owned global paths under `~/.mcp-use/` defined above. Neither side scans or writes outside its declared paths.
 
 ## Commands
 
-### `mcp-use typecheck` (in `src/cli/typecheck.ts`, dispatched from the bin)
+### `mcp-use typecheck` (in `packages/cli/src/cli/typecheck.ts`, dispatched from the bin)
 
 Discovers the server entry with the same `--path`, `--entry`, and `--mcp-dir` rules as `dev`/`build`, reconciles the managed root `mcp-env.d.ts`, then resolves `typescript` from the selected project and invokes its `tsc` binary with `--noEmit`. This preserves the project's compiler version and plugins; the CLI does not bundle TypeScript. Arguments after `--` are forwarded to `tsc`, and the command returns the compiler's exit code. A clean run prints `[mcp-use] no type errors (<duration>ms)` to stdout, because `tsc --noEmit` is otherwise silent on success and a silent exit is indistinguishable from a hang. Failing runs add nothing to the compiler's own diagnostics. Missing TypeScript or entry discovery failures exit `1` with an actionable error.
 
 The command does not inspect or execute the server and does not generate tool-specific types. Its only type preparation is keeping the constant `typeof import("./entry.js")` bridge current. Templates commit that bridge, so editor typechecking and a direct `tsc --noEmit` also work before any mcp-use command has run. No install or postinstall lifecycle hook is involved.
 
-### `mcp-use build` (in `src/cli/build.ts`, dispatched from the bin)
+### `mcp-use build` (in `packages/cli/src/cli/build.ts`, dispatched from the bin)
 
 Vite emits the server bundle to `.mcp-use/build/` with `ssr: { external: true }`: every bare import stays external and resolves from `node_modules` at runtime; only the user's source is bundled. Output is unminified ESM targeting the package's Node floor. `--source-maps` emits the server map and external view maps; inline view maps remain disabled to keep inline resources free of source payload and external map dependencies. When views exist, `VIEWS_SPEC.md` adds one client build per view plus a generated server wrapper that embeds the view asset registry.
 
@@ -290,7 +291,7 @@ When `MCP_ASSETS_URL` is set during a default external views build, the embedded
 
 The build is transpile-only and does not run a typecheck. First-party templates expose `mcp-use typecheck` as their project-owned `typecheck` script.
 
-### `mcp-use dev` (in `src/cli/dev.ts`, dispatched from the bin)
+### `mcp-use dev` (in `packages/cli/src/cli/dev.ts`, dispatched from the bin)
 
 A single long-lived process. It:
 
@@ -343,7 +344,7 @@ The Inspector is development tooling by default. `mcp-use` installs the optimize
 
 Both embedded mounts (`mcp-use dev` and `mcp-use start --with-inspector`) forward the `MANUFACT_CHAT_URL` environment variable to `mountInspector`, which injects it as `window.__MANUFACT_CHAT_URL__` so the hosted-chat endpoint is configured at runtime without rebuilding the Inspector bundle. When it is unset, the Inspector falls back to its build-time default.
 
-`mcp-use dev` resolves a project-declared Inspector override first and otherwise loads the framework dependency, calls `mountInspector({ basePath, autoConnectUrl, devMode: true, oauthProxyAllowLoopback, manufactChatUrl })`, and dispatches `${basePath}/inspector/**` to the returned Fetch handler before the MCP handler. The handler is rebuilt atomically when a successful entry reload changes `basePath`. The Inspector package exclusively owns its bundled UI assets, Hono implementation, MCP relay, OAuth BFF, callback, and health/config routes; `mcp-use` owns loading, route delegation, tunnel controls, and browser lifecycle.
+`mcp-use dev` resolves a project-declared Inspector override first and otherwise loads the framework dependency, calls `mountInspector({ basePath, autoConnectUrl, devMode: true, oauthProxyAllowLoopback, manufactChatUrl })`, and dispatches `${basePath}/inspector/**` to the returned Fetch handler before the MCP handler. The handler is rebuilt atomically when a successful entry reload changes `basePath`. The Inspector package exclusively owns its bundled UI assets, Hono implementation, MCP relay, OAuth BFF, callback, and health/config routes; `@mcp-use/cli` owns loading, route delegation, tunnel controls, and browser lifecycle.
 
 The returned mount serves the exact UI bundle shipped in the installed package under `${basePath}/inspector/assets/**`; it never resolves jsDelivr or honors a CDN override. Thus local development works offline after dependency installation and the UI/backend contract cannot drift independently of the lockfile.
 

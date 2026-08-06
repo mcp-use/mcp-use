@@ -20,8 +20,10 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync } from "node:fs";
 import { createServer as createNodeServer } from "node:http";
+import { createRequire } from "node:module";
 import { networkInterfaces } from "node:os";
 import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { createServer, createServerModuleRunner } from "vite";
@@ -742,8 +744,24 @@ export async function runDev(options: DevOptions): Promise<void> {
     }
   );
 
-  // Vendored Node bridge — same adapter serve() used internally.
-  const { toNodeHandler } = await import("../node-bridge.js");
+  const projectRequire = createRequire(join(options.cwd, "package.json"));
+  let nodeBridgeEntry: string;
+  try {
+    nodeBridgeEntry = projectRequire.resolve("mcp-use/node");
+  } catch (error) {
+    throw new Error(
+      "Could not resolve mcp-use/node from the selected project. Install " +
+        "mcp-use in the project before running mcp-use dev.",
+      { cause: error }
+    );
+  }
+  const { toNodeHandler } = (await import(
+    pathToFileURL(nodeBridgeEntry).href
+  )) as {
+    toNodeHandler(handler: {
+      fetch: WebHandler;
+    }): (req: IncomingMessage, res: ServerResponse) => Promise<void>;
+  };
   const nodeListener = toNodeHandler({ fetch: devFetch });
 
   const onRequest = (req: IncomingMessage, res: ServerResponse): void => {

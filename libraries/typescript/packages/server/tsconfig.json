@@ -28,9 +28,6 @@
     "node_modules",
     "dist",
     "**/*.test.ts",
-    "src/bin.ts",
-    "src/bin/**/*",
-    "src/cli/**/*",
-    "src/commands/**/*"
+    "src/bin.ts"
   ]
 }

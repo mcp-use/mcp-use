@@ -18,7 +18,6 @@ import {
 } from "../../src/cli/index.js";
 import { mcpUseViewsPlugin } from "../../src/cli/views-plugin.js";
 import { VIRTUAL_VIEW_RESOLVED_PREFIX } from "../../src/cli/views.js";
-import { synthesizeViewDocument } from "../../src/views/document.js";
 import { bindBasicToolToView, copyFixture, removeDir } from "./helpers.js";
 
 const UI_META = {
@@ -675,25 +674,6 @@ describe("runBuild (views)", () => {
     expect(text).toContain("<style>");
     expect(text).not.toContain("/_mcp-use/views/product-search-result/");
   }, 60_000);
-
-  it("escapes </script> in legacy inline module source", () => {
-    const html = synthesizeViewDocument(
-      {
-        kind: "inline",
-        js: 'const s = "</script>"; console.log(s);',
-        css: "",
-      },
-      "https://example.com",
-      "/mcp"
-    );
-    const moduleMatch = html.match(
-      /<script type="module">([\s\S]*?)<\/script>\s*<\/body>/
-    );
-    expect(moduleMatch).not.toBeNull();
-    const body = moduleMatch![1]!;
-    expect(body).not.toContain("</script>");
-    expect(body).toContain("<\\/script>");
-  });
 
   it("builds a view that contains </script> in source as external assets", async () => {
     const cwd = copyFixture("build-views-escape", "views");

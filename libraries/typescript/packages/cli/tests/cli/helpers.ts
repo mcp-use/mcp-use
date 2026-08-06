@@ -5,6 +5,7 @@ import {
   mkdirSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { createServer, type Server } from "node:net";
@@ -12,6 +13,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
+const serverPackageRoot = join(here, "..", "..", "..", "server");
 
 /** Absolute path to the committed basic fixture project. */
 export const FIXTURE_BASIC = join(here, "fixtures", "basic");
@@ -20,16 +22,10 @@ export const FIXTURE_BASIC = join(here, "fixtures", "basic");
 export const FIXTURE_VIEWS = join(here, "fixtures", "views");
 
 /**
- * Scratch root for mutable fixture copies. Lives inside the package (not the
- * OS tmpdir) so node resolution of externalized bare imports still walks up
- * into `packages/server/node_modules` — where `mcp-use` declares
- * itself as a `devDependency` (see package.json) purely so pnpm links a real
- * `node_modules/mcp-use` → package-root symlink there. That entry is
- * what lets the fixture's own `import "mcp-use"` (and this package's
- * `runBuild`/`runDev`, which build/serve the fixture as if it were an
- * ordinary user project) resolve during both Vite/Rolldown bundling and
- * `tsc` typechecking of `tests/cli/fixtures/basic/`, neither of which
- * implements Node's own package self-reference algorithm.
+ * Scratch root for mutable fixture copies. Each copy receives a local
+ * `node_modules/mcp-use` link, matching the package layout of an installed
+ * consumer without creating a workspace dependency cycle between the CLI and
+ * server packages.
  */
 export const TMP_ROOT = join(here, ".tmp");
 
@@ -42,6 +38,9 @@ export function copyFixture(
   const dest = join(TMP_ROOT, `${label}-${randomBytes(4).toString("hex")}`);
   mkdirSync(dest, { recursive: true });
   cpSync(source, dest, { recursive: true });
+  const nodeModules = join(dest, "node_modules");
+  mkdirSync(nodeModules, { recursive: true });
+  symlinkSync(serverPackageRoot, join(nodeModules, "mcp-use"), "junction");
   return dest;
 }
 
