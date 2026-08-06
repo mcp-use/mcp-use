@@ -2,7 +2,7 @@ import type { LlmDriver } from "./driver.js";
 import { runToolLoop, runToolLoopNonStreaming } from "./toolLoop.js";
 import type { LlmStreamEvent, ProviderMessage, ProviderTool } from "./types.js";
 
-export interface NativeRunOptions {
+interface NativeRunOptions {
   messages: ProviderMessage[];
   tools: ProviderTool[];
   callTool: (name: string, args: Record<string, unknown>) => Promise<unknown>;
@@ -10,7 +10,7 @@ export interface NativeRunOptions {
   signal?: AbortSignal;
 }
 
-export interface AgentStep {
+interface AgentStep {
   action: {
     tool: string;
     toolInput: Record<string, unknown>;

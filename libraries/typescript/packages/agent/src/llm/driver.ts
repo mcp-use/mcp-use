@@ -54,7 +54,7 @@ export function createLlmDriver(config: ProviderConfig): LlmDriver {
 }
 
 /** Raw fetch + SSE/NDJSON providers (non-OpenAI and legacy proxy paths). */
-export class RestLlmDriver implements LlmDriver {
+class RestLlmDriver implements LlmDriver {
   constructor(private readonly config: ProviderConfig) {}
 
   stream(

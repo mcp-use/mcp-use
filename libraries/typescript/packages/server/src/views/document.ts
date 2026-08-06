@@ -13,7 +13,7 @@ import type { ViewManifestEntry } from "./types.js";
  * @returns Absolute URL `${origin}${assetPath}`.
  * @throws When `assetPath` does not start with `/`.
  */
-export function resolveAssetUrl(assetPath: string, origin: string): string {
+function resolveAssetUrl(assetPath: string, origin: string): string {
   if (!assetPath.startsWith("/")) {
     throw new Error(
       `View manifest asset path must be origin-absolute (start with "/"); got ${JSON.stringify(assetPath)}`
@@ -41,7 +41,7 @@ export function viewAssetsBasePath(basePath: string, viewName: string): string {
  * @param basePath - MCP mount prefix.
  * @param viewName - View directory / registry key (required for view-relative paths).
  */
-export function resolveExternalAssetUrl(
+function resolveExternalAssetUrl(
   assetPath: string,
   assetsBase: string,
   basePath: string,
@@ -67,10 +67,7 @@ export function resolveExternalAssetUrl(
  * @param basePath - MCP mount prefix (e.g. `/mcp`).
  * @returns Absolute prefix with trailing slash.
  */
-export function resolvePublicBase(
-  assetsBase: string,
-  basePath: string
-): string {
+function resolvePublicBase(assetsBase: string, basePath: string): string {
   return `${assetsBase}${pathUnderBase(basePath, "_mcp-use/public")}/`;
 }
 

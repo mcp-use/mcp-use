@@ -37,7 +37,7 @@ const REQUEST_ID_BYTES = 36;
  * @remarks
  * Override with `MCP_USE_TUNNEL_API` when testing another relay deployment.
  */
-export function tunnelApiBase(): string {
+function tunnelApiBase(): string {
   return process.env["MCP_USE_TUNNEL_API"] ?? DEFAULT_TUNNEL_API;
 }
 

@@ -34,7 +34,7 @@ export interface ProjectInspectorModule {
 }
 
 /** Result of resolving the optional project-local Inspector package. */
-export type ProjectInspectorLoadResult =
+type ProjectInspectorLoadResult =
   | { installed: true; module: ProjectInspectorModule }
   | { installed: false };
 

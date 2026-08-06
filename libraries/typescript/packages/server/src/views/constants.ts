@@ -5,7 +5,7 @@ export const UI_EXTENSION_ID = "io.modelcontextprotocol/ui" as const;
 export const UI_MIME_TYPE = "text/html;profile=mcp-app" as const;
 
 /** URI scheme prefix for view resources (`ui://views/<name>.html`). */
-export const UI_RESOURCE_URI_PREFIX = "ui://views/" as const;
+const UI_RESOURCE_URI_PREFIX = "ui://views/" as const;
 
 /** Nested `_meta` key for UI metadata on tools and resources. */
 export const UI_META_KEY = "ui" as const;

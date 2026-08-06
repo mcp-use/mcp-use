@@ -2,10 +2,10 @@ import type { App } from "@modelcontextprotocol/ext-apps";
 import type { ContentBlock } from "@modelcontextprotocol/server";
 
 /** Model-visible state owned by one mounted view runtime. */
-export type ViewState = Record<string, unknown>;
+type ViewState = Record<string, unknown>;
 
 /** Reserved field carrying the serialized {@link ModelContext} tree. */
-export const UI_CONTEXT_KEY = "_uiContext" as const;
+const UI_CONTEXT_KEY = "_uiContext" as const;
 
 interface ModelContextNode {
   id: string;
@@ -39,13 +39,13 @@ interface OpenAiSetGlobalsEvent extends Event {
 }
 
 /** Complete model-visible snapshot sent on every update. */
-export interface ModelContextParams {
+interface ModelContextParams {
   structuredContent: ViewState & { [UI_CONTEXT_KEY]: string };
   content: ContentBlock[];
 }
 
 /** Narrow runtime surface used by the shared state/context flush pump. */
-export interface ModelContextStoreHost {
+interface ModelContextStoreHost {
   /** Connect once, or return the cached in-flight / settled connection promise. */
   connect(): Promise<App>;
 }
@@ -54,7 +54,7 @@ export interface ModelContextStoreHost {
 let warnedModelContextUnsupported = false;
 
 /** Mark that the missing-capability warning has been emitted. */
-export function markModelContextUnsupportedWarned(): boolean {
+function markModelContextUnsupportedWarned(): boolean {
   if (warnedModelContextUnsupported) {
     return false;
   }
@@ -63,7 +63,7 @@ export function markModelContextUnsupportedWarned(): boolean {
 }
 
 /** Reset the missing-capability warn-once flag between tests. */
-export function _resetModelContextForTesting(): void {
+function _resetModelContextForTesting(): void {
   warnedModelContextUnsupported = false;
 }
 

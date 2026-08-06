@@ -38,12 +38,12 @@ function readEnvDomains(name: string): string[] | undefined {
 }
 
 /** Domains from `CSP_URLS` (shortcut for all categories). */
-export function readCspUrlsShortcut(): string[] {
+function readCspUrlsShortcut(): string[] {
   return readEnvDomains("CSP_URLS") ?? [];
 }
 
 /** Per-category env override, or `CSP_URLS` when the category var is unset. */
-export function readEnvDomainsForCategory(category: CspCategory): string[] {
+function readEnvDomainsForCategory(category: CspCategory): string[] {
   const perCategory = readEnvDomains(CATEGORY_ENV[category]);
   if (perCategory !== undefined) {
     return perCategory;
