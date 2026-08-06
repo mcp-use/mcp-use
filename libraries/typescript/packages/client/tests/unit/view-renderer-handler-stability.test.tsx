@@ -10,6 +10,66 @@ import type {
 } from "../../src/react/view/types.js";
 
 describe("ViewRenderer handler stability", () => {
+  it("routes iframe console records without forwarding them to the app bridge", async () => {
+    const source: ViewRendererSource = {
+      kind: "preloaded",
+      html: "<html><body>widget</body></html>",
+    };
+    const sandboxWindow = {} as Window;
+    const onLog = vi.fn();
+    const downstreamListener = vi.fn();
+    let renderer!: ReactTestRenderer;
+
+    window.addEventListener("message", downstreamListener);
+    try {
+      await act(async () => {
+        renderer = create(
+          <ViewRenderer
+            viewId="console-message-test"
+            source={source}
+            sandboxUrl={new URL("https://sandbox.example/widget")}
+            onLog={onLog}
+          />,
+          {
+            createNodeMock: (element) =>
+              element.type === "iframe"
+                ? {
+                    contentWindow: sandboxWindow,
+                    setAttribute: vi.fn(),
+                    src: "",
+                  }
+                : {},
+          }
+        );
+      });
+
+      const event = new MessageEvent("message", {
+        data: {
+          type: "iframe-console-log",
+          level: "error",
+          args: ["widget failure"],
+        },
+        origin: "https://sandbox.example",
+      });
+      Object.defineProperty(event, "source", { value: sandboxWindow });
+
+      await act(async () => {
+        window.dispatchEvent(event);
+      });
+
+      expect(onLog).toHaveBeenCalledWith({
+        level: "error",
+        data: ["widget failure"],
+      });
+      expect(downstreamListener).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener("message", downstreamListener);
+      await act(async () => {
+        renderer?.unmount();
+      });
+    }
+  });
+
   it("does not restart the bridge when a configured handler changes identity", async () => {
     const source: ViewRendererSource = {
       kind: "preloaded",
