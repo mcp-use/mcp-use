@@ -32,6 +32,15 @@ if (!existsSync(join(root, "types", "vite-client.d.ts"))) {
 if (files.some((file) => file.endsWith(".map"))) {
   throw new Error("CLI package must not publish source maps");
 }
+const javascript = files
+  .filter((file) => file.endsWith(".js"))
+  .map((file) => readFileSync(join(root, file), "utf8"));
+if (!javascript.some((source) => source.includes("api.tunnel.mcp-use.run"))) {
+  throw new Error("CLI package is missing bundled tunnel support");
+}
+if (javascript.some((source) => source.includes("@mcp-use/tunnel"))) {
+  throw new Error("CLI package must not require @mcp-use/tunnel at runtime");
+}
 
 function walk(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {

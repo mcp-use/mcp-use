@@ -25,7 +25,7 @@ import {
 // Controllable tunnel state. Tests flip `url` to pin the tunnel-gated CORS
 // contract on Vite module URLs.
 const tunnelState = vi.hoisted(() => ({ url: null as string | null }));
-vi.mock("../../src/cli/tunnel.js", () => ({
+vi.mock("@mcp-use/tunnel", () => ({
   createTunnelManager: () => ({
     start: async (port: number) => {
       tunnelState.url = `https://fake.local.mcp-use.run`;

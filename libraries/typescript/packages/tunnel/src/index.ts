@@ -1,9 +1,8 @@
 /**
- * Tunnel lifecycle for `mcp-use dev` and `mcp-use start`.
+ * Tunnel lifecycle shared by the embedded and standalone CLIs.
  *
- * The framework connects directly to the relay over WebSocket. No native
- * binary, package-runner subprocess, or separately installed tunnel package is
- * required.
+ * The client connects directly to the relay over WebSocket. No native binary
+ * or package-runner subprocess is required.
  */
 
 import http, {
@@ -14,7 +13,7 @@ import http, {
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-/** Default URL for the Durable Object tunnel relay. */
+/** Default URL for the managed tunnel relay. */
 const DEFAULT_TUNNEL_API = "https://api.tunnel.mcp-use.run";
 const SETUP_TIMEOUT_MS = 30_000;
 const MAX_CONTROL_MESSAGE_BYTES = 64 * 1024;
@@ -35,17 +34,23 @@ const REQUEST_ID_BYTES = 36;
  * Base URL of the tunnel relay.
  *
  * @remarks
- * Override with `MCP_USE_TUNNEL_API` when testing another relay deployment.
+ * Override with `MCP_USE_WS_RELAY` when testing another relay deployment.
  */
-function tunnelApiBase(): string {
-  return process.env["MCP_USE_TUNNEL_API"] ?? DEFAULT_TUNNEL_API;
+export function tunnelApiBase(override?: string): string {
+  const value =
+    override ?? process.env["MCP_USE_WS_RELAY"] ?? DEFAULT_TUNNEL_API;
+  const url = new URL(value);
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    throw new Error("Tunnel relay URL must use HTTP or HTTPS");
+  }
+  return url.toString();
 }
 
 /** On-disk shape of `.mcp-use/state/tunnel.json`. */
 interface TunnelStateFile {
   /** Last successfully assigned tunnel identifier. */
   subdomain: string;
-  /** Bearer credential used to reclaim and release the tunnel. */
+  /** Reservation authentication value. */
   token?: string;
   /** Relay WebSocket URL for reattaching after a transient disconnect. */
   connect_url?: string;
@@ -138,6 +143,14 @@ export interface TunnelManager {
   stop(): Promise<void>;
   /** Current tunnel public origin URL, or `null` when inactive. */
   status(): { url: string | null };
+}
+
+/** Options shared by embedded and standalone tunnel clients. */
+export interface TunnelManagerOptions {
+  /** Relay API origin. Defaults to `MCP_USE_WS_RELAY` or the production relay. */
+  relayUrl?: string;
+  /** Requested stable tunnel identifier. */
+  subdomain?: string;
 }
 
 const RESPAWN_BACKOFF_INITIAL_MS = 1_000;
@@ -273,16 +286,16 @@ async function parseRelayResponse<T>(response: Response): Promise<T> {
   return body as T;
 }
 
-async function reserveTunnel(subdomain?: string): Promise<TunnelReservation> {
-  const response = await fetch(
-    new URL("/api/tunnels/request", tunnelApiBase()),
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(subdomain === undefined ? {} : { subdomain }),
-      signal: AbortSignal.timeout(10_000),
-    }
-  );
+async function reserveTunnel(
+  relayBase: string,
+  subdomain?: string
+): Promise<TunnelReservation> {
+  const response = await fetch(new URL("/api/tunnels/request", relayBase), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(subdomain === undefined ? {} : { subdomain }),
+    signal: AbortSignal.timeout(10_000),
+  });
   const reservation = await parseRelayResponse<TunnelReservation>(response);
   if (
     typeof reservation.tunnel_id !== "string" ||
@@ -295,14 +308,14 @@ async function reserveTunnel(subdomain?: string): Promise<TunnelReservation> {
   return reservation;
 }
 
-async function releaseTunnel(state: TunnelStateFile): Promise<void> {
+async function releaseTunnel(
+  relayBase: string,
+  state: TunnelStateFile
+): Promise<void> {
   if (state.token === undefined) return;
   try {
     await fetch(
-      new URL(
-        `/api/tunnels/${encodeURIComponent(state.subdomain)}`,
-        tunnelApiBase()
-      ),
+      new URL(`/api/tunnels/${encodeURIComponent(state.subdomain)}`, relayBase),
       {
         method: "DELETE",
         headers: { authorization: `Bearer ${state.token}` },
@@ -718,9 +731,10 @@ function markIntentionalClose(socket: WebSocket): void {
 }
 
 /**
- * Create a tunnel manager backed by the Cloudflare relay.
+ * Create a tunnel manager backed by the managed relay.
  *
  * @param stateFilePath - Absolute `.mcp-use/state/tunnel.json` path.
+ * @param options - Optional relay and requested subdomain overrides.
  * @returns A manager shared by CLI startup and Inspector dev controls.
  *
  * @example
@@ -730,7 +744,11 @@ function markIntentionalClose(socket: WebSocket): void {
  * console.log(url);
  * ```
  */
-export function createTunnelManager(stateFilePath: string): TunnelManager {
+export function createTunnelManager(
+  stateFilePath: string,
+  options: TunnelManagerOptions = {}
+): TunnelManager {
+  const relayBase = tunnelApiBase(options.relayUrl);
   let connection: TunnelConnection | undefined;
   let currentUrl: string | null = null;
   let activePort: number | undefined;
@@ -831,7 +849,10 @@ export function createTunnelManager(stateFilePath: string): TunnelManager {
     requestedSubdomain?: string
   ): Promise<TunnelConnection> => {
     console.log(`[mcp-use] starting tunnel for port ${port}…`);
-    const reservation = await reserveTunnel(requestedSubdomain);
+    const reservation = await reserveTunnel(
+      relayBase,
+      options.subdomain ?? requestedSubdomain
+    );
     return attach(port, reservation);
   };
 
@@ -883,7 +904,7 @@ export function createTunnelManager(stateFilePath: string): TunnelManager {
           }
 
           const saved = await loadState();
-          if (saved !== undefined) await releaseTunnel(saved);
+          if (saved !== undefined) await releaseTunnel(relayBase, saved);
           reattachReservation = undefined;
           reattachFailures = 0;
 
@@ -935,11 +956,18 @@ export function createTunnelManager(stateFilePath: string): TunnelManager {
       const saved = await loadState();
       let next: TunnelConnection;
       const savedReservation = reservationFromState(saved);
-      if (savedReservation !== undefined) {
+      if (
+        savedReservation !== undefined &&
+        (options.subdomain === undefined ||
+          savedReservation.tunnel_id === options.subdomain)
+      ) {
         try {
           next = await attach(port, savedReservation);
         } catch {
-          await releaseTunnel(stateFromReservation(savedReservation));
+          await releaseTunnel(
+            relayBase,
+            stateFromReservation(savedReservation)
+          );
           next = await open(port, savedReservation.tunnel_id).catch(
             async () => {
               console.log(
@@ -950,7 +978,7 @@ export function createTunnelManager(stateFilePath: string): TunnelManager {
           );
         }
       } else {
-        if (saved !== undefined) await releaseTunnel(saved);
+        if (saved !== undefined) await releaseTunnel(relayBase, saved);
         try {
           next = await open(port, saved?.subdomain);
         } catch (error) {
@@ -981,7 +1009,7 @@ export function createTunnelManager(stateFilePath: string): TunnelManager {
       reattachReservation = undefined;
       reattachFailures = 0;
       if (releasable !== undefined) {
-        await releaseTunnel(stateFromReservation(releasable));
+        await releaseTunnel(relayBase, stateFromReservation(releasable));
       }
       if (active !== undefined) {
         markIntentionalClose(active.socket);

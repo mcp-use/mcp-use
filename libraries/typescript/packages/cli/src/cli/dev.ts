@@ -59,7 +59,9 @@ import {
   type ProjectInspectorModule,
 } from "./inspector.js";
 import { isInspectorPath, isInspectorRequest } from "./inspector-route.js";
-import { createTunnelManager } from "./tunnel.js";
+// Bundled into the CLI artifact without becoming a runtime dependency.
+// eslint-disable-next-line import/no-extraneous-dependencies
+import { createTunnelManager } from "@mcp-use/tunnel";
 import { syncMcpEnvDeclaration } from "./mcp-env-declaration.js";
 import { resolveWorkspacePaths } from "./workspace.js";
 import {

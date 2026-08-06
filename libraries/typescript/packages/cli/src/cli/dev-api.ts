@@ -3,7 +3,7 @@
  * handler — tunnel controls and session metadata for the inspector UI.
  */
 
-import type { TunnelManager } from "./tunnel.js";
+import type { TunnelManager } from "@mcp-use/tunnel";
 
 /** Web-standard request handler compatible with `MCPServer.fetch`. */
 type FetchHandler = (request: Request) => Promise<Response>;

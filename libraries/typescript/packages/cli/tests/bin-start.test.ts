@@ -23,7 +23,7 @@ const tunnelMocks = vi.hoisted(() => ({
   stop: vi.fn(),
 }));
 
-vi.mock("../src/cli/tunnel.js", () => ({
+vi.mock("@mcp-use/tunnel", () => ({
   createTunnelManager: tunnelMocks.create,
 }));
 
