@@ -5,7 +5,7 @@
  */
 
 import { existsSync, readdirSync } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import react from "@vitejs/plugin-react";
 import type { ViteDevServer } from "vite";
 
@@ -115,7 +115,11 @@ export function isViewPath(
   override?: string
 ): boolean {
   const viewsDir = resolveViewsDir(cwd, override);
-  return file === viewsDir || file.startsWith(`${viewsDir}/`);
+  const viewRelativePath = relative(viewsDir, resolve(file));
+  return (
+    viewRelativePath === "" ||
+    (!viewRelativePath.startsWith("..") && !isAbsolute(viewRelativePath))
+  );
 }
 
 /**
@@ -129,9 +133,7 @@ export function isViewEntryPath(
   override?: string
 ): boolean {
   const viewsDir = resolveViewsDir(cwd, override);
-  const viewsRel = file.startsWith(`${viewsDir}/`)
-    ? file.slice(viewsDir.length + 1)
-    : file;
+  const viewsRel = relative(viewsDir, resolve(file)).split(sep).join("/");
   return /^[^/]+\/view\.tsx$/.test(viewsRel);
 }
 

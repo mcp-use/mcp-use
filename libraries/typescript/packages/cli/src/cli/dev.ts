@@ -26,7 +26,7 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
-import { createServer, createServerModuleRunner } from "vite";
+import { createServer, createServerModuleRunner, normalizePath } from "vite";
 // Bundled into the lazy dev chunk; keeping this build input in devDependencies
 // prevents the standalone CLI from installing the full SDK dependency tree.
 // eslint-disable-next-line import/no-extraneous-dependencies
@@ -435,6 +435,11 @@ export async function runDev(options: DevOptions): Promise<void> {
       : [nextStandaloneCompatPlugin(options.cwd)],
     server: {
       middlewareMode: true,
+      // Windows file notifications can be coalesced or dropped while Vite is
+      // transforming the same module. Polling keeps dev reloads reliable.
+      ...(process.platform === "win32" && {
+        watch: { usePolling: true, interval: 100 },
+      }),
       // Absolute asset URLs in dev: without `origin`, Vite emits root-relative
       // paths that resolve against the host page inside srcdoc iframes.
       ...(viewsAtStartup && { origin: devOrigin }),
@@ -599,7 +604,9 @@ export async function runDev(options: DevOptions): Promise<void> {
     if (isViewPath(file, options.cwd, viewsDirectory)) {
       return;
     }
-    const modules = ssrEnvironment.moduleGraph.getModulesByFile(file);
+    const modules = ssrEnvironment.moduleGraph.getModulesByFile(
+      normalizePath(file)
+    );
     if (modules === undefined || modules.size === 0) {
       return;
     }

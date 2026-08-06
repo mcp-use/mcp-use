@@ -992,7 +992,9 @@ describe("runDev (views)", () => {
     expect(publicResponse.headers.get("cache-control")).toBe(
       "public, max-age=0, must-revalidate"
     );
-    expect(await publicResponse.text()).toBe("public-fixture\n");
+    expect(await publicResponse.text()).toBe(
+      readFileSync(join(cwd, "public", "test.txt"), "utf8")
+    );
 
     const docConfigMatch =
       /__mcpUseViewConfig=\{[^}]*"publicBase":"([^"]+)"/.exec(docHtml);

@@ -71,6 +71,7 @@ beforeEach(async () => {
   mocks.logger.level = "info";
   homeDirectory = await mkdtemp(join(tmpdir(), "mcp-use-client-"));
   vi.stubEnv("HOME", homeDirectory);
+  vi.stubEnv("USERPROFILE", homeDirectory);
   stdinTtyDescriptor = Object.getOwnPropertyDescriptor(process.stdin, "isTTY");
   setStdinTty(false);
 
