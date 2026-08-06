@@ -6,7 +6,11 @@ import { ManufactOAuthCallback } from "@/client/components/ManufactOAuthCallback
 import { OAuthCallback } from "@/client/components/OAuthCallback";
 import { Toaster } from "@/client/components/ui/sonner";
 import { ViewPreview } from "@/client/components/ViewPreview";
-import { McpClientProvider, type McpServer } from "@mcp-use/client/react";
+import {
+  McpClientProvider,
+  SKILLS_EXTENSION_ID,
+  type McpServer,
+} from "@mcp-use/client/react";
 import { useEffect, useMemo, useRef } from "react";
 import { Route, BrowserRouter as Router, Routes } from "react-router";
 import { toast } from "sonner";
@@ -148,6 +152,7 @@ function App() {
                   "io.modelcontextprotocol/ui": {
                     mimeTypes: ["text/html;profile=mcp-app"],
                   },
+                  [SKILLS_EXTENSION_ID]: {},
                 },
               },
             }}

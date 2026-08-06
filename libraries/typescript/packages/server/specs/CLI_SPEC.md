@@ -4,6 +4,29 @@
 **Scope:** the complete first-party `mcp-use` CLI: `dev`, `build`, `typecheck`, `start`, cloud auth, organizations, servers, deployments, deploy, client, and screenshot; plus optional Inspector mounting in `dev` and production `start`.
 **Packages:** `mcp-use@2`, published from `packages/server`, owns the server API, runtime, and a tiny compatibility bin. `@mcp-use/cli@4`, published from `packages/cli`, owns the executable implementation, command chunks, and toolchain. `mcp-use` installs the CLI and delegates its bin to it, so the normal `mcp-use` installation and command remain unchanged. The development Inspector remains independently published.
 
+## Skills lifecycle
+
+`dev` and `build` resolve the conventional skills directory alongside the MCP
+source root: `skills/` normally and `<mcp-dir>/skills` with `--mcp-dir`.
+Explicit `ServerConfig.skills.directory` values remain relative to the project
+root. The CLI imports the entry, lets the server apply config precedence, and
+validates a complete static snapshot before mounting or emitting output.
+Filesystem discovery and YAML parsing live exclusively in the CLI package.
+The audited parser is vendored and bundled into the CLI's private skills-loader
+entry; neither published package declares a YAML dependency.
+
+Development watches skill content as server input. A valid change swaps the
+whole server generation and publishes the ordinary resources-list change event;
+an invalid edit reports the validation error and retains the last valid
+handler. A present empty directory warns and still enables an empty catalog.
+
+Build wrappers prime the server with JSON-safe metadata, UTF-8 text, and
+base64 binary contents. The emitted server must continue serving identical
+skills after the source directory is removed. Builds fail for a missing forced
+directory, invalid YAML or Agent Skills metadata, unsafe configuration, or an
+invalid discovered file tree. Generated project templates do not create a
+skills directory by default.
+
 ## Goals
 
 - `npm install mcp-use` is sufficient for `mcp-use dev`, `mcp-use build`, and `mcp-use start`; users do not install Vite separately.

@@ -1,4 +1,3 @@
-import { getBasePath } from "@/client/utils/basePath";
 import {
   getStoredConnectionConfig,
   toEditableConnectionConfig,
@@ -8,19 +7,29 @@ import {
 import { isLocalhostServerUrl } from "@/client/utils/servers";
 import type { McpServer, McpServerConfig } from "@mcp-use/client/react";
 import { useEffect, useRef, useState } from "react";
-import { isMcpUseTunnelUrl } from "./layoutHeaderUtils";
 
-function tunnelMcpFromOrigin(tunnelUrl: string): string {
-  return `${tunnelUrl.replace(/\/+$/, "")}${getBasePath()}`;
+export function resolveLocalTunnelRecoveryTarget(
+  currentUrl: string,
+  localhostMcpUrl: string | null
+): string | null {
+  if (
+    !localhostMcpUrl ||
+    !isLocalhostServerUrl(localhostMcpUrl) ||
+    isLocalhostServerUrl(currentUrl) ||
+    currentUrl === localhostMcpUrl
+  ) {
+    return null;
+  }
+  return localhostMcpUrl;
 }
 
 /**
- * When dev tunnel is active, reconnect the selected localhost server to the
- * tunnel MCP endpoint (and back when the tunnel stops).
+ * Recover localhost connections rewritten by the legacy tunnel-switching
+ * behavior. The Inspector keeps using its same-origin local endpoint while a
+ * public tunnel is active; the tunnel URL is only displayed and shared with
+ * external clients.
  */
 export function useTunnelConnectionSync({
-  tunnelUrl,
-  tunnelMcpUrl,
   selectedServerId,
   selectedServer,
   configLoaded,
@@ -28,8 +37,6 @@ export function useTunnelConnectionSync({
   updateConnection,
   connections,
 }: {
-  tunnelUrl: string | null;
-  tunnelMcpUrl?: string | null;
   selectedServerId: string | null;
   selectedServer: McpServer | undefined;
   configLoaded: boolean;
@@ -80,17 +87,10 @@ export function useTunnelConnectionSync({
     }
 
     const currentUrl = selectedServer.url ?? "";
-    const onLocalhost = isLocalhostServerUrl(currentUrl);
-    const onTunnel = isMcpUseTunnelUrl(currentUrl);
-    const tunnelMcp =
-      tunnelMcpUrl ?? (tunnelUrl ? tunnelMcpFromOrigin(tunnelUrl) : null);
-
-    let targetUrl: string | null = null;
-    if (tunnelUrl && tunnelMcp && onLocalhost) {
-      targetUrl = tunnelMcp;
-    } else if (!tunnelUrl && onTunnel && localhostMcpRef.current) {
-      targetUrl = localhostMcpRef.current;
-    }
+    const targetUrl = resolveLocalTunnelRecoveryTarget(
+      currentUrl,
+      localhostMcpRef.current
+    );
 
     if (!targetUrl || targetUrl === currentUrl) return;
 
@@ -129,8 +129,6 @@ export function useTunnelConnectionSync({
     removeConnection,
     selectedServer,
     selectedServerId,
-    tunnelMcpUrl,
-    tunnelUrl,
     updateConnection,
   ]);
 

@@ -77,6 +77,11 @@ import {
   type DiscoveredView,
 } from "./views.js";
 import type { ViewsManifest } from "../views/types.js";
+import type { SkillsOptions, SkillsSnapshot } from "../skills/types.js";
+import {
+  discoverConfiguredSkills,
+  resolveConfiguredSkillsDirectory,
+} from "../skills/node-loader.js";
 
 /** Canonical Web handler exposed by `MCPServer.fetch`. */
 type WebHandler = (request: Request) => Promise<Response>;
@@ -99,6 +104,8 @@ interface ServerLike {
     views: ViewsManifest,
     options?: { dev?: boolean; projectRoot?: string }
   ): void;
+  __primeSkills(snapshot: SkillsSnapshot | undefined): void;
+  __skillsConfig(): boolean | SkillsOptions | undefined;
 }
 
 /**
@@ -380,6 +387,8 @@ export async function runDev(options: DevOptions): Promise<void> {
   const viewsDirectory =
     options.viewsDir ??
     (options.mcpDir === undefined ? undefined : join(options.mcpDir, "views"));
+  const conventionalSkillsDirectory =
+    options.mcpDir === undefined ? "skills" : join(options.mcpDir, "skills");
   if (!existsSync(resolveViewsDir(options.cwd, viewsDirectory))) {
     console.log("[mcp-use] views directory not configured.");
   }
@@ -472,13 +481,32 @@ export async function runDev(options: DevOptions): Promise<void> {
 
   const importServer = async (
     viewsSnapshot: DiscoveredView[]
-  ): Promise<ServerLike> => {
-    const load = async (): Promise<ServerLike> => {
+  ): Promise<{
+    server: ServerLike;
+    skillsDirectory: string | undefined;
+  }> => {
+    const load = async (): Promise<{
+      server: ServerLike;
+      skillsDirectory: string | undefined;
+    }> => {
       const moduleExports = (await runner.import(entry)) as Record<
         string,
         unknown
       >;
       const server = serverFrom(moduleExports);
+      const skillsConfig = server.__skillsConfig();
+      const skillsDirectory = resolveConfiguredSkillsDirectory(
+        skillsConfig,
+        options.cwd,
+        conventionalSkillsDirectory
+      );
+      server.__primeSkills(
+        discoverConfiguredSkills(
+          skillsConfig,
+          options.cwd,
+          conventionalSkillsDirectory
+        )
+      );
       const viewsManifest = buildDevViewsManifest(viewsSnapshot);
       if (typeof server.__primeViews !== "function") {
         throw new Error(
@@ -490,7 +518,7 @@ export async function runDev(options: DevOptions): Promise<void> {
         projectRoot: options.cwd,
       });
 
-      return server;
+      return { server, skillsDirectory };
     };
 
     if (localFallbackMcpUrl === undefined) {
@@ -517,12 +545,14 @@ export async function runDev(options: DevOptions): Promise<void> {
 
   let currentHandler: WebHandler;
   let basePath: string;
+  let currentSkillsDirectory: string | undefined;
   try {
-    const server = await importServer(currentViews);
+    const { server, skillsDirectory } = await importServer(currentViews);
     server.__setEventBus(eventBus);
     server.__mount();
     currentHandler = async (request) => server.fetch(request);
     basePath = server.basePath ?? "/mcp";
+    currentSkillsDirectory = skillsDirectory;
   } catch (error) {
     await runner.close();
     await vite.close();
@@ -571,6 +601,7 @@ export async function runDev(options: DevOptions): Promise<void> {
   let desiredRevision = 0;
   let reconciling = false;
   let reloadTimer: ReturnType<typeof setTimeout> | undefined;
+  let skillsReloadTimer: ReturnType<typeof setTimeout> | undefined;
   const isAborted = (): boolean => options.signal?.aborted === true;
 
   /**
@@ -587,7 +618,7 @@ export async function runDev(options: DevOptions): Promise<void> {
         const viewsSnapshot = discoverViews(options.cwd, viewsDirectory);
         try {
           runner.evaluatedModules.clear();
-          const server = await importServer(viewsSnapshot);
+          const { server, skillsDirectory } = await importServer(viewsSnapshot);
           server.__setEventBus(eventBus);
           server.__mount();
 
@@ -601,6 +632,7 @@ export async function runDev(options: DevOptions): Promise<void> {
           currentViews = [...viewsSnapshot];
           currentHandler = nextHandler;
           basePath = nextBasePath;
+          currentSkillsDirectory = skillsDirectory;
           eventBus.publish({ kind: "tools_list_changed" });
           eventBus.publish({ kind: "prompts_list_changed" });
           eventBus.publish({ kind: "resources_list_changed" });
@@ -609,9 +641,13 @@ export async function runDev(options: DevOptions): Promise<void> {
         } catch (error) {
           if (isAborted()) return;
           if (revision !== desiredRevision) continue;
+          const message = (
+            error instanceof Error ? error.message : String(error)
+          )
+            .replace(/\s+/g, " ")
+            .trim();
           console.error(
-            "[mcp-use] reload failed — keeping the previous server:\n",
-            error
+            `[mcp-use] reload failed — keeping the previous server: ${message}`
           );
           return;
         }
@@ -630,8 +666,30 @@ export async function runDev(options: DevOptions): Promise<void> {
     }, RELOAD_SETTLE_MS);
   };
 
+  const scheduleSkillsReload = (): void => {
+    if (skillsReloadTimer !== undefined) clearTimeout(skillsReloadTimer);
+    // Editors and scaffolding tools commonly create/rename a skill and then
+    // write SKILL.md in several filesystem operations. Let that short burst
+    // settle so discovery does not validate an intermediate empty file.
+    skillsReloadTimer = setTimeout(() => {
+      skillsReloadTimer = undefined;
+      scheduleReconcile();
+    }, 150);
+  };
+
   const onSsrFileEvent = (file: string): void => {
     if (isViewPath(file, options.cwd, viewsDirectory)) {
+      return;
+    }
+    const normalizedFile = file.replaceAll("\\", "/");
+    if (
+      currentSkillsDirectory !== undefined &&
+      (normalizedFile === currentSkillsDirectory.replaceAll("\\", "/") ||
+        normalizedFile.startsWith(
+          `${currentSkillsDirectory.replaceAll("\\", "/")}/`
+        ))
+    ) {
+      scheduleSkillsReload();
       return;
     }
     const modules = ssrEnvironment.moduleGraph.getModulesByFile(
@@ -736,6 +794,7 @@ export async function runDev(options: DevOptions): Promise<void> {
    * watcher subscriptions, tunnel, HTTP listener, module runner, Vite.
    */
   const teardown = async (): Promise<void> => {
+    if (skillsReloadTimer !== undefined) clearTimeout(skillsReloadTimer);
     vite.watcher.off("change", onSsrFileEvent);
     vite.watcher.off("add", onFileAddOrUnlink);
     vite.watcher.off("unlink", onFileAddOrUnlink);

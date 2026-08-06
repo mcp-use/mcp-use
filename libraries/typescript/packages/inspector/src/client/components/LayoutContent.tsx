@@ -7,6 +7,7 @@ import { ElicitationTab } from "@/client/components/ElicitationTab";
 import { NotificationsTab } from "@/client/components/NotificationsTab";
 import { PromptsTab } from "@/client/components/PromptsTab";
 import { ResourcesTab } from "@/client/components/ResourcesTab";
+import { SkillsTab } from "@/client/components/SkillsTab";
 import { SamplingTab } from "@/client/components/SamplingTab";
 import { ServerMetadataTab } from "@/client/components/ServerMetadataTab";
 import { ToolsTab } from "@/client/components/ToolsTab";
@@ -28,6 +29,7 @@ const ALL_KNOWN_TABS: TabType[] = [
   "tools",
   "prompts",
   "resources",
+  "skills",
   "chat",
   "sampling",
   "elicitation",
@@ -252,6 +254,20 @@ export function LayoutContent({
             isConnected={selectedServer.state === "ready"}
             mcpServerUrl={selectedServer.url || ""}
             refreshResources={selectedServer.refreshResources}
+          />
+        </div>
+      )}
+      {isTabVisible("skills") && mountedTabs.has("skills") && (
+        <div
+          style={{ display: activeTab === "skills" ? "block" : "none" }}
+          className="h-full"
+        >
+          <SkillsTab
+            key={`skills-${selectedServer.id}`}
+            skills={selectedServer.skills ?? []}
+            getSkill={selectedServer.getSkill}
+            readResource={selectedServer.readResource}
+            refreshSkills={selectedServer.listSkills}
           />
         </div>
       )}

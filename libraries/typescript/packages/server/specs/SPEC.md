@@ -1,6 +1,6 @@
 # mcp-use v2 — server framework contract
 
-**Status:** Core MCP primitives, request logging, landing page, direct resource-server auth, views, and the complete CLI are implemented.
+**Status:** Core MCP primitives, request logging, landing page, direct resource-server auth, views, experimental Skills over MCP, and the complete CLI are implemented.
 **Package:** `mcp-use@2`, published from `packages/server`.
 **Branch target:** `v2`.
 
@@ -29,6 +29,43 @@ Greenfield framework on the official v2 SDK (`@modelcontextprotocol/server`, sta
 - **No registry return-type accumulation.** `MCPServer<TUser, TEnv>` uses generics only for OAuth user data and Hono environment/bindings; registration methods never return `MCPServer<TTools & {...}>` (the tRPC/Hono/Skybridge pattern). The official v2 SDK does it on neither side (`registerTool` returns a `RegisteredTool` handle; client `callTool` is untyped), our client's primary job is connecting to _third-party_ servers (no server type to import), and accumulation only sees literal chained calls — it structurally cannot type loop/conditional registration or OpenAPI-imported tools. Typed hooks use exported `ToolRef` handles instead. Callback types are plain function types (no bivariance hack); narrow-to-wide erasure happens at the registry `.set()` boundary via contained casts.
 
 ## Phase 1 — basic MCP pieces ✅
+
+### Experimental Skills over MCP
+
+`ServerConfig.skills` is `boolean | { directory?: string }`. Omission is
+convention-first: a project `skills/` directory enables the extension when it
+exists and is otherwise ignored. `false` always disables it. `true` and object
+forms force discovery and fail when the effective directory is missing. A
+custom `directory` is a safe project-root-relative path. With CLI `--mcp-dir`,
+only the default convention moves to `<mcp-dir>/skills`; explicit directories
+remain project-root-relative.
+
+Discovery recursively finds every `SKILL.md`, validates Agent Skills YAML,
+name, description, and directory matching, skips symlinks, and rejects paths
+outside the project. Each skill includes every regular descendant file,
+including nested skills, scripts, data, and binary assets. Frontmatter is
+preserved as JSON. Files receive appropriate MIME types and a
+`sha256:<lowercase hex>` digest of their raw bytes. Discovery produces one
+immutable snapshot before serving; development replaces the entire server on
+a valid edit and production builds embed the snapshot.
+
+Filesystem traversal, YAML parsing, MIME detection, and hashing are owned by
+the Node-only `@mcp-use/cli` skills loader. The server package owns only the
+configuration contract, immutable snapshot shape, and protocol runtime. The
+CLI vendors its audited parser, so neither package declares a YAML dependency.
+
+An enabled snapshot advertises `io.modelcontextprotocol/skills` with
+`directoryRead: true`, implements deterministic `skills/list` and
+URI-addressed `skills/get`, serves files through `resources/read`, and provides
+non-recursive `resources/directory/read`. Unknown skills and directories return
+`-32602`. No index resource, archive, aggregate digest, automatic instruction
+injection, or tool-description rewriting exists. The extension is advertised
+for an existing but empty directory and `skills/list` returns an empty array.
+
+Node source execution resolves discovery through the installed CLI loader on
+first mount. Browser/workerd entries contain no filesystem, YAML, hashing, or
+MIME discovery code; those runtimes require a snapshot primed by the build
+wrapper.
 
 Scope: server identity, tools, resources, resource templates, prompts, completion, and HTTP serving. Files: `src/server.ts` (MCPServer), `src/mount-mcp.ts` (fetch-native MCP mount), `src/config.ts` (ServerConfig), `src/context.ts` (RequestContext), one file per primitive's types (`src/tools.ts`, `src/resources.ts`, `src/prompts.ts`), and `src/completable.ts`. The bin implementation, toolchain, and optional development Inspector integration live in `packages/cli` and are governed by `CLI_SPEC.md`. Callbacks prefer raw SDK result shapes (see ground rules); deprecated response helpers and a small resource/prompt conversion layer remain for upgrade compatibility. Types-plus-tests typecheck runs via `tsconfig.test.json` (`pnpm typecheck`, part of `test:run`); compile-time contracts are pinned by `tests/type-level.test.ts` (`@ts-expect-error` + `expectTypeOf`).
 

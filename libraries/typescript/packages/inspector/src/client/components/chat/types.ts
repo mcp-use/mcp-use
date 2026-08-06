@@ -42,6 +42,7 @@ export interface ChatSerializedMessage {
 
 export interface ChatBodyContext {
   disabledTools: string[];
+  enabledSkillUris?: string[];
   widgetModelContext?: string;
 }
 

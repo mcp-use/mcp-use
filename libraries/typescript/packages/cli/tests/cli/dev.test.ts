@@ -2,7 +2,13 @@
  * e2e tests for runDev: a real Vite dev server + module runner serving the
  * fixture over HTTP, including edit-triggered reload and error resilience.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import {
   Client,
@@ -220,6 +226,151 @@ describe("runDev", () => {
 
     await dev.stop();
     expect(process.listeners("SIGINT")).not.toContain(sigint);
+  });
+
+  it("reloads skill edits and keeps the last valid snapshot", async () => {
+    const cwd = copyFixture("dev-skills");
+    const skillDir = join(cwd, "skills", "refunds");
+    mkdirSync(skillDir, { recursive: true });
+    const skillFile = join(skillDir, "SKILL.md");
+    writeFileSync(
+      skillFile,
+      "---\nname: refunds\ndescription: Process refunds\n---\n# v1\n"
+    );
+    const dev = await startDev(cwd, await getFreePort(), undefined, false);
+    cleanups.push(dev.stop, () => removeDir(cwd));
+
+    expect(await mcpRequest(dev.url, "skills/list")).toMatchObject({
+      result: { skills: [{ uri: "skill://refunds/SKILL.md" }] },
+    });
+
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    cleanups.push(() => errorSpy.mockRestore());
+    writeFileSync(skillFile, "---\nname: wrong\ndescription: Invalid\n---\n");
+    await waitFor(async () =>
+      errorSpy.mock.calls.some((call) =>
+        String(call[0]).includes("reload failed")
+      )
+        ? true
+        : undefined
+    );
+    const reloadError = errorSpy.mock.calls.find((call) =>
+      String(call[0]).includes("reload failed")
+    );
+    expect(reloadError).toHaveLength(1);
+    expect(String(reloadError?.[0])).not.toContain("\n");
+    expect(await mcpRequest(dev.url, "skills/list")).toMatchObject({
+      result: { skills: [{ frontmatter: { name: "refunds" } }] },
+    });
+
+    writeFileSync(
+      skillFile,
+      "---\nname: refunds\ndescription: Updated refunds\n---\n# v2\n"
+    );
+    await waitFor(async () => {
+      const body = await mcpRequest(dev.url, "skills/list");
+      const result = body["result"] as {
+        skills?: Array<{ frontmatter?: { description?: string } }>;
+      };
+      return result.skills?.[0]?.frontmatter?.description === "Updated refunds"
+        ? true
+        : undefined;
+    });
+
+    errorSpy.mockClear();
+    writeFileSync(skillFile, "");
+    writeFileSync(
+      skillFile,
+      "---\nname: refunds\ndescription: Atomically updated refunds\n---\n# v3\n"
+    );
+    await waitFor(async () => {
+      const body = await mcpRequest(dev.url, "skills/list");
+      const result = body["result"] as {
+        skills?: Array<{ frontmatter?: { description?: string } }>;
+      };
+      return result.skills?.[0]?.frontmatter?.description ===
+        "Atomically updated refunds"
+        ? true
+        : undefined;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(errorSpy).not.toHaveBeenCalled();
+
+    const addedSkillDir = join(cwd, "skills", "shipping");
+    const addedSkillFile = join(addedSkillDir, "SKILL.md");
+    mkdirSync(addedSkillDir, { recursive: true });
+    writeFileSync(
+      addedSkillFile,
+      "---\nname: shipping\ndescription: Track shipments\n---\n# Shipping\n"
+    );
+    await waitFor(async () => {
+      const body = await mcpRequest(dev.url, "skills/list");
+      const result = body["result"] as { skills?: unknown[] };
+      return result.skills?.length === 2 ? true : undefined;
+    });
+
+    writeFileSync(
+      addedSkillFile,
+      "---\nname: shipping\ndescription: Updated shipment tracking\n---\n# Shipping\n"
+    );
+    await waitFor(async () => {
+      const body = await mcpRequest(dev.url, "skills/list");
+      const result = body["result"] as {
+        skills?: Array<{ frontmatter?: { description?: string } }>;
+      };
+      return result.skills?.some(
+        (skill) =>
+          skill.frontmatter?.description === "Updated shipment tracking"
+      )
+        ? true
+        : undefined;
+    });
+
+    rmSync(addedSkillDir, { recursive: true, force: true });
+    await waitFor(async () => {
+      const body = await mcpRequest(dev.url, "skills/list");
+      const result = body["result"] as { skills?: unknown[] };
+      return result.skills?.length === 1 ? true : undefined;
+    });
+  });
+
+  it("watches supporting files in a configured skills directory", async () => {
+    const cwd = copyFixture("dev-custom-skills");
+    const entry = join(cwd, "src", "index.ts");
+    writeFileSync(
+      entry,
+      readFileSync(entry, "utf8").replace(
+        'name: "fixture-basic", version: "1.0.0"',
+        'name: "fixture-basic", version: "1.0.0", skills: { directory: "manuals" }'
+      )
+    );
+    const skillDir = join(cwd, "manuals", "refunds");
+    mkdirSync(join(skillDir, "references"), { recursive: true });
+    writeFileSync(
+      join(skillDir, "SKILL.md"),
+      "---\nname: refunds\ndescription: Process refunds\n---\n"
+    );
+    const policy = join(skillDir, "references", "policy.md");
+    writeFileSync(policy, "Policy v1\n");
+
+    const dev = await startDev(cwd, await getFreePort(), undefined, false);
+    cleanups.push(dev.stop, () => removeDir(cwd));
+    expect(
+      await mcpRequest(dev.url, "resources/read", {
+        uri: "skill://refunds/references/policy.md",
+      })
+    ).toMatchObject({ result: { contents: [{ text: "Policy v1\n" }] } });
+
+    writeFileSync(policy, "Policy v2\n");
+    await waitFor(async () => {
+      const body = await mcpRequest(dev.url, "resources/read", {
+        uri: "skill://refunds/references/policy.md",
+      });
+      const result = body["result"] as {
+        contents?: Array<{ text?: string }>;
+      };
+      return result.contents?.[0]?.text === "Policy v2\n" ? true : undefined;
+    });
   });
 
   it("mounts the project-local Inspector on the existing dev listener", async () => {

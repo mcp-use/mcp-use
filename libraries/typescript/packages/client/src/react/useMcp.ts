@@ -37,6 +37,7 @@ import type { UseMcpOptions, UseMcpResult } from "./types.js";
 import { loadServerIcon } from "./useMcp-helpers.js";
 import { useMcpOperations } from "./useMcp-operations.js";
 import { getOAuthTokenExpiry } from "./token-expiry.js";
+import { SKILLS_EXTENSION_ID } from "../core/skills.js";
 
 const DEFAULT_RECONNECT_DELAY = 3000;
 const DEFAULT_RETRY_DELAY = 5000;
@@ -341,6 +342,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     ResourceTemplate[]
   >([]);
   const [prompts, setPrompts] = useState<Prompt[]>([]);
+  const [skills, setSkills] = useState<import("../core/skills.js").Skill[]>([]);
   const [serverInfo, setServerInfo] = useState<UseMcpResult["serverInfo"]>(
     // Only use cached metadata if it has at least a name
     options._initialServerInfo?.name
@@ -507,6 +509,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     setResources,
     setResourceTemplates,
     setPrompts,
+    setSkills,
     addLog,
   });
 
@@ -560,6 +563,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
         setResources([]);
         setResourceTemplates([]);
         setPrompts([]);
+        setSkills([]);
         setError(undefined);
         setAuthUrl(undefined);
         setAuthTokens(undefined);
@@ -738,6 +742,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     setResources([]);
     setResourceTemplates([]);
     setPrompts([]);
+    setSkills([]);
     setServerInfo(undefined);
     setCapabilities(undefined);
     setProtocolEra(undefined);
@@ -915,11 +920,27 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
               notification.method === "notifications/resources/list_changed"
             ) {
               addLog("info", "Resources list changed, auto-refreshing...");
-              connectionOperations
-                .refreshResources()
-                .catch((err) =>
-                  addLog("warn", "Auto-refresh resources failed:", err)
-                );
+              const clientInfoExtensions = (
+                mergedClientInfo as {
+                  capabilities?: { extensions?: Record<string, unknown> };
+                }
+              ).capabilities?.extensions;
+              const optionExtensions = (
+                effectiveClientOptions?.capabilities as
+                  | { extensions?: Record<string, unknown> }
+                  | undefined
+              )?.extensions;
+              const supportsSkills =
+                optionExtensions?.[SKILLS_EXTENSION_ID] !== undefined ||
+                clientInfoExtensions?.[SKILLS_EXTENSION_ID] !== undefined;
+              Promise.all([
+                connectionOperations.refreshResources(),
+                ...(supportsSkills
+                  ? [connectionOperations.refreshSkills()]
+                  : []),
+              ]).catch((err) =>
+                addLog("warn", "Auto-refresh resources failed:", err)
+              );
             } else if (
               notification.method === "notifications/prompts/list_changed"
             ) {
@@ -1065,6 +1086,17 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
           setProtocolVersion(protocolVersion);
           setInstructions(instructions);
           setExtensions(extensions);
+          if (extensions["io.modelcontextprotocol/skills"] !== undefined) {
+            try {
+              const result = await connection.listAllSkills();
+              if (isMountedRef.current) setSkills(result.skills);
+            } catch (error) {
+              addLog("warn", "Failed to load initial skills:", error);
+              if (isMountedRef.current) setSkills([]);
+            }
+          } else {
+            setSkills([]);
+          }
         }
 
         if (serverInfo) {
@@ -2039,6 +2071,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     resources,
     resourceTemplates,
     prompts,
+    skills,
     serverInfo,
     capabilities,
     protocolEra,

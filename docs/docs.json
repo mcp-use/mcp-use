@@ -317,7 +317,8 @@
                         "pages": [
                           "v2/typescript/server/tools",
                           "v2/typescript/server/resources",
-                          "v2/typescript/server/prompts"
+                          "v2/typescript/server/prompts",
+                          "v2/typescript/server/skills"
                         ]
                       },
                       {

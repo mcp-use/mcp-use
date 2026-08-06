@@ -190,6 +190,7 @@ export function Layout({ children }: LayoutProps) {
         "tools",
         "prompts",
         "resources",
+        "skills",
         "chat",
         "sampling",
         "elicitation",
@@ -520,7 +521,6 @@ export function Layout({ children }: LayoutProps) {
   const displayServerRef = useRef<McpServer | undefined>(undefined);
 
   const isTunnelConnecting = useTunnelConnectionSync({
-    tunnelUrl,
     selectedServerId,
     selectedServer,
     configLoaded,
