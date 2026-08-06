@@ -5,6 +5,7 @@
 import { createServerModuleRunner, type DevEnvironment } from "vite";
 
 import type { ViewsManifest } from "../views/types.js";
+import type { SkillsOptions, SkillsSnapshot } from "../skills/types.js";
 
 const DEFAULT_BASE_PATH = "/mcp";
 
@@ -19,6 +20,8 @@ const BUILD_ENTRY_MCP_URL = "http://localhost:3000";
 interface ServerLike {
   __mount(): void;
   __primeViews(views: ViewsManifest, options?: { dev?: boolean }): void;
+  __primeSkills(snapshot: SkillsSnapshot | undefined): void;
+  __skillsConfig(): boolean | SkillsOptions | undefined;
   basePath?: string;
 }
 
@@ -88,6 +91,9 @@ export async function resolveBuildBasePath(
  * @param environment - Vite SSR environment for module evaluation.
  * @param entry - Absolute path to the user's server entry.
  * @param viewsManifest - Built or dev-shaped manifest to prime.
+ * @param projectRoot - Root used to resolve Skills configuration.
+ * @param conventionalSkillsDirectory - Conventional Skills path for this CLI invocation.
+ * @returns The validated Skills snapshot to embed, when enabled.
  * @throws On binding hard errors (naming the view/tool).
  *
  * @internal
@@ -95,8 +101,10 @@ export async function resolveBuildBasePath(
 export async function validateViewBindingsAtBuild(
   environment: DevEnvironment,
   entry: string,
-  viewsManifest: ViewsManifest
-): Promise<void> {
+  viewsManifest: ViewsManifest,
+  projectRoot: string,
+  conventionalSkillsDirectory: string
+): Promise<SkillsSnapshot | undefined> {
   const runner = createServerModuleRunner(environment, {
     hmr: false,
     sourcemapInterceptor: "node",
@@ -122,8 +130,25 @@ export async function validateViewBindingsAtBuild(
         "The entry's default export does not support __primeViews."
       );
     }
+    if (
+      typeof server.__skillsConfig !== "function" ||
+      typeof server.__primeSkills !== "function"
+    ) {
+      throw new Error(
+        "The entry's default export does not support Skills over MCP."
+      );
+    }
+    const { discoverConfiguredSkills } =
+      await import("../skills/node-loader.js");
+    const skillsSnapshot = discoverConfiguredSkills(
+      server.__skillsConfig(),
+      projectRoot,
+      conventionalSkillsDirectory
+    );
     server.__primeViews(viewsManifest);
+    server.__primeSkills(skillsSnapshot);
     server.__mount();
+    return skillsSnapshot;
   } finally {
     if (previousMcpUrl === undefined) {
       delete process.env["MCP_URL"];

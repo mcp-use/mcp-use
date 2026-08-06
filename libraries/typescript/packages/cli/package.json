@@ -27,13 +27,18 @@
       "types": "./types/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./internal/skills-loader": {
+      "types": "./types/internal/skills-loader.d.ts",
+      "import": "./dist/internal/skills-loader.js"
+    },
     "./vite-client": {
       "types": "./types/vite-client.d.ts"
     }
   },
   "files": [
     "dist",
-    "types"
+    "types",
+    "THIRD_PARTY_NOTICES.md"
   ],
   "engines": {
     "node": ">=22.22.2"

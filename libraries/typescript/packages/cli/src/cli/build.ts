@@ -45,6 +45,7 @@ import { resolveWorkspacePaths, type BuildManifest } from "./workspace.js";
 import { normalizeAssetsBaseUrl } from "../views/origin.js";
 import { viewAssetsBasePath } from "../views/document.js";
 import type { ViewsManifest } from "../views/types.js";
+import type { SkillsSnapshot } from "../skills/types.js";
 
 /** Fixed filename of the emitted server entry inside `.mcp-use/build/`. */
 const BUILD_ENTRY_NAME = "index.js";
@@ -97,17 +98,20 @@ export interface BuildOptions {
 async function writeWrapperEntry(
   cacheDir: string,
   userEntry: string,
-  viewsManifest: ViewsManifest
+  viewsManifest: ViewsManifest,
+  skillsSnapshot: SkillsSnapshot | undefined
 ): Promise<string> {
   const wrapperPath = join(cacheDir, WRAPPER_BASENAME);
   await mkdir(cacheDir, { recursive: true });
   const manifestJson = JSON.stringify(viewsManifest);
+  const skillsJson = JSON.stringify(skillsSnapshot);
   await writeFile(
     wrapperPath,
     [
       `import server from ${JSON.stringify(userEntry)};`,
-      `import { registerViews } from "mcp-use";`,
+      `import { registerSkills, registerViews } from "mcp-use";`,
       `server[registerViews](${manifestJson});`,
+      `server[registerSkills](${skillsJson});`,
       `export default server;`,
       "",
     ].join("\n")
@@ -335,6 +339,8 @@ export async function runBuild(options: BuildOptions): Promise<void> {
   let bindingServer:
     | Awaited<ReturnType<typeof createBindingValidationServer>>
     | undefined;
+  const conventionalSkillsDirectory =
+    options.mcpDir === undefined ? "skills" : join(options.mcpDir, "skills");
 
   if (views.length === 0) {
     bindingServer ??= await createBindingValidationServer(
@@ -343,12 +349,19 @@ export async function runBuild(options: BuildOptions): Promise<void> {
       false
     );
     try {
-      await validateViewBindingsAtBuild(
+      const skillsSnapshot = await validateViewBindingsAtBuild(
         bindingServer.environments.ssr,
         entry,
-        {}
+        {},
+        options.cwd,
+        conventionalSkillsDirectory
       );
-      const wrapperEntry = await writeWrapperEntry(paths.cache, entry, {});
+      const wrapperEntry = await writeWrapperEntry(
+        paths.cache,
+        entry,
+        {},
+        skillsSnapshot
+      );
       await build({
         root: options.cwd,
         configFile: false,
@@ -421,6 +434,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
   );
   let buildBasePath: string;
   const viewsManifest: ViewsManifest = {};
+  let skillsSnapshot: SkillsSnapshot | undefined;
   const buildAssetsBase = readBuildAssetsBase();
   try {
     buildBasePath = await resolveBuildBasePath(
@@ -466,10 +480,12 @@ export async function runBuild(options: BuildOptions): Promise<void> {
 
     await copyPublicAssets(options.cwd, join(viewsOutDir, "public"));
 
-    await validateViewBindingsAtBuild(
+    skillsSnapshot = await validateViewBindingsAtBuild(
       bindingServer.environments.ssr,
       entry,
-      viewsManifest
+      viewsManifest,
+      options.cwd,
+      conventionalSkillsDirectory
     );
   } finally {
     await bindingServer.close();
@@ -478,7 +494,8 @@ export async function runBuild(options: BuildOptions): Promise<void> {
   const wrapperEntry = await writeWrapperEntry(
     paths.cache,
     entry,
-    viewsManifest
+    viewsManifest,
+    skillsSnapshot
   );
 
   await build({

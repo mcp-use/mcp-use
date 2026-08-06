@@ -26,6 +26,12 @@
       "browser": "./dist/internal/node-http-unavailable.js",
       "node": "./dist/internal/node-http.js",
       "default": "./dist/internal/node-http-unavailable.js"
+    },
+    "#mcp-use-skills-loader": {
+      "workerd": "./dist/internal/skills-loader-unavailable.js",
+      "browser": "./dist/internal/skills-loader-unavailable.js",
+      "node": "@mcp-use/cli/internal/skills-loader",
+      "default": "./dist/internal/skills-loader-unavailable.js"
     }
   },
   "exports": {

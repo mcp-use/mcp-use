@@ -222,6 +222,90 @@ describe("runDev", () => {
     expect(process.listeners("SIGINT")).not.toContain(sigint);
   });
 
+  it("reloads skill edits and keeps the last valid snapshot", async () => {
+    const cwd = copyFixture("dev-skills");
+    const skillDir = join(cwd, "skills", "refunds");
+    mkdirSync(skillDir, { recursive: true });
+    const skillFile = join(skillDir, "SKILL.md");
+    writeFileSync(
+      skillFile,
+      "---\nname: refunds\ndescription: Process refunds\n---\n# v1\n"
+    );
+    const dev = await startDev(cwd, await getFreePort(), undefined, false);
+    cleanups.push(dev.stop, () => removeDir(cwd));
+
+    expect(await mcpRequest(dev.url, "skills/list")).toMatchObject({
+      result: { skills: [{ uri: "skill://refunds/SKILL.md" }] },
+    });
+
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    cleanups.push(() => errorSpy.mockRestore());
+    writeFileSync(skillFile, "---\nname: wrong\ndescription: Invalid\n---\n");
+    await waitFor(async () =>
+      errorSpy.mock.calls.some((call) =>
+        String(call[0]).includes("reload failed")
+      )
+        ? true
+        : undefined
+    );
+    expect(await mcpRequest(dev.url, "skills/list")).toMatchObject({
+      result: { skills: [{ frontmatter: { name: "refunds" } }] },
+    });
+
+    writeFileSync(
+      skillFile,
+      "---\nname: refunds\ndescription: Updated refunds\n---\n# v2\n"
+    );
+    await waitFor(async () => {
+      const body = await mcpRequest(dev.url, "skills/list");
+      const result = body["result"] as {
+        skills?: Array<{ frontmatter?: { description?: string } }>;
+      };
+      return result.skills?.[0]?.frontmatter?.description === "Updated refunds"
+        ? true
+        : undefined;
+    });
+  });
+
+  it("watches supporting files in a configured skills directory", async () => {
+    const cwd = copyFixture("dev-custom-skills");
+    const entry = join(cwd, "src", "index.ts");
+    writeFileSync(
+      entry,
+      readFileSync(entry, "utf8").replace(
+        'name: "fixture-basic", version: "1.0.0"',
+        'name: "fixture-basic", version: "1.0.0", skills: { directory: "manuals" }'
+      )
+    );
+    const skillDir = join(cwd, "manuals", "refunds");
+    mkdirSync(join(skillDir, "references"), { recursive: true });
+    writeFileSync(
+      join(skillDir, "SKILL.md"),
+      "---\nname: refunds\ndescription: Process refunds\n---\n"
+    );
+    const policy = join(skillDir, "references", "policy.md");
+    writeFileSync(policy, "Policy v1\n");
+
+    const dev = await startDev(cwd, await getFreePort(), undefined, false);
+    cleanups.push(dev.stop, () => removeDir(cwd));
+    expect(
+      await mcpRequest(dev.url, "resources/read", {
+        uri: "skill://refunds/references/policy.md",
+      })
+    ).toMatchObject({ result: { contents: [{ text: "Policy v1\n" }] } });
+
+    writeFileSync(policy, "Policy v2\n");
+    await waitFor(async () => {
+      const body = await mcpRequest(dev.url, "resources/read", {
+        uri: "skill://refunds/references/policy.md",
+      });
+      const result = body["result"] as {
+        contents?: Array<{ text?: string }>;
+      };
+      return result.contents?.[0]?.text === "Policy v2\n" ? true : undefined;
+    });
+  });
+
   it("mounts the project-local Inspector on the existing dev listener", async () => {
     const cwd = copyFixture("dev-inspector-installed");
     cleanups.push(() => removeDir(cwd));
