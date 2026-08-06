@@ -1,3 +1,5 @@
+import { LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/ext-apps/app-bridge";
+
 const OPENAI_COMPATIBILITY_BRIDGE_SCRIPT = `<script>
 (function () {
   var files = new Map();
@@ -20,6 +22,7 @@ const OPENAI_COMPATIBILITY_BRIDGE_SCRIPT = `<script>
     if (context.theme !== undefined) globals.theme = context.theme;
     if (context.displayMode !== undefined) globals.displayMode = context.displayMode;
     if (context.locale !== undefined) globals.locale = context.locale;
+    if (context.view !== undefined) globals.view = context.view;
     if (context.safeAreaInsets !== undefined) {
       globals.safeArea = { insets: context.safeAreaInsets };
     }
@@ -94,15 +97,22 @@ const OPENAI_COMPATIBILITY_BRIDGE_SCRIPT = `<script>
     var params = message.params || {};
     switch (message.method) {
       case "ui/notifications/tool-input":
-      case "ui/notifications/tool-input-partial":
         markHostConnected();
         dispatchGlobals({ toolInput: params.arguments || {} });
+        break;
+      case "ui/notifications/tool-input-partial":
+        // window.openai has no partial-input global. Do not expose incomplete
+        // or approval-gated arguments as if the final tool input had arrived.
+        markHostConnected();
         break;
       case "ui/notifications/tool-result":
         markHostConnected();
         dispatchGlobals({
-          toolOutput: params,
-          toolResponseMetadata: params._meta || null
+          // OpenAI defines toolOutput as structuredContent, not the complete
+          // CallToolResult envelope. Keep that envelope (including hidden
+          // _meta) in toolResponseMetadata instead.
+          toolOutput: params.structuredContent === undefined ? null : params.structuredContent,
+          toolResponseMetadata: params
         });
         break;
       case "ui/notifications/host-context-changed":
@@ -112,7 +122,7 @@ const OPENAI_COMPATIBILITY_BRIDGE_SCRIPT = `<script>
     }
   });
 
-  api.toolInput = api.toolInput || {};
+  api.toolInput = api.toolInput === undefined ? null : api.toolInput;
   api.toolOutput = api.toolOutput === undefined ? null : api.toolOutput;
   api.toolResponseMetadata =
     api.toolResponseMetadata === undefined ? null : api.toolResponseMetadata;
@@ -146,10 +156,6 @@ const OPENAI_COMPATIBILITY_BRIDGE_SCRIPT = `<script>
   };
   api.setWidgetState = api.setWidgetState || function (state) {
     dispatchGlobals({ widgetState: state });
-    return sendRequest("ui/update-model-context", {
-      structuredContent: state || {},
-      content: [{ type: "text", text: JSON.stringify(state || {}) }]
-    });
   };
   api.notifyIntrinsicHeight = api.notifyIntrinsicHeight || function (height) {
     sendNotification("ui/notifications/size-changed", { height: height });
@@ -177,7 +183,7 @@ const OPENAI_COMPATIBILITY_BRIDGE_SCRIPT = `<script>
     sendRequest("ui/initialize", {
       appCapabilities: {},
       appInfo: { name: "mcp-use-openai-compat", version: "1.0.0" },
-      protocolVersion: "2025-06-18"
+      protocolVersion: ${JSON.stringify(LATEST_PROTOCOL_VERSION)}
     }).then(function (result) {
       markHostConnected(result);
       sendNotification("ui/notifications/initialized", {});
@@ -189,9 +195,11 @@ const OPENAI_COMPATIBILITY_BRIDGE_SCRIPT = `<script>
 </script>`;
 
 /**
- * Prepend a complete ChatGPT Apps SDK compatibility surface for Inspector
- * previews. Native V2 views keep using MCP Apps; legacy useWidget() bundles
- * receive the same tool lifecycle and host actions through window.openai.
+ * Prepend the shared ChatGPT Apps SDK compatibility aliases and
+ * Inspector-supported file helpers. Native V2 views keep using MCP Apps;
+ * legacy useWidget() bundles receive the same tool lifecycle and host actions
+ * through window.openai. Unsupported ChatGPT-only extensions remain absent so
+ * apps can feature-detect them as documented.
  */
 export function injectOpenAiFileApis(html: string): string {
   const headEnd = findOpeningConstructEnd(html, "<head");

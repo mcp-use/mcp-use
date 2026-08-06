@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/ext-apps/app-bridge";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { injectOpenAiFileApis } from "../../src/react/view/inject-openai-file-apis.js";
@@ -96,13 +97,13 @@ describe("injectOpenAiFileApis", () => {
     );
   });
 
-  it("populates the complete window.openai compatibility surface", () => {
+  it("populates the shared window.openai aliases and supported extensions", () => {
     const { guest, cleanup } = mountInjectedBridge();
     const openai = (guest as typeof guest & { openai: Record<string, unknown> })
       .openai;
 
     expect(openai).toMatchObject({
-      toolInput: {},
+      toolInput: null,
       toolOutput: null,
       toolResponseMetadata: null,
       theme: "light",
@@ -121,6 +122,15 @@ describe("injectOpenAiFileApis", () => {
     ]) {
       expect(openai[method]).toBeTypeOf("function");
     }
+    for (const unsupportedExtension of [
+      "requestModal",
+      "requestClose",
+      "selectFiles",
+      "setOpenInAppUrl",
+      "requestCheckout",
+    ]) {
+      expect(openai[unsupportedExtension]).toBeUndefined();
+    }
 
     cleanup();
   });
@@ -136,6 +146,7 @@ describe("injectOpenAiFileApis", () => {
           theme: unknown;
           displayMode: unknown;
           locale: unknown;
+          view: unknown;
         };
       }
     ).openai;
@@ -152,22 +163,36 @@ describe("injectOpenAiFileApis", () => {
         source: guest.parent,
         data: {
           jsonrpc: "2.0",
+          method: "ui/notifications/tool-input-partial",
+          params: { arguments: { question: "Cho" } },
+        },
+      })
+    );
+    expect(openai.toolInput).toBeNull();
+    expect(globalsEvents).toHaveLength(0);
+
+    guest.dispatchEvent(
+      new guest.MessageEvent("message", {
+        source: guest.parent,
+        data: {
+          jsonrpc: "2.0",
           method: "ui/notifications/tool-input",
           params: { arguments: { question: "Choose" } },
         },
       })
     );
+    const toolResult = {
+      content: [],
+      structuredContent: { options: ["A", "B"] },
+      _meta: { source: "test" },
+    };
     guest.dispatchEvent(
       new guest.MessageEvent("message", {
         source: guest.parent,
         data: {
           jsonrpc: "2.0",
           method: "ui/notifications/tool-result",
-          params: {
-            content: [],
-            structuredContent: { options: ["A", "B"] },
-            _meta: { source: "test" },
-          },
+          params: toolResult,
         },
       })
     );
@@ -181,20 +206,48 @@ describe("injectOpenAiFileApis", () => {
             theme: "dark",
             displayMode: "fullscreen",
             locale: "de-CH",
+            view: { id: "poll" },
           },
         },
       })
     );
 
     expect(openai.toolInput).toEqual({ question: "Choose" });
-    expect(openai.toolOutput).toMatchObject({
-      structuredContent: { options: ["A", "B"] },
-    });
-    expect(openai.toolResponseMetadata).toEqual({ source: "test" });
+    expect(openai.toolOutput).toEqual({ options: ["A", "B"] });
+    expect(openai.toolResponseMetadata).toEqual(toolResult);
     expect(openai.theme).toBe("dark");
     expect(openai.displayMode).toBe("fullscreen");
     expect(openai.locale).toBe("de-CH");
+    expect(openai.view).toEqual({ id: "poll" });
     expect(globalsEvents).toHaveLength(3);
+
+    cleanup();
+  });
+
+  it("keeps widget state private and updates it synchronously", () => {
+    vi.useFakeTimers();
+    const { guest, cleanup } = mountInjectedBridge();
+    const postMessage = vi.spyOn(guest.parent, "postMessage");
+    const openai = (
+      guest as typeof guest & {
+        openai: {
+          widgetState: unknown;
+          setWidgetState: (state: unknown) => unknown;
+        };
+      }
+    ).openai;
+    const state = {
+      modelContent: "Selected image",
+      privateContent: { selectedId: "private-1" },
+      imageIds: ["file-1"],
+    };
+
+    expect(openai.setWidgetState(state)).toBeUndefined();
+    expect(openai.widgetState).toEqual(state);
+    expect(postMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ method: "ui/update-model-context" }),
+      "*"
+    );
 
     cleanup();
   });
@@ -242,7 +295,11 @@ describe("injectOpenAiFileApis", () => {
 
     const initialize = postMessage.mock.calls.find(
       ([message]) => (message as { method?: string }).method === "ui/initialize"
-    )?.[0] as { id: string };
+    )?.[0] as {
+      id: string;
+      params: { protocolVersion: string };
+    };
+    expect(initialize.params.protocolVersion).toBe(LATEST_PROTOCOL_VERSION);
     guest.dispatchEvent(
       new guest.MessageEvent("message", {
         source: guest.parent,
