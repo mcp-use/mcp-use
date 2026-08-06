@@ -11,20 +11,20 @@ if (!files.includes(join("dist", "bin.js"))) {
 if (!files.includes(join("dist", "index.js"))) {
   throw new Error("Missing dist/index.js");
 }
-const sdkLicense = join(
-  "dist",
-  "third-party-licenses",
-  "modelcontextprotocol-server-LICENSE"
-);
-if (!files.includes(sdkLicense)) {
-  throw new Error(`Missing ${sdkLicense} for bundled SDK code`);
-}
-const sdkLicenseText = readFileSync(join(root, sdkLicense), "utf8");
-if (
-  !sdkLicenseText.includes("Apache License") ||
-  !sdkLicenseText.includes("MIT License")
-) {
-  throw new Error(`${sdkLicense} does not contain the expected license terms`);
+const bundledLicenses = new Map([
+  ["modelcontextprotocol-server-LICENSE", ["Apache License", "MIT License"]],
+  ["modelcontextprotocol-core-LICENSE", ["Apache License", "MIT License"]],
+  ["zod-LICENSE", ["MIT License"]],
+]);
+for (const [filename, expectedTerms] of bundledLicenses) {
+  const license = join("dist", "third-party-licenses", filename);
+  if (!files.includes(license)) {
+    throw new Error(`Missing ${license} for bundled dependency code`);
+  }
+  const licenseText = readFileSync(join(root, license), "utf8");
+  if (expectedTerms.some((term) => !licenseText.includes(term))) {
+    throw new Error(`${license} does not contain the expected license terms`);
+  }
 }
 if (!existsSync(join(root, "types", "vite-client.d.ts"))) {
   throw new Error("Missing types/vite-client.d.ts");
