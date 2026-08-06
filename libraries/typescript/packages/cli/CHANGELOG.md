@@ -1,5 +1,12 @@
 # @mcp-use/cli
 
+## 4.0.2-canary.5
+
+### Patch Changes
+
+- 06ec118: Use cross-platform filesystem paths for private CLI state, view discovery, and
+  public asset tests so the CLI build and test suite work on Windows.
+
 ## 4.0.2-canary.4
 
 ### Patch Changes
