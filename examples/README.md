@@ -61,6 +61,7 @@ When you clone this repository locally, you'll find `python/` and `typescript/` 
 ### Client Examples
 - **[CommonJS Example](../libraries/typescript/packages/client/examples/browser/commonjs/commonjs_example.cjs)** - CommonJS usage
 - **[CLI Examples](../libraries/typescript/packages/client/examples/cli/)** - Command-line interface examples
+- **[Parallel Search MCP](../libraries/typescript/packages/client/examples/node/parallel-search.ts)** - Keyless web search with source links
 - **[React Integration](../libraries/typescript/packages/client/examples/browser/react/)** - React client examples
 - **[Notifications Client](../libraries/typescript/packages/client/examples/node/communication/notification-client.ts)** - Notification handling
 - **[Sampling Client](../libraries/typescript/packages/client/examples/node/communication/sampling-client.ts)** - Sampling configuration

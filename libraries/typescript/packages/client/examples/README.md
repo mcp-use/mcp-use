@@ -28,6 +28,7 @@ Run the complete matrix:
 ## Feature examples
 
 - `node/basic-http.ts` — tools + automatic v1/v2 negotiation.
+- `node/parallel-search.ts` — keyless web search with source links through a hosted MCP server.
 - `node/communication/sampling-client.ts` — v1 reverse request and v2
   `input_required` sampling.
 - `node/communication/elicitation-client.ts` — v1 reverse request and v2
