@@ -61,7 +61,7 @@ It adds no command code of its own: every entry re-exports from
 record for behavior. The compatibility package exists for the historical
 install command only, and new projects should depend on `mcp-use`.
 
-There are no `ls`, `rm`, `switch`, or `install` aliases in v2 alpha. The accepted names below are the complete public surface. Cloud commands use native `fetch`, filesystem, and child-process APIs where adequate. Command-local parsing uses `node:util.parseArgs`; the package does not recreate a global Commander tree.
+There are no `ls`, `rm`, `switch`, or `install` aliases in v2. The accepted names below are the complete public surface. Cloud commands use native `fetch`, filesystem, and child-process APIs where adequate. Command-local parsing uses `node:util.parseArgs`; the package does not recreate a global Commander tree.
 
 ### Cross-command conventions
 
@@ -167,7 +167,7 @@ mcp-use client <name> auth status [--json]
 mcp-use client <name> auth logout [--yes] [--json]
 ```
 
-- v2 alpha client commands support HTTP(S) MCP servers; stdio, interactive REPL, resource subscriptions, implicit active sessions, and forced OAuth refresh are omitted. Every operation names a saved server.
+- v2 client commands support HTTP(S) MCP servers; stdio, interactive REPL, resource subscriptions, implicit active sessions, and forced OAuth refresh are omitted. Every operation names a saved server.
 - `connect` validates a unique filesystem-safe name, connects before saving, and attempts OAuth on an authorization challenge unless `--no-oauth`. In an interactive TTY, OAuth prints `This server requires OAuth. Press Enter to open your browser.`, waits for Enter, and then opens the browser. `--no-open` and non-TTY human output never prompt or open a browser; they print a state-free local loopback launcher URL while the callback continues to wait. The launcher redirects the browser to the provider without placing the provider URL or OAuth state in terminal output. `--json` prints neither URL and never waits for fresh consent; it exits `1` with `oauth_interaction_required` and an interactive retry command in `error.details.nextSteps`. Repeated headers are stored as credentials, not metadata. Reusing a name requires removing it first.
 - `--protocol auto` prefers the modern wire and falls back to legacy. `--protocol legacy` selects only the legacy wire. `--protocol modern` selects the stateless, sessionless modern wire with no fallback. Saved metadata stores these names, never protocol revision dates.
 - A strict protocol mismatch exits `1` with code `protocol_mismatch`. User-facing mismatch messages name `legacy` or `modern` and do not expose protocol revision dates.
@@ -228,7 +228,7 @@ Vite is a **regular dependency** of `@mcp-use/cli`, which is a regular dependenc
 
 Vite is framework implementation machinery: the package owns the compatible version and one install must provide the complete dev/build experience. Dependency installation and runtime evaluation are separate concerns; lazy chunks keep production startup lean even though Vite is installed. When views land, `@vitejs/plugin-react` is also a regular dependency. `react` and `react-dom` remain optional peers because applications own their singleton versions.
 
-`@mcp-use/client` is an optional peer at a compatible published version (`^2.0.0-alpha.0`). It remains independently published and independently installable; `mcp-use client` and `mcp-use screenshot` dynamic-import it. Human commands auto-install it when absent; JSON commands return `client_install_required` without changing dependencies. Server library exports do not re-export or absorb the SDK.
+`@mcp-use/client` is an optional peer at a compatible published version (`^2.0.1`). It remains independently published and independently installable; `mcp-use client` and `mcp-use screenshot` dynamic-import it. Human commands auto-install it when absent; JSON commands return `client_install_required` without changing dependencies. Server library exports do not re-export or absorb the SDK.
 
 `mcp-use` declares `@mcp-use/inspector` as a regular dependency so the local Inspector and screenshot preview always match the framework release. The Inspector package itself has zero regular dependencies and ships its standalone browser application prebuilt and compressed. `@mcp-use/cli` declares both `@mcp-use/client` and `@mcp-use/inspector` as optional peers: the framework satisfies the Inspector peer, while Client-only commands retain their explicit opt-in behavior.
 
