@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 20.0.5-canary.6
+
+### Patch Changes
+
+- 4574f32: Make embedded Inspector layouts fill their iframe height, remove the empty desktop header gap, and hide standalone sidebar footer controls.
+  - mcp-use@2.0.5-canary.6
+
 ## 20.0.5-canary.5
 
 ### Patch Changes
