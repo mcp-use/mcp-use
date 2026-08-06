@@ -44,8 +44,9 @@ export default defineConfig([
       "internal/resource-completion": "src/resource-completion.ts",
       // Internal-only validation entry; absent from package exports.
       "internal/usage": "src/usage.ts",
-      // Runtime-only binary: owns `mcp-use start` and delegates development
-      // commands to the separately installed @mcp-use/cli package.
+      // Runtime-only binary. It owns the published `mcp-use` bin but no
+      // command code: every command runs from @mcp-use/cli, a dependency of
+      // this package, so the prebuilt can be budgeted independently.
       bin: "src/bin.ts",
       "node-bridge": "src/node-bridge.ts",
       "internal/node-http": "src/node-http.ts",
