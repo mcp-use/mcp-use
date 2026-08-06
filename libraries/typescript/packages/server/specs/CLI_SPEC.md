@@ -326,7 +326,7 @@ Intercepted by the dev HTTP listener before the MCP handler (exact path match on
 | `POST` | `{basePath}/inspector/api/dev/start-tunnel` | `{ ok: true, restarting: false }` on success; `{ error }` with status 500 on failure.                                                                                |
 | `POST` | `{basePath}/inspector/api/dev/stop-tunnel`  | `{ ok: true }`.                                                                                                                                                      |
 
-Tunnel state lives at `.mcp-use/state/tunnel.json` as `{ subdomain, token? }`. Reading remains compatible with the historical `{ subdomain }` shape; new writes include the per-reservation bearer credential and use owner-only file permissions so an interrupted process can release and reclaim its identifier securely. Relay-generated identifiers use the historical readable adjective-color format. The control API defaults to `https://api.tunnel.mcp-use.run`; public tunnels remain `https://<adjective>-<color>.tunnel.mcp-use.run`. The relay base URL is overridable via `MCP_USE_TUNNEL_API`.
+Tunnel state lives at `.mcp-use/state/tunnel.json` as `{ subdomain, token? }`. Reading remains compatible with the historical `{ subdomain }` shape; new writes include the per-reservation bearer credential and use owner-only file permissions so an interrupted process can release and reclaim its identifier securely. Relay-generated identifiers use the historical readable adjective-color format. The relay API defaults to `https://api.tunnel.mcp-use.run`; public tunnels remain `https://<adjective>-<color>.tunnel.mcp-use.run`. The relay base URL is overridable via `MCP_USE_WS_RELAY`.
 
 ### `mcp-use start` (in its own lazy command chunk)
 

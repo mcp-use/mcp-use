@@ -352,7 +352,7 @@ async function cliCommand(
 
 function formatRuntimeError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
-  if (/tunnel|bore connection/i.test(message)) {
+  if (/tunnel/i.test(message)) {
     return [
       "[tunnel_connection_timeout] Public tunnel could not establish a connection.",
       `Cause: ${message}`,
@@ -360,8 +360,8 @@ function formatRuntimeError(error: unknown): string {
       "Retry:",
       "  mcp-use dev --tunnel",
       "",
-      "Verify outbound network access and tunnel service status:",
-      "  https://local.mcp-use.run",
+      "Verify outbound network access and relay health:",
+      "  https://api.tunnel.mcp-use.run/health",
     ].join("\n");
   }
   return message;

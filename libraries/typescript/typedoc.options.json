@@ -2,7 +2,12 @@
   "$schema": "https://typedoc.org/schema.json",
   "name": "mcp-use TypeScript API",
   "entryPointStrategy": "packages",
-  "entryPoints": ["packages/server", "packages/client", "packages/agent"],
+  "entryPoints": [
+    "packages/server",
+    "packages/client",
+    "packages/agent",
+    "packages/tunnel"
+  ],
   "plugin": ["./scripts/typedoc-navigation-plugin.mjs"],
   "theme": "mcp-use",
   "out": ".typedoc",

@@ -64,6 +64,7 @@
   },
   "devDependencies": {
     "@mcp-use/client": "workspace:*",
+    "@mcp-use/tunnel": "workspace:*",
     "@modelcontextprotocol/client": "2.0.0",
     "@modelcontextprotocol/server": "2.0.0",
     "@types/node": "^22.20.0",

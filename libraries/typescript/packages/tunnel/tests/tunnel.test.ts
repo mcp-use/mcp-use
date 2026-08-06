@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createTunnelManager } from "../../src/cli/tunnel.js";
+import { createTunnelManager } from "../src/index.js";
 
 const reservation = {
   tunnel_id: "quiet-amber",
@@ -25,7 +25,7 @@ function closeEvent(code: number, reason: string): CloseEvent {
   return event;
 }
 
-function messageEvent(data: string): MessageEvent {
+function messageEvent(data: unknown): MessageEvent {
   const event = new Event("message") as MessageEvent;
   Object.defineProperty(event, "data", { value: data });
   return event;
@@ -42,6 +42,7 @@ class MockWebSocket extends EventTarget {
   readonly sent: string[] = [];
   binaryType = "blob";
   readyState = MockWebSocket.CONNECTING;
+  closeCode: number | undefined;
 
   constructor(readonly url: string) {
     super();
@@ -76,6 +77,7 @@ class MockWebSocket extends EventTarget {
 
   close(code = 1000, reason = ""): void {
     if (this.readyState === MockWebSocket.CLOSED) return;
+    this.closeCode = code;
     this.readyState = MockWebSocket.CLOSED;
     this.dispatchEvent(closeEvent(code, reason));
   }
@@ -83,12 +85,18 @@ class MockWebSocket extends EventTarget {
   disconnect(code = 1012, reason = "Worker deployment"): void {
     this.close(code, reason);
   }
+
+  receive(data: unknown): void {
+    this.dispatchEvent(messageEvent(data));
+  }
 }
 
 describe("createTunnelManager", () => {
   let stateFilePath: string;
   let createRequests: number;
   let deleteRequests: number;
+  let requestUrl: string | undefined;
+  let requestBody: string | undefined;
 
   beforeEach(() => {
     stateFilePath = join(
@@ -97,17 +105,21 @@ describe("createTunnelManager", () => {
     );
     createRequests = 0;
     deleteRequests = 0;
+    requestUrl = undefined;
+    requestBody = undefined;
     MockWebSocket.instances.length = 0;
     MockWebSocket.keepaliveSupported = true;
     vi.stubGlobal("WebSocket", MockWebSocket);
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
         if (init?.method === "DELETE") {
           deleteRequests += 1;
           return Response.json({ deleted: true });
         }
         createRequests += 1;
+        requestUrl = input instanceof Request ? input.url : input.toString();
+        requestBody = typeof init?.body === "string" ? init.body : undefined;
         return Response.json(reservation, { status: 201 });
       })
     );
@@ -116,6 +128,19 @@ describe("createTunnelManager", () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
+  });
+
+  it("uses the configured relay and requested subdomain", async () => {
+    const tunnel = createTunnelManager(stateFilePath, {
+      relayUrl: "https://relay.example.com/base",
+      subdomain: "preferred-name",
+    });
+    await tunnel.start(3000);
+
+    expect(requestUrl).toBe("https://relay.example.com/api/tunnels/request");
+    expect(requestBody).toBe(JSON.stringify({ subdomain: "preferred-name" }));
+
+    await tunnel.stop();
   });
 
   it("reattaches the same reservation after a deployment disconnect", async () => {
@@ -168,5 +193,35 @@ describe("createTunnelManager", () => {
     expect(tunnel.status().url).toBe(reservation.public_url);
 
     await tunnel.stop();
+  });
+
+  it("rejects malformed frames, invalid identifiers, and unsupported messages", async () => {
+    const tunnel = createTunnelManager(stateFilePath);
+    await tunnel.start(3000);
+    const socket = MockWebSocket.instances[0];
+    socket?.receive(new Uint8Array(1 + 36 + 256 * 1024 + 1).buffer);
+    expect(socket?.closeCode).toBe(1003);
+    await tunnel.stop();
+
+    const second = createTunnelManager(stateFilePath);
+    await second.start(3000);
+    const invalidIdSocket = MockWebSocket.instances.at(-1);
+    invalidIdSocket?.receive(
+      JSON.stringify({ type: "cancel", requestId: "not-a-request-id" })
+    );
+    expect(invalidIdSocket?.closeCode).toBe(1008);
+    await second.stop();
+
+    const third = createTunnelManager(stateFilePath);
+    await third.start(3000);
+    const unsupportedSocket = MockWebSocket.instances.at(-1);
+    unsupportedSocket?.receive(
+      JSON.stringify({
+        type: "unsupported",
+        requestId: "123e4567-e89b-42d3-a456-426614174000",
+      })
+    );
+    expect(unsupportedSocket?.closeCode).toBe(1003);
+    await third.stop();
   });
 });

@@ -39,6 +39,9 @@ export default defineConfig({
     "tailwindcss",
     "vite",
   ],
+  // Ship tunnel support inside the CLI artifact without adding a runtime
+  // dependency to either @mcp-use/cli or mcp-use.
+  noExternal: ["@mcp-use/tunnel"],
   define: {
     __MCP_USE_CLI_VERSION__: JSON.stringify(cliPackage.version),
   },

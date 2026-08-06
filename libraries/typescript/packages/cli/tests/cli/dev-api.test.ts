@@ -4,7 +4,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createDevApiHandler } from "../../src/cli/dev-api.js";
-import type { TunnelManager } from "../../src/cli/tunnel.js";
+import type { TunnelManager } from "@mcp-use/tunnel";
 
 function fakeTunnel(initialUrl: string | null = null): {
   manager: TunnelManager;

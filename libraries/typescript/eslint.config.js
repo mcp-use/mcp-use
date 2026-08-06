@@ -284,12 +284,16 @@ export default [
       "tsdoc/syntax": "error",
     },
   },
-  // mcp-use server and @mcp-use/cli — strictest type safety, no escape hatches.
+  // Runtime packages — strictest type safety, no escape hatches.
   // `any` is banned outright; `unknown` is allowed only at real boundaries
   // and must be narrowed before use (the no-unsafe-* rules enforce this).
   // Doc comments must be valid TSDoc (see packages/server/CLAUDE.md).
   {
-    files: ["packages/server/src/**/*.ts", "packages/cli/src/**/*.ts"],
+    files: [
+      "packages/server/src/**/*.ts",
+      "packages/cli/src/**/*.ts",
+      "packages/tunnel/src/**/*.ts",
+    ],
     languageOptions: {
       parser: tsparser,
       parserOptions: {
@@ -299,6 +303,7 @@ export default [
         project: [
           "./packages/server/tsconfig.test.json",
           "./packages/cli/tsconfig.test.json",
+          "./packages/tunnel/tsconfig.test.json",
         ],
         tsconfigRootDir: import.meta.dirname,
       },
