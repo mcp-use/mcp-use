@@ -9,7 +9,7 @@ This is extremely useful when you have multiple microservices or specialized MCP
 Pass a configuration object directly to `server.proxy()`. The keys act as the **namespaces** for the child servers to prevent naming collisions.
 
 ```typescript
-import { MCPServer } from "mcp-use/server";
+import { MCPServer } from "mcp-use";
 import path from "node:path";
 
 const server = new MCPServer({ name: "UnifiedServer", version: "1.0.0" });
@@ -46,7 +46,7 @@ In the example above, the `database` tools will be prefixed with `database_` (e.
 For advanced use cases (dynamic auth headers, manual session lifecycles, or custom connectors), you can inject an explicit `MCPSession` directly into the `proxy` method using the `@mcp-use/client` SDK.
 
 ```typescript
-import { MCPServer } from "mcp-use/server";
+import { MCPServer } from "mcp-use";
 import { MCPClient } from "@mcp-use/client";
 
 const server = new MCPServer({ name: "UnifiedServer", version: "1.0.0" });

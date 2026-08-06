@@ -11,7 +11,7 @@ Complete end-to-end examples showing server + widget implementations for common 
 ### Server (index.ts)
 
 ```typescript
-import { MCPServer, text, widget, object, error } from "mcp-use/server";
+import { MCPServer, text, widget, object, error } from "mcp-use";
 import { z } from "zod";
 
 const server = new MCPServer({
@@ -150,7 +150,7 @@ export default function WeatherDisplay() {
 ### Server (index.ts)
 
 ```typescript
-import { MCPServer, text, widget, object, error } from "mcp-use/server";
+import { MCPServer, text, widget, object, error } from "mcp-use";
 import { z } from "zod";
 
 const server = new MCPServer({
@@ -434,7 +434,7 @@ export default function TodoList() {
 ### Server (index.ts)
 
 ```typescript
-import { MCPServer, widget, text } from "mcp-use/server";
+import { MCPServer, widget, text } from "mcp-use";
 import { z } from "zod";
 
 const server = new MCPServer({

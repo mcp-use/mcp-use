@@ -112,11 +112,11 @@
     "@modelcontextprotocol/core": "2.0.0",
     "@modelcontextprotocol/ext-apps": "npm:@mcp-use/ext-apps@1.7.4-pr720.1",
     "@modelcontextprotocol/server": "2.0.0",
-    "hono": "^4.12.27",
+    "hono": "^4.12.34",
     "jose": "^6.1.3"
   },
   "peerDependencies": {
-    "@mcp-use/client": "^2.0.0",
+    "@mcp-use/client": "^2.0.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

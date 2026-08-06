@@ -5,7 +5,7 @@
     "node": ">=22.22.2"
   },
   "version": "1.0.0",
-  "description": "an mcp-use server",
+  "description": "a minimal mcp-use server with no tools registered, ready to add your own",
   "author": "mcp-use",
   "license": "MIT",
   "homepage": "https://github.com/mcp-use/mcp-use",
@@ -18,7 +18,6 @@
     "mcp-use",
     "manufact"
   ],
-  "main": "dist/index.js",
   "scripts": {
     "build": "mcp-use build",
     "dev": "mcp-use dev",

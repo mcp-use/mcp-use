@@ -59,7 +59,6 @@ When you clone this repository locally, you'll find `python/` and `typescript/` 
 ## TypeScript Examples
 
 ### Client Examples
-- **[Node HTTP Client](../libraries/typescript/packages/mcp-use/examples/client/node/full-features-example.ts)** - Node/HTTP client with tool calls, sampling, elicitation, notifications
 - **[CommonJS Example](../libraries/typescript/packages/client/examples/browser/commonjs/commonjs_example.cjs)** - CommonJS usage
 - **[CLI Examples](../libraries/typescript/packages/client/examples/cli/)** - Command-line interface examples
 - **[React Integration](../libraries/typescript/packages/client/examples/browser/react/)** - React client examples
@@ -69,25 +68,17 @@ When you clone this repository locally, you'll find `python/` and `typescript/` 
 ### Server Examples
 - **[Basic Server](../libraries/typescript/packages/server/examples/basic/)** - Simple server implementation
 - **[Server Features](../libraries/typescript/packages/server/examples/)** - Advanced features
-  - [Everything](../libraries/typescript/packages/mcp-use/examples/server/features/everything/) - All MCP primitives in one server
   - [Conformance](../libraries/typescript/packages/server/examples/conformance/) - MCP conformance test server
   - [Elicitation](../libraries/typescript/packages/server/examples/elicitation/) - Form and URL elicitation
   - [Sampling](../libraries/typescript/packages/server/examples/sampling/) - Server-initiated LLM sampling
   - [Notifications](../libraries/typescript/packages/server/examples/notifications/) - Bidirectional notifications
-  - [Completion](../libraries/typescript/packages/mcp-use/examples/server/features/completion/) - Autocomplete for prompt args
-  - [Streaming Props](../libraries/typescript/packages/mcp-use/examples/server/features/streaming-props/) - Stream tool props to widgets
   - [Middleware](../libraries/typescript/packages/server/examples/middleware/) - Built-in middleware pipeline
-  - [Express Middleware](../libraries/typescript/packages/mcp-use/examples/server/features/express-middleware/) - Express/Hono integration
-  - [Session Management](../libraries/typescript/packages/mcp-use/examples/server/features/session-management/) - Memory, filesystem, Redis storage
   - [Proxy](../libraries/typescript/packages/server/examples/proxy/) - Proxy MCP server
-  - [Client Info](../libraries/typescript/packages/mcp-use/examples/server/features/client-info/) - Access client capabilities
-  - [DNS Rebinding](../libraries/typescript/packages/mcp-use/examples/server/features/dns-rebinding/) - DNS rebinding protection
 - **[OAuth Examples](../libraries/typescript/packages/server/examples/auth/)** - OAuth implementations
   - [Auth0](../libraries/typescript/packages/server/examples/auth/auth0/)
   - [Better Auth (v2 + Hono)](../libraries/typescript/packages/server/examples/auth/better-auth/)
   - [Supabase](../libraries/typescript/packages/server/examples/auth/supabase/)
   - [WorkOS](../libraries/typescript/packages/server/examples/auth/workos/)
-- **[Deployment](../libraries/typescript/packages/mcp-use/examples/server/deployment/)** - Deployment examples
 - **[MCP Apps view examples](../libraries/typescript/packages/server/examples/views/)** — current `view` API and React hooks
   - **[Basic](../libraries/typescript/packages/server/examples/views/basic/)** - Typed tool output, view tools, host context, and display modes
   - [File Upload](../libraries/typescript/packages/server/examples/views/file-upload/) - File-manager view using `useFiles`

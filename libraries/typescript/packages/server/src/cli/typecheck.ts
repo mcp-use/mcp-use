@@ -23,11 +23,15 @@ export interface TypecheckOptions {
  * Refresh the MCP environment declaration and run the project's own
  * TypeScript compiler with emission disabled.
  *
+ * TypeScript prints nothing when a project is clean, so a success line is
+ * written on exit code `0` to distinguish a passing run from a hung one.
+ *
  * @returns The exit code returned by TypeScript.
  * @throws If the entry cannot be found, TypeScript is not installed in the
  * project, or the compiler process cannot be started.
  */
 export async function runTypecheck(options: TypecheckOptions): Promise<number> {
+  const startedAt = performance.now();
   const sourceRoot =
     options.mcpDir === undefined
       ? options.cwd
@@ -44,7 +48,16 @@ export async function runTypecheck(options: TypecheckOptions): Promise<number> {
   }
 
   const compiler = resolveProjectTypeScript(options.cwd);
-  return runCompiler(compiler, options.cwd, options.tscArgs ?? []);
+  const exitCode = await runCompiler(
+    compiler,
+    options.cwd,
+    options.tscArgs ?? []
+  );
+  if (exitCode === 0) {
+    const duration = Math.round(performance.now() - startedAt);
+    console.log(`[mcp-use] no type errors (${duration}ms)`);
+  }
+  return exitCode;
 }
 
 /** Resolve the `tsc` binary from the selected project's TypeScript package. */

@@ -85,10 +85,19 @@ app.use(
     exposeHeaders: ["*"],
   })
 );
+// The CLI is primarily local dev tooling, where proxying to localhost MCP
+// servers is the main use case — but the published Docker image runs this same
+// CLI with NODE_ENV=production on a public port, where loopback proxying is
+// SSRF into the container's own services. Allow loopback outside production;
+// INSPECTOR_ALLOW_LOOPBACK overrides either way.
+const allowLoopback = process.env.INSPECTOR_ALLOW_LOOPBACK
+  ? process.env.INSPECTOR_ALLOW_LOOPBACK === "true"
+  : process.env.NODE_ENV !== "production";
+
 registerInspectorProxyRoutes(app, {
   autoConnectUrl: mcpUrl,
   oauthProxyAllowedOrigins: [],
-  oauthProxyAllowLoopback: true,
+  oauthProxyAllowLoopback: allowLoopback,
 });
 
 registerInspectorShell(app, {

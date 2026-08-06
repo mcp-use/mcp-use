@@ -96,7 +96,7 @@ After scaffolding:
 Open `index.ts` and you'll see a basic server. Let's add a simple tool:
 
 ```typescript
-import { MCPServer, text } from "mcp-use/server";
+import { MCPServer, text } from "mcp-use";
 import { z } from "zod";
 
 const server = new MCPServer({
@@ -181,7 +181,7 @@ export const getWeather = server.tool(
 Return structured data with `object()`:
 
 ```typescript
-import { MCPServer, text, object } from "mcp-use/server";
+import { MCPServer, text, object } from "mcp-use";
 
 export const getWeatherDetailed = server.tool(
   {

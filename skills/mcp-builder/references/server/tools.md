@@ -9,7 +9,7 @@ Tools are backend actions the AI can call. They take structured input and return
 ## Basic Tool
 
 ```typescript
-import { MCPServer, text } from "mcp-use/server";
+import { MCPServer, text } from "mcp-use";
 import { z } from "zod";
 
 const server = new MCPServer({
@@ -223,7 +223,7 @@ return object({
 **Always use `error()` helper, don't throw:**
 
 ```typescript
-import { text, error } from "mcp-use/server";
+import { text, error } from "mcp-use";
 
 export const fetchUserTool = server.tool(
   { name: "fetch-user", schema: z.object({ id: z.string() }) },
@@ -262,7 +262,7 @@ export const fetchUserTool = server.tool(
 When your tool returns visual UI:
 
 ```typescript
-import { widget, text } from "mcp-use/server";
+import { widget, text } from "mcp-use";
 
 export const searchProducts = server.tool(
   {

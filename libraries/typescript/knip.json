@@ -13,6 +13,7 @@
   ],
   "workspaces": {
     ".": {
+      "entry": ["scripts/version-packages.mjs"],
       "project": ["*.{js,ts}"]
     },
     "packages/server": {

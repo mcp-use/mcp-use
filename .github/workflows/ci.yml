@@ -50,7 +50,7 @@ on:
   push:
     branches: [main, canary]
   pull_request:
-    branches: [main, canary, beta]
+    branches: [main, canary]
   workflow_call:
     inputs:
       ref:
@@ -89,6 +89,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
+          fetch-depth: 0
       - uses: dorny/paths-filter@v3
         id: filter
         if: github.event_name != 'workflow_call'
@@ -660,9 +661,6 @@ jobs:
       - name: Build Packages
         run: pnpm build
 
-      - name: Test release versioning
-        run: pnpm test:release-versioning
-
   typescript-test-mcp-use:
     needs: typescript-lint
     name: "typescript/mcp-use (node-${{ matrix.node-version }})"
@@ -813,7 +811,7 @@ jobs:
 
   typescript-changeset-check:
     needs: detect-changes
-    if: ${{ (github.event_name == 'workflow_call' && inputs.run_changeset_check) || (github.event_name == 'pull_request' && github.head_ref != 'beta' && github.base_ref != 'canary' && github.base_ref != 'beta' && needs.detect-changes.outputs.typescript == 'true') }}
+    if: ${{ (github.event_name == 'workflow_call' && inputs.run_changeset_check) || (github.event_name == 'pull_request' && github.base_ref != 'canary' && needs.detect-changes.outputs.typescript == 'true') }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -840,11 +838,25 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --no-frozen-lockfile
 
+      - name: Prevent canary-to-main version regression
+        if: github.event_name == 'pull_request' && github.base_ref == 'main' && github.head_ref == 'canary'
+        run: pnpm release-channel preflight --channel stable
+
       - name: Check for Changesets
         env:
           BASE_REF: ${{ github.base_ref || 'main' }}
+          HEAD_REF: ${{ github.head_ref }}
         run: |
-          if [ -n "$(ls -A .changeset/*.md 2>/dev/null | grep -v README.md)" ]; then
+          if [ "$BASE_REF" = "main" ] && [ "$HEAD_REF" = "canary" ]; then
+            pending_changesets="$(node scripts/release-channel.mjs pending)"
+            if [ -n "$pending_changesets" ]; then
+              echo "✅ Pending changeset found"
+              printf '%s\n' "$pending_changesets"
+              pnpm changeset status --since="origin/${BASE_REF}"
+            else
+              echo "✅ No pending changesets; prerelease changesets are already applied"
+            fi
+          elif [ -n "$(ls -A .changeset/*.md 2>/dev/null | grep -v README.md)" ]; then
             echo "✅ Changeset found"
             pnpm changeset status --since="origin/${BASE_REF}"
           else

@@ -12,8 +12,8 @@ import React, { useCallback, useState } from "react";
 const DEFAULT_URL = import.meta.env.VITE_MCP_URL ?? "http://127.0.0.1:3102/mcp";
 
 const PRESETS: { label: string; url: string }[] = [
-  { label: "official v2 (3102)", url: "http://127.0.0.1:3102/mcp" },
-  { label: "official v1 (3101)", url: "http://127.0.0.1:3101/mcp" },
+  { label: "mcp-use v2 (3102)", url: "http://127.0.0.1:3102/mcp" },
+  { label: "mcp-use legacy (3101)", url: "http://127.0.0.1:3101/mcp" },
   { label: "mcp-use v2 (3104 proxy)", url: "/demo/mcp-use-v2" },
   { label: "Linear OAuth", url: "https://mcp.linear.app/mcp" },
 ];
