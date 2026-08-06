@@ -250,6 +250,29 @@ export function ChatTab({
   const [followups, setFollowups] = useState<string[]>(chatFollowups);
   const [activeView, setActiveView] = useState<ChatView>(defaultView);
   const [disabledTools, setDisabledTools] = useState<Set<string>>(new Set());
+  const [disabledSkillUris, setDisabledSkillUris] = useState<Set<string>>(
+    new Set()
+  );
+  const skills = connection.skills ?? [];
+  const enabledSkillUris = useMemo(
+    () =>
+      new Set(
+        skills
+          .map((skill) => skill.uri)
+          .filter((uri) => !disabledSkillUris.has(uri))
+      ),
+    [skills, disabledSkillUris]
+  );
+  const setEnabledSkillUris = useCallback(
+    (enabled: Set<string>) => {
+      setDisabledSkillUris(
+        new Set(
+          skills.map((skill) => skill.uri).filter((uri) => !enabled.has(uri))
+        )
+      );
+    },
+    [skills]
+  );
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const messagesAreaRef = useRef<HTMLDivElement | null>(null);
   // Track position of trigger for removal in textarea
@@ -307,6 +330,7 @@ export function ChatTab({
     readResource,
     widgetModelContexts,
     disabledTools: effectiveDisabledTools,
+    enabledSkillUris,
     appToolConnections,
   };
 
@@ -321,6 +345,7 @@ export function ChatTab({
     widgetModelContexts,
     initialMessages: restoredMessages ?? initialMessages,
     disabledTools: effectiveDisabledTools,
+    enabledSkillUris,
     streamProtocol,
     credentials,
     extraHeaders,
@@ -330,6 +355,7 @@ export function ChatTab({
     ...chatHookParams,
     initialMessages: restoredMessages ?? initialMessages,
     systemPrompt: resolvedSystemPrompt,
+    skills,
   });
 
   const {
@@ -368,6 +394,7 @@ export function ChatTab({
 
   const clearChatToLanding = useCallback(() => {
     clearMessages();
+    setDisabledSkillUris(new Set());
     setShaderPhase("visible");
   }, [clearMessages]);
 
@@ -403,6 +430,7 @@ export function ChatTab({
     setShaderPhase("visible");
     setInternalChatTitle(CHAT_TITLE_PLACEHOLDER);
     setActiveChatId(null);
+    setDisabledSkillUris(new Set());
     if (effectiveChatStorage) {
       const session = await effectiveChatStorage.createChat({
         agentId: serverId,
@@ -1234,6 +1262,27 @@ export function ChatTab({
     [executePrompt, clearPromptsState, inputValue]
   );
 
+  const handleSkillSelect = useCallback(
+    (skill: (typeof skills)[number]) => {
+      const next = new Set(enabledSkillUris);
+      if (next.has(skill.uri)) next.delete(skill.uri);
+      else next.add(skill.uri);
+      setEnabledSkillUris(next);
+
+      if (textareaRef.current && triggerSpanRef.current) {
+        const { start, end } = triggerSpanRef.current;
+        const nextInput = inputValue.slice(0, start) + inputValue.slice(end);
+        setInputValue(nextInput);
+        requestAnimationFrame(() => {
+          textareaRef.current?.focus();
+          textareaRef.current?.setSelectionRange(start, start);
+        });
+      }
+      clearPromptsState();
+    },
+    [clearPromptsState, enabledSkillUris, inputValue, setEnabledSkillUris]
+  );
+
   const handleSendMessage = useCallback(() => {
     // Can send if there's text, prompt results, or attachments
     const hasContent =
@@ -1264,13 +1313,15 @@ export function ChatTab({
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === "ArrowDown") {
         setPromptFocusedIndex((prev) => {
-          if (filteredPrompts.length === 0) return -1;
-          return (prev + 1) % filteredPrompts.length;
+          const suggestionCount = filteredPrompts.length + skills.length;
+          if (suggestionCount === 0) return -1;
+          return (prev + 1) % suggestionCount;
         });
       } else if (e.key === "ArrowUp") {
         setPromptFocusedIndex((prev) => {
-          if (filteredPrompts.length === 0) return -1;
-          return (prev - 1 + filteredPrompts.length) % filteredPrompts.length;
+          const suggestionCount = filteredPrompts.length + skills.length;
+          if (suggestionCount === 0) return -1;
+          return (prev - 1 + suggestionCount) % suggestionCount;
         });
       } else if (e.key === "Escape") {
         e.stopPropagation();
@@ -1279,13 +1330,18 @@ export function ChatTab({
         const prompt = filteredPrompts[promptFocusedIndex];
         if (prompt) {
           handlePromptSelect(prompt);
+        } else {
+          const skill = skills[promptFocusedIndex - filteredPrompts.length];
+          if (skill) handleSkillSelect(skill);
         }
       }
     },
     [
       filteredPrompts,
+      skills,
       promptFocusedIndex,
       handlePromptSelect,
+      handleSkillSelect,
       clearPromptsUIState,
     ]
   );
@@ -1491,6 +1547,9 @@ export function ChatTab({
           prompts={filteredPrompts}
           selectedPrompt={selectedPrompt}
           promptResults={results}
+          skills={skills}
+          enabledSkillUris={enabledSkillUris}
+          onEnabledSkillUrisChange={setEnabledSkillUris}
           attachments={attachments}
           tools={hideToolSelector ? undefined : toolInfos}
           disabledTools={hideToolSelector ? undefined : disabledTools}
@@ -1499,6 +1558,7 @@ export function ChatTab({
           }
           onDeletePromptResult={handleDeleteResult}
           onPromptSelect={handlePromptSelect}
+          onSkillSelect={handleSkillSelect}
           onInputChange={setInputValue}
           onKeyDown={handleKeyDown}
           onKeyUp={handleKeyUp}
@@ -1628,6 +1688,9 @@ export function ChatTab({
             promptFocusedIndex={promptFocusedIndex}
             prompts={filteredPrompts}
             promptResults={results}
+            skills={skills}
+            enabledSkillUris={enabledSkillUris}
+            onEnabledSkillUrisChange={setEnabledSkillUris}
             selectedPrompt={selectedPrompt}
             attachments={attachments}
             tools={hideToolSelector ? undefined : toolInfos}
@@ -1637,6 +1700,7 @@ export function ChatTab({
             }
             onDeletePromptResult={handleDeleteResult}
             onPromptSelect={handlePromptSelect}
+            onSkillSelect={handleSkillSelect}
             onInputChange={setInputValue}
             onKeyDown={handleKeyDown}
             onKeyUp={handleKeyUp}

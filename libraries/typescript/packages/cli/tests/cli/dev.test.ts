@@ -2,7 +2,13 @@
  * e2e tests for runDev: a real Vite dev server + module runner serving the
  * fixture over HTTP, including edit-triggered reload and error resilience.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import {
   Client,
@@ -248,6 +254,11 @@ describe("runDev", () => {
         ? true
         : undefined
     );
+    const reloadError = errorSpy.mock.calls.find((call) =>
+      String(call[0]).includes("reload failed")
+    );
+    expect(reloadError).toHaveLength(1);
+    expect(String(reloadError?.[0])).not.toContain("\n");
     expect(await mcpRequest(dev.url, "skills/list")).toMatchObject({
       result: { skills: [{ frontmatter: { name: "refunds" } }] },
     });
@@ -264,6 +275,62 @@ describe("runDev", () => {
       return result.skills?.[0]?.frontmatter?.description === "Updated refunds"
         ? true
         : undefined;
+    });
+
+    errorSpy.mockClear();
+    writeFileSync(skillFile, "");
+    writeFileSync(
+      skillFile,
+      "---\nname: refunds\ndescription: Atomically updated refunds\n---\n# v3\n"
+    );
+    await waitFor(async () => {
+      const body = await mcpRequest(dev.url, "skills/list");
+      const result = body["result"] as {
+        skills?: Array<{ frontmatter?: { description?: string } }>;
+      };
+      return result.skills?.[0]?.frontmatter?.description ===
+        "Atomically updated refunds"
+        ? true
+        : undefined;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(errorSpy).not.toHaveBeenCalled();
+
+    const addedSkillDir = join(cwd, "skills", "shipping");
+    const addedSkillFile = join(addedSkillDir, "SKILL.md");
+    mkdirSync(addedSkillDir, { recursive: true });
+    writeFileSync(
+      addedSkillFile,
+      "---\nname: shipping\ndescription: Track shipments\n---\n# Shipping\n"
+    );
+    await waitFor(async () => {
+      const body = await mcpRequest(dev.url, "skills/list");
+      const result = body["result"] as { skills?: unknown[] };
+      return result.skills?.length === 2 ? true : undefined;
+    });
+
+    writeFileSync(
+      addedSkillFile,
+      "---\nname: shipping\ndescription: Updated shipment tracking\n---\n# Shipping\n"
+    );
+    await waitFor(async () => {
+      const body = await mcpRequest(dev.url, "skills/list");
+      const result = body["result"] as {
+        skills?: Array<{ frontmatter?: { description?: string } }>;
+      };
+      return result.skills?.some(
+        (skill) =>
+          skill.frontmatter?.description === "Updated shipment tracking"
+      )
+        ? true
+        : undefined;
+    });
+
+    rmSync(addedSkillDir, { recursive: true, force: true });
+    await waitFor(async () => {
+      const body = await mcpRequest(dev.url, "skills/list");
+      const result = body["result"] as { skills?: unknown[] };
+      return result.skills?.length === 1 ? true : undefined;
     });
   });
 

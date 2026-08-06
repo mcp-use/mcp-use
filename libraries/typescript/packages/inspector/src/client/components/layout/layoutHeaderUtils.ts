@@ -21,6 +21,8 @@ export function getTabCount(tabId: string, server: McpServer): number {
     return server.prompts.length;
   } else if (tabId === "resources") {
     return server.resources.length;
+  } else if (tabId === "skills") {
+    return server.skills?.length ?? 0;
   } else if (tabId === "sampling") {
     return server.pendingSamplingRequests?.length || 0;
   } else if (tabId === "elicitation") {
@@ -29,6 +31,10 @@ export function getTabCount(tabId: string, server: McpServer): number {
     return server.unreadNotificationCount;
   }
   return 0;
+}
+
+export function supportsSkills(server: McpServer): boolean {
+  return server.extensions?.["io.modelcontextprotocol/skills"] !== undefined;
 }
 
 export function shouldShowDot(

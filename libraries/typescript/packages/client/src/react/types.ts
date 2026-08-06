@@ -449,6 +449,8 @@ export type UseMcpResult = {
   resourceTemplates: ResourceTemplate[];
   /** List of prompts available from the connected MCP server */
   prompts: Prompt[];
+  /** Skills advertised through the experimental Skills over MCP extension. */
+  skills: import("../core/skills.js").Skill[];
   /** Server information normalized for the active connection. */
   serverInfo?: {
     /** Optional human-readable server title. */
@@ -603,6 +605,17 @@ export type UseMcpResult = {
       blob?: string;
     }>;
   }>;
+  /** Refresh the complete paginated skill catalog. */
+  listSkills: () => Promise<void>;
+  /** Resolve one skill by its canonical URI. */
+  getSkill: (
+    uri: string
+  ) => Promise<import("../core/skills.js").SkillGetResult>;
+  /** Read one non-recursive directory in a remote skill. */
+  readResourceDirectory: (
+    uri: string,
+    cursor?: string
+  ) => Promise<import("../core/skills.js").SkillDirectoryReadResult>;
   /**
    * Function to list prompts from the MCP server.
    * @returns A promise that resolves when prompts are refreshed.

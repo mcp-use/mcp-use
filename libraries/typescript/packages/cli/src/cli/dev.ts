@@ -601,6 +601,7 @@ export async function runDev(options: DevOptions): Promise<void> {
   let desiredRevision = 0;
   let reconciling = false;
   let reloadTimer: ReturnType<typeof setTimeout> | undefined;
+  let skillsReloadTimer: ReturnType<typeof setTimeout> | undefined;
   const isAborted = (): boolean => options.signal?.aborted === true;
 
   /**
@@ -640,9 +641,13 @@ export async function runDev(options: DevOptions): Promise<void> {
         } catch (error) {
           if (isAborted()) return;
           if (revision !== desiredRevision) continue;
+          const message = (
+            error instanceof Error ? error.message : String(error)
+          )
+            .replace(/\s+/g, " ")
+            .trim();
           console.error(
-            "[mcp-use] reload failed — keeping the previous server:\n",
-            error
+            `[mcp-use] reload failed — keeping the previous server: ${message}`
           );
           return;
         }
@@ -661,6 +666,17 @@ export async function runDev(options: DevOptions): Promise<void> {
     }, RELOAD_SETTLE_MS);
   };
 
+  const scheduleSkillsReload = (): void => {
+    if (skillsReloadTimer !== undefined) clearTimeout(skillsReloadTimer);
+    // Editors and scaffolding tools commonly create/rename a skill and then
+    // write SKILL.md in several filesystem operations. Let that short burst
+    // settle so discovery does not validate an intermediate empty file.
+    skillsReloadTimer = setTimeout(() => {
+      skillsReloadTimer = undefined;
+      scheduleReconcile();
+    }, 150);
+  };
+
   const onSsrFileEvent = (file: string): void => {
     if (isViewPath(file, options.cwd, viewsDirectory)) {
       return;
@@ -673,7 +689,7 @@ export async function runDev(options: DevOptions): Promise<void> {
           `${currentSkillsDirectory.replaceAll("\\", "/")}/`
         ))
     ) {
-      scheduleReconcile();
+      scheduleSkillsReload();
       return;
     }
     const modules = ssrEnvironment.moduleGraph.getModulesByFile(
@@ -778,6 +794,7 @@ export async function runDev(options: DevOptions): Promise<void> {
    * watcher subscriptions, tunnel, HTTP listener, module runner, Vite.
    */
   const teardown = async (): Promise<void> => {
+    if (skillsReloadTimer !== undefined) clearTimeout(skillsReloadTimer);
     vite.watcher.off("change", onSsrFileEvent);
     vite.watcher.off("add", onFileAddOrUnlink);
     vite.watcher.off("unlink", onFileAddOrUnlink);

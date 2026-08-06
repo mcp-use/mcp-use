@@ -601,9 +601,9 @@ export class InspectorConnectionStorageProvider extends LocalStorageProvider {
         sanitizePersistedInspectorConfig({
           ...pickInspectorConnectionExtras(prev[id]),
           ...config,
-          // Tunnel switching is a live transport override. Persist the stable
-          // localhost endpoint so a later dev-process restart cannot boot into
-          // an expired tunnel URL.
+          // Recover connections written by the legacy tunnel-switching flow.
+          // The mounted Inspector should always persist its stable localhost
+          // endpoint rather than an ephemeral public tunnel URL.
           ...(isLocalhostServerUrl(id) &&
           typeof config.url === "string" &&
           isMcpUseTunnelUrl(config.url)
