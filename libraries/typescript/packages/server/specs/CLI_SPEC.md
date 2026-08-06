@@ -54,7 +54,8 @@ bundles the same command chunks from `packages/server` behind the same
 `mcp-use` bin, and carries the build toolchain (`vite`, `@vitejs/plugin-react`,
 `tailwindcss`, `@tailwindcss/vite`) as runtime dependencies so the pipeline is
 installed with the CLI rather than with generated apps. `@mcp-use/client` and
-`@mcp-use/inspector` stay optional peers, as they are for `mcp-use`.
+`@mcp-use/inspector` are optional peers of the prebuilt, so neither is
+installed unless the project asks for it.
 
 It adds no command code of its own: every entry re-exports from
 `packages/server`, so `mcp-use` remains the canonical package and the source of
