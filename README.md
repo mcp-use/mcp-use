@@ -370,6 +370,10 @@ Remix a complete MCP App, inspect the source, or deploy it as a starting point:
 - [Manufact](https://manufact.com)
 - [MIT license](https://github.com/mcp-use/mcp-use/blob/main/LICENSE)
 
+## Star History
+
+[![Star History Chart](https://star-history.dera.page/svg?repos=mcp-use/mcp-use&type=date&legend=top-left)](https://star-history.dera.page/#mcp-use/mcp-use&type=date&legend=top-left)
+
 ## Contributors
 
 Built by [Pietro](https://github.com/pietrozullo), [Luigi](https://github.com/pederzh), [Enrico](https://github.com/tonxxd), and the mcp-use community.
