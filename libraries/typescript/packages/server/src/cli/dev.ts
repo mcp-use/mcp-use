@@ -1,12 +1,12 @@
 /**
- * `mcp-use dev` — a single long-lived dev process (CLI_SPEC.md § Commands →
- * dev): a Vite dev server (Environment API, node/SSR environment only) loads
+ * `mcp-use dev` — a single long-lived dev process: a Vite dev server
+ * (Environment API, node/SSR environment only) loads
  * the entry through the module runner; one HTTP listener delegates every
  * request to an atomically swappable handler reference.
  *
  * When views exist, the same Vite server gains a client environment with real
  * HMR for view files; the CLI primes views on each entry reload via the
- * internal {@link registerViews} API (VIEWS_SPEC.md § Dev).
+ * internal {@link registerViews} API.
  *
  * Reload, not HMR: on file change the entry is re-imported and the handler
  * reference swapped — no registration diffing or running-registry mutation.
@@ -308,9 +308,8 @@ function serverFrom(moduleExports: Record<string, unknown>): ServerLike {
  *
  * @param options - Project root, optional entry override, port and host.
  * @throws If no entry is found, if the initial import fails, if the entry's
- * default export is not an `MCPServer` (see the entry contract in
- * CLI_SPEC.md), or if `vite` is not installed (`mcp-use dev` requires it as a
- * devDependency).
+ * default export is not an `MCPServer`, or if `vite` is not installed
+ * (`mcp-use dev` requires it as a devDependency).
  *
  * @internal Reached only via the bin's dedicated dev command chunk — not
  * re-exported from the package's "." entry.

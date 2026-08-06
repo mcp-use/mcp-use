@@ -126,7 +126,7 @@ describe("runBuild", () => {
     expect(existsSync(entryFile)).toBe(true);
     expect(existsSync(`${entryFile}.map`)).toBe(false);
 
-    // Manifest shape per CLI_SPEC.md § Commands → build.
+    // Verify the build manifest shape.
     const manifest = JSON.parse(
       readFileSync(join(buildDir, BUILD_MANIFEST_NAME), "utf8")
     ) as BuildManifest;

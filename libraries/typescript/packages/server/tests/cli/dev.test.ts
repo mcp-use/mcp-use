@@ -700,8 +700,8 @@ throw new Error("startup failure after MCPServer construction");
   });
 
   // DNS-rebinding protection: the dev listener validates Host on localhost
-  // binds before any routing — same posture as MCPServer.listen() (CLI_SPEC.md
-  // § dev). Origin is not validated unless the server sets allowedOrigins.
+  // binds before any routing. Origin is not validated unless the server sets
+  // allowedOrigins.
   // Raw node:http requests because fetch() sanitizes Host/Origin headers.
   it("rejects non-localhost Host but accepts foreign Origin (DNS rebinding)", async () => {
     const cwd = copyFixture("dev-rebind");
@@ -921,7 +921,7 @@ describe("runDev (views)", () => {
     expect(tunnelViteClient).toContain("new WebSocket");
     tunnelState.url = null;
 
-    // Vite module CORS (CLI_SPEC.md § DNS-rebinding protection):
+    // Vite module CORS:
     // without a tunnel, a validated loopback Origin is reflected exactly
     // (with Vary: Origin) so a local MCP host can load the module graph…
     const loopbackOrigin = "http://localhost:6274";
@@ -980,7 +980,7 @@ describe("runDev (views)", () => {
     expect(assetImportResponse.status).toBe(200);
     const assetImportJs = await assetImportResponse.text();
     // Vite `server.origin` is the browsable origin: `localhost`, not the
-    // 127.0.0.1 bind address (VIEWS_SPEC.md § Dev).
+    // 127.0.0.1 bind address.
     expect(assetImportJs).toMatch(
       new RegExp(
         `http://localhost:${port}/views/product-search-result/badge\\.png`
