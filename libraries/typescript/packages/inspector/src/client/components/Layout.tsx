@@ -516,6 +516,7 @@ export function Layout({ children }: LayoutProps) {
   };
 
   const selectedServer = connections.find((c) => c.id === selectedServerId);
+  const displayServerRef = useRef<McpServer | undefined>(undefined);
 
   const isTunnelConnecting = useTunnelConnectionSync({
     tunnelUrl,
@@ -526,6 +527,14 @@ export function Layout({ children }: LayoutProps) {
     updateConnection: updateServer,
     connections,
   });
+
+  useEffect(() => {
+    if (!isTunnelConnecting && selectedServer) {
+      displayServerRef.current = selectedServer;
+    } else if (!isTunnelConnecting) {
+      displayServerRef.current = undefined;
+    }
+  }, [isTunnelConnecting, selectedServer]);
 
   // Aggregate tools, prompts, and resources from all connected servers
   // When a server is selected, use only that server's items
@@ -811,8 +820,7 @@ export function Layout({ children }: LayoutProps) {
     !!urlServerId &&
     !urlServerId.startsWith("http://") &&
     !urlServerId.startsWith("https://");
-  const showBootScreen =
-    isAutoConnecting || isBootstrappingServer || isTunnelConnecting;
+  const showBootScreen = isAutoConnecting || isBootstrappingServer;
   const layoutViewKey = selectedServer?.id ?? "home";
   const viewTransitionKey = showBootScreen ? "boot" : layoutViewKey;
   const [displayKey, setDisplayKey] = useState(viewTransitionKey);
@@ -830,10 +838,21 @@ export function Layout({ children }: LayoutProps) {
   }, [viewTransitionKey, displayKey]);
 
   const showDisplayBoot = displayKey === "boot";
-  const displayServer =
-    showDisplayBoot || displayKey === "home"
-      ? undefined
-      : connections.find((c) => c.id === displayKey);
+  const displayServer = showDisplayBoot
+    ? undefined
+    : displayKey === "home"
+      ? (selectedServer ??
+        (isTunnelConnecting ? displayServerRef.current : undefined))
+      : (connections.find((c) => c.id === displayKey) ??
+        (isTunnelConnecting ? displayServerRef.current : undefined));
+  const displayServerWithStableMetadata =
+    isTunnelConnecting && displayServer && displayServerRef.current
+      ? {
+          ...displayServer,
+          serverInfo:
+            displayServerRef.current.serverInfo ?? displayServer.serverInfo,
+        }
+      : displayServer;
 
   // Apply embedded styling
   const isSingleTab = isEmbedded && embeddedConfig.singleTab;
@@ -855,8 +874,8 @@ export function Layout({ children }: LayoutProps) {
     ? "flex-1 w-full bg-white dark:bg-black p-0 overflow-auto"
     : cn(
         "flex-1 min-h-0 min-w-0 max-w-full w-full bg-white dark:bg-black rounded-2xl border border-zinc-200 dark:border-zinc-700 overflow-x-hidden overflow-y-auto",
-        !displayServer && "lg:mx-4",
-        displayServer && "lg:mr-4"
+        !displayServerWithStableMetadata && "lg:mx-4",
+        displayServerWithStableMetadata && "lg:mr-4"
       );
 
   const bodyClassName = isSingleTab
@@ -865,7 +884,7 @@ export function Layout({ children }: LayoutProps) {
 
   const headerProps = {
     connections,
-    selectedServer: displayServer,
+    selectedServer: displayServerWithStableMetadata,
     activeTab,
     onServerSelect: handleServerSelect,
     onTabChange: handleTabChange,
@@ -891,11 +910,11 @@ export function Layout({ children }: LayoutProps) {
             {!isSingleTab && <LayoutHeader {...headerProps} />}
 
             <div className={bodyClassName}>
-              {displayServer && !isSingleTab && (
+              {displayServerWithStableMetadata && !isSingleTab && (
                 <InspectorSidebar
                   activeTab={activeTab}
                   onTabChange={handleTabChange}
-                  selectedServer={displayServer}
+                  selectedServer={displayServerWithStableMetadata}
                   visibleTabs={embeddedConfig.visibleTabs}
                   collapsed={sidebarCollapsed}
                   onCollapsedChange={setSidebarCollapsed}
@@ -908,7 +927,7 @@ export function Layout({ children }: LayoutProps) {
               )}
               <main className={mainClassName}>
                 <LayoutContent
-                  selectedServer={displayServer}
+                  selectedServer={displayServerWithStableMetadata}
                   activeTab={activeTab}
                   toolsSearchRef={toolsSearchRef}
                   promptsSearchRef={promptsSearchRef}
@@ -918,9 +937,9 @@ export function Layout({ children }: LayoutProps) {
                   {children}
                 </LayoutContent>
               </main>
-              {displayServer && !isSingleTab && (
+              {displayServerWithStableMetadata && !isSingleTab && (
                 <SidebarRpcPanel
-                  serverId={displayServer.id}
+                  serverId={displayServerWithStableMetadata.id}
                   open={rpcLoggerOpen}
                 />
               )}
@@ -931,7 +950,7 @@ export function Layout({ children }: LayoutProps) {
 
       {!isSingleTab && !showDisplayBoot && (
         <MobileInspectorToolbar
-          serverId={displayServer?.id}
+          serverId={displayServerWithStableMetadata?.id}
           rpcLoggerOpen={rpcLoggerOpen}
           onRpcLoggerOpenChange={setRpcLoggerOpen}
         />
