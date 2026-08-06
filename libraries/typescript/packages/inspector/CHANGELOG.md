@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 20.0.2-canary.1
+
+### Patch Changes
+
+- 281b63a: fix(inspector): avoid inspector tunnel flash
+  - mcp-use@2.0.2-canary.1
+
 ## 20.0.2-canary.0
 
 ### Patch Changes
