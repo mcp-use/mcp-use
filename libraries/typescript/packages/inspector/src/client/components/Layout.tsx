@@ -27,6 +27,7 @@ import {
   type EditableConnectionConfig,
 } from "@/client/utils/connectionUpdates";
 import { isInspectorSamplingAvailable } from "@/client/utils/samplingProtocol";
+import { getSkillsState } from "./layout/layoutHeaderUtils";
 import { getServerDisplayName } from "@/client/utils/servers";
 import { useMcpClient, type McpServer } from "@mcp-use/client/react";
 import {
@@ -275,6 +276,21 @@ export function Layout({ children }: LayoutProps) {
       activeTab === "sampling" &&
       selectedServer &&
       !isInspectorSamplingAvailable(selectedServer)
+    ) {
+      handleTabChange("tools");
+    }
+  }, [activeTab, connections, selectedServerId, handleTabChange]);
+
+  // A bookmarked Skills URL can be restored before the catalog is ready.
+  // Move to a usable tab until the server advertises a non-empty catalog.
+  useEffect(() => {
+    const selectedServer = connections.find(
+      (connection) => connection.id === selectedServerId
+    );
+    if (
+      activeTab === "skills" &&
+      selectedServer &&
+      getSkillsState(selectedServer) !== "available"
     ) {
       handleTabChange("tools");
     }

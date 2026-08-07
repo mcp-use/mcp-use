@@ -1,37 +1,25 @@
-import { Check, LibraryBig, MessageSquare } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
 import { Spinner } from "../ui/spinner";
 import { cn } from "@/client/lib/utils";
 import { useEffect } from "react";
-import type { Prompt, Skill } from "@mcp-use/client/react";
+import type { Prompt } from "@mcp-use/client/react";
 
 interface PromptsDropdownProps {
   isOpen?: boolean;
   focusedIndex: number;
   prompts: Prompt[];
-  skills: Skill[];
-  enabledSkillUris: Set<string>;
   selectedPrompt: Prompt | null;
   onPromptSelect: (prompt: Prompt) => void;
-  onSkillSelect: (skill: Skill) => void;
-}
-
-function skillName(skill: Skill): string {
-  return typeof skill.frontmatter.name === "string"
-    ? skill.frontmatter.name
-    : skill.uri;
 }
 
 export function PromptsDropdown({
   isOpen,
   focusedIndex,
   prompts,
-  skills,
-  enabledSkillUris,
   selectedPrompt,
   onPromptSelect,
-  onSkillSelect,
 }: PromptsDropdownProps) {
   if (!isOpen) return null;
 
@@ -91,45 +79,6 @@ export function PromptsDropdown({
             <TooltipContent>{prompt.description}</TooltipContent>
           </Tooltip>
         ))}
-        {skills.length > 0 && (
-          <div className="mt-3 text-xs font-medium text-zinc-900 dark:text-zinc-100 mb-2">
-            Skills
-          </div>
-        )}
-        {skills.map((skill, index) => {
-          const suggestionIndex = prompts.length + index;
-          const enabled = enabledSkillUris.has(skill.uri);
-          return (
-            <Tooltip key={skill.uri}>
-              <TooltipTrigger
-                render={
-                  <Button
-                    id={`prompt-suggestion-${suggestionIndex}`}
-                    type="button"
-                    variant="ghost"
-                    className={cn(
-                      "w-full flex items-center gap-2 px-3 py-2 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors text-left justify-start",
-                      focusedIndex === suggestionIndex &&
-                        "bg-zinc-200 dark:bg-zinc-700"
-                    )}
-                    onClick={() => onSkillSelect(skill)}
-                    data-testid={`chat-skill-option-${index}`}
-                  >
-                    <LibraryBig className="h-4 w-4 shrink-0 text-zinc-600 dark:text-zinc-400" />
-                    <span className="flex-1 min-w-0 truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                      {skillName(skill)}
-                    </span>
-                    {enabled && <Check className="size-4 shrink-0" />}
-                  </Button>
-                }
-                nativeButton
-              />
-              <TooltipContent>
-                {String(skill.frontmatter.description ?? skill.uri)}
-              </TooltipContent>
-            </Tooltip>
-          );
-        })}
       </div>
     </div>
   );

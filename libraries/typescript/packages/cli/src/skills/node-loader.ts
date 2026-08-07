@@ -11,6 +11,17 @@ import type {
 
 const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
+/**
+ * Optional recovery hook for development-only skill discovery.
+ *
+ * Production callers leave this unset, so discovery remains strict. A caller
+ * that supplies the hook receives each independently invalid SKILL.md and a
+ * snapshot containing every other valid skill.
+ */
+export interface SkillsDiscoveryOptions {
+  onInvalidSkill?: (error: Error) => void;
+}
+
 function assertSafeDirectory(projectRoot: string, directory: string): string {
   if (directory.trim() === "" || isAbsolute(directory)) {
     throw new TypeError(
@@ -181,7 +192,8 @@ function frontmatter(path: string): Record<string, unknown> {
 export function discoverConfiguredSkills(
   config: boolean | SkillsOptions | undefined,
   projectRoot: string,
-  conventionalDirectory = "skills"
+  conventionalDirectory = "skills",
+  options?: SkillsDiscoveryOptions
 ): SkillsSnapshot | undefined {
   if (config === false) return undefined;
   const forced =
@@ -204,62 +216,138 @@ export function discoverConfiguredSkills(
   if (skillFiles.length === 0) {
     console.warn(`[mcp-use] Skills directory is empty: ${skillsRoot}`);
   }
+
+  const invalidSkillRoots: string[] = [];
+  const validSkills: Array<{
+    skillFile: string;
+    skillRoot: string;
+    metadata: Record<string, unknown>;
+  }> = [];
+  for (const skillFile of skillFiles) {
+    const skillRoot = resolve(skillFile, "..");
+    try {
+      if (skillRoot === skillsRoot) {
+        throw new Error(
+          `${skillFile}: SKILL.md must be inside a named child directory`
+        );
+      }
+      validSkills.push({
+        skillFile,
+        skillRoot,
+        metadata: frontmatter(skillFile),
+      });
+    } catch (error) {
+      const invalidSkill =
+        error instanceof Error ? error : new Error(String(error));
+      if (options?.onInvalidSkill === undefined) throw invalidSkill;
+      invalidSkillRoots.push(skillRoot);
+      options.onInvalidSkill(invalidSkill);
+    }
+  }
+
+  const isWithinInvalidDescendant = (
+    path: string,
+    skillRoot: string
+  ): boolean =>
+    invalidSkillRoots.some(
+      (invalidRoot) =>
+        invalidRoot.startsWith(`${skillRoot}${sep}`) &&
+        (path === invalidRoot || path.startsWith(`${invalidRoot}${sep}`))
+    );
+
+  const omitInvalidSkill = (skillRoot: string, error: unknown): void => {
+    const invalidSkill =
+      error instanceof Error ? error : new Error(String(error));
+    if (options?.onInvalidSkill === undefined) throw invalidSkill;
+    invalidSkillRoots.push(skillRoot);
+    options.onInvalidSkill(invalidSkill);
+  };
+
+  const successfulSkills: Array<{
+    skill: SkillsSnapshot["skills"][number];
+    resources: SkillResourceSnapshot[];
+    directories: SkillsSnapshot["directories"];
+  }> = [];
+  // Process descendants first. If a nested skill has an unreadable resource,
+  // it is omitted before its parent manifest is assembled, so none of the
+  // invalid child's files or directories can leak into the parent.
+  validSkills
+    .sort(
+      (left, right) =>
+        relative(skillsRoot, right.skillRoot).split(sep).length -
+        relative(skillsRoot, left.skillRoot).split(sep).length
+    )
+    .forEach(({ skillFile, skillRoot, metadata }) => {
+      try {
+        const files = allFiles.filter(
+          (file) =>
+            file.startsWith(`${skillRoot}${sep}`) &&
+            !isWithinInvalidDescendant(file, skillRoot)
+        );
+        const resources = files.map((file) => {
+          const bytes = readFileSync(file);
+          const uri = skillUri(skillsRoot, skillRoot, file);
+          const type = mimeType(file);
+          const digest = `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+          return {
+            uri,
+            name: basename(file),
+            mimeType: type,
+            digest,
+            ...(isTextMime(type)
+              ? { text: bytes.toString("utf8") }
+              : { blob: bytes.toString("base64") }),
+          };
+        });
+        const root = skillUri(skillsRoot, skillRoot, skillFile).replace(
+          /\/SKILL\.md$/,
+          ""
+        );
+        const directories = allDirectories
+          .filter(
+            (directoryPath) =>
+              directoryPath === skillRoot ||
+              (directoryPath.startsWith(`${skillRoot}${sep}`) &&
+                !isWithinInvalidDescendant(directoryPath, skillRoot))
+          )
+          .map((directoryPath) => {
+            const rel = relative(skillRoot, directoryPath);
+            const uri =
+              rel === ""
+                ? root
+                : `${root}/${rel.split(sep).map(encodeURIComponent).join("/")}`;
+            return {
+              uri,
+              name: rel === "" ? basename(skillRoot) : basename(directoryPath),
+            };
+          });
+        successfulSkills.push({
+          skill: {
+            uri: skillUri(skillsRoot, skillRoot, skillFile),
+            frontmatter: metadata,
+            resources: resources.map(({ uri, digest }) => ({ uri, digest })),
+          },
+          resources,
+          directories,
+        });
+      } catch (error) {
+        omitInvalidSkill(skillRoot, error);
+      }
+    });
+
   const resourcesByUri = new Map<string, SkillResourceSnapshot>();
   const directoriesByUri = new Map<string, { uri: string; name: string }>();
-  const skills = skillFiles.map((skillFile) => {
-    const skillRoot = resolve(skillFile, "..");
-    if (skillRoot === skillsRoot) {
-      throw new Error(
-        `${skillFile}: SKILL.md must be inside a named child directory`
-      );
-    }
-    const metadata = frontmatter(skillFile);
-    const files = allFiles.filter((file) =>
-      file.startsWith(`${skillRoot}${sep}`)
-    );
-    const resources = files.map((file) => {
-      const bytes = readFileSync(file);
-      const uri = skillUri(skillsRoot, skillRoot, file);
-      const type = mimeType(file);
-      const digest = `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
-      if (!resourcesByUri.has(uri)) {
-        resourcesByUri.set(uri, {
-          uri,
-          name: basename(file),
-          mimeType: type,
-          digest,
-          ...(isTextMime(type)
-            ? { text: bytes.toString("utf8") }
-            : { blob: bytes.toString("base64") }),
-        });
+  for (const { resources, directories } of successfulSkills) {
+    for (const resource of resources) {
+      if (!resourcesByUri.has(resource.uri)) {
+        resourcesByUri.set(resource.uri, resource);
       }
-      return { uri, digest };
-    });
-    const root = skillUri(skillsRoot, skillRoot, skillFile).replace(
-      /\/SKILL\.md$/,
-      ""
-    );
-    for (const directoryPath of allDirectories.filter(
-      (directoryPath) =>
-        directoryPath === skillRoot ||
-        directoryPath.startsWith(`${skillRoot}${sep}`)
-    )) {
-      const rel = relative(skillRoot, directoryPath);
-      const uri =
-        rel === ""
-          ? root
-          : `${root}/${rel.split(sep).map(encodeURIComponent).join("/")}`;
-      directoriesByUri.set(uri, {
-        uri,
-        name: rel === "" ? basename(skillRoot) : basename(directoryPath),
-      });
     }
-    return {
-      uri: skillUri(skillsRoot, skillRoot, skillFile),
-      frontmatter: metadata,
-      resources,
-    };
-  });
+    for (const directory of directories) {
+      directoriesByUri.set(directory.uri, directory);
+    }
+  }
+  const skills = successfulSkills.map(({ skill }) => skill);
   skills.sort((left, right) => left.uri.localeCompare(right.uri));
   return {
     skills,

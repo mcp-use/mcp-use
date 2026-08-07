@@ -20,11 +20,17 @@ export interface SkillsSnapshot {
   directories: Array<{ uri: string; name: string }>;
 }
 
+/** Optional recovery hook used by development-time skill discovery. */
+export interface SkillsDiscoveryOptions {
+  onInvalidSkill?: (error: Error) => void;
+}
+
 /** Discover and validate an immutable Skills snapshot from a project tree. */
 export declare function discoverConfiguredSkills(
   config: boolean | SkillsOptions | undefined,
   projectRoot: string,
-  conventionalDirectory?: string
+  conventionalDirectory?: string,
+  options?: SkillsDiscoveryOptions
 ): SkillsSnapshot | undefined;
 
 /** Resolve the effective directory watched and read by CLI tooling. */

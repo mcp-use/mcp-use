@@ -39,7 +39,6 @@ import {
 import {
   buildSkillSystemContext,
   createSkillContextConnection,
-  filterDisabledSkillHistory,
 } from "./skill-context";
 
 // Type alias for backward compatibility
@@ -56,7 +55,6 @@ interface UseChatMessagesClientSideProps {
   initialMessages?: Message[];
   systemPrompt?: string;
   skills?: Skill[];
-  enabledSkillUris?: Set<string>;
 }
 
 export function useChatMessagesClientSide({
@@ -70,7 +68,6 @@ export function useChatMessagesClientSide({
   initialMessages,
   systemPrompt = DEFAULT_CHAT_SYSTEM_PROMPT,
   skills = [],
-  enabledSkillUris = new Set(),
 }: UseChatMessagesClientSideProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages ?? []);
   const [isLoading, setIsLoading] = useState(false);
@@ -207,14 +204,11 @@ export function useChatMessagesClientSide({
         ]);
 
         const hasImageAttachments = (userMessage.attachments?.length ?? 0) > 0;
-        const historyMessages = filterDisabledSkillHistory(
-          [
-            ...messages,
-            ...promptResultsMessages,
-            ...(userInput.trim() || hasImageAttachments ? [userMessage] : []),
-          ],
-          enabledSkillUris
-        );
+        const historyMessages = [
+          ...messages,
+          ...promptResultsMessages,
+          ...(userInput.trim() || hasImageAttachments ? [userMessage] : []),
+        ];
 
         const serializedWidgetContext = serializeWidgetModelContexts(
           widgetModelContexts ?? new Map()
@@ -237,7 +231,8 @@ export function useChatMessagesClientSide({
 
         const skillConnection = createSkillContextConnection({
           skills,
-          enabledUris: enabledSkillUris,
+          origin:
+            connection.displayName ?? connection.url ?? "connected MCP server",
           getSkill: connection.getSkill,
           readResource: connection.readResource,
         });
@@ -253,7 +248,10 @@ export function useChatMessagesClientSide({
             connection,
             ...(appToolConnections ?? []),
           ],
-          systemPrompt: `${systemPrompt}${buildSkillSystemContext(skills, enabledSkillUris)}`,
+          systemPrompt: `${systemPrompt}${buildSkillSystemContext(
+            skills,
+            connection.displayName ?? connection.url ?? "connected MCP server"
+          )}`,
           disallowedTools:
             disabledTools && disabledTools.size > 0
               ? [...disabledTools].sort()
@@ -530,7 +528,6 @@ export function useChatMessagesClientSide({
       recordTrace,
       systemPrompt,
       skills,
-      enabledSkillUris,
     ]
   );
 

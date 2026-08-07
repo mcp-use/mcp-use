@@ -37,6 +37,19 @@ export function supportsSkills(server: McpServer): boolean {
   return server.extensions?.["io.modelcontextprotocol/skills"] !== undefined;
 }
 
+export const SKILLS_UNSUPPORTED_MESSAGE =
+  "This server does not advertise the Skills over MCP extension.";
+export const SKILLS_EMPTY_CATALOG_MESSAGE =
+  "This server advertises Skills over MCP, but returned an empty catalog.";
+
+export type SkillsState = "unsupported" | "empty" | "available";
+
+/** An advertised empty catalog is unavailable until the server supplies skills. */
+export function getSkillsState(server: McpServer): SkillsState {
+  if (!supportsSkills(server)) return "unsupported";
+  return (server.skills?.length ?? 0) === 0 ? "empty" : "available";
+}
+
 export function shouldShowDot(
   tabId: string,
   count: number,

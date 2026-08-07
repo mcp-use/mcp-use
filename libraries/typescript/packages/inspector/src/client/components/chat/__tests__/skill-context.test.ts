@@ -4,8 +4,8 @@ import type { Skill } from "@mcp-use/client/react";
 import {
   buildSkillSystemContext,
   createSkillContextConnection,
-  filterDisabledSkillHistory,
   READ_SKILL_TOOL,
+  READ_SKILL_RESOURCE_TOOL,
 } from "../skill-context";
 
 const source = `---\nname: refunds\ndescription: Handle refunds safely\n---\n# Refunds\n`;
@@ -24,9 +24,11 @@ const skill: Skill = {
 
 describe("skill chat context", () => {
   it("advertises metadata without eagerly embedding instructions", () => {
-    const context = buildSkillSystemContext([skill], new Set([skill.uri]));
+    const context = buildSkillSystemContext([skill], "Storefront MCP");
     expect(context).toContain("refunds");
     expect(context).toContain("Handle refunds safely");
+    expect(context).toContain(skill.uri);
+    expect(context).toContain("Storefront MCP");
     expect(context).not.toContain("# Refunds");
   });
 
@@ -36,7 +38,7 @@ describe("skill chat context", () => {
     }));
     const connection = createSkillContextConnection({
       skills: [skill],
-      enabledUris: new Set([skill.uri]),
+      origin: "Storefront MCP",
       getSkill: async () => ({ skill }),
       readResource,
     });
@@ -46,13 +48,19 @@ describe("skill chat context", () => {
     expect(readResource).toHaveBeenCalledWith(skill.uri);
     expect(result).toMatchObject({
       content: [{ type: "text", text: source }],
+      structuredContent: {
+        origin: "Storefront MCP",
+        skill: {
+          name: "refunds",
+          description: "Handle refunds safely",
+        },
+      },
     });
   });
 
   it("blocks changed bytes", async () => {
     const connection = createSkillContextConnection({
       skills: [skill],
-      enabledUris: new Set([skill.uri]),
       getSkill: async () => ({ skill }),
       readResource: async () => ({
         contents: [{ uri: skill.uri, text: `${source}changed` }],
@@ -63,28 +71,27 @@ describe("skill chat context", () => {
     ).rejects.toThrow("digest mismatch");
   });
 
-  it("removes disabled skill tool history from future context", () => {
-    const messages = [
-      {
-        id: "assistant-1",
-        role: "assistant" as const,
-        content: "",
-        timestamp: 1,
-        parts: [
-          {
-            type: "tool-invocation" as const,
-            toolInvocation: {
-              toolName: READ_SKILL_TOOL,
-              args: { skillUri: skill.uri },
-              result: { content: [{ type: "text", text: source }] },
-            },
-          },
-        ],
-      },
-    ];
-    expect(filterDisabledSkillHistory(messages, new Set())).toEqual([]);
-    expect(
-      filterDisabledSkillHistory(messages, new Set([skill.uri]))
-    ).toHaveLength(1);
+  it("only reads resources from the refreshed skill manifest", async () => {
+    const readResource = vi.fn(async () => ({
+      contents: [
+        {
+          uri: "skill://shop/refunds/references/policy.md",
+          text: "policy",
+        },
+      ],
+    }));
+    const connection = createSkillContextConnection({
+      skills: [skill],
+      getSkill: async () => ({ skill }),
+      readResource,
+    });
+
+    await expect(
+      connection!.callTool(READ_SKILL_RESOURCE_TOOL, {
+        skillUri: skill.uri,
+        resourceUri: "skill://shop/refunds/not-listed.md",
+      })
+    ).rejects.toThrow("not part of the skill manifest");
+    expect(readResource).not.toHaveBeenCalled();
   });
 });

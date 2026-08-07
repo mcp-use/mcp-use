@@ -1,5 +1,11 @@
 import { createHash } from "node:crypto";
-import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -175,6 +181,91 @@ describe("skill discovery", () => {
     expect(() => discoverConfiguredSkills(undefined, cwd)).toThrow(
       /must match its parent directory/
     );
+  });
+
+  it("can omit invalid skills for a fresh development snapshot", () => {
+    const cwd = project();
+    const refunds = writeSkill(cwd, "refunds", "refunds");
+    writeFileSync(join(refunds, "references.md"), "Refund policy\n");
+    const shipping = writeSkill(cwd, "shipping", "not-shipping");
+    writeFileSync(join(shipping, "partially-written.md"), "Do not serve\n");
+    const errors: string[] = [];
+
+    const snapshot = discoverConfiguredSkills(undefined, cwd, "skills", {
+      onInvalidSkill: (error) => errors.push(error.message),
+    })!;
+
+    expect(errors).toEqual(
+      expect.arrayContaining([expect.stringMatching(/shipping\/SKILL\.md/)])
+    );
+    expect(snapshot.skills.map((skill) => skill.frontmatter.name)).toEqual([
+      "refunds",
+    ]);
+    expect(snapshot.resources.map((resource) => resource.uri)).toEqual(
+      expect.arrayContaining([
+        "skill://refunds/SKILL.md",
+        "skill://refunds/references.md",
+      ])
+    );
+    expect(
+      snapshot.resources.some((resource) => resource.uri.includes("shipping"))
+    ).toBe(false);
+    expect(
+      snapshot.directories.some((directory) =>
+        directory.uri.includes("shipping")
+      )
+    ).toBe(false);
+  });
+
+  it("does not leak an invalid nested skill into its valid parent manifest", () => {
+    const cwd = project();
+    writeSkill(cwd, "billing", "billing");
+    const refunds = writeSkill(cwd, "billing/refunds", "not-refunds");
+    writeFileSync(join(refunds, "partial.md"), "Do not serve\n");
+
+    const snapshot = discoverConfiguredSkills(undefined, cwd, "skills", {
+      onInvalidSkill: () => {},
+    })!;
+    const parent = snapshot.skills.find(
+      (skill) => skill.uri === "skill://billing/SKILL.md"
+    );
+
+    expect(
+      parent?.resources.some((resource) => resource.uri.includes("refunds"))
+    ).toBe(false);
+    expect(
+      snapshot.resources.some((resource) => resource.uri.includes("refunds"))
+    ).toBe(false);
+    expect(
+      snapshot.directories.some((directory) =>
+        directory.uri.includes("refunds")
+      )
+    ).toBe(false);
+  });
+
+  it("omits a skill when a supporting resource cannot be read", () => {
+    const cwd = project();
+    writeSkill(cwd, "refunds", "refunds");
+    const shipping = writeSkill(cwd, "shipping", "shipping");
+    const brokenFile = join(shipping, "references.md");
+    writeFileSync(brokenFile, "Unreadable\n");
+    chmodSync(brokenFile, 0o000);
+    try {
+      const errors: string[] = [];
+      const snapshot = discoverConfiguredSkills(undefined, cwd, "skills", {
+        onInvalidSkill: (error) => errors.push(error.message),
+      })!;
+
+      expect(errors).toHaveLength(1);
+      expect(snapshot.skills.map((skill) => skill.frontmatter.name)).toEqual([
+        "refunds",
+      ]);
+      expect(
+        snapshot.resources.some((resource) => resource.uri.includes("shipping"))
+      ).toBe(false);
+    } finally {
+      chmodSync(brokenFile, 0o644);
+    }
   });
 
   it("rejects invalid untyped skills configuration", () => {
