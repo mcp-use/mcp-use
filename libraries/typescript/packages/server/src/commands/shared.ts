@@ -9,7 +9,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { openBrowser as launchBrowser } from "../cli/open-browser.js";
 
@@ -180,7 +180,7 @@ export async function writePrivateJson(
   await chmod(parent, 0o700);
   const temporary = join(
     parent,
-    `.${path.slice(path.lastIndexOf("/") + 1)}.${process.pid}.${Date.now()}.tmp`
+    `.${basename(path)}.${process.pid}.${Date.now()}.tmp`
   );
   await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, {
     mode: 0o600,
@@ -196,3 +196,8 @@ export async function removeFile(path: string): Promise<void> {
 
 /** Global mcp-use state directory. */
 export const GLOBAL_STATE_DIR = join(homedir(), ".mcp-use");
+
+/** Resolve the state directory from the current process home (test-friendly). */
+export function getGlobalStateDir(): string {
+  return join(homedir(), ".mcp-use");
+}

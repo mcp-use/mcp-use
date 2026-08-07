@@ -33,9 +33,10 @@ function page(path: string, value: HelpPage): void {
 
 page("", {
   usage: "mcp-use client <command>",
-  summary: "Connect to and invoke saved HTTP(S) MCP servers.",
+  summary: "Connect to and invoke saved MCP servers.",
   commands: [
-    ["connect <name> <url>", "Connect and save a server"],
+    ["connect <name> <url>", "Connect and save an HTTP(S) server"],
+    ['connect <name> "<command>" --stdio', "Connect and save a stdio server"],
     ["list", "List saved servers"],
     ["remove <name>", "Remove a saved server"],
     ["<name>", "Invoke a saved server"],
@@ -44,9 +45,10 @@ page("", {
 });
 
 page("connect", {
-  usage: "mcp-use client connect <name> <url> [options]",
-  summary: "Connect to and save an HTTP(S) MCP server.",
+  usage: "mcp-use client connect <name> <url|command> [options]",
+  summary: "Connect to and save an HTTP(S) or stdio MCP server.",
   options: [
+    ["--stdio", "Treat the target as a stdio command instead of a URL"],
     ['-H, --header <"Key: Value">', "Static header (repeatable)"],
     ["--no-oauth", "Skip OAuth on authorization challenges"],
     ["--auth-timeout <ms>", "OAuth wait timeout (default: 300000)"],
@@ -60,6 +62,7 @@ page("connect", {
   ],
   notes: [
     "JSON mode never opens a browser or prints an OAuth URL/state. If new consent is required, it returns oauth_interaction_required with an interactive retry command.",
+    'With --stdio, quote paths and arguments that contain spaces, e.g. `"/opt/MCP Servers/server" "--config=dev env.json"`.',
   ],
 });
 

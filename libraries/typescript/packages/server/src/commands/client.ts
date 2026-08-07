@@ -11,7 +11,7 @@ import { loadClientPackage } from "./load-client.js";
 import {
   CommandError,
   confirm,
-  GLOBAL_STATE_DIR,
+  getGlobalStateDir,
   openBrowser,
   pathExists,
   printResult,
@@ -21,23 +21,44 @@ import {
   wantsJson,
   writePrivateJson,
 } from "./shared.js";
+import { parseStdioTarget } from "./stdio-target.js";
 
-interface SavedServer {
+type ProtocolMode = "auto" | "legacy" | "modern";
+
+interface SavedHttpServer {
   url: string;
   oauth: boolean;
-  protocol: "auto" | "legacy" | "modern";
+  protocol: ProtocolMode;
 }
+
+interface SavedStdioServer {
+  type: "stdio";
+  command: string;
+  args: string[];
+  protocol: ProtocolMode;
+}
+
+type SavedServer = SavedHttpServer | SavedStdioServer;
 
 interface SavedServers {
   servers: Record<string, SavedServer>;
+}
+
+function isStdioServer(server: SavedServer): server is SavedStdioServer {
+  return "type" in server && server.type === "stdio";
 }
 
 interface SavedCredentials {
   headers?: Record<string, string>;
 }
 
-const CLIENT_DIR = join(GLOBAL_STATE_DIR, "client");
-const SERVERS_PATH = join(CLIENT_DIR, "servers.json");
+function clientDir(): string {
+  return join(getGlobalStateDir(), "client");
+}
+
+function serversPath(): string {
+  return join(clientDir(), "servers.json");
+}
 
 type BrowserMode = "ask" | "never";
 
@@ -88,28 +109,74 @@ async function connect(
       "auth-timeout": { type: "string" },
       protocol: { type: "string", default: "auto" },
       "no-open": { type: "boolean" },
+      stdio: { type: "boolean" },
     },
   });
   if (positionals.length !== 2) {
-    throw new UsageError("Usage: mcp-use client connect <name> <url>");
+    throw new UsageError(
+      values.stdio === true
+        ? 'Usage: mcp-use client connect <name> "<command>" --stdio'
+        : "Usage: mcp-use client connect <name> <url>"
+    );
   }
-  const [name, rawUrl] = positionals as [string, string];
+  const [name, target] = positionals as [string, string];
   validateName(name);
-  const url = new URL(rawUrl);
-  if (!["http:", "https:"].includes(url.protocol)) {
-    throw new UsageError("Client URLs must use http or https.");
-  }
   const protocol = parseProtocol(values.protocol);
-  const timeout = parsePositiveInteger(
-    values["auth-timeout"] ?? "300000",
-    "--auth-timeout"
-  );
   const saved = await readServers();
   if (saved.servers[name] !== undefined) {
     throw new UsageError(`Saved server already exists: ${name}`);
   }
+
+  if (values.stdio === true) {
+    let parsed;
+    try {
+      parsed = parseStdioTarget(target);
+    } catch (error) {
+      throw new UsageError(
+        error instanceof Error ? error.message : "Invalid stdio command."
+      );
+    }
+    const definition: SavedStdioServer = {
+      type: "stdio",
+      command: parsed.command,
+      args: parsed.args,
+      protocol,
+    };
+    const connection = await openConnection(
+      name,
+      definition,
+      {},
+      300_000,
+      "never",
+      json
+    );
+    await connection.disconnect();
+    saved.servers[name] = definition;
+    await writePrivateJson(serversPath(), saved);
+    printResult(
+      {
+        name,
+        type: "stdio",
+        command: definition.command,
+        args: definition.args,
+        protocol,
+      },
+      json,
+      `Connected and saved ${name}.`
+    );
+    return 0;
+  }
+
+  const url = new URL(target);
+  if (!["http:", "https:"].includes(url.protocol)) {
+    throw new UsageError("Client URLs must use http or https.");
+  }
+  const timeout = parsePositiveInteger(
+    values["auth-timeout"] ?? "300000",
+    "--auth-timeout"
+  );
   const credentials = { headers: parseHeaders(values.header ?? []) };
-  const definition: SavedServer = {
+  const definition: SavedHttpServer = {
     url: url.href,
     oauth: values["no-oauth"] !== true,
     protocol,
@@ -128,7 +195,7 @@ async function connect(
   );
   await connection.disconnect();
   saved.servers[name] = definition;
-  await writePrivateJson(SERVERS_PATH, saved);
+  await writePrivateJson(serversPath(), saved);
   await writePrivateJson(credentialsPath(name), credentials);
   printResult(
     { name, url: safeUrlForOutput(definition.url), protocol },
@@ -141,15 +208,29 @@ async function connect(
 async function list(argv: readonly string[], json: boolean): Promise<number> {
   parseJsonOnly(argv);
   const saved = await readServers();
-  const result = Object.entries(saved.servers).map(([name, server]) => ({
-    name,
-    ...server,
-    url: safeUrlForOutput(server.url),
-  }));
+  const result = Object.entries(saved.servers).map(([name, server]) => {
+    if (isStdioServer(server)) {
+      return {
+        name,
+        type: "stdio" as const,
+        command: server.command,
+        args: server.args,
+        protocol: server.protocol,
+        target: [server.command, ...server.args].join(" "),
+      };
+    }
+    return {
+      name,
+      type: "http" as const,
+      ...server,
+      url: safeUrlForOutput(server.url),
+      target: safeUrlForOutput(server.url),
+    };
+  });
   printResult(
     result,
     json,
-    result.map((server) => `${server.name}\t${server.url}`).join("\n") ||
+    result.map((server) => `${server.name}\t${server.target}`).join("\n") ||
       "No saved servers."
   );
   return 0;
@@ -165,7 +246,7 @@ async function remove(argv: readonly string[], json: boolean): Promise<number> {
   const name = one(positionals, "mcp-use client remove <name>");
   const saved = await readServers();
   delete saved.servers[name];
-  await writePrivateJson(SERVERS_PATH, saved);
+  await writePrivateJson(serversPath(), saved);
   await rm(credentialsDirectory(name), { recursive: true, force: true });
   printResult({ removed: name }, json, `Removed ${name}.`);
   return 0;
@@ -186,6 +267,11 @@ async function savedServerCommand(
   const family = argv[0];
   const operation = argv[1];
   if (family === "auth") {
+    if (isStdioServer(definition)) {
+      throw new UsageError(
+        `Saved server ${name} uses stdio and does not support OAuth commands.`
+      );
+    }
     if (operation === "status") {
       parseJsonOnly(argv.slice(2));
       const authenticated = await pathExists(oauthDirectory(name));
@@ -221,10 +307,9 @@ async function savedServerCommand(
   }
 
   validateSavedCommandArgs(name, family, operation, argv.slice(2));
-  const credentials = await readJson<SavedCredentials>(
-    credentialsPath(name),
-    {}
-  );
+  const credentials = isStdioServer(definition)
+    ? {}
+    : await readJson<SavedCredentials>(credentialsPath(name), {});
   const connection = await openConnection(
     name,
     definition,
@@ -411,6 +496,20 @@ async function openConnection(
     allowInstall: !quiet,
   });
   if (quiet) logger.level = "silent";
+
+  if (isStdioServer(definition)) {
+    const client = new MCPClient({
+      mcpServers: {
+        [name]: {
+          command: definition.command,
+          args: definition.args,
+          ...stdioProtocolConfig(definition.protocol),
+        },
+      },
+    });
+    return client.connect(name);
+  }
+
   let rejectOAuthInteraction: ((error: CommandError) => void) | undefined;
   const oauthInteractionRequired =
     quiet && definition.oauth
@@ -509,6 +608,21 @@ async function openConnection(
   }
 }
 
+function stdioProtocolConfig(protocol: ProtocolMode): Record<string, unknown> {
+  if (protocol === "auto") {
+    return { protocolNegotiation: "auto" };
+  }
+  if (protocol === "modern") {
+    return { protocolNegotiation: { pin: "2026-07-28" } };
+  }
+  return {
+    protocolNegotiation: "legacy",
+    clientOptions: {
+      supportedProtocolVersions: ["2025-11-25"],
+    },
+  };
+}
+
 /**
  * Open a saved server for another CLI command.
  *
@@ -524,10 +638,9 @@ export async function openSavedConnection(
   if (definition === undefined) {
     throw new UsageError(`Unknown saved server: ${name}`);
   }
-  const credentials = await readJson<SavedCredentials>(
-    credentialsPath(name),
-    {}
-  );
+  const credentials = isStdioServer(definition)
+    ? {}
+    : await readJson<SavedCredentials>(credentialsPath(name), {});
   return openConnection(
     name,
     definition,
@@ -626,7 +739,7 @@ function parseHeaders(values: readonly string[]): Record<string, string> {
   return headers;
 }
 
-function parseProtocol(value: string | undefined): SavedServer["protocol"] {
+function parseProtocol(value: string | undefined): ProtocolMode {
   if (value !== "auto" && value !== "legacy" && value !== "modern") {
     throw new UsageError("Invalid protocol. Expected auto, legacy, or modern.");
   }
@@ -664,27 +777,54 @@ function safeUrlForOutput(raw: string): string {
 
 async function readServers(): Promise<SavedServers> {
   const saved = await readJson<{
-    servers: Record<
-      string,
-      Omit<SavedServer, "protocol"> & { protocol?: unknown }
-    >;
-  }>(SERVERS_PATH, { servers: {} });
+    servers: Record<string, Record<string, unknown>>;
+  }>(serversPath(), { servers: {} });
   const normalized: SavedServers = { servers: {} };
   let migrated = false;
 
   for (const [name, server] of Object.entries(saved.servers)) {
+    if (server.type === "stdio") {
+      if (
+        typeof server.command !== "string" ||
+        !Array.isArray(server.args) ||
+        !server.args.every((arg) => typeof arg === "string")
+      ) {
+        throw new UsageError(
+          `Saved stdio server ${name} is invalid. Remove and reconnect it.`
+        );
+      }
+      const protocol = normalizeSavedProtocol(server.protocol);
+      normalized.servers[name] = {
+        type: "stdio",
+        command: server.command,
+        args: server.args as string[],
+        protocol,
+      };
+      migrated ||= protocol !== server.protocol;
+      continue;
+    }
+
+    if (typeof server.url !== "string") {
+      throw new UsageError(
+        `Saved server ${name} is invalid. Remove and reconnect it.`
+      );
+    }
     const protocol = normalizeSavedProtocol(server.protocol);
-    normalized.servers[name] = { ...server, protocol };
+    normalized.servers[name] = {
+      url: server.url,
+      oauth: server.oauth !== false,
+      protocol,
+    };
     migrated ||= protocol !== server.protocol;
   }
 
   if (migrated) {
-    await writePrivateJson(SERVERS_PATH, normalized);
+    await writePrivateJson(serversPath(), normalized);
   }
   return normalized;
 }
 
-function normalizeSavedProtocol(value: unknown): SavedServer["protocol"] {
+function normalizeSavedProtocol(value: unknown): ProtocolMode {
   if (value === "auto" || value === "legacy" || value === "modern") {
     return value;
   }
@@ -698,7 +838,7 @@ function normalizeSavedProtocol(value: unknown): SavedServer["protocol"] {
 
 function normalizeProtocolConnectionError(
   error: unknown,
-  protocol: SavedServer["protocol"]
+  protocol: ProtocolMode
 ): unknown {
   if (
     protocol === "auto" ||
@@ -722,7 +862,7 @@ function normalizeProtocolConnectionError(
 
 function sanitizeConnectionError(
   error: unknown,
-  definition: SavedServer,
+  definition: SavedHttpServer,
   credentials: SavedCredentials
 ): unknown {
   const secrets = connectionSecrets(definition.url, credentials.headers);
@@ -788,7 +928,7 @@ function redactText(value: string, secrets: ReadonlySet<string>): string {
 
 function credentialsDirectory(name: string): string {
   return join(
-    CLIENT_DIR,
+    clientDir(),
     "credentials",
     createHash("sha256").update(name).digest("hex")
   );

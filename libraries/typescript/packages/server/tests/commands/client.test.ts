@@ -6,6 +6,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const AUTHORIZATION_LAUNCHER_URL = "http://127.0.0.1:33418/authorize";
 
+let homeDirectory: string;
+
+vi.mock("node:os", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:os")>();
+  return {
+    ...actual,
+    homedir: () => homeDirectory || actual.homedir(),
+  };
+});
+
 const mocks = vi.hoisted(() => ({
   closePrompt: vi.fn(),
   connectCall: vi.fn(),
@@ -19,6 +29,8 @@ const mocks = vi.hoisted(() => ({
             clientOptions?: { supportedProtocolVersions?: string[] };
             protocolNegotiation?: "auto" | "legacy" | { pin: "2026-07-28" };
             url?: string;
+            command?: string;
+            args?: string[];
           }
         >;
       }
@@ -55,7 +67,6 @@ const connection = {
   readResource: vi.fn(),
 };
 
-let homeDirectory: string;
 let runClient: (argv: readonly string[]) => Promise<number>;
 let stdout = "";
 let stderr = "";
@@ -71,6 +82,7 @@ beforeEach(async () => {
   mocks.logger.level = "info";
   homeDirectory = await mkdtemp(join(tmpdir(), "mcp-use-client-"));
   vi.stubEnv("HOME", homeDirectory);
+  vi.stubEnv("USERPROFILE", homeDirectory);
   stdinTtyDescriptor = Object.getOwnPropertyDescriptor(process.stdin, "isTTY");
   setStdinTty(false);
 
@@ -179,6 +191,49 @@ describe("client JSON output", () => {
     expect(stdout).not.toContain("fragment-secret");
   });
 
+  it("preserves quoted stdio command paths and arguments when saving", async () => {
+    await expect(
+      runClient([
+        "connect",
+        "local",
+        '"/opt/MCP Servers/server" "--config=dev env.json"',
+        "--stdio",
+        "--json",
+      ])
+    ).resolves.toBe(0);
+
+    expect(JSON.parse(stdout)).toEqual({
+      name: "local",
+      type: "stdio",
+      command: "/opt/MCP Servers/server",
+      args: ["--config=dev env.json"],
+      protocol: "auto",
+    });
+    expect(mocks.config?.mcpServers.local).toEqual({
+      command: "/opt/MCP Servers/server",
+      args: ["--config=dev env.json"],
+      protocolNegotiation: "auto",
+    });
+    expect(mocks.connectCall).toHaveBeenCalledWith("local");
+
+    const { getGlobalStateDir } = await import("../../src/commands/shared.js");
+    const saved = JSON.parse(
+      await readFile(join(getGlobalStateDir(), "client", "servers.json"), {
+        encoding: "utf8",
+      })
+    ) as {
+      servers: Record<
+        string,
+        { type: string; command: string; args: string[] }
+      >;
+    };
+    expect(saved.servers.local).toMatchObject({
+      type: "stdio",
+      command: "/opt/MCP Servers/server",
+      args: ["--config=dev env.json"],
+    });
+  });
+
   it("returns structured OAuth recovery without URL, state, logs, or browser", async () => {
     mocks.triggerOAuth = true;
 
@@ -234,9 +289,11 @@ describe("client JSON output", () => {
         expected: [
           {
             name: "demo",
+            type: "http",
             oauth: false,
             protocol: "auto",
             url: "https://mcp.example.com/mcp",
+            target: "https://mcp.example.com/mcp",
           },
         ],
       },
@@ -453,9 +510,11 @@ describe("client human-readable output", () => {
     await expect(runClient(["list", "--json"])).resolves.toBe(0);
     expect(JSON.parse(stdout)).toContainEqual({
       name: "remove-flags",
+      type: "http",
       oauth: false,
       protocol: "auto",
       url: "https://mcp.example.com/mcp",
+      target: "https://mcp.example.com/mcp",
     });
     expect(stderr).toBe("");
   });
@@ -530,8 +589,8 @@ describe("client protocol selection", () => {
   });
 
   it("migrates saved revision values before listing or reconnecting", async () => {
-    const { GLOBAL_STATE_DIR } = await import("../../src/commands/shared.js");
-    const clientDirectory = join(GLOBAL_STATE_DIR, "client");
+    const { getGlobalStateDir } = await import("../../src/commands/shared.js");
+    const clientDirectory = join(getGlobalStateDir(), "client");
     const serversPath = join(clientDirectory, "servers.json");
     await mkdir(clientDirectory, { recursive: true });
     await writeFile(
@@ -556,15 +615,19 @@ describe("client protocol selection", () => {
     expect(JSON.parse(stdout)).toEqual([
       {
         name: "old",
+        type: "http",
         url: "https://old.example.com/mcp",
         oauth: false,
         protocol: "legacy",
+        target: "https://old.example.com/mcp",
       },
       {
         name: "new",
+        type: "http",
         url: "https://new.example.com/mcp",
         oauth: false,
         protocol: "modern",
+        target: "https://new.example.com/mcp",
       },
     ]);
     expect(await readFile(serversPath, "utf8")).not.toMatch(
