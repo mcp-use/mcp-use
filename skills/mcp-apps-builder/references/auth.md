@@ -34,7 +34,7 @@ async ({ documentId }, ctx) => {
     };
   }
 
-  await deleteOwnedDocument(documentId, ctx.auth.user.userId);
+  await deleteOwnedDocument(documentId, ctx.auth.user.id);
   return { content: [{ type: "text", text: "Document deleted" }] };
 };
 ```
