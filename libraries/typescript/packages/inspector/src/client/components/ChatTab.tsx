@@ -64,11 +64,7 @@ import { useLocalSystemPrompt } from "./chat/system-prompt/useLocalSystemPrompt"
 import { resolveSystemPrompt } from "./chat/system-prompt/local-storage";
 import type { ChatSystemPromptProvider } from "./chat/system-prompt/types";
 import { useWidgetDebug } from "../context/WidgetDebugContext";
-import type {
-  ChatBodyBuilder,
-  MessageAttachment,
-  ToolAuthenticationRequest,
-} from "./chat/types";
+import type { ChatBodyBuilder, MessageAttachment } from "./chat/types";
 import { resolveChatToolPolicy } from "./chat/chat-tool-policy";
 
 // Structural type — avoids nominal incompatibility when pnpm creates
@@ -543,105 +539,6 @@ export function ChatTab({
   const clearMcpServerAuthRequired = effectiveClientSide
     ? undefined
     : serverSideChat.clearMcpServerAuthRequired;
-
-  const [authenticatingTool, setAuthenticatingTool] = useState(false);
-  const [retryingTool, setRetryingTool] = useState(false);
-
-  const handleToolAuthentication = useCallback(
-    async (_request: ToolAuthenticationRequest) => {
-      setAuthenticatingTool(true);
-      try {
-        await connection.authenticate();
-      } catch (error) {
-        toast.error(
-          error instanceof Error
-            ? `Authentication failed: ${error.message}`
-            : "Authentication failed"
-        );
-      } finally {
-        setAuthenticatingTool(false);
-      }
-    },
-    [connection]
-  );
-
-  const handleRetryAuthenticatedTool = useCallback(
-    async (request: ToolAuthenticationRequest) => {
-      setRetryingTool(true);
-      const updateInvocation = (
-        result: unknown,
-        state: "pending" | "result" | "error",
-        truncateAfterTool = false
-      ) => {
-        setMessages((current) =>
-          current.map((message) => {
-            if (message.id !== request.messageId || !message.parts) {
-              return message;
-            }
-
-            const partIndex = message.parts.findIndex(
-              (part) =>
-                part.type === "tool-invocation" &&
-                (request.toolCallId
-                  ? part.toolInvocation?.toolCallId === request.toolCallId
-                  : part.toolInvocation?.toolName === request.toolName)
-            );
-            if (partIndex < 0) return message;
-
-            const parts = message.parts.map((part, index) =>
-              index === partIndex && part.toolInvocation
-                ? {
-                    ...part,
-                    toolInvocation: {
-                      ...part.toolInvocation,
-                      result,
-                      state,
-                    },
-                  }
-                : part
-            );
-
-            return {
-              ...message,
-              parts: truncateAfterTool ? parts.slice(0, partIndex + 1) : parts,
-            };
-          })
-        );
-      };
-
-      updateInvocation(undefined, "pending", true);
-      try {
-        const result = await connection.callTool(
-          request.toolName,
-          request.args
-        );
-        updateInvocation(
-          result,
-          result && typeof result === "object" && "isError" in result
-            ? (result as { isError?: boolean }).isError
-              ? "error"
-              : "result"
-            : "result"
-        );
-      } catch (error) {
-        updateInvocation(
-          {
-            content: [
-              {
-                type: "text",
-                text: error instanceof Error ? error.message : String(error),
-              },
-            ],
-            isError: true,
-          },
-          "error"
-        );
-      } finally {
-        setRetryingTool(false);
-      }
-    },
-    [connection, setMessages]
-  );
 
   const handleMcpReconnect = useCallback(async () => {
     try {
@@ -1760,11 +1657,6 @@ export function ChatTab({
               serverBaseUrl={connection.url}
               messagesEndRef={messagesEndRef}
               traceEvents={traceEvents}
-              authorization={connection.authorization}
-              onAuthenticateTool={handleToolAuthentication}
-              onRetryTool={handleRetryAuthenticatedTool}
-              authenticatingTool={authenticatingTool}
-              retryingTool={retryingTool}
             />
           ) : (
             <ChatRawView events={traceEvents} usage={tokenUsage} />
@@ -1781,15 +1673,7 @@ export function ChatTab({
 
       {llmConfig && (
         <div className="relative shrink-0" data-chat-composer>
-          <FullscreenChatOverlay
-            messages={messages}
-            isLoading={isLoading}
-            authorization={connection.authorization}
-            onAuthenticateTool={handleToolAuthentication}
-            onRetryTool={handleRetryAuthenticatedTool}
-            authenticatingTool={authenticatingTool}
-            retryingTool={retryingTool}
-          />
+          <FullscreenChatOverlay messages={messages} isLoading={isLoading} />
           {managedChatNoticeNode}
           <ChatInputArea
             variant={isMcpWidgetFullscreen ? "fullscreen" : "default"}
