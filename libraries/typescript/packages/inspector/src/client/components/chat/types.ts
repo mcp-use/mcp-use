@@ -34,6 +34,13 @@ export interface Message {
   }>;
 }
 
+export interface ToolAuthenticationRequest {
+  messageId: string;
+  toolCallId?: string;
+  toolName: string;
+  args: Record<string, unknown>;
+}
+
 export interface ChatSerializedMessage {
   role: string;
   content: unknown;

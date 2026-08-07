@@ -1,4 +1,4 @@
-import { Check, Copy, Loader2, Wrench, X } from "lucide-react";
+import { Check, Copy, Loader2, LockKeyhole, Wrench, X } from "lucide-react";
 import { Button } from "@/client/components/ui/button";
 import {
   Sheet,
@@ -17,7 +17,7 @@ interface ToolCallDisplayProps {
   toolName: string;
   args: Record<string, unknown>;
   result?: any;
-  state?: "call" | "result" | "error";
+  state?: "call" | "result" | "error" | "auth";
   partialArgs?: Record<string, unknown>;
 }
 
@@ -42,6 +42,10 @@ export function ToolCallDisplay({
         );
       case "error":
         return <X className="h-4 w-4 text-red-500 dark:text-red-400" />;
+      case "auth":
+        return (
+          <LockKeyhole className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+        );
       default:
         return (
           <Check className="h-4 w-4 text-emerald-800 dark:text-emerald-400" />
@@ -57,6 +61,8 @@ export function ToolCallDisplay({
         return " bg-emerald-500/20 dark:bg-emerald-500/20";
       case "error":
         return " bg-red-500/20 dark:bg-red-500/20";
+      case "auth":
+        return " bg-amber-500/20 dark:bg-amber-500/20";
       default:
         return " bg-emerald-500/20 dark:bg-emerald-500/20";
     }
@@ -126,7 +132,7 @@ export function ToolCallDisplay({
             Tool Call Details
           </SheetTitle>
           <SheetDescription className="flex items-center gap-2">
-            {toolName} — {state}
+            {toolName} — {state === "auth" ? "pending authentication" : state}
             {state === "call" && (
               <span className="flex items-center gap-1 text-blue-500 dark:text-blue-400">
                 <Loader2 className="h-3 w-3 animate-spin" />

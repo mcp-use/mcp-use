@@ -1,11 +1,17 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { MessageList } from "./MessageList";
-import type { Message } from "./types";
+import type { Message, ToolAuthenticationRequest } from "./types";
+import type { McpServer } from "@mcp-use/client/react";
 
 interface FullscreenChatOverlayProps {
   messages: Message[];
   isLoading: boolean;
+  authorization?: McpServer["authorization"];
+  onAuthenticateTool?: (request: ToolAuthenticationRequest) => Promise<void>;
+  onRetryTool?: (request: ToolAuthenticationRequest) => Promise<void>;
+  authenticatingTool?: boolean;
+  retryingTool?: boolean;
 }
 
 export function useMcpWidgetFullscreen(): boolean {
@@ -36,6 +42,11 @@ export function useMcpWidgetFullscreen(): boolean {
 export function FullscreenChatOverlay({
   messages,
   isLoading,
+  authorization,
+  onAuthenticateTool,
+  onRetryTool,
+  authenticatingTool,
+  retryingTool,
 }: FullscreenChatOverlayProps) {
   const isFullscreen = useMcpWidgetFullscreen();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -87,6 +98,11 @@ export function FullscreenChatOverlay({
             isLoading={isLoading}
             messagesEndRef={transcriptEndRef}
             renderToolResults={false}
+            authorization={authorization}
+            onAuthenticateTool={onAuthenticateTool}
+            onRetryTool={onRetryTool}
+            authenticatingTool={authenticatingTool}
+            retryingTool={retryingTool}
           />
         </section>
       )}
