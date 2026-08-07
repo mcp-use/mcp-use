@@ -20,9 +20,12 @@ export interface SkillsSnapshot {
   directories: Array<{ uri: string; name: string }>;
 }
 
-/** Optional recovery hook used by development-time skill discovery. */
+/** Optional controls for Node-only skill discovery. */
 export interface SkillsDiscoveryOptions {
+  /** Recover from independently invalid skills; omit for strict discovery. */
   onInvalidSkill?: (error: Error) => void;
+  /** Override resource reads, primarily for deterministic failure testing. */
+  readResourceFile?: (path: string) => Buffer;
 }
 
 /** Discover and validate an immutable Skills snapshot from a project tree. */

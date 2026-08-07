@@ -100,16 +100,17 @@ export function createSkillContextConnection(options: {
 }): SkillContextConnection | null {
   const catalog = new Map(options.skills.map((skill) => [skill.uri, skill]));
   if (catalog.size === 0) return null;
+  const loadedSkillDigests = new Map<string, string>();
 
-  const resolve = async (skillUri: unknown): Promise<Skill> => {
-    if (typeof skillUri !== "string" || !catalog.has(skillUri)) {
-      throw new Error("Unknown skill URI");
-    }
+  const resolve = async (skillUri: string): Promise<Skill> => {
     const current = (await options.getSkill(skillUri)).skill;
     if (current.uri !== skillUri)
       throw new Error("skills/get returned a different URI");
     return current;
   };
+
+  const skillDigest = (skill: Skill): string | undefined =>
+    skill.resources?.find((resource) => resource.uri === skill.uri)?.digest;
 
   return {
     tools: [
@@ -140,18 +141,56 @@ export function createSkillContextConnection(options: {
       },
     ],
     async callTool(name, args) {
-      const skill = await resolve(args.skillUri);
-      const uri = name === READ_SKILL_TOOL ? skill.uri : args.resourceUri;
       if (name !== READ_SKILL_TOOL && name !== READ_SKILL_RESOURCE_TOOL) {
         throw new Error(`Unknown skill host tool: ${name}`);
       }
-      if (typeof uri !== "string")
+      if (!args || typeof args !== "object" || Array.isArray(args)) {
+        throw new Error("Skill host tool arguments must be an object");
+      }
+      const skillUri = args.skillUri;
+      if (typeof skillUri !== "string" || !catalog.has(skillUri)) {
+        throw new Error("Unknown skill URI");
+      }
+      const resourceUri = args.resourceUri;
+      if (
+        name === READ_SKILL_RESOURCE_TOOL &&
+        typeof resourceUri !== "string"
+      ) {
         throw new Error("resourceUri must be a string");
+      }
+      if (
+        name === READ_SKILL_RESOURCE_TOOL &&
+        !loadedSkillDigests.has(skillUri)
+      ) {
+        throw new Error("Load SKILL.md before reading skill resources");
+      }
+      if (name === READ_SKILL_TOOL) {
+        // A failed refresh must not leave an earlier version authorized.
+        loadedSkillDigests.delete(skillUri);
+      }
+
+      const skill = await resolve(skillUri);
+      if (name === READ_SKILL_RESOURCE_TOOL) {
+        const loadedDigest = loadedSkillDigests.get(skillUri);
+        const currentDigest = skillDigest(skill);
+        if (!currentDigest || currentDigest !== loadedDigest) {
+          loadedSkillDigests.delete(skillUri);
+          throw new Error(
+            "Skill instructions changed; reload SKILL.md before reading resources"
+          );
+        }
+      }
+
+      const uri = name === READ_SKILL_TOOL ? skill.uri : resourceUri;
       const content = await readVerifiedResource({
         skill,
-        uri,
+        uri: uri as string,
         readResource: options.readResource,
       });
+      if (name === READ_SKILL_TOOL) {
+        // readVerifiedResource requires this digest and verifies the returned bytes.
+        loadedSkillDigests.set(skillUri, skillDigest(skill)!);
+      }
       const manifest = (skill.resources ?? []).map((resource) => resource.uri);
       const catalogEntry = catalog.get(skill.uri);
       const metadata = {

@@ -11,15 +11,15 @@ import type {
 
 const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-/**
- * Optional recovery hook for development-only skill discovery.
- *
- * Production callers leave this unset, so discovery remains strict. A caller
- * that supplies the hook receives each independently invalid SKILL.md and a
- * snapshot containing every other valid skill.
- */
+/** Optional controls for Node-only skill discovery. */
 export interface SkillsDiscoveryOptions {
+  /**
+   * Recover from independently invalid skills. Production callers leave this
+   * unset so discovery remains strict.
+   */
   onInvalidSkill?: (error: Error) => void;
+  /** Override resource reads, primarily for deterministic failure testing. */
+  readResourceFile?: (path: string) => Buffer;
 }
 
 function assertSafeDirectory(projectRoot: string, directory: string): string {
@@ -218,6 +218,14 @@ export function discoverConfiguredSkills(
   }
 
   const invalidSkillRoots: string[] = [];
+  const readResourceFile = options?.readResourceFile ?? readFileSync;
+  const omitInvalidSkill = (skillRoot: string, error: unknown): void => {
+    const invalidSkill =
+      error instanceof Error ? error : new Error(String(error));
+    if (options?.onInvalidSkill === undefined) throw invalidSkill;
+    invalidSkillRoots.push(skillRoot);
+    options.onInvalidSkill(invalidSkill);
+  };
   const validSkills: Array<{
     skillFile: string;
     skillRoot: string;
@@ -237,11 +245,7 @@ export function discoverConfiguredSkills(
         metadata: frontmatter(skillFile),
       });
     } catch (error) {
-      const invalidSkill =
-        error instanceof Error ? error : new Error(String(error));
-      if (options?.onInvalidSkill === undefined) throw invalidSkill;
-      invalidSkillRoots.push(skillRoot);
-      options.onInvalidSkill(invalidSkill);
+      omitInvalidSkill(skillRoot, error);
     }
   }
 
@@ -254,14 +258,6 @@ export function discoverConfiguredSkills(
         invalidRoot.startsWith(`${skillRoot}${sep}`) &&
         (path === invalidRoot || path.startsWith(`${invalidRoot}${sep}`))
     );
-
-  const omitInvalidSkill = (skillRoot: string, error: unknown): void => {
-    const invalidSkill =
-      error instanceof Error ? error : new Error(String(error));
-    if (options?.onInvalidSkill === undefined) throw invalidSkill;
-    invalidSkillRoots.push(skillRoot);
-    options.onInvalidSkill(invalidSkill);
-  };
 
   const successfulSkills: Array<{
     skill: SkillsSnapshot["skills"][number];
@@ -285,7 +281,7 @@ export function discoverConfiguredSkills(
             !isWithinInvalidDescendant(file, skillRoot)
         );
         const resources = files.map((file) => {
-          const bytes = readFileSync(file);
+          const bytes = readResourceFile(file);
           const uri = skillUri(skillsRoot, skillRoot, file);
           const type = mimeType(file);
           const digest = `sha256:${createHash("sha256").update(bytes).digest("hex")}`;

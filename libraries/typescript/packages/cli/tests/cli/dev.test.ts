@@ -392,6 +392,44 @@ describe("runDev", () => {
     });
   });
 
+  it("reloads skill files when the configured skills directory overlaps views", async () => {
+    const cwd = copyFixture("dev-overlapping-skills-views", "views");
+    const entry = join(cwd, "src", "index.ts");
+    writeFileSync(
+      entry,
+      readFileSync(entry, "utf8").replace(
+        'name: "fixture-views", version: "1.0.0"',
+        'name: "fixture-views", version: "1.0.0", skills: { directory: "views" }'
+      )
+    );
+    const skillDir = join(cwd, "views", "product-search-result");
+    writeFileSync(
+      join(skillDir, "SKILL.md"),
+      "---\nname: product-search-result\ndescription: Product search guidance\n---\n"
+    );
+    const guide = join(skillDir, "guide.md");
+    writeFileSync(guide, "Guidance v1\n");
+
+    const dev = await startDev(cwd, await getFreePort(), undefined, false);
+    cleanups.push(dev.stop, () => removeDir(cwd));
+    expect(
+      await mcpRequest(dev.url, "resources/read", {
+        uri: "skill://product-search-result/guide.md",
+      })
+    ).toMatchObject({ result: { contents: [{ text: "Guidance v1\n" }] } });
+
+    writeFileSync(guide, "Guidance v2\n");
+    await waitFor(async () => {
+      const body = await mcpRequest(dev.url, "resources/read", {
+        uri: "skill://product-search-result/guide.md",
+      });
+      const result = body["result"] as {
+        contents?: Array<{ text?: string }>;
+      };
+      return result.contents?.[0]?.text === "Guidance v2\n" ? true : undefined;
+    });
+  });
+
   it("mounts the project-local Inspector on the existing dev listener", async () => {
     const cwd = copyFixture("dev-inspector-installed");
     cleanups.push(() => removeDir(cwd));

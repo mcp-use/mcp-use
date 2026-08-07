@@ -7,6 +7,7 @@
  * the child process log in `.mcp-use/example-verification/` for CI artifacts.
  */
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   access,
   chmod,
@@ -476,65 +477,73 @@ async function assertScenario(connection, example, origin) {
     }
     case "skills": {
       const { skills } = await connection.listSkills();
-      const refunds = skills.find(
-        (skill) => skill.uri === "skill://refunds/SKILL.md"
-      );
-      if (!refunds || refunds.frontmatter.name !== "refunds") {
-        throw new Error("Expected the refunds skill in the skill catalog.");
-      }
-      const { skill } = await connection.getSkill(refunds.uri);
-      if (
-        !skill.resources?.some(
-          (resource) =>
-            resource.uri === "skill://refunds/references/policy.md" &&
-            resource.digest.startsWith("sha256:")
-        )
-      ) {
-        throw new Error("Expected the refund policy in the skill manifest.");
-      }
-      const policy = await connection.readResource(
-        "skill://refunds/references/policy.md"
-      );
-      if (
-        !policy.contents?.some((content) => content.text?.includes("30 days"))
-      ) {
-        throw new Error("Expected to read the refund policy resource.");
-      }
-      const purchasing = skills.find(
-        (skill) => skill.uri === "skill://purchasing/SKILL.md"
-      );
-      if (!purchasing || purchasing.frontmatter.name !== "purchasing") {
-        throw new Error("Expected the purchasing skill in the skill catalog.");
-      }
-      const { skill: purchasingSkill } = await connection.getSkill(
-        purchasing.uri
-      );
-      if (
-        !purchasingSkill.resources?.some(
-          (resource) =>
-            resource.uri ===
-              "skill://purchasing/references/approval-policy.md" &&
-            resource.digest.startsWith("sha256:")
-        )
-      ) {
-        throw new Error(
-          "Expected the purchase approval policy in the skill manifest."
-        );
-      }
-      const approvalPolicy = await connection.readResource(
-        "skill://purchasing/references/approval-policy.md"
-      );
-      if (
-        !approvalPolicy.contents?.some((content) =>
-          content.text?.includes("manager approval")
-        )
-      ) {
-        throw new Error("Expected to read the purchase approval policy.");
-      }
+      await verifySkillResource(connection, skills, {
+        name: "refunds",
+        resourceUri: "skill://refunds/references/policy.md",
+        marker: "30 days",
+        label: "refund policy",
+      });
+      await verifySkillResource(connection, skills, {
+        name: "purchasing",
+        resourceUri: "skill://purchasing/references/approval-policy.md",
+        marker: "manager approval",
+        label: "purchase approval policy",
+      });
       return;
     }
     default:
       return;
+  }
+}
+
+async function verifySkillResource(
+  connection,
+  skills,
+  { name, resourceUri, marker, label }
+) {
+  const catalogSkill = skills.find(
+    (skill) => skill.uri === `skill://${name}/SKILL.md`
+  );
+  if (!catalogSkill || catalogSkill.frontmatter.name !== name) {
+    throw new Error(`Expected the ${name} skill in the skill catalog.`);
+  }
+
+  const { skill } = await connection.getSkill(catalogSkill.uri);
+  if (skill.uri !== catalogSkill.uri) {
+    throw new Error(
+      `The ${name} skill response did not match its catalog URI.`
+    );
+  }
+  const manifestResources =
+    skill.resources?.filter((resource) => resource.uri === resourceUri) ?? [];
+  if (manifestResources.length !== 1) {
+    throw new Error(`Expected the ${label} in the skill manifest.`);
+  }
+
+  const result = await connection.readResource(resourceUri);
+  if (result.contents?.length !== 1) {
+    throw new Error(`Expected one returned resource for the ${label}.`);
+  }
+  const content = result.contents[0];
+  if (content.uri !== resourceUri) {
+    throw new Error(`The ${label} response did not match its requested URI.`);
+  }
+  if (!content.text?.includes(marker)) {
+    throw new Error(`Expected to read the ${label} resource.`);
+  }
+
+  const bytes =
+    typeof content.text === "string"
+      ? Buffer.from(content.text, "utf8")
+      : typeof content.blob === "string"
+        ? Buffer.from(content.blob, "base64")
+        : undefined;
+  if (!bytes) {
+    throw new Error(`Expected the ${label} resource to contain bytes.`);
+  }
+  const expectedDigest = `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+  if (manifestResources[0].digest !== expectedDigest) {
+    throw new Error(`The ${label} digest did not match the returned resource.`);
   }
 }
 

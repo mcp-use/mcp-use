@@ -27,7 +27,7 @@ import {
   type EditableConnectionConfig,
 } from "@/client/utils/connectionUpdates";
 import { isInspectorSamplingAvailable } from "@/client/utils/samplingProtocol";
-import { getSkillsState } from "./layout/layoutHeaderUtils";
+import { getSkillsFallbackTab } from "./layout/layoutHeaderUtils";
 import { getServerDisplayName } from "@/client/utils/servers";
 import { useMcpClient, type McpServer } from "@mcp-use/client/react";
 import {
@@ -114,6 +114,8 @@ export function Layout({ children }: LayoutProps) {
   } = useInspector();
 
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isEmbeddedConfigInitialized, setIsEmbeddedConfigInitialized] =
+    useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
       return localStorage.getItem("inspector-sidebar-collapsed") === "true";
@@ -170,6 +172,7 @@ export function Layout({ children }: LayoutProps) {
         setActiveTab(config.defaultTab);
       }
     }
+    setIsEmbeddedConfigInitialized(true);
   }, []); // Only run once on mount
 
   // Read tunnelUrl from query parameters and store in context
@@ -281,20 +284,31 @@ export function Layout({ children }: LayoutProps) {
     }
   }, [activeTab, connections, selectedServerId, handleTabChange]);
 
-  // A bookmarked Skills URL can be restored before the catalog is ready.
-  // Move to a usable tab until the server advertises a non-empty catalog.
+  // Wait for both server discovery and embedded visibility configuration before
+  // redirecting a bookmarked Skills URL to a visible, usable tab.
   useEffect(() => {
     const selectedServer = connections.find(
       (connection) => connection.id === selectedServerId
     );
     if (
+      isEmbeddedConfigInitialized &&
       activeTab === "skills" &&
-      selectedServer &&
-      getSkillsState(selectedServer) !== "available"
+      selectedServer
     ) {
-      handleTabChange("tools");
+      const fallbackTab = getSkillsFallbackTab(
+        selectedServer,
+        embeddedConfig.visibleTabs
+      );
+      if (fallbackTab) handleTabChange(fallbackTab);
     }
-  }, [activeTab, connections, selectedServerId, handleTabChange]);
+  }, [
+    activeTab,
+    connections,
+    selectedServerId,
+    handleTabChange,
+    embeddedConfig.visibleTabs,
+    isEmbeddedConfigInitialized,
+  ]);
 
   // Listen for custom navigation events from toast (for sampling and elicitation requests)
   useEffect(() => {

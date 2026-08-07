@@ -24,6 +24,7 @@ import { AddToClientDropdown } from "./AddToClientDropdown";
 import LogoAnimated from "./LogoAnimated";
 import { ServerDropdown } from "./ServerDropdown";
 import {
+  getSkillsAccessibleLabel,
   getSkillsState,
   getTabCount,
   isMcpUseTunnelUrl,
@@ -341,7 +342,11 @@ export function LayoutHeader({
                             "text-red-600 dark:text-red-400"
                         )}
                       >
-                        <span className="sr-only">{tab.label}</span>
+                        <span className="sr-only">
+                          {skillsState
+                            ? getSkillsAccessibleLabel(tab.label, skillsState)
+                            : tab.label}
+                        </span>
                       </TabsTrigger>
                     );
 

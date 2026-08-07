@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import {
-  chmodSync,
   mkdirSync,
+  readFileSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -249,23 +249,22 @@ describe("skill discovery", () => {
     const shipping = writeSkill(cwd, "shipping", "shipping");
     const brokenFile = join(shipping, "references.md");
     writeFileSync(brokenFile, "Unreadable\n");
-    chmodSync(brokenFile, 0o000);
-    try {
-      const errors: string[] = [];
-      const snapshot = discoverConfiguredSkills(undefined, cwd, "skills", {
-        onInvalidSkill: (error) => errors.push(error.message),
-      })!;
+    const errors: string[] = [];
+    const snapshot = discoverConfiguredSkills(undefined, cwd, "skills", {
+      onInvalidSkill: (error) => errors.push(error.message),
+      readResourceFile: (path) => {
+        if (path === brokenFile) throw new Error(`Cannot read ${path}`);
+        return readFileSync(path);
+      },
+    })!;
 
-      expect(errors).toHaveLength(1);
-      expect(snapshot.skills.map((skill) => skill.frontmatter.name)).toEqual([
-        "refunds",
-      ]);
-      expect(
-        snapshot.resources.some((resource) => resource.uri.includes("shipping"))
-      ).toBe(false);
-    } finally {
-      chmodSync(brokenFile, 0o644);
-    }
+    expect(errors).toHaveLength(1);
+    expect(snapshot.skills.map((skill) => skill.frontmatter.name)).toEqual([
+      "refunds",
+    ]);
+    expect(
+      snapshot.resources.some((resource) => resource.uri.includes("shipping"))
+    ).toBe(false);
   });
 
   it("rejects invalid untyped skills configuration", () => {

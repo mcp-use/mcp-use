@@ -687,10 +687,9 @@ export async function runDev(options: DevOptions): Promise<void> {
   };
 
   const onSsrFileEvent = (file: string): void => {
-    if (isViewPath(file, options.cwd, viewsDirectory)) {
-      return;
-    }
     const normalizedFile = file.replaceAll("\\", "/");
+    // Skills may intentionally live under the views root. Give that configured
+    // data directory precedence before view files take the HMR-only path.
     if (
       currentSkillsDirectory !== undefined &&
       (normalizedFile === currentSkillsDirectory.replaceAll("\\", "/") ||
@@ -699,6 +698,9 @@ export async function runDev(options: DevOptions): Promise<void> {
         ))
     ) {
       scheduleSkillsReload();
+      return;
+    }
+    if (isViewPath(file, options.cwd, viewsDirectory)) {
       return;
     }
     const modules = ssrEnvironment.moduleGraph.getModulesByFile(
