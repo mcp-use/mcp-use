@@ -1,12 +1,15 @@
 import {
   Client,
+  discoverOAuthProtectedResourceMetadata,
   SdkError,
   SdkHttpError,
   StreamableHTTPClientTransport,
   UnauthorizedError,
   type ClientOptions,
+  type OAuthClientProvider,
   type VersionNegotiationMode,
 } from "@modelcontextprotocol/client";
+import { completeOAuthFlow, isOAuthInteractionRequired } from "../auth/flow.js";
 import { DialectJsonSchemaValidator } from "../utils/json-schema-validator.js";
 import { logger } from "../utils/logging.js";
 import type { ConnectorInitOptions } from "./base.js";
@@ -95,6 +98,8 @@ interface HttpConnectorOptions extends ConnectorInitOptions {
     /** Maximum number of reconnection attempts. */
     maxRetries?: number;
   };
+  /** Detect RFC 9728 metadata after anonymous connection. Defaults to true. */
+  detectMixedAuth?: boolean;
 }
 
 type StreamableHttpFailure = {
@@ -102,6 +107,18 @@ type StreamableHttpFailure = {
   is401Error: boolean;
   httpStatusCode?: number;
 };
+
+function isOAuthClientProvider(
+  provider: ConnectorInitOptions["authProvider"]
+): provider is OAuthClientProvider {
+  return Boolean(
+    provider &&
+    "redirectToAuthorization" in provider &&
+    typeof provider.redirectToAuthorization === "function" &&
+    "tokens" in provider &&
+    typeof provider.tokens === "function"
+  );
+}
 
 function createMcpProxyFetch(
   logicalServerUrl: string,
@@ -162,8 +179,11 @@ export class HttpConnector extends BaseConnector {
   private readonly gatewayUrl?: string;
   private readonly serverId?: string;
   private readonly reconnectionOptions?: HttpConnectorOptions["reconnectionOptions"];
+  private readonly detectMixedAuth: boolean;
   private transportType: "streamable-http" | null = null;
   private streamableTransport: StreamableHTTPClientTransport | null = null;
+  private hadAccessTokenAtConnect = false;
+  private pendingOAuthCompletion: Promise<void> | null = null;
 
   /**
    * Creates an HTTP connector.
@@ -204,6 +224,111 @@ export class HttpConnector extends BaseConnector {
     // server/discover flow when it is available.
     this.protocolNegotiation = opts.protocolNegotiation ?? "auto";
     this.reconnectionOptions = opts.reconnectionOptions;
+    this.detectMixedAuth = opts.detectMixedAuth ?? true;
+  }
+
+  private get oauthProvider(): OAuthClientProvider | undefined {
+    return isOAuthClientProvider(this.opts.authProvider)
+      ? this.opts.authProvider
+      : undefined;
+  }
+
+  private async completeInteractiveAuthorization(): Promise<void> {
+    const provider = this.oauthProvider;
+    if (!provider) {
+      throw new Error("No OAuth client provider is configured");
+    }
+    if (!this.pendingOAuthCompletion) {
+      this.pendingOAuthCompletion = completeOAuthFlow(provider, this.baseUrl, {
+        fetchFn: this.customFetch,
+        finishAuthorization: async (code, iss) => {
+          const transport = this.streamableTransport;
+          if (!transport) {
+            throw new Error("OAuth transport is no longer connected");
+          }
+          await transport.finishAuth(code, iss);
+        },
+      })
+        .then(() => {
+          if (this.authorizationCache) {
+            this.authorizationCache = {
+              ...this.authorizationCache,
+              authenticated: true,
+            };
+          }
+        })
+        .finally(() => {
+          this.pendingOAuthCompletion = null;
+        });
+    }
+    await this.pendingOAuthCompletion;
+  }
+
+  protected override async executeRequest<T>(
+    operation: () => Promise<T>
+  ): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      const provider = this.oauthProvider as
+        | (OAuthClientProvider & { preventAutoAuth?: boolean })
+        | undefined;
+      if (
+        !provider ||
+        provider.preventAutoAuth === true ||
+        !isOAuthInteractionRequired(error)
+      ) {
+        throw error;
+      }
+      await this.completeInteractiveAuthorization();
+      return operation();
+    }
+  }
+
+  /** Authenticate an already-connected server without requiring a 401 first. */
+  override async authenticate(): Promise<void> {
+    if (!this.connected || !this.streamableTransport) {
+      throw new Error("MCP client is not connected");
+    }
+    await this.completeInteractiveAuthorization();
+  }
+
+  override async initialize(
+    defaultRequestOptions = this.opts.defaultRequestOptions ?? {}
+  ): ReturnType<BaseConnector["initialize"]> {
+    const capabilities = await super.initialize(defaultRequestOptions);
+    if (
+      !this.detectMixedAuth ||
+      !this.oauthProvider ||
+      this.hadAccessTokenAtConnect
+    ) {
+      return capabilities;
+    }
+
+    try {
+      const metadata = await discoverOAuthProtectedResourceMetadata(
+        this.baseUrl,
+        { protocolVersion: this.negotiatedProtocolVersion },
+        this.customFetch
+      );
+      this.authorizationCache = {
+        mode: "mixed",
+        authenticated: false,
+        ...(metadata.resource ? { resource: metadata.resource } : {}),
+        ...(metadata.scopes_supported
+          ? { scopesSupported: [...metadata.scopes_supported] }
+          : {}),
+      };
+      logger.info(
+        "OAuth protected-resource metadata found after anonymous connection; server uses mixed auth"
+      );
+    } catch (error) {
+      // RFC 9728 metadata is optional for anonymous servers. Discovery is a
+      // best-effort classification and must never turn a valid MCP connection
+      // into a failure.
+      logger.debug("Mixed-auth metadata was not discovered:", error);
+    }
+    return capabilities;
   }
 
   private buildClientOptions(): ClientOptions {
@@ -341,6 +466,17 @@ export class HttpConnector extends BaseConnector {
 
     const baseUrl = this.baseUrl;
     logger.debug(`Connecting to MCP implementation via HTTP: ${baseUrl}`);
+
+    const oauthProvider = this.oauthProvider;
+    if (oauthProvider) {
+      try {
+        this.hadAccessTokenAtConnect = Boolean(
+          (await oauthProvider.tokens())?.access_token
+        );
+      } catch {
+        this.hadAccessTokenAtConnect = false;
+      }
+    }
 
     try {
       await this.connectWithStreamableHttp(baseUrl);

@@ -126,14 +126,22 @@ async function connect(
     json,
     `mcp-use client connect ${name} <url> --no-open`
   );
+  const authorization = connection.authorization;
   await connection.disconnect();
   saved.servers[name] = definition;
   await writePrivateJson(SERVERS_PATH, saved);
   await writePrivateJson(credentialsPath(name), credentials);
   printResult(
-    { name, url: safeUrlForOutput(definition.url), protocol },
+    {
+      name,
+      url: safeUrlForOutput(definition.url),
+      protocol,
+      ...(authorization ? { authorization } : {}),
+    },
     json,
-    `Connected and saved ${name}.`
+    authorization?.mode === "mixed" && !authorization.authenticated
+      ? `Connected and saved ${name}.\nThis server is using mixed auth. Public tools are available now; run \`mcp-use client ${name} auth login\` to authenticate.`
+      : `Connected and saved ${name}.`
   );
   return 0;
 }
@@ -234,6 +242,16 @@ async function savedServerCommand(
     json
   );
   try {
+    if (family === "auth" && operation === "login") {
+      parseJsonOnly(argv.slice(2));
+      await connection.authenticate();
+      printResult(
+        { name, authenticated: true },
+        json,
+        `Authenticated ${name}.`
+      );
+      return 0;
+    }
     if (family === "tools") {
       if (operation === "list") {
         parseJsonOnly(argv.slice(2));
@@ -323,6 +341,10 @@ function validateSavedCommandArgs(
     (family === "resources" && operation === "list") ||
     (family === "prompts" && operation === "list")
   ) {
+    parseJsonOnly(args);
+    return;
+  }
+  if (family === "auth" && operation === "login") {
     parseJsonOnly(args);
     return;
   }
@@ -426,24 +448,21 @@ async function openConnection(
         storageKeyPrefix: `mcp-use-cli:${name}`,
         openBrowser: async (url: string) => {
           if (quiet) {
-            setImmediate(() => {
-              rejectOAuthInteraction?.(
-                new CommandError(
-                  "oauth_interaction_required",
-                  "OAuth interaction is required; retry this command without --json in a terminal.",
+            const error = new CommandError(
+              "oauth_interaction_required",
+              "OAuth interaction is required; retry this command without --json in a terminal.",
+              {
+                server: name,
+                nextSteps: [
                   {
-                    server: name,
-                    nextSteps: [
-                      {
-                        description: "Authenticate interactively in a terminal",
-                        command: interactiveCommand,
-                      },
-                    ],
-                  }
-                )
-              );
-            });
-            return;
+                    description: "Authenticate interactively in a terminal",
+                    command: interactiveCommand,
+                  },
+                ],
+              }
+            );
+            rejectOAuthInteraction?.(error);
+            throw error;
           }
           if (browserMode === "never") {
             process.stderr.write(`Open this URL to authenticate:\n${url}\n`);

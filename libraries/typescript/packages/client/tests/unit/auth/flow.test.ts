@@ -91,6 +91,27 @@ describe("completeOAuthFlow", () => {
     );
   });
 
+  it("finishes a pending flow through the official transport callback", async () => {
+    const finishAuthorization = vi.fn(async () => {});
+    const provider = {
+      hasPendingFlow: true,
+      getAuthorizationResponse: vi.fn(async () => ({
+        code: "auth-code",
+        iss: "https://auth.example.com",
+      })),
+    } as unknown as OAuthClientProvider;
+
+    await completeOAuthFlow(provider, "https://example.com/mcp", {
+      finishAuthorization,
+    });
+
+    expect(finishAuthorization).toHaveBeenCalledWith(
+      "auth-code",
+      "https://auth.example.com"
+    );
+    expect(auth).not.toHaveBeenCalled();
+  });
+
   it("skips the first auth() when hasPendingFlow is set", async () => {
     vi.mocked(auth).mockResolvedValueOnce("AUTHORIZED");
     const getAuthorizationCode = vi.fn(async () => "auth-code");

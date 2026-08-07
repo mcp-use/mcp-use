@@ -33,8 +33,16 @@ export function ServerHeaderAuthButton({
   className?: string;
 }) {
   const { state, authUrl, authenticate } = server;
+  const isUnauthenticatedMixedServer =
+    state === "ready" &&
+    server.authorization?.mode === "mixed" &&
+    !server.authorization.authenticated;
 
-  if (state !== "pending_auth" && state !== "authenticating") {
+  if (
+    state !== "pending_auth" &&
+    state !== "authenticating" &&
+    !isUnauthenticatedMixedServer
+  ) {
     return null;
   }
 
@@ -53,7 +61,7 @@ export function ServerHeaderAuthButton({
   }
 
   if (authenticate) {
-    return (
+    const button = (
       <Button
         data-testid="server-header-authenticate"
         size="sm"
@@ -68,6 +76,20 @@ export function ServerHeaderAuthButton({
         Authenticate
       </Button>
     );
+
+    if (isUnauthenticatedMixedServer) {
+      return (
+        <div
+          data-testid="server-header-mixed-auth"
+          className="flex items-center gap-2 text-xs text-yellow-700 dark:text-yellow-500"
+        >
+          <span>This server is using mixed auth.</span>
+          {button}
+        </div>
+      );
+    }
+
+    return button;
   }
 
   if (authUrl) {
