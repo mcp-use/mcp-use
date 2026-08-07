@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.1.0-canary.4
+
+### Patch Changes
+
+- 792e8eb: Allow widget-declared MCP App sandbox CSPs to use dynamic compilation while preserving their declared domain restrictions.
+
 ## 2.1.0-canary.3
 
 ### Minor Changes
