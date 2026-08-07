@@ -11,6 +11,7 @@
     "mcp-use": "2.0.4"
   },
   "changesets": [
+    "bright-inspector-assets",
     "bright-widgets-bridge",
     "calm-owls-prompt",
     "clean-cli-ownership",

@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 21.0.0-canary.8
+
+### Patch Changes
+
+- fd0236f: fix(inspector): load provider assets from the development server
+  - mcp-use@3.0.0-canary.8
+
 ## 21.0.0-canary.7
 
 ### Minor Changes
