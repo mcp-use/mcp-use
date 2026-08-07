@@ -42,6 +42,8 @@ class WebSocketConnector(BaseConnector):
                 - A dict: Not supported for WebSocket (will log warning)
                 - An httpx.Auth object: Not supported for WebSocket (will log warning)
         """
+        super().__init__()
+
         self.url = url
         self.headers = headers or {}
 
@@ -255,3 +257,21 @@ class WebSocketConnector(BaseConnector):
     def public_identifier(self) -> str:
         """Get the identifier for the connector."""
         return f"websocket:{self.url}"
+
+    @property
+    def is_connected(self) -> bool:
+        """Check if the connector is actually connected.
+
+        WebSocketConnector manages the connection over raw WebSocket messages
+        rather than an MCP ClientSession, so unlike the base implementation this
+        does not depend on ``client_session``. It also checks that the receiver
+        task is still running: ``_receive_messages`` catches its own exceptions
+        and returns without resetting ``_connected``, so a dropped connection
+        would otherwise still report as connected until ``disconnect()`` is
+        called explicitly.
+        """
+        if not self._connected:
+            return False
+        if self._receiver_task is None or self._receiver_task.done():
+            return False
+        return True
