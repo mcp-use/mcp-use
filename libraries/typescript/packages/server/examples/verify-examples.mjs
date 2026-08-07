@@ -474,6 +474,65 @@ async function assertScenario(connection, example, origin) {
       }
       return;
     }
+    case "skills": {
+      const { skills } = await connection.listSkills();
+      const refunds = skills.find(
+        (skill) => skill.uri === "skill://refunds/SKILL.md"
+      );
+      if (!refunds || refunds.frontmatter.name !== "refunds") {
+        throw new Error("Expected the refunds skill in the skill catalog.");
+      }
+      const { skill } = await connection.getSkill(refunds.uri);
+      if (
+        !skill.resources?.some(
+          (resource) =>
+            resource.uri === "skill://refunds/references/policy.md" &&
+            resource.digest.startsWith("sha256:")
+        )
+      ) {
+        throw new Error("Expected the refund policy in the skill manifest.");
+      }
+      const policy = await connection.readResource(
+        "skill://refunds/references/policy.md"
+      );
+      if (
+        !policy.contents?.some((content) => content.text?.includes("30 days"))
+      ) {
+        throw new Error("Expected to read the refund policy resource.");
+      }
+      const purchasing = skills.find(
+        (skill) => skill.uri === "skill://purchasing/SKILL.md"
+      );
+      if (!purchasing || purchasing.frontmatter.name !== "purchasing") {
+        throw new Error("Expected the purchasing skill in the skill catalog.");
+      }
+      const { skill: purchasingSkill } = await connection.getSkill(
+        purchasing.uri
+      );
+      if (
+        !purchasingSkill.resources?.some(
+          (resource) =>
+            resource.uri ===
+              "skill://purchasing/references/approval-policy.md" &&
+            resource.digest.startsWith("sha256:")
+        )
+      ) {
+        throw new Error(
+          "Expected the purchase approval policy in the skill manifest."
+        );
+      }
+      const approvalPolicy = await connection.readResource(
+        "skill://purchasing/references/approval-policy.md"
+      );
+      if (
+        !approvalPolicy.contents?.some((content) =>
+          content.text?.includes("manager approval")
+        )
+      ) {
+        throw new Error("Expected to read the purchase approval policy.");
+      }
+      return;
+    }
     default:
       return;
   }
