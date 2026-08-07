@@ -4,6 +4,7 @@ LangChain adapter for MCP tools.
 This module provides utilities to convert MCP tools to LangChain tools.
 """
 
+import json
 import re
 from typing import Any, NoReturn
 
@@ -33,9 +34,29 @@ from mcp_use.logging import logger
 
 LangChainContentBlock = dict[str, Any]
 LangChainToolResult = str | LangChainContentBlock | list[LangChainContentBlock]
+_MISSING = object()
 
 
-def _mcp_content_to_langchain(content: list[Any]) -> str | list[LangChainContentBlock]:
+def _serialize_structured_content(structured_content: Any) -> str:
+    """Serialize MCP structured content into text that every LangChain provider accepts."""
+    if isinstance(structured_content, str):
+        return structured_content
+    if hasattr(structured_content, "model_dump"):
+        structured_content = structured_content.model_dump(mode="json")
+    return json.dumps(structured_content, ensure_ascii=False, default=str)
+
+
+def _get_structured_content(tool_result: CallToolResult) -> Any:
+    """Return structuredContent from either MCP wire-style or Python-style field names."""
+    structured_content = getattr(tool_result, "structuredContent", _MISSING)
+    if structured_content is not _MISSING:
+        return structured_content
+    return getattr(tool_result, "structured_content", None)
+
+
+def _mcp_content_to_langchain(
+    content: list[Any], structured_content: Any | None = None
+) -> str | list[LangChainContentBlock]:
     """Convert MCP tool result content to LangChain-compatible format.
 
     Maps MCP content types to LangChain content blocks:
@@ -47,7 +68,9 @@ def _mcp_content_to_langchain(content: list[Any]) -> str | list[LangChainContent
     If the result is a single TextContent, returns a plain string for simplicity.
     """
     if not content:
-        return ""
+        if structured_content is not None:
+            return _serialize_structured_content(structured_content)
+        return "(no content)"
 
     # Single TextContent → plain string (most common case)
     if len(content) == 1 and isinstance(content[0], TextContent):
@@ -103,6 +126,17 @@ def _mcp_content_to_langchain(content: list[Any]) -> str | list[LangChainContent
         return "\n".join(b["text"] for b in blocks)
 
     return blocks
+
+
+def _resource_content_to_text(content: Any) -> str:
+    """Decode one MCP resource content block into text."""
+    if isinstance(content, TextResourceContents):
+        return content.text
+    if isinstance(content, BlobResourceContents):
+        return content.blob
+    if isinstance(content, bytes):
+        return content.decode()
+    return str(content)
 
 
 class LangChainAdapter(BaseAdapter[BaseTool]):
@@ -182,7 +216,10 @@ class LangChainAdapter(BaseAdapter[BaseTool]):
                     tool_result: CallToolResult = await self.tool_connector.call_tool(self.name, kwargs)
                     converted_content: LangChainToolResult | None = None
                     try:
-                        converted_content = _mcp_content_to_langchain(tool_result.content)
+                        converted_content = _mcp_content_to_langchain(
+                            tool_result.content,
+                            structured_content=_get_structured_content(tool_result),
+                        )
                         if tool_result.isError:
                             error_message = (
                                 converted_content
@@ -233,14 +270,7 @@ class LangChainAdapter(BaseAdapter[BaseTool]):
                 logger.debug(f'Resource tool: "{self.name}" called')
                 try:
                     result = await self.tool_connector.read_resource(mcp_resource.uri)
-                    for content in result.contents:
-                        # Attempt to decode bytes if necessary
-                        if isinstance(content, bytes):
-                            content_decoded = content.decode()
-                        else:
-                            content_decoded = str(content)
-
-                    return content_decoded
+                    return "\n".join(_resource_content_to_text(content) for content in result.contents)
                 except Exception as e:
                     if self.handle_tool_error:
                         return format_error(e, tool=self.name)  # Format the error to make LLM understand it
