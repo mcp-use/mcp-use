@@ -17,6 +17,7 @@ import type {
   Tool,
 } from "@modelcontextprotocol/client";
 import { logger } from "../utils/logging.js";
+import { isOAuthInteractionRequired } from "../auth/flow.js";
 import type {
   SamplingCreateMessageParams,
   SamplingCreateMessageResult,
@@ -39,7 +40,7 @@ const passthroughResultSchema = {
 import type { ConnectionManager } from "./connection-manager.js";
 import type { ConnectorInitEventData } from "../telemetry/events.js";
 import { trackConnectorTelemetry } from "../telemetry/connector-telemetry.js";
-import type { MCPServerInfo } from "../core/session.js";
+import type { MCPAuthorizationInfo, MCPServerInfo } from "../core/session.js";
 
 /**
  * Handles a notification received from an MCP server.
@@ -137,6 +138,7 @@ export abstract class BaseConnector {
   protected toolsCache: Tool[] | null = null;
   protected capabilitiesCache: Record<string, unknown> | null = null;
   protected serverInfoCache: MCPServerInfo | null = null;
+  protected authorizationCache: MCPAuthorizationInfo | undefined;
   protected connected = false;
   protected readonly opts: ConnectorInitOptions;
   protected notificationHandlers: NotificationHandler[] = [];
@@ -476,6 +478,24 @@ export abstract class BaseConnector {
   abstract get publicIdentifier(): Record<string, string>;
 
   /**
+   * Run one logical MCP operation. HTTP connectors override this host seam to
+   * finish an SDK-started interactive OAuth flow and retry exactly once.
+   */
+  protected async executeRequest<T>(operation: () => Promise<T>): Promise<T> {
+    return operation();
+  }
+
+  /** OAuth state discovered for the active connection, when available. */
+  get authorization(): MCPAuthorizationInfo | undefined {
+    return this.authorizationCache;
+  }
+
+  /** Start optional OAuth for a connected mixed-auth server. */
+  async authenticate(): Promise<void> {
+    throw new Error("This connector does not support interactive OAuth");
+  }
+
+  /**
    * Disconnects the SDK client and releases transport resources.
    *
    * @returns A promise that resolves after cleanup completes.
@@ -539,13 +559,13 @@ export abstract class BaseConnector {
     // Fetch and cache tools
     // Gracefully handle servers that don't implement tools/list or have no tools
     try {
-      const listToolsRes = await this.client.listTools(
-        undefined,
-        defaultRequestOptions
+      const listToolsRes = await this.executeRequest(() =>
+        this.client!.listTools(undefined, defaultRequestOptions)
       );
       this.toolsCache = (listToolsRes.tools ?? []) as Tool[];
       logger.debug(`Fetched ${this.toolsCache.length} tools from server`);
     } catch (err: unknown) {
+      if (isOAuthInteractionRequired(err)) throw err;
       const error = err as Error & { code?: number };
       // If tools/list is not implemented or fails, assume no tools
       // This commonly happens with blank servers that have no tools registered
@@ -644,9 +664,8 @@ export abstract class BaseConnector {
     const progressHandler = enhancedOptions?.onprogress;
     if (progressHandler) this.activeProgressHandlers.add(progressHandler);
     try {
-      const res = await this.client.callTool(
-        { name, arguments: args },
-        enhancedOptions
+      const res = await this.executeRequest(() =>
+        this.client!.callTool({ name, arguments: args }, enhancedOptions)
       );
       logger.debug(`Tool '${name}' returned`, res);
       return res as CallToolResult;
@@ -667,7 +686,9 @@ export abstract class BaseConnector {
       throw new Error("MCP client is not connected");
     }
     logger.debug("[listTools] Fetching fresh tools from server...");
-    const result = await this.client.listTools(undefined, options);
+    const result = await this.executeRequest(() =>
+      this.client!.listTools(undefined, options)
+    );
     // Create a new array to ensure React detects the change (avoid reference equality issues)
     const tools = result.tools ? [...result.tools] : [];
     logger.debug(
@@ -690,7 +711,9 @@ export abstract class BaseConnector {
     }
 
     logger.debug("Listing resources", cursor ? `with cursor: ${cursor}` : "");
-    return await this.client.listResources({ cursor }, options);
+    return await this.executeRequest(() =>
+      this.client!.listResources({ cursor }, options)
+    );
   }
 
   /**
@@ -715,17 +738,19 @@ export abstract class BaseConnector {
 
     try {
       logger.debug("Listing all resources (with auto-pagination)");
-      const allResources: any[] = [];
-      let cursor: string | undefined = undefined;
+      return await this.executeRequest(async () => {
+        const allResources: any[] = [];
+        let cursor: string | undefined = undefined;
 
-      do {
-        const result: { resources?: any[]; nextCursor?: string } =
-          await this.client.listResources({ cursor }, options);
-        allResources.push(...(result.resources || []));
-        cursor = result.nextCursor;
-      } while (cursor);
+        do {
+          const result: { resources?: any[]; nextCursor?: string } =
+            await this.client!.listResources({ cursor }, options);
+          allResources.push(...(result.resources || []));
+          cursor = result.nextCursor;
+        } while (cursor);
 
-      return { resources: allResources };
+        return { resources: allResources };
+      });
     } catch (err: unknown) {
       const error = err as Error & { code?: number };
       // Gracefully handle if server advertises but doesn't actually support it
@@ -749,7 +774,9 @@ export abstract class BaseConnector {
     }
 
     logger.debug("Listing resource templates");
-    return await this.client.listResourceTemplates(undefined, options);
+    return await this.executeRequest(() =>
+      this.client!.listResourceTemplates(undefined, options)
+    );
   }
 
   /**
@@ -767,7 +794,9 @@ export abstract class BaseConnector {
       throw new Error("MCP client is not connected");
     }
     logger.debug("[complete] Requesting completions for:", params.ref);
-    const result = await this.client.complete(params, options);
+    const result = await this.executeRequest(() =>
+      this.client!.complete(params, options)
+    );
     logger.debug(
       `[complete] Received ${result.completion.values.length} suggestions`
     );
@@ -787,7 +816,9 @@ export abstract class BaseConnector {
     }
 
     logger.debug(`Reading resource ${uri}`);
-    const res = await this.client.readResource({ uri }, options);
+    const res = await this.executeRequest(() =>
+      this.client!.readResource({ uri }, options)
+    );
     return res;
   }
 
@@ -803,7 +834,9 @@ export abstract class BaseConnector {
     }
 
     logger.debug(`Subscribing to resource: ${uri}`);
-    return await this.client.subscribeResource({ uri }, options);
+    return await this.executeRequest(() =>
+      this.client!.subscribeResource({ uri }, options)
+    );
   }
 
   /**
@@ -818,7 +851,9 @@ export abstract class BaseConnector {
     }
 
     logger.debug(`Unsubscribing from resource: ${uri}`);
-    return await this.client.unsubscribeResource({ uri }, options);
+    return await this.executeRequest(() =>
+      this.client!.unsubscribeResource({ uri }, options)
+    );
   }
 
   /**
@@ -839,7 +874,7 @@ export abstract class BaseConnector {
 
     try {
       logger.debug("Listing prompts");
-      return await this.client.listPrompts();
+      return await this.executeRequest(() => this.client!.listPrompts());
     } catch (err: unknown) {
       const error = err as Error & { code?: number };
       // Gracefully handle if server advertises but doesn't actually support it
@@ -864,7 +899,9 @@ export abstract class BaseConnector {
     }
 
     logger.debug(`Getting prompt ${name}`);
-    return await this.client.getPrompt({ name, arguments: args });
+    return await this.executeRequest(() =>
+      this.client!.getPrompt({ name, arguments: args })
+    );
   }
 
   /**
@@ -888,10 +925,12 @@ export abstract class BaseConnector {
     // v2 requires a result schema for non-spec methods; a passthrough schema
     // preserves the v1 behavior of returning the raw server result for any
     // method string.
-    return await this.client.request(
-      { method, params: params ?? {} },
-      passthroughResultSchema,
-      options
+    return await this.executeRequest(() =>
+      this.client!.request(
+        { method, params: params ?? {} },
+        passthroughResultSchema,
+        options
+      )
     );
   }
 

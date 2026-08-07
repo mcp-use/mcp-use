@@ -35,6 +35,7 @@ const helpTree: readonly [path: readonly string[], usage: string][] = [
   ],
   [["demo", "auth"], "mcp-use client <name> auth <command>"],
   [["demo", "auth", "status"], "mcp-use client <name> auth status [options]"],
+  [["demo", "auth", "login"], "mcp-use client <name> auth login [options]"],
   [["demo", "auth", "logout"], "mcp-use client <name> auth logout [options]"],
 ];
 

@@ -82,7 +82,7 @@ page("<name>", {
     ["tools", "List, describe, or call tools"],
     ["resources", "List or read resources"],
     ["prompts", "List or get prompts"],
-    ["auth", "Inspect or clear saved OAuth state"],
+    ["auth", "Authenticate or inspect saved OAuth state"],
   ],
   options: [HELP],
 });
@@ -170,10 +170,17 @@ page("<name> auth", {
   usage: "mcp-use client <name> auth <command>",
   summary: "Manage saved OAuth state.",
   commands: [
+    ["login", "Authenticate this server"],
     ["status", "Show OAuth status"],
     ["logout", "Delete saved OAuth credentials"],
   ],
   options: [HELP],
+});
+
+page("<name> auth login", {
+  usage: "mcp-use client <name> auth login [options]",
+  summary: "Authenticate a saved MCP server with OAuth.",
+  options: [JSON, HELP],
 });
 
 page("<name> auth status", {
