@@ -1,5 +1,22 @@
 # mcp-use
 
+## 3.0.0-canary.7
+
+### Minor Changes
+
+- 6911124: Add experimental server authoring support for Skills over MCP with automatic
+  `skills/` discovery, explicit disable and directory configuration, SEP-2640
+  resource methods, development reloads, and build-time embedding.
+
+### Patch Changes
+
+- Updated dependencies [819ef5b]
+- Updated dependencies [6911124]
+- Updated dependencies [2daf9c9]
+  - @mcp-use/client@2.1.0-canary.3
+  - @mcp-use/cli@5.0.0-canary.6
+  - @mcp-use/inspector@21.0.0-canary.7
+
 ## 2.0.5-canary.6
 
 ### Patch Changes

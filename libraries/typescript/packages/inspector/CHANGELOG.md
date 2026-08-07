@@ -1,5 +1,21 @@
 # @mcp-use/inspector
 
+## 21.0.0-canary.7
+
+### Minor Changes
+
+- 2daf9c9: Add typed Skills over MCP client operations, a capability-gated Inspector
+  file explorer with integrity verification, and removable progressive skill
+  context in Inspector chat.
+
+### Patch Changes
+
+- Updated dependencies [819ef5b]
+- Updated dependencies [6911124]
+- Updated dependencies [2daf9c9]
+  - @mcp-use/client@2.1.0-canary.3
+  - mcp-use@3.0.0-canary.7
+
 ## 20.0.5-canary.6
 
 ### Patch Changes
