@@ -1,5 +1,6 @@
 """Unit tests for LangChain adapter content conversion."""
 
+import json
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -9,6 +10,7 @@ from mcp.types import (
     CallToolResult,
     EmbeddedResource,
     ImageContent,
+    Resource,
     TextContent,
     TextResourceContents,
     Tool,
@@ -80,6 +82,30 @@ class TestLangChainAdapterContentConversion:
 
         assert result == "{'unexpected': 'value'}"
 
+    # --- Issue #1604: empty content + structuredContent fallback ---
+
+    def test_empty_content_with_structured_content_returns_json(self):
+        """MCP 2025-11-25 servers may return empty content[] with structuredContent.
+        The adapter must fall back to JSON-serialized structuredContent so that
+        Bedrock (and other strict LLMs) never receive an empty tool result."""
+        structured = {"success": True, "data": {"count": 3}}
+        result = _mcp_content_to_langchain([], structured_content=structured)
+
+        assert result == json.dumps(structured)
+
+    def test_empty_content_without_structured_content_returns_placeholder(self):
+        """When both content and structuredContent are absent, a non-empty
+        placeholder string must be returned to avoid Bedrock ValidationException."""
+        result = _mcp_content_to_langchain([])
+
+        assert result == "(no content)"
+
+    def test_empty_content_structured_content_none_returns_placeholder(self):
+        """Explicit None for structured_content still yields the placeholder."""
+        result = _mcp_content_to_langchain([], structured_content=None)
+
+        assert result == "(no content)"
+
 
 class TestLangChainAdapterToolExecution:
     """Tests for LangChain tool execution behavior."""
@@ -112,3 +138,65 @@ class TestLangChainAdapterToolExecution:
         assert result["details"] == "tool failed"
         assert result["tool"] == "failing_tool"
         assert result["tool_content"] == "tool failed"
+
+
+class TestLangChainAdapterResourceTool:
+    """Tests for _convert_resource fixes (issue #1625)."""
+
+    @pytest.mark.asyncio
+    async def test_resource_tool_concatenates_multiple_content_blocks(self):
+        """All content blocks must be joined; the old code silently dropped all
+        but the last block, causing data loss for multi-page resources."""
+        adapter = LangChainAdapter()
+        connector = MagicMock()
+
+        read_result = MagicMock()
+        read_result.contents = [
+            TextResourceContents(uri="file:///f", text="page 1"),
+            TextResourceContents(uri="file:///f", text="page 2"),
+            TextResourceContents(uri="file:///f", text="page 3"),
+        ]
+        connector.read_resource = AsyncMock(return_value=read_result)
+
+        mcp_resource = Resource(uri="file:///f", name="multi_page")
+        tool = adapter._convert_resource(mcp_resource, connector)
+        result = await tool._arun()
+
+        # All three blocks must be present, joined by newlines
+        assert "page 1" in result
+        assert "page 2" in result
+        assert "page 3" in result
+
+    @pytest.mark.asyncio
+    async def test_resource_tool_returns_empty_string_for_empty_contents(self):
+        """An empty contents list must return '' without raising UnboundLocalError.
+        The old code crashed because content_decoded was never assigned."""
+        adapter = LangChainAdapter()
+        connector = MagicMock()
+
+        read_result = MagicMock()
+        read_result.contents = []
+        connector.read_resource = AsyncMock(return_value=read_result)
+
+        mcp_resource = Resource(uri="file:///empty", name="empty_resource")
+        tool = adapter._convert_resource(mcp_resource, connector)
+        result = await tool._arun()
+
+        assert result == ""
+
+    @pytest.mark.asyncio
+    async def test_resource_tool_decodes_bytes_content(self):
+        """Bytes content blocks must be decoded to strings before joining."""
+        adapter = LangChainAdapter()
+        connector = MagicMock()
+
+        read_result = MagicMock()
+        read_result.contents = [b"hello", b" world"]
+        connector.read_resource = AsyncMock(return_value=read_result)
+
+        mcp_resource = Resource(uri="file:///bytes", name="bytes_resource")
+        tool = adapter._convert_resource(mcp_resource, connector)
+        result = await tool._arun()
+
+        assert "hello" in result
+        assert "world" in result

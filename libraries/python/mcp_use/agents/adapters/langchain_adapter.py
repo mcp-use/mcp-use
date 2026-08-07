@@ -4,6 +4,7 @@ LangChain adapter for MCP tools.
 This module provides utilities to convert MCP tools to LangChain tools.
 """
 
+import json
 import re
 from typing import Any, NoReturn
 
@@ -35,7 +36,10 @@ LangChainContentBlock = dict[str, Any]
 LangChainToolResult = str | LangChainContentBlock | list[LangChainContentBlock]
 
 
-def _mcp_content_to_langchain(content: list[Any]) -> str | list[LangChainContentBlock]:
+def _mcp_content_to_langchain(
+    content: list[Any],
+    structured_content: dict[str, Any] | None = None,
+) -> str | list[LangChainContentBlock]:
     """Convert MCP tool result content to LangChain-compatible format.
 
     Maps MCP content types to LangChain content blocks:
@@ -45,9 +49,13 @@ def _mcp_content_to_langchain(content: list[Any]) -> str | list[LangChainContent
       - EmbeddedResource   → text or file block depending on resource type
 
     If the result is a single TextContent, returns a plain string for simplicity.
+    When content is empty, falls back to structuredContent (MCP 2025-11-25 spec)
+    serialized as JSON. Returns "(no content)" if both are absent.
     """
     if not content:
-        return ""
+        if structured_content is not None:
+            return json.dumps(structured_content)
+        return "(no content)"
 
     # Single TextContent → plain string (most common case)
     if len(content) == 1 and isinstance(content[0], TextContent):
@@ -182,7 +190,9 @@ class LangChainAdapter(BaseAdapter[BaseTool]):
                     tool_result: CallToolResult = await self.tool_connector.call_tool(self.name, kwargs)
                     converted_content: LangChainToolResult | None = None
                     try:
-                        converted_content = _mcp_content_to_langchain(tool_result.content)
+                        converted_content = _mcp_content_to_langchain(
+                            tool_result.content, tool_result.structuredContent
+                        )
                         if tool_result.isError:
                             error_message = (
                                 converted_content
@@ -233,14 +243,13 @@ class LangChainAdapter(BaseAdapter[BaseTool]):
                 logger.debug(f'Resource tool: "{self.name}" called')
                 try:
                     result = await self.tool_connector.read_resource(mcp_resource.uri)
+                    parts = []
                     for content in result.contents:
-                        # Attempt to decode bytes if necessary
                         if isinstance(content, bytes):
-                            content_decoded = content.decode()
+                            parts.append(content.decode())
                         else:
-                            content_decoded = str(content)
-
-                    return content_decoded
+                            parts.append(str(content))
+                    return "\n".join(parts)
                 except Exception as e:
                     if self.handle_tool_error:
                         return format_error(e, tool=self.name)  # Format the error to make LLM understand it
