@@ -44,7 +44,7 @@
     "dev:server": "VITE_DEV=true tsx watch src/server/server.ts",
     "dev:standalone": "tsx watch src/server/server.ts",
     "clean": "rimraf dist",
-    "build": "npm run clean && npm run build:client-exports && npm run build:server && npm run build:app && npm run verify:package",
+    "build": "pnpm run clean && pnpm run build:client-exports && pnpm run build:server && pnpm run build:app && pnpm run verify:package",
     "build:app": "vite build --config vite.app.config.ts && node scripts/compress-app.mjs",
     "watch:app": "vite build --watch --config vite.app.config.ts",
     "preview:app": "vite preview --config vite.app.config.ts --host 127.0.0.1",
@@ -89,7 +89,6 @@
     "express": "^4.21.2 || ^5.0.0",
     "lucide-react": "^0.562.0",
     "markdown-to-jsx": "^9.7.4",
-    "mcp-use": "workspace:*",
     "motion": "^12.34.2",
     "react": "^18.0.0 || ^19.0.0",
     "react-dom": "^18.0.0 || ^19.0.0",
@@ -120,9 +119,6 @@
       "optional": true
     },
     "markdown-to-jsx": {
-      "optional": true
-    },
-    "mcp-use": {
       "optional": true
     },
     "motion": {

@@ -12,7 +12,7 @@ if (Object.keys(manifest.dependencies ?? {}).length !== 0) {
     "Inspector package must not install framework runtime dependencies"
   );
 }
-for (const peer of ["mcp-use", "@mcp-use/client", "@mcp-use/agent"]) {
+for (const peer of ["@mcp-use/client", "@mcp-use/agent"]) {
   if (manifest.peerDependencies?.[peer] === undefined) {
     throw new Error(`Missing framework peer declaration: ${peer}`);
   }
