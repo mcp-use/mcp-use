@@ -3,7 +3,8 @@
 The smallest useful `mcp-use` server: a tool, a static resource, and a prompt.
 
 ```sh
-pnpm dev
+npm install
+npm run dev
 ```
 
 Connect to `http://localhost:3000/mcp`. Call `greet` with `{ "name": "Ada" }`,

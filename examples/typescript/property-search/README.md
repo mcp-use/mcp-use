@@ -27,10 +27,11 @@ Valley, Noe Valley, and SoMa. Neighborhood names can be passed naturally to
 
 ## Run
 
-From the repository root:
+From this directory:
 
 ```bash
-pnpm --dir libraries/typescript/packages/server/examples/views/property-search dev
+npm install
+npm run dev
 ```
 
 Open the inspector URL printed by the CLI and connect to the local MCP server.
@@ -39,8 +40,8 @@ The default MCP endpoint is `/mcp`.
 For a production-style self-contained build:
 
 ```bash
-pnpm --dir libraries/typescript/packages/server/examples/views/property-search build --inline
-pnpm --dir libraries/typescript/packages/server/examples/views/property-search start
+npm run build -- --inline
+npm start
 ```
 
 ## Featured spoken demo

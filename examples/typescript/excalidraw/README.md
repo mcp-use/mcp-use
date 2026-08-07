@@ -71,12 +71,11 @@ scene under the original checkpoint before it reports success.
 
 ## Run locally
 
-From this directory (after installing workspace deps from the TypeScript
-monorepo root):
+From this directory:
 
 ```sh
-pnpm install
-pnpm dev
+npm install
+npm run dev
 ```
 
 `mcp-use dev` serves MCP at `http://127.0.0.1:3000/mcp`. Preview the view
@@ -84,8 +83,8 @@ through the built-in inspector: open `ui://views/excalidraw.html` via
 `resources/read`.
 
 ```sh
-pnpm build && pnpm start
-pnpm typecheck
+npm run build && npm start
+npm run typecheck
 ```
 
 ## Source
