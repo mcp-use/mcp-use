@@ -62,7 +62,7 @@ page("connect", {
   ],
   notes: [
     "JSON mode never opens a browser or prints an OAuth URL/state. If new consent is required, it returns oauth_interaction_required with an interactive retry command.",
-    'With --stdio, pass one target string and use quote delimiters for paths/args with spaces, e.g. `"/opt/MCP Servers/server" "--config=dev env.json"` or `"C:\\Program Files\\foo.exe"`. OAuth/header options apply only to URL connects.',
+    'With --stdio, pass one target string (wrap the whole target in outer single quotes so the shell keeps inner quote delimiters), e.g. `\'"/opt/MCP Servers/server" "--config=dev env.json"\'` or `\'"C:\\Program Files\\foo.exe"\'`. OAuth/header options apply only to URL connects.',
   ],
 });
 
