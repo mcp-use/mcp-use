@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { parseStdioTarget } from "../../src/commands/stdio-target.js";
+import {
+  formatStdioTarget,
+  parseStdioTarget,
+} from "../../src/commands/stdio-target.js";
 
 describe("parseStdioTarget", () => {
   it("keeps simple stdio commands unchanged", () => {
@@ -21,10 +24,20 @@ describe("parseStdioTarget", () => {
     });
   });
 
-  it("preserves Windows backslashes inside quoted command paths", () => {
+  it('preserves Windows paths when using quote delimiters (not \\")', () => {
+    // Quote characters delimit the token. Backslash-escaped quotes outside a
+    // quoted region are literal '"' characters and would still split on spaces.
+    const target = String.raw`"C:\Program Files\nodejs\node.exe" "server path.js" --flag`;
+    expect(parseStdioTarget(target)).toEqual({
+      command: String.raw`C:\Program Files\nodejs\node.exe`,
+      args: ["server path.js", "--flag"],
+    });
     expect(
       parseStdioTarget(
-        String.raw`"C:\Program Files\nodejs\node.exe" "server path.js" --flag`
+        formatStdioTarget(String.raw`C:\Program Files\nodejs\node.exe`, [
+          "server path.js",
+          "--flag",
+        ])
       )
     ).toEqual({
       command: String.raw`C:\Program Files\nodejs\node.exe`,
@@ -47,5 +60,18 @@ describe("parseStdioTarget", () => {
 
   it("rejects an empty command", () => {
     expect(() => parseStdioTarget("   ")).toThrow("cannot be empty");
+  });
+
+  it("rejects an empty quoted executable", () => {
+    expect(() => parseStdioTarget('""')).toThrow("cannot be empty");
+    expect(() => parseStdioTarget('"" --flag')).toThrow("cannot be empty");
+  });
+});
+
+describe("formatStdioTarget", () => {
+  it("shell-quotes tokens so spaces remain unambiguous", () => {
+    expect(
+      formatStdioTarget("/opt/MCP Servers/server", ["--config=dev env.json"])
+    ).toBe('"/opt/MCP Servers/server" "--config=dev env.json"');
   });
 });

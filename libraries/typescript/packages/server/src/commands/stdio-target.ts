@@ -23,12 +23,30 @@ export interface StdioTarget {
 export function parseStdioTarget(target: string): StdioTarget {
   const parts = splitCommandLine(target);
 
-  if (parts.length === 0) {
+  if (parts.length === 0 || parts[0] === "") {
     throw new Error("Stdio command cannot be empty");
   }
 
   const [command, ...args] = parts;
   return { command: command!, args };
+}
+
+/**
+ * Format command/argv for human-readable list output so spaces round-trip
+ * through {@link parseStdioTarget}.
+ */
+export function formatStdioTarget(command: string, args: string[]): string {
+  return [command, ...args].map(shellQuoteToken).join(" ");
+}
+
+function shellQuoteToken(token: string): string {
+  if (token.length === 0) {
+    return '""';
+  }
+  if (!/[\s'"\\]/.test(token)) {
+    return token;
+  }
+  return `"${token.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 }
 
 function splitCommandLine(input: string): string[] {

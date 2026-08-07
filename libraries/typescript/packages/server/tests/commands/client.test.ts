@@ -207,12 +207,15 @@ describe("client JSON output", () => {
       type: "stdio",
       command: "/opt/MCP Servers/server",
       args: ["--config=dev env.json"],
-      protocol: "auto",
+      protocol: "legacy",
     });
     expect(mocks.config?.mcpServers.local).toEqual({
       command: "/opt/MCP Servers/server",
       args: ["--config=dev env.json"],
-      protocolNegotiation: "auto",
+      protocolNegotiation: "legacy",
+      clientOptions: {
+        supportedProtocolVersions: ["2025-11-25"],
+      },
     });
     expect(mocks.connectCall).toHaveBeenCalledWith("local");
 
@@ -224,13 +227,53 @@ describe("client JSON output", () => {
     ) as {
       servers: Record<
         string,
-        { type: string; command: string; args: string[] }
+        { type: string; command: string; args: string[]; protocol: string }
       >;
     };
     expect(saved.servers.local).toMatchObject({
       type: "stdio",
       command: "/opt/MCP Servers/server",
       args: ["--config=dev env.json"],
+      protocol: "legacy",
+    });
+
+    stdout = "";
+    await expect(runClient(["list", "--json"])).resolves.toBe(0);
+    expect(JSON.parse(stdout)).toEqual([
+      {
+        name: "local",
+        type: "stdio",
+        command: "/opt/MCP Servers/server",
+        args: ["--config=dev env.json"],
+        protocol: "legacy",
+        target: '"/opt/MCP Servers/server" "--config=dev env.json"',
+      },
+    ]);
+  });
+
+  it("reports protocol_mismatch for strict stdio protocol connects", async () => {
+    mocks.connectError = new Error(
+      "Unsupported protocol version: 2025-11-25; supported: 2026-07-28"
+    );
+
+    await expect(
+      runClient([
+        "connect",
+        "stdio-mismatch",
+        "node server.js",
+        "--stdio",
+        "--protocol",
+        "legacy",
+        "--json",
+      ])
+    ).resolves.toBe(1);
+
+    expect(stdout).toBe("");
+    expect(JSON.parse(stderr)).toEqual({
+      error: {
+        code: "protocol_mismatch",
+        message: "Server does not support the requested legacy protocol.",
+      },
     });
   });
 

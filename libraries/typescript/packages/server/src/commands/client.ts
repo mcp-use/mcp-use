@@ -21,7 +21,7 @@ import {
   wantsJson,
   writePrivateJson,
 } from "./shared.js";
-import { parseStdioTarget } from "./stdio-target.js";
+import { formatStdioTarget, parseStdioTarget } from "./stdio-target.js";
 
 type ProtocolMode = "auto" | "legacy" | "modern";
 
@@ -107,7 +107,7 @@ async function connect(
       header: { type: "string", short: "H", multiple: true },
       "no-oauth": { type: "boolean" },
       "auth-timeout": { type: "string" },
-      protocol: { type: "string", default: "auto" },
+      protocol: { type: "string" },
       "no-open": { type: "boolean" },
       stdio: { type: "boolean" },
     },
@@ -121,7 +121,13 @@ async function connect(
   }
   const [name, target] = positionals as [string, string];
   validateName(name);
-  const protocol = parseProtocol(values.protocol);
+  // Stdio defaults to legacy: auto probing can stall spawn-per-invocation servers.
+  const protocol =
+    values.protocol !== undefined
+      ? parseProtocol(values.protocol)
+      : values.stdio === true
+        ? "legacy"
+        : "auto";
   const saved = await readServers();
   if (saved.servers[name] !== undefined) {
     throw new UsageError(`Saved server already exists: ${name}`);
@@ -216,7 +222,7 @@ async function list(argv: readonly string[], json: boolean): Promise<number> {
         command: server.command,
         args: server.args,
         protocol: server.protocol,
-        target: [server.command, ...server.args].join(" "),
+        target: formatStdioTarget(server.command, server.args),
       };
     }
     return {
@@ -507,7 +513,11 @@ async function openConnection(
         },
       },
     });
-    return client.connect(name);
+    try {
+      return await client.connect(name);
+    } catch (error) {
+      throw normalizeProtocolConnectionError(error, definition.protocol);
+    }
   }
 
   let rejectOAuthInteraction: ((error: CommandError) => void) | undefined;
