@@ -842,6 +842,9 @@ jobs:
         if: github.event_name == 'pull_request' && github.base_ref == 'main' && github.head_ref == 'canary'
         run: pnpm release-channel preflight --channel stable
 
+      - name: Test release-channel helper
+        run: pnpm test:release-channel
+
       - name: Check for Changesets
         env:
           BASE_REF: ${{ github.base_ref || 'main' }}
