@@ -344,3 +344,56 @@ class TestAuthMiddlewarePathMatchingSecurity:
         # /mcpx does NOT require auth (different path, not a subpath)
         response = client.get("/mcpx")
         assert response.status_code == 200
+
+
+class TestAuthMiddlewareEmptyPathLists:
+    """Test that empty path lists disable defaults rather than falling back to them."""
+
+    def test_empty_protected_paths_disables_default_mcp_protection(self):
+        """Passing protected_paths=[] disables all middleware-level protection."""
+
+        async def endpoint(request: Request) -> JSONResponse:
+            return JSONResponse({"ok": True})
+
+        app = Starlette(routes=[Route("/mcp", endpoint, methods=["GET"])])
+        app.add_middleware(
+            AuthMiddleware,
+            auth_provider=MockAuthProvider(),
+            protected_paths=[],
+        )
+        client = TestClient(app, raise_server_exceptions=False)
+
+        # /mcp should be unprotected because protected_paths=[] was explicitly passed
+        response = client.get("/mcp")
+        assert response.status_code == 200
+
+    def test_empty_exclude_paths_disables_default_exclusions(self):
+        """Passing exclude_paths=[] means no paths are excluded from auth."""
+
+        async def endpoint(request: Request) -> JSONResponse:
+            return JSONResponse({"ok": True})
+
+        app = Starlette(
+            routes=[
+                Route("/health", endpoint, methods=["GET"]),
+                Route("/mcp", endpoint, methods=["GET"]),
+            ]
+        )
+        app.add_middleware(
+            AuthMiddleware,
+            auth_provider=MockAuthProvider(),
+            exclude_paths=[],
+        )
+        client = TestClient(app, raise_server_exceptions=False)
+
+        # /health is NOT excluded anymore (no default exclusions), /mcp is still protected
+        response = client.get("/health")
+        assert response.status_code == 401
+
+        # /mcp still requires auth (default protected_paths applies)
+        response = client.get("/mcp")
+        assert response.status_code == 401
+
+        # But valid token still works
+        response = client.get("/mcp", headers={"Authorization": "Bearer valid-token"})
+        assert response.status_code == 200
