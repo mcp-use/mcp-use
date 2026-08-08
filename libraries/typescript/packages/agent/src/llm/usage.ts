@@ -33,10 +33,23 @@ export function tokenUsageFromRecord(raw: unknown): TokenUsage | undefined {
     "candidatesTokenCount",
     "eval_count"
   );
+  // Anthropic reports cache counters ALONGSIDE input_tokens and bills all of them, so
+  // input_tokens alone is not what the call is charged on. OpenAI reports cached_tokens
+  // INSIDE prompt_tokens, so adding that one would double count. Only the Anthropic-shaped
+  // keys are summed here.
+  const cacheReadOutsideInput = numberAt(usage, "cache_read_input_tokens");
+  const cacheCreationInputTokens = numberAt(
+    usage,
+    "cacheCreationInputTokens",
+    "cache_creation_input_tokens"
+  );
+  const uncountedCache =
+    (cacheReadOutsideInput ?? 0) + (cacheCreationInputTokens ?? 0);
+
   const totalTokens =
     numberAt(usage, "totalTokens", "total_tokens", "totalTokenCount") ??
     (inputTokens !== undefined && outputTokens !== undefined
-      ? inputTokens + outputTokens
+      ? inputTokens + outputTokens + uncountedCache
       : undefined);
 
   const inputDetails =
@@ -60,6 +73,7 @@ export function tokenUsageFromRecord(raw: unknown): TokenUsage | undefined {
     outputTokens === undefined &&
     totalTokens === undefined &&
     cachedInputTokens === undefined &&
+    cacheCreationInputTokens === undefined &&
     reasoningTokens === undefined
   ) {
     return undefined;
@@ -70,6 +84,35 @@ export function tokenUsageFromRecord(raw: unknown): TokenUsage | undefined {
     outputTokens,
     totalTokens,
     cachedInputTokens,
+    cacheCreationInputTokens,
     reasoningTokens,
   };
+}
+
+/**
+ * Merge later counters over earlier ones without letting an absent field erase a present one.
+ *
+ * `tokenUsageFromRecord` returns every key and sets the ones it did not find to `undefined`,
+ * so a spread merge overwrites good values with `undefined`. Anthropic's streaming
+ * `message_delta` carries `output_tokens` only, which made a spread wipe the input and cache
+ * counters captured at `message_start`.
+ *
+ * This deliberately does not recompute `totalTokens`. Whether a cache counter is additive
+ * depends on the provider (Anthropic reports it outside `input_tokens`, OpenAI inside
+ * `prompt_tokens`), and that distinction is gone by the time usage has been normalised. The
+ * caller knows its provider and owns the total.
+ */
+export function mergeTokenUsage(
+  base: TokenUsage | undefined,
+  next: TokenUsage | undefined
+): TokenUsage | undefined {
+  if (!base) return next;
+  if (!next) return base;
+  const merged: TokenUsage = { ...base };
+  for (const [key, value] of Object.entries(next)) {
+    if (value !== undefined) {
+      (merged as Record<string, unknown>)[key] = value;
+    }
+  }
+  return merged;
 }
