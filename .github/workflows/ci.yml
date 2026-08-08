@@ -772,7 +772,7 @@ jobs:
       - name: Run Inspector Tests
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
-        run: pnpm --filter @mcp-use/inspector --if-present test
+        run: pnpm --filter @mcp-use/inspector test:unit
 
   typescript-test-cli:
     needs: typescript-lint
