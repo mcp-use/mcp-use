@@ -696,7 +696,7 @@ jobs:
       - name: Run mcp-use Unit Tests
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
-        run: pnpm --filter mcp-use --if-present test:unit
+        run: pnpm --filter mcp-use test:run
       - name: Run @mcp-use/agent Unit Tests
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
