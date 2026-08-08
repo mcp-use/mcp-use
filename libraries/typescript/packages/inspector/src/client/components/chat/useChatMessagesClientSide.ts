@@ -4,7 +4,7 @@ import {
   providerConfigFromOptions,
   type McpConnectionLike,
 } from "@mcp-use/agent";
-import type { McpServer } from "@mcp-use/client/react";
+import type { McpServer, Skill } from "@mcp-use/client/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PromptResult } from "../../hooks/useMCPPrompts";
 import {
@@ -36,6 +36,10 @@ import {
   widgetModelContextProviderMessage,
   type WidgetModelContext,
 } from "./widget-model-context";
+import {
+  buildSkillSystemContext,
+  createSkillContextConnection,
+} from "./skill-context";
 
 // Type alias for backward compatibility
 type MCPConnection = McpServer;
@@ -50,6 +54,7 @@ interface UseChatMessagesClientSideProps {
   appToolConnections?: McpConnectionLike[];
   initialMessages?: Message[];
   systemPrompt?: string;
+  skills?: Skill[];
 }
 
 export function useChatMessagesClientSide({
@@ -62,6 +67,7 @@ export function useChatMessagesClientSide({
   appToolConnections,
   initialMessages,
   systemPrompt = DEFAULT_CHAT_SYSTEM_PROMPT,
+  skills = [],
 }: UseChatMessagesClientSideProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages ?? []);
   const [isLoading, setIsLoading] = useState(false);
@@ -223,6 +229,13 @@ export function useChatMessagesClientSide({
           },
         });
 
+        const skillConnection = createSkillContextConnection({
+          skills,
+          origin:
+            connection.displayName ?? connection.url ?? "connected MCP server",
+          getSkill: connection.getSkill,
+          readResource: connection.readResource,
+        });
         const agent = new MCPAgent({
           llm: providerConfigFromOptions(llmConfig.provider, llmConfig.model, {
             apiKey: llmConfig.apiKey,
@@ -230,8 +243,15 @@ export function useChatMessagesClientSide({
             baseUrl: llmConfig.baseUrl,
             credentials: llmConfig.credentials,
           }),
-          mcpServers: [connection, ...(appToolConnections ?? [])],
-          systemPrompt,
+          mcpServers: [
+            ...(skillConnection ? [skillConnection] : []),
+            connection,
+            ...(appToolConnections ?? []),
+          ],
+          systemPrompt: `${systemPrompt}${buildSkillSystemContext(
+            skills,
+            connection.displayName ?? connection.url ?? "connected MCP server"
+          )}`,
           disallowedTools:
             disabledTools && disabledTools.size > 0
               ? [...disabledTools].sort()
@@ -507,6 +527,7 @@ export function useChatMessagesClientSide({
       widgetModelContexts,
       recordTrace,
       systemPrompt,
+      skills,
     ]
   );
 

@@ -1,6 +1,7 @@
 import type {
   CallToolResult,
   GetPromptResult,
+  InputRequiredResult,
   StandardSchemaWithJSON,
 } from "@modelcontextprotocol/server";
 import type { Env } from "hono";
@@ -32,6 +33,7 @@ export type InferPromptInput<T> = T extends {
 
 /**
  * Prompt execution callback. Prefer the SDK's raw {@link GetPromptResult}.
+ * Interactive prompts may return an {@link InputRequiredResult}.
  *
  * Deprecated response helpers that return a {@link CallToolResult} are still
  * accepted and converted at registration time.
@@ -56,4 +58,5 @@ export type PromptCallback<
 ) =>
   | GetPromptResult
   | CallToolResult
-  | Promise<GetPromptResult | CallToolResult>;
+  | InputRequiredResult
+  | Promise<GetPromptResult | CallToolResult | InputRequiredResult>;

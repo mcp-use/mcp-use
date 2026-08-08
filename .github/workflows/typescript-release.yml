@@ -99,6 +99,14 @@ jobs:
         working-directory: libraries/typescript
         run: pnpm release-channel preflight --channel canary
 
+      - name: Prepare and validate canary release plan
+        if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
+        working-directory: libraries/typescript
+        run: |
+          pnpm release-channel prepare --channel canary
+          pnpm changeset status --since origin/main --output "$RUNNER_TEMP/canary-changeset-status.json"
+          pnpm release-channel validate --channel canary --plan "$RUNNER_TEMP/canary-changeset-status.json"
+
       - name: Version packages (Canary)
         if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
         run: |

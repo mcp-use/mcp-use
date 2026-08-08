@@ -43,7 +43,7 @@ export function buildCSPString(csp: WidgetDeclaredCsp): string {
 
   return [
     "default-src 'none'",
-    `script-src 'unsafe-inline' ${resourceSrc}`,
+    `script-src 'unsafe-inline' 'unsafe-eval' ${resourceSrc}`,
     `style-src 'unsafe-inline' ${resourceSrc}`,
     `img-src ${resourceSrc}`,
     `font-src ${resourceSrc}`,

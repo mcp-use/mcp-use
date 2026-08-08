@@ -33,6 +33,7 @@ permissions:
 #    ├─ typescript/mcp-use: Unit tests + agent integration tests (requires API keys)
 #    ├─ typescript/inspector: Unit tests for inspector package
 #    ├─ typescript/cli: Unit tests for CLI package
+#    ├─ typescript/tunnel: Protocol and local relay integration tests
 #    └─ typescript-changeset-check: PR validation (PRs only)
 #
 # 4. create-mcp-use-app Tests (runs if packages/create-mcp-use-app/** changed)
@@ -263,7 +264,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Download all test results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: transport-test-results-*
           path: test-results
@@ -428,7 +429,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Download all test results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: primitive-test-results-*
           path: test-results
@@ -621,6 +622,9 @@ jobs:
       - name: Build Client Types
         run: pnpm build:client
 
+      - name: Build Tunnel Types
+        run: pnpm build:tunnel
+
       - name: Check Formatting
         run: pnpm format:check
 
@@ -807,7 +811,34 @@ jobs:
       - name: Run CLI Tests
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
-        run: pnpm --filter @mcp-use/cli --if-present test
+        run: pnpm --filter @mcp-use/cli --if-present test:run
+
+  typescript-test-tunnel:
+    needs: typescript-lint
+    name: "typescript/tunnel (node-${{ matrix.node-version }})"
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [22.23.1]
+    defaults:
+      run:
+        working-directory: libraries/typescript
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.13.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: pnpm
+          cache-dependency-path: libraries/typescript/pnpm-lock.yaml
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build Tunnel
+        run: pnpm build:tunnel
+      - name: Run Tunnel Tests
+        run: pnpm --filter @mcp-use/tunnel test:run
 
   typescript-changeset-check:
     needs: detect-changes
@@ -949,7 +980,7 @@ jobs:
         if: matrix.pm == 'yarn'
         run: corepack enable
       - name: Download Package Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: workspace-packages
           path: ./packages

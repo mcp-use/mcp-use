@@ -302,7 +302,7 @@ describe("MCP middleware — result validation", () => {
 });
 
 describe("MCP middleware — tool schema emission", () => {
-  it("strips root schema dialects introduced by tools/list middleware", async () => {
+  it("preserves root schema dialects introduced by tools/list middleware", async () => {
     const server = new MCPServer({
       name: "schema-emission-test-server",
       version: "1.0.0",
@@ -346,8 +346,8 @@ describe("MCP middleware — tool schema emission", () => {
       const result = await client.listTools();
       const tool = result.tools.find(({ name }) => name === "typed-echo");
       expect(tool).toBeDefined();
-      expect(tool?.inputSchema).not.toHaveProperty("$schema");
-      expect(tool?.outputSchema).not.toHaveProperty("$schema");
+      expect(tool?.inputSchema).toHaveProperty("$schema", draft07);
+      expect(tool?.outputSchema).toHaveProperty("$schema", draft07);
     } finally {
       await client.close();
       await server.close();

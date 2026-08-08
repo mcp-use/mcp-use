@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "noEmit": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./node_modules/.cache/tsconfig.test.tsbuildinfo",
+    "rootDir": "."
+  },
+  "include": ["src/**/*", "tests/**/*"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "tests/cli/.tmp",
+    "tests/cli/fixtures"
+  ]
+}

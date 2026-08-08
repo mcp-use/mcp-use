@@ -19,6 +19,15 @@ export type {
   PendingSamplingRequest,
   PendingElicitationRequest,
 } from "./types.js";
+export type {
+  Skill,
+  SkillDirectoryEntry,
+  SkillDirectoryReadResult,
+  SkillGetResult,
+  SkillResource,
+  SkillsListResult,
+} from "../core/skills.js";
+export { SKILLS_EXTENSION_ID } from "../core/skills.js";
 export { pickPersistedServerConfig, toPersistedServerConfig } from "./types.js";
 export { useMcp } from "./useMcp.js";
 export { detectFavicon } from "../utils/favicon.js";

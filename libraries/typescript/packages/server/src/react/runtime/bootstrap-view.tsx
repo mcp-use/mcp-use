@@ -99,7 +99,7 @@ export interface ViewModule {
  *
  * @internal
  */
-export interface BootstrapViewOptions {
+interface BootstrapViewOptions {
   /** DOM id of the mount container; created if missing. @defaultValue `"root"` */
   rootId?: string;
   /**

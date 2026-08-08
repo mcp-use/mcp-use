@@ -32,6 +32,7 @@ type Params = {
   setResources: Dispatch<SetStateAction<Resource[]>>;
   setResourceTemplates: Dispatch<SetStateAction<ResourceTemplate[]>>;
   setPrompts: Dispatch<SetStateAction<Prompt[]>>;
+  setSkills: Dispatch<SetStateAction<import("../core/skills.js").Skill[]>>;
   addLog: AddLog;
 };
 
@@ -116,6 +117,31 @@ export function useMcpOperations(params: Params) {
     [params.addLog]
   );
 
+  const listSkills = useCallback(async () => {
+    const connection = requireConnection(params, "list skills");
+    params.addLog("info", "Listing skills");
+    const result = await connection.listAllSkills();
+    params.setSkills(result.skills);
+  }, [params.addLog]);
+
+  const getSkill = useCallback(
+    async (uri: string) => {
+      const connection = requireConnection(params, "get skill");
+      params.addLog("info", `Getting skill: ${uri}`);
+      return connection.getSkill(uri);
+    },
+    [params.addLog]
+  );
+
+  const readResourceDirectory = useCallback(
+    async (uri: string, cursor?: string) => {
+      const connection = requireConnection(params, "read resource directory");
+      params.addLog("info", `Reading resource directory: ${uri}`);
+      return connection.readResourceDirectory(uri, cursor);
+    },
+    [params.addLog]
+  );
+
   const listPrompts = useCallback(async () => {
     const connection = requireConnection(params, "list prompts");
     params.addLog("info", "Listing prompts");
@@ -152,6 +178,22 @@ export function useMcpOperations(params: Params) {
       params.setPrompts(result.prompts || []);
     } catch (error) {
       params.addLog("warn", "Failed to refresh prompts:", error);
+    }
+  }, [params.addLog]);
+
+  const refreshSkills = useCallback(async () => {
+    if (params.stateRef.current !== "ready" || !params.connectionRef.current)
+      return;
+    try {
+      const result = await params.connectionRef.current.listAllSkills();
+      params.setSkills(result.skills);
+    } catch (error) {
+      // A development reload may remove the final skills directory, in which
+      // case the replacement server intentionally no longer exposes the
+      // extension. Clear the prior snapshot without treating that transition
+      // as a connection failure.
+      params.setSkills([]);
+      params.addLog("debug", "Skills are unavailable after refresh:", error);
     }
   }, [params.addLog]);
 
@@ -192,10 +234,14 @@ export function useMcpOperations(params: Params) {
     callTool,
     listResources,
     readResource,
+    listSkills,
+    getSkill,
+    readResourceDirectory,
     listPrompts,
     refreshTools,
     refreshResources,
     refreshPrompts,
+    refreshSkills,
     refreshResourceTemplates,
     refreshAll,
     getPrompt,

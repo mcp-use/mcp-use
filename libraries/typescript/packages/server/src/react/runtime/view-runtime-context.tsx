@@ -15,7 +15,7 @@ import type { McpAppRuntime } from "./view-runtime.js";
  *
  * @internal
  */
-export const ViewRuntimeContext = createContext<McpAppRuntime | null>(null);
+const ViewRuntimeContext = createContext<McpAppRuntime | null>(null);
 
 /**
  * Provide a {@link McpAppRuntime} to the view tree.

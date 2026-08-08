@@ -14,7 +14,7 @@ import { Spinner } from "@/client/components/ui/spinner";
 
 const CHAT_MESSAGE_CAPABILITIES = { text: {}, image: {} } as const;
 
-export interface McpAppsViewPanelProps {
+interface McpAppsViewPanelProps {
   serverId: string;
   viewId: string;
   toolName: string;

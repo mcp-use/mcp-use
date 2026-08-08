@@ -27,6 +27,7 @@ import {
   type EditableConnectionConfig,
 } from "@/client/utils/connectionUpdates";
 import { isInspectorSamplingAvailable } from "@/client/utils/samplingProtocol";
+import { getSkillsFallbackTab } from "./layout/layoutHeaderUtils";
 import { getServerDisplayName } from "@/client/utils/servers";
 import { useMcpClient, type McpServer } from "@mcp-use/client/react";
 import {
@@ -46,6 +47,7 @@ import { LayoutHeader } from "./LayoutHeader";
 import { InspectorSidebar } from "./layout/sidebar/InspectorSidebar";
 import { SidebarRpcPanel } from "./layout/sidebar/SidebarRpcPanel";
 import { MobileInspectorToolbar } from "./layout/mobile/MobileInspectorToolbar";
+import { getInspectorBodyClassName } from "./layout/inspectorLayoutClasses";
 import { useTunnelConnectionSync } from "./layout/useTunnelConnectionSync";
 
 interface LayoutProps {
@@ -112,6 +114,8 @@ export function Layout({ children }: LayoutProps) {
   } = useInspector();
 
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isEmbeddedConfigInitialized, setIsEmbeddedConfigInitialized] =
+    useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
       return localStorage.getItem("inspector-sidebar-collapsed") === "true";
@@ -168,6 +172,7 @@ export function Layout({ children }: LayoutProps) {
         setActiveTab(config.defaultTab);
       }
     }
+    setIsEmbeddedConfigInitialized(true);
   }, []); // Only run once on mount
 
   // Read tunnelUrl from query parameters and store in context
@@ -189,6 +194,7 @@ export function Layout({ children }: LayoutProps) {
         "tools",
         "prompts",
         "resources",
+        "skills",
         "chat",
         "sampling",
         "elicitation",
@@ -277,6 +283,32 @@ export function Layout({ children }: LayoutProps) {
       handleTabChange("tools");
     }
   }, [activeTab, connections, selectedServerId, handleTabChange]);
+
+  // Wait for both server discovery and embedded visibility configuration before
+  // redirecting a bookmarked Skills URL to a visible, usable tab.
+  useEffect(() => {
+    const selectedServer = connections.find(
+      (connection) => connection.id === selectedServerId
+    );
+    if (
+      isEmbeddedConfigInitialized &&
+      activeTab === "skills" &&
+      selectedServer
+    ) {
+      const fallbackTab = getSkillsFallbackTab(
+        selectedServer,
+        embeddedConfig.visibleTabs
+      );
+      if (fallbackTab) handleTabChange(fallbackTab);
+    }
+  }, [
+    activeTab,
+    connections,
+    selectedServerId,
+    handleTabChange,
+    embeddedConfig.visibleTabs,
+    isEmbeddedConfigInitialized,
+  ]);
 
   // Listen for custom navigation events from toast (for sampling and elicitation requests)
   useEffect(() => {
@@ -516,9 +548,9 @@ export function Layout({ children }: LayoutProps) {
   };
 
   const selectedServer = connections.find((c) => c.id === selectedServerId);
+  const displayServerRef = useRef<McpServer | undefined>(undefined);
 
   const isTunnelConnecting = useTunnelConnectionSync({
-    tunnelUrl,
     selectedServerId,
     selectedServer,
     configLoaded,
@@ -526,6 +558,14 @@ export function Layout({ children }: LayoutProps) {
     updateConnection: updateServer,
     connections,
   });
+
+  useEffect(() => {
+    if (!isTunnelConnecting && selectedServer) {
+      displayServerRef.current = selectedServer;
+    } else if (!isTunnelConnecting) {
+      displayServerRef.current = undefined;
+    }
+  }, [isTunnelConnecting, selectedServer]);
 
   // Aggregate tools, prompts, and resources from all connected servers
   // When a server is selected, use only that server's items
@@ -811,8 +851,7 @@ export function Layout({ children }: LayoutProps) {
     !!urlServerId &&
     !urlServerId.startsWith("http://") &&
     !urlServerId.startsWith("https://");
-  const showBootScreen =
-    isAutoConnecting || isBootstrappingServer || isTunnelConnecting;
+  const showBootScreen = isAutoConnecting || isBootstrappingServer;
   const layoutViewKey = selectedServer?.id ?? "home";
   const viewTransitionKey = showBootScreen ? "boot" : layoutViewKey;
   const [displayKey, setDisplayKey] = useState(viewTransitionKey);
@@ -830,13 +869,24 @@ export function Layout({ children }: LayoutProps) {
   }, [viewTransitionKey, displayKey]);
 
   const showDisplayBoot = displayKey === "boot";
-  const displayServer =
-    showDisplayBoot || displayKey === "home"
-      ? undefined
-      : connections.find((c) => c.id === displayKey);
+  const displayServer = showDisplayBoot
+    ? undefined
+    : displayKey === "home"
+      ? (selectedServer ??
+        (isTunnelConnecting ? displayServerRef.current : undefined))
+      : (connections.find((c) => c.id === displayKey) ??
+        (isTunnelConnecting ? displayServerRef.current : undefined));
+  const displayServerWithStableMetadata =
+    isTunnelConnecting && displayServer && displayServerRef.current
+      ? {
+          ...displayServer,
+          serverInfo:
+            displayServerRef.current.serverInfo ?? displayServer.serverInfo,
+        }
+      : displayServer;
 
   // Apply embedded styling
-  const isSingleTab = isEmbedded && embeddedConfig.singleTab;
+  const isSingleTab = isEmbedded && embeddedConfig.singleTab === true;
 
   const containerStyle: React.CSSProperties = isEmbedded
     ? {
@@ -855,17 +905,15 @@ export function Layout({ children }: LayoutProps) {
     ? "flex-1 w-full bg-white dark:bg-black p-0 overflow-auto"
     : cn(
         "flex-1 min-h-0 min-w-0 max-w-full w-full bg-white dark:bg-black rounded-2xl border border-zinc-200 dark:border-zinc-700 overflow-x-hidden overflow-y-auto",
-        !displayServer && "lg:mx-4",
-        displayServer && "lg:mr-4"
+        !displayServerWithStableMetadata && "lg:mx-4",
+        displayServerWithStableMetadata && "lg:mr-4"
       );
 
-  const bodyClassName = isSingleTab
-    ? "flex-1 min-h-0"
-    : "flex min-w-0 flex-1 min-h-0 overflow-hidden";
+  const bodyClassName = getInspectorBodyClassName(isSingleTab);
 
   const headerProps = {
     connections,
-    selectedServer: displayServer,
+    selectedServer: displayServerWithStableMetadata,
     activeTab,
     onServerSelect: handleServerSelect,
     onTabChange: handleTabChange,
@@ -891,16 +939,17 @@ export function Layout({ children }: LayoutProps) {
             {!isSingleTab && <LayoutHeader {...headerProps} />}
 
             <div className={bodyClassName}>
-              {displayServer && !isSingleTab && (
+              {displayServerWithStableMetadata && !isSingleTab && (
                 <InspectorSidebar
                   activeTab={activeTab}
                   onTabChange={handleTabChange}
-                  selectedServer={displayServer}
+                  selectedServer={displayServerWithStableMetadata}
                   visibleTabs={embeddedConfig.visibleTabs}
                   collapsed={sidebarCollapsed}
                   onCollapsedChange={setSidebarCollapsed}
                   rpcLoggerOpen={rpcLoggerOpen}
                   onRpcLoggerOpenChange={setRpcLoggerOpen}
+                  embedded={isEmbedded}
                   onCommandPaletteOpen={() =>
                     handleCommandPaletteOpen("button")
                   }
@@ -908,7 +957,7 @@ export function Layout({ children }: LayoutProps) {
               )}
               <main className={mainClassName}>
                 <LayoutContent
-                  selectedServer={displayServer}
+                  selectedServer={displayServerWithStableMetadata}
                   activeTab={activeTab}
                   toolsSearchRef={toolsSearchRef}
                   promptsSearchRef={promptsSearchRef}
@@ -918,9 +967,9 @@ export function Layout({ children }: LayoutProps) {
                   {children}
                 </LayoutContent>
               </main>
-              {displayServer && !isSingleTab && (
+              {displayServerWithStableMetadata && !isSingleTab && (
                 <SidebarRpcPanel
-                  serverId={displayServer.id}
+                  serverId={displayServerWithStableMetadata.id}
                   open={rpcLoggerOpen}
                 />
               )}
@@ -931,7 +980,7 @@ export function Layout({ children }: LayoutProps) {
 
       {!isSingleTab && !showDisplayBoot && (
         <MobileInspectorToolbar
-          serverId={displayServer?.id}
+          serverId={displayServerWithStableMetadata?.id}
           rpcLoggerOpen={rpcLoggerOpen}
           onRpcLoggerOpenChange={setRpcLoggerOpen}
         />

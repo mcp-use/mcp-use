@@ -15,6 +15,7 @@ interface InspectorSidebarProps {
   onCollapsedChange: (collapsed: boolean) => void;
   rpcLoggerOpen: boolean;
   onRpcLoggerOpenChange: (open: boolean) => void;
+  embedded?: boolean;
   onCommandPaletteOpen: () => void;
 }
 
@@ -27,6 +28,7 @@ export function InspectorSidebar({
   onCollapsedChange,
   rpcLoggerOpen,
   onRpcLoggerOpenChange,
+  embedded = false,
   onCommandPaletteOpen,
 }: InspectorSidebarProps) {
   return (
@@ -52,12 +54,14 @@ export function InspectorSidebar({
           />
         </SidebarProximityNav>
       </div>
-      <InspectorSidebarFooter
-        collapsed={collapsed}
-        rpcLoggerOpen={rpcLoggerOpen}
-        onRpcLoggerOpenChange={onRpcLoggerOpenChange}
-        onCommandPaletteOpen={onCommandPaletteOpen}
-      />
+      {!embedded && (
+        <InspectorSidebarFooter
+          collapsed={collapsed}
+          rpcLoggerOpen={rpcLoggerOpen}
+          onRpcLoggerOpenChange={onRpcLoggerOpenChange}
+          onCommandPaletteOpen={onCommandPaletteOpen}
+        />
+      )}
       <SidebarRail
         collapsed={collapsed}
         onToggle={() => onCollapsedChange(!collapsed)}
