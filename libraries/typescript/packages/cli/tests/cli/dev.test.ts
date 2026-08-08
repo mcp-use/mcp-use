@@ -228,40 +228,58 @@ describe("runDev", () => {
     expect(process.listeners("SIGINT")).not.toContain(sigint);
   });
 
-  it("reloads skill edits and keeps the last valid snapshot", async () => {
+  it("omits invalid skills on reload while preserving valid siblings", async () => {
     const cwd = copyFixture("dev-skills");
     const skillDir = join(cwd, "skills", "refunds");
-    mkdirSync(skillDir, { recursive: true });
+    mkdirSync(join(skillDir, "references"), { recursive: true });
     const skillFile = join(skillDir, "SKILL.md");
     writeFileSync(
       skillFile,
       "---\nname: refunds\ndescription: Process refunds\n---\n# v1\n"
     );
+    const policyFile = join(skillDir, "references", "policy.md");
+    writeFileSync(policyFile, "Refund policy v1\n");
+    const siblingDir = join(cwd, "skills", "shipping");
+    mkdirSync(siblingDir, { recursive: true });
+    writeFileSync(
+      join(siblingDir, "SKILL.md"),
+      "---\nname: shipping\ndescription: Track shipments\n---\n# Shipping\n"
+    );
     const dev = await startDev(cwd, await getFreePort(), undefined, false);
     cleanups.push(dev.stop, () => removeDir(cwd));
 
     expect(await mcpRequest(dev.url, "skills/list")).toMatchObject({
-      result: { skills: [{ uri: "skill://refunds/SKILL.md" }] },
+      result: {
+        skills: [
+          { uri: "skill://refunds/SKILL.md" },
+          { uri: "skill://shipping/SKILL.md" },
+        ],
+      },
     });
 
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     cleanups.push(() => errorSpy.mockRestore());
     writeFileSync(skillFile, "---\nname: wrong\ndescription: Invalid\n---\n");
-    await waitFor(async () =>
-      errorSpy.mock.calls.some((call) =>
-        String(call[0]).includes("reload failed")
-      )
+    await waitFor(async () => {
+      const body = await mcpRequest(dev.url, "skills/list");
+      const result = body["result"] as {
+        skills?: Array<{ frontmatter?: { name?: string } }>;
+      };
+      return result.skills?.length === 1 &&
+        result.skills[0]?.frontmatter?.name === "shipping"
         ? true
-        : undefined
-    );
+        : undefined;
+    });
     const reloadError = errorSpy.mock.calls.find((call) =>
-      String(call[0]).includes("reload failed")
+      String(call[0]).includes("invalid skill omitted")
     );
     expect(reloadError).toHaveLength(1);
     expect(String(reloadError?.[0])).not.toContain("\n");
-    expect(await mcpRequest(dev.url, "skills/list")).toMatchObject({
-      result: { skills: [{ frontmatter: { name: "refunds" } }] },
-    });
+    expect(
+      await mcpRequest(dev.url, "resources/read", {
+        uri: "skill://refunds/references/policy.md",
+      })
+    ).toHaveProperty("error");
 
     writeFileSync(
       skillFile,
@@ -272,7 +290,9 @@ describe("runDev", () => {
       const result = body["result"] as {
         skills?: Array<{ frontmatter?: { description?: string } }>;
       };
-      return result.skills?.[0]?.frontmatter?.description === "Updated refunds"
+      return result.skills?.some(
+        (skill) => skill.frontmatter?.description === "Updated refunds"
+      )
         ? true
         : undefined;
     });
@@ -296,22 +316,22 @@ describe("runDev", () => {
     await new Promise((resolve) => setTimeout(resolve, 200));
     expect(errorSpy).not.toHaveBeenCalled();
 
-    const addedSkillDir = join(cwd, "skills", "shipping");
+    const addedSkillDir = join(cwd, "skills", "returns");
     const addedSkillFile = join(addedSkillDir, "SKILL.md");
     mkdirSync(addedSkillDir, { recursive: true });
     writeFileSync(
       addedSkillFile,
-      "---\nname: shipping\ndescription: Track shipments\n---\n# Shipping\n"
+      "---\nname: returns\ndescription: Process returns\n---\n# Returns\n"
     );
     await waitFor(async () => {
       const body = await mcpRequest(dev.url, "skills/list");
       const result = body["result"] as { skills?: unknown[] };
-      return result.skills?.length === 2 ? true : undefined;
+      return result.skills?.length === 3 ? true : undefined;
     });
 
     writeFileSync(
       addedSkillFile,
-      "---\nname: shipping\ndescription: Updated shipment tracking\n---\n# Shipping\n"
+      "---\nname: returns\ndescription: Updated returns\n---\n# Returns\n"
     );
     await waitFor(async () => {
       const body = await mcpRequest(dev.url, "skills/list");
@@ -319,8 +339,7 @@ describe("runDev", () => {
         skills?: Array<{ frontmatter?: { description?: string } }>;
       };
       return result.skills?.some(
-        (skill) =>
-          skill.frontmatter?.description === "Updated shipment tracking"
+        (skill) => skill.frontmatter?.description === "Updated returns"
       )
         ? true
         : undefined;
@@ -330,7 +349,7 @@ describe("runDev", () => {
     await waitFor(async () => {
       const body = await mcpRequest(dev.url, "skills/list");
       const result = body["result"] as { skills?: unknown[] };
-      return result.skills?.length === 1 ? true : undefined;
+      return result.skills?.length === 2 ? true : undefined;
     });
   });
 
@@ -370,6 +389,44 @@ describe("runDev", () => {
         contents?: Array<{ text?: string }>;
       };
       return result.contents?.[0]?.text === "Policy v2\n" ? true : undefined;
+    });
+  });
+
+  it("reloads skill files when the configured skills directory overlaps views", async () => {
+    const cwd = copyFixture("dev-overlapping-skills-views", "views");
+    const entry = join(cwd, "src", "index.ts");
+    writeFileSync(
+      entry,
+      readFileSync(entry, "utf8").replace(
+        'name: "fixture-views", version: "1.0.0"',
+        'name: "fixture-views", version: "1.0.0", skills: { directory: "views" }'
+      )
+    );
+    const skillDir = join(cwd, "views", "product-search-result");
+    writeFileSync(
+      join(skillDir, "SKILL.md"),
+      "---\nname: product-search-result\ndescription: Product search guidance\n---\n"
+    );
+    const guide = join(skillDir, "guide.md");
+    writeFileSync(guide, "Guidance v1\n");
+
+    const dev = await startDev(cwd, await getFreePort(), undefined, false);
+    cleanups.push(dev.stop, () => removeDir(cwd));
+    expect(
+      await mcpRequest(dev.url, "resources/read", {
+        uri: "skill://product-search-result/guide.md",
+      })
+    ).toMatchObject({ result: { contents: [{ text: "Guidance v1\n" }] } });
+
+    writeFileSync(guide, "Guidance v2\n");
+    await waitFor(async () => {
+      const body = await mcpRequest(dev.url, "resources/read", {
+        uri: "skill://product-search-result/guide.md",
+      });
+      const result = body["result"] as {
+        contents?: Array<{ text?: string }>;
+      };
+      return result.contents?.[0]?.text === "Guidance v2\n" ? true : undefined;
     });
   });
 

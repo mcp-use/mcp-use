@@ -504,7 +504,13 @@ export async function runDev(options: DevOptions): Promise<void> {
         discoverConfiguredSkills(
           skillsConfig,
           options.cwd,
-          conventionalSkillsDirectory
+          conventionalSkillsDirectory,
+          {
+            onInvalidSkill: (error) => {
+              const message = error.message.replace(/\s+/g, " ").trim();
+              console.error(`[mcp-use] invalid skill omitted: ${message}`);
+            },
+          }
         )
       );
       const viewsManifest = buildDevViewsManifest(viewsSnapshot);
@@ -633,6 +639,9 @@ export async function runDev(options: DevOptions): Promise<void> {
           currentHandler = nextHandler;
           basePath = nextBasePath;
           currentSkillsDirectory = skillsDirectory;
+          if (currentSkillsDirectory !== undefined) {
+            vite.watcher.add(currentSkillsDirectory);
+          }
           eventBus.publish({ kind: "tools_list_changed" });
           eventBus.publish({ kind: "prompts_list_changed" });
           eventBus.publish({ kind: "resources_list_changed" });
@@ -678,10 +687,9 @@ export async function runDev(options: DevOptions): Promise<void> {
   };
 
   const onSsrFileEvent = (file: string): void => {
-    if (isViewPath(file, options.cwd, viewsDirectory)) {
-      return;
-    }
     const normalizedFile = file.replaceAll("\\", "/");
+    // Skills may intentionally live under the views root. Give that configured
+    // data directory precedence before view files take the HMR-only path.
     if (
       currentSkillsDirectory !== undefined &&
       (normalizedFile === currentSkillsDirectory.replaceAll("\\", "/") ||
@@ -690,6 +698,9 @@ export async function runDev(options: DevOptions): Promise<void> {
         ))
     ) {
       scheduleSkillsReload();
+      return;
+    }
+    if (isViewPath(file, options.cwd, viewsDirectory)) {
       return;
     }
     const modules = ssrEnvironment.moduleGraph.getModulesByFile(
@@ -723,6 +734,13 @@ export async function runDev(options: DevOptions): Promise<void> {
   vite.watcher.on("change", onSsrFileEvent);
   vite.watcher.on("add", onFileAddOrUnlink);
   vite.watcher.on("unlink", onFileAddOrUnlink);
+  // Skill files are data, not server-module imports, so Vite does not
+  // necessarily watch their directory until we opt it in explicitly.
+  // Watching the configured root also covers a conventional skills/ folder
+  // created after the dev server has already started.
+  if (currentSkillsDirectory !== undefined) {
+    vite.watcher.add(currentSkillsDirectory);
+  }
 
   // --- One long-lived HTTP listener delegating to the current handler. -----
   const tunnelManager = createTunnelManager(paths.tunnel);

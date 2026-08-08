@@ -52,8 +52,6 @@ interface UseChatMessagesProps {
   initialMessages?: Message[];
   /** Tool names the user has disabled via the tool selector. Sent to the server so it can exclude them. */
   disabledTools?: Set<string>;
-  /** Canonical skill URIs enabled for this chat turn. */
-  enabledSkillUris?: Set<string>;
   /**
    * Wire protocol used by the streaming endpoint.
    * - `"sse"` (default): Inspector SSE protocol (`data: {"type":"text","content":"..."}\n\n`)
@@ -86,7 +84,6 @@ export function useChatMessages({
   widgetModelContexts,
   initialMessages,
   disabledTools,
-  enabledSkillUris,
   streamProtocol = "sse",
   credentials,
   extraHeaders,
@@ -241,12 +238,8 @@ export function useChatMessages({
           inspectorApi("chat/stream");
 
         const disabledToolNames = [...(disabledTools ?? [])].sort();
-        const enabledSkills = [...(enabledSkillUris ?? [])].sort();
         const bodyContext = {
           disabledTools: disabledToolNames,
-          ...(enabledSkills.length > 0
-            ? { enabledSkillUris: enabledSkills }
-            : {}),
           ...(serializedWidgetContext
             ? { widgetModelContext: serializedWidgetContext }
             : {}),
@@ -261,7 +254,6 @@ export function useChatMessages({
               ...(disabledToolNames.length > 0
                 ? { disabledTools: disabledToolNames }
                 : {}),
-              enabledSkillUris: enabledSkills,
             };
         const requestEnvelope = bodyBuilder
           ? redactSensitiveRequestFields(requestBody)
@@ -277,7 +269,6 @@ export function useChatMessages({
               ...(disabledToolNames.length > 0
                 ? { disabledTools: disabledToolNames }
                 : {}),
-              enabledSkillUris: enabledSkills,
             };
         recordTrace({
           type: "request",
@@ -853,7 +844,6 @@ export function useChatMessages({
       waitForChatApiUrl,
       widgetModelContexts,
       disabledTools,
-      enabledSkillUris,
       streamProtocol,
       credentials,
       extraHeaders,

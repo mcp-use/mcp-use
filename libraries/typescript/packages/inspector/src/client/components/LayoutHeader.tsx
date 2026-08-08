@@ -13,7 +13,7 @@ import {
   isInspectorSamplingAvailable,
   STATELESS_SAMPLING_UNSUPPORTED_MESSAGE,
 } from "@/client/utils/samplingProtocol";
-import { ChevronDown, Plus } from "lucide-react";
+import { ChevronDown, CircleAlert, Plus } from "lucide-react";
 import type { McpServer } from "@mcp-use/client/react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -23,7 +23,14 @@ import { TabCountBadge } from "./shared/TabCountBadge";
 import { AddToClientDropdown } from "./AddToClientDropdown";
 import LogoAnimated from "./LogoAnimated";
 import { ServerDropdown } from "./ServerDropdown";
-import { getTabCount, isMcpUseTunnelUrl } from "./layout/layoutHeaderUtils";
+import {
+  getSkillsAccessibleLabel,
+  getSkillsState,
+  getTabCount,
+  isMcpUseTunnelUrl,
+  SKILLS_EMPTY_CATALOG_MESSAGE,
+  SKILLS_UNSUPPORTED_MESSAGE,
+} from "./layout/layoutHeaderUtils";
 import { getInspectorHeaderClassName } from "./layout/inspectorLayoutClasses";
 import { LAYOUT_TABS } from "./layout/layoutTabs";
 import { ServerUrlChip } from "./layout/ServerUrlChip";
@@ -293,21 +300,31 @@ export function LayoutHeader({
                   .filter((tab) => tab.id !== "separator")
                   .map((tab) => {
                     const count = getTabCount(tab.id, selectedServer);
+                    const skillsState =
+                      tab.id === "skills"
+                        ? getSkillsState(selectedServer)
+                        : undefined;
                     const isDisabled =
-                      tab.id === "sampling" &&
-                      !isInspectorSamplingAvailable(selectedServer);
+                      (tab.id === "sampling" &&
+                        !isInspectorSamplingAvailable(selectedServer)) ||
+                      (skillsState !== undefined &&
+                        skillsState !== "available");
+                    const disabledTooltip =
+                      tab.id === "skills"
+                        ? skillsState === "empty"
+                          ? SKILLS_EMPTY_CATALOG_MESSAGE
+                          : SKILLS_UNSUPPORTED_MESSAGE
+                        : STATELESS_SAMPLING_UNSUPPORTED_MESSAGE;
 
                     const trigger = (
                       <TabsTrigger
                         value={tab.id}
                         disabled={isDisabled}
                         disabledTooltip={
-                          isDisabled
-                            ? STATELESS_SAMPLING_UNSUPPORTED_MESSAGE
-                            : undefined
+                          isDisabled ? disabledTooltip : undefined
                         }
                         data-testid={`tab-${tab.id}`}
-                        icon={tab.icon}
+                        icon={skillsState === "empty" ? CircleAlert : tab.icon}
                         iconOnly
                         title={isDisabled ? undefined : tab.label}
                         badge={
@@ -319,9 +336,17 @@ export function LayoutHeader({
                             />
                           ) : undefined
                         }
-                        className="size-9 shrink-0 rounded-full p-0"
+                        className={cn(
+                          "size-9 shrink-0 rounded-full p-0",
+                          skillsState === "empty" &&
+                            "text-red-600 dark:text-red-400"
+                        )}
                       >
-                        <span className="sr-only">{tab.label}</span>
+                        <span className="sr-only">
+                          {skillsState
+                            ? getSkillsAccessibleLabel(tab.label, skillsState)
+                            : tab.label}
+                        </span>
                       </TabsTrigger>
                     );
 
