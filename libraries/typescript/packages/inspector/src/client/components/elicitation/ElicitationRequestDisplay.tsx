@@ -1,8 +1,8 @@
 import { Button } from "@/client/components/ui/button";
 import { Label } from "@/client/components/ui/label";
 import { Checkbox } from "@/client/components/ui/checkbox";
-import type { ElicitResult } from "@modelcontextprotocol/sdk/types.js";
-import type { PendingElicitationRequest } from "@/client/types/elicitation";
+import type { ElicitResult } from "@mcp-use/client/react";
+import type { PendingElicitationRequest } from "@/client/types/pending-requests";
 import { JSONDisplay } from "@/client/components/shared/JSONDisplay";
 import { toast } from "sonner";
 import {
@@ -19,7 +19,9 @@ import {
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
 import { Badge } from "@/client/components/ui/badge";
-import { ElicitationFormFields, useElicitationForm } from "./shared";
+import { ElicitationFormFields } from "./shared/ElicitationFormFields";
+import { useElicitationForm } from "./shared/useElicitationForm";
+import { createElement } from "react";
 
 interface ElicitationRequestDisplayProps {
   request: PendingElicitationRequest | null;
@@ -80,53 +82,48 @@ export function ElicitationRequestDisplay({
     }
     onClose();
 
-    // Show success toast with navigation back to tools tab
-    import("react").then((React) => {
-      const toastId = toast(
-        React.createElement(
+    const toastId = toast(
+      createElement(
+        "div",
+        { className: "space-y-3" },
+        createElement(
           "div",
-          { className: "space-y-3" },
-          React.createElement(
-            "div",
-            null,
-            React.createElement("strong", null, "Elicitation Response Sent"),
-            React.createElement(
-              "p",
-              { className: "text-sm text-muted-foreground mt-1" },
-              "The tool will continue executing."
-            )
-          ),
-          React.createElement(
-            "div",
-            { className: "flex gap-2" },
-            React.createElement(
-              "button",
-              {
-                "data-testid": "elicitation-view-tool-result",
-                className:
-                  "px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90",
-                onClick: () => {
-                  // Dispatch event to navigate to tools tab
-                  const event = new globalThis.CustomEvent(
-                    "navigate-to-tool-result",
-                    {
-                      detail: { toolName: null },
-                    }
-                  );
-                  window.dispatchEvent(event);
-                  // Dismiss the toast immediately
-                  toast.dismiss(toastId);
-                },
-              },
-              "View Tool Result"
-            )
+          null,
+          createElement("strong", null, "Elicitation Response Sent"),
+          createElement(
+            "p",
+            { className: "text-sm text-muted-foreground mt-1" },
+            "The tool will continue executing."
           )
         ),
-        {
-          duration: 5000, // Auto-dismiss after 5 seconds
-        }
-      );
-    });
+        createElement(
+          "div",
+          { className: "flex gap-2" },
+          createElement(
+            "button",
+            {
+              "data-testid": "elicitation-view-tool-result",
+              className:
+                "px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90",
+              onClick: () => {
+                const event = new globalThis.CustomEvent(
+                  "navigate-to-tool-result",
+                  {
+                    detail: { toolName: null },
+                  }
+                );
+                window.dispatchEvent(event);
+                toast.dismiss(toastId);
+              },
+            },
+            "View Tool Result"
+          )
+        )
+      ),
+      {
+        duration: 5000,
+      }
+    );
   };
 
   const handleDecline = () => {
@@ -160,7 +157,6 @@ export function ElicitationRequestDisplay({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
       <div className="flex items-center justify-between p-4 border-b dark:border-zinc-700">
         <div className="flex items-center gap-2">
           <h3 className="font-medium text-gray-900 dark:text-gray-100">
@@ -182,46 +178,55 @@ export function ElicitationRequestDisplay({
         </div>
         <div className="flex items-center gap-2">
           <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onCopy}
-                className="h-8 w-8 p-0"
-              >
-                {isCopied ? (
-                  <Check className="h-4 w-4 text-green-600" />
-                ) : (
-                  <Copy className="h-4 w-4" />
-                )}
-              </Button>
-            </TooltipTrigger>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onCopy}
+                  className="h-8 w-8 p-0"
+                >
+                  {isCopied ? (
+                    <Check className="h-4 w-4 text-green-600" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                </Button>
+              }
+              nativeButton
+            />
             <TooltipContent>Copy request</TooltipContent>
           </Tooltip>
           <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onDownload}
-                className="h-8 w-8 p-0"
-              >
-                <Download className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onDownload}
+                  className="h-8 w-8 p-0"
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+              }
+              nativeButton
+            />
             <TooltipContent>Download request</TooltipContent>
           </Tooltip>
           <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onFullscreen}
-                className="h-8 w-8 p-0"
-              >
-                <Maximize2 className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onFullscreen}
+                  className="h-8 w-8 p-0"
+                >
+                  <Maximize2 className="h-4 w-4" />
+                </Button>
+              }
+              nativeButton
+            />
             <TooltipContent>Fullscreen</TooltipContent>
           </Tooltip>
           <Button
@@ -235,9 +240,7 @@ export function ElicitationRequestDisplay({
         </div>
       </div>
 
-      {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        {/* Message Section */}
         <div className="space-y-2">
           <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
             Message
@@ -247,7 +250,6 @@ export function ElicitationRequestDisplay({
           </p>
         </div>
 
-        {/* URL Mode Display */}
         {isUrlMode && "url" in request.request && (
           <div className="space-y-2">
             <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
@@ -289,7 +291,6 @@ export function ElicitationRequestDisplay({
           </div>
         )}
 
-        {/* Form Mode Display */}
         {isFormMode && (
           <div className="space-y-2">
             <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
@@ -310,7 +311,6 @@ export function ElicitationRequestDisplay({
           </div>
         )}
 
-        {/* Schema Display (for debugging/reference) */}
         {isFormMode &&
           "requestedSchema" in request.request &&
           request.request.requestedSchema && (
@@ -325,11 +325,11 @@ export function ElicitationRequestDisplay({
           )}
       </div>
 
-      {/* Actions Footer */}
       <div className="flex gap-2 p-4 border-t dark:border-zinc-700">
         <Button
           onClick={handleAccept}
           className="flex-1"
+          disabled={isUrlMode && !urlCompleted}
           data-testid="elicitation-accept-button"
         >
           Accept

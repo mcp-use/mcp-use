@@ -1,9 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import type {
-  Prompt,
-  GetPromptResult,
-} from "@modelcontextprotocol/sdk/types.js";
-import { MCPPromptCallEvent, Telemetry } from "@/client/telemetry";
+import type { Prompt, GetPromptResult } from "@mcp-use/client/react";
+import { MCPPromptCallEvent, captureInspectorEvent } from "@/client/telemetry";
 
 export interface PromptResult {
   promptName: string;
@@ -79,18 +76,15 @@ export function useMCPPrompts({
         const duration = Date.now() - startTime;
 
         // Track successful prompt call
-        const telemetry = Telemetry.getInstance();
-        telemetry
-          .capture(
-            new MCPPromptCallEvent({
-              promptName: prompt.name,
-              serverId,
-              success: true,
-            })
-          )
-          .catch(() => {
-            // Silently fail - telemetry should not break the application
-          });
+        captureInspectorEvent(
+          new MCPPromptCallEvent({
+            promptName: prompt.name,
+            serverId,
+            success: true,
+          })
+        ).catch(() => {
+          // Silently fail - telemetry should not break the application
+        });
 
         setResults((prev) => [
           {
@@ -104,19 +98,16 @@ export function useMCPPrompts({
         ]);
       } catch (error) {
         // Track failed prompt call
-        const telemetry = Telemetry.getInstance();
-        telemetry
-          .capture(
-            new MCPPromptCallEvent({
-              promptName: prompt.name,
-              serverId,
-              success: false,
-              error: error instanceof Error ? error.message : "Unknown error",
-            })
-          )
-          .catch(() => {
-            // Silently fail - telemetry should not break the application
-          });
+        captureInspectorEvent(
+          new MCPPromptCallEvent({
+            promptName: prompt.name,
+            serverId,
+            success: false,
+            error: error instanceof Error ? error.message : "Unknown error",
+          })
+        ).catch(() => {
+          // Silently fail - telemetry should not break the application
+        });
 
         const errorMessage =
           error instanceof Error ? error.message : String(error);

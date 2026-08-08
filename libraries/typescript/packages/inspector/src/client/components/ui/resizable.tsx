@@ -41,25 +41,25 @@ function ResizableHandle({
     <ResizablePrimitive.Separator
       data-slot="resizable-handle"
       className={cn(
-        "relative flex items-center justify-center bg-border",
-        // when in focus
-        "focus-visible:ring-ring focus-visible:ring-1 focus-visible:ring-offset-1 focus-visible:outline-hidden",
-        // dom pseudo element :after
-        "after:absolute after:inset-y-0 after:left-1/2 after:w-1 after:-translate-x-1/2",
-        // when the orientation changes
-        "aria-[orientation=vertical]:h-auto aria-[orientation=vertical]:w-px",
-        "aria-[orientation=horizontal]:h-px aria-[orientation=horizontal]:w-full",
-        // dom pseudo element :after when the orientation changes
-        "aria-[orientation=vertical]:after:left-0 aria-[orientation=vertical]:after:h-1 aria-[orientation=vertical]:after:w-full aria-[orientation=vertical]:after:translate-x-0 aria-[orientation=vertical]:after:-translate-y-1/2",
-        // icon
+        "relative z-50 box-content shrink-0",
+        "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1",
+        // ponytail: 1px line flush with panels; padding + negative margin = drag slop, no visual gap
+        "before:pointer-events-none before:absolute before:bg-zinc-200 before:transition-[height,width,background-color] before:duration-200 before:ease-out dark:before:bg-zinc-700",
+        "hover:before:bg-foreground/35 dark:hover:before:bg-foreground/45",
+        "aria-[orientation=horizontal]:h-px aria-[orientation=horizontal]:w-full aria-[orientation=horizontal]:py-1.5 aria-[orientation=horizontal]:-my-1.5",
+        "aria-[orientation=horizontal]:before:inset-x-0 aria-[orientation=horizontal]:before:top-1.5 aria-[orientation=horizontal]:before:h-px",
+        "hover:aria-[orientation=horizontal]:before:h-0.5",
+        "aria-[orientation=vertical]:h-full aria-[orientation=vertical]:w-px aria-[orientation=vertical]:px-1.5 aria-[orientation=vertical]:-mx-1.5",
+        "aria-[orientation=vertical]:before:inset-y-0 aria-[orientation=vertical]:before:left-1.5 aria-[orientation=vertical]:before:w-px",
+        "hover:aria-[orientation=vertical]:before:w-0.5",
         "[&[aria-orientation=horizontal]>div]:rotate-90",
         className
       )}
       {...props}
     >
       {withHandle && (
-        <div className="bg-border z-10 flex h-4 w-3 items-center justify-center rounded-xs border">
-          <GripVerticalIcon className="size-2.5" />
+        <div className="pointer-events-none absolute top-1/2 left-1/2 z-10 flex h-4 w-3 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-xs border border-zinc-200 bg-background shadow-sm dark:border-zinc-700">
+          <GripVerticalIcon className="size-2.5 text-muted-foreground" />
         </div>
       )}
     </ResizablePrimitive.Separator>

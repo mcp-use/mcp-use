@@ -36,6 +36,12 @@ export function ThemeProvider({
 }: ThemeProviderProps) {
   const [theme, setTheme] = useState<Theme>(forcedTheme || defaultTheme);
   const [mounted, setMounted] = useState(false);
+  const [systemTheme, setSystemTheme] = useState<"light" | "dark">(() => {
+    if (typeof window === "undefined") return "light";
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  });
 
   // Get system theme preference
   const getSystemTheme = (): "light" | "dark" => {
@@ -46,7 +52,7 @@ export function ThemeProvider({
   };
 
   // Get resolved theme (actual theme being used)
-  const resolvedTheme = theme === "system" ? getSystemTheme() : theme;
+  const resolvedTheme = theme === "system" ? systemTheme : theme;
 
   // Apply theme to document
   const applyTheme = (newTheme: Theme) => {
@@ -80,6 +86,7 @@ export function ThemeProvider({
 
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
     const handleChange = () => {
+      setSystemTheme(mediaQuery.matches ? "dark" : "light");
       applyTheme("system");
     };
 

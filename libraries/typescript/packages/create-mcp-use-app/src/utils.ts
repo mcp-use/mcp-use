@@ -94,7 +94,11 @@ export function updatePackageJson(projectPath: string, projectName: string) {
   const packageJsonContent = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
 
   packageJsonContent.name = projectName;
-  packageJsonContent.description = `MCP server: ${projectName}`;
+  // Keep the template's own description so a generated project says what it
+  // actually is. Only templates without one fall back to the generic string.
+  if (!packageJsonContent.description) {
+    packageJsonContent.description = `${projectName}: an mcp-use server`;
+  }
 
   writeFileSync(packageJsonPath, JSON.stringify(packageJsonContent, null, 2));
 }

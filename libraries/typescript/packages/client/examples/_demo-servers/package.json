@@ -1,0 +1,20 @@
+{
+  "name": "@mcp-use/client-demo-servers",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "mcp-use:v1": "tsx v1-http.ts",
+    "mcp-use:v2": "tsx v2-http.ts",
+    "ours:v1": "pnpm --dir ../../../server/examples/conformance dev --port ${PORT:-3103} --no-open",
+    "ours:v2": "pnpm --dir ../../../server/examples/views/basic dev",
+    "v1": "pnpm run mcp-use:v1",
+    "v2": "pnpm run mcp-use:v2"
+  },
+  "dependencies": {
+    "mcp-use": "^2.0.4",
+    "zod": "^4.2.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.0"
+  }
+}

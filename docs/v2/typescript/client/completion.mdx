@@ -1,0 +1,43 @@
+---
+title: "Completions"
+description: "Autocomplete for prompt and resource template arguments"
+icon: "wand-magic-sparkles"
+---
+
+Request suggestions for prompt arguments or resource template URI variables:
+
+```typescript
+import { MCPClient } from "@mcp-use/client";
+
+const client = new MCPClient({
+  mcpServers: { demo: { url: "http://localhost:3000/mcp" } },
+});
+
+try {
+  const conn = await client.connect("demo");
+
+  const result = await conn.complete({
+    ref: { type: "ref/prompt", name: "code-review" },
+    argument: { name: "language", value: "py" },
+  });
+
+  console.log(result.completion.values); // e.g. ["python", "pytorch"]
+} finally {
+  await client.close();
+}
+```
+
+## React
+
+```tsx
+const mcp = useMcp({ url: "http://localhost:3000/mcp" });
+
+const result = await mcp.complete({
+  ref: { type: "ref/resource", uri: "file:///{path}" },
+  argument: { name: "path", value: "/tmp" },
+});
+```
+
+## Reference
+
+[`MCPConnection`](https://mcp-use-typescript-api-reference.vercel.app/modules/_mcp-use_client.index.html#mcpconnection) — `complete()`.

@@ -1,0 +1,43 @@
+---
+title: "Inspector Updates"
+description: "New updates and improvements to the mcp-use v2 Inspector"
+icon: "bug-play"
+tag: "New"
+rss: true
+---
+
+<Update label="v20.0.5" description="August 2026">
+  ## Safer Inspector proxy defaults
+  Patch release for Inspector deployments using the v2 SDK.
+
+- **Fix**: `mountInspector()` now blocks loopback proxy targets by default, preventing a publicly reachable Inspector from proxying requests to services on its host's loopback interface. Local development continues to allow loopback; production can opt in with `INSPECTOR_ALLOW_LOOPBACK=true` (`#2134`)
+- **Update**: Updated mcp-use to v2.0.5
+</Update>
+
+<Update label="v20.0.4" description="August 2026">
+  ## Bug fixes and performance enhancements
+  Maintenance update with bug fixes and performance enhancements.
+
+- **Update**: Updated mcp-use to v2.0.4
+</Update>
+
+<Update label="v20.0.3" description="August 2026">
+  ## Bug fixes and performance enhancements
+  Maintenance update with bug fixes and performance enhancements.
+
+- **Update**: Updated mcp-use to v2.0.3
+</Update>
+
+<Update label="v20.0.0" description="August 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=20.0.0&title=Inspector%20for%20mcp-use%20v2&date=2026-08&lang=inspector" alt="Release 20.0.0" />
+  </Frame>
+  ## Inspector for mcp-use v2
+  Major release aligning the Inspector with the native mcp-use v2 client and server stack.
+
+- **New**: standalone Inspector installs use the project-pinned package and serve local assets, while `mcp-use dev` mounts the framework-neutral Inspector on the existing listener
+- **Enhancement**: Inspector connection modes are authoritative: Auto attempts a direct browser connection before proxy fallback, Direct never uses the proxy, and Proxy uses it immediately
+- **Fix**: the OAuth BFF binds proxy requests to SDK-discovered metadata, fails closed for private targets and unsafe redirects, and limits request bodies and timeouts
+- **New**: hosted chat supports local MCP servers through the browser agent and cloud LLM proxy for signed-in users
+- **Update**: Updated mcp-use to v2.0.0
+</Update>

@@ -1,0 +1,104 @@
+---
+title: "Content Security Policy"
+description: "Configure the domains that MCP Apps widgets can load, call, and embed."
+icon: "shield"
+---
+
+Content Security Policy (CSP) controls which domains your views can fetch from, load scripts/styles from, and embed. Views run in sandboxed iframes, so CSP must explicitly allow any external resources.
+
+## Server and asset origins
+
+Set **`MCP_URL`** to your server's public origin (OAuth resource URL, API calls, CSP `connectDomains`):
+
+```env
+MCP_URL=https://myserver.com
+```
+
+Set **`MCP_ASSETS_URL`** when view JS/CSS and `public/` files are served from a different prefix (CDN, Supabase Storage):
+
+```env
+MCP_ASSETS_URL=https://cdn.example.com/storage/v1/object/public/widgets
+```
+
+When `MCP_ASSETS_URL` is unset, assets use the same origin as `MCP_URL` (or the request origin behind a proxy).
+
+At **`mcp-use build`**, `MCP_ASSETS_URL` rewrites manifest paths to full `https://` URLs for static upload workflows.
+
+## CSP merge order
+
+On each `resources/read`, the framework merges CSP in this order (high → low priority):
+
+1. Author `view.csp` on the bound tool
+2. `CSP_*_DOMAINS` env vars (per category) or the `CSP_URLS` shortcut
+3. MCP auto-append: `MCP_URL` → `connectDomains`; assets origin → `resourceDomains`
+
+`CSP_URLS` and per-category env vars rank **above** MCP auto-append. Duplicate origins keep the higher-priority entry's position.
+
+## Add domains for one view
+
+Declare CSP on the tool's `view:` config:
+
+```typescript
+server.tool(
+  {
+    name: "weather",
+    view: {
+      name: "weather-display",
+      csp: {
+        connectDomains: ["https://api.weather.com"],
+        resourceDomains: ["https://cdn.weather.com"],
+        frameDomains: ["https://trusted-embed.com"],
+      },
+    },
+  },
+  async () => ({
+    /* ... */
+  }),
+);
+```
+
+MCP Apps CSP fields: `connectDomains`, `resourceDomains`, `frameDomains`, `baseUriDomains`.
+
+## Global CSP env vars
+
+Use `CSP_URLS` when every view needs the same extra domains (shortcut for **all four** categories):
+
+```env
+CSP_URLS=https://api.example.com,https://cdn.example.com
+```
+
+Override one category without affecting others:
+
+```env
+CSP_CONNECT_DOMAINS=https://api.example.com
+CSP_RESOURCE_DOMAINS=https://cdn.example.com
+CSP_FRAME_DOMAINS=https://embed.example.com
+CSP_BASE_URI_DOMAINS=https://myserver.com
+```
+
+## Static deployments
+
+When assets live on static storage and the MCP server runs elsewhere:
+
+```env
+MCP_URL=https://PROJECT.supabase.co/functions/v1/mcp-server
+MCP_ASSETS_URL=https://PROJECT.supabase.co/storage/v1/object/public/widgets
+CSP_URLS=https://PROJECT.supabase.co
+```
+
+## Verify CSP
+
+The mcp-use Inspector provides a **CSP Mode Toggle** for testing:
+
+- **Permissive**: Relaxed CSP for debugging
+- **Widget-Declared**: Enforces the view's declared CSP (production-like)
+
+<Warning>
+  CSP violations are logged in the console. Use Widget-Declared mode to catch
+  CSP issues before production deployment.
+</Warning>
+
+## Next Steps
+
+- [MCP Apps](/v2/typescript/mcp-apps): View overview and routing
+- [Self hosted](/v2/typescript/server/deployment/self-hosted): Run an MCP server in Docker

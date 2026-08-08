@@ -1,178 +1,49 @@
-import { AuroraBackground } from "@/client/components/ui/aurora-background";
-import { Badge } from "@/client/components/ui/badge";
 import { BlurFade } from "@/client/components/ui/blur-fade";
 import { Button } from "@/client/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/client/components/ui/tooltip";
-import { cn } from "@/client/lib/utils";
-import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
-import { ArrowUp, Loader2 } from "lucide-react";
-import React from "react";
-import type { PromptResult } from "../../hooks/useMCPPrompts";
-import { ChatInput } from "./ChatInput";
-import { PromptResultsList } from "./PromptResultsList";
-import { PromptsDropdown } from "./PromptsDropdown";
-import type { ToolInfo } from "./ToolSelector";
-import type { LLMConfig, MessageAttachment } from "./types";
-import { ProviderIcon } from "./providerMeta";
+import React, { type ReactNode } from "react";
+import { ChatInputArea } from "./ChatInputArea";
 
-interface ChatLandingFormProps {
-  mcpServerUrl: string;
-  inputValue: string;
-  isConnected: boolean;
-  isLoading: boolean;
-  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
-  llmConfig: LLMConfig | null;
-  promptsDropdownOpen: boolean;
-  promptFocusedIndex: number;
-  prompts: Prompt[];
-  selectedPrompt: Prompt | null;
-  promptResults: PromptResult[];
-  attachments: MessageAttachment[];
-  tools?: ToolInfo[];
-  disabledTools?: Set<string>;
-  onDisabledToolsChange?: (disabledTools: Set<string>) => void;
-  onInputChange: (value: string) => void;
-  onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
-  onKeyUp: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
-  onClick: () => void;
-  onSubmit: (e: React.FormEvent) => void;
-  onConfigDialogOpenChange: (open: boolean) => void;
-  onPromptSelect: (prompt: Prompt) => void;
-  onDeletePromptResult: (index: number) => void;
-  onAttachmentAdd: (file: File) => void;
-  onAttachmentRemove: (index: number) => void;
-  /** When true, hides the model badge below the input. */
-  hideModelBadge?: boolean;
-  /** When true, hides the MCP server URL below the title. */
-  hideServerUrl?: boolean;
+type ChatInputAreaProps = React.ComponentProps<typeof ChatInputArea>;
+
+interface ChatLandingFormProps extends ChatInputAreaProps {
+  serverDisplayName: string;
+  /** Inline notice rendered above the composer (e.g. managed chat errors). */
+  composerNotice?: ReactNode;
   /** Optional quick question suggestions displayed below the landing input. */
   quickQuestions?: string[];
   /** Called when a quick question is selected. */
   onQuickQuestionSelect?: (question: string) => void;
-  /**
-   * When set (hosted-managed mode), renders a "Manufact free tier" pill below
-   * the input instead of the provider/model badge. Ignores `hideModelBadge`.
-   */
-  freeTierInfo?: {
-    onLoginClick: () => void;
-  };
 }
 
 export function ChatLandingForm({
-  mcpServerUrl,
-  inputValue,
-  isConnected,
-  isLoading,
-  textareaRef,
-  llmConfig,
-  promptsDropdownOpen,
-  promptFocusedIndex,
-  prompts,
-  selectedPrompt,
-  promptResults,
-  attachments,
-  tools,
-  disabledTools,
-  onDisabledToolsChange,
-  onInputChange,
-  onKeyDown,
-  onKeyUp,
-  onClick,
-  onSubmit,
-  onConfigDialogOpenChange,
-  onPromptSelect,
-  onDeletePromptResult,
-  onAttachmentAdd,
-  onAttachmentRemove,
-  hideModelBadge,
-  hideServerUrl,
+  serverDisplayName,
+  composerNotice,
   quickQuestions = [],
   onQuickQuestionSelect,
-  freeTierInfo,
+  ...inputAreaProps
 }: ChatLandingFormProps) {
-  // Can send if there's text, prompt results, or attachments
-  const canSend =
-    inputValue.trim() || promptResults.length > 0 || attachments.length > 0;
-
   return (
-    <AuroraBackground>
+    <div className="flex h-full flex-col items-center justify-center">
       <BlurFade className="w-full max-w-4xl mx-auto px-2 sm:px-4">
         <div className="text-center mb-6 sm:mb-8">
           <h1
             className="text-2xl sm:text-4xl font-light mb-2 dark:text-white"
             data-testid="chat-landing-header"
           >
-            Chat with MCP Server
+            Chat with {serverDisplayName}
           </h1>
-          {!hideServerUrl && (
-            <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 font-light break-all px-2">
-              {mcpServerUrl}
-            </p>
-          )}
+          <p
+            className="mx-auto max-w-xl text-sm text-muted-foreground sm:text-base"
+            data-testid="chat-landing-description"
+          >
+            Chat, inspect traces, preview widgets, and more.
+          </p>
         </div>
 
-        <form onSubmit={onSubmit} className="space-y-6">
-          <div className="flex justify-center">
-            <div className="relative w-full max-w-2xl">
-              <PromptsDropdown
-                prompts={prompts}
-                isOpen={promptsDropdownOpen}
-                selectedPrompt={selectedPrompt}
-                focusedIndex={promptFocusedIndex}
-                onPromptSelect={onPromptSelect}
-              />
-              <PromptResultsList
-                promptResults={promptResults}
-                onDeletePromptResult={onDeletePromptResult}
-              />
+        <div className="space-y-6">
+          {composerNotice}
+          <ChatInputArea {...inputAreaProps} />
 
-              <ChatInput
-                inputValue={inputValue}
-                isConnected={isConnected}
-                isLoading={isLoading}
-                textareaRef={textareaRef}
-                attachments={attachments}
-                placeholder="Ask a question or request an action..."
-                className={cn(
-                  "bg-white/80 dark:text-white dark:bg-black backdrop-blur-sm border-gray-200 dark:border-zinc-800",
-                  promptResults.length > 0 && "pt-16"
-                )}
-                tools={tools}
-                disabledTools={disabledTools}
-                onDisabledToolsChange={onDisabledToolsChange}
-                onInputChange={onInputChange}
-                onKeyDown={onKeyDown}
-                onKeyUp={onKeyUp}
-                onClick={onClick}
-                onAttachmentAdd={onAttachmentAdd}
-                onAttachmentRemove={onAttachmentRemove}
-              />
-
-              <div className="absolute right-0 p-3 bottom-0">
-                <Button
-                  type="submit"
-                  size="sm"
-                  className={cn(
-                    "h-10 w-10 rounded-full",
-                    isLoading && "animate-spin",
-                    !canSend && "bg-zinc-400"
-                  )}
-                  disabled={isLoading || !canSend || !isConnected}
-                  data-testid="chat-send-button"
-                >
-                  {isLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <ArrowUp className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-            </div>
-          </div>
           {quickQuestions.length > 0 && (
             <div className="flex flex-wrap items-center justify-center gap-2 px-2">
               {quickQuestions.map((question) => (
@@ -183,39 +54,17 @@ export function ChatLandingForm({
                   size="sm"
                   className="rounded-full bg-white/70 dark:bg-black/50 text-gray-900 dark:text-white"
                   onClick={() => onQuickQuestionSelect?.(question)}
-                  disabled={isLoading || !isConnected}
+                  disabled={
+                    inputAreaProps.isLoading || !inputAreaProps.isConnected
+                  }
                 >
                   {question}
                 </Button>
               ))}
             </div>
           )}
-          {llmConfig && (!hideModelBadge || freeTierInfo) && (
-            <div className="flex justify-center mt-4">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Badge
-                    variant="secondary"
-                    className="pl-1 font-mono text-[11px] cursor-pointer hover:bg-secondary/80 transition-colors"
-                    onClick={() => onConfigDialogOpenChange(true)}
-                  >
-                    <ProviderIcon
-                      provider={llmConfig.provider}
-                      className="mr-0"
-                    />
-                    {llmConfig.provider}/{llmConfig.model}
-                  </Badge>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>
-                    {freeTierInfo ? "Change model / upgrade" : "Change API Key"}
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-            </div>
-          )}
-        </form>
+        </div>
       </BlurFade>
-    </AuroraBackground>
+    </div>
   );
 }

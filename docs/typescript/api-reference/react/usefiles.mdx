@@ -1,0 +1,97 @@
+---
+title: "useFiles()"
+description: "Upload and download files from ChatGPT views"
+icon: "file-up"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/server/src/react/hooks/use-files.ts"
+---
+
+`useFiles` exposes ChatGPT's optional file upload and download extensions
+without widget-state side effects.
+
+<Warning>
+  File operations use the ChatGPT-only `window.openai` extension, not the MCP
+  Apps bridge. Always check `isSupported`; other MCP Apps hosts may not provide
+  these operations.
+</Warning>
+
+## Usage
+
+```tsx
+import { useFiles } from "mcp-use/react";
+import { useState } from "react";
+
+export default function FileView() {
+  const { isSupported, upload, getDownloadUrl } = useFiles();
+  const [fileId, setFileId] = useState<string>();
+
+  if (!isSupported) {
+    return <p>File operations require ChatGPT.</p>;
+  }
+
+  async function handleUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0];
+    if (!file) return;
+
+    const uploaded = await upload(file);
+    setFileId(uploaded.fileId);
+  }
+
+  async function handleDownload() {
+    if (!fileId) return;
+    const { downloadUrl } = await getDownloadUrl({ fileId });
+    window.open(downloadUrl, "_blank");
+  }
+
+  return (
+    <div>
+      <input type="file" onChange={handleUpload} />
+      {fileId && <button onClick={handleDownload}>Download</button>}
+    </div>
+  );
+}
+```
+
+## Signature
+
+```ts
+function useFiles(): UseFilesResult;
+
+interface UseFilesResult {
+  isSupported: boolean;
+  upload(file: File): Promise<FileMetadata>;
+  getDownloadUrl(file: FileMetadata): Promise<{ downloadUrl: string }>;
+}
+
+type FileMetadata = {
+  fileId: string;
+};
+```
+
+`isSupported` is `true` only when both `window.openai.uploadFile` and
+`window.openai.getFileDownloadUrl` are available. Calling either operation on
+an unsupported host rejects with a descriptive error.
+
+## Model context
+
+`useFiles` does not read or update ChatGPT widget state. Uploading returns an
+opaque `fileId`, but does not automatically attach the file to future model
+turns.
+
+`ui/update-model-context` can send text or structured data, but placing a
+`fileId` in that data does not attach the uploaded file or grant the model
+access to its contents. If the model needs the file, pass it through an
+explicit tool flow that accepts a ChatGPT file reference.
+
+## Download URLs
+
+`getDownloadUrl` returns a temporary URL. Store the stable `fileId`, not the
+URL, and request a fresh URL when the user needs to view or download the file.
+
+```ts
+const { downloadUrl } = await getDownloadUrl({ fileId });
+```
+
+## Related
+
+- [ChatGPT file APIs](https://developers.openai.com/apps-sdk/reference#file-apis)
+- [`ModelContext`](/typescript/api-reference/react/modelcontext)

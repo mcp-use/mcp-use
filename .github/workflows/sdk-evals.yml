@@ -1,0 +1,88 @@
+name: SDK agentic evals
+
+on:
+  schedule:
+    # Mon/Wed/Fri 14:00 UTC
+    - cron: "0 14 * * 1,3,5"
+  workflow_dispatch:
+    inputs:
+      tasks:
+        description: "Comma-separated task ids (blank = all)"
+        required: false
+        type: string
+      trials:
+        description: "Fresh trials per task"
+        required: false
+        type: string
+        default: "1"
+
+permissions:
+  contents: read
+
+jobs:
+  eval:
+    name: eval (Codex · ${{ matrix.task }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        task:
+          - v2-01-basic-tool-server
+          - v2-02-stateful-ticket-queue
+          - v2-03-docs-lookup-server
+          - v2-06-project-board-composition
+          - v2-07-debug-inventory-server
+          - v2-08-openapi-order-service
+          - v2-09-raw-input-required-approval
+          - v2-10-multi-view-incident-console
+          - v2-11-middleware-protected-audit
+    steps:
+      - name: Check credentials and task selection
+        id: gate
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REQUESTED_TASKS: ${{ github.event.inputs.tasks }}
+        run: |
+          set -euo pipefail
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "::error::OPENAI_API_KEY is required for the Codex agent and GPT judge."
+            exit 1
+          fi
+          if [ -n "$REQUESTED_TASKS" ]; then
+            IFS=',' read -ra TASKS <<< "$REQUESTED_TASKS"
+            for task in "${TASKS[@]}"; do
+              task="${task#"${task%%[![:space:]]*}"}"
+              task="${task%"${task##*[![:space:]]}"}"
+              if [ "$task" = "${{ matrix.task }}" ]; then
+                echo "run=true" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+            done
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "run=true" >> "$GITHUB_OUTPUT"
+
+      - name: Run evaluator
+        id: eval
+        if: steps.gate.outputs.run == 'true'
+        uses: mcp-use/mcp-use-evals@main
+        timeout-minutes: 150
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          agent: codex
+          tasks: ${{ matrix.task }}
+          conditions: noskill+blank
+          trials: ${{ github.event.inputs.trials || '1' }}
+          batch-id: ${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Upload evaluation result
+        if: always() && steps.gate.outputs.run == 'true' && steps.eval.outputs.run-dir != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdk-evals-${{ matrix.task }}-${{ github.run_id }}
+          path: |
+            ${{ steps.eval.outputs.run-dir }}
+            !${{ steps.eval.outputs.run-dir }}/**/workspace/**
+          retention-days: 30

@@ -1,5 +1,5 @@
 ---
-title: "OpenAPI"
+title: "OpenAPI -> MCP"
 description: "Generate MCP tools from an OpenAPI document"
 icon: "file-code"
 ---
@@ -7,7 +7,10 @@ icon: "file-code"
 `MCPServer.fromOpenAPI()` creates an MCP server from a parsed OpenAPI document. Each included OpenAPI operation is registered as an MCP tool that calls the matching HTTP endpoint.
 
 <Tip>
-We do not recommend mapping a production API directly to MCP without review. LLMs usually perform better with a deliberately crafted MCP server: focused tools, clear names, model-friendly descriptions, and workflows that match the tasks users actually ask for. 
+  We do not recommend mapping a production API directly to MCP without review.
+  LLMs usually perform better with a deliberately crafted MCP server: focused
+  tools, clear names, model-friendly descriptions, and workflows that match the
+  tasks users actually ask for.
 </Tip>
 
 ## Basic Usage
@@ -15,7 +18,7 @@ We do not recommend mapping a production API directly to MCP without review. LLM
 Load or import an OpenAPI document, then pass it to `MCPServer.fromOpenAPI()`:
 
 ```typescript
-import { MCPServer, type OpenAPIDocument } from "mcp-use/server";
+import { MCPServer, type OpenAPIDocument } from "mcp-use";
 
 const response = await fetch("https://api.example.com/openapi.json");
 
@@ -100,7 +103,9 @@ const server = MCPServer.fromOpenAPI({
 ```
 
 <Note>
-The `auth` and `headers` options authenticate requests from your MCP server to the upstream API. They do not add authentication to the MCP server itself. To protect the MCP endpoint, configure server authentication separately.
+  The `auth` and `headers` options authenticate requests from your MCP server to
+  the upstream API. They do not add authentication to the MCP server itself. To
+  protect the MCP endpoint, configure server authentication separately.
 </Note>
 
 ## Request and Response Mapping
@@ -115,7 +120,7 @@ Generated tools flatten OpenAPI parameters into a single input object:
 
 For example, an operation like `GET /users/{userId}/projects?limit=10` becomes a tool with `userId` and `limit` inputs.
 
-JSON responses are returned with the `object()` response helper. Non-JSON responses are returned as text. If the upstream API returns a non-2xx response, the generated tool returns an MCP error response containing the upstream response text.
+JSON responses are returned as raw MCP results with JSON text content and `structuredContent`. Non-JSON responses are returned as text content. If the upstream API returns a non-2xx response, the generated tool returns an MCP error result containing the upstream response text.
 
 ## Naming and Descriptions
 
@@ -145,17 +150,17 @@ type FromOpenAPIOptions = {
 };
 ```
 
-| Option | Description |
-| --- | --- |
-| `spec` | Parsed OpenAPI document. This is required. |
+| Option    | Description                                                            |
+| --------- | ---------------------------------------------------------------------- |
+| `spec`    | Parsed OpenAPI document. This is required.                             |
 | `baseUrl` | Upstream API base URL. Defaults to `spec.servers[0].url` when present. |
-| `name` | MCP server name. Defaults to `spec.info.title`. |
-| `version` | MCP server version. Defaults to `spec.info.version` or `1.0.0`. |
-| `auth` | Bearer token or static header auth for upstream API requests. |
-| `headers` | Static headers sent with every upstream API request. |
-| `tags` | Include only operations with one of these OpenAPI tags. |
-| `exclude` | Exclude operations by operation ID, path, method, or tag. |
-| `fetch` | Custom fetch implementation, useful for tests or custom transports. |
+| `name`    | MCP server name. Defaults to `spec.info.title`.                        |
+| `version` | MCP server version. Defaults to `spec.info.version` or `1.0.0`.        |
+| `auth`    | Bearer token or static header auth for upstream API requests.          |
+| `headers` | Static headers sent with every upstream API request.                   |
+| `tags`    | Include only operations with one of these OpenAPI tags.                |
+| `exclude` | Exclude operations by operation ID, path, method, or tag.              |
+| `fetch`   | Custom fetch implementation, useful for tests or custom transports.    |
 
 ## Limitations
 
@@ -171,15 +176,21 @@ If you run into these limits, use the generated server as a reference and move t
 
 ## Example
 
-<Card title="OpenAPI Server Example" icon="github" href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/features/openapi">
-  Complete runnable example that generates MCP tools from the National Weather Service OpenAPI document.
+<Card
+  title="OpenAPI Server Example"
+  icon="github"
+  href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/openapi"
+>
+  Complete runnable example that generates MCP tools from the National Weather
+  Service OpenAPI document.
 </Card>
 
 ## Next Steps
 
 <CardGroup cols={2}>
   <Card title="Tools" icon="wrench" href="/typescript/server/tools">
-    Learn how to create hand-crafted MCP tools with Zod schemas and custom handlers.
+    Learn how to create hand-crafted MCP tools with Zod schemas and custom
+    handlers.
   </Card>
   <Card title="Examples" icon="folder-code" href="/typescript/server/examples">
     Browse runnable server examples, including the OpenAPI feature example.

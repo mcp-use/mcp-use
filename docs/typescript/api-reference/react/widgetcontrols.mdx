@@ -1,0 +1,125 @@
+---
+title: "WidgetControls"
+description: "Wrapper component that adds control buttons for widget debugging and view controls"
+icon: "sliders-horizontal"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/react/WidgetControls.tsx"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this component on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/react/WidgetControls.tsx' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/react/WidgetControls.tsx</a>
+</Callout>
+
+## WidgetControls
+
+Wrapper component that adds control buttons for widget debugging and view controls (fullscreen and picture-in-picture). It combines a debug button and view controls under shared hover logic, so you can drop development and testing capabilities onto any widget by wrapping its content.
+
+```tsx
+import { WidgetControls } from "mcp-use/react";
+```
+
+<Tip>
+Use `<McpUseProvider debugger viewControls />` to automatically include `WidgetControls`. That is the recommended approach since the provider also wires up the other providers a widget needs.
+</Tip>
+
+Wraps `children` in a relatively positioned container and overlays a row of icon buttons. All buttons share the same hover logic and render together. The control row fades in on hover (`opacity-100` / `pointer-events-auto`) and fades out otherwise (`opacity-0` / `pointer-events-none`).
+
+The component reads live widget data and actions from the `useWidget()` hook (props, output, metadata, state, theme, display mode, safe area, max height, locale, user agent, availability, and the `callTool`, `sendFollowUpMessage`, `openExternal`, `requestDisplayMode`, and `setState` actions). When rendered inside the inspector (detected when `window.location.pathname` includes `/inspector/api/`) all controls are hidden, because the inspector renders its own controls.
+
+**Props**
+><ParamField body="children" type="React.ReactNode" required="True" >   The widget content to wrap. Rendered inside the relatively positioned container, beneath the floating control row. </ParamField>
+><ParamField body="className" type="string" default='""' >   Additional CSS classes applied to the wrapper container (which also carries `relative h-fit`). </ParamField>
+><ParamField body="position" type='"top-left" | "top-center" | "top-right" | "center-left" | "center-right" | "bottom-left" | "bottom-center" | "bottom-right"' default='"top-right"' >   Where the control buttons are placed within the wrapper. One of eight positions. Drives both the Tailwind position classes and the safe-area-aware inline offsets. </ParamField>
+><ParamField body="attachTo" type="HTMLElement | null" default="undefined" >   When provided, hover detection is bound to this element via `mouseenter` / `mouseleave` listeners instead of the wrapper. Use it to reveal the controls from a custom element. When set, the wrapper's own hover handlers are skipped. </ParamField>
+><ParamField body="showLabels" type="boolean" default="true" >   Whether each button shows a hover tooltip with its label (for example "Fullscreen", "Picture in Picture", "Debug Info"). The tooltip position adapts to the `position` prop. </ParamField>
+><ParamField body="debugger" type="boolean" default="false" >   Enables the debug button. When `true`, a debug icon appears that toggles a full-screen overlay showing widget debug info and interactive action controls. </ParamField>
+><ParamField body="viewControls" type='boolean | "pip" | "fullscreen"' default="false" >   Enables the view controls. `true` shows both the picture-in-picture and fullscreen buttons, `"pip"` shows only the picture-in-picture button, and `"fullscreen"` shows only the fullscreen button. View control buttons are hidden while the widget is already in `fullscreen` or `pip` display mode. </ParamField>
+
+**Signature**
+```ts wrap
+function WidgetControls({ children, className = "", position = "top-right", attachTo, showLabels = true, debugger: enableDebugger = false, viewControls = false }: WidgetControlsProps): JSX.Element
+```
+
+### debugger overlay
+
+When `debugger` is `true`, the debug button toggles a fixed full-screen overlay (`z-[10000]`). The overlay closes on a backdrop click, on a click outside its content, and via an explicit close button, and it locks `document.body` scroll while open.
+
+**Debug Info table**
+><ResponseField name="Props" type="object" >   Current widget props from `toolInput`. </ResponseField>
+><ResponseField name="Output" type="object" >   Tool output data (`toolOutput`). </ResponseField>
+><ResponseField name="Metadata" type="object" >   Response metadata (`toolResponseMetadata`). </ResponseField>
+><ResponseField name="State" type="object" >   Persistent widget state (`widgetState`). </ResponseField>
+><ResponseField name="Theme" type="string" >   Current theme, light or dark. </ResponseField>
+><ResponseField name="Display Mode" type="string" >   Current display mode: inline, pip, or fullscreen. </ResponseField>
+><ResponseField name="Locale" type="string" >   The user locale. </ResponseField>
+><ResponseField name="Max Height" type="number" >   The widget max height, displayed in pixels. </ResponseField>
+><ResponseField name="User Agent" type="object" >   Device capabilities, summarized as the device type. </ResponseField>
+><ResponseField name="Safe Area" type="object" >   Safe area insets for mobile, shown as `T B L R` values. </ResponseField>
+><ResponseField name="API Available" type="boolean" >   Whether the widget API is available, shown as Yes or No. </ResponseField>
+><ResponseField name="window.openai Keys" type="string[]" >   All available keys on the `window.openai` object, detected after mount. </ResponseField>
+
+**Actions**
+><ResponseField name="Call Tool" type="action" >   Test calling another MCP tool. Takes a tool name and a JSON arguments string, then invokes `callTool`. </ResponseField>
+><ResponseField name="Send Follow-Up" type="action" >   Send a follow-up message to the conversation via `sendFollowUpMessage`. </ResponseField>
+><ResponseField name="Open Link" type="action" >   Open an external URL via `openExternal`. </ResponseField>
+><ResponseField name="Display Mode" type="action" >   Request a display mode (Inline, PiP, or Fullscreen) via `requestDisplayMode`. </ResponseField>
+><ResponseField name="Set State" type="action" >   Update widget state via `setState` (adds a `debugTimestamp` to the current state). </ResponseField>
+
+### viewControls buttons
+
+When `viewControls` is enabled, the control row shows view-mode buttons. They are only visible while the widget is not already in `fullscreen` or `pip` display mode.
+
+**Buttons**
+><ResponseField name="Fullscreen" type="button" >   Shown when `viewControls` is `true` or `"fullscreen"`. Calls `requestDisplayMode("fullscreen")` to expand the widget to fullscreen. </ResponseField>
+><ResponseField name="Picture in Picture" type="button" >   Shown when `viewControls` is `true` or `"pip"`. Calls `requestDisplayMode("pip")` to show the widget in a floating window. </ResponseField>
+
+## Basic Usage
+
+```tsx wrap
+import { WidgetControls } from "mcp-use/react";
+
+function MyWidget() {
+  return (
+    <WidgetControls debugger viewControls>
+      <div>My widget content</div>
+    </WidgetControls>
+  );
+}
+```
+
+## Position Customization
+
+Control buttons can be placed in any of the eight positions. The placement also reflows the hover tooltip and applies safe-area-aware offsets.
+
+```tsx wrap
+// Top right (default)
+<WidgetControls position="top-right" debugger>
+  <MyWidget />
+</WidgetControls>
+
+// Bottom left
+<WidgetControls position="bottom-left" debugger>
+  <MyWidget />
+</WidgetControls>
+
+// Center right
+<WidgetControls position="center-right" debugger>
+  <MyWidget />
+</WidgetControls>
+```
+
+## Usage with McpUseProvider
+
+`WidgetControls` is included automatically when you pass `debugger` or `viewControls` to `McpUseProvider`. This is the recommended approach since the provider also sets up the other providers a widget needs.
+
+```tsx wrap
+import { McpUseProvider } from "mcp-use/react";
+
+<McpUseProvider debugger viewControls>
+  <MyWidget />
+</McpUseProvider>
+```
+
+## Related
+
+- [McpUseProvider](/typescript/api-reference/react/mcpuseprovider): Unified provider that can include `WidgetControls`.
+- [useWidget](/typescript/api-reference/react/usewidget): Hook for accessing widget data and actions, used internally by `WidgetControls`.

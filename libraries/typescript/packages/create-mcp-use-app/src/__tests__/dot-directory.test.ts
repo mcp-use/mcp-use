@@ -186,12 +186,35 @@ describe("template file updates against a tmpdir fixture", () => {
 
     const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf-8"));
     expect(pkg.name).toBe("my-app");
-    expect(pkg.description).toBe("MCP server: my-app");
+    expect(pkg.description).toBe("my-app: an mcp-use server");
 
     const indexContent = readFileSync(join(dir, "index.ts"), "utf-8");
     expect(indexContent).toContain('name: "my-app"');
     expect(indexContent).toContain('title: "my-app"');
     expect(indexContent).not.toContain("{{PROJECT_NAME}}");
+  });
+
+  it("keeps the template's description instead of overwriting it", () => {
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify(
+        {
+          name: "placeholder",
+          description:
+            "an mcp-use server with example tools and zod validated input",
+        },
+        null,
+        2
+      )
+    );
+
+    updatePackageJson(dir, "my-app");
+
+    const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf-8"));
+    expect(pkg.name).toBe("my-app");
+    expect(pkg.description).toBe(
+      "an mcp-use server with example tools and zod validated input"
+    );
   });
 
   it("regression: a basename with quotes flows the sanitized name into index.ts (not the raw one)", () => {

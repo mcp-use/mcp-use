@@ -1,0 +1,21 @@
+{
+  "name": "mcp-use-example-schema-arktype",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "mcp-use dev",
+    "build": "mcp-use build",
+    "start": "mcp-use start",
+    "typecheck": "tsc --noEmit",
+    "verify": "node ../../verify-examples.mjs --example=schema-libraries-arktype"
+  },
+  "dependencies": {
+    "arktype": "^2.2.3",
+    "mcp-use": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "tsx": "^4.21.0",
+    "typescript": "^7.0.2"
+  }
+}

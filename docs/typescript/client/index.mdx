@@ -1,105 +1,111 @@
 ---
-title: "Introduction"
-description: "Connect to MCP servers with the mcp-use client"
-icon: "list-start"
+title: "MCP Client"
+description: "Connect a TypeScript app to MCP servers and call tools, resources, and prompts."
+icon: "router"
 ---
 
-# MCP Client
+`@mcp-use/client` connects your app to one or more MCP servers. The client negotiates legacy (v1 sessionful) and modern (v2 sessionless) servers automatically and exposes one connection API for both.
 
-**mcp-use** provides a complete MCP client implementation for TypeScript that enables your applications to connect to and interact with any MCP server. Whether you're building AI agents, automation tools, or integrations, the MCPClient gives you full access to MCP protocol features with a clean, type-safe API.
+## Install
 
-## Key Features
-
-- **Multi-server support**: Connect to multiple MCP servers simultaneously
-- **Multiple connection types**: STDIO, HTTP, and SSE transports
-- **Full MCP protocol**: Complete support for tools, resources, prompts, and notifications
-- **Sampling and elicitation**: Handle LLM sampling and form/URL elicitation with optional helpers (defaults, validation, typed results)
-- **Type-safe**: Full TypeScript support with automatic type inference
-- **Middleware support**: Add logging, metrics, and custom middleware
-- **Sandbox mode**: Secure execution environment for untrusted code
-
-## Installation
-
-Install the mcp-use package:
-
-<CodeGroup>
-```bash npm
-npm install mcp-use
+```bash
+npm install @mcp-use/client
 ```
-```bash pnpm
-pnpm add mcp-use
-```
-```bash yarn
-yarn add mcp-use
-```
-</CodeGroup>
 
-## Quick Start
+Node.js 20+ required. The package is ESM-only.
 
-Here's a basic example of connecting to an MCP server and calling a tool:
+## Entry points
 
+| Building                       | Import                  | Transports  |
+| ------------------------------ | ----------------------- | ----------- |
+| Node script, service, or agent | `@mcp-use/client`       | HTTP, stdio |
+| Browser (no React)             | `@mcp-use/client`       | HTTP        |
+| React app                      | `@mcp-use/client/react` | HTTP        |
 
-<a href="https://codesandbox.io/p/devbox/nice-ptolemy-9j887v?embed=1&file=%2Fsrc%2Findex.ts">
-<img noZoom src="https://codesandbox.io/static/img/play-codesandbox.svg" alt="Edit mcp-client-getting-started" />
-</a>
+MCP App view hooks (`useToolContext`, `useCallTool`, …) live in `mcp-use/react`, not the client package.
+
+## Quick start
 
 ```typescript
-import { MCPClient } from 'mcp-use'
+import { MCPClient } from "@mcp-use/client";
 
-// Create client and connect
 const client = new MCPClient({
   mcpServers: {
-    'my-server': {
-      command: 'npx',
-      args: ['-y', '@modelcontextprotocol/server-everything']
-    }
-  }
-})
-await client.createAllSessions()
+    demo: { url: "http://localhost:3000/mcp" },
+  },
+});
 
-// Get a session for a specific server
-const session = client.getSession('my-server')
+try {
+  const connection = await client.connect("demo");
 
-// List available tools
-const tools = await session.listTools()
-console.log('Available tools:', tools)
+  const tools = await connection.listTools();
+  console.log(tools.map((t) => t.name));
 
-// Call a tool
-const result = await session.callTool('tool_name', { 
-  param: 'value' 
-})
-console.log('Result:', result)
-
-// Cleanup
-await client.closeAllSessions()
+  const result = await connection.callTool("echo", { message: "hello" });
+  const text = result.content.find((b) => b.type === "text");
+  if (text?.type === "text") console.log(text.text);
+} finally {
+  await client.close();
+}
 ```
 
-## Next Steps
+## Core types
 
-<CardGroup cols={3}>
-  <Card title="Environments" icon="layer-group" href="/typescript/client/environments">
-    Use the client in Node.js, browser, and React applications
-  </Card>
-  <Card title="Configuration" icon="cog" href="/typescript/client/client-configuration">
-    Configure your client and understand connection types (STDIO, HTTP, SSE)
-  </Card>
-  <Card title="Elicitation" icon="check" href="/typescript/client/elicitation">
-    Handle form and URL elicitation with optional helpers (defaults, validation)
-  </Card>
-  <Card title="Sampling" icon="pipette" href="/typescript/client/sampling">
-    Enable tools to request LLM completions via client callbacks
-  </Card>
+- **`MCPClient`** — holds server config and opens connections.
+- **`MCPConnection`** — call tools, read resources, fetch prompts. Check `connection.info` for `protocolEra`, `protocolVersion`, capabilities, and instructions.
+- **`MCPSession`** — deprecated alias for `MCPConnection`.
+
+Prefer `client.connect(name)` over `createSession()`. Use `client.connectAll()` for every configured server.
+
+## Configure servers
+
+```typescript
+const client = new MCPClient({
+  mcpServers: {
+    remote: {
+      url: "https://api.example.com/mcp",
+      authToken: process.env.MCP_TOKEN,
+    },
+    local: {
+      command: "npx",
+      args: ["-y", "@modelcontextprotocol/server-filesystem", "./"],
+    },
+  },
+});
+```
+
+HTTP servers support OAuth (automatic by default), bearer tokens, and custom headers. Stdio is Node-only.
+
+Upgrading from v1? See the [v2 migration guide](/typescript/client/migration).
+
+## Next steps
+
+<CardGroup cols={2}>
   <Card title="Tools" icon="wrench" href="/typescript/client/tools">
-    Invoke server functions and handle results
+    List and call server tools.
   </Card>
-  <Card title="Resources" icon="folder-open" href="/typescript/client/resources">
-    Read content from server resources
+  <Card
+    title="v2 Migration"
+    icon="arrow-right-left"
+    href="/typescript/client/migration"
+  >
+    Breaking changes and upgrade checklist.
   </Card>
-  <Card title="Server Manager" icon="server" href="/typescript/client/server-manager">
-    Manage multiple MCP servers simultaneously
+  <Card
+    title="Authentication"
+    icon="shield"
+    href="/typescript/client/authentication"
+  >
+    OAuth and bearer tokens.
   </Card>
-  <Card title="OAuth" icon="shield" href="/typescript/client/authentication">
-    Secure your connections with OAuth
+  <Card title="React" icon="react" href="/typescript/client/usemcp">
+    `McpClientProvider` and hooks.
+  </Card>
+  <Card
+    title="Environments"
+    icon="container"
+    href="/typescript/client/environments"
+  >
+    Node, browser, and React differences.
   </Card>
 </CardGroup>
-

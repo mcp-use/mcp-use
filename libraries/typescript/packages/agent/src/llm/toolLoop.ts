@@ -1,0 +1,206 @@
+import { isToolResultError, toolResultToContent } from "./toolResultParts.js";
+import type { LlmDriver } from "./driver.js";
+import { LlmRequestError } from "./providers/openai-chat-completions.js";
+import type { LlmStreamEvent, ProviderMessage, ProviderTool } from "./types.js";
+
+interface ToolCallFn {
+  (name: string, args: Record<string, unknown>): Promise<unknown>;
+}
+
+export interface ToolLoopParams {
+  driver: LlmDriver;
+  /** Initial conversation history + the user turn that triggers the run. */
+  messages: ProviderMessage[];
+  /** Tools available to the LLM (already filtered by the caller). */
+  tools: ProviderTool[];
+  /** Executes an MCP tool and returns its raw result. */
+  callTool: ToolCallFn;
+  /** Cap on assistant↔tool turns. */
+  maxSteps?: number;
+  signal?: AbortSignal;
+}
+
+/**
+ * Provider-agnostic tool loop. Streams the assistant response, executes any
+ * tool calls via `callTool`, appends their results, and continues until the
+ * assistant produces a response with no more tool calls, or `maxSteps` is
+ * exhausted.
+ *
+ * This replaces MCPAgent.streamEvents() without pulling in langchain.
+ */
+export async function* runToolLoop(
+  params: ToolLoopParams
+): AsyncGenerator<LlmStreamEvent, void, unknown> {
+  if (params.driver.managesToolLoop && params.driver.streamToolLoop) {
+    yield* params.driver.streamToolLoop(params);
+    return;
+  }
+
+  const { driver, tools, callTool, signal } = params;
+  const maxSteps = params.maxSteps ?? 10;
+  const messages: ProviderMessage[] = [...params.messages];
+
+  for (let step = 0; step < maxSteps; step++) {
+    if (signal?.aborted) return;
+
+    // Buffer tool calls from this turn and assistant text so we can append
+    // them to the running transcript before dispatching tools.
+    const pendingToolCalls: {
+      id: string;
+      name: string;
+      args: Record<string, unknown>;
+    }[] = [];
+    let assistantText = "";
+
+    try {
+      for await (const ev of driver.stream({
+        messages,
+        tools,
+        signal,
+      })) {
+        if (ev.type === "text-delta") {
+          assistantText += ev.delta;
+        } else if (ev.type === "tool-call-ready") {
+          pendingToolCalls.push({
+            id: ev.toolCallId,
+            name: ev.toolName,
+            args: ev.args,
+          });
+        }
+        yield ev;
+      }
+    } catch (err) {
+      // Preserve structured HTTP errors (429 loginRequired, 402 credits, …) so
+      // hosted-inspector UI can show the managed-chat notice instead of a raw
+      // "OpenAI request failed …" bubble.
+      if (err instanceof LlmRequestError) {
+        throw err;
+      }
+      yield {
+        type: "error",
+        message: err instanceof Error ? err.message : String(err),
+      };
+      return;
+    }
+
+    if (pendingToolCalls.length === 0) {
+      // Assistant produced a final answer; we've already yielded `done`.
+      return;
+    }
+
+    // Record assistant turn (text + tool calls) in conversation history.
+    messages.push({
+      role: "assistant",
+      content: assistantText,
+      toolCalls: pendingToolCalls,
+    });
+
+    // Dispatch tool calls sequentially. Sequential keeps ordering
+    // deterministic and avoids provider-specific parallel-call quirks.
+    for (const tc of pendingToolCalls) {
+      if (signal?.aborted) return;
+      let result: unknown;
+      let isError = false;
+      try {
+        result = await callTool(tc.name, tc.args);
+        isError = isToolResultError(result);
+      } catch (err) {
+        isError = true;
+        result = {
+          isError: true,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+      messages.push({
+        role: "tool",
+        content: toolResultToContent(result),
+        toolCallId: tc.id,
+        toolName: tc.name,
+        toolResult: result,
+        toolIsError: isError,
+      });
+      yield {
+        type: "tool-result",
+        toolCallId: tc.id,
+        toolName: tc.name,
+        result,
+        isError,
+      };
+    }
+  }
+}
+
+/**
+ * Non-streaming helper used by the server-side `handleChatRequest` path.
+ * Runs the same tool loop but collects the final assistant text and tool
+ * invocations into a result object.
+ */
+export async function runToolLoopNonStreaming(params: ToolLoopParams): Promise<{
+  content: string;
+  toolCalls: {
+    toolName: string;
+    args: Record<string, unknown>;
+    result: unknown;
+  }[];
+}> {
+  if (params.driver.managesToolLoop && params.driver.runToolLoopNonStreaming) {
+    return params.driver.runToolLoopNonStreaming(params);
+  }
+
+  const { driver, tools, callTool, signal } = params;
+  const maxSteps = params.maxSteps ?? 10;
+  const messages: ProviderMessage[] = [...params.messages];
+  const transcriptToolCalls: {
+    toolName: string;
+    args: Record<string, unknown>;
+    result: unknown;
+  }[] = [];
+  let finalText = "";
+
+  for (let step = 0; step < maxSteps; step++) {
+    if (signal?.aborted) break;
+    const { text, toolCalls } = await driver.complete({
+      messages,
+      tools,
+      signal,
+    });
+    if (toolCalls.length === 0) {
+      finalText = text;
+      break;
+    }
+    messages.push({
+      role: "assistant",
+      content: text,
+      toolCalls,
+    });
+    for (const tc of toolCalls) {
+      let result: unknown;
+      let isError = false;
+      try {
+        result = await callTool(tc.name, tc.args);
+        isError = isToolResultError(result);
+      } catch (err) {
+        isError = true;
+        result = {
+          isError: true,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+      transcriptToolCalls.push({
+        toolName: tc.name,
+        args: tc.args,
+        result,
+      });
+      messages.push({
+        role: "tool",
+        content: toolResultToContent(result),
+        toolCallId: tc.id,
+        toolName: tc.name,
+        toolResult: result,
+        toolIsError: isError,
+      });
+    }
+  }
+
+  return { content: finalText, toolCalls: transcriptToolCalls };
+}

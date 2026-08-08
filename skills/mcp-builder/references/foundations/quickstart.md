@@ -12,7 +12,7 @@ cd my-server
 npm run dev
 ```
 
-This installs dependencies, starts the server on port 3000, and opens the inspector at `http://localhost:3000/inspector`.
+This installs dependencies, starts the server on port 3000, and opens the inspector at `http://localhost:3000/mcp/inspector`.
 
 ### Choosing a Template
 
@@ -20,8 +20,8 @@ Pick the template that matches what the user is building:
 
 | Template | Command | Use When |
 |----------|---------|----------|
-| **starter** (default) | `npx create-mcp-use-app my-server` | Full-featured server with tools, resources, prompts, and widget examples |
-| **mcp-apps** | `npx create-mcp-use-app my-server --template mcp-apps` | Widget-focused for ChatGPT, Claude, and other MCP Apps-compatible clients |
+| **mcp-server** | `npx create-mcp-use-app my-server --template mcp-server` | Server with example tool and prompt (no widgets or resources) |
+| **mcp-apps** (interactive default) | `npx create-mcp-use-app my-server --template mcp-apps` | Widget-focused for ChatGPT, Claude, and other MCP Apps-compatible clients |
 | **blank** | `npx create-mcp-use-app my-server --template blank` | Clean slate — bare server with commented-out examples |
 | **GitHub repo** | `npx create-mcp-use-app my-server --template owner/repo` | Custom or community templates from any GitHub repository |
 
@@ -43,12 +43,12 @@ npx create-mcp-use-app --list-templates
 
 ### What Each Template Produces
 
-**starter:**
+**mcp-server:**
 ```
 my-server/
-├── index.ts              # Server with example tool, resource, and prompt
-├── resources/            # Widget directory (display-weather.tsx example)
-├── public/               # Static assets (favicon, icon)
+├── index.ts              # Server with example tool and prompt
+├── mcp-env.d.ts          # Managed server-to-view typing bridge
+├── public/               # Static assets (icon)
 ├── package.json          # Pre-configured scripts: dev, build, start, deploy
 └── tsconfig.json
 ```
@@ -57,6 +57,7 @@ my-server/
 ```
 my-server/
 ├── index.ts              # Server with widget-returning tools
+├── mcp-env.d.ts          # Managed server-to-view typing bridge
 ├── resources/            # Widget directory (product-search-result/ example)
 │   └── product-search-result/
 │       ├── widget.tsx    # React widget with carousel UI
@@ -70,6 +71,7 @@ my-server/
 ```
 my-server/
 ├── index.ts              # Bare MCPServer with commented-out examples
+├── mcp-env.d.ts          # Managed server-to-view typing bridge
 ├── public/
 ├── package.json
 └── tsconfig.json
@@ -82,9 +84,10 @@ After scaffolding:
 1. `npm run dev` — starts server with hot reload + inspector
 2. Edit `index.ts` to add tools, resources, prompts
 3. Add widgets as `.tsx` files in `resources/`
-4. Test everything at `http://localhost:3000/inspector`
-5. `npm run build` — production build
-6. `npm run deploy` — deploy to production
+4. Test everything at `http://localhost:3000/mcp/inspector`
+5. `npm run typecheck` — refresh MCP view types and run local TypeScript
+6. `npm run build` — production build
+7. `npm run deploy` — deploy to production
 
 ---
 
@@ -93,7 +96,7 @@ After scaffolding:
 Open `index.ts` and you'll see a basic server. Let's add a simple tool:
 
 ```typescript
-import { MCPServer, text } from "mcp-use/server";
+import { MCPServer, text } from "mcp-use";
 import { z } from "zod";
 
 const server = new MCPServer({
@@ -104,7 +107,7 @@ const server = new MCPServer({
 });
 
 // Add this tool
-server.tool(
+export const greet = server.tool(
   {
     name: "greet",
     description: "Greet a user by name",
@@ -123,7 +126,7 @@ server.listen();
 **Save the file** - the server auto-reloads!
 
 **Test it:**
-1. Open inspector (`http://localhost:3000/inspector`)
+1. Open inspector (`http://localhost:3000/mcp/inspector`)
 2. Click "List Tools"
 3. Find "greet" tool
 4. Click "Call Tool"
@@ -145,7 +148,7 @@ const mockWeather: Record<string, { temp: number; conditions: string }> = {
   "Paris": { temp: 18, conditions: "Overcast" }
 };
 
-server.tool(
+export const getWeather = server.tool(
   {
     name: "get-weather",
     description: "Get current weather for a city",
@@ -178,9 +181,9 @@ server.tool(
 Return structured data with `object()`:
 
 ```typescript
-import { MCPServer, text, object } from "mcp-use/server";
+import { MCPServer, text, object } from "mcp-use";
 
-server.tool(
+export const getWeatherDetailed = server.tool(
   {
     name: "get-weather-detailed",
     description: "Get detailed weather information",

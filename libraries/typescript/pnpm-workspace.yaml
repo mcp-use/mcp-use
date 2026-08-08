@@ -1,10 +1,19 @@
 packages:
   - packages/*
   # examples
-  - packages/mcp-use/examples/**/*
+  - packages/client/examples/browser/react
+  - packages/client/examples/conformance
+  - packages/server/examples/*
+  - packages/server/examples/schema-libraries/*
+  - packages/server/examples/views/*
+  - packages/server/examples/auth/*
   - packages/create-mcp-use-app/src/templates/**/*
   # tests
   - test_app
+
+catalog:
+  "@modelcontextprotocol/sdk": ">=1.25.2"
+
 onlyBuiltDependencies:
   - "@tailwindcss/oxide"
   - esbuild
@@ -17,3 +26,93 @@ minimumReleaseAgeExclude:
   - mcp-use
   - "@mcp-use/*"
   - create-mcp-use-app
+  # v2 SDK betas are tracked closely during the v2 migration and are pinned to
+  # exact versions in package.json, so bumps are always an explicit, reviewed
+  # change rather than an automatic resolution.
+  - "@modelcontextprotocol/*"
+  - nanoid@3.3.8 || 5.0.9
+  - lodash-es@4.17.23 || 4.17.24
+  - brace-expansion@5.0.6
+  - joi@18.2.1
+  - form-data@4.0.6
+  - dompurify@3.4.8 || 3.4.9 || 3.4.11
+  - js-yaml@4.1.2
+  - "@babel/core@7.29.1"
+  - hono@4.12.34
+  - brace-expansion@5.0.9
+
+overrides:
+  mcp-use: workspace:*
+  "@mcp-use/client": workspace:*
+  "@mcp-use/inspector": workspace:*
+  create-mcp-use-app: workspace:*
+  "@langchain/core": ^1.1.8
+  "@langchain/anthropic": ^1.0.0
+  "@langchain/openai": ^1.0.0
+  langchain: ^1.2.3
+  react: ^19.2.0
+  react-dom: ^19.2.0
+  "@types/react": ^19.2.7
+  "@types/react-dom": ^19.2.3
+  react-router: ^8.3.0
+  react-router-dom: ^8.3.0
+  qs: ">=6.15.2"
+  preact: ">=10.28.2"
+  zod: 4.4.3
+  jsondiffpatch: ">=0.7.2"
+  esbuild: 0.27.1
+  vite: ">=8.0.5"
+  prismjs: ">=1.30.0"
+  glob: ">=10.5.0"
+  js-yaml: ">=4.1.2"
+  flatted: ">=3.4.2"
+  tar: ">=7.5.21"
+  undici: ">=7.29.0 <8"
+  "@hono/node-server": ">=2.0.5"
+  hono: ">=4.12.34"
+  express-rate-limit: ">=8.2.2"
+  dompurify: ">=3.4.11"
+  minimatch: ">=10.2.6"
+  rollup: ">=4.59.0"
+  "@modelcontextprotocol/sdk": ">=1.25.2"
+  ai: ">=5.0.52"
+  axios: ">=1.18.0"
+  body-parser: ">=2.3.0"
+  brace-expansion: ">=2.0.3"
+  "@isaacs/brace-expansion": ">=5.0.9"
+  picomatch: ">=4.0.4"
+  form-data: ">=4.0.6"
+  lodash: ">=4.18.0"
+  lodash-es: ">=4.17.24"
+  joi: ">=18.2.1"
+  "@babel/core": ">=7.29.1"
+  path-to-regexp: ">=8.4.0"
+  yaml: ">=2.8.3"
+  "@eslint/plugin-kit": ">=0.3.4"
+  protobufjs: ">=7.5.6 <8"
+  "@protobufjs/utf8": ">=1.1.1"
+  vitest: ">=4.1.9"
+  ws: ">=8.20.1"
+  uuid: ">=13.0.1 <14"
+  fast-uri: ">=3.1.4"
+  ip-address: ">=10.2.2"
+  postcss: ">=8.5.23"
+  sharp: ">=0.35.0"
+  langsmith: ">=0.6.0"
+  follow-redirects: ">=1.16.0"
+  better-auth: ">=1.6.2"
+  "@ungap/structured-clone": ">=1.3.3"
+  brace-expansion@>=5.0.0 <5.0.6: ^5.0.9
+  nanoid@<3.3.8: ^3.3.8
+  nanoid@>=4.0.0 <5.0.9: ^5.0.9
+
+allowBuilds:
+  "@tailwindcss/oxide": true
+  esbuild: true
+  # The Next.js route example does not use image optimization, so its optional
+  # sharp dependency must not run a native build in CI.
+  sharp: false
+  unrs-resolver: true
+
+patchedDependencies:
+  "@modelcontextprotocol/server@2.0.0": patches/@modelcontextprotocol__server@2.0.0.patch

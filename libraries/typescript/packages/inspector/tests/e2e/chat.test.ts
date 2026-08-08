@@ -10,7 +10,7 @@ import { getTestMatrix } from "./helpers/test-matrix";
 
 test.describe("Inspector Chat Tests", () => {
   // Note: To run these tests with a real MCP server:
-  // 1. cd packages/mcp-use/examples/server/features/conformance
+  // 1. cd packages/server/examples/conformance
   // 2. pnpm build && pnpm start --port 3002
   // 3. Ensure you have OPENAI_API_KEY in your .env file
   // Then run: pnpm test:e2e tests/e2e/chat.test.ts
@@ -24,7 +24,7 @@ test.describe("Inspector Chat Tests", () => {
     const { usesBuiltinInspector, inspectorUrl } = getTestMatrix();
     if (usesBuiltinInspector) {
       await goToInspectorWithAutoConnectAndOpenTools(page, {
-        waitForWidgets: true,
+        waitForViews: true,
       });
     } else {
       await page.goto(inspectorUrl);
@@ -305,12 +305,16 @@ test.describe("Inspector Chat Tests", () => {
         .getByTestId("chat-input")
         .fill(`Write a short list of 10 items. Iteration ${i + 1}.`);
       await page.getByTestId("chat-send-button").click();
-      await expect(page.getByTestId("chat-message-user")).toBeVisible({
+      // Each iteration adds one user + one assistant message. Assert on the
+      // count (not visibility) so the locator stays unambiguous after the
+      // first turn, which would otherwise trip Playwright strict mode.
+      await expect(page.getByTestId("chat-message-user")).toHaveCount(i + 1, {
         timeout: 3000,
       });
-      await expect(page.getByTestId("chat-message-assistant")).toBeVisible({
-        timeout: 45000,
-      });
+      await expect(page.getByTestId("chat-message-assistant")).toHaveCount(
+        i + 1,
+        { timeout: 45000 }
+      );
     }
 
     const container = page.getByTestId("chat-messages-scroll-container");
@@ -325,18 +329,19 @@ test.describe("Inspector Chat Tests", () => {
     const scrollButton = page.getByTestId("chat-scroll-to-bottom");
     await expect(scrollButton).toBeVisible({ timeout: 3000 });
 
-    // Click button and ensure we end up at the bottom.
+    // Click button and ensure we end up at the bottom. The scroll is animated,
+    // so poll until it settles instead of measuring synchronously.
     await scrollButton.click();
 
-    await container.evaluate((el) => {
-      const distanceFromBottom =
-        el.scrollHeight - (el.scrollTop + el.clientHeight);
-      if (distanceFromBottom > 80) {
-        throw new Error(
-          `Expected to be near bottom, distance=${distanceFromBottom}`
-        );
-      }
-    });
+    await expect
+      .poll(
+        () =>
+          container.evaluate(
+            (el) => el.scrollHeight - (el.scrollTop + el.clientHeight)
+          ),
+        { timeout: 5000 }
+      )
+      .toBeLessThanOrEqual(80);
 
     await expect(scrollButton).not.toBeVisible({ timeout: 3000 });
   });
@@ -420,30 +425,32 @@ test.describe("Inspector Chat Tests", () => {
   });
 });
 
-// Regression for MCP-2419: in hosted mode the Chat tab is configured to stream
-// through the managed cloud backend (`chatApiUrl`). That backend connects to the
-// MCP server itself and cannot reach a user's localhost server, so the request
-// 502s and surfaces as an opaque CORS / "Failed to fetch" error. The inspector
-// now detects loopback server URLs and falls back to client-side (in-browser)
-// streaming, which never touches the cloud backend.
+// Regression for MCP-2419 / managed localhost chat: in hosted mode with a
+// loopback MCP server, the browser runs MCPAgent client-side and routes LLM
+// calls through `/inspector/llm/*` — never the server-side `/chat/stream`.
 test.describe("Inspector Chat Tests - hosted mode + localhost server", () => {
-  // The conformance server runs on localhost across every matrix config, so the
-  // loopback fallback should always engage here.
   const CLOUD_CHAT_URL =
     "https://cloud.manufact.com/api/v1/inspector/chat/stream";
 
   let cloudCalls: string[];
+  let llmCalls: string[];
+  let llmAuthorizations: string[];
 
   test.beforeEach(async ({ page, context }) => {
     await context.clearCookies();
 
-    // Enable hosted mode + intercept the cloud endpoint BEFORE navigating.
-    ({ calls: cloudCalls } = await enableHostedChatMode(page, CLOUD_CHAT_URL));
+    ({
+      calls: cloudCalls,
+      llmCalls,
+      llmAuthorizations,
+    } = await enableHostedChatMode(page, CLOUD_CHAT_URL, {
+      mockLlmProxy: "success",
+    }));
 
     const { usesBuiltinInspector, inspectorUrl } = getTestMatrix();
     if (usesBuiltinInspector) {
       await goToInspectorWithAutoConnectAndOpenTools(page, {
-        waitForWidgets: true,
+        waitForViews: true,
       });
     } else {
       await page.goto(inspectorUrl);
@@ -452,14 +459,11 @@ test.describe("Inspector Chat Tests - hosted mode + localhost server", () => {
       await navigateToTools(page);
     }
 
-    // The localhost fallback runs the client-side loop, which needs a BYOK key.
-    // configureLLMAPI opens the config dialog and saves one — only reachable
-    // because the inspector chose client-side mode for this loopback server.
-    await configureLLMAPI(page);
+    await page.getByRole("tab", { name: /Chat/ }).first().click();
     await expect(page.getByTestId("chat-landing-header")).toBeVisible();
   });
 
-  test("routes chat client-side and never calls the cloud backend", async ({
+  test("routes LLM through the proxy and never calls /chat/stream", async ({
     page,
   }) => {
     await page.getByTestId("chat-input").fill("What is 2+2?");
@@ -469,70 +473,114 @@ test.describe("Inspector Chat Tests - hosted mode + localhost server", () => {
       timeout: 3000,
     });
 
-    // Client-side streaming returns a real assistant answer. Before the fix the
-    // request hit the (mocked-502) cloud backend and surfaced an error bubble.
     await expect(page.getByTestId("chat-message-assistant")).toBeVisible({
       timeout: 45000,
     });
 
     expect(cloudCalls).toHaveLength(0);
+    expect(llmCalls.length).toBeGreaterThan(0);
   });
-});
 
-// MCP-2419 UX: the localhost fallback must be *explained*, not silent. On the
-// hosted inspector a managed key normally "just works", so dropping the user on
-// a bare "Configure API Key" screen is confusing. When the selected server is
-// localhost we show a notice telling them why the managed key is unavailable and
-// that they need their own key. This notice must NOT appear on the local
-// inspector, where BYOK is the normal flow for every server.
-test.describe("Inspector Chat Tests - localhost managed-key notice", () => {
-  const CLOUD_CHAT_URL =
-    "https://cloud.manufact.com/api/v1/inspector/chat/stream";
-  const NOTICE = "chat-localhost-managed-key-notice";
-
-  async function connect(page: Parameters<typeof navigateToTools>[0]) {
-    const { usesBuiltinInspector, inspectorUrl } = getTestMatrix();
-    if (usesBuiltinInspector) {
-      await goToInspectorWithAutoConnectAndOpenTools(page, {
-        waitForWidgets: true,
+  test("anonymous send opens chat configuration with cloud sign-in on 429", async ({
+    page,
+  }) => {
+    await page.unroute(
+      `${CLOUD_CHAT_URL.replace(/\/chat\/stream\/?$/, "/llm")}/**`
+    );
+    const llmBase = CLOUD_CHAT_URL.replace(/\/chat\/stream\/?$/, "/llm");
+    await page.route(`${llmBase}/**`, async (route) => {
+      llmCalls.push(route.request().url());
+      await route.fulfill({
+        status: 429,
+        contentType: "application/json",
+        body: JSON.stringify({
+          error: "rate_limited",
+          loginRequired: true,
+          loginUrl: "https://manufact.com/login",
+        }),
       });
-    } else {
-      await page.goto(inspectorUrl);
-      await page.evaluate(() => localStorage.clear());
-      await connectToConformanceServer(page);
-      await navigateToTools(page);
-    }
-  }
+    });
 
-  test("hosted mode + localhost server explains the BYOK fallback", async ({
-    page,
-    context,
-  }) => {
-    await context.clearCookies();
-    // Enable hosted mode BEFORE navigating so chatApiUrl is set.
-    await enableHostedChatMode(page, CLOUD_CHAT_URL);
-    await connect(page);
+    await page.getByTestId("chat-input").fill("hello");
+    await page.getByTestId("chat-send-button").click();
 
-    // Open Chat WITHOUT configuring a key — the empty state carries the notice.
-    await page.getByRole("tab", { name: /Chat/ }).first().click();
-    await expect(page.getByTestId(NOTICE)).toBeVisible();
+    await expect(page.getByTestId("chat-config-dialog")).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(page.getByTestId("chat-config-sign-in-card")).toBeVisible();
     await expect(
-      page.getByTestId("chat-configure-api-key-button")
-    ).toBeVisible();
+      page.getByText(
+        "Sign in through Manufact Cloud to continue with managed chat."
+      )
+    ).not.toBeVisible();
   });
 
-  test("local inspector + localhost server shows no notice", async ({
+  test("delegates OAuth to cloud and sends its bearer token", async ({
     page,
     context,
   }) => {
-    await context.clearCookies();
-    // No enableHostedChatMode → no chatApiUrl → ordinary local BYOK flow.
-    await connect(page);
+    const origin = new URL(CLOUD_CHAT_URL).origin;
+    await context.route(`${origin}/api/auth/oauth2/register`, async (route) => {
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        headers: { "Access-Control-Allow-Origin": "*" },
+        body: JSON.stringify({ client_id: "inspector-e2e" }),
+      });
+    });
+    await context.route(`${origin}/api/auth/oauth2/token`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        headers: { "Access-Control-Allow-Origin": "*" },
+        body: JSON.stringify({
+          access_token: "oauth-e2e-token",
+          refresh_token: "oauth-e2e-refresh",
+          expires_in: 3600,
+        }),
+      });
+    });
+    await context.route(`${origin}/api/auth/oauth2/userinfo`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        headers: { "Access-Control-Allow-Origin": "*" },
+        body: JSON.stringify({
+          sub: "user-e2e",
+          name: "OAuth User",
+          email: "oauth@example.com",
+        }),
+      });
+    });
+    await context.route(
+      `${origin}/api/auth/oauth2/authorize**`,
+      async (route) => {
+        const requestUrl = new URL(route.request().url());
+        const redirectUri = requestUrl.searchParams.get("redirect_uri")!;
+        const state = requestUrl.searchParams.get("state")!;
+        const callback = new URL(redirectUri);
+        callback.searchParams.set("code", "oauth-e2e-code");
+        callback.searchParams.set("state", state);
+        await route.fulfill({
+          status: 200,
+          contentType: "text/html",
+          body: `<script>location.href=${JSON.stringify(callback.toString())}</script>`,
+        });
+      }
+    );
 
-    await page.getByRole("tab", { name: /Chat/ }).first().click();
+    const popupPromise = page.waitForEvent("popup");
+    await page.getByRole("button", { name: "Sign in" }).first().click();
+    const popup = await popupPromise;
+    await popup.waitForEvent("close");
+
     await expect(
-      page.getByTestId("chat-configure-api-key-button")
+      page.getByRole("button", { name: "User menu" }).first()
     ).toBeVisible();
-    await expect(page.getByTestId(NOTICE)).toHaveCount(0);
+    await page.getByTestId("chat-input").fill("authenticated hello");
+    await page.getByTestId("chat-send-button").click();
+    await expect
+      .poll(() => llmAuthorizations.at(-1))
+      .toBe("Bearer oauth-e2e-token");
   });
 });
