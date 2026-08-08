@@ -1,0 +1,161 @@
+---
+title: CLI Client
+description: Connect to HTTP MCP servers, call tools, read resources, get prompts, manage OAuth, and produce parseable JSON from the terminal.
+icon: "terminal"
+---
+
+Use `mcp-use client` to test or automate an HTTP MCP server from the terminal. Save a server under a name, then use that name for every tool, resource, prompt, and auth command.
+
+For the complete command and flag catalog, see the [CLI reference](/v2/typescript/api-reference/cli-reference#client).
+
+## Connect and call a tool
+
+Run the CLI with `npx`, or install `mcp-use` in your project.
+
+```bash
+npx mcp-use client connect dev http://localhost:3000/mcp
+npx mcp-use client dev tools list
+npx mcp-use client dev tools call get-weather city=Tokyo
+```
+
+`connect` supports HTTP and HTTPS MCP URLs. It verifies the connection before saving it. The CLI stores saved server metadata under `~/.mcp-use/client/`.
+
+List or remove saved servers with these commands:
+
+```bash
+npx mcp-use client list
+npx mcp-use client remove dev
+```
+
+## Choose a protocol mode
+
+The default `--protocol auto` mode prefers the modern MCP wire and falls back
+to the legacy wire when the server does not support modern negotiation.
+
+Use `legacy` or `modern` when you need strict compatibility testing:
+
+```bash
+npx mcp-use client connect old-server https://old.example.com/mcp \
+  --protocol legacy
+npx mcp-use client connect modern-server https://modern.example.com/mcp \
+  --protocol modern
+```
+
+`legacy` uses only the legacy wire. `modern` uses the stateless, sessionless
+modern wire with no fallback.
+
+## Authenticate with OAuth
+
+When a server requires OAuth in an interactive terminal, the CLI displays this prompt:
+
+```text
+This server requires OAuth. Press Enter to open your browser.
+```
+
+Press Enter to open the authorization page. The command keeps waiting for the loopback callback, then verifies and saves the connection.
+
+Use `--no-open` to authenticate without launching a browser:
+
+```bash
+npx mcp-use client connect prod https://mcp.example.com/mcp --no-open
+```
+
+With `--no-open`, `--json`, or non-interactive stdin, the CLI never prompts or opens a browser. It prints the authorization URL to stderr and continues waiting for the loopback callback. Open that URL yourself to finish authentication.
+
+Use `--no-oauth` for a public server or when an authorization challenge should fail instead of starting OAuth. Repeated `-H` or `--header` options add static request headers.
+
+```bash
+npx mcp-use client connect public https://mcp.example.com/mcp --no-oauth
+npx mcp-use client connect private https://mcp.example.com/mcp \
+  -H "Authorization: Bearer $TOKEN" --no-oauth
+```
+
+Check or clear saved OAuth credentials with auth commands:
+
+```bash
+npx mcp-use client prod auth status
+npx mcp-use client prod auth logout
+```
+
+`auth logout` removes OAuth material but keeps the saved server and its non-OAuth connection metadata.
+
+## Call tools
+
+List tools, inspect a tool schema, then call the tool with its required inputs.
+
+```bash
+npx mcp-use client dev tools list
+npx mcp-use client dev tools describe get-weather
+npx mcp-use client dev tools call get-weather city=Tokyo
+```
+
+Tool and prompt arguments accept `key=value` pairs. Use `key:=<json>` for typed or nested values, or pass one JSON object.
+
+```bash
+npx mcp-use client dev tools call search query=shoes limit:=5
+npx mcp-use client dev tools call search filters:='{"color":"black","inStock":true}'
+npx mcp-use client dev tools call search '{"query":"shoes","limit":5}'
+```
+
+Use `--timeout <ms>` for slow tools. The default is `30000` milliseconds.
+
+```bash
+npx mcp-use client dev tools call generate-report topic=sales --timeout 60000
+```
+
+## Read resources
+
+Resources are server-provided content identified by URI. List resources, then read the URI you need.
+
+```bash
+npx mcp-use client dev resources list
+npx mcp-use client dev resources read "file:///tmp/data.json"
+```
+
+## Get prompts
+
+Prompts are reusable message templates exposed by the server. Prompt arguments use the same forms as tool arguments.
+
+```bash
+npx mcp-use client dev prompts list
+npx mcp-use client dev prompts get greeting name=Alice
+npx mcp-use client dev prompts get greeting '{"name":"Alice"}'
+```
+
+## Produce parseable JSON
+
+Every client command documented with `--json` accepts it anywhere after `client`. The following forms are equivalent:
+
+```bash
+npx mcp-use client --json dev tools list
+npx mcp-use client dev --json tools list
+npx mcp-use client dev tools list --json
+```
+
+Successful commands write exactly one JSON value followed by a newline to stdout. Calls, resource reads, and prompt gets return the raw MCP result envelope. Lists return arrays. Errors write one envelope to stderr and do not write a result to stdout:
+
+```json
+{ "error": { "code": "usage_error", "message": "Tool not found: missing" } }
+```
+
+OAuth authorization URLs and dependency-install status are operational messages on stderr, so stdout remains parseable under `--json`.
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+npx mcp-use client connect dev http://localhost:3000/mcp --no-oauth --json >/dev/null
+npx mcp-use client dev tools list --json | jq -r '.[].name'
+npx mcp-use client dev tools call get-weather city=Tokyo --json | jq '.content'
+```
+
+## Troubleshoot commands
+
+- `Unknown saved server: <name>`: run `npx mcp-use client list`, or reconnect with `npx mcp-use client connect <name> <url>`.
+- `Tool not found: <name>`: run `tools list` against the same saved server.
+- `protocol_mismatch`: reconnect with `--protocol auto`, or choose the protocol
+  mode the server supports.
+- An OAuth command waits without opening a browser: open the authorization URL printed to stderr, then complete authorization before the configured timeout.
+- A tool returns an error: under `--json`, inspect `error.details` for the original MCP tool result.
+
+For exhaustive command shapes, flags, and storage details, use the [CLI reference](/v2/typescript/api-reference/cli-reference#client).

@@ -1,0 +1,105 @@
+---
+title: "MCP Client"
+sidebarTitle: "Overview"
+description: "Connect a TypeScript app to MCP servers and call tools, resources, and prompts."
+icon: "router"
+---
+
+`@mcp-use/client` connects your app to one or more MCP servers. It negotiates the
+server's supported MCP protocol automatically and exposes the same connection
+API across sessionful and sessionless servers.
+
+## Install
+
+```bash
+npm install @mcp-use/client
+```
+
+The package requires Node.js `>=22.22.2` for Node applications and is ESM-only.
+
+## Quick start
+
+```typescript
+import { MCPClient } from "@mcp-use/client";
+
+const client = new MCPClient({
+  mcpServers: {
+    demo: { url: "http://localhost:3000/mcp" },
+  },
+});
+
+try {
+  const connection = await client.connect("demo");
+
+  const tools = await connection.listTools();
+  console.log(tools.map((tool) => tool.name));
+
+  const result = await connection.callTool("echo", { message: "hello" });
+  const text = result.content.find((block) => block.type === "text");
+  if (text?.type === "text") {
+    console.log(text.text);
+  }
+} finally {
+  await client.close();
+}
+```
+
+`connect(name)` returns a ready `MCPConnection`. Always close the client when
+your application is finished so its active connections and transports are
+released.
+
+## Core types
+
+- **`MCPClient`** — holds server configuration and opens connections.
+- **`MCPConnection`** — calls tools, reads resources, and fetches prompts.
+  `connection.info` exposes the negotiated protocol, server metadata,
+  capabilities, and instructions.
+- **`MCPSession`** — deprecated compatibility alias for `MCPConnection`.
+
+Use `client.connect(name)` for one configured server or `client.connectAll()` to
+connect to every configured server.
+
+## Configure servers
+
+```typescript
+import { MCPClient } from "@mcp-use/client";
+
+const client = new MCPClient({
+  mcpServers: {
+    remote: {
+      url: "https://api.example.com/mcp",
+      authToken: process.env.MCP_TOKEN,
+    },
+    local: {
+      command: "npx",
+      args: ["-y", "@modelcontextprotocol/server-filesystem", "./"],
+    },
+  },
+});
+```
+
+HTTP servers support automatic OAuth, bearer tokens, and custom headers. Stdio
+connections are available only in Node.js.
+
+Migrating existing client code? Follow the
+[client migration guide](/v2/typescript/client/migration).
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Tools" icon="wrench" href="/v2/typescript/client/tools">
+    List and call server tools.
+  </Card>
+  <Card title="Migration guide" icon="arrow-right-left" href="/v2/typescript/client/migration">
+    Update packages, imports, configuration, and connection code.
+  </Card>
+  <Card title="Authentication" icon="shield" href="/v2/typescript/client/authentication">
+    Configure OAuth and bearer tokens.
+  </Card>
+  <Card title="React" icon="react" href="/v2/typescript/client/usemcp">
+    Manage connections with `McpClientProvider` and hooks.
+  </Card>
+  <Card title="Environments" icon="container" href="/v2/typescript/client/environments">
+    Compare Node, browser, and React support.
+  </Card>
+</CardGroup>

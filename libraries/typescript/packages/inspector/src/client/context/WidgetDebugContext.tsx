@@ -1,7 +1,7 @@
 /**
  * Widget Debug Context
  *
- * Manages debugging state for MCP Apps and ChatGPT Apps widgets.
+ * Manages debugging state for MCP Apps widgets.
  * Tracks CSP violations, widget state, host context, and playground settings.
  *
  * Follows the same React Context pattern as InspectorContext (not Zustand).
@@ -16,8 +16,10 @@ import {
   useRef,
   useState,
 } from "react";
+import type { WidgetModelContext } from "@/client/components/chat/widget-model-context";
+import type { ViewAppToolConnection } from "@mcp-use/client/react";
 
-type WidgetProtocol = "mcp-apps" | "chatgpt-app" | "mcp-ui";
+type WidgetProtocol = "mcp-apps";
 
 export interface CspViolation {
   directive: string;
@@ -37,21 +39,20 @@ export interface WidgetDeclaredCsp {
   baseUriDomains?: string[];
 }
 
-interface WidgetInfo {
+export interface WidgetInfo {
   toolName: string;
   protocol: WidgetProtocol;
+  modelContextScope?: string;
   hostContext?: any;
   cspViolations: CspViolation[];
   declaredCsp?: WidgetDeclaredCsp;
   effectivePolicy?: string;
-  modelContext?: {
-    content?: any[];
-    structuredContent?: Record<string, unknown>;
-  };
+  modelContext?: WidgetModelContext;
   widgetState?: any;
+  appToolConnection?: ViewAppToolConnection;
 }
 
-export type DeviceType = "mobile" | "tablet" | "desktop" | "custom";
+export type DeviceType = "mobile" | "desktop";
 
 export interface PlaygroundSettings {
   deviceType: DeviceType;
@@ -62,8 +63,6 @@ export interface PlaygroundSettings {
   safeAreaInsets: { top: number; right: number; bottom: number; left: number };
   locale: string;
   timeZone: string;
-  // Protocol selection for dual-protocol tools
-  selectedProtocol: "mcp-apps" | "chatgpt-app" | null; // null = use default (MCP Apps priority)
 }
 
 interface WidgetDebugState {
@@ -92,9 +91,15 @@ interface WidgetDebugContextType extends WidgetDebugState {
     csp: WidgetDeclaredCsp | undefined,
     effectivePolicy?: string
   ) => void;
+  setWidgetAppToolConnection: (
+    widgetId: string,
+    connection: ViewAppToolConnection | null
+  ) => void;
   updatePlaygroundSettings: (settings: Partial<PlaygroundSettings>) => void;
   clearAllWidgets: () => void;
   getAllModelContexts: () => Map<string, WidgetInfo["modelContext"]>;
+  getModelContexts: (scope: string) => Map<string, WidgetInfo["modelContext"]>;
+  getAppToolConnections: (scope: string) => ViewAppToolConnection[];
 }
 
 const WidgetDebugContext = createContext<WidgetDebugContextType | undefined>(
@@ -104,14 +109,45 @@ const WidgetDebugContext = createContext<WidgetDebugContextType | undefined>(
 const DEFAULT_PLAYGROUND_SETTINGS: PlaygroundSettings = {
   deviceType: "desktop",
   customViewport: { width: 768, height: 1024 },
-  cspMode: "permissive",
+  cspMode: "widget-declared",
   displayModeOverride: null,
   capabilities: { hover: true, touch: false },
   safeAreaInsets: { top: 0, right: 0, bottom: 0, left: 0 },
   locale: "en-US",
   timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-  selectedProtocol: null, // Default to priority-based selection
 };
+
+export function selectModelContexts(
+  widgets: ReadonlyMap<string, WidgetInfo>,
+  scope?: string
+): Map<string, WidgetInfo["modelContext"]> {
+  const contexts = new Map<string, WidgetInfo["modelContext"]>();
+  for (const [id, widget] of widgets) {
+    if (
+      widget.modelContext &&
+      (scope === undefined || widget.modelContextScope === scope)
+    ) {
+      contexts.set(id, widget.modelContext);
+    }
+  }
+  return contexts;
+}
+
+export function selectAppToolConnections(
+  widgets: ReadonlyMap<string, WidgetInfo>,
+  scope: string
+): ViewAppToolConnection[] {
+  const connections: ViewAppToolConnection[] = [];
+  for (const widget of widgets.values()) {
+    if (
+      widget.modelContextScope === scope &&
+      widget.appToolConnection?.tools.length
+    ) {
+      connections.push(widget.appToolConnection);
+    }
+  }
+  return connections;
+}
 
 /**
  * Provider for widget debugging context
@@ -261,6 +297,24 @@ export function WidgetDebugProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const setWidgetAppToolConnection = useCallback(
+    (widgetId: string, connection: ViewAppToolConnection | null) => {
+      setState((prev) => {
+        const widget = prev.widgets.get(widgetId);
+        if (!widget) return prev;
+        if (widget.appToolConnection === connection) return prev;
+
+        const newWidgets = new Map(prev.widgets);
+        newWidgets.set(widgetId, {
+          ...widget,
+          appToolConnection: connection ?? undefined,
+        });
+        return { ...prev, widgets: newWidgets };
+      });
+    },
+    []
+  );
+
   const updatePlaygroundSettings = useCallback(
     (settings: Partial<PlaygroundSettings>) => {
       setState((prev) => ({
@@ -283,14 +337,17 @@ export function WidgetDebugProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const getAllModelContexts = useCallback(() => {
-    const contexts = new Map<string, WidgetInfo["modelContext"]>();
-    for (const [id, widget] of state.widgets) {
-      if (widget.modelContext) {
-        contexts.set(id, widget.modelContext);
-      }
-    }
-    return contexts;
-  }, [state.widgets]);
+    return selectModelContexts(stateRef.current.widgets);
+  }, []);
+
+  const getModelContexts = useCallback(
+    (scope: string) => selectModelContexts(stateRef.current.widgets, scope),
+    []
+  );
+
+  const getAppToolConnections = useCallback((scope: string) => {
+    return selectAppToolConnections(stateRef.current.widgets, scope);
+  }, []);
 
   // Memoize context value to prevent unnecessary re-renders of consumers
   const value = useMemo<WidgetDebugContextType>(
@@ -305,9 +362,12 @@ export function WidgetDebugProvider({ children }: { children: ReactNode }) {
       setWidgetModelContext,
       setWidgetState,
       setWidgetDeclaredCsp,
+      setWidgetAppToolConnection,
       updatePlaygroundSettings,
       clearAllWidgets,
       getAllModelContexts,
+      getModelContexts,
+      getAppToolConnections,
     }),
     [
       state,
@@ -320,9 +380,12 @@ export function WidgetDebugProvider({ children }: { children: ReactNode }) {
       setWidgetModelContext,
       setWidgetState,
       setWidgetDeclaredCsp,
+      setWidgetAppToolConnection,
       updatePlaygroundSettings,
       clearAllWidgets,
       getAllModelContexts,
+      getModelContexts,
+      getAppToolConnections,
     ]
   );
 
@@ -347,7 +410,5 @@ export function useWidgetDebug() {
  */
 export const DEVICE_VIEWPORT_CONFIGS = {
   mobile: { width: 390, height: 844, name: "iPhone 14" },
-  tablet: { width: 820, height: 1180, name: "iPad Air" },
   desktop: { width: 1440, height: 900, name: "Desktop" },
-  custom: { width: 768, height: 1024, name: "Custom" },
 } as const;

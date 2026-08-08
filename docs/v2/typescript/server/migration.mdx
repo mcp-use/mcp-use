@@ -1,0 +1,599 @@
+---
+title: "Migrate to v2"
+description: "Migrate mcp-use 1.x servers, widgets, and runtime behavior to the v2 beta."
+icon: "arrow-right-left"
+---
+
+Upgrade an existing `mcp-use` 1.x server by updating the runtime, server entry,
+registrations, request context, security configuration, and widgets.
+
+Most server registrations keep the same concepts and require small syntax
+changes. Widgets require a complete rewrite as MCP App Views.
+
+## Migration checklist
+
+<Steps>
+  <Step title="Update the runtime and server entry">
+    Upgrade to Node.js `>=22.22.2`, use ESM, import from `mcp-use`, and
+    default-export the server.
+  </Step>
+  <Step title="Update server registrations">
+    Convert tools, resources, resource templates, and prompts to the
+    definition-plus-callback API and return raw MCP results.
+  </Step>
+  <Step title="Update runtime behavior">
+    Replace session assumptions, request context fields, authentication,
+    notifications, elicitation, middleware, and deployment adapters.
+  </Step>
+  <Step title="Rebuild widgets as Views">
+    Replace the widget file layout, tool binding, result helper, provider,
+    generated helpers, hooks, state model, and asset paths.
+  </Step>
+  <Step title="Review beta limitations and verify">
+    Check whether a missing v1 capability affects the server, then typecheck,
+    build, run, and exercise the migrated project.
+  </Step>
+</Steps>
+
+## Update the runtime and entry point
+
+The current v2 beta requires Node.js `>=22.22.2` and ESM.
+
+```bash
+npm install mcp-use
+```
+
+Import server APIs from `mcp-use`:
+
+```typescript
+import { MCPServer } from "mcp-use";
+
+const server = new MCPServer({
+  name: "inventory-server",
+  version: "2.0.0",
+});
+
+export default server;
+```
+
+Default-export the server from `index.ts`.
+
+## Export every static tool
+
+Assign every statically declared tool to an exported constant. If tools live in
+other modules, re-export them from the server entry:
+
+```typescript
+export const search = server.tool(definition, callback);
+export { getDetails } from "./tools/get-details.js";
+```
+
+Apply this rule to all static tools, not only tools currently bound to or called
+by a View.
+
+The root `mcp-env.d.ts` declaration registers
+`typeof import("<server-entry>")`. Only exported `ToolRef` values participate in
+View typing. This is a live type-only import, not the v1 tool-registry
+generator. `mcp-use dev`, `build`, and `typecheck` create or refresh the
+declaration, but they do not execute the server to generate tool-specific
+types.
+
+If the v1 server registers a tool from a loop, runtime configuration, or an
+OpenAPI document, it cannot export a static `ToolRef`. Call that tool from a
+View with explicit types:
+
+```tsx
+import { useDynamicTool } from "mcp-use/react";
+
+const lookup = useDynamicTool<{ id: string }, { value: string }>("lookup");
+const result = await lookup.callTool({ id: "item-1" });
+```
+
+<Warning>
+  Do not import a server-side `ToolRef` value into a file-based View. The View
+  bundle must not include server code.
+</Warning>
+
+## Migrate tools
+
+Move the callback to the second argument, replace `schema` with
+`inputSchema`, and return a raw MCP result.
+
+```typescript
+// v1
+import { MCPServer, text } from "mcp-use/server";
+
+server.tool({
+  name: "weather",
+  schema: z.object({ city: z.string() }),
+  cb: async ({ city }) => text(await getWeather(city)),
+});
+```
+
+```typescript
+// v2
+import { MCPServer } from "mcp-use";
+
+export const weather = server.tool(
+  {
+    name: "weather",
+    inputSchema: z.object({ city: z.string() }),
+    outputSchema: z.object({ forecast: z.string() }),
+  },
+  async ({ city }) => {
+    const result = { forecast: await getWeather(city) };
+
+    return {
+      content: [{ type: "text", text: JSON.stringify(result) }],
+      structuredContent: result,
+    };
+  },
+);
+```
+
+`schema` remains an alias for `inputSchema` in the current beta, but
+`inputSchema` matches the MCP wire field and is the migration target.
+
+Follow these result rules:
+
+- A successful tool with `outputSchema` must return matching
+  `structuredContent`.
+- An error result may return `isError: true` without structured output.
+- For object-shaped structured output, include a text fallback in `content`.
+- Replace `inputs[]` with a Standard Schema-compatible input schema.
+- Do not chain `server.tool(...).tool(...)`; `tool()` returns a `ToolRef`.
+
+Response helpers such as `text()`, `object()`, `array()`, `image()`, and
+`error()` remain as deprecated upgrade shims. Prefer raw `CallToolResult`,
+`ReadResourceResult`, and `GetPromptResult` envelopes. Native `array()` does not
+preserve the v1 `{ data }` wrapper.
+
+## Migrate resources and templates
+
+Pass the reader as the second argument. A static resource callback receives
+`(uri, ctx)` and returns `contents`:
+
+```typescript
+server.resource(
+  {
+    name: "settings",
+    uri: "app://settings",
+    mimeType: "application/json",
+  },
+  async (uri) => ({
+    contents: [
+      {
+        uri: uri.href,
+        mimeType: "application/json",
+        text: JSON.stringify({ theme: "dark" }),
+      },
+    ],
+  }),
+);
+```
+
+Remove inline `readCallback` and `callbacks` fields.
+
+For resource templates:
+
+- replace nested `resourceTemplate` with top-level `uriTemplate`
+- move `callbacks.complete` to top-level `complete`
+- pass the reader separately as `(uri, params, ctx)`
+- handle inferred template values as `string | string[]`
+- return raw `contents`
+
+```typescript
+server.resourceTemplate(
+  {
+    name: "user",
+    uriTemplate: "users://{id}",
+    complete: {
+      id: async (value) =>
+        ["alice", "bob"].filter((id) => id.startsWith(value)),
+    },
+  },
+  async (uri, { id }) => ({
+    contents: [{ uri: uri.href, text: `User ${String(id)}` }],
+  }),
+);
+```
+
+## Migrate prompts
+
+Keep `schema` for prompt arguments, pass the callback separately, and return
+raw `messages`:
+
+```typescript
+server.prompt(
+  {
+    name: "review",
+    schema: z.object({ code: z.string() }),
+  },
+  async ({ code }) => ({
+    messages: [
+      {
+        role: "user",
+        content: { type: "text", text: `Review this code:\n${code}` },
+      },
+    ],
+  }),
+);
+```
+
+Replace v1 `args[]` and inline `cb`. `completable()` supplies suggestions but
+does not constrain valid values. Apply field refinements before wrapping a
+schema with `completable()`.
+
+## Update request context
+
+v2 request context exists only for the current request. Remove session
+assumptions from client metadata, logging, progress, notifications, and
+elicitation.
+
+| v1                          | v2                                            |
+| --------------------------- | --------------------------------------------- |
+| `ctx.req`                   | `ctx.request`                                 |
+| Node/Web request access     | `ctx.request.raw` for the Web `Request`       |
+| `ctx.log(...)`              | `ctx.sendLog(...)`                            |
+| `ctx.client.supportsApps()` | `ctx.client.supportsViews()`                  |
+| `ctx.user`                  | provider-specific `ctx.auth.user`             |
+| session metadata            | current request's `ctx.client` snapshot       |
+| blocking `ctx.elicit(...)`  | keyed input-required round trip               |
+| `ctx.sample(...)`           | no server-side equivalent in the current beta |
+
+`ctx.client.info()`, `capabilities()`, `can()`, `extension()`, and `user()`
+return client-declared request hints. Never use them for authorization. Use
+verified `ctx.auth` data for identity and permissions.
+
+### Send notifications on the correct channel
+
+v2 supports custom notifications during an active request:
+
+```typescript
+await ctx.sendNotification("com.example/import-status", {
+  status: "started",
+});
+```
+
+Await the notification before the callback returns. It travels on the
+originating request's response stream and cannot notify that client after the
+request finishes.
+
+Use the standard request-scoped and subscription APIs for their specific jobs:
+
+```typescript
+await ctx.reportProgress(50, 100, "Halfway");
+await ctx.sendLog("info", "Import is halfway complete");
+
+await server.notifyToolsChanged();
+await server.notifyPromptsChanged();
+await server.notifyResourcesChanged();
+await server.notifyResourceUpdated("app://settings");
+```
+
+The server helpers notify matching active subscription listeners. They do not
+provide arbitrary broadcast or session-targeted push.
+
+### Make elicitation replay-safe
+
+v2 elicitation returns an input-required result and re-runs the handler when
+the client supplies input:
+
+```typescript
+const response = await ctx.elicit(
+  "confirm-booking",
+  "Book this flight?",
+  z.object({ confirmed: z.boolean() }),
+);
+
+if (response.status === "required") {
+  return response.result;
+}
+
+if (response.status !== "accept" || !response.data.confirmed) {
+  return { content: [{ type: "text", text: "Cancelled" }] };
+}
+
+// Perform the side effect only after accepted, validated input is present.
+```
+
+Use a stable key. Assume the handler can run more than once. Do not perform a
+side effect before accepted input is available.
+
+## Rebuild widgets as MCP App Views
+
+Legacy widgets require a full UI migration. File discovery, binding, tool
+results, component lifecycle, hooks, state, assets, and typing all changed.
+
+### Move the files and binding
+
+| v1                            | v2                                                |
+| ----------------------------- | ------------------------------------------------- |
+| `resources/<name>/widget.tsx` | `views/<name>/view.tsx`                           |
+| tool `widget: { name, ... }`  | tool `view: { name, ... }`                        |
+| `widget(...)` result helper   | raw `{ content, structuredContent, _meta? }`      |
+| `widget({ props })`           | result `_meta`, read with `useToolContext().meta` |
+| manual `uiResource`           | generated MCP App resource                        |
+| `McpUseProvider`              | framework bootstrap; no aggregate provider        |
+| `generateHelpers()`           | exported `ToolRef` values through `mcp-env.d.ts`  |
+
+Move data previously passed as `props` to the tool result's `_meta` field.
+Access it from `useToolContext().meta` in the View. `_meta` is View-only and is
+not validated or typed by `outputSchema`; validate or narrow it before use.
+
+Keep `structuredContent` for output that matches `outputSchema` and should also
+be visible to the model.
+
+The bound tool must:
+
+- export its `ToolRef`
+- declare an `outputSchema`
+- return matching `structuredContent`
+- move v1 `widget({ props })` data to result `_meta`
+- return useful text `content` for the model and text-only hosts
+- bind to exactly one View with `view: { name }`
+
+Each View can bind to at most one server tool. Create another View when a
+second tool needs a rendered result. Keep helper tools viewless and call them
+from the View with `useCallTool()`.
+
+Move resource facts such as `description`, `csp`, `permissions`, `domain`, and
+`prefersBorder` into the bound tool's `view` configuration. Remove v1
+`invoking`, `invoked`, and `widgetAccessible`; the native View configuration
+does not emit those OpenAI-specific overlay fields.
+
+```typescript
+export const search = server.tool(
+  {
+    name: "search",
+    inputSchema: z.object({ query: z.string() }),
+    outputSchema: z.object({
+      count: z.number(),
+    }),
+    view: {
+      name: "results",
+      description: "Search results",
+      prefersBorder: true,
+    },
+  },
+  async ({ query }) => {
+    const items = await searchItems(query);
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Found ${items.length} matching items`,
+        },
+      ],
+      structuredContent: { count: items.length },
+      _meta: { items },
+    };
+  },
+);
+```
+
+### Replace widget hooks
+
+Default-export the View component. It mounts once while the host connects and
+while tool input and result notifications arrive.
+
+```tsx
+import { useToolContext } from "mcp-use/react";
+
+type ResultsMeta = {
+  items: Array<{ id: string; name: string }>;
+};
+
+export default function ResultsView() {
+  const view = useToolContext<"search">();
+
+  if (view.status === "pending") {
+    return <div>Searching for {view.toolInput?.query ?? "items"}…</div>;
+  }
+
+  if (view.status === "error") {
+    return <div role="alert">{view.error.message}</div>;
+  }
+
+  const meta = view.meta as ResultsMeta | undefined;
+  const items = meta?.items ?? [];
+
+  return (
+    <ul>
+      {items.map((item) => (
+        <li key={item.id}>{item.name}</li>
+      ))}
+    </ul>
+  );
+}
+```
+
+Use the focused v2 surface:
+
+| v1                                 | v2                                                            |
+| ---------------------------------- | ------------------------------------------------------------- |
+| `useWidget()` / `useWidgetProps()` | `useToolContext<"tool-name">()`                               |
+| `useWidgetState()`                 | `useViewState(objectDefault)`                                 |
+| `useWidgetTheme()`                 | `useViewTheme()`                                              |
+| `WidgetControls`                   | `ViewControls`                                                |
+| widget `callTool`                  | `useCallTool()`                                               |
+| widget `sendFollowUpMessage`       | `useSendFollowUp()`                                           |
+| widget `openExternal`              | `useOpenExternal()`                                           |
+| widget display mode fields         | `useDisplayMode()`                                            |
+| `<McpUseProvider autoSize>`        | remove the provider; automatic resizing is enabled by default |
+
+`viewConfig` supports `autoResize` and `displayModes`. Both values below are
+the defaults, so omit the export when they are correct for the View:
+
+```tsx
+import type { ViewConfig } from "mcp-use/react";
+
+export const viewConfig = {
+  autoResize: true,
+  displayModes: ["inline", "fullscreen", "pip"],
+} satisfies ViewConfig;
+```
+
+`displayModes` must include `"inline"`. Use `useSendSizeChanged()` only when
+`autoResize` is `false` and the View reports its size manually.
+
+Compose optional presentation components such as `ThemeProvider`,
+`ViewControls`, and your own error boundary. The framework owns the connection,
+bootstrap, and required top-level error boundary.
+
+### Migrate View state and model context
+
+`useViewState()` requires an object default and shares one JSON-serializable
+snapshot across the mounted View. The state is model-visible.
+
+ChatGPT can restore View state across View lifetimes. Other MCP Apps hosts keep
+the state only for the current iframe lifetime.
+
+Use `ModelContext` or `modelContext` for model-visible natural-language context.
+Use `useSendFollowUp()` to trigger a new model turn. Keep presentation-only
+state in ordinary React state.
+
+`useFiles()` keeps the upload/download capability check, but it no longer
+accepts the v1 `modelVisible` option or mutates widget state automatically.
+
+### Update View assets
+
+Native View documents are generated MCP resources. Do not register
+`uiResource()` or serve a separate HTML document.
+
+| Asset                   | v2 location                             |
+| ----------------------- | --------------------------------------- |
+| View source             | `views/<name>/view.tsx`                 |
+| Production View bundles | `${basePath}/_mcp-use/views/<name>/...` |
+| Public files            | `${basePath}/_mcp-use/public/...`       |
+| View resource URI       | `ui://views/<name>.html`                |
+
+Move existing widget CSP domains to `view.csp`.
+
+## Update authentication, proxies, and security
+
+Native v2 acts as an OAuth resource server backed by an external authorization
+server. Import provider adapters from `mcp-use/oauth/*`, supply their required
+locator options, and use the provider-specific `ctx.auth.user` type.
+
+Replace generic `userId` assumptions with the provider's mapped field, commonly
+`id`. Replace `getAuth`, `hasScope`, and `requireScope` with verified
+`ctx.auth`, scopes, permissions, and application authorization checks.
+
+OAuth proxy or authorization-server mode has no native v2 migration. Do not
+translate `oauthProxy`, `jwksVerifier`, or `mountOAuthProxy` as resource-server
+configuration.
+
+v2 upstream composition accepts HTTP remotes or a ready compatible client
+connection. A v1 stdio child-process proxy requires an architecture change.
+
+### Preserve security semantics explicitly
+
+The name `allowedOrigins` changed meaning:
+
+| Security control                         | v1                       | v2               |
+| ---------------------------------------- | ------------------------ | ---------------- |
+| Host-header and DNS-rebinding allowlist  | `allowedOrigins`         | `allowedHosts`   |
+| Reject untrusted browser request origins | Not separate             | `allowedOrigins` |
+| Browser response access                  | Permissive CORS behavior | Explicit `cors`  |
+
+Map v1 CORS `allowMethods` and `allowHeaders` to v2 `methods` and
+`allowedHeaders`. Test Host rejection, Origin rejection, and CORS separately.
+
+Use `basePath` for the MCP route. Set `MCP_URL` for the externally visible
+server origin.
+
+## Review current beta limitations
+
+The following v1 capabilities do not currently have direct v2 equivalents.
+Update the application design where one of these limitations affects your
+server.
+
+### Server lifecycle and transport
+
+- Session stores, active-session registries, stream managers, session recovery,
+  and session affinity are not part of v2.
+- Arbitrary session-targeted and post-response push are not available.
+  Request-scoped custom notifications and subscription invalidations remain
+  available.
+- Server-to-client sampling through `ctx.sample()` is not available.
+- The v1 roots-changed callback surface is not available.
+- Express and Connect adapters are not available. Use Hono or `server.fetch`.
+- Stdio serving and stdio child-process proxy configuration do not have a
+  native migration path.
+- CommonJS and unsupported Node.js versions are intentional compatibility
+  breaks, not beta bugs.
+
+Move durable state to application storage keyed by verified user, tenant, or an
+explicit domain handle. Do not key business state to an MCP transport session.
+
+### OAuth, proxy, and OpenAPI
+
+- OAuth proxy and authorization-server mode are deferred. Direct
+  resource-server authentication is implemented.
+- Unsigned token bypasses such as `verifyJwt: false` are not supported.
+- Verify proxy requirements for upstream OAuth, templates, completions,
+  subscriptions, list synchronization, sampling, and elicitation before
+  migrating.
+- Verify OpenAPI servers that depend on external references, cookies, non-JSON
+  request bodies, callbacks, webhooks, or automatic security-scheme discovery.
+
+### Views
+
+- Each View can bind to at most one server tool.
+- A bound tool requires `outputSchema` and matching `structuredContent`.
+- Static typing sees exported `ToolRef` values only.
+- Cross-lifetime `useViewState()` restoration is host-specific.
+- `useFiles()` is host-specific and must be capability-checked.
+- View resource facts are static per bound tool. v2 has no supported hook for
+  rewriting `domain` or other View resource metadata per client.
+- Raw `uiResource`, `@mcp-ui/server` adapters, `exposeAsTool`, and a shared View
+  bound to multiple server tools have no native equivalent.
+
+## Verify the migration
+
+<Steps>
+  <Step title="Run a real TypeScript check">
+    Run `mcp-use typecheck`, `npm run typecheck`, or the project's actual `tsc
+    --noEmit` command. `mcp-use build` bundles code but does not prove that v1
+    APIs are type-compatible.
+  </Step>
+  <Step title="Build and start the production output">
+    Run the project's production build, start the built server, and confirm the
+    expected MCP route and public asset routes.
+  </Step>
+  <Step title="Exercise server primitives">
+    Call at least one tool, read a static resource, complete and read a resource
+    template, and get a prompt with a real client.
+  </Step>
+  <Step title="Render every View state">
+    Verify pending, ready, and error states; matching structured output; theme;
+    display mode; sizing; CSP; and public assets in a capable host.
+  </Step>
+  <Step title="Test security and authentication">
+    Check a valid token, missing or invalid scopes, mapped user data, Host
+    rejection, Origin rejection, and browser CORS behavior.
+  </Step>
+  <Step title="Preserve behavioral coverage">
+    Keep existing runtime assertions as runtime assertions. If v2 does not
+    support a tested behavior, leave that limitation explicit instead of
+    replacing the test with source-text or artifact assertions.
+  </Step>
+  <Step title="Remove v1 leftovers">
+    Remove remaining v1 imports, helpers, widget files, session APIs, sampling
+    calls, stdio proxy configuration, and old security fields. No
+    `mcp-use/server` import can stay: that subpath does not exist in v2.
+  </Step>
+</Steps>
+
+## Continue with the v2 guides
+
+- [Server overview](/v2/typescript/server) explains the stateless server model.
+- [Tools](/v2/typescript/server/tools), [Resources](/v2/typescript/server/resources),
+  and [Prompts](/v2/typescript/server/prompts) cover each registration API.
+- [MCP Apps](/v2/typescript/mcp-apps) covers View authoring and host behavior.
+- [Authentication](/v2/typescript/server/authentication/index) covers direct
+  OAuth resource-server configuration.
+- [Notifications](/v2/typescript/server/notifications) separates request-scoped
+  messages from subscription invalidations.

@@ -21,16 +21,6 @@ jobs:
           echo "caret=^${TARGET}" >> "$GITHUB_OUTPUT"
           echo "Target mcp-use: $TARGET (^${TARGET})"
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
       - name: Detect package manager
         id: pm
         run: |
@@ -39,6 +29,21 @@ jobs:
           else
             echo "pm=npm" >> "$GITHUB_OUTPUT"
           fi
+
+      # Only for pnpm repos, and no `version:` on purpose: consumer repos pin
+      # pnpm via the `packageManager` field in package.json. Passing `version`
+      # too makes pnpm/action-setup@v4 abort with ERR_PNPM_BAD_PM_VERSION
+      # ("Multiple versions of pnpm specified") — the failure this fixes. Gating
+      # on pm==pnpm also stops the step erroring on npm-only repos (no version
+      # and no packageManager to fall back to).
+      - name: Setup pnpm
+        if: steps.pm.outputs.pm == 'pnpm'
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
 
       - name: Bump, install, and build
         id: bump

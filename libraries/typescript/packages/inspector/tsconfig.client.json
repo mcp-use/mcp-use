@@ -12,15 +12,12 @@
     "allowSyntheticDefaultImports": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     }
   },
   "include": [
-    "src/client/index.ts",
-    "src/types/**/*",
-    "src/llm/**/*"
+    "src/client/index.ts"
   ],
   "exclude": ["src/client/**/*.test.*", "src/client/**/*.spec.*"]
 }

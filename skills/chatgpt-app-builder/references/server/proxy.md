@@ -9,7 +9,7 @@ This is extremely useful when you have multiple microservices or specialized MCP
 Pass a configuration object directly to `server.proxy()`. The keys act as the **namespaces** for the child servers to prevent naming collisions.
 
 ```typescript
-import { MCPServer } from "mcp-use/server";
+import { MCPServer } from "mcp-use";
 import path from "node:path";
 
 const server = new MCPServer({ name: "UnifiedServer", version: "1.0.0" });
@@ -19,20 +19,20 @@ await server.proxy({
   // Proxy a local TypeScript server (using the 'tsx' runner)
   database: {
     command: "tsx",
-    args: [path.resolve(__dirname, "./db-server.ts")]
+    args: [path.resolve(__dirname, "./db-server.ts")],
   },
-  
+
   // Proxy a local Python FastMCP server
   weather: {
     command: "uv",
     args: ["run", "weather_server.py"],
-    env: { ...process.env, FASTMCP_LOG_LEVEL: "ERROR" }
+    env: { ...process.env, FASTMCP_LOG_LEVEL: "ERROR" },
   },
-  
+
   // Proxy a remote server over HTTP
   manufact: {
-    url: "https://manufact.com/docs/mcp"
-  }
+    url: "https://manufact.com/docs/mcp",
+  },
 });
 
 // Start the unified server
@@ -46,8 +46,8 @@ In the example above, the `database` tools will be prefixed with `database_` (e.
 For advanced use cases (dynamic auth headers, manual session lifecycles, or custom connectors), you can inject an explicit `MCPSession` directly into the `proxy` method using the `mcp-use/client` SDK.
 
 ```typescript
-import { MCPServer } from "mcp-use/server";
-import { MCPClient } from "mcp-use/client";
+import { MCPServer } from "mcp-use";
+import { MCPClient } from "@mcp-use/client";
 
 const server = new MCPServer({ name: "UnifiedServer", version: "1.0.0" });
 
@@ -55,9 +55,9 @@ const server = new MCPServer({ name: "UnifiedServer", version: "1.0.0" });
 const customClient = new MCPClient({
   mcpServers: {
     secure_db: {
-      url: "https://secure-db.example.com/mcp"
-    }
-  }
+      url: "https://secure-db.example.com/mcp",
+    },
+  },
 });
 
 // Manage the session manually
@@ -74,6 +74,6 @@ await server.listen(3000);
 The `mcp-use` proxying system goes far beyond simple tool forwarding:
 
 1. **Schema Translation**: Automatically translates raw JSON Schemas from child servers into runtime Zod schemas.
-2. **LLM Sampling & Elicitation**: Automatically intercepts out-of-band JSONRPC requests (sampling/elicitation) from child servers, resolves the HTTP context of the original user who triggered the tool, and routes the request securely back to that user's client. 
+2. **LLM Sampling & Elicitation**: Automatically intercepts out-of-band JSONRPC requests (sampling/elicitation) from child servers, resolves the HTTP context of the original user who triggered the tool, and routes the request securely back to that user's client.
 3. **Progress Tracking**: If a child tool emits `notifications/progress/report`, the Aggregator catches and pipes those directly through the unified `ToolContext` back to the parent client.
 4. **State Syncing**: The Aggregator listens to `list_changed` events emitted by the child server and instantly forwards them to all connected clients.

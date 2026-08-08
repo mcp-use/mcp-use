@@ -1,0 +1,25 @@
+{
+  "name": "mcp-use-example-nextjs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "verify": "node ../verify-examples.mjs --example=nextjs"
+  },
+  "dependencies": {
+    "mcp-use": "workspace:*",
+    "next": "^16.2.11",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.17",
+    "typescript": "^5.9.3"
+  }
+}

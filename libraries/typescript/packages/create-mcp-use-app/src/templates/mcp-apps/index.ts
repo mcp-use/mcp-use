@@ -1,16 +1,14 @@
-import { MCPServer, object, text, widget } from "mcp-use/server";
+import { MCPServer } from "mcp-use";
 import { z } from "zod";
 
 const server = new MCPServer({
   name: "{{PROJECT_NAME}}",
-  title: "{{PROJECT_NAME}}", // display name
+  title: "{{PROJECT_NAME}}", // Human readable name of the server
   version: "1.0.0",
-  description: "MCP server with MCP Apps integration",
-  instructions:
-    "Use search-tools to find fruit matches before calling get-fruit-details. Prefer the widget result when the user wants to browse or compare options visually.",
-  baseUrl: process.env.MCP_URL || "http://localhost:3000", // Full base URL (e.g., https://myserver.com)
-  favicon: "favicon.ico",
-  websiteUrl: "https://mcp-use.com", // Can be customized later
+  description: "an mcp-use app",
+  instructions: "use show-app to open the app view", // Model-facing guidance — surfaced to the LLM by compatible clients.
+  websiteUrl: "https://mcp-use.com",
+  // Icons for your MCP Server, from public/ (or absolute URLs).
   icons: [
     {
       src: "icon.svg",
@@ -18,114 +16,102 @@ const server = new MCPServer({
       sizes: ["512x512"],
     },
   ],
+
+  // The MCP server is by default served at /mcp, to customise
+  // basePath: "/mcp",
+
+  // mcp-use has 1 line adapter for OAuth, import from mcp-use/oauth/*
+  // oauth: oauthClerkProvider(), // zero-config via MCP_USE_OAUTH_CLERK_FRONTEND_API_URL, import from mcp-use/oauth/*
+
+  // When OAuth is on, the HTML landing page (/mcp) is protected by default, set to true to keep the landing page public while /mcp stays bearer-protected.
+  // publicLandingPage: true,
 });
 
-/**
- * TOOL THAT RETURNS A WIDGET
- * The `widget` config tells mcp-use which widget component to render.
- * The `widget()` helper in the handler passes props to that component.
- * Docs: https://mcp-use.com/docs/typescript/server/mcp-apps
- */
+// TOOLS
 
-// Fruits data — color values are Tailwind bg-[] classes used by the carousel UI
-const fruits = [
-  { fruit: "mango", color: "bg-[#FBF1E1] dark:bg-[#FBF1E1]/10" },
-  { fruit: "pineapple", color: "bg-[#f8f0d9] dark:bg-[#f8f0d9]/10" },
-  { fruit: "cherries", color: "bg-[#E2EDDC] dark:bg-[#E2EDDC]/10" },
-  { fruit: "coconut", color: "bg-[#fbedd3] dark:bg-[#fbedd3]/10" },
-  { fruit: "apricot", color: "bg-[#fee6ca] dark:bg-[#fee6ca]/10" },
-  { fruit: "blueberry", color: "bg-[#e0e6e6] dark:bg-[#e0e6e6]/10" },
-  { fruit: "grapes", color: "bg-[#f4ebe2] dark:bg-[#f4ebe2]/10" },
-  { fruit: "watermelon", color: "bg-[#e6eddb] dark:bg-[#e6eddb]/10" },
-  { fruit: "orange", color: "bg-[#fdebdf] dark:bg-[#fdebdf]/10" },
-  { fruit: "avocado", color: "bg-[#ecefda] dark:bg-[#ecefda]/10" },
-  { fruit: "apple", color: "bg-[#F9E7E4] dark:bg-[#F9E7E4]/10" },
-  { fruit: "pear", color: "bg-[#f1f1cf] dark:bg-[#f1f1cf]/10" },
-  { fruit: "plum", color: "bg-[#ece5ec] dark:bg-[#ece5ec]/10" },
-  { fruit: "banana", color: "bg-[#fdf0dd] dark:bg-[#fdf0dd]/10" },
-  { fruit: "strawberry", color: "bg-[#f7e6df] dark:bg-[#f7e6df]/10" },
-  { fruit: "lemon", color: "bg-[#feeecd] dark:bg-[#feeecd]/10" },
-];
-
-const fruitRowSchema = z.object({
-  fruit: z.string(),
-  color: z.string(),
+// tool inputs are zod schemas. Important: set decriptions for the model to understand the input.
+const showAppInputSchema = z.object({
+  appName: z
+    .string()
+    .optional()
+    .describe(
+      "Optional title shown in the MCP App card instead of the default"
+    ),
 });
 
-server.tool(
+// tool outputs are zod schemas. Important: set descriptions for the model to understand the output.
+const showAppOutputSchema = z.object({
+  message: z.string().describe("Message to display in the MCP App"),
+});
+
+export const showApp = server.tool(
   {
-    name: "search-tools",
-    description: "Search for fruits and display the results in a visual widget",
-    schema: z.object({
-      query: z.string().optional().describe("Search query to filter fruits"),
-    }),
-    // Hosts (e.g. ChatGPT) expect explicit hints. Use openWorldHint: true for HTTP/API calls;
-    // destructiveHint: true when deleting or overwriting user data.
+    name: "show-app", // Unique tool id on the wire.
+    title: "Show MCP App", // Short label in inspector and client UIs (falls back to name).
+    description: "Display the MCP App starter view", // LLM-facing summary of what the tool does.
+    inputSchema: showAppInputSchema, // Validated before the handler runs; .describe() text becomes LLM hints.
+    outputSchema: showAppOutputSchema, // Required when binding a view — the view reads structuredContent typed by this.
+    view: {
+      name: "my-view", // directory under views/
+      description: "MCP App starter card with interactive demo hooks",
+      prefersBorder: false, // ask the host to skip a card border around the view
+      csp: {
+        resourceDomains: [
+          "https://fonts.googleapis.com",
+          "https://fonts.gstatic.com",
+        ],
+      },
+    },
+    // Behavioral hints for clients (readOnly / destructive / open-world).
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
       openWorldHint: false,
     },
-    outputSchema: z.object({
-      query: z.string(),
-      results: z.array(fruitRowSchema),
-    }),
-    widget: {
-      name: "product-search-result",
-      invoking: "Searching...",
-      invoked: "Results loaded",
-    },
   },
-  async ({ query }) => {
-    const results = fruits.filter(
-      (f) => !query || f.fruit.toLowerCase().includes(query.toLowerCase())
-    );
+  async ({ appName }, ctx) => {
+    // Brief delay so the pending skeleton is visible during dev/inspector demos.
+    await new Promise((resolve) => setTimeout(resolve, 1500));
 
-    // let's emulate a delay to show the loading state
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    console.log(`The app name was: ${appName}`);
+    const data = { message: `The MCP App starter for ${appName} is ready!` };
 
-    return widget({
-      props: { query: query ?? "", results },
-      output: text(
-        `Found ${results.length} fruits matching "${query ?? "all"}"`
-      ),
-    });
+    return {
+      content: [{ type: "text", text: data.message }],
+      structuredContent: data,
+    };
   }
 );
 
-server.tool(
+// say-hello — plain tool (no view); used by the Say Hello button in my-view
+const sayHelloInputSchema = z.object({
+  name: z.string().describe("Name to greet"),
+});
+
+const sayHelloOutputSchema = z.object({
+  greeting: z.string().describe("Greeting to display"),
+});
+
+export const sayHello = server.tool(
   {
-    name: "get-fruit-details",
-    description: "Get detailed information about a specific fruit",
-    schema: z.object({
-      fruit: z.string().describe("The fruit name"),
-    }),
+    name: "say-hello",
+    title: "Say hello",
+    description: "Returns a greeting for the Say Hello button demo",
+    inputSchema: sayHelloInputSchema,
+    outputSchema: sayHelloOutputSchema,
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
       openWorldHint: false,
     },
-    outputSchema: z.object({
-      fruit: z.string(),
-      color: z.string(),
-      facts: z.array(z.string()),
-    }),
   },
-  async ({ fruit }) => {
-    const found = fruits.find(
-      (f) => f.fruit?.toLowerCase() === fruit?.toLowerCase()
-    );
-    return object({
-      fruit: found?.fruit ?? fruit,
-      color: found?.color ?? "unknown",
-      facts: [
-        `${fruit} is a delicious fruit`,
-        `Color: ${found?.color ?? "unknown"}`,
-      ],
-    });
+  async ({ name }) => {
+    const data = { greeting: `Hello, ${name}!` };
+    return {
+      content: [{ type: "text", text: data.greeting }],
+      structuredContent: data,
+    };
   }
 );
 
-server.listen().then(() => {
-  console.log(`Server running`);
-});
+export default server;

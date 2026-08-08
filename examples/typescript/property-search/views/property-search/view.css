@@ -1,0 +1,864 @@
+/*
+ * HomeScout SF view styles.
+ *
+ * Layout follows the familiar real-estate-portal split: map on the left,
+ * scrolling result rail on the right, filter bar across the top. Everything is
+ * theme-aware because the host reports light or dark.
+ */
+
+:root {
+  color-scheme: light dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family:
+    Inter,
+    ui-sans-serif,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  background: #f4f5f7;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+/* ---------------------------------------------------------------- shell */
+
+.hs-app {
+  --ink: #23232b;
+  --ink-soft: #5c6169;
+  --line: #e2e4e9;
+  --surface: #ffffff;
+  --canvas: #f4f5f7;
+  --accent: #1668e3;
+  --accent-ink: #ffffff;
+  --accent-soft: #e8f1fe;
+  --shadow-sm: 0 1px 2px rgb(19 24 33 / 8%), 0 2px 8px rgb(19 24 33 / 6%);
+  --shadow-lg: 0 10px 34px rgb(19 24 33 / 16%);
+  --radius: 12px;
+
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  min-height: 360px;
+  color: var(--ink);
+  background: var(--canvas);
+}
+
+.hs-app.hs-dark {
+  --ink: #eef0f4;
+  --ink-soft: #a3abb7;
+  --line: #2c313a;
+  --surface: #1a1d23;
+  --canvas: #12141a;
+  --accent: #6ea8ff;
+  --accent-ink: #10131a;
+  --accent-soft: #1f2a3c;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
+  --shadow-lg: 0 12px 36px rgb(0 0 0 / 55%);
+}
+
+/* ------------------------------------------------------------- boot state */
+
+.hs-boot {
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.hs-boot-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.hs-boot-note {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.hs-logo {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 18px;
+  line-height: 1;
+}
+
+/* ---------------------------------------------------------------- buttons */
+
+.hs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    transform 120ms ease;
+}
+
+.hs-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.hs-btn:active {
+  transform: translateY(1px);
+}
+
+.hs-btn.is-primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.hs-btn.is-primary:hover {
+  filter: brightness(1.08);
+  color: var(--accent-ink);
+}
+
+.hs-btn.is-ghost {
+  background: transparent;
+}
+
+.hs-btn.is-saved {
+  border-color: #d8305f;
+  color: #d8305f;
+}
+
+/* ---------------------------------------------------------------- filters */
+
+.hs-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  scrollbar-width: none;
+  z-index: 400;
+}
+
+.hs-filters::-webkit-scrollbar {
+  display: none;
+}
+
+.hs-filters select {
+  flex: none;
+  height: 34px;
+  padding: 0 30px 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background-color: var(--surface);
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position:
+    right 14px center,
+    right 9px center;
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
+  appearance: none;
+  font-size: 13.5px;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.hs-filters select:hover {
+  border-color: var(--accent);
+}
+
+.hs-saved-count {
+  margin-left: auto;
+  flex: none;
+  padding: 0 10px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: #fdeaf0;
+  color: #b3204a;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.hs-dark .hs-saved-count {
+  background: #3a1c27;
+  color: #ff92b3;
+}
+
+/* -------------------------------------------------------------- workspace */
+
+.hs-workspace {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(340px, 0.95fr);
+}
+
+.hs-app:not(.hs-full) .hs-workspace {
+  grid-template-columns: 1fr;
+}
+
+.hs-app.hs-full .hs-workspace {
+  grid-template-columns: minmax(0, 1.6fr) minmax(400px, 0.85fr);
+}
+
+/* -------------------------------------------------------------------- map */
+
+.hs-map {
+  position: relative;
+  min-width: 0;
+  background: var(--canvas);
+}
+
+.hs-map-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+/* Leaflet chrome, restyled to match the app. */
+.hs-map .leaflet-container {
+  background: #e9ecef;
+  font: inherit;
+}
+
+.hs-dark .hs-map .leaflet-container {
+  background: #101318;
+}
+
+.hs-map .leaflet-control-attribution {
+  padding: 2px 7px;
+  border-radius: 6px 0 0 0;
+  background: rgb(255 255 255 / 82%);
+  color: #4a5058;
+  font-size: 10.5px;
+}
+
+.hs-dark .hs-map .leaflet-control-attribution {
+  background: rgb(18 20 26 / 85%);
+  color: #9aa2ae;
+}
+
+.hs-map .leaflet-control-attribution a {
+  color: inherit;
+}
+
+.hs-ring {
+  fill: var(--accent);
+  fill-opacity: 0.07;
+  stroke: var(--accent);
+  stroke-opacity: 0.45;
+  stroke-width: 1.5;
+  stroke-dasharray: 6 5;
+}
+
+/* ------------------------------------------------------------- price pins */
+
+/*
+ * The marker element is zero-sized and anchored exactly on the coordinate;
+ * the bubble positions itself above it, so pins keep their shape and never
+ * drift while zooming.
+ */
+.hs-pin {
+  width: 0;
+  height: 0;
+}
+
+.hs-bubble {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -100%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  border: 1.5px solid var(--accent);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--accent);
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform 140ms ease,
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.hs-bubble::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  width: 7px;
+  height: 7px;
+  transform: translateX(-50%) rotate(45deg);
+  border-right: 1.5px solid var(--accent);
+  border-bottom: 1.5px solid var(--accent);
+  background: inherit;
+}
+
+.hs-bubble:hover,
+.hs-bubble.is-hovered {
+  transform: translate(-50%, -100%) scale(1.08);
+  background: var(--accent-soft);
+}
+
+.hs-bubble.is-selected {
+  background: var(--accent);
+  color: var(--accent-ink);
+  transform: translate(-50%, -100%) scale(1.14);
+}
+
+.hs-bubble.is-selected::after {
+  background: var(--accent);
+}
+
+.hs-bubble.is-pending {
+  border-color: #8b8f98;
+  border-style: dashed;
+  color: #6c717a;
+}
+
+.hs-bubble.is-pending::after {
+  border-color: #8b8f98;
+}
+
+.hs-bubble-heart {
+  color: #d8305f;
+  font-size: 11px;
+}
+
+.hs-bubble.is-selected .hs-bubble-heart {
+  color: #ffd0dd;
+}
+
+/* --------------------------------------------------------- map overlay UI */
+
+.hs-map-controls {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  z-index: 600;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.hs-map-controls button {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.hs-map-controls button:last-child {
+  border-bottom: 0;
+  font-size: 13px;
+}
+
+.hs-map-controls button:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.hs-fullscreen-toggle {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  z-index: 610;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+}
+
+.hs-fullscreen-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.hs-app:not(.hs-full) .hs-map-controls {
+  top: 58px;
+}
+
+.hs-pulse {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  z-index: 600;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  max-width: calc(100% - 80px);
+  padding: 8px 13px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 9px;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  animation: hs-pulse-in 260ms ease-out;
+}
+
+@keyframes hs-pulse-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+.hs-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  align-self: center;
+}
+
+.hs-pulse-label {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.hs-pulse-detail {
+  font-size: 12px;
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------ detail card */
+
+.hs-sheet {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 600;
+  width: min(340px, calc(100% - 24px));
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  animation: hs-sheet-in 200ms ease-out;
+}
+
+@keyframes hs-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+.hs-sheet-close {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  z-index: 2;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 88%);
+  color: #23232b;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.hs-sheet-media {
+  height: 118px;
+  overflow: hidden;
+}
+
+.hs-sheet-body {
+  padding: 11px 13px 13px;
+}
+
+.hs-sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hs-sheet-head strong {
+  font-size: 19px;
+  letter-spacing: -0.01em;
+}
+
+.hs-sheet-head .hs-badge {
+  position: static;
+}
+
+.hs-sheet-address {
+  margin-top: 3px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.hs-sheet-note {
+  margin: 6px 0 10px;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.hs-sheet-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+  margin: 0 0 12px;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--line);
+}
+
+.hs-sheet-stats dt {
+  color: var(--ink-soft);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.hs-sheet-stats dd {
+  margin: 2px 0 0;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.hs-sheet-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.hs-sheet-actions .hs-btn {
+  flex: 1;
+  justify-content: center;
+}
+
+/* ---------------------------------------------------------------- results */
+
+.hs-results {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.hs-results-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px 10px;
+}
+
+.hs-results-head h1 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+.hs-results-head p {
+  margin: 3px 0 0;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+
+.hs-results-meta {
+  margin-left: auto;
+  text-align: right;
+  flex: none;
+}
+
+.hs-results-meta strong {
+  display: block;
+  font-size: 20px;
+  line-height: 1.1;
+}
+
+.hs-results-meta span {
+  color: var(--ink-soft);
+  font-size: 11.5px;
+}
+
+.hs-results-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.hs-filter-summary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.hs-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.hs-sort select {
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.hs-cards {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  padding: 12px 16px;
+  align-content: start;
+}
+
+.hs-app.hs-full .hs-cards {
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+/* ------------------------------------------------------------ result card */
+
+.hs-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface);
+  cursor: pointer;
+  transition:
+    box-shadow 140ms ease,
+    border-color 140ms ease,
+    transform 140ms ease;
+}
+
+.hs-card:hover,
+.hs-card.is-hovered {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+.hs-card.is-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.hs-card-media {
+  position: relative;
+  height: 132px;
+  overflow: hidden;
+}
+
+.hs-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.hs-badge {
+  position: absolute;
+  left: 9px;
+  top: 9px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  background: rgb(255 255 255 / 92%);
+  color: #23232b;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.hs-badge.is-open {
+  background: #0b7a52;
+  color: #fff;
+}
+
+.hs-badge.is-new {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.hs-badge.is-pending {
+  background: #6c717a;
+  color: #fff;
+}
+
+.hs-heart {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 88%);
+  color: #5c6169;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.hs-heart:hover,
+.hs-heart.is-saved {
+  color: #d8305f;
+}
+
+.hs-card-body {
+  padding: 10px 12px 12px;
+}
+
+.hs-card-price {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  font-size: 18px;
+  font-weight: 750;
+  letter-spacing: -0.015em;
+}
+
+.hs-card-ppsf {
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  font-weight: 550;
+}
+
+.hs-card-facts {
+  margin-top: 3px;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+
+.hs-card-facts b {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.hs-card-facts i {
+  font-style: normal;
+  opacity: 0.5;
+}
+
+.hs-card-address {
+  margin-top: 5px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.hs-card-meta {
+  margin-top: 2px;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+}
+
+/* ---------------------------------------------------------------- empty */
+
+.hs-empty {
+  padding: 34px 16px;
+  text-align: center;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+}
+
+.hs-empty strong {
+  display: block;
+  font-size: 15px;
+}
+
+.hs-empty p {
+  margin: 5px 0 12px;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+
+.hs-disclaimer {
+  padding: 9px 16px 11px;
+  border-top: 1px solid var(--line);
+  color: var(--ink-soft);
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+
+/* --------------------------------------------------------------- narrow */
+
+@media (max-width: 860px) {
+  .hs-app.hs-full .hs-workspace {
+    grid-template-columns: 1fr;
+    grid-template-rows: 42% minmax(0, 1fr);
+  }
+
+  .hs-app.hs-full .hs-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .hs-results {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+}

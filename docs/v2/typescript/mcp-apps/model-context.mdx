@@ -1,0 +1,116 @@
+---
+title: "Model context"
+description: "Choose what the model sees from tool results, structured view state, and the currently visible UI."
+icon: "brain"
+---
+
+Use model context to give the next model turn the information it needs without duplicating every value rendered by the view. Tool results establish the initial context; `useViewState` and `ModelContext` update it as the user interacts.
+
+## Choose the right channel
+
+| Need                                          | Use                                                            |
+| --------------------------------------------- | -------------------------------------------------------------- |
+| Return a concise tool result                  | A text `content` block                                         |
+| Send structured render data to the view       | Tool-result `structuredContent`, read through `useToolContext` |
+| Keep structured user choices model-visible    | `useViewState`                                                 |
+| Describe what the user currently sees         | `<ModelContext>`                                               |
+| Keep ephemeral UI state private to the iframe | React `useState`                                               |
+| Persist durable business data                 | Your backend                                                   |
+
+## Keep structured choices in view state
+
+Use `useViewState` for selections, filters, drafts, and progress that future model turns should understand.
+
+```tsx
+import { useViewState } from "mcp-use/react";
+
+function Filters() {
+  const [state, setState] = useViewState({
+    selectedCategory: "all",
+    sort: "newest",
+  });
+
+  return (
+    <button onClick={() => setState({ ...state, sort: "price" })}>
+      Sort by price
+    </button>
+  );
+}
+```
+
+The root state value must be a JSON-serializable object. All components in one mounted view share it. Separate view instances remain isolated.
+
+ChatGPT restores the state through `window.openai.widgetState`. Other MCP Apps hosts keep it for the current iframe lifetime until the protocol provides a restoration channel.
+
+## Describe visible UI
+
+Use `ModelContext` for natural-language descriptions that follow the React component lifecycle.
+
+```tsx
+import { ModelContext } from "mcp-use/react";
+
+function Dashboard() {
+  return (
+    <ModelContext content="Dashboard">
+      <ModelContext content="Revenue chart is visible" />
+      <ModelContext content="Three alerts are unresolved" />
+    </ModelContext>
+  );
+}
+```
+
+Nested components serialize into an indented tree:
+
+```text
+- Dashboard
+  - Revenue chart is visible
+  - Three alerts are unresolved
+```
+
+For annotations produced by event handlers or other callbacks, store the
+description in React state and render it declaratively:
+
+```tsx
+function ProductPicker() {
+  const [selection, setSelection] = useState<string | null>(null);
+
+  return (
+    <>
+      {selection && <ModelContext content={`Selected ${selection}`} />}
+      <button onClick={() => setSelection("Wireless Headphones")}>
+        Select headphones
+      </button>
+    </>
+  );
+}
+```
+
+## Understand the merged snapshot
+
+The runtime merges structured state and the serialized context tree into one complete object:
+
+```json
+{
+  "selectedCategory": "audio",
+  "sort": "price",
+  "_uiContext": "- Dashboard\n  - Revenue chart is visible"
+}
+```
+
+`_uiContext` is a reserved model-visible field. `useViewState` filters it from application state and rejects developer state containing the same key.
+
+Every write sends the complete snapshot. On MCP Apps hosts, mcp-use sends the object as `structuredContent` and a JSON text block as `content` through `ui/update-model-context`. On ChatGPT, mcp-use writes the object to `modelContent` with `window.openai.setWidgetState`.
+
+## Keep ephemeral values local
+
+Use React `useState` for transient details that the model does not need, such as hover state, open tooltips, or animation progress.
+
+```tsx
+const [hoveredId, setHoveredId] = useState<string | null>(null);
+```
+
+## Next steps
+
+- Read the [`useViewState` API reference](https://mcp-use-typescript-api-reference.vercel.app/modules/mcp-use.react.html#useviewstate) for signatures, errors, and host behavior.
+- Read the [`ModelContext` API reference](https://mcp-use-typescript-api-reference.vercel.app/modules/mcp-use.react.html#modelcontext) for lifecycle and nesting.
+- Use [Interactivity](/v2/typescript/mcp-apps/interactivity) for tool calls and follow-up messages.

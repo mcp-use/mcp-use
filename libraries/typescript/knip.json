@@ -1,48 +1,79 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "rules": {
-    "optionalPeerDependencies": "off"
+    "optionalPeerDependencies": "off",
+    "exports": "warn",
+    "types": "warn"
   },
   "ignoreWorkspaces": [
-    "packages/mcp-use/examples/**",
-    "packages/create-mcp-use-app/src/templates/**"
+    "packages/client/examples/**",
+    "packages/create-mcp-use-app/src/templates/**",
+    "packages/server/examples/**",
+    "test_app"
   ],
   "workspaces": {
     ".": {
+      "entry": ["scripts/version-packages.mjs"],
       "project": ["*.{js,ts}"]
     },
-    "packages/mcp-use": {
+    "packages/server": {
       "entry": [
-        "scripts/**/*.{js,mjs,ts}",
-        "tests/helpers/**/*.ts",
-        "tests/servers/**/*.ts",
-        "tests/docs/**/*.ts"
+        "src/index.ts",
+        "src/bin.ts",
+        "src/react/index.ts",
+        "src/vite-client.ts",
+        "src/oauth/**/*.ts",
+        "tests/**/*.{ts,tsx}"
       ],
       "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"],
-      "ignoreBinaries": ["lsof", "sleep", "dev"]
+      "ignoreBinaries": ["npx"],
+      "ignoreUnresolved": ["#mcp-use-node-http"],
+      "ignoreDependencies": ["mcp-use"]
+    },
+    "packages/agent": {
+      "entry": [
+        "src/index.ts",
+        "src/langchain.ts",
+        "tests/**/*.ts",
+        "examples/**/*.ts"
+      ],
+      "project": ["src/**/*.ts", "tests/**/*.ts", "examples/**/*.ts"]
     },
     "packages/cli": {
-      "project": ["src/**/*.ts", "tests/**/*.ts"],
+      "entry": ["src/index.ts", "tests/**/*.mjs"],
+      "project": ["src/**/*.ts", "tests/**/*.mjs"],
       "ignoreDependencies": [
-        "@mcp-use/inspector"
+        "@modelcontextprotocol/server",
+        "@tailwindcss/vite",
+        "@vitejs/plugin-react",
+        "tailwindcss",
+        "vite"
       ]
+    },
+    "packages/client": {
+      "entry": [
+        "src/index.ts",
+        "src/index-browser.ts",
+        "src/react/index.ts",
+        "tests/**/*.{ts,tsx}"
+      ],
+      "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"]
     },
     "packages/inspector": {
       "entry": [
         "src/server/*.ts",
         "start-auth-servers.ts",
-        "scripts/**/*.{js,mjs,ts}",
         "tests/e2e/**/*.{ts,tsx,mjs}"
       ],
       "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"],
       "ignoreDependencies": [
-        "@scarf/scarf",
+        "inspector-rate-limiter-memory",
         "tailwindcss",
         "tw-animate-css"
       ]
     },
     "packages/create-mcp-use-app": {
-      "entry": ["src/index.tsx", "scripts/**/*.{js,mjs,ts}"],
+      "entry": ["scripts/**/*.{js,mjs,ts}", "src/index.ts"],
       "project": ["src/**/*.{ts,tsx}"]
     }
   }

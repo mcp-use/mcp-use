@@ -16,16 +16,19 @@ export function getTestMatrix(): TestMatrixConfig {
     | "external-built"
     | "builtin-dev"
     | "remote";
+  const builtinPort = Number(process.env.TEST_PORT || 3000);
 
   const usesBuiltinInspector = serverMode === "builtin-dev";
+  // Builtin/embedded inspector mounts under the server basePath (default /mcp).
+  // Standalone inspector Vite serves at /inspector with empty basePath.
   const inspectorUrl = usesBuiltinInspector
-    ? "http://localhost:3000/inspector"
+    ? `http://localhost:${builtinPort}/mcp/inspector`
     : "http://localhost:3000/inspector";
 
   const serverUrl = (() => {
     if (process.env.TEST_SERVER_URL) return process.env.TEST_SERVER_URL;
     return usesBuiltinInspector
-      ? "http://localhost:3000/mcp"
+      ? `http://localhost:${builtinPort}/mcp`
       : "http://localhost:3002/mcp";
   })();
 

@@ -1,0 +1,48 @@
+---
+title: "Updates"
+description: "New updates and improvements to the mcp-use v2 SDK"
+icon: "sparkles"
+tag: "New"
+rss: true
+---
+
+<Update label="v2.0.5" description="August 2026">
+  ## CLI, stdio, and scaffold fixes
+  Patch release for the v2 SDK, CLI, client, and project scaffolds.
+
+- **Fix** (client): child-process stderr is piped to `errlog` by default as documented; `StdioConnector` and `StdioServerConfig` now expose `stderr: "pipe" | "inherit" | "ignore"` for explicit control (`#2086`)
+- **Fix** (client): stdio MCP servers configured with explicit environment variables no longer inherit the full parent process environment (`#2125`)
+- **Fix**: `mcp-use typecheck` prints a successful no-errors line, and `mcp-use start --with-inspector` prints the mounted Inspector URL (`#2099`, `#2100`)
+- **Fix** (@mcp-use/cli): package-manager arguments are forwarded correctly to development commands (`#2124`)
+- **Fix** (create-mcp-use-app): generated app templates no longer include a stale `main` field and retain their distinct descriptions (`#2085`)
+- **Update**: Updated @mcp-use/inspector to v20.0.5, @mcp-use/cli to v4.0.1, and create-mcp-use-app to v2.0.1
+</Update>
+
+<Update label="v2.0.4" description="August 2026">
+  ## Bug fixes and performance enhancements
+  Maintenance update with bug fixes and performance enhancements.
+
+- **Update**: Updated @mcp-use/inspector to v20.0.4
+</Update>
+
+<Update label="v2.0.3" description="August 2026">
+  ## Bug fixes and performance enhancements
+  Maintenance update with bug fixes and performance enhancements.
+
+- **Update**: Updated @mcp-use/inspector to v20.0.3
+</Update>
+
+<Update label="v2.0.0" description="August 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=2.0.0&title=Native%20mcp-use%20v2&date=2026-08&lang=typescript" alt="Release 2.0.0" />
+  </Frame>
+  ## Native mcp-use v2
+  Major release migrating the SDK to the official MCP TypeScript SDK v2.
+
+- **Breaking**: `@mcp-use/client` and `@mcp-use/agent` are ESM-only and require Node 22.22.2 or newer; CommonJS entry points are no longer published
+- **New** (client): HTTP connections negotiate the protocol automatically, using the modern `server/discover` flow when available and transparently falling back to the legacy handshake
+- **New** (client): OAuth, connectors, sessions, `useMcp`, reverse requests, and browser/Node runtimes are rebuilt on `@modelcontextprotocol/client`; the root entry selects a browser-safe or Node-enabled implementation by environment
+- **New** (server): the fetch-native server runtime adds typed MCP middleware and observers, Hono integration, OAuth providers, OpenAPI generation, Next.js mounting, and MCP Apps views
+- **New**: the CLI builds external hashed view assets by default, supports inline builds, inspector-aware production builds, tunnels, and `mcp-use typecheck`
+- **Update**: Updated @mcp-use/inspector to v20.0.0, @mcp-use/cli to v4.0.0, @mcp-use/client and @mcp-use/agent to v2.0.0, and create-mcp-use-app to v2.0.0
+</Update>

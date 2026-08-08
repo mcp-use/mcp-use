@@ -1,0 +1,55 @@
+---
+title: "Build views"
+description: "Bind a tool result to a React MCP App view."
+icon: "panels-top-left"
+---
+
+Create one default-exported React component at `views/<name>/view.tsx`. Bind it from exactly one tool with `view: { name }`; every view-bound tool must declare an `outputSchema`.
+
+```ts
+export const searchProducts = server.tool(
+  {
+    name: "search-products",
+    inputSchema: z.object({ query: z.string() }),
+    outputSchema: z.object({
+      query: z.string(),
+      items: z.array(z.object({ id: z.string(), name: z.string() })),
+    }),
+    view: {
+      name: "product-results",
+      description: "Interactive product search results",
+      csp: { connectDomains: ["https://api.example.com"] },
+    },
+  },
+  async ({ query }) => {
+    const data = { query, items: [] };
+    return {
+      content: [{ type: "text", text: JSON.stringify(data) }],
+      structuredContent: data,
+    };
+  },
+);
+```
+
+```tsx
+// views/product-results/view.tsx
+import { ThemeProvider, useToolContext } from "mcp-use/react";
+
+export default function ProductResults() {
+  const view = useToolContext<"search-products">();
+  if (view.status === "pending") return <p>Searching…</p>;
+  if (view.status === "error") return <p>{view.error.message}</p>;
+
+  return (
+    <ThemeProvider>
+      <ul>
+        {view.toolOutput.items.map((item) => (
+          <li key={item.id}>{item.name}</li>
+        ))}
+      </ul>
+    </ThemeProvider>
+  );
+}
+```
+
+Export tool refs from the server entry so `mcp-env.d.ts` can type view calls. Public files belong under `public/`; reference them with root-relative paths in view code. Run `mcp-use typecheck` and exercise the tool in the Inspector.

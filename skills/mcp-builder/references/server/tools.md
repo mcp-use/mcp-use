@@ -9,7 +9,7 @@ Tools are backend actions the AI can call. They take structured input and return
 ## Basic Tool
 
 ```typescript
-import { MCPServer, text } from "mcp-use/server";
+import { MCPServer, text } from "mcp-use";
 import { z } from "zod";
 
 const server = new MCPServer({
@@ -18,7 +18,7 @@ const server = new MCPServer({
   baseUrl: process.env.MCP_URL || "http://localhost:3000"
 });
 
-server.tool(
+export const sendEmail = server.tool(
   {
     name: "send-email",
     description: "Send an email to a user",
@@ -42,6 +42,10 @@ server.tool(
 - Second argument: async handler function
 - Handler receives validated input matching schema
 - Must return a response helper (`text()`, `object()`, `widget()`, etc.)
+- Assign every statically declared tool to an exported constant. View typing is
+  derived from exported `ToolRef` values, so `useCallTool("send-email")` is a
+  TypeScript error if `sendEmail` is not exported. Re-export refs from split
+  modules; reserve `useDynamicTool<Args, Result>()` for runtime registrations.
 
 ---
 
@@ -94,7 +98,7 @@ z.object({
 Declare the nature of your tool so clients can warn users:
 
 ```typescript
-server.tool(
+export const deleteUserTool = server.tool(
   {
     name: "delete-user",
     description: "Permanently delete a user account",
@@ -124,7 +128,7 @@ server.tool(
 The second parameter to tool handlers provides advanced capabilities:
 
 ```typescript
-server.tool(
+export const processLargeFile = server.tool(
   {
     name: "process-large-file",
     schema: z.object({ fileUrl: z.string().describe("URL to file") })
@@ -162,18 +166,20 @@ server.tool(
 - `ctx.sample(prompt: string)` - Ask the LLM for help (requires client support)
 - `ctx.client.can(capability: string)` - Check if client supports a feature
 
-### Client Identity & Caller Context
+### Client Metadata & Caller Context
 
-`ctx.client` also exposes per-invocation caller context from `params._meta`:
+`ctx.client` exposes request-scoped capabilities, implementation metadata, and
+optional OpenAI caller hints from the current request's `_meta`:
 
 ```typescript
-server.tool({ name: "personalise", schema: z.object({}) }, async (_p, ctx) => {
-  // Session-level (stable for the connection lifetime)
-  const { name, version } = ctx.client.info();   // "openai-mcp", "1.0.0"
-  const isAppsClient = ctx.client.supportsApps(); // true for ChatGPT
+import type { UserContext } from "mcp-use";
+
+export const personalise = server.tool({ name: "personalise", schema: z.object({}) }, async (_p, ctx) => {
+  const { name, version } = ctx.client.info();
+  const isAppsClient = ctx.client.supportsViews();
 
   // Per-invocation — may differ on every tool call
-  const caller = ctx.client.user();
+  const caller: UserContext | undefined = ctx.client.user();
   if (caller) {
     const city = caller.location?.city ?? "there";
     const greeting = caller.locale?.startsWith("it") ? "Ciao" : "Hello";
@@ -184,34 +190,29 @@ server.tool({ name: "personalise", schema: z.object({}) }, async (_p, ctx) => {
 ```
 
 **`ctx.client.user()` fields:**
-- `subject` — stable opaque user ID (same across conversations, e.g. `openai/subject`)
-- `conversationId` — current chat thread ID (changes per chat, e.g. `openai/session`)
+- `subject` — opaque client-reported subject hint (e.g. `openai/subject`)
+- `conversationId` — client-reported conversation hint (e.g. `openai/session`)
 - `locale` — BCP-47 locale, e.g. `"it-IT"` (server-side; inside widgets prefer `useWidget().locale` which is client-side and fresher)
-- `location` — `{ city, region, country, timezone, latitude, longitude }`
+- `location` — `{ city, region, country, timezone, latitude, longitude }`; coordinates may be strings or numbers
 - `userAgent` — browser/host user-agent string
-- `timezoneOffsetMinutes` — UTC offset in minutes
+- `organizationId` — organization hint (e.g. `openai/organization`)
 
 **Key rules:**
 - Returns `undefined` on clients that don't send this metadata (Inspector, CLI, non-ChatGPT clients)
+- Values come from the current request only; they are never cached from a previous call
 - **Unverified / advisory** — self-reported by the client, not suitable for access control
 - For verified identity, use `ctx.auth` (requires OAuth)
 
-**ChatGPT multi-tenant model:**
-ChatGPT uses a single MCP session for ALL users of a deployed app. Use `ctx.client.user()` to distinguish callers:
-
-```
-1 MCP session  ctx.session.sessionId              — shared across ALL users
-  N subjects   ctx.client.user()?.subject         — one per ChatGPT user account
-    M threads  ctx.client.user()?.conversationId  — one per chat conversation
-```
+Do not treat transport or connection state as user identity. If application
+state must span calls, key it by verified identity from `ctx.auth` or another
+trusted application identifier, not by `ctx.client.user()`.
 
 ```typescript
-// Identify who is calling this specific invocation
 const caller = ctx.client.user();
 return object({
-  mcpSession: ctx.session.sessionId,           // shared transport session
-  user: caller?.subject ?? null,                // ChatGPT user ID
-  conversation: caller?.conversationId ?? null, // this chat thread
+  localeHint: caller?.locale ?? null,
+  conversationHint: caller?.conversationId ?? null,
+  authenticatedUser: ctx.auth?.user ?? null,
 });
 ```
 
@@ -222,9 +223,9 @@ return object({
 **Always use `error()` helper, don't throw:**
 
 ```typescript
-import { text, error } from "mcp-use/server";
+import { text, error } from "mcp-use";
 
-server.tool(
+export const fetchUserTool = server.tool(
   { name: "fetch-user", schema: z.object({ id: z.string() }) },
   async ({ id }) => {
     try {
@@ -261,9 +262,9 @@ server.tool(
 When your tool returns visual UI:
 
 ```typescript
-import { widget, text } from "mcp-use/server";
+import { widget, text } from "mcp-use";
 
-server.tool(
+export const searchProducts = server.tool(
   {
     name: "search-products",
     description: "Search products by keyword",
@@ -306,7 +307,7 @@ See [../widgets/basics.md](../widgets/basics.md) for widget implementation.
 Validate tool output at runtime:
 
 ```typescript
-server.tool(
+export const calculateStats = server.tool(
   {
     name: "calculate-stats",
     schema: z.object({
@@ -348,7 +349,7 @@ Securely handle API keys and configuration:
 // index.ts
 const WEATHER_API_KEY = process.env.WEATHER_API_KEY;
 
-server.tool(
+export const getWeather = server.tool(
   {
     name: "get-weather",
     schema: z.object({ city: z.string() })
@@ -395,7 +396,7 @@ Cache expensive operations:
 ```typescript
 const cache = new Map<string, { data: any; expires: number }>();
 
-server.tool(
+export const fetchWeather = server.tool(
   { name: "fetch-weather", schema: z.object({ city: z.string() }) },
   async ({ city }) => {
     const cacheKey = `weather:${city}`;

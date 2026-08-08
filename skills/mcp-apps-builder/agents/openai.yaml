@@ -1,0 +1,4 @@
+interface:
+  display_name: "mcp-use MCP Apps Builder"
+  short_description: "Build and migrate native mcp-use v2 apps"
+  default_prompt: "Use $mcp-apps-builder to build or update this MCP server and verify its real tool and View lifecycle."

@@ -1,8 +1,8 @@
 /**
- * The authorize redirect is top-level navigation in both Direct and Via Proxy
- * modes (useRedirectFlow: true), so the user-picker page is driven identically;
- * the difference is whether OAuth metadata + token-exchange fetches go through
- * the inspector backend.
+ * The authorize redirect is top-level navigation in both Auto and forced Proxy
+ * modes (useRedirectFlow: true), so the user-picker page is driven identically.
+ * Auto starts direct and can fall back; forced Proxy routes through the inspector
+ * backend from the start.
  */
 
 import { expect, test } from "@playwright/test";
@@ -12,7 +12,7 @@ import {
   type GoogleEmulateHandle,
 } from "./fixtures/google-emulate-server.js";
 
-type ConnectionType = "Direct" | "Via Proxy";
+type ConnectionMode = "auto" | "proxy";
 
 // Both variants share one fixture on fixed ports (the MCP server's registered
 // redirect URI pins us to a known port), so they must run in the same worker.
@@ -34,14 +34,19 @@ test.beforeEach(async ({ page, context }) => {
   await page.evaluate(() => localStorage.clear());
 });
 
-function describeOAuthFlow(connectionType: ConnectionType): void {
-  test.describe(`OAuth flow via emulate Google (${connectionType})`, () => {
+function describeOAuthFlow(connectionMode: ConnectionMode): void {
+  test.describe(`OAuth flow via emulate Google (${connectionMode})`, () => {
     test("completes OAuth and reaches ready state", async ({ page }) => {
       await page.getByTestId("connection-form-url-input").fill(fixture.mcpUrl);
 
-      if (connectionType !== "Direct") {
-        await page.getByTestId("connection-form-type-select").click();
-        await page.getByRole("option", { name: connectionType }).click();
+      if (connectionMode !== "auto") {
+        await page.getByTestId("connection-form-config-button").click();
+        await page.getByTestId("config-dialog-connection-mode-select").click();
+        await page.getByRole("option", { name: "Proxy" }).click();
+        await page
+          .getByRole("dialog")
+          .getByRole("button", { name: "Save" })
+          .click();
       }
 
       await page.getByTestId("connection-form-connect-button").click();
@@ -69,5 +74,5 @@ function describeOAuthFlow(connectionType: ConnectionType): void {
   });
 }
 
-describeOAuthFlow("Direct");
-describeOAuthFlow("Via Proxy");
+describeOAuthFlow("auto");
+describeOAuthFlow("proxy");

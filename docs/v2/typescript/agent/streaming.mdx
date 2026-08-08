@@ -1,0 +1,157 @@
+---
+title: "Streaming"
+description: "Stream MCPAgent tool steps and provider-neutral LLM events."
+icon: "arrow-up-down"
+---
+
+`MCPAgent` provides two streaming APIs. Use `stream()` for tool-step progress and a final string. Use `streamEvents()` for provider-neutral token, tool, usage, error, and completion events.
+
+| Method | Use it for | Output |
+| --- | --- | --- |
+| `stream()` | Tool progress and a final answer | Yields `AgentStep`; returns the final string |
+| `streamEvents()` | Token UIs and detailed tool lifecycle state | Yields `LlmStreamEvent`; returns `void` |
+
+## Stream tool steps
+
+Read the generator directly when you need both yielded steps and its final return value.
+
+```typescript
+import { MCPAgent } from "@mcp-use/agent";
+
+async function main() {
+  const agent = new MCPAgent({
+    llm: "openai/gpt-4o",
+    mcpServers: {
+      filesystem: {
+        command: "npx",
+        args: ["-y", "@modelcontextprotocol/server-filesystem", "./"],
+      },
+    },
+  });
+
+  try {
+    await agent.initialize();
+    const stream = agent.stream({
+      prompt: "Inspect package.json and summarize the project scripts.",
+    });
+
+    while (true) {
+      const next = await stream.next();
+
+      if (next.done) {
+        console.log("Final answer:", next.value);
+        break;
+      }
+
+      console.log(`Tool: ${next.value.action.tool}`);
+      console.log(`Input: ${JSON.stringify(next.value.action.toolInput)}`);
+      if (next.value.observation) {
+        console.log(`Result: ${next.value.observation}`);
+      }
+    }
+  } finally {
+    await agent.close();
+  }
+}
+
+main().catch(console.error);
+```
+
+For each tool call, `stream()` can yield an initial step with an empty `observation`, followed by another step containing the tool result. A `for await` loop receives the steps but does not expose the generator's final return value.
+
+## Stream provider-neutral events
+
+`streamEvents()` uses the same `LlmStreamEvent` variants for every supported provider.
+
+```typescript
+import { MCPAgent, type LlmStreamEvent } from "@mcp-use/agent";
+
+async function main() {
+  const agent = new MCPAgent({
+    llm: "openai/gpt-4o",
+    mcpServers: {
+      filesystem: {
+        command: "npx",
+        args: ["-y", "@modelcontextprotocol/server-filesystem", "./"],
+      },
+    },
+  });
+
+  let answer = "";
+
+  try {
+    await agent.initialize();
+
+    for await (const event of agent.streamEvents({
+      prompt: "List the TypeScript files and summarize their purpose.",
+    })) {
+      handleEvent(event);
+      if (event.type === "text-delta") {
+        answer += event.delta;
+      }
+    }
+
+    console.log("\nFinal answer:", answer);
+  } finally {
+    await agent.close();
+  }
+}
+
+function handleEvent(event: LlmStreamEvent) {
+  switch (event.type) {
+    case "tool-call-ready":
+      console.log(`\nCalling ${event.toolName}`, event.args);
+      break;
+    case "tool-result":
+      console.log(`\n${event.toolName} finished; error=${event.isError}`);
+      break;
+    case "error":
+      console.error(`\nModel error: ${event.message}`);
+      break;
+  }
+}
+
+main().catch(console.error);
+```
+
+Accumulate `text-delta` values when your UI needs the complete final answer. `streamEvents()` itself returns no result and does not write the streamed turn to conversation memory.
+
+## Handle every event variant
+
+| `type` | Meaning |
+| --- | --- |
+| `text-delta` | A text fragment from the model |
+| `tool-call-start` | The model started producing a tool call |
+| `tool-call-args-delta` | A partial JSON argument fragment; concatenate fragments before parsing |
+| `tool-call-ready` | A complete tool name and parsed argument object |
+| `tool-result` | The tool result, with `isError` indicating tool failure |
+| `usage` | Provider token usage, when available |
+| `error` | A model-loop error message |
+| `done` | The tool loop finished |
+
+Tool execution failures are emitted as `tool-result` with `isError: true`. Other streaming failures can appear as `error`. Decide whether your UI should show a partial answer, retry, or fail the request.
+
+## Cancel a stream
+
+Pass an `AbortSignal` through the run options:
+
+```typescript
+const controller = new AbortController();
+const timeout = setTimeout(() => controller.abort(), 5_000);
+
+try {
+  for await (const event of agent.streamEvents({
+    prompt: "Perform a long audit.",
+    signal: controller.signal,
+  })) {
+    console.log(event.type);
+  }
+} finally {
+  clearTimeout(timeout);
+}
+```
+
+## Next steps
+
+- [Manage conversation memory](/v2/typescript/agent/memory-management)
+- [Configure an LLM provider](/v2/typescript/agent/llm-providers)

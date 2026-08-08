@@ -81,6 +81,28 @@ export function hasNoOpenFlag(): boolean {
 }
 
 /**
+ * Return startup diagnostics that are useful without reflecting error messages,
+ * stacks, URLs, headers, or other potentially sensitive values into logs.
+ */
+export function formatErrorDiagnostic(error: unknown): string {
+  if (!(error instanceof Error)) {
+    return `UnknownError (${typeof error})`;
+  }
+
+  const safeName = /^[A-Za-z][A-Za-z0-9_.-]{0,63}$/.test(error.name)
+    ? error.name
+    : "Error";
+  const candidateCode = (error as NodeJS.ErrnoException).code;
+  const safeCode =
+    typeof candidateCode === "string" &&
+    /^[A-Z][A-Z0-9_]{0,31}$/.test(candidateCode)
+      ? candidateCode
+      : undefined;
+
+  return safeCode ? `${safeName} (${safeCode})` : safeName;
+}
+
+/**
  * Helper function to format error responses with context and timestamp
  */
 export function formatErrorResponse(error: unknown, context: string) {

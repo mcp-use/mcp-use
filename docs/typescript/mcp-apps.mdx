@@ -1,0 +1,52 @@
+---
+title: "MCP Apps"
+description: "Build interactive MCP App views with mcp-use."
+icon: "app-window"
+---
+
+An MCP App pairs a tool with a React view. Views live under `views/<name>/view.tsx`; the bound tool declares `view: { name }` and an `outputSchema`.
+
+```ts
+import { MCPServer } from "mcp-use";
+import { z } from "zod";
+
+const server = new MCPServer({ name: "catalog", version: "1.0.0" });
+
+export const showProduct = server.tool(
+  {
+    name: "show-product",
+    inputSchema: z.object({ id: z.string() }),
+    outputSchema: z.object({ id: z.string(), name: z.string() }),
+    view: { name: "product" },
+  },
+  async ({ id }) => {
+    const data = { id, name: "Example product" };
+    return {
+      content: [{ type: "text", text: JSON.stringify(data) }],
+      structuredContent: data,
+    };
+  },
+);
+
+export default server;
+```
+
+The matching `views/product/view.tsx` reads the request lifecycle and typed result with `useToolContext()`:
+
+```tsx
+import { ThemeProvider, useToolContext } from "mcp-use/react";
+
+export default function ProductView() {
+  const view = useToolContext<"show-product">();
+  if (view.status === "pending") return <p>Loading…</p>;
+  if (view.status === "error") return <p>{view.error.message}</p>;
+
+  return (
+    <ThemeProvider>
+      <h2>{view.toolOutput.name}</h2>
+    </ThemeProvider>
+  );
+}
+```
+
+Use focused hooks such as `useHostContext`, `useCallTool`, `useViewState`, `useDisplayMode`, and `useSendFollowUp` when the view needs host data or actions. See [Build views](/typescript/mcp-apps/widgets), [Interactivity](/typescript/mcp-apps/interactivity), and [Content security policy](/typescript/mcp-apps/content-security-policy).

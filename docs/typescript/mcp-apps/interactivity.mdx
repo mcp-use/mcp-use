@@ -1,0 +1,40 @@
+---
+title: "View interactivity"
+description: "Use focused hooks for MCP App state, tools, and host actions."
+icon: "mouse-pointer-click"
+---
+
+`useToolContext()` owns the rendering tool lifecycle. Add focused hooks only for the capabilities a view needs:
+
+- `useCallTool()` calls an exported server tool and exposes pending, data, and error state.
+- `useViewState()` stores an object snapshot and restores it on hosts that support persisted view state.
+- `useHostContext()` reads locale, platform, display mode, and advertised capabilities.
+- `useDisplayMode()` requests inline, picture-in-picture, or fullscreen presentation.
+- `useSendFollowUp()` sends a user-visible follow-up message through a capable host.
+- `useOpenExternal()` asks the host to open an external URL.
+
+```tsx
+import { useCallTool, useToolContext, useViewState } from "mcp-use/react";
+
+export default function CounterView() {
+  const view = useToolContext<"show-counter">();
+  const [state, setState] = useViewState({ clicks: 0 });
+  const reset = useCallTool("reset-counter");
+
+  if (view.status !== "ready") return <p>Loading…</p>;
+
+  return (
+    <main>
+      <p>{state.clicks} local clicks</p>
+      <button onClick={() => setState({ clicks: state.clicks + 1 })}>
+        Add
+      </button>
+      <button onClick={() => void reset.callTool({})}>
+        Reset server counter
+      </button>
+    </main>
+  );
+}
+```
+
+Feature-detect host capabilities before showing optional actions. Keep model-visible state explicit with `ModelContext`; ordinary React state is private to the mounted iframe.

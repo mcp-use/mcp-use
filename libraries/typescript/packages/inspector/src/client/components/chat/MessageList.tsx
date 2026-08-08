@@ -1,15 +1,14 @@
 import { TextShimmer } from "@/client/components/ui/text-shimmer";
-import { memo, useCallback, useEffect, useRef } from "react";
-import type { MessageContentBlock } from "mcp-use/react";
+import { memo, useCallback, useMemo, useRef, type RefObject } from "react";
+import type { MessageContentBlock } from "@/client/types/message-content-block";
 import { AssistantMessage } from "./AssistantMessage";
 import { ToolCallDisplay } from "./ToolCallDisplay";
 import { ToolResultRenderer } from "./ToolResultRenderer";
 import { UserMessage } from "./UserMessage";
-import type { MessageAttachment } from "./types";
-import { detectWidgetProtocol } from "@/client/utils/widget-detection";
-import { InlineElicitationCard } from "./InlineElicitationCard";
-import type { PendingElicitationRequest } from "@/client/types/elicitation";
-import type { ElicitResult } from "@modelcontextprotocol/sdk/types.js";
+import type { LLMConfig, MessageAttachment } from "./types";
+import { isViewTool } from "@mcp-use/client/react";
+import { buildMessageTokenMap, type InspectorTraceEvent } from "./trace";
+import { normalizeWidgetMessage } from "./widget-message";
 
 interface Message {
   id: string;
@@ -21,6 +20,7 @@ interface Message {
     type: "text" | "tool-invocation";
     text?: string;
     toolInvocation?: {
+      toolCallId?: string;
       toolName: string;
       args: Record<string, unknown>;
       result?: any;
@@ -47,12 +47,14 @@ interface MessageListProps {
   ) => Promise<void>;
   /** When provided, passed to widget renderers to avoid useMcpClient() context lookup. */
   serverBaseUrl?: string;
-  /** Pending elicitation requests to render inline in the chat thread. */
-  pendingElicitationRequests?: PendingElicitationRequest[];
-  /** Handler called when the user accepts or declines an elicitation. */
-  onApproveElicitation?: (requestId: string, result: ElicitResult) => void;
-  /** Handler called when the user cancels an elicitation. */
-  onRejectElicitation?: (requestId: string, error?: string) => void;
+  /** Anchor at the end of the thread — owned by useChatScrollToBottom in ChatTab. */
+  messagesEndRef?: RefObject<HTMLDivElement | null>;
+  /** Trace events used to derive per-message token counts on hover. */
+  traceEvents?: InspectorTraceEvent[];
+  modelContextScope?: string;
+  llmConfig?: LLMConfig | null;
+  /** Keep tool-call chrome but omit MCP App result bodies (e.g. chat drawer). */
+  renderToolResults?: boolean;
 }
 
 export const MessageList = memo(
@@ -63,12 +65,21 @@ export const MessageList = memo(
     readResource,
     tools,
     sendMessage,
-    serverBaseUrl,
-    pendingElicitationRequests,
-    onApproveElicitation,
-    onRejectElicitation,
+    messagesEndRef,
+    traceEvents = [],
+    modelContextScope,
+    llmConfig,
+    renderToolResults = true,
   }: MessageListProps) => {
-    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const widgetMessageInFlightRef = useRef(false);
+    const isLoadingRef = useRef(isLoading);
+    isLoadingRef.current = isLoading;
+    const sendMessageRef = useRef(sendMessage);
+    sendMessageRef.current = sendMessage;
+    const messageTokenMap = useMemo(
+      () => buildMessageTokenMap(messages, traceEvents),
+      [messages, traceEvents]
+    );
 
     // Helper function to get tool metadata by name.
     // Normalizes hyphens/underscores because the Anthropic API converts
@@ -84,46 +95,34 @@ export const MessageList = memo(
     // Helper function to check if a tool has widget support
     const isWidgetTool = (toolName: string): boolean => {
       const toolMeta = getToolMeta(toolName);
-      const protocol = detectWidgetProtocol(toolMeta, undefined);
-      // mcp-ui requires result to detect, so don't pre-render for those
-      return protocol !== null && protocol !== "mcp-ui";
+      return isViewTool(toolMeta);
     };
 
-    // Convert a ui/message content array to a text string + image attachments,
-    // then forward to sendMessage so the full message reaches the LLM.
     const handleFollowUp = useCallback(
-      (content: MessageContentBlock[]) => {
-        const text = content
-          .filter(
-            (c): c is { type: "text"; text: string } =>
-              c.type === "text" && "text" in c
-          )
-          .map((c) => c.text)
-          .join("\n");
-        const images: MessageAttachment[] = content
-          .filter(
-            (c): c is { type: "image"; data: string; mimeType: string } =>
-              c.type === "image" && "data" in c && "mimeType" in c
-          )
-          .map((c) => ({
-            type: "image" as const,
-            data: c.data,
-            mimeType: c.mimeType,
-          }));
-        sendMessage?.(text, images.length > 0 ? images : undefined);
-      },
-      [sendMessage]
-    );
+      async (content: MessageContentBlock[]) => {
+        if (isLoadingRef.current || widgetMessageInFlightRef.current) {
+          throw new Error("Chat is busy with another turn");
+        }
+        const currentSendMessage = sendMessageRef.current;
+        if (!currentSendMessage) {
+          throw new Error("Chat is not available on this host surface");
+        }
 
-    // Scroll to bottom when messages change or streaming status changes
-    useEffect(() => {
-      if (messages.length > 0 && messagesEndRef.current) {
-        messagesEndRef.current.scrollIntoView({
-          behavior: !isLoading ? "smooth" : "auto",
-          block: "start",
-        });
-      }
-    }, [messages.length, isLoading]);
+        const normalized = normalizeWidgetMessage(content);
+        widgetMessageInFlightRef.current = true;
+        try {
+          await currentSendMessage(
+            normalized.text,
+            normalized.attachments.length > 0
+              ? normalized.attachments
+              : undefined
+          );
+        } finally {
+          widgetMessageInFlightRef.current = false;
+        }
+      },
+      []
+    );
 
     // Determine if we're in "thinking" state vs "streaming" state
     const isThinking =
@@ -164,13 +163,28 @@ export const MessageList = memo(
       })();
 
     // Determine if a message is currently streaming
-    const isMessageStreaming = (message: Message) => {
-      if (!isLoading) return false;
+    const lastMessage = messages[messages.length - 1];
+    const isLastAssistantStreaming =
+      isLoading && lastMessage?.role === "assistant";
 
-      // If this is the last message and it's from assistant, it's streaming
-      const lastMessage = messages[messages.length - 1];
-      return message.id === lastMessage.id && lastMessage.role === "assistant";
+    const getLastTextPartIndex = (parts: NonNullable<Message["parts"]>) => {
+      for (let i = parts.length - 1; i >= 0; i--) {
+        if (parts[i]?.type === "text") return i;
+      }
+      return -1;
     };
+
+    const isTextPartStreaming = (
+      message: Message,
+      partIndex: number,
+      parts: NonNullable<Message["parts"]>
+    ) =>
+      isLastAssistantStreaming &&
+      message.id === lastMessage?.id &&
+      partIndex === getLastTextPartIndex(parts);
+
+    const isMessageStreaming = (message: Message) =>
+      isLastAssistantStreaming && message.id === lastMessage?.id;
 
     return (
       <div className="space-y-6 max-w-3xl mx-auto px-2">
@@ -195,11 +209,18 @@ export const MessageList = memo(
                 content={contentStr}
                 timestamp={message.timestamp}
                 attachments={message.attachments}
+                inputTokens={messageTokenMap.get(message.id)?.inputTokens}
               />
             );
           }
 
           if (message.role === "assistant") {
+            const outputTokens = messageTokenMap.get(message.id)?.outputTokens;
+            const lastTextPartIndex =
+              message.parts && message.parts.length > 0
+                ? getLastTextPartIndex(message.parts)
+                : -1;
+
             return (
               <div key={message.id} className="space-y-4">
                 {/* Handle message parts if available (for proper ordering) */}
@@ -207,8 +228,8 @@ export const MessageList = memo(
                   message.parts.map((part, partIndex) => {
                     const partKey =
                       part.type === "text"
-                        ? `${message.id}-text-${partIndex}-${part.text?.slice(0, 20)}`
-                        : `${message.id}-tool-${part.toolInvocation?.toolName}-${partIndex}`;
+                        ? `${message.id}-text-${partIndex}`
+                        : `${message.id}-tool-${part.toolInvocation?.toolCallId ?? `${part.toolInvocation?.toolName}-${partIndex}`}`;
 
                     if (part.type === "text") {
                       return (
@@ -220,7 +241,16 @@ export const MessageList = memo(
                               ? message.timestamp
                               : undefined
                           }
-                          _isStreaming={isMessageStreaming(message)}
+                          _isStreaming={isTextPartStreaming(
+                            message,
+                            partIndex,
+                            message.parts!
+                          )}
+                          outputTokens={
+                            partIndex === lastTextPartIndex
+                              ? outputTokens
+                              : undefined
+                          }
                         />
                       );
                     } else if (
@@ -246,34 +276,36 @@ export const MessageList = memo(
                           />
                           {/* Render tool result / widget */}
                           {/* Render immediately for widget tools or streaming tools, even if result is null */}
-                          {(part.toolInvocation.result ||
-                            part.toolInvocation.state === "streaming" ||
-                            isWidgetTool(part.toolInvocation.toolName)) && (
-                            <div
-                              data-tool-call-id={`${message.id}-${part.toolInvocation.toolName}-${partIndex}`}
-                            >
-                              <ToolResultRenderer
-                                toolName={part.toolInvocation.toolName}
-                                toolArgs={part.toolInvocation.args}
-                                result={part.toolInvocation.result || null}
-                                serverId={serverId}
-                                readResource={readResource}
-                                serverBaseUrl={serverBaseUrl}
-                                toolMeta={getToolMeta(
-                                  part.toolInvocation.toolName
-                                )}
-                                onSendFollowUp={handleFollowUp}
-                                partialToolArgs={
-                                  part.toolInvocation.partialArgs
-                                }
-                                cancelled={
-                                  part.toolInvocation.state === "error" &&
-                                  part.toolInvocation.result ===
-                                    "Cancelled by user"
-                                }
-                              />
-                            </div>
-                          )}
+                          {renderToolResults &&
+                            (part.toolInvocation.result ||
+                              part.toolInvocation.state === "streaming" ||
+                              isWidgetTool(part.toolInvocation.toolName)) && (
+                              <div
+                                data-tool-call-id={`${message.id}-${part.toolInvocation.toolName}-${partIndex}`}
+                              >
+                                <ToolResultRenderer
+                                  toolName={part.toolInvocation.toolName}
+                                  toolArgs={part.toolInvocation.args}
+                                  result={part.toolInvocation.result || null}
+                                  serverId={serverId}
+                                  readResource={readResource}
+                                  toolMeta={getToolMeta(
+                                    part.toolInvocation.toolName
+                                  )}
+                                  onSendFollowUp={handleFollowUp}
+                                  modelContextScope={modelContextScope}
+                                  llmConfig={llmConfig}
+                                  partialToolArgs={
+                                    part.toolInvocation.partialArgs
+                                  }
+                                  cancelled={
+                                    part.toolInvocation.state === "error" &&
+                                    part.toolInvocation.result ===
+                                      "Cancelled by user"
+                                  }
+                                />
+                              </div>
+                            )}
                         </div>
                       );
                     }
@@ -285,6 +317,7 @@ export const MessageList = memo(
                       content={contentStr}
                       timestamp={message.timestamp}
                       _isStreaming={isMessageStreaming(message)}
+                      outputTokens={outputTokens}
                     />
 
                     {/* Tool Calls (fallback for non-parts messages) */}
@@ -301,23 +334,25 @@ export const MessageList = memo(
                                 result={toolCall.result}
                                 state={toolCall.result ? "result" : "call"}
                               />
-                              {/* Render tool result (OpenAI Apps SDK or MCP-UI resources) */}
-                              {/* Render immediately for widget tools, even if result is null */}
-                              {(toolCall.result ||
-                                isWidgetTool(toolCall.toolName)) && (
-                                <div data-tool-call-id={toolCallKey}>
-                                  <ToolResultRenderer
-                                    toolName={toolCall.toolName}
-                                    toolArgs={toolCall.args}
-                                    result={toolCall.result || null}
-                                    serverId={serverId}
-                                    readResource={readResource}
-                                    serverBaseUrl={serverBaseUrl}
-                                    toolMeta={getToolMeta(toolCall.toolName)}
-                                    onSendFollowUp={handleFollowUp}
-                                  />
-                                </div>
-                              )}
+                              {/* Render tool result / widget */}
+                              {/* Render immediately for widget tools or streaming tools, even if result is null */}
+                              {renderToolResults &&
+                                (toolCall.result ||
+                                  isWidgetTool(toolCall.toolName)) && (
+                                  <div data-tool-call-id={toolCallKey}>
+                                    <ToolResultRenderer
+                                      toolName={toolCall.toolName}
+                                      toolArgs={toolCall.args}
+                                      result={toolCall.result || null}
+                                      serverId={serverId}
+                                      readResource={readResource}
+                                      toolMeta={getToolMeta(toolCall.toolName)}
+                                      onSendFollowUp={handleFollowUp}
+                                      modelContextScope={modelContextScope}
+                                      llmConfig={llmConfig}
+                                    />
+                                  </div>
+                                )}
                             </div>
                           );
                         })}
@@ -331,23 +366,6 @@ export const MessageList = memo(
 
           return null;
         })}
-
-        {/* Inline elicitation cards — shown when a tool triggers elicitation during chat */}
-        {pendingElicitationRequests &&
-          pendingElicitationRequests.length > 0 &&
-          onApproveElicitation &&
-          onRejectElicitation && (
-            <div className="space-y-3">
-              {pendingElicitationRequests.map((req) => (
-                <InlineElicitationCard
-                  key={req.id}
-                  request={req}
-                  onApprove={onApproveElicitation}
-                  onReject={onRejectElicitation}
-                />
-              ))}
-            </div>
-          )}
 
         {/* Thinking indicator - only show when actually thinking, not streaming */}
         {isThinking && (
@@ -366,7 +384,6 @@ export const MessageList = memo(
           </div>
         )}
 
-        {/* Reference for scrolling to bottom */}
         <div ref={messagesEndRef} />
       </div>
     );

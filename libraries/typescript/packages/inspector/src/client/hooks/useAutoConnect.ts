@@ -1,25 +1,46 @@
-import type { McpServer } from "mcp-use/react";
+import type { McpServer, McpServerConfig } from "@mcp-use/client/react";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
+import {
+  getDefaultInspectorProxyAddress,
+  normalizeConnectionMode,
+  protocolModeFromNegotiation,
+  protocolNegotiationForMode,
+  toMcpServerConfig,
+  type ConnectionMode,
+} from "@/client/utils/connectionUpdates";
+import { getInspectorBase } from "@/client/utils/basePath";
 
 /** Survives full page reload; avoids fragile long JSON in query (was resolving to localhost + http). */
 export const INSPECTOR_RECONNECT_STORAGE_KEY = "__mcpUseInspectorReconnect";
 
-// Type alias for backward compatibility
-type MCPConnection = McpServer;
+/** Sync check on first paint — avoids a dashboard flash before useAutoConnect runs. */
+export function detectPendingAutoConnect(search?: string): boolean {
+  const resolvedSearch =
+    search ?? (typeof window !== "undefined" ? window.location.search : "");
+
+  if (typeof window !== "undefined") {
+    try {
+      if (sessionStorage.getItem(INSPECTOR_RECONNECT_STORAGE_KEY)) return true;
+    } catch {
+      // sessionStorage unavailable
+    }
+
+    // Legacy runtime config injected by older server-managed Inspector shells.
+    const shellAutoConnectUrl = (
+      window as Window & { __MCP_USE_INSPECTOR__?: { autoConnectUrl?: string } }
+    ).__MCP_USE_INSPECTOR__?.autoConnectUrl;
+    if (shellAutoConnectUrl) return true;
+  }
+
+  const params = new URLSearchParams(resolvedSearch);
+  return !!params.get("autoConnect");
+}
 
 interface UseAutoConnectOptions {
-  connections: MCPConnection[];
-  addConnection: (
-    url: string,
-    name?: string,
-    proxyConfig?: {
-      proxyAddress?: string;
-      customHeaders?: Record<string, string>;
-    },
-    transportType?: "http" | "sse"
-  ) => void;
+  connections: McpServer[];
+  addServer: (id: string, config: McpServerConfig) => void;
   removeConnection: (id: string) => void;
   configLoaded: boolean;
   embedded?: boolean;
@@ -34,7 +55,15 @@ interface ConnectionConfig {
   url: string;
   name: string;
   transportType: "http" | "sse";
-  connectionType: "Direct" | "Via Proxy";
+  connectionMode: ConnectionMode;
+  connectionType?: "Direct" | "Via Proxy";
+  autoProxyFallback?:
+    | boolean
+    | {
+        enabled?: boolean;
+        proxyAddress?: string;
+      };
+  protocolNegotiation?: McpServerConfig["protocolNegotiation"];
   customHeaders?: Record<string, string>;
   requestTimeout?: number;
   resetTimeoutOnProgress?: boolean;
@@ -46,6 +75,27 @@ interface ConnectionConfig {
     refresh_token?: string;
     scope?: string;
   };
+}
+
+export function shouldReplaceAutoConnectConnection(
+  existing: {
+    url?: string;
+    state?: string;
+    transportType?: "http" | "sse";
+    protocolNegotiation?: McpServerConfig["protocolNegotiation"];
+  },
+  config: Pick<
+    ConnectionConfig,
+    "url" | "transportType" | "protocolNegotiation"
+  >
+): boolean {
+  return (
+    existing.url === config.url &&
+    existing.state !== "ready" &&
+    ((existing.transportType ?? "http") !== config.transportType ||
+      protocolModeFromNegotiation(existing.protocolNegotiation) !==
+        protocolModeFromNegotiation(config.protocolNegotiation))
+  );
 }
 
 /**
@@ -96,6 +146,7 @@ function parseAutoConnectParam(param: string): ConnectionConfig | null {
       name: "Auto-connected Server",
       transportType: "http",
       connectionType: "Direct",
+      connectionMode: "auto",
     };
   }
 
@@ -159,8 +210,17 @@ function parseAutoConnectParam(param: string): ConnectionConfig | null {
           url: url,
           name: parsed.name || "Auto-connected Server",
           transportType: parsed.transportType === "sse" ? "sse" : "http",
+          connectionMode: normalizeConnectionMode(
+            parsed.connectionMode,
+            parsed.connectionType,
+            !!parsed.proxyConfig?.proxyAddress
+          ),
           connectionType:
             parsed.connectionType === "Via Proxy" ? "Via Proxy" : "Direct",
+          autoProxyFallback: parsed.autoProxyFallback,
+          protocolNegotiation: protocolNegotiationForMode(
+            protocolModeFromNegotiation(parsed.protocolNegotiation)
+          ),
           customHeaders: parsed.customHeaders || {},
           requestTimeout: parsed.requestTimeout,
           resetTimeoutOnProgress: parsed.resetTimeoutOnProgress,
@@ -190,6 +250,7 @@ function parseAutoConnectParam(param: string): ConnectionConfig | null {
           name: "Auto-connected Server",
           transportType: "http",
           connectionType: "Direct",
+          connectionMode: "auto",
         };
       }
       console.warn(
@@ -218,7 +279,7 @@ function parseAutoConnectParam(param: string): ConnectionConfig | null {
  * Note: Proxy fallback is handled automatically by useMcp's built-in autoProxyFallback.
  *
  * @param options - Configuration for auto-connect behavior. Includes the current `connections`
- *   list, `addConnection`/`removeConnection` callbacks, `configLoaded` from context, and
+ *   list, `addServer`/`removeConnection` callbacks, `configLoaded` from context, and
  *   `embedded` (when `true`, limits persistence of stored OAuth tokens / uses session-like storage).
  * @returns An object with the auto-connect state:
  *   - `isAutoConnecting`: `true` when an automatic connection attempt is active, `false` otherwise.
@@ -226,13 +287,15 @@ function parseAutoConnectParam(param: string): ConnectionConfig | null {
  */
 export function useAutoConnect({
   connections,
-  addConnection,
-  removeConnection: _removeConnection,
+  addServer,
+  removeConnection,
   configLoaded: contextConfigLoaded,
   embedded = false,
 }: UseAutoConnectOptions): AutoConnectState {
   const navigate = useNavigate();
-  const [isAutoConnecting, setIsAutoConnecting] = useState(false);
+  const [isAutoConnecting, setIsAutoConnecting] = useState(() =>
+    detectPendingAutoConnect()
+  );
   const [autoConnectConfig, setAutoConnectConfig] =
     useState<ConnectionConfig | null>(null);
   const [configLoaded, setConfigLoaded] = useState(false);
@@ -240,8 +303,15 @@ export function useAutoConnect({
   // Unified connection attempt function
   const attemptConnection = useCallback(
     (config: ConnectionConfig) => {
-      const { url, name, transportType, connectionType, customHeaders, auth } =
-        config;
+      const {
+        url,
+        name,
+        transportType,
+        connectionMode,
+        protocolNegotiation,
+        customHeaders,
+        auth,
+      } = config;
 
       console.log("[useAutoConnect] Config received:", config);
       console.log(
@@ -302,30 +372,59 @@ export function useAutoConnect({
         const targetOrigin = new URL(url).origin;
         const inspectorOrigin = window.location.origin;
         if (inspectorOrigin !== targetOrigin) {
-          proxyAddress = `${inspectorOrigin}/inspector/api/proxy`;
+          proxyAddress = getDefaultInspectorProxyAddress();
         }
       } catch {
-        proxyAddress = `${window.location.origin}/inspector/api/proxy`;
+        proxyAddress = getDefaultInspectorProxyAddress();
       }
 
-      const proxyConfig: {
-        proxyAddress?: string;
-        headers?: Record<string, string>;
-      } = {
-        ...(proxyAddress ? { proxyAddress } : {}),
-        ...(Object.keys(finalCustomHeaders).length > 0 && {
-          headers: finalCustomHeaders,
-        }),
-      };
+      const proxyConfig:
+        | {
+            proxyAddress?: string;
+            headers?: Record<string, string>;
+          }
+        | undefined =
+        connectionMode === "proxy" && proxyAddress
+          ? {
+              proxyAddress,
+              ...(Object.keys(finalCustomHeaders).length > 0 && {
+                headers: finalCustomHeaders,
+              }),
+            }
+          : Object.keys(finalCustomHeaders).length > 0
+            ? { headers: finalCustomHeaders }
+            : undefined;
+
+      const autoProxyFallback =
+        connectionMode === "auto"
+          ? config.autoProxyFallback !== undefined
+            ? config.autoProxyFallback
+            : proxyAddress
+              ? { enabled: true, proxyAddress }
+              : false
+          : false;
 
       console.warn(
-        `[useAutoConnect] Attempting connection (${connectionType}):`,
-        { url, transportType, proxyConfig }
+        `[useAutoConnect] Attempting connection (${connectionMode}):`,
+        { url, transportType, proxyConfig, autoProxyFallback }
       );
 
-      addConnection(url, name, proxyConfig, transportType);
+      addServer(
+        url,
+        toMcpServerConfig({
+          url,
+          name,
+          transportType,
+          connectionMode,
+          protocolNegotiation: protocolNegotiation ?? "auto",
+          connectionType: connectionMode === "proxy" ? "Via Proxy" : "Direct",
+          proxyConfig,
+          headers: finalCustomHeaders,
+          autoProxyFallback,
+        })
+      );
     },
-    [addConnection]
+    [addServer]
   );
 
   // Helper to handle auto-connect for a config
@@ -334,6 +433,17 @@ export function useAutoConnect({
       const existing = connections.find((c) => c.url === config.url);
 
       if (existing) {
+        if (shouldReplaceAutoConnectConnection(existing, config)) {
+          console.warn(
+            "[useAutoConnect] Existing connection transport differs from auto-connect config; replacing it"
+          );
+          removeConnection(existing.id);
+          setAutoConnectConfig(config);
+          setIsAutoConnecting(true);
+          attemptConnection(config);
+          return;
+        }
+
         // Connection already exists
         if (existing.state === "ready") {
           // Already connected - navigate immediately
@@ -366,7 +476,7 @@ export function useAutoConnect({
         attemptConnection(config);
       }
     },
-    [connections, navigate, attemptConnection]
+    [connections, navigate, removeConnection, attemptConnection]
   );
 
   // Load config and initiate auto-connect
@@ -472,8 +582,26 @@ export function useAutoConnect({
       return;
     }
 
+    // Serialized runtime config injected by the SDK v2 Inspector shell
+    // (window.__MCP_USE_INSPECTOR__) — the shell has no inspector backend, so
+    // this replaces the config.json fetch below.
+    const shellAutoConnectUrl = (
+      window as Window & {
+        __MCP_USE_INSPECTOR__?: { autoConnectUrl?: string };
+      }
+    ).__MCP_USE_INSPECTOR__?.autoConnectUrl;
+    if (shellAutoConnectUrl) {
+      const config = parseAutoConnectParam(shellAutoConnectUrl);
+      if (config) {
+        handleAutoConnectConfig(config);
+      }
+
+      setConfigLoaded(true);
+      return;
+    }
+
     // Fallback to config.json
-    fetch("/inspector/config.json")
+    fetch(`${getInspectorBase()}/config.json`)
       .then((res) => res.json())
       .then((configData: { autoConnectUrl: string | null }) => {
         setConfigLoaded(true);

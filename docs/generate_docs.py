@@ -1195,11 +1195,18 @@ def generate_module_docs(module_name: str, output_dir: str) -> None:
         "description": description,
         "icon": icon,
         "github": github_url,
+        # Keep the auto-generated API reference visible in the sidebar but out
+        # of search indexing (search engines, internal docs search, and AI
+        # context), so generic queries surface curated guides. See MCP-2398.
+        "noindex": True,
     }
 
     content.append("---")
     for key, value in frontmatter.items():
-        content.append(f'{key}: "{value}"')
+        if isinstance(value, bool):
+            content.append(f"{key}: {str(value).lower()}")
+        else:
+            content.append(f'{key}: "{value}"')
     content.append("---")
     content.append("")
     content.append('import {RandomGradientBackground} from "/snippets/gradient.jsx"')

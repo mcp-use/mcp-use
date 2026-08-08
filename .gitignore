@@ -182,4 +182,7 @@ conf.yaml
 .cursor
 .cursorrules
 .claude
+
+# Local pnpm store
+.pnpm-store/
 .mcp-use/

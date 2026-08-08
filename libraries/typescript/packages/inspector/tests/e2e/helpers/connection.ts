@@ -6,7 +6,7 @@ import { getTestMatrix } from "./test-matrix";
 const CI_MULTIPLIER = process.env.CI ? 3 : 1;
 
 /**
- * Wait for HMR reload to propagate. Use after modifying server or widget files.
+ * Wait for HMR reload to propagate. Use after modifying server or view files.
  * Gives the dev server time to rebuild and the Inspector time to reflect changes.
  */
 export async function waitForHMRReload(
@@ -15,41 +15,6 @@ export async function waitForHMRReload(
 ): Promise<void> {
   const minMs = options?.minMs ?? 2500;
   await page.waitForTimeout(minMs);
-}
-
-/**
- * Pre-warm widgets by fetching their URLs to trigger Vite build.
- * This eliminates cold start delays when widgets are first rendered in tests.
- * Only runs when Vite dev server is active (TEST_SERVER_MODE=builtin-dev).
- */
-export async function warmWidgets(
-  page: Page,
-  widgetNames: string[]
-): Promise<void> {
-  const { supportsHMR, serverUrl } = getTestMatrix();
-
-  // Only warm widgets in dev mode with Vite
-  if (!supportsHMR) {
-    return;
-  }
-
-  // Extract base URL from server URL (remove /mcp path)
-  const baseUrl = serverUrl.replace(/\/mcp$/, "");
-
-  // Fetch each widget URL to trigger Vite transformation
-  await Promise.all(
-    widgetNames.map(async (widgetName) => {
-      try {
-        await page.request.get(
-          `${baseUrl}/mcp-use/widgets/${widgetName}/index.html`,
-          { timeout: 10000 * CI_MULTIPLIER }
-        );
-      } catch (e) {
-        // Ignore errors - widget may not exist or build may fail
-        // Tests will fail later if widget is actually broken
-      }
-    })
-  );
 }
 
 /**
@@ -71,48 +36,41 @@ export async function connectToConformanceServer(page: Page) {
 }
 
 /**
- * Wait for widget tools to be registered on the server.
- * Widget tools are auto-registered from the resources/ directory.
- * This prevents race conditions where tests run before widgets finish registering.
- *
- * After HMR events (especially from other tests), widget tools may not be immediately
- * available. This function handles that by:
- * 1. First waiting briefly for widgets to appear
- * 2. If not found, reloading the page to get fresh tools list
- * 3. Then waiting again with full timeout
+ * Wait for the conformance tools used by view tests to be visible.
  *
  * @param page - Playwright page object
  * @param options - Optional configuration
- * @param options.skipIfMissing - If true, silently skip if widgets are not found (default: false)
+ * @param options.skipIfMissing - If true, silently skip if the tools are not found
  */
-export async function waitForWidgetTools(
+export async function waitForViewTools(
   page: Page,
   options?: { skipIfMissing?: boolean }
 ) {
   const skipIfMissing = options?.skipIfMissing ?? false;
 
   if (skipIfMissing) {
-    // Try to wait for widgets, but don't fail if they're not present
-    // This is useful for HMR tests that start with a minimal server configuration
+    // HMR tests can start from a temporarily incomplete server definition.
     try {
+      await expect(
+        page.getByTestId("tool-item-get-weather-delayed")
+      ).toBeVisible({
+        timeout: 2000 * CI_MULTIPLIER,
+      });
       await expect(
         page.getByTestId("tool-item-apps-sdk-only-card")
       ).toBeVisible({
         timeout: 2000 * CI_MULTIPLIER,
       });
-      await expect(page.getByTestId("tool-item-display-info")).toBeVisible({
-        timeout: 2000 * CI_MULTIPLIER,
-      });
     } catch {
-      // Widgets not present, continue anyway
+      // Tools not present, continue anyway.
     }
   } else {
-    // Wait for auto-registered widget tools to appear
-    // These are registered asynchronously after the server starts
+    await expect(page.getByTestId("tool-item-get-weather-delayed")).toBeVisible(
+      {
+        timeout: 10000 * CI_MULTIPLIER,
+      }
+    );
     await expect(page.getByTestId("tool-item-apps-sdk-only-card")).toBeVisible({
-      timeout: 10000 * CI_MULTIPLIER,
-    });
-    await expect(page.getByTestId("tool-item-display-info")).toBeVisible({
       timeout: 10000 * CI_MULTIPLIER,
     });
   }
@@ -127,8 +85,7 @@ export async function navigateToTools(page: Page) {
   await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
   await expect(page.getByTestId("tool-item-test_simple_text")).toBeVisible();
 
-  // Wait for widget tools to be registered to avoid race conditions
-  await waitForWidgetTools(page);
+  await waitForViewTools(page);
 }
 
 /**
@@ -137,24 +94,119 @@ export async function navigateToTools(page: Page) {
  *
  * @param page - Playwright page object
  * @param options - Optional configuration
- * @param options.waitForWidgets - Whether to wait for widget tools (default: false for HMR tests)
+ * @param options.waitForViews - Whether to wait for view-related tools (default: false for HMR tests)
  */
 export async function goToInspectorWithAutoConnectAndOpenTools(
   page: Page,
-  options?: { waitForWidgets?: boolean }
+  options?: { waitForViews?: boolean }
 ) {
   const { inspectorUrl, serverUrl, usesBuiltinInspector } = getTestMatrix();
-  const waitForWidgets = options?.waitForWidgets ?? false;
+  const waitForViews = options?.waitForViews ?? false;
   const url = `${inspectorUrl}?autoConnect=${encodeURIComponent(serverUrl)}`;
   await page.goto(usesBuiltinInspector ? inspectorUrl : url);
   await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
   await expect(page.getByTestId("tool-item-test_simple_text")).toBeVisible();
 
-  // Wait for widget tools to be registered if requested (ui-widgets tests)
-  // HMR tests skip this since they start with a minimal server
-  if (waitForWidgets) {
-    await waitForWidgetTools(page);
+  if (waitForViews) {
+    await waitForViewTools(page);
   }
+}
+
+/**
+ * Simulate the hosted inspector (e.g. inspector.manufact.com) by injecting the
+ * runtime `window.__MANUFACT_CHAT_URL__` the server normally bakes in. This
+ * flips the Chat tab to route through the managed cloud backend at `chatApiUrl`.
+ *
+ * Must be called before navigating to the inspector. Returns a list that
+ * records every request made to the cloud chat endpoint, so tests can assert
+ * whether (or not) chat was routed there.
+ */
+export async function enableHostedChatMode(
+  page: Page,
+  cloudChatUrl: string,
+  opts?: { mockLlmProxy?: boolean | "login-required" | "success" }
+): Promise<{
+  calls: string[];
+  llmCalls: string[];
+  llmAuthorizations: string[];
+}> {
+  await page.addInitScript((url) => {
+    (
+      window as unknown as { __MANUFACT_CHAT_URL__?: string }
+    ).__MANUFACT_CHAT_URL__ = url;
+  }, cloudChatUrl);
+
+  // Record + short-circuit any call to the cloud endpoint so the test never
+  // depends on a real backend and a regression surfaces immediately.
+  const calls: string[] = [];
+  const llmCalls: string[] = [];
+  const llmAuthorizations: string[] = [];
+  await page.route(`${cloudChatUrl}**`, async (route) => {
+    calls.push(route.request().url());
+    await route.fulfill({ status: 502, body: "Bad Gateway" });
+  });
+
+  if (opts?.mockLlmProxy) {
+    const llmBase = cloudChatUrl.replace(/\/chat\/stream\/?$/, "/llm");
+    await page.route(`${llmBase}/**`, async (route) => {
+      llmCalls.push(route.request().url());
+      llmAuthorizations.push(
+        (await route.request().allHeaders()).authorization ?? ""
+      );
+      if (opts.mockLlmProxy === "login-required") {
+        await route.fulfill({
+          status: 429,
+          contentType: "application/json",
+          body: JSON.stringify({
+            error: "rate_limited",
+            loginRequired: true,
+            loginUrl: "https://manufact.com/login",
+          }),
+        });
+        return;
+      }
+      const sse = [
+        'data: {"choices":[{"delta":{"content":"4"}}]}\n\n',
+        'data: {"choices":[{"finish_reason":"stop"}]}\n\n',
+        "data: [DONE]\n\n",
+      ].join("");
+      await route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body: sse,
+      });
+    });
+  }
+
+  // Hosted identity discovers the cloud OAuth provider on mount. Stub an
+  // anonymous provider so tests never reach the real cloud backend.
+  const cloudOrigin = new URL(cloudChatUrl).origin;
+  await page.route(`${cloudOrigin}/api/auth/get-session**`, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      headers: { "Access-Control-Allow-Origin": "*" },
+      body: "null",
+    });
+  });
+  await page.route(
+    `${cloudOrigin}/api/auth/.well-known/openid-configuration**`,
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        headers: { "Access-Control-Allow-Origin": "*" },
+        body: JSON.stringify({
+          authorization_endpoint: `${cloudOrigin}/api/auth/oauth2/authorize`,
+          token_endpoint: `${cloudOrigin}/api/auth/oauth2/token`,
+          userinfo_endpoint: `${cloudOrigin}/api/auth/oauth2/userinfo`,
+          registration_endpoint: `${cloudOrigin}/api/auth/oauth2/register`,
+        }),
+      });
+    }
+  );
+
+  return { calls, llmCalls, llmAuthorizations };
 }
 
 /**
