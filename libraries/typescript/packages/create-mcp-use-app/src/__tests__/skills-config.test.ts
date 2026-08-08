@@ -10,6 +10,7 @@ import {
 describe("release-channel configuration", () => {
   it.each([
     ["2.0.0-beta.15", "beta", "beta"],
+    ["2.0.2-canary.0", "canary", "canary"],
     ["2.0.0", "latest", "main"],
   ] as const)(
     "maps create-mcp-use-app@%s to npm %s and skill branch %s",
