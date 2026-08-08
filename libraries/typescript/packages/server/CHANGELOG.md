@@ -1,5 +1,12 @@
 # mcp-use
 
+## 3.0.0-canary.11
+
+### Patch Changes
+
+- 12bf15e: Fix Turbopack builds for Next.js servers using Skills over MCP.
+  - @mcp-use/inspector@21.0.0-canary.11
+
 ## 3.0.0-canary.10
 
 ### Patch Changes
