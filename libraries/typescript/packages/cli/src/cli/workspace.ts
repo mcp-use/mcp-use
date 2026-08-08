@@ -15,7 +15,7 @@
  * ```text
  * .mcp-use/
  * ├─ build/        ← compiled server + manifest.json (this package)
- * ├─ generated/    ← output of the typegen escape-hatch command — reserved (VIEWS_SPEC.md)
+ * ├─ generated/    ← output of the reserved typegen escape-hatch command
  * ├─ cache/        ← disposable dev/build scratch
  * ├─ state/        ← mutable runtime state (e.g. tunnel.json)
  * └─ cloud/        ← cloud linkage (link.json)
@@ -79,7 +79,7 @@ interface WorkspacePaths {
   build: string;
   /**
    * Generated `.d.ts` artifacts directory — reserved for the typegen
-   * escape-hatch command (VIEWS_SPEC.md § Typegen, demoted).
+   * escape-hatch command.
    */
   generated: string;
   /** Disposable dev/build scratch directory. */
