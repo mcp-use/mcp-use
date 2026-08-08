@@ -1,0 +1,142 @@
+---
+title: "ErrorBoundary"
+description: "React error boundary component for graceful error handling in widgets API Documentation"
+icon: "shield-alert"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/react/ErrorBoundary.tsx"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/react/ErrorBoundary.tsx' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/react/ErrorBoundary.tsx</a>
+</Callout>
+
+`ErrorBoundary` is a React class component that catches JavaScript errors anywhere in its child component tree, logs those errors, and renders a fallback UI instead of crashing the entire widget. It extends `React.Component` and implements `getDerivedStateFromError` and `componentDidCatch`, so it stops error propagation at the boundary and keeps the rest of the host application alive.
+
+## ErrorBoundary
+
+Catches React errors in the child component tree, logs them, and displays a fallback UI instead of crashing the entire widget.
+
+```tsx
+import { ErrorBoundary } from "mcp-use/react";
+```
+
+Wraps a subtree and renders its children normally until a descendant throws during render, in a lifecycle method, or in a constructor. When an error is caught, the boundary updates its internal state (`{ hasError: true, error }`) and renders the fallback instead of the children.
+
+Behavior on a caught error:
+
+- It calls the static `getDerivedStateFromError(error)` to flip its state to `hasError: true` and store the `error`.
+- In `componentDidCatch(error, errorInfo)` it logs the error through the package logger as `"Widget Error:"` (logger name `"ErrorBoundary"`), then invokes the optional `onError` callback. Logging always happens whether or not `onError` is provided.
+- If a `fallback` prop is provided (any value other than `undefined`), it is rendered. A function `fallback` is called with the caught `Error` and its return value is rendered; a non-function `fallback` is rendered directly.
+- If no `fallback` is provided, it renders the built-in error card: a red-bordered, red-background container with a bold "Widget Error" heading and the `error.message` shown in a `pre` block with `whitespace-pre-wrap`. The card includes dark mode classes (`dark:bg-red-900/20 dark:text-red-100`) so it adapts to the host theme.
+
+The boundary only catches errors thrown during the React render lifecycle of its descendants. As with all React error boundaries, it does not catch errors in event handlers, asynchronous code (such as `setTimeout` or promise callbacks), server-side rendering, or errors thrown in the boundary itself.
+
+**Props**
+><ParamField body="children" type="React.ReactNode" required="true" >   The widget content to wrap. Rendered as-is while no error has been caught. </ParamField>
+><ParamField body="fallback" type="React.ReactNode | ((error: Error) => React.ReactNode)" >   Custom fallback UI to render when an error is caught. Pass a static node, or a function that receives the caught `Error` and returns a node. When omitted (`undefined`), the built-in red error card is shown instead. </ParamField>
+><ParamField body="onError" type="(error: Error, errorInfo: React.ErrorInfo) => void" >   Callback invoked when an error is caught, after the error is logged. Receives the `Error` and React's `errorInfo` (which includes `componentStack`). Useful for reporting to an analytics or monitoring service. </ParamField>
+
+**Signature**
+```ts wrap
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, { hasError: boolean; error: Error | null }>
+
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+  fallback?: React.ReactNode | ((error: Error) => React.ReactNode);
+  onError?: (error: Error, errorInfo: React.ErrorInfo) => void;
+}
+```
+
+### Basic usage
+
+Wrap any widget subtree to contain its render errors. While no error occurs, the children render normally.
+
+```tsx wrap
+import { ErrorBoundary } from "mcp-use/react";
+
+function MyWidget() {
+  return (
+    <ErrorBoundary>
+      <div>My widget content</div>
+    </ErrorBoundary>
+  );
+}
+```
+
+### Custom fallback
+
+Pass a `fallback` prop to replace the default red error card. A static node renders directly.
+
+```tsx wrap
+<ErrorBoundary fallback={<div>Something went wrong. Please try again.</div>}>
+  <MyWidget />
+</ErrorBoundary>
+```
+
+Pass a function to receive the caught `Error` and render details from it.
+
+```tsx wrap
+<ErrorBoundary
+  fallback={(error) => (
+    <div className="p-4 rounded bg-yellow-50 text-yellow-800">
+      <p className="font-bold">Oops!</p>
+      <p className="text-sm">{error.message}</p>
+    </div>
+  )}
+>
+  <MyWidget />
+</ErrorBoundary>
+```
+
+### Error callback
+
+Use `onError` to run a side effect (for example, reporting to analytics) when an error is caught. The callback receives the `Error` and React's `errorInfo`, whose `componentStack` describes where the error originated. Logging to the console happens regardless of whether `onError` is provided.
+
+```tsx wrap
+<ErrorBoundary
+  onError={(error, errorInfo) => {
+    analytics.track("widget_error", {
+      message: error.message,
+      stack: errorInfo.componentStack,
+    });
+  }}
+>
+  <MyWidget />
+</ErrorBoundary>
+```
+
+`fallback` and `onError` can be combined: the fallback controls what the user sees, while the callback handles the side effect.
+
+```tsx wrap
+<ErrorBoundary
+  fallback={<div>Something went wrong</div>}
+  onError={(error) => console.error("Widget crashed:", error)}
+>
+  <MyWidget />
+</ErrorBoundary>
+```
+
+### Automatic inclusion
+
+`ErrorBoundary` is included automatically when you use [`McpUseProvider`](/typescript/api-reference/react/mcpuseprovider), so you usually do not need to mount it yourself. The provider wraps your widget content with the boundary as the innermost wrapper, ensuring all render errors in the subtree are caught.
+
+```tsx wrap
+import { McpUseProvider } from "mcp-use/react";
+
+<McpUseProvider>
+  <MyWidget />
+</McpUseProvider>
+```
+
+### Default error display
+
+When no `fallback` is provided and an error is caught, the boundary renders a built-in card showing what went wrong:
+
+- A red-bordered, red-background error container.
+- A bold "Widget Error" heading.
+- The `error.message` rendered in a `pre` block with `whitespace-pre-wrap` so multi-line messages stay readable.
+- Dark mode classes so the card adapts to the host theme.
+
+## Related
+
+- [`McpUseProvider`](/typescript/api-reference/react/mcpuseprovider) includes `ErrorBoundary` automatically.
+- [`useWidget`](/typescript/api-reference/react/usewidget) is the widget hook for accessing props and actions.

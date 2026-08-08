@@ -85,7 +85,7 @@ class MCPAgent:
         pretty_print: bool = False,
         agent_id: str | None = None,
         api_key: str | None = None,
-        base_url: str = "https://cloud.mcp-use.com",
+        base_url: str = "https://cloud.manufact.com",
         callbacks: list | None = None,
         chat_id: str | None = None,
         retry_on_error: bool = True,

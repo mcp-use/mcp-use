@@ -1,0 +1,122 @@
+---
+title: "Elicitation schemas"
+description: "Migration from v1 enum elicitation helpers to Zod form schemas in mcp-use v2."
+icon: "list-checks"
+---
+
+<Callout type="warn" title="Removed in v2">
+  v1 enum elicitation helpers (`enumSchema`, `untitledEnum`, `titledEnum`,
+  `legacyEnum`, `untitledMultiEnum`, `titledMultiEnum`, and related types) are
+  not exported from `mcp-use` v2. Use Zod schemas with
+  [`ctx.elicit()`](/typescript/api-reference/server/tool-context#elicit)
+  instead.
+</Callout>
+
+In mcp-use v1, enum-style elicitation fields were built as raw JSON Schema
+fragments and composed with helpers exported from `mcp-use/server`. v2 uses
+stateless multi-round-trip elicitation: pass a Zod object schema to
+`ctx.elicit`, handle the `required` round when the client must collect input,
+then continue when the user accepts.
+
+See the [Elicitation guide](/typescript/server/elicitation) for form vs URL mode,
+client capability checks, and accept/decline/cancel handling. The
+[elicitation example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/elicitation)
+shows keyed form and URL flows on the native v2 API.
+
+## Migration map
+
+| v1 helper                                         | v2 replacement                                                                                                      |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `untitledEnum(["a", "b"])`                        | `z.enum(["a", "b"])`                                                                                                |
+| `titledEnum([{ value: "a", title: "Option A" }])` | `z.enum(["a", "b"]).describe("Human-readable label for the field")` — put display copy on the field or tool message |
+| `legacyEnum([{ value: "a", name: "Option A" }])`  | `z.enum(["a", "b"])` — legacy `enumNames` are not emitted; prefer field `.describe()`                               |
+| `untitledMultiEnum(["a", "b"])`                   | `z.array(z.enum(["a", "b"]))`                                                                                       |
+| `titledMultiEnum([{ value, title }])`             | `z.array(z.enum(["a", "b"]))` with a descriptive field `.describe()`                                                |
+| `enumSchema({ plan, features })`                  | `z.object({ plan, features })`                                                                                      |
+
+## Example
+
+v1 code that composed enum fragments:
+
+```ts wrap
+// v1 — removed
+import { enumSchema, titledEnum, untitledMultiEnum } from "mcp-use/server";
+
+const requestedSchema = enumSchema({
+  plan: titledEnum([
+    { value: "free", title: "Free" },
+    { value: "pro", title: "Pro" },
+  ]),
+  features: untitledMultiEnum(["analytics", "exports", "sso"]),
+});
+
+const result = await ctx.elicit({
+  message: "Choose your plan and features",
+  requestedSchema,
+});
+```
+
+v2 equivalent with Zod and keyed elicitation:
+
+```ts wrap
+import { MCPServer, text } from "mcp-use";
+import { z } from "zod";
+
+const planSchema = z.object({
+  plan: z.enum(["free", "pro"]).describe("Subscription plan"),
+  features: z
+    .array(z.enum(["analytics", "exports", "sso"]))
+    .describe("Enabled feature flags"),
+});
+
+server.tool(
+  {
+    name: "pick-options",
+    description: "Collect a plan and feature selection.",
+    inputSchema: z.object({}),
+  },
+  async (_params, ctx) => {
+    const result = await ctx.elicit(
+      "plan-selection",
+      "Choose your plan and features",
+      planSchema,
+    );
+
+    if (result.status === "required") {
+      return result.result;
+    }
+
+    if (result.status !== "accept") {
+      return text("Selection cancelled.");
+    }
+
+    return text(`Received: ${JSON.stringify(result.data)}`);
+  },
+);
+```
+
+## Raw JSON Schema
+
+If you still need a hand-written MCP schema, use the verbose
+[`ctx.elicit()` overload](/typescript/api-reference/server/tool-context#elicit)
+with `ElicitFormParams.requestedSchema`. Prefer Zod for new code — mcp-use
+validates accepted responses and infers TypeScript types from the schema.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Elicitation guide"
+    icon="check"
+    href="/typescript/server/elicitation"
+  >
+    When to use form vs URL mode and how to handle user decisions.
+  </Card>
+  <Card
+    title="Tool context: elicit"
+    icon="terminal"
+    href="/typescript/api-reference/server/tool-context#elicit"
+  >
+    Overloads, result types, timeouts, and validation errors.
+  </Card>
+</CardGroup>

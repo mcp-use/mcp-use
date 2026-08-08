@@ -1,20 +1,33 @@
 import { Button } from "@/client/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/client/components/ui/tooltip";
 import { cn } from "@/client/lib/utils";
-import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
-import { Send, Square } from "lucide-react";
+import type { Prompt } from "@mcp-use/client/react";
+import { ArrowUp, Loader2 } from "lucide-react";
 import React from "react";
+import type { ElicitResult } from "@mcp-use/client/react";
+import type { PendingElicitationRequest } from "@/client/types/pending-requests";
 import type { PromptResult } from "../../hooks/useMCPPrompts";
 import { ChatInput } from "./ChatInput";
+import { ModelConfigBadge } from "./providerMeta";
 import { PromptResultsList } from "./PromptResultsList";
 import { PromptsDropdown } from "./PromptsDropdown";
 import type { ToolInfo } from "./ToolSelector";
-import type { MessageAttachment } from "./types";
+import type { LLMConfig, MessageAttachment } from "./types";
+import { FloatingChatElicitation } from "./FloatingChatElicitation";
+import { SystemPromptButton } from "./SystemPromptButton";
+import type { ChatSystemPromptProvider } from "./system-prompt/types";
 
 interface ChatInputAreaProps {
+  variant?: "default" | "fullscreen";
   inputValue: string;
   isConnected: boolean;
   isLoading: boolean;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  llmConfig: LLMConfig | null;
   promptsDropdownOpen: boolean;
   promptFocusedIndex: number;
   prompts: Prompt[];
@@ -30,21 +43,47 @@ interface ChatInputAreaProps {
   onClick: () => void;
   onSendMessage: () => void;
   onStopStreaming: () => void;
+  onConfigDialogOpenChange: (open: boolean) => void;
   onPromptSelect: (prompt: Prompt) => void;
   onDeletePromptResult: (index: number) => void;
   onAttachmentAdd: (file: File) => void;
   onAttachmentRemove: (index: number) => void;
+  /** When true, hides the model badge in the input toolbar. */
+  hideModelBadge?: boolean;
+  /**
+   * When set (hosted-managed mode), keeps the model badge visible for upgrade
+   * even when `hideModelBadge` is true.
+   */
+  freeTierInfo?: {
+    onLoginClick: () => void;
+  };
+  managedCloudInfo?: {
+    models: import("./useManagedCloudModel").CloudModel[];
+    selectedModelId: string;
+    onModelChange: (modelId: string) => void;
+    isLoading?: boolean;
+  };
+  modelBadgeMode?: "managed" | "byok";
+  modelDisplayName?: string;
   /** Optional followup suggestions rendered above the chat input. */
   followups?: string[];
   /** Called when a followup suggestion is selected. */
   onFollowupSelect?: (followup: string) => void;
+  /** Pending MCP elicitation requests — rendered floating above the composer. */
+  pendingElicitationRequests?: PendingElicitationRequest[];
+  onApproveElicitation?: (requestId: string, result: ElicitResult) => void;
+  onRejectElicitation?: (requestId: string, error?: string) => void;
+  /** Pluggable system prompt source (localStorage or host API). */
+  systemPromptProvider?: ChatSystemPromptProvider;
 }
 
 export function ChatInputArea({
+  variant = "default",
   inputValue,
   isConnected,
   isLoading,
   textareaRef,
+  llmConfig,
   promptsDropdownOpen,
   promptFocusedIndex,
   prompts,
@@ -60,21 +99,78 @@ export function ChatInputArea({
   onClick,
   onSendMessage,
   onStopStreaming,
+  onConfigDialogOpenChange,
   onPromptSelect,
   onDeletePromptResult,
   onAttachmentAdd,
   onAttachmentRemove,
+  hideModelBadge,
+  freeTierInfo,
+  managedCloudInfo,
+  modelBadgeMode = "byok",
+  modelDisplayName,
   followups = [],
   onFollowupSelect,
+  pendingElicitationRequests,
+  onApproveElicitation,
+  onRejectElicitation,
+  systemPromptProvider,
 }: ChatInputAreaProps) {
-  // Can send if there's text, prompt results, or attachments
+  const isFullscreen = variant === "fullscreen";
   const canSend =
     inputValue.trim() || promptResults.length > 0 || attachments.length > 0;
+  const hasPendingElicitation = (pendingElicitationRequests?.length ?? 0) > 0;
+
+  const modelBadge =
+    llmConfig && (!hideModelBadge || freeTierInfo || managedCloudInfo) ? (
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <ModelConfigBadge
+              provider={llmConfig.provider}
+              model={llmConfig.model}
+              displayName={modelDisplayName}
+              mode={modelBadgeMode}
+              className="shrink-0"
+              onClick={() => onConfigDialogOpenChange(true)}
+            />
+          }
+          nativeButton
+        />
+        <TooltipContent>
+          <p>
+            {managedCloudInfo || freeTierInfo
+              ? "Change model"
+              : "Change API Key"}
+          </p>
+        </TooltipContent>
+      </Tooltip>
+    ) : null;
 
   return (
-    <div className="w-full flex flex-col justify-center items-center p-2 sm:p-4 sm:pt-0 text-foreground">
-      <div className="relative w-full max-w-3xl backdrop-blur-xl">
-        {followups.length > 0 && (
+    <div
+      className={cn(
+        "w-full flex shrink-0 flex-col items-center px-2 pt-0 sm:px-4 text-foreground",
+        isFullscreen ? "pb-4 sm:pb-4" : "pb-2 sm:pb-2"
+      )}
+    >
+      <div
+        className={cn(
+          "relative w-full max-w-3xl",
+          !isFullscreen && "backdrop-blur-xl"
+        )}
+      >
+        {!isFullscreen &&
+          hasPendingElicitation &&
+          onApproveElicitation &&
+          onRejectElicitation && (
+            <FloatingChatElicitation
+              requests={pendingElicitationRequests!}
+              onApprove={onApproveElicitation}
+              onReject={onRejectElicitation}
+            />
+          )}
+        {!isFullscreen && followups.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-2">
             {followups.map((followup) => (
               <Button
@@ -91,63 +187,87 @@ export function ChatInputArea({
             ))}
           </div>
         )}
-        <PromptsDropdown
-          isOpen={promptsDropdownOpen}
-          prompts={prompts}
-          selectedPrompt={selectedPrompt}
-          focusedIndex={promptFocusedIndex}
-          onPromptSelect={onPromptSelect}
-        />
-        <PromptResultsList
-          promptResults={promptResults}
-          onDeletePromptResult={onDeletePromptResult}
-        />
+        {!isFullscreen && (
+          <>
+            <PromptsDropdown
+              isOpen={promptsDropdownOpen}
+              prompts={prompts}
+              selectedPrompt={selectedPrompt}
+              focusedIndex={promptFocusedIndex}
+              onPromptSelect={onPromptSelect}
+            />
+            <PromptResultsList
+              promptResults={promptResults}
+              onDeletePromptResult={onDeletePromptResult}
+            />
+          </>
+        )}
 
         <ChatInput
+          variant={variant}
           inputValue={inputValue}
           isConnected={isConnected}
           isLoading={isLoading}
           textareaRef={textareaRef}
           attachments={attachments}
-          placeholder="Ask a question"
+          placeholder="Ask a question or request an action..."
           className={cn(
-            "bg-zinc-50 z-10 focus:bg-zinc-100 dark:text-white dark:bg-black border-gray-200 dark:border-zinc-800",
-            promptResults.length > 0 && "pt-16"
+            "bg-white/80 dark:text-white dark:bg-black backdrop-blur-sm border-gray-200 dark:border-zinc-800",
+            !isFullscreen && promptResults.length > 0 && "pt-16"
           )}
-          tools={tools}
-          disabledTools={disabledTools}
-          onDisabledToolsChange={onDisabledToolsChange}
+          showAttachButton={!isFullscreen}
+          tools={isFullscreen ? undefined : tools}
+          disabledTools={isFullscreen ? undefined : disabledTools}
+          onDisabledToolsChange={
+            isFullscreen ? undefined : onDisabledToolsChange
+          }
           onInputChange={onInputChange}
           onKeyDown={onKeyDown}
           onKeyUp={onKeyUp}
           onClick={onClick}
           onAttachmentAdd={onAttachmentAdd}
           onAttachmentRemove={onAttachmentRemove}
+          inlineControls={
+            !isFullscreen && llmConfig && systemPromptProvider ? (
+              <SystemPromptButton
+                compact
+                value={systemPromptProvider.prompt}
+                onSave={systemPromptProvider.savePrompt}
+                disabled={
+                  !isConnected || isLoading || systemPromptProvider.disabled
+                }
+                isSaving={systemPromptProvider.isSaving}
+              />
+            ) : null
+          }
+          trailingControls={
+            <>
+              {!isFullscreen && modelBadge}
+              <Button
+                type="button"
+                size="sm"
+                className={cn(
+                  "h-8 w-8 rounded-full p-0",
+                  isLoading && "animate-spin",
+                  !canSend && !isLoading && "bg-zinc-400"
+                )}
+                disabled={
+                  !isLoading &&
+                  (!canSend || !isConnected || hasPendingElicitation)
+                }
+                title={isLoading ? "Stop streaming" : "Send"}
+                onClick={isLoading ? onStopStreaming : onSendMessage}
+                data-testid="chat-send-button"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <ArrowUp className="h-3.5 w-3.5" />
+                )}
+              </Button>
+            </>
+          }
         />
-
-        <div className="absolute right-0 p-3 bottom-0 flex items-center gap-2">
-          {isLoading ? (
-            <Button
-              className="min-w-none h-auto w-auto aspect-square rounded-full items-center justify-center flex"
-              title="Stop streaming"
-              type="button"
-              onClick={onStopStreaming}
-            >
-              <Square className="h-4 w-4" />
-            </Button>
-          ) : (
-            <Button
-              disabled={!canSend || !isConnected || isLoading}
-              className="min-w-none h-auto w-auto aspect-square rounded-full items-center justify-center flex"
-              title="Send"
-              type="button"
-              onClick={onSendMessage}
-              data-testid="chat-send-button"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
       </div>
     </div>
   );

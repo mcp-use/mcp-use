@@ -28,7 +28,7 @@ export function SavedPromptsList({
 }: SavedPromptsListProps) {
   if (savedPrompts.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-4 text-center">
+      <div className="flex flex-1 flex-col items-center justify-center p-4 text-center">
         <Clock className="h-12 w-12 text-gray-400 dark:text-gray-600 mb-3" />
         <p className="text-gray-500 dark:text-gray-400">No history</p>
         <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
@@ -39,14 +39,13 @@ export function SavedPromptsList({
   }
 
   return (
-    <div className="overflow-y-auto flex-1 border-r dark:border-zinc-700 overscroll-contain">
+    <div>
       {savedPrompts.map((prompt, index) => (
         <ListItem
           key={prompt.id}
           id={`saved-prompt-${prompt.id}`}
           isSelected={selectedPrompt?.id === prompt.id}
           isFocused={focusedIndex === index}
-          icon={<Clock className="h-4 w-4" />}
           title={prompt.name}
           description={`${prompt.promptName} - ${new Date(prompt.savedAt).toLocaleString()}`}
           onClick={() => onLoadPrompt(prompt)}

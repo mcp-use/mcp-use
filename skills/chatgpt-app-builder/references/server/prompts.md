@@ -9,7 +9,7 @@ Prompts are reusable message templates with parameters that help structure AI in
 ## Basic Prompt
 
 ```typescript
-import { MCPServer, text } from "mcp-use/server";
+import { MCPServer, text } from "mcp-use";
 import { z } from "zod";
 
 const server = new MCPServer({
@@ -230,7 +230,7 @@ server.prompt(
 For longer, structured prompts use `markdown()`:
 
 ```typescript
-import { markdown } from "mcp-use/server";
+import { markdown } from "mcp-use";
 
 server.prompt(
   {
@@ -411,7 +411,7 @@ server.prompt(
 Add autocomplete suggestions to prompt arguments using `completable()`:
 
 ```typescript
-import { MCPServer, text, completable } from "mcp-use/server";
+import { MCPServer, text, completable } from "mcp-use";
 import { z } from "zod";
 
 // Static list of suggestions
@@ -537,7 +537,7 @@ server.tool(
 ## Complete Example
 
 ```typescript
-import { MCPServer, text, markdown } from "mcp-use/server";
+import { MCPServer, text, markdown } from "mcp-use";
 import { z } from "zod";
 
 const server = new MCPServer({

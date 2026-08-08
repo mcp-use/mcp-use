@@ -3,42 +3,52 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { logger } from "hono/logger";
 import open from "open";
-import { registerInspectorRoutes } from "./shared-routes.js";
-import type { InspectorMode } from "./shared-static.js";
-import { registerStaticRoutes } from "./shared-static.js";
-import { setServerPort } from "./tunnel.js";
-import { findAvailablePort, isValidUrl } from "./utils.js";
+import { registerInspectorShell } from "./inspector-shell.js";
+import { registerInspectorProxyRoutes } from "./proxy-routes.js";
+import {
+  findAvailablePort,
+  formatErrorDiagnostic,
+  isValidUrl,
+} from "./utils.js";
+import { getInspectorVersion } from "./version.js";
 
-// Parse command line arguments
 const args = process.argv.slice(2);
 let mcpUrl: string | undefined;
 let startPort = 8080;
 let noOpen = false;
 
 for (let i = 0; i < args.length; i++) {
-  if (args[i] === "--url" && i + 1 < args.length) {
+  if (args[i] === "--url") {
+    if (i + 1 >= args.length || args[i + 1].startsWith("-")) {
+      console.error("Error: --url requires a value");
+      process.exit(1);
+    }
     const url = args[i + 1];
     if (!isValidUrl(url)) {
-      console.error(`Error: Invalid URL format: ${url}`);
+      console.error("Error: Invalid URL format.");
       console.error("URL must start with http://, https://, ws://, or wss://");
       process.exit(1);
     }
     mcpUrl = url;
     i++;
-  } else if (args[i] === "--port" && i + 1 < args.length) {
+  } else if (args[i] === "--port") {
+    if (i + 1 >= args.length || args[i + 1].startsWith("-")) {
+      console.error("Error: --port requires a value");
+      process.exit(1);
+    }
     const parsedPort = Number.parseInt(args[i + 1], 10);
     if (Number.isNaN(parsedPort) || parsedPort < 1 || parsedPort > 65535) {
-      console.error(
-        `Error: Port must be a number between 1 and 65535, got: ${args[i + 1]}`
-      );
+      console.error("Error: Port must be a number between 1 and 65535.");
       process.exit(1);
     }
     startPort = parsedPort;
     i++;
   } else if (args[i] === "--no-open") {
     noOpen = true;
+  } else if (args[i] === "--version" || args[i] === "-v") {
+    console.log(getInspectorVersion());
+    process.exit(0);
   } else if (args[i] === "--help" || args[i] === "-h") {
     console.log(`
 MCP Inspector - Inspect and debug MCP servers
@@ -50,55 +60,51 @@ Options:
   --url <url>    MCP server URL to auto-connect to (e.g., http://localhost:3000/mcp)
   --port <port>  Starting port to try (default: 8080, will find next available)
   --no-open      Do not auto-open inspector in browser
+  --version, -v  Show the inspector version
   --help, -h     Show this help message
 
 Examples:
-  # Run inspector with auto-connect
   npx @mcp-use/inspector --url http://localhost:3000/mcp
-
-  # Run starting from custom port
   npx @mcp-use/inspector --url http://localhost:3000/mcp --port 9000
-
-  # Run without auto-connect
   npx @mcp-use/inspector
 `);
     process.exit(0);
+  } else {
+    console.error("Error: Unknown option.");
+    console.error("Run with --help to see available options.");
+    process.exit(1);
   }
 }
 
 const app = new Hono();
 
-// Middleware - expose mcp-session-id for cross-origin requests (FastMCP session management)
 app.use(
   "*",
   cors({
     origin: "*",
-    exposeHeaders: ["*"], // Expose all headers since this is a proxy
+    exposeHeaders: ["*"],
   })
 );
-// Apply logger middleware only to proxy routes
-app.use("/inspector/api/proxy/*", logger());
+// The CLI is primarily local dev tooling, where proxying to localhost MCP
+// servers is the main use case — but the published Docker image runs this same
+// CLI with NODE_ENV=production on a public port, where loopback proxying is
+// SSRF into the container's own services. Allow loopback outside production;
+// INSPECTOR_ALLOW_LOOPBACK overrides either way.
+const allowLoopback = process.env.INSPECTOR_ALLOW_LOOPBACK
+  ? process.env.INSPECTOR_ALLOW_LOOPBACK === "true"
+  : process.env.NODE_ENV !== "production";
 
-registerInspectorRoutes(app, { autoConnectUrl: mcpUrl });
+registerInspectorProxyRoutes(app, {
+  autoConnectUrl: mcpUrl,
+  oauthProxyAllowedOrigins: [],
+  oauthProxyAllowLoopback: allowLoopback,
+});
 
-// Detect the deployment mode. The same CLI binary powers both local standalone
-// usage (`npx @mcp-use/inspector`) and the cloud-hosted Railway deployment at
-// inspector.mcpus.com — Railway sets RAILWAY_ENVIRONMENT_NAME, so we use that
-// as the primary cloud signal, with an explicit MCP_INSPECTOR_MODE override
-// for other hosted environments.
-const inspectorMode: InspectorMode =
-  (process.env.MCP_INSPECTOR_MODE as InspectorMode | undefined) ??
-  (process.env.RAILWAY_ENVIRONMENT_NAME ? "cloud" : "standalone");
-
-// Register static file serving (must be last as it includes catch-all route).
-// Runtime env vars here override what was baked in at `vite build` time — this
-// lets a single pre-built npm tarball be configured per deploy.
-registerStaticRoutes(app, undefined, {
-  inspectorMode,
+registerInspectorShell(app, {
+  inspectorMode: "standalone",
   manufactChatUrl: process.env.MANUFACT_CHAT_URL,
 });
 
-// Start the server with automatic port selection
 async function startServer() {
   try {
     const port = await findAvailablePort(startPort);
@@ -106,28 +112,32 @@ async function startServer() {
       fetch: app.fetch,
       port,
     });
-    setServerPort(port);
-    console.log(`🚀 MCP Inspector running on http://localhost:${port}`);
+    console.log(`MCP Inspector started at http://localhost:${port}/inspector`);
     if (mcpUrl) {
-      console.log(`📡 Auto-connecting to: ${mcpUrl}`);
+      console.log("Auto-connect configured.");
     }
-    // Auto-open browser (unless --no-open flag is present)
     if (!noOpen) {
+      const openUrl = new URL(`http://localhost:${port}/inspector`);
+      if (mcpUrl) {
+        openUrl.searchParams.set("autoConnect", mcpUrl);
+      }
       try {
-        await open(`http://localhost:${port}/inspector`);
-        console.log(`🌐 Browser opened`);
-      } catch {
+        await open(openUrl.toString());
+        console.log("Browser opened.");
+      } catch (error) {
         console.log(
-          `🌐 Please open http://localhost:${port}/inspector in your browser`
+          `Browser could not be opened automatically. Open ${openUrl.toString()} manually.`
         );
+        console.error(`Browser open error: ${formatErrorDiagnostic(error)}`);
       }
     }
     return { port, fetch: app.fetch };
   } catch (error) {
-    console.error("Failed to start server:", error);
+    console.error(
+      `Failed to start server (StartupError): ${formatErrorDiagnostic(error)}`
+    );
     process.exit(1);
   }
 }
 
-// Start the server
 startServer();

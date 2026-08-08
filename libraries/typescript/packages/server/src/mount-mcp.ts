@@ -1,0 +1,135 @@
+import {
+  createMcpHandler,
+  type AuthInfo,
+  type CreateMcpHandlerOptions,
+  type McpHttpHandler,
+  type McpServerFactory,
+} from "@modelcontextprotocol/server";
+
+import { trackBufferedResponse } from "./buffered-response.js";
+import { getRequestBag, matchesPath, type FetchHandler } from "./fetch-app.js";
+import {
+  extractClientCapabilitiesFromBody,
+  stashClientCapabilities,
+} from "./views/capabilities.js";
+
+/** Options for {@link createMcpMount}. */
+export interface MountMcpOptions {
+  /** Route path the MCP endpoint is served on. Defaults to `/mcp`. */
+  path?: string;
+  /**
+   * Options forwarded to the SDK's `createMcpHandler`.
+   *
+   * `legacy` defaults to `"stateless"`: 2025-era (non-envelope) requests are
+   * served by a fresh instance over a session-less streamable HTTP transport.
+   * Pass `legacy: "reject"` for modern-only strict serving, where
+   * legacy-classified requests get the unsupported-protocol-version error.
+   */
+  handler?: CreateMcpHandlerOptions;
+  /**
+   * Produce verified {@link AuthInfo} for the request before the SDK handler
+   * runs. When omitted, requests are served without authenticated identity.
+   */
+  authInfo?: (request: Request) => AuthInfo | undefined;
+}
+
+/** Result of {@link createMcpMount}. */
+export interface McpMount {
+  /** Underlying SDK handler (`close`, `notify`, `bus`). */
+  handler: McpHttpHandler;
+  /** Fetch handler for the MCP path only (compose into a larger app). */
+  fetch: FetchHandler;
+}
+
+/**
+ * Create the MCP Streamable HTTP endpoint as a fetch handler.
+ *
+ * Returns the underlying `McpHttpHandler` so callers can call `close()` on
+ * shutdown to abort in-flight exchanges, and use `notify`/`bus` for
+ * list-changed notifications.
+ *
+ * Compose the returned `fetch` into a larger app with {@link composeFetch}
+ * from `mcp-use`, and put Host/Origin validation in front when binding
+ * locally or exposing the process directly.
+ *
+ * @example
+ * ```ts
+ * const { handler, fetch: mcpFetch } = createMcpMount(factory);
+ * const app = composeFetch(mcpFetch, jsonBodyMiddleware(), hostValidationMiddleware(hosts));
+ * ```
+ */
+export function createMcpMount(
+  factory: McpServerFactory,
+  options: MountMcpOptions = {}
+): McpMount {
+  const {
+    path = "/mcp",
+    handler: handlerOptions,
+    authInfo: getAuthInfo,
+  } = options;
+  const legacyMode = handlerOptions?.legacy ?? "stateless";
+  const handler = createMcpHandler(factory, {
+    legacy: "stateless",
+    ...handlerOptions,
+  });
+
+  const fetch: FetchHandler = async (request) => {
+    if (!matchesPath(request, path)) {
+      return new Response("Not Found", { status: 404 });
+    }
+
+    // ponytail: stateless wire is POST-only; SDK GET/DELETE/HEAD probes are optional.
+    // 204 avoids browser console noise from 405 while remaining client-safe.
+    if (legacyMode === "stateless") {
+      const method = request.method.toUpperCase();
+      if (method === "GET" || method === "DELETE" || method === "HEAD") {
+        return new Response(null, { status: 204 });
+      }
+    }
+
+    const bag = getRequestBag(request);
+    let parsedBody = bag.parsedBody;
+    if (parsedBody === undefined) {
+      try {
+        parsedBody = await request.clone().json();
+      } catch {
+        // Non-JSON or empty body — the SDK handler will surface the error.
+      }
+    }
+
+    const capabilities = extractClientCapabilitiesFromBody(parsedBody);
+    if (capabilities !== undefined) {
+      stashClientCapabilities(request, capabilities);
+    }
+
+    const authInfo = getAuthInfo?.(request) ?? bag.authInfo;
+    const response = await handler.fetch(request, {
+      ...(parsedBody !== undefined && { parsedBody }),
+      ...(authInfo !== undefined && { authInfo }),
+    });
+    // The SDK currently constructs JSON replies with Response.json(), so these
+    // bodies are fully buffered. Record that contract at the SDK boundary
+    // instead of inferring it later from a content type that custom handlers
+    // may also use for genuinely streaming JSON.
+    const isJson = response.headers
+      .get("content-type")
+      ?.toLowerCase()
+      .includes("application/json");
+    if (!isJson) return response;
+
+    // Bun can drop a JSON stream returned directly from an async fetch
+    // handler. SDK JSON replies are already buffered, so materialize the body
+    // before returning it to Bun while keeping streaming SSE responses intact.
+    if ("Bun" in globalThis && response.body !== null) {
+      return new Response(await response.arrayBuffer(), {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+      });
+    }
+
+    return trackBufferedResponse(request, response);
+  };
+
+  return { handler, fetch };
+}

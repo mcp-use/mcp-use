@@ -1,0 +1,80 @@
+---
+title: "Examples"
+description: "Browse maintained MCP server examples by feature."
+icon: "code"
+---
+
+Canonical examples live under
+[`libraries/typescript/packages/server/examples`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples).
+They use the `mcp-use` package root. The repository's example registry declares
+which projects receive automated client or configuration verification.
+
+## Core protocol and lifecycle
+
+| Example                                                                                                                                                   | What it demonstrates                                                         |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| [`basic`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/basic)                                               | Tools, a resource, and a prompt                                              |
+| [`conformance`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/conformance)                                   | Protocol conformance fixtures; use focused examples for application patterns |
+| [`middleware`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/middleware)                                     | Request-scoped MCP middleware                                                |
+| [`notifications`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/notifications)                               | `subscriptions/listen` invalidations                                         |
+| [`sampling`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/sampling)                                         | The stateless server-side sampling boundary                                  |
+| [`security`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/security)                                         | Host and origin validation                                                   |
+| [`sessionless-lifecycle`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/sessionless-lifecycle)               | Request-scoped context without session affinity                              |
+| [`elicitation`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/elicitation)                                   | Form and URL input-required rounds                                           |
+| [`resource-template-completion`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/resource-template-completion) | Resource-template autocomplete                                               |
+| [`events`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/events)                                             | Read-only request observers                                                  |
+| [`proxy`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/proxy)                                               | Composing upstream MCP servers                                               |
+
+## Views
+
+The `views` directory contains complete MCP Apps examples:
+
+- [`views/basic`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/views/basic)
+- [`views/excalidraw`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/views/excalidraw)
+- [`views/file-upload`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/views/file-upload)
+- [`views/story-writer`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/views/story-writer)
+- [`views/tic-tac-toe`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/views/tic-tac-toe)
+- [`views/view-state`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/views/view-state)
+
+## Authentication
+
+Provider examples are under `examples/auth`:
+
+- [`auth0`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/auth/auth0)
+- [`better-auth`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/auth/better-auth)
+- [`clerk`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/auth/clerk)
+- [`keycloak`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/auth/keycloak)
+- [`supabase`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/auth/supabase)
+- [`workos`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/auth/workos)
+
+These projects require credentials and provider tenants, so repository
+verification checks their configuration rather than contacting live providers.
+
+## Runtime and deployment
+
+| Example                                                                                                                             | Target                          |
+| ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| [`nextjs`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/nextjs)                       | Drop-in Next.js route           |
+| [`nextjs-standalone`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/nextjs-standalone) | Standalone Next.js application  |
+| [`vercel`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/vercel)                       | Serverless Web `fetch` handler  |
+| [`railway`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/railway)                     | Railway deployment              |
+| [`openapi`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/openapi)                     | Generated tools for weather.gov |
+| [`public-landing`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/public-landing)       | Public server landing page      |
+
+## Create a project
+
+Choose the template explicitly:
+
+```bash
+npx create-mcp-use-app@latest my-server --template mcp-server
+npx create-mcp-use-app@latest my-app --template mcp-apps
+```
+
+Use `mcp-server` for a protocol server without a view and `mcp-apps` for an
+interactive MCP App.
+
+## External showcases
+
+Community and product showcases are not canonical repository fixtures. Check
+their source, ownership, deployment status, and hosted endpoint before relying
+on them; a repository example is the maintained reference for server behavior.

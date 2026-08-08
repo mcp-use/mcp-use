@@ -180,7 +180,7 @@ def function_name(param1: str, param2: int) -> bool:
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) 20 or higher (22 recommended)
+- [Node.js](https://nodejs.org/) 22 or higher
 - [pnpm](https://pnpm.io/installation) 10 or higher
 
 ### Monorepo Structure
@@ -192,8 +192,10 @@ libraries/typescript/
 ├── package.json          # Root workspace config
 ├── pnpm-workspace.yaml   # Workspace definition
 ├── packages/
-│   ├── mcp-use/          # Core library (npm: mcp-use)
-│   ├── cli/              # CLI tools (npm: @mcp-use/cli)
+│   ├── server/           # MCP framework and CLI (npm: mcp-use)
+│   ├── client/           # MCP client (npm: @mcp-use/client)
+│   ├── agent/            # MCP agent (npm: @mcp-use/agent)
+│   ├── cli/              # CLI shim (npm: @mcp-use/cli)
 │   ├── inspector/        # MCP Inspector (npm: @mcp-use/inspector)
 │   └── create-mcp-use-app/  # Project scaffolding CLI
 ```
@@ -203,7 +205,7 @@ libraries/typescript/
 - All packages share the same `node_modules` at the workspace root (efficient disk usage)
 - Packages can depend on each other using `workspace:*` protocol
 - Running `pnpm install` at the root installs dependencies for all packages
-- Running `pnpm build` builds packages in the correct dependency order (`mcp-use` first, then others)
+- Running `pnpm build` builds packages in the correct dependency order (`@mcp-use/client`, then `mcp-use`, then the rest)
 
 ### Setup
 

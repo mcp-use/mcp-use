@@ -1,0 +1,192 @@
+---
+title: "Interactivity"
+description: "Let a View call tools, send follow-up messages, open links, change display modes, and expose actions to the model."
+icon: "mouse-pointer-click"
+---
+
+Interactions in a View can target the MCP server, the model, the host, or the mounted UI. Choose the API based on where the action should happen.
+
+| You want to...                             | Use                 |
+| ------------------------------------------ | ------------------- |
+| Call a server tool from the View           | `useCallTool()`     |
+| Ask the model to continue the conversation | `useSendFollowUp()` |
+| Open a URL through the host                | `useOpenExternal()` |
+| Change how the host displays the View      | `useDisplayMode()`  |
+| Let the model act on the mounted View      | `useViewTool()`     |
+
+## Call a server tool
+
+Use `useCallTool()` when a button, form, or other control should call an MCP tool. The hook provides the last successful result, the latest error, and the current pending state.
+
+Export the tool reference returned by `server.tool()` so TypeScript can infer its input and output types in the View.
+
+```tsx
+import { useCallTool } from "mcp-use/react";
+
+export function FruitDetailsButton({ fruit }: { fruit: string }) {
+  const { callTool, data, error, isPending } = useCallTool("get-fruit-details");
+
+  async function loadFruitDetails() {
+    try {
+      await callTool({ fruit });
+    } catch {
+      // The hook exposes the failure through `error`.
+    }
+  }
+
+  return (
+    <section>
+      <button type="button" disabled={isPending} onClick={loadFruitDetails}>
+        {isPending ? "Loading..." : "View details"}
+      </button>
+
+      {error && <p role="alert">{error.message}</p>}
+
+      {data && <pre>{JSON.stringify(data.structuredContent, null, 2)}</pre>}
+    </section>
+  );
+}
+```
+
+`callTool()` rejects when the tool returns an error or the request fails. The hook also places that failure in `error` so the View can render it.
+
+## Ask the model to continue
+
+Use `useSendFollowUp()` when an action requires a new model turn. The prompt appears as a user-authored message in the conversation.
+
+```tsx
+import { useHostContext, useSendFollowUp } from "mcp-use/react";
+
+export function CompareButton({ fruit }: { fruit: string }) {
+  const { hostCapabilities } = useHostContext();
+  const sendFollowUp = useSendFollowUp();
+
+  if (hostCapabilities?.message === undefined) {
+    return null;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void sendFollowUp({
+          prompt: `Compare ${fruit} with similar fruits.`,
+        });
+      }}
+    >
+      Compare
+    </button>
+  );
+}
+```
+
+The promise resolves when the host accepts the message, not when the model responds. Use `useCallTool()` instead when the View already knows which server operation to perform.
+
+## Open an external link
+
+Views run in a sandbox. Use `useOpenExternal()` to ask the host to open a URL outside the View.
+
+```tsx
+import { useHostContext, useOpenExternal } from "mcp-use/react";
+
+export function ProducerLink({ url }: { url: string }) {
+  const { hostCapabilities } = useHostContext();
+  const openExternal = useOpenExternal();
+
+  if (hostCapabilities?.openLinks === undefined) {
+    return null;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void openExternal({ url });
+      }}
+    >
+      Visit producer
+    </button>
+  );
+}
+```
+
+The host decides whether and how to open the URL. It may ask the user for confirmation.
+
+## Change the display mode
+
+Use `useDisplayMode()` when a View needs more or less space. Only offer modes included in `availableDisplayModes`.
+
+```tsx
+import { useDisplayMode } from "mcp-use/react";
+
+export function ExpandButton() {
+  const { displayMode, availableDisplayModes, requestDisplayMode } =
+    useDisplayMode();
+
+  if (
+    displayMode === "fullscreen" ||
+    !availableDisplayModes.includes("fullscreen")
+  ) {
+    return null;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void requestDisplayMode({ mode: "fullscreen" });
+      }}
+    >
+      Expand
+    </button>
+  );
+}
+```
+
+A display-mode request is advisory. Read `displayMode` for the mode the host actually applies.
+
+## Let the model act on the View
+
+Use `useViewTool()` to expose an action that operates on the mounted UI. The tool exists while the component is mounted and its handler receives the latest React state.
+
+```tsx
+import { useViewTool } from "mcp-use/react";
+import { useState } from "react";
+import { z } from "zod";
+
+export function FruitResults() {
+  const [selectedFruit, setSelectedFruit] = useState<string>();
+
+  useViewTool(
+    {
+      name: "highlight-fruit",
+      description: "Highlight a fruit in the current results",
+      inputSchema: z.object({
+        fruit: z.string(),
+      }),
+    },
+    async ({ fruit }) => {
+      setSelectedFruit(fruit);
+
+      return {
+        content: [{ type: "text", text: `Highlighted ${fruit}` }],
+      };
+    },
+  );
+
+  return (
+    <p>
+      {selectedFruit === undefined
+        ? "No fruit selected"
+        : `Selected: ${selectedFruit}`}
+    </p>
+  );
+}
+```
+
+`useCallTool()` lets the View call the server. `useViewTool()` lets the host or model call the mounted View.
+
+## Next steps
+
+- Use [Model context](/v2/typescript/mcp-apps/model-context) to share View state and visible UI information with the model.
+- Configure [Content Security Policy](/v2/typescript/mcp-apps/content-security-policy) before connecting to external APIs or loading external assets.

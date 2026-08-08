@@ -1,0 +1,990 @@
+---
+title: "Sessions and streams"
+description: "Pluggable session storage and SSE stream management for MCP servers API Documentation"
+icon: "database"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/sessions/index.ts"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/sessions/index.ts' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/sessions/index.ts</a>
+</Callout>
+
+Session management is split into two concerns. A `SessionStore` persists serializable session metadata (client capabilities, log level, timestamps), while a `StreamManager` tracks active SSE connections that cannot be serialized (the `ReadableStreamDefaultController` for each stream). You pass an instance of each to the `MCPServer` constructor through the `sessionStore` and `streamManager` options. Everything on this page is exported from `mcp-use/server`.
+
+```ts
+import {
+  InMemorySessionStore,
+  FileSystemSessionStore,
+  RedisSessionStore,
+  InMemoryStreamManager,
+  RedisStreamManager,
+} from "mcp-use/server";
+```
+
+Pick a store and a stream manager based on your deployment:
+
+- Single instance, sessions can reset on restart: `InMemorySessionStore` + `InMemoryStreamManager` (the production defaults).
+- Single instance with hot reload, sessions should survive a restart: `FileSystemSessionStore` (the default when `NODE_ENV !== "production"`).
+- Distributed or load-balanced deployment: `RedisSessionStore` + `RedisStreamManager`.
+
+## InMemorySessionStore
+
+Default session storage backed by a JavaScript `Map`. Sessions live in memory and are lost on server restart. Suitable for development, single-instance deployments, and apps where losing sessions on restart is acceptable. Not suitable for distributed or horizontally scaled deployments. Implements `SessionStore`.
+
+```ts
+import { InMemorySessionStore } from "mcp-use/server";
+```
+
+Create an in-memory session store. Takes no arguments.
+
+**Signature**
+```ts wrap
+constructor()
+```
+
+### get
+
+Retrieve session metadata by ID. Returns `null` when the session is not present.
+
+**Parameters**
+><ParamField body="sessionId" type="string" required="true" >   The unique session identifier. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<SessionMetadata | null>" />
+
+**Signature**
+```ts wrap
+get(sessionId: string): Promise<SessionMetadata | null>
+```
+
+### set
+
+Store or update session metadata under a session ID.
+
+**Parameters**
+><ParamField body="sessionId" type="string" required="true" >   The unique session identifier. </ParamField>
+><ParamField body="data" type="SessionMetadata" required="true" >   Serializable session metadata to store. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Signature**
+```ts wrap
+set(sessionId: string, data: SessionMetadata): Promise<void>
+```
+
+### delete
+
+Remove session metadata for a session ID.
+
+**Parameters**
+><ParamField body="sessionId" type="string" required="true" >   The unique session identifier. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Signature**
+```ts wrap
+delete(sessionId: string): Promise<void>
+```
+
+### has
+
+Check whether session metadata exists for a session ID.
+
+**Parameters**
+><ParamField body="sessionId" type="string" required="true" >   The unique session identifier. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<boolean>" />
+
+**Signature**
+```ts wrap
+has(sessionId: string): Promise<boolean>
+```
+
+### keys
+
+List all stored session IDs.
+
+**Returns**
+><ResponseField name="returns" type="Promise<string[]>" />
+
+**Signature**
+```ts wrap
+keys(): Promise<string[]>
+```
+
+### setWithTTL
+
+Store session metadata that auto-expires after `ttlMs` milliseconds. The in-memory implementation schedules deletion with `setTimeout`, so the timer is lost on restart. For production TTL backed by the storage engine, use `RedisSessionStore`.
+
+**Parameters**
+><ParamField body="sessionId" type="string" required="true" >   The unique session identifier. </ParamField>
+><ParamField body="data" type="SessionMetadata" required="true" >   Serializable session metadata to store. </ParamField>
+><ParamField body="ttlMs" type="number" required="true" >   Time to live in milliseconds before the session is removed. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Signature**
+```ts wrap
+setWithTTL(sessionId: string, data: SessionMetadata, ttlMs: number): Promise<void>
+```
+
+### size
+
+The current number of active sessions. Read-only getter, useful for monitoring and debugging.
+
+**Returns**
+><ResponseField name="returns" type="number" />
+
+**Signature**
+```ts wrap
+get size(): number
+```
+
+### clear
+
+Remove all sessions from the store. Useful for testing and manual cleanup.
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Signature**
+```ts wrap
+clear(): Promise<void>
+```
+
+## FileSystemSessionStore
+
+Session storage that persists metadata to a JSON file on disk, so sessions survive server hot reloads (tsx, nodemon) without forcing clients to re-initialize. Writes use a debounced, write-to-temp-then-rename atomic pattern to avoid corruption. Designed for development with hot reload and single-instance deployments that need persistence. Not suitable for production or distributed deployments (use `InMemorySessionStore` or `RedisSessionStore`). Implements `SessionStore`.
+
+```ts
+import { FileSystemSessionStore } from "mcp-use/server";
+```
+
+Create a file-system session store. On construction it synchronously loads any existing sessions from `path`, skipping sessions older than `maxAgeMs`. A missing file or corrupted JSON is handled gracefully and the store starts fresh.
+
+**Parameters**
+><ParamField body="config" type="FileSystemSessionStoreConfig" default="{}" >   Store configuration. See `FileSystemSessionStoreConfig` for fields and defaults. </ParamField>
+
+**Signature**
+```ts wrap
+constructor(config: FileSystemSessionStoreConfig = {})
+```
+
+### get
+
+Retrieve session metadata by ID. Returns `null` when the session is not present.
+
+**Parameters**
+><ParamField body="sessionId" type="string" required="true" >   The unique session identifier. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<SessionMetadata | null>" />
+
+**Signature**
+```ts wrap
+get(sessionId: string): Promise<SessionMetadata | null>
+```
+
+### set
+
+Store or update session metadata, then schedule a debounced save to disk.
+
+**Parameters**
+><ParamField body="sessionId" type="string" required="true" >   The unique session identifier. </ParamField>
+><ParamField body="data" type="SessionMetadata" required="true" >   Serializable session metadata to store. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Signature**
+```ts wrap
+set(sessionId: string, data: SessionMetadata): Promise<void>
+```
+
+### delete
+
+Remove session metadata, then schedule a debounced save to disk.
+
+**Parameters**
+><ParamField body="sessionId" type="string" required="true" >   The unique session identifier. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Signature**
+```ts wrap
+delete(sessionId: string): Promise<void>
+```
+
+### has
+
+Check whether session metadata exists for a session ID.
+
+**Parameters**
+><ParamField body="sessionId" type="string" required="true" >   The unique session identifier. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<boolean>" />
+
+**Signature**
+```ts wrap
+has(sessionId: string): Promise<boolean>
+```
+
+### keys
+
+List all stored session IDs.
+
+**Returns**
+><ResponseField name="returns" type="Promise<string[]>" />
+
+**Signature**
+```ts wrap
+keys(): Promise<string[]>
+```
+
+### setWithTTL
+
+Store session metadata with a TTL. This implementation resets `lastAccessedAt` to the current time, schedules a debounced save, and registers a `setTimeout` to delete the session after `ttlMs`. TTL is also enforced on load via `maxAgeMs`, so expired sessions are dropped when the file is read on the next start.
+
+**Parameters**
+><ParamField body="sessionId" type="string" required="true" >   The unique session identifier. </ParamField>
+><ParamField body="data" type="SessionMetadata" required="true" >   Serializable session metadata to store. </ParamField>
+><ParamField body="ttlMs" type="number" required="true" >   Time to live in milliseconds before the session is removed. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Signature**
+```ts wrap
+setWithTTL(sessionId: string, data: SessionMetadata, ttlMs: number): Promise<void>
+```
+
+### size
+
+The current number of active sessions held in memory. Read-only getter.
+
+**Returns**
+><ResponseField name="returns" type="number" />
+
+**Signature**
+```ts wrap
+get size(): number
+```
+
+### clear
+
+Remove all sessions and schedule a debounced save to disk.
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Signature**
+```ts wrap
+clear(): Promise<void>
+```
+
+### flush
+
+Force an immediate save to disk, bypassing the debounce timer. Useful for guaranteeing persistence before process exit.
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Signature**
+```ts wrap
+flush(): Promise<void>
+```
+
+## RedisSessionStore
+
+Production-ready session storage that persists metadata in Redis, so sessions survive restarts and can be shared across distributed, load-balanced instances. Stores only serializable metadata. For active SSE streams in a distributed setup, pair it with `RedisStreamManager`. Redis is an optional dependency: install it with `npm install redis` (or `pnpm add redis`). You pass an already-connected client through the config. Implements `SessionStore`.
+
+```ts
+import { RedisSessionStore } from "mcp-use/server";
+```
+
+Create a Redis-backed session store from a connected `RedisClient`. The `prefix` defaults to `"mcp:session:"` and `defaultTTL` defaults to `3600` seconds (1 hour).
+
+**Parameters**
+><ParamField body="config" type="RedisSessionStoreConfig" required="true" >   Store configuration. See `RedisSessionStoreConfig` for fields and defaults. </ParamField>
+
+**Signature**
+```ts wrap
+constructor(config: RedisSessionStoreConfig)
+```
+
+### get
+
+Retrieve and JSON-parse session metadata by ID. Returns `null` when the key is absent, and also returns `null` (after logging) if the read or parse fails, so a transient Redis error never throws here.
+
+**Parameters**
+><ParamField body="sessionId" type="string" required="true" >   The unique session identifier. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<SessionMetadata | null>" />
+
+**Signature**
+```ts wrap
+get(sessionId: string): Promise<SessionMetadata | null>
+```
+
+### set
+
+JSON-serialize and store session metadata with the configured `defaultTTL`. Uses `setEx` (node-redis v5+), falls back to `setex` (ioredis), or finally `set(key, value, { EX })`. Re-throws on Redis errors.
+
+**Parameters**
+><ParamField body="sessionId" type="string" required="true" >   The unique session identifier. </ParamField>
+><ParamField body="data" type="SessionMetadata" required="true" >   Serializable session metadata to store. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Signature**
+```ts wrap
+set(sessionId: string, data: SessionMetadata): Promise<void>
+```
+
+### delete
+
+Delete the Redis key for a session. Re-throws on Redis errors.
+
+**Parameters**
+><ParamField body="sessionId" type="string" required="true" >   The unique session identifier. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Signature**
+```ts wrap
+delete(sessionId: string): Promise<void>
+```
+
+### has
+
+Check whether a session key exists. Returns `false` (after logging) on a Redis error rather than throwing.
+
+**Parameters**
+><ParamField body="sessionId" type="string" required="true" >   The unique session identifier. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<boolean>" />
+
+**Signature**
+```ts wrap
+has(sessionId: string): Promise<boolean>
+```
+
+### keys
+
+List all session IDs, returned with the key prefix stripped. Returns `[]` on a Redis error. Uses the Redis `KEYS` command, which blocks Redis. For production with many sessions, prefer `SCAN` or maintain a separate SET of active IDs.
+
+**Returns**
+><ResponseField name="returns" type="Promise<string[]>" />
+
+**Signature**
+```ts wrap
+keys(): Promise<string[]>
+```
+
+### setWithTTL
+
+Store session metadata with a custom TTL. `ttlMs` is converted to seconds with `Math.ceil(ttlMs / 1000)` and applied via `setEx`, `setex`, or `set(key, value, { EX })`. Re-throws on Redis errors.
+
+**Parameters**
+><ParamField body="sessionId" type="string" required="true" >   The unique session identifier. </ParamField>
+><ParamField body="data" type="SessionMetadata" required="true" >   Serializable session metadata to store. </ParamField>
+><ParamField body="ttlMs" type="number" required="true" >   Time to live in milliseconds. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Signature**
+```ts wrap
+setWithTTL(sessionId: string, data: SessionMetadata, ttlMs: number): Promise<void>
+```
+
+### close
+
+Close the underlying Redis connection by calling `quit()`. Call this on server shutdown. Re-throws on Redis errors.
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Signature**
+```ts wrap
+close(): Promise<void>
+```
+
+### clear
+
+Delete every session key matching the configured prefix. Re-throws on Redis errors. Uses the blocking `KEYS` command, so it is intended for testing rather than production with large datasets.
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Signature**
+```ts wrap
+clear(): Promise<void>
+```
+
+## InMemoryStreamManager
+
+Default stream manager. It holds active `ReadableStreamDefaultController` instances in a `Map` so the server can push notifications and sampling responses to connected clients. Suitable for single-instance and non-distributed deployments. Not suitable for load-balanced deployments, where a stream may live on a different server (use `RedisStreamManager`). Implements `StreamManager`.
+
+```ts
+import { InMemoryStreamManager } from "mcp-use/server";
+```
+
+Create an in-memory stream manager. Takes no arguments.
+
+**Signature**
+```ts wrap
+constructor()
+```
+
+### create
+
+Register an active SSE stream controller for a session.
+
+**Parameters**
+><ParamField body="sessionId" type="string" required="true" >   The unique session identifier. </ParamField>
+><ParamField body="controller" type="ReadableStreamDefaultController" required="true" >   The controller for the SSE connection. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Signature**
+```ts wrap
+create(sessionId: string, controller: ReadableStreamDefaultController): Promise<void>
+```
+
+### send
+
+Encode `data` and enqueue it directly to the in-memory controllers. When `sessionIds` is `undefined` the message is broadcast to every active stream; otherwise it is sent to the listed sessions. If a controller throws on enqueue (client disconnected or stream closed), that stale entry is removed.
+
+**Parameters**
+><ParamField body="sessionIds" type="string[] | undefined" required="true" >   Sessions to send to, or `undefined` to broadcast to all. </ParamField>
+><ParamField body="data" type="string" required="true" >   SSE-formatted payload (for example `event: message\ndata: {...}\n\n`). </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Signature**
+```ts wrap
+send(sessionIds: string[] | undefined, data: string): Promise<void>
+```
+
+### delete
+
+Close and remove the active stream for a session. A controller that is already closed is ignored.
+
+**Parameters**
+><ParamField body="sessionId" type="string" required="true" >   The unique session identifier. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Signature**
+```ts wrap
+delete(sessionId: string): Promise<void>
+```
+
+### has
+
+Check whether an active stream exists for a session.
+
+**Parameters**
+><ParamField body="sessionId" type="string" required="true" >   The unique session identifier. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<boolean>" />
+
+**Signature**
+```ts wrap
+has(sessionId: string): Promise<boolean>
+```
+
+### close
+
+Close every active stream and clear the map. Call this on server shutdown.
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Signature**
+```ts wrap
+close(): Promise<void>
+```
+
+### size
+
+The current number of active streams. Read-only getter, useful for monitoring.
+
+**Returns**
+><ResponseField name="returns" type="number" />
+
+**Signature**
+```ts wrap
+get size(): number
+```
+
+## RedisStreamManager
+
+Distributed stream manager built on Redis Pub/Sub. Each server keeps its local controllers in memory and subscribes to a per-session Redis channel, so a notification published from any instance reaches the instance that actually holds the client's SSE stream. It also implements the optional request/response routing methods so server-to-client requests (sampling, elicitation, roots) resolve correctly when the client's response lands on a different instance. Redis is an optional dependency: install it with `npm install redis`. Pub/Sub requires two clients, so pass a dedicated `pubSubClient` alongside the regular `client`. Implements `StreamManager`.
+
+```ts
+import { RedisStreamManager } from "mcp-use/server";
+```
+
+Create a Redis stream manager. `prefix` defaults to `"mcp:stream:"` and `heartbeatInterval` defaults to `10` seconds; Redis keys expire after `heartbeatInterval * 2`.
+
+**Parameters**
+><ParamField body="config" type="RedisStreamManagerConfig" required="true" >   Manager configuration. See `RedisStreamManagerConfig` for fields and defaults. </ParamField>
+
+**Signature**
+```ts wrap
+constructor(config: RedisStreamManagerConfig)
+```
+
+### create
+
+Register an active SSE stream and subscribe to its Redis channel. Idempotent: an existing subscription for the same session is torn down first (handy on SSE reconnect). It stores the controller locally, marks the session available in Redis with an expiry of `heartbeatInterval * 2`, adds the ID to an active-sessions SET, starts a heartbeat that refreshes those expiries, and subscribes to both the session channel and its `delete:` channel. Throws if the Pub/Sub client has no `subscribe` method, and re-throws other Redis errors.
+
+**Parameters**
+><ParamField body="sessionId" type="string" required="true" >   The unique session identifier. </ParamField>
+><ParamField body="controller" type="ReadableStreamDefaultController" required="true" >   The controller for the SSE connection. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Signature**
+```ts wrap
+create(sessionId: string, controller: ReadableStreamDefaultController): Promise<void>
+```
+
+### send
+
+Publish `data` to session channels via Redis Pub/Sub, so any instance holding the matching SSE stream forwards it to the client. With `sessionIds` set, it publishes to those sessions; when `undefined`, it broadcasts to all sessions in the active-sessions SET (falling back to a `KEYS` scan if SET operations are unavailable). Publishing uses the regular `client`, not `pubSubClient`, because a node-redis v5+ client in subscriber mode cannot publish. Throws if the client has no `publish` method, and re-throws other Redis errors.
+
+**Parameters**
+><ParamField body="sessionIds" type="string[] | undefined" required="true" >   Sessions to publish to, or `undefined` to broadcast to all active sessions. </ParamField>
+><ParamField body="data" type="string" required="true" >   SSE-formatted payload. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Signature**
+```ts wrap
+send(sessionIds: string[] | undefined, data: string): Promise<void>
+```
+
+### delete
+
+Tear down a session's stream: stop its heartbeat, unsubscribe from the session and delete channels, publish a delete message so other servers clean up, remove the availability key, remove the ID from the active-sessions SET, and close the local controller if present. Throws if the client lacks `unsubscribe` or `publish`, and re-throws other Redis errors.
+
+**Parameters**
+><ParamField body="sessionId" type="string" required="true" >   The unique session identifier. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Signature**
+```ts wrap
+delete(sessionId: string): Promise<void>
+```
+
+### has
+
+Check whether a session has an active stream on any server, by testing the availability key in Redis. Returns `false` (after logging) on a Redis error.
+
+**Parameters**
+><ParamField body="sessionId" type="string" required="true" >   The unique session identifier. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<boolean>" />
+
+**Signature**
+```ts wrap
+has(sessionId: string): Promise<boolean>
+```
+
+### close
+
+Clear all heartbeats, then remove the availability keys and active-set entries only for sessions owned by this instance (important when several servers share one Redis), close every local controller, and clear local state. Re-throws on Redis errors.
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Signature**
+```ts wrap
+close(): Promise<void>
+```
+
+### localSize
+
+The number of active local streams on this server instance. Read-only getter.
+
+**Returns**
+><ResponseField name="returns" type="number" />
+
+**Signature**
+```ts wrap
+get localSize(): number
+```
+
+### registerOutboundRequest
+
+Record a pending outbound server-to-client request in Redis (keyed by session and request ID, with a 5-minute TTL) so its response can be routed back to this instance from any other instance.
+
+**Parameters**
+><ParamField body="requestId" type="string | number" required="true" >   The JSON-RPC request ID. </ParamField>
+><ParamField body="sessionId" type="string" required="true" >   The session the request belongs to. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Signature**
+```ts wrap
+registerOutboundRequest(requestId: string | number, sessionId: string): Promise<void>
+```
+
+### forwardInboundResponse
+
+Decide whether an inbound JSON-RPC response belongs to another instance. If a routing record exists for a different `serverId`, publish the response to that server's channel, delete the routing key, and return `true`. Returns `false` when there is no record, the record is unparseable, or the request originated locally (the local SDK Protocol handles it). Throws if the client has no `publish` method.
+
+**Parameters**
+><ParamField body="message" type="{ id: string | number; [key: string]: unknown }" required="true" >   The JSON-RPC response message; must have an `id`. </ParamField>
+><ParamField body="sessionId" type="string" required="true" >   The session the response belongs to. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<boolean>" />
+
+**Signature**
+```ts wrap
+forwardInboundResponse(message: { id: string | number; [key: string]: unknown }, sessionId: string): Promise<boolean>
+```
+
+### onForwardedResponse
+
+Register a handler invoked when a response is forwarded from another instance, and subscribe (once) to this server's dedicated Pub/Sub channel. The handler should feed the response into the local transport so the SDK Protocol can resolve the pending request. If the Pub/Sub client has no `subscribe` method, response forwarding is disabled with a warning rather than throwing.
+
+**Parameters**
+><ParamField body="handler" type="(message: unknown, sessionId: string) => void" required="true" >   Called with the forwarded JSON-RPC response and its session ID. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="void" />
+
+**Signature**
+```ts wrap
+onForwardedResponse(handler: (message: unknown, sessionId: string) => void): void
+```
+
+## Types
+
+### SessionStore
+
+The pluggable contract for session metadata storage. It stores only serializable `SessionMetadata` (client capabilities, log level, timestamps), never runtime objects like transports, server instances, or stream controllers. For active SSE connections, use a `StreamManager` instead. All methods are async to support external backends such as Redis or Postgres. Implement this interface to back sessions with a custom store.
+
+```ts
+import type { SessionStore } from "mcp-use/server";
+```
+
+The required methods are `get`, `set`, `delete`, `has`, and `keys`. `setWithTTL` is optional. `get` resolves to `null` when the session is missing.
+
+**Properties**
+><ParamField body="get" type="(sessionId: string) => Promise<SessionMetadata | null>" required="true" >   Retrieve session metadata by ID, or `null` if not found. </ParamField>
+><ParamField body="set" type="(sessionId: string, data: SessionMetadata) => Promise<void>" required="true" >   Store or update session metadata. </ParamField>
+><ParamField body="delete" type="(sessionId: string) => Promise<void>" required="true" >   Delete session metadata. </ParamField>
+><ParamField body="has" type="(sessionId: string) => Promise<boolean>" required="true" >   Check whether session metadata exists. </ParamField>
+><ParamField body="keys" type="() => Promise<string[]>" required="true" >   List all session IDs, used for cleanup and monitoring. </ParamField>
+><ParamField body="setWithTTL" type="(sessionId: string, data: SessionMetadata, ttlMs: number) => Promise<void>" >   Optional. Store session metadata with automatic expiration after `ttlMs` milliseconds. </ParamField>
+
+**Signature**
+```ts wrap
+interface SessionStore {
+  get(sessionId: string): Promise<SessionMetadata | null>;
+  set(sessionId: string, data: SessionMetadata): Promise<void>;
+  delete(sessionId: string): Promise<void>;
+  has(sessionId: string): Promise<boolean>;
+  keys(): Promise<string[]>;
+  setWithTTL?(sessionId: string, data: SessionMetadata, ttlMs: number): Promise<void>;
+}
+```
+
+### SessionData
+
+The complete in-memory session record. It extends `SessionMetadata` with non-serializable runtime objects (transport, server, Hono context, the notification sender). Full `SessionData` exists only in memory on the server handling the session, never in a `SessionStore`.
+
+```ts
+import type { SessionData } from "mcp-use/server";
+```
+
+Extends every field of `SessionMetadata` and adds the runtime references below. The notification callback receives an object shaped `{ method: string; params: Record<string, unknown> }`.
+
+**Properties**
+><ParamField body="transport" type="Transport" required="true" >   This session's transport instance (not serializable). </ParamField>
+><ParamField body="server" type="McpServer" >   This session's server instance (not serializable). </ParamField>
+><ParamField body="context" type="Context" >   Hono context for the session's current request (not serializable). </ParamField>
+><ParamField body="sendNotification" type="(notification: { method: string; params: Record<string, unknown> }) => Promise<void>" >   Function to send a notification to the client (not serializable). </ParamField>
+><ParamField body="expressRes" type="Response | Record<string, unknown>" >   Express-like response object for notifications (not serializable). </ParamField>
+><ParamField body="honoContext" type="Context" >   Hono context for direct response access (not serializable). </ParamField>
+
+**Signature**
+```ts wrap
+interface SessionData extends SessionMetadata {
+  transport: Transport;
+  server?: McpServer;
+  context?: Context;
+  sendNotification?: (notification: {
+    method: string;
+    params: Record<string, unknown>;
+  }) => Promise<void>;
+  expressRes?: Response | Record<string, unknown>;
+  honoContext?: Context;
+}
+```
+
+### SessionMetadata
+
+The serializable subset of a session that a `SessionStore` persists. It deliberately excludes runtime objects so it can be written to Redis, Postgres, or a JSON file. Only `lastAccessedAt` is required; the remaining fields capture negotiation state from initialization.
+
+```ts
+import type { SessionMetadata } from "mcp-use/server";
+```
+
+`lastAccessedAt` drives idle-timeout tracking and is the only required field.
+
+**Properties**
+><ParamField body="lastAccessedAt" type="number" required="true" >   Timestamp of last activity, used for idle-timeout tracking. </ParamField>
+><ParamField body="logLevel" type="string" >   Minimum log level for filtering log messages (RFC 5424 levels). </ParamField>
+><ParamField body="clientCapabilities" type="Record<string, unknown>" >   Client capabilities advertised during initialization. </ParamField>
+><ParamField body="clientInfo" type="Implementation" >   Client info (name, version). </ParamField>
+><ParamField body="protocolVersion" type="string" >   Protocol version negotiated during initialization. </ParamField>
+><ParamField body="progressToken" type="number" >   Progress token for the current tool call, if any. </ParamField>
+
+**Signature**
+```ts wrap
+interface SessionMetadata {
+  lastAccessedAt: number;
+  logLevel?: string;
+  clientCapabilities?: Record<string, unknown>;
+  clientInfo?: Implementation;
+  protocolVersion?: string;
+  progressToken?: number;
+}
+```
+
+### FileSystemSessionStoreConfig
+
+Constructor options for `FileSystemSessionStore`. Every field is optional and has a default.
+
+```ts
+import type { FileSystemSessionStoreConfig } from "mcp-use/server";
+```
+
+`path` defaults to `.mcp-use/sessions.json` resolved against `process.cwd()`. `debounceMs` defaults to `100`. `maxAgeMs` defaults to `86400000` (24 hours).
+
+**Properties**
+><ParamField body="path" type="string" default=".mcp-use/sessions.json" >   Path to the session file, resolved against the project root. </ParamField>
+><ParamField body="debounceMs" type="number" default="100" >   Debounce delay in milliseconds for write operations, batching rapid consecutive writes. </ParamField>
+><ParamField body="maxAgeMs" type="number" default="86400000" >   Maximum session age in milliseconds. Sessions older than this are cleaned up on load (default: 24 hours). </ParamField>
+
+**Signature**
+```ts wrap
+interface FileSystemSessionStoreConfig {
+  path?: string;
+  debounceMs?: number;
+  maxAgeMs?: number;
+}
+```
+
+### RedisSessionStoreConfig
+
+Constructor options for `RedisSessionStore`. Only `client` is required and must already be connected.
+
+```ts
+import type { RedisSessionStoreConfig } from "mcp-use/server";
+```
+
+`prefix` defaults to `"mcp:session:"` and `defaultTTL` defaults to `3600` seconds.
+
+**Properties**
+><ParamField body="client" type="RedisClient" required="true" >   Redis client instance (node-redis or ioredis). Must already be connected. </ParamField>
+><ParamField body="prefix" type="string" default="mcp:session:" >   Key prefix for session storage. </ParamField>
+><ParamField body="defaultTTL" type="number" default="3600" >   Default TTL in seconds for sessions (default: 1 hour). </ParamField>
+><ParamField body="serialize" type="boolean" default="true" >   Whether to serialize and deserialize session data. </ParamField>
+
+**Signature**
+```ts wrap
+interface RedisSessionStoreConfig {
+  client: RedisClient;
+  prefix?: string;
+  defaultTTL?: number;
+  serialize?: boolean;
+}
+```
+
+### RedisClient
+
+The minimal Redis client contract used by `RedisSessionStore` and `RedisStreamManager`. It is compatible with node-redis v5+ and ioredis. Several methods are optional because the stores probe for whichever variant the underlying client provides (for example `setEx` versus `setex`, or the Pub/Sub and SET methods that only `RedisStreamManager` needs).
+
+```ts
+import type { RedisClient } from "mcp-use/server";
+```
+
+Provide a client that satisfies this shape. node-redis (via `createClient`) and ioredis both qualify.
+
+**Properties**
+><ParamField body="get" type="(key: string) => Promise<string | null>" required="true" >   Get a string value by key. </ParamField>
+><ParamField body="set" type="(key: string, value: string, options?: any) => Promise<string | null>" required="true" >   Set a string value, with optional options (e.g. `{ EX }`). </ParamField>
+><ParamField body="setEx" type="(key: string, seconds: number, value: string) => Promise<string | null>" >   Set with expiry, node-redis v5+ variant. </ParamField>
+><ParamField body="setex" type="(key: string, seconds: number, value: string) => Promise<string | null>" >   Set with expiry, ioredis variant. </ParamField>
+><ParamField body="del" type="(key: string | string[]) => Promise<number>" required="true" >   Delete one or more keys. </ParamField>
+><ParamField body="exists" type="(key: string | string[]) => Promise<number>" required="true" >   Check existence of one or more keys. </ParamField>
+><ParamField body="keys" type="(pattern: string) => Promise<string[]>" required="true" >   List keys matching a pattern. </ParamField>
+><ParamField body="expire" type="(key: string, seconds: number) => Promise<boolean | number>" >   Set a key's expiry, node-redis v5+ variant. </ParamField>
+><ParamField body="sAdd" type="(key: string, ...members: string[]) => Promise<number>" >   Add members to a SET. </ParamField>
+><ParamField body="sRem" type="(key: string, ...members: string[]) => Promise<number>" >   Remove members from a SET. </ParamField>
+><ParamField body="sMembers" type="(key: string) => Promise<string[]>" >   List members of a SET. </ParamField>
+><ParamField body="publish" type="(channel: string, message: string) => Promise<number>" >   Publish a message to a Pub/Sub channel. </ParamField>
+><ParamField body="subscribe" type="(channel: string, callback: (message: string) => void) => Promise<number | void>" >   Subscribe to a Pub/Sub channel. </ParamField>
+><ParamField body="unsubscribe" type="(channel: string) => Promise<number | void>" >   Unsubscribe from a Pub/Sub channel. </ParamField>
+><ParamField body="quit" type='() => Promise<string | "OK">' required="true" >   Close the connection. </ParamField>
+
+**Signature**
+```ts wrap
+interface RedisClient {
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string, options?: any): Promise<string | null>;
+  setEx?(key: string, seconds: number, value: string): Promise<string | null>;
+  setex?(key: string, seconds: number, value: string): Promise<string | null>;
+  del(key: string | string[]): Promise<number>;
+  exists(key: string | string[]): Promise<number>;
+  keys(pattern: string): Promise<string[]>;
+  expire?(key: string, seconds: number): Promise<boolean | number>;
+  sAdd?(key: string, ...members: string[]): Promise<number>;
+  sRem?(key: string, ...members: string[]): Promise<number>;
+  sMembers?(key: string): Promise<string[]>;
+  publish?(channel: string, message: string): Promise<number>;
+  subscribe?(channel: string, callback: (message: string) => void): Promise<number | void>;
+  unsubscribe?(channel: string): Promise<number | void>;
+  quit(): Promise<string | "OK">;
+}
+```
+
+### StreamManager
+
+The pluggable contract for managing active SSE stream connections, kept separate from `SessionStore` because controllers cannot be serialized. It enables server-to-client push (notifications, sampling responses) and, through its optional methods, distributed request/response routing across load-balanced servers. `create`, `send`, `delete`, and `has` are required. `close`, `registerOutboundRequest`, `forwardInboundResponse`, and `onForwardedResponse` are optional and implemented by `RedisStreamManager` for distributed deployments.
+
+```ts
+import type { StreamManager } from "mcp-use/server";
+```
+
+Implement this interface to back active streams with a custom transport (for example a Postgres NOTIFY/LISTEN bus).
+
+**Properties**
+><ParamField body="create" type="(sessionId: string, controller: ReadableStreamDefaultController) => Promise<void>" required="true" >   Register an active SSE stream controller for a session. </ParamField>
+><ParamField body="send" type="(sessionIds: string[] | undefined, data: string) => Promise<void>" required="true" >   Send data to specific streams, or broadcast when `sessionIds` is `undefined`. </ParamField>
+><ParamField body="delete" type="(sessionId: string) => Promise<void>" required="true" >   Remove an active SSE stream. </ParamField>
+><ParamField body="has" type="(sessionId: string) => Promise<boolean>" required="true" >   Check whether an active stream exists for a session. </ParamField>
+><ParamField body="close" type="() => Promise<void>" >   Optional. Close all connections and clean up on shutdown. </ParamField>
+><ParamField body="registerOutboundRequest" type="(requestId: string | number, sessionId: string) => Promise<void>" >   Optional. Register a pending outbound server-to-client request for cross-instance routing. </ParamField>
+><ParamField body="forwardInboundResponse" type="(message: { id: string | number; [key: string]: unknown }, sessionId: string) => Promise<boolean>" >   Optional. Forward an inbound response to its originating instance; returns `true` if forwarded. </ParamField>
+><ParamField body="onForwardedResponse" type="(handler: (message: unknown, sessionId: string) => void) => void" >   Optional. Register a handler for responses forwarded from other instances. </ParamField>
+
+**Signature**
+```ts wrap
+interface StreamManager {
+  create(sessionId: string, controller: ReadableStreamDefaultController): Promise<void>;
+  send(sessionIds: string[] | undefined, data: string): Promise<void>;
+  delete(sessionId: string): Promise<void>;
+  has(sessionId: string): Promise<boolean>;
+  close?(): Promise<void>;
+  registerOutboundRequest?(requestId: string | number, sessionId: string): Promise<void>;
+  forwardInboundResponse?(
+    message: { id: string | number; [key: string]: unknown },
+    sessionId: string
+  ): Promise<boolean>;
+  onForwardedResponse?(handler: (message: unknown, sessionId: string) => void): void;
+}
+```
+
+### RedisStreamManagerConfig
+
+Constructor options for `RedisStreamManager`. Pub/Sub needs a dedicated subscriber connection, so both `pubSubClient` and `client` are required and should be separate connections.
+
+```ts
+import type { RedisStreamManagerConfig } from "mcp-use/server";
+```
+
+`pubSubClient` is used for subscriptions and `client` for availability checks and publishing. `prefix` defaults to `"mcp:stream:"` and `heartbeatInterval` defaults to `10` seconds, with Redis keys expiring after `heartbeatInterval * 2`.
+
+**Properties**
+><ParamField body="pubSubClient" type="RedisClient" required="true" >   Redis client for Pub/Sub subscriptions. Should be a separate connection from `client`. </ParamField>
+><ParamField body="client" type="RedisClient" required="true" >   Redis client for checking session availability and publishing. Can be shared with the `SessionStore`. </ParamField>
+><ParamField body="prefix" type="string" default="mcp:stream:" >   Channel prefix for Pub/Sub. </ParamField>
+><ParamField body="heartbeatInterval" type="number" default="10" >   Heartbeat interval in seconds to keep sessions alive. Redis keys expire after this interval times two. </ParamField>
+
+**Signature**
+```ts wrap
+interface RedisStreamManagerConfig {
+  pubSubClient: RedisClient;
+  client: RedisClient;
+  prefix?: string;
+  heartbeatInterval?: number;
+}
+```
+
+## Example: Redis-backed sessions
+
+A complete server using `RedisSessionStore` for persistent session metadata. With a connected client passed in, sessions survive restarts and deploys, so reconnecting clients keep the same session ID without re-initializing.
+
+```ts wrap
+import { MCPServer, text } from "mcp-use/server";
+import { RedisSessionStore } from "mcp-use/server";
+import { createClient } from "redis";
+import z from "zod";
+
+const REDIS_URL = process.env.REDIS_URL;
+if (!REDIS_URL) {
+  console.error("REDIS_URL environment variable is required.");
+  process.exit(1);
+}
+
+const redisClient = createClient({ url: REDIS_URL });
+await redisClient.connect();
+
+const sessionStore = new RedisSessionStore({
+  client: redisClient,
+  prefix: "mcp:session:",
+  defaultTTL: 3600, // 1 hour
+});
+
+const server = new MCPServer({
+  name: "redis-session-example",
+  version: "1.0.0",
+  description: "MCP server with Redis-backed session persistence",
+  sessionStore,
+});
+
+server.tool(
+  {
+    name: "echo",
+    description: "Echoes back the input",
+    schema: z.object({ message: z.string() }),
+  },
+  async ({ message }) => text(`Echo: ${message}`)
+);
+
+const port = parseInt(process.env.PORT || "3000", 10);
+await server.listen(port);
+```
+
+<Tip>
+For a distributed deployment, also pass a `streamManager: new RedisStreamManager({ client, pubSubClient })` so notifications and sampling responses reach clients regardless of which instance holds the SSE stream. Pub/Sub needs two connections, so create the second with `redisClient.duplicate()`.
+</Tip>

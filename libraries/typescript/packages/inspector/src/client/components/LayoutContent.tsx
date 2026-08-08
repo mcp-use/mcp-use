@@ -1,20 +1,47 @@
-import type { McpServer } from "mcp-use/react";
-import type { ReactNode, RefObject } from "react";
+import type { McpServer } from "@mcp-use/client/react";
+import { useEffect, useState, type ReactNode, type RefObject } from "react";
+import { useManufactAuth } from "@/client/auth/manufact-auth";
+import { ChatTab } from "@/client/components/ChatTab";
+import { ConnectionSettingsTab } from "@/client/components/ConnectionSettingsTab";
+import { ElicitationTab } from "@/client/components/ElicitationTab";
+import { NotificationsTab } from "@/client/components/NotificationsTab";
+import { PromptsTab } from "@/client/components/PromptsTab";
+import { ResourcesTab } from "@/client/components/ResourcesTab";
+import { SamplingTab } from "@/client/components/SamplingTab";
+import { ServerMetadataTab } from "@/client/components/ServerMetadataTab";
+import { ToolsTab } from "@/client/components/ToolsTab";
 import { useInspector } from "@/client/context/InspectorContext";
 import type { TabType } from "@/client/context/InspectorContext";
-import { ChatTab } from "./ChatTab";
-import { ElicitationTab } from "./ElicitationTab";
-import { NotificationsTab } from "./NotificationsTab";
-import { PromptsTab } from "./PromptsTab";
-import { ResourcesTab } from "./ResourcesTab";
-import { SamplingTab } from "./SamplingTab";
-import { ToolsTab } from "./ToolsTab";
+import { isInspectorSamplingAvailable } from "@/client/utils/samplingProtocol";
+import { isLocalhostServerUrl } from "@/client/utils/servers";
+import {
+  FALLBACK_MANAGED_MODEL_ID,
+  buildManagedAuthHeaders,
+  buildManagedLlmProxyConfig,
+  shouldUseManagedClientSide,
+} from "./chat/freeTier";
+import { useManagedCloudModel } from "./chat/useManagedCloudModel";
 
-// Type alias for backward compatibility
-type MCPConnection = McpServer;
+import type { EditableConnectionConfig } from "@/client/utils/connectionUpdates";
+
+const ALL_KNOWN_TABS: TabType[] = [
+  "tools",
+  "prompts",
+  "resources",
+  "chat",
+  "sampling",
+  "elicitation",
+  "notifications",
+  "server-metadata",
+  "connection-settings",
+];
+
+function normalizeTab(tab: string): TabType {
+  return ALL_KNOWN_TABS.includes(tab as TabType) ? (tab as TabType) : "tools";
+}
 
 interface LayoutContentProps {
-  selectedServer: MCPConnection | undefined;
+  selectedServer: McpServer | undefined;
   activeTab: string;
   toolsSearchRef: RefObject<{
     focusSearch: () => void;
@@ -28,6 +55,7 @@ interface LayoutContentProps {
     focusSearch: () => void;
     blurSearch: () => void;
   } | null>;
+  onUpdateConnection?: (config: EditableConnectionConfig) => void;
   children: ReactNode;
 }
 
@@ -37,9 +65,61 @@ export function LayoutContent({
   toolsSearchRef,
   promptsSearchRef,
   resourcesSearchRef,
+  onUpdateConnection,
   children,
 }: LayoutContentProps) {
   const { embeddedConfig } = useInspector();
+  const initialTab = normalizeTab(activeTab);
+  const [mountedTabs, setMountedTabs] = useState<Set<TabType>>(
+    () => new Set([initialTab])
+  );
+
+  useEffect(() => {
+    const tab = normalizeTab(activeTab);
+    setMountedTabs((prev) => (prev.has(tab) ? prev : new Set(prev).add(tab)));
+  }, [activeTab]);
+
+  const {
+    accessToken,
+    mode: manufactAuthMode,
+    user,
+  } = useManufactAuth(embeddedConfig.chatApiUrl);
+  const managedAuthHeaders = buildManagedAuthHeaders(accessToken);
+  const managedCredentials =
+    manufactAuthMode === "session" ? ("include" as const) : undefined;
+  const isManufactAuthenticated = user != null;
+
+  const chatApiUrl = embeddedConfig.chatApiUrl;
+  const isLoopbackServer =
+    !!selectedServer?.url && isLocalhostServerUrl(selectedServer.url);
+  const useManagedClientSide = selectedServer
+    ? shouldUseManagedClientSide({
+        isLoopback: isLoopbackServer,
+        chatApiUrl: embeddedConfig.chatApiUrl,
+        enableFreeTierUpgrade: embeddedConfig.chatEnableFreeTierUpgrade,
+      })
+    : false;
+  const managedCloudModel = useManagedCloudModel(
+    chatApiUrl,
+    accessToken,
+    manufactAuthMode,
+    !!selectedServer && !!chatApiUrl && isManufactAuthenticated
+  );
+  const managedLlmConfig = useManagedClientSide
+    ? buildManagedLlmProxyConfig(
+        chatApiUrl!,
+        accessToken,
+        manufactAuthMode === "session",
+        isManufactAuthenticated ? managedCloudModel.selectedModelId : undefined
+      )
+    : (embeddedConfig.managedLlmConfig ??
+      (chatApiUrl && !isLoopbackServer
+        ? {
+            provider: "openai-compatible" as const,
+            model: FALLBACK_MANAGED_MODEL_ID,
+            apiKey: "server-managed",
+          }
+        : undefined));
 
   // When forceConnected is enabled, render the chat tab directly without a
   // real server connection. The backend (chatApiUrl) manages everything.
@@ -50,12 +130,13 @@ export function LayoutContent({
     const stubConnection = {
       id: "force-connected",
       url: "",
+      displayName: "",
       name: "",
       state: "ready" as const,
       tools: [],
       prompts: [],
       resources: [],
-    } as unknown as MCPConnection;
+    } as unknown as McpServer;
 
     return (
       <ChatTab
@@ -68,10 +149,12 @@ export function LayoutContent({
         readResource={async () => ({ contents: [] })}
         useClientSide={false}
         chatApiUrl={embeddedConfig.chatApiUrl}
+        extraHeaders={managedAuthHeaders}
+        credentials={managedCredentials}
         managedLlmConfig={
           embeddedConfig.managedLlmConfig ?? {
-            provider: "anthropic",
-            model: "claude-haiku-4-5",
+            provider: "openai-compatible",
+            model: FALLBACK_MANAGED_MODEL_ID,
             apiKey: "server-managed",
           }
         }
@@ -98,24 +181,19 @@ export function LayoutContent({
 
   // Helper to check if a tab should be rendered
   const isTabVisible = (tab: TabType): boolean => {
+    if (tab === "sampling" && !isInspectorSamplingAvailable(selectedServer)) {
+      return false;
+    }
     if (!embeddedConfig.visibleTabs) return true;
     return embeddedConfig.visibleTabs.includes(tab);
   };
 
-  const allKnownTabs: TabType[] = [
-    "tools",
-    "prompts",
-    "resources",
-    "chat",
-    "sampling",
-    "elicitation",
-    "notifications",
-  ];
+  const allKnownTabs = ALL_KNOWN_TABS;
 
-  // Render all visible tabs but hide inactive ones to preserve state
+  // Mount tabs on first visit; keep mounted (display:none) to preserve state.
   return (
     <>
-      {isTabVisible("tools") && (
+      {isTabVisible("tools") && mountedTabs.has("tools") && (
         <div
           style={{ display: activeTab === "tools" ? "block" : "none" }}
           className="h-full"
@@ -132,7 +210,7 @@ export function LayoutContent({
           />
         </div>
       )}
-      {isTabVisible("prompts") && (
+      {isTabVisible("prompts") && mountedTabs.has("prompts") && (
         <div
           style={{ display: activeTab === "prompts" ? "block" : "none" }}
           className="h-full"
@@ -160,7 +238,7 @@ export function LayoutContent({
           />
         </div>
       )}
-      {isTabVisible("resources") && (
+      {isTabVisible("resources") && mountedTabs.has("resources") && (
         <div
           style={{ display: activeTab === "resources" ? "block" : "none" }}
           className="h-full"
@@ -177,7 +255,7 @@ export function LayoutContent({
           />
         </div>
       )}
-      {isTabVisible("chat") && (
+      {isTabVisible("chat") && mountedTabs.has("chat") && (
         <div
           style={{ display: activeTab === "chat" ? "block" : "none" }}
           className="h-full"
@@ -204,29 +282,16 @@ export function LayoutContent({
               )
             }
             readResource={selectedServer.readResource}
-            useClientSide={!embeddedConfig.chatApiUrl}
-            chatApiUrl={embeddedConfig.chatApiUrl}
-            managedLlmConfig={
-              embeddedConfig.managedLlmConfig ??
-              (embeddedConfig.chatApiUrl
-                ? {
-                    // Stub surfaced on the chat badge. Mirrors the model the
-                    // hosted `/inspector/chat/stream` backend uses by default
-                    // (see cloud.mcp-use/src/lib/mcp-chat-stream.ts).
-                    provider: "anthropic",
-                    model: "claude-haiku-4-5",
-                    apiKey: "server-managed",
-                  }
-                : undefined)
-            }
+            useClientSide={useManagedClientSide || !chatApiUrl}
+            chatApiUrl={chatApiUrl}
+            extraHeaders={managedAuthHeaders}
+            credentials={embeddedConfig.chatCredentials ?? managedCredentials}
+            managedLlmConfig={managedLlmConfig}
+            managedCloudModel={managedCloudModel}
             enableFreeTierUpgrade={embeddedConfig.chatEnableFreeTierUpgrade}
             hideTitle={embeddedConfig.chatHideTitle}
-            hideModelBadge={
-              embeddedConfig.chatHideModelBadge ?? !!embeddedConfig.chatApiUrl
-            }
-            hideServerUrl={
-              embeddedConfig.chatHideServerUrl ?? !!embeddedConfig.chatApiUrl
-            }
+            hideModelBadge={embeddedConfig.chatHideModelBadge ?? false}
+            hideServerUrl={embeddedConfig.chatHideServerUrl ?? !!chatApiUrl}
             clearButtonLabel={embeddedConfig.chatClearButtonLabel}
             clearButtonHideIcon={embeddedConfig.chatClearButtonHideIcon}
             clearButtonHideShortcut={embeddedConfig.chatClearButtonHideShortcut}
@@ -236,11 +301,10 @@ export function LayoutContent({
             hideClearButton={embeddedConfig.chatHideClearButton}
             hideToolSelector={embeddedConfig.chatHideToolSelector}
             streamProtocol={embeddedConfig.chatStreamProtocol}
-            credentials={embeddedConfig.chatCredentials}
           />
         </div>
       )}
-      {isTabVisible("sampling") && (
+      {isTabVisible("sampling") && mountedTabs.has("sampling") && (
         <div
           style={{ display: activeTab === "sampling" ? "block" : "none" }}
           className="h-full"
@@ -252,11 +316,11 @@ export function LayoutContent({
             onReject={selectedServer.rejectSampling}
             serverId={selectedServer.id}
             isConnected={selectedServer.state === "ready"}
-            mcpServerUrl={selectedServer.url}
+            mcpServerUrl={selectedServer.url ?? ""}
           />
         </div>
       )}
-      {isTabVisible("elicitation") && (
+      {isTabVisible("elicitation") && mountedTabs.has("elicitation") && (
         <div
           style={{ display: activeTab === "elicitation" ? "block" : "none" }}
           className="h-full"
@@ -271,7 +335,7 @@ export function LayoutContent({
           />
         </div>
       )}
-      {isTabVisible("notifications") && (
+      {isTabVisible("notifications") && mountedTabs.has("notifications") && (
         <div
           style={{
             display: activeTab === "notifications" ? "block" : "none",
@@ -290,6 +354,36 @@ export function LayoutContent({
           />
         </div>
       )}
+      {isTabVisible("server-metadata") &&
+        mountedTabs.has("server-metadata") && (
+          <div
+            style={{
+              display: activeTab === "server-metadata" ? "block" : "none",
+            }}
+            className="h-full"
+          >
+            <ServerMetadataTab
+              key={`server-metadata-${selectedServer.id}`}
+              connection={selectedServer}
+            />
+          </div>
+        )}
+      {isTabVisible("connection-settings") &&
+        mountedTabs.has("connection-settings") &&
+        onUpdateConnection && (
+          <div
+            style={{
+              display: activeTab === "connection-settings" ? "block" : "none",
+            }}
+            className="h-full"
+          >
+            <ConnectionSettingsTab
+              key={`connection-settings-${selectedServer.id}`}
+              connection={selectedServer}
+              onSave={onUpdateConnection}
+            />
+          </div>
+        )}
       {!allKnownTabs.includes(activeTab as TabType) && <>{children}</>}
     </>
   );

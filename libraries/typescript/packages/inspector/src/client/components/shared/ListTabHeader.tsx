@@ -8,7 +8,14 @@ import {
 } from "@/client/components/ui/tooltip";
 import type { LucideIcon } from "lucide-react";
 import { RefreshCw, Search } from "lucide-react";
+import {
+  inspectorStickyTabHeaderClass,
+  inspectorTabHeaderPadding,
+  inspectorTabTitleClass,
+} from "@/client/lib/font-weight";
 import { Kbd } from "../ui/kbd";
+
+export const tabHeaderIconClass = "h-3.5 w-3.5 shrink-0 text-muted-foreground";
 
 interface ListTabHeaderProps {
   /** Current active tab name */
@@ -49,6 +56,8 @@ interface ListTabHeaderProps {
   onRefresh?: () => void;
   /** Whether a refresh is in progress */
   isRefreshing?: boolean;
+  /** Whether the parent scroll area has been scrolled */
+  isScrolled?: boolean;
 }
 
 export function ListTabHeader({
@@ -70,16 +79,24 @@ export function ListTabHeader({
   primaryTabName,
   onRefresh,
   isRefreshing = false,
+  isScrolled = false,
 }: ListTabHeaderProps) {
   const isPrimaryTab = activeTab === primaryTabName;
+  const ActiveIcon = isPrimaryTab ? PrimaryIcon : SecondaryIcon;
+  const activeTitle = isPrimaryTab ? primaryTabTitle : secondaryTabTitle;
 
   return (
-    <div className="flex flex-row items-center justify-between p-4 sm:p-4 py-3 gap-2">
+    <div
+      className={`flex flex-row items-center justify-between gap-2 ${inspectorStickyTabHeaderClass(isScrolled)} ${inspectorTabHeaderPadding}`}
+    >
       <div className="flex items-center gap-2 flex-1 min-w-0">
         {!isSearchExpanded ? (
           <>
-            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
-              {isPrimaryTab ? primaryTabTitle : secondaryTabTitle}
+            <h2
+              className={`${inspectorTabTitleClass} flex items-center gap-1.5`}
+            >
+              <ActiveIcon className={tabHeaderIconClass} aria-hidden />
+              {activeTitle}
             </h2>
             {isPrimaryTab && (
               <>
@@ -90,16 +107,19 @@ export function ListTabHeader({
                   {primaryCount}
                 </Badge>
                 <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={onSearchExpand}
-                      className="h-8 w-8 p-0"
-                    >
-                      <Search className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
+                  <TooltipTrigger
+                    render={
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={onSearchExpand}
+                        className="h-8 w-8 p-0"
+                      >
+                        <Search className="h-4 w-4" />
+                      </Button>
+                    }
+                    nativeButton
+                  />
                   <TooltipContent side="bottom" className="flex gap-2">
                     Search
                     <Kbd>F</Kbd>
@@ -107,19 +127,22 @@ export function ListTabHeader({
                 </Tooltip>
                 {onRefresh && (
                   <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={onRefresh}
-                        disabled={isRefreshing}
-                        className="h-8 w-8 p-0"
-                      >
-                        <RefreshCw
-                          className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
-                        />
-                      </Button>
-                    </TooltipTrigger>
+                    <TooltipTrigger
+                      render={
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={onRefresh}
+                          disabled={isRefreshing}
+                          className="h-8 w-8 p-0"
+                        >
+                          <RefreshCw
+                            className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
+                          />
+                        </Button>
+                      }
+                      nativeButton
+                    />
                     <TooltipContent side="bottom" className="flex gap-2">
                       Refresh list
                       <Kbd>R</Kbd>
@@ -146,7 +169,6 @@ export function ListTabHeader({
         onClick={onTabSwitch}
         className="gap-2 flex-shrink-0"
       >
-        {isPrimaryTab ? <SecondaryIcon /> : <PrimaryIcon />}
         <span className="hidden sm:inline">
           {isPrimaryTab ? secondaryTabTitle : primaryTabTitle}
         </span>

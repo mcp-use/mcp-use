@@ -1,0 +1,191 @@
+---
+title: "HTTP and MCP middleware"
+description: "Hono HTTP middleware, operation-level MCP middleware, observer events, and ServerConfig.cors"
+icon: "layers"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/server/src/middleware/mcp-middleware.ts"
+---
+
+<Callout type="info" title="Source Code">
+  View the implementation on GitHub:{" "}
+  <a
+    href="https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/server/src/middleware/mcp-middleware.ts"
+    target="_blank"
+    rel="noopener noreferrer"
+  >
+    mcp-middleware.ts
+  </a>
+</Callout>
+
+The v2 server uses Hono for its HTTP application and the Web Fetch API as its universal serving boundary. Register **HTTP middleware** with `server.use(...)`, **MCP operation middleware** with `server.use('mcp:…', ...)`, and read-only **observer events** with `server.on('mcp:…', ...)`.
+
+## Handlers vs middleware vs events
+
+|                     | **Handlers** `server.tool()` | **Middleware** `server.use('mcp:…')`                   | **Events** `server.on('mcp:…')`  |
+| ------------------- | ---------------------------- | ------------------------------------------------------ | -------------------------------- |
+| Purpose             | Implement the operation      | Intercept: auth, rate-limit, mutate params             | Observe: logging, metrics, audit |
+| Control flow        | Returns result               | Calls `next()` or returns a method-valid short circuit | No `next()`; cannot block        |
+| Mutate `ctx.params` | N/A                          | Yes                                                    | No (read-only snapshot)          |
+
+## Mounting
+
+```ts
+import { MCPServer } from "mcp-use";
+
+const server = new MCPServer({
+  name: "my-server",
+  version: "1.0.0",
+  cors: { origin: "https://app.example.com" },
+  allowedOrigins: ["app.example.com"],
+});
+
+// Vercel / Workers
+export default server;
+
+// Existing Hono application
+app.mount("/", server.fetch);
+
+// Node default
+await server.listen(3000);
+
+// Custom http.Server
+import { createServer } from "node:http";
+import { toNodeHandler } from "mcp-use/node";
+createServer(toNodeHandler({ fetch: server.fetch })).listen(3000);
+```
+
+Custom HTTP routes and middleware can live directly on the server:
+
+```ts
+server.use("*", async (c, next) => {
+  c.set("requestId", crypto.randomUUID());
+  await next();
+});
+
+server.get("/health", (c) => c.json({ ok: true }));
+```
+
+Use the mandatory `mcp:` prefix to distinguish operation middleware from Hono middleware.
+
+## Operation-level MCP middleware
+
+Register with `server.use('mcp:…', handler)`. Patterns:
+
+- `mcp:*` — every MCP operation
+- `mcp:tools/call` — exact match
+
+Middleware runs in FIFO order (first registered = outermost). `ctx.params` is mutable before `next()`. The context is the active Hono `Context` augmented with MCP fields: `ctx.request` is its `HonoRequest`, `ctx.request.raw` is the native Web `Request`, and deprecated `ctx.req` is the same `HonoRequest`. Values populated by HTTP middleware are available through `ctx.get()`. Throwing rejects the request (surfaced as an MCP error result).
+
+Exact patterns correlate `ctx.params`, `next()`, and the middleware return type with the selected MCP method. The global `mcp:*` pattern is pass-through middleware: it must call `next()`, cannot access its result, and cannot replace the response. Use an exact pattern for method-specific transformations.
+
+```ts
+server.use("mcp:*", async (ctx, next) => {
+  console.log(`→ ${ctx.method}`, ctx.params);
+  await next();
+  console.log(`← ${ctx.method}`);
+});
+
+server.use("mcp:tools/call", async (ctx, next) => {
+  if (ctx.auth && !ctx.auth.scopes.includes("tools:*")) {
+    throw new Error("Insufficient scope");
+  }
+  return next();
+});
+
+server.use("mcp:tools/list", async (ctx, next) => {
+  if (ctx.request?.header("x-example-access") !== "allow") {
+    throw new Error("Tool discovery is not allowed");
+  }
+  return next();
+});
+
+server.use("mcp:tools/list", async (_ctx, next) => {
+  const tools = await next(); // Tool[]
+  return tools.filter((tool) => !tool.name.startsWith("_"));
+});
+```
+
+Hook points: `tools/call`, `resources/read`, `prompts/get`, and `tools/list` / `resources/list` / `prompts/list`.
+
+## Observer events
+
+Read-only telemetry — cannot block or mutate params. Append `:complete` for after-handler:
+
+Observers support `mcp:*` and category patterns such as `mcp:tools/*`, in addition to exact methods.
+Their frozen snapshot contains `method`, `params`, `request` (`req` is a
+deprecated alias), `session`, `auth`, and read-only `state`. It is intentionally
+not a full Hono `Context`; APIs such as `ctx.get()` and `ctx.env` are available
+to middleware, not observers.
+
+```ts
+server.on("mcp:tools/call", (ctx) => {
+  metrics.increment("tools.call", { tool: ctx.params.name });
+});
+
+server.on("mcp:tools/call:complete", (ctx, result) => {
+  audit.log({
+    tool: ctx.params.name,
+    isError: "isError" in result ? result.isError : false,
+  });
+});
+```
+
+Throwing in an event listener is logged; it does not fail the MCP request.
+
+## ServerConfig.cors
+
+Optional CORS on routes served by `server.fetch` / `listen()` (MCP, custom routes, view assets, inspector). Off when omitted. Pair with `allowedOrigins` for browser clients.
+
+```ts
+new MCPServer({
+  name: "api",
+  version: "1.0.0",
+  allowedOrigins: ["app.example.com"],
+  cors: {
+    origin: "https://app.example.com",
+    credentials: true,
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "mcp-protocol-version",
+      "mcp-method",
+      "mcp-name",
+    ],
+  },
+});
+```
+
+OAuth `.well-known` responses already set `Access-Control-Allow-Origin: *` from the SDK; global CORS middleware skips responses that already have ACAO.
+
+## Exported types
+
+```ts
+import type {
+  MiddlewareContext,
+  McpMiddlewareContext,
+  McpMiddlewareMethod,
+  McpMiddlewareResult,
+  McpMiddlewareFn,
+  McpMiddlewareFnFor,
+  ToolsCallMiddlewareContext,
+  ResourcesReadMiddlewareContext,
+  PromptsGetMiddlewareContext,
+  McpEventListenerFn,
+  McpCompleteEventListenerFn,
+  CorsOptions,
+} from "mcp-use";
+```
+
+Low-level helpers (`createMcpMiddlewareEntry`, `createMcpEventListenerEntry`, `composeMiddleware`, and `matchesPattern`) are exported for advanced composition.
+
+## See also
+
+<CardGroup cols={2}>
+  <Card
+    title="MCPServer"
+    icon="server"
+    href="/typescript/api-reference/server/mcp-server"
+  >
+    `app`, `fetch`, route methods, `use()`, `on()`, `listen()`, and
+    `ServerConfig.cors`.
+  </Card>
+</CardGroup>

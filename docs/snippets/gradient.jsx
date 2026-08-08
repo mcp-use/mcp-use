@@ -1,53 +1,19 @@
-import { useMemo } from "react";
-
 export const RandomGradientBackground = ({
   className,
   color,
   children,
   grayscaled = false,
 }) => {
-  const saturation = useMemo(() => {
-    if (color) {
-      const values = color.split("(")[1].split(")")[0].trim().split(/\s+/);
-      return parseFloat(values[1] || "0");
-    }
-    return grayscaled ? 0 : 0.2;
-  }, [color, grayscaled]);
-
-  const lightness = useMemo(() => {
-    if (color) {
-      const values = color.split("(")[1].split(")")[0].trim().split(/\s+/);
-      return parseFloat(values[0] || "0.5");
-    }
-    return grayscaled ? 0.3 : 0.4;
-  }, [color, grayscaled]);
-
-  const randomHue = useMemo(() => {
-    if (color) {
-      const values = color.split("(")[1].split(")")[0].trim().split(/\s+/);
-      return parseFloat(values[2] || "0");
-    }
-    return Math.floor(Math.random() * 360);
-  }, [color]);
-
-  const randomColor = useMemo(() => {
-    if (color) {
-      return color;
-    }
-    return `oklch(${Math.min(lightness, 1)} ${saturation} ${randomHue})`;
-  }, [randomHue, saturation, lightness]);
-
-  const lightColor = useMemo(() => {
-    return `oklch(${Math.min(lightness * 2, 1)} ${saturation} ${randomHue})`;
-  }, [randomHue, saturation, lightness, color]);
-
-  const direction = useMemo(() => {
-    return Math.floor(Math.random() * 360);
-  }, [randomHue]);
-
-  const brightnessFilter = useMemo(() => {
-    return "1000%";
-  }, []);
+  const values = color
+    ? color.split("(")[1].split(")")[0].trim().split(/\s+/)
+    : [];
+  const saturation = color ? parseFloat(values[1] || "0") : grayscaled ? 0 : 0.2;
+  const lightness = color ? parseFloat(values[0] || "0.5") : grayscaled ? 0.3 : 0.4;
+  const randomHue = color ? parseFloat(values[2] || "0") : Math.floor(Math.random() * 360);
+  const randomColor = color || `oklch(${Math.min(lightness, 1)} ${saturation} ${randomHue})`;
+  const lightColor = `oklch(${Math.min(lightness * 2, 1)} ${saturation} ${randomHue})`;
+  const direction = Math.floor(Math.random() * 360);
+  const brightnessFilter = "1000%";
 
   return (
     <div

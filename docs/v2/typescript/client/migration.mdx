@@ -1,0 +1,310 @@
+---
+title: "Migrate to v2"
+description: "Migrate client, agent, and React connection code from mcp-use 1.x"
+icon: "arrow-right-left"
+---
+
+This guide updates applications from the mcp-use 1.x client surface to the
+current beta packages. It covers client, agent, and React connection code.
+
+<Warning>
+  Server and interactive UI APIs also have breaking changes. Do not assume that
+  existing server or widget code can be carried forward unchanged. Follow the
+  [server guide](/v2/typescript/server) and
+  [MCP Apps guide](/v2/typescript/mcp-apps) for those parts of your application.
+</Warning>
+
+## 1. Update the runtime and packages
+
+The current client and agent packages require Node.js `>=22.22.2` and are
+ESM-only.
+
+```bash
+npm install @mcp-use/client @mcp-use/agent
+```
+
+Install `mcp-use` when the same project builds a server or MCP App View:
+
+```bash
+npm install mcp-use
+```
+
+Ensure your project emits ESM and your bundler respects the package's `node` and
+`browser` export conditions.
+
+## 2. Move imports to their package entry points
+
+| 1.x surface | Current import | Purpose |
+| ----------- | -------------- | ------- |
+| `MCPClient`, connectors, OAuth, and sessions from `mcp-use` | `@mcp-use/client` | Node or browser MCP client |
+| `useMcp` and `McpClientProvider` from `mcp-use/react` | `@mcp-use/client/react` | React connection management |
+| `MCPAgent` and `PROMPTS` from `mcp-use` | `@mcp-use/agent` | Native agent |
+| LangChain agent compatibility and `ServerManager` | `@mcp-use/agent/langchain` | Optional LangChain integration |
+| Widget compatibility hooks | `mcp-use/react` View hooks | Code running inside MCP App Views |
+| `MCPServer` and server capabilities | `mcp-use` | MCP server |
+
+```typescript
+import { MCPClient } from "@mcp-use/client";
+import { MCPAgent, PROMPTS } from "@mcp-use/agent";
+```
+
+For the optional LangChain compatibility layer:
+
+```typescript
+import {
+  LangChainMCPAgent,
+  ServerManager,
+} from "@mcp-use/agent/langchain";
+```
+
+The native `MCPAgent` and the LangChain compatibility agent are separate public
+entry points. Import `ServerManager` only from the LangChain entry.
+
+### Removed client subpaths
+
+The client package exports only its conditional root and `./react` entry.
+Replace these removed imports:
+
+| Removed import | Use instead |
+| -------------- | ----------- |
+| `@mcp-use/client/browser` | `@mcp-use/client` in a browser build |
+| `@mcp-use/client/auth` | `@mcp-use/client` |
+| `@mcp-use/client/auth/node` | Node OAuth helpers from `@mcp-use/client` |
+
+The root entry resolves to the Node build under the `node` condition and to the
+browser-safe build under the `browser` or default condition.
+
+## 3. Update the connection API
+
+Use `connect()` and `connectAll()`:
+
+```typescript
+import {
+  MCPClient,
+  type MCPConnection,
+} from "@mcp-use/client";
+
+const client = new MCPClient({
+  mcpServers: {
+    demo: { url: "https://api.example.com/mcp" },
+  },
+});
+
+try {
+  const connection: MCPConnection = await client.connect("demo");
+  await connection.callTool("echo", { message: "hello" });
+} finally {
+  await client.close();
+}
+```
+
+`createSession()` and `createAllSessions()` remain as deprecated compatibility
+aliases. `MCPSession` is a deprecated runtime and type alias for
+`MCPConnection`.
+
+Every connection exposes the negotiated server information:
+
+```typescript
+console.log(connection.info.protocolEra);
+console.log(connection.info.protocolVersion);
+console.log(connection.info.capabilities);
+console.log(connection.info.instructions);
+```
+
+## 4. Configure protocol negotiation
+
+The public configuration field is `protocolNegotiation`, not
+`versionNegotiation`.
+
+HTTP connections default to `protocolNegotiation: "auto"`: they probe the
+sessionless protocol and fall back to the sessionful protocol. Stdio defaults to
+`"legacy"` to avoid probing a process that may be launched for one invocation.
+
+```typescript
+import { MCPClient } from "@mcp-use/client";
+
+const client = new MCPClient({
+  mcpServers: {
+    compatible: {
+      url: "https://api.example.com/mcp",
+      protocolNegotiation: "auto",
+    },
+  },
+});
+```
+
+The client CLI uses the same three modes:
+
+```bash
+mcp-use client connect demo https://api.example.com/mcp --protocol auto
+mcp-use client connect legacy https://legacy.example.com/mcp --protocol legacy
+mcp-use client connect modern https://modern.example.com/mcp --protocol modern
+```
+
+The accepted values are `auto`, `legacy`, and `modern`. There is no
+`--negotiate` flag.
+
+## 5. Rename client configuration
+
+Search your client configuration for the removed 1.x names and update them:
+
+| 1.x name | Current name |
+| -------- | ------------ |
+| `samplingCallback` | `onSampling` |
+| `elicitationCallback` | `onElicitation` |
+| `auth_token` | `authToken` |
+| `customHeaders` | `headers` |
+| `clientConfig` | `clientInfo` |
+| `debug` | `logLevel` |
+| `BrowserTelemetry` | `Telemetry` |
+| `ResourceTemplate` client type | `ResourceTemplateType` |
+
+Sampling, elicitation, and notification callbacks can be set as global client
+defaults or on an individual server configuration. Per-server callbacks take
+precedence.
+
+## 6. Update authentication behavior
+
+`MCPClient` automatically creates an OAuth provider for HTTP servers that do not
+already configure an `authProvider`, `authToken`, `oauth: false`, or an
+`Authorization` header.
+
+- Node OAuth opens a browser and waits for its loopback callback.
+- The browser root client opens a popup by default and can use a redirect.
+- `useMcp` and `McpClientProvider` default to
+  `preventAutoAuth: true`. Handle `pending_auth` and call `authenticate()`.
+
+```tsx
+import { useMcpServer } from "@mcp-use/client/react";
+
+export function ServerAuth() {
+  const server = useMcpServer("demo");
+
+  if (server?.state === "pending_auth") {
+    return (
+      <button onClick={() => void server.authenticate()}>
+        Sign in
+      </button>
+    );
+  }
+
+  return null;
+}
+```
+
+For a React OAuth callback route, import `onMcpAuthorization` from
+`@mcp-use/client/react`. A non-React browser build can use the browser
+conditional root export.
+
+Pre-registered clients also have different configuration shapes:
+
+- `MCPClient`: `oauth.staticClientInfo.client_id`
+- React: `oauth.clientId`
+
+See [Authentication](/v2/typescript/client/authentication) for complete Node,
+browser, React, proxy, and public-client examples.
+
+## 7. Update React connection code and Views
+
+Move connection management to `@mcp-use/client/react`:
+
+| 1.x usage | Current usage |
+| --------- | ------------- |
+| `useMcp` from `mcp-use/react` | `useMcp` from `@mcp-use/client/react` |
+| `McpServerOptions` | `McpServerConfig` (`McpServerOptions` is deprecated) |
+| Server config `name` used as a display label | `displayName` |
+| Displayed `server.name` | Negotiated `server.serverInfo?.name` |
+
+`@mcp-use/client/react` also exports `ViewRenderer` for a host application that
+renders MCP App Views.
+
+Code running inside a View stays in `mcp-use/react`, but should use focused View
+hooks such as `useToolContext`, `useCallTool`, and `useViewState`. Compatibility
+hooks such as `useWidget` are deprecated.
+
+## 8. Replace removed low-level exports
+
+The client root no longer re-exports the old Zod `*Schema` constants or
+`JSONSchemaToZod`.
+
+- Import protocol types from `@modelcontextprotocol/client`.
+- Use `ResourceTemplateType` for the protocol resource-template type.
+- Use Zod 4's `z.fromJSONSchema()` when you need to convert JSON Schema.
+
+The current telemetry implementation does not bundle the PostHog browser or
+Node SDKs. If you used the old telemetry override, note that `telFetch` is now a
+non-throwing `(url, init) => Promise<void>` helper.
+
+Do not remove `@modelcontextprotocol/ext-apps` based on the old migration notes;
+the current client still uses it for MCP Apps bridging.
+
+## 9. Review server and MCP App changes
+
+The server is now built around the root `mcp-use` entry, a stateless
+`MCPServer`, and standard protocol result envelopes. Review tool, resource,
+prompt, middleware, authentication, and deployment APIs against the
+[server guide](/v2/typescript/server).
+
+Interactive results use MCP Apps Views. Bind a View to a tool, return
+model-facing `content` and View props in `structuredContent`, and consume the
+result with focused hooks such as `useToolContext`. Deprecated widget helpers
+exist only for compatibility. Follow the
+[MCP Apps guide](/v2/typescript/mcp-apps) before updating interactive UI code.
+
+## 10. Check Inspector callback URLs
+
+The standalone Inspector OAuth callback resolves relative to the configured
+Inspector base path. With the normal `/inspector` base, the callback is
+`/inspector/oauth/callback`; deployments under another base use that base's
+`/oauth/callback`.
+
+If you run a custom OAuth proxy, continue to bind upstream targets to
+SDK-discovered metadata. The Inspector proxy rejects arbitrary upstream target
+URLs.
+
+## Migration checklist
+
+<Steps>
+  <Step title="Update the runtime and packages">
+    Use Node.js `>=22.22.2`, install the beta package tags, and confirm ESM output.
+  </Step>
+  <Step title="Fix imports">
+    Search for client and agent imports from `mcp-use`, removed
+    `@mcp-use/client/*` subpaths, and connection hooks from `mcp-use/react`.
+  </Step>
+  <Step title="Separate native and LangChain agents">
+    Keep `MCPAgent` and `PROMPTS` on `@mcp-use/agent`; move
+    `ServerManager` and LangChain compatibility imports to
+    `@mcp-use/agent/langchain`.
+  </Step>
+  <Step title="Rename configuration">
+    Search for `versionNegotiation`, `samplingCallback`,
+    `elicitationCallback`, `auth_token`, `customHeaders`, `clientConfig`, and
+    `debug`.
+  </Step>
+  <Step title="Use the connection API">
+    Replace `createSession` and `createAllSessions` calls with `connect` and
+    `connectAll`; replace `MCPSession` annotations with `MCPConnection`.
+  </Step>
+  <Step title="Update OAuth UI">
+    Handle React's `pending_auth` state, use the correct pre-registered client
+    shape for each API, and verify callback and proxy URLs.
+  </Step>
+  <Step title="Update Views">
+    Separate React connection management from code that runs inside an MCP App
+    View, then replace deprecated widget compatibility hooks.
+  </Step>
+  <Step title="Verify each environment">
+    Type-check Node, browser, and React entry points independently, then connect
+    to one sessionful and one sessionless server if your application supports
+    both.
+  </Step>
+</Steps>
+
+## Related
+
+- [Client overview](/v2/typescript/client/index)
+- [Authentication](/v2/typescript/client/authentication)
+- [React integration](/v2/typescript/client/usemcp)
+- [Server guide](/v2/typescript/server)
+- [MCP Apps guide](/v2/typescript/mcp-apps)

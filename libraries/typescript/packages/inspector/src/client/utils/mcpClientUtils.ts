@@ -351,7 +351,7 @@ export function generateTypeScriptSDKCode(
     .map((line, i) => (i === 0 ? line : "    " + line))
     .join("\n");
 
-  return `import { MCPClient } from "mcp-use";
+  return `import { MCPClient } from "@mcp-use/client";
 
 const client = new MCPClient({
   mcpServers: {
@@ -359,23 +359,21 @@ const client = new MCPClient({
   }
 });
 
-await client.createAllSessions();
-
-const session = client.getSession("${id}");
+const connection = await client.connect("${id}");
 
 // Get available tools
-const tools = await session.listTools();
+const tools = await connection.listTools();
 console.log('Available tools:', tools.map(tool => tool.name));
 
 // Get available resources
-const resources = await session.listResources();
-console.log('Available resources:', resources.map(resource => resource.name));
+const resources = await connection.listResources();
+console.log('Available resources:', resources.map(resource => resource.uri));
 
 // Call a tool (example)
-// const result = await session.callTool("toolName", { param: "value" });
+// const result = await connection.callTool("toolName", { param: "value" });
 
 // Read a resource (example)
-// const resourceContent = await session.readResource("resource-uri");`;
+// const resourceContent = await connection.readResource("resource-uri");`;
 }
 
 /**

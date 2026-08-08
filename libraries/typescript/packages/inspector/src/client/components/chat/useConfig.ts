@@ -1,6 +1,9 @@
-import { MCPChatConfiguredEvent, Telemetry } from "@/client/telemetry";
-import { useCallback, useEffect, useState } from "react";
-import type { ProviderName } from "@/llm/types";
+import {
+  MCPChatConfiguredEvent,
+  captureInspectorEvent,
+} from "@/client/telemetry";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { ProviderName } from "@mcp-use/agent";
 import type { AuthConfig, LLMConfig } from "./types";
 import {
   DEFAULT_MODELS,
@@ -9,6 +12,7 @@ import {
   providerSupportsBaseUrl,
 } from "./types";
 import { hashString } from "./utils";
+import { writeStoredChatMode } from "./chatModeStorage";
 
 interface UseConfigProps {
   mcpServerUrl: string;
@@ -155,9 +159,13 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
     }
   }, [mcpServerUrl]);
 
-  // Update model and load API key / base URL when provider changes
+  // Load API key / base URL when provider changes; reset model only on switch.
+  const prevTempProviderRef = useRef(tempProvider);
   useEffect(() => {
-    if (!providerSupportsBaseUrl(tempProvider)) {
+    const providerChanged = prevTempProviderRef.current !== tempProvider;
+    prevTempProviderRef.current = tempProvider;
+
+    if (providerChanged && !providerSupportsBaseUrl(tempProvider)) {
       setTempModel(DEFAULT_MODELS[tempProvider]);
     }
     const apiKeys = getApiKeys();
@@ -166,12 +174,12 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
     setTempBaseUrl(baseUrls[tempProvider] || getDefaultBaseUrl(tempProvider));
   }, [tempProvider, getApiKeys, getBaseUrls]);
 
-  const saveLLMConfig = useCallback(() => {
+  const saveLLMConfig = useCallback((): boolean => {
     if (providerRequiresApiKey(tempProvider) && !tempApiKey.trim()) {
-      return;
+      return false;
     }
     if (providerSupportsBaseUrl(tempProvider) && !tempBaseUrl.trim()) {
-      return;
+      return false;
     }
 
     // Save API key for the current provider
@@ -221,19 +229,18 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
 
     // Track chat configuration (no API key)
     try {
-      Telemetry.getInstance()
-        .capture(
-          new MCPChatConfiguredEvent({
-            provider: tempProvider,
-            model: tempModel,
-          })
-        )
-        .catch(() => {});
+      captureInspectorEvent(
+        new MCPChatConfiguredEvent({
+          provider: tempProvider,
+          model: tempModel,
+        })
+      ).catch(() => {});
     } catch {
       // ignore telemetry errors
     }
 
     setConfigDialogOpen(false);
+    return true;
   }, [
     tempProvider,
     tempApiKey,
@@ -268,6 +275,7 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
     setTempAuthType("none");
     localStorage.removeItem("mcp-inspector-llm-config");
     localStorage.removeItem("mcp-inspector-auth-config");
+    writeStoredChatMode("managed");
   }, [tempProvider, getApiKeys, saveApiKeys, getBaseUrls, saveBaseUrls]);
 
   return {

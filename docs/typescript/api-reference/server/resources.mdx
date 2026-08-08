@@ -1,0 +1,222 @@
+---
+title: "Resources"
+description: "Register static and templated resources on an MCPServer API Documentation"
+icon: "file-text"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/mcp-server.ts"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/mcp-server.ts' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/mcp-server.ts</a>
+</Callout>
+
+Resources expose data and content that MCP clients can read by URI: configuration, files, database records, API responses, and more. Register a single fixed resource with [`server.resource()`](/typescript/api-reference/server/resources#server-resource), or register a parameterized family of resources with [`server.resourceTemplate()`](/typescript/api-reference/server/resources#server-resourcetemplate). Both methods are members of the `MCPServer` class and return `this`, so calls can be chained.
+
+## Resource Registration
+
+Registration methods for static and templated resources, plus the related definition and callback types.
+
+```ts
+import { MCPServer } from "mcp-use/server";
+```
+
+## Methods
+
+### server.resource()
+
+Registers a static resource that clients can read at a fixed URI. A resource represents a single addressable piece of content (configuration, a status snapshot, a document) identified by its `uri`. The content is produced by a [`ReadResourceCallback`](/typescript/api-reference/server/resources#readresourcecallback), which may be passed as the second argument or supplied as the `readCallback` field on the definition.
+
+If neither a `callback` argument nor a `readCallback` field is present, registration throws an `Error`. Resources are keyed internally by `` `${name}:${uri}` ``, so a unique `name` plus `uri` pair avoids collisions. Use [`server.resourceTemplate()`](/typescript/api-reference/server/resources#server-resourcetemplate) instead when the URI contains parameters.
+
+**Parameters**
+><ParamField body="resourceDefinition" type="ResourceDefinition<HasOAuth> | ResourceDefinitionWithoutCallback" required>   Resource configuration object. Use `ResourceDefinition` (with a `readCallback` and a required `mimeType`) or `ResourceDefinitionWithoutCallback` (pass the callback as the second argument; `mimeType` is optional and inferred from response helpers). </ParamField>
+><ParamField body="callback" type="ReadResourceCallback<HasOAuth>" >   Async function that returns the resource content. Optional when `readCallback` is set on the definition. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="this" >   The same `MCPServer` instance, for method chaining. </ResponseField>
+
+**Signature**
+```ts wrap
+public resource: (resourceDefinition: ResourceDefinition<HasOAuth> | ResourceDefinitionWithoutCallback, callback?: ReadResourceCallback<HasOAuth>) => this;
+```
+
+**Example**
+```ts wrap
+import { MCPServer, markdown } from "mcp-use/server";
+
+const server = new MCPServer({
+  name: "simple-example-server",
+  version: "1.0.0",
+  description: "A simple MCP server example",
+});
+
+server.resource(
+  {
+    name: "greeting",
+    uri: "app://greeting",
+    title: "Greeting Message",
+  },
+  async () => markdown("# Hello from mcp-use!")
+);
+
+await server.listen();
+```
+
+### server.resourceTemplate()
+
+Registers a resource template: a family of resources whose URIs share a pattern with `{param}` placeholders (for example `user://{userId}/profile`). When a client reads a URI that matches the template, the placeholders are parsed out and passed to the callback. Use this for parameterized reads such as files by path or records by id.
+
+The definition may use the nested shape (`ResourceTemplateDefinition` / `ResourceTemplateDefinitionWithoutCallback`, where the URI lives under `resourceTemplate.uriTemplate`) or the flat shape (`FlatResourceTemplateDefinition` / `FlatResourceTemplateDefinitionWithoutCallback`, where `uriTemplate` sits directly on the object). Supplying an optional Zod `schema` narrows the `params` argument of the callback to `z.infer<schema>`. The read handler is taken from the `callback` argument or, if omitted, from the `readCallback` field on the definition; if neither is present, registration throws an `Error`. Templates are keyed internally by `name`.
+
+**Parameters**
+><ParamField body="templateDefinition" type="T" required>   Resource template configuration. `T` is one of `ResourceTemplateDefinition`, `ResourceTemplateDefinitionWithoutCallback`, `FlatResourceTemplateDefinition`, or `FlatResourceTemplateDefinitionWithoutCallback`. </ParamField>
+><ParamField body="callback" type="ReadResourceTemplateCallback<InferTemplateParams<T>, HasOAuth>" >   Async function receiving the matched URI and extracted parameters. Optional when `readCallback` is set on the definition. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="this" >   The same `MCPServer` instance, for method chaining. </ResponseField>
+
+**Signature**
+```ts wrap
+public resourceTemplate: <T extends ResourceTemplateDefinition<HasOAuth, any> | ResourceTemplateDefinitionWithoutCallback | FlatResourceTemplateDefinition<HasOAuth, any> | FlatResourceTemplateDefinitionWithoutCallback>(templateDefinition: T, callback?: ReadResourceTemplateCallback<InferTemplateParams<T>, HasOAuth>) => this;
+```
+
+**Example**
+```ts wrap
+import { MCPServer, text } from "mcp-use/server";
+import { promises as fs } from "node:fs";
+
+const server = new MCPServer({ name: "files-server", version: "1.0.0" });
+
+server.resourceTemplate(
+  {
+    name: "files",
+    uriTemplate: "file:///{path}",
+    description: "Read files by path",
+  },
+  async (uri, params) => {
+    const content = await fs.readFile(params.path, "utf-8");
+    return text(content);
+  }
+);
+```
+
+## Types
+
+### ResourceDefinition
+
+Configuration object for a static resource registered through [`server.resource()`](/typescript/api-reference/server/resources#server-resource). This is the inline-callback shape: it carries a required `mimeType` and a `readCallback`. To pass the callback as the second argument to `server.resource()` instead, use `ResourceDefinitionWithoutCallback`, whose `mimeType` is optional and inferred from response helpers such as `text()` or `object()`.
+
+The generic parameter `HasOAuth` is `false` by default and controls whether `ctx.auth` is available inside the callback.
+
+**Fields**
+><ParamField body="name" type="string" required>   Unique identifier for the resource. Example: `"app-settings"`. </ParamField>
+><ParamField body="uri" type="string" required>   URI pattern for accessing the resource. Use a custom scheme such as `config://` or `app://`. Example: `"config://app-settings"`. </ParamField>
+><ParamField body="title" type="string" >   Human-readable title. Example: `"App Settings"`. </ParamField>
+><ParamField body="description" type="string" >   Description of what the resource contains. </ParamField>
+><ParamField body="mimeType" type="string" required>   MIME type of the resource content (required for this shape). </ParamField>
+><ParamField body="annotations" type="ResourceAnnotations" >   Optional annotations for discovery and presentation. </ParamField>
+><ParamField body="readCallback" type="ReadResourceCallback<HasOAuth>" required>   Async callback that returns the resource content. </ParamField>
+><ParamField body="_meta" type="Record<string, unknown>" >   Arbitrary metadata attached to the resource. </ParamField>
+><ParamField body="callbacks" type="ResourceTemplateCallbacks" >   Optional completion callbacks. </ParamField>
+
+**Signature**
+```ts wrap
+interface ResourceDefinition<HasOAuth extends boolean = false> {
+  name: string;
+  uri: string;
+  title?: string;
+  description?: string;
+  mimeType: string;
+  annotations?: ResourceAnnotations;
+  readCallback: ReadResourceCallback<HasOAuth>;
+  _meta?: Record<string, unknown>;
+  callbacks?: ResourceTemplateCallbacks;
+}
+```
+
+### UIResourceDefinition
+
+Discriminated union describing an interactive UI resource (a widget) for clients that support rich rendering, such as ChatGPT (Apps SDK) and MCP Apps clients. Pass a value of this type to `server.uiResource()`. The active member is chosen by the `type` discriminant: `"externalUrl"`, `"rawHtml"`, `"remoteDom"`, `"appsSdk"`, or `"mcpApps"`. All members extend a common base providing `name`, `title`, `description`, `props`, `size`, `annotations`, `encoding` (defaults to `"text"`), `exposeAsTool` (defaults to `true`), `toolAnnotations`, `toolOutput`, and `_meta`.
+
+Each member adds its own content fields: `externalUrl` carries a `widget` id, `rawHtml` carries `htmlContent`, `remoteDom` carries a `script` (and optional `framework`, default `"react"`), `appsSdk` carries an `htmlTemplate`, and `mcpApps` carries an `htmlTemplate` plus unified `metadata` that adapters translate per protocol.
+
+**Members**
+><ResponseField name="ExternalUrlUIResource" type="{ type: 'externalUrl'; widget: string; adapters?; appsSdkMetadata? }" >   Serves a widget through an iframe (legacy MCP-UI). </ResponseField>
+><ResponseField name="RawHtmlUIResource" type="{ type: 'rawHtml'; htmlContent: string; adapters?; appsSdkMetadata? }" >   Renders direct HTML content (legacy MCP-UI). </ResponseField>
+><ResponseField name="RemoteDomUIResource" type="{ type: 'remoteDom'; script: string; framework?; adapters?; appsSdkMetadata? }" >   Scripted remote-DOM UI components (legacy MCP-UI). </ResponseField>
+><ResponseField name="AppsSdkUIResource" type="{ type: 'appsSdk'; htmlTemplate: string; appsSdkMetadata? }" >   OpenAI Apps SDK compatible widget using the `text/html+skybridge` mime type. </ResponseField>
+><ResponseField name="McpAppsUIResource" type="{ type: 'mcpApps'; htmlTemplate: string; metadata?; appsSdkMetadata? }" >   Official MCP Apps Extension (SEP-1865) widget with dual-protocol support. </ResponseField>
+
+**Signature**
+```ts wrap
+type UIResourceDefinition =
+  | ExternalUrlUIResource
+  | RawHtmlUIResource
+  | RemoteDomUIResource
+  | AppsSdkUIResource
+  | McpAppsUIResource;
+```
+
+**Example**
+```ts wrap
+import { MCPServer } from "mcp-use/server";
+
+const server = new MCPServer({
+  name: "mcp-apps-gallery",
+  version: "1.0.0",
+  description: "MCP Apps widget gallery",
+});
+
+server.uiResource({
+  type: "mcpApps",
+  name: "welcome-card",
+  title: "Welcome",
+  description: "A welcome card with server information",
+  htmlTemplate: `<div class="card"><h1>Welcome to MCP Apps</h1></div>`,
+  metadata: {
+    prefersBorder: true,
+    widgetDescription: "Server welcome card",
+  },
+  exposeAsTool: true,
+});
+```
+
+### ReadResourceCallback
+
+The async handler that produces the content for a static resource. It receives a single `ctx` argument (an `EnhancedResourceContext`) carrying request context and a client capability checker, and returns a promise resolving to a `CallToolResult` (the shape returned by response helpers like `text()` and `object()`) or a `ReadResourceResult` (the older API shape). The generic `HasOAuth` controls whether `ctx.auth` is available.
+
+**Parameters**
+><ParamField body="ctx" type="EnhancedResourceContext<HasOAuth>" required>   Request context with `req`, `client` (capability checker), and, when OAuth is configured, `auth`. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<CallToolResult | ReadResourceResult | TypedCallToolResult<any>>" >   The resource content. </ResponseField>
+
+**Signature**
+```ts wrap
+type ReadResourceCallback<HasOAuth extends boolean = false> = (
+  ctx: EnhancedResourceContext<HasOAuth>
+) => Promise<CallToolResult | ReadResourceResult | TypedCallToolResult<any>>;
+```
+
+### ReadResourceTemplateCallback
+
+The async handler that produces content for a [resource template](/typescript/api-reference/server/resources#server-resourcetemplate). It is an overloaded union of four signatures so handlers can take only the arguments they need: no arguments, the matched `uri` only, `uri` plus extracted `params`, or `uri`, `params`, and `ctx`. The implementation inspects `callback.length` (the function arity) to decide which signature applies, so declare exactly the parameters you use. The generic `TParams` (default `Record<string, any>`) types the extracted URI parameters and is narrowed automatically when the template definition supplies a Zod `schema`; `HasOAuth` controls `ctx.auth` availability.
+
+**Parameters**
+><ParamField body="uri" type="URL" >   The matched resource URI (omit in the zero-argument form). </ParamField>
+><ParamField body="params" type="TParams" >   Parameters parsed from the URI template placeholders. </ParamField>
+><ParamField body="ctx" type="EnhancedResourceContext<HasOAuth>" >   Request context with `req`, `client`, and optional `auth`. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<CallToolResult | ReadResourceResult | TypedCallToolResult<any>>" >   The resource content. </ResponseField>
+
+**Signature**
+```ts wrap
+type ReadResourceTemplateCallback<
+  TParams extends Record<string, any> = Record<string, any>,
+  HasOAuth extends boolean = false,
+> =
+  | (() => Promise<CallToolResult | ReadResourceResult | TypedCallToolResult<any>>)
+  | ((uri: URL) => Promise<CallToolResult | ReadResourceResult | TypedCallToolResult<any>>)
+  | ((uri: URL, params: TParams) => Promise<CallToolResult | ReadResourceResult | TypedCallToolResult<any>>)
+  | ((uri: URL, params: TParams, ctx: EnhancedResourceContext<HasOAuth>) => Promise<CallToolResult | ReadResourceResult | TypedCallToolResult<any>>);
+```

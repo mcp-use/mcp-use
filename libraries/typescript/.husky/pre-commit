@@ -1,32 +1,83 @@
 #!/bin/sh
 
-# Navigate to TypeScript library directory
-cd "$(dirname "$0")/.." || exit 1
+# Resolve the active checkout from Git. In a linked worktree, the installed hook
+# may live in the primary checkout, so deriving the worktree from $0 is unsafe.
+REPO_ROOT=$(git rev-parse --show-toplevel) || {
+  echo "❌ Could not determine the active Git worktree."
+  exit 1
+}
+ACTIVE_GIT_DIR=$(git rev-parse --absolute-git-dir) || exit 1
+TYPESCRIPT_DIR="$REPO_ROOT/libraries/typescript"
+
+cd "$TYPESCRIPT_DIR" || exit 1
+
+# Pin subsequent Git commands to the active worktree. Git can export repository
+# context associated with the hook's installed path, which may be in the primary
+# checkout rather than this linked worktree.
+GIT_DIR="$ACTIVE_GIT_DIR"
+GIT_WORK_TREE="$REPO_ROOT"
+export GIT_DIR GIT_WORK_TREE
+unset GIT_PREFIX
+
+# Keep NUL-delimited path lists so filenames with whitespace are handled safely.
+# Only paths that were already staged are eligible for formatting, linting, and
+# re-staging; unrelated tracked and untracked files must remain untouched.
+STAGED_PATHS_FILE=$(mktemp "${TMPDIR:-/tmp}/mcp-use-staged.XXXXXX") || exit 1
+STAGED_LINT_PATHS_FILE=$(mktemp "${TMPDIR:-/tmp}/mcp-use-staged-lint.XXXXXX") || {
+  rm -f "$STAGED_PATHS_FILE"
+  exit 1
+}
+trap 'rm -f "$STAGED_PATHS_FILE" "$STAGED_LINT_PATHS_FILE"' 0 1 2 3 15
+
+git -C "$REPO_ROOT" diff --cached --name-only --relative=libraries/typescript \
+  -z --diff-filter=ACMR -- libraries/typescript > "$STAGED_PATHS_FILE"
+git -C "$REPO_ROOT" diff --cached --name-only --relative=libraries/typescript \
+  -z --diff-filter=ACMR -- \
+  ':(top,glob)libraries/typescript/**/*.cjs' \
+  ':(top,glob)libraries/typescript/**/*.cts' \
+  ':(top,glob)libraries/typescript/**/*.js' \
+  ':(top,glob)libraries/typescript/**/*.jsx' \
+  ':(top,glob)libraries/typescript/**/*.mjs' \
+  ':(top,glob)libraries/typescript/**/*.mts' \
+  ':(top,glob)libraries/typescript/**/*.ts' \
+  ':(top,glob)libraries/typescript/**/*.tsx' \
+  > "$STAGED_LINT_PATHS_FILE"
 
 echo "🔍 Running pre-commit checks..."
 
-# 1. Run format to auto-fix formatting issues
+# 1. Format staged files only
 echo "📝 Formatting code..."
-pnpm format || {
-  echo "❌ Formatting failed. Please fix the issues and try again."
-  exit 1
-}
+if [ -s "$STAGED_PATHS_FILE" ]; then
+  xargs -0 pnpm exec prettier --write --ignore-unknown -- < "$STAGED_PATHS_FILE" || {
+    echo "❌ Formatting failed. Please fix the issues and try again."
+    exit 1
+  }
+else
+  echo "ℹ️  No staged TypeScript workspace files to format"
+fi
 
-# 2. Run lint:fix to auto-fix linting issues
+# 2. Lint staged code files only
 echo "🔧 Fixing lint issues..."
-pnpm lint:fix || {
-  echo "❌ Linting failed. Please fix the issues and try again."
-  exit 1
-}
+if [ -s "$STAGED_LINT_PATHS_FILE" ]; then
+  xargs -0 pnpm exec eslint --fix -- < "$STAGED_LINT_PATHS_FILE" || {
+    echo "❌ Linting failed. Please fix the issues and try again."
+    exit 1
+  }
+else
+  echo "ℹ️  No staged JavaScript/TypeScript files to lint"
+fi
 
-# 3. Stage any changes made by format and lint:fix
-git add -u
+# 3. Re-stage formatter/linter changes only for paths that were already staged
+if [ -s "$STAGED_PATHS_FILE" ]; then
+  xargs -0 git add -- < "$STAGED_PATHS_FILE"
+fi
 
 # 4. Check for changeset when TypeScript files are modified
 echo "📦 Checking for changeset..."
 
-# Get list of staged files
-STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
+# Get list of staged files in the TypeScript workspace
+STAGED_FILES=$(git -C "$REPO_ROOT" diff --cached --name-only \
+  --relative=libraries/typescript --diff-filter=ACM -- libraries/typescript)
 
 # Check if any TypeScript/JavaScript files were changed
 HAS_CODE_CHANGES=$(echo "$STAGED_FILES" | grep -E '\.(ts|tsx|js|jsx)$' || true)

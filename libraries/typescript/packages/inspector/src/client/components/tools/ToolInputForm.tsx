@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/client/components/ui/select";
-import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { Tool } from "@mcp-use/client/react";
 import { extractEnumValues, resolveToolPropertySchema } from "./schema-utils";
 
 interface ToolInputFormProps {
@@ -123,11 +123,18 @@ export function ToolInputForm({
         if (isObjectOrArray) {
           return (
             <div key={key} className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <Label htmlFor={key} className="text-sm font-medium">
-                  {key}
-                  {isRequired && <span className="text-red-500 ml-1">*</span>}
-                </Label>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <Label htmlFor={key} className="text-sm font-medium">
+                    {key}
+                    {isRequired && <span className="text-red-500 ml-1">*</span>}
+                  </Label>
+                  {typedProp?.description && (
+                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                      {typedProp.description}
+                    </p>
+                  )}
+                </div>
                 {showSendEmptyToggle && onToggleEmpty && (
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="text-xs text-muted-foreground whitespace-nowrap">
@@ -160,15 +167,10 @@ export function ToolInputForm({
                 value={stringValue}
                 onChange={(e) => onArgChange(key, e.target.value)}
                 onPaste={(e) => handlePaste(e, key)}
-                placeholder={typedProp?.description || `Enter ${key}`}
+                placeholder={`Enter ${key}`}
                 disabled={sendEmptyFields?.has(key) ?? false}
                 className={`min-h-[100px] ${!isSet ? "opacity-70" : ""} ${autoFilledFields?.has(key) ? "animate-pulse ring-2 ring-green-500 dark:ring-green-400" : ""}`}
               />
-              {typedProp?.description && (
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {typedProp.description}
-                </p>
-              )}
             </div>
           );
         }
@@ -177,10 +179,17 @@ export function ToolInputForm({
         if (isEnum && enumValues) {
           return (
             <div key={key} className="space-y-2">
-              <Label htmlFor={key} className="text-sm font-medium">
-                {key}
-                {isRequired && <span className="text-red-500 ml-1">*</span>}
-              </Label>
+              <div>
+                <Label htmlFor={key} className="text-sm font-medium">
+                  {key}
+                  {isRequired && <span className="text-red-500 ml-1">*</span>}
+                </Label>
+                {typedProp.description && (
+                  <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                    {typedProp.description}
+                  </p>
+                )}
+              </div>
               <Select
                 value={String(toolArgs[key] || "")}
                 onValueChange={(value) => onArgChange(key, value)}
@@ -190,9 +199,7 @@ export function ToolInputForm({
                   className={`w-full ${!isSet ? "opacity-70" : ""}`}
                   data-testid={`tool-param-${key}`}
                 >
-                  <SelectValue
-                    placeholder={typedProp.description || "Select an option"}
-                  />
+                  <SelectValue placeholder="Select an option" />
                 </SelectTrigger>
                 <SelectContent>
                   {enumValues.map((option, index) => (
@@ -203,22 +210,24 @@ export function ToolInputForm({
                   ))}
                 </SelectContent>
               </Select>
-              {typedProp.description && (
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {typedProp.description}
-                </p>
-              )}
             </div>
           );
         }
 
         return (
           <div key={key} className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <Label htmlFor={key} className="text-sm font-medium">
-                {key}
-                {isRequired && <span className="text-red-500 ml-1">*</span>}
-              </Label>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <Label htmlFor={key} className="text-sm font-medium">
+                  {key}
+                  {isRequired && <span className="text-red-500 ml-1">*</span>}
+                </Label>
+                {typedProp?.description && (
+                  <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                    {typedProp.description}
+                  </p>
+                )}
+              </div>
               {showSendEmptyToggle && onToggleEmpty && (
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="text-xs text-muted-foreground whitespace-nowrap">
@@ -238,10 +247,11 @@ export function ToolInputForm({
             <Input
               id={key}
               data-testid={`tool-param-${key}`}
+              data-tool-argument-input="true"
               value={stringValue}
               onChange={(e) => onArgChange(key, e.target.value)}
               onPaste={(e) => handlePaste(e, key)}
-              placeholder={typedProp?.description || `Enter ${key}`}
+              placeholder={`Enter ${key}`}
               disabled={sendEmptyFields?.has(key) ?? false}
               className={`${!isSet ? "opacity-70" : ""} ${
                 autoFilledFields?.has(key)
@@ -249,11 +259,6 @@ export function ToolInputForm({
                   : ""
               }`}
             />
-            {typedProp?.description && (
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {typedProp.description}
-              </p>
-            )}
           </div>
         );
       })}

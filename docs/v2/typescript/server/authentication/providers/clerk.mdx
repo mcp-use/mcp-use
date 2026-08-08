@@ -1,0 +1,103 @@
+---
+title: "Clerk Provider"
+description: "Configure Clerk OAuth authentication for an MCP server."
+icon: "/images/icons/clerk.svg"
+---
+
+Use `oauthClerkProvider` when Clerk is the authorization server. MCP clients register directly with Clerk, and mcp-use verifies Clerk-issued access tokens.
+
+## Configure Clerk
+
+In the [Clerk Dashboard](https://dashboard.clerk.com/), enable Dynamic Client Registration for the application and copy its Frontend API URL. Enable and request `user:org:read` when tools need organization context.
+
+Pass the Frontend API URL explicitly:
+
+```bash
+CLERK_FRONTEND_API_URL=https://verb-noun-42.clerk.accounts.dev
+# Optional when Clerk emits a dedicated access-token audience:
+# CLERK_AUDIENCE=https://api.example.com
+```
+
+```typescript
+import { MCPServer } from "mcp-use";
+import { oauthClerkProvider } from "mcp-use/oauth/clerk";
+
+const frontendApiUrl = process.env.CLERK_FRONTEND_API_URL;
+if (!frontendApiUrl) {
+  throw new Error("CLERK_FRONTEND_API_URL is required");
+}
+
+const server = new MCPServer({
+  name: "clerk-server",
+  version: "1.0.0",
+  oauth: oauthClerkProvider({
+    frontendApiUrl,
+    ...(process.env.CLERK_AUDIENCE
+      ? { audience: process.env.CLERK_AUDIENCE }
+      : {}),
+    scopesSupported: ["profile", "email", "offline_access", "user:org:read"],
+  }),
+});
+
+export default server;
+```
+
+`audience` is optional. Set it only when Clerk emits that exact `aud`; when omitted, the provider uses issuer-bound access-token verification.
+
+## Use organization context
+
+Clerk maps `org_id`, `org_role`, and `org_slug` to `organizationId`, `organizationRole`, and `organizationSlug`. Organization permissions are top-level `ctx.auth.permissions`.
+
+```typescript
+server.tool(
+  {
+    name: "list_documents",
+    description: "List documents for the Clerk organization.",
+  },
+  async (_args, ctx) => {
+    const organizationId = ctx.auth.user.organizationId;
+    if (
+      !organizationId ||
+      !ctx.auth.permissions.includes("org:documents:read")
+    ) {
+      return {
+        isError: true,
+        content: [{ type: "text", text: "Organization access required" }],
+      };
+    }
+
+    const documents = await db.documents.findMany({
+      where: { organizationId },
+    });
+    return {
+      content: [{ type: "text", text: JSON.stringify(documents) }],
+    };
+  },
+);
+```
+
+The mapped user also includes `id`, optional `email`, `name`, `username`, `picture`, and `emailVerified`, plus `roles`.
+
+<CardGroup cols={2}>
+  <Card
+    title="Runnable Clerk example"
+    icon="github"
+    href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/auth/clerk"
+  >
+    Compare with the maintained Clerk example.
+  </Card>
+  <Card
+    title="Clerk OAuth documentation"
+    icon="book-open"
+    href="https://clerk.com/docs/guides/configure/auth-strategies/oauth/how-clerk-implements-oauth"
+  >
+    Review Clerk OAuth and DCR behavior.
+  </Card>
+  <Card
+    title="User Context"
+    icon="user"
+    href="/v2/typescript/server/authentication/user-context"
+  >
+    Use Clerk identity, organization, and permissions.
+  </Card>
+</CardGroup>

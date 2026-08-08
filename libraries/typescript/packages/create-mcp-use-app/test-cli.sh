@@ -12,6 +12,14 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+PACKAGE_VERSION="$(node -p 'require("./package.json").version')"
+if [[ "$PACKAGE_VERSION" == *-beta.* ]]; then
+    EXPECTED_DEFAULT_DIST_TAG="beta"
+else
+    EXPECTED_DEFAULT_DIST_TAG="latest"
+fi
+EXPECTED_DEFAULT_MCP_USE_VERSION="$(node -e 'const tag = process.argv[1]; fetch("https://registry.npmjs.org/mcp-use", { headers: { Accept: "application/vnd.npm.install-v1+json" } }).then(response => { if (!response.ok) throw new Error(`npm registry returned ${response.status}`); return response.json(); }).then(metadata => process.stdout.write(metadata["dist-tags"][tag]))' "$EXPECTED_DEFAULT_DIST_TAG")"
+
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEST_DIR="${TEST_DIR:-/tmp/create-mcp-use-app-test-$$}"
@@ -69,11 +77,11 @@ run_test() {
         npm)
             cmd="npx --yes --package=$PACKAGE_FULL_PATH create-mcp-use-app $app_name --template $template $flag --no-skills"
             ;;
-        yarn)
-            cmd="yarn dlx -p $PACKAGE_FULL_PATH create-mcp-use-app $app_name --template $template $flag --no-skills"
-            ;;
         pnpm)
             cmd="pnpm --package=$PACKAGE_FULL_PATH dlx create-mcp-use-app $app_name --template $template $flag --no-skills"
+            ;;
+        bun)
+            cmd="bunx --package=$PACKAGE_FULL_PATH create-mcp-use-app $app_name --template $template $flag --no-skills"
             ;;
     esac
     
@@ -103,9 +111,9 @@ run_test() {
         # Check expected package manager command in output
         if [ -n "$flag" ]; then
             case "$flag" in
-                --yarn)
-                    if ! grep -q "yarn dev" /tmp/test-output.log; then
-                        echo -e "${RED}❌ FAILED: Expected 'yarn dev' in output${NC}"
+                --bun)
+                    if ! grep -q "bun run dev" /tmp/test-output.log; then
+                        echo -e "${RED}❌ FAILED: Expected 'bun run dev' in output${NC}"
                         TESTS_FAILED=$((TESTS_FAILED + 1))
                         return 1
                     fi
@@ -139,6 +147,11 @@ run_test() {
         # Verify package versions based on flags
         if command -v jq > /dev/null 2>&1; then
             local package_json="$app_name/package.json"
+            if [[ "$(jq -r '(.dependencies // {}) + (.devDependencies // {}) + (.optionalDependencies // {}) + (.peerDependencies // {}) | ."@mcp-use/inspector" // empty' "$package_json")" != "" ]]; then
+                echo -e "${RED}❌ FAILED: Inspector is bundled by mcp-use and must not be a direct dependency${NC}"
+                TESTS_FAILED=$((TESTS_FAILED + 1))
+                return 1
+            fi
             
             if grep -q "\-\-dev" <<< "$flag"; then
                 # Check for workspace:* versions
@@ -149,25 +162,35 @@ run_test() {
                     return 1
                 fi
                 echo -e "${GREEN}   ✓ Verified workspace:* versions${NC}"
-            elif grep -q "\-\-canary" <<< "$flag"; then
-                # Check for canary versions
+            elif grep -q "\-\-sdk-version" <<< "$flag"; then
+                # Check for pinned sdk version (e.g. canary from --sdk-version canary)
+                local expected_version
+                if grep -q "\-\-sdk-version canary" <<< "$flag"; then
+                    expected_version="canary"
+                elif grep -q "\-\-sdk-version 1.0.0" <<< "$flag"; then
+                    expected_version="1.0.0"
+                else
+                    expected_version=""
+                fi
                 local mcp_use_version=$(jq -r '.dependencies."mcp-use"' "$package_json")
-                if [[ "$mcp_use_version" != "canary" ]]; then
-                    echo -e "${RED}❌ FAILED: Expected canary version with --canary, got: $mcp_use_version${NC}"
+                if [[ -n "$expected_version" && "$mcp_use_version" != "$expected_version" ]]; then
+                    echo -e "${RED}❌ FAILED: Expected $expected_version with $flag, got: $mcp_use_version${NC}"
                     TESTS_FAILED=$((TESTS_FAILED + 1))
                     return 1
                 fi
-                echo -e "${GREEN}   ✓ Verified canary versions${NC}"
+                echo -e "${GREEN}   ✓ Verified sdk version: $mcp_use_version${NC}"
             else
-                # Check for latest or specific versions (not workspace:* or canary)
+                # The beta scaffolder must default to the exact beta SDK pin.
                 local mcp_use_version=$(jq -r '.dependencies."mcp-use"' "$package_json")
-                if [[ "$mcp_use_version" == "workspace:"* ]] || [[ "$mcp_use_version" == "canary" ]]; then
-                    echo -e "${RED}❌ FAILED: Expected latest/specific version, got: $mcp_use_version${NC}"
+                if [[ "$mcp_use_version" != "$EXPECTED_DEFAULT_MCP_USE_VERSION" ]]; then
+                    echo -e "${RED}❌ FAILED: Expected mcp-use@$EXPECTED_DEFAULT_MCP_USE_VERSION, got: $mcp_use_version${NC}"
                     TESTS_FAILED=$((TESTS_FAILED + 1))
                     return 1
                 fi
-                echo -e "${GREEN}   ✓ Verified latest/specific versions${NC}"
+                echo -e "${GREEN}   ✓ Verified mcp-use@$mcp_use_version default${NC}"
             fi
+
+            echo -e "${GREEN}   ✓ Verified Inspector is provided by mcp-use${NC}"
         fi
         
         echo -e "${GREEN}✅ PASSED${NC}"
@@ -189,11 +212,19 @@ echo -e "${BLUE}═════════════════════�
 echo ""
 
 # Test package manager flags
-run_test "Flag-Yarn" npm starter "--yarn" ""
+run_test "Flag-NPM" npm mcp-server "--npm" ""
 echo ""
-run_test "Flag-NPM" npm starter "--npm" ""
+run_test "Flag-PNPM" npm mcp-server "--pnpm" ""
 echo ""
-run_test "Flag-PNPM" npm starter "--pnpm" ""
+run_test "Flag-Bun" npm mcp-server "--bun" ""
+echo ""
+run_test "Removed-Flag-Falls-Back-To-NPM" npm mcp-server "--yarn" ""
+if grep -qi "yarn" /tmp/test-output.log; then
+    echo -e "${RED}❌ FAILED: Removed --yarn option appeared in output${NC}"
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+else
+    echo -e "${GREEN}✅ Removed --yarn option falls back without Yarn instructions${NC}"
+fi
 echo ""
 
 echo -e "${BLUE}═══════════════════════════════════════════════${NC}"
@@ -202,11 +233,17 @@ echo -e "${BLUE}═════════════════════�
 echo ""
 
 # Test version flags
-run_test "Version-Dev" npm starter "--dev" ""
+run_test "Version-Dev" npm mcp-server "--dev" ""
 echo ""
-run_test "Version-Canary" npm starter "--canary" ""
+run_test "Version-Sdk-Canary" npm mcp-server "--sdk-version canary" ""
 echo ""
-run_test "Version-Latest" npm starter "" ""
+run_test "Version-Sdk-Semver" npm mcp-server "--sdk-version 1.0.0" ""
+echo ""
+run_test "Version-Default-Channel-Server" npm mcp-server "" ""
+echo ""
+run_test "Version-Default-Channel-Apps" npm mcp-apps "" ""
+echo ""
+run_test "Version-Default-Channel-Blank" npm blank "" ""
 echo ""
 
 # Optional: Test with installation (slower)
@@ -216,9 +253,9 @@ if [ "${RUN_INSTALL_TESTS:-no}" == "yes" ]; then
     echo -e "${BLUE}═══════════════════════════════════════════════${NC}"
     echo ""
     
-    run_test "Install-NPM" npm starter "--npm" "yes"
+    run_test "Install-NPM" npm mcp-server "--npm" "yes"
     echo ""
-    run_test "Install-Yarn" yarn starter "--yarn" "yes"
+    run_test "Install-Bun" bun mcp-server "--bun" "yes"
     echo ""
 fi
 
@@ -250,4 +287,3 @@ else
     echo -e "${RED}❌ Some tests failed${NC}"
     exit 1
 fi
-

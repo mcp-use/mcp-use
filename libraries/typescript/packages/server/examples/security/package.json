@@ -1,0 +1,8 @@
+{
+  "name": "mcp-use-example-security",
+  "private": true,
+  "type": "module",
+  "scripts": { "dev": "mcp-use dev", "build": "mcp-use build", "start": "mcp-use start", "typecheck": "tsc --noEmit", "verify": "node ../verify-examples.mjs --example=security" },
+  "dependencies": { "mcp-use": "workspace:*" },
+  "devDependencies": { "@types/node": "^22.20.0", "typescript": "^7.0.2" }
+}

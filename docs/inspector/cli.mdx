@@ -4,6 +4,8 @@ description: "Run the MCP Inspector from the command line"
 icon: "terminal"
 ---
 
+{/* TODO: Add Inspector media when a screenshot or short clip would clarify the workflow. */}
+
 The MCP Inspector can be run directly from the command line using `npx`, making it easy to quickly inspect and debug MCP servers without installing anything globally.
 
 ## Quick Start
@@ -28,15 +30,6 @@ Auto-connect to an MCP server when the inspector starts.
 ```bash
 npx @mcp-use/inspector --url http://localhost:3000/mcp
 ```
-
-**Example URLs:**
-- Local server: `http://localhost:3000/mcp`
-- Remote server: `https://mcp.linear.app/mcp`
-- WebSocket: `ws://localhost:8080/mcp`
-
-<Note>
-The URL must start with `http://`, `https://`, `ws://`, or `wss://`. The inspector will validate the URL format before starting.
-</Note>
 
 ### `--port <port>`
 
@@ -132,50 +125,8 @@ MCP_URL=https://my-tunnel.trycloudflare.com npx @mcp-use/cli dev
 When using a reverse proxy, set `MCP_URL` to the public-facing URL. This ensures widget hot-reload (HMR) and asset loading work correctly through the proxy.
 </Tip>
 
-## Automatic Port Selection
-
-If the specified port (or default 8080) is already in use, the inspector will automatically try the next available port. The terminal output will show the actual port being used:
-
-```
-🚀 MCP Inspector running on http://localhost:8081
-📡 Auto-connecting to: http://localhost:3000/mcp
-🌐 Browser opened
-```
-
-## Troubleshooting
-
-### Port Already in Use
-
-If you see an error about the port being in use:
-
-```bash
-# Try a different port
-npx @mcp-use/inspector --port 9000
-
-# Or stop the process using the port
-lsof -ti:8080 | xargs kill
-```
-
-### Invalid URL Format
-
-Ensure your URL starts with a valid protocol:
-
-```bash
-# ✅ Valid
-npx @mcp-use/inspector --url http://localhost:3000/mcp
-npx @mcp-use/inspector --url https://mcp.example.com/mcp
-
-# ❌ Invalid
-npx @mcp-use/inspector --url localhost:3000/mcp
-```
-
-### Browser Doesn't Open
-
-If the browser doesn't open automatically, check the terminal output for the inspector URL and open it manually. If you passed `--no-open`, this is expected behavior.
-
 ## Related Documentation
 
 - [Getting Started](/inspector/index) - Overview of the inspector
 - [Connection Settings](/inspector/connection-settings) - Advanced connection configuration
-- [Self-Hosting](/inspector/self-hosting) - Deploy your own inspector instance
-
+- [Mount the Inspector](/inspector/integration) - Serve the Inspector from an app

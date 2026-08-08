@@ -10,7 +10,7 @@ A **backend action** the AI can call. Takes input, returns output.
 **Use for:** Actions, operations, mutations, API calls
 
 ```typescript
-server.tool({ name, description, schema }, async (input) => {
+export const tool = server.tool({ name, description, schema }, async (input) => {
   // Your logic here
   return text("result");
 });
@@ -50,7 +50,7 @@ A **tool that returns visual UI**. Same as a tool but renders a React component.
 **Use for:** Browsing data, interactive selection, visual feedback
 
 ```typescript
-server.tool(
+export const widgetTool = server.tool(
   { name, schema, widget: { name: "widget-name" } },
   async (input) => widget({ props: { data }, output: text("...") })
 );
