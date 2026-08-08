@@ -30,6 +30,10 @@ class MockSandbox:
         self.commands = MagicMock()
         self.commands.run = MagicMock(return_value=MockCommandHandle())
 
+    @classmethod
+    def create(cls, *args, **kwargs):
+        return cls(*args, **kwargs)
+
     def get_host(self, port):
         return "test-host.sandbox.e2b.dev"
 
@@ -184,7 +188,7 @@ class TestSandboxConnectorConnection:
         # Setup mocks to raise an exception during sandbox creation
         mock_sandbox_instance = MagicMock()
         mock_sandbox_instance.get_host.side_effect = Exception("Sandbox creation error")
-        mock_sandbox_class.return_value = mock_sandbox_instance
+        mock_sandbox_class.create.return_value = mock_sandbox_instance
 
         # Create connector and attempt to connect
         sandbox_options = SandboxOptions(api_key="test-api-key")

@@ -131,7 +131,6 @@ class SandboxConnector(BaseConnector):
         self.sandbox: Sandbox | None = None
         self.process: CommandHandle | None = None
         self.client_session: ClientSession | None = None
-        self.errlog = sys.stderr
         self.base_url: str | None = None
         self._connected = False
         self._connection_manager: SseConnectionManager | None = None
@@ -217,7 +216,7 @@ class SandboxConnector(BaseConnector):
 
         try:
             # Create and start the sandbox
-            self.sandbox = Sandbox(
+            self.sandbox = Sandbox.create(
                 template=self.sandbox_template_id,
                 api_key=self.api_key,
             )
