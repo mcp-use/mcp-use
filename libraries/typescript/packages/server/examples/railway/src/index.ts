@@ -1,11 +1,11 @@
 /**
  * mcp-use on a long-lived Node server (Railway-style).
  *
- * This module follows the CLI entry contract (../../../specs/CLI_SPEC.md): it
- * default-exports the `MCPServer` instance and never calls `listen()` itself
+ * This module default-exports the `MCPServer` instance and never calls
+ * `listen()` itself
  * — `mcp-use dev` and `mcp-use start` own the socket (and shutdown signals).
  * The MCP protocol layer underneath stays stateless: every request builds a
- * fresh SDK server from the tool/resource registry (see ../../../specs/SPEC.md).
+ * fresh SDK server from the tool/resource registry.
  * The process living across requests is purely a deployment convenience — no
  * MCP session state lives in it, so any replica behind a load balancer can
  * serve any request with no session affinity.
@@ -142,7 +142,7 @@ if (publicDomain !== undefined) {
   console.log(`Public MCP endpoint: https://${publicDomain}${BASE_PATH}`);
 }
 
-// Entry contract (CLI_SPEC.md): export the server; never call listen() here.
+// Export the server; never call listen() here.
 // `mcp-use dev`/`mcp-use start` bind the socket using this instance's config
 // (host, basePath) and handle SIGINT/SIGTERM shutdown.
 export default server;

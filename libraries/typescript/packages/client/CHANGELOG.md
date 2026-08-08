@@ -1,5 +1,23 @@
 # @mcp-use/client
 
+## 2.1.0-canary.4
+
+### Patch Changes
+
+- 792e8eb: Allow widget-declared MCP App sandbox CSPs to use dynamic compilation while preserving their declared domain restrictions.
+
+## 2.1.0-canary.3
+
+### Minor Changes
+
+- 2daf9c9: Add typed Skills over MCP client operations, a capability-gated Inspector
+  file explorer with integrity verification, and removable progressive skill
+  context in Inspector chat.
+
+### Patch Changes
+
+- 819ef5b: Prevent iframe console log records from being parsed as MCP Apps JSON-RPC messages in the Inspector.
+
 ## 2.0.2-canary.2
 
 ### Patch Changes

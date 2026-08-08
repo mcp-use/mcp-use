@@ -1,12 +1,12 @@
 /**
- * `mcp-use dev` — a single long-lived dev process (CLI_SPEC.md § Commands →
- * dev): a Vite dev server (Environment API, node/SSR environment only) loads
+ * `mcp-use dev` — a single long-lived dev process: a Vite dev server
+ * (Environment API, node/SSR environment only) loads
  * the entry through the module runner; one HTTP listener delegates every
  * request to an atomically swappable handler reference.
  *
  * When views exist, the same Vite server gains a client environment with real
  * HMR for view files; the CLI primes views on each entry reload via the
- * internal {@link registerViews} API (VIEWS_SPEC.md § Dev).
+ * internal {@link registerViews} API.
  *
  * Reload, not HMR: on file change the entry is re-imported and the handler
  * reference swapped — no registration diffing or running-registry mutation.
@@ -325,9 +325,8 @@ function serverFrom(moduleExports: Record<string, unknown>): ServerLike {
  *
  * @param options - Project root, optional entry override, port and host.
  * @throws If no entry is found, if the initial import fails, if the entry's
- * default export is not an `MCPServer` (see the entry contract in
- * CLI_SPEC.md), or if `vite` is not installed (`mcp-use dev` requires it as a
- * devDependency).
+ * default export is not an `MCPServer`, or if `vite` is not installed
+ * (`mcp-use dev` requires it as a devDependency).
  *
  * @internal Reached only via the bin's dedicated dev command chunk — not
  * re-exported from the package's "." entry.
@@ -504,7 +503,13 @@ export async function runDev(options: DevOptions): Promise<void> {
         discoverConfiguredSkills(
           skillsConfig,
           options.cwd,
-          conventionalSkillsDirectory
+          conventionalSkillsDirectory,
+          {
+            onInvalidSkill: (error) => {
+              const message = error.message.replace(/\s+/g, " ").trim();
+              console.error(`[mcp-use] invalid skill omitted: ${message}`);
+            },
+          }
         )
       );
       const viewsManifest = buildDevViewsManifest(viewsSnapshot);
@@ -633,6 +638,9 @@ export async function runDev(options: DevOptions): Promise<void> {
           currentHandler = nextHandler;
           basePath = nextBasePath;
           currentSkillsDirectory = skillsDirectory;
+          if (currentSkillsDirectory !== undefined) {
+            vite.watcher.add(currentSkillsDirectory);
+          }
           eventBus.publish({ kind: "tools_list_changed" });
           eventBus.publish({ kind: "prompts_list_changed" });
           eventBus.publish({ kind: "resources_list_changed" });
@@ -678,10 +686,9 @@ export async function runDev(options: DevOptions): Promise<void> {
   };
 
   const onSsrFileEvent = (file: string): void => {
-    if (isViewPath(file, options.cwd, viewsDirectory)) {
-      return;
-    }
     const normalizedFile = file.replaceAll("\\", "/");
+    // Skills may intentionally live under the views root. Give that configured
+    // data directory precedence before view files take the HMR-only path.
     if (
       currentSkillsDirectory !== undefined &&
       (normalizedFile === currentSkillsDirectory.replaceAll("\\", "/") ||
@@ -690,6 +697,9 @@ export async function runDev(options: DevOptions): Promise<void> {
         ))
     ) {
       scheduleSkillsReload();
+      return;
+    }
+    if (isViewPath(file, options.cwd, viewsDirectory)) {
       return;
     }
     const modules = ssrEnvironment.moduleGraph.getModulesByFile(
@@ -723,6 +733,13 @@ export async function runDev(options: DevOptions): Promise<void> {
   vite.watcher.on("change", onSsrFileEvent);
   vite.watcher.on("add", onFileAddOrUnlink);
   vite.watcher.on("unlink", onFileAddOrUnlink);
+  // Skill files are data, not server-module imports, so Vite does not
+  // necessarily watch their directory until we opt it in explicitly.
+  // Watching the configured root also covers a conventional skills/ folder
+  // created after the dev server has already started.
+  if (currentSkillsDirectory !== undefined) {
+    vite.watcher.add(currentSkillsDirectory);
+  }
 
   // --- One long-lived HTTP listener delegating to the current handler. -----
   const tunnelManager = createTunnelManager(paths.tunnel);

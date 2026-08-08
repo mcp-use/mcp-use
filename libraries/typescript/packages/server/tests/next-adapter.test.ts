@@ -129,6 +129,10 @@ describe("withMcpUse config composition", () => {
           "/api/mcp": ["./already/**/*"],
           "/other": ["./other/**/*"],
         },
+        turbopack: {
+          root: "/example",
+          resolveAlias: { "@app/config": "./config.ts" },
+        },
       },
       "/api/mcp"
     );
@@ -148,6 +152,13 @@ describe("withMcpUse config composition", () => {
     expect(config.outputFileTracingIncludes).toEqual({
       "/api/mcp": ["./already/**/*", "./.mcp-use/build/**/*"],
       "/other": ["./other/**/*"],
+    });
+    expect(config.turbopack).toEqual({
+      root: "/example",
+      resolveAlias: {
+        "@app/config": "./config.ts",
+        "#mcp-use-skills-loader": "@mcp-use/cli/internal/skills-loader",
+      },
     });
   });
 

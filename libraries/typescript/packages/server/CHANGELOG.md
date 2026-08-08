@@ -1,5 +1,52 @@
 # mcp-use
 
+## 3.0.0-canary.11
+
+### Patch Changes
+
+- 12bf15e: Fix Turbopack builds for Next.js servers using Skills over MCP.
+  - @mcp-use/inspector@21.0.0-canary.11
+
+## 3.0.0-canary.10
+
+### Patch Changes
+
+- Updated dependencies [e41076f]
+  - @mcp-use/cli@5.0.0-canary.7
+  - @mcp-use/inspector@21.0.0-canary.10
+
+## 3.0.0-canary.9
+
+### Patch Changes
+
+- Updated dependencies [792e8eb]
+  - @mcp-use/inspector@21.0.0-canary.9
+  - @mcp-use/cli@5.0.0-canary.6
+
+## 3.0.0-canary.8
+
+### Patch Changes
+
+- Updated dependencies [fd0236f]
+  - @mcp-use/inspector@21.0.0-canary.8
+
+## 3.0.0-canary.7
+
+### Minor Changes
+
+- 6911124: Add experimental server authoring support for Skills over MCP with automatic
+  `skills/` discovery, explicit disable and directory configuration, SEP-2640
+  resource methods, development reloads, and build-time embedding.
+
+### Patch Changes
+
+- Updated dependencies [819ef5b]
+- Updated dependencies [6911124]
+- Updated dependencies [2daf9c9]
+  - @mcp-use/client@2.1.0-canary.3
+  - @mcp-use/cli@5.0.0-canary.6
+  - @mcp-use/inspector@21.0.0-canary.7
+
 ## 2.0.5-canary.6
 
 ### Patch Changes
@@ -425,7 +472,7 @@
 - fe4d3b2: Enable MCP view JS code splitting and polish inspector boot UX.
 
   **mcp-use**
-  - Enable rolldown code splitting for per-view client builds (`chunkFileNames` alongside the entry chunk); update `VIEWS_SPEC.md` for external assets and split chunks.
+  - Enable rolldown code splitting for per-view client builds (`chunkFileNames` alongside the entry chunk) for external assets and split chunks.
   - Paint a centered boot spinner in the managed inspector shell while the CDN bundle downloads.
 
   **@mcp-use/inspector**
@@ -987,7 +1034,7 @@
 - fe4d3b2: Enable MCP view JS code splitting and polish inspector boot UX.
 
   **mcp-use**
-  - Enable rolldown code splitting for per-view client builds (`chunkFileNames` alongside the entry chunk); update `VIEWS_SPEC.md` for external assets and split chunks.
+  - Enable rolldown code splitting for per-view client builds (`chunkFileNames` alongside the entry chunk) for external assets and split chunks.
   - Paint a centered boot spinner in the managed inspector shell while the CDN bundle downloads.
 
   **@mcp-use/inspector**

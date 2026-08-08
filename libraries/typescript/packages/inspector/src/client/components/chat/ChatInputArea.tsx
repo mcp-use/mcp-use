@@ -5,7 +5,7 @@ import {
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
 import { cn } from "@/client/lib/utils";
-import type { Prompt, Skill } from "@mcp-use/client/react";
+import type { Prompt } from "@mcp-use/client/react";
 import { ArrowUp, Loader2 } from "lucide-react";
 import React from "react";
 import type { ElicitResult } from "@mcp-use/client/react";
@@ -20,7 +20,6 @@ import type { LLMConfig, MessageAttachment } from "./types";
 import { FloatingChatElicitation } from "./FloatingChatElicitation";
 import { SystemPromptButton } from "./SystemPromptButton";
 import type { ChatSystemPromptProvider } from "./system-prompt/types";
-import { SkillContextChips } from "./SkillContextChips";
 
 interface ChatInputAreaProps {
   variant?: "default" | "fullscreen";
@@ -34,9 +33,6 @@ interface ChatInputAreaProps {
   prompts: Prompt[];
   selectedPrompt: Prompt | null;
   promptResults: PromptResult[];
-  skills?: Skill[];
-  enabledSkillUris?: Set<string>;
-  onEnabledSkillUrisChange?: (enabledUris: Set<string>) => void;
   attachments: MessageAttachment[];
   tools?: ToolInfo[];
   disabledTools?: Set<string>;
@@ -49,7 +45,6 @@ interface ChatInputAreaProps {
   onStopStreaming: () => void;
   onConfigDialogOpenChange: (open: boolean) => void;
   onPromptSelect: (prompt: Prompt) => void;
-  onSkillSelect: (skill: Skill) => void;
   onDeletePromptResult: (index: number) => void;
   onAttachmentAdd: (file: File) => void;
   onAttachmentRemove: (index: number) => void;
@@ -94,9 +89,6 @@ export function ChatInputArea({
   prompts,
   selectedPrompt,
   promptResults,
-  skills = [],
-  enabledSkillUris = new Set(),
-  onEnabledSkillUrisChange,
   attachments,
   tools,
   disabledTools,
@@ -109,7 +101,6 @@ export function ChatInputArea({
   onStopStreaming,
   onConfigDialogOpenChange,
   onPromptSelect,
-  onSkillSelect,
   onDeletePromptResult,
   onAttachmentAdd,
   onAttachmentRemove,
@@ -198,27 +189,16 @@ export function ChatInputArea({
         )}
         {!isFullscreen && (
           <>
-            {onEnabledSkillUrisChange && (
-              <SkillContextChips
-                skills={skills}
-                enabledUris={enabledSkillUris}
-                onChange={onEnabledSkillUrisChange}
-              />
-            )}
             <PromptsDropdown
               isOpen={promptsDropdownOpen}
               prompts={prompts}
-              skills={skills}
-              enabledSkillUris={enabledSkillUris}
               selectedPrompt={selectedPrompt}
               focusedIndex={promptFocusedIndex}
               onPromptSelect={onPromptSelect}
-              onSkillSelect={onSkillSelect}
             />
             <PromptResultsList
               promptResults={promptResults}
               onDeletePromptResult={onDeletePromptResult}
-              offsetForSkills={skills.length > 0}
             />
           </>
         )}
@@ -233,11 +213,7 @@ export function ChatInputArea({
           placeholder="Ask a question or request an action..."
           className={cn(
             "bg-white/80 dark:text-white dark:bg-black backdrop-blur-sm border-gray-200 dark:border-zinc-800",
-            !isFullscreen &&
-              (promptResults.length > 0 || skills.length > 0) &&
-              (promptResults.length > 0 && skills.length > 0
-                ? "pt-24"
-                : "pt-16")
+            !isFullscreen && promptResults.length > 0 && "pt-16"
           )}
           showAttachButton={!isFullscreen}
           tools={isFullscreen ? undefined : tools}

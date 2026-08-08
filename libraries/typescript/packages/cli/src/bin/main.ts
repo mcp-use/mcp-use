@@ -1,5 +1,5 @@
 /**
- * Command dispatch for the `mcp-use` bin (specs/CLI_SPEC.md).
+ * Command dispatch for the `mcp-use` bin.
  *
  * Every substantial command is dispatched through its own dynamic import.
  * The library entry, bin, and production `start` path therefore never

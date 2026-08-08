@@ -1,5 +1,26 @@
 # @mcp-use/cli
 
+## 5.0.0-canary.7
+
+### Patch Changes
+
+- e41076f: Improve Skills over MCP discovery in Inspector and omit invalid skills from fresh development snapshots.
+
+## 5.0.0-canary.6
+
+### Minor Changes
+
+- 6911124: Add experimental server authoring support for Skills over MCP with automatic
+  `skills/` discovery, explicit disable and directory configuration, SEP-2640
+  resource methods, development reloads, and build-time embedding.
+
+### Patch Changes
+
+- Updated dependencies [819ef5b]
+- Updated dependencies [2daf9c9]
+  - @mcp-use/client@2.1.0-canary.3
+  - @mcp-use/inspector@21.0.0-canary.7
+
 ## 4.0.2-canary.5
 
 ### Patch Changes

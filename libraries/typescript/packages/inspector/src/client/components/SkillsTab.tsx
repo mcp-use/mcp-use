@@ -410,7 +410,7 @@ export function SkillsTab({
                 />
                 <div className="p-2 flex-1">
                   {filtered.length === 0 ? (
-                    <div className="text-sm text-muted-foreground p-6 text-center">
+                    <div className="p-6 text-center text-sm text-muted-foreground">
                       No skills available
                     </div>
                   ) : (

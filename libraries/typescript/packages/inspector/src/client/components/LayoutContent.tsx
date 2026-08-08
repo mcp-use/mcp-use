@@ -15,6 +15,7 @@ import { useInspector } from "@/client/context/InspectorContext";
 import type { TabType } from "@/client/context/InspectorContext";
 import { isInspectorSamplingAvailable } from "@/client/utils/samplingProtocol";
 import { isLocalhostServerUrl } from "@/client/utils/servers";
+import { getSkillsState } from "./layout/layoutHeaderUtils";
 import {
   FALLBACK_MANAGED_MODEL_ID,
   buildManagedAuthHeaders,
@@ -184,6 +185,9 @@ export function LayoutContent({
   // Helper to check if a tab should be rendered
   const isTabVisible = (tab: TabType): boolean => {
     if (tab === "sampling" && !isInspectorSamplingAvailable(selectedServer)) {
+      return false;
+    }
+    if (tab === "skills" && getSkillsState(selectedServer) !== "available") {
       return false;
     }
     if (!embeddedConfig.visibleTabs) return true;

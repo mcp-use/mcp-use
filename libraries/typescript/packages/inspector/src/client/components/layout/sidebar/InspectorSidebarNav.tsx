@@ -1,5 +1,6 @@
 import { cn } from "@/client/lib/utils";
 import type { TabType } from "@/client/context/InspectorContext";
+import { CircleAlert } from "lucide-react";
 import {
   isInspectorSamplingAvailable,
   STATELESS_SAMPLING_UNSUPPORTED_MESSAGE,
@@ -10,7 +11,13 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
-import { getTabCount, shouldShowDot } from "../layoutHeaderUtils";
+import {
+  getSkillsState,
+  getTabCount,
+  SKILLS_EMPTY_CATALOG_MESSAGE,
+  SKILLS_UNSUPPORTED_MESSAGE,
+  shouldShowDot,
+} from "../layoutHeaderUtils";
 import type { LayoutTabDef } from "../layoutTabs";
 import { LAYOUT_TABS } from "../layoutTabs";
 import { useSidebarProximityRowRefs } from "./SidebarProximityNav";
@@ -73,11 +80,20 @@ export function InspectorSidebarNav({
       {filteredTabs.map((tab, index) => {
         const count = getTabCount(tab.id, selectedServer);
         const showDot = shouldShowDot(tab.id, count, collapsed);
-        const Icon = tab.icon;
+        const skillsState =
+          tab.id === "skills" ? getSkillsState(selectedServer) : undefined;
+        const Icon = skillsState === "empty" ? CircleAlert : tab.icon;
         const isActive = activeTab === tab.id;
         const isDisabled =
-          tab.id === "sampling" &&
-          !isInspectorSamplingAvailable(selectedServer);
+          (tab.id === "sampling" &&
+            !isInspectorSamplingAvailable(selectedServer)) ||
+          (skillsState !== undefined && skillsState !== "available");
+        const disabledMessage =
+          tab.id === "skills"
+            ? skillsState === "empty"
+              ? SKILLS_EMPTY_CATALOG_MESSAGE
+              : SKILLS_UNSUPPORTED_MESSAGE
+            : STATELESS_SAMPLING_UNSUPPORTED_MESSAGE;
         const hasTrailing = count > 0 || showDot;
 
         const row = (
@@ -88,9 +104,7 @@ export function InspectorSidebarNav({
             tabIndex={isDisabled ? -1 : undefined}
             data-testid={`tab-${tab.id}`}
             data-active={isActive ? true : undefined}
-            title={
-              isDisabled ? STATELESS_SAMPLING_UNSUPPORTED_MESSAGE : undefined
-            }
+            title={isDisabled ? disabledMessage : undefined}
             onClick={() => {
               if (!isDisabled) onTabChange(tab.id);
             }}
@@ -104,8 +118,24 @@ export function InspectorSidebarNav({
               isDisabled && "pointer-events-none"
             )}
           >
-            <Icon className="size-4 shrink-0" />
-            <span className={sidebarNavLabelClass}>{tab.label}</span>
+            <Icon
+              className={cn(
+                "size-4 shrink-0",
+                skillsState === "empty" && "text-red-600 dark:text-red-400"
+              )}
+              aria-hidden={skillsState === "empty" || undefined}
+            />
+            <span
+              className={cn(
+                sidebarNavLabelClass,
+                skillsState === "empty" && "text-red-600 dark:text-red-400"
+              )}
+            >
+              {tab.label}
+              {skillsState === "empty" && (
+                <span className="sr-only">: advertised but empty</span>
+              )}
+            </span>
           </button>
         );
 
@@ -121,7 +151,7 @@ export function InspectorSidebarNav({
                     isDisabled ? (
                       <span
                         className="block cursor-not-allowed"
-                        title={STATELESS_SAMPLING_UNSUPPORTED_MESSAGE}
+                        title={disabledMessage}
                       >
                         {row}
                       </span>
@@ -133,7 +163,7 @@ export function InspectorSidebarNav({
                 />
                 <TooltipContent side="right">
                   {isDisabled
-                    ? STATELESS_SAMPLING_UNSUPPORTED_MESSAGE
+                    ? disabledMessage
                     : count > 0
                       ? `${tab.label} (${count})`
                       : tab.label}

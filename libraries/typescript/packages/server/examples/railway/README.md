@@ -5,17 +5,17 @@ any container/VM host without a serverless invocation model) runs an app.
 
 ## What this demonstrates
 
-- **The CLI entry contract** (`specs/CLI_SPEC.md`): `src/index.ts` registers
-  tools and `export default server` — it never calls `listen()` itself.
+- **CLI entry:** `src/index.ts` registers tools and `export default server` —
+  it never calls `listen()` itself.
   `mcp-use dev` (local reload), `mcp-use build` (compile to
   `.mcp-use/build/`), and `mcp-use start` (serve the build) own the socket
   and shutdown signals. This is the node-deployment door, as opposed to the
   per-invocation `server.fetch` handler used on serverless platforms (see the
   `vercel` example).
 - **A long-lived process is still stateless MCP.** `MCPServer` builds a fresh
-  SDK server from its tool/resource/prompt registry on *every* request (see
-  `../../specs/SPEC.md`) — the Node process living across requests is a deployment
-  convenience, not a place MCP session state accumulates. Any replica behind a
+  SDK server from its tool/resource/prompt registry on *every* request — the
+  Node process living across requests is a deployment convenience, not a place
+  MCP session state accumulates. Any replica behind a
   load balancer can serve any request; there is no session affinity to worry
   about. `railway.json` here sets `numReplicas: 2` specifically to make that
   point concrete — scaling out requires no sticky sessions, no shared store.

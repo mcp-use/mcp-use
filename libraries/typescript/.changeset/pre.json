@@ -11,16 +11,23 @@
     "mcp-use": "2.0.4"
   },
   "changesets": [
+    "bright-inspector-assets",
     "bright-widgets-bridge",
     "calm-owls-prompt",
     "clean-cli-ownership",
     "clean-inspectors-fit",
     "clean-tunnels-connect",
     "fair-pandas-smile",
+    "fix-next-skills-turbopack",
     "fuzzy-tools-wait",
+    "gentle-widgets-eval",
+    "quiet-console-routing",
     "quiet-lions-connect",
     "repair-canary-baseline",
     "slick-nights-taste",
-    "tidy-knip-exports"
+    "soft-skills-travel",
+    "tidy-knip-exports",
+    "tidy-skills-inspector",
+    "tidy-skills-over-mcp"
   ]
 }

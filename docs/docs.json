@@ -884,6 +884,10 @@
       "destination": "/python/changelog/changelog"
     },
     {
+      "source": "/typescript/server/migration",
+      "destination": "/v2/typescript/server/migration"
+    },
+    {
       "source": "/typescript/server/ui-widgets",
       "destination": "/typescript/mcp-apps"
     },
@@ -1172,25 +1176,15 @@
       "msapplication-TileColor": "#1a1a1a",
       "msapplication-TileImage": "/images/mstile-144x144.png",
       "msapplication-config": "/browserconfig.xml",
-      "og:title": "mcp-use - The fullstack MCP framework to develop MCP Apps for ChatGPT / Claude and MCP Servers for AI Agents.",
       "og:type": "website",
-      "og:url": "https://mcp-use.com",
       "og:image": "https://cdn.mcp-use.com/og-image.png",
-      "og:description": "The fullstack MCP framework to develop MCP Apps for ChatGPT / Claude and MCP Servers for AI Agents.",
       "og:site_name": "mcp-use",
       "og:locale": "en_US",
       "twitter:card": "summary_large_image",
       "twitter:site": "@manufact",
       "twitter:creator": "@manufact",
-      "twitter:title": "mcp-use - The fullstack MCP framework to develop MCP Apps for ChatGPT / Claude and MCP Servers for AI Agents.",
-      "twitter:description": "The fullstack MCP framework to develop MCP Apps for ChatGPT / Claude and MCP Servers for AI Agents.",
       "twitter:image": "https://cdn.mcp-use.com/og-image.png",
-      "twitter:image:alt": "mcp-use logo and interface showing MCP Apps for ChatGPT / Claude and MCP Servers for AI Agents.",
-      "article:published_time": "2024-12-01T00:00:00+00:00",
-      "article:modified_time": "2026-05-14T00:00:00+00:00",
-      "article:author": "Manufact Team",
-      "article:section": "Technology",
-      "article:tag": "MCP, MCP Servers, MCP Apps, ChatGPT, Claude, AI Agents, open source, developers, API"
+      "twitter:image:alt": "mcp-use logo and interface showing MCP Apps for ChatGPT / Claude and MCP Servers for AI Agents."
     }
   }
 }
