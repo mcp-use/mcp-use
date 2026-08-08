@@ -3,6 +3,7 @@
 
 import pytest
 
+from mcp_use.client.task_managers import websocket as websocket_module
 from mcp_use.task_managers.websocket import WebSocketConnectionManager
 
 
@@ -79,3 +80,46 @@ class TestWebSocketConnectionManager:
             assert manager.headers == headers
         except TypeError as e:
             pytest.fail(f"WebSocketConnectionManager failed to accept headers parameter: {e}")
+
+    def test_headers_raise_clear_error_when_websocket_client_does_not_support_them(self):
+        """Configured headers should not be silently ignored by websocket_client."""
+        manager = WebSocketConnectionManager("ws://example.com", {"Authorization": "Bearer test-token"})
+
+        with pytest.raises(RuntimeError, match="does not support forwarding handshake headers"):
+            manager._websocket_client_kwargs()
+
+    def test_headers_are_forwarded_when_websocket_client_supports_them(self, monkeypatch):
+        """Headers should be forwarded when the underlying MCP client supports them."""
+
+        def websocket_client_with_headers(url, headers=None):
+            return None
+
+        monkeypatch.setattr(websocket_module, "websocket_client", websocket_client_with_headers)
+
+        headers = {"Authorization": "Bearer test-token"}
+        manager = WebSocketConnectionManager("ws://example.com", headers)
+
+        assert manager._websocket_client_kwargs() == {"headers": headers}
+
+    async def test_establish_connection_forwards_headers_to_websocket_client(self, monkeypatch):
+        """Regression test for Authorization/header propagation during handshake setup."""
+        calls = []
+
+        class WebSocketClientContext:
+            async def __aenter__(self):
+                return ("read-stream", "write-stream")
+
+            async def __aexit__(self, exc_type, exc_value, traceback):
+                return None
+
+        def websocket_client_with_headers(url, headers=None):
+            calls.append({"url": url, "headers": headers})
+            return WebSocketClientContext()
+
+        monkeypatch.setattr(websocket_module, "websocket_client", websocket_client_with_headers)
+
+        headers = {"Authorization": "Bearer test-token"}
+        manager = WebSocketConnectionManager("ws://example.com", headers)
+
+        assert await manager._establish_connection() == ("read-stream", "write-stream")
+        assert calls == [{"url": "ws://example.com", "headers": headers}]
