@@ -38,6 +38,28 @@ function run(root, registryFile, ...args) {
   );
 }
 
+function writeChangeset(root, id, releases, summary = "Test change.") {
+  const frontmatter = releases
+    .map(({ name, type }) => `"${name}": ${type}`)
+    .join("\n");
+  writeFileSync(
+    join(root, ".changeset", `${id}.md`),
+    `---\n${frontmatter}\n---\n\n${summary}\n`
+  );
+}
+
+function writePreState(root, initialVersions, changesets = []) {
+  writeFileSync(
+    join(root, ".changeset", "pre.json"),
+    JSON.stringify({
+      mode: "pre",
+      tag: "canary",
+      initialVersions,
+      changesets,
+    })
+  );
+}
+
 test("rejects a stable source version below npm latest", () => {
   const { root, registryFile } = fixture({
     localVersion: "2.0.1",
@@ -76,6 +98,29 @@ test("accepts a canary release above npm latest", () => {
   assert.equal(plan.releases[0].target, true);
 });
 
+test("rejects an unpublished Canary version below the current Canary tag", () => {
+  const { root, registryFile } = fixture({
+    localVersion: "2.1.0-canary.0",
+    latest: "2.0.4",
+    canary: "2.1.0-canary.4",
+    published: ["2.0.4", "2.1.0-canary.4"],
+  });
+  const result = run(
+    root,
+    registryFile,
+    "snapshot",
+    "--channel",
+    "canary",
+    "--output",
+    join(root, "plan.json")
+  );
+  assert.notEqual(result.status, 0);
+  assert.match(
+    result.stderr,
+    /2\.1\.0-canary\.0 must be greater than npm canary 2\.1\.0-canary\.4/u
+  );
+});
+
 test("ignores changesets already applied in prerelease mode", () => {
   const { root, registryFile } = fixture({
     localVersion: "2.0.5-canary.0",
@@ -99,6 +144,198 @@ test("ignores changesets already applied in prerelease mode", () => {
   const result = run(root, registryFile, "pending");
   assert.equal(result.status, 0);
   assert.equal(result.stdout.trim(), "");
+});
+
+test("prepares internal peer ranges for pending Canary changes", () => {
+  const { root, registryFile } = fixture({
+    localVersion: "2.0.4",
+    latest: "2.0.4",
+    canary: "2.0.5-canary.6",
+    published: ["2.0.4", "2.0.5-canary.6"],
+  });
+  mkdirSync(join(root, "packages", "client"), { recursive: true });
+  mkdirSync(join(root, "packages", "agent"), { recursive: true });
+  mkdirSync(join(root, "packages", "inspector"), { recursive: true });
+  writeFileSync(
+    join(root, "packages", "client", "package.json"),
+    JSON.stringify({
+      name: "@mcp-use/client",
+      version: "2.0.1",
+      peerDependencies: { "mcp-use": "workspace:*" },
+    })
+  );
+  writeFileSync(
+    join(root, "packages", "server", "package.json"),
+    JSON.stringify({
+      name: "mcp-use",
+      version: "2.0.5-canary.6",
+      peerDependencies: { "@mcp-use/client": "^2.0.1" },
+    })
+  );
+  writeFileSync(
+    join(root, "packages", "agent", "package.json"),
+    JSON.stringify({ name: "@mcp-use/agent", version: "2.0.2-canary.4" })
+  );
+  writeFileSync(
+    join(root, "packages", "inspector", "package.json"),
+    JSON.stringify({
+      name: "@mcp-use/inspector",
+      version: "20.0.5-canary.6",
+      peerDependencies: { "@mcp-use/agent": "^2.0.1" },
+    })
+  );
+  writeChangeset(root, "skills", [
+    { name: "@mcp-use/agent", type: "patch" },
+    { name: "@mcp-use/client", type: "minor" },
+    { name: "mcp-use", type: "minor" },
+  ]);
+  writePreState(root, {
+    "@mcp-use/agent": "2.0.1",
+    "@mcp-use/client": "2.0.1",
+    "@mcp-use/inspector": "20.0.4",
+    "mcp-use": "2.0.4",
+  });
+
+  const result = run(root, registryFile, "prepare", "--channel", "canary");
+  assert.equal(result.status, 0, result.stderr);
+  const server = JSON.parse(
+    readFileSync(join(root, "packages", "server", "package.json"), "utf8")
+  );
+  assert.equal(
+    server.peerDependencies["@mcp-use/client"],
+    "^2.0.1 || ^2.1.0-canary.0"
+  );
+  const client = JSON.parse(
+    readFileSync(join(root, "packages", "client", "package.json"), "utf8")
+  );
+  assert.equal(
+    client.peerDependencies["mcp-use"],
+    "^2.0.4 || ^2.0.5-canary.0 || ^2.1.0-canary.0"
+  );
+  const inspector = JSON.parse(
+    readFileSync(join(root, "packages", "inspector", "package.json"), "utf8")
+  );
+  assert.equal(
+    inspector.peerDependencies["@mcp-use/agent"],
+    "^2.0.1 || ^2.0.2-canary.0"
+  );
+
+  const repeated = run(root, registryFile, "prepare", "--channel", "canary");
+  assert.equal(repeated.status, 0, repeated.stderr);
+  assert.equal(
+    readFileSync(join(root, "packages", "client", "package.json"), "utf8"),
+    `${JSON.stringify(client, null, 2)}\n`
+  );
+});
+
+test("rejects the accidental mcp-use, CLI, and Inspector Canary majors", () => {
+  const { root, registryFile } = fixture({
+    localVersion: "2.0.5-canary.6",
+    latest: "2.0.4",
+    canary: "2.0.5-canary.6",
+    published: ["2.0.4", "2.0.5-canary.6"],
+  });
+  const planFile = join(root, "changeset-status.json");
+  writeFileSync(
+    planFile,
+    JSON.stringify({
+      changesets: [
+        {
+          id: "skills",
+          releases: [
+            { name: "mcp-use", type: "minor" },
+            { name: "@mcp-use/cli", type: "minor" },
+            { name: "@mcp-use/inspector", type: "minor" },
+          ],
+        },
+      ],
+      releases: [
+        {
+          name: "mcp-use",
+          type: "major",
+          oldVersion: "2.0.5-canary.6",
+          newVersion: "3.0.0-canary.7",
+        },
+        {
+          name: "@mcp-use/cli",
+          type: "major",
+          oldVersion: "4.0.2-canary.5",
+          newVersion: "5.0.0-canary.6",
+        },
+        {
+          name: "@mcp-use/inspector",
+          type: "major",
+          oldVersion: "20.0.5-canary.6",
+          newVersion: "21.0.0-canary.7",
+        },
+      ],
+      preState: { mode: "pre", tag: "canary" },
+    })
+  );
+
+  const result = run(
+    root,
+    registryFile,
+    "validate",
+    "--channel",
+    "canary",
+    "--plan",
+    planFile
+  );
+  assert.notEqual(result.status, 0);
+  assert.match(
+    result.stderr,
+    /mcp-use would cross a major boundary .* without an explicit major changeset/u
+  );
+  assert.match(
+    result.stderr,
+    /@mcp-use\/cli would cross a major boundary .* without an explicit major changeset/u
+  );
+  assert.match(
+    result.stderr,
+    /@mcp-use\/inspector would cross a major boundary .* without an explicit major changeset/u
+  );
+});
+
+test("accepts a Canary major with an explicit major changeset", () => {
+  const { root, registryFile } = fixture({
+    localVersion: "2.0.5-canary.6",
+    latest: "2.0.4",
+    canary: "2.0.5-canary.6",
+    published: ["2.0.4", "2.0.5-canary.6"],
+  });
+  const planFile = join(root, "changeset-status.json");
+  writeFileSync(
+    planFile,
+    JSON.stringify({
+      changesets: [
+        {
+          id: "v3",
+          releases: [{ name: "mcp-use", type: "major" }],
+        },
+      ],
+      releases: [
+        {
+          name: "mcp-use",
+          type: "major",
+          oldVersion: "2.0.5-canary.6",
+          newVersion: "3.0.0-canary.7",
+        },
+      ],
+      preState: { mode: "pre", tag: "canary" },
+    })
+  );
+
+  const result = run(
+    root,
+    registryFile,
+    "validate",
+    "--channel",
+    "canary",
+    "--plan",
+    planFile
+  );
+  assert.equal(result.status, 0, result.stderr);
 });
 
 test("registry verification accepts a completed target after a publish error", () => {
