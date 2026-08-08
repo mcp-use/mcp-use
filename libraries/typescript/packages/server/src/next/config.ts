@@ -11,6 +11,18 @@ interface NextHeaderRule {
   headers: NextHeader[];
 }
 
+type TurbopackAliasTarget =
+  | string
+  | string[]
+  | Record<string, string | string[]>;
+
+interface TurbopackConfig {
+  /** Preserve arbitrary Turbopack settings supplied by the application. */
+  [key: string]: unknown;
+  /** Module aliases augmented for the server runtime. */
+  resolveAlias?: Record<string, TurbopackAliasTarget>;
+}
+
 /** Minimal structural Next.js config type, avoiding a runtime Next dependency. */
 export interface NextConfigLike {
   /** Preserve arbitrary Next.js settings while augmenting the fields we use. */
@@ -19,6 +31,8 @@ export interface NextConfigLike {
   headers?: () => NextHeaderRule[] | Promise<NextHeaderRule[]>;
   /** Next.js output tracing globs augmented with compiled MCP view assets. */
   outputFileTracingIncludes?: Record<string, string[]>;
+  /** Turbopack configuration augmented with mcp-use runtime aliases. */
+  turbopack?: TurbopackConfig;
 }
 
 /** Options for {@link withMcpUse}. */
@@ -142,6 +156,8 @@ export function composeNextConfig<T extends NextConfigLike>(
   const originalHeaders = nextConfig.headers?.bind(nextConfig);
   const existingTrace = nextConfig.outputFileTracingIncludes ?? {};
   const routeTrace = existingTrace[basePath] ?? [];
+  const existingTurbopack = nextConfig.turbopack ?? {};
+  const existingResolveAlias = existingTurbopack.resolveAlias ?? {};
 
   return {
     ...nextConfig,
@@ -161,6 +177,15 @@ export function composeNextConfig<T extends NextConfigLike>(
     outputFileTracingIncludes: {
       ...existingTrace,
       [basePath]: [...new Set([...routeTrace, BUILD_TRACE_GLOB])],
+    },
+    turbopack: {
+      ...existingTurbopack,
+      resolveAlias: {
+        ...existingResolveAlias,
+        // Turbopack does not resolve this private package import when it
+        // bundles the server's prebuilt Node entry.
+        "#mcp-use-skills-loader": "@mcp-use/cli/internal/skills-loader",
+      },
     },
   };
 }
