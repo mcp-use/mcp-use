@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 21.0.0-canary.10
+
+### Patch Changes
+
+- e41076f: Improve Skills over MCP discovery in Inspector and omit invalid skills from fresh development snapshots.
+  - mcp-use@3.0.0-canary.10
+
 ## 21.0.0-canary.9
 
 ### Patch Changes
