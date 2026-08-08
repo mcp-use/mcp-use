@@ -4,7 +4,7 @@ import { main } from "../../src/bin/main.js";
 
 const helpTree: readonly [path: readonly string[], usage: string][] = [
   [[], "mcp-use client <command>"],
-  [["connect"], "mcp-use client connect <name> <url> [options]"],
+  [["connect"], "mcp-use client connect <name> <url|command> [options]"],
   [["list"], "mcp-use client list [options]"],
   [["remove"], "mcp-use client remove <name> [options]"],
   [["demo"], "mcp-use client <name> <command>"],
