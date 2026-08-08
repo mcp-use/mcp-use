@@ -104,7 +104,7 @@ jobs:
         working-directory: libraries/typescript
         run: |
           pnpm release-channel prepare --channel canary
-          pnpm changeset status --output "$RUNNER_TEMP/canary-changeset-status.json"
+          pnpm changeset status --since origin/main --output "$RUNNER_TEMP/canary-changeset-status.json"
           pnpm release-channel validate --channel canary --plan "$RUNNER_TEMP/canary-changeset-status.json"
 
       - name: Version packages (Canary)
