@@ -1,5 +1,25 @@
 # @mcp-use/inspector
 
+## 20.1.0-canary.7
+
+### Minor Changes
+
+- 2daf9c9: Add typed Skills over MCP client operations, a capability-gated Inspector
+  file explorer with integrity verification, and removable progressive skill
+  context in Inspector chat.
+
+### Patch Changes
+
+- fd0236f: fix(inspector): load provider assets from the development server
+- 4574f32: Make embedded Inspector layouts fill their iframe height, remove the empty desktop header gap, and hide standalone sidebar footer controls.
+- 792e8eb: Allow widget-declared MCP App sandbox CSPs to use dynamic compilation while preserving their declared domain restrictions.
+- 281b63a: fix(inspector): avoid inspector tunnel flash
+- 6985d78: chore: clear unused TypeScript export surface flagged by knip
+
+  Trim internal barrels, drop dead stubs and duplicate re-exports, and un-export file-local helpers so knip reports a clean export graph without changing published package entry APIs.
+
+- e41076f: Improve Skills over MCP discovery in Inspector and omit invalid skills from fresh development snapshots.
+
 ## 21.0.0-canary.11
 
 ### Patch Changes

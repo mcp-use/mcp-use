@@ -1,5 +1,43 @@
 # mcp-use
 
+## 2.1.0-canary.7
+
+### Minor Changes
+
+- 6911124: Add experimental server authoring support for Skills over MCP with automatic
+  `skills/` discovery, explicit disable and directory configuration, SEP-2640
+  resource methods, development reloads, and build-time embedding.
+
+### Patch Changes
+
+- 546d349: Fix MCP v2 server responses by preserving tool JSON Schema dialects and accepting input-required prompt results.
+- e0ac78e: Move the CLI implementation and its tests into `@mcp-use/cli` while preserving the existing `mcp-use` command and server API.
+- 668a312: Publish the authenticated WebSocket tunnel client as a standalone package and
+  bundle the same implementation into `mcp-use dev/start --tunnel`. This removes
+  native tunnel binaries and adds bounded HTTP, streaming, MCP JSON-RPC, and
+  public WebSocket forwarding without adding a runtime dependency to `mcp-use`.
+- 12bf15e: Fix Turbopack builds for Next.js servers using Skills over MCP.
+- c94028c: Make `mcp-use dev` reconcile server and V2 view changes as coherent project generations. Reload candidates now use immutable view snapshots, and stale candidates cannot replace the active handler, publish catalog changes, or report superseded failures.
+- 52f535c: Allow modern MCP connections to remain ready when the server omits optional identity metadata. Direct proxy connections now report a clear error when an anonymous upstream cannot provide a namespace.
+- 6985d78: chore: clear unused TypeScript export surface flagged by knip
+
+  Trim internal barrels, drop dead stubs and duplicate re-exports, and un-export file-local helpers so knip reports a clean export graph without changing published package entry APIs.
+
+- Updated dependencies [fd0236f]
+- Updated dependencies [e0ac78e]
+- Updated dependencies [4574f32]
+- Updated dependencies [668a312]
+- Updated dependencies [06ec118]
+- Updated dependencies [c94028c]
+- Updated dependencies [792e8eb]
+- Updated dependencies [281b63a]
+- Updated dependencies [6911124]
+- Updated dependencies [6985d78]
+- Updated dependencies [2daf9c9]
+- Updated dependencies [e41076f]
+  - @mcp-use/inspector@20.1.0-canary.7
+  - @mcp-use/cli@4.1.0-canary.6
+
 ## 3.0.0-canary.11
 
 ### Patch Changes
