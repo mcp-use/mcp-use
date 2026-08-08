@@ -86,7 +86,10 @@ export function inspectorTokenUsageFromUnknown(
   // Anthropic reports these alongside input_tokens and bills all of them, so a total of
   // input + output understates what the call cost. OpenAI's cached_tokens sits inside
   // prompt_tokens, so only the Anthropic-shaped keys are added here.
-  const cachedInputTokens = number("cachedInputTokens", "cache_read_input_tokens");
+  const cachedInputTokens = number(
+    "cachedInputTokens",
+    "cache_read_input_tokens"
+  );
   const cacheCreationInputTokens = number(
     "cacheCreationInputTokens",
     "cache_creation_input_tokens"
