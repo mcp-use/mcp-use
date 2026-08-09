@@ -266,8 +266,14 @@ jobs:
 
           exit "$exit_code"
 
-      # The Python action continues to publish conformance-results for the
-      # existing PR comment workflow. Keep v2's native reports separate.
+      - name: Summarize TypeScript conformance scores
+        if: always()
+        working-directory: .
+        run: |
+          node libraries/typescript/scripts/summarize-conformance.mjs \
+            conformance-results/typescript \
+            --output conformance-results/typescript/summary.md
+
       - name: Upload TypeScript v2 conformance results
         if: always()
         uses: actions/upload-artifact@v4

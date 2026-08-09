@@ -7,8 +7,8 @@ server:
 
   # Stateless legacy HTTP has no session or SSE resumability.
   - server-sse-polling:server-sse-polling-session
-  - server-sse-polling:server-sse-priming-event
-  - server-sse-polling:server-sse-retry-field
+  - server-sse-priming-event
+  - server-sse-retry-field
   - server-sse-multiple-streams:server-sse-multiple-streams-session
 
   # Stateless legacy HTTP does not retain resource subscriptions.

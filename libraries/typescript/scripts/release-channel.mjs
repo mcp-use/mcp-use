@@ -250,6 +250,13 @@ function compareOrThrow(version, latest, message) {
   }
 }
 
+function historicalCanaryVersions(metadata, baseline) {
+  return Object.keys(metadata.versions ?? {})
+    .filter((version) => semver.prerelease(version)?.[0] === "canary")
+    .filter((version) => semver.gt(version, baseline))
+    .sort(semver.rcompare);
+}
+
 async function preflight(channel) {
   const pre = prereleaseState();
   const pending = pendingChangesets();
@@ -267,6 +274,15 @@ async function preflight(channel) {
     const latest = metadata["dist-tags"]?.latest;
     const baseline = pre?.initialVersions?.[manifest.name] ?? manifest.version;
     compareOrThrow(baseline, latest, `${manifest.name} ${channel} baseline`);
+
+    if (channel === "stable") {
+      const historical = historicalCanaryVersions(metadata, baseline);
+      if (historical.length) {
+        console.warn(
+          `${manifest.name} stable promotion is below historical Canary versions: ${historical.join(", ")}`
+        );
+      }
+    }
   }
 
   console.log(
