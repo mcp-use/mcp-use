@@ -9,15 +9,16 @@ import {
 } from "../csp";
 
 describe("CSP diagnostics", () => {
-  it("allows eval while retaining widget-declared domain restrictions", () => {
+  it("keeps eval disabled while retaining widget-declared domains", () => {
     const policy = buildCSPString({
       connectDomains: ["https://api.example.com"],
       resourceDomains: ["https://cdn.example.com"],
     });
 
     expect(policy).toContain(
-      "script-src 'unsafe-inline' 'unsafe-eval' data: blob: https://cdn.example.com"
+      "script-src 'unsafe-inline' data: blob: https://cdn.example.com"
     );
+    expect(policy).not.toContain("'unsafe-eval'");
     expect(policy).toContain("connect-src https://api.example.com");
     expect(policy).toContain("frame-src 'none'");
   });

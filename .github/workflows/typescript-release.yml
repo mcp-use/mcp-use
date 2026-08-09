@@ -58,6 +58,10 @@ jobs:
         working-directory: libraries/typescript
         run: pnpm build
 
+      - name: Verify packed release installation
+        working-directory: libraries/typescript
+        run: pnpm verify:release-install
+
       # ============================================================================
       # CANARY BRANCH: Prerelease workflow
       # ============================================================================
