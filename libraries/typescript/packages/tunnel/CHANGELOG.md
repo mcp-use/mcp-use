@@ -1,5 +1,11 @@
 # @mcp-use/tunnel
 
+## 0.2.0-canary.1
+
+### Patch Changes
+
+- 42fe287: Allow production `start --tunnel` traffic through localhost Host validation while preserving the public forwarded origin.
+
 ## 0.2.0-canary.0
 
 ### Minor Changes

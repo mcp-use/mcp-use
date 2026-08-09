@@ -1,7 +1,7 @@
 {
   "name": "@mcp-use/tunnel",
   "type": "module",
-  "version": "0.2.0-canary.0",
+  "version": "0.2.0-canary.1",
   "description": "WebSocket tunnel client for mcp-use",
   "author": "mcp-use, Inc.",
   "license": "MIT",
