@@ -1,5 +1,27 @@
 # @mcp-use/cli
 
+## 4.1.0
+
+### Minor Changes
+
+- 6911124: Add experimental server authoring support for Skills over MCP with automatic
+  `skills/` discovery, explicit disable and directory configuration, SEP-2640
+  resource methods, development reloads, and build-time embedding.
+
+### Patch Changes
+
+- e0ac78e: Move the CLI implementation and its tests into `@mcp-use/cli` while preserving the existing `mcp-use` command and server API.
+- 668a312: Publish the authenticated WebSocket tunnel client as a standalone package and
+  bundle the same implementation into `mcp-use dev/start --tunnel`. This removes
+  native tunnel binaries and adds bounded HTTP, streaming, MCP JSON-RPC, and
+  public WebSocket forwarding without adding a runtime dependency to `mcp-use`.
+- 06ec118: Use cross-platform filesystem paths for private CLI state, view discovery, and
+  public asset tests so the CLI build and test suite work on Windows.
+- 42fe287: Allow production `start --tunnel` traffic through localhost Host validation while preserving the public forwarded origin.
+- c94028c: Make `mcp-use dev` reconcile server and V2 view changes as coherent project generations. Reload candidates now use immutable view snapshots, and stale candidates cannot replace the active handler, publish catalog changes, or report superseded failures.
+- 1f7df2a: Keep widget-declared CSPs restrictive by default and make clean release installs resolve a single compatible build-tool dependency graph.
+- e41076f: Improve Skills over MCP discovery in Inspector and omit invalid skills from fresh development snapshots.
+
 ## 4.1.0-canary.8
 
 ### Patch Changes
