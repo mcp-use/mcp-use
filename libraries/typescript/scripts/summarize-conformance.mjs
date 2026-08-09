@@ -39,6 +39,7 @@ const expectedFailures = expectedFailuresFile
   : [];
 
 function isExpectedOutcome(suite, check) {
+  if (!suite.startsWith("2025-11-25/server/")) return false;
   return expectedFailures.some((entry) => {
     const separator = entry.indexOf(":");
     const scenario = separator === -1 ? entry : entry.slice(0, separator);

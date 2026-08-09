@@ -24,7 +24,7 @@ overrides:
   zod: 4.4.3
   jsondiffpatch: '>=0.7.2'
   esbuild: 0.27.1
-  vite: '>=8.0.5'
+  vite: 8.0.16
   prismjs: '>=1.30.0'
   glob: '>=10.5.0'
   js-yaml: '>=4.1.2'
@@ -211,7 +211,7 @@ importers:
         specifier: 4.3.3
         version: 4.3.3
       vite:
-        specifier: '>=8.0.5'
+        specifier: 8.0.16
         version: 8.0.16(@types/node@22.20.1)(esbuild@0.27.1)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.3)
     devDependencies:
       '@mcp-use/client':
@@ -322,7 +322,7 @@ importers:
         specifier: ^0.12.5
         version: 0.12.5
       vite:
-        specifier: '>=8.0.5'
+        specifier: 8.0.16
         version: 8.0.16(@types/node@25.6.0)(esbuild@0.27.1)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.3)
 
   packages/client/examples/conformance:
@@ -525,7 +525,7 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
       vite:
-        specifier: '>=8.0.5'
+        specifier: 8.0.16
         version: 8.0.16(@types/node@25.6.0)(esbuild@0.27.1)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.3)
       vitest:
         specifier: '>=4.1.9'
@@ -734,7 +734,7 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
       vite:
-        specifier: '>=8.0.5'
+        specifier: 8.0.16
         version: 8.0.16(@types/node@22.20.1)(esbuild@0.27.1)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.3)
 
   packages/server/examples/conformance:
@@ -781,7 +781,7 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
       vite:
-        specifier: '>=8.0.5'
+        specifier: 8.0.16
         version: 8.0.16(@types/node@22.20.1)(esbuild@0.27.1)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.3)
 
   packages/server/examples/events:
@@ -797,7 +797,7 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
       vite:
-        specifier: '>=8.0.5'
+        specifier: 8.0.16
         version: 8.0.16(@types/node@22.20.1)(esbuild@0.27.1)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.3)
 
   packages/server/examples/middleware:
@@ -816,7 +816,7 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
       vite:
-        specifier: '>=8.0.5'
+        specifier: 8.0.16
         version: 8.0.16(@types/node@22.20.1)(esbuild@0.27.1)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.3)
 
   packages/server/examples/nextjs:
@@ -897,7 +897,7 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
       vite:
-        specifier: '>=8.0.5'
+        specifier: 8.0.16
         version: 8.0.16(@types/node@22.20.1)(esbuild@0.27.1)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.3)
 
   packages/server/examples/openapi:
@@ -980,7 +980,7 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
       vite:
-        specifier: '>=8.0.5'
+        specifier: 8.0.16
         version: 8.0.16(@types/node@22.20.1)(esbuild@0.27.1)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.3)
 
   packages/server/examples/sampling:
@@ -1104,7 +1104,7 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
       vite:
-        specifier: '>=8.0.5'
+        specifier: 8.0.16
         version: 8.0.16(@types/node@22.20.1)(esbuild@0.27.1)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.3)
 
   packages/server/examples/vercel:
@@ -3846,12 +3846,12 @@ packages:
   '@tailwindcss/vite@4.2.0':
     resolution: {integrity: sha512-da9mFCaHpoOgtQiWtDGIikTrSpUFBtIZCG3jy/u2BGV+l/X1/pbxzmIUxNt6JWm19N3WtGi4KlJdSH/Si83WOA==}
     peerDependencies:
-      vite: '>=8.0.5'
+      vite: 8.0.16
 
   '@tailwindcss/vite@4.3.3':
     resolution: {integrity: sha512-yYU8cogLeSh/ms2jh8Fj7jaba/EWa7Ja6GoUqYZaraEuCI5YS6ms6ObZgjjedm+jm6XZjdNRWBpPP6Z86oOxcw==}
     peerDependencies:
-      vite: '>=8.0.5'
+      vite: 8.0.16
 
   '@testing-library/dom@10.4.1':
     resolution: {integrity: sha512-o4PXJQidqJl82ckFaXUeoAW+XysPLauYI43Abki5hABd853iMhitooc6znOnczgbTYmEP6U6/y1ZyKAIsvMKGg==}
@@ -4431,7 +4431,7 @@ packages:
     peerDependencies:
       '@rolldown/plugin-babel': ^0.1.7 || ^0.2.0
       babel-plugin-react-compiler: ^1.0.0
-      vite: '>=8.0.5'
+      vite: 8.0.16
     peerDependenciesMeta:
       '@rolldown/plugin-babel':
         optional: true
@@ -4444,7 +4444,7 @@ packages:
     peerDependencies:
       '@rolldown/plugin-babel': ^0.1.7 || ^0.2.0
       babel-plugin-react-compiler: ^1.0.0
-      vite: '>=8.0.5'
+      vite: 8.0.16
     peerDependenciesMeta:
       '@rolldown/plugin-babel':
         optional: true
@@ -4457,7 +4457,7 @@ packages:
     peerDependencies:
       '@rolldown/plugin-babel': ^0.1.7 || ^0.2.0
       babel-plugin-react-compiler: ^1.0.0
-      vite: '>=8.0.5'
+      vite: 8.0.16
     peerDependenciesMeta:
       '@rolldown/plugin-babel':
         optional: true
@@ -4480,7 +4480,7 @@ packages:
     resolution: {integrity: sha512-EVkXzBjrPGM+cK8/ANWgBrkUCfJfb38/EfTSO8h7pWvKkyPkpWxvR7BkD2MyItMF62C97zAEoqdpUixwR/e+Rw==}
     peerDependencies:
       msw: ^2.4.9
-      vite: '>=8.0.5'
+      vite: 8.0.16
     peerDependenciesMeta:
       msw:
         optional: true
@@ -7872,7 +7872,7 @@ packages:
       '@vitest/ui': 4.1.9
       happy-dom: '*'
       jsdom: '*'
-      vite: '>=8.0.5'
+      vite: 8.0.16
     peerDependenciesMeta:
       '@edge-runtime/vm':
         optional: true
