@@ -34,7 +34,7 @@ describe("buildViewSandboxBlobUrl", () => {
     );
   });
 
-  it("builds widget-declared CSP with eval and only declared domains", () => {
+  it("builds restrictive widget-declared CSP with only declared domains", () => {
     const dom = new JSDOM(
       buildSandboxProxyBlobHtml("?csp_mode=widget-declared"),
       { runScripts: "dangerously", url: "https://sandbox.example" }
@@ -62,8 +62,9 @@ describe("buildViewSandboxBlobUrl", () => {
 
       const srcdoc = window.document.querySelector("iframe")?.srcdoc;
       expect(srcdoc).toContain(
-        "script-src 'unsafe-inline' 'unsafe-eval' data: blob: https://cdn.example.com"
+        "script-src 'unsafe-inline' data: blob: https://cdn.example.com"
       );
+      expect(srcdoc).not.toContain("script-src 'unsafe-inline' 'unsafe-eval'");
       expect(srcdoc).toContain("connect-src https://api.example.com");
       expect(srcdoc).toContain("frame-src https://frames.example.com");
       expect(srcdoc).toContain("img-src data: blob: https://cdn.example.com");

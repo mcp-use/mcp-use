@@ -75,5 +75,8 @@ export function buildSandboxProxyBlobHtml(search: string): string {
   const escaped = JSON.stringify(search).replace(/</g, "\\u003c");
   const inject =
     "<script>window.__SANDBOX_SEARCH__ = " + escaped + ";</script>";
-  return SANDBOX_PROXY_HTML.replace("<body>", "<body>" + inject);
+  return SANDBOX_PROXY_HTML.replace(
+    `        const scriptSrcParts = ["'unsafe-inline'", "'unsafe-eval'", resourceSrc];\n`,
+    `        const scriptSrcParts = ["'unsafe-inline'", resourceSrc];\n`
+  ).replace("<body>", "<body>" + inject);
 }
