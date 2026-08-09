@@ -38,7 +38,9 @@ for (const file of files.sort()) {
     passed,
     failed,
     warnings,
-    total: checks.length,
+    // INFO records describe the scenario and are not test outcomes. Match
+    // the conformance runner's score convention: total = passed + failed.
+    total: passed + failed,
   });
 }
 
