@@ -59,7 +59,7 @@ jobs:
             const fs = require('fs')
             const path = require('path')
             const root = process.env.RESULTS_ROOT
-            const summaryPath = path.join(root, 'typescript', 'summary.md')
+            const summaryPath = path.join(root, 'summary.md')
             if (!fs.existsSync(summaryPath)) {
               core.setFailed(`Missing TypeScript conformance summary: ${summaryPath}`)
               return
@@ -79,7 +79,7 @@ jobs:
               issue_number: issue.number,
               per_page: 100,
             })
-            const comment = `${marker}\n## TypeScript v2 Conformance (current head)\n\n${body}`
+            const comment = `${marker}\n## TypeScript Conformance (current head)\n\n${body}`
             const existing = comments.find((item) => item.body?.includes(marker))
             if (existing) {
               await github.rest.issues.updateComment({

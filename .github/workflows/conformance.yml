@@ -147,7 +147,7 @@ jobs:
           badge-gist-token: ${{ secrets.GIST_SECRET }}
 
   typescript-v2-conformance-test:
-    name: TypeScript Conformance Tests (legacy + modern)
+    name: TypeScript Conformance Tests (v2; legacy + modern modes)
     needs: detect-changes
     if: needs.detect-changes.outputs.typescript == 'true'
     runs-on: ubuntu-latest
@@ -269,9 +269,14 @@ jobs:
       - name: Summarize TypeScript conformance scores
         if: always()
         working-directory: .
+        env:
+          CONFORMANCE_RUNNER: '@modelcontextprotocol/conformance@0.2.0-alpha.10'
+          SPEC_VERSIONS: '2025-11-25 2026-07-28'
         run: |
           node libraries/typescript/scripts/summarize-conformance.mjs \
             conformance-results/typescript \
+            --runner "$CONFORMANCE_RUNNER" \
+            --spec-versions "$SPEC_VERSIONS" \
             --output conformance-results/typescript/summary.md
 
       - name: Upload TypeScript v2 conformance results

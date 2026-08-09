@@ -4,9 +4,16 @@ import { join, relative } from "node:path";
 const [root, ...args] = process.argv.slice(2);
 const outputIndex = args.indexOf("--output");
 const output = outputIndex === -1 ? undefined : args[outputIndex + 1];
+const runnerIndex = args.indexOf("--runner");
+const runner = runnerIndex === -1 ? undefined : args[runnerIndex + 1];
+const specVersionsIndex = args.indexOf("--spec-versions");
+const specVersions =
+  specVersionsIndex === -1 ? undefined : args[specVersionsIndex + 1];
 
 if (!root) {
-  console.error("Usage: summarize-conformance <results-dir> [--output <file>]");
+  console.error(
+    "Usage: summarize-conformance <results-dir> [--runner <package>] [--spec-versions <versions>] [--output <file>]"
+  );
   process.exit(2);
 }
 
@@ -46,6 +53,9 @@ const totals = rows.reduce(
 );
 
 const lines = [
+  "**Runner:** `" + (runner ?? "unspecified") + "`",
+  "**Spec versions:** `" + (specVersions ?? "unspecified") + "`",
+  "",
   `**Score: ${totals.passed}/${totals.total} passed** (${totals.failed} failed, ${totals.warnings} warnings)`,
   "",
   "| Suite | Score | Failed | Warnings |",
