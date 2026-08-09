@@ -2,7 +2,7 @@
 
 Setting up OAuth with Clerk. DCR mode only — MCP clients register themselves directly with Clerk via Dynamic Client Registration; the MCP server only verifies the resulting JWTs against Clerk's JWKS.
 
-**Learn more:** [Clerk OAuth Docs](https://clerk.com/docs/guides/configure/auth-strategies/oauth/how-clerk-implements-oauth) · [Runnable example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/clerk)
+**Learn more:** [Clerk OAuth Docs](https://clerk.com/docs/guides/configure/auth-strategies/oauth/how-clerk-implements-oauth) · [Runnable example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/auth/clerk)
 
 ---
 
