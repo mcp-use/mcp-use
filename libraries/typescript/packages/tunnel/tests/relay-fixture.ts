@@ -148,9 +148,17 @@ export async function createRelayFixture(): Promise<{
           requestId,
           method: request.method ?? "GET",
           path: `${match[1] ?? "/"}${url.search}`,
-          headers: Object.fromEntries(
-            Object.entries(request.headers).filter(([name]) => name !== "host")
-          ),
+          headers: {
+            ...Object.fromEntries(
+              Object.entries(request.headers).filter(
+                ([name]) => name !== "host"
+              )
+            ),
+            ...(request.headers.host !== undefined && {
+              "x-forwarded-host": request.headers.host,
+            }),
+            "x-forwarded-proto": "http",
+          },
         })
       );
       for await (const chunk of request) {
