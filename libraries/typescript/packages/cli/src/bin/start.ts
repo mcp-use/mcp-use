@@ -177,7 +177,13 @@ export async function runStart(options: StartOptions): Promise<StartedServer> {
       // eslint-disable-next-line import/no-extraneous-dependencies
       const { createTunnelManager } = await import("@mcp-use/tunnel");
       tunnel = createTunnelManager(
-        join(options.cwd, WORKSPACE_DIR_NAME, "state", "tunnel.json")
+        join(options.cwd, WORKSPACE_DIR_NAME, "state", "tunnel.json"),
+        {
+          // The authenticated tunnel is the public edge. Keep the original
+          // hostname in X-Forwarded-Host while presenting a loopback Host to
+          // the localhost listener's DNS-rebinding protection.
+          localHostHeader: "localhost",
+        }
       );
       const tunnelInfo = await tunnel.start(boundPort);
       const endpoint = new URL(url);

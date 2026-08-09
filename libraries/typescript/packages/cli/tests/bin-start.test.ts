@@ -407,7 +407,8 @@ describe("runStart", () => {
     const started = await runStart({ cwd, port: 0, tunnel: true });
 
     expect(tunnelMocks.create).toHaveBeenCalledWith(
-      join(cwd, ".mcp-use", "state", "tunnel.json")
+      join(cwd, ".mcp-use", "state", "tunnel.json"),
+      { localHostHeader: "localhost" }
     );
     expect(tunnelMocks.start).toHaveBeenCalledWith(started.port);
     expect(started.tunnelUrl).toBe("https://public-test.local.mcp-use.run/mcp");
