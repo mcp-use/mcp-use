@@ -84,8 +84,10 @@ export function deriveProjectInfo(rawName: string, cwd: string): ProjectInfo {
   return {
     useCurrentDir: false,
     projectPath: resolve(cwd, name),
+    // The directory keeps the name as typed; only the npm identifier is
+    // sanitized, matching how the "." branch above treats the cwd basename.
     displayName: name,
-    packageName: name,
+    packageName: sanitizePackageName(name),
   };
 }
 
