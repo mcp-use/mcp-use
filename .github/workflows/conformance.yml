@@ -133,6 +133,13 @@ jobs:
           source .venv/bin/activate
           uv pip install -e ".[dev]"
 
+      - name: Verify Python conformance fixtures
+        working-directory: libraries/python
+        run: |
+          source .venv/bin/activate
+          uv pip check
+          python -c "import mcp_use; import tests.integration.servers_for_testing.conformance_server"
+
       - name: Run Python conformance tests
         uses: mcp-use/mcp-conformance-action@v1
         env:
