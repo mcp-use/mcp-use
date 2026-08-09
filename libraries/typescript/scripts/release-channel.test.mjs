@@ -121,6 +121,21 @@ test("rejects an unpublished Canary version below the current Canary tag", () =>
   );
 });
 
+test("allows stable promotion below an unrelated historical Canary major", () => {
+  const { root, registryFile } = fixture({
+    localVersion: "2.1.0",
+    latest: "2.0.4",
+    canary: "2.1.0-canary.7",
+    published: ["2.0.4", "2.1.0-canary.7", "3.0.0-canary.11"],
+  });
+  const result = run(root, registryFile, "preflight", "--channel", "stable");
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(
+    result.stderr,
+    /historical Canary versions: 3\.0\.0-canary\.11/u
+  );
+});
+
 test("ignores changesets already applied in prerelease mode", () => {
   const { root, registryFile } = fixture({
     localVersion: "2.0.5-canary.0",
