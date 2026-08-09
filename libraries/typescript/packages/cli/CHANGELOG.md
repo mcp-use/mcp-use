@@ -1,5 +1,11 @@
 # @mcp-use/cli
 
+## 4.1.0-canary.7
+
+### Patch Changes
+
+- 1f7df2a: Keep widget-declared CSPs restrictive by default and make clean release installs resolve a single compatible build-tool dependency graph.
+
 ## 4.1.0-canary.6
 
 ### Minor Changes
