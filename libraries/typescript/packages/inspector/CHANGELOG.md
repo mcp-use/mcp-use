@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 20.1.0-canary.8
+
+### Patch Changes
+
+- 173b2d5: Prevent iframe console log records from being parsed as MCP Apps JSON-RPC messages in the Inspector.
+
 ## 20.1.0-canary.7
 
 ### Minor Changes
