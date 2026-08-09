@@ -21,7 +21,7 @@ function formatUrlChipLabel(url: string): string {
   }
 }
 
-export interface ServerUrlChipTunnelPopover {
+interface ServerUrlChipTunnelPopover {
   mcpUrl: string;
   onStop: () => void | Promise<void>;
   open: boolean;
@@ -73,10 +73,29 @@ export function ServerUrlChip({
 }: ServerUrlChipProps) {
   const [copied, setCopied] = useState(false);
   const [showCopiedBanner, setShowCopiedBanner] = useState(false);
+  const [displayUrl, setDisplayUrl] = useState(url);
+  const [previousUrl, setPreviousUrl] = useState<string | null>(null);
+  const [isUrlTransitioning, setIsUrlTransitioning] = useState(false);
 
-  if (!url) return null;
+  useEffect(() => {
+    if (!url || url === displayUrl) return;
+
+    setPreviousUrl(displayUrl);
+    setDisplayUrl(url);
+    setIsUrlTransitioning(true);
+
+    const id = window.setTimeout(() => {
+      setPreviousUrl(null);
+      setIsUrlTransitioning(false);
+    }, 280);
+    return () => window.clearTimeout(id);
+  }, [displayUrl, url]);
 
   const chipLabel = formatUrlChipLabel(url);
+  const displayChipLabel = formatUrlChipLabel(displayUrl);
+  const previousChipLabel = previousUrl
+    ? formatUrlChipLabel(previousUrl)
+    : null;
   const copyTarget = tunnelPopover?.mcpUrl ?? url;
   const isTunnel = !!tunnelPopover;
 
@@ -101,6 +120,8 @@ export function ServerUrlChip({
     return () => clearTimeout(id);
   }, [tunnelPopover?.autoCopyOnOpen]);
 
+  if (!url) return null;
+
   const urlLabel = (
     <>
       {isTunnel ? (
@@ -108,7 +129,24 @@ export function ServerUrlChip({
       ) : (
         <Globe className="size-3.5 shrink-0" />
       )}
-      <span className="truncate max-w-[min(24rem,30vw)]">{chipLabel}</span>
+      <span
+        className="inspector-url-transition min-w-0 max-w-[min(24rem,30vw)]"
+        aria-hidden="true"
+      >
+        {previousChipLabel && isUrlTransitioning && (
+          <span className="inspector-url-transition-out">
+            {previousChipLabel}
+          </span>
+        )}
+        <span
+          className={cn(
+            "inspector-url-transition-in",
+            !isUrlTransitioning && "inspector-url-transition-static"
+          )}
+        >
+          {displayChipLabel}
+        </span>
+      </span>
     </>
   );
 
@@ -128,6 +166,7 @@ export function ServerUrlChip({
             render={
               <button
                 type="button"
+                aria-label={chipLabel}
                 className={cn(urlClasses, "hover:opacity-80")}
               >
                 {urlLabel}

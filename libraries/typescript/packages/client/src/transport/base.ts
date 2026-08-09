@@ -35,6 +35,7 @@ const passthroughResultSchema = {
     validate: (value: unknown) => ({ value }),
   },
 };
+
 import type { ConnectionManager } from "./connection-manager.js";
 import type { ConnectorInitEventData } from "../telemetry/events.js";
 import { trackConnectorTelemetry } from "../telemetry/connector-telemetry.js";
@@ -521,7 +522,8 @@ export abstract class BaseConnector {
     const capabilities = this.client.getServerCapabilities();
     this.capabilitiesCache = (capabilities as Record<string, unknown>) || null;
 
-    // Cache server info from the initialize response
+    // The SDK normalizes identity from legacy initialize responses and modern
+    // result metadata. Modern servers may remain anonymous.
     const serverInfo = this.client.getServerVersion();
     this.serverInfoCache = serverInfo
       ? {

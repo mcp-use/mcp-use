@@ -72,6 +72,7 @@ When you clone this repository locally, you'll find `python/` and `typescript/` 
   - [Elicitation](../libraries/typescript/packages/server/examples/elicitation/) - Form and URL elicitation
   - [Sampling](../libraries/typescript/packages/server/examples/sampling/) - Server-initiated LLM sampling
   - [Notifications](../libraries/typescript/packages/server/examples/notifications/) - Bidirectional notifications
+  - [Skills over MCP](../libraries/typescript/packages/server/examples/skills-over-mcp/) - Publish Agent Skills and supporting files
   - [Middleware](../libraries/typescript/packages/server/examples/middleware/) - Built-in middleware pipeline
   - [Proxy](../libraries/typescript/packages/server/examples/proxy/) - Proxy MCP server
 - **[OAuth Examples](../libraries/typescript/packages/server/examples/auth/)** - OAuth implementations

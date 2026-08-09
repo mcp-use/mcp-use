@@ -346,6 +346,33 @@ describe("MCPServer.proxy", () => {
     );
   });
 
+  it("rejects a direct anonymous connection without a proxy namespace", async () => {
+    const parent = new MCPServer({ name: "parent", version: "1.0.0" });
+    servers.push(parent);
+    const connection: ProxyConnection = {
+      info: {},
+      async listTools() {
+        return [];
+      },
+      async callTool() {
+        return { content: [] };
+      },
+      async readResource() {
+        return { contents: [] };
+      },
+      async listPrompts() {
+        return { prompts: [] };
+      },
+      async getPrompt() {
+        return { messages: [] };
+      },
+    };
+
+    await expect(parent.proxy(connection)).rejects.toThrow(
+      "Cannot proxy an anonymous MCP connection directly"
+    );
+  });
+
   it("contains rejected downstream progress notifications", async () => {
     const diagnostics = vi.spyOn(console, "error").mockImplementation(() => {});
     let mountedTool:

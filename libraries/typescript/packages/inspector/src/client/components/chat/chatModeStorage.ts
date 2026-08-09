@@ -1,6 +1,6 @@
 export const CHAT_MODE_STORAGE_KEY = "mcp-inspector:chat-mode";
 
-export type ChatMode = "byok" | "managed";
+type ChatMode = "byok" | "managed";
 
 export function readStoredChatMode(): ChatMode | null {
   try {
@@ -15,14 +15,6 @@ export function readStoredChatMode(): ChatMode | null {
 export function writeStoredChatMode(mode: ChatMode): void {
   try {
     localStorage.setItem(CHAT_MODE_STORAGE_KEY, mode);
-  } catch {
-    // ponytail: ignore quota / private mode
-  }
-}
-
-export function clearStoredChatMode(): void {
-  try {
-    localStorage.removeItem(CHAT_MODE_STORAGE_KEY);
   } catch {
     // ponytail: ignore quota / private mode
   }

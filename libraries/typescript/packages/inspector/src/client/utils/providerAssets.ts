@@ -6,6 +6,9 @@ export function providerAssetUrl(filename: string): string {
       ? undefined
       : (window as unknown as { __MCP_INSPECTOR_MODE__?: string })
           .__MCP_INSPECTOR_MODE__;
+  if (mode === "development") {
+    return `${getInspectorBase()}/providers/${filename}`;
+  }
   if (typeof window !== "undefined" && mode !== "cloud") {
     return `${getInspectorBase()}/assets/providers/${filename}`;
   }

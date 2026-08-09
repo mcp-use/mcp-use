@@ -51,8 +51,8 @@ export interface MCPConnectionInfo {
   protocolEra: MCPProtocolEra;
   /** Negotiated MCP protocol version. */
   protocolVersion: string;
-  /** Server identity reported during negotiation. */
-  server: MCPServerInfo;
+  /** Server identity reported during negotiation, when provided. */
+  server?: MCPServerInfo;
   /** Capabilities advertised by the server. */
   capabilities: Record<string, unknown>;
   /** Instructions advertised by the server. */
@@ -369,7 +369,7 @@ export class MCPConnection {
     const protocolVersion = this.negotiatedProtocolVersion;
     const server = this.serverInfo;
 
-    if (!protocolEra || !protocolVersion || !server) {
+    if (!protocolEra || !protocolVersion) {
       throw new Error("MCP connection is not initialized");
     }
 
@@ -384,7 +384,7 @@ export class MCPConnection {
     return {
       protocolEra,
       protocolVersion,
-      server,
+      ...(server ? { server } : {}),
       capabilities,
       instructions: this.connector.instructions,
       extensions,
@@ -596,6 +596,56 @@ export class MCPConnection {
   ) {
     return this.connector.request(method, params, options);
   }
+
+  /** List one page of skills advertised through the experimental extension. */
+  async listSkills(cursor?: string, options?: RequestOptions) {
+    return (await this.request(
+      "skills/list",
+      cursor === undefined ? {} : { cursor },
+      options
+    )) as import("./skills.js").SkillsListResult;
+  }
+
+  /** List the complete skill catalog, following pagination defensively. */
+  async listAllSkills(options?: RequestOptions) {
+    const skills: import("./skills.js").Skill[] = [];
+    const seenCursors = new Set<string>();
+    let cursor: string | undefined;
+    do {
+      const page = await this.listSkills(cursor, options);
+      skills.push(...(Array.isArray(page.skills) ? page.skills : []));
+      cursor = page.nextCursor;
+      if (cursor !== undefined) {
+        if (seenCursors.has(cursor)) {
+          throw new Error("skills/list returned a repeated pagination cursor");
+        }
+        seenCursors.add(cursor);
+      }
+    } while (cursor !== undefined);
+    return { skills };
+  }
+
+  /** Get one skill by its canonical `SKILL.md` URI. */
+  async getSkill(uri: string, options?: RequestOptions) {
+    return (await this.request(
+      "skills/get",
+      { uri },
+      options
+    )) as import("./skills.js").SkillGetResult;
+  }
+
+  /** Read one non-recursive skill directory. */
+  async readResourceDirectory(
+    uri: string,
+    cursor?: string,
+    options?: RequestOptions
+  ) {
+    return (await this.request(
+      "resources/directory/read",
+      cursor === undefined ? { uri } : { uri, cursor },
+      options
+    )) as import("./skills.js").SkillDirectoryReadResult;
+  }
 }
 
 /** @deprecated Use {@link MCPConnection}. */
@@ -603,3 +653,12 @@ export { MCPConnection as MCPSession };
 
 // Re-export types for convenience
 export type { CallToolResult, MetaObject, Notification, Root, Tool };
+export type {
+  Skill,
+  SkillDirectoryEntry,
+  SkillDirectoryReadResult,
+  SkillGetResult,
+  SkillResource,
+  SkillsListResult,
+} from "./skills.js";
+export { SKILLS_EXTENSION_ID } from "./skills.js";

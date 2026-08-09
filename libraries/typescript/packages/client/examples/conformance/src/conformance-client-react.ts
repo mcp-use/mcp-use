@@ -11,9 +11,11 @@ import { JSDOM } from "jsdom";
 import { McpClientProvider, useMcpClient } from "@mcp-use/client/react";
 import TestRenderer, { act } from "react-test-renderer";
 import {
+  conformanceClientOptions,
   handleElicitation,
   isAuthScenario,
   parseConformanceContext,
+  parsePreRegistrationContext,
   requiresOAuthRetryFetch,
   runScenario,
   runWithScenarioTimeout,
@@ -95,9 +97,19 @@ function ScenarioDriver({ scenario, resolve, reject }: DriverProps): null {
     const conformanceSession: ConformanceSession = {
       listTools: async () => server.tools as any[],
       callTool: (name, args) => server.callTool(name, args),
+      listResources: async () => {
+        await server.listResources();
+        return server.resources;
+      },
+      readResource: (uri) => server.readResource(uri),
+      listPrompts: async () => {
+        await server.listPrompts();
+        return server.prompts;
+      },
+      getPrompt: (name, args) => server.getPrompt(name, args),
     };
 
-    runScenario(scenario, conformanceSession)
+    runScenario(scenario, conformanceSession, parseConformanceContext())
       .then(() => {
         doneRef.current = true;
         resolve();
@@ -116,8 +128,6 @@ function setupReactRuntimeDom(): () => void {
     url: "http://localhost:3000/",
   });
 
-  (globalThis as any).window = dom.window;
-  (globalThis as any).document = dom.window.document;
   Object.defineProperty(globalThis, "navigator", {
     value: dom.window.navigator,
     configurable: true,
@@ -128,8 +138,6 @@ function setupReactRuntimeDom(): () => void {
 
   return () => {
     dom.window.close();
-    delete (globalThis as any).window;
-    delete (globalThis as any).document;
     delete (globalThis as any).navigator;
     delete (globalThis as any).localStorage;
     delete (globalThis as any).sessionStorage;
@@ -149,7 +157,7 @@ async function main(): Promise<void> {
   const teardownDom = setupReactRuntimeDom();
   const authProvider = isAuthScenario(scenario)
     ? await createHeadlessConformanceOAuthProvider({
-        preRegistrationContext: parseConformanceContext(),
+        preRegistrationContext: parsePreRegistrationContext(),
       })
     : undefined;
   // The retry fetch sees scopes carried by the initial WWW-Authenticate response
@@ -158,7 +166,10 @@ async function main(): Promise<void> {
     test: {
       name: "test",
       url: serverUrl,
+      callbackUrl: "http://localhost:3000/oauth/callback",
       authProvider,
+      oauth: isAuthScenario(scenario) ? undefined : false,
+      clientOptions: conformanceClientOptions(),
       ...(authProvider &&
         requiresOAuthRetryFetch(scenario) && {
           fetch: createOAuthRetryFetch(fetch, serverUrl, authProvider, {

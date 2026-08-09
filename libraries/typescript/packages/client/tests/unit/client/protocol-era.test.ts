@@ -25,6 +25,7 @@ describe("protocol era exposure", () => {
         extensions: { "com.example/feature": { enabled: true } },
       }),
       getInstructions: () => "Use the server carefully.",
+      listTools: async () => ({ tools: [] }),
     };
     (connector as any).serverInfoCache = server ?? null;
     (connector as any).capabilitiesCache = {
@@ -80,6 +81,18 @@ describe("protocol era exposure", () => {
     });
     expect(session.supports("tools")).toBe(true);
     expect(session.supports("resources")).toBe(false);
+  });
+
+  it("treats an anonymous modern server as initialized", async () => {
+    const connector = connectorWithClient("modern", "2026-07-28");
+    await connector.initialize();
+    const info = new MCPSession(connector).info;
+
+    expect(info).toMatchObject({
+      protocolEra: "modern",
+      protocolVersion: "2026-07-28",
+    });
+    expect(info).not.toHaveProperty("server");
   });
 
   it("automatically negotiates the newest supported HTTP protocol", () => {

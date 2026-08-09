@@ -95,10 +95,13 @@ jobs:
             echo "typescript=$FILTER_TYPESCRIPT" >> $GITHUB_OUTPUT
           fi
 
-  conformance-test:
-    name: Run Conformance Tests
+  python-conformance-test:
+    # mcp-conformance-action@v1 is pinned here to
+    # @modelcontextprotocol/conformance 0.1.16. Keep Python on that stable
+    # runner until its v2 coverage is migrated deliberately.
+    name: Python Conformance Tests (v1)
     needs: detect-changes
-    if: needs.detect-changes.outputs.python == 'true' || needs.detect-changes.outputs.typescript == 'true'
+    if: needs.detect-changes.outputs.python == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -118,92 +121,266 @@ jobs:
         with:
           version: "latest"
 
-      - name: Set up Node.js
+      - name: Set up Node.js for the v1 conformance runner
         uses: actions/setup-node@v4
         with:
           node-version: '22.23.1'
 
-      - name: Install pnpm
-        if: needs.detect-changes.outputs.typescript == 'true'
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
       - name: Prepare Python
-        if: needs.detect-changes.outputs.python == 'true'
         working-directory: libraries/python
         run: |
           uv venv
           source .venv/bin/activate
           uv pip install -e ".[dev]"
 
-      - name: Prepare TypeScript server
-        if: needs.detect-changes.outputs.typescript == 'true'
-        working-directory: libraries/typescript
+      - name: Verify Python conformance fixtures
+        working-directory: libraries/python
         run: |
-          pnpm install
-          pnpm build
+          source .venv/bin/activate
+          uv pip check
+          python -c "import mcp_use; import tests.integration.servers_for_testing.conformance_server"
 
-      - name: Install TypeScript conformance server dependencies
-        if: needs.detect-changes.outputs.typescript == 'true'
-        working-directory: libraries/typescript/packages/server/examples/conformance
-        run: pnpm install
-
-      - name: Install TypeScript conformance client dependencies
-        if: needs.detect-changes.outputs.typescript == 'true'
-        working-directory: libraries/typescript/packages/client/examples/conformance
-        run: pnpm install
-
-      - name: Build server list
-        id: build-servers
-        env:
-          NEEDS_PYTHON: ${{ needs.detect-changes.outputs.python }}
-          NEEDS_TYPESCRIPT: ${{ needs.detect-changes.outputs.typescript }}
-        run: |
-          SERVERS='['
-          if [ "$NEEDS_PYTHON" = "true" ]; then
-            SERVERS+='{"name":"python","start-command":"source .venv/bin/activate && python tests/integration/servers_for_testing/conformance_server.py --transport streamable-http --port 8000","url":"http://127.0.0.1:8000/mcp","working-directory":"libraries/python"}'
-          fi
-          if [ "$NEEDS_TYPESCRIPT" = "true" ]; then
-            if [[ $SERVERS != '[' ]]; then
-              SERVERS+=','
-            fi
-            SERVERS+='{"name":"typescript","start-command":"PORT=3000 node ../../dist/bin.js dev --no-open","url":"http://localhost:3000/mcp","working-directory":"libraries/typescript/packages/server/examples/conformance"}'
-          fi
-          SERVERS+=']'
-          echo "servers=$SERVERS" >> $GITHUB_OUTPUT
-
-      - name: Build client list
-        id: build-clients
-        env:
-          NEEDS_PYTHON: ${{ needs.detect-changes.outputs.python }}
-          NEEDS_TYPESCRIPT: ${{ needs.detect-changes.outputs.typescript }}
-        run: |
-          CLIENTS='['
-          if [ "$NEEDS_PYTHON" = "true" ]; then
-            CLIENTS+='{"name":"python-client","command":".venv/bin/python tests/integration/clients_for_testing/conformance_client.py","working-directory":"libraries/python"}'
-          fi
-          if [ "$NEEDS_TYPESCRIPT" = "true" ]; then
-            if [[ $CLIENTS != '[' ]]; then
-              CLIENTS+=','
-            fi
-            CLIENTS+='{"name":"typescript-node-client","command":"libraries/typescript/packages/client/examples/conformance/run-conformance-client-node.sh"}'
-            CLIENTS+=','
-            CLIENTS+='{"name":"typescript-browser-client","command":"libraries/typescript/packages/client/examples/conformance/run-conformance-client-browser.sh"}'
-            CLIENTS+=','
-            CLIENTS+='{"name":"typescript-react-client","command":"libraries/typescript/packages/client/examples/conformance/run-conformance-client-react.sh"}'
-          fi
-          CLIENTS+=']'
-          echo "clients=$CLIENTS" >> $GITHUB_OUTPUT
-
-      - name: Run conformance tests
+      - name: Run Python conformance tests
         uses: mcp-use/mcp-conformance-action@v1
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
         with:
           mode: test
           test-type: both
-          servers: ${{ steps.build-servers.outputs.servers }}
-          clients: ${{ steps.build-clients.outputs.clients }}
+          conformance-version: '0.1.16'
+          servers: '[{"name":"python","start-command":"source .venv/bin/activate && python tests/integration/servers_for_testing/conformance_server.py --transport streamable-http --port 8000","url":"http://127.0.0.1:8000/mcp","working-directory":"libraries/python"}]'
+          clients: '[{"name":"python-client","command":".venv/bin/python tests/integration/clients_for_testing/conformance_client.py","working-directory":"libraries/python"}]'
           badge-gist-id: ${{ secrets.CONFORMANCE_GIST_ID }}
           badge-gist-token: ${{ secrets.GIST_SECRET }}
+
+  typescript-v2-conformance-test:
+    name: TypeScript Conformance Tests (v2; legacy + modern modes)
+    needs: detect-changes
+    if: needs.detect-changes.outputs.typescript == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.1'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Prepare TypeScript conformance examples
+        working-directory: libraries/typescript
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: Run TypeScript conformance tests
+        env:
+          # Pin the v2 runner independently from the v1 action used above.
+          CONFORMANCE_RUNNER: '@modelcontextprotocol/conformance@0.2.0-alpha.10'
+          # Dated versions intentionally exclude off-timeline extensions such as tasks.
+          SPEC_VERSIONS: '2025-11-25 2026-07-28'
+          LEGACY_SERVER_EXPECTED_FAILURES: 'libraries/typescript/packages/server/examples/conformance/expected-failures.yml'
+        run: |
+          set +e
+          exit_code=0
+          results_dir=conformance-results/typescript
+          mkdir -p "$results_dir"
+
+          (
+            cd libraries/typescript/packages/server/examples/conformance
+            PORT=3000 node ../../dist/bin.js dev --no-open
+          ) > "$results_dir/server.log" 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null; wait "$server_pid" 2>/dev/null' EXIT
+
+          server_ready=false
+          for attempt in {1..60}; do
+            if curl --silent --show-error --output /dev/null http://127.0.0.1:3000/mcp; then
+              server_ready=true
+              break
+            fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              echo 'TypeScript conformance server exited before it became ready.'
+              cat "$results_dir/server.log"
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$server_ready" != true ]; then
+            echo 'TypeScript conformance server did not become ready within 60 seconds.'
+            exit_code=1
+          fi
+
+          for spec_version in $SPEC_VERSIONS; do
+            version_results_dir="$results_dir/$spec_version"
+            mkdir -p "$version_results_dir"
+
+            if [ "$server_ready" = true ]; then
+              expected_failure_args=()
+              if [ "$spec_version" = '2025-11-25' ]; then
+                expected_failure_args=(--expected-failures "$LEGACY_SERVER_EXPECTED_FAILURES")
+              fi
+
+              pnpm dlx "$CONFORMANCE_RUNNER" server \
+                --url http://127.0.0.1:3000/mcp \
+                --suite all \
+                --spec-version "$spec_version" \
+                --output-dir "$version_results_dir/server" \
+                "${expected_failure_args[@]}" || exit_code=1
+
+              if [ "$spec_version" = '2025-11-25' ]; then
+                printf '%s\n' \
+                  '### TypeScript legacy server exclusions' \
+                  '' \
+                  '- `tools-call-sampling` — stateless legacy HTTP has no client session for sampling.' \
+                  '- `tools-call-elicitation` — stateless legacy HTTP has no client session for elicitation.' \
+                  '- `elicitation-sep1034-defaults` — stateless legacy HTTP has no client session for elicitation.' \
+                  '- `elicitation-sep1330-enums` — stateless legacy HTTP has no client session for elicitation.' \
+                  '- `server-sse-polling` — stateless legacy HTTP has no session or SSE resumability.' \
+                  '- `server-sse-multiple-streams` — stateless legacy HTTP has no session for multiple SSE streams.' \
+                  '- `resources-subscribe` — stateless legacy HTTP does not retain resource subscriptions.' \
+                  '- `resources-unsubscribe` — stateless legacy HTTP does not retain resource subscriptions.' \
+                  >> "$GITHUB_STEP_SUMMARY"
+              fi
+            fi
+
+            pnpm dlx "$CONFORMANCE_RUNNER" client \
+              --command 'cd libraries/typescript/packages/client/examples/conformance && ./run-conformance-client-node.sh' \
+              --suite all \
+              --spec-version "$spec_version" \
+              --output-dir "$version_results_dir/client-node" || exit_code=1
+
+            pnpm dlx "$CONFORMANCE_RUNNER" client \
+              --command 'cd libraries/typescript/packages/client/examples/conformance && ./run-conformance-client-browser.sh' \
+              --suite all \
+              --spec-version "$spec_version" \
+              --output-dir "$version_results_dir/client-browser" || exit_code=1
+
+            pnpm dlx "$CONFORMANCE_RUNNER" client \
+              --command 'cd libraries/typescript/packages/client/examples/conformance && ./run-conformance-client-react.sh' \
+              --suite all \
+              --spec-version "$spec_version" \
+              --output-dir "$version_results_dir/client-react" || exit_code=1
+          done
+
+          exit "$exit_code"
+
+      - name: Summarize TypeScript conformance scores
+        if: always()
+        working-directory: .
+        env:
+          CONFORMANCE_RUNNER: '@modelcontextprotocol/conformance@0.2.0-alpha.10'
+          SPEC_VERSIONS: '2025-11-25 2026-07-28'
+          LEGACY_SERVER_EXPECTED_FAILURES: 'libraries/typescript/packages/server/examples/conformance/expected-failures.yml'
+        run: |
+          node libraries/typescript/scripts/summarize-conformance.mjs \
+            conformance-results/typescript \
+            --runner "$CONFORMANCE_RUNNER" \
+            --spec-versions "$SPEC_VERSIONS" \
+            --expected-failures "$LEGACY_SERVER_EXPECTED_FAILURES" \
+            --output conformance-results/typescript/summary.md
+
+      - name: Upload TypeScript v2 conformance results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: typescript-v2-conformance-results
+          path: conformance-results/typescript
+          if-no-files-found: warn
+          retention-days: 14
+
+  report-conformance:
+    name: Report current-head conformance scores
+    needs:
+      - python-conformance-test
+      - typescript-v2-conformance-test
+    if: >
+      always() &&
+      github.event_name == 'pull_request' &&
+      (needs.python-conformance-test.result != 'skipped' ||
+      needs.typescript-v2-conformance-test.result != 'skipped')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Download Python v1 results
+        id: download-python-results
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: conformance-results
+          path: conformance-results
+
+      - name: Post Python v1 score
+        if: steps.download-python-results.outcome == 'success'
+        uses: mcp-use/mcp-conformance-action@v1
+        with:
+          mode: comment
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          comment-mode: update
+
+      - name: Download TypeScript v2 results
+        id: download-typescript-results
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: typescript-v2-conformance-results
+          path: typescript-v2-conformance-results
+
+      - name: Post TypeScript v2 score
+        if: steps.download-typescript-results.outcome == 'success'
+        uses: actions/github-script@v7
+        env:
+          RESULTS_ROOT: typescript-v2-conformance-results
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs')
+            const path = require('path')
+            const root = process.env.RESULTS_ROOT
+            const summaryPath = path.join(root, 'summary.md')
+            if (!fs.existsSync(summaryPath)) {
+              core.setFailed(`Missing TypeScript conformance summary: ${summaryPath}`)
+              return
+            }
+
+            const issue = context.payload.pull_request?.number
+            if (!issue) {
+              core.info('Conformance workflow was not associated with a pull request')
+              return
+            }
+
+            const marker = '<!-- mcp-use-typescript-conformance-results -->'
+            const body = `${marker}\n## TypeScript Conformance (current head)\n\n${fs.readFileSync(summaryPath, 'utf8').trim()}`
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue,
+              per_page: 100,
+            })
+            const existing = comments.find((comment) => comment.body?.includes(marker))
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              })
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue,
+                body,
+              })
+            }

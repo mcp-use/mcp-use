@@ -7,8 +7,8 @@ import {
   type ClientOptions,
   type VersionNegotiationMode,
 } from "@modelcontextprotocol/client";
-import { logger } from "../utils/logging.js";
 import { DialectJsonSchemaValidator } from "../utils/json-schema-validator.js";
+import { logger } from "../utils/logging.js";
 import type { ConnectorInitOptions } from "./base.js";
 import { BaseConnector } from "./base.js";
 
@@ -284,7 +284,7 @@ export class HttpConnector extends BaseConnector {
         status === 400 &&
         streamableErr.message.includes("Missing session ID")
       ) {
-        fallbackReason = "Server requires session ID (FastMCP compatibility)";
+        fallbackReason = "Server requires session ID";
         logger.warn(`⚠️  ${fallbackReason}`);
       } else if (status === 404 || status === 405) {
         fallbackReason = `Server returned ${status} - server likely doesn't support streamable HTTP`;
@@ -310,7 +310,7 @@ export class HttpConnector extends BaseConnector {
         errorStr.includes("Bad Request: Missing session ID") ||
         errorMsg.includes("FastMCP session ID error")
       ) {
-        fallbackReason = "Server requires session ID (FastMCP compatibility)";
+        fallbackReason = "Server requires session ID";
         logger.warn(`⚠️  ${fallbackReason}`);
       } else if (
         errorStr.includes("405 Method Not Allowed") ||

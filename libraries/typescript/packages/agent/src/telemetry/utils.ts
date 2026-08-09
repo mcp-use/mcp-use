@@ -1,5 +1,4 @@
 import type { BaseLanguageModel } from "@langchain/core/language_models/base";
-export { getPackageVersion } from "../version.js";
 
 function getModelProvider(llm: BaseLanguageModel): string {
   // Use LangChain's standard _llm_type property for identification

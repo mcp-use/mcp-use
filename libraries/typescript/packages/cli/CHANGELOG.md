@@ -1,5 +1,101 @@
 # @mcp-use/cli
 
+## 4.1.0-canary.8
+
+### Patch Changes
+
+- 42fe287: Allow production `start --tunnel` traffic through localhost Host validation while preserving the public forwarded origin.
+
+## 4.1.0-canary.7
+
+### Patch Changes
+
+- 1f7df2a: Keep widget-declared CSPs restrictive by default and make clean release installs resolve a single compatible build-tool dependency graph.
+
+## 4.1.0-canary.6
+
+### Minor Changes
+
+- 6911124: Add experimental server authoring support for Skills over MCP with automatic
+  `skills/` discovery, explicit disable and directory configuration, SEP-2640
+  resource methods, development reloads, and build-time embedding.
+
+### Patch Changes
+
+- e0ac78e: Move the CLI implementation and its tests into `@mcp-use/cli` while preserving the existing `mcp-use` command and server API.
+- 668a312: Publish the authenticated WebSocket tunnel client as a standalone package and
+  bundle the same implementation into `mcp-use dev/start --tunnel`. This removes
+  native tunnel binaries and adds bounded HTTP, streaming, MCP JSON-RPC, and
+  public WebSocket forwarding without adding a runtime dependency to `mcp-use`.
+- 06ec118: Use cross-platform filesystem paths for private CLI state, view discovery, and
+  public asset tests so the CLI build and test suite work on Windows.
+- c94028c: Make `mcp-use dev` reconcile server and V2 view changes as coherent project generations. Reload candidates now use immutable view snapshots, and stale candidates cannot replace the active handler, publish catalog changes, or report superseded failures.
+- e41076f: Improve Skills over MCP discovery in Inspector and omit invalid skills from fresh development snapshots.
+
+## 5.0.0-canary.7
+
+### Patch Changes
+
+- e41076f: Improve Skills over MCP discovery in Inspector and omit invalid skills from fresh development snapshots.
+
+## 5.0.0-canary.6
+
+### Minor Changes
+
+- 6911124: Add experimental server authoring support for Skills over MCP with automatic
+  `skills/` discovery, explicit disable and directory configuration, SEP-2640
+  resource methods, development reloads, and build-time embedding.
+
+### Patch Changes
+
+- Updated dependencies [819ef5b]
+- Updated dependencies [2daf9c9]
+  - @mcp-use/client@2.1.0-canary.3
+  - @mcp-use/inspector@21.0.0-canary.7
+
+## 4.0.2-canary.5
+
+### Patch Changes
+
+- 06ec118: Use cross-platform filesystem paths for private CLI state, view discovery, and
+  public asset tests so the CLI build and test suite work on Windows.
+
+## 4.0.2-canary.4
+
+### Patch Changes
+
+- c94028c: Make `mcp-use dev` reconcile server and V2 view changes as coherent project generations. Reload candidates now use immutable view snapshots, and stale candidates cannot replace the active handler, publish catalog changes, or report superseded failures.
+
+## 4.0.2-canary.3
+
+### Patch Changes
+
+- 668a312: Publish the authenticated WebSocket tunnel client as a standalone package and
+  bundle the same implementation into `mcp-use dev/start --tunnel`. This removes
+  native tunnel binaries and adds bounded HTTP, streaming, MCP JSON-RPC, and
+  public WebSocket forwarding without adding a runtime dependency to `mcp-use`.
+
+## 4.0.2-canary.2
+
+### Patch Changes
+
+- e0ac78e: Move the CLI implementation and its tests into `@mcp-use/cli` while preserving the existing `mcp-use` command and server API.
+
+## 4.0.2-canary.1
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-use/inspector@20.0.5-canary.0
+
+## 4.0.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [52f535c]
+  - @mcp-use/client@2.0.2-canary.0
+  - @mcp-use/inspector@20.0.2-canary.0
+
 ## 4.0.1
 
 ### Patch Changes

@@ -23,9 +23,9 @@ npm run dev
 
 The default local URLs are:
 
-| URL | Purpose |
-| --- | --- |
-| `http://localhost:3000/mcp` | MCP endpoint |
+| URL                                   | Purpose      |
+| ------------------------------------- | ------------ |
+| `http://localhost:3000/mcp`           | MCP endpoint |
 | `http://localhost:3000/mcp/inspector` | Inspector UI |
 
 You can also open the hosted Inspector at [inspector.mcp-use.com](https://inspector.mcp-use.com) or run it with [`npx @mcp-use/inspector`](/inspector/cli).
@@ -64,11 +64,37 @@ Use **Resources** to read server-provided content by URI. Use **Prompts** to tes
 
 These tabs are useful when a client reports missing context. They show what the server actually exposes after connection and auth.
 
+## Inspect Skills over MCP
+
+**Skills** is always present in the Inspector navigation. When a server does not
+advertise the experimental `io.modelcontextprotocol/skills` extension, the tab
+is disabled, like Sampling, with an explanation that Skills over MCP is not
+available from that server. When the extension is available, each skill appears
+as a folder containing its `SKILL.md` and supporting resources.
+
+When the extension is advertised but its catalog is empty, the tab is shown as
+a red error state and disabled, with a tooltip explaining that the server
+returned no skills.
+
+Select a file to read it on demand. Before previewing it, the Inspector verifies the raw SHA-256 digest advertised by the skill manifest. For `SKILL.md`, it also checks that the parsed YAML frontmatter matches the catalog entry. A digest mismatch blocks the preview instead of passing changed content to the user or model.
+
+Markdown, safe text, raster images, audio, and video have inline previews. Scripts, HTML, SVG, and other binary files are never executed; you can explicitly download verified files when needed.
+
 ## Try chat
 
 Use **Chat** to test how an LLM calls your server's tools in a conversation. The chat view can use hosted chat where available or a provider key stored in your browser.
 
 Keep chat testing focused on end-to-end behavior. Use the Tools tab first when you need to isolate input schemas, tool errors, or widget rendering.
+
+For servers that advertise Skills over MCP, chat receives a compact catalog of
+each skill's name, description, origin, and URI. When a skill is relevant, the
+chat host loads its `SKILL.md` and supporting resources lazily through the
+server's Skills over MCP and resource methods. It verifies each resource
+against the manifest's raw SHA-256 digest before making it available to the
+model. The Inspector never executes skill scripts or lets `allowed-tools`
+widen the selected MCP tool permissions.
+
+Skills over MCP remains experimental. Treat remote skill content as untrusted and review it before relying on its instructions. See the [working group](https://modelcontextprotocol.io/community/working-groups/skills-over-mcp), [SEP-2640](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2640), and [Agent Skills specification](https://agentskills.io/specification).
 
 ## Debug widgets
 
@@ -109,10 +135,18 @@ For the full shortcut list, see [Keyboard shortcuts](/inspector/keyboard-shortcu
   <Card title="CLI usage" icon="terminal" href="/inspector/cli">
     Run the Inspector from the command line and auto-connect to a server.
   </Card>
-  <Card title="Connection settings" icon="settings" href="/inspector/connection-settings">
+  <Card
+    title="Connection settings"
+    icon="settings"
+    href="/inspector/connection-settings"
+  >
     Choose Direct or Via Proxy and tune connection details only when needed.
   </Card>
-  <Card title="Debug widgets" icon="bug" href="/inspector/debugging-chatgpt-apps">
+  <Card
+    title="Debug widgets"
+    icon="bug"
+    href="/inspector/debugging-chatgpt-apps"
+  >
     Test MCP Apps widgets, layout behavior, CSP, and display modes.
   </Card>
   <Card title="Mount the Inspector" icon="plug-2" href="/inspector/integration">

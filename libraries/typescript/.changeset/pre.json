@@ -1,0 +1,34 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/agent": "2.0.1",
+    "@mcp-use/cli": "4.0.1",
+    "@mcp-use/client": "2.0.1",
+    "create-mcp-use-app": "2.0.1",
+    "@mcp-use/inspector": "20.0.4",
+    "mcp-use": "2.0.4",
+    "@mcp-use/tunnel": "0.1.6"
+  },
+  "changesets": [
+    "bright-inspector-assets",
+    "bright-widgets-bridge",
+    "calm-owls-prompt",
+    "clean-cli-ownership",
+    "clean-inspectors-fit",
+    "clean-tunnels-connect",
+    "fair-pandas-smile",
+    "fix-next-skills-turbopack",
+    "fresh-tunnels-start",
+    "fuzzy-tools-wait",
+    "gentle-widgets-eval",
+    "quiet-lions-connect",
+    "safe-inspector-console-routing",
+    "slick-nights-taste",
+    "soft-skills-travel",
+    "strict-widgets-stable-release",
+    "tidy-knip-exports",
+    "tidy-skills-inspector",
+    "tidy-skills-over-mcp"
+  ]
+}

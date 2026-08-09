@@ -1,0 +1,57 @@
+{
+  "name": "@mcp-use/tunnel",
+  "type": "module",
+  "version": "0.2.0-canary.1",
+  "description": "WebSocket tunnel client for mcp-use",
+  "author": "mcp-use, Inc.",
+  "license": "MIT",
+  "homepage": "https://github.com/mcp-use/mcp-use#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mcp-use/mcp-use.git",
+    "directory": "libraries/typescript/packages/tunnel"
+  },
+  "bugs": {
+    "url": "https://github.com/mcp-use/mcp-use/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "tunnel",
+    "websocket"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "mcp-tunnel": "./dist/bin.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "scripts": {
+    "build": "rimraf dist && tsup && tsc --emitDeclarationOnly --declaration && rimraf dist/.tsbuildinfo",
+    "test": "vitest run",
+    "test:run": "pnpm typecheck && pnpm test",
+    "typecheck": "tsc -p tsconfig.test.json --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "@types/ws": "^8.18.1",
+    "rimraf": "^6.1.3",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.9",
+    "ws": "^8.18.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

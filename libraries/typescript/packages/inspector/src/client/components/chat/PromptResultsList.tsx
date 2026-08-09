@@ -5,15 +5,17 @@ import { Button } from "../ui/button";
 interface PromptResultsListProps {
   promptResults: PromptResult[];
   onDeletePromptResult: (index: number) => void;
+  offsetForSkills?: boolean;
 }
 
 export function PromptResultsList({
   promptResults,
   onDeletePromptResult,
+  offsetForSkills = false,
 }: PromptResultsListProps) {
   return (
     <div
-      className="absolute top-4 left-4 right-4 flex gap-2 overflow-x-auto z-20 flex-nowrap"
+      className={`absolute ${offsetForSkills ? "top-12" : "top-4"} left-4 right-4 flex gap-2 overflow-x-auto z-20 flex-nowrap`}
       style={{
         scrollbarWidth: "none" /* Firefox */,
         msOverflowStyle: "none" /* IE/Edge */,

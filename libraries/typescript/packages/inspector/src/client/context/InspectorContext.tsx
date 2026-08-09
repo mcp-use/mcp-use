@@ -6,6 +6,7 @@ export type TabType =
   | "tools"
   | "prompts"
   | "resources"
+  | "skills"
   | "chat"
   | "sampling"
   | "elicitation"
