@@ -852,8 +852,19 @@ export function InspectorDashboard() {
                     </div>
                   </div>
                   {(connection.state === "pending_auth" ||
-                    connection.state === "authenticating") && (
+                    connection.state === "authenticating" ||
+                    (connection.state === "ready" &&
+                      connection.authorization?.mode === "mixed" &&
+                      !connection.authorization.authenticated)) && (
                     <div className="text-sm text-yellow-600 dark:text-yellow-400 mt-2">
+                      {connection.state === "ready" && (
+                        <p
+                          data-testid="server-tile-mixed-auth"
+                          className="mb-2 text-xs"
+                        >
+                          This server is using mixed auth.
+                        </p>
+                      )}
                       {connection.state === "authenticating" ? (
                         <Button
                           size="sm"

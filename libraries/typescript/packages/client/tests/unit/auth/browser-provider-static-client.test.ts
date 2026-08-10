@@ -8,7 +8,7 @@
  * returned undefined and the SDK fell through to DCR.
  */
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OAuthClientInformation } from "@modelcontextprotocol/client";
 import { BrowserOAuthClientProvider } from "../../../src/auth/browser.js";
 import { LocalStorageKVStore } from "../../../src/auth/storage.js";
@@ -24,6 +24,7 @@ describe("BrowserOAuthClientProvider — pre-registered client_id", () => {
     localStorage.clear();
   });
   afterEach(() => {
+    vi.restoreAllMocks();
     localStorage.clear();
     restoreLocalStorage();
   });
@@ -126,6 +127,35 @@ describe("BrowserOAuthClientProvider — pre-registered client_id", () => {
       v: 1,
       alg: "A256GCM",
     });
+  });
+
+  it("opens a prepared authorization only after an explicit start", async () => {
+    const focus = vi.fn();
+    const open = vi.spyOn(window, "open").mockReturnValue({
+      closed: false,
+      focus,
+    } as unknown as Window);
+    const onPopupWindow = vi.fn();
+    const provider = new BrowserOAuthClientProvider(SERVER_URL, {
+      callbackUrl: "https://app.example.com/inspector/oauth/callback",
+      preventAutoAuth: true,
+      onPopupWindow,
+    });
+
+    await provider.redirectToAuthorization(
+      new URL("https://auth.example.com/authorize")
+    );
+    expect(open).not.toHaveBeenCalled();
+
+    provider.startAuthorization();
+
+    expect(open).toHaveBeenCalledWith(
+      provider.getLastAttemptedAuthUrl(),
+      `mcp_auth_${provider.serverUrlHash}`,
+      expect.any(String)
+    );
+    expect(onPopupWindow).toHaveBeenCalledOnce();
+    expect(focus).toHaveBeenCalledOnce();
   });
 
   it("does not expose a persisted authorization URL after reload", async () => {

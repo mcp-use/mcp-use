@@ -18,6 +18,7 @@ import type {
   VersionNegotiationMode,
 } from "@modelcontextprotocol/client";
 import type { BaseMCPClient } from "../core/base.js";
+import type { MCPAuthorizationInfo } from "../core/session.js";
 import type {
   SamplingCreateMessageParams,
   SamplingCreateMessageResult,
@@ -178,6 +179,12 @@ export type UseMcpOptions = {
    * Set to true to show a modal/button before triggering OAuth instead of auto-redirecting
    */
   preventAutoAuth?: boolean;
+  /**
+   * Detect OAuth protected-resource metadata after an anonymous connection so
+   * mixed-auth servers can offer optional authentication without blocking use.
+   * @defaultValue true
+   */
+  detectMixedAuth?: boolean;
   /**
    * Use full-page redirect for OAuth instead of popup window (default: false)
    * Redirect flow avoids popup blockers and provides better UX on mobile.
@@ -375,6 +382,7 @@ export type PersistedMcpServerConfig = Pick<
   | "reconnectionOptions"
   | "popupFeatures"
   | "preventAutoAuth"
+  | "detectMixedAuth"
   | "useRedirectFlow"
   | "protocolNegotiation"
   | "timeout"
@@ -537,6 +545,8 @@ export type UseMcpResult = {
     /** OAuth client secret, when the provider issued a confidential client. */
     client_secret?: string;
   };
+  /** OAuth availability discovered for an anonymously connected server. */
+  authorization?: MCPAuthorizationInfo;
   /** Array of internal log messages (useful for debugging) */
   log: {
     /** Log severity. */
@@ -802,6 +812,7 @@ const PERSISTED_SERVER_CONFIG_KEYS = [
   "reconnectionOptions",
   "popupFeatures",
   "preventAutoAuth",
+  "detectMixedAuth",
   "useRedirectFlow",
   "protocolNegotiation",
   "timeout",

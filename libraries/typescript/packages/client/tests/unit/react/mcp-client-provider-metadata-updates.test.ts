@@ -13,6 +13,7 @@ const clearStorageSpies: Array<ReturnType<typeof vi.fn>> = [];
 let latestClient: ReturnType<typeof useMcpClient> | null = null;
 let mockProtocolEra: "legacy" | "modern" = "legacy";
 let mockInstructions = "legacy instructions";
+let mockAuthorization: { mode: "mixed"; authenticated: boolean } | undefined;
 
 vi.mock("../../../src/react/useMcp.js", () => {
   const tools: unknown[] = [];
@@ -47,6 +48,7 @@ vi.mock("../../../src/react/useMcp.js", () => {
         error: undefined,
         authUrl: undefined,
         authTokens: undefined,
+        authorization: mockAuthorization,
         protocolEra: mockProtocolEra,
         protocolVersion:
           mockProtocolEra === "legacy" ? "2025-11-25" : "2026-07-28",
@@ -101,6 +103,7 @@ describe("McpClientProvider metadata-only updates", () => {
     latestClient = null;
     mockProtocolEra = "legacy";
     mockInstructions = "legacy instructions";
+    mockAuthorization = undefined;
     vi.restoreAllMocks();
   });
 
@@ -176,6 +179,39 @@ describe("McpClientProvider metadata-only updates", () => {
     expect(latestClient?.getServer("sandbox")?.instructions).toBe(
       "modern instructions"
     );
+  });
+
+  it("propagates mixed-auth metadata to provider consumers", async () => {
+    let renderer: ReturnType<typeof create>;
+    await act(async () => {
+      renderer = create(
+        React.createElement(
+          McpClientProvider,
+          null,
+          React.createElement(TestHarness)
+        )
+      );
+    });
+    await flushUpdates();
+
+    expect(latestClient?.getServer("sandbox")?.authorization).toBeUndefined();
+    mockAuthorization = { mode: "mixed", authenticated: false };
+
+    await act(async () => {
+      renderer!.update(
+        React.createElement(
+          McpClientProvider,
+          null,
+          React.createElement(TestHarness)
+        )
+      );
+    });
+    await flushUpdates();
+
+    expect(latestClient?.getServer("sandbox")?.authorization).toEqual({
+      mode: "mixed",
+      authenticated: false,
+    });
   });
 
   it("persists only serializable server configuration", async () => {

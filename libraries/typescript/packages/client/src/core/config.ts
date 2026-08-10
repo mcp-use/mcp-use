@@ -214,6 +214,12 @@ export interface HttpServerConfig extends BaseServerConfig {
    */
   oauth?: AutoOAuthOptions | false;
   /**
+   * Detect mixed-auth servers after an anonymous connection by using the
+   * official SDK's RFC 9728 protected-resource metadata discovery.
+   * @defaultValue true
+   */
+  detectMixedAuth?: boolean;
+  /**
    * Protocol version negotiation mode. Defaults to `"auto"` to negotiate both
    * v1 and v2 MCP servers. See {@link HttpConnector}.
    */
@@ -360,6 +366,7 @@ export function createConnectorFromConfig(
       fetch: serverConfig.fetch,
       authToken: serverConfig.authToken,
       authProvider: serverConfig.authProvider,
+      detectMixedAuth: serverConfig.detectMixedAuth,
       protocolNegotiation: serverConfig.protocolNegotiation,
       timeout: serverConfig.timeout,
       roots: serverConfig.roots,

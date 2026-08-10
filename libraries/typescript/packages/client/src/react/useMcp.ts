@@ -134,6 +134,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     autoReconnect = true,
     reconnectionOptions,
     preventAutoAuth = true, // Default to true - require explicit user action for OAuth
+    detectMixedAuth = true,
     useRedirectFlow = false, // Default to false for backward compatibility (use popup)
     onPopupWindow,
     timeout = 30000, // 30 seconds default for connection timeout
@@ -363,6 +364,8 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
   const [authUrl, setAuthUrl] = useState<string | undefined>(undefined);
   const [authTokens, setAuthTokens] =
     useState<UseMcpResult["authTokens"]>(undefined);
+  const [authorization, setAuthorization] =
+    useState<UseMcpResult["authorization"]>(undefined);
 
   const clientRef = useRef<BrowserMCPClient | null>(null);
   const connectionRef = useRef<MCPConnection | null>(null);
@@ -386,6 +389,9 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
 
   // --- Refs for values used in callbacks ---
   const stateRef = useRef(state);
+  const authorizationRef = useRef(authorization);
+  const authorizationServerUrlRef = useRef(url);
+  authorizationRef.current = authorization;
   const autoReconnectRef = useRef(autoReconnect);
   const successfulTransportRef = useRef<TransportType | null>(null);
   // Forward refs for functions (declared later) to avoid circular dependencies
@@ -500,6 +506,26 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     [instanceLogger]
   );
 
+  const onAuthorizationRequired = useCallback(
+    (authError: unknown) => {
+      const preparedAuthUrl =
+        authProviderRef.current?.getLastAttemptedAuthUrl?.() ?? undefined;
+      addLog(
+        "info",
+        "This server requires OAuth for the requested operation; waiting for authentication.",
+        authError
+      );
+      const authorizationRequired = {
+        ...(authorizationRef.current ?? { mode: "mixed" as const }),
+        authenticated: false,
+      };
+      authorizationRef.current = authorizationRequired;
+      setAuthorization(authorizationRequired);
+      if (preparedAuthUrl) setAuthUrl(preparedAuthUrl);
+    },
+    [addLog]
+  );
+
   const connectionOperations = useMcpOperations({
     stateRef,
     connectionRef,
@@ -511,6 +537,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     setPrompts,
     setSkills,
     addLog,
+    onAuthorizationRequired,
   });
 
   /**
@@ -734,6 +761,11 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     connectingRef.current = true;
     connectEpochRef.current += 1;
     connectAttemptRef.current += 1;
+    if (authorizationServerUrlRef.current !== url) {
+      authorizationServerUrlRef.current = url;
+      authorizationRef.current = undefined;
+      setAuthorization(undefined);
+    }
     setError(undefined);
     setAuthUrl(undefined);
     successfulTransportRef.current = null;
@@ -840,6 +872,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
           // Protocol era negotiation mode ("legacy" | "auto" | { pin }); the
           // connector defaults to automatic v1/v2 negotiation.
           ...(protocolNegotiation !== undefined && { protocolNegotiation }),
+          detectMixedAuth,
           // Pass user-configurable reconnection options, or when autoReconnect
           // is disabled, disable SDK transport reconnection to prevent
           // unwanted GET polling requests
@@ -1078,7 +1111,13 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
           protocolVersion,
           instructions,
           extensions,
+          authorization: connectionAuthorization,
         } = connection.info;
+
+        if (connectionAuthorization) {
+          setAuthorization(connectionAuthorization);
+          authorizationRef.current = connectionAuthorization;
+        }
 
         // Surface normalized metadata identically for v1 and v2 servers.
         if (isMountedRef.current) {
@@ -1136,6 +1175,14 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
             return "failed";
           }
           if (tokens?.access_token) {
+            if (authorizationRef.current?.mode === "mixed") {
+              const authenticatedAuthorization = {
+                ...authorizationRef.current,
+                authenticated: true,
+              };
+              setAuthorization(authenticatedAuthorization);
+              authorizationRef.current = authenticatedAuthorization;
+            }
             const expiresAt = getOAuthTokenExpiry(tokens);
 
             // Best-effort: resolve the OAuth token endpoint + client credentials
@@ -1425,6 +1472,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     headers,
     transportType,
     preventAutoAuth,
+    detectMixedAuth,
     useRedirectFlow,
     onPopupWindow,
     enabled,
@@ -1488,12 +1536,19 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
   const authenticate = useCallback(async () => {
     addLog("info", "Manual authentication requested...");
     const currentState = stateRef.current;
+    const isOptionalMixedAuthentication =
+      currentState === "ready" && authorizationRef.current?.mode === "mixed";
 
     if (currentState === "failed") {
       addLog("info", "Attempting to reconnect and authenticate via retry...");
       retry();
-    } else if (currentState === "pending_auth") {
-      addLog("info", "Proceeding with authentication from pending state...");
+    } else if (
+      currentState === "pending_auth" ||
+      (currentState === "ready" &&
+        authorizationRef.current?.mode === "mixed" &&
+        !authorizationRef.current.authenticated)
+    ) {
+      addLog("info", "Proceeding with authentication...");
 
       try {
         assert(
@@ -1663,16 +1718,20 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
           case "cancelled":
             addLog(
               "warn",
-              "Authentication popup was closed before completing. Returning to pending_auth."
+              isOptionalMixedAuthentication
+                ? "Authentication popup was closed before completing. Public tools remain available."
+                : "Authentication popup was closed before completing. Returning to pending_auth."
             );
-            setState("pending_auth");
+            setState(isOptionalMixedAuthentication ? "ready" : "pending_auth");
             break;
           case "timeout":
             addLog(
               "warn",
-              "Authentication timed out waiting for the popup. Returning to pending_auth."
+              isOptionalMixedAuthentication
+                ? "Authentication timed out waiting for the popup. Public tools remain available."
+                : "Authentication timed out waiting for the popup. Returning to pending_auth."
             );
-            setState("pending_auth");
+            setState(isOptionalMixedAuthentication ? "ready" : "pending_auth");
             break;
           case "error":
             failConnection(`Authentication failed: ${result.error}`);
@@ -2082,6 +2141,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     log,
     authUrl,
     authTokens,
+    authorization,
     client: clientRef.current,
     ...connectionOperations,
     retry,

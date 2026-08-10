@@ -30,6 +30,7 @@ vi.mock("../../../src/telemetry/telemetry-browser.js", () => ({
   Tel: {
     getInstance: () => ({
       trackUseMcpConnection: vi.fn().mockResolvedValue(undefined),
+      trackUseMcpToolCall: vi.fn().mockResolvedValue(undefined),
     }),
   },
 }));
@@ -42,6 +43,7 @@ const authProvider = {
   serverUrl: "https://example.com/mcp",
   tokens: vi.fn().mockResolvedValue(undefined),
   clearStorage: vi.fn().mockReturnValue(0),
+  getLastAttemptedAuthUrl: vi.fn().mockReturnValue(null),
 };
 
 function connectionFor(protocolEra: "legacy" | "modern") {
@@ -66,6 +68,7 @@ function connectionFor(protocolEra: "legacy" | "modern") {
       extensions: { "example.dev/feature": { enabled: true } },
     },
     supports: vi.fn().mockReturnValue(false),
+    callTool: vi.fn().mockResolvedValue({ content: [] }),
     listAllResources: vi.fn().mockResolvedValue({ resources: [] }),
     listResourceTemplates: vi.fn().mockResolvedValue({
       resourceTemplates: [],
@@ -87,6 +90,7 @@ async function renderFor(
     | ReturnType<typeof import("../../../src/react/useMcp.js").useMcp>
     | undefined;
   const { useMcp } = await import("../../../src/react/useMcp.js");
+  let renderer: ReturnType<typeof create>;
 
   function TestComponent() {
     result = useMcp({
@@ -104,7 +108,7 @@ async function renderFor(
   }
 
   await act(async () => {
-    create(<TestComponent />);
+    renderer = create(<TestComponent />);
   });
   await act(async () => {
     await Promise.resolve();
@@ -112,12 +116,19 @@ async function renderFor(
     await Promise.resolve();
   });
 
-  return { result: result!, connection };
+  return {
+    result: result!,
+    getResult: () => result!,
+    connection,
+    renderer: renderer!,
+  };
 }
 
 describe("useMcp connection metadata", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    authProvider.tokens.mockResolvedValue(undefined);
+    authProvider.getLastAttemptedAuthUrl.mockReturnValue(null);
   });
 
   it.each(["legacy", "modern"] as const)(
@@ -164,6 +175,104 @@ describe("useMcp connection metadata", () => {
         },
       })
     );
+  });
+
+  it("exposes mixed auth without blocking an anonymous connection", async () => {
+    const { result } = await renderFor("modern", false, {}, (connection) => {
+      Object.assign(connection.info, {
+        authorization: {
+          mode: "mixed",
+          authenticated: false,
+          resource: "https://example.com/mcp",
+        },
+      });
+    });
+
+    expect(result.state).toBe("ready");
+    expect(result.authorization).toEqual({
+      mode: "mixed",
+      authenticated: false,
+      resource: "https://example.com/mcp",
+    });
+    expect(client.addServer).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ detectMixedAuth: true })
+    );
+  });
+
+  it("keeps public tools ready when a protected tool triggers OAuth later", async () => {
+    const { result, getResult, connection } = await renderFor("modern");
+    authProvider.getLastAttemptedAuthUrl.mockReturnValue(
+      "https://auth.example.com/authorize?state=prepared"
+    );
+    connection.callTool.mockRejectedValueOnce(
+      Object.assign(new Error("Authentication required"), {
+        name: "UnauthorizedError",
+      })
+    );
+
+    await act(async () => {
+      await expect(result.callTool("protected", {})).rejects.toThrow(
+        "Authentication required"
+      );
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const updatedResult = getResult();
+    expect(updatedResult.log.map((entry) => entry.message)).toContainEqual(
+      expect.stringContaining("requires OAuth for the requested operation")
+    );
+    expect(updatedResult.state).toBe("ready");
+    expect(updatedResult.authUrl).toContain("auth.example.com/authorize");
+    expect(updatedResult.authorization).toEqual({
+      mode: "mixed",
+      authenticated: false,
+    });
+
+    connection.callTool.mockResolvedValueOnce({
+      content: [{ type: "text", text: "public result" }],
+    });
+    await expect(updatedResult.callTool("public", {})).resolves.toMatchObject({
+      content: [{ text: "public result" }],
+    });
+  });
+
+  it("marks a previously authenticated connection unauthenticated for scope step-up", async () => {
+    const { result, getResult, connection } = await renderFor(
+      "modern",
+      false,
+      {},
+      (configuredConnection) => {
+        Object.assign(configuredConnection.info, {
+          authorization: {
+            mode: "mixed",
+            authenticated: true,
+            resource: "https://example.com/mcp",
+            scopesSupported: ["public", "admin"],
+          },
+        });
+      }
+    );
+    connection.callTool.mockRejectedValueOnce(
+      Object.assign(new Error("Additional authorization required"), {
+        name: "InsufficientScopeError",
+      })
+    );
+
+    await act(async () => {
+      await expect(result.callTool("admin", {})).rejects.toThrow(
+        "Additional authorization required"
+      );
+    });
+
+    expect(getResult().authorization).toEqual({
+      mode: "mixed",
+      authenticated: false,
+      resource: "https://example.com/mcp",
+      scopesSupported: ["public", "admin"],
+    });
   });
 
   it("keeps the connection ready when optional template discovery is unsupported", async () => {

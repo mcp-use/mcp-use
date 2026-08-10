@@ -13,6 +13,7 @@ import {
   type SetStateAction,
 } from "react";
 import type { MCPConnection } from "../core/session.js";
+import { isOAuthInteractionRequired } from "../auth/flow.js";
 import { Tel } from "../telemetry/telemetry-browser.js";
 import { formatMcpNotReadyReason } from "./useMcp-helpers.js";
 import type { UseMcpResult } from "./types.js";
@@ -34,6 +35,7 @@ type Params = {
   setPrompts: Dispatch<SetStateAction<Prompt[]>>;
   setSkills: Dispatch<SetStateAction<import("../core/skills.js").Skill[]>>;
   addLog: AddLog;
+  onAuthorizationRequired: (error: unknown) => void;
 };
 
 function requireConnection(params: Params, operation: string): MCPConnection {
@@ -71,6 +73,9 @@ export function useMcpOperations(params: Params) {
           .catch(() => {});
         return result;
       } catch (error) {
+        if (isOAuthInteractionRequired(error)) {
+          params.onAuthorizationRequired(error);
+        }
         params.addLog("error", `Tool "${name}" call failed:`, error);
         Tel.getInstance()
           .trackUseMcpToolCall({
@@ -83,7 +88,7 @@ export function useMcpOperations(params: Params) {
         throw error;
       }
     },
-    [params.addLog]
+    [params.addLog, params.onAuthorizationRequired]
   );
 
   const listResources = useCallback(async () => {

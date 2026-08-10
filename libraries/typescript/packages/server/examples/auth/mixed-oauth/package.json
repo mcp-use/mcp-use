@@ -1,0 +1,26 @@
+{
+  "name": "mcp-use-example-auth-mixed-oauth",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Example: a mixed-OAuth mcp-use server with public and protected tools.",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "scripts": {
+    "dev": "mcp-use dev --port 3000",
+    "build": "mcp-use build",
+    "start": "mcp-use start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@better-auth/oauth-provider": "^1.6.2",
+    "better-auth": "^1.6.2",
+    "hono": "^4.12.34",
+    "mcp-use": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "typescript": "^7.0.2"
+  }
+}

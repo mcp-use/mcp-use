@@ -62,6 +62,8 @@ interface ToolsTabProps {
   readResource: (uri: string) => Promise<any>;
   serverId: string;
   isConnected: boolean;
+  authenticate?: () => Promise<void>;
+  isAuthenticating?: boolean;
   refreshTools?: () => Promise<void>;
 }
 
@@ -85,6 +87,8 @@ export function ToolsTab({
   readResource,
   serverId,
   isConnected,
+  authenticate,
+  isAuthenticating,
   refreshTools,
 }: ToolsTabProps & { ref?: React.RefObject<ToolsTabRef | null> }) {
   // State
@@ -473,6 +477,10 @@ export function ToolsTab({
     filteredResults,
     cancelExecution,
     results,
+    pendingAuthorization,
+    authenticateAndRerun,
+    isAuthorizing,
+    authorizationError,
   } = useToolExecution({
     selectedTool,
     payloadToSend,
@@ -480,6 +488,9 @@ export function ToolsTab({
     callTool,
     readResource,
     serverId,
+    isConnected,
+    authenticate,
+    isAuthenticating,
   });
 
   const latestResultTimestamp = filteredResults[0]?.timestamp;
@@ -780,6 +791,14 @@ export function ToolsTab({
                   onDelete={handleDeleteResult}
                   onFullscreen={handleFullscreen}
                   onRerunTool={executeTool}
+                  onAuthenticateAndRerun={
+                    pendingAuthorization ? authenticateAndRerun : undefined
+                  }
+                  pendingAuthorizationTimestamp={
+                    pendingAuthorization?.timestamp
+                  }
+                  isAuthenticating={isAuthorizing}
+                  authorizationError={authorizationError}
                 />
               </motion.div>
             )}
@@ -977,6 +996,12 @@ export function ToolsTab({
                 isMaximized={isMaximized}
                 onRerunTool={executeTool}
                 onWidgetHeightChange={handleWidgetHeightChange}
+                onAuthenticateAndRerun={
+                  pendingAuthorization ? authenticateAndRerun : undefined
+                }
+                pendingAuthorizationTimestamp={pendingAuthorization?.timestamp}
+                isAuthenticating={isAuthorizing}
+                authorizationError={authorizationError}
               />
             </div>
           </ResizablePanel>

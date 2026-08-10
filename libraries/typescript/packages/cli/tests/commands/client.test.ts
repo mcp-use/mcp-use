@@ -46,6 +46,14 @@ vi.mock("../../src/commands/shared.js", async (importOriginal) => {
 });
 
 const connection = {
+  authenticate: vi.fn(),
+  authorization: undefined as
+    | {
+        mode: "mixed";
+        authenticated: boolean;
+        resource?: string;
+      }
+    | undefined,
   callTool: vi.fn(),
   disconnect: vi.fn(),
   getPrompt: vi.fn(),
@@ -89,6 +97,8 @@ beforeEach(async () => {
   connection.callTool.mockResolvedValue({
     content: [{ type: "text", text: "called" }],
   });
+  connection.authenticate.mockResolvedValue(undefined);
+  connection.authorization = undefined;
   connection.disconnect.mockResolvedValue(undefined);
   connection.getPrompt.mockResolvedValue({
     messages: [{ role: "user", content: { type: "text", text: "Hello, Ada" } }],
@@ -381,6 +391,61 @@ describe("client JSON output", () => {
 });
 
 describe("client human-readable output", () => {
+  it("reports mixed auth without blocking connect", async () => {
+    connection.authorization = {
+      mode: "mixed",
+      authenticated: false,
+      resource: "https://mcp.example.com/mcp",
+    };
+
+    await expect(
+      runClient(["connect", "mixed", "https://mcp.example.com/mcp"])
+    ).resolves.toBe(0);
+
+    expect(stdout).toContain("Connected and saved mixed.");
+    expect(stdout).toContain("This server is using mixed auth.");
+    expect(stdout).toContain("mcp-use client mixed auth login");
+  });
+
+  it("redacts credentials from mixed-auth resource metadata in JSON", async () => {
+    connection.authorization = {
+      mode: "mixed",
+      authenticated: false,
+      resource:
+        "https://user-secret:password-secret@mcp.example.com/mcp?token=query-secret#fragment-secret",
+    };
+
+    await expect(
+      runClient([
+        "connect",
+        "mixed-json",
+        "https://mcp.example.com/mcp",
+        "--json",
+      ])
+    ).resolves.toBe(0);
+
+    expect(stdout).not.toContain("user-secret");
+    expect(stdout).not.toContain("password-secret");
+    expect(stdout).not.toContain("query-secret");
+    expect(stdout).not.toContain("fragment-secret");
+    expect(JSON.parse(stdout).authorization.resource).toContain("REDACTED");
+  });
+
+  it("authenticates an already-connected mixed server on demand", async () => {
+    await runClient(["connect", "mixed-login", "https://mcp.example.com/mcp"]);
+    stdout = "";
+
+    await expect(
+      runClient(["mixed-login", "auth", "login", "--json"])
+    ).resolves.toBe(0);
+
+    expect(connection.authenticate).toHaveBeenCalledOnce();
+    expect(JSON.parse(stdout)).toEqual({
+      name: "mixed-login",
+      authenticated: true,
+    });
+  });
+
   it("separates tool names and descriptions with a hyphen", async () => {
     await expect(
       runClient([

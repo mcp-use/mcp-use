@@ -17,7 +17,11 @@ export {
   type BrowserOAuthOptions,
 } from "./auth/browser.js";
 export { onMcpAuthorization } from "./auth/callback.js";
-export { completeOAuthFlow, isUnauthorized } from "./auth/flow.js";
+export {
+  completeOAuthFlow,
+  isOAuthInteractionRequired,
+  isUnauthorized,
+} from "./auth/flow.js";
 export { auth, UnauthorizedError } from "@modelcontextprotocol/client";
 /** Browser-compatible MCP client for HTTP servers. */
 export { BrowserMCPClient as MCPClient } from "./core/browser.js";
