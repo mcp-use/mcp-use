@@ -1,5 +1,14 @@
 # mcp-use
 
+## 2.1.1-canary.0
+
+### Patch Changes
+
+- 1c3e40b: Detect mixed-auth MCP servers without blocking anonymous connections, expose optional authentication in React, the CLI, and the Inspector, resume protected operations through the official SDK OAuth flow, and preserve multiple Set-Cookie headers through the Node bridge for colocated OAuth servers.
+- Updated dependencies [1c3e40b]
+  - @mcp-use/cli@4.1.1-canary.0
+  - @mcp-use/inspector@20.1.1-canary.0
+
 ## 2.1.0
 
 ### Minor Changes
