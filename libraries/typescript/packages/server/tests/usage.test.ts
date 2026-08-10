@@ -27,6 +27,10 @@ afterEach(() => {
 });
 
 async function capture(root: string): Promise<void> {
+  // These cases exercise identity persistence, not the opt-out, so they must
+  // not inherit an ambient MCP_USE_ANONYMIZED_TELEMETRY=false. afterEach
+  // already restores this variable.
+  process.env["MCP_USE_ANONYMIZED_TELEMETRY"] = "true";
   process.env["MCP_USE_TELEMETRY_VALIDATION_ID"] = "usage-test";
   const fetch = vi.fn(async () => new Response(null, { status: 202 }));
   vi.stubGlobal("fetch", fetch);
