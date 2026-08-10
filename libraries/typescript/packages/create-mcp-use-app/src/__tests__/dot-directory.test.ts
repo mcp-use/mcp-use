@@ -149,6 +149,15 @@ describe("deriveProjectInfo", () => {
     expect(info.displayName).toBe("my-app");
     expect(info.packageName).toBe("my-app");
   });
+
+  it("sanitizes a named project too, keeping the directory as typed", () => {
+    // Only the "." branch used to sanitize, so `create-mcp-use-app 'My "App"'`
+    // put the raw name straight into index.ts and produced invalid TypeScript.
+    const info = deriveProjectInfo('My "App"', "/tmp");
+    expect(info.projectPath).toBe(resolve("/tmp", 'My "App"'));
+    expect(info.displayName).toBe('My "App"');
+    expect(info.packageName).toBe("my--app");
+  });
 });
 
 // End-to-end: simulates the actual file-mutation step the CLI runs against a
