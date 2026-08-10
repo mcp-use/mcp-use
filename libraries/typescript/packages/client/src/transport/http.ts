@@ -15,6 +15,8 @@ import { logger } from "../utils/logging.js";
 import type { ConnectorInitOptions } from "./base.js";
 import { BaseConnector } from "./base.js";
 
+const MIXED_AUTH_DISCOVERY_TIMEOUT_MS = 2_000;
+
 /**
  * Detect a 401 anywhere in an error / cause chain. Under
  * `versionNegotiation: "auto"` a connect-time 401 can surface wrapped as
@@ -163,6 +165,39 @@ function createMcpProxyFetch(
   };
 }
 
+function createDeadlineFetch(
+  baseFetch: typeof fetch,
+  deadlineSignal: AbortSignal
+): typeof fetch {
+  return async (input, init) => {
+    const requestSignal = init?.signal;
+    if (!requestSignal) {
+      return baseFetch(input, { ...init, signal: deadlineSignal });
+    }
+
+    const controller = new AbortController();
+    const abortFromRequest = () => controller.abort(requestSignal.reason);
+    const abortFromDeadline = () => controller.abort(deadlineSignal.reason);
+
+    if (requestSignal.aborted) abortFromRequest();
+    else
+      requestSignal.addEventListener("abort", abortFromRequest, { once: true });
+
+    if (deadlineSignal.aborted) abortFromDeadline();
+    else
+      deadlineSignal.addEventListener("abort", abortFromDeadline, {
+        once: true,
+      });
+
+    try {
+      return await baseFetch(input, { ...init, signal: controller.signal });
+    } finally {
+      requestSignal.removeEventListener("abort", abortFromRequest);
+      deadlineSignal.removeEventListener("abort", abortFromDeadline);
+    }
+  };
+}
+
 /**
  * Connects to an MCP server using streamable HTTP.
  *
@@ -305,12 +340,28 @@ export class HttpConnector extends BaseConnector {
       return capabilities;
     }
 
+    const controller = new AbortController();
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const discoveryTimeout = new Promise<never>((_, reject) => {
+      timeout = setTimeout(() => {
+        const error = new Error(
+          `Mixed-auth metadata discovery timed out after ${MIXED_AUTH_DISCOVERY_TIMEOUT_MS}ms`
+        );
+        controller.abort(error);
+        reject(error);
+      }, MIXED_AUTH_DISCOVERY_TIMEOUT_MS);
+    });
+    const baseFetch = this.customFetch ?? globalThis.fetch.bind(globalThis);
+
     try {
-      const metadata = await discoverOAuthProtectedResourceMetadata(
-        this.baseUrl,
-        { protocolVersion: this.negotiatedProtocolVersion },
-        this.customFetch
-      );
+      const metadata = await Promise.race([
+        discoverOAuthProtectedResourceMetadata(
+          this.baseUrl,
+          { protocolVersion: this.negotiatedProtocolVersion },
+          createDeadlineFetch(baseFetch, controller.signal)
+        ),
+        discoveryTimeout,
+      ]);
       this.authorizationCache = {
         mode: "mixed",
         authenticated: false,
@@ -327,6 +378,8 @@ export class HttpConnector extends BaseConnector {
       // best-effort classification and must never turn a valid MCP connection
       // into a failure.
       logger.debug("Mixed-auth metadata was not discovered:", error);
+    } finally {
+      if (timeout) clearTimeout(timeout);
     }
     return capabilities;
   }

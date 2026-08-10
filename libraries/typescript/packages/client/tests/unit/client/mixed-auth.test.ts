@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OAuthClientProvider } from "@modelcontextprotocol/client";
 
 vi.mock("@modelcontextprotocol/client", async (importOriginal) => {
@@ -48,6 +48,10 @@ describe("mixed OAuth authorization", () => {
     vi.mocked(discoverOAuthProtectedResourceMetadata).mockReset();
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("classifies an anonymous connection from official RFC 9728 metadata", async () => {
     vi.mocked(discoverOAuthProtectedResourceMetadata).mockResolvedValue({
       resource: "https://mcp.example.com/mcp",
@@ -74,7 +78,7 @@ describe("mixed OAuth authorization", () => {
     expect(discoverOAuthProtectedResourceMetadata).toHaveBeenCalledWith(
       "https://mcp.example.com/mcp",
       { protocolVersion: "2025-11-25" },
-      undefined
+      expect.any(Function)
     );
     expect(connector.authorization).toEqual({
       mode: "mixed",
@@ -82,6 +86,34 @@ describe("mixed OAuth authorization", () => {
       resource: "https://mcp.example.com/mcp",
       scopesSupported: ["search", "build"],
     });
+  });
+
+  it("does not let a non-responsive metadata endpoint block an anonymous connection", async () => {
+    vi.useFakeTimers();
+    vi.mocked(discoverOAuthProtectedResourceMetadata).mockImplementation(
+      () => new Promise(() => {})
+    );
+    const connector = new HttpConnector("https://mcp.example.com/mcp", {
+      authProvider: createProvider(),
+    });
+    attachConnectedClient(
+      connector,
+      {
+        getServerCapabilities: () => ({ tools: {} }),
+        getServerVersion: () => ({ name: "anonymous", version: "1.0.0" }),
+        getNegotiatedProtocolVersion: () => "2025-11-25",
+        getProtocolEra: () => "legacy",
+        listTools: vi.fn(async () => ({ tools: [{ name: "public" }] })),
+      },
+      { finishAuth: vi.fn(async () => {}) }
+    );
+
+    const initialization = connector.initialize();
+    await vi.runAllTimersAsync();
+
+    await expect(initialization).resolves.toMatchObject({ tools: {} });
+    expect(connector.tools.map((tool) => tool.name)).toEqual(["public"]);
+    expect(connector.authorization).toBeUndefined();
   });
 
   it("finishes SDK-started OAuth and retries a protected operation once", async () => {
