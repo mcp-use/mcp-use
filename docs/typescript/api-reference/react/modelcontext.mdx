@@ -1,0 +1,135 @@
+---
+title: "ModelContext"
+description: "Describe visible UI with a nested context tree that is merged with view state and sent to the model."
+icon: "brain"
+---
+
+`ModelContext` describes what the user currently sees. mcp-use merges that description with [`useViewState`](/typescript/api-reference/react/useviewstate) before sending it to the host.
+
+```tsx
+import { ModelContext } from "mcp-use/react";
+
+function WeatherCard({
+  city,
+  temperature,
+}: {
+  city: string;
+  temperature: number;
+}) {
+  return (
+    <>
+      <ModelContext
+        content={`Showing weather for ${city}: ${temperature} degrees`}
+      />
+      <div>
+        {city}: {temperature}°
+      </div>
+    </>
+  );
+}
+```
+
+For `city="Paris"` and `temperature={22}`, the serialized context is:
+
+```text
+- Showing weather for Paris: 22 degrees
+```
+
+Nested `ModelContext` components form an indented context tree when the UI needs more detail.
+
+## Component signature
+
+```ts
+function ModelContext({
+  content,
+  children,
+}: {
+  content: string;
+  children?: ReactNode;
+}): ReactElement | null;
+```
+
+<ParamField body="content" type="string" required="True">
+  Text describing the visible UI. Whitespace-only content creates no node;
+  nested nodes attach to the nearest non-empty ancestor.
+</ParamField>
+
+<ParamField body="children" type="ReactNode" default="undefined">
+  Optional UI and nested `ModelContext` components. A self-closing component
+  registers a leaf and renders `null`.
+</ParamField>
+
+The component registers its node after mount, updates it when `content` changes, and removes it on unmount. Siblings retain their React registration order.
+
+## Describe dynamic UI
+
+Use state-derived content so the context follows what is on screen:
+
+```tsx
+const [tab, setTab] = useState("overview");
+
+return (
+  <ModelContext content="Analytics dashboard">
+    <ModelContext content={`Active tab: ${tab}`} />
+    <TabPanel tab={tab} onTabChange={setTab} />
+  </ModelContext>
+);
+```
+
+Multiple root components are allowed. They serialize as root-level sibling bullets.
+
+## Imperative API
+
+Use `modelContext` for events and non-React code. Imperative entries join the same tree as root nodes.
+
+```ts
+import { modelContext } from "mcp-use/react";
+
+modelContext.set("selected-item", "Selected product: Wireless Headphones");
+modelContext.remove("selected-item");
+modelContext.clear();
+```
+
+### `modelContext.set(key, content)`
+
+Creates or replaces a root entry under a stable key. It returns `void`.
+
+### `modelContext.remove(key)`
+
+Removes the named imperative entry. Missing keys are ignored.
+
+### `modelContext.clear()`
+
+Clears every component and imperative context node from the runtime store.
+
+Imperative entries are not tied to React lifecycle. Remove them explicitly when they become stale.
+
+## Merged host payload
+
+The runtime stores the serialized tree under the reserved `_uiContext` key. This key is model-visible but hidden from the state returned by `useViewState`.
+
+For example, view state and context may produce:
+
+```json
+{
+  "count": 1,
+  "_uiContext": "- Dashboard\n  - Revenue chart is visible"
+}
+```
+
+On MCP Apps hosts, the complete object is sent as `structuredContent`, and its JSON representation is sent as a text `content` block. On ChatGPT, it is written to `window.openai.widgetState.modelContent` with `setWidgetState`.
+
+When the tree is empty, `_uiContext` remains present as an empty string. Context and state changes are batched, deduplicated, and coalesced while a host write is in flight.
+
+## Choose state or context
+
+| Need                                                                      | API                                                            |
+| ------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| A cart, selection, draft, filter, or other structured model-visible value | [`useViewState`](/typescript/api-reference/react/useviewstate) |
+| A natural-language description of what is visible                         | `ModelContext` or `modelContext`                               |
+| Ephemeral UI state the model does not need                                | React `useState`                                               |
+
+## Related
+
+- [`useViewState`](/typescript/api-reference/react/useviewstate)
+- [`useToolContext`](/typescript/api-reference/react/usewidget)

@@ -33,6 +33,7 @@ permissions:
 #    ├─ typescript/mcp-use: Unit tests + agent integration tests (requires API keys)
 #    ├─ typescript/inspector: Unit tests for inspector package
 #    ├─ typescript/cli: Unit tests for CLI package
+#    ├─ typescript/tunnel: Protocol and local relay integration tests
 #    └─ typescript-changeset-check: PR validation (PRs only)
 #
 # 4. create-mcp-use-app Tests (runs if packages/create-mcp-use-app/** changed)
@@ -89,6 +90,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
+          fetch-depth: 0
       - uses: dorny/paths-filter@v3
         id: filter
         if: github.event_name != 'workflow_call'
@@ -136,7 +138,11 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install ruff
+          # Pinned so a new ruff release cannot change what this job checks.
+          # 0.16.0 began formatting fenced code blocks inside Markdown, which
+          # turned every libraries/python PR red on README examples that were
+          # never covered before. Bump deliberately, alongside any reformat.
+          pip install ruff==0.15.22
       - name: Lint with ruff
         run: |
           ruff check .
@@ -258,7 +264,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Download all test results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: transport-test-results-*
           path: test-results
@@ -269,11 +275,11 @@ jobs:
           script: |
             const fs = require('fs');
             const path = require('path');
-            
+
             const transports = ['stdio', 'sse', 'streamable_http'];
             let tableRows = [];
             let allPassed = true;
-            
+
             for (const transport of transports) {
               const xmlPath = path.join('test-results', `transport-test-results-${transport}`, `test-results-${transport}.xml`);
               let status = '⏭️ Skipped';
@@ -315,30 +321,30 @@ jobs:
               
               tableRows.push(`| ${transport} | ${status} | ${tests} | ${passed} | ${failed} | ${errors} | ${time} |`);
             }
-            
+
             const overallStatus = allPassed ? '✅ All transport tests passed!' : '❌ Some transport tests failed';
-            
+
             const comment = `## Python Transport Tests Results
-            
+
             ${overallStatus}
-            
+
             | Transport | Status | Tests | Passed | Failed | Errors | Time |
             |-----------|--------|-------|--------|--------|--------|------|
             ${tableRows.join('\n')}
             `;
-            
+
             // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-            
+
             const botComment = comments.find(c => 
               c.user.type === 'Bot' && 
               c.body.includes('## Python Transport Tests Results')
             );
-            
+
             if (botComment) {
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
@@ -423,7 +429,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Download all test results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: primitive-test-results-*
           path: test-results
@@ -434,11 +440,11 @@ jobs:
           script: |
             const fs = require('fs');
             const path = require('path');
-            
+
             const primitives = ['sampling', 'tools', 'resources', 'prompts', 'elicitation', 'notifications', 'auth', 'roots'];
             let tableRows = [];
             let allPassed = true;
-            
+
             for (const primitive of primitives) {
               const xmlPath = path.join('test-results', `primitive-test-results-${primitive}`, `test-results-${primitive}.xml`);
               let status = '⏭️ Skipped';
@@ -480,30 +486,30 @@ jobs:
               
               tableRows.push(`| ${primitive} | ${status} | ${tests} | ${passed} | ${failed} | ${errors} | ${time} |`);
             }
-            
+
             const overallStatus = allPassed ? '✅ All primitive tests passed!' : '❌ Some primitive tests failed';
-            
+
             const comment = `## Python Primitive Tests Results
-            
+
             ${overallStatus}
-            
+
             | Primitive | Status | Tests | Passed | Failed | Errors | Time |
             |-----------|--------|-------|--------|--------|--------|------|
             ${tableRows.join('\n')}
             `;
-            
+
             // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-            
+
             const botComment = comments.find(c => 
               c.user.type === 'Bot' && 
               c.body.includes('## Python Primitive Tests Results')
             );
-            
+
             if (botComment) {
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
@@ -587,7 +593,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [20, 22]
+        node-version: [22.23.1]
     name: typescript-lint (node-${{ matrix.node-version }})
     defaults:
       run:
@@ -599,9 +605,9 @@ jobs:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v4
         with:
-          version: 10.6.1
+          version: 11.13.1
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -612,6 +618,12 @@ jobs:
 
       - name: Install Dependencies
         run: pnpm install --no-frozen-lockfile
+
+      - name: Build Client Types
+        run: pnpm build:client
+
+      - name: Build Tunnel Types
+        run: pnpm build:tunnel
 
       - name: Check Formatting
         run: pnpm format:check
@@ -624,7 +636,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [20, 22]
+        node-version: [22.23.1]
     name: typescript-build (node-${{ matrix.node-version }})
     defaults:
       run:
@@ -636,9 +648,9 @@ jobs:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v4
         with:
-          version: 10.6.1
+          version: 11.13.1
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -661,7 +673,7 @@ jobs:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     strategy:
       matrix:
-        node-version: [20, 22]
+        node-version: [22.23.1]
     defaults:
       run:
         working-directory: libraries/typescript
@@ -669,9 +681,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
-      - uses: pnpm/action-setup@v3
+      - uses: pnpm/action-setup@v4
         with:
-          version: 10.6.1
+          version: 11.13.1
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
@@ -681,19 +693,24 @@ jobs:
         run: pnpm install --no-frozen-lockfile
       - name: Build Packages
         run: pnpm build
+      - name: Run client Unit Tests
+        env:
+          MCP_USE_ANONYMIZED_TELEMETRY: false
+        run: pnpm --filter @mcp-use/client test:run
       - name: Run mcp-use Unit Tests
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
         run: pnpm --filter mcp-use --if-present test:unit
-      - name: Run mcp-use Agent Integration Tests
+      - name: Run @mcp-use/agent Unit Tests
+        env:
+          MCP_USE_ANONYMIZED_TELEMETRY: false
+        run: pnpm --filter @mcp-use/agent test:unit
+      - name: Run @mcp-use/agent native OpenAI e2e
         if: env.OPENAI_API_KEY != ''
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
-          LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
-          MCP_USE_LANGFUSE: true
           MCP_USE_ANONYMIZED_TELEMETRY: false
-        run: pnpm --filter mcp-use --if-present test:integration:agent
+        run: pnpm --filter @mcp-use/agent test:integration:native-openai
 
   typescript-knip:
     needs: typescript-lint
@@ -706,20 +723,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
-      - uses: pnpm/action-setup@v3
+      - uses: pnpm/action-setup@v4
         with:
-          version: 10.6.1
+          version: 11.13.1
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22.23.1
           cache: "pnpm"
           cache-dependency-path: libraries/typescript/pnpm-lock.yaml
       - name: Install Dependencies
         run: pnpm install --no-frozen-lockfile
-      - name: Generate version file
-        # src/version.ts is gitignored and produced at build time; knip needs it
-        # to resolve the `./version.js` imports in packages/mcp-use.
-        run: pnpm --filter mcp-use generate:version
       - name: Run Knip
         run: |
           set -o pipefail
@@ -740,7 +753,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [20, 22]
+        node-version: [22.23.1]
     defaults:
       run:
         working-directory: libraries/typescript
@@ -748,9 +761,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
-      - uses: pnpm/action-setup@v3
+      - uses: pnpm/action-setup@v4
         with:
-          version: 10.6.1
+          version: 11.13.1
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
@@ -772,7 +785,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
-        node-version: [20, 22]
+        node-version: [22.23.1]
     defaults:
       run:
         working-directory: libraries/typescript
@@ -780,9 +793,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
-      - uses: pnpm/action-setup@v3
+      - uses: pnpm/action-setup@v4
         with:
-          version: 10.6.1
+          version: 11.13.1
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
@@ -794,11 +807,38 @@ jobs:
         run: pnpm build
       - name: Verify CLI build artifact
         shell: bash
-        run: test -f packages/cli/dist/index.cjs || { echo "::warning::dist/index.cjs missing after pnpm build, rebuilding CLI explicitly"; pnpm --filter @mcp-use/cli build; }
+        run: test -f packages/cli/dist/bin.js || { echo "::warning::dist/bin.js missing after pnpm build, rebuilding CLI explicitly"; pnpm --filter @mcp-use/cli build; }
       - name: Run CLI Tests
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
-        run: pnpm --filter @mcp-use/cli --if-present test
+        run: pnpm --filter @mcp-use/cli --if-present test:run
+
+  typescript-test-tunnel:
+    needs: typescript-lint
+    name: "typescript/tunnel (node-${{ matrix.node-version }})"
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [22.23.1]
+    defaults:
+      run:
+        working-directory: libraries/typescript
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.13.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: pnpm
+          cache-dependency-path: libraries/typescript/pnpm-lock.yaml
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build Tunnel
+        run: pnpm build:tunnel
+      - name: Run Tunnel Tests
+        run: pnpm --filter @mcp-use/tunnel test:run
 
   typescript-changeset-check:
     needs: detect-changes
@@ -815,25 +855,41 @@ jobs:
           fetch-depth: 0
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v4
         with:
-          version: 10.6.1
+          version: 11.13.1
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22.23.1
           cache: "pnpm"
           cache-dependency-path: libraries/typescript/pnpm-lock.yaml
 
       - name: Install Dependencies
         run: pnpm install --no-frozen-lockfile
 
+      - name: Prevent canary-to-main version regression
+        if: github.event_name == 'pull_request' && github.base_ref == 'main' && github.head_ref == 'canary'
+        run: pnpm release-channel preflight --channel stable
+
       - name: Check for Changesets
+        env:
+          BASE_REF: ${{ github.base_ref || 'main' }}
+          HEAD_REF: ${{ github.head_ref }}
         run: |
-          if [ -n "$(ls -A .changeset/*.md 2>/dev/null | grep -v README.md)" ]; then
+          if [ "$BASE_REF" = "main" ] && [ "$HEAD_REF" = "canary" ]; then
+            pending_changesets="$(node scripts/release-channel.mjs pending)"
+            if [ -n "$pending_changesets" ]; then
+              echo "✅ Pending changeset found"
+              printf '%s\n' "$pending_changesets"
+              pnpm changeset status --since="origin/${BASE_REF}"
+            else
+              echo "✅ No pending changesets; prerelease changesets are already applied"
+            fi
+          elif [ -n "$(ls -A .changeset/*.md 2>/dev/null | grep -v README.md)" ]; then
             echo "✅ Changeset found"
-            pnpm changeset status --since=origin/main
+            pnpm changeset status --since="origin/${BASE_REF}"
           else
             echo "⚠️ No changeset found. If this PR includes changes that should be published, please add a changeset:"
             echo "  pnpm changeset"
@@ -851,12 +907,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
-      - uses: pnpm/action-setup@v3
+      - uses: pnpm/action-setup@v4
         with:
-          version: 10.6.1
+          version: 11.13.1
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22.23.1
           cache: "pnpm"
           cache-dependency-path: libraries/typescript/pnpm-lock.yaml
       - name: Install Dependencies
@@ -875,7 +931,7 @@ jobs:
         working-directory: libraries/typescript/packages/inspector
         run: npm pack
       - name: Pack mcp-use
-        working-directory: libraries/typescript/packages/mcp-use
+        working-directory: libraries/typescript/packages/server
         run: npm pack
       - name: Upload All Package Artifacts
         uses: actions/upload-artifact@v4
@@ -883,7 +939,7 @@ jobs:
           name: workspace-packages
           path: |
             libraries/typescript/packages/create-mcp-use-app/create-mcp-use-app-*.tgz
-            libraries/typescript/packages/mcp-use/mcp-use-*.tgz
+            libraries/typescript/packages/server/mcp-use-*.tgz
             libraries/typescript/packages/cli/mcp-use-cli-*.tgz
             libraries/typescript/packages/inspector/mcp-use-inspector-*.tgz
           retention-days: 1
@@ -913,18 +969,18 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
-      - uses: pnpm/action-setup@v3
+      - uses: pnpm/action-setup@v4
         if: matrix.pm == 'pnpm'
         with:
-          version: 10.6.1
+          version: 11.13.1
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22.23.1
       - name: Setup Yarn
         if: matrix.pm == 'yarn'
         run: corepack enable
       - name: Download Package Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: workspace-packages
           path: ./packages
@@ -956,7 +1012,7 @@ jobs:
           [ -f "test-app/package.json" ] || exit 1
           [ -f "test-app/index.ts" ] || exit 1
           echo "✅ Project created successfully"
-      
+
       - name: Test dev command (non --dev flag only)
         if: matrix.flag == ''
         shell: bash
@@ -974,12 +1030,12 @@ jobs:
               pnpm dev &
               ;;
           esac
-          
+
           DEV_PID=$!
-          
+
           # Wait for server to start (10 seconds should be enough)
           sleep 10
-          
+
           # Kill the dev server
           if [ "${{ runner.os }}" == "Windows" ]; then
             # On Windows, kill by port is more reliable than DEV_PID
@@ -993,8 +1049,8 @@ jobs:
           else
             kill $DEV_PID 2>/dev/null || true
           fi
-          
+
           # Wait for process to exit
           wait $DEV_PID 2>/dev/null || true
-          
+
           echo "✅ Dev server started and stopped successfully"

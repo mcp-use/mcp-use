@@ -1,26 +1,12 @@
-/**
- * HostedUserMenu — session-aware avatar for inspector.manufact.com
- *
- * Fetches the current user from `<chatApiUrl origin>/api/auth/get-session`
- * using the shared session cookie (works across *.manufact.com when the
- * backend runs with COOKIE_DOMAIN=.manufact.com).
- *
- * ── Integration points ───────────────────────────────────────────────────
- *  • Mounted by `LayoutHeader` when `embeddedConfig.chatApiUrl` is set.
- *  • `onUserResolved` callback lets LayoutHeader know whether the user is
- *    logged in so it can update the Deploy button href accordingly.
- *  • `fallback` prop: rendered at narrow widths when unauthenticated (logo).
- *  • Listens to the custom `manufact:session-changed` window event so that
- *    after a successful login in `LoginModal` the avatar appears immediately
- *    (LoginModal dispatches this event via `handleSuccess`).
- *
- * ── No extra infrastructure ──────────────────────────────────────────────
- *  Session check is a simple GET — no WebSockets or polling. The only
- *  re-check triggers are: initial mount and `manufact:session-changed`.
- */
-import { useCallback, useEffect, useState } from "react";
+/** OAuth-backed Manufact sign-in button and user menu. */
+import { useEffect, useRef } from "react";
 import type React from "react";
-import { LayoutDashboard } from "lucide-react";
+import { LayoutDashboard, LogOut } from "lucide-react";
+import { toast } from "sonner";
+import {
+  useHostedSession,
+  type HostedUser,
+} from "@/client/hooks/useHostedSession";
 import { Button } from "@/client/components/ui/button";
 import {
   DropdownMenu,
@@ -35,13 +21,7 @@ import {
   AvatarFallback,
   AvatarImage,
 } from "@/client/components/ui/avatar";
-
-interface HostedUser {
-  id: string;
-  name?: string | null;
-  email?: string | null;
-  image?: string | null;
-}
+import { cn } from "@/client/lib/utils";
 
 function getInitial(
   name: string | null | undefined,
@@ -61,6 +41,8 @@ interface HostedUserMenuProps {
   fallback?: React.ReactNode;
   /** Called once the session check resolves with the authenticated user or null. */
   onUserResolved?: (user: HostedUser | null) => void;
+  /** Tighter sign-in button for mobile headers. */
+  compact?: boolean;
 }
 
 /**
@@ -74,72 +56,70 @@ export function HostedUserMenu({
   dashboardUrl = "https://manufact.com/cloud",
   fallback = null,
   onUserResolved,
+  compact = false,
 }: HostedUserMenuProps) {
-  const [user, setUser] = useState<HostedUser | null>(null);
-  const [loaded, setLoaded] = useState(false);
+  const { user, loaded, authorizing, authorize, logout, mode } =
+    useHostedSession(chatApiUrl);
 
-  const fetchSession = useCallback(() => {
-    let cancelled = false;
-    const sessionUrl = `${new URL(chatApiUrl).origin}/api/auth/get-session`;
-
-    fetch(sessionUrl, { credentials: "include" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (!cancelled) {
-          const resolved = data?.user ?? null;
-          setUser(resolved);
-          setLoaded(true);
-          onUserResolved?.(resolved);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setLoaded(true);
-          onUserResolved?.(null);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [chatApiUrl]);
-
+  // Notify the parent (LayoutHeader) whenever the resolved session changes.
+  const lastReportedId = useRef<string | null | undefined>(undefined);
   useEffect(() => {
-    const cleanup = fetchSession();
-    return cleanup;
-  }, [fetchSession]);
-
-  useEffect(() => {
-    const handler = () => {
-      fetchSession();
-    };
-    window.addEventListener("manufact:session-changed", handler);
-    return () =>
-      window.removeEventListener("manufact:session-changed", handler);
-  }, [fetchSession]);
+    if (!loaded) return;
+    const id = user?.id ?? null;
+    if (lastReportedId.current === id) return;
+    lastReportedId.current = id;
+    onUserResolved?.(user);
+  }, [loaded, user, onUserResolved]);
 
   // While the session check is still in-flight render nothing to avoid a flash.
   if (!loaded) return null;
 
-  if (!user) return <>{fallback}</>;
+  if (!user) {
+    return (
+      <>
+        {fallback}
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn(
+            "shrink-0 rounded-full text-[13px]",
+            compact ? "px-2.5 text-xs" : "px-4"
+          )}
+          disabled={authorizing}
+          onClick={() => {
+            void authorize().catch((error) =>
+              toast.error(
+                error instanceof Error ? error.message : "Authorization failed"
+              )
+            );
+          }}
+        >
+          {authorizing ? "Authorizing…" : "Sign in"}
+        </Button>
+      </>
+    );
+  }
 
   const initial = getInitial(user.name, user.email);
   const displayName = user.name ?? user.email ?? "User";
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          className="relative h-8 w-8 shrink-0 rounded-full p-0 mr-2"
-          aria-label="User menu"
-        >
-          <Avatar className="h-8 w-8 border border-zinc-300 dark:border-zinc-600">
-            <AvatarImage src={user.image ?? ""} alt={displayName} />
-            <AvatarFallback className="text-sm">{initial}</AvatarFallback>
-          </Avatar>
-        </Button>
-      </DropdownMenuTrigger>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            variant="ghost"
+            className="relative h-8 w-8 shrink-0 rounded-full p-0 mr-2"
+            aria-label="User menu"
+          >
+            <Avatar className="h-8 w-8 border border-zinc-300 dark:border-zinc-600">
+              <AvatarImage src={user.image ?? ""} alt={displayName} />
+              <AvatarFallback className="text-sm">{initial}</AvatarFallback>
+            </Avatar>
+          </Button>
+        }
+        nativeButton
+      />
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
@@ -154,11 +134,22 @@ export function HostedUserMenu({
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <a href={dashboardUrl} target="_blank" rel="noopener noreferrer">
-            <LayoutDashboard className="mr-2 h-4 w-4" />
-            Go to dashboard
-          </a>
+        <DropdownMenuItem
+          render={
+            <a href={dashboardUrl} target="_blank" rel="noopener noreferrer">
+              <LayoutDashboard className="mr-2 h-4 w-4" />
+              Go to dashboard
+            </a>
+          }
+        />
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={() => {
+            void logout().catch(() => toast.error("Sign out failed"));
+          }}
+        >
+          <LogOut className="mr-2 h-4 w-4" />
+          {mode === "session" ? "Sign out of Manufact" : "Disconnect Inspector"}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

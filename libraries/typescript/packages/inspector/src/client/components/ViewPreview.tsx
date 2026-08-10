@@ -19,13 +19,14 @@
  * signals readiness + fonts have loaded + two animation frames have elapsed.
  */
 
-import { useMcpClient } from "mcp-use/react";
+import { ViewRenderer, useMcpClient } from "@mcp-use/client/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
-import { MCPAppsRenderer } from "./MCPAppsRenderer";
+import { useViewHostProps } from "@/client/hooks/useViewHostProps";
+import { getBasePath } from "@/client/utils/basePath";
+import { Spinner } from "@/client/components/ui/spinner";
 
 const PREVIEW_SERVER_ID = "preview-default";
-const PREVIEW_BUNDLE_SERVER_ID = "preview-bundle";
 
 interface PreviewProps {
   toolInput?: Record<string, unknown>;
@@ -94,6 +95,28 @@ function usePreviewViewport(): void {
       body.style.overflow = prevBodyOverflow;
     };
   }, []);
+}
+
+/** Expose non-secret preview failures to CDP callers. */
+function usePreviewErrorSignal(
+  bundleRequired: boolean,
+  bundlePresent: boolean
+): void {
+  useEffect(() => {
+    const markRuntimeError = () => {
+      document.body.dataset.viewError = "runtime_error";
+    };
+    if (bundleRequired && !bundlePresent) {
+      document.body.dataset.viewError = "invalid_payload";
+    }
+    window.addEventListener("error", markRuntimeError);
+    window.addEventListener("unhandledrejection", markRuntimeError);
+    return () => {
+      window.removeEventListener("error", markRuntimeError);
+      window.removeEventListener("unhandledrejection", markRuntimeError);
+      delete document.body.dataset.viewError;
+    };
+  }, [bundleRequired, bundlePresent]);
 }
 
 /**
@@ -214,10 +237,12 @@ function ViewPreviewBundle({
   view,
   bundle,
   widthOverride,
+  theme,
 }: {
   view: string;
   bundle: PreviewBundle;
   widthOverride?: number;
+  theme: "light" | "dark";
 }) {
   const [rendererReady, setRendererReady] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -238,19 +263,33 @@ function ViewPreviewBundle({
 
   return (
     <div ref={containerRef} style={{ width: "100vw", height: "100vh" }}>
-      <MCPAppsRenderer
-        serverId={PREVIEW_BUNDLE_SERVER_ID}
-        toolCallId={toolCallId}
+      <ViewRenderer
+        viewId={toolCallId}
         toolName={view}
         toolInput={bundle.toolInput}
         toolOutput={bundle.toolOutput}
-        resourceUri={bundle.resourceUri}
-        readResource={readResource}
         displayMode="inline"
-        inlineWidthOverride={widthOverride}
-        noWrapper
+        inlineMaxWidth={widthOverride}
         chromeless
         onReady={() => setRendererReady(true)}
+        source={{
+          kind: "live",
+          connection: {
+            callTool: async () => {
+              throw new Error("Preview bundle mode has no server connection");
+            },
+            readResource,
+          },
+          resourceUri: bundle.resourceUri,
+        }}
+        cspMode="permissive"
+        hostInfo={{ name: "mcp-use-inspector", version: "11.0.0" }}
+        hostContext={{ theme }}
+        // A partial `window.openai` makes legacy `useWidget()` builds select
+        // the ChatGPT adapter before the MCP Apps handshake and render with
+        // empty props. Bundle previews are MCP Apps hosts, so do not advertise
+        // a second host protocol just to provide optional file helpers.
+        mockOpenAiFileApis={false}
       />
     </div>
   );
@@ -271,7 +310,8 @@ function ViewPreviewLive({ view }: { view: string }) {
   const serverUrl = useMemo(() => {
     const fromQuery = search.get("server");
     if (fromQuery) return fromQuery;
-    return `${window.location.origin}/mcp`;
+    // The MCP transport lives at `${basePath}` (default `/mcp`; root-mount `/`).
+    return `${window.location.origin}${getBasePath() || "/"}`;
   }, [search]);
 
   // Forwarded headers for live-mode interactive use. Not used by the
@@ -297,7 +337,8 @@ function ViewPreviewLive({ view }: { view: string }) {
     if (!storageLoaded) return;
     addServer(PREVIEW_SERVER_ID, {
       url: serverUrl,
-      name: "Preview",
+      displayName: "Preview",
+      protocolNegotiation: "auto",
       ...(previewHeaders ? { headers: previewHeaders } : {}),
     });
   }, [storageLoaded, serverUrl, previewHeaders, addServer]);
@@ -328,6 +369,19 @@ function ViewPreviewLive({ view }: { view: string }) {
   usePreviewReadinessSignal(rendererReady);
   usePreviewViewport();
 
+  const hostProps = useViewHostProps({
+    serverId: PREVIEW_SERVER_ID,
+    viewId: toolCallId,
+    resourceUri: resourceUri ?? "",
+    toolName: view,
+    toolInput: previewProps.toolInput,
+    toolOutput: previewProps.toolOutput,
+    readResource,
+    displayMode: "fullscreen",
+    chromeless: true,
+    onReady: () => setRendererReady(true),
+  });
+
   if (failed) {
     return (
       <div style={{ padding: 16, fontFamily: "monospace", color: "#b00" }}>
@@ -356,26 +410,24 @@ function ViewPreviewLive({ view }: { view: string }) {
           color: "var(--muted-foreground, #888)",
         }}
       >
-        Loading…
+        <Spinner className="size-5" />
       </div>
     );
   }
 
   return (
     <div style={{ width: "100vw", height: "100vh" }}>
-      <MCPAppsRenderer
-        serverId={PREVIEW_SERVER_ID}
-        toolCallId={toolCallId}
-        toolName={view}
-        toolInput={previewProps.toolInput}
-        toolOutput={previewProps.toolOutput}
-        resourceUri={resourceUri}
-        readResource={readResource}
-        displayMode="fullscreen"
-        noWrapper
-        chromeless
-        onReady={() => setRendererReady(true)}
-      />
+      {hostProps && resourceUri ? (
+        <ViewRenderer
+          viewId={toolCallId}
+          toolName={view}
+          toolInput={previewProps.toolInput}
+          toolOutput={previewProps.toolOutput}
+          displayMode="fullscreen"
+          chromeless
+          {...hostProps}
+        />
+      ) : null}
     </div>
   );
 }
@@ -388,6 +440,8 @@ export function ViewPreview() {
   // Bundle is read once at mount. The screenshot CLI sets it via CDP
   // before any document scripts run, so it's stable across renders.
   const bundle = useMemo(() => readPreviewBundle(), []);
+  const bundleRequired = search.get("protocol") === "1";
+  usePreviewErrorSignal(bundleRequired, bundle !== undefined);
 
   const widthOverride = useMemo(() => {
     const raw = search.get("width");
@@ -395,6 +449,7 @@ export function ViewPreview() {
     const n = parseInt(raw, 10);
     return Number.isFinite(n) && n > 0 ? n : undefined;
   }, [search]);
+  const theme = search.get("theme") === "dark" ? "dark" : "light";
 
   if (bundle) {
     return (
@@ -402,8 +457,10 @@ export function ViewPreview() {
         view={view}
         bundle={bundle}
         widthOverride={widthOverride}
+        theme={theme}
       />
     );
   }
+  if (bundleRequired) return null;
   return <ViewPreviewLive view={view} />;
 }

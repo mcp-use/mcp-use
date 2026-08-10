@@ -15,9 +15,11 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
-import type { PendingSamplingRequest } from "@/client/types/sampling";
-import type { CreateMessageResult } from "@modelcontextprotocol/sdk/types.js";
-import { CreateMessageResultSchema } from "@modelcontextprotocol/sdk/types.js";
+import type { PendingSamplingRequest } from "@/client/types/pending-requests";
+import type { CreateMessageResult } from "@mcp-use/client/react";
+// v2 no longer re-exports Zod `*Schema` constants; use the Standard Schema
+// validators keyed by spec type name instead.
+import { specTypeSchemas } from "@mcp-use/client/react";
 import {
   Check,
   Copy,
@@ -27,7 +29,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { createElement, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { LLMConfig } from "../chat/types";
 import { useSamplingLLM } from "./useSamplingLLM";
@@ -204,65 +206,66 @@ export function SamplingRequestDisplay({
   const handleApprove = () => {
     if (!request) return;
 
-    const validationResult = CreateMessageResultSchema.safeParse(messageResult);
-    if (!validationResult.success) {
+    const validationResult =
+      specTypeSchemas.CreateMessageResult["~standard"].validate(messageResult);
+    if (validationResult.issues) {
       toast.error("Invalid response", {
-        description: `Validation failed: ${validationResult.error.message}`,
+        description: `Validation failed: ${validationResult.issues
+          .map((issue) => issue.message)
+          .join(", ")}`,
       });
       return;
     }
 
-    onApprove(request.id, validationResult.data);
+    onApprove(request.id, validationResult.value as CreateMessageResult);
     onClose();
 
     // Show success toast with navigation back to tools tab
     // Use the same button styling as the approve/deny toast
-    import("react").then((React) => {
-      const toastId = toast(
-        React.createElement(
+    const toastId = toast(
+      createElement(
+        "div",
+        { className: "space-y-3" },
+        createElement(
           "div",
-          { className: "space-y-3" },
-          React.createElement(
-            "div",
-            null,
-            React.createElement("strong", null, "Sampling Response Sent"),
-            React.createElement(
-              "p",
-              { className: "text-sm text-muted-foreground mt-1" },
-              "The tool will continue executing."
-            )
-          ),
-          React.createElement(
-            "div",
-            { className: "flex gap-2" },
-            React.createElement(
-              "button",
-              {
-                "data-testid": "sampling-view-tool-result",
-                className:
-                  "px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90",
-                onClick: () => {
-                  // Dispatch event to navigate to tools tab
-                  const event = new globalThis.CustomEvent(
-                    "navigate-to-tool-result",
-                    {
-                      detail: { toolName: request.toolName },
-                    }
-                  );
-                  window.dispatchEvent(event);
-                  // Dismiss the toast immediately
-                  toast.dismiss(toastId);
-                },
-              },
-              "View Tool Result"
-            )
+          null,
+          createElement("strong", null, "Sampling Response Sent"),
+          createElement(
+            "p",
+            { className: "text-sm text-muted-foreground mt-1" },
+            "The tool will continue executing."
           )
         ),
-        {
-          duration: 5000, // Auto-dismiss after 5 seconds
-        }
-      );
-    });
+        createElement(
+          "div",
+          { className: "flex gap-2" },
+          createElement(
+            "button",
+            {
+              "data-testid": "sampling-view-tool-result",
+              className:
+                "px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90",
+              onClick: () => {
+                // Dispatch event to navigate to tools tab
+                const event = new globalThis.CustomEvent(
+                  "navigate-to-tool-result",
+                  {
+                    detail: { toolName: request.toolName },
+                  }
+                );
+                window.dispatchEvent(event);
+                // Dismiss the toast immediately
+                toast.dismiss(toastId);
+              },
+            },
+            "View Tool Result"
+          )
+        )
+      ),
+      {
+        duration: 5000, // Auto-dismiss after 5 seconds
+      }
+    );
   };
 
   const handleReject = () => {
@@ -295,46 +298,55 @@ export function SamplingRequestDisplay({
         </div>
         <div className="flex items-center gap-2">
           <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onCopy}
-                className="h-8 w-8 p-0"
-              >
-                {isCopied ? (
-                  <Check className="h-4 w-4 text-green-600" />
-                ) : (
-                  <Copy className="h-4 w-4" />
-                )}
-              </Button>
-            </TooltipTrigger>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onCopy}
+                  className="h-8 w-8 p-0"
+                >
+                  {isCopied ? (
+                    <Check className="h-4 w-4 text-green-600" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                </Button>
+              }
+              nativeButton
+            />
             <TooltipContent>Copy request</TooltipContent>
           </Tooltip>
           <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onDownload}
-                className="h-8 w-8 p-0"
-              >
-                <Download className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onDownload}
+                  className="h-8 w-8 p-0"
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+              }
+              nativeButton
+            />
             <TooltipContent>Download request</TooltipContent>
           </Tooltip>
           <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onFullscreen}
-                className="h-8 w-8 p-0"
-              >
-                <Maximize2 className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onFullscreen}
+                  className="h-8 w-8 p-0"
+                >
+                  <Maximize2 className="h-4 w-4" />
+                </Button>
+              }
+              nativeButton
+            />
             <TooltipContent>Fullscreen</TooltipContent>
           </Tooltip>
           <Button

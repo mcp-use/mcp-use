@@ -1,0 +1,16 @@
+{
+  "$schema": "https://react.doctor/schema/config.json",
+  // Scan the mcp-use React runtime and view examples only.
+  // Non-React server sources and generated workspaces are excluded.
+  "ignore": {
+    "files": [
+      "dist/**",
+      "node_modules/**",
+      "**/.mcp-use/**",
+      "examples/railway/**",
+      "examples/vercel/**",
+      "src/*.ts",
+      "src/views/**"
+    ]
+  }
+}

@@ -1,0 +1,127 @@
+---
+title: "ServerConfig"
+description: "Configure mcp-use v2 server identity, branding, HTTP routing, logging, and OAuth."
+icon: "settings"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/server/src/config.ts"
+---
+
+`ServerConfig` is the object you pass to `new MCPServer(...)`. `name` and `version` are required. The v2 server is stateless, uses Hono for HTTP routing, and exposes a Fetch-standard serving boundary; there are no session-store fields on this type.
+
+```ts
+import { MCPServer } from "mcp-use";
+
+const server = new MCPServer({
+  name: "catalog-server",
+  title: "Catalog Server",
+  version: "1.0.0",
+  description: "Search the product catalog.",
+  websiteUrl: "https://example.com/catalog",
+  icons: [
+    { src: "brand/icon.svg", mimeType: "image/svg+xml" },
+    {
+      src: "brand/icon-32.png",
+      mimeType: "image/png",
+      sizes: ["32x32"],
+    },
+  ],
+});
+```
+
+## Configuration fields
+
+> <ParamField body="name" type="string" required={true}>
+>   Machine-readable server name reported during MCP initialization.
+> </ParamField>
+
+<ParamField body="version" type="string" required={true}>Server version reported during MCP initialization.</ParamField>
+<ParamField body="title" type="string">Human-readable display name. Clients can fall back to `name` when omitted.</ParamField>
+<ParamField body="description" type="string">Human-readable description reported in MCP implementation metadata.</ParamField>
+<ParamField body="websiteUrl" type="string">Absolute HTTP(S) website or documentation URL reported in MCP implementation metadata. Relative, empty, and non-HTTP(S) values throw at construction.</ParamField>
+<ParamField body="icons" type="Icon[]">Official MCP implementation icons. A source can be a path relative to `public/`, an absolute HTTP(S) URL, or an `image/*` data URL. Local paths become request-scoped absolute URLs under `${basePath}/_mcp-use/public/`. An empty array is valid.</ParamField>
+<ParamField body="favicon" type="string">Explicit browser favicon source. It accepts the same source forms as `icons` and overrides favicon inference. The server exposes the selected image at the root-level `/favicon.ico` route.</ParamField>
+<ParamField body="instructions" type="string">Server-wide guidance surfaced to models by MCP clients.</ParamField>
+<ParamField body="basePath" type="string" default="/mcp">Exact MCP endpoint pathname. It must start with `/` and cannot contain whitespace, `//`, a query, a fragment, or a trailing slash except for `/` itself.</ParamField>
+<ParamField body="host" type="string" default="127.0.0.1">Hostname used by `listen()`. Set `"0.0.0.0"` for a public bind. `server.fetch` does not bind a socket.</ParamField>
+<ParamField body="allowedHosts" type="string[]">Additional Host-header allowlist entries. Values are additive to localhost names and enable Host validation for `server.fetch`.</ParamField>
+<ParamField body="allowedOrigins" type="string[]">Additional Origin-header allowlist entries. Values are additive to localhost origins. When omitted, Origin validation is off (SDK-aligned). GET and HEAD skip Origin validation when enabled.</ParamField>
+<ParamField body="legacy" type='"stateless" | "reject"' default="stateless">Serve 2025-era clients through the stateless compatibility path, or reject them for a modern-only server.</ParamField>
+<ParamField body="publicLandingPage" type="boolean" default="false">Expose the HTML landing page without bearer authentication when OAuth is configured. The page remains available for explicit HTML GET/HEAD navigation and MCP protocol requests stay protected.</ParamField>
+<ParamField body="cors" type="CorsOptions">Add CORS headers to every mcp-use-owned route. Omit it for no CORS headers; use this alongside `allowedOrigins` when serving browser clients.</ParamField>
+<ParamField body="logging" type="LoggingOptions">Configure request logging. Logging is enabled at `info` by default; use `{ enabled: false }`, `debug`, or `trace` as needed.</ParamField>
+<ParamField body="requestState" type="ServerOptions['requestState']">Configure integrity verification for `requestState` echoed across `input_required` rounds.</ParamField>
+<ParamField body="oauth" type="OAuthProvider<TUser>">OAuth resource-server provider. When you supply a non-`never` `TUser`, this field becomes required and authenticated callbacks receive `ctx.auth.user`.</ParamField>
+
+## Icon and favicon behavior
+
+When `favicon` is omitted, `icons` selects the browser favicon using the **first icon** in author order.
+
+An empty `icons` array selects no favicon. An explicit empty `favicon` is invalid.
+
+`GET /favicon.ico` and `HEAD /favicon.ico` stay at the domain root even when `basePath` is custom or `/`. Local files and data URLs are served directly. HTTP(S) favicon sources return a `307` redirect; mcp-use never fetches the remote image server-side. Missing local files return `404`.
+
+Local files belong under the project `public/` directory:
+
+```text
+public/
+└── brand/
+    ├── icon.svg
+    └── icon-32.png
+```
+
+`mcp-use build` copies `public/` into the production output even when the server has no views. Local paths cannot start with `/` or contain traversal segments, backslashes, queries, fragments, or empty path segments.
+
+## Type definition
+
+```ts
+import type { Icon, ServerOptions } from "@modelcontextprotocol/server";
+import type { CorsOptions, LoggingOptions } from "mcp-use";
+import type { OAuthProvider } from "mcp-use/oauth";
+
+interface BaseServerConfig {
+  name: string;
+  version: string;
+  title?: string;
+  description?: string;
+  websiteUrl?: string;
+  icons?: Icon[];
+  favicon?: string;
+  instructions?: string;
+  basePath?: string;
+  host?: string;
+  port?: number;
+  allowedHosts?: string[];
+  allowedOrigins?: string[];
+  legacy?: "stateless" | "reject";
+  publicLandingPage?: boolean;
+  cors?: CorsOptions;
+  logging?: LoggingOptions;
+  requestState?: ServerOptions["requestState"];
+}
+
+type ServerConfig<TUser = never> = BaseServerConfig &
+  ([TUser] extends [never]
+    ? { oauth?: undefined }
+    : { oauth: OAuthProvider<TUser> });
+```
+
+`host` and `port` are code-level listener fallbacks. `listen()` and `mcp-use start` use them only after an explicit flag/value and `HOST`/`PORT`; use `port: 0` to request an ephemeral port.
+
+`ServerConfig<TUser>` requires `oauth` when `TUser` is not `never` and rejects it when no authenticated user type is declared.
+
+## Use branding in browser pages
+
+`server.branding` exposes the immutable normalized `favicon`, `icons`, and `websiteUrl` values. Browser shells should link to `/favicon.ico` instead of duplicating selection logic.
+
+```ts
+if (server.branding.favicon) {
+  // Render this in the page head.
+  const faviconLink = '<link rel="icon" href="/favicon.ico">';
+}
+```
+
+The built-in landing page adds this link automatically and displays the selected favicon as its server icon. MCP clients receive `websiteUrl` and `icons` through standard server implementation metadata.
+
+## See also
+
+- [MCPServer](/typescript/api-reference/server/mcp-server) for server lifecycle and registration methods.
+- [Authentication](/typescript/server/authentication) for OAuth provider setup.

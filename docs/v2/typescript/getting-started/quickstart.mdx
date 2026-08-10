@@ -1,0 +1,252 @@
+---
+title: "Quickstart"
+description: "Scaffold, run, and test an MCP App with mcp-use."
+icon: "rocket"
+---
+
+<Visibility for="agents">
+  For the complete documentation index, see
+  [llms.txt](https://mcp-use.com/docs/llms.txt).
+</Visibility>
+
+Create an mcp-use app, run it locally, and render its View in the Inspector. The
+generated project includes a server, two tools, and a React View.
+
+<Note>
+  This quickstart uses the `mcp-apps` template. To build a tool-only server, use
+  `--template mcp-server`. For an MCP client or agent, start with the [MCP
+  Client](/v2/typescript/client/index) or [MCP
+  Agent](/v2/typescript/agent/index) documentation.
+</Note>
+
+## Prerequisites
+
+- Node.js 22.22.2 or later
+- npm, pnpm, or Bun
+
+## Scaffold an mcp-use app
+
+<CodeGroup>
+```bash npm
+npx create-mcp-use-app@latest my-mcp-app --template mcp-apps
+```
+
+```bash pnpm
+pnpm dlx create-mcp-use-app@latest my-mcp-app --template mcp-apps
+```
+
+```bash bun
+bunx create-mcp-use-app@latest my-mcp-app --template mcp-apps
+```
+
+</CodeGroup>
+
+The scaffolder can install dependencies and the `mcp-apps-builder` coding-agent
+skill. Accept the defaults when prompted.
+
+## Run the development server
+
+<CodeGroup>
+```bash npm
+cd my-mcp-app
+npm run dev
+```
+
+```bash pnpm
+cd my-mcp-app
+pnpm dev
+```
+
+```bash bun
+cd my-mcp-app
+bun run dev
+```
+
+</CodeGroup>
+
+`mcp-use dev` serves the MCP endpoint at `http://localhost:3000/mcp` and the
+Inspector at `http://localhost:3000/mcp/inspector`. The Inspector opens
+automatically in an interactive terminal.
+
+## Explore the generated project
+
+```text
+my-mcp-app/
+├── public/
+│   ├── icon.svg
+│   └── logo-mcp-use.svg
+├── views/
+│   └── my-view/
+│       ├── view.tsx
+│       ├── view.css
+│       ├── icons.tsx
+│       ├── MeshGradient.tsx
+│       └── Tooltip.tsx
+├── index.ts
+├── mcp-env.d.ts
+├── package.json
+└── tsconfig.json
+```
+
+- `index.ts` creates the server and registers the `show-app` and `say-hello`
+  tools.
+- `views/my-view/view.tsx` contains the React View rendered by `show-app`.
+- `mcp-env.d.ts` connects exported tool definitions to typed React hooks.
+- `public/` contains assets served by the framework.
+
+## Understand the View-bound tool
+
+The generated `show-app` tool imports from `mcp-use`, declares `inputSchema` and
+`outputSchema`, and binds the View with `view: { name: "my-view" }`.
+
+```typescript index.ts
+import { MCPServer } from "mcp-use";
+import { z } from "zod";
+
+const server = new MCPServer({
+  name: "my-mcp-app",
+  version: "1.0.0",
+});
+
+export const showApp = server.tool(
+  {
+    name: "show-app",
+    description: "Display the starter MCP App",
+    inputSchema: z.object({
+      appName: z.string().optional().describe("Title shown in the MCP App"),
+    }),
+    outputSchema: z.object({
+      message: z.string().describe("Message displayed by the View"),
+    }),
+    view: {
+      name: "my-view",
+      description: "Starter MCP App View",
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: false,
+    },
+  },
+  async ({ appName }) => {
+    const data = {
+      message: `The MCP App for ${appName ?? "my project"} is ready!`,
+    };
+
+    return {
+      content: [{ type: "text", text: data.message }],
+      structuredContent: data,
+    };
+  },
+);
+
+export default server;
+```
+
+Assign statically declared tools to exported constants. The generated
+`mcp-env.d.ts` uses those exports to type View hooks. Export the server as the
+default value so the CLI can run, build, and deploy it.
+
+## Read tool results in the View
+
+The View directory must match `view.name`. Use `useToolContext()` to read the
+invocation that rendered the View:
+
+```tsx views/my-view/view.tsx
+import { useToolContext } from "mcp-use/react";
+
+export default function MyView() {
+  const view = useToolContext<"show-app">();
+
+  if (view.status === "pending") {
+    return <p>Loading the app…</p>;
+  }
+
+  if (view.status === "error") {
+    return <p role="alert">{view.error.message}</p>;
+  }
+
+  return <h2>{view.toolOutput.message}</h2>;
+}
+```
+
+When the tool succeeds, `view.toolOutput` is the typed value returned in
+`structuredContent`. The host and model receive the text in `content`.
+
+## Check the project
+
+Run the generated type check after changing tools or Views:
+
+<CodeGroup>
+```bash npm
+npm run typecheck
+```
+
+```bash pnpm
+pnpm typecheck
+```
+
+```bash bun
+bun run typecheck
+```
+
+</CodeGroup>
+
+The command refreshes `mcp-env.d.ts` and runs TypeScript without emitting build
+files.
+
+You can also call the server from the terminal:
+
+```bash
+npx mcp-use client connect local http://localhost:3000/mcp
+npx mcp-use client local tools list
+```
+
+## Deploy the project
+
+Deploy the generated project to Manufact:
+
+<CodeGroup>
+```bash npm
+npm run deploy
+```
+
+```bash pnpm
+pnpm deploy
+```
+
+```bash bun
+bun run deploy
+```
+
+</CodeGroup>
+
+The first deployment signs you in and links the local project. See the
+[Manufact deployment guide](/v2/typescript/server/deployment/mcp-use) for
+environment variables, regions, and subsequent deployments.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Tools" icon="wrench" href="/v2/typescript/server/tools">
+    Define validated inputs, outputs, annotations, and View-bound results.
+  </Card>
+  <Card title="MCP Apps" icon="app-window-mac" href="/v2/typescript/mcp-apps">
+    Build production Views and integrate with MCP hosts.
+  </Card>
+  <Card title="Inspector" icon="bug-play" href="/inspector/index">
+    Test and debug your server interactively.
+  </Card>
+  <Card
+    title="Deployment"
+    icon="rocket"
+    href="/v2/typescript/server/deployment/mcp-use"
+  >
+    Publish the server and configure production environments.
+  </Card>
+</CardGroup>
+
+<Tip>
+  **Need help?** Join our [Discord](https://discord.gg/XkNkSkMz3V) or visit
+  [GitHub](https://github.com/mcp-use/mcp-use).
+</Tip>

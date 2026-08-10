@@ -1,96 +1,92 @@
 ---
 title: "Self-Hosting"
-description: "Deploy MCP Inspector to your own infrastructure"
-icon: "server"
+description: "Deploy your own MCP Inspector instance with Docker."
+icon: "container"
 ---
 
-<Card title="Live Preview" >
-You can preview the inspector at inspector.mcp-use.com
+Run the Inspector on your own infrastructure when you need full control over your debugging environment.
 
-[![See Live Inspector](/images/UseLiveSmall.svg)](https://inspector.mcp-use.com)
-</Card>
-# Self-Hosting MCP Inspector
+The official Docker image is published at [`mcpuse/inspector`](https://hub.docker.com/r/mcpuse/inspector) on Docker Hub.
 
-Deploy the MCP Inspector to your own infrastructure with a single Docker container. Perfect for enterprise environments, air-gapped networks, or when you need full control over your debugging environment.
-
-
-<Card title="Docker Image" icon="docker">
-The MCP Inspector provides an official Docker image via Docker Hub that can be used for deployments on any system that is running Docker. Here's a one-liner that will start a container running the Inspector.
+## Quick start
 
 ```bash
-docker run -d -p 8080:8080 --name mcp-inspector mcpuse/inspector:latest
+docker run -d -p 127.0.0.1:8080:8080 --name mcp-inspector mcpuse/inspector:latest
 ```
 
-[![Docker Hub](/images/dockerbutton.svg)](https://hub.docker.com/r/mcpuse/inspector)
-</Card>
+Then open `http://localhost:8080` to access your self-hosted Inspector.
 
-## Quick Deploy
+<Warning>
+Anyone who can reach the Inspector can use it to connect to and call your MCP servers. The examples bind to `127.0.0.1` so the Inspector is only reachable from the host itself. If you need remote access, put it behind a reverse proxy with authentication and TLS, or restrict access with firewall rules — don't publish port 8080 on all interfaces.
+</Warning>
 
-<Card title="Railway" icon="/images/railway.svg">
-Deploy instantly to Railway with automatic HTTPS and custom domains.
+## Deployment options
 
-[![Deploy on Railway](/images/railway-button.svg)](https://railway.com/deploy/nl4ZMa?referralCode=71PxSL&utm_medium=integration&utm_source=template&utm_campaign=generic)
-</Card>
-
-## CLI Usage
-
-You can also run the inspector using the CLI. See the [CLI Usage](/inspector/cli) guide for command-line options and examples.
-
-## Docker Deployment
-
-### Using Docker Run
-
-Deploy locally or on any Docker-compatible infrastructure:
-
-```bash
-docker run -d \
-  --name mcp-inspector \
-  -p 8080:8080 \
-  -e NODE_ENV=production \
-  mcpuse/inspector:latest
-```
-
-### Using Docker Compose
-
-For more complex deployments with environment variables:
-
-```yaml
-version: '3.8'
-services:
-  mcp-inspector:
-    image: mcpuse/inspector:latest
-    ports:
-      - "8080:8080"
-    environment:
-      - NODE_ENV=production
-      - PORT=8080
-      # Optional: Allow embedding from specific origins
-      - MCP_INSPECTOR_FRAME_ANCESTORS=https://app.example.com https://dev.example.com
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-```
-
-### Environment Variables
+<Tabs>
+  <Tab title="Docker Run">
+    ```bash
+    docker run -d \
+      --name mcp-inspector \
+      -p 127.0.0.1:8080:8080 \
+      mcpuse/inspector:latest
+    ```
+  </Tab>
+  <Tab title="Docker Compose">
+    ```yaml
+    services:
+      mcp-inspector:
+        image: mcpuse/inspector:latest
+        ports:
+          - "127.0.0.1:8080:8080"
+        restart: unless-stopped
+        healthcheck:
+          test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/inspector"]
+          interval: 30s
+          timeout: 10s
+          retries: 3
+    ```
+  </Tab>
+</Tabs>
 
 <Note>
-All configuration is optional. The inspector works out of the box with sensible defaults.
+The image is based on `node:20-alpine`, which ships `wget` (BusyBox) but not `curl` — use `wget` in healthchecks.
 </Note>
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `NODE_ENV` | `production` | Node.js environment |
-| `PORT` | `8080` | Port to run the inspector on |
-| `HOST` | `0.0.0.0` | Host to bind to |
-| `MCP_INSPECTOR_FRAME_ANCESTORS` | `'self'` in production, `*` in dev | Configure which origins can embed inspector widgets in iframes. Use space-separated origins (e.g., `"https://app.example.com https://dev.example.com"`) or `*` for all. |
+## Ports
 
-## Support
+The container always listens on port `8080` — the image's start command pins it with `--port 8080`, so a `PORT` environment variable has no effect. To serve on a different host port, remap it with Docker instead:
 
-For self-hosting support:
-- [GitHub Issues](https://github.com/mcp-use/mcp-use/issues)
-- [Discord Community](https://discord.gg/XkNkSkMz3V)
+```bash
+docker run -d -p 127.0.0.1:3001:8080 mcpuse/inspector:latest
+```
 
-Visit [inspector.mcp-use.com](https://inspector.mcp-use.com) to try the hosted version first!
+`NODE_ENV=production` is already set in the image; no environment variables are required.
+
+## Air-gapped installation
+
+For hosts without registry access, transfer the image as a tarball:
+
+```bash
+# On a connected host
+docker pull mcpuse/inspector:latest
+docker save mcpuse/inspector:latest -o mcp-inspector.tar
+
+# On the air-gapped host
+docker load -i mcp-inspector.tar
+```
+
+<Note>
+When connecting from a self-hosted Inspector to an MCP server on another host, the browser must be able to reach the server directly, or you can use the proxy connection mode. See [Connection settings](/inspector/connection-settings) for when to use each.
+</Note>
+
+## Alternatives
+
+Self-hosting is one of three ways to run the Inspector:
+
+| Option | Command | Best for |
+| --- | --- | --- |
+| Hosted | [inspector.mcp-use.com](https://inspector.mcp-use.com) | Quick testing, no install |
+| Local CLI | `npx @mcp-use/inspector` | Local development |
+| Self-hosted | `docker run mcpuse/inspector:latest` | Production, enterprise, air-gapped |
+
+Servers built with `mcp-use` also auto-mount the Inspector at `/inspector` — see the [Inspector overview](/inspector/index).

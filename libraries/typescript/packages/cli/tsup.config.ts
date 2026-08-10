@@ -1,22 +1,49 @@
-import { cp } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { defineConfig } from "tsup";
 
+const cliPackage = JSON.parse(
+  readFileSync(new URL("./package.json", import.meta.url), "utf8")
+) as { version: string };
+
 export default defineConfig({
-  entry: ["src/index.ts"],
-  format: ["cjs", "esm"],
+  entry: {
+    index: "src/index.ts",
+    bin: "src/bin.ts",
+    "internal/skills-loader": "src/skills/node-loader.ts",
+    "next-server-shims": "src/cli/next-server-shims.ts",
+    "commands/start": "src/commands/start.ts",
+    "commands/dev": "src/commands/dev.ts",
+    "commands/build": "src/commands/build.ts",
+    "commands/typecheck": "src/commands/typecheck.ts",
+    "commands/identity": "src/commands/identity.ts",
+    "commands/organizations": "src/commands/organizations.ts",
+    "commands/servers": "src/commands/servers.ts",
+    "commands/deployments": "src/commands/deployments.ts",
+    "commands/deploy": "src/commands/deploy.ts",
+    "commands/client": "src/commands/client.ts",
+    "commands/screenshot": "src/commands/screenshot.ts",
+  },
+  format: ["esm"],
+  target: "node22",
+  platform: "node",
+  splitting: true,
+  sourcemap: false,
+  minify: true,
   dts: false,
-  splitting: false,
-  sourcemap: true,
-  clean: true,
-  noExternal: ["chalk", "open"],
-  shims: true,
-  // Copy the Next.js runtime shim loader/register scripts into dist/shims/.
-  // These must stay as standalone .mjs files so Node can load them via
-  // `module.register()` / `--import=...`. See src/utils/next-shims.ts.
-  async onSuccess() {
-    await cp("src/shims", "dist/shims", {
-      recursive: true,
-      filter: (src) => !src.endsWith(".DS_Store"),
-    });
+  // The build pipeline is installed with the CLI, not with generated apps.
+  // Preserve its package-relative runtime lookups rather than rebundling it.
+  external: [
+    "@mcp-use/client",
+    "@mcp-use/inspector",
+    "@tailwindcss/vite",
+    "@vitejs/plugin-react",
+    "tailwindcss",
+    "vite",
+  ],
+  // Ship tunnel support inside the CLI artifact without adding a runtime
+  // dependency to either @mcp-use/cli or mcp-use.
+  noExternal: ["@mcp-use/tunnel"],
+  define: {
+    __MCP_USE_CLI_VERSION__: JSON.stringify(cliPackage.version),
   },
 });

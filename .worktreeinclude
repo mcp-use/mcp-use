@@ -1,0 +1,5 @@
+libraries/typescript/packages/server/examples/auth/auth0/.env
+libraries/typescript/packages/server/examples/auth/better-auth/.env
+libraries/typescript/packages/server/examples/auth/clerk/.env
+libraries/typescript/packages/server/examples/auth/supabase/.env
+libraries/typescript/packages/server/examples/auth/workos/.env

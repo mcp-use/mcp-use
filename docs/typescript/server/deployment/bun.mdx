@@ -1,0 +1,17 @@
+---
+title: Bun
+description: Deploy an mcp-use server with Bun.
+---
+
+Bun is a Node-compatible filesystem runtime. Build and deploy
+`.mcp-use/build` with the server, and expose `server.fetch` at the MCP route.
+The generated `_mcp-use` asset subtree must reach the same handler.
+
+```bash
+MCP_URL=https://api.example.com/mcp npm run build
+bun run bun-server.ts
+```
+
+Before release, call a tool and capture `ui://views/my-view.html` with
+`mcp-use screenshot`; a successful HTTP status alone does not validate
+the streamable MCP response or rendered View.

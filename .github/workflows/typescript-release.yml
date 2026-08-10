@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       force_publish:
-        description: 'Force publish packages'
+        description: "Force publish packages"
         required: false
         type: boolean
         default: false
@@ -33,14 +33,16 @@ jobs:
           fetch-depth: 0
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v4
         with:
-          version: 10.6.1
+          version: 11.13.1
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 23
+          # npm 12 (used for trusted publishing) requires Node 22.22+, 24.15+,
+          # or 26+. Pin the current LTS line rather than the unsupported Node 23.
+          node-version: 24
           cache: "pnpm"
           cache-dependency-path: libraries/typescript/pnpm-lock.yaml
           registry-url: "https://registry.npmjs.org"
@@ -50,11 +52,15 @@ jobs:
 
       - name: Install Dependencies
         working-directory: libraries/typescript
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Build Packages
         working-directory: libraries/typescript
         run: pnpm build
+
+      - name: Verify packed release installation
+        working-directory: libraries/typescript
+        run: pnpm verify:release-install
 
       # ============================================================================
       # CANARY BRANCH: Prerelease workflow
@@ -82,13 +88,28 @@ jobs:
         working-directory: libraries/typescript
         id: has-changesets
         run: |
-          if [ -n "$(find .changeset -name '*.md' -not -name 'README.md' -print -quit)" ]; then
+          PENDING="$(pnpm --silent release-channel pending)"
+          if [ -n "$PENDING" ]; then
             echo "has_changesets=true" >> $GITHUB_OUTPUT
-            echo "Found changesets to publish"
+            echo "Found pending changesets:"
+            echo "$PENDING"
           else
             echo "has_changesets=false" >> $GITHUB_OUTPUT
-            echo "No changesets found"
+            echo "No pending changesets found"
           fi
+
+      - name: Verify canary release baseline
+        if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
+        working-directory: libraries/typescript
+        run: pnpm release-channel preflight --channel canary
+
+      - name: Prepare and validate canary release plan
+        if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
+        working-directory: libraries/typescript
+        run: |
+          pnpm release-channel prepare --channel canary
+          pnpm changeset status --since origin/main --output "$RUNNER_TEMP/canary-changeset-status.json"
+          pnpm release-channel validate --channel canary --plan "$RUNNER_TEMP/canary-changeset-status.json"
 
       - name: Version packages (Canary)
         if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
@@ -102,13 +123,33 @@ jobs:
           git commit -m "chore(typescript): version packages (canary)" || echo "No changes to commit"
           git push
 
+      - name: Build versioned packages (Canary)
+        if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
+        working-directory: libraries/typescript
+        run: pnpm build
+
+      - name: Create canary release plan
+        if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
+        working-directory: libraries/typescript
+        run: pnpm release-channel snapshot --channel canary --output canary-release-plan.json
+
       - name: Publish packages (Canary)
         if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
+        id: publish-canary
+        continue-on-error: true
         working-directory: libraries/typescript
         run: |
           # Using npm trusted publishing (OIDC) - no token needed
           pnpm changeset publish
           echo "✅ Published canary packages to npm using trusted publishing"
+
+      - name: Verify canary packages and dist-tags
+        if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
+        working-directory: libraries/typescript
+        env:
+          VERIFY_ATTEMPTS: 12
+          VERIFY_DELAY_SECONDS: 10
+        run: pnpm release-channel verify --plan canary-release-plan.json
 
       - name: Tag + push tags (Canary)
         if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
@@ -116,26 +157,27 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          
+
           # Ensure we're on the latest commit (commits were pushed in previous step)
           git fetch --tags --force
           git pull origin canary
-          
+
           cd libraries/typescript
           pnpm changeset tag
+          pnpm release-channel tags --plan canary-release-plan.json --output ../../.release-tags
           cd ../..
 
-          NEW_TAGS=$(git tag --points-at HEAD)
-          if [ -z "$NEW_TAGS" ]; then
-            echo "ℹ️  No tags were created by changeset tag"
+          if [ ! -s .release-tags ]; then
+            echo "ℹ️  Release plan contains no new tags"
             exit 0
           fi
 
+          NEW_TAGS=$(cat .release-tags)
           echo "📦 Tags created: $NEW_TAGS"
-          echo "$NEW_TAGS" > .release-tags
-
-          # Push tags (commits were already pushed in the "Version packages" step)
-          git push --tags
+          while IFS= read -r tag; do
+            git show-ref --verify --quiet "refs/tags/$tag"
+            git push origin "refs/tags/$tag"
+          done < .release-tags
           echo "✅ Pushed tags"
 
       - name: Create GitHub Releases (Canary)
@@ -280,6 +322,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          cd libraries/typescript
+          pnpm release-channel preflight --channel stable
+          cd ../..
+
           # Create new branch (from repo root)
           BRANCH_NAME="release/exit-prerelease-$(date +%s)"
           git checkout -b "$BRANCH_NAME"
@@ -291,7 +337,11 @@ jobs:
 
           # Version packages
           echo "Versioning packages..."
-          pnpm changeset version
+          pnpm version:exit-prerelease
+
+          # changeset version updates workspace dependency metadata. Refresh the
+          # lockfile now so the release PR is reproducible and main remains clean.
+          pnpm install --no-frozen-lockfile
 
           # Go back to repo root for git operations
           cd ../..
@@ -346,13 +396,13 @@ jobs:
 
       - name: Publish packages (Main)
         if: github.ref == 'refs/heads/main' &&
-            steps.check-prerelease.outputs.in_prerelease == 'false' &&
-            steps.check-release.outputs.should_publish == 'true'
+          steps.check-prerelease.outputs.in_prerelease == 'false' &&
+          steps.check-release.outputs.should_publish == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        id: publish-main
+        continue-on-error: true
         run: |
-          set -e  # Exit immediately if any command fails
-
           # Configure git identity - changesets creates annotated tags (git tag -m),
           # which fail without user.name/user.email configured
           git config user.name "github-actions[bot]"
@@ -362,48 +412,52 @@ jobs:
           git fetch --tags --force
           git checkout main
           git pull origin main
-          
-          # Publish to npm using trusted publishing (OIDC) - no token needed
+
           cd libraries/typescript
+          pnpm release-channel preflight --channel stable
+          pnpm release-channel snapshot --channel stable --output stable-release-plan.json
           pnpm changeset publish
+          echo "✅ Stable publish command completed"
+
+      - name: Verify stable packages and dist-tags
+        if: github.ref == 'refs/heads/main' &&
+          steps.check-prerelease.outputs.in_prerelease == 'false' &&
+          steps.check-release.outputs.should_publish == 'true'
+        working-directory: libraries/typescript
+        env:
+          VERIFY_ATTEMPTS: 12
+          VERIFY_DELAY_SECONDS: 10
+        run: pnpm release-channel verify --plan stable-release-plan.json
+
+      - name: Tag and push verified stable packages
+        if: github.ref == 'refs/heads/main' &&
+          steps.check-prerelease.outputs.in_prerelease == 'false' &&
+          steps.check-release.outputs.should_publish == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch --tags --force
+          cd libraries/typescript
           pnpm changeset tag
-
-          # Capture new tags created by changeset before pushing
+          pnpm release-channel tags --plan stable-release-plan.json --output ../../.release-tags
           cd ../..
-          NEW_TAGS=$(git tag --points-at HEAD)
-          
-          if [ -z "$NEW_TAGS" ]; then
-            echo "❌ No tags were created by changeset tag - packages were published to npm but tagging failed"
-            exit 1
-          fi
-          
-          echo "📦 Tags created: $NEW_TAGS"
-
-          # Save tags to a file for the next step
-          echo "$NEW_TAGS" > .release-tags
-
-          # Push git tags - fail immediately if this doesn't work
-          # Note: Commits should already be pushed from the prerelease exit step
-          if ! git push --tags; then
-            echo "❌ Failed to push tags to remote (git push --tags)"
-            rm -f .release-tags  # Clean up tags file since push failed
-            exit 1
-          fi
-
-          echo "✅ Published packages to npm using trusted publishing and pushed tags"
+          while IFS= read -r tag; do
+            git show-ref --verify --quiet "refs/tags/$tag"
+            git push origin "refs/tags/$tag"
+          done < .release-tags
 
       - name: Create deployment marker (Main)
         if: github.ref == 'refs/heads/main' &&
-            steps.check-prerelease.outputs.in_prerelease == 'false' &&
-            steps.check-release.outputs.should_publish == 'true'
+          steps.check-prerelease.outputs.in_prerelease == 'false' &&
+          steps.check-release.outputs.should_publish == 'true'
         run: |
           echo "packages_published=true" > .railway-deploy-marker
           echo "branch=main" >> .railway-deploy-marker
 
       - name: Upload deployment marker (Main)
         if: github.ref == 'refs/heads/main' &&
-            steps.check-prerelease.outputs.in_prerelease == 'false' &&
-            steps.check-release.outputs.should_publish == 'true'
+          steps.check-prerelease.outputs.in_prerelease == 'false' &&
+          steps.check-release.outputs.should_publish == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: railway-deploy-marker

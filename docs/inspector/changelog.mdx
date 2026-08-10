@@ -6,6 +6,102 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v20.1.0" description="August 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=20.1.0&title=Skills%20over%20MCP%20%26%20Inspector%20runtime&date=2026-08&lang=inspector" alt="Release 20.1.0" />
+  </Frame>
+  ## Skills over MCP & Inspector runtime
+  Minor release paired with `mcp-use` v2.1.0 — typed Skills operations, an integrity-checked file explorer, and development/runtime fixes for the v2 Inspector.
+
+- **New**: typed Skills over MCP client operations, a capability-gated Inspector file explorer with integrity verification, and removable progressive skill context in Inspector chat
+- **Enhancement**: Skills discovery omits invalid skills from fresh development snapshots
+- **Enhancement**: the `window.openai` compatibility bridge exposes tool lifecycle globals and host actions while preserving the native MCP Apps handshake for v2 views; iframe console records are not parsed as MCP Apps JSON-RPC messages
+- **Fix**: provider assets load from the development server, widget-declared sandbox CSPs can use dynamic compilation within their declared domains, and embedded layouts fill their iframe height without the empty desktop header gap or standalone sidebar footer controls
+- **Fix**: avoid the Inspector tunnel flash while connection state transitions complete
+- **Update**: Updated mcp-use to v2.1.0
+</Update>
+
+<Update label="v20.0.4" description="August 2026">
+  ## Stable npm README links
+  Patch release fixing absolute links in the published Inspector documentation.
+
+- **Fix**: README images and repository links use stable absolute URLs so npm renders the published Inspector documentation correctly
+- **Update**: Updated mcp-use to v2.0.4
+</Update>
+
+<Update label="v20.0.3" description="August 2026">
+  ## Stable package README metadata
+  Patch release making the published Inspector README reliable on npm.
+
+- **Fix**: Publish a package-root README and verify that it stays synchronized with the repository README before packing
+- **Update**: Updated mcp-use to v2.0.3
+</Update>
+
+<Update label="v20.0.0" description="August 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=20.0.0&title=MCP%20SDK%20v2%20%26%20hosted%20Inspector&date=2026-08&lang=inspector" alt="Release 20.0.0" />
+  </Frame>
+  ## MCP SDK v2 & hosted Inspector
+  Major release paired with `mcp-use` v2.0.0 — the Inspector moves to the official MCP SDK v2 and a project-pinned, secure relay/runtime architecture.
+
+- **Update**: The Inspector and client move to the official MCP SDK v2 with automatic protocol negotiation, ESM-only packages, Node.js 22.22.2+, redesigned OAuth, and v1 API cleanup
+- **New**: Project-pinned Inspector development owns the MCP/OAuth relay and serves local assets without a remote application fallback; the standalone package adds the full proxy and OAuth BFF
+- **New**: Hosted and localhost chat, MCP Apps tool lifecycle delivery, fullscreen chat controls, and streamed tool-call input improve interactive Inspector sessions
+- **Fix**: OAuth session values are encrypted at rest, secret connection fields are not persisted, browser launches and Inspector routes are hardened, and proxy/OAuth APIs are rate-limited
+- **Enhancement**: Immutable CDN asset resolution and zero-dependency packaging prevent mixed-version assets and keep standalone installs clean
+- **Update**: Updated mcp-use to v2.0.0
+</Update>
+
+<Update label="v12.0.3" description="July 2026">
+  ## Tunneling docs link
+  Patch release fixing the tunnel popover documentation link.
+
+- **Documentation**: The tunnel popover now links to `https://mcp-use.com/docs/tunneling` instead of the removed Manufact URL
+- **Update**: Updated mcp-use to v1.34.3
+</Update>
+
+<Update label="v12.0.2" description="July 2026">
+  ## Backend-less CDN shell support
+  Patch release improving the Inspector bundle used by the SDK v2 backend-less shell.
+
+- **Fix**: CDN auto-connect reads `window.__MCP_USE_INSPECTOR__.autoConnectUrl`, and the version badge and MCP `clientInfo` fall back to the compile-time bundle version when runtime injection is absent
+- **Update**: Updated mcp-use to v1.34.2
+</Update>
+
+<Update label="v12.0.1" description="July 2026">
+  ## mcp-use v1.34.1
+  Patch release paired with `mcp-use` v1.34.1; there are no Inspector-specific source changes.
+
+- **Update**: Updated mcp-use to v1.34.1
+</Update>
+
+<Update label="v12.0.0" description="July 2026">
+  ## Hosted OAuth reliability (mcp-use v1.34.0)
+  Major release paired with `mcp-use` v1.34.0 — peer dependency bump; runtime OAuth fixes come from the updated `mcp-use` dependency (no inspector-specific source changes in this wave).
+
+- **Fix**: gateway-fronted and hosted OAuth servers no longer drop to `failed` with "Server does not support OAuth" when discovery succeeded on an earlier pass — inherits `oauthProxyUrl` wiring and `pending_auth` handling from mcp-use v1.34.0 (`#1840`)
+- **Update**: Peer dependency on `mcp-use` moves to `>=1.34.0-canary.0`
+- **Update**: Updated mcp-use to v1.34.0
+</Update>
+
+<Update label="v11.0.0" description="June 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=11.0.0&title=MCP%20Apps%20primary%20widget%20runtime&date=2026-06&lang=inspector" alt="Release 11.0.0" />
+  </Frame>
+  ## MCP Apps runtime, Auto connections & host context styles
+  Major release paired with `mcp-use` v1.33.0 — widgets now render with MCP Apps as the primary runtime, new connections default to Auto mode with proxy fallback, and host context style variables are applied while the Apps SDK preview tab remains for `window.openai`-only widgets.
+
+- **New**: widgets render with the MCP Apps bridge as the primary runtime and apply host context style variables; the Apps SDK ("Component (Apps SDK)") preview tab remains for widgets that only speak `window.openai` (`#1739`)
+- **Enhancement**: new connections default to Auto mode, trying a direct browser connection first and falling back to the configured Inspector proxy when CORS or other proxy-resolvable connection errors occur; Direct and Proxy remain available as advanced overrides (`#1795`)
+- **Fix**: OAuth proxy fetch is scoped per server configuration, so connecting one server Via Proxy no longer mutates global `fetch`, changes unrelated requests, or affects other servers configured for Direct mode (`#1770`)
+- **Fix**: stale saved auto-connect entries are replaced when the advertised transport changes, so embedded Inspector instances stop retrying deprecated SSE connections after switching to streamable HTTP (`#1792`)
+- **Fix**: signed-in users on the hosted free tier are no longer shown the "sign in to increase your limits" prompt — the free-tier upgrade chrome only renders for anonymous visitors (`#1767`)
+- **Fix**: the inspector CLI handles `--version` and unknown options and reads its version from `package.json`, so canary builds and CLI version output stay in sync (`#1722`)
+- **Update**: Bumped `vite` to 8.0.16 (`#1742`)
+- **Update**: Peer dependency on `mcp-use` moves to `>=1.33.0-canary.0`
+- **Update**: Updated mcp-use to v1.33.0
+</Update>
+
 <Update label="v10.0.1" description="June 2026">
   ## Hosted localhost chat & chat scroll helper
   Patch release paired with `mcp-use` v1.32.1 — hosted inspector chat falls back to browser-side streaming for loopback MCP servers and adds a scroll-to-bottom affordance in long chats.

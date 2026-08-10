@@ -1,0 +1,158 @@
+{
+  "name": "mcp-use",
+  "type": "module",
+  "version": "2.1.0",
+  "description": "MCP framework and CLI built on the official v2 SDK",
+  "author": "mcp-use, Inc.",
+  "license": "MIT",
+  "homepage": "https://github.com/mcp-use/mcp-use#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mcp-use/mcp-use.git",
+    "directory": "libraries/typescript/packages/server"
+  },
+  "bugs": {
+    "url": "https://github.com/mcp-use/mcp-use/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "server",
+    "typescript"
+  ],
+  "imports": {
+    "#mcp-use-node-http": {
+      "workerd": "./dist/internal/node-http-unavailable.js",
+      "browser": "./dist/internal/node-http-unavailable.js",
+      "node": "./dist/internal/node-http.js",
+      "default": "./dist/internal/node-http-unavailable.js"
+    },
+    "#mcp-use-skills-loader": {
+      "workerd": "./dist/internal/skills-loader-unavailable.js",
+      "browser": "./dist/internal/skills-loader-unavailable.js",
+      "node": "@mcp-use/cli/internal/skills-loader",
+      "default": "./dist/internal/skills-loader-unavailable.js"
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "workerd": "./dist/index.js",
+      "browser": "./dist/index.js",
+      "node": "./dist/index-node.js",
+      "import": "./dist/index.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.js"
+    },
+    "./vite-client": {
+      "types": "./dist/vite-client.d.ts"
+    },
+    "./landing": {
+      "types": "./dist/landing.d.ts",
+      "import": "./dist/landing.js"
+    },
+    "./oauth": {
+      "types": "./dist/oauth/index.d.ts",
+      "import": "./dist/oauth/index.js"
+    },
+    "./oauth/clerk": {
+      "types": "./dist/oauth/clerk.d.ts",
+      "import": "./dist/oauth/clerk.js"
+    },
+    "./oauth/auth0": {
+      "types": "./dist/oauth/auth0.d.ts",
+      "import": "./dist/oauth/auth0.js"
+    },
+    "./oauth/workos": {
+      "types": "./dist/oauth/workos.d.ts",
+      "import": "./dist/oauth/workos.js"
+    },
+    "./oauth/supabase": {
+      "types": "./dist/oauth/supabase.d.ts",
+      "import": "./dist/oauth/supabase.js"
+    },
+    "./oauth/keycloak": {
+      "types": "./dist/oauth/keycloak.d.ts",
+      "import": "./dist/oauth/keycloak.js"
+    },
+    "./oauth/better-auth": {
+      "types": "./dist/oauth/better-auth.d.ts",
+      "import": "./dist/oauth/better-auth.js"
+    },
+    "./node": {
+      "types": "./dist/node-bridge.d.ts",
+      "import": "./dist/node-bridge.js",
+      "default": "./dist/node-bridge.js"
+    },
+    "./next": {
+      "types": "./dist/next/index.d.ts",
+      "import": "./dist/next/index.js",
+      "default": "./dist/next/index.js"
+    }
+  },
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "mcp-use": "./dist/bin.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "scripts": {
+    "prepack": "node ../../scripts/package-readme.mjs verify",
+    "build": "rimraf dist && tsup && tsc --emitDeclarationOnly --declaration && rimraf dist/.tsbuildinfo",
+    "dev": "tsc --watch",
+    "test": "vitest",
+    "test:run": "npm run typecheck && vitest run",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "doctor": "npx react-doctor@latest"
+  },
+  "dependencies": {
+    "@mcp-use/cli": "workspace:*",
+    "@mcp-use/inspector": "workspace:*",
+    "@modelcontextprotocol/client": "2.0.0",
+    "@modelcontextprotocol/core": "2.0.0",
+    "@modelcontextprotocol/ext-apps": "npm:@mcp-use/ext-apps@1.7.4-pr720.1",
+    "@modelcontextprotocol/server": "2.0.0",
+    "hono": "^4.12.34",
+    "jose": "^6.1.3"
+  },
+  "peerDependencies": {
+    "@mcp-use/client": "^2.0.1 || ^2.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@mcp-use/client": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@mcp-use/client": "workspace:*",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^22.20.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "es-module-lexer": "^2.3.0",
+    "happy-dom": "^20.10.6",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9",
+    "zod": "^4.4.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

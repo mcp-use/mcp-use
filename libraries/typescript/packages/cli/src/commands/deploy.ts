@@ -1,1658 +1,1816 @@
-import chalk from "chalk";
-import { promises as fs } from "node:fs";
-import path from "node:path";
-import open from "open";
-import type {
-  EnvEnvironment,
-  GitHubConnectionStatus,
-  OrgInfo,
-} from "../utils/api.js";
+import { execFile } from "node:child_process";
+import { createReadStream } from "node:fs";
 import {
-  ApiUnauthorizedError,
-  GitHubAuthRequiredError,
-  McpUseAPI,
-} from "../utils/api.js";
-import {
-  getWebUrl,
-  isLoggedIn,
-  readConfig,
-  writeConfig,
-} from "../utils/config.js";
-import {
-  getGitInfo,
-  gitInit,
-  gitAddRemoteAndPush,
-  gitCommitAndPush,
-  GitCommandError,
-  hasUncommittedChanges,
-  isGitHubUrl,
-} from "../utils/git.js";
-import { getMcpServerUrl } from "../utils/cloud-urls.js";
-import { getProjectLink, saveProjectLink } from "../utils/project-link.js";
-import { packProjectTarball, sanitizeRepoName } from "../utils/tarball.js";
-import {
-  loginCommand,
-  promptOrgSelection,
-  resolveOrgFromOption,
-} from "./auth.js";
+  appendFile,
+  lstat,
+  opendir,
+  readFile,
+  writeFile,
+} from "node:fs/promises";
+import { basename, isAbsolute, join, relative, resolve } from "node:path";
+import { createInterface } from "node:readline/promises";
+import { parseArgs, promisify } from "node:util";
+import { createGzip } from "node:zlib";
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+import {
+  cloudApiForOrganization,
+  cloudWebUrl,
+  type CloudApi,
+} from "./cloud-api.js";
+import {
+  CommandError,
+  CommandUsageError,
+  confirm,
+  openBrowser,
+  pathExists,
+  printResult,
+  readJson,
+  reportError,
+  UsageError,
+  wantsJson,
+  writePrivateJson,
+} from "./shared.js";
 
-async function parseEnvFile(filePath: string): Promise<Record<string, string>> {
+const exec = promisify(execFile);
+const MAX_ARCHIVE_BYTES = 80 * 1024 * 1024;
+const EXCLUDED_DIRECTORIES = new Set([
+  ".git",
+  "node_modules",
+  "dist",
+  "build",
+  ".next",
+  ".turbo",
+  ".vercel",
+  ".cache",
+  ".parcel-cache",
+  ".pytest_cache",
+  ".ruff_cache",
+  ".mypy_cache",
+  "__pycache__",
+  ".venv",
+  "venv",
+  "coverage",
+  ".nyc_output",
+  ".output",
+  "out",
+  "target",
+  ".mcp-use",
+]);
+
+const HELP = `Deploy an MCP server to Manufact Cloud.
+
+Usage:
+  mcp-use deploy [path] [options]
+
+Source modes:
+  GitHub (default)   Deploy the current origin. If none exists, an interactive
+                     run can create a private repository; --yes authorizes the
+                     same flow without prompts.
+  Managed upload     Pass --no-github on the first deploy to upload local
+                     source. Linked managed projects auto-detect this on retry.
+
+Options:
+  --org <id-or-slug>       Target organization (default: active organization)
+  --name <name>            Cloud server/repository name (default: project name)
+  --branch <name>          Branch (default: current Git branch, or main)
+  --root-dir <path>        Project root inside the repository/upload directory
+  --region <region>        Cloud region identifier
+  --env <KEY=VALUE>        Environment variable; repeatable
+  --env-file <path>        Load environment variables from a file
+  --build-command <cmd>    Override the build command
+  --start-command <cmd>    Override the start command
+  --dockerfile <path>      Dockerfile path relative to the selected source root
+  --watch-paths <glob>     GitHub auto-deploy path filter; repeatable
+  --wait-for-ci            Wait for other GitHub checks before auto-deploy
+  --no-github              Upload local source to a managed private repository
+  --new                    Create a new server instead of using the local link
+  --open                   Open the server page after a successful deployment
+  -y, --yes                Authorize confirmations and Git/repository mutations
+  --json                   Emit exactly one JSON result or error; never prompt
+  -h, --help               Show this help without Git, auth, or network access
+
+Automation:
+  --json does not authorize mutations. Use --json --yes for headless GitHub
+  repository creation, or --json --no-github for a managed source upload.
+  --new requires --yes in JSON or non-interactive environments.
+
+Incompatible combinations:
+  --open cannot be combined with --json because JSON mode never opens a browser.
+  --no-github cannot replace a linked GitHub server in place; add --new --yes
+  to create a separate managed-source server.
+  --watch-paths and --wait-for-ci are GitHub-only.
+
+Managed archive:
+  Uploads the selected project without .git, dependencies, build output,
+  .mcp-use, .env*, caches, coverage, OS metadata, or symbolic links.
+  The compressed archive limit is 80 MB.
+
+Examples:
+  mcp-use deploy
+  mcp-use deploy --yes
+  mcp-use deploy --no-github
+  mcp-use deploy --no-github --json
+  mcp-use deploy --json --yes
+  mcp-use deploy --env-file .env.production --open
+
+Exit codes:
+  0  Success or help
+  1  Git, API, upload, or deployment failure
+  2  Invalid arguments or an explicit headless choice is required`;
+
+interface ProjectLink {
+  organizationId: string;
+  serverId: string;
+  serverSlug?: string | null;
+  repository?: string;
+  sourceType?: "github" | "managed";
+}
+
+interface Installation {
+  id?: string;
+  installationId: string;
+  account?: {
+    login?: string | null;
+    type?: string | null;
+  } | null;
+}
+
+interface GitProbe {
+  isRepository: boolean;
+  root?: string;
+  remote?: string;
+  branch?: string;
+  dirty?: boolean;
+  unavailable?: boolean;
+}
+
+interface DeployValues {
+  org?: string;
+  name?: string;
+  branch?: string;
+  "root-dir"?: string;
+  region?: string;
+  env?: string[];
+  "env-file"?: string;
+  "build-command"?: string;
+  "start-command"?: string;
+  dockerfile?: string;
+  "watch-paths"?: string[];
+  "wait-for-ci"?: boolean;
+  "no-github"?: boolean;
+  new?: boolean;
+  open?: boolean;
+  yes?: boolean;
+  json?: boolean;
+  help?: boolean;
+}
+
+interface CreatedServer {
+  server: { id: string; slug: string | null };
+  deploymentId: string | null;
+}
+
+/** Run `mcp-use deploy`. */
+export async function runDeploy(argv: readonly string[]): Promise<number> {
+  const json = wantsJson(argv);
   try {
-    const content = await fs.readFile(filePath, "utf-8");
-    const envVars: Record<string, string> = {};
-    const lines = content.split("\n");
-    let currentKey: string | null = null;
-    let currentValue = "";
+    const { values, positionals } = parseDeployArguments(argv);
+    if (values.help === true) {
+      process.stdout.write(`${HELP}\n`);
+      return 0;
+    }
+    if (values.json === true && values.open === true) {
+      throw new CommandUsageError(
+        "invalid_argument_combination",
+        "--open cannot be combined with --json; JSON mode never opens a browser.",
+        {
+          nextSteps: [
+            {
+              description: "Deploy as JSON without opening a browser",
+              command: "mcp-use deploy --json",
+            },
+            {
+              description: "Deploy and open the server page interactively",
+              command: "mcp-use deploy --open",
+            },
+          ],
+        }
+      );
+    }
 
-    for (let line of lines) {
-      line = line.trim();
-      if (!line || line.startsWith("#")) continue;
-      if (currentKey && !line.includes("=")) {
-        currentValue += "\n" + line;
-        continue;
-      }
-      if (currentKey) {
-        envVars[currentKey] = currentValue.replace(/^["']|["']$/g, "");
-        currentKey = null;
-        currentValue = "";
-      }
-      const equalIndex = line.indexOf("=");
-      if (equalIndex === -1) continue;
-      const key = line.substring(0, equalIndex).trim();
-      const value = line.substring(equalIndex + 1).trim();
-      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
-        console.log(chalk.yellow(`⚠️  Skipping invalid env key: ${key}`));
-        continue;
-      }
+    const cwd = resolve(positionals[0] ?? process.cwd());
+    const linkPath = join(cwd, ".mcp-use", "cloud", "link.json");
+
+    if (values.new === true) {
+      const accepted = await confirm(
+        "Create a new cloud server for this project?",
+        { yes: values.yes === true, json }
+      );
+      if (!accepted) return 0;
+    }
+
+    const { api, organizationId } = await cloudApiForOrganization(values.org);
+    const existing = await readJson<ProjectLink | null>(linkPath, null);
+    const createNew = values.new === true || existing === null;
+    if (
+      !createNew &&
+      existing !== null &&
+      existing.organizationId !== organizationId
+    ) {
+      throw new CommandError(
+        "organization_mismatch",
+        "The linked server belongs to another organization. Pass --new --yes to create one.",
+        {
+          nextSteps: [
+            {
+              description: "Create a server in the selected organization",
+              command: "mcp-use deploy --new --yes",
+            },
+          ],
+        }
+      );
+    }
+
+    const linkedManaged =
+      !createNew &&
+      existing !== null &&
+      (await linkedServerIsManaged(api, existing));
+    if (
+      values["no-github"] === true &&
+      !createNew &&
+      existing !== null &&
+      !linkedManaged
+    ) {
+      throw new CommandUsageError(
+        "source_mode_conflict",
+        "This project is linked to a GitHub-backed server; managed upload cannot replace its source in place.",
+        {
+          serverId: existing.serverId,
+          nextSteps: [
+            {
+              description: "Redeploy the linked GitHub server",
+              command: "mcp-use deploy",
+            },
+            {
+              description: "Create a separate managed-source server",
+              command: "mcp-use deploy --no-github --new --yes",
+            },
+          ],
+        }
+      );
+    }
+    const managed = values["no-github"] === true || linkedManaged;
+
+    if (managed) {
       if (
-        (value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'"))
+        values["watch-paths"] !== undefined ||
+        values["wait-for-ci"] === true
       ) {
-        envVars[key] = value.slice(1, -1);
-      } else if (value.startsWith('"') || value.startsWith("'")) {
-        currentKey = key;
-        currentValue = value.slice(1);
-      } else {
-        envVars[key] = value;
+        throw new CommandUsageError(
+          "source_mode_conflict",
+          "--watch-paths and --wait-for-ci are available only for GitHub deployments.",
+          {
+            nextSteps: [
+              {
+                description:
+                  "Upload managed source without GitHub trigger options",
+                command: "mcp-use deploy --no-github",
+              },
+              {
+                description: "Deploy through GitHub with trigger options",
+                command: "mcp-use deploy --yes --watch-paths <glob>",
+              },
+            ],
+          }
+        );
       }
+      return await deployManaged({
+        api,
+        organizationId,
+        cwd,
+        linkPath,
+        existing: createNew ? null : existing,
+        values,
+        json,
+      });
     }
-    if (currentKey) {
-      envVars[currentKey] = currentValue.replace(/^["']|["']$/g, "");
-    }
-    return envVars;
+
+    return await deployGitHub({
+      api,
+      organizationId,
+      cwd,
+      linkPath,
+      existing: createNew ? null : existing,
+      values,
+      json,
+    });
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      throw new Error(`Environment file not found: ${filePath}`);
-    }
-    throw new Error(
-      `Failed to parse environment file: ${error instanceof Error ? error.message : "Unknown error"}`
+    return reportError(
+      error instanceof TypeError ? new UsageError(error.message) : error,
+      json
     );
   }
 }
 
-function parseEnvVar(envStr: string): { key: string; value: string } {
-  const equalIndex = envStr.indexOf("=");
-  if (equalIndex === -1) {
-    throw new Error(`Invalid env format: "${envStr}". Expected KEY=VALUE`);
+function parseDeployArguments(argv: readonly string[]): {
+  values: DeployValues;
+  positionals: string[];
+} {
+  const { values, positionals } = parseArgs({
+    args: [...argv],
+    allowPositionals: true,
+    strict: true,
+    options: {
+      org: { type: "string" },
+      name: { type: "string" },
+      branch: { type: "string" },
+      "root-dir": { type: "string" },
+      region: { type: "string" },
+      env: { type: "string", multiple: true },
+      "env-file": { type: "string" },
+      "build-command": { type: "string" },
+      "start-command": { type: "string" },
+      dockerfile: { type: "string" },
+      "watch-paths": { type: "string", multiple: true },
+      "wait-for-ci": { type: "boolean" },
+      "no-github": { type: "boolean" },
+      new: { type: "boolean" },
+      open: { type: "boolean" },
+      yes: { type: "boolean", short: "y" },
+      json: { type: "boolean" },
+      help: { type: "boolean", short: "h" },
+    },
+  });
+  if (positionals.length > 1) {
+    throw new UsageError("Usage: mcp-use deploy [path] [options]");
   }
-  const key = envStr.substring(0, equalIndex).trim();
-  const value = envStr.substring(equalIndex + 1);
-  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
-    throw new Error(`Invalid env key: "${key}".`);
+  if (values["watch-paths"] !== undefined) {
+    values["watch-paths"] = normalizeDeployPatterns(values["watch-paths"]);
   }
-  return { key, value };
+  return { values, positionals };
 }
 
-/**
- * Upsert env vars onto an existing server via the env-variables API.
- *
- * The `--env`/`--env-file` flags are only honored on initial server creation
- * (where `env` rides on the createServer body). On redeploys we have to call
- * the dedicated env-variables endpoints, otherwise the values are silently
- * dropped. Existing keys are updated; new keys are created. Keys not in the
- * supplied set are left alone — clearing requires `mcp-use servers env rm`.
- */
-export async function syncEnvVarsToServer(
-  api: McpUseAPI,
-  serverId: string,
-  envVars: Record<string, string>,
-  opts?: { branch?: string; environments?: EnvEnvironment[] }
-): Promise<{ created: number; updated: number }> {
-  const entries = Object.entries(envVars);
-  if (entries.length === 0) return { created: 0, updated: 0 };
+function normalizeDeployPatterns(values: string[]): string[] {
+  if (values.length === 1 && values[0] === "") return [];
+  if (values.length > 32) {
+    throw new UsageError("--watch-paths accepts at most 32 patterns.");
+  }
+  if (values.some((value) => value === "")) {
+    throw new UsageError(
+      "--watch-paths accepts an empty value only by itself to clear all patterns."
+    );
+  }
+  if (values.some((value) => value.length > 512)) {
+    throw new UsageError(
+      "--watch-paths patterns may not exceed 512 characters."
+    );
+  }
+  return values;
+}
 
-  // Scope the sync to the deploy branch's preview env when a branch is given;
-  // otherwise operate on production scope (branch IS NULL), matching prior behavior.
-  const existing = await api.listEnvVariables(
+async function deployManaged(input: {
+  api: CloudApi;
+  organizationId: string;
+  cwd: string;
+  linkPath: string;
+  existing: ProjectLink | null;
+  values: DeployValues;
+  json: boolean;
+}): Promise<number> {
+  const { api, organizationId, cwd, linkPath, existing, values, json } = input;
+  const projectRoot = cwd;
+  const sourceRoot = resolveContainedPath(
+    cwd,
+    values["root-dir"] ?? ".",
+    "--root-dir"
+  );
+  if (!(await pathExists(sourceRoot))) {
+    throw new UsageError(`Project directory not found: ${sourceRoot}`);
+  }
+  validateSourcePath(sourceRoot, values.dockerfile, "--dockerfile");
+  await validateManagedPackage(projectRoot);
+
+  const env = await loadEnvironment(
+    projectRoot,
+    values["env-file"],
+    values.env ?? []
+  );
+  const archive = await packProject(projectRoot);
+  assertManagedArchiveSize(archive.byteLength);
+
+  const branch = values.branch ?? "main";
+  const name = values.name ?? (await projectName(sourceRoot));
+  let serverId: string;
+  let serverSlug: string | null | undefined;
+  let deploymentId: string;
+
+  if (existing !== null) {
+    serverId = existing.serverId;
+    serverSlug = existing.serverSlug;
+    await syncServerConfiguration(api, serverId, values);
+    await syncEnvironment(api, serverId, env, values.branch);
+    const sourceForm = new FormData();
+    appendArchive(sourceForm, archive);
+    sourceForm.set("branch", branch);
+    sourceForm.set("commitMessage", "Redeploy from mcp-use CLI");
+    await api.multipartRequest(
+      `/servers/${encodeURIComponent(serverId)}/source`,
+      sourceForm
+    );
+    const deployment = await api.request<{ id: string }>("/deployments", {
+      method: "POST",
+      body: JSON.stringify({ serverId, branch, trigger: "redeploy" }),
+    });
+    deploymentId = deployment.id;
+  } else {
+    const form = new FormData();
+    appendArchive(form, archive);
+    form.set("organizationId", organizationId);
+    form.set("managed", "true");
+    form.set("name", name);
+    form.set("repoName", sanitizeRepositoryName(name));
+    form.set("private", "true");
+    form.set("branch", branch);
+    form.set("commitMessage", "Deploy from mcp-use CLI");
+    if (values.region !== undefined) form.set("region", values.region);
+    if (values["root-dir"] !== undefined) {
+      form.set("rootDir", values["root-dir"]);
+    }
+    if (values["build-command"] !== undefined) {
+      form.set("buildCommand", values["build-command"]);
+    }
+    if (values["start-command"] !== undefined) {
+      form.set("startCommand", values["start-command"]);
+    }
+    if (values.dockerfile !== undefined) {
+      form.set("dockerfilePath", values.dockerfile);
+    }
+    if (Object.keys(env).length > 0) form.set("env", JSON.stringify(env));
+
+    const created = await api.multipartRequest<CreatedServer>("/servers", form);
+    if (created.deploymentId === null) {
+      throw deploymentNotCreated(created.server.id);
+    }
+    serverId = created.server.id;
+    serverSlug = created.server.slug;
+    deploymentId = created.deploymentId;
+  }
+
+  await writePrivateJson(linkPath, {
+    organizationId,
     serverId,
-    opts?.branch ? { branch: opts.branch } : undefined
-  );
-  const byKey = new Map(existing.map((v) => [v.key, v]));
-
-  const results = await Promise.all(
-    entries.map(async ([key, value]) => {
-      const found = byKey.get(key);
-      if (found) {
-        await api.updateEnvVariable(serverId, found.id, { value });
-        return "updated" as const;
-      }
-      await api.createEnvVariable(serverId, {
-        key,
-        value,
-        ...(opts?.branch ? { branch: opts.branch } : {}),
-        ...(opts?.environments ? { environments: opts.environments } : {}),
-      });
-      return "created" as const;
-    })
-  );
-
-  return {
-    created: results.filter((r) => r === "created").length,
-    updated: results.filter((r) => r === "updated").length,
-  };
+    ...(serverSlug !== undefined ? { serverSlug } : {}),
+    sourceType: "managed",
+  } satisfies ProjectLink);
+  await ensureLocalMcpUseIgnored(projectRoot);
+  return finishDeployment({
+    sourceType: "managed",
+    serverId,
+    ...(serverSlug !== undefined ? { serverSlug } : {}),
+    deploymentId,
+    label: "managed source",
+    values,
+    json,
+  });
 }
 
-async function buildEnvVars(
-  options: DeployOptions
-): Promise<Record<string, string>> {
-  const envVars: Record<string, string> = {};
-  if (options.envFile) {
+/** Validate the compressed upload size before making a multipart request. */
+export function assertManagedArchiveSize(sizeBytes: number): void {
+  if (sizeBytes <= MAX_ARCHIVE_BYTES) return;
+  throw new CommandError(
+    "archive_too_large",
+    `Project archive is ${(sizeBytes / 1024 / 1024).toFixed(2)} MB; the maximum is 80 MB.`,
+    {
+      sizeBytes,
+      maxBytes: MAX_ARCHIVE_BYTES,
+      nextSteps: [
+        {
+          description: "Exclude large generated files and retry",
+          command: "mcp-use deploy --no-github",
+        },
+      ],
+    }
+  );
+}
+
+async function deployGitHub(input: {
+  api: CloudApi;
+  organizationId: string;
+  cwd: string;
+  linkPath: string;
+  existing: ProjectLink | null;
+  values: DeployValues;
+  json: boolean;
+}): Promise<number> {
+  const { api, organizationId, cwd, linkPath, existing, values, json } = input;
+  let probe = await probeGit(cwd);
+  let repository: string;
+  let installation: Installation | undefined;
+
+  if (!probe.isRepository || probe.remote === undefined) {
+    if (probe.unavailable === true) {
+      throw new CommandError(
+        "git_unavailable",
+        "Git is not installed or could not be executed.",
+        {
+          nextSteps: [
+            {
+              description: "Deploy without GitHub",
+              command: "mcp-use deploy --no-github",
+            },
+          ],
+        }
+      );
+    }
+    await authorizeRepositoryBootstrap(values, json);
+    const installations = await listInstallations(api, organizationId);
+    installation = await selectInstallation(installations, values, json);
+    const name = values.name ?? (await projectName(cwd));
+    const repositoryName = sanitizeRepositoryName(name);
+    let created: {
+      fullName: string;
+      cloneUrl: string;
+      htmlUrl: string;
+    };
     try {
-      const fileEnv = await parseEnvFile(options.envFile);
-      Object.assign(envVars, fileEnv);
-      console.log(
-        chalk.gray(
-          `Loaded ${Object.keys(fileEnv).length} variable(s) from ${options.envFile}`
-        )
+      created = await api.request<{
+        fullName: string;
+        cloneUrl: string;
+        htmlUrl: string;
+      }>(
+        `/github/installations/${encodeURIComponent(installation.installationId)}/repos`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            name: repositoryName,
+            private: true,
+            org: installation.account?.login ?? undefined,
+          }),
+        }
       );
     } catch (error) {
-      console.log(
-        chalk.red(
-          `✗ ${error instanceof Error ? error.message : "Failed to load env file"}`
-        )
+      throw new CommandError(
+        "github_repository_creation_failed",
+        `Could not create the private GitHub repository ${repositoryName}.`,
+        {
+          account: installation.account?.login ?? null,
+          cause: error instanceof Error ? error.message : String(error),
+          nextSteps: [
+            {
+              description: "Retry with a unique repository name",
+              command: "mcp-use deploy --name <unique-name> --yes",
+            },
+            {
+              description: "Deploy without GitHub",
+              command: "mcp-use deploy --no-github",
+            },
+          ],
+        }
       );
-      process.exit(1);
     }
-  }
-  if (options.env && options.env.length > 0) {
-    for (const envStr of options.env) {
-      try {
-        const { key, value } = parseEnvVar(envStr);
-        envVars[key] = value;
-      } catch (error) {
-        console.log(
-          chalk.red(
-            `✗ ${error instanceof Error ? error.message : "Invalid env variable"}`
-          )
-        );
-        process.exit(1);
+    try {
+      await bootstrapRepository(cwd, probe, created.cloneUrl);
+    } catch (error) {
+      const normalized =
+        error instanceof CommandError
+          ? error
+          : normalizeGitMutationError(error, cwd);
+      const details =
+        normalized.details !== null &&
+        typeof normalized.details === "object" &&
+        !Array.isArray(normalized.details)
+          ? normalized.details
+          : {};
+      const nextSteps = commandNextSteps(normalized.details);
+      if (!nextSteps.some((step) => step.command === "mcp-use deploy --yes")) {
+        nextSteps.push({
+          description: "Retry using the repository already created",
+          command: "mcp-use deploy --yes",
+        });
       }
+      throw new CommandError(normalized.code, normalized.message, {
+        ...details,
+        repository: created.fullName,
+        url: created.htmlUrl,
+        nextSteps,
+      });
     }
+    probe = await probeGit(cwd);
+    repository = created.fullName;
+  } else {
+    repository = parseGitHubRepository(probe.remote);
   }
-  return envVars;
-}
 
-interface DeployOptions {
-  open?: boolean;
-  name?: string;
-  port?: number;
-  runtime?: "node" | "python";
-  new?: boolean;
-  env?: string[];
-  envFile?: string;
-  rootDir?: string;
-  org?: string;
-  yes?: boolean;
-  region?: "US" | "EU" | "APAC";
-  buildCommand?: string;
-  startCommand?: string;
-  /** Path to a non-default Dockerfile (relative to rootDir / repo root). */
-  dockerfile?: string;
-  /**
-   * Deploy branch. Defaults to the current git branch (managed flow: "main").
-   * Also scopes env-var sync to that branch's preview env.
-   */
-  branch?: string;
-  /**
-   * Upload local source without connecting the user's GitHub. Uses the
-   * platform-managed org and a tarball instead of pushing to a user repo.
-   */
-  noGithub?: boolean;
-}
-
-async function isMcpProject(cwd: string = process.cwd()): Promise<boolean> {
-  try {
-    const content = await fs.readFile(path.join(cwd, "package.json"), "utf-8");
-    const pkg = JSON.parse(content);
-    return !!(
-      pkg.dependencies?.["mcp-use"] ||
-      pkg.dependencies?.["@modelcontextprotocol/sdk"] ||
-      pkg.devDependencies?.["mcp-use"] ||
-      pkg.devDependencies?.["@modelcontextprotocol/sdk"]
+  const repositoryRoot = probe.root ?? cwd;
+  const branch = values.branch ?? probe.branch;
+  if (branch === undefined || branch === "" || branch === "HEAD") {
+    throw new CommandError(
+      "detached_head",
+      "Cannot infer a branch from detached HEAD; pass --branch.",
+      {
+        nextSteps: [
+          {
+            description: "Deploy an explicit branch",
+            command: "mcp-use deploy --branch <branch>",
+          },
+        ],
+      }
     );
+  }
+  validateSourcePath(repositoryRoot, values["root-dir"], "--root-dir");
+  validateSourcePath(repositoryRoot, values.dockerfile, "--dockerfile");
+  const env = await loadEnvironment(cwd, values["env-file"], values.env ?? []);
+
+  if (probe.dirty === true) {
+    await handleDirtyRepository(repositoryRoot, branch, values, json);
+  }
+
+  let serverId: string;
+  let serverSlug: string | null | undefined;
+  let deploymentId: string;
+  if (existing !== null) {
+    serverId = existing.serverId;
+    serverSlug = existing.serverSlug;
+    await syncServerConfiguration(api, serverId, values);
+    await syncEnvironment(api, serverId, env, values.branch);
+    const deployment = await api.request<{ id: string }>("/deployments", {
+      method: "POST",
+      body: JSON.stringify({ serverId, branch, trigger: "manual" }),
+    });
+    deploymentId = deployment.id;
+  } else {
+    const installations =
+      installation === undefined
+        ? await listInstallations(api, organizationId)
+        : [installation];
+    installation ??= await installationFor(api, installations, repository);
+    if (installation === undefined) {
+      const settingsUrl = `${cloudWebUrl()}/settings`;
+      throw new CommandError(
+        installations.length === 0
+          ? "github_installation_required"
+          : "github_access_required",
+        installations.length === 0
+          ? "No GitHub App installation is connected to this organization."
+          : `The mcp-use GitHub App cannot access ${repository}.`,
+        {
+          repository,
+          url: settingsUrl,
+          nextSteps: [
+            {
+              description: "Configure GitHub access",
+              command: settingsUrl,
+            },
+            {
+              description: "Retry deployment",
+              command: "mcp-use deploy",
+            },
+          ],
+        }
+      );
+    }
+    const created = await api.request<CreatedServer>("/servers", {
+      method: "POST",
+      body: JSON.stringify({
+        type: "github",
+        organizationId,
+        installationId: installation.id ?? installation.installationId,
+        name: values.name ?? basename(repository),
+        repoFullName: repository,
+        branch,
+        ...(values["root-dir"] !== undefined
+          ? { rootDir: values["root-dir"] }
+          : {}),
+        ...(values.region !== undefined ? { region: values.region } : {}),
+        ...(values["build-command"] !== undefined
+          ? { buildCommand: values["build-command"] }
+          : {}),
+        ...(values["start-command"] !== undefined
+          ? { startCommand: values["start-command"] }
+          : {}),
+        ...(values.dockerfile !== undefined
+          ? { dockerfilePath: values.dockerfile }
+          : {}),
+        ...(values["watch-paths"] !== undefined
+          ? { watchPaths: values["watch-paths"] }
+          : {}),
+        ...(values["wait-for-ci"] !== undefined
+          ? { waitForCi: values["wait-for-ci"] }
+          : {}),
+        ...(Object.keys(env).length > 0 ? { env } : {}),
+      }),
+    });
+    if (created.deploymentId === null) {
+      throw deploymentNotCreated(created.server.id);
+    }
+    serverId = created.server.id;
+    serverSlug = created.server.slug;
+    deploymentId = created.deploymentId;
+  }
+
+  await writePrivateJson(linkPath, {
+    organizationId,
+    serverId,
+    ...(serverSlug !== undefined ? { serverSlug } : {}),
+    repository,
+    sourceType: "github",
+  } satisfies ProjectLink);
+  await ensureLocalMcpUseIgnored(repositoryRoot);
+  return finishDeployment({
+    sourceType: "github",
+    serverId,
+    ...(serverSlug !== undefined ? { serverSlug } : {}),
+    deploymentId,
+    label: repository,
+    values,
+    json,
+  });
+}
+
+async function syncEnvironment(
+  api: CloudApi,
+  serverId: string,
+  environment: Record<string, string>,
+  branch: string | undefined
+): Promise<void> {
+  if (Object.keys(environment).length === 0) return;
+  const query =
+    branch === undefined ? "" : `?branch=${encodeURIComponent(branch)}`;
+  const existing = await api.request<
+    Array<{ id: string; key: string; branch?: string | null }>
+  >(`/servers/${encodeURIComponent(serverId)}/env-variables${query}`);
+  const byKey = new Map(existing.map((variable) => [variable.key, variable]));
+  await Promise.all(
+    Object.entries(environment).map(async ([key, value]) => {
+      const variable = byKey.get(key);
+      const body = JSON.stringify({
+        key,
+        value,
+        branch: branch ?? null,
+        environments: branch === undefined ? ["production"] : ["preview"],
+      });
+      if (variable === undefined) {
+        await api.request(
+          `/servers/${encodeURIComponent(serverId)}/env-variables`,
+          { method: "POST", body }
+        );
+      } else {
+        await api.request(
+          `/servers/${encodeURIComponent(serverId)}/env-variables/${encodeURIComponent(variable.id)}`,
+          { method: "PATCH", body }
+        );
+      }
+    })
+  );
+}
+
+async function syncServerConfiguration(
+  api: CloudApi,
+  serverId: string,
+  values: DeployValues
+): Promise<void> {
+  const config = {
+    ...(values["root-dir"] !== undefined
+      ? { rootDir: values["root-dir"] }
+      : {}),
+    ...(values["build-command"] !== undefined
+      ? { buildCommand: values["build-command"] }
+      : {}),
+    ...(values["start-command"] !== undefined
+      ? { startCommand: values["start-command"] }
+      : {}),
+    ...(values.dockerfile !== undefined
+      ? { dockerfilePath: values.dockerfile }
+      : {}),
+  };
+  const body = {
+    ...(values.name !== undefined ? { name: values.name } : {}),
+    ...(values.branch !== undefined ? { productionBranch: values.branch } : {}),
+    ...(values.region !== undefined ? { region: values.region } : {}),
+    ...(values["watch-paths"] !== undefined
+      ? { watchPaths: values["watch-paths"] }
+      : {}),
+    ...(values["wait-for-ci"] !== undefined
+      ? { waitForCi: values["wait-for-ci"] }
+      : {}),
+    ...(Object.keys(config).length > 0 ? { config } : {}),
+  };
+  if (Object.keys(body).length === 0) return;
+  await api.request(`/servers/${encodeURIComponent(serverId)}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+async function linkedServerIsManaged(
+  api: CloudApi,
+  link: ProjectLink
+): Promise<boolean> {
+  if (link.sourceType !== undefined) return link.sourceType === "managed";
+  if (link.repository === undefined) return true;
+  try {
+    const server = await api.request<{
+      connectedRepository?: { isManaged?: boolean } | null;
+    }>(`/servers/${encodeURIComponent(link.serverId)}`);
+    return server.connectedRepository?.isManaged === true;
   } catch {
     return false;
   }
 }
 
-async function getProjectName(cwd: string = process.cwd()): Promise<string> {
-  try {
-    const content = await fs.readFile(path.join(cwd, "package.json"), "utf-8");
-    const pkg = JSON.parse(content);
-    if (pkg.name) return pkg.name;
-  } catch {
-    // fall through
+async function authorizeRepositoryBootstrap(
+  values: DeployValues,
+  json: boolean
+): Promise<void> {
+  if (values.yes === true) return;
+  if (json || !process.stdin.isTTY) {
+    throw new CommandUsageError(
+      "deployment_mode_required",
+      "No GitHub origin was found. Choose a deployment mode explicitly.",
+      {
+        nextSteps: [
+          {
+            description: "Upload local source without GitHub",
+            command: "mcp-use deploy --no-github",
+          },
+          {
+            description: "Create a private GitHub repository and push",
+            command: "mcp-use deploy --yes",
+          },
+        ],
+      }
+    );
   }
-  return path.basename(cwd);
+  const accepted = await promptYesNo(
+    "No GitHub origin was found. Create a private repository and push this project?",
+    true
+  );
+  if (!accepted) {
+    throw new CommandUsageError(
+      "deployment_mode_required",
+      "Deployment cancelled. Choose a deployment mode.",
+      {
+        nextSteps: [
+          {
+            description: "Upload local source without GitHub",
+            command: "mcp-use deploy --no-github",
+          },
+          {
+            description: "Retry GitHub setup",
+            command: "mcp-use deploy",
+          },
+        ],
+      }
+    );
+  }
 }
 
-async function detectBuildCommand(cwd: string): Promise<string | undefined> {
-  try {
-    const content = await fs.readFile(path.join(cwd, "package.json"), "utf-8");
-    if (JSON.parse(content).scripts?.build) return "npm run build";
-  } catch {
-    // noop
+async function listInstallations(
+  api: CloudApi,
+  organizationId: string
+): Promise<Installation[]> {
+  const response = await api.request<{ installations: Installation[] }>(
+    `/github/installations?organizationId=${encodeURIComponent(organizationId)}`
+  );
+  if (response.installations.length === 0) {
+    const settingsUrl = `${cloudWebUrl()}/settings`;
+    throw new CommandError(
+      "github_installation_required",
+      "No GitHub App installation is connected to this organization.",
+      {
+        url: settingsUrl,
+        nextSteps: [
+          {
+            description: "Connect GitHub in the cloud dashboard",
+            command: settingsUrl,
+          },
+          {
+            description: "Retry deployment after connecting GitHub",
+            command: "mcp-use deploy",
+          },
+          {
+            description: "Deploy without GitHub",
+            command: "mcp-use deploy --no-github",
+          },
+        ],
+      }
+    );
   }
-  return undefined;
+  return response.installations;
 }
 
-async function detectStartCommand(cwd: string): Promise<string | undefined> {
-  try {
-    const content = await fs.readFile(path.join(cwd, "package.json"), "utf-8");
-    const pkg = JSON.parse(content);
-    if (pkg.scripts?.start) return "npm start";
-    if (pkg.main) return `node ${pkg.main}`;
-  } catch {
-    // noop
+async function selectInstallation(
+  installations: Installation[],
+  values: DeployValues,
+  json: boolean
+): Promise<Installation> {
+  const ordered = [...installations].sort((left, right) => {
+    const leftOrg = left.account?.type?.toLowerCase() === "organization";
+    const rightOrg = right.account?.type?.toLowerCase() === "organization";
+    return Number(rightOrg) - Number(leftOrg);
+  });
+  if (ordered.length === 1 || values.yes === true) return ordered[0]!;
+  if (json || !process.stdin.isTTY) {
+    throw new CommandUsageError(
+      "github_installation_required",
+      "Multiple GitHub installations are available; pass --yes to select deterministically.",
+      {
+        nextSteps: [
+          {
+            description: "Use the default organization installation",
+            command: "mcp-use deploy --yes",
+          },
+        ],
+      }
+    );
   }
-  return undefined;
+
+  process.stdout.write("Choose the GitHub account for the new repository:\n");
+  for (const [index, installation] of ordered.entries()) {
+    process.stdout.write(
+      `  ${index + 1}. ${installation.account?.login ?? installation.installationId}\n`
+    );
+  }
+  const prompt = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+  try {
+    const answer = await prompt.question("Account [1]: ");
+    const index = answer.trim() === "" ? 0 : Number(answer) - 1;
+    if (!Number.isInteger(index) || index < 0 || index >= ordered.length) {
+      throw new UsageError("Invalid GitHub account selection.");
+    }
+    return ordered[index]!;
+  } finally {
+    prompt.close();
+  }
 }
 
-async function detectRuntime(cwd: string): Promise<"node" | "python"> {
-  for (const f of ["requirements.txt", "pyproject.toml", "setup.py"]) {
+async function bootstrapRepository(
+  cwd: string,
+  probe: GitProbe,
+  cloneUrl: string
+): Promise<void> {
+  try {
+    await ensureMcpUseIgnored(cwd);
+    if (!probe.isRepository) {
+      await mutateGit(cwd, ["init"]);
+    }
+    // Persist the created repository identity before committing. If identity,
+    // commit, or push fails, the next deploy sees origin and reuses this repo
+    // instead of creating another one.
+    await mutateGit(cwd, ["remote", "add", "origin", cloneUrl]);
+    await mutateGit(cwd, ["add", "."]);
+    const staged = await readGit(cwd, ["diff", "--cached", "--quiet"]);
+    if (!staged.ok) {
+      await mutateGit(cwd, ["commit", "-m", "Initial commit"]);
+    }
+    await mutateGit(cwd, ["branch", "-M", "main"]);
+    await mutateGit(cwd, ["push", "-u", "origin", "main"]);
+  } catch (error) {
+    throw normalizeGitMutationError(error, cwd);
+  }
+}
+
+function commandNextSteps(
+  details: unknown
+): Array<{ description: string; command: string }> {
+  if (details === null || typeof details !== "object") {
+    return [];
+  }
+  const rawNextSteps = (details as Record<string, unknown>)["nextSteps"];
+  if (!Array.isArray(rawNextSteps)) return [];
+  const nextSteps: unknown[] = rawNextSteps;
+  return nextSteps.filter(
+    (
+      step
+    ): step is {
+      description: string;
+      command: string;
+    } =>
+      step !== null &&
+      typeof step === "object" &&
+      "description" in step &&
+      typeof step.description === "string" &&
+      "command" in step &&
+      typeof step.command === "string"
+  );
+}
+
+async function ensureMcpUseIgnored(cwd: string): Promise<void> {
+  const path = join(cwd, ".gitignore");
+  let contents = "";
+  try {
+    contents = await readFile(path, "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+  if (
+    contents
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .includes(".mcp-use/")
+  ) {
+    return;
+  }
+  if (contents === "") {
+    await writeFile(path, ".mcp-use/\n", "utf8");
+  } else {
+    await appendFile(path, `${contents.endsWith("\n") ? "" : "\n"}.mcp-use/\n`);
+  }
+}
+
+async function ensureLocalMcpUseIgnored(cwd: string): Promise<void> {
+  const excludePath = join(cwd, ".git", "info", "exclude");
+  if (!(await pathExists(excludePath))) return;
+  try {
+    const contents = await readFile(excludePath, "utf8");
+    if (
+      contents
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .includes(".mcp-use/")
+    ) {
+      return;
+    }
+    await appendFile(
+      excludePath,
+      `${contents.endsWith("\n") || contents === "" ? "" : "\n"}.mcp-use/\n`
+    );
+  } catch {
+    // A completed cloud deployment must not be turned into a failure merely
+    // because the repository's optional local exclude file is read-only.
+  }
+}
+
+async function handleDirtyRepository(
+  cwd: string,
+  branch: string,
+  values: DeployValues,
+  json: boolean
+): Promise<void> {
+  if (values.yes !== true) {
+    if (json || !process.stdin.isTTY) {
+      throw new CommandUsageError(
+        "git_changes_require_confirmation",
+        "The repository has uncommitted changes.",
+        {
+          nextSteps: [
+            {
+              description: "Authorize committing and pushing the changes",
+              command: "mcp-use deploy --yes",
+            },
+            {
+              description: "Commit the changes yourself",
+              command: "git add . && git commit && git push",
+            },
+          ],
+        }
+      );
+    }
+    const accepted = await promptYesNo(
+      "Commit and push the current changes before deploying?",
+      true
+    );
+    if (!accepted) return;
+  }
+  try {
+    await mutateGit(cwd, ["add", "."]);
+    await mutateGit(cwd, ["commit", "-m", "Deploy changes"]);
+    await mutateGit(cwd, ["push", "origin", branch]);
+  } catch (error) {
+    throw normalizeGitMutationError(error, cwd);
+  }
+}
+
+async function probeGit(cwd: string): Promise<GitProbe> {
+  const inside = await readGit(cwd, ["rev-parse", "--is-inside-work-tree"]);
+  if (!inside.ok) {
+    if (inside.unavailable !== true && !isNotGitRepository(inside)) {
+      throw gitProbeError("git rev-parse --is-inside-work-tree", inside);
+    }
+    return {
+      isRepository: false,
+      ...(inside.unavailable !== undefined
+        ? { unavailable: inside.unavailable }
+        : {}),
+    };
+  }
+  const [root, remote, branch, status] = await Promise.all([
+    readGit(cwd, ["rev-parse", "--show-toplevel"]),
+    readGit(cwd, ["remote", "get-url", "origin"]),
+    readGit(cwd, ["branch", "--show-current"]),
+    readGit(cwd, ["status", "--porcelain"]),
+  ]);
+  if (!root.ok || root.stdout === "") {
+    throw gitProbeError("git rev-parse --show-toplevel", root);
+  }
+  if (!remote.ok && !isMissingOrigin(remote)) {
+    throw gitProbeError("git remote get-url origin", remote);
+  }
+  if (!branch.ok) {
+    throw gitProbeError("git branch --show-current", branch);
+  }
+  if (!status.ok) {
+    throw gitProbeError("git status --porcelain", status);
+  }
+  return {
+    isRepository: true,
+    root: root.stdout,
+    ...(remote.ok && remote.stdout !== "" ? { remote: remote.stdout } : {}),
+    ...(branch.ok ? { branch: branch.stdout } : {}),
+    dirty: status.ok && status.stdout !== "",
+  };
+}
+
+async function readGit(
+  cwd: string,
+  args: string[]
+): Promise<{
+  ok: boolean;
+  stdout: string;
+  stderr: string;
+  unavailable?: boolean;
+  code?: number | string;
+}> {
+  try {
+    const result = await exec("git", args, { cwd });
+    return {
+      ok: true,
+      stdout: result.stdout.trim(),
+      stderr: result.stderr.trim(),
+    };
+  } catch (error) {
+    const failure = error as NodeJS.ErrnoException & {
+      stdout?: string;
+      stderr?: string;
+    };
+    return {
+      ok: false,
+      stdout: String(failure.stdout ?? "").trim(),
+      stderr: String(failure.stderr ?? failure.message ?? "").trim(),
+      ...(failure.code === "ENOENT" ? { unavailable: true } : {}),
+      ...(failure.code !== undefined ? { code: failure.code } : {}),
+    };
+  }
+}
+
+function isNotGitRepository(result: {
+  stdout: string;
+  stderr: string;
+}): boolean {
+  return /not a git repository|not inside a work tree/i.test(
+    `${result.stderr}\n${result.stdout}`
+  );
+}
+
+function isMissingOrigin(result: { stdout: string; stderr: string }): boolean {
+  return /no such remote(?:\s+['"]?origin)?/i.test(
+    `${result.stderr}\n${result.stdout}`
+  );
+}
+
+function gitProbeError(
+  command: string,
+  result: { stdout: string; stderr: string; code?: number | string }
+): CommandError {
+  const cause = redactGitDiagnostic(
+    result.stderr || result.stdout || "Git returned no diagnostics."
+  );
+  return new CommandError("git_command_failed", `${command} failed: ${cause}`, {
+    command,
+    ...(result.code !== undefined ? { exitCode: result.code } : {}),
+    nextSteps: [
+      {
+        description: "Verify the repository with Git",
+        command: "git status",
+      },
+      {
+        description: "Deploy without GitHub",
+        command: "mcp-use deploy --no-github",
+      },
+    ],
+  });
+}
+
+async function mutateGit(cwd: string, args: string[]): Promise<void> {
+  try {
+    await exec("git", args, { cwd });
+  } catch (error) {
+    const failure = error as {
+      stdout?: string;
+      stderr?: string;
+      code?: number | string;
+    };
+    throw new GitMutationError(
+      `git ${args.join(" ")}`,
+      String(failure.stderr ?? failure.stdout ?? ""),
+      failure.code
+    );
+  }
+}
+
+class GitMutationError extends Error {
+  constructor(
+    readonly command: string,
+    readonly output: string,
+    readonly exitCode: number | string | undefined
+  ) {
+    super(output.trim() || `${command} failed`);
+  }
+}
+
+function normalizeGitMutationError(error: unknown, cwd: string): CommandError {
+  if (!(error instanceof GitMutationError)) {
+    return new CommandError(
+      "git_command_failed",
+      error instanceof Error ? error.message : String(error)
+    );
+  }
+  if (
+    /tell me who you are|author identity unknown|unable to auto-detect email address|empty ident (?:name|email)|user\.email|user\.name/i.test(
+      error.output
+    )
+  ) {
+    const command = redactGitDiagnostic(error.command);
+    return new CommandError(
+      "git_identity_required",
+      "Git needs a user name and email before it can create a commit.",
+      {
+        command,
+        nextSteps: [
+          {
+            description: "Set the email for this project",
+            command: `git -C ${JSON.stringify(cwd)} config user.email "you@example.com"`,
+          },
+          {
+            description: "Set the name for this project",
+            command: `git -C ${JSON.stringify(cwd)} config user.name "Your Name"`,
+          },
+          { description: "Retry deployment", command: "mcp-use deploy --yes" },
+        ],
+      }
+    );
+  }
+  if (/non-fast-forward|rejected|unrelated histories/i.test(error.output)) {
+    const command = redactGitDiagnostic(error.command);
+    return new CommandError(
+      "git_push_rejected",
+      "GitHub rejected the push because the remote branch contains other commits.",
+      {
+        command,
+        nextSteps: [
+          {
+            description: "Reconcile the remote branch",
+            command:
+              "git pull --rebase origin main --allow-unrelated-histories && git push -u origin main",
+          },
+        ],
+      }
+    );
+  }
+  const command = redactGitDiagnostic(error.command);
+  const output = redactGitDiagnostic(error.output.trim());
+  return new CommandError(
+    "git_command_failed",
+    `${command} failed${output === "" ? "." : `: ${output}`}`,
+    { command, exitCode: error.exitCode }
+  );
+}
+
+function parseGitHubRepository(remote: string): string {
+  const match = remote.match(
+    /github\.com[/:]([^/\s]+)\/([^/\s]+?)(?:\.git)?\/?$/
+  );
+  if (match?.[1] === undefined || match[2] === undefined) {
+    const safeRemote = redactGitDiagnostic(remote);
+    throw new CommandError(
+      "unsupported_remote",
+      `The origin remote is not a supported GitHub repository: ${safeRemote}`,
+      {
+        remote: safeRemote,
+        nextSteps: [
+          {
+            description: "Set a GitHub origin",
+            command:
+              "git remote set-url origin https://github.com/<owner>/<repo>.git",
+          },
+          {
+            description: "Deploy without GitHub",
+            command: "mcp-use deploy --no-github",
+          },
+        ],
+      }
+    );
+  }
+  return `${match[1]}/${match[2]}`;
+}
+
+function redactGitDiagnostic(value: string): string {
+  return value.replace(
+    /\b(https?:\/\/)[^/@\s]+(?::[^@\s]*)?@/gi,
+    "$1[REDACTED]@"
+  );
+}
+
+async function installationFor(
+  api: CloudApi,
+  installations: Installation[],
+  repository: string
+): Promise<Installation | undefined> {
+  const [owner, repo] = repository.split("/") as [string, string];
+  const ordered = [...installations].sort((left, right) => {
+    const leftMatch =
+      left.account?.login?.toLowerCase() === owner.toLowerCase();
+    const rightMatch =
+      right.account?.login?.toLowerCase() === owner.toLowerCase();
+    return Number(rightMatch) - Number(leftMatch);
+  });
+  for (const installation of ordered) {
     try {
-      await fs.access(path.join(cwd, f));
-      return "python";
+      const access = await api.request<{ hasAccess: boolean }>(
+        `/github/installations/${encodeURIComponent(installation.installationId)}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/access`
+      );
+      if (access.hasAccess) return installation;
     } catch {
+      // Try the next installation.
+    }
+  }
+  return undefined;
+}
+
+async function packProject(projectRoot: string): Promise<Buffer> {
+  const gzip = createGzip();
+  const chunks: Buffer[] = [];
+  const collecting = (async () => {
+    for await (const chunk of gzip) {
+      chunks.push(Buffer.from(chunk as Buffer));
+    }
+  })();
+  try {
+    await addDirectoryToArchive(gzip, projectRoot, "");
+    await writeArchiveChunk(gzip, Buffer.alloc(1024));
+    gzip.end();
+  } catch (error) {
+    gzip.destroy(error instanceof Error ? error : new Error(String(error)));
+    throw error;
+  }
+  await collecting;
+  return Buffer.concat(chunks);
+}
+
+async function addDirectoryToArchive(
+  gzip: ReturnType<typeof createGzip>,
+  projectRoot: string,
+  relativeDirectory: string
+): Promise<void> {
+  const directory = await opendir(
+    relativeDirectory === ""
+      ? projectRoot
+      : join(projectRoot, relativeDirectory)
+  );
+  const entries = [];
+  for await (const entry of directory) entries.push(entry);
+  entries.sort((left, right) => left.name.localeCompare(right.name));
+
+  for (const entry of entries) {
+    const relativePath =
+      relativeDirectory === ""
+        ? entry.name
+        : join(relativeDirectory, entry.name);
+    if (!shouldArchive(relativePath)) continue;
+    const absolutePath = join(projectRoot, relativePath);
+    const stats = await lstat(absolutePath);
+    const archivePath = `app/${relativePath.replaceAll("\\", "/")}`;
+    const common = {
+      path: archivePath,
+      mode: stats.mode & 0o777,
+      mtime: Math.floor(stats.mtimeMs / 1000),
+    };
+
+    if (stats.isDirectory()) {
+      await writeTarHeader(gzip, { ...common, type: "directory", size: 0 });
+      await addDirectoryToArchive(gzip, projectRoot, relativePath);
+    } else if (stats.isFile()) {
+      await writeTarHeader(gzip, {
+        ...common,
+        type: "file",
+        size: stats.size,
+      });
+      for await (const chunk of createReadStream(absolutePath)) {
+        await writeArchiveChunk(gzip, chunk as Buffer);
+      }
+      await writeTarPadding(gzip, stats.size);
+    } else if (stats.isSymbolicLink()) {
+      // Managed uploads intentionally omit links. A link can escape the project
+      // root or point back into an excluded secret/dependency directory, and
+      // extraction behavior differs between archive runtimes.
       continue;
     }
   }
-  return "node";
 }
 
-async function prompt(
-  question: string,
-  defaultValue: "y" | "n" = "n"
-): Promise<boolean> {
-  const readline = await import("node:readline");
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-  const indicator = defaultValue === "y" ? "Y/n" : "y/N";
-  const q = question.replace(/(\(y\/n\):)/, `(${indicator}):`);
-  return new Promise((resolve) => {
-    rl.question(q, (answer) => {
-      rl.close();
-      const a = answer.trim().toLowerCase();
-      if (a === "") resolve(defaultValue === "y");
-      else resolve(a === "y" || a === "yes");
-    });
-  });
-}
-
-async function promptText(
-  question: string,
-  defaultValue?: string
-): Promise<string> {
-  const readline = await import("node:readline");
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-  const suffix = defaultValue ? chalk.gray(` [${defaultValue}]`) : "";
-  return new Promise((resolve) => {
-    rl.question(question + suffix + " ", (answer) => {
-      rl.close();
-      resolve(answer.trim() || defaultValue || "");
-    });
-  });
-}
-
-// ---------------------------------------------------------------------------
-// .gitignore management
-// ---------------------------------------------------------------------------
-
-const REQUIRED_IGNORES = [
-  "node_modules",
-  "dist",
-  ".env",
-  ".env.local",
-  ".mcp-use",
-];
-
-async function ensureGitignore(cwd: string): Promise<void> {
-  const gitignorePath = path.join(cwd, ".gitignore");
-  let content = "";
-  try {
-    content = await fs.readFile(gitignorePath, "utf-8");
-  } catch {
-    // file doesn't exist yet
+function shouldArchive(relativePath: string): boolean {
+  const segments = relativePath.split(/[/\\]/).filter(Boolean);
+  if (segments.some((segment) => EXCLUDED_DIRECTORIES.has(segment))) {
+    return false;
   }
-  const missing = REQUIRED_IGNORES.filter((entry) => !content.includes(entry));
-  if (missing.length > 0) {
-    const additions = missing.join("\n");
-    const newContent =
-      content + (content.endsWith("\n") ? "" : "\n") + additions + "\n";
-    await fs.writeFile(gitignorePath, newContent, "utf-8");
+  const filename = segments.at(-1) ?? "";
+  if (
+    filename === ".DS_Store" ||
+    filename === "Thumbs.db" ||
+    filename === "desktop.ini"
+  ) {
+    return false;
   }
+  return !filename.startsWith(".env");
 }
 
-// ---------------------------------------------------------------------------
-// Deployment progress (poll build-logs)
-// ---------------------------------------------------------------------------
+interface TarEntry {
+  path: string;
+  mode: number;
+  mtime: number;
+  size: number;
+  type: "file" | "directory" | "symlink";
+  linkPath?: string;
+}
 
-async function displayDeploymentProgress(
-  api: McpUseAPI,
-  deploymentId: string,
-  progressOptions?: { yes?: boolean }
+async function writeTarHeader(
+  gzip: ReturnType<typeof createGzip>,
+  entry: TarEntry
 ): Promise<void> {
-  const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-  let frameIndex = 0;
-  let spinnerInterval: NodeJS.Timeout | null = null;
-
-  const startSpinner = (message: string) => {
-    if (spinnerInterval) clearInterval(spinnerInterval);
-    process.stdout.write("\r\x1b[K");
-    spinnerInterval = setInterval(() => {
-      process.stdout.write(
-        "\r" + chalk.cyan(frames[frameIndex]) + " " + chalk.gray(message)
-      );
-      frameIndex = (frameIndex + 1) % frames.length;
-    }, 80);
-  };
-
-  const stopSpinner = () => {
-    if (spinnerInterval) {
-      clearInterval(spinnerInterval);
-      spinnerInterval = null;
-      process.stdout.write("\r\x1b[K");
-    }
-  };
-
-  console.log();
-  startSpinner("Deploying...");
-
-  let checkCount = 0;
-  const maxChecks = 120;
-  let delay = 2000;
-  const maxDelay = 10000;
-  let buildLogOffset = 0;
-
-  while (checkCount < maxChecks) {
-    const waitMs = delay;
-    await new Promise<void>((r) => setTimeout(r, waitMs));
-    checkCount++;
-
-    try {
-      const resp = await api.getDeploymentBuildLogs(
-        deploymentId,
-        buildLogOffset
-      );
-      if (resp.logs.length > 0) {
-        for (const line of resp.logs.split("\n").filter((l) => l.trim())) {
-          try {
-            const d = JSON.parse(line);
-            if (d.line) {
-              stopSpinner();
-              const color =
-                d.level === "error"
-                  ? chalk.red
-                  : d.level === "warn"
-                    ? chalk.yellow
-                    : chalk.gray;
-              const prefix = d.step ? chalk.cyan(`[${d.step}]`) + " " : "";
-              console.log(prefix + color(d.line));
-            }
-          } catch {
-            stopSpinner();
-            console.log(chalk.gray(line));
-          }
-        }
-        buildLogOffset = resp.offset;
-      }
-    } catch {
-      // not ready yet
-    }
-
-    const dep = await api.getDeployment(deploymentId);
-
-    if (dep.status === "running") {
-      stopSpinner();
-      const mcpUrl = getMcpServerUrl(dep);
-      const webUrl = (await getWebUrl()).replace(/\/$/, "");
-      const config = await readConfig();
-      let dashboardUrl: string | null = null;
-      if (dep.serverId) {
-        dashboardUrl = config.orgSlug
-          ? `${webUrl}/cloud/${config.orgSlug}/servers/${dep.serverId}`
-          : `${webUrl}/cloud/servers/${dep.serverId}`;
-      }
-      const inspectorUrl = `https://inspector.manufact.com/inspector?autoConnect=${encodeURIComponent(mcpUrl)}`;
-
-      console.log(chalk.green.bold("✓ Deployment successful!\n"));
-      if (mcpUrl) {
-        console.log(chalk.white("🌐 MCP Server URL:"));
-        console.log(chalk.cyan.bold(`   ${mcpUrl}\n`));
-      }
-      if (dashboardUrl) {
-        console.log(chalk.white("📊 Dashboard:"));
-        console.log(chalk.cyan.bold(`   ${dashboardUrl}\n`));
-      }
-      console.log(chalk.white("🔍 Inspector URL:"));
-      console.log(chalk.cyan.bold(`   ${inspectorUrl}\n`));
-      console.log(chalk.gray("Deployment ID: ") + chalk.white(dep.id));
-      return;
-    } else if (dep.status === "failed") {
-      stopSpinner();
-      console.log(chalk.red.bold("✗ Deployment failed\n"));
-      if (dep.error) {
-        const internalPatterns = [
-          "GraphQL",
-          "authenticated",
-          "INTERNAL",
-          "Fly API",
-          "token validation",
-          "context deadline",
-          "Bad gateway",
-          "502",
-          "503",
-        ];
-        const isInternalError = internalPatterns.some((p) =>
-          dep.error!.includes(p)
-        );
-        if (isInternalError) {
-          console.log(
-            chalk.red("Error: ") +
-              "An internal infrastructure error occurred. Please try again."
-          );
-          console.log(chalk.gray("  Details: " + dep.error));
-        } else {
-          console.log(chalk.red("Error: ") + dep.error);
-        }
-      }
-      process.exit(1);
-    } else if (dep.status === "building" || dep.status === "pending") {
-      startSpinner("Building and deploying...");
-      delay = Math.min(delay * 1.2, maxDelay);
-    } else {
-      stopSpinner();
-      console.log(chalk.yellow("⚠️  Deployment status: ") + dep.status);
-      return;
-    }
+  const pax: Record<string, string> = {};
+  const pathFields = splitUstarPath(entry.path);
+  if (pathFields === undefined || !isAscii(entry.path)) {
+    pax["path"] = entry.path;
   }
-
-  stopSpinner();
-  console.log(chalk.yellow("⚠️  Deployment is taking longer than expected."));
-  console.log(
-    chalk.gray("Check status with: ") +
-      chalk.white(`mcp-use deployments get ${deploymentId}`)
+  if (
+    entry.linkPath !== undefined &&
+    (Buffer.byteLength(entry.linkPath) > 100 || !isAscii(entry.linkPath))
+  ) {
+    pax["linkpath"] = entry.linkPath;
+  }
+  if (Object.keys(pax).length > 0) {
+    const body = Buffer.from(
+      Object.entries(pax)
+        .map(([key, value]) => paxRecord(key, value))
+        .join("")
+    );
+    await writeArchiveChunk(
+      gzip,
+      createTarHeader({
+        path: "PaxHeader/entry",
+        mode: 0o644,
+        mtime: entry.mtime,
+        size: body.length,
+        type: "pax",
+      })
+    );
+    await writeArchiveChunk(gzip, body);
+    await writeTarPadding(gzip, body.length);
+  }
+  await writeArchiveChunk(
+    gzip,
+    createTarHeader({
+      ...entry,
+      path: pathFields === undefined ? "app/PaxEntry" : entry.path,
+      ...(entry.linkPath !== undefined &&
+      (Buffer.byteLength(entry.linkPath) > 100 || !isAscii(entry.linkPath))
+        ? { linkPath: "PaxLink" }
+        : {}),
+    })
   );
 }
 
-// ---------------------------------------------------------------------------
-// GitHub helpers
-// ---------------------------------------------------------------------------
-
-async function promptReauthenticateOn401(
-  options: DeployOptions,
-  orgIdToRestore: string | undefined
-): Promise<McpUseAPI> {
-  console.log(chalk.red("\n✗ Session expired or API key invalid."));
-  if (options.yes) {
-    console.log(
-      chalk.gray("  Run mcp-use login to re-authenticate, then retry.")
-    );
-    process.exit(1);
+function createTarHeader(
+  entry: Omit<TarEntry, "type"> & {
+    type: TarEntry["type"] | "pax";
   }
-  const should = await prompt(chalk.white("Log in again? (Y/n): "), "y");
-  if (!should) {
-    process.exit(1);
+): Buffer {
+  const header = Buffer.alloc(512);
+  const pathFields = splitUstarPath(entry.path) ?? {
+    name: entry.path.slice(-100),
+    prefix: "",
+  };
+  writeString(header, pathFields.name, 0, 100);
+  writeOctal(header, entry.mode, 100, 8);
+  writeOctal(header, 0, 108, 8);
+  writeOctal(header, 0, 116, 8);
+  writeOctal(header, entry.size, 124, 12);
+  writeOctal(header, entry.mtime, 136, 12);
+  header.fill(0x20, 148, 156);
+  header[156] =
+    entry.type === "directory"
+      ? 0x35
+      : entry.type === "symlink"
+        ? 0x32
+        : entry.type === "pax"
+          ? 0x78
+          : 0x30;
+  if (entry.linkPath !== undefined) {
+    writeString(header, entry.linkPath, 157, 100);
   }
-  await loginCommand({ silent: false });
-  if (!(await isLoggedIn())) {
-    console.log(chalk.red("✗ Login failed. Please try again."));
-    process.exit(1);
-  }
-  const fresh = await McpUseAPI.create();
-  if (orgIdToRestore) {
-    fresh.setOrgId(orgIdToRestore);
-  }
-  return fresh;
+  writeString(header, "ustar", 257, 6);
+  writeString(header, "00", 263, 2);
+  writeString(header, "mcp-use", 265, 32);
+  writeString(header, "mcp-use", 297, 32);
+  writeString(header, pathFields.prefix, 345, 155);
+  const checksum = header.reduce((sum, byte) => sum + byte, 0);
+  const encoded = checksum.toString(8).padStart(6, "0");
+  header.write(encoded, 148, 6, "ascii");
+  header[154] = 0;
+  header[155] = 0x20;
+  return header;
 }
 
-async function ensureApiSessionForDeploy(
-  api: McpUseAPI,
-  options: DeployOptions,
-  orgIdToRestore: string | undefined
-): Promise<McpUseAPI> {
-  let client = api;
-  for (;;) {
-    try {
-      await client.testAuth();
-      return client;
-    } catch (e) {
-      if (!(e instanceof ApiUnauthorizedError)) throw e;
-      client = await promptReauthenticateOn401(options, orgIdToRestore);
+function splitUstarPath(
+  path: string
+): { name: string; prefix: string } | undefined {
+  if (Buffer.byteLength(path) <= 100) return { name: path, prefix: "" };
+  for (let separator = path.lastIndexOf("/"); separator > 0; ) {
+    const prefix = path.slice(0, separator);
+    const name = path.slice(separator + 1);
+    if (Buffer.byteLength(prefix) <= 155 && Buffer.byteLength(name) <= 100) {
+      return { name, prefix };
     }
+    separator = path.lastIndexOf("/", separator - 1);
   }
+  return undefined;
 }
 
-async function getGitHubConnectionStatusWith401Retry(
-  api: McpUseAPI,
-  options: DeployOptions,
-  orgIdToRestore: string | undefined
-): Promise<{ api: McpUseAPI; status: GitHubConnectionStatus }> {
-  let client = api;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const status = await client.getGitHubConnectionStatus();
-      return { api: client, status };
-    } catch (e) {
-      if (e instanceof ApiUnauthorizedError && attempt === 0) {
-        client = await promptReauthenticateOn401(options, orgIdToRestore);
-        await client.testAuth();
-        continue;
-      }
-      throw e;
-    }
-  }
-  throw new Error("Unreachable");
-}
-
-async function checkRepoAccess(
-  api: McpUseAPI,
-  owner: string,
-  repo: string
-): Promise<boolean> {
-  return api.checkGitHubRepoAccess(owner, repo);
-}
-
-async function promptGitHubInstallation(
-  api: McpUseAPI,
-  reason: "not_connected" | "no_access",
-  repoName?: string,
-  opts?: {
-    yes?: boolean;
-    installationId?: string;
-    reauth: () => Promise<McpUseAPI>;
-  }
-): Promise<{ ok: boolean; api: McpUseAPI }> {
-  const yes = !!opts?.yes;
-  const reauth = opts?.reauth;
-  console.log();
-
-  if (reason === "not_connected") {
-    console.log(chalk.yellow("⚠️  GitHub account not connected"));
-    console.log(
-      chalk.white("Deployments require a connected GitHub account.\n")
-    );
-  } else {
-    console.log(
-      chalk.yellow("⚠️  GitHub App doesn't have access to this repository")
-    );
-    console.log(
-      chalk.white(
-        `The GitHub App needs permission to access ${chalk.cyan(repoName || "this repository")}.\n`
-      )
-    );
-  }
-
-  const shouldInstall = yes
-    ? true
-    : await prompt(
-        chalk.white(
-          `Would you like to ${reason === "not_connected" ? "connect" : "configure"} GitHub now? (Y/n): `
-        ),
-        "y"
-      );
-  if (!shouldInstall) return { ok: false, api };
-
-  let client = api;
-
-  try {
-    let appName: string;
-    for (;;) {
-      try {
-        appName = await client.getGitHubAppName();
-        break;
-      } catch (e) {
-        if (e instanceof ApiUnauthorizedError && reauth) {
-          client = await reauth();
-          await client.testAuth();
-          continue;
-        }
-        throw e;
-      }
-    }
-
-    const installUrl = `https://github.com/apps/${appName}/installations/new`;
-
-    console.log(chalk.cyan(`\nOpening browser...`));
-    console.log(chalk.gray(`URL: ${installUrl}\n`));
-
-    if (reason === "no_access") {
-      console.log(
-        chalk.white("Please add ") +
-          chalk.cyan.bold(repoName || "your repository") +
-          chalk.white(" to the app's repository access, then return here.\n")
-      );
-    } else {
-      console.log(
-        chalk.white("Complete the GitHub App installation, then return here.\n")
-      );
-    }
-
-    await open(installUrl);
-
-    if (!yes) {
-      await prompt(chalk.white("Press Enter when done..."), "y");
-    } else {
-      console.log(chalk.gray("Waiting for GitHub configuration (polling)..."));
-      const deadline = Date.now() + 120_000;
-      while (Date.now() < deadline) {
-        await new Promise((r) => setTimeout(r, 2000));
-        try {
-          const status = await client.getGitHubConnectionStatus();
-          if (status.is_connected) {
-            if (!repoName) return { ok: true, api: client };
-            const [o, r] = repoName.split("/");
-            if (o && r && (await checkRepoAccess(client, o, r))) {
-              return { ok: true, api: client };
-            }
-          }
-        } catch (e) {
-          if (e instanceof ApiUnauthorizedError && reauth) {
-            client = await reauth();
-            await client.testAuth();
-            continue;
-          }
-        }
-      }
-    }
-
-    return { ok: true, api: client };
-  } catch (e) {
-    if (e instanceof ApiUnauthorizedError) {
-      console.log(chalk.red("\n✗ Session expired or API key invalid."));
-      process.exit(1);
-    }
-    console.log(chalk.yellow("\n⚠️  Unable to open browser automatically"));
-    console.log(
-      chalk.white("Please visit: ") +
-        chalk.cyan("https://manufact.com/cloud/settings")
-    );
-    return { ok: false, api: client };
+function paxRecord(key: string, value: string): string {
+  const content = `${key}=${value}\n`;
+  let length = Buffer.byteLength(content) + 3;
+  while (true) {
+    const record = `${length} ${content}`;
+    const actual = Buffer.byteLength(record);
+    if (actual === length) return record;
+    length = actual;
   }
 }
 
-// ---------------------------------------------------------------------------
-// Managed deploy (no user GitHub) — upload local source as a tarball
-// ---------------------------------------------------------------------------
+function isAscii(value: string): boolean {
+  return Buffer.byteLength(value) === value.length;
+}
 
-/**
- * Deploy the local project directly via the platform-managed GitHub org. No
- * user GitHub connection, no git remote — the source is packed into a tarball
- * and uploaded. Reuses the project link for redeploys (push source + redeploy).
- */
-async function deployViaManagedUpload(
-  api: McpUseAPI,
-  options: DeployOptions,
-  ctx: { cwd: string; organizationId: string }
+function writeString(
+  target: Buffer,
+  value: string,
+  offset: number,
+  length: number
+): void {
+  target.write(value, offset, length, "utf8");
+}
+
+function writeOctal(
+  target: Buffer,
+  value: number,
+  offset: number,
+  length: number
+): void {
+  const encoded = Math.max(0, value)
+    .toString(8)
+    .padStart(length - 1, "0")
+    .slice(-(length - 1));
+  target.write(encoded, offset, length - 1, "ascii");
+  target[offset + length - 1] = 0;
+}
+
+async function writeTarPadding(
+  gzip: ReturnType<typeof createGzip>,
+  size: number
 ): Promise<void> {
-  const { cwd, organizationId } = ctx;
-  const projectDir = options.rootDir ? path.resolve(cwd, options.rootDir) : cwd;
-
-  try {
-    await fs.access(projectDir);
-  } catch {
-    console.log(chalk.red(`✗ Project directory not found: ${projectDir}`));
-    process.exit(1);
-  }
-
-  const isMcp = await isMcpProject(projectDir);
-  if (!isMcp && !options.yes) {
-    console.log(
-      chalk.yellow("⚠️  This doesn't look like an MCP server project.")
-    );
-    const shouldContinue = await prompt(
-      chalk.white("Continue anyway? (y/n): ")
-    );
-    if (!shouldContinue) process.exit(0);
-    console.log();
-  }
-
-  const envVars = await buildEnvVars(options);
-  const branch = options.branch || "main";
-  const projectName = options.name || (await getProjectName(projectDir));
-
-  console.log(chalk.gray("Packaging project source..."));
-  const tarball = await packProjectTarball(projectDir);
-  console.log(
-    chalk.gray(
-      `  Archive size: ${(tarball.length / 1024 / 1024).toFixed(2)} MB`
-    )
-  );
-  if (tarball.length > 80 * 1024 * 1024) {
-    console.log(
-      chalk.red(
-        "✗ Project archive exceeds 80 MB. Add large/derived files to .gitignore and retry."
-      )
-    );
-    process.exit(1);
-  }
-
-  // Redeploy an existing managed server when linked (keeps the same URL).
-  const existingLink = !options.new ? await getProjectLink(cwd) : null;
-  let serverId = existingLink?.serverId;
-  if (serverId) {
-    try {
-      const linked = await api.getServer(serverId);
-      if (linked.organizationId !== organizationId) serverId = undefined;
-    } catch {
-      serverId = undefined;
-    }
-  }
-
-  let deploymentId: string | undefined;
-
-  if (serverId) {
-    console.log(chalk.gray("Uploading source and redeploying..."));
-    if (Object.keys(envVars).length > 0) {
-      await syncEnvVarsToServer(
-        api,
-        serverId,
-        envVars,
-        options.branch ? { branch: options.branch } : undefined
-      );
-    }
-    await api.pushSourceToServer(serverId, {
-      tarball,
-      branch,
-      commitMessage: "Redeploy from mcp-use CLI",
-    });
-    const dep = await api.createDeployment({
-      serverId,
-      branch,
-      trigger: "redeploy",
-    });
-    deploymentId = dep.id;
-    await saveProjectLink(cwd, {
-      deploymentId: dep.id,
-      deploymentName: projectName,
-      serverId,
-      linkedAt: new Date().toISOString(),
-    });
-  } else {
-    console.log(chalk.gray("Uploading source (no GitHub required)..."));
-    const result = await api.createServerFromManagedUpload({
-      organizationId,
-      name: projectName,
-      repoName: sanitizeRepoName(projectName),
-      tarball,
-      branch,
-      commitMessage: "Deploy from mcp-use CLI",
-      port: options.port,
-      env: Object.keys(envVars).length > 0 ? envVars : undefined,
-    });
-    deploymentId = result.deploymentId ?? undefined;
-    if (result.server?.id) serverId = result.server.id;
-    if (result.server?.id && deploymentId) {
-      await saveProjectLink(cwd, {
-        deploymentId,
-        deploymentName: projectName,
-        serverId: result.server.id,
-        linkedAt: new Date().toISOString(),
-      });
-    }
-  }
-
-  if (!deploymentId) {
-    console.log(chalk.red("✗ No deployment was created."));
-    process.exit(1);
-  }
-
-  console.log(chalk.green("✓ Deployment created: ") + chalk.gray(deploymentId));
-  await displayDeploymentProgress(api, deploymentId, { yes: options.yes });
-
-  // No git remote was created for this folder (--no-github). Explain where the
-  // source actually lives so users/agents don't go looking for a local remote
-  // or a GitHub repo they can't open.
-  console.log();
-  console.log(
-    chalk.gray(
-      "Source is stored in a private mcp-use-managed repository (no GitHub remote in this folder)."
-    )
-  );
-  if (serverId) {
-    const webUrl = (await getWebUrl()).replace(/\/$/, "");
-    const config = await readConfig();
-    const settingsUrl = config.orgSlug
-      ? `${webUrl}/cloud/${config.orgSlug}/servers/${serverId}`
-      : `${webUrl}/cloud/servers/${serverId}`;
-    console.log(
-      chalk.gray("View it or move it to your own GitHub from the dashboard: ") +
-        chalk.cyan(settingsUrl)
-    );
-  }
+  const padding = (512 - (size % 512)) % 512;
+  if (padding > 0) await writeArchiveChunk(gzip, Buffer.alloc(padding));
 }
 
-// ---------------------------------------------------------------------------
-// Main deploy command
-// ---------------------------------------------------------------------------
+async function writeArchiveChunk(
+  gzip: ReturnType<typeof createGzip>,
+  chunk: Buffer
+): Promise<void> {
+  if (gzip.write(chunk)) return;
+  await new Promise<void>((resolve, reject) => {
+    const cleanup = () => {
+      gzip.off("drain", onDrain);
+      gzip.off("error", onError);
+    };
+    const onDrain = () => {
+      cleanup();
+      resolve();
+    };
+    const onError = (error: Error) => {
+      cleanup();
+      reject(error);
+    };
+    gzip.once("drain", onDrain);
+    gzip.once("error", onError);
+  });
+}
 
-export async function deployCommand(options: DeployOptions): Promise<void> {
+function appendArchive(form: FormData, archive: Buffer): void {
+  form.set(
+    "sourceFile",
+    new Blob([new Uint8Array(archive)], { type: "application/gzip" }),
+    "source.tar.gz"
+  );
+}
+
+function resolveContainedPath(
+  root: string,
+  value: string,
+  option: string
+): string {
+  if (isAbsolute(value)) throw new UsageError(`${option} must be relative.`);
+  const target = resolve(root, value);
+  const path = relative(root, target);
+  if (path.startsWith("..") || isAbsolute(path)) {
+    throw new UsageError(`${option} must not escape the project directory.`);
+  }
+  return target;
+}
+
+function validateSourcePath(
+  sourceRoot: string,
+  value: string | undefined,
+  option: string
+): void {
+  if (value === undefined) return;
+  resolveContainedPath(sourceRoot, value, option);
+}
+
+async function loadEnvironment(
+  cwd: string,
+  envFile: string | undefined,
+  assignments: string[]
+): Promise<Record<string, string>> {
+  const result: Record<string, string> = {};
+  if (envFile !== undefined) {
+    const path = resolveContainedPath(cwd, envFile, "--env-file");
+    if (!(await pathExists(path))) {
+      throw new UsageError(`Environment file not found: ${envFile}`);
+    }
+    for (const raw of (await readFile(path, "utf8")).split(/\r?\n/)) {
+      const line = raw.trim();
+      if (line === "" || line.startsWith("#")) continue;
+      assignEnvironment(result, line);
+    }
+  }
+  for (const assignment of assignments) assignEnvironment(result, assignment);
+  return result;
+}
+
+function assignEnvironment(
+  target: Record<string, string>,
+  assignment: string
+): void {
+  const separator = assignment.indexOf("=");
+  const key = assignment.slice(0, separator);
+  if (separator <= 0 || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
+    throw new UsageError("Invalid environment assignment; expected KEY=VALUE.");
+  }
+  target[key] = assignment.slice(separator + 1);
+}
+
+async function projectName(cwd: string): Promise<string> {
   try {
-    const cwd = process.cwd();
+    const pkg = JSON.parse(
+      await readFile(join(cwd, "package.json"), "utf8")
+    ) as {
+      name?: unknown;
+    };
+    if (typeof pkg.name === "string" && pkg.name.trim() !== "") return pkg.name;
+  } catch {
+    // Fall back to the directory name.
+  }
+  return basename(cwd);
+}
 
-    // ── Step 1: Auth ──────────────────────────────────────────────
-    if (!(await isLoggedIn())) {
-      console.log(chalk.cyan.bold("Welcome to Manufact Cloud!\n"));
-      if (options.yes) {
-        console.log(
-          chalk.red(
-            "✗ Not logged in. Run " +
-              chalk.white("npx mcp-use login") +
-              " first."
-          )
-        );
-        process.exit(1);
-      }
-
-      const shouldLogin = await prompt(
-        chalk.white("You need to log in to deploy. Log in now? (Y/n): "),
-        "y"
-      );
-      if (!shouldLogin) {
-        console.log(
-          chalk.gray(
-            "Run " + chalk.white("npx mcp-use login") + " to get started."
-          )
-        );
-        process.exit(0);
-      }
-
-      try {
-        await loginCommand({ silent: false });
-        if (!(await isLoggedIn())) {
-          console.log(chalk.red("✗ Login failed. Please try again."));
-          process.exit(1);
-        }
-        console.log(chalk.gray("\nContinuing with deployment...\n"));
-      } catch (error) {
-        console.error(
-          chalk.red.bold("✗ Login failed:"),
-          chalk.red(error instanceof Error ? error.message : "Unknown error")
-        );
-        process.exit(1);
+async function validateManagedPackage(sourceRoot: string): Promise<void> {
+  const manifestPath = join(sourceRoot, "package.json");
+  if (!(await pathExists(manifestPath))) return;
+  let manifest: Record<string, unknown>;
+  try {
+    manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Record<
+      string,
+      unknown
+    >;
+  } catch {
+    return;
+  }
+  if (manifest["workspaces"] !== undefined) return;
+  const sections = [
+    "dependencies",
+    "devDependencies",
+    "optionalDependencies",
+    "peerDependencies",
+  ];
+  const workspaceDependencies: string[] = [];
+  for (const section of sections) {
+    const dependencies = manifest[section];
+    if (
+      dependencies === null ||
+      typeof dependencies !== "object" ||
+      Array.isArray(dependencies)
+    ) {
+      continue;
+    }
+    for (const [name, version] of Object.entries(dependencies)) {
+      if (typeof version === "string" && version.startsWith("workspace:")) {
+        workspaceDependencies.push(name);
       }
     }
-
-    let api = await McpUseAPI.create();
-
-    // ── Step 2: Org resolution ────────────────────────────────────
-    let resolvedOrgId: string | undefined;
-    let resolvedOrgName: string | undefined;
-    let resolvedOrgSlug: string | undefined;
-
-    if (options.org) {
-      const authInfo = await api.testAuth();
-      const match = resolveOrgFromOption(authInfo.orgs ?? [], options.org);
-      if (match) {
-        api.setOrgId(match.id);
-        resolvedOrgId = match.id;
-        resolvedOrgName = match.name;
-        resolvedOrgSlug = match.slug ?? undefined;
-        const slug = match.slug ? chalk.gray(` (${match.slug})`) : "";
-        console.log(
-          chalk.gray("Organization: ") + chalk.cyan(match.name) + slug
-        );
-      } else {
-        console.error(
-          chalk.red(
-            `✗ Organization "${options.org}" not found. Run ${chalk.white("npx mcp-use org list")} to see available organizations.`
-          )
-        );
-        process.exit(1);
-      }
-    } else {
-      const config = await readConfig();
-      if (!config.orgId) {
-        const authInfo = await api.testAuth();
-        if (authInfo.orgs.length === 0) {
-          console.log(
-            chalk.red(
-              "✗ No organizations found. Please create one at manufact.com/cloud."
-            )
-          );
-          process.exit(1);
-        }
-        let selectedOrg: OrgInfo | null;
-        if (authInfo.orgs.length === 1) {
-          selectedOrg = authInfo.orgs[0];
-        } else {
-          selectedOrg = await promptOrgSelection(
-            authInfo.orgs,
-            authInfo.default_org_id
-          );
-        }
-        if (!selectedOrg) {
-          console.log(chalk.red("✗ No organization selected."));
-          process.exit(1);
-        }
-        api.setOrgId(selectedOrg.id);
-        resolvedOrgId = selectedOrg.id;
-        resolvedOrgName = selectedOrg.name;
-        resolvedOrgSlug = selectedOrg.slug ?? undefined;
-        await writeConfig({
-          ...config,
-          orgId: selectedOrg.id,
-          orgName: selectedOrg.name,
-          orgSlug: selectedOrg.slug ?? undefined,
-        });
-        console.log(
-          chalk.gray("Organization: ") + chalk.cyan(selectedOrg.name)
-        );
-      } else {
-        resolvedOrgId = config.orgId;
-        resolvedOrgName = config.orgName;
-        resolvedOrgSlug = config.orgSlug;
-        api.setOrgId(config.orgId);
-        if (config.orgName) {
-          const slug = config.orgSlug ? chalk.gray(` (${config.orgSlug})`) : "";
-          console.log(
-            chalk.gray("Organization: ") + chalk.cyan(config.orgName) + slug
-          );
-        }
-      }
-    }
-
-    api = await ensureApiSessionForDeploy(api, options, resolvedOrgId);
-
-    console.log(chalk.cyan.bold("\n🚀 Deploying to Manufact cloud...\n"));
-
-    // ── No-GitHub deploy: upload local source via platform-managed org ──
-    // Explicit via --no-github, or auto-detected when redeploying a project
-    // already linked to a platform-managed server (--no-github not needed again).
-    let useNoGithubDeploy = !!options.noGithub;
-    if (!useNoGithubDeploy && !options.new) {
-      const link = await getProjectLink(cwd);
-      if (link?.serverId) {
-        try {
-          const linked = await api.getServer(link.serverId);
-          if (linked.connectedRepository?.isManaged) useNoGithubDeploy = true;
-        } catch {
-          // Server gone / inaccessible — fall through to the normal flow.
-        }
-      }
-    }
-    if (useNoGithubDeploy) {
-      const organizationId =
-        resolvedOrgId ?? (await api.resolveOrganizationId());
-      await deployViaManagedUpload(api, options, { cwd, organizationId });
-      return;
-    }
-
-    // ── Step 3: GitHub connection ─────────────────────────────────
-    const reauth = () => promptReauthenticateOn401(options, resolvedOrgId);
-
-    let ghConn = await getGitHubConnectionStatusWith401Retry(
-      api,
-      options,
-      resolvedOrgId
-    );
-    api = ghConn.api;
-    let connectionStatus = ghConn.status;
-
-    if (!connectionStatus.is_connected) {
-      const installed = await promptGitHubInstallation(
-        api,
-        "not_connected",
-        undefined,
+  }
+  if (workspaceDependencies.length === 0) return;
+  throw new CommandError(
+    "workspace_dependencies_unresolved",
+    `This upload root uses workspace dependencies but is not a workspace root: ${workspaceDependencies.join(", ")}.`,
+    {
+      dependencies: workspaceDependencies,
+      nextSteps: [
         {
-          yes: options.yes,
-          reauth,
-        }
-      );
-      if (!installed.ok) {
-        console.log(chalk.gray("Deployment cancelled."));
-        process.exit(0);
-      }
-      api = installed.api;
-      ghConn = await getGitHubConnectionStatusWith401Retry(
-        api,
-        options,
-        resolvedOrgId
-      );
-      api = ghConn.api;
-      connectionStatus = ghConn.status;
-      if (!connectionStatus.is_connected) {
-        console.log(chalk.red("\n✗ GitHub connection could not be verified."));
-        console.log(
-          chalk.cyan(
-            "  Visit https://manufact.com/cloud/settings to connect GitHub.\n"
-          )
-        );
-        process.exit(1);
-      }
+          description: "Deploy the monorepo root and select this package",
+          command:
+            "mcp-use deploy <monorepo-root> --no-github --root-dir <package-path>",
+        },
+        {
+          description:
+            "Use published dependency versions for a standalone upload",
+          command:
+            "Replace workspace:* versions in package.json, then run mcp-use deploy --no-github",
+        },
+      ],
     }
+  );
+}
 
-    const installations = connectionStatus.installations ?? [];
-    if (installations.length === 0) {
-      console.log(chalk.red("✗ No GitHub installations found."));
-      process.exit(1);
-    }
+function sanitizeRepositoryName(name: string): string {
+  const result = name
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/^[-.]+|[-.]+$/g, "")
+    .slice(0, 80);
+  return result || "mcp-server";
+}
 
-    console.log(chalk.green("✓ GitHub connected\n"));
-
-    // Resolved later based on user selection or repo ownership.
-    let installationDbId: string | undefined;
-    let githubInstallationId: string | undefined;
-
-    // ── Step 4: Project & Git ─────────────────────────────────────
-    const projectDir = options.rootDir
-      ? path.resolve(cwd, options.rootDir)
-      : cwd;
-
-    if (options.rootDir) {
-      try {
-        await fs.access(projectDir);
-      } catch {
-        console.log(
-          chalk.red(`✗ Root directory not found: ${options.rootDir}`)
-        );
-        process.exit(1);
-      }
-    }
-
-    const isMcp = await isMcpProject(projectDir);
-    if (!isMcp && !options.yes) {
-      console.log(
-        chalk.yellow("⚠️  This doesn't look like an MCP server project.")
-      );
-      const shouldContinue = await prompt(
-        chalk.white("Continue anyway? (y/n): ")
-      );
-      if (!shouldContinue) {
-        process.exit(0);
-      }
-      console.log();
-    }
-
-    let gitInfo = await getGitInfo(cwd);
-    let repoFullName: string | undefined;
-    let branch: string = options.branch || "main";
-
-    if (!gitInfo.isGitRepo || !gitInfo.remoteUrl) {
-      // No git repo or no remote — offer to create one
-      const projectName = options.name || (await getProjectName(projectDir));
-
-      console.log(chalk.yellow("⚠️  No GitHub remote found.\n"));
-      if (options.yes) {
-        console.log(chalk.gray("Creating GitHub repository automatically..."));
-      } else {
-        const shouldCreate = await prompt(
-          chalk.white("Create a GitHub repository and push your code? (Y/n): "),
-          "y"
-        );
-        if (!shouldCreate) {
-          console.log(
-            chalk.gray(
-              "Deployment cancelled. Set up a GitHub remote and try again."
-            )
-          );
-          process.exit(0);
-        }
-      }
-
-      // Let the user pick which GitHub account to create the repo under.
-      // Default to the first org-type installation (org accounts support auto-create).
-      const defaultIdx = installations.findIndex(
-        (i) => i.account_type === "Organization"
-      );
-      let selectedIdx = defaultIdx >= 0 ? defaultIdx : 0;
-
-      if (installations.length > 1 && !options.yes) {
-        console.log(
-          chalk.cyan.bold("🐙 Select a GitHub account for the repository:\n")
-        );
-        for (let i = 0; i < installations.length; i++) {
-          const inst = installations[i];
-          const typeLabel =
-            inst.account_type === "Organization"
-              ? chalk.gray(" (org)")
-              : chalk.gray(" (personal)");
-          const marker = i === selectedIdx ? chalk.green(" ← default") : "";
-          console.log(
-            `  ${chalk.white(`${i + 1}.`)} ${inst.account_login}${typeLabel}${marker}`
-          );
-        }
-        console.log();
-
-        const readline = await import("node:readline");
-        const rl = readline.createInterface({
-          input: process.stdin,
-          output: process.stdout,
-        });
-        const answer = await new Promise<string>((resolve) => {
-          rl.question(
-            chalk.gray(`Enter number [${selectedIdx + 1}]: `),
-            (a) => {
-              rl.close();
-              resolve(a.trim());
-            }
-          );
-        });
-        const parsed = answer === "" ? selectedIdx : parseInt(answer, 10) - 1;
-        if (parsed >= 0 && parsed < installations.length) {
-          selectedIdx = parsed;
-        }
-      }
-
-      const repoInstallation = installations[selectedIdx];
-      installationDbId = repoInstallation.id;
-      githubInstallationId = repoInstallation.installation_id;
-
-      const repoName = options.yes
-        ? projectName
-        : await promptText(chalk.gray("Repository name:"), projectName);
-
-      await ensureGitignore(cwd);
-
-      console.log(
-        chalk.gray(
-          `Creating repository on ${repoInstallation.account_login}...`
-        )
-      );
-
-      let repoResult: { fullName: string; cloneUrl: string; htmlUrl: string };
-      try {
-        repoResult = await api.createGitHubRepo({
-          installationId: repoInstallation.installation_id,
-          name: repoName,
-          private: true,
-          org: repoInstallation.account_login,
-        });
-      } catch (err) {
-        if (err instanceof GitHubAuthRequiredError) {
-          console.log(
-            chalk.yellow(
-              `\n  Personal accounts require a one-time GitHub authorization.\n`
-            )
-          );
-          try {
-            await open(err.authorizeUrl);
-            console.log(
-              chalk.gray("  Browser opened. Authorize and return here.\n")
-            );
-          } catch {
-            console.log(
-              chalk.gray(
-                `  Open this URL in your browser:\n  ${err.authorizeUrl}\n`
-              )
-            );
-          }
-          const readline = await import("node:readline");
-          await new Promise<void>((resolve) => {
-            const rl = readline.createInterface({
-              input: process.stdin,
-              output: process.stdout,
-            });
-            rl.question(
-              chalk.gray("  Press Enter after authorizing..."),
-              () => {
-                rl.close();
-                resolve();
-              }
-            );
-          });
-          console.log(chalk.gray("Retrying repository creation..."));
-          repoResult = await api.createGitHubRepo({
-            installationId: repoInstallation.installation_id,
-            name: repoName,
-            private: true,
-            org: repoInstallation.account_login,
-          });
-        } else {
-          throw err;
-        }
-      }
-      console.log(chalk.green(`✓ Created ${chalk.cyan(repoResult.fullName)}`));
-
-      try {
-        if (!gitInfo.isGitRepo) {
-          await ensureGitignore(cwd);
-          console.log(chalk.gray("Initializing git..."));
-          await gitInit(cwd, "Initial commit");
-          console.log(chalk.gray("Pushing to GitHub..."));
-          await gitAddRemoteAndPush(cwd, repoResult.cloneUrl, "main");
-        } else {
-          if (await hasUncommittedChanges(cwd)) {
-            console.log(
-              chalk.red(
-                "✗ You have uncommitted changes. Commit and push before deploying."
-              )
-            );
-            process.exit(1);
-          }
-          console.log(chalk.gray("Adding remote and pushing..."));
-          await gitAddRemoteAndPush(
-            cwd,
-            repoResult.cloneUrl,
-            gitInfo.branch || "main"
-          );
-        }
-      } catch (err) {
-        if (err instanceof GitCommandError) {
-          console.log(chalk.red(`\n✗ Git step failed: \`${err.command}\``));
-          const stderrTrimmed = (err.stderr || err.stdout).trim();
-          if (stderrTrimmed) {
-            console.log(chalk.gray(stderrTrimmed));
-          }
-          // Actionable hint for the most common failure: missing identity.
-          if (/tell me who you are|user\.email|user\.name/i.test(err.stderr)) {
-            console.log(
-              chalk.yellow(
-                "\n  Set your git identity for this project and retry:\n" +
-                  `    git -C ${JSON.stringify(cwd)} config user.email "you@example.com"\n` +
-                  `    git -C ${JSON.stringify(cwd)} config user.name  "Your Name"`
-              )
-            );
-          } else if (
-            /non-fast-forward|rejected|unrelated histories/i.test(err.stderr)
-          ) {
-            console.log(
-              chalk.yellow(
-                "\n  The remote branch already has commits. Either delete the empty GitHub repo and retry, " +
-                  "or reconcile manually:\n" +
-                  "    git pull --rebase origin main --allow-unrelated-histories\n" +
-                  "    git push -u origin main"
-              )
-            );
-          }
-          process.exit(1);
-        }
-        throw err;
-      }
-
-      console.log(chalk.green("✓ Code pushed to GitHub\n"));
-
-      gitInfo = await getGitInfo(cwd);
-      repoFullName = repoResult.fullName;
-      branch = options.branch || gitInfo.branch || "main";
-    } else if (!isGitHubUrl(gitInfo.remoteUrl!)) {
-      console.log(chalk.red("✗ Remote is not a GitHub repository"));
-      console.log(chalk.yellow(`   Current remote: ${gitInfo.remoteUrl}\n`));
-      process.exit(1);
-    } else if (!gitInfo.owner || !gitInfo.repo) {
-      console.log(chalk.red("✗ Could not parse GitHub repository information"));
-      process.exit(1);
-    } else {
-      repoFullName = `${gitInfo.owner}/${gitInfo.repo}`;
-      branch = options.branch || gitInfo.branch || "main";
-
-      // Resolve installation matching the repo owner
-      const ownerLower = gitInfo.owner!.toLowerCase();
-      const matchingInst =
-        installations.find(
-          (i) => i.account_login.toLowerCase() === ownerLower
-        ) ??
-        installations.find((i) => i.account_type === "Organization") ??
-        installations[0];
-      installationDbId = matchingInst.id;
-      githubInstallationId = matchingInst.installation_id;
-
-      // Check for uncommitted changes
-      if (gitInfo.hasUncommittedChanges) {
-        if (options.yes) {
-          console.log(
-            chalk.red(
-              "✗ You have uncommitted changes. Commit and push before deploying."
-            )
-          );
-          process.exit(1);
-        }
-        console.log(chalk.yellow("⚠️  You have uncommitted changes.\n"));
-        const shouldCommit = await prompt(
-          chalk.white("Commit and push changes before deploying? (Y/n): "),
-          "y"
-        );
-        if (shouldCommit) {
-          await ensureGitignore(cwd);
-          console.log(chalk.gray("Committing and pushing..."));
-          await gitCommitAndPush(cwd, "Deploy changes", branch);
-          gitInfo = await getGitInfo(cwd);
-          console.log(chalk.green("✓ Changes pushed\n"));
-        } else {
-          console.log(chalk.gray("Deploying from last pushed commit.\n"));
-        }
-      }
-
-      // Check repo access
-      console.log(chalk.gray("Checking repository access..."));
-      const hasAccess = await checkRepoAccess(
-        api,
-        gitInfo.owner!,
-        gitInfo.repo!
-      );
-      if (!hasAccess) {
-        console.log(
-          chalk.yellow(
-            `⚠️  GitHub App doesn't have access to ${chalk.cyan(repoFullName)}`
-          )
-        );
-        const configured = await promptGitHubInstallation(
-          api,
-          "no_access",
-          repoFullName,
-          {
-            yes: options.yes,
-            installationId: githubInstallationId,
-            reauth: () => promptReauthenticateOn401(options, resolvedOrgId),
-          }
-        );
-        if (!configured.ok) {
-          process.exit(0);
-        }
-        api = configured.api;
-        const retry = await checkRepoAccess(api, gitInfo.owner!, gitInfo.repo!);
-        if (!retry) {
-          const appName = await api.getGitHubAppName();
-          console.log(
-            chalk.red(
-              `\n✗ Repository ${chalk.cyan(repoFullName)} is still not accessible.`
-            )
-          );
-          console.log(
-            chalk.cyan(
-              `  https://github.com/apps/${appName}/installations/new\n`
-            )
-          );
-          process.exit(1);
-        }
-      }
-      console.log(chalk.green("✓ Repository access confirmed"));
-    }
-
-    // ── Step 5: Display config ────────────────────────────────────
-    const projectName = options.name || (await getProjectName(projectDir));
-    const port = options.port || 3000;
-    const buildCommand = await detectBuildCommand(projectDir);
-    const startCommand = await detectStartCommand(projectDir);
-    const runtime = options.runtime || (await detectRuntime(projectDir));
-    const envVars = await buildEnvVars(options);
-
-    console.log();
-    console.log(chalk.white("Deployment configuration:"));
-    console.log(chalk.gray(`  Repository:    `) + chalk.cyan(repoFullName));
-    console.log(chalk.gray(`  Branch:        `) + chalk.cyan(branch));
-    console.log(chalk.gray(`  Name:          `) + chalk.cyan(projectName));
-    console.log(chalk.gray(`  Runtime:       `) + chalk.cyan(runtime));
-    console.log(chalk.gray(`  Port:          `) + chalk.cyan(port));
-    if (options.region)
-      console.log(chalk.gray(`  Region:        `) + chalk.cyan(options.region));
-    if (options.dockerfile)
-      console.log(
-        chalk.gray(`  Dockerfile:    `) + chalk.cyan(options.dockerfile)
-      );
-    if (options.buildCommand)
-      console.log(
-        chalk.gray(`  Build command: `) + chalk.cyan(options.buildCommand)
-      );
-    else if (buildCommand)
-      console.log(
-        chalk.gray(`  Build command: `) +
-          chalk.gray(buildCommand + " (auto-detected)")
-      );
-    if (options.startCommand)
-      console.log(
-        chalk.gray(`  Start command: `) + chalk.cyan(options.startCommand)
-      );
-    else if (startCommand)
-      console.log(
-        chalk.gray(`  Start command: `) +
-          chalk.gray(startCommand + " (auto-detected)")
-      );
-    if (Object.keys(envVars).length > 0) {
-      console.log(
-        chalk.gray(`  Environment:   `) +
-          chalk.cyan(`${Object.keys(envVars).length} variable(s)`)
-      );
-    }
-    console.log();
-
-    if (!options.yes) {
-      const shouldDeploy = await prompt(chalk.white(`Deploy? (Y/n): `), "y");
-      if (!shouldDeploy) {
-        console.log(chalk.gray("Deployment cancelled."));
-        process.exit(0);
-      }
-    }
-
-    // ── Step 6: Deploy ────────────────────────────────────────────
-    const existingLink = !options.new ? await getProjectLink(cwd) : null;
-    let serverId = existingLink?.serverId;
-
-    // When --org is specified, verify the linked server belongs to that org.
-    // If not, ignore the link and create a new server in the specified org.
-    if (serverId && resolvedOrgId) {
-      try {
-        const linkedServer = await api.getServer(serverId);
-        if (linkedServer.organizationId !== resolvedOrgId) {
-          const target = resolvedOrgName
-            ? `${resolvedOrgName}${resolvedOrgSlug ? ` (${resolvedOrgSlug})` : ""}`
-            : resolvedOrgId;
-          console.log(
-            chalk.yellow(
-              `⚠️  Linked server belongs to a different organization. Creating a new server in ${target}...\n`
-            )
-          );
-          serverId = undefined;
-        }
-      } catch {
-        // If we can't fetch the server, let the existing flow handle it
-      }
-    }
-
-    if (existingLink && serverId) {
-      try {
-        const existingDep = await api.getDeployment(existingLink.deploymentId);
-        if (existingDep && existingDep.status !== "failed") {
-          console.log(chalk.green(`✓ Found linked server`));
-          console.log(chalk.gray(`  Redeploying to maintain the same URL...`));
-          console.log(chalk.cyan(`  URL: ${getMcpServerUrl(existingDep)}\n`));
-
-          if (Object.keys(envVars).length > 0) {
-            const synced = await syncEnvVarsToServer(
-              api,
-              serverId,
-              envVars,
-              options.branch ? { branch: options.branch } : undefined
-            );
-            console.log(
-              chalk.green(
-                `✓ Synced ${synced.created + synced.updated} environment variable(s)` +
-                  (synced.created || synced.updated
-                    ? chalk.gray(
-                        ` (${synced.created} created, ${synced.updated} updated)`
-                      )
-                    : "")
-              )
-            );
-          }
-
-          const newDep = await api.createDeployment({
-            serverId,
-            branch,
-            trigger: "redeploy",
-          });
-
-          await saveProjectLink(cwd, {
-            ...existingLink,
-            linkedAt: new Date().toISOString(),
-            deploymentId: newDep.id,
-          });
-
-          console.log(
-            chalk.green("✓ Deployment created: ") + chalk.gray(newDep.id)
-          );
-          await displayDeploymentProgress(api, newDep.id, { yes: options.yes });
-          return;
-        }
-      } catch (err: any) {
-        const is404 =
-          err?.status === 404 || (err?.message ?? "").includes("404");
-        if (is404) {
-          console.log(
-            chalk.yellow("⚠️  Previously linked server no longer exists.\n")
-          );
-          if (!options.yes) {
-            const shouldRecreate = await prompt(
-              chalk.white("Create a new server and deploy? (Y/n): "),
-              "y"
-            );
-            if (!shouldRecreate) {
-              console.log(chalk.gray("Deployment cancelled."));
-              process.exit(0);
-            }
-          }
-          serverId = undefined;
-        }
-      }
-    }
-
-    let deploymentId: string | undefined;
-
-    if (serverId) {
-      if (Object.keys(envVars).length > 0) {
-        const synced = await syncEnvVarsToServer(
-          api,
-          serverId,
-          envVars,
-          options.branch ? { branch: options.branch } : undefined
-        );
-        console.log(
-          chalk.green(
-            `✓ Synced ${synced.created + synced.updated} environment variable(s)` +
-              (synced.created || synced.updated
-                ? chalk.gray(
-                    ` (${synced.created} created, ${synced.updated} updated)`
-                  )
-                : "")
-          )
-        );
-      }
-      console.log(chalk.gray("Creating deployment..."));
-      try {
-        const result = await api.createDeployment({
-          serverId,
-          branch,
-          trigger: "manual",
-        });
-        deploymentId = result.id;
-      } catch (err: any) {
-        const is404 =
-          err?.status === 404 || (err?.message ?? "").includes("404");
-        if (is404) {
-          console.log(
-            chalk.yellow(
-              "⚠️  Linked server no longer exists. Creating a new one...\n"
-            )
-          );
-          serverId = undefined;
-        } else {
-          throw err;
-        }
-      }
-    }
-
-    if (!serverId) {
-      const orgId = await api.resolveOrganizationId();
-
-      if (!installationDbId) {
-        console.log(
-          chalk.red(
-            "✗ Could not determine GitHub installation for this repository."
-          )
-        );
-        process.exit(1);
-      }
-
-      console.log(chalk.gray("Creating server and deployment..."));
-      const serverResult = await api.createServer({
-        type: "github",
-        organizationId: orgId,
-        installationId: installationDbId,
-        name: projectName,
-        repoFullName: repoFullName!,
-        branch,
-        rootDir: options.rootDir,
-        port,
-        env: Object.keys(envVars).length > 0 ? envVars : undefined,
-        region: options.region,
-        buildCommand: options.buildCommand,
-        startCommand: options.startCommand,
-        dockerfilePath: options.dockerfile,
-      });
-
-      deploymentId = serverResult.deploymentId ?? "";
-      if (!deploymentId) {
-        console.log(
-          chalk.green("✓ Server created: ") + chalk.gray(serverResult.server.id)
-        );
-        console.log(chalk.yellow("⚠️  No deployment was triggered."));
-        return;
-      }
-
-      await saveProjectLink(cwd, {
-        deploymentId,
-        deploymentName: projectName,
-        linkedAt: new Date().toISOString(),
-        serverId: serverResult.server.id,
-      });
-      console.log(
-        chalk.gray(`  Linked to this project (stored in .mcp-use/project.json)`)
-      );
-      console.log(chalk.gray(`  Future deploys will reuse the same URL\n`));
-    }
-
-    if (!deploymentId) {
-      console.log(chalk.red("✗ No deployment was created."));
-      process.exit(1);
-    }
-
-    console.log(
-      chalk.green("✓ Deployment created: ") + chalk.gray(deploymentId)
+async function promptYesNo(
+  question: string,
+  defaultValue: boolean
+): Promise<boolean> {
+  const prompt = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+  try {
+    const answer = await prompt.question(
+      `${question} ${defaultValue ? "[Y/n]" : "[y/N]"} `
     );
-    await displayDeploymentProgress(api, deploymentId, { yes: options.yes });
-
-    if (options.open) {
-      const dep = await api.getDeployment(deploymentId);
-      const url = getMcpServerUrl(dep);
-      if (url) {
-        console.log(chalk.gray("\nOpening in browser..."));
-        await open(url);
-      }
-    }
-  } catch (error) {
-    console.error(
-      chalk.red.bold("\n✗ Deployment failed:"),
-      chalk.red(error instanceof Error ? error.message : "Unknown error")
-    );
-    process.exit(1);
+    const normalized = answer.trim().toLowerCase();
+    if (normalized === "") return defaultValue;
+    return normalized === "y" || normalized === "yes";
+  } finally {
+    prompt.close();
   }
+}
+
+function deploymentNotCreated(serverId: string): CommandError {
+  return new CommandError(
+    "deployment_not_created",
+    "Server was created but no deployment was started.",
+    {
+      serverId,
+      nextSteps: [
+        {
+          description: "Inspect the server",
+          command: `mcp-use servers get ${serverId}`,
+        },
+      ],
+    }
+  );
+}
+
+function finishDeployment(input: {
+  sourceType: "github" | "managed";
+  serverId: string;
+  serverSlug?: string | null;
+  deploymentId: string;
+  label: string;
+  values: DeployValues;
+  json: boolean;
+}): number {
+  const webUrl = `${cloudWebUrl()}/${encodeURIComponent(input.serverSlug ?? input.serverId)}`;
+  const result = {
+    sourceType: input.sourceType,
+    serverId: input.serverId,
+    deploymentId: input.deploymentId,
+    status: "pending",
+    webUrl,
+  };
+  if (input.values.open === true) openBrowser(webUrl);
+  printResult(
+    result,
+    input.json,
+    `Deployment ${input.deploymentId} started for ${input.label}.`
+  );
+  return 0;
 }

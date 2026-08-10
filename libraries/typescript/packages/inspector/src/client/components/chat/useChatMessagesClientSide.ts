@@ -1,23 +1,48 @@
-import { MCPChatMessageEvent, Telemetry } from "@/client/telemetry";
-import { runToolLoop } from "@/llm/toolLoop";
-import type { ProviderTool } from "@/llm/types";
-import type { McpServer } from "mcp-use/react";
-import { useCallback, useRef, useState } from "react";
+import { MCPChatMessageEvent, captureInspectorEvent } from "@/client/telemetry";
+import {
+  MCPAgent,
+  providerConfigFromOptions,
+  type McpConnectionLike,
+} from "@mcp-use/agent";
+import type { McpServer, Skill } from "@mcp-use/client/react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { PromptResult } from "../../hooks/useMCPPrompts";
 import {
   convertMessagesToProvider,
   convertPromptResultsToMessages,
 } from "./conversion";
-import type { LLMConfig, Message, MessageAttachment } from "./types";
+import type {
+  LLMConfig,
+  Message,
+  MessageAttachment,
+  SendMessageOptions,
+} from "./types";
 import { fileToAttachment, isValidTotalSize } from "./utils";
+import {
+  appendTraceEvent,
+  EMPTY_TRACE_STATE,
+  type InspectorTraceEvent,
+  type InspectorTraceEventInput,
+} from "./trace";
+import { DEFAULT_CHAT_SYSTEM_PROMPT } from "./system-prompt-default";
+import {
+  isManagedLlmConfig,
+  managedNoticeFromLlmError,
+  type ManagedChatNotice,
+} from "./managedChatNotice";
+import { parsePartialToolArgs } from "./partialToolArgs";
+import {
+  serializeWidgetModelContexts,
+  widgetModelContextProviderMessage,
+  type WidgetModelContext,
+} from "./widget-model-context";
+import {
+  buildSkillSystemContext,
+  createSkillContextConnection,
+} from "./skill-context";
 
 // Type alias for backward compatibility
 type MCPConnection = McpServer;
-
-interface WidgetModelContext {
-  content?: Array<{ type: string; text: string }>;
-  structuredContent?: Record<string, unknown>;
-}
 
 interface UseChatMessagesClientSideProps {
   connection: MCPConnection;
@@ -26,10 +51,11 @@ interface UseChatMessagesClientSideProps {
   readResource?: (uri: string) => Promise<any>;
   widgetModelContexts?: Map<string, WidgetModelContext | undefined>;
   disabledTools?: Set<string>;
+  appToolConnections?: McpConnectionLike[];
+  initialMessages?: Message[];
+  systemPrompt?: string;
+  skills?: Skill[];
 }
-
-const SYSTEM_PROMPT =
-  "You are a helpful assistant with access to MCP tools. Help users interact with the MCP server.";
 
 export function useChatMessagesClientSide({
   connection,
@@ -38,26 +64,70 @@ export function useChatMessagesClientSide({
   readResource,
   widgetModelContexts,
   disabledTools,
+  appToolConnections,
+  initialMessages,
+  systemPrompt = DEFAULT_CHAT_SYSTEM_PROMPT,
+  skills = [],
 }: UseChatMessagesClientSideProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(initialMessages ?? []);
   const [isLoading, setIsLoading] = useState(false);
   const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
+  const [traceState, setTraceState] = useState(EMPTY_TRACE_STATE);
+  const [managedChatNotice, setManagedChatNotice] =
+    useState<ManagedChatNotice | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const sendInProgressRef = useRef(false);
+  const traceIdRef = useRef(0);
+
+  const recordTrace = useCallback((event: InspectorTraceEventInput) => {
+    const next = {
+      ...event,
+      id: `trace-${++traceIdRef.current}`,
+      timestamp: Date.now(),
+    } as InspectorTraceEvent;
+    setTraceState((state) => appendTraceEvent(state, next));
+  }, []);
+
+  useEffect(() => {
+    if (initialMessages !== undefined) {
+      setMessages(initialMessages);
+    }
+  }, [initialMessages]);
 
   const sendMessage = useCallback(
     async (
       userInput: string,
       promptResults: PromptResult[],
-      extraAttachments?: MessageAttachment[]
+      extraAttachments?: MessageAttachment[],
+      options?: SendMessageOptions
     ) => {
       const allAttachments = [...attachments, ...(extraAttachments ?? [])];
       const hasContent =
         userInput.trim() ||
         promptResults.length > 0 ||
         allAttachments.length > 0;
-      if (!hasContent || !llmConfig || !isConnected) {
+      const rejectOrReturn = (message: string) => {
+        if (options?.throwOnError) {
+          throw new Error(message);
+        }
+      };
+      if (!hasContent) {
+        rejectOrReturn("Chat message must include content");
         return;
       }
+      if (!llmConfig) {
+        rejectOrReturn("Chat is not configured");
+        return;
+      }
+      if (!isConnected) {
+        rejectOrReturn("The MCP server is not connected");
+        return;
+      }
+      if (sendInProgressRef.current) {
+        rejectOrReturn("Chat is busy with another turn");
+        return;
+      }
+      sendInProgressRef.current = true;
 
       const promptResultsMessages =
         convertPromptResultsToMessages(promptResults);
@@ -82,14 +152,21 @@ export function useChatMessagesClientSide({
       abortControllerRef.current = new AbortController();
       const startTime = Date.now();
       let toolCallsCount = 0;
+      const assistantMessageId = `assistant-${Date.now()}`;
 
       try {
-        const assistantMessageId = `assistant-${Date.now()}`;
+        let accepted = false;
+        const markAccepted = () => {
+          if (accepted) return;
+          accepted = true;
+          options?.onAccepted?.();
+        };
         let currentTextPart = "";
         const parts: Array<{
           type: "text" | "tool-invocation";
           text?: string;
           toolInvocation?: {
+            toolCallId: string;
             toolName: string;
             args: Record<string, unknown>;
             result?: any;
@@ -101,7 +178,7 @@ export function useChatMessagesClientSide({
         // Per-tool-call accumulated JSON for partial-args rendering.
         const toolCallArgBuffers = new Map<
           string,
-          { name: string; accumulatedJson: string }
+          { accumulatedJson: string }
         >();
 
         // Throttled yield: allows React to flush re-renders during streaming.
@@ -126,103 +203,62 @@ export function useChatMessagesClientSide({
           },
         ]);
 
-        // Discover + filter tools from the live MCP connection.
-        const allTools = connection.tools ?? [];
-        const toolList: ProviderTool[] = allTools
-          .filter((t) => !disabledTools?.has(t.name))
-          .map((t) => ({
-            name: t.name,
-            description: t.description,
-            inputSchema: (t.inputSchema as Record<string, unknown>) ?? {
-              type: "object",
-            },
-          }));
-
-        // Build the provider-neutral message stream (system + history + widget
-        // state context + optional multimodal user turn).
-        const widgetContextMessages: Message[] = [];
-        if (widgetModelContexts && widgetModelContexts.size > 0) {
-          const widgetParts: string[] = [];
-          for (const [, ctx] of widgetModelContexts) {
-            if (!ctx) continue;
-            if (ctx.content?.length) {
-              widgetParts.push(ctx.content.map((c) => c.text).join("\n"));
-            } else if (ctx.structuredContent) {
-              widgetParts.push(JSON.stringify(ctx.structuredContent));
-            }
-          }
-          if (widgetParts.length > 0) {
-            widgetContextMessages.push({
-              id: `widget-context-${Date.now()}`,
-              role: "user",
-              content: `[Current Widget State]\n${widgetParts.join("\n")}`,
-              timestamp: Date.now(),
-            });
-          }
-        }
-
         const hasImageAttachments = (userMessage.attachments?.length ?? 0) > 0;
         const historyMessages = [
           ...messages,
           ...promptResultsMessages,
-          ...widgetContextMessages,
           ...(userInput.trim() || hasImageAttachments ? [userMessage] : []),
         ];
 
-        const providerMessages = convertMessagesToProvider(historyMessages);
-        providerMessages.unshift({
-          role: "system",
-          content: SYSTEM_PROMPT,
+        const serializedWidgetContext = serializeWidgetModelContexts(
+          widgetModelContexts ?? new Map()
+        );
+        const widgetContextMessage = widgetModelContextProviderMessage(
+          serializedWidgetContext
+        );
+        const providerMessages = [
+          ...(widgetContextMessage ? [widgetContextMessage] : []),
+          ...convertMessagesToProvider(historyMessages),
+        ];
+        recordTrace({
+          type: "request",
+          request: {
+            provider: llmConfig.provider,
+            model: llmConfig.model,
+            messages: providerMessages,
+          },
         });
 
-        // Helper: best-effort parse of accumulated tool-args JSON so the UI
-        // can render the tool input progressively before the call completes.
-        const tryParseArgs = (
-          raw: string
-        ): Record<string, unknown> | undefined => {
-          try {
-            return JSON.parse(raw);
-          } catch {
-            // Try to close unclosed strings/brackets/braces.
-            const strategies: Array<() => unknown> = [
-              () => {
-                let r = raw;
-                const quotes = (r.match(/(?<!\\)"/g) || []).length;
-                if (quotes % 2 !== 0) r += '"';
-                const ob =
-                  (r.match(/{/g) || []).length - (r.match(/}/g) || []).length;
-                const oq =
-                  (r.match(/\[/g) || []).length - (r.match(/]/g) || []).length;
-                for (let i = 0; i < oq; i++) r += "]";
-                for (let i = 0; i < ob; i++) r += "}";
-                return JSON.parse(r);
-              },
-              () => {
-                let r = raw;
-                r = r.replace(/,\s*"[^"]*"?\s*:\s*("([^"\\]|\\.)*)?$/, "");
-                r = r.replace(/,\s*"[^"]*$/, "");
-                const quotes = (r.match(/(?<!\\)"/g) || []).length;
-                if (quotes % 2 !== 0) r += '"';
-                const ob =
-                  (r.match(/{/g) || []).length - (r.match(/}/g) || []).length;
-                const oq =
-                  (r.match(/\[/g) || []).length - (r.match(/]/g) || []).length;
-                for (let i = 0; i < oq; i++) r += "]";
-                for (let i = 0; i < ob; i++) r += "}";
-                return JSON.parse(r);
-              },
-            ];
-            for (const strat of strategies) {
-              try {
-                return strat() as Record<string, unknown>;
-              } catch {
-                // next
-              }
-            }
-            return undefined;
-          }
-        };
-
+        const skillConnection = createSkillContextConnection({
+          skills,
+          origin:
+            connection.displayName ?? connection.url ?? "connected MCP server",
+          getSkill: connection.getSkill,
+          readResource: connection.readResource,
+        });
+        const agent = new MCPAgent({
+          llm: providerConfigFromOptions(llmConfig.provider, llmConfig.model, {
+            apiKey: llmConfig.apiKey,
+            temperature: llmConfig.temperature,
+            baseUrl: llmConfig.baseUrl,
+            credentials: llmConfig.credentials,
+          }),
+          mcpServers: [
+            ...(skillConnection ? [skillConnection] : []),
+            connection,
+            ...(appToolConnections ?? []),
+          ],
+          systemPrompt: `${systemPrompt}${buildSkillSystemContext(
+            skills,
+            connection.displayName ?? connection.url ?? "connected MCP server"
+          )}`,
+          disallowedTools:
+            disabledTools && disabledTools.size > 0
+              ? [...disabledTools].sort()
+              : undefined,
+          maxSteps: 10,
+          autoInitialize: true,
+        });
         const commitMessageParts = () => {
           setMessages((prev) =>
             prev.map((msg) =>
@@ -233,60 +269,30 @@ export function useChatMessagesClientSide({
           );
         };
 
-        const maybeFetchAppsSdkResource = async (toolPart: {
-          type: "text" | "tool-invocation";
-          toolInvocation?: {
-            toolName: string;
-            args: Record<string, unknown>;
-            result?: any;
-            state?: "pending" | "streaming" | "result" | "error";
-          };
-        }) => {
-          const result = toolPart.toolInvocation?.result;
-          const appsSdkUri = result?._meta?.["openai/outputTemplate"];
-          if (!appsSdkUri || typeof appsSdkUri !== "string" || !readResource)
-            return;
-          try {
-            const resourceData = await readResource(appsSdkUri);
-            if (
-              resourceData?.contents &&
-              Array.isArray(resourceData.contents)
-            ) {
-              const mcpResources = resourceData.contents.map(
-                (content: any) => ({ type: "resource", resource: content })
-              );
-              toolPart.toolInvocation!.result = {
-                ...result,
-                content: [...(result.content || []), ...mcpResources],
-                structuredContent: result?.structuredContent || null,
-              };
-            }
-          } catch (error) {
-            console.error("Failed to fetch Apps SDK resource:", error);
-          }
-        };
-
-        for await (const ev of runToolLoop({
-          config: {
-            provider: llmConfig.provider,
-            model: llmConfig.model,
-            apiKey: llmConfig.apiKey,
-            temperature: llmConfig.temperature,
-            baseUrl: llmConfig.baseUrl,
-          },
+        for await (const ev of agent.streamEvents({
           messages: providerMessages,
-          tools: toolList,
-          callTool: async (name, args) => {
-            return await connection.callTool(name, args, {
-              signal: abortControllerRef.current?.signal,
-            });
-          },
-          maxSteps: 10,
           signal: abortControllerRef.current?.signal,
         })) {
+          markAccepted();
           if (abortControllerRef.current?.signal.aborted) break;
 
+          // Keep inspector compatible with an older installed agent build while
+          // the additive usage event rolls through workspace package outputs.
+          if ((ev as { type: string }).type === "usage") {
+            const usageEvent = ev as unknown as {
+              type: "usage";
+              usage: import("./trace").InspectorTokenUsage;
+            };
+            recordTrace({
+              type: "usage",
+              usage: usageEvent.usage,
+              raw: usageEvent,
+            });
+            continue;
+          }
+
           if (ev.type === "text-delta") {
+            recordTrace({ type: "text-delta", delta: ev.delta, raw: ev });
             currentTextPart += ev.delta;
             const lastPart = parts[parts.length - 1];
             if (lastPart && lastPart.type === "text") {
@@ -296,14 +302,20 @@ export function useChatMessagesClientSide({
             }
             commitMessageParts();
           } else if (ev.type === "tool-call-start") {
+            recordTrace({
+              type: "tool-call-start",
+              toolCallId: ev.toolCallId,
+              toolName: ev.toolName,
+              raw: ev,
+            });
             if (currentTextPart) currentTextPart = "";
             toolCallArgBuffers.set(ev.toolCallId, {
-              name: ev.toolName,
               accumulatedJson: "",
             });
             parts.push({
               type: "tool-invocation",
               toolInvocation: {
+                toolCallId: ev.toolCallId,
                 toolName: ev.toolName,
                 args: {},
                 state: "streaming",
@@ -315,53 +327,46 @@ export function useChatMessagesClientSide({
             const buf = toolCallArgBuffers.get(ev.toolCallId);
             if (buf) {
               buf.accumulatedJson += ev.argsDelta;
-              const partial = tryParseArgs(buf.accumulatedJson);
+              const partial = parsePartialToolArgs(buf.accumulatedJson);
               if (partial) {
                 const toolPart = parts.find(
                   (p) =>
                     p.type === "tool-invocation" &&
                     p.toolInvocation?.state === "streaming" &&
-                    p.toolInvocation?.toolName === buf.name
+                    p.toolInvocation?.toolCallId === ev.toolCallId
                 );
                 if (toolPart && toolPart.toolInvocation) {
-                  const prev = toolPart.toolInvocation.partialArgs;
-                  const prevKeys = prev ? Object.keys(prev) : [];
-                  const newKeys = Object.keys(partial);
-                  const prevTotal = prevKeys.reduce(
-                    (s, k) => s + String(prev![k] ?? "").length,
-                    0
-                  );
-                  const newTotal = newKeys.reduce(
-                    (s, k) => s + String(partial[k] ?? "").length,
-                    0
-                  );
-                  if (
-                    newKeys.length > prevKeys.length ||
-                    newTotal >= prevTotal
-                  ) {
-                    toolPart.toolInvocation.partialArgs = partial;
-                  }
+                  toolPart.toolInvocation.partialArgs = partial;
                   commitMessageParts();
                   await maybeYield();
                 }
               }
             }
           } else if (ev.type === "tool-call-ready") {
+            recordTrace({
+              type: "tool-call-args",
+              toolCallId: ev.toolCallId,
+              toolName: ev.toolName,
+              args: ev.args,
+              raw: ev,
+            });
             toolCallsCount++;
             if (currentTextPart) currentTextPart = "";
             const streamingPart = parts.find(
               (p) =>
                 p.type === "tool-invocation" &&
                 p.toolInvocation?.state === "streaming" &&
-                p.toolInvocation?.toolName === ev.toolName
+                p.toolInvocation?.toolCallId === ev.toolCallId
             );
             if (streamingPart && streamingPart.toolInvocation) {
               streamingPart.toolInvocation.args = ev.args;
               streamingPart.toolInvocation.state = "pending";
+              streamingPart.toolInvocation.partialArgs = undefined;
             } else {
               parts.push({
                 type: "tool-invocation",
                 toolInvocation: {
+                  toolCallId: ev.toolCallId,
                   toolName: ev.toolName,
                   args: ev.args,
                   state: "pending",
@@ -370,20 +375,30 @@ export function useChatMessagesClientSide({
             }
             commitMessageParts();
           } else if (ev.type === "tool-result") {
+            recordTrace({
+              type: "tool-result",
+              toolCallId: ev.toolCallId,
+              toolName: ev.toolName,
+              result: ev.result,
+              isError: ev.isError,
+              raw: ev,
+            });
             const toolPart = parts.find(
               (p) =>
                 p.type === "tool-invocation" &&
-                p.toolInvocation?.toolName === ev.toolName &&
+                p.toolInvocation?.toolCallId === ev.toolCallId &&
                 !p.toolInvocation?.result
             );
             if (toolPart && toolPart.toolInvocation) {
               toolPart.toolInvocation.result = ev.result;
               toolPart.toolInvocation.state =
                 ev.isError || (ev.result as any)?.isError ? "error" : "result";
-              await maybeFetchAppsSdkResource(toolPart);
               commitMessageParts();
             }
+          } else if (ev.type === "done") {
+            recordTrace({ type: "done", raw: ev });
           } else if (ev.type === "error") {
+            recordTrace({ type: "error", message: ev.message, raw: ev });
             throw new Error(ev.message);
           }
         }
@@ -392,13 +407,15 @@ export function useChatMessagesClientSide({
           for (const part of parts) {
             if (
               part.type === "tool-invocation" &&
-              part.toolInvocation?.state === "pending"
+              (part.toolInvocation?.state === "pending" ||
+                part.toolInvocation?.state === "streaming")
             ) {
               part.toolInvocation.state = "error";
               part.toolInvocation.result = "Cancelled by user";
             }
           }
         }
+        markAccepted();
 
         setMessages((prev) =>
           prev.map((msg) =>
@@ -409,28 +426,43 @@ export function useChatMessagesClientSide({
         );
 
         if (llmConfig) {
-          const telemetry = Telemetry.getInstance();
-          telemetry
-            .capture(
-              new MCPChatMessageEvent({
-                serverId: connection.url,
-                provider: llmConfig.provider,
-                model: llmConfig.model,
-                messageCount: messages.length + 1,
-                toolCallsCount,
-                success: true,
-                executionMode: "client-side",
-                duration: Date.now() - startTime,
-              })
-            )
-            .catch(() => {
-              // Silently fail - telemetry should not break the application
-            });
+          captureInspectorEvent(
+            new MCPChatMessageEvent({
+              serverId: connection.url,
+              provider: llmConfig.provider,
+              model: llmConfig.model,
+              messageCount: messages.length + 1,
+              toolCallsCount,
+              success: true,
+              executionMode: "client-side",
+              duration: Date.now() - startTime,
+            })
+          ).catch(() => {
+            // Silently fail - telemetry should not break the application
+          });
         }
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
+          if (options?.throwOnError) {
+            throw new Error("Chat turn was cancelled");
+          }
           return;
         }
+
+        const notice = isManagedLlmConfig(llmConfig)
+          ? managedNoticeFromLlmError(error)
+          : null;
+        if (notice) {
+          setManagedChatNotice(notice);
+          setMessages((prev) =>
+            prev.filter((m) => m.id !== assistantMessageId)
+          );
+          if (options?.throwOnError) {
+            throw new Error("Chat request could not be completed");
+          }
+          return;
+        }
+
         console.error("Client-side agent error:", error);
 
         let errorDetail = "Unknown error occurred";
@@ -450,24 +482,21 @@ export function useChatMessagesClientSide({
         }
 
         if (llmConfig) {
-          const telemetry = Telemetry.getInstance();
-          telemetry
-            .capture(
-              new MCPChatMessageEvent({
-                serverId: connection.url,
-                provider: llmConfig.provider,
-                model: llmConfig.model,
-                messageCount: messages.length + 1,
-                toolCallsCount,
-                success: false,
-                executionMode: "client-side",
-                duration: Date.now() - startTime,
-                error: errorDetail,
-              })
-            )
-            .catch(() => {
-              // Silently fail - telemetry should not break the application
-            });
+          captureInspectorEvent(
+            new MCPChatMessageEvent({
+              serverId: connection.url,
+              provider: llmConfig.provider,
+              model: llmConfig.model,
+              messageCount: messages.length + 1,
+              toolCallsCount,
+              success: false,
+              executionMode: "client-side",
+              duration: Date.now() - startTime,
+              error: errorDetail,
+            })
+          ).catch(() => {
+            // Silently fail - telemetry should not break the application
+          });
         }
 
         const errorMessage: Message = {
@@ -477,9 +506,13 @@ export function useChatMessagesClientSide({
           timestamp: Date.now(),
         };
         setMessages((prev) => [...prev, errorMessage]);
+        if (options?.throwOnError) {
+          throw new Error(errorDetail);
+        }
       } finally {
         setIsLoading(false);
         abortControllerRef.current = null;
+        sendInProgressRef.current = false;
       }
     },
     [
@@ -490,13 +523,20 @@ export function useChatMessagesClientSide({
       readResource,
       attachments,
       disabledTools,
+      appToolConnections,
       widgetModelContexts,
+      recordTrace,
+      systemPrompt,
+      skills,
     ]
   );
 
   const clearMessages = useCallback(() => {
     setMessages([]);
+    setTraceState(EMPTY_TRACE_STATE);
+    setManagedChatNotice(null);
   }, []);
+  const clearTrace = useCallback(() => setTraceState(EMPTY_TRACE_STATE), []);
 
   const stop = useCallback(() => {
     if (abortControllerRef.current) {
@@ -533,16 +573,30 @@ export function useChatMessagesClientSide({
     setAttachments([]);
   }, []);
 
+  const clearManagedChatNotice = useCallback(() => {
+    setManagedChatNotice(null);
+  }, []);
+
+  const showManagedChatNotice = useCallback((notice: ManagedChatNotice) => {
+    setManagedChatNotice(notice);
+  }, []);
+
   return {
     messages,
     isLoading,
     attachments,
+    managedChatNotice,
     sendMessage,
     clearMessages,
+    clearManagedChatNotice,
+    showManagedChatNotice,
     setMessages,
     stop,
     addAttachment,
     removeAttachment,
     clearAttachments,
+    clearTrace,
+    traceEvents: traceState.events,
+    tokenUsage: traceState.usage,
   };
 }

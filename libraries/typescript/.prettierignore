@@ -13,6 +13,8 @@
 **/.tsup/**
 **/.vite/**
 **/.mcp-use/**
+**/playwright-report/**
+**/src/skills/vendor/*.min.js
 
 
 # Dependencies

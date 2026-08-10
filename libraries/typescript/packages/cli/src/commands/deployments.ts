@@ -1,660 +1,353 @@
-import chalk from "chalk";
-import { Command } from "commander";
-import { McpUseAPI } from "../utils/api.js";
-import { getMcpServerUrl } from "../utils/cloud-urls.js";
-import { isLoggedIn } from "../utils/config.js";
-import { handleCommandError } from "../utils/errors.js";
-import { formatRelativeTime } from "../utils/format.js";
+import { parseArgs } from "node:util";
 
-const DEFAULT_LIST_LIMIT = 30;
+import { cloudApiForOrganization, type CloudApi } from "./cloud-api.js";
+import {
+  confirm,
+  printResult,
+  reportError,
+  UsageError,
+  wantsJson,
+} from "./shared.js";
 
-async function prompt(question: string): Promise<boolean> {
-  const readline = await import("node:readline");
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  return new Promise((resolve) => {
-    rl.question(question, (answer) => {
-      rl.close();
-      const trimmedAnswer = answer.trim().toLowerCase();
-      resolve(trimmedAnswer === "y" || trimmedAnswer === "yes");
-    });
-  });
+interface Deployment {
+  id: string;
+  status: string;
+  serverId?: string | null;
+  gitBranch?: string | null;
 }
 
-function getStatusColor(status: string): (text: string) => string {
-  switch (status) {
-    case "running":
-      return chalk.green;
-    case "building":
-    case "pending":
-      return chalk.yellow;
-    case "failed":
-    case "stopped":
-      return chalk.red;
-    default:
-      return chalk.gray;
+interface BuildLogs {
+  logs: string;
+  offset: number;
+  totalLength: number;
+  status: string;
+}
+
+const HELP = `Usage: mcp-use deployments <command> [options]
+
+Manage cloud deployments and logs.
+
+Commands:
+  list                         List deployments
+  get <deployment-id>          Show one deployment
+  logs <deployment-id>         Read runtime or build logs
+  restart <deployment-id>      Create a replacement deployment
+  stop <deployment-id>         Stop a deployment
+  delete <deployment-id>       Delete a deployment
+
+Run mcp-use deployments <command> --help for all options.
+
+Exit codes:
+  0  Success or help
+  2  Invalid arguments or confirmation required
+  1  API or operational failure`;
+
+const COMMAND_HELP: Record<string, string> = {
+  list: `Usage: mcp-use deployments list [options]\n\nOptions:\n  --org <id-or-slug>  Override the active organization\n  --server <id>       Filter by server\n  --limit <n>         Results per page (default: 30; range: 1-100)\n  --skip <n>          Results to skip (default: 0)\n  --json              Emit the complete API page\n  -h, --help          Show this help`,
+  get: `Usage: mcp-use deployments get <deployment-id> [--json]\n\nOptions:\n  --json      Emit the complete deployment object\n  -h, --help  Show this help`,
+  logs: `Usage: mcp-use deployments logs <deployment-id> [options]\n\nOptions:\n  --build     Read build logs instead of runtime logs\n  --follow    Poll build logs until a terminal status\n  --json      Emit exactly one object; with --follow, emit only at completion\n  -h, --help  Show this help`,
+  restart: `Usage: mcp-use deployments restart <deployment-id> [options]\n\nOptions:\n  --branch <name>  Override the source branch\n  --follow         Follow build logs after restart\n  --json           Emit exactly one object; with --follow, emit only at completion\n  -h, --help       Show this help`,
+  stop: `Usage: mcp-use deployments stop <deployment-id> [options]\n\nOptions:\n  --yes       Confirm without prompting\n  --json      Emit the result; never prompt\n  -h, --help  Show this help`,
+  delete: `Usage: mcp-use deployments delete <deployment-id> [options]\n\nOptions:\n  --yes       Confirm without prompting\n  --json      Emit the result; never prompt\n  -h, --help  Show this help`,
+};
+
+/** Run the `mcp-use deployments` command family. */
+export async function runDeployments(argv: readonly string[]): Promise<number> {
+  if (argv.some((token) => token === "--help" || token === "-h")) {
+    process.stdout.write(`${COMMAND_HELP[argv[0] ?? ""] ?? HELP}\n`);
+    return 0;
   }
-}
-
-function formatId(id: string): string {
-  return id;
-}
-
-function formatPageHeader(label: string, count: number, total: number): string {
-  return count === total
-    ? `${label} (${total})`
-    : `${label} (${count} of ${total})`;
-}
-
-function printNextPageHint(
-  command: string,
-  page: { items: unknown[]; total: number; limit: number; skip: number },
-  extraArgs: string[] = []
-): void {
-  const nextSkip = page.skip + page.items.length;
-  if (nextSkip >= page.total) return;
-
-  const args = [
-    command,
-    "--limit",
-    String(page.limit),
-    "--skip",
-    String(nextSkip),
-    ...extraArgs,
-  ];
-  console.log(chalk.gray(`Next page: ${args.join(" ")}`));
-}
-
-async function listDeploymentsCommand(options: {
-  limit?: string;
-  skip?: string;
-  sort?: string;
-}): Promise<void> {
+  const json = wantsJson(argv);
   try {
-    if (!(await isLoggedIn())) {
-      console.log(chalk.red("✗ You are not logged in."));
-      console.log(
-        chalk.gray(
-          "Run " + chalk.white("npx mcp-use login") + " to get started."
-        )
-      );
-      process.exit(1);
-    }
-
-    const limit = options.limit
-      ? parseInt(options.limit, 10)
-      : DEFAULT_LIST_LIMIT;
-    const skip = options.skip ? parseInt(options.skip, 10) : undefined;
-    if (limit !== undefined && (Number.isNaN(limit) || limit < 1)) {
-      console.log(chalk.red("✗ Invalid --limit"));
-      process.exit(1);
-    }
-    if (skip !== undefined && (Number.isNaN(skip) || skip < 0)) {
-      console.log(chalk.red("✗ Invalid --skip"));
-      process.exit(1);
-    }
-
-    const api = await McpUseAPI.create();
-    const [page, authResult] = await Promise.all([
-      api.listDeployments({
-        limit,
-        skip,
-        sort: options.sort ?? "createdAt:desc",
-      }),
-      api.testAuth(),
-    ]);
-    const deployments = page.items;
-
-    const orgMap = new Map(authResult.orgs.map((o) => [o.id, o.name]));
-
-    const uniqueServerIds = [
-      ...new Set(
-        deployments
-          .map((d) => d.serverId)
-          .filter((id): id is string => id != null)
-      ),
-    ];
-
-    const serverResults = await Promise.allSettled(
-      uniqueServerIds.map((id) => api.getServer(id))
+    const subcommand = argv[0];
+    if (subcommand === "list") return await list(argv.slice(1), json);
+    if (subcommand === "get") return await get(argv.slice(1), json);
+    if (subcommand === "logs") return await logs(argv.slice(1), json);
+    if (subcommand === "restart") return await restart(argv.slice(1), json);
+    if (subcommand === "stop") return await stop(argv.slice(1), json);
+    if (subcommand === "delete") return await remove(argv.slice(1), json);
+    throw new UsageError(
+      "Usage: mcp-use deployments <list|get|logs|restart|stop|delete>"
     );
-
-    const serverOrgMap = new Map<string, string>();
-    for (let i = 0; i < uniqueServerIds.length; i++) {
-      const result = serverResults[i];
-      if (result.status === "fulfilled") {
-        const orgName =
-          orgMap.get(result.value.organizationId) ??
-          result.value.organizationId.substring(0, 19);
-        serverOrgMap.set(uniqueServerIds[i], orgName);
-      }
-    }
-
-    const sortedDeployments = [...deployments].sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
-
-    if (sortedDeployments.length === 0) {
-      if (page.total === 0) {
-        console.log(chalk.yellow("No deployments found."));
-        console.log(
-          chalk.gray(
-            "\nDeploy your first MCP server with " +
-              chalk.white("mcp-use deploy")
-          )
-        );
-      } else {
-        console.log(
-          chalk.yellow(`No deployments found at --skip ${page.skip}.`)
-        );
-        console.log(chalk.gray(`Total deployments: ${page.total}`));
-      }
-      return;
-    }
-
-    console.log(
-      chalk.cyan.bold(
-        `\n📦 ${formatPageHeader(
-          "Deployments",
-          sortedDeployments.length,
-          page.total
-        )}\n`
-      )
-    );
-
-    console.log(
-      chalk.white.bold(
-        `${"ID".padEnd(40)} ${"NAME".padEnd(25)} ${"ORG".padEnd(20)} ${"STATUS".padEnd(12)} ${"MCP URL".padEnd(45)} ${"CREATED"}`
-      )
-    );
-    console.log(chalk.gray("─".repeat(155)));
-
-    for (const deployment of sortedDeployments) {
-      const id = formatId(deployment.id).padEnd(40);
-      const name = deployment.name.substring(0, 24).padEnd(25);
-      const orgName = deployment.serverId
-        ? (serverOrgMap.get(deployment.serverId) ?? "-")
-        : "-";
-      const org = orgName.substring(0, 19).padEnd(20);
-      const statusColor = getStatusColor(deployment.status);
-      const status = statusColor(deployment.status.padEnd(12));
-      const mcpUrl = (deployment.mcpUrl || "-").substring(0, 44).padEnd(45);
-      const created = formatRelativeTime(deployment.createdAt);
-
-      console.log(
-        `${chalk.gray(id)} ${name} ${chalk.magenta(org)} ${status} ${chalk.cyan(mcpUrl)} ${chalk.gray(created)}`
-      );
-    }
-
-    const extraArgs = [];
-    if (options.sort) extraArgs.push("--sort", options.sort);
-    printNextPageHint("mcp-use deployments list", page, extraArgs);
-    console.log();
   } catch (error) {
-    handleCommandError(error, "Failed to list deployments");
+    return reportError(
+      error instanceof TypeError ? new UsageError(error.message) : error,
+      json
+    );
   }
 }
 
-async function getDeploymentCommand(deploymentId: string): Promise<void> {
-  try {
-    if (!(await isLoggedIn())) {
-      console.log(chalk.red("✗ You are not logged in."));
-      console.log(
-        chalk.gray(
-          "Run " + chalk.white("npx mcp-use login") + " to get started."
-        )
-      );
-      process.exit(1);
-    }
-
-    const api = await McpUseAPI.create();
-    const deployment = await api.getDeployment(deploymentId);
-
-    console.log(chalk.cyan.bold("\n📦 Deployment Details\n"));
-
-    console.log(chalk.white("ID:            ") + chalk.gray(deployment.id));
-    console.log(chalk.white("Name:          ") + chalk.cyan(deployment.name));
-
-    const statusColor = getStatusColor(deployment.status);
-    console.log(
-      chalk.white("Status:        ") + statusColor(deployment.status)
-    );
-
-    if (deployment.serverId) {
-      console.log(
-        chalk.white("Server ID:     ") + chalk.gray(deployment.serverId)
-      );
-    }
-
-    const mcpUrl = getMcpServerUrl(deployment);
-    if (mcpUrl) {
-      console.log(chalk.white("MCP URL:       ") + chalk.cyan(mcpUrl));
-    }
-
-    if (deployment.gitBranch) {
-      console.log(
-        chalk.white("Branch:        ") + chalk.gray(deployment.gitBranch)
-      );
-    }
-    if (deployment.gitCommitSha) {
-      console.log(
-        chalk.white("Commit:        ") +
-          chalk.gray(deployment.gitCommitSha.substring(0, 7))
-      );
-    }
-
-    if (deployment.port) {
-      console.log(chalk.white("Port:          ") + chalk.gray(deployment.port));
-    }
-
-    if (deployment.provider) {
-      console.log(
-        chalk.white("Provider:      ") + chalk.gray(deployment.provider)
-      );
-    }
-
-    console.log(
-      chalk.white("Created:       ") +
-        chalk.gray(formatRelativeTime(deployment.createdAt))
-    );
-    console.log(
-      chalk.white("Updated:       ") +
-        chalk.gray(formatRelativeTime(deployment.updatedAt))
-    );
-
-    if (deployment.status === "failed" && deployment.error) {
-      console.log(chalk.red("\nError:"));
-      console.log(chalk.red(`  ${deployment.error}`));
-    }
-
-    console.log();
-  } catch (error) {
-    handleCommandError(error, "Failed to get deployment");
-  }
+async function list(argv: readonly string[], json: boolean): Promise<number> {
+  const { values } = parseArgs({
+    args: [...argv],
+    allowPositionals: false,
+    strict: true,
+    options: {
+      org: { type: "string" },
+      server: { type: "string" },
+      limit: { type: "string", default: "30" },
+      skip: { type: "string", default: "0" },
+      json: { type: "boolean" },
+    },
+  });
+  const limit = boundedInteger(values.limit, "--limit", 1, 100);
+  const skip = boundedInteger(values.skip, "--skip", 0);
+  const query = new URLSearchParams({
+    limit: String(limit),
+    skip: String(skip),
+    ...(values.server !== undefined ? { serverId: values.server } : {}),
+  });
+  const { api } = await cloudApiForOrganization(values.org);
+  const result = await api.request<unknown>(`/deployments?${query}`);
+  printResult(result, json, formatDeploymentList(result));
+  return 0;
 }
 
-async function restartDeploymentCommand(
-  deploymentId: string,
-  options: { follow?: boolean; branch?: string }
-): Promise<void> {
-  try {
-    if (!(await isLoggedIn())) {
-      console.log(chalk.red("✗ You are not logged in."));
-      console.log(
-        chalk.gray(
-          "Run " + chalk.white("npx mcp-use login") + " to get started."
-        )
-      );
-      process.exit(1);
-    }
+async function get(argv: readonly string[], json: boolean): Promise<number> {
+  const { positionals } = parseSimple(argv, {
+    json: { type: "boolean" as const },
+  });
+  const id = one(positionals, "mcp-use deployments get <deployment-id>");
+  const { api } = await cloudApiForOrganization();
+  const deployment = await api.request<Deployment>(
+    `/deployments/${encodeURIComponent(id)}`
+  );
+  printResult(deployment, json, formatDeployment(deployment));
+  return 0;
+}
 
-    const api = await McpUseAPI.create();
-    const deployment = await api.getDeployment(deploymentId);
-
-    if (!deployment.serverId) {
-      console.log(
-        chalk.red("✗ Cannot restart: deployment has no linked server.")
-      );
-      process.exit(1);
-    }
-
-    console.log(
-      chalk.cyan.bold(`\n🔄 Restarting deployment: ${deployment.name}\n`)
+async function logs(argv: readonly string[], json: boolean): Promise<number> {
+  const { values, positionals } = parseSimple(argv, {
+    build: { type: "boolean" as const },
+    follow: { type: "boolean" as const },
+    json: { type: "boolean" as const },
+  });
+  const id = one(positionals, "mcp-use deployments logs <deployment-id>");
+  const { api } = await cloudApiForOrganization();
+  if (values.build === true) {
+    await streamBuildLogs(api, id, values.follow === true, json);
+  } else {
+    const response = await api.request<{ logs: string }>(
+      `/deployments/${encodeURIComponent(id)}/logs?lines=500`
     );
+    if (json) {
+      printResult({ deploymentId: id, logs: response.logs }, true);
+    } else {
+      process.stdout.write(
+        response.logs.endsWith("\n") ? response.logs : `${response.logs}\n`
+      );
+    }
+  }
+  return 0;
+}
 
-    // Reuse the deployment's branch by default; `--branch` overrides to target
-    // a different branch's preview.
-    const branch = options.branch ?? deployment.gitBranch ?? undefined;
-    const newDep = await api.createDeployment({
-      serverId: deployment.serverId,
-      ...(branch ? { branch } : {}),
+async function restart(
+  argv: readonly string[],
+  json: boolean
+): Promise<number> {
+  const { values, positionals } = parseSimple(argv, {
+    branch: { type: "string" as const },
+    follow: { type: "boolean" as const },
+    json: { type: "boolean" as const },
+  });
+  const id = one(positionals, "mcp-use deployments restart <deployment-id>");
+  const { api } = await cloudApiForOrganization();
+  const current = await api.request<Deployment>(
+    `/deployments/${encodeURIComponent(id)}`
+  );
+  if (current.serverId === undefined || current.serverId === null) {
+    throw new UsageError(`Deployment ${id} is not attached to a server.`);
+  }
+  const created = await api.request<{ id: string }>("/deployments", {
+    method: "POST",
+    body: JSON.stringify({
+      serverId: current.serverId,
+      branch: values.branch ?? current.gitBranch ?? undefined,
       trigger: "redeploy",
-    });
-
-    console.log(chalk.green("✓ Restart initiated: ") + chalk.gray(newDep.id));
-
-    if (options.follow) {
-      console.log(chalk.gray("\nFollowing build logs...\n"));
-
-      let offset = 0;
-      let terminal = false;
-      while (!terminal) {
-        await new Promise((r) => setTimeout(r, 2000));
-        try {
-          const resp = await api.getDeploymentBuildLogs(newDep.id, offset);
-          if (resp.logs.length > 0) {
-            const lines = resp.logs.split("\n").filter((l) => l.trim());
-            for (const line of lines) {
-              try {
-                const logData = JSON.parse(line);
-                if (logData.line) {
-                  const levelColor =
-                    logData.level === "error"
-                      ? chalk.red
-                      : logData.level === "warn"
-                        ? chalk.yellow
-                        : chalk.gray;
-                  const stepPrefix = logData.step
-                    ? chalk.cyan(`[${logData.step}]`) + " "
-                    : "";
-                  console.log(stepPrefix + levelColor(logData.line));
-                }
-              } catch {
-                console.log(chalk.gray(line));
-              }
-            }
-            offset = resp.offset;
-          }
-          if (
-            resp.status === "running" ||
-            resp.status === "failed" ||
-            resp.status === "stopped"
-          ) {
-            terminal = true;
-          }
-        } catch {
-          // Build logs not ready yet
-        }
-      }
-    } else {
-      console.log(
-        chalk.gray(
-          "\nCheck status with: " +
-            chalk.white(`mcp-use deployments get ${newDep.id}`)
-        )
-      );
-    }
-
-    console.log();
-  } catch (error) {
-    handleCommandError(error, "Failed to restart deployment");
+    }),
+  });
+  if (values.follow === true) {
+    await streamBuildLogs(api, created.id, true, json);
+  } else {
+    printResult(created, json, `Restarted as deployment ${created.id}.`);
   }
+  return 0;
 }
 
-async function deleteDeploymentCommand(
-  deploymentId: string,
-  options: { yes?: boolean }
+async function stop(argv: readonly string[], json: boolean): Promise<number> {
+  return destructive(argv, json, "stop");
+}
+
+async function remove(argv: readonly string[], json: boolean): Promise<number> {
+  return destructive(argv, json, "delete");
+}
+
+async function destructive(
+  argv: readonly string[],
+  json: boolean,
+  operation: "stop" | "delete"
+): Promise<number> {
+  const { values, positionals } = parseSimple(argv, {
+    yes: { type: "boolean" as const },
+    json: { type: "boolean" as const },
+  });
+  const id = one(
+    positionals,
+    `mcp-use deployments ${operation} <deployment-id>`
+  );
+  if (
+    !(await confirm(
+      `${operation === "stop" ? "Stop" : "Delete"} deployment ${id}?`,
+      {
+        yes: values.yes === true,
+        json,
+      }
+    ))
+  ) {
+    return 0;
+  }
+  const { api } = await cloudApiForOrganization();
+  await api.request(
+    `/deployments/${encodeURIComponent(id)}${operation === "stop" ? "/stop" : ""}`,
+    { method: operation === "stop" ? "POST" : "DELETE" }
+  );
+  printResult(
+    { [operation === "stop" ? "stopped" : "deleted"]: id },
+    json,
+    `${operation === "stop" ? "Stopped" : "Deleted"} ${id}.`
+  );
+  return 0;
+}
+
+async function streamBuildLogs(
+  api: CloudApi,
+  id: string,
+  follow: boolean,
+  json: boolean
 ): Promise<void> {
-  try {
-    if (!(await isLoggedIn())) {
-      console.log(chalk.red("✗ You are not logged in."));
-      console.log(
-        chalk.gray(
-          "Run " + chalk.white("npx mcp-use login") + " to get started."
-        )
-      );
-      process.exit(1);
-    }
-
-    const api = await McpUseAPI.create();
-    const deployment = await api.getDeployment(deploymentId);
-
-    if (!options.yes) {
-      console.log(
-        chalk.yellow(
-          `\n⚠️  You are about to delete deployment: ${chalk.white(deployment.name)}`
-        )
-      );
-      console.log(chalk.gray(`   ID: ${deployment.id}`));
-      if (deployment.mcpUrl) {
-        console.log(chalk.gray(`   URL: ${deployment.mcpUrl}\n`));
-      }
-
-      const confirmed = await prompt(
-        chalk.white("Are you sure you want to delete this deployment? (y/N): ")
-      );
-
-      if (!confirmed) {
-        console.log(chalk.gray("Deletion cancelled."));
-        return;
-      }
-    }
-
-    await api.deleteDeployment(deploymentId);
-    console.log(
-      chalk.green.bold(`\n✓ Deployment deleted: ${deployment.name}\n`)
+  let offset = 0;
+  let status = "pending";
+  let collectedLogs = "";
+  const terminal = new Set(["running", "failed", "stopped"]);
+  let keepPolling = true;
+  while (keepPolling) {
+    const response = await api.request<BuildLogs>(
+      `/deployments/${encodeURIComponent(id)}/build-logs?offset=${offset}`
     );
-  } catch (error) {
-    handleCommandError(error, "Failed to delete deployment");
-  }
-}
-
-async function logsCommand(
-  deploymentId: string,
-  options: { build?: boolean; follow?: boolean }
-): Promise<void> {
-  try {
-    if (!(await isLoggedIn())) {
-      console.log(chalk.red("✗ You are not logged in."));
-      console.log(
-        chalk.gray(
-          "Run " + chalk.white("npx mcp-use login") + " to get started."
-        )
-      );
-      process.exit(1);
-    }
-
-    const api = await McpUseAPI.create();
-
-    if (options.follow) {
-      console.log(chalk.gray("Following build logs...\n"));
-
-      let offset = 0;
-      let terminal = false;
-      while (!terminal) {
-        await new Promise((r) => setTimeout(r, 2000));
-        try {
-          const resp = await api.getDeploymentBuildLogs(deploymentId, offset);
-          if (resp.logs.length > 0) {
-            const lines = resp.logs.split("\n").filter((l) => l.trim());
-            for (const line of lines) {
-              try {
-                const logData = JSON.parse(line);
-                if (logData.line) {
-                  const levelColor =
-                    logData.level === "error"
-                      ? chalk.red
-                      : logData.level === "warn"
-                        ? chalk.yellow
-                        : chalk.gray;
-                  const stepPrefix = logData.step
-                    ? chalk.cyan(`[${logData.step}]`) + " "
-                    : "";
-                  console.log(stepPrefix + levelColor(logData.line));
-                }
-              } catch {
-                console.log(chalk.gray(line));
-              }
-            }
-            offset = resp.offset;
-          }
-          if (
-            resp.status === "running" ||
-            resp.status === "failed" ||
-            resp.status === "stopped"
-          ) {
-            terminal = true;
-          }
-        } catch {
-          // Build logs not ready yet
-        }
-      }
-    } else if (options.build) {
-      const resp = await api.getDeploymentBuildLogs(deploymentId);
-      const logs = resp.logs;
-
-      if (!logs || logs.trim() === "") {
-        console.log(
-          chalk.yellow("No build logs available for this deployment.")
+    if (response.logs !== "") {
+      collectedLogs += response.logs;
+      if (!json) {
+        process.stdout.write(
+          response.logs.endsWith("\n") ? response.logs : `${response.logs}\n`
         );
-        return;
-      }
-
-      const logLines = logs.split("\n").filter((l) => l.trim());
-      for (const line of logLines) {
-        try {
-          const logData = JSON.parse(line);
-          if (logData.line) {
-            const levelColor =
-              logData.level === "error"
-                ? chalk.red
-                : logData.level === "warn"
-                  ? chalk.yellow
-                  : chalk.gray;
-            const stepPrefix = logData.step
-              ? chalk.cyan(`[${logData.step}]`) + " "
-              : "";
-            console.log(stepPrefix + levelColor(logData.line));
-          }
-        } catch {
-          console.log(chalk.gray(line));
-        }
-      }
-    } else {
-      const logs = await api.getDeploymentLogs(deploymentId);
-
-      if (!logs || logs.trim() === "") {
-        console.log(chalk.yellow("No logs available for this deployment."));
-        return;
-      }
-
-      const logLines = logs.split("\n").filter((l) => l.trim());
-      for (const line of logLines) {
-        try {
-          const logData = JSON.parse(line);
-          if (logData.line) {
-            const levelColor =
-              logData.level === "error"
-                ? chalk.red
-                : logData.level === "warn"
-                  ? chalk.yellow
-                  : chalk.gray;
-            const stepPrefix = logData.step
-              ? chalk.cyan(`[${logData.step}]`) + " "
-              : "";
-            console.log(stepPrefix + levelColor(logData.line));
-          }
-        } catch {
-          console.log(chalk.gray(line));
-        }
       }
     }
-
-    console.log();
-  } catch (error) {
-    handleCommandError(error, "Failed to get logs");
+    offset = response.offset;
+    status = response.status;
+    keepPolling = follow && !terminal.has(response.status);
+    if (keepPolling) {
+      await new Promise((resolve) => setTimeout(resolve, 1_000));
+    }
   }
-}
-
-async function stopDeploymentCommand(deploymentId: string): Promise<void> {
-  try {
-    if (!(await isLoggedIn())) {
-      console.log(chalk.red("✗ You are not logged in."));
-      console.log(
-        chalk.gray(
-          "Run " + chalk.white("npx mcp-use login") + " to get started."
-        )
-      );
-      process.exit(1);
-    }
-
-    const api = await McpUseAPI.create();
-    await api.stopDeployment(deploymentId);
-
-    console.log(chalk.green.bold(`\n✓ Deployment stopped\n`));
-  } catch (error) {
-    handleCommandError(error, "Failed to stop deployment");
-  }
-}
-
-async function startDeploymentCommand(deploymentId: string): Promise<void> {
-  try {
-    if (!(await isLoggedIn())) {
-      console.log(chalk.red("✗ You are not logged in."));
-      console.log(
-        chalk.gray(
-          "Run " + chalk.white("npx mcp-use login") + " to get started."
-        )
-      );
-      process.exit(1);
-    }
-
-    console.log(
-      chalk.yellow(
-        "⚠️  Start is not supported in this version. Use `mcp-use deployments restart` to redeploy."
-      )
+  if (json) {
+    printResult(
+      { deploymentId: id, offset, logs: collectedLogs, status },
+      true
     );
-  } catch (error) {
-    handleCommandError(error, "Failed to start deployment");
   }
 }
 
-export function createDeploymentsCommand(): Command {
-  const deploymentsCommand = new Command("deployments")
-    .description("Manage cloud deployments")
-    .showHelpAfterError(
-      "(Run `mcp-use deployments --help` to see available commands)"
+function parseSimple<T extends Record<string, { type: "string" | "boolean" }>>(
+  argv: readonly string[],
+  options: T
+) {
+  return parseArgs({
+    args: [...argv],
+    allowPositionals: true,
+    strict: true,
+    options,
+  });
+}
+
+function one(positionals: string[], usage: string): string {
+  if (positionals.length !== 1) throw new UsageError(`Usage: ${usage}`);
+  return positionals[0]!;
+}
+
+function boundedInteger(
+  raw: string | undefined,
+  name: string,
+  minimum: number,
+  maximum = Number.MAX_SAFE_INTEGER
+): number {
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < minimum || value > maximum) {
+    throw new UsageError(
+      `${name} must be an integer from ${minimum} to ${maximum}.`
     );
+  }
+  return value;
+}
 
-  deploymentsCommand
-    .command("list")
-    .alias("ls")
-    .description("List deployments")
-    .option("--limit <n>", "Page size (default 30)")
-    .option("--skip <n>", "Offset for pagination")
-    .option("--sort <field:asc|desc>", "Sort (e.g. createdAt:desc)")
-    .action(listDeploymentsCommand);
+function formatDeploymentList(value: unknown): string {
+  const items =
+    isRecord(value) && Array.isArray(value["items"])
+      ? value["items"].filter(isRecord)
+      : [];
+  if (items.length === 0) return "No deployments.";
+  const rows = items.map((item) =>
+    [
+      shortId(field(item, "id")),
+      field(item, "serverId") ?? "-",
+      field(item, "status") ?? "-",
+      field(item, "deploymentTrigger") ?? "-",
+      field(item, "gitBranch") ?? "-",
+      field(item, "createdAt") ?? "-",
+      summarize(field(item, "error")),
+    ].join("\t")
+  );
+  return [
+    "DEPLOYMENT\tSERVER\tSTATUS\tTRIGGER\tBRANCH\tCREATED\tERROR",
+    ...rows,
+  ].join("\n");
+}
 
-  deploymentsCommand
-    .command("get")
-    .argument("<deployment-id>", "Deployment ID")
-    .description("Get deployment details")
-    .action(getDeploymentCommand);
+function formatDeployment(value: unknown): string {
+  if (!isRecord(value)) return String(value);
+  const id = field(value, "id") ?? "-";
+  const error = field(value, "error");
+  return [
+    `Deployment: ${id}`,
+    `Server: ${field(value, "serverId") ?? "-"}`,
+    `Status: ${field(value, "status") ?? "-"}`,
+    `Trigger: ${field(value, "deploymentTrigger") ?? "-"}`,
+    `Branch: ${field(value, "gitBranch") ?? "-"}`,
+    `Created: ${field(value, "createdAt") ?? "-"}`,
+    ...(error !== undefined
+      ? [
+          `Error: ${summarize(error)}`,
+          `Build logs: mcp-use deployments logs ${id} --build`,
+        ]
+      : []),
+  ].join("\n");
+}
 
-  deploymentsCommand
-    .command("restart")
-    .argument("<deployment-id>", "Deployment ID")
-    .option("-f, --follow", "Follow build logs")
-    .option(
-      "--branch <name>",
-      "Target branch for the redeploy (default: the deployment's branch)"
-    )
-    .description(
-      "Restart a deployment (triggers a new deployment on the same server)"
-    )
-    .action(restartDeploymentCommand);
+function field(value: unknown, key: string): string | undefined {
+  if (!isRecord(value)) return undefined;
+  const result = value[key];
+  return typeof result === "string" && result !== "" ? result : undefined;
+}
 
-  deploymentsCommand
-    .command("delete")
-    .alias("rm")
-    .argument("<deployment-id>", "Deployment ID")
-    .option("-y, --yes", "Skip confirmation prompt")
-    .description("Delete a deployment")
-    .action(deleteDeploymentCommand);
+function shortId(value: string | undefined): string {
+  return value === undefined ? "-" : value.slice(0, 8);
+}
 
-  deploymentsCommand
-    .command("logs")
-    .argument("<deployment-id>", "Deployment ID")
-    .option("-b, --build", "Show build logs instead of runtime logs")
-    .option("-f, --follow", "Follow build logs in real-time")
-    .description("View deployment logs")
-    .action(logsCommand);
+function summarize(value: string | undefined): string {
+  if (value === undefined) return "-";
+  const firstLine = value.split(/\r?\n/, 1)[0] ?? value;
+  return firstLine.length > 100 ? `${firstLine.slice(0, 97)}...` : firstLine;
+}
 
-  deploymentsCommand
-    .command("stop")
-    .argument("<deployment-id>", "Deployment ID")
-    .description("Stop a deployment")
-    .action(stopDeploymentCommand);
-
-  deploymentsCommand
-    .command("start")
-    .argument("<deployment-id>", "Deployment ID")
-    .description("Start a stopped deployment")
-    .action(startDeploymentCommand);
-
-  return deploymentsCommand;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }

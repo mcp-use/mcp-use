@@ -1,0 +1,91 @@
+---
+title: "Code Mode"
+description: "Code execution types and methods for MCPClient"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/client/src/core/node.ts"
+---
+
+Node.js only. Enable on `MCPClient` to let agents execute JavaScript with access to connected MCP tools.
+
+```ts
+import { BaseCodeExecutor, MCPClient } from "@mcp-use/client";
+import type {
+  CodeModeConfig,
+  ExecutionResult,
+  ToolSearchResponse,
+  VMExecutorOptions,
+  E2BExecutorOptions,
+} from "@mcp-use/client";
+```
+
+## Enable
+
+```ts
+// Shorthand
+new MCPClient(config, { codeMode: true });
+
+// Full config
+new MCPClient(config, {
+  codeMode: {
+    enabled: true,
+    executor: "vm" | "e2b" | customFn | BaseCodeExecutor,
+    executorOptions: { timeoutMs?: number, apiKey?: string, memoryLimitMb?: number },
+  },
+});
+```
+
+## Methods
+
+### executeCode(code, timeout?)
+
+Runs code with tool namespaces exposed as `serverName.toolName(args)`.
+
+Returns `ExecutionResult`:
+
+| Field | Type |
+| ----- | ---- |
+| `result` | `unknown` |
+| `logs` | `string[]` |
+| `error` | `string \| null` |
+| `execution_time` | `number` (seconds) |
+
+### searchTools(query?, detailLevel?)
+
+Search tools across active sessions. `detailLevel`: `"names" | "descriptions" | "full"`.
+
+Returns `ToolSearchResponse` with `results` and `meta` (counts, namespaces).
+
+## Executors
+
+| Type | Class / value | Notes |
+| ---- | ------------- | ----- |
+| VM | `"vm"` (default) | `VMCodeExecutor`, `isVMAvailable()` |
+| E2B | `"e2b"` | `E2BCodeExecutor`, requires `@e2b/code-interpreter` peer |
+| Custom | `BaseCodeExecutor` subclass or async function | Implement `execute()` + `cleanup()` |
+
+`CodeModeConnector` exposes internal `execute_code` and `search_tools` MCP tools.
+
+## Types
+
+```ts
+interface CodeModeConfig {
+  enabled: boolean;
+  executor?: "vm" | "e2b" | CodeExecutorFunction | BaseCodeExecutor;
+  executorOptions?: VMExecutorOptions | E2BExecutorOptions;
+}
+
+interface VMExecutorOptions {
+  timeoutMs?: number;      // default 30000
+  memoryLimitMb?: number;
+}
+
+interface E2BExecutorOptions {
+  apiKey: string;
+  timeoutMs?: number;      // default 300000
+}
+```
+
+## Related
+
+- [Code mode guide](/typescript/client/code-mode)
+- [`MCPClient`](/typescript/api-reference/client/mcp-client)

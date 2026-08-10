@@ -4,7 +4,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
 import { Spinner } from "../ui/spinner";
 import { cn } from "@/client/lib/utils";
 import { useEffect } from "react";
-import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
+import type { Prompt } from "@mcp-use/client/react";
 
 interface PromptsDropdownProps {
   isOpen?: boolean;
@@ -26,7 +26,9 @@ export function PromptsDropdown({
   // Scroll to focused index
   useEffect(() => {
     if (focusedIndex >= 0) {
-      const element = document.getElementById(`prompt-${focusedIndex}`);
+      const element = document.getElementById(
+        `prompt-suggestion-${focusedIndex}`
+      );
       if (element) {
         element.scrollIntoView({ behavior: "smooth", block: "nearest" });
       }
@@ -39,36 +41,41 @@ export function PromptsDropdown({
       data-testid="chat-prompts-dropdown"
     >
       <div className="p-2">
-        <div className="text-xs font-medium text-zinc-900 dark:text-zinc-100 mb-2">
-          Prompts
-        </div>
+        {prompts.length > 0 && (
+          <div className="text-xs font-medium text-zinc-900 dark:text-zinc-100 mb-2">
+            Prompts
+          </div>
+        )}
         {prompts.map((prompt, index) => (
           <Tooltip key={index}>
-            <TooltipTrigger asChild>
-              <Button
-                id={`prompt-${index}`}
-                type="button"
-                variant="ghost"
-                className={cn(
-                  "w-full flex items-center px-3 py-2 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors text-left justify-start",
-                  focusedIndex === index && "bg-zinc-200 dark:bg-zinc-700"
-                )}
-                onClick={() => onPromptSelect(prompt)}
-                data-testid={`chat-prompt-option-${index}`}
-              >
-                <div className="flex items-center justify-center shrink-0">
-                  <MessageSquare className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                    {prompt.name}
-                    {selectedPrompt?.name === prompt.name && (
-                      <Spinner className="size-3 text-zinc-600 dark:text-zinc-400" />
-                    )}
+            <TooltipTrigger
+              render={
+                <Button
+                  id={`prompt-suggestion-${index}`}
+                  type="button"
+                  variant="ghost"
+                  className={cn(
+                    "w-full flex items-center px-3 py-2 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors text-left justify-start",
+                    focusedIndex === index && "bg-zinc-200 dark:bg-zinc-700"
+                  )}
+                  onClick={() => onPromptSelect(prompt)}
+                  data-testid={`chat-prompt-option-${index}`}
+                >
+                  <div className="flex items-center justify-center shrink-0">
+                    <MessageSquare className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
                   </div>
-                </div>
-              </Button>
-            </TooltipTrigger>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                      {prompt.name}
+                      {selectedPrompt?.name === prompt.name && (
+                        <Spinner className="size-3 text-zinc-600 dark:text-zinc-400" />
+                      )}
+                    </div>
+                  </div>
+                </Button>
+              }
+              nativeButton
+            />
             <TooltipContent>{prompt.description}</TooltipContent>
           </Tooltip>
         ))}

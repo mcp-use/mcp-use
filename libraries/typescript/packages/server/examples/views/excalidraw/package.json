@@ -1,0 +1,30 @@
+{
+  "name": "mcp-use-example-excalidraw",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Excalidraw MCP Apps views example ported to mcp-use.",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "scripts": {
+    "dev": "mcp-use dev",
+    "build": "mcp-use build",
+    "start": "mcp-use start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@excalidraw/excalidraw": "^0.18.0",
+    "mcp-use": "workspace:*",
+    "morphdom": "^2.7.8",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^7.0.2"
+  }
+}

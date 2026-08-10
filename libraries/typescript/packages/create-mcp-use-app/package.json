@@ -1,6 +1,6 @@
 {
   "name": "create-mcp-use-app",
-  "version": "0.14.16",
+  "version": "2.0.2",
   "type": "module",
   "description": "Create MCP-Use apps with one command",
   "author": "mcp-use, Inc.",
@@ -22,14 +22,14 @@
     "scaffold",
     "cli",
     "init",
-    "starter",
+    "mcp-server",
     "template"
   ],
   "bin": {
     "create-mcp-use-app": "./dist/index.js"
   },
   "scripts": {
-    "build": "npm run clean && tsup src/index.tsx --format esm && tsc --emitDeclarationOnly --declaration && npm run copy-templates",
+    "build": "npm run clean && tsup src/index.ts --format esm && tsc --emitDeclarationOnly --declaration && npm run copy-templates",
     "clean": "rimraf dist tsconfig.tsbuildinfo",
     "copy-templates": "node scripts/copy-templates.js",
     "dev": "tsc --build --watch",
@@ -43,19 +43,11 @@
     "README.md"
   ],
   "engines": {
-    "node": "^20.19.0 || >=22.12.0"
+    "node": ">=22.22.2"
   },
-  "dependencies": {
-    "chalk": "^5.6.2",
-    "commander": "^14.0.2",
-    "ink": "^6.6.0",
-    "ink-select-input": "^6.2.0",
-    "ink-text-input": "^6.0.0",
-    "ora": "^9.0.0",
-    "react": "^19.2.3",
-    "tar": "^7.5.16"
-  },
+  "dependencies": {},
   "devDependencies": {
+    "@clack/prompts": "^1.7.0",
     "vitest": "^4.1.0"
   },
   "publishConfig": {

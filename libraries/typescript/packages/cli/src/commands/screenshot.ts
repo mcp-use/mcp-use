@@ -1,787 +1,759 @@
-import chalk from "chalk";
-import { Command } from "commander";
-import type { MCPSession } from "mcp-use/client";
-import { MCPClient } from "mcp-use/client";
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync } from "node:fs";
-import { mkdir } from "node:fs/promises";
+import { access, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
-import path from "node:path";
-import { captureScreenshot } from "../utils/cdp-screenshot.js";
-import { resolveChromePath } from "../utils/chrome-path.js";
-import { formatError, formatInfo, formatSchema } from "../utils/format.js";
-import { parseToolArgs } from "../utils/parse-args.js";
-import {
-  activeSessions,
-  cleanupAndExit,
-  getCliClientInfo,
-  getOrRestoreSession,
-} from "../utils/session.js";
+import { tmpdir } from "node:os";
+import { basename, join, resolve } from "node:path";
+import { parseArgs } from "node:util";
+import { fileURLToPath } from "node:url";
 
-interface ScreenshotOptions {
-  tool?: string;
-  width?: string;
-  height?: string;
-  inspector?: string;
-  mcp?: string;
-  theme: "light" | "dark";
-  output?: string;
-  waitFor?: string;
-  delay?: string;
-  quiet?: boolean;
-  timeout: string;
-  cdpUrl?: string;
-  header?: string[];
-  deviceScaleFactor?: string;
+import type { MCPConnection } from "@mcp-use/client";
+
+import {
+  openDirectConnection,
+  openSavedConnection,
+  parseMcpArguments,
+} from "./client.js";
+import {
+  CommandError,
+  printResult,
+  reportError,
+  UsageError,
+  wantsJson,
+} from "./shared.js";
+
+interface PreviewHealth {
+  status: string;
+  protocol: string;
+  version: number;
+  capabilities: string[];
 }
 
-interface ScreenshotContext {
-  sessionName?: string;
-  usagePrefix: string;
+interface BrowserHandle {
+  cdp: CdpClient;
+  sessionId: string;
+  close(): Promise<void>;
+}
+
+interface LocalInspectorHandle {
+  origin: string;
+  close(): Promise<void>;
+}
+
+const HELP = `Usage: mcp-use screenshot (--server <name> | --mcp <url>) --tool <name> [args...] [options]
+
+Call a view-backed MCP tool and capture its rendered MCP App as PNG.
+
+Source options:
+  --server <name>             Use a server saved by mcp-use client
+  --mcp <url>                 Connect directly to an HTTP(S) MCP endpoint
+  -H, --header <"Key: Value"> Header for --mcp; repeatable and incompatible
+                              with --server
+
+Capture options:
+  --tool <name>               View-backed tool to call (required)
+  --output <path>             Output PNG path (default: timestamped view name)
+  --width <px>                Host/widget width (default: 768, matching an
+                              OpenAI inline MCP App container)
+  --height <px>               Host viewport height used for responsive layout
+                              (default: 720); PNG is cropped to widget bounds
+  --device-scale-factor <n>   Pixel density, greater than 0 and at most 4
+                              (default: 1)
+  --theme <light|dark>        Host theme (default: light)
+  --wait-for <selector>       Wait for a selector before capture
+  --delay <ms>                Additional delay after readiness (default: 0)
+  --timeout <ms>              Tool/browser timeout (default: 30000)
+  --inspector <url>           Use an existing Inspector origin
+  --cdp-url <url>             Use an existing Chrome DevTools endpoint
+  --json                      Emit one result or error; never prompt
+  -h, --help                  Show this help
+
+Arguments:
+  Pass one JSON object or key=value/key:=<json> pairs after the options.
+
+Examples:
+  mcp-use screenshot --server demo --tool show-app appName=Demo
+  mcp-use screenshot --mcp https://example.com/mcp --tool show-app \\
+    '{"appName":"CI"}' --theme dark --output app.png --json
+
+Exit codes:
+  0  Capture succeeded or help
+  2  Invalid arguments
+  1  MCP, tool, Inspector, browser, readiness, or write failure`;
+
+/** Run `mcp-use screenshot`. */
+export async function runScreenshot(argv: readonly string[]): Promise<number> {
+  if (argv.some((token) => token === "--help" || token === "-h")) {
+    process.stdout.write(`${HELP}\n`);
+    return 0;
+  }
+  const json = wantsJson(argv);
+  let connection: MCPConnection | undefined;
+  let browser: BrowserHandle | undefined;
+  let localInspector: LocalInspectorHandle | undefined;
+  try {
+    const { values, positionals } = parseArgs({
+      args: [...argv],
+      allowPositionals: true,
+      strict: true,
+      options: {
+        server: { type: "string" },
+        mcp: { type: "string" },
+        tool: { type: "string" },
+        header: { type: "string", short: "H", multiple: true },
+        output: { type: "string" },
+        width: { type: "string", default: "768" },
+        height: { type: "string", default: "720" },
+        "device-scale-factor": { type: "string", default: "1" },
+        theme: { type: "string", default: "light" },
+        inspector: { type: "string" },
+        "cdp-url": { type: "string" },
+        "wait-for": { type: "string" },
+        delay: { type: "string", default: "0" },
+        timeout: { type: "string", default: "30000" },
+        json: { type: "boolean" },
+      },
+    });
+    if ((values.server === undefined) === (values.mcp === undefined)) {
+      throw new UsageError("Exactly one of --server or --mcp is required.");
+    }
+    if (values.tool === undefined) throw new UsageError("--tool is required.");
+    if (values.server !== undefined && values.header !== undefined) {
+      throw new UsageError("--header is valid only with --mcp.");
+    }
+    if (values.theme !== "light" && values.theme !== "dark") {
+      throw new UsageError("--theme must be light or dark.");
+    }
+    const width = positive(values.width, "--width");
+    const height = positive(values.height, "--height");
+    const scale = Number(values["device-scale-factor"]);
+    if (!Number.isFinite(scale) || scale <= 0 || scale > 4) {
+      throw new UsageError(
+        "--device-scale-factor must be greater than 0 and at most 4."
+      );
+    }
+    const timeout = positive(values.timeout, "--timeout");
+    const delay = nonNegative(values.delay, "--delay");
+    const headers = parseHeaders(values.header ?? []);
+    connection =
+      values.server !== undefined
+        ? await openSavedConnection(values.server, 300_000, json)
+        : await openDirectConnection(new URL(values.mcp!).href, headers, json);
+
+    const tools = await connection.listTools();
+    const tool = tools.find((candidate) => candidate.name === values.tool);
+    if (tool === undefined)
+      throw new CommandError(
+        "tool_not_found",
+        `Tool not found: ${values.tool}`
+      );
+    const resourceUri = resourceUriFrom(tool);
+    const input = parseMcpArguments(positionals);
+    const result = await connection.callTool(values.tool, input, { timeout });
+    if (result.isError === true) {
+      throw new CommandError(
+        "tool_failed",
+        `Tool ${values.tool} returned an error.`,
+        result
+      );
+    }
+    const resource = await connection.readResource(resourceUri);
+    resourceText(resource);
+
+    localInspector =
+      values.inspector === undefined
+        ? await launchLocalInspector(timeout)
+        : undefined;
+    const inspector = (values.inspector ?? localInspector!.origin).replace(
+      /\/+$/,
+      ""
+    );
+    await verifyPreview(inspector, timeout);
+    const viewName = viewNameFrom(resourceUri);
+    const previewUrl = new URL(
+      `${inspector}/inspector/preview/${encodeURIComponent(viewName)}`
+    );
+    previewUrl.searchParams.set("protocol", "1");
+    previewUrl.searchParams.set("theme", values.theme);
+    previewUrl.searchParams.set("width", String(width));
+
+    browser =
+      values["cdp-url"] !== undefined
+        ? await connectRemoteBrowser(values["cdp-url"])
+        : await launchLocalBrowser();
+    await browser.cdp.send(
+      "Emulation.setDeviceMetricsOverride",
+      {
+        width,
+        height,
+        deviceScaleFactor: scale,
+        mobile: false,
+      },
+      browser.sessionId
+    );
+    await browser.cdp.send("Page.enable", {}, browser.sessionId);
+    await browser.cdp.send("Runtime.enable", {}, browser.sessionId);
+    await browser.cdp.send(
+      "Page.addScriptToEvaluateOnNewDocument",
+      {
+        source: `globalThis.__mcpUsePreviewBundle = ${serializeInline({
+          resourceUri,
+          resourceContents: resource,
+          toolInput: input,
+          toolOutput: result,
+        })};`,
+      },
+      browser.sessionId
+    );
+    await browser.cdp.send(
+      "Page.navigate",
+      { url: previewUrl.href },
+      browser.sessionId
+    );
+    await waitForDocument(browser, timeout);
+    await waitForReady(browser, values["wait-for"], timeout);
+    if (delay > 0) await sleep(delay);
+    const bounds = await readCaptureBounds(browser);
+    const captured = (await browser.cdp.send(
+      "Page.captureScreenshot",
+      {
+        format: "png",
+        captureBeyondViewport: true,
+        fromSurface: true,
+        clip: { ...bounds, scale: 1 },
+      },
+      browser.sessionId
+    )) as { data?: unknown };
+    if (typeof captured.data !== "string") {
+      throw new CommandError(
+        "capture_failed",
+        "Chrome returned no screenshot data."
+      );
+    }
+    const output = resolve(
+      values.output ??
+        `${viewName}-${new Date().toISOString().replace(/[:.]/g, "-")}.png`
+    );
+    await writeFile(output, Buffer.from(captured.data, "base64"));
+    printResult(
+      {
+        path: output,
+        width: bounds.width,
+        height: bounds.height,
+        viewport: { width, height },
+        deviceScaleFactor: scale,
+        theme: values.theme,
+      },
+      json,
+      output
+    );
+    return 0;
+  } catch (error) {
+    return reportError(
+      error instanceof TypeError ? new UsageError(error.message) : error,
+      json
+    );
+  } finally {
+    await browser?.close().catch(() => {});
+    await localInspector?.close().catch(() => {});
+    await connection?.disconnect().catch(() => {});
+  }
+}
+
+async function launchLocalInspector(
+  timeout: number
+): Promise<LocalInspectorHandle> {
+  const port = await freePort();
+  const inspectorEntry = import.meta.resolve("@mcp-use/inspector");
+  const cliPath = fileURLToPath(new URL("../cli.js", inspectorEntry));
+  const child = spawn(
+    process.execPath,
+    [cliPath, "--port", String(port), "--no-open"],
+    { stdio: "ignore" }
+  );
+  const origin = `http://127.0.0.1:${port}`;
+  try {
+    await waitForInspector(origin, child, Math.min(timeout, 10_000));
+  } catch (error) {
+    child.kill("SIGTERM");
+    throw error;
+  }
+  return {
+    origin,
+    async close() {
+      await stopChild(child);
+    },
+  };
+}
+
+async function waitForInspector(
+  origin: string,
+  child: ChildProcess,
+  timeout: number
+): Promise<void> {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    if (child.exitCode !== null) {
+      throw new CommandError(
+        "inspector_start_failed",
+        `Packaged Inspector exited before becoming ready (code ${child.exitCode}).`
+      );
+    }
+    try {
+      await verifyPreview(origin, Math.min(1_000, timeout));
+      return;
+    } catch {
+      await sleep(100);
+    }
+  }
+  throw new CommandError(
+    "inspector_start_failed",
+    "Packaged Inspector did not start in time."
+  );
+}
+
+async function stopChild(child: ChildProcess): Promise<void> {
+  if (child.exitCode !== null) return;
+  child.kill("SIGTERM");
+  await Promise.race([
+    new Promise<void>((resolveExit) => child.once("exit", () => resolveExit())),
+    sleep(2_000),
+  ]);
+  if (child.exitCode === null) child.kill("SIGKILL");
+}
+
+async function verifyPreview(origin: string, timeout: number): Promise<void> {
+  const response = await fetch(`${origin}/inspector/health`, {
+    signal: AbortSignal.timeout(timeout),
+  });
+  if (!response.ok) {
+    throw new CommandError(
+      "incompatible_inspector",
+      `Inspector health check failed (${response.status}).`
+    );
+  }
+  const health = (await response.json()) as Partial<PreviewHealth>;
+  if (
+    health.status !== "ok" ||
+    health.protocol !== "mcp-use-inspector-preview" ||
+    health.version !== 1 ||
+    !health.capabilities?.includes("view-preview")
+  ) {
+    throw new CommandError(
+      "incompatible_inspector",
+      "Inspector does not support mcp-use-inspector-preview version 1."
+    );
+  }
+}
+
+function resourceUriFrom(tool: unknown): string {
+  const meta =
+    tool !== null && typeof tool === "object"
+      ? (tool as { _meta?: Record<string, unknown> })._meta
+      : undefined;
+  const nested =
+    meta?.["ui"] !== null && typeof meta?.["ui"] === "object"
+      ? (meta["ui"] as Record<string, unknown>)["resourceUri"]
+      : undefined;
+  const uri = nested ?? meta?.["ui/resourceUri"];
+  if (typeof uri !== "string") {
+    throw new CommandError(
+      "missing_view",
+      "Tool does not advertise an MCP Apps UI resource."
+    );
+  }
+  return uri;
+}
+
+function resourceText(resource: unknown): string {
+  const contents =
+    resource !== null && typeof resource === "object"
+      ? (resource as { contents?: unknown }).contents
+      : undefined;
+  if (!Array.isArray(contents))
+    throw new CommandError("invalid_view", "View resource has no contents.");
+  const item = contents.find(
+    (candidate) =>
+      candidate !== null &&
+      typeof candidate === "object" &&
+      typeof (candidate as { text?: unknown }).text === "string"
+  ) as { text: string } | undefined;
+  if (item === undefined)
+    throw new CommandError(
+      "invalid_view",
+      "View resource has no HTML document."
+    );
+  return item.text;
+}
+
+function viewNameFrom(uri: string): string {
+  const url = new URL(uri);
+  return basename(url.pathname).replace(/\.html$/, "") || url.hostname;
+}
+
+async function launchLocalBrowser(): Promise<BrowserHandle> {
+  const executable = await chromeExecutable();
+  const port = await freePort();
+  const profile = await mkdtemp(join(tmpdir(), "mcp-use-chrome-"));
+  const child = spawn(
+    executable,
+    [
+      `--remote-debugging-port=${port}`,
+      `--user-data-dir=${profile}`,
+      "--headless=new",
+      "--no-first-run",
+      "--no-default-browser-check",
+      "about:blank",
+    ],
+    { stdio: "ignore" }
+  );
+  try {
+    const version = await pollJson<{ webSocketDebuggerUrl: string }>(
+      `http://127.0.0.1:${port}/json/version`,
+      10_000
+    );
+    const connected = await connectBrowser(version.webSocketDebuggerUrl);
+    return {
+      ...connected,
+      async close() {
+        await connected.close();
+        child.kill("SIGTERM");
+        await rm(profile, { recursive: true, force: true });
+      },
+    };
+  } catch (error) {
+    child.kill("SIGTERM");
+    await rm(profile, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+async function connectRemoteBrowser(url: string): Promise<BrowserHandle> {
+  return connectBrowser(url);
+}
+
+async function connectBrowser(url: string): Promise<BrowserHandle> {
+  const cdp = await CdpClient.connect(url);
+  const target = (await cdp.send("Target.createTarget", {
+    url: "about:blank",
+  })) as { targetId: string };
+  const attached = (await cdp.send("Target.attachToTarget", {
+    targetId: target.targetId,
+    flatten: true,
+  })) as { sessionId: string };
+  return {
+    cdp,
+    sessionId: attached.sessionId,
+    async close() {
+      await cdp
+        .send("Target.closeTarget", { targetId: target.targetId })
+        .catch(() => {});
+      cdp.close();
+    },
+  };
+}
+
+async function waitForDocument(
+  browser: BrowserHandle,
+  timeout: number
+): Promise<void> {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    const result = (await browser.cdp.send(
+      "Runtime.evaluate",
+      { expression: "document.readyState", returnByValue: true },
+      browser.sessionId
+    )) as { result?: { value?: unknown } };
+    if (result.result?.value === "complete") return;
+    await sleep(100);
+  }
+  throw new CommandError(
+    "browser_timeout",
+    "Inspector page did not load in time."
+  );
+}
+
+async function waitForReady(
+  browser: BrowserHandle,
+  selector: string | undefined,
+  timeout: number
+): Promise<void> {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    const expression = `(() => ({
+      ready: document.body?.dataset.viewReady === "true",
+      error: document.body?.dataset.viewError || null,
+      selector: ${JSON.stringify(selector)} === undefined || !!document.querySelector(${JSON.stringify(selector ?? "")})
+    }))()`;
+    const response = (await browser.cdp.send(
+      "Runtime.evaluate",
+      { expression, returnByValue: true },
+      browser.sessionId
+    )) as {
+      result?: {
+        value?: { ready?: boolean; error?: string | null; selector?: boolean };
+      };
+    };
+    const state = response.result?.value;
+    if (state?.error)
+      throw new CommandError(
+        "preview_failed",
+        `Inspector preview failed: ${state.error}`
+      );
+    if (state?.ready === true && state.selector === true) return;
+    await sleep(100);
+  }
+  throw new CommandError(
+    "browser_timeout",
+    "View did not become ready in time."
+  );
+}
+
+interface CaptureBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 /**
- * Curl-style `Key: Value` parser. Splits on the first `:` so values may
- * contain colons, and trims both sides so `Authorization:Bearer xyz` and
- * `Authorization: Bearer xyz` are equivalent.
+ * Read the rendered iframe's outer bounds after all requested settling time.
+ * The viewport controls responsive layout; the PNG represents only the MCP
+ * App surface, matching how an inline host embeds the widget.
  */
-export function parseHeaderArg(raw: string): [string, string] {
-  const idx = raw.indexOf(":");
-  if (idx === -1) {
-    throw new Error(
-      `Invalid --header value "${raw}". Expected "Key: Value" (e.g. "Authorization: Bearer xyz").`
-    );
-  }
-  const key = raw.slice(0, idx).trim();
-  const value = raw.slice(idx + 1).trim();
-  if (!key) {
-    throw new Error(`Invalid --header value "${raw}". Header name is empty.`);
-  }
-  return [key, value];
+async function readCaptureBounds(
+  browser: BrowserHandle
+): Promise<CaptureBounds> {
+  const response = (await browser.cdp.send(
+    "Runtime.evaluate",
+    {
+      expression: `(() => {
+        const frame = document.querySelector("iframe");
+        if (!frame) return null;
+        const rect = frame.getBoundingClientRect();
+        return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+      })()`,
+      returnByValue: true,
+    },
+    browser.sessionId
+  )) as { result?: { value?: unknown } };
+  return normalizeCaptureBounds(response.result?.value);
 }
 
-export function parseHeaderArgs(args: string[]): Record<string, string> {
+/** Validate and pixel-align browser-provided CSS bounds for CDP capture. */
+export function normalizeCaptureBounds(value: unknown): CaptureBounds {
+  if (value === null || typeof value !== "object") {
+    throw new CommandError(
+      "capture_failed",
+      "Inspector preview did not expose rendered widget bounds."
+    );
+  }
+  const candidate = value as Partial<CaptureBounds>;
+  const numbers = [candidate.x, candidate.y, candidate.width, candidate.height];
+  if (
+    numbers.some(
+      (number) => typeof number !== "number" || !Number.isFinite(number)
+    ) ||
+    candidate.width! <= 0 ||
+    candidate.height! <= 0
+  ) {
+    throw new CommandError(
+      "capture_failed",
+      "Inspector preview returned invalid widget bounds."
+    );
+  }
+  const x = Math.floor(candidate.x!);
+  const y = Math.floor(candidate.y!);
+  return {
+    x,
+    y,
+    width: Math.ceil(candidate.x! + candidate.width!) - x,
+    height: Math.ceil(candidate.y! + candidate.height!) - y,
+  };
+}
+
+class CdpClient {
+  readonly #socket: WebSocket;
+  #nextId = 1;
+  readonly #pending = new Map<
+    number,
+    { resolve(value: unknown): void; reject(error: Error): void }
+  >();
+
+  private constructor(socket: WebSocket) {
+    this.#socket = socket;
+    socket.addEventListener("message", (event) => {
+      const message = JSON.parse(String(event.data)) as {
+        id?: number;
+        result?: unknown;
+        error?: { message?: string };
+      };
+      if (message.id === undefined) return;
+      const pending = this.#pending.get(message.id);
+      if (pending === undefined) return;
+      this.#pending.delete(message.id);
+      if (message.error !== undefined) {
+        pending.reject(
+          new Error(message.error.message ?? "CDP command failed.")
+        );
+      } else {
+        pending.resolve(message.result);
+      }
+    });
+    socket.addEventListener("close", () => {
+      for (const pending of this.#pending.values()) {
+        pending.reject(new Error("Chrome DevTools connection closed."));
+      }
+      this.#pending.clear();
+    });
+  }
+
+  static async connect(url: string): Promise<CdpClient> {
+    const socket = new WebSocket(url);
+    await new Promise<void>((resolveConnection, reject) => {
+      socket.addEventListener("open", () => resolveConnection(), {
+        once: true,
+      });
+      socket.addEventListener(
+        "error",
+        () => reject(new Error("Could not connect to Chrome DevTools.")),
+        { once: true }
+      );
+    });
+    return new CdpClient(socket);
+  }
+
+  send(
+    method: string,
+    params: unknown = {},
+    sessionId?: string
+  ): Promise<unknown> {
+    const id = this.#nextId++;
+    return new Promise((resolveCommand, reject) => {
+      this.#pending.set(id, { resolve: resolveCommand, reject });
+      this.#socket.send(
+        JSON.stringify({
+          id,
+          method,
+          params,
+          ...(sessionId !== undefined ? { sessionId } : {}),
+        })
+      );
+    });
+  }
+
+  close(): void {
+    this.#socket.close();
+  }
+}
+
+async function chromeExecutable(): Promise<string> {
+  const configured =
+    process.env["MCP_USE_CHROME_PATH"] ??
+    process.env["PUPPETEER_EXECUTABLE_PATH"] ??
+    process.env["CHROME_PATH"];
+  const candidates = [
+    configured,
+    ...(process.platform === "darwin"
+      ? [
+          "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+          "/Applications/Chromium.app/Contents/MacOS/Chromium",
+          "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
+          "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+        ]
+      : process.platform === "win32"
+        ? [
+            `${process.env["PROGRAMFILES"] ?? ""}\\Google\\Chrome\\Application\\chrome.exe`,
+            `${process.env["LOCALAPPDATA"] ?? ""}\\Google\\Chrome\\Application\\chrome.exe`,
+          ]
+        : [
+            "/usr/bin/google-chrome",
+            "/usr/bin/google-chrome-stable",
+            "/usr/bin/chromium",
+            "/usr/bin/chromium-browser",
+          ]),
+  ].filter(
+    (candidate): candidate is string =>
+      candidate !== undefined && candidate !== ""
+  );
+  for (const candidate of candidates) {
+    try {
+      await access(candidate);
+      return candidate;
+    } catch {
+      // Try the next browser.
+    }
+  }
+  throw new CommandError(
+    "chrome_not_found",
+    "Chrome, Chromium, Edge, or Brave was not found. Set MCP_USE_CHROME_PATH."
+  );
+}
+
+function freePort(): Promise<number> {
+  return new Promise((resolvePort, reject) => {
+    const server = createServer();
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      const port =
+        typeof address === "object" && address !== null ? address.port : 0;
+      server.close((error) => (error ? reject(error) : resolvePort(port)));
+    });
+  });
+}
+
+async function pollJson<T>(url: string, timeout: number): Promise<T> {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(url);
+      if (response.ok) return (await response.json()) as T;
+    } catch {
+      // Browser is still starting.
+    }
+    await sleep(100);
+  }
+  throw new CommandError(
+    "chrome_start_failed",
+    "Chrome DevTools did not start."
+  );
+}
+
+function parseHeaders(values: readonly string[]): Record<string, string> {
   const headers: Record<string, string> = {};
-  for (const raw of args) {
-    const [key, value] = parseHeaderArg(raw);
-    headers[key] = value;
+  for (const value of values) {
+    const separator = value.indexOf(":");
+    if (separator <= 0) throw new UsageError(`Invalid header: ${value}`);
+    headers[value.slice(0, separator).trim()] = value
+      .slice(separator + 1)
+      .trim();
   }
   return headers;
 }
 
-function collectHeader(value: string, previous: string[] = []): string[] {
-  return previous.concat([value]);
-}
-
-interface ScreenshotBundle {
-  resourceUri: string;
-  resourceContents: unknown;
-  toolInput?: Record<string, unknown>;
-  toolOutput?: unknown;
-}
-
-/**
- * Inspect a tool's `_meta` for the UI resource URI it renders, if any. Falls back
- * to the OpenAI Apps `openai/outputTemplate` key for cross-ecosystem compatibility.
- */
-export function detectToolResourceUri(
-  tool: { _meta?: Record<string, unknown> } | undefined | null
-): string | null {
-  if (!tool) return null;
-  const meta = tool._meta;
-  if (!meta) return null;
-  const uiMeta = (meta.ui as { resourceUri?: string } | undefined) ?? undefined;
-  return (
-    uiMeta?.resourceUri ??
-    (meta["openai/outputTemplate"] as string | undefined) ??
-    null
-  );
-}
-
-interface CaptureToolScreenshotInputs {
-  session: MCPSession;
-  toolName: string;
-  toolArgs: Record<string, unknown>;
-  toolOutput: unknown;
-  resourceUri: string;
-}
-
-interface CaptureToolScreenshotOptions {
-  /**
-   * Desired output width in CSS pixels. When omitted, the screenshot fits the
-   * widget's natural rendered width. When set, also overrides the inline-mode
-   * 768px max-width cap so the widget renders at the requested width.
-   */
-  width?: number;
-  /**
-   * Desired output height in CSS pixels. When omitted, the screenshot fits the
-   * widget's natural rendered height.
-   */
-  height?: number;
-  theme?: "light" | "dark";
-  output?: string;
-  waitFor?: string;
-  delayMs?: number;
-  timeoutMs?: number;
-  inspector?: string;
-  quiet?: boolean;
-  /**
-   * Pre-existing CDP WebSocket URL. When set, the screenshot is captured via
-   * the remote browser instead of spawning a local Chrome. The inspector URL
-   * must be reachable from that remote browser.
-   */
-  cdpUrl?: string;
-  /**
-   * Device pixel ratio for rendering. Defaults to 1. With a value of 2 the
-   * resulting PNG is (width × 2) × (height × 2) device pixels (Retina-style
-   * capture). Forwarded to `Emulation.setDeviceMetricsOverride`.
-   */
-  deviceScaleFactor?: number;
-}
-
-interface CaptureToolScreenshotResult {
-  outputPath: string;
-  /** Final clip width in CSS pixels (what the PNG visually represents). */
-  width: number;
-  /** Final clip height in CSS pixels. */
-  height: number;
-  view: string;
-}
-
-/**
- * End-to-end screenshot pipeline for a tool whose UI resource has already been
- * resolved. Reuses the caller's existing tool result so we don't re-invoke the
- * tool, ensures a dev server is running (spawning one if needed), reads the UI
- * resource, and captures via CDP. Cleans up any spawned dev server before
- * returning, even on failure.
- */
-export async function captureToolScreenshot(
-  inputs: CaptureToolScreenshotInputs,
-  options: CaptureToolScreenshotOptions = {}
-): Promise<CaptureToolScreenshotResult> {
-  const { width, height } = options;
-  const theme: "light" | "dark" = options.theme ?? "light";
-  const timeoutMs = options.timeoutMs ?? 30000;
-  const delayMs = options.delayMs ?? 0;
-
-  const chromePath = options.cdpUrl ? undefined : resolveChromePath();
-  const view = extractViewName(inputs.resourceUri);
-
-  const devOptions: ScreenshotOptions = {
-    theme,
-    timeout: String(timeoutMs),
-    inspector: options.inspector,
-    quiet: options.quiet,
-  };
-
-  let devHandle: DevServerHandle | undefined;
-  try {
-    devHandle = await ensureDevServer(devOptions);
-
-    const resourceContents = await inputs.session.readResource(
-      inputs.resourceUri
-    );
-    const bundle: ScreenshotBundle = {
-      resourceUri: inputs.resourceUri,
-      resourceContents,
-      toolInput: inputs.toolArgs,
-      toolOutput: inputs.toolOutput,
-    };
-
-    const previewUrl = new URL(`/inspector/preview/${view}`, devHandle.url);
-    previewUrl.searchParams.set("theme", theme);
-    // Width also drives the inline-mode max-width inside the iframe: when set,
-    // the widget renders at this width, then we clip to it. When unset, the
-    // widget renders at its natural width (capped at 768).
-    if (width !== undefined) {
-      previewUrl.searchParams.set("width", String(width));
-    }
-
-    const ts = timestampSuffix();
-    const outputPath = path.resolve(options.output ?? `./${view}-${ts}.png`);
-    await mkdir(path.dirname(outputPath), { recursive: true });
-
-    const captured = await captureScreenshot({
-      url: previewUrl.toString(),
-      width,
-      height,
-      theme,
-      waitForSelector: options.waitFor ?? 'body[data-view-ready="true"]',
-      timeoutMs,
-      outputPath,
-      chromePath,
-      cdpUrl: options.cdpUrl,
-      delayMs: Number.isFinite(delayMs) && delayMs > 0 ? delayMs : 0,
-      bundle,
-      deviceScaleFactor: options.deviceScaleFactor,
-    });
-
-    return {
-      outputPath,
-      width: captured.width,
-      height: captured.height,
-      view,
-    };
-  } finally {
-    killChild(devHandle?.child);
+function positive(value: string | undefined, name: string): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new UsageError(`${name} must be positive.`);
   }
+  return parsed;
 }
 
-/**
- * Allocate a free TCP port by binding to 0 and reading back what the OS chose.
- */
-function getFreePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const srv = createServer();
-    srv.unref();
-    srv.on("error", reject);
-    srv.listen(0, () => {
-      const addr = srv.address();
-      if (typeof addr === "object" && addr) {
-        const port = addr.port;
-        srv.close(() => resolve(port));
-      } else {
-        srv.close(() => reject(new Error("Failed to allocate free port")));
-      }
-    });
-  });
-}
-
-/**
- * Probe a server's `/inspector/health` endpoint. Returns true only if it
- * responds with the inspector's JSON payload (`{ status: "ok" }`).
- *
- * A bare `res.ok` check is not enough: a Vite/SPA dev server happily returns
- * 200 + HTML for any unknown path (SPA fallback), which would be misidentified
- * as a valid inspector and later cause a silent timeout when the preview
- * route is missing.
- */
-async function probeServer(url: string, timeoutMs = 1500): Promise<boolean> {
-  const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const u = new URL("/inspector/health", url);
-    const res = await fetch(u, { signal: controller.signal });
-    if (!res.ok) return false;
-    const ct = res.headers.get("content-type") ?? "";
-    if (!ct.includes("application/json")) return false;
-    const body = (await res.json()) as { status?: string };
-    return body?.status === "ok";
-  } catch {
-    return false;
-  } finally {
-    clearTimeout(t);
+function nonNegative(value: string | undefined, name: string): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new UsageError(`${name} must be non-negative.`);
   }
+  return parsed;
 }
 
-/**
- * Wait until `/inspector/health` reports ready, polling every 200ms.
- */
-async function waitForHealth(url: string, timeoutMs = 15000): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (await probeServer(url)) return true;
-    await new Promise((r) => setTimeout(r, 200));
-  }
-  return false;
+function serializeInline(value: unknown): string {
+  return JSON.stringify(value)
+    .replace(/</g, "\\u003c")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
 }
 
-interface DevServerHandle {
-  url: string;
-  child?: ChildProcess;
-}
-
-/**
- * Resolve the path to `@mcp-use/inspector`'s standalone CLI entry. Throws
- * with a clear message when the inspector package can't be located — that
- * usually means the workspace hasn't been installed/built.
- *
- * We can't use `require.resolve('@mcp-use/inspector')` because the inspector
- * package's `exports` field only declares an `import` condition, so CJS
- * resolution fails. Subpath resolution (`/dist/cli.js`, `/package.json`)
- * also fails because neither is listed in `exports`. So we walk up from
- * both the current module and the CWD looking for the installed package.
- */
-function resolveInspectorCli(): string {
-  const candidateRoots = new Set<string>();
-  // CJS: __dirname is defined; ESM: derive from import.meta.url.
-  const moduleDir =
-    typeof __dirname !== "undefined"
-      ? __dirname
-      : path.dirname(new URL(import.meta.url).pathname);
-  candidateRoots.add(moduleDir);
-  candidateRoots.add(process.cwd());
-
-  for (const start of candidateRoots) {
-    let dir = start;
-    while (true) {
-      const candidate = path.join(
-        dir,
-        "node_modules",
-        "@mcp-use",
-        "inspector",
-        "dist",
-        "cli.js"
-      );
-      if (existsSync(candidate)) return candidate;
-      const parent = path.dirname(dir);
-      if (parent === dir) break;
-      dir = parent;
-    }
-  }
-  throw new Error(
-    "Could not locate `@mcp-use/inspector` in node_modules. Install the inspector package or pass --inspector <url> to use an existing instance."
-  );
-}
-
-/**
- * Resolve a usable inspector host:
- *
- *   - When `--inspector <url>` is given, probe it (strict: must return the
- *     inspector's JSON health payload) and use it.
- *   - Otherwise, always spawn a fresh `@mcp-use/inspector` on a free port.
- *
- * Note: we no longer try to reuse a server on `localhost:3000`. A Vite-only
- * dev server (or any unrelated 200-returning service) would otherwise be
- * misidentified and cause silent rendering failures. Always-spawn keeps
- * behavior predictable and decoupled from whatever else is running locally.
- */
-async function ensureDevServer(
-  options: ScreenshotOptions
-): Promise<DevServerHandle> {
-  if (options.inspector) {
-    const ok = await probeServer(options.inspector);
-    if (!ok) {
-      throw new Error(
-        `Inspector at ${options.inspector} did not respond on /inspector/health with status:"ok"`
-      );
-    }
-    return { url: options.inspector };
-  }
-
-  const port = await getFreePort();
-  const url = `http://localhost:${port}`;
-  if (!options.quiet) {
-    console.error(formatInfo(`Starting inspector on port ${port}…`));
-  }
-
-  const inspectorCli = resolveInspectorCli();
-  const child = spawn(
-    process.execPath,
-    [inspectorCli, "--port", String(port), "--no-open"],
-    {
-      cwd: process.cwd(),
-      stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env, MCP_INSPECTOR_MODE: "standalone" },
-    }
-  );
-
-  const prefix = chalk.gray("[inspector]");
-  if (!options.quiet) {
-    child.stdout?.on("data", (d: Buffer) => {
-      process.stderr.write(`${prefix} ${d}`);
-    });
-    child.stderr?.on("data", (d: Buffer) => {
-      process.stderr.write(`${prefix} ${d}`);
-    });
-  } else {
-    child.stdout?.resume();
-    child.stderr?.resume();
-  }
-
-  const ready = await waitForHealth(url);
-  if (!ready) {
-    child.kill("SIGTERM");
-    throw new Error(`Inspector failed to come up on ${url} within 15s.`);
-  }
-  return { url, child };
-}
-
-function killChild(child: ChildProcess | undefined) {
-  if (!child || child.killed) return;
-  try {
-    child.kill("SIGTERM");
-  } catch {
-    // Ignore.
-  }
-}
-
-/**
- * Returns a filesystem-safe timestamp string: YYYY-MM-DD_HH-mm-ss
- */
-export function timestampSuffix(date = new Date()): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const datePart = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-  const timePart = `${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}`;
-  return `${datePart}_${timePart}`;
-}
-
-export function extractViewName(resourceUri: string): string {
-  // ui://<host>/<path>[.<buildId>].html
-  const m = resourceUri.match(/^ui:\/\/([^/]+)\/(.+)$/);
-  if (!m) return encodeURIComponent(resourceUri);
-  const name = m[2].replace(/\.html$/, "").replace(/\.[0-9a-f]+$/i, "");
-  // Built-in "widget" namespace: drop the host prefix to keep existing names short.
-  return m[1] === "widget" ? name : `${m[1]}-${name}`;
-}
-
-export function parseDimension(raw: string, name: string): number {
-  const n = parseInt(raw, 10);
-  if (!Number.isFinite(n) || n <= 0) {
-    throw new Error(`--${name} must be a positive integer (got "${raw}")`);
-  }
-  return n;
-}
-
-/**
- * Parse `--device-scale-factor <n>`. Allows fractional values (e.g. 1.5) and
- * caps at 4 to avoid accidental 16x-pixel screenshots (memory + disk).
- */
-export function parseDeviceScaleFactor(raw: string): number {
-  const n = parseFloat(raw);
-  if (!Number.isFinite(n) || n <= 0) {
-    throw new Error(
-      `--device-scale-factor must be a positive number (got "${raw}")`
-    );
-  }
-  if (n > 4) {
-    throw new Error(
-      `--device-scale-factor must be <= 4 to avoid excessive pixel counts (got "${raw}")`
-    );
-  }
-  return n;
-}
-
-export function requiresArguments(inputSchema: unknown): boolean {
-  if (!inputSchema || typeof inputSchema !== "object") return false;
-  const required = (inputSchema as { required?: unknown }).required;
-  return Array.isArray(required) && required.length > 0;
-}
-
-const AD_HOC_SESSION_NAME = "__screenshot_ad_hoc__";
-
-/**
- * Resolve an authenticated MCPSession for the screenshot run.
- *
- * Resolution order:
- *  1. `sessionName` → restore that saved server (passed in by the per-client
- *     subcommand `mcp-use client <name> screenshot`).
- *  2. `--mcp <url>` → open an unauthenticated ad-hoc session at that URL.
- */
-async function resolveSessionForScreenshot(
-  options: ScreenshotOptions,
-  sessionName: string | undefined,
-  headers: Record<string, string> | undefined
-): Promise<MCPSession | null> {
-  if (sessionName) {
-    const result = await getOrRestoreSession(sessionName);
-    return result?.session ?? null;
-  }
-
-  if (options.mcp) {
-    const client = new MCPClient();
-    client.addServer(AD_HOC_SESSION_NAME, {
-      url: options.mcp,
-      ...(headers ? { headers } : {}),
-      clientInfo: getCliClientInfo(),
-    });
-    try {
-      const session = await client.createSession(AD_HOC_SESSION_NAME);
-      activeSessions.set(AD_HOC_SESSION_NAME, { client, session });
-      return session;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(formatError(`Failed to connect to ${options.mcp}: ${msg}`));
-      return null;
-    }
-  }
-
-  console.error(
-    formatError(
-      "No MCP target. Pass --mcp <url> for an ad-hoc connection, or use `mcp-use client <name> screenshot` for a saved server."
-    )
-  );
-  return null;
-}
-
-async function screenshotCommand(
-  options: ScreenshotOptions,
-  argsList: string[] | undefined,
-  context: ScreenshotContext
-): Promise<void> {
-  let exitCode = 0;
-
-  try {
-    if (!options.tool) {
-      console.error(
-        formatError(
-          "--tool <name> is required (optionally with key=value args)."
-        )
-      );
-      exitCode = 1;
-      return;
-    }
-
-    let headers: Record<string, string> | undefined;
-    if (options.header && options.header.length > 0) {
-      if (!options.mcp) {
-        console.error(
-          formatError(
-            "--header is only supported with --mcp <url>. Saved servers carry their own auth from `mcp-use client connect`."
-          )
-        );
-        exitCode = 1;
-        return;
-      }
-      try {
-        headers = parseHeaderArgs(options.header);
-      } catch (err) {
-        console.error(
-          formatError(err instanceof Error ? err.message : String(err))
-        );
-        exitCode = 1;
-        return;
-      }
-    }
-
-    try {
-      resolveChromePath();
-    } catch (err) {
-      console.error(
-        formatError(err instanceof Error ? err.message : String(err))
-      );
-      exitCode = 1;
-      return;
-    }
-
-    const width =
-      options.width !== undefined
-        ? parseDimension(options.width, "width")
-        : undefined;
-    const height =
-      options.height !== undefined
-        ? parseDimension(options.height, "height")
-        : undefined;
-    const navTimeout = parseInt(options.timeout, 10) || 30000;
-    const delayMs = options.delay ? parseInt(options.delay, 10) : 0;
-    const deviceScaleFactor = options.deviceScaleFactor
-      ? parseDeviceScaleFactor(options.deviceScaleFactor)
-      : undefined;
-
-    // Resolve session before spawning the dev server so auth issues fail fast.
-    const session = await resolveSessionForScreenshot(
-      options,
-      context.sessionName,
-      headers
-    );
-    if (!session) {
-      exitCode = 1;
-      return;
-    }
-
-    const tool = session.tools.find((t) => t.name === options.tool);
-    if (!tool) {
-      throw new Error(
-        `Tool "${options.tool}" not found. Available: ${session.tools
-          .map((t) => t.name)
-          .join(", ")}`
-      );
-    }
-    const resourceUri = detectToolResourceUri(tool);
-    if (!resourceUri) {
-      throw new Error(
-        `Tool "${options.tool}" does not declare a UI resource (expected _meta.ui.resourceUri or openai/outputTemplate).`
-      );
-    }
-
-    let toolArgs: Record<string, unknown> = {};
-    if (argsList && argsList.length > 0) {
-      try {
-        toolArgs = parseToolArgs(
-          argsList,
-          tool.inputSchema as Parameters<typeof parseToolArgs>[1]
-        );
-      } catch (err) {
-        console.error(
-          formatError(err instanceof Error ? err.message : String(err))
-        );
-        console.log("");
-        console.log(formatInfo("Usage:"));
-        console.log(
-          `  npx ${context.usagePrefix} --tool ${options.tool} key=value [key2=value2 ...]`
-        );
-        console.log(
-          `  npx ${context.usagePrefix} --tool ${options.tool} nested:='{"a":1}'   # JSON value`
-        );
-        console.log(
-          `  npx ${context.usagePrefix} --tool ${options.tool} '{"key":"value"}'   # full JSON object`
-        );
-        if (tool.inputSchema) {
-          console.log("");
-          console.log(formatInfo("Tool schema:"));
-          console.log(formatSchema(tool.inputSchema));
-        }
-        exitCode = 1;
-        return;
-      }
-    } else if (requiresArguments(tool.inputSchema)) {
-      console.error(formatError("This tool requires arguments."));
-      console.log("");
-      console.log(formatInfo("Provide arguments as key=value pairs:"));
-      console.log(
-        `  npx ${context.usagePrefix} --tool ${options.tool} key=value [key2=value2 ...]`
-      );
-      console.log("");
-      console.log(formatInfo("Tool schema:"));
-      console.log(formatSchema(tool.inputSchema));
-      exitCode = 1;
-      return;
-    }
-    const toolOutput = await session.callTool(options.tool, toolArgs);
-
-    const result = await captureToolScreenshot(
-      {
-        session,
-        toolName: options.tool,
-        toolArgs,
-        toolOutput,
-        resourceUri,
-      },
-      {
-        width,
-        height,
-        theme: options.theme,
-        output: options.output,
-        waitFor: options.waitFor,
-        delayMs,
-        timeoutMs: navTimeout,
-        inspector: options.inspector,
-        quiet: options.quiet,
-        cdpUrl: options.cdpUrl,
-        deviceScaleFactor,
-      }
-    );
-
-    console.log(
-      `Saved screenshot: ${result.outputPath} (${result.width}×${result.height})`
-    );
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error(formatError(`Screenshot failed: ${msg}`));
-    exitCode = 1;
-  } finally {
-    await cleanupAndExit(exitCode);
-  }
-}
-
-/**
- * Apply the screenshot flags that are common to both the ad-hoc top-level form
- * (`mcp-use client screenshot`) and the per-server form
- * (`mcp-use client <name> screenshot`).
- */
-function withCommonScreenshotOptions(cmd: Command): Command {
-  return cmd
-    .argument(
-      "[args...]",
-      "Tool args as key=value pairs (use key:=<json> for nested values, or pass a single JSON object)."
-    )
-    .option(
-      "--tool <name>",
-      "Tool to call. Its UI resource is rendered with the result."
-    )
-    .option(
-      "--width <px>",
-      "Output image width in pixels. When omitted, fits the widget's natural width. When set, the widget renders at this width (overrides the inline-mode 768px cap)."
-    )
-    .option(
-      "--height <px>",
-      "Output image height in pixels. When omitted, fits the widget's natural height."
-    )
-    .option(
-      "--device-scale-factor <n>",
-      "Device pixel ratio for rendering (e.g. 2 for Retina). Output PNG is (width × dsf) × (height × dsf). Must be > 0 and <= 4."
-    )
-    .option(
-      "--inspector <url>",
-      "Inspector host that serves /inspector/preview/:view. When omitted, auto-spawns `@mcp-use/inspector` on a free port."
-    )
-    .option(
-      "--theme <light|dark>",
-      "Color scheme to render the view in.",
-      "light"
-    )
-    .option(
-      "--output <path>",
-      "Output PNG path. Defaults to ./<view>-<timestamp>.png in cwd."
-    )
-    .option(
-      "--wait-for <selector>",
-      'Override readiness selector (default: body[data-view-ready="true"]).'
-    )
-    .option(
-      "--delay <ms>",
-      "Extra wait after readiness, to let chart animations / async layouts settle.",
-      "0"
-    )
-    .option("--timeout <ms>", "Navigation + readiness timeout in ms.", "30000")
-    .option(
-      "--cdp-url <url>",
-      "Connect to an existing CDP WebSocket (ws:// or wss://) instead of spawning local Chrome. Useful for hosted browsers like Notte."
-    )
-    .option("--quiet", "Suppress dev-server output.");
-}
-
-/**
- * Top-level ad-hoc form: `mcp-use client screenshot --mcp <url> --tool <name>`.
- *
- * Doesn't take a saved-server positional. The MCP server is supplied inline
- * via `--mcp`, and authenticated servers can be reached with repeatable
- * `-H, --header` flags. This is the programmatic entry point for one-off or
- * automated screenshot runs that don't want to first `mcp-use client connect`.
- */
-export function createClientScreenshotCommand(): Command {
-  const cmd = withCommonScreenshotOptions(
-    new Command("screenshot").description(
-      "Render an MCP Apps view headlessly and save a PNG. Connects to an MCP server inline via --mcp; for a saved server, use `mcp-use client <name> screenshot`."
-    )
-  )
-    .option(
-      "--mcp <url>",
-      "Ad-hoc MCP server URL. Required for the top-level form. No authentication unless --header is supplied."
-    )
-    .option(
-      "-H, --header <header>",
-      'HTTP header to send to the --mcp <url> server, formatted "Key: Value". Repeatable. Use to pass an Authorization bearer token or other auth headers when screenshotting an authenticated MCP server.',
-      collectHeader,
-      [] as string[]
-    );
-
-  cmd.action(async (args: string[], opts: ScreenshotOptions) => {
-    await screenshotCommand(opts, args, {
-      usagePrefix: "mcp-use client screenshot",
-    });
-  });
-
-  return cmd;
-}
-
-/**
- * Per-server form: `mcp-use client <name> screenshot --tool <name>`. The saved
- * server's auth (OAuth or bearer) is reused — no `--mcp`/`--header` flags.
- */
-export function createPerClientScreenshotCommand(name: string): Command {
-  const cmd = withCommonScreenshotOptions(
-    new Command("screenshot").description(
-      `Render an MCP Apps view headlessly using the saved server '${name}'.`
-    )
-  );
-
-  cmd.action(async (args: string[], opts: ScreenshotOptions) => {
-    await screenshotCommand(opts, args, {
-      sessionName: name,
-      usagePrefix: `mcp-use client ${name} screenshot`,
-    });
-  });
-
-  return cmd;
+function sleep(milliseconds: number): Promise<void> {
+  return new Promise((resolveSleep) => setTimeout(resolveSleep, milliseconds));
 }

@@ -1,1330 +1,817 @@
-import chalk from "chalk";
-import { Command } from "commander";
-import type { MCPSession } from "mcp-use/client";
-import { MCPClient } from "mcp-use/client";
-import type { NodeOAuthClientProvider } from "mcp-use/auth/node";
-import { createInterface } from "node:readline";
-import {
-  formatError,
-  formatHeader,
-  formatInfo,
-  formatJson,
-  formatKeyValue,
-  formatPromptMessages,
-  formatResourceContent,
-  formatSchema,
-  formatSuccess,
-  formatTable,
-  formatToolCall,
-  formatToolMode,
-  formatWarning,
-  isStdoutTty,
-} from "../utils/format.js";
-import { parsePromptArgs, parseToolArgs } from "../utils/parse-args.js";
-import {
-  buildOAuthProvider,
-  isUnauthorized,
-  runOAuthFlow,
-} from "../utils/oauth.js";
-import {
-  getSession,
-  listAllSessions,
-  removeSession,
-  saveSession,
-  updateSessionInfo,
-} from "../utils/session-storage.js";
-import {
-  activeSessions,
-  cleanupAndExit,
-  getCliClientInfo,
-  getOrRestoreSession,
-} from "../utils/session.js";
-import {
-  authStatusCommand,
-  authRefreshCommand,
-  authLogoutCommand,
-} from "./client-auth.js";
-import {
-  captureToolScreenshot,
-  createClientScreenshotCommand,
-  createPerClientScreenshotCommand,
-  detectToolResourceUri,
-  parseDeviceScaleFactor,
-} from "./screenshot.js";
+import { createHash } from "node:crypto";
+import { rm } from "node:fs/promises";
+import { join } from "node:path";
+import { createInterface } from "node:readline/promises";
+import { parseArgs } from "node:util";
 
-/**
- * Reserved top-level subcommands under `mcp-use client`. Any other token in
- * that position is treated as a client name and routed via
- * `createPerClientCommand`. Keep this in sync with the subcommands registered
- * in `createClientCommand` below, plus commander's built-in help tokens.
- */
-export const RESERVED_CLIENT_SUBCOMMANDS = new Set([
-  "connect",
-  "list",
-  "remove",
-  "screenshot",
-  "help",
-]);
+import type { MCPConnection } from "@mcp-use/client";
 
-/**
- * Per-client scope tokens that live under `mcp-use client <name> ...`. When a
- * user types one of these in the client-name slot (e.g.
- * `mcp-use client tools call foo`), they almost certainly forgot the client
- * name — route to a tailored error instead of "unknown command".
- */
-export const PER_CLIENT_SCOPES = new Set([
-  "tools",
-  "resources",
-  "prompts",
-  "auth",
-  "disconnect",
-  "interactive",
-  "screenshot",
-]);
+import { resolveClientHelp } from "./client-help.js";
+import { loadClientPackage } from "./load-client.js";
+import {
+  CommandError,
+  confirm,
+  GLOBAL_STATE_DIR,
+  openBrowser,
+  pathExists,
+  printResult,
+  readJson,
+  reportError,
+  UsageError,
+  wantsJson,
+  writePrivateJson,
+} from "./shared.js";
 
-async function connectCommand(
-  name: string | undefined,
-  urlOrCommand: string | undefined,
-  options: {
-    stdio?: boolean;
-    auth?: string;
-    oauth?: boolean;
-    authTimeout?: string;
-  }
-): Promise<void> {
-  // `connect` requires both <name> and <url>. Commander's default missing-arg
-  // error ("missing required argument 'url'") is confusing when users pass a
-  // URL as the only positional — they don't realize the server needs a name.
-  // Catch the common shapes here and give a tailored fix-it message.
-  if (!name || !urlOrCommand) {
-    const looksLikeUrl = !!name && /^https?:\/\//i.test(name);
+interface SavedServer {
+  url: string;
+  oauth: boolean;
+  protocol: "auto" | "legacy" | "modern";
+}
 
-    if (looksLikeUrl && !urlOrCommand && !options.stdio) {
-      console.error(formatError("Missing server name."));
-      console.error("");
-      console.error(
-        formatInfo(
-          "Each saved server needs a short name you'll use to address it later."
-        )
-      );
-      console.error("");
-      console.error("Try:");
-      console.error(`  mcp-use client connect <name> ${name}`);
-      console.error("");
-      console.error("Example:");
-      console.error(`  mcp-use client connect my-server ${name}`);
-      console.error("  mcp-use client my-server tools list");
-    } else if (name && !urlOrCommand) {
-      console.error(
-        formatError(options.stdio ? "Missing <command>." : "Missing <url>.")
-      );
-      console.error("");
-      console.error(formatInfo("Usage:"));
-      console.error(
-        options.stdio
-          ? `  mcp-use client connect ${name} "<command>" --stdio`
-          : `  mcp-use client connect ${name} <url>`
-      );
-    } else {
-      console.error(formatError("Missing required arguments: <name> <url>."));
-      console.error("");
-      console.error(formatInfo("Usage:"));
-      console.error("  mcp-use client connect <name> <url>");
-      console.error("");
-      console.error("Example:");
-      console.error(
-        "  mcp-use client connect manufact https://mcp.manufact.com/mcp"
-      );
+interface SavedServers {
+  servers: Record<string, SavedServer>;
+}
+
+interface SavedCredentials {
+  headers?: Record<string, string>;
+}
+
+const CLIENT_DIR = join(GLOBAL_STATE_DIR, "client");
+const SERVERS_PATH = join(CLIENT_DIR, "servers.json");
+
+type BrowserMode = "ask" | "never";
+
+/** Run the `mcp-use client` command family. */
+export async function runClient(argv: readonly string[]): Promise<number> {
+  if (argv.includes("--help") || argv.includes("-h")) {
+    const help = resolveClientHelp(argv);
+    if (help.text !== undefined) {
+      process.stdout.write(`${help.text}\n`);
+      return 0;
     }
-    await cleanupAndExit(1);
+    process.stderr.write(`${help.error}\n`);
+    return 2;
   }
-
-  // Narrow for TS: the validation block above exits on missing args. The
-  // `await cleanupAndExit` doesn't propagate `never` through control flow,
-  // so assert here once instead of sprinkling `!` everywhere.
-  const sessionName: string = name as string;
-  const target: string = urlOrCommand as string;
-
-  // Reject names that collide with per-server scope tokens. If someone saved a
-  // server as `tools`, every `mcp-use client tools ...` invocation would be
-  // intercepted by the "missing server name" routing in index.ts and the
-  // saved entry would be unreachable. Fail fast at save time instead.
-  if (PER_CLIENT_SCOPES.has(sessionName)) {
-    console.error(
-      formatError(
-        `'${sessionName}' is a reserved name and can't be used for a saved server.`
-      )
-    );
-    console.error("");
-    console.error(
-      `Reserved names: ${Array.from(PER_CLIENT_SCOPES).sort().join(", ")}`
-    );
-    console.error("");
-    console.error("Pick a different name, e.g.:");
-    console.error(`  mcp-use client connect my-${sessionName} ${target}`);
-    await cleanupAndExit(1);
-  }
-
+  const json = wantsJson(argv);
+  const normalizedArgv = argv.filter((token) => token !== "--json");
+  const first = normalizedArgv[0];
   try {
-    const client = new MCPClient();
-    let session: MCPSession;
-    const cliClientInfo = getCliClientInfo();
+    if (first === "connect")
+      return await connect(normalizedArgv.slice(1), json);
+    if (first === "list") return await list(normalizedArgv.slice(1), json);
+    if (first === "remove") {
+      return await remove(normalizedArgv.slice(1), json);
+    }
+    if (first === undefined) {
+      throw new UsageError("Usage: mcp-use client <connect|list|remove|name>");
+    }
+    return await savedServerCommand(first, normalizedArgv.slice(1), json);
+  } catch (error) {
+    return reportError(
+      error instanceof TypeError ? new UsageError(error.message) : error,
+      json
+    );
+  }
+}
 
-    if (options.stdio) {
-      const parts = target.split(" ");
-      const command = parts[0];
-      const args = parts.slice(1);
+async function connect(
+  argv: readonly string[],
+  json: boolean
+): Promise<number> {
+  const { values, positionals } = parseArgs({
+    args: [...argv],
+    allowPositionals: true,
+    strict: true,
+    options: {
+      header: { type: "string", short: "H", multiple: true },
+      "no-oauth": { type: "boolean" },
+      "auth-timeout": { type: "string" },
+      protocol: { type: "string", default: "auto" },
+      "no-open": { type: "boolean" },
+    },
+  });
+  if (positionals.length !== 2) {
+    throw new UsageError("Usage: mcp-use client connect <name> <url>");
+  }
+  const [name, rawUrl] = positionals as [string, string];
+  validateName(name);
+  const url = new URL(rawUrl);
+  if (!["http:", "https:"].includes(url.protocol)) {
+    throw new UsageError("Client URLs must use http or https.");
+  }
+  const protocol = parseProtocol(values.protocol);
+  const timeout = parsePositiveInteger(
+    values["auth-timeout"] ?? "300000",
+    "--auth-timeout"
+  );
+  const saved = await readServers();
+  if (saved.servers[name] !== undefined) {
+    throw new UsageError(`Saved server already exists: ${name}`);
+  }
+  const credentials = { headers: parseHeaders(values.header ?? []) };
+  const definition: SavedServer = {
+    url: url.href,
+    oauth: values["no-oauth"] !== true,
+    protocol,
+  };
+  const connection = await openConnection(
+    name,
+    definition,
+    credentials,
+    timeout,
+    resolveBrowserMode({
+      noOpen: values["no-open"] === true,
+      json,
+    }),
+    json,
+    `mcp-use client connect ${name} <url> --no-open`
+  );
+  await connection.disconnect();
+  saved.servers[name] = definition;
+  await writePrivateJson(SERVERS_PATH, saved);
+  await writePrivateJson(credentialsPath(name), credentials);
+  printResult(
+    { name, url: safeUrlForOutput(definition.url), protocol },
+    json,
+    `Connected and saved ${name}.`
+  );
+  return 0;
+}
 
-      console.error(
-        formatInfo(`Connecting to stdio server: ${command} ${args.join(" ")}`)
+async function list(argv: readonly string[], json: boolean): Promise<number> {
+  parseJsonOnly(argv);
+  const saved = await readServers();
+  const result = Object.entries(saved.servers).map(([name, server]) => ({
+    name,
+    ...server,
+    url: safeUrlForOutput(server.url),
+  }));
+  printResult(
+    result,
+    json,
+    result.map((server) => `${server.name}\t${server.url}`).join("\n") ||
+      "No saved servers."
+  );
+  return 0;
+}
+
+async function remove(argv: readonly string[], json: boolean): Promise<number> {
+  const { positionals } = parseArgs({
+    args: [...argv],
+    allowPositionals: true,
+    strict: true,
+    options: {},
+  });
+  const name = one(positionals, "mcp-use client remove <name>");
+  const saved = await readServers();
+  delete saved.servers[name];
+  await writePrivateJson(SERVERS_PATH, saved);
+  await rm(credentialsDirectory(name), { recursive: true, force: true });
+  printResult({ removed: name }, json, `Removed ${name}.`);
+  return 0;
+}
+
+async function savedServerCommand(
+  name: string,
+  argv: readonly string[],
+  json: boolean
+): Promise<number> {
+  const saved = await readServers();
+  const definition = saved.servers[name];
+  if (definition === undefined) {
+    throw new UsageError(
+      `Unknown saved server: ${name}. Run \`mcp-use client connect ${name} <url>\`.`
+    );
+  }
+  const family = argv[0];
+  const operation = argv[1];
+  if (family === "auth") {
+    if (operation === "status") {
+      parseJsonOnly(argv.slice(2));
+      const authenticated = await pathExists(oauthDirectory(name));
+      printResult(
+        { name, oauth: definition.oauth, authenticated },
+        json,
+        authenticated ? "Authenticated." : "No saved OAuth session."
       );
-
-      client.addServer(sessionName, {
-        command,
-        args,
-        clientInfo: cliClientInfo,
+      return 0;
+    }
+    if (operation === "logout") {
+      const { values, positionals } = parseArgs({
+        args: [...argv.slice(2)],
+        allowPositionals: true,
+        strict: true,
+        options: { yes: { type: "boolean" } },
       });
-
-      session = await client.createSession(sessionName);
-
-      await saveSession(sessionName, {
-        type: "stdio",
-        command,
-        args,
-        lastUsed: new Date().toISOString(),
-      });
-    } else {
-      console.error(formatInfo(`Connecting to ${target}...`));
-
-      // Static --auth bypasses OAuth entirely. `--no-oauth` disables auto-OAuth
-      // on 401 (commander maps `--no-oauth` to options.oauth === false).
-      const wantOAuth = !options.auth && options.oauth !== false;
-      let authProvider: NodeOAuthClientProvider | undefined;
-      if (wantOAuth) {
-        const authTimeoutMs = options.authTimeout
-          ? Number.parseInt(options.authTimeout, 10)
-          : undefined;
-        authProvider = await buildOAuthProvider(target, {
-          ...(authTimeoutMs ? { authTimeoutMs } : {}),
-        });
+      if (positionals.length !== 0) {
+        throw new UsageError(`Usage: mcp-use client ${name} auth logout`);
       }
+      if (
+        !(await confirm(`Delete OAuth credentials for ${name}?`, {
+          yes: values.yes === true,
+          json,
+        }))
+      ) {
+        return 0;
+      }
+      await rm(oauthDirectory(name), { recursive: true, force: true });
+      printResult({ loggedOut: name }, json, `Logged out ${name}.`);
+      return 0;
+    }
+  }
 
-      client.addServer(sessionName, {
-        url: target,
-        ...(authProvider
-          ? { authProvider }
-          : options.auth
-            ? { headers: { Authorization: `Bearer ${options.auth}` } }
-            : {}),
-        clientInfo: cliClientInfo,
-      });
-
-      try {
-        session = await client.createSession(sessionName);
-      } catch (err) {
-        if (authProvider && isUnauthorized(err)) {
-          console.error(
-            formatWarning(
-              "Server requires authentication. Starting OAuth flow."
+  validateSavedCommandArgs(name, family, operation, argv.slice(2));
+  const credentials = await readJson<SavedCredentials>(
+    credentialsPath(name),
+    {}
+  );
+  const connection = await openConnection(
+    name,
+    definition,
+    credentials,
+    300_000,
+    resolveBrowserMode({ noOpen: false, json }),
+    json
+  );
+  try {
+    if (family === "tools") {
+      if (operation === "list") {
+        parseJsonOnly(argv.slice(2));
+        const tools = await connection.listTools();
+        printResult(
+          tools,
+          json,
+          tools
+            .map((tool) =>
+              tool.description
+                ? `${tool.name} - ${tool.description}`
+                : tool.name
             )
-          );
-          await runOAuthFlow(authProvider, target);
-          console.error(formatSuccess("Authentication successful"));
-          session = await client.createSession(sessionName);
-        } else {
-          throw err;
-        }
+            .join("\n")
+        );
+        return 0;
       }
-
-      await saveSession(sessionName, {
-        type: "http",
-        url: target,
-        authMode: authProvider ? "oauth" : options.auth ? "bearer" : undefined,
-        authToken: authProvider ? undefined : options.auth,
-        lastUsed: new Date().toISOString(),
-      });
+      if (operation === "describe") {
+        const toolName = one(
+          argv.slice(2),
+          `mcp-use client ${name} tools describe <tool>`
+        );
+        const tool = (await connection.listTools()).find(
+          (candidate) => candidate.name === toolName
+        );
+        if (tool === undefined)
+          throw new UsageError(`Tool not found: ${toolName}`);
+        printResult(tool, json);
+        return 0;
+      }
+      if (operation === "call") {
+        return await callTool(connection, name, argv.slice(2), json);
+      }
     }
-
-    activeSessions.set(sessionName, { client, session });
-
-    const serverInfo = session.serverInfo;
-    const capabilities = session.serverCapabilities;
-
-    if (serverInfo) {
-      await updateSessionInfo(sessionName, serverInfo, capabilities);
+    if (family === "resources") {
+      if (operation === "list") {
+        parseJsonOnly(argv.slice(2));
+        const resources = await connection.listResources();
+        printResult(resources, json);
+        return 0;
+      }
+      if (operation === "read") {
+        const uri = one(
+          argv.slice(2),
+          `mcp-use client ${name} resources read <uri>`
+        );
+        printResult(await connection.readResource(uri), json);
+        return 0;
+      }
     }
+    if (family === "prompts") {
+      if (operation === "list") {
+        parseJsonOnly(argv.slice(2));
+        printResult(await connection.listPrompts(), json);
+        return 0;
+      }
+      if (operation === "get") {
+        const prompt = argv[2];
+        if (prompt === undefined) {
+          throw new UsageError(
+            `Usage: mcp-use client ${name} prompts get <prompt> [args]`
+          );
+        }
+        printResult(
+          await connection.getPrompt(prompt, parseMcpArguments(argv.slice(3))),
+          json
+        );
+        return 0;
+      }
+    }
+    throw new UsageError(
+      `Usage: mcp-use client ${name} <tools|resources|prompts|auth> ...`
+    );
+  } finally {
+    await connection.disconnect();
+  }
+}
 
-    console.log(formatSuccess(`Connected as '${sessionName}'`));
+function validateSavedCommandArgs(
+  name: string,
+  family: string | undefined,
+  operation: string | undefined,
+  args: readonly string[]
+): void {
+  if (
+    (family === "tools" && operation === "list") ||
+    (family === "resources" && operation === "list") ||
+    (family === "prompts" && operation === "list")
+  ) {
+    parseJsonOnly(args);
+    return;
+  }
+  if (family === "tools" && operation === "describe") {
+    one(args, `mcp-use client ${name} tools describe <tool>`);
+    return;
+  }
+  if (family === "tools" && operation === "call") {
+    parseToolCallArgs(name, args);
+    return;
+  }
+  if (family === "resources" && operation === "read") {
+    one(args, `mcp-use client ${name} resources read <uri>`);
+    return;
+  }
+  if (family === "prompts" && operation === "get") {
+    if (args[0] === undefined) {
+      throw new UsageError(
+        `Usage: mcp-use client ${name} prompts get <prompt> [args]`
+      );
+    }
+    parseMcpArguments(args.slice(1));
+    return;
+  }
+  throw new UsageError(
+    `Usage: mcp-use client ${name} <tools|resources|prompts|auth> ...`
+  );
+}
 
-    if (serverInfo) {
-      console.log("");
-      console.log(formatHeader("Server Information:"));
-      console.log(
-        formatKeyValue({
-          Name: serverInfo.name,
-          Version: serverInfo.version || "unknown",
+async function callTool(
+  connection: MCPConnection,
+  serverName: string,
+  argv: readonly string[],
+  json: boolean
+): Promise<number> {
+  const { tool, timeout, positionals } = parseToolCallArgs(serverName, argv);
+  const result = await connection.callTool(
+    tool,
+    parseMcpArguments(positionals),
+    { timeout }
+  );
+  if (result.isError === true) {
+    throw new CommandError(
+      "tool_error",
+      `Tool ${tool} returned an error.`,
+      result
+    );
+  }
+  printResult(result, json);
+  return 0;
+}
+
+function parseToolCallArgs(
+  serverName: string,
+  argv: readonly string[]
+): { tool: string; timeout: number; positionals: string[] } {
+  const tool = argv[0];
+  if (tool === undefined) {
+    throw new UsageError(
+      `Usage: mcp-use client ${serverName} tools call <tool> [args]`
+    );
+  }
+  const { values, positionals } = parseArgs({
+    args: [...argv.slice(1)],
+    allowPositionals: true,
+    strict: true,
+    options: {
+      timeout: { type: "string", default: "30000" },
+    },
+  });
+  const timeout = parsePositiveInteger(values.timeout, "--timeout");
+  parseMcpArguments(positionals);
+  return { tool, timeout, positionals };
+}
+
+async function openConnection(
+  name: string,
+  definition: SavedServer,
+  credentials: SavedCredentials,
+  authTimeoutMs: number,
+  browserMode: BrowserMode = process.stdin.isTTY ? "ask" : "never",
+  quiet = false,
+  interactiveCommand = `mcp-use client ${name} tools list`
+): Promise<MCPConnection> {
+  const { createOAuthProvider, MCPClient, logger } = await loadClientPackage({
+    allowInstall: !quiet,
+  });
+  if (quiet) logger.level = "silent";
+  let rejectOAuthInteraction: ((error: CommandError) => void) | undefined;
+  const oauthInteractionRequired =
+    quiet && definition.oauth
+      ? new Promise<never>((_resolve, reject) => {
+          rejectOAuthInteraction = reject;
         })
-      );
-    }
-
-    if (capabilities) {
-      console.log("");
-      console.log(formatHeader("Capabilities:"));
-      const caps = Object.keys(capabilities).join(", ");
-      console.log(`  ${caps || "none"}`);
-    }
-
-    const tools = session.tools;
-    console.log("");
-    console.log(
-      formatInfo(
-        `Available: ${tools.length} tool${tools.length !== 1 ? "s" : ""}`
-      )
-    );
-  } catch (error: any) {
-    console.error(formatError(`Connection failed: ${error.message}`));
-    await cleanupAndExit(1);
-  }
-  await cleanupAndExit(0);
-}
-
-async function disconnectCommand(name: string): Promise<void> {
-  try {
-    const sessionData = activeSessions.get(name);
-    if (sessionData) {
-      await sessionData.client.closeAllSessions();
-      activeSessions.delete(name);
-      console.log(formatSuccess(`Disconnected from ${name}`));
-    } else {
-      console.log(formatInfo(`Server '${name}' is not connected`));
-    }
-  } catch (error: any) {
-    console.error(formatError(`Failed to disconnect: ${error.message}`));
-    await cleanupAndExit(1);
-  }
-  await cleanupAndExit(0);
-}
-
-async function removeClientCommand(name: string): Promise<void> {
-  try {
-    const config = await getSession(name);
-    if (!config) {
-      console.error(formatError(`Server '${name}' not found`));
-      console.error("");
-      console.error("See your saved servers with:");
-      console.error("  mcp-use client list");
-      await cleanupAndExit(1);
-    }
-
-    const sessionData = activeSessions.get(name);
-    if (sessionData) {
-      await sessionData.client.closeAllSessions();
-      activeSessions.delete(name);
-    }
-
-    // OAuth tokens are keyed by URL hash, not by saved-server name, so two
-    // saved entries pointing at the same URL share one token store. Only
-    // wipe the tokens when this entry is the last one using the URL.
-    const isOAuthHttp =
-      config!.type === "http" &&
-      config!.authMode === "oauth" &&
-      typeof config!.url === "string";
-    const sharedUrlSibling = isOAuthHttp
-      ? (await listAllSessions()).find(
-          (s) =>
-            s.name !== name &&
-            s.config.type === "http" &&
-            s.config.url === config!.url
-        )
       : undefined;
-
-    await removeSession(name);
-    console.log(formatSuccess(`Removed saved server '${name}'`));
-
-    if (isOAuthHttp) {
-      if (sharedUrlSibling) {
-        console.log(
-          formatInfo(
-            `OAuth tokens for ${config!.url} were kept because saved server '${sharedUrlSibling.name}' still uses that URL.`
-          )
-        );
-      } else {
-        try {
-          const provider = await buildOAuthProvider(config!.url!);
-          await provider.invalidateCredentials("all");
-          console.log(formatInfo(`Removed OAuth tokens for ${config!.url}`));
-        } catch (error: any) {
-          console.error(
-            formatWarning(
-              `Saved entry removed, but failed to clear OAuth tokens for ${config!.url}: ${error.message}`
-            )
-          );
-        }
-      }
-    }
-  } catch (error: any) {
-    console.error(formatError(`Failed to remove server: ${error.message}`));
-    await cleanupAndExit(1);
-  }
-  await cleanupAndExit(0);
-}
-
-async function listClientsCommand(): Promise<void> {
+  const oauthBase = oauthDirectory(name);
+  const authProvider = definition.oauth
+    ? await createOAuthProvider(definition.url, {
+        baseDir: oauthBase,
+        authTimeoutMs,
+        storageKeyPrefix: `mcp-use-cli:${name}`,
+        openBrowser: async (url: string) => {
+          if (quiet) {
+            setImmediate(() => {
+              rejectOAuthInteraction?.(
+                new CommandError(
+                  "oauth_interaction_required",
+                  "OAuth interaction is required; retry this command without --json in a terminal.",
+                  {
+                    server: name,
+                    nextSteps: [
+                      {
+                        description: "Authenticate interactively in a terminal",
+                        command: interactiveCommand,
+                      },
+                    ],
+                  }
+                )
+              );
+            });
+            return;
+          }
+          if (browserMode === "never") {
+            process.stderr.write(`Open this URL to authenticate:\n${url}\n`);
+            return;
+          }
+          await waitForOAuthEnter();
+          openBrowser(url);
+        },
+        // Conditional exports select NodeOAuthOptions at runtime. TypeScript
+        // resolves the package's browser-default declaration in this build.
+      } as unknown as Parameters<typeof createOAuthProvider>[1])
+    : undefined;
+  const protocolConfig =
+    definition.protocol === "auto"
+      ? { protocolNegotiation: "auto" as const }
+      : definition.protocol === "modern"
+        ? {
+            protocolNegotiation: {
+              pin: "2026-07-28",
+            },
+          }
+        : {
+            protocolNegotiation: "legacy" as const,
+            clientOptions: {
+              supportedProtocolVersions: ["2025-11-25"],
+            },
+          };
+  const client = new MCPClient({
+    mcpServers: {
+      [name]: {
+        url: definition.url,
+        ...(credentials.headers !== undefined
+          ? { headers: credentials.headers }
+          : {}),
+        ...(authProvider !== undefined ? { authProvider } : { oauth: false }),
+        ...protocolConfig,
+      },
+    },
+  });
   try {
-    const sessions = await listAllSessions();
-
-    if (sessions.length === 0) {
-      if (isStdoutTty()) {
-        console.log(formatInfo("No saved servers"));
-        console.log(
-          formatInfo(
-            "Connect to a server with: npx mcp-use client connect <name> <url>"
-          )
-        );
-      }
-      return;
-    }
-
-    const tty = isStdoutTty();
-    if (tty) {
-      console.log(formatHeader("Saved Servers:"));
-      console.log("");
-    }
-
-    const tableData = sessions.map((s) => ({
-      name: s.name,
-      type: s.config.type,
-      target:
-        s.config.type === "http"
-          ? s.config.url || ""
-          : `${s.config.command} ${(s.config.args || []).join(" ")}`,
-      server: s.config.serverInfo?.name || "unknown",
-    }));
-
-    console.log(
-      formatTable(tableData, [
-        { key: "name", header: "Name" },
-        { key: "type", header: "Type" },
-        { key: "target", header: "Target", truncate: true },
-        { key: "server", header: "Server" },
-      ])
-    );
-  } catch (error: any) {
-    console.error(formatError(`Failed to list servers: ${error.message}`));
-    await cleanupAndExit(1);
-  }
-  await cleanupAndExit(0);
-}
-
-async function listToolsCommand(
-  name: string,
-  options: { json?: boolean }
-): Promise<void> {
-  try {
-    const result = await getOrRestoreSession(name);
-    if (!result) {
-      await cleanupAndExit(1);
-    }
-
-    const { session } = result!;
-    const tools = await session.listTools();
-
-    if (options.json) {
-      console.log(formatJson(tools));
-    } else if (tools.length === 0) {
-      if (isStdoutTty()) console.log(formatInfo("No tools available"));
-    } else {
-      const tty = isStdoutTty();
-      if (tty) {
-        console.log(formatHeader(`Available Tools (${tools.length}):`));
-        console.log("");
-      }
-
-      const tableData = tools.map((tool) => {
-        const props = (tool.inputSchema as any)?.properties ?? {};
-        const required = (tool.inputSchema as any)?.required ?? [];
-        const total = Object.keys(props).length;
-        const reqCount = Array.isArray(required) ? required.length : 0;
-        const argsCell = total === 0 ? chalk.gray("—") : `${reqCount}/${total}`;
-        return {
-          name: chalk.bold(tool.name),
-          mode: formatToolMode((tool as any).annotations),
-          args: argsCell,
-          description: tool.description || chalk.gray("(no description)"),
-        };
-      });
-
-      console.log(
-        formatTable(tableData, [
-          { key: "name", header: "Tool" },
-          { key: "mode", header: "Mode" },
-          { key: "args", header: "Args" },
-          { key: "description", header: "Description", truncate: true },
-        ])
-      );
-
-      if (tty) {
-        console.log("");
-        console.log(
-          chalk.gray(
-            "ARGS shows required/total. Modes: read-only · write · destructive."
-          )
-        );
-      }
-    }
-  } catch (error: any) {
-    console.error(formatError(`Failed to list tools: ${error.message}`));
-    await cleanupAndExit(1);
-  }
-  await cleanupAndExit(0);
-}
-
-async function describeToolCommand(
-  name: string,
-  toolName: string
-): Promise<void> {
-  try {
-    const result = await getOrRestoreSession(name);
-    if (!result) {
-      await cleanupAndExit(1);
-    }
-
-    const { session } = result!;
-    const tools = session.tools;
-    const tool = tools.find((t) => t.name === toolName);
-
-    if (!tool) {
-      console.error(formatError(`Tool '${toolName}' not found`));
-      console.log("");
-      console.log(formatInfo("Available tools:"));
-      tools.forEach((t) => console.log(`  • ${t.name}`));
-      await cleanupAndExit(1);
-    }
-
-    console.log(formatHeader(`Tool: ${tool!.name}`));
-    console.log("");
-
-    if (tool!.description) {
-      console.log(tool!.description);
-      console.log("");
-    }
-
-    if (tool!.inputSchema) {
-      console.log(formatHeader("Input Schema:"));
-      console.log(formatSchema(tool!.inputSchema));
-    }
-  } catch (error: any) {
-    console.error(formatError(`Failed to describe tool: ${error.message}`));
-    await cleanupAndExit(1);
-  }
-  await cleanupAndExit(0);
-}
-
-async function processToolScreenshot(
-  session: MCPSession,
-  toolName: string,
-  args: Record<string, unknown>,
-  callResult: any,
-  options?: {
-    screenshot?: boolean;
-    screenshotOutput?: string;
-    screenshotDeviceScaleFactor?: string;
-  }
-): Promise<void> {
-  const toolWithMeta = session.tools.find((t) => t.name === toolName);
-  const resourceUri = detectToolResourceUri(toolWithMeta);
-  const wantsScreenshot =
-    options?.screenshot === true ||
-    options?.screenshotOutput !== undefined ||
-    options?.screenshotDeviceScaleFactor !== undefined;
-
-  let screenshot: {
-    path: string;
-    width: number;
-    height: number;
-    view: string;
-  } | null = null;
-  let screenshotError: string | null = null;
-  let widgetHintUri: string | null = null;
-
-  if (resourceUri) {
-    if (wantsScreenshot) {
-      console.error(
-        formatInfo(`Capturing widget screenshot (${resourceUri})...`)
-      );
-      try {
-        const screenshotOpts: {
-          output?: string;
-          deviceScaleFactor?: number;
-        } = {};
-        if (options?.screenshotOutput) {
-          screenshotOpts.output = options.screenshotOutput;
-        }
-        if (options?.screenshotDeviceScaleFactor) {
-          screenshotOpts.deviceScaleFactor = parseDeviceScaleFactor(
-            options.screenshotDeviceScaleFactor
-          );
-        }
-        const shot = await captureToolScreenshot(
-          {
-            session,
-            toolName,
-            toolArgs: args,
-            toolOutput: callResult,
-            resourceUri,
-          },
-          screenshotOpts
-        );
-        screenshot = {
-          path: shot.outputPath,
-          width: shot.width,
-          height: shot.height,
-          view: shot.view,
-        };
-      } catch (err: any) {
-        screenshotError = err?.message ?? String(err);
-      }
-    } else {
-      widgetHintUri = resourceUri;
-    }
-  }
-
-  if (screenshot) {
-    // Always announce the screenshot on stderr so `--json` stdout stays a
-    // clean CallToolResult — agents piping JSON shouldn't have to filter
-    // status lines out of their parse target.
-    console.error(
-      formatSuccess(
-        `Saved widget screenshot: ${screenshot.path} (${screenshot.width}×${screenshot.height})`
-      )
-    );
-  }
-  if (screenshotError) {
-    console.error(
-      formatWarning(`Skipped widget screenshot: ${screenshotError}`)
-    );
-  }
-  if (widgetHintUri) {
-    console.error(
-      formatInfo(
-        `This tool renders a widget (${widgetHintUri}). Re-run with --screenshot to save a PNG of it.`
-      )
-    );
-  }
-}
-
-async function callToolCommand(
-  name: string,
-  toolName: string,
-  argsList?: string[],
-  options?: {
-    timeout?: number;
-    json?: boolean;
-    screenshot?: boolean;
-    screenshotOutput?: string;
-    screenshotDeviceScaleFactor?: string;
-  }
-): Promise<void> {
-  try {
-    const result = await getOrRestoreSession(name);
-    if (!result) {
-      await cleanupAndExit(1);
-    }
-
-    const { session } = result!;
-
-    const tools = session.tools;
-    const tool = tools.find((t) => t.name === toolName);
-
-    let args: Record<string, unknown> = {};
-    if (argsList && argsList.length > 0) {
-      try {
-        args = parseToolArgs(argsList, tool?.inputSchema as any);
-      } catch (error: any) {
-        console.error(formatError(error.message));
-        console.log("");
-        console.log(formatInfo("Usage:"));
-        console.log(
-          `  npx mcp-use client ${name} tools call ${toolName} key=value [key2=value2 ...]`
-        );
-        console.log(
-          `  npx mcp-use client ${name} tools call ${toolName} nested:='{"a":1}'   # JSON value`
-        );
-        console.log(
-          `  npx mcp-use client ${name} tools call ${toolName} '{"key":"value"}'   # full JSON object`
-        );
-        if (tool?.inputSchema) {
-          console.log("");
-          console.log(formatInfo("Tool schema:"));
-          console.log(formatSchema(tool.inputSchema));
-        }
-        await cleanupAndExit(1);
-      }
-    } else if (
-      tool?.inputSchema?.required &&
-      tool.inputSchema.required.length > 0
+    const connection = client.connect(name);
+    return await (oauthInteractionRequired === undefined
+      ? connection
+      : Promise.race([connection, oauthInteractionRequired]));
+  } catch (error) {
+    if (
+      error instanceof CommandError &&
+      error.code === "oauth_interaction_required"
     ) {
-      console.error(formatError("This tool requires arguments."));
-      console.log("");
-      console.log(formatInfo("Provide arguments as key=value pairs:"));
-      console.log(
-        `  npx mcp-use client ${name} tools call ${toolName} key=value [key2=value2 ...]`
-      );
-      console.log("");
-      console.log(formatInfo("Tool schema:"));
-      console.log(formatSchema(tool.inputSchema));
-      await cleanupAndExit(1);
-    }
-
-    console.error(formatInfo(`Calling tool '${toolName}'...`));
-    const callResult = await session.callTool(toolName, args, {
-      timeout: options?.timeout,
-    });
-
-    await processToolScreenshot(session, toolName, args, callResult, options);
-
-    if (options?.json) {
-      console.log(formatJson(callResult));
-    } else {
-      console.log(formatToolCall(callResult));
-    }
-
-    if (callResult.isError) {
-      await cleanupAndExit(1);
-    }
-  } catch (error: any) {
-    console.error(formatError(`Failed to call tool: ${error.message}`));
-    if (error?.data !== undefined) {
-      console.error(
-        chalk.gray(
-          typeof error.data === "string" ? error.data : formatJson(error.data)
-        )
-      );
-    }
-    await cleanupAndExit(1);
-  }
-  await cleanupAndExit(0);
-}
-
-async function listResourcesCommand(
-  name: string,
-  options: { json?: boolean }
-): Promise<void> {
-  try {
-    const result = await getOrRestoreSession(name);
-    if (!result) {
-      await cleanupAndExit(1);
-    }
-
-    const { session } = result!;
-    const resourcesResult = await session.listAllResources();
-    const resources = resourcesResult.resources;
-
-    if (options.json) {
-      console.log(formatJson(resources));
-    } else if (resources.length === 0) {
-      if (isStdoutTty()) console.log(formatInfo("No resources available"));
-    } else {
-      const tty = isStdoutTty();
-      if (tty) {
-        console.log(formatHeader(`Available Resources (${resources.length}):`));
-        console.log("");
-      }
-
-      const tableData = resources.map((resource) => ({
-        name: chalk.bold(resource.name || "(no name)"),
-        type: resource.mimeType || chalk.gray("unknown"),
-        uri: resource.uri,
-      }));
-
-      console.log(
-        formatTable(tableData, [
-          { key: "name", header: "Name" },
-          { key: "type", header: "Type" },
-          { key: "uri", header: "URI", truncate: true },
-        ])
-      );
-    }
-  } catch (error: any) {
-    console.error(formatError(`Failed to list resources: ${error.message}`));
-    await cleanupAndExit(1);
-  }
-  await cleanupAndExit(0);
-}
-
-async function readResourceCommand(
-  name: string,
-  uri: string,
-  options: { json?: boolean }
-): Promise<void> {
-  try {
-    const result = await getOrRestoreSession(name);
-    if (!result) {
-      await cleanupAndExit(1);
-    }
-
-    const { session } = result!;
-
-    console.error(formatInfo(`Reading resource: ${uri}`));
-    const resource = await session.readResource(uri);
-
-    if (options.json) {
-      console.log(formatJson(resource));
-    } else {
-      console.log(formatResourceContent(resource));
-    }
-  } catch (error: any) {
-    console.error(formatError(`Failed to read resource: ${error.message}`));
-    await cleanupAndExit(1);
-  }
-  await cleanupAndExit(0);
-}
-
-async function subscribeResourceCommand(
-  name: string,
-  uri: string
-): Promise<void> {
-  // Subscribe is intentionally long-lived: it keeps the process alive to
-  // receive notifications until Ctrl+C. Don't run cleanupAndExit on the
-  // success path — only on error.
-  try {
-    const result = await getOrRestoreSession(name);
-    if (!result) {
-      await cleanupAndExit(1);
-    }
-
-    const { session } = result!;
-
-    await session.subscribeToResource(uri);
-    console.log(formatSuccess(`Subscribed to resource: ${uri}`));
-
-    session.on("notification", async (notification) => {
-      if (notification.method === "notifications/resources/updated") {
-        console.log("");
-        console.log(formatInfo("Resource updated:"));
-        console.log(formatJson(notification.params));
-      }
-    });
-
-    console.log(formatInfo("Listening for updates... (Press Ctrl+C to stop)"));
-
-    // Handle Ctrl+C (SIGINT) to unsubscribe cleanly
-    process.once("SIGINT", async () => {
-      console.log(formatInfo("\nUnsubscribing and shutting down..."));
-      try {
-        await session.unsubscribeFromResource(uri);
-      } catch (e) {
-        // ignore errors during shutdown
-      }
-      await cleanupAndExit(0);
-    });
-
-    await new Promise(() => {});
-  } catch (error: any) {
-    console.error(
-      formatError(`Failed to subscribe to resource: ${error.message}`)
-    );
-    await cleanupAndExit(1);
-  }
-}
-
-async function unsubscribeResourceCommand(
-  name: string,
-  uri: string
-): Promise<void> {
-  try {
-    const result = await getOrRestoreSession(name);
-    if (!result) {
-      await cleanupAndExit(1);
-    }
-
-    const { session } = result!;
-
-    await session.unsubscribeFromResource(uri);
-    console.log(formatSuccess(`Unsubscribed from resource: ${uri}`));
-  } catch (error: any) {
-    console.error(
-      formatError(`Failed to unsubscribe from resource: ${error.message}`)
-    );
-    await cleanupAndExit(1);
-  }
-  await cleanupAndExit(0);
-}
-
-async function listPromptsCommand(
-  name: string,
-  options: { json?: boolean }
-): Promise<void> {
-  try {
-    const result = await getOrRestoreSession(name);
-    if (!result) {
-      await cleanupAndExit(1);
-    }
-
-    const { session } = result!;
-    const promptsResult = await session.listPrompts();
-    const prompts = promptsResult.prompts;
-
-    if (options.json) {
-      console.log(formatJson(prompts));
-    } else if (prompts.length === 0) {
-      if (isStdoutTty()) console.log(formatInfo("No prompts available"));
-    } else {
-      const tty = isStdoutTty();
-      if (tty) {
-        console.log(formatHeader(`Available Prompts (${prompts.length}):`));
-        console.log("");
-      }
-
-      const tableData = prompts.map((prompt) => {
-        const args = (prompt as any).arguments ?? [];
-        const reqCount = Array.isArray(args)
-          ? args.filter((a: any) => a?.required).length
-          : 0;
-        const total = Array.isArray(args) ? args.length : 0;
-        const argsCell = total === 0 ? chalk.gray("—") : `${reqCount}/${total}`;
-        return {
-          name: chalk.bold(prompt.name),
-          args: argsCell,
-          description: prompt.description || chalk.gray("(no description)"),
-        };
-      });
-
-      console.log(
-        formatTable(tableData, [
-          { key: "name", header: "Prompt" },
-          { key: "args", header: "Args" },
-          { key: "description", header: "Description", truncate: true },
-        ])
-      );
-    }
-  } catch (error: any) {
-    console.error(formatError(`Failed to list prompts: ${error.message}`));
-    await cleanupAndExit(1);
-  }
-  await cleanupAndExit(0);
-}
-
-async function getPromptCommand(
-  name: string,
-  promptName: string,
-  argsList?: string[],
-  options?: { json?: boolean }
-): Promise<void> {
-  try {
-    const result = await getOrRestoreSession(name);
-    if (!result) {
-      await cleanupAndExit(1);
-    }
-
-    const { session } = result!;
-
-    let args: Record<string, string> = {};
-    if (argsList && argsList.length > 0) {
-      try {
-        args = parsePromptArgs(argsList);
-      } catch (error: any) {
-        console.error(formatError(error.message));
-        console.log("");
-        console.log(formatInfo("Usage:"));
-        console.log(
-          `  npx mcp-use client ${name} prompts get ${promptName} key=value [key2=value2 ...]`
-        );
-        console.log(
-          `  npx mcp-use client ${name} prompts get ${promptName} '{"key":"value"}'   # full JSON object`
-        );
-        await cleanupAndExit(1);
-      }
-    }
-
-    console.error(formatInfo(`Getting prompt '${promptName}'...`));
-    const prompt = await session.getPrompt(promptName, args);
-
-    if (options?.json) {
-      console.log(formatJson(prompt));
-    } else {
-      console.log(formatHeader(`Prompt: ${promptName}`));
-      console.log("");
-
-      if (prompt.description) {
-        console.log(prompt.description);
-        console.log("");
-      }
-
-      if (prompt.messages) {
-        console.log(formatHeader("Messages:"));
-        console.log("");
-        console.log(formatPromptMessages(prompt.messages));
-      }
-    }
-  } catch (error: any) {
-    console.error(formatError(`Failed to get prompt: ${error.message}`));
-    await cleanupAndExit(1);
-  }
-  await cleanupAndExit(0);
-}
-
-async function interactiveCommand(name: string): Promise<void> {
-  try {
-    const result = await getOrRestoreSession(name);
-    if (!result) return;
-
-    const { name: sessionName, session } = result;
-
-    console.log(formatHeader("MCP Interactive Mode"));
-    console.log("");
-    console.log(formatInfo(`Connected to: ${sessionName}`));
-    console.log("");
-    console.log(chalk.gray("Commands:"));
-    console.log(chalk.gray("  tools list              - List available tools"));
-    console.log(
-      chalk.gray(
-        "  tools call <name> [--screenshot] - Call a tool (will prompt for args)"
-      )
-    );
-    console.log(chalk.gray("  tools describe <name>   - Show tool details"));
-    console.log(
-      chalk.gray("  resources list          - List available resources")
-    );
-    console.log(chalk.gray("  resources read <uri>    - Read a resource"));
-    console.log(
-      chalk.gray("  prompts list            - List available prompts")
-    );
-    console.log(chalk.gray("  prompts get <name>      - Get a prompt"));
-    console.log(
-      chalk.gray("  exit, quit              - Exit interactive mode")
-    );
-    console.log("");
-
-    const rl = createInterface({
-      input: process.stdin,
-      output: process.stdout,
-      prompt: chalk.cyan("mcp> "),
-    });
-
-    rl.prompt();
-
-    rl.on("line", async (line) => {
-      const trimmed = line.trim();
-
-      if (!trimmed) {
-        rl.prompt();
-        return;
-      }
-
-      if (trimmed === "exit" || trimmed === "quit") {
-        console.log(formatInfo("Goodbye!"));
-        rl.close();
-        await cleanupAndExit(0);
-      }
-
-      const parts = trimmed.split(" ");
-      const scope = parts[0];
-      const command = parts[1];
-      const arg = parts[2];
-
-      try {
-        if (scope === "tools") {
-          if (command === "list") {
-            const tools = await session.listTools();
-            console.log(
-              formatInfo(
-                `Available tools: ${tools.map((t) => t.name).join(", ")}`
-              )
-            );
-          } else if (command === "call" && arg) {
-            const wantsScreenshot = parts.includes("--screenshot");
-            // Implements auto widget-screenshot flow for the REPL
-            rl.question(
-              "Arguments (JSON, or press Enter for none): ",
-              async (argsInput) => {
-                try {
-                  const args = argsInput.trim() ? JSON.parse(argsInput) : {};
-                  const result = await session.callTool(arg, args);
-                  console.log(formatToolCall(result));
-                  // Trigger the screenshot flow if a widget is present and flag was passed
-                  await processToolScreenshot(session, arg, args, result, {
-                    screenshot: wantsScreenshot,
-                  });
-                } catch (error: any) {
-                  console.error(formatError(error.message));
-                }
-                rl.prompt();
-              }
-            );
-            return;
-          } else if (command === "describe" && arg) {
-            const tools = session.tools;
-            const tool = tools.find((t) => t.name === arg);
-            if (tool) {
-              console.log(formatHeader(`Tool: ${tool.name}`));
-              if (tool.description) console.log(tool.description);
-              if (tool.inputSchema) {
-                console.log("");
-                console.log(formatSchema(tool.inputSchema));
-              }
-            } else {
-              console.error(formatError(`Tool '${arg}' not found`));
-            }
-          } else {
-            console.error(
-              formatError(
-                "Invalid command. Try: tools list, tools call <name>, tools describe <name>"
-              )
-            );
-          }
-        } else if (scope === "resources") {
-          if (command === "list") {
-            const result = await session.listAllResources();
-            const resources = result.resources;
-            console.log(
-              formatInfo(
-                `Available resources: ${resources.map((r) => r.uri).join(", ")}`
-              )
-            );
-          } else if (command === "read" && arg) {
-            const resource = await session.readResource(arg);
-            console.log(formatResourceContent(resource));
-          } else {
-            console.error(
-              formatError(
-                "Invalid command. Try: resources list, resources read <uri>"
-              )
-            );
-          }
-        } else if (scope === "prompts") {
-          if (command === "list") {
-            const result = await session.listPrompts();
-            const prompts = result.prompts;
-            console.log(
-              formatInfo(
-                `Available prompts: ${prompts.map((p) => p.name).join(", ")}`
-              )
-            );
-          } else if (command === "get" && arg) {
-            rl.question(
-              "Arguments (JSON, or press Enter for none): ",
-              async (argsInput) => {
-                try {
-                  const args = argsInput.trim() ? JSON.parse(argsInput) : {};
-                  const prompt = await session.getPrompt(arg, args);
-                  console.log(formatPromptMessages(prompt.messages));
-                } catch (error: any) {
-                  console.error(formatError(error.message));
-                }
-                rl.prompt();
-              }
-            );
-            return;
-          } else {
-            console.error(
-              formatError(
-                "Invalid command. Try: prompts list, prompts get <name>"
-              )
-            );
-          }
-        } else {
-          console.error(
-            formatError(
-              "Unknown command. Type a valid scope: tools, resources, prompts"
-            )
-          );
+      (authProvider as { dispose?: () => void } | undefined)?.dispose?.();
+      await (
+        client as typeof client & {
+          closeSession?: (serverName: string) => Promise<void>;
         }
-      } catch (error: any) {
-        console.error(formatError(error.message));
-      }
-
-      rl.prompt();
-    });
-
-    rl.on("close", async () => {
-      console.log("");
-      console.log(formatInfo("Goodbye!"));
-      await cleanupAndExit(0);
-    });
-  } catch (error: any) {
-    console.error(
-      formatError(`Failed to start interactive mode: ${error.message}`)
+      ).closeSession?.(name);
+      throw error;
+    }
+    throw sanitizeConnectionError(
+      normalizeProtocolConnectionError(error, definition.protocol),
+      definition,
+      credentials
     );
-    await cleanupAndExit(1);
   }
 }
 
 /**
- * Top-level `client` command. Exposes only commands that do not target an
- * existing saved server: `connect` (which creates one) and `list`. Per-server
- * operations live under `createPerClientCommand(<name>)` and are routed by
- * `index.ts` based on the positional after `client`.
+ * Open a saved server for another CLI command.
+ *
+ * @internal
  */
-export function createClientCommand(): Command {
-  const clientCommand = new Command("client")
-    .description(
-      "Interactive MCP client for terminal usage. Use `mcp-use client <name> ...` to run commands against a saved server."
-    )
-    .showHelpAfterError(
-      "(Run `mcp-use client --help` to see available commands)"
-    );
-
-  clientCommand
-    .command("connect [name] [url]")
-    .description(
-      "Connect to an MCP server and save it under a short name. Use the name to address it in later commands (e.g. `mcp-use client <name> tools list`)."
-    )
-    .option("--stdio", "Use stdio connector instead of HTTP")
-    .option("--auth <token>", "Static Bearer token (skips OAuth)")
-    .option(
-      "--no-oauth",
-      "Don't auto-trigger OAuth on 401; fail with the 401 instead"
-    )
-    .option(
-      "--auth-timeout <ms>",
-      "OAuth loopback wait timeout in ms (default 300000)"
-    )
-    .action(connectCommand);
-
-  clientCommand
-    .command("list")
-    .description("List saved servers")
-    .action(listClientsCommand);
-
-  clientCommand
-    .command("remove <name>")
-    .description(
-      "Remove a saved server. Also clears any OAuth tokens for that URL, unless another saved server still uses it."
-    )
-    .action(removeClientCommand);
-
-  clientCommand.addCommand(createClientScreenshotCommand());
-
-  return clientCommand;
+export async function openSavedConnection(
+  name: string,
+  authTimeoutMs = 300_000,
+  quiet = false
+): Promise<MCPConnection> {
+  const saved = await readServers();
+  const definition = saved.servers[name];
+  if (definition === undefined) {
+    throw new UsageError(`Unknown saved server: ${name}`);
+  }
+  const credentials = await readJson<SavedCredentials>(
+    credentialsPath(name),
+    {}
+  );
+  return openConnection(
+    name,
+    definition,
+    credentials,
+    authTimeoutMs,
+    process.stdin.isTTY ? "ask" : "never",
+    quiet
+  );
 }
 
 /**
- * Build the per-server command subtree for a given saved-server name. The
- * name is captured in each action closure so subcommand definitions stay
- * free of an extra positional argument.
+ * Open an ad-hoc HTTP MCP connection.
+ *
+ * @internal
  */
-export function createPerClientCommand(name: string): Command {
-  const cmd = new Command(`mcp-use client ${name}`)
-    .description(`Commands for server '${name}'`)
-    .showHelpAfterError(
-      `(Run \`mcp-use client ${name} --help\` to see available commands)`
+export async function openDirectConnection(
+  url: string,
+  headers: Record<string, string>,
+  quiet = false
+): Promise<MCPConnection> {
+  return openConnection(
+    "screenshot",
+    { url, oauth: false, protocol: "auto" },
+    { headers },
+    300_000,
+    "never",
+    quiet
+  );
+}
+
+/**
+ * Parse the CLI's JSON/key-value MCP argument grammar.
+ *
+ * @internal
+ */
+export function parseMcpArguments(
+  argv: readonly string[]
+): Record<string, unknown> {
+  if (argv.length === 0) return {};
+  if (argv.length === 1 && argv[0]?.trimStart().startsWith("{")) {
+    const value = JSON.parse(argv[0]) as unknown;
+    if (value === null || Array.isArray(value) || typeof value !== "object") {
+      throw new UsageError("The JSON argument must be an object.");
+    }
+    return value as Record<string, unknown>;
+  }
+  const result: Record<string, unknown> = {};
+  for (const token of argv) {
+    const typed = token.indexOf(":=");
+    const plain = token.indexOf("=");
+    const separator = typed >= 0 ? typed : plain;
+    const width = typed >= 0 ? 2 : 1;
+    if (separator <= 0) {
+      throw new UsageError(
+        `Expected key=value or key:=<json>, received: ${token}`
+      );
+    }
+    const key = token.slice(0, separator).replace(/^--/, "");
+    const raw = token.slice(separator + width);
+    result[key] = typed >= 0 ? (JSON.parse(raw) as unknown) : raw;
+  }
+  return result;
+}
+
+function resolveBrowserMode(options: {
+  noOpen: boolean;
+  json: boolean;
+}): BrowserMode {
+  if (options.json || options.noOpen || !process.stdin.isTTY) return "never";
+  return "ask";
+}
+
+async function waitForOAuthEnter(): Promise<void> {
+  const prompt = createInterface({
+    input: process.stdin,
+    output: process.stderr,
+  });
+  try {
+    await prompt.question(
+      "This server requires OAuth. Press Enter to open your browser."
     );
+  } finally {
+    prompt.close();
+  }
+}
 
-  cmd
-    .command("disconnect")
-    .description("Disconnect from this server")
-    .action(() => disconnectCommand(name));
+function parseHeaders(values: readonly string[]): Record<string, string> {
+  const headers: Record<string, string> = {};
+  for (const value of values) {
+    const separator = value.indexOf(":");
+    if (separator <= 0) throw new UsageError(`Invalid header: ${value}`);
+    headers[value.slice(0, separator).trim()] = value
+      .slice(separator + 1)
+      .trim();
+  }
+  return headers;
+}
 
-  cmd
-    .command("interactive")
-    .description("Start interactive REPL mode for this server")
-    .action(() => interactiveCommand(name));
+function parseProtocol(value: string | undefined): SavedServer["protocol"] {
+  if (value !== "auto" && value !== "legacy" && value !== "modern") {
+    throw new UsageError("Invalid protocol. Expected auto, legacy, or modern.");
+  }
+  return value;
+}
 
-  const toolsCommand = new Command("tools")
-    .description("Interact with MCP tools")
-    .showHelpAfterError(
-      `(Run \`mcp-use client ${name} tools --help\` to see available actions)`
+function parsePositiveInteger(value: string | undefined, name: string): number {
+  const result = Number(value);
+  if (!Number.isInteger(result) || result <= 0) {
+    throw new UsageError(`${name} must be a positive integer.`);
+  }
+  return result;
+}
+
+function validateName(name: string): void {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name)) {
+    throw new UsageError(
+      "Server names must be 1-64 filesystem-safe letters, numbers, dots, dashes, or underscores."
     );
-  toolsCommand
-    .command("list")
-    .description("List available tools")
-    .option("--json", "Output as JSON")
-    .action((options) => listToolsCommand(name, options));
-  toolsCommand
-    .command("call <tool> [args...]")
-    .description(
-      "Call a tool. Args as key=value pairs (use key:=<json> for nested values, or pass a JSON object)"
-    )
-    .option("--timeout <ms>", "Request timeout in milliseconds", parseInt)
-    .option("--json", "Output as JSON")
-    .option(
-      "--screenshot",
-      "Capture a PNG screenshot of the rendered widget for tools that declare a UI resource"
-    )
-    .option(
-      "--screenshot-output <path>",
-      "Output PNG path for the widget screenshot (implies --screenshot; defaults to ./<view>-<timestamp>.png)"
-    )
-    .option(
-      "--screenshot-device-scale-factor <n>",
-      "Device pixel ratio for the widget screenshot (implies --screenshot; e.g. 2 for Retina). Defaults to 1."
-    )
-    .action((tool, args, options) =>
-      callToolCommand(name, tool, args, options)
-    );
-  toolsCommand
-    .command("describe <tool>")
-    .description("Show tool details and schema")
-    .action((tool) => describeToolCommand(name, tool));
-  cmd.addCommand(toolsCommand);
+  }
+}
 
-  const resourcesCommand = new Command("resources")
-    .description("Interact with MCP resources")
-    .showHelpAfterError(
-      `(Run \`mcp-use client ${name} resources --help\` to see available actions)`
-    );
-  resourcesCommand
-    .command("list")
-    .description("List available resources")
-    .option("--json", "Output as JSON")
-    .action((options) => listResourcesCommand(name, options));
-  resourcesCommand
-    .command("read <uri>")
-    .description("Read a resource by URI")
-    .option("--json", "Output as JSON")
-    .action((uri, options) => readResourceCommand(name, uri, options));
-  resourcesCommand
-    .command("subscribe <uri>")
-    .description("Subscribe to resource updates")
-    .action((uri) => subscribeResourceCommand(name, uri));
-  resourcesCommand
-    .command("unsubscribe <uri>")
-    .description("Unsubscribe from resource updates")
-    .action((uri) => unsubscribeResourceCommand(name, uri));
-  cmd.addCommand(resourcesCommand);
+function safeUrlForOutput(raw: string): string {
+  const url = new URL(raw);
+  if (url.username !== "" || url.password !== "") {
+    url.username = "[REDACTED]";
+    url.password = "";
+  }
+  for (const key of [...url.searchParams.keys()]) {
+    url.searchParams.set(key, "[REDACTED]");
+  }
+  if (url.hash !== "") url.hash = "[REDACTED]";
+  return url.href;
+}
 
-  const promptsCommand = new Command("prompts")
-    .description("Interact with MCP prompts")
-    .showHelpAfterError(
-      `(Run \`mcp-use client ${name} prompts --help\` to see available actions)`
-    );
-  promptsCommand
-    .command("list")
-    .description("List available prompts")
-    .option("--json", "Output as JSON")
-    .action((options) => listPromptsCommand(name, options));
-  promptsCommand
-    .command("get <prompt> [args...]")
-    .description(
-      "Get a prompt. Args as key=value pairs (or pass a JSON object)"
-    )
-    .option("--json", "Output as JSON")
-    .action((prompt, args, options) =>
-      getPromptCommand(name, prompt, args, options)
-    );
-  cmd.addCommand(promptsCommand);
+async function readServers(): Promise<SavedServers> {
+  const saved = await readJson<{
+    servers: Record<
+      string,
+      Omit<SavedServer, "protocol"> & { protocol?: unknown }
+    >;
+  }>(SERVERS_PATH, { servers: {} });
+  const normalized: SavedServers = { servers: {} };
+  let migrated = false;
 
-  const authCommand = new Command("auth")
-    .description("Manage OAuth tokens for HTTP servers")
-    .showHelpAfterError(
-      `(Run \`mcp-use client ${name} auth --help\` to see available actions)`
+  for (const [name, server] of Object.entries(saved.servers)) {
+    const protocol = normalizeSavedProtocol(server.protocol);
+    normalized.servers[name] = { ...server, protocol };
+    migrated ||= protocol !== server.protocol;
+  }
+
+  if (migrated) {
+    await writePrivateJson(SERVERS_PATH, normalized);
+  }
+  return normalized;
+}
+
+function normalizeSavedProtocol(value: unknown): SavedServer["protocol"] {
+  if (value === "auto" || value === "legacy" || value === "modern") {
+    return value;
+  }
+  if (value === undefined) return "auto";
+  if (value === "2025-11-25") return "legacy";
+  if (value === "2026-07-28") return "modern";
+  throw new UsageError(
+    "Saved server has an invalid protocol setting. Remove and reconnect it."
+  );
+}
+
+function normalizeProtocolConnectionError(
+  error: unknown,
+  protocol: SavedServer["protocol"]
+): unknown {
+  if (
+    protocol === "auto" ||
+    !(error instanceof Error) ||
+    (!error.message.includes("Unsupported protocol version") &&
+      !error.message.includes("pinned protocol version"))
+  ) {
+    return error;
+  }
+  if (protocol === "legacy") {
+    return new CommandError(
+      "protocol_mismatch",
+      "Server does not support the requested legacy protocol."
     );
-  authCommand
-    .command("status")
-    .description("Show OAuth token status for this server")
-    .action(() => authStatusCommand(name));
-  authCommand
-    .command("refresh")
-    .description("Force-refresh the OAuth access token")
-    .action(() => authRefreshCommand(name));
-  authCommand
-    .command("logout")
-    .description("Remove stored OAuth tokens for this server's URL")
-    .action(() => authLogoutCommand(name));
-  cmd.addCommand(authCommand);
+  }
+  return new CommandError(
+    "protocol_mismatch",
+    "Server does not support the requested modern protocol (stateless/sessionless, no fallback)."
+  );
+}
 
-  cmd.addCommand(createPerClientScreenshotCommand(name));
+function sanitizeConnectionError(
+  error: unknown,
+  definition: SavedServer,
+  credentials: SavedCredentials
+): unknown {
+  const secrets = connectionSecrets(definition.url, credentials.headers);
+  if (!(error instanceof Error) || secrets.size === 0) return error;
+  const message = redactText(error.message, secrets);
+  if (error instanceof CommandError) {
+    return new CommandError(
+      error.code,
+      message,
+      redactUnknown(error.details, secrets)
+    );
+  }
+  const safe = new Error(message);
+  safe.name = error.name;
+  return safe;
+}
 
-  return cmd;
+function connectionSecrets(
+  rawUrl: string,
+  headers: Record<string, string> | undefined
+): Set<string> {
+  const secrets = new Set<string>();
+  const url = new URL(rawUrl);
+  for (const value of [
+    url.username,
+    url.password,
+    ...url.searchParams.values(),
+    url.hash.slice(1),
+  ]) {
+    if (value !== "") secrets.add(value);
+  }
+  for (const value of Object.values(headers ?? {})) {
+    if (value !== "") {
+      secrets.add(value);
+      const bearer = value.match(/^Bearer\s+(.+)$/i)?.[1];
+      if (bearer !== undefined) secrets.add(bearer);
+    }
+  }
+  return secrets;
+}
+
+function redactUnknown(value: unknown, secrets: ReadonlySet<string>): unknown {
+  if (typeof value === "string") return redactText(value, secrets);
+  if (Array.isArray(value)) {
+    return value.map((item) => redactUnknown(item, secrets));
+  }
+  if (value === null || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [
+      key,
+      redactUnknown(item, secrets),
+    ])
+  );
+}
+
+function redactText(value: string, secrets: ReadonlySet<string>): string {
+  let result = value;
+  for (const secret of secrets) {
+    result = result.replaceAll(secret, "[REDACTED]");
+  }
+  return result;
+}
+
+function credentialsDirectory(name: string): string {
+  return join(
+    CLIENT_DIR,
+    "credentials",
+    createHash("sha256").update(name).digest("hex")
+  );
+}
+
+function credentialsPath(name: string): string {
+  return join(credentialsDirectory(name), "credentials.json");
+}
+
+function oauthDirectory(name: string): string {
+  return join(credentialsDirectory(name), "oauth");
+}
+
+function parseJsonOnly(argv: readonly string[]): void {
+  parseArgs({
+    args: [...argv],
+    allowPositionals: false,
+    strict: true,
+    options: {},
+  });
+}
+
+function one(positionals: readonly string[], usage: string): string {
+  if (positionals.length !== 1) throw new UsageError(`Usage: ${usage}`);
+  return positionals[0]!;
 }

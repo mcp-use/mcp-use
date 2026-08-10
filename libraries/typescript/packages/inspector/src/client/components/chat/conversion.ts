@@ -1,5 +1,5 @@
-import { convertMessagesToProvider as convertMessagesToProviderImpl } from "@/llm/messageFormat";
-import type { ProviderMessage } from "@/llm/types";
+import { convertMessagesToProvider as convertMessagesToProviderImpl } from "@mcp-use/agent";
+import type { ProviderMessage } from "@mcp-use/agent";
 import type { PromptResult } from "../../hooks/useMCPPrompts";
 import type { Message } from "./types";
 
