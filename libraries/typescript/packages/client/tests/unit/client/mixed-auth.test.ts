@@ -165,25 +165,39 @@ describe("mixed OAuth authorization", () => {
     expect(finishAuth).not.toHaveBeenCalled();
   });
 
-  it("clears discovered authorization metadata on disconnect", async () => {
+  it("rediscovers authorization metadata after reconnect", async () => {
+    vi.mocked(discoverOAuthProtectedResourceMetadata)
+      .mockResolvedValueOnce({
+        resource: "https://mcp.example.com/first",
+        authorization_servers: ["https://auth.example.com"],
+      })
+      .mockResolvedValueOnce({
+        resource: "https://mcp.example.com/second",
+        authorization_servers: ["https://auth.example.com"],
+      });
     const connector = new HttpConnector("https://mcp.example.com/mcp", {
-      detectMixedAuth: false,
+      authProvider: createProvider(),
     });
     attachConnectedClient(
       connector,
       { getProtocolEra: () => "modern" },
       { finishAuth: vi.fn(async () => {}) }
     );
-    Object.assign(connector as object, {
-      authorizationCache: {
-        mode: "mixed",
-        authenticated: false,
-        resource: "https://mcp.example.com/mcp",
-      },
-    });
 
-    expect(connector.authorization).toBeDefined();
+    await expect(connector.discoverAuthorization()).resolves.toMatchObject({
+      resource: "https://mcp.example.com/first",
+    });
     await connector.disconnect();
     expect(connector.authorization).toBeUndefined();
+
+    attachConnectedClient(
+      connector,
+      { getProtocolEra: () => "modern" },
+      { finishAuth: vi.fn(async () => {}) }
+    );
+    await expect(connector.discoverAuthorization()).resolves.toMatchObject({
+      resource: "https://mcp.example.com/second",
+    });
+    expect(discoverOAuthProtectedResourceMetadata).toHaveBeenCalledTimes(2);
   });
 });

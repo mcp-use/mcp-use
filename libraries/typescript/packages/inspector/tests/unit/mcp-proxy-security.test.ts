@@ -147,4 +147,41 @@ describe("Inspector MCP proxy request isolation", () => {
     );
     expect(response.headers.get("x-accel-buffering")).toBe("no");
   });
+
+  it("preserves upstream cache policy while disabling SSE buffering", async () => {
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode("data: ready\n\n"));
+      },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(
+        async () =>
+          new Response(stream, {
+            headers: {
+              "Cache-Control": "private, no-store",
+              "Content-Type": "text/event-stream",
+            },
+          })
+      )
+    );
+    const app = new Hono();
+    mountMcpProxy(app, {
+      path: "/inspector/api/proxy",
+      enableLogging: false,
+    });
+
+    const response = await app.fetch(
+      new Request(proxyUrl, {
+        headers: {
+          "X-Target-URL": "https://93.184.216.34/mcp",
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(response.headers.get("x-accel-buffering")).toBe("no");
+  });
 });

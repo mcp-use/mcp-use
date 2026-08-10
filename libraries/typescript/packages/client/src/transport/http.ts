@@ -901,5 +901,6 @@ export class HttpConnector extends BaseConnector {
       }
     }
     await super.cleanupResources();
+    this.authorizationDiscovery = null;
   }
 }
