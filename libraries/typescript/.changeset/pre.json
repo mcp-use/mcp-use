@@ -13,6 +13,7 @@
   "changesets": [
     "fresh-tools-auth",
     "quick-sse-proxy",
+    "tidy-pumas-smoke",
     "wise-cats-explore"
   ]
 }

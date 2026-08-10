@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 2.0.3-canary.0
+
+### Patch Changes
+
+- a56231e: Sanitize the npm package name for named projects, not just `.`. A name like `My "App"` was written verbatim into the template's `index.ts`, producing invalid TypeScript.
+
 ## 2.0.2
 
 ### Patch Changes
