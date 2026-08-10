@@ -106,6 +106,7 @@ function isSameMcpServer(left: McpServer, right: McpServer): boolean {
     sameSerializedValue(left.resources, right.resources) &&
     sameSerializedValue(left.resourceTemplates, right.resourceTemplates) &&
     sameSerializedValue(left.prompts, right.prompts) &&
+    sameSerializedValue(left.skills, right.skills) &&
     sameSerializedValue(left.notifications, right.notifications) &&
     left.unreadNotificationCount === right.unreadNotificationCount &&
     sameSerializedValue(
@@ -406,6 +407,7 @@ function McpServerWrapper({
     mcp.resources,
     mcp.resourceTemplates,
     mcp.prompts,
+    mcp.skills,
     mcp.serverInfo,
     mcp.capabilities,
     mcp.protocolEra,
