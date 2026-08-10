@@ -200,6 +200,29 @@ describe("useMcp connection metadata", () => {
     );
   });
 
+  it("exposes tools before auxiliary inventories finish loading", async () => {
+    let releaseInventories!: () => void;
+    const inventoriesPending = new Promise<void>((resolve) => {
+      releaseInventories = resolve;
+    });
+    const { result } = await renderFor("modern", false, {}, (connection) => {
+      connection.listAllResources.mockImplementation(() =>
+        inventoriesPending.then(() => ({ resources: [] }))
+      );
+      connection.listPrompts.mockImplementation(() =>
+        inventoriesPending.then(() => ({ prompts: [] }))
+      );
+    });
+
+    expect(result.state).toBe("ready");
+    expect(result.tools.map((tool) => tool.name)).toEqual(["echo"]);
+
+    await act(async () => {
+      releaseInventories();
+      await inventoriesPending;
+    });
+  });
+
   it("keeps public tools ready when a protected tool triggers OAuth later", async () => {
     const { result, getResult, connection } = await renderFor("modern");
     authProvider.getLastAttemptedAuthUrl.mockReturnValue(
