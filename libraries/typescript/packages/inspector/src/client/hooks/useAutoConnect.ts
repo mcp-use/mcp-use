@@ -41,7 +41,7 @@ export function detectPendingAutoConnect(search?: string): boolean {
 interface UseAutoConnectOptions {
   connections: McpServer[];
   addServer: (id: string, config: McpServerConfig) => void;
-  removeConnection: (id: string) => void;
+  removeConnection: (id: string) => void | Promise<void>;
   configLoaded: boolean;
   embedded?: boolean;
 }
@@ -90,11 +90,27 @@ export function shouldReplaceAutoConnectConnection(
   >
 ): boolean {
   return (
-    existing.url === config.url &&
-    existing.state !== "ready" &&
-    ((existing.transportType ?? "http") !== config.transportType ||
-      protocolModeFromNegotiation(existing.protocolNegotiation) !==
-        protocolModeFromNegotiation(config.protocolNegotiation))
+    existing.url !== config.url ||
+    (existing.state !== "ready" &&
+      ((existing.transportType ?? "http") !== config.transportType ||
+        protocolModeFromNegotiation(existing.protocolNegotiation) !==
+          protocolModeFromNegotiation(config.protocolNegotiation)))
+  );
+}
+
+/**
+ * Find the connection targeted by auto-connect.
+ *
+ * The Inspector normally uses the URL as both the connection ID and URL. Old
+ * tunnel switching could preserve the localhost ID while rewriting only the
+ * URL, so ID matching must take precedence when recovering those entries.
+ */
+export function findAutoConnectConnection<
+  T extends { id: string; url?: string },
+>(connections: T[], targetUrl: string): T | undefined {
+  return (
+    connections.find((connection) => connection.id === targetUrl) ??
+    connections.find((connection) => connection.url === targetUrl)
   );
 }
 
@@ -430,17 +446,28 @@ export function useAutoConnect({
   // Helper to handle auto-connect for a config
   const handleAutoConnectConfig = useCallback(
     (config: ConnectionConfig) => {
-      const existing = connections.find((c) => c.url === config.url);
+      const existing = findAutoConnectConnection(connections, config.url);
 
       if (existing) {
         if (shouldReplaceAutoConnectConnection(existing, config)) {
           console.warn(
-            "[useAutoConnect] Existing connection transport differs from auto-connect config; replacing it"
+            "[useAutoConnect] Existing connection differs from auto-connect config; replacing it"
           );
-          removeConnection(existing.id);
           setAutoConnectConfig(config);
           setIsAutoConnecting(true);
-          attemptConnection(config);
+          void Promise.resolve(removeConnection(existing.id))
+            .then(() => attemptConnection(config))
+            .catch((error: unknown) => {
+              console.error(
+                "[useAutoConnect] Failed to replace stale connection:",
+                error
+              );
+              setAutoConnectConfig(null);
+              setIsAutoConnecting(false);
+              toast.error(
+                "Cannot replace the saved connection. Please try again."
+              );
+            });
           return;
         }
 
