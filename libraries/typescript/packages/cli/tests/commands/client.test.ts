@@ -407,6 +407,30 @@ describe("client human-readable output", () => {
     expect(stdout).toContain("mcp-use client mixed auth login");
   });
 
+  it("redacts credentials from mixed-auth resource metadata in JSON", async () => {
+    connection.authorization = {
+      mode: "mixed",
+      authenticated: false,
+      resource:
+        "https://user-secret:password-secret@mcp.example.com/mcp?token=query-secret#fragment-secret",
+    };
+
+    await expect(
+      runClient([
+        "connect",
+        "mixed-json",
+        "https://mcp.example.com/mcp",
+        "--json",
+      ])
+    ).resolves.toBe(0);
+
+    expect(stdout).not.toContain("user-secret");
+    expect(stdout).not.toContain("password-secret");
+    expect(stdout).not.toContain("query-secret");
+    expect(stdout).not.toContain("fragment-secret");
+    expect(JSON.parse(stdout).authorization.resource).toContain("REDACTED");
+  });
+
   it("authenticates an already-connected mixed server on demand", async () => {
     await runClient(["connect", "mixed-login", "https://mcp.example.com/mcp"]);
     stdout = "";

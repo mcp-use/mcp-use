@@ -19,6 +19,8 @@ type FlowProvider = OAuthClientProvider & {
   getKey?: (keySuffix: string) => string;
   getLastAttemptedAuthUrl?: () => string | null;
   markFlowComplete?: () => void;
+  preventAutoAuth?: boolean;
+  startAuthorization?: () => void;
   useRedirectFlow?: boolean;
 };
 
@@ -109,6 +111,16 @@ export async function completeOAuthFlow(
     if (result !== "REDIRECT") {
       throw new Error(`Unexpected OAuth auth() result: ${result}`);
     }
+  }
+
+  // With preventAutoAuth, redirectToAuthorization() deliberately only stores
+  // the SDK-prepared URL. An explicit authenticate() call is the user gesture
+  // that should launch that already-prepared request.
+  if (
+    flowProvider.preventAutoAuth === true &&
+    typeof flowProvider.startAuthorization === "function"
+  ) {
+    flowProvider.startAuthorization();
   }
 
   if (

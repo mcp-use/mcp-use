@@ -150,6 +150,25 @@ describe("completeOAuthFlow", () => {
     expect(markFlowComplete).toHaveBeenCalledOnce();
   });
 
+  it("launches a prepared browser flow after explicit authentication", async () => {
+    vi.mocked(runAuthPopup).mockResolvedValue({ kind: "success" });
+    const startAuthorization = vi.fn();
+    const provider = {
+      hasPendingFlow: true,
+      preventAutoAuth: true,
+      startAuthorization,
+      getKey: () => "mcp:auth_server_tokens",
+      getLastAttemptedAuthUrl: () =>
+        "https://auth.example.com/authorize?state=stored-state",
+    } as unknown as OAuthClientProvider;
+
+    await completeOAuthFlow(provider, "https://example.com/mcp");
+
+    expect(auth).not.toHaveBeenCalled();
+    expect(startAuthorization).toHaveBeenCalledOnce();
+    expect(runAuthPopup).toHaveBeenCalledOnce();
+  });
+
   it("does not resolve a full-page redirect flow before navigation", async () => {
     const provider = {
       hasPendingFlow: true,

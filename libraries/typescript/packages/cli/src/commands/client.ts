@@ -136,7 +136,16 @@ async function connect(
       name,
       url: safeUrlForOutput(definition.url),
       protocol,
-      ...(authorization ? { authorization } : {}),
+      ...(authorization
+        ? {
+            authorization: {
+              ...authorization,
+              ...(authorization.resource
+                ? { resource: safeUrlForOutput(authorization.resource) }
+                : {}),
+            },
+          }
+        : {}),
     },
     json,
     authorization?.mode === "mixed" && !authorization.authenticated

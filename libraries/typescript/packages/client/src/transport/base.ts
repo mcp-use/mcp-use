@@ -967,6 +967,7 @@ export abstract class BaseConnector {
     }
 
     this.toolsCache = null;
+    this.authorizationCache = undefined;
     if (issues.length) {
       logger.warn(`Resource cleanup finished with ${issues.length} issue(s)`);
     }

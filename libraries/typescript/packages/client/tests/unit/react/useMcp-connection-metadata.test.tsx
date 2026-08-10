@@ -239,6 +239,42 @@ describe("useMcp connection metadata", () => {
     });
   });
 
+  it("marks a previously authenticated connection unauthenticated for scope step-up", async () => {
+    const { result, getResult, connection } = await renderFor(
+      "modern",
+      false,
+      {},
+      (configuredConnection) => {
+        Object.assign(configuredConnection.info, {
+          authorization: {
+            mode: "mixed",
+            authenticated: true,
+            resource: "https://example.com/mcp",
+            scopesSupported: ["public", "admin"],
+          },
+        });
+      }
+    );
+    connection.callTool.mockRejectedValueOnce(
+      Object.assign(new Error("Additional authorization required"), {
+        name: "InsufficientScopeError",
+      })
+    );
+
+    await act(async () => {
+      await expect(result.callTool("admin", {})).rejects.toThrow(
+        "Additional authorization required"
+      );
+    });
+
+    expect(getResult().authorization).toEqual({
+      mode: "mixed",
+      authenticated: false,
+      resource: "https://example.com/mcp",
+      scopesSupported: ["public", "admin"],
+    });
+  });
+
   it("keeps the connection ready when optional template discovery is unsupported", async () => {
     const { result } = await renderFor("modern", false, {}, (connection) => {
       connection.supports.mockReturnValue(true);

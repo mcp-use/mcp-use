@@ -163,4 +163,26 @@ describe("mixed OAuth authorization", () => {
     );
     expect(finishAuth).not.toHaveBeenCalled();
   });
+
+  it("clears discovered authorization metadata on disconnect", async () => {
+    const connector = new HttpConnector("https://mcp.example.com/mcp", {
+      detectMixedAuth: false,
+    });
+    attachConnectedClient(
+      connector,
+      { getProtocolEra: () => "modern" },
+      { finishAuth: vi.fn(async () => {}) }
+    );
+    Object.assign(connector as object, {
+      authorizationCache: {
+        mode: "mixed",
+        authenticated: false,
+        resource: "https://mcp.example.com/mcp",
+      },
+    });
+
+    expect(connector.authorization).toBeDefined();
+    await connector.disconnect();
+    expect(connector.authorization).toBeUndefined();
+  });
 });

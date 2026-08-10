@@ -177,8 +177,8 @@ return (
 - **`McpServerConfig`** — server options passed to `addServer` (replaces deprecated `McpServerOptions`).
 - **`displayName`** — your label for the server in UI.
 - **`serverInfo.name`** — name returned by the server at init.
-- **`authorization`** — optional mixed-auth metadata with `authenticated`,
-  `resource`, and `scopesSupported`.
+- **`authorization`** — optional mixed-auth metadata with `mode`,
+  `authenticated`, `resource`, and `scopesSupported`.
 
 Sampling, elicitation, and notifications are queued on each `McpServer` (`pendingSamplingRequests`, `pendingElicitationRequests`, `notifications`). See [Sampling](/v2/typescript/client/sampling) and [Elicitation](/v2/typescript/client/elicitation).
 

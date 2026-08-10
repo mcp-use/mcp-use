@@ -42,8 +42,13 @@ the CLI. If the browser does not open automatically, visit
    `protected_profile` call resumes successfully.
 6. Call `public_ping` again to confirm public tools still work after OAuth.
 
-The same server also accepts the standalone Inspector at
-`http://localhost:4173`; connect it to `http://localhost:3000/mcp`.
+To run the standalone Inspector on the origin allowed by this demo:
+
+```bash
+npx @mcp-use/inspector --port 4173 --url http://localhost:3000/mcp
+```
+
+It opens `http://localhost:4173/inspector` and connects to the demo server.
 
 ## Why the server does not use `MCPServer({ oauth })`
 

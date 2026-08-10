@@ -515,9 +515,12 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
         "This server requires OAuth for the requested operation; waiting for authentication.",
         authError
       );
-      setAuthorization(
-        (current) => current ?? { mode: "mixed", authenticated: false }
-      );
+      const authorizationRequired = {
+        ...(authorizationRef.current ?? { mode: "mixed" as const }),
+        authenticated: false,
+      };
+      authorizationRef.current = authorizationRequired;
+      setAuthorization(authorizationRequired);
       if (preparedAuthUrl) setAuthUrl(preparedAuthUrl);
     },
     [addLog]
@@ -1533,6 +1536,8 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
   const authenticate = useCallback(async () => {
     addLog("info", "Manual authentication requested...");
     const currentState = stateRef.current;
+    const isOptionalMixedAuthentication =
+      currentState === "ready" && authorizationRef.current?.mode === "mixed";
 
     if (currentState === "failed") {
       addLog("info", "Attempting to reconnect and authenticate via retry...");
@@ -1713,16 +1718,20 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
           case "cancelled":
             addLog(
               "warn",
-              "Authentication popup was closed before completing. Returning to pending_auth."
+              isOptionalMixedAuthentication
+                ? "Authentication popup was closed before completing. Public tools remain available."
+                : "Authentication popup was closed before completing. Returning to pending_auth."
             );
-            setState("pending_auth");
+            setState(isOptionalMixedAuthentication ? "ready" : "pending_auth");
             break;
           case "timeout":
             addLog(
               "warn",
-              "Authentication timed out waiting for the popup. Returning to pending_auth."
+              isOptionalMixedAuthentication
+                ? "Authentication timed out waiting for the popup. Public tools remain available."
+                : "Authentication timed out waiting for the popup. Returning to pending_auth."
             );
-            setState("pending_auth");
+            setState(isOptionalMixedAuthentication ? "ready" : "pending_auth");
             break;
           case "error":
             failConnection(`Authentication failed: ${result.error}`);
