@@ -1238,11 +1238,14 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
 
         successfulTransportRef.current = transportTypeParam;
         setState("ready");
-        void connection.discoverAuthorization().then((discovered) => {
-          if (!discovered || !isMountedRef.current) return;
-          authorizationRef.current = discovered;
-          setAuthorization(discovered);
-        });
+        const authorizationDiscovery = connection.discoverAuthorization?.();
+        if (authorizationDiscovery) {
+          void authorizationDiscovery.then((discovered) => {
+            if (!discovered || !isMountedRef.current) return;
+            authorizationRef.current = discovered;
+            setAuthorization(discovered);
+          });
+        }
         return "success";
       } catch (err: unknown) {
         const error = err as Error & { code?: number; message?: string };

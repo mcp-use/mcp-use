@@ -74,6 +74,7 @@ describe("mixed OAuth authorization", () => {
     );
 
     await connector.initialize();
+    await connector.discoverAuthorization();
 
     expect(discoverOAuthProtectedResourceMetadata).toHaveBeenCalledWith(
       "https://mcp.example.com/mcp",
