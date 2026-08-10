@@ -36,6 +36,43 @@ redirect.
 
 Pass a custom `authProvider` when your application owns the authorization flow.
 
+## Whole-server and mixed OAuth
+
+Whole-server OAuth rejects the MCP connection until the user authorizes. A
+mixed-auth server instead allows anonymous connection and public operations,
+then requires OAuth only for protected tools, resources, or prompts.
+
+When a successfully connected server publishes
+[RFC 9728 protected-resource metadata](https://www.rfc-editor.org/rfc/rfc9728.html),
+`MCPClient` exposes it as mixed auth without forcing authorization:
+
+```typescript
+const connection = await client.connect("demo");
+
+if (
+  connection.authorization?.mode === "mixed" &&
+  !connection.authorization.authenticated
+) {
+  console.log("Public operations are available without signing in.");
+
+  // Optional: authenticate now instead of waiting for a protected operation.
+  await connection.authenticate();
+}
+```
+
+`connection.info.authorization` exposes the same state. It includes `resource`
+and `scopesSupported` when the protected-resource metadata advertises them.
+Mixed-auth discovery is best-effort and defaults to enabled for HTTP servers
+with an OAuth provider. Set `detectMixedAuth: false` on the server configuration
+to skip the discovery request.
+
+If the client stays anonymous, a later wire-level OAuth challenge from a
+protected operation starts the official SDK flow. Automatic flows finish OAuth
+through the active transport and retry the logical operation once. Explicit
+browser flows surface the prepared authentication action so the host can
+authenticate and retry. MCP tool results with `isError: true` or auth-like text
+are application errors, not OAuth challenges.
+
 ## React: explicit authentication
 
 React connection APIs use an explicit authorization step by default.
@@ -52,6 +89,18 @@ export function ProtectedConnection() {
 
   if (mcp.state === "pending_auth") {
     return <button onClick={() => void mcp.authenticate()}>Sign in</button>;
+  }
+
+  if (
+    mcp.authorization?.mode === "mixed" &&
+    !mcp.authorization.authenticated
+  ) {
+    return (
+      <>
+        <p>Public tools are available. Sign in to use protected tools.</p>
+        <button onClick={() => void mcp.authenticate()}>Authenticate</button>
+      </>
+    );
   }
 
   return <p>Connection state: {mcp.state}</p>;
@@ -215,6 +264,7 @@ const client = new MCPClient({
 | `headers` | Custom HTTP headers |
 | `oauth` | Automatic OAuth options, or `false` to disable automatic OAuth |
 | `authProvider` | Custom SDK-compatible provider |
+| `detectMixedAuth` | Discover optional mixed OAuth after anonymous connection; defaults to `true` |
 
 ## Node OAuth helpers
 

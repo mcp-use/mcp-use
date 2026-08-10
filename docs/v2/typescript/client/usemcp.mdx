@@ -72,6 +72,34 @@ function ServerPanel({ serverId }: { serverId: string }) {
 
 OAuth does not auto-start by default (`preventAutoAuth: true`). Show a sign-in button when `state === "pending_auth"`.
 
+Mixed auth is reported separately from the connection state. A mixed-auth
+server remains `ready` because its public operations are usable, while
+`authorization` describes the optional OAuth state:
+
+```tsx
+function ServerAuth({ serverId }: { serverId: string }) {
+  const server = useMcpServer(serverId);
+  if (!server) return null;
+
+  const needsOptionalAuth =
+    server.authorization?.mode === "mixed" &&
+    !server.authorization.authenticated;
+
+  return needsOptionalAuth ? (
+    <div>
+      <p>This server is using mixed auth. Public tools are available.</p>
+      <button onClick={() => void server.authenticate()}>Authenticate</button>
+    </div>
+  ) : null;
+}
+```
+
+The hook detects mixed auth from RFC 9728 protected-resource metadata after an
+anonymous connection. Set `detectMixedAuth: false` to disable this best-effort
+discovery. With the default explicit browser flow, a wire-level OAuth challenge
+from a protected operation prepares the auth action; call `authenticate()` and
+retry that operation. Tool-level `isError` results do not trigger OAuth.
+
 ## OAuth callback
 
 Create a route (default: `/oauth/callback`):
@@ -133,7 +161,15 @@ if (mcp.state === "pending_auth") {
 }
 if (mcp.state !== "ready") return <div>Connecting…</div>;
 
-return <pre>{mcp.tools.map((t) => t.name).join("\n")}</pre>;
+return (
+  <>
+    {mcp.authorization?.mode === "mixed" &&
+      !mcp.authorization.authenticated && (
+        <button onClick={mcp.authenticate}>Authenticate protected tools</button>
+      )}
+    <pre>{mcp.tools.map((t) => t.name).join("\n")}</pre>
+  </>
+);
 ```
 
 ## Types
@@ -141,6 +177,8 @@ return <pre>{mcp.tools.map((t) => t.name).join("\n")}</pre>;
 - **`McpServerConfig`** — server options passed to `addServer` (replaces deprecated `McpServerOptions`).
 - **`displayName`** — your label for the server in UI.
 - **`serverInfo.name`** — name returned by the server at init.
+- **`authorization`** — optional mixed-auth metadata with `authenticated`,
+  `resource`, and `scopesSupported`.
 
 Sampling, elicitation, and notifications are queued on each `McpServer` (`pendingSamplingRequests`, `pendingElicitationRequests`, `notifications`). See [Sampling](/v2/typescript/client/sampling) and [Elicitation](/v2/typescript/client/elicitation).
 

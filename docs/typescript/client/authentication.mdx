@@ -6,7 +6,9 @@ icon: "shield"
 
 ## OAuth (automatic)
 
-For HTTP servers without a bearer token, the client auto-provisions OAuth on connect:
+For HTTP servers without a bearer token, the client provisions an OAuth provider
+automatically. A server that protects the whole MCP endpoint starts OAuth during
+connection:
 
 ```typescript
 import { MCPClient } from "@mcp-use/client";
@@ -23,6 +25,38 @@ await client.connect("demo");
 
 Disable with `oauth: false`. Override options with an `oauth` object on the server config. Pass a custom `authProvider` to skip auto-provisioning.
 
+## Mixed auth
+
+A mixed-auth server allows anonymous MCP connection and public operations, but
+requires OAuth for some tools, resources, or prompts. When the server publishes
+[RFC 9728 protected-resource metadata](https://www.rfc-editor.org/rfc/rfc9728.html),
+the client detects this after the anonymous connection succeeds:
+
+```typescript
+const connection = await client.connect("demo");
+
+if (
+  connection.authorization?.mode === "mixed" &&
+  !connection.authorization.authenticated
+) {
+  console.log("Public operations are available without signing in.");
+
+  // Optional: authenticate now instead of waiting for a protected operation.
+  await connection.authenticate();
+}
+```
+
+`connection.info.authorization` exposes the same state, including the canonical
+resource and advertised scopes when the metadata provides them. Detection is
+best-effort and defaults to enabled for HTTP servers with an OAuth provider. Set
+`detectMixedAuth: false` on the server configuration to skip it.
+
+If you stay anonymous, a later wire-level OAuth challenge from a protected
+operation starts the official SDK flow. Automatic flows retry the operation once
+after authorization. Explicit browser flows surface the auth action so the host
+can authenticate and retry. A tool result with `isError: true` or auth-like text
+is not treated as an OAuth challenge.
+
 ### React
 
 ```tsx
@@ -30,6 +64,15 @@ const mcp = useMcp({ url: "https://api.example.com/mcp" });
 
 if (mcp.state === "pending_auth") {
   return <button onClick={mcp.authenticate}>Sign in</button>;
+}
+
+if (mcp.authorization?.mode === "mixed" && !mcp.authorization.authenticated) {
+  return (
+    <>
+      <p>Public tools are available. Sign in to use protected tools.</p>
+      <button onClick={mcp.authenticate}>Authenticate</button>
+    </>
+  );
 }
 ```
 
@@ -109,6 +152,7 @@ headers: { Authorization: "Bearer sk-..." }
 | `headers` | Custom HTTP headers |
 | `oauth` | OAuth options, or `false` to disable |
 | `authProvider` | Custom SDK-compatible provider |
+| `detectMixedAuth` | Discover optional mixed OAuth after anonymous connection; defaults to `true` |
 
 ## Node OAuth helpers
 
