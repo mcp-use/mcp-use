@@ -14,6 +14,11 @@ let latestClient: ReturnType<typeof useMcpClient> | null = null;
 let mockProtocolEra: "legacy" | "modern" = "legacy";
 let mockInstructions = "legacy instructions";
 let mockAuthorization: { mode: "mixed"; authenticated: boolean } | undefined;
+let mockSkills: Array<{
+  uri: string;
+  frontmatter: { name: string; description: string };
+  resources: unknown[];
+}> = [];
 
 vi.mock("../../../src/react/useMcp.js", () => {
   const tools: unknown[] = [];
@@ -42,6 +47,7 @@ vi.mock("../../../src/react/useMcp.js", () => {
         resources,
         resourceTemplates,
         prompts,
+        skills: mockSkills,
         serverInfo,
         capabilities,
         state: "ready" as const,
@@ -104,6 +110,7 @@ describe("McpClientProvider metadata-only updates", () => {
     mockProtocolEra = "legacy";
     mockInstructions = "legacy instructions";
     mockAuthorization = undefined;
+    mockSkills = [];
     vi.restoreAllMocks();
   });
 
@@ -212,6 +219,45 @@ describe("McpClientProvider metadata-only updates", () => {
       mode: "mixed",
       authenticated: false,
     });
+  });
+
+  it("propagates refreshed skills to provider consumers", async () => {
+    let renderer: ReturnType<typeof create>;
+    await act(async () => {
+      renderer = create(
+        React.createElement(
+          McpClientProvider,
+          null,
+          React.createElement(TestHarness)
+        )
+      );
+    });
+    await flushUpdates();
+
+    expect(latestClient?.getServer("sandbox")?.skills).toEqual([]);
+    mockSkills = [
+      {
+        uri: "skill://shipping/SKILL.md",
+        frontmatter: {
+          name: "shipping",
+          description: "Track shipments",
+        },
+        resources: [],
+      },
+    ];
+
+    await act(async () => {
+      renderer!.update(
+        React.createElement(
+          McpClientProvider,
+          null,
+          React.createElement(TestHarness)
+        )
+      );
+    });
+    await flushUpdates();
+
+    expect(latestClient?.getServer("sandbox")?.skills).toEqual(mockSkills);
   });
 
   it("persists only serializable server configuration", async () => {
