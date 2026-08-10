@@ -23,10 +23,7 @@ type FlowProvider = OAuthClientProvider & {
 };
 
 /** Host callback used to complete the official transport's pending OAuth flow. */
-export type FinishOAuthAuthorization = (
-  code: string,
-  iss?: string
-) => Promise<void>;
+type FinishOAuthAuthorization = (code: string, iss?: string) => Promise<void>;
 
 /**
  * True if the error (or a wrapped cause) is an HTTP 401 / UnauthorizedError

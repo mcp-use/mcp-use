@@ -4,4 +4,4 @@
 "@mcp-use/inspector": patch
 ---
 
-Detect mixed-auth MCP servers without blocking anonymous connections, expose optional authentication in React and the Inspector, and resume protected operations through the official SDK OAuth flow.
+Detect mixed-auth MCP servers without blocking anonymous connections, expose optional authentication in React, the CLI, and the Inspector, and resume protected operations through the official SDK OAuth flow.
