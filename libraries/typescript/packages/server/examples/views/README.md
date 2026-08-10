@@ -8,6 +8,8 @@ Sibling examples for MCP Apps views with `mcp-use`:
   download URLs with `useFiles`
 - [`story-writer/`](./story-writer/) — progressive pending tool input into a
   live view (default `viewConfig`, terminal result latch)
+- [`generative-ui/`](./generative-ui/) — a json-render UI whose structured
+  spec streams into the View and renders as it grows
 - [`view-state/`](./view-state/) — a small product carousel with a
   model-visible cart
 - [`property-search/`](./property-search/) — a staged-data San Francisco home
