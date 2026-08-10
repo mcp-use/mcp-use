@@ -126,6 +126,9 @@ async function connect(
     json,
     `mcp-use client connect ${name} <url> --no-open`
   );
+  // The interactive CLI exits after reporting the connection, so wait for the
+  // optional classification here even though browser clients update lazily.
+  await connection.discoverAuthorization();
   const authorization = connection.authorization;
   await connection.disconnect();
   saved.servers[name] = definition;

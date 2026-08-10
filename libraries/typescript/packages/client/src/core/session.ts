@@ -364,6 +364,11 @@ export class MCPConnection {
     return this.connector.authorization;
   }
 
+  /** Discover optional OAuth metadata without delaying MCP readiness. */
+  async discoverAuthorization(): Promise<MCPAuthorizationInfo | undefined> {
+    return this.connector.discoverAuthorization();
+  }
+
   /** Authenticate an already-connected mixed-auth server. */
   async authenticate(): Promise<void> {
     await this.connector.authenticate();

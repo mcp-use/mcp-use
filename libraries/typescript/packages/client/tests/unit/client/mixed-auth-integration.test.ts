@@ -36,9 +36,16 @@ describe("mixed auth over streamable HTTP", () => {
 
   it("connects anonymously and starts OAuth only when a protected tool returns 401", async () => {
     let origin = "";
+    let metadataRequests = 0;
+    let releaseMetadata!: () => void;
+    const metadataGate = new Promise<void>((resolve) => {
+      releaseMetadata = resolve;
+    });
     const server = createServer(async (request, response) => {
       const path = new URL(request.url ?? "/", origin).pathname;
       if (path === "/.well-known/oauth-protected-resource/mcp") {
+        metadataRequests += 1;
+        await metadataGate;
         json(response, {
           resource: `${origin}/mcp`,
           authorization_servers: [origin],
@@ -140,6 +147,12 @@ describe("mixed auth over streamable HTTP", () => {
 
     await connector.connect();
     await connector.initialize();
+    expect(connector.authorization).toBeUndefined();
+    expect(metadataRequests).toBe(0);
+    const discovery = connector.discoverAuthorization();
+    await vi.waitFor(() => expect(metadataRequests).toBe(1));
+    releaseMetadata();
+    await discovery;
 
     expect(connector.tools.map((tool) => tool.name)).toEqual(["protected"]);
     expect(connector.authorization).toMatchObject({

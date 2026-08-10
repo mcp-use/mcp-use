@@ -1068,6 +1068,77 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
 
         // Get tools, resources, and prompts through the protocol-neutral connection.
         setTools(connection.tools || []);
+
+        const {
+          server: serverInfo,
+          capabilities,
+          protocolEra,
+          protocolVersion,
+          instructions,
+          extensions,
+          authorization: connectionAuthorization,
+        } = connection.info;
+
+        if (connectionAuthorization) {
+          setAuthorization(connectionAuthorization);
+          authorizationRef.current = connectionAuthorization;
+        }
+        setProtocolEra(protocolEra);
+        setProtocolVersion(protocolVersion);
+        setInstructions(instructions);
+        setExtensions(extensions);
+
+        if (serverInfo) {
+          addLog("debug", "Server info:", serverInfo);
+          setServerInfo(serverInfo);
+          iconLoadingPromiseRef.current = loadServerIcon({
+            serverInfo,
+            url,
+            isMounted: () => isMountedRef.current,
+            setServerInfo,
+            addLog,
+          });
+        }
+        if (capabilities) {
+          addLog("debug", "Server capabilities:", capabilities);
+          setCapabilities(capabilities);
+        }
+
+        // Tools and normalized connection metadata are sufficient for a usable
+        // connection. Auxiliary inventories must populate progressively rather
+        // than extending the ready-state critical path.
+        successfulTransportRef.current = transportTypeParam;
+        setState("ready");
+        // Optional OAuth metadata is not part of anonymous MCP readiness. Give
+        // React a chance to paint the ready state before starting its network
+        // fallbacks, which may legitimately return 404 for public servers.
+        const discoverAuthorizationAfterReady = () => {
+          if (!isMountedRef.current || connectionRef.current !== connection) {
+            return;
+          }
+          const authorizationDiscovery = connection.discoverAuthorization?.();
+          if (authorizationDiscovery) {
+            void authorizationDiscovery.then((discovered) => {
+              if (
+                !discovered ||
+                !isMountedRef.current ||
+                connectionRef.current !== connection
+              ) {
+                return;
+              }
+              authorizationRef.current = discovered;
+              setAuthorization(discovered);
+            });
+          }
+        };
+        if (typeof globalThis.requestAnimationFrame === "function") {
+          globalThis.requestAnimationFrame(() => {
+            setTimeout(discoverAuthorizationAfterReady, 0);
+          });
+        } else {
+          setTimeout(discoverAuthorizationAfterReady, 0);
+        }
+
         // Capability advertisements in the wild are not always granular: a
         // server may support resources/list while returning Method not found
         // for resources/templates/list. Inventory failures must not tear down
@@ -1104,27 +1175,8 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
         setPrompts(promptsResult.prompts || []);
         setResourceTemplates(templatesResult.resourceTemplates || []);
 
-        const {
-          server: serverInfo,
-          capabilities,
-          protocolEra,
-          protocolVersion,
-          instructions,
-          extensions,
-          authorization: connectionAuthorization,
-        } = connection.info;
-
-        if (connectionAuthorization) {
-          setAuthorization(connectionAuthorization);
-          authorizationRef.current = connectionAuthorization;
-        }
-
-        // Surface normalized metadata identically for v1 and v2 servers.
+        // Skills are another auxiliary inventory and populate progressively.
         if (isMountedRef.current) {
-          setProtocolEra(protocolEra);
-          setProtocolVersion(protocolVersion);
-          setInstructions(instructions);
-          setExtensions(extensions);
           if (extensions["io.modelcontextprotocol/skills"] !== undefined) {
             try {
               const result = await connection.listAllSkills();
@@ -1136,32 +1188,6 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
           } else {
             setSkills([]);
           }
-        }
-
-        if (serverInfo) {
-          addLog("debug", "Server info:", serverInfo);
-          if (!isMountedRef.current) {
-            addLog("debug", "Skipping state update - component unmounted");
-            return "failed";
-          }
-          setServerInfo(serverInfo);
-
-          iconLoadingPromiseRef.current = loadServerIcon({
-            serverInfo,
-            url,
-            isMounted: () => isMountedRef.current,
-            setServerInfo,
-            addLog,
-          });
-        }
-
-        if (capabilities) {
-          addLog("debug", "Server capabilities:", capabilities);
-          if (!isMountedRef.current) {
-            addLog("debug", "Skipping state update - component unmounted");
-            return "failed";
-          }
-          setCapabilities(capabilities);
         }
 
         // Get OAuth tokens if authentication was used
@@ -1236,8 +1262,6 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
           }
         }
 
-        successfulTransportRef.current = transportTypeParam;
-        setState("ready");
         return "success";
       } catch (err: unknown) {
         const error = err as Error & { code?: number; message?: string };

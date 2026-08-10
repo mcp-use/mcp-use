@@ -398,6 +398,13 @@ async function proxyResponse(response: Response): Promise<Response> {
     response.headers.get("content-length")
   );
   if (isTrueStream) {
+    // Railway's edge and other reverse proxies may buffer an otherwise valid
+    // SSE response until it closes. MCP v2 subscriptions are intentionally
+    // long-lived, so that turns the immediate subscription acknowledgement
+    // into a connection timeout. Explicitly opt this response out of proxy
+    // buffering while preserving the upstream cache policy.
+    responseHeaders["x-accel-buffering"] = "no";
+    responseHeaders["cache-control"] ??= "no-cache, no-transform";
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
