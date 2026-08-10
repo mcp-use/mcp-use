@@ -12,6 +12,7 @@
   },
   "changesets": [
     "fresh-tools-auth",
-    "quick-sse-proxy"
+    "quick-sse-proxy",
+    "wise-cats-explore"
   ]
 }

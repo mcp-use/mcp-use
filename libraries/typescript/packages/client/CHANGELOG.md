@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.1.1-canary.2
+
+### Patch Changes
+
+- 6c310bf: Fix code mode with a custom executor function: the first `executeCode()` call no longer throws `Custom executor function should be handled in executeCode`, `searchTools()` works instead of always throwing, and `close()` runs executor cleanup. Also forward `detail_level` from the `search_tools` meta tool instead of silently coercing every value to `"full"`.
+
 ## 2.1.1-canary.1
 
 ### Patch Changes
