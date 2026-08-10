@@ -794,6 +794,9 @@ export function ToolsTab({
                   onAuthenticateAndRerun={
                     pendingAuthorization ? authenticateAndRerun : undefined
                   }
+                  pendingAuthorizationTimestamp={
+                    pendingAuthorization?.timestamp
+                  }
                   isAuthenticating={isAuthorizing}
                   authorizationError={authorizationError}
                 />
@@ -996,6 +999,7 @@ export function ToolsTab({
                 onAuthenticateAndRerun={
                   pendingAuthorization ? authenticateAndRerun : undefined
                 }
+                pendingAuthorizationTimestamp={pendingAuthorization?.timestamp}
                 isAuthenticating={isAuthorizing}
                 authorizationError={authorizationError}
               />

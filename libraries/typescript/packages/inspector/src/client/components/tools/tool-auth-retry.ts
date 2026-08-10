@@ -1,5 +1,6 @@
 const PENDING_TOOL_EXECUTION_STORAGE_KEY =
   "__mcpUseInspectorPendingToolExecution";
+const PENDING_TOOL_EXECUTION_MAX_AGE_MS = 15 * 60_000;
 
 type SessionStorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
@@ -15,7 +16,15 @@ export interface PendingToolExecution {
 }
 
 function defaultSessionStorage(): SessionStorageLike | undefined {
-  return typeof sessionStorage === "undefined" ? undefined : sessionStorage;
+  try {
+    return typeof sessionStorage === "undefined" ? undefined : sessionStorage;
+  } catch {
+    return undefined;
+  }
+}
+
+function storageKey(serverId: string): string {
+  return `${PENDING_TOOL_EXECUTION_STORAGE_KEY}:${encodeURIComponent(serverId)}`;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -38,24 +47,45 @@ function isPendingToolExecution(value: unknown): value is PendingToolExecution {
   );
 }
 
+interface StoredPendingToolExecution {
+  savedAt: number;
+  execution: PendingToolExecution;
+}
+
+function isStoredPendingToolExecution(
+  value: unknown
+): value is StoredPendingToolExecution {
+  return (
+    isRecord(value) &&
+    typeof value.savedAt === "number" &&
+    Number.isFinite(value.savedAt) &&
+    isPendingToolExecution(value.execution)
+  );
+}
+
 /** Load the pending tool request for `serverId`, if one is available. */
 export function readPendingToolExecution(
   serverId: string,
   storage: SessionStorageLike | undefined = defaultSessionStorage()
 ): PendingToolExecution | null {
   if (!storage) return null;
+  const key = storageKey(serverId);
   try {
-    const raw = storage.getItem(PENDING_TOOL_EXECUTION_STORAGE_KEY);
+    const raw = storage.getItem(key);
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
-    if (!isPendingToolExecution(parsed)) {
-      storage.removeItem(PENDING_TOOL_EXECUTION_STORAGE_KEY);
+    if (
+      !isStoredPendingToolExecution(parsed) ||
+      parsed.execution.serverId !== serverId ||
+      Date.now() - parsed.savedAt > PENDING_TOOL_EXECUTION_MAX_AGE_MS
+    ) {
+      storage.removeItem(key);
       return null;
     }
-    return parsed.serverId === serverId ? parsed : null;
+    return parsed.execution;
   } catch {
     try {
-      storage.removeItem(PENDING_TOOL_EXECUTION_STORAGE_KEY);
+      storage.removeItem(key);
     } catch {
       // Storage is best-effort.
     }
@@ -71,8 +101,11 @@ export function savePendingToolExecution(
   if (!storage) return;
   try {
     storage.setItem(
-      PENDING_TOOL_EXECUTION_STORAGE_KEY,
-      JSON.stringify(execution)
+      storageKey(execution.serverId),
+      JSON.stringify({
+        savedAt: Date.now(),
+        execution,
+      } satisfies StoredPendingToolExecution)
     );
   } catch {
     // Storage is best-effort; popup OAuth can still resume in memory.
@@ -85,10 +118,8 @@ export function clearPendingToolExecution(
   storage: SessionStorageLike | undefined = defaultSessionStorage()
 ): void {
   if (!storage) return;
-  const pending = readPendingToolExecution(serverId, storage);
-  if (!pending) return;
   try {
-    storage.removeItem(PENDING_TOOL_EXECUTION_STORAGE_KEY);
+    storage.removeItem(storageKey(serverId));
   } catch {
     // Storage is best-effort.
   }

@@ -51,7 +51,8 @@ interface ToolResultDisplayProps {
   onMaximize?: () => void;
   isMaximized?: boolean;
   onRerunTool?: () => void;
-  onAuthenticateAndRerun?: () => Promise<void> | void;
+  onAuthenticateAndRerun?: (timestamp: number) => Promise<void> | void;
+  pendingAuthorizationTimestamp?: number;
   isAuthenticating?: boolean;
   authorizationError?: string | null;
   onWidgetHeightChange?: (height: number | null) => void;
@@ -389,6 +390,7 @@ export function ToolResultDisplay({
   isMaximized = false,
   onRerunTool,
   onAuthenticateAndRerun,
+  pendingAuthorizationTimestamp,
   isAuthenticating = false,
   authorizationError,
   onWidgetHeightChange,
@@ -706,6 +708,9 @@ export function ToolResultDisplay({
 
           {(() => {
             if (result.authorizationRequired) {
+              const canAuthenticateAndRerun =
+                Boolean(onAuthenticateAndRerun) &&
+                result.timestamp === pendingAuthorizationTimestamp;
               return (
                 <div
                   role="alert"
@@ -719,7 +724,7 @@ export function ToolResultDisplay({
                       Authenticate to use this tool. The Inspector will rerun it
                       automatically after authorization.
                     </p>
-                    {authorizationError && (
+                    {canAuthenticateAndRerun && authorizationError && (
                       <p className="mt-1 text-xs text-red-700 dark:text-red-300">
                         {authorizationError}
                       </p>
@@ -728,15 +733,17 @@ export function ToolResultDisplay({
                   <Button
                     data-testid="tool-result-authenticate-rerun"
                     size="sm"
-                    onClick={() => void onAuthenticateAndRerun?.()}
-                    disabled={!onAuthenticateAndRerun || isAuthenticating}
+                    onClick={() =>
+                      void onAuthenticateAndRerun?.(result.timestamp)
+                    }
+                    disabled={!canAuthenticateAndRerun || isAuthenticating}
                   >
-                    {isAuthenticating ? (
+                    {canAuthenticateAndRerun && isAuthenticating ? (
                       <Loader2 className="size-3.5 animate-spin" aria-hidden />
                     ) : (
                       <LockKeyhole className="size-3.5" aria-hidden />
                     )}
-                    {isAuthenticating
+                    {canAuthenticateAndRerun && isAuthenticating
                       ? "Authenticating…"
                       : "Authenticate and rerun"}
                   </Button>

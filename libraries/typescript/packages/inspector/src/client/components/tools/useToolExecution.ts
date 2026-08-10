@@ -75,9 +75,8 @@ export function useToolExecution({
     null
   );
   const [copiedResult, setCopiedResult] = useState<number | null>(null);
-  const [abortController, setAbortController] =
-    useState<AbortController | null>(null);
   const executingRef = useRef(false);
+  const activeExecutionRef = useRef<AbortController | null>(null);
   const shouldResumeAuthorizationRef = useRef(pendingAuthorization !== null);
   const [resumeVersion, setResumeVersion] = useState(0);
 
@@ -87,7 +86,7 @@ export function useToolExecution({
 
       const controller = new AbortController();
       executingRef.current = true;
-      setAbortController(controller);
+      activeExecutionRef.current = controller;
       setIsExecuting(true);
       const startTime = Date.now();
 
@@ -208,9 +207,11 @@ export function useToolExecution({
           setResults((prev) => [errorResult, ...prev]);
         }
       } finally {
-        executingRef.current = false;
-        setAbortController(null);
-        setIsExecuting(false);
+        if (activeExecutionRef.current === controller) {
+          activeExecutionRef.current = null;
+          executingRef.current = false;
+          setIsExecuting(false);
+        }
       }
     },
     [callTool, readResource, serverId]
@@ -265,25 +266,35 @@ export function useToolExecution({
     serverId,
   ]);
 
-  const authenticateAndRerun = useCallback(async () => {
-    if (!pendingAuthorization || !authenticate || isAuthorizing) return;
+  const authenticateAndRerun = useCallback(
+    async (timestamp: number) => {
+      if (
+        !pendingAuthorization ||
+        pendingAuthorization.timestamp !== timestamp ||
+        !authenticate ||
+        isAuthorizing
+      ) {
+        return;
+      }
 
-    savePendingToolExecution(pendingAuthorization);
-    setAuthorizationError(null);
-    setIsAuthorizing(true);
-    try {
-      await authenticate();
-      shouldResumeAuthorizationRef.current = true;
-      setResumeVersion((version) => version + 1);
-    } catch (error) {
-      clearPendingToolExecution(serverId);
-      setAuthorizationError(
-        error instanceof Error ? error.message : "Authentication failed"
-      );
-    } finally {
-      setIsAuthorizing(false);
-    }
-  }, [authenticate, isAuthorizing, pendingAuthorization, serverId]);
+      savePendingToolExecution(pendingAuthorization);
+      setAuthorizationError(null);
+      setIsAuthorizing(true);
+      try {
+        await authenticate();
+        shouldResumeAuthorizationRef.current = true;
+        setResumeVersion((version) => version + 1);
+      } catch (error) {
+        clearPendingToolExecution(serverId);
+        setAuthorizationError(
+          error instanceof Error ? error.message : "Authentication failed"
+        );
+      } finally {
+        setIsAuthorizing(false);
+      }
+    },
+    [authenticate, isAuthorizing, pendingAuthorization, serverId]
+  );
 
   const handleCopyResult = useCallback(async (index: number, text: string) => {
     try {
@@ -324,11 +335,14 @@ export function useToolExecution({
   );
 
   const cancelExecution = useCallback(() => {
-    abortController?.abort();
+    const controller = activeExecutionRef.current;
+    if (!controller) return;
+    controller.abort();
+    if (activeExecutionRef.current !== controller) return;
+    activeExecutionRef.current = null;
     executingRef.current = false;
-    setAbortController(null);
     setIsExecuting(false);
-  }, [abortController]);
+  }, []);
 
   return {
     results,
