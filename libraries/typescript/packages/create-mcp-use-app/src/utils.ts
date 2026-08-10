@@ -48,13 +48,14 @@ export function findUnsafeEntries(dir: string): string[] {
 
 // Sanitize a raw directory name into a valid npm package name.
 // npm names must be lowercase and may not contain spaces, most special chars,
-// or leading dots/dashes.
+// or leading dots, dashes or underscores. npm publish rejects a leading
+// underscore outright: "name cannot start with an underscore".
 export function sanitizePackageName(raw: string): string {
   return (
     raw
       .toLowerCase()
       .replace(/[^a-z0-9_.-]/g, "-")
-      .replace(/^[.-]+/, "")
+      .replace(/^[._-]+/, "")
       .replace(/[.-]+$/, "") || "my-app"
   );
 }
