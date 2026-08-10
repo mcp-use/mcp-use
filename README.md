@@ -46,7 +46,7 @@
 </div>
 
 > [!NOTE]
-> **Migrating from v1? Give it to your agent:** [Read the migration guide →](https://docs.mcp-use.com/v2/typescript/server/migration)
+> **Migrating from v1? Give it to your agent:**
 >
 > ```text
 > Migrate this mcp-use project to v2 following
