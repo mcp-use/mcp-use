@@ -490,6 +490,14 @@ export abstract class BaseConnector {
     return this.authorizationCache;
   }
 
+  /**
+   * Discover optional authorization metadata without delaying connection
+   * readiness. HTTP connectors override this with RFC 9728 discovery.
+   */
+  async discoverAuthorization(): Promise<MCPAuthorizationInfo | undefined> {
+    return this.authorization;
+  }
+
   /** Start optional OAuth for a connected mixed-auth server. */
   async authenticate(): Promise<void> {
     throw new Error("This connector does not support interactive OAuth");

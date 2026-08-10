@@ -10,6 +10,7 @@ import {
   type VersionNegotiationMode,
 } from "@modelcontextprotocol/client";
 import { completeOAuthFlow, isOAuthInteractionRequired } from "../auth/flow.js";
+import type { MCPAuthorizationInfo } from "../core/session.js";
 import { DialectJsonSchemaValidator } from "../utils/json-schema-validator.js";
 import { logger } from "../utils/logging.js";
 import type { ConnectorInitOptions } from "./base.js";
@@ -219,6 +220,9 @@ export class HttpConnector extends BaseConnector {
   private streamableTransport: StreamableHTTPClientTransport | null = null;
   private hadAccessTokenAtConnect = false;
   private pendingOAuthCompletion: Promise<void> | null = null;
+  private authorizationDiscovery: Promise<
+    MCPAuthorizationInfo | undefined
+  > | null = null;
 
   /**
    * Creates an HTTP connector.
@@ -332,14 +336,33 @@ export class HttpConnector extends BaseConnector {
     defaultRequestOptions = this.opts.defaultRequestOptions ?? {}
   ): ReturnType<BaseConnector["initialize"]> {
     const capabilities = await super.initialize(defaultRequestOptions);
+    // Mixed auth is optional metadata layered on top of a valid anonymous MCP
+    // connection. Start discovery eagerly, but never make connection readiness
+    // wait for well-known fallbacks, proxy latency, or their timeout.
+    void this.discoverAuthorization();
+    return capabilities;
+  }
+
+  override async discoverAuthorization(): Promise<
+    MCPAuthorizationInfo | undefined
+  > {
     if (
       !this.detectMixedAuth ||
       !this.oauthProvider ||
       this.hadAccessTokenAtConnect
     ) {
-      return capabilities;
+      return this.authorizationCache;
     }
 
+    if (this.authorizationDiscovery) return this.authorizationDiscovery;
+
+    this.authorizationDiscovery = this.discoverMixedAuthorization();
+    return this.authorizationDiscovery;
+  }
+
+  private async discoverMixedAuthorization(): Promise<
+    MCPAuthorizationInfo | undefined
+  > {
     const controller = new AbortController();
     let timeout: ReturnType<typeof setTimeout> | undefined;
     const discoveryTimeout = new Promise<never>((_, reject) => {
@@ -381,7 +404,7 @@ export class HttpConnector extends BaseConnector {
     } finally {
       if (timeout) clearTimeout(timeout);
     }
-    return capabilities;
+    return this.authorizationCache;
   }
 
   private buildClientOptions(): ClientOptions {

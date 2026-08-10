@@ -55,6 +55,7 @@ const connection = {
       }
     | undefined,
   callTool: vi.fn(),
+  discoverAuthorization: vi.fn(),
   disconnect: vi.fn(),
   getPrompt: vi.fn(),
   listPrompts: vi.fn(),
@@ -97,6 +98,9 @@ beforeEach(async () => {
   connection.callTool.mockResolvedValue({
     content: [{ type: "text", text: "called" }],
   });
+  connection.discoverAuthorization.mockImplementation(
+    async () => connection.authorization
+  );
   connection.authenticate.mockResolvedValue(undefined);
   connection.authorization = undefined;
   connection.disconnect.mockResolvedValue(undefined);
