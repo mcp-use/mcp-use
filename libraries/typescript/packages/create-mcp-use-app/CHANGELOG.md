@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 2.0.3-canary.1
+
+### Patch Changes
+
+- cb8bb56: Strip leading underscores when sanitizing a project name into an npm package name. `create-mcp-use-app _foo` produced `"name": "_foo"`, which npm publish rejects with "name cannot start with an underscore".
+
 ## 2.0.3-canary.0
 
 ### Patch Changes
