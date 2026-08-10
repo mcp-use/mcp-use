@@ -110,4 +110,41 @@ describe("Inspector MCP proxy request isolation", () => {
     expect(response.status).toBe(204);
     expect(await response.text()).toBe("");
   });
+
+  it("disables reverse-proxy buffering for open-ended SSE responses", async () => {
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode("data: ready\n\n"));
+      },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(
+        async () =>
+          new Response(stream, {
+            headers: { "Content-Type": "text/event-stream" },
+          })
+      )
+    );
+    const app = new Hono();
+    mountMcpProxy(app, {
+      path: "/inspector/api/proxy",
+      enableLogging: false,
+    });
+
+    const response = await app.fetch(
+      new Request(proxyUrl, {
+        headers: {
+          "X-Target-URL": "https://93.184.216.34/mcp",
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("text/event-stream");
+    expect(response.headers.get("cache-control")).toBe(
+      "no-cache, no-transform"
+    );
+    expect(response.headers.get("x-accel-buffering")).toBe("no");
+  });
 });
