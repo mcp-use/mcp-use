@@ -1,9 +1,5 @@
 import type { Spec } from "@json-render/core";
-import {
-  defineRegistry,
-  JSONUIProvider,
-  Renderer,
-} from "@json-render/react";
+import { defineRegistry, JSONUIProvider, Renderer } from "@json-render/react";
 import { shadcnComponents } from "@json-render/shadcn";
 import { ThemeProvider, useToolContext } from "mcp-use/react";
 import { useCallback, useState } from "react";

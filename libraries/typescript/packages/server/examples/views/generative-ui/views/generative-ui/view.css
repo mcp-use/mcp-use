@@ -75,9 +75,14 @@
 .generative-ui-canvas {
   width: 100%;
   color: var(--foreground);
-  font-family:
-    var(--vscode-font-family, system-ui, -apple-system, BlinkMacSystemFont,
-    "Segoe UI", sans-serif);
+  font-family: var(
+    --vscode-font-family,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif
+  );
 }
 
 .generative-ui-status {
