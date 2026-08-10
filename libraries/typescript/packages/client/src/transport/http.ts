@@ -332,17 +332,6 @@ export class HttpConnector extends BaseConnector {
     await this.completeInteractiveAuthorization();
   }
 
-  override async initialize(
-    defaultRequestOptions = this.opts.defaultRequestOptions ?? {}
-  ): ReturnType<BaseConnector["initialize"]> {
-    const capabilities = await super.initialize(defaultRequestOptions);
-    // Mixed auth is optional metadata layered on top of a valid anonymous MCP
-    // connection. Start discovery eagerly, but never make connection readiness
-    // wait for well-known fallbacks, proxy latency, or their timeout.
-    void this.discoverAuthorization();
-    return capabilities;
-  }
-
   override async discoverAuthorization(): Promise<
     MCPAuthorizationInfo | undefined
   > {

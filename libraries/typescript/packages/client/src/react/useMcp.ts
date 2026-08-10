@@ -1238,14 +1238,28 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
 
         successfulTransportRef.current = transportTypeParam;
         setState("ready");
-        const authorizationDiscovery = connection.discoverAuthorization?.();
-        if (authorizationDiscovery) {
-          void authorizationDiscovery.then((discovered) => {
-            if (!discovered || !isMountedRef.current) return;
-            authorizationRef.current = discovered;
-            setAuthorization(discovered);
-          });
-        }
+        // Optional OAuth metadata is not part of anonymous MCP readiness. Give
+        // React a chance to paint the ready state before starting its network
+        // fallbacks, which may legitimately return 404 for public servers.
+        setTimeout(() => {
+          if (!isMountedRef.current || connectionRef.current !== connection) {
+            return;
+          }
+          const authorizationDiscovery = connection.discoverAuthorization?.();
+          if (authorizationDiscovery) {
+            void authorizationDiscovery.then((discovered) => {
+              if (
+                !discovered ||
+                !isMountedRef.current ||
+                connectionRef.current !== connection
+              ) {
+                return;
+              }
+              authorizationRef.current = discovered;
+              setAuthorization(discovered);
+            });
+          }
+        }, 0);
         return "success";
       } catch (err: unknown) {
         const error = err as Error & { code?: number; message?: string };
