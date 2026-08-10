@@ -1241,7 +1241,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
         // Optional OAuth metadata is not part of anonymous MCP readiness. Give
         // React a chance to paint the ready state before starting its network
         // fallbacks, which may legitimately return 404 for public servers.
-        setTimeout(() => {
+        const discoverAuthorizationAfterReady = () => {
           if (!isMountedRef.current || connectionRef.current !== connection) {
             return;
           }
@@ -1259,7 +1259,14 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
               setAuthorization(discovered);
             });
           }
-        }, 0);
+        };
+        if (typeof globalThis.requestAnimationFrame === "function") {
+          globalThis.requestAnimationFrame(() => {
+            setTimeout(discoverAuthorizationAfterReady, 0);
+          });
+        } else {
+          setTimeout(discoverAuthorizationAfterReady, 0);
+        }
         return "success";
       } catch (err: unknown) {
         const error = err as Error & { code?: number; message?: string };
