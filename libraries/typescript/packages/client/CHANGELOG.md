@@ -1,5 +1,12 @@
 # @mcp-use/client
 
+## 2.1.1-canary.3
+
+### Patch Changes
+
+- e7ca969: Enable the Inspector Skills tab when a dev-server HMR reload adds skills after
+  the initial connection negotiated without the Skills extension.
+
 ## 2.1.1-canary.2
 
 ### Patch Changes
