@@ -58,13 +58,23 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  */
 function toRenderableSpec(value: unknown): Spec | null {
   if (!isRecord(value) || typeof value.root !== "string") return null;
-  if (!isRecord(value.elements) || !isRecord(value.elements[value.root])) {
+  const rootElement = isRecord(value.elements)
+    ? value.elements[value.root]
+    : undefined;
+  if (
+    !isRecord(value.elements) ||
+    !isRecord(rootElement) ||
+    !isRecord(rootElement.props)
+  ) {
     return null;
   }
 
   const elements: Record<string, Record<string, unknown>> = {};
   for (const [key, element] of Object.entries(value.elements)) {
-    if (isRecord(element)) elements[key] = element;
+    // json-render calls Object.entries on each rendered element's props.
+    // Exclude elements that have arrived before their props are streamed;
+    // their parents can safely reference them while `loading` is true.
+    if (isRecord(element) && isRecord(element.props)) elements[key] = element;
   }
 
   return {
