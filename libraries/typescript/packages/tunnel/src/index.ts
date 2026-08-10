@@ -151,6 +151,11 @@ export interface TunnelManagerOptions {
   relayUrl?: string;
   /** Requested stable tunnel identifier. */
   subdomain?: string;
+  /**
+   * Host header presented to the local origin. The public hostname remains
+   * available through `X-Forwarded-Host`. Defaults to the public hostname.
+   */
+  localHostHeader?: string;
 }
 
 const RESPAWN_BACKOFF_INITIAL_MS = 1_000;
@@ -330,6 +335,7 @@ async function releaseTunnel(
 async function connectTunnel(
   port: number,
   reservation: TunnelReservation,
+  localHostHeader: string | undefined,
   onUnexpectedClose: (event: CloseEvent) => void
 ): Promise<TunnelConnection> {
   const socket = new WebSocket(reservation.connect_url);
@@ -374,7 +380,11 @@ async function connectTunnel(
     }
     const headers = sanitizeHeaders(message.headers, true);
     const forwardedHost = message.headers["x-forwarded-host"];
-    if (typeof forwardedHost === "string") headers.host = forwardedHost;
+    if (localHostHeader !== undefined) {
+      headers.host = localHostHeader;
+    } else if (typeof forwardedHost === "string") {
+      headers.host = forwardedHost;
+    }
     const localRequest = http.request({
       hostname: "127.0.0.1",
       port,
@@ -828,7 +838,7 @@ export function createTunnelManager(
     port: number,
     reservation: TunnelReservation
   ): Promise<TunnelConnection> =>
-    connectTunnel(port, reservation, (event) => {
+    connectTunnel(port, reservation, options.localHostHeader, (event) => {
       connection = undefined;
       currentUrl = null;
       const terminal =

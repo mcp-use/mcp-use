@@ -1,4 +1,4 @@
-/** Unit tests for entry discovery (CLI_SPEC.md § Entry contract). */
+/** Unit tests for entry discovery. */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";

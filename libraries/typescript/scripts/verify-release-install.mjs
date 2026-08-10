@@ -326,17 +326,22 @@ function verifyRuntimeImport(directory, conditions) {
         .join("\n")
     );
   } else {
-    assert.ok(
-      builtins.every((url) => url === "node:process"),
-      `unexpected Node builtins: ${builtins.join(", ")}`
-    );
-    const processResolution = resolutions.find(
-      ({ url }) => url === "node:process"
-    );
-    if (processResolution) {
+    const allowedBuiltins = new Map([
+      [
+        "node:process",
+        /(?:@modelcontextprotocol\/server\/dist\/shimsNode|\/mcp-use\/dist\/index-node)\.(?:mjs|js)$/,
+      ],
+      ["node:http", /\/mcp-use\/dist\/index-node\.js$/],
+    ]);
+    for (const resolution of resolutions.filter(({ url }) =>
+      url.startsWith("node:")
+    )) {
+      const allowedParent = allowedBuiltins.get(resolution.url);
+      assert.ok(allowedParent, `unexpected Node builtin: ${resolution.url}`);
       assert.match(
-        processResolution.parentURL ?? "",
-        /@modelcontextprotocol\/server\/dist\/shimsNode\.mjs$/
+        resolution.parentURL ?? "",
+        allowedParent,
+        `${resolution.url} loaded by unexpected parent`
       );
     }
   }

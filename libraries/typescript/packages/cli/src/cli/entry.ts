@@ -1,8 +1,8 @@
 /**
  * Server-entry discovery for `mcp-use build` and `mcp-use dev`.
  *
- * The entry contract (CLI_SPEC.md): the user's entry module default-exports
- * the `MCPServer` instance and never calls `listen()` itself — the CLI owns
+ * The user's entry module default-exports the `MCPServer` instance and never
+ * calls `listen()` itself — the CLI owns
  * the socket.
  */
 

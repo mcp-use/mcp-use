@@ -1,5 +1,46 @@
 # @mcp-use/client
 
+## 2.1.0
+
+### Minor Changes
+
+- 2daf9c9: Add typed Skills over MCP client operations, a capability-gated Inspector
+  file explorer with integrity verification, and removable progressive skill
+  context in Inspector chat.
+
+### Patch Changes
+
+- 60eb3ac: Populate the Inspector's `window.openai` compatibility bridge with tool lifecycle globals and host actions while preserving the native MCP Apps handshake for V2 views.
+- 792e8eb: Allow widget-declared MCP App sandbox CSPs to use dynamic compilation while preserving their declared domain restrictions.
+- 52f535c: Allow modern MCP connections to remain ready when the server omits optional identity metadata. Direct proxy connections now report a clear error when an anonymous upstream cannot provide a namespace.
+- 6985d78: chore: clear unused TypeScript export surface flagged by knip
+
+  Trim internal barrels, drop dead stubs and duplicate re-exports, and un-export file-local helpers so knip reports a clean export graph without changing published package entry APIs.
+
+## 2.1.0-canary.5
+
+### Minor Changes
+
+- 2daf9c9: Add typed Skills over MCP client operations, a capability-gated Inspector
+  file explorer with integrity verification, and removable progressive skill
+  context in Inspector chat.
+
+### Patch Changes
+
+- 60eb3ac: Populate the Inspector's `window.openai` compatibility bridge with tool lifecycle globals and host actions while preserving the native MCP Apps handshake for V2 views.
+- 792e8eb: Allow widget-declared MCP App sandbox CSPs to use dynamic compilation while preserving their declared domain restrictions.
+- 819ef5b: Prevent iframe console log records from being parsed as MCP Apps JSON-RPC messages in the Inspector.
+- 52f535c: Allow modern MCP connections to remain ready when the server omits optional identity metadata. Direct proxy connections now report a clear error when an anonymous upstream cannot provide a namespace.
+- 6985d78: chore: clear unused TypeScript export surface flagged by knip
+
+  Trim internal barrels, drop dead stubs and duplicate re-exports, and un-export file-local helpers so knip reports a clean export graph without changing published package entry APIs.
+
+## 2.1.0-canary.4
+
+### Patch Changes
+
+- 792e8eb: Allow widget-declared MCP App sandbox CSPs to use dynamic compilation while preserving their declared domain restrictions.
+
 ## 2.1.0-canary.3
 
 ### Minor Changes

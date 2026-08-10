@@ -1,5 +1,21 @@
 # create-mcp-use-app
 
+## 2.0.2
+
+### Patch Changes
+
+- 6985d78: chore: clear unused TypeScript export surface flagged by knip
+
+  Trim internal barrels, drop dead stubs and duplicate re-exports, and un-export file-local helpers so knip reports a clean export graph without changing published package entry APIs.
+
+## 2.0.2-canary.1
+
+### Patch Changes
+
+- 6985d78: chore: clear unused TypeScript export surface flagged by knip
+
+  Trim internal barrels, drop dead stubs and duplicate re-exports, and un-export file-local helpers so knip reports a clean export graph without changing published package entry APIs.
+
 ## 2.0.2-canary.0
 
 ### Patch Changes
@@ -131,7 +147,7 @@
 - fe4d3b2: Enable MCP view JS code splitting and polish inspector boot UX.
 
   **mcp-use**
-  - Enable rolldown code splitting for per-view client builds (`chunkFileNames` alongside the entry chunk); update `VIEWS_SPEC.md` for external assets and split chunks.
+  - Enable rolldown code splitting for per-view client builds (`chunkFileNames` alongside the entry chunk) for external assets and split chunks.
   - Paint a centered boot spinner in the managed inspector shell while the CDN bundle downloads.
 
   **@mcp-use/inspector**
@@ -242,7 +258,7 @@
 - fe4d3b2: Enable MCP view JS code splitting and polish inspector boot UX.
 
   **mcp-use**
-  - Enable rolldown code splitting for per-view client builds (`chunkFileNames` alongside the entry chunk); update `VIEWS_SPEC.md` for external assets and split chunks.
+  - Enable rolldown code splitting for per-view client builds (`chunkFileNames` alongside the entry chunk) for external assets and split chunks.
   - Paint a centered boot spinner in the managed inspector shell while the CDN bundle downloads.
 
   **@mcp-use/inspector**

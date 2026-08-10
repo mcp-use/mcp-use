@@ -58,6 +58,7 @@ describe("WebSocket tunnel end to end", () => {
   let relay: Awaited<ReturnType<typeof createRelayFixture>>;
   let tunnel: TunnelManager;
   let publicUrl: string;
+  let localPort: number;
   let cancelled: Promise<void>;
 
   beforeEach(async () => {
@@ -78,6 +79,17 @@ describe("WebSocket tunnel end to end", () => {
       }
       if (request.url?.startsWith("/concurrent/")) {
         setTimeout(() => response.end(request.url), 5);
+        return;
+      }
+      if (request.url === "/headers") {
+        response.setHeader("content-type", "application/json");
+        response.end(
+          JSON.stringify({
+            host: request.headers.host,
+            forwardedHost: request.headers["x-forwarded-host"],
+            forwardedProto: request.headers["x-forwarded-proto"],
+          })
+        );
         return;
       }
       const chunks: Buffer[] = [];
@@ -118,7 +130,7 @@ describe("WebSocket tunnel end to end", () => {
       });
     });
 
-    const localPort = await listen(local);
+    localPort = await listen(local);
     relay = await createRelayFixture();
     const statePath = join(
       mkdtempSync(join(tmpdir(), "mcp-use-tunnel-e2e-")),
@@ -181,6 +193,36 @@ describe("WebSocket tunnel end to end", () => {
     await expect(
       webSocketExchange(wsUrl, Buffer.from([1, 2, 3]))
     ).resolves.toEqual(Buffer.from([1, 2, 3]));
+  });
+
+  it("can present a loopback Host while preserving the public forwarded origin", async () => {
+    const defaultHeaders = await fetch(`${publicUrl}/headers`).then(
+      async (response) => response.json()
+    );
+    expect(defaultHeaders).toMatchObject({
+      host: new URL(publicUrl).host,
+      forwardedHost: new URL(publicUrl).host,
+      forwardedProto: "http",
+    });
+
+    await tunnel.stop();
+    const statePath = join(
+      mkdtempSync(join(tmpdir(), "mcp-use-tunnel-local-host-e2e-")),
+      "tunnel.json"
+    );
+    tunnel = createTunnelManager(statePath, {
+      relayUrl: relay.relayBase,
+      localHostHeader: "localhost",
+    });
+    ({ url: publicUrl } = await tunnel.start(localPort));
+
+    await expect(
+      fetch(`${publicUrl}/headers`).then(async (response) => response.json())
+    ).resolves.toMatchObject({
+      host: "localhost",
+      forwardedHost: new URL(publicUrl).host,
+      forwardedProto: "http",
+    });
   });
 
   it("releases the authenticated reservation during graceful shutdown", async () => {

@@ -6,11 +6,87 @@ tag: "New"
 rss: true
 ---
 
+<Update label="v2.1.0" description="August 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=2.1.0&title=Skills%20over%20MCP%20%26%20v2%20server%20tooling&date=2026-08&lang=typescript" alt="Release 2.1.0" />
+  </Frame>
+  ## Skills over MCP & v2 server tooling
+  Minor release adding experimental Skills over MCP authoring to the v2 server and completing the package split around the standalone CLI and Inspector.
+
+- **Fix**: MCP v2 server responses preserve tool JSON Schema dialects and accept input-required prompt results (`#2147`)
+- **Fix**: Modern connections remain ready when optional upstream identity metadata is absent, while anonymous direct-proxy upstreams report a clear namespace error
+- **New**: Experimental Skills over MCP authoring discovers `skills/`, supports explicit disable and directory configuration, SEP-2640 resource methods, development reloads, and build-time embedding
+- **New**: Authenticated WebSocket tunneling is published as a standalone package and bundled into `mcp-use dev/start --tunnel`, with bounded HTTP, streaming, MCP JSON-RPC, and public WebSocket forwarding
+- **Enhancement**: `mcp-use dev` reconciles server and v2 view changes as coherent project generations, so stale reload candidates cannot replace the active handler or publish outdated catalogs
+- **Update** (@mcp-use/cli): CLI implementation and tests now live in `@mcp-use/cli` while preserving the `mcp-use` command and server API; Windows path handling and bundled SDK/license packaging are covered
+- **Enhancement** (@mcp-use/cli): Skills over MCP discovery in Inspector filters invalid skills from fresh development snapshots
+- **Fix**: Next.js Turbopack builds resolve the Skills over MCP loader correctly (`#2197`)
+- **Enhancement** (@mcp-use/inspector): typed Skills operations, a capability-gated file explorer with integrity verification, the `window.openai` compatibility bridge, and related runtime fixes; see the Inspector changelog
+- **Fix** (create-mcp-use-app): clear unused TypeScript export surface flagged by Knip without changing published package entry APIs
+- **Update**: Updated @mcp-use/inspector to v20.1.0
+- **Update**: Updated @mcp-use/cli to v4.1.0
+- **Update**: Updated create-mcp-use-app to v2.0.2
+</Update>
+
+<Update label="v2.0.4" description="August 2026">
+  ## Stable npm README links
+  Patch release fixing absolute links in the published package documentation.
+
+- **Fix**: README images and repository links use stable absolute URLs so npm renders the published package documentation correctly
+- **Update**: Updated @mcp-use/inspector to v20.0.4
+</Update>
+
+<Update label="v2.0.3" description="August 2026">
+  ## Stable package README metadata
+  Patch release making the published package README reliable on npm.
+
+- **Fix**: Publish a package-root README and verify that it stays synchronized with the repository README before packing
+- **Update**: Updated @mcp-use/inspector to v20.0.3
+</Update>
+
+<Update label="v2.0.0" description="August 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=2.0.0&title=MCP%20SDK%20v2%20%26%20server%20tooling&date=2026-08&lang=typescript" alt="Release 2.0.0" />
+  </Frame>
+  ## MCP SDK v2 & server tooling
+  Major release migrating the TypeScript stack to the official MCP SDK v2 and introducing the v2 server, views, CLI, and scaffold architecture.
+
+- **Update**: The client and agent stack moves to the official MCP SDK v2, with automatic protocol negotiation, redesigned OAuth handling, ESM-only packages, a Node.js 22.22.2+ floor, and removal of v1 API aliases
+- **New**: The v2 server exposes a fetch-native Hono surface with typed MCP middleware, observers, CORS, OpenAPI generation, a Next.js adapter, request-scoped helpers, and production `build`/`start` tooling
+- **New**: The v2 views runtime adds typed `ToolRef`/`useCallTool` registration, file-based views, external or inline assets, shared React runtime handling, and managed Inspector integration
+- **Enhancement** (@mcp-use/cli): the CLI becomes ESM, adds `client connect --negotiate`, automatic client SDK installation, `mcp-use typecheck`, device-code login, and production tunneling
+- **Enhancement** (create-mcp-use-app): v2 templates use `mcp-server`, `views/`, `mcp-env.d.ts`, Bun-aware installs, and opt-in source maps while retaining the `starter` template as a deprecated alias
+- **Enhancement** (@mcp-use/inspector): the v2 Inspector adds project-pinned relay/OAuth tooling, hosted and local chat, immutable CDN assets, and MCP Apps/fullscreen improvements; see the Inspector changelog
+- **Update**: Updated @mcp-use/inspector to v20.0.0
+- **Update**: Updated @mcp-use/cli to v4.0.0
+- **Update**: Updated create-mcp-use-app to v2.0.0
+</Update>
+
+<Update label="v1.34.3" description="July 2026">
+  ## Tunneling docs link
+  Patch release fixing the tunnel popover documentation link.
+
+- **Documentation** (@mcp-use/inspector): the tunnel popover now links to `https://mcp-use.com/docs/tunneling` instead of the removed Manufact URL
+- **Update**: Updated @mcp-use/inspector to v12.0.3
+- **Update**: Updated @mcp-use/cli to v3.6.4
+</Update>
+
+<Update label="v1.34.2" description="July 2026">
+  ## Backend-less Inspector CDN shell
+  Patch release improving the Inspector bundle used by the SDK v2 backend-less shell.
+
+- **Fix** (@mcp-use/inspector): CDN auto-connect reads the URL injected by the SDK v2 shell, while the version badge and MCP `clientInfo` fall back to the compile-time bundle version when runtime injection is absent
+- **Update**: Updated @mcp-use/inspector to v12.0.2
+- **Update**: Updated @mcp-use/cli to v3.6.3
+</Update>
+
 <Update label="v1.34.1" description="July 2026">
   ## Hosted OAuth discovery through the proxy
   Patch release fixing the Authenticate button on gateway-hosted OAuth servers when MCP traffic is proxied for CORS.
 
 - **Fix** (auth): `BrowserOAuthClientProvider` re-anchors proxy-origin `.well-known` OAuth discovery onto the actual MCP server. When MCP is tunneled through the inspector/gateway proxy, the SDK derived discovery URLs from the proxy origin whenever no `WWW-Authenticate` hint was available (SSE transport, token refresh) — discovery failed on the proxy origin and the server was misclassified as "does not support OAuth". Lookups are now rewritten to the server origin (including the RFC 8414 §3.1 / RFC 9728 §3.1 path-insertion form), so MCP traffic can stay behind the proxy while OAuth still resolves (`#1843`)
+- **Update**: Updated @mcp-use/inspector to v12.0.1
+- **Update**: Updated @mcp-use/cli to v3.6.2
 </Update>
 
 <Update label="v1.34.0" description="July 2026">

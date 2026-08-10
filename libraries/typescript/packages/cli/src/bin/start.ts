@@ -1,5 +1,5 @@
 /**
- * Inline implementation of `mcp-use start` (specs/CLI_SPEC.md).
+ * Inline implementation of `mcp-use start`.
  *
  * Serves a production build from `.mcp-use/build/` with zero toolchain
  * dependencies: read the manifest, import the built entry, call `listen()`
@@ -15,8 +15,8 @@ import { loadProjectEnv } from "../cli/next-compat.js";
 import type { FetchHandler } from "../fetch-app.js";
 
 /*
- * Workspace constants, re-declared per CLI_SPEC.md ("Same names,
- * re-declared") — never imported from the old `mcp-use` package.
+ * Workspace constants are re-declared rather than imported from the old
+ * `mcp-use` package.
  */
 const WORKSPACE_DIR_NAME = ".mcp-use";
 const BUILD_SUBDIR_NAME = "build";
@@ -177,7 +177,13 @@ export async function runStart(options: StartOptions): Promise<StartedServer> {
       // eslint-disable-next-line import/no-extraneous-dependencies
       const { createTunnelManager } = await import("@mcp-use/tunnel");
       tunnel = createTunnelManager(
-        join(options.cwd, WORKSPACE_DIR_NAME, "state", "tunnel.json")
+        join(options.cwd, WORKSPACE_DIR_NAME, "state", "tunnel.json"),
+        {
+          // The authenticated tunnel is the public edge. Keep the original
+          // hostname in X-Forwarded-Host while presenting a loopback Host to
+          // the localhost listener's DNS-rebinding protection.
+          localHostHeader: "localhost",
+        }
       );
       const tunnelInfo = await tunnel.start(boundPort);
       const endpoint = new URL(url);

@@ -124,6 +124,21 @@ describe("runBuild", () => {
     });
   });
 
+  it("strictly rejects invalid skills during a production build", async () => {
+    const cwd = copyFixture("build-skills");
+    dirs.push(cwd);
+    const skillDir = join(cwd, "skills", "refunds");
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(
+      join(skillDir, "SKILL.md"),
+      "---\nname: not-refunds\ndescription: Invalid\n---\n"
+    );
+
+    await expect(runBuild({ cwd })).rejects.toThrow(
+      /frontmatter name must match its parent directory/
+    );
+  });
+
   it("emits an ESM bundle + manifest to .mcp-use/build and preserves the default export", async () => {
     const cwd = copyFixture("build");
     dirs.push(cwd);
@@ -156,7 +171,7 @@ describe("runBuild", () => {
     expect(existsSync(entryFile)).toBe(true);
     expect(existsSync(`${entryFile}.map`)).toBe(false);
 
-    // Manifest shape per CLI_SPEC.md § Commands → build.
+    // Verify the build manifest shape.
     const manifest = JSON.parse(
       readFileSync(join(buildDir, BUILD_MANIFEST_NAME), "utf8")
     ) as BuildManifest;

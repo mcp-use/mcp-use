@@ -2,7 +2,7 @@
  * Hand-rolled argv parsing for the `mcp-use` bin.
  *
  * Deliberately dependency-free (no commander): the bin must add zero runtime
- * dependencies to the package (see specs/CLI_SPEC.md, dependency rules).
+ * dependencies to the package.
  */
 import { resolveListenHost, resolveListenPort } from "../listen-address.js";
 
