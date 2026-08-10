@@ -269,7 +269,7 @@ Ship to [Manufact](https://manufact.com) and get observability, analytics, evals
 npm run deploy
 ```
 
-Prefer to run it yourself? Follow the [self-hosting guide →](https://mcpuse-codex-v1-v2-docs-split.mintlify.site/v2/typescript/server/deployment/runtime-patterns).
+Prefer to run it yourself? Follow the [self-hosting guide →](https://docs.mcp-use.com/typescript/server/deployment/runtime-patterns).
 
 ## How mcp-use compares
 
