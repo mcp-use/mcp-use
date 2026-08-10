@@ -9,7 +9,11 @@
 import "./telemetry/configure-node.js";
 
 export { auth, UnauthorizedError } from "@modelcontextprotocol/client";
-export { completeOAuthFlow, isUnauthorized } from "./auth/flow.js";
+export {
+  completeOAuthFlow,
+  isOAuthInteractionRequired,
+  isUnauthorized,
+} from "./auth/flow.js";
 export {
   createOAuthProvider,
   NodeOAuthClientProvider,

@@ -9,6 +9,8 @@ import {
   Check,
   Copy,
   History,
+  Loader2,
+  LockKeyhole,
   Maximize,
   Minimize,
   Play,
@@ -27,6 +29,7 @@ export interface ToolResult {
   args: Record<string, unknown>;
   result: any;
   error?: string;
+  authorizationRequired?: boolean;
   timestamp: number;
   duration?: number;
   // Tool metadata from definition (_meta field)
@@ -48,6 +51,9 @@ interface ToolResultDisplayProps {
   onMaximize?: () => void;
   isMaximized?: boolean;
   onRerunTool?: () => void;
+  onAuthenticateAndRerun?: () => Promise<void> | void;
+  isAuthenticating?: boolean;
+  authorizationError?: string | null;
   onWidgetHeightChange?: (height: number | null) => void;
 }
 
@@ -382,6 +388,9 @@ export function ToolResultDisplay({
   onMaximize,
   isMaximized = false,
   onRerunTool,
+  onAuthenticateAndRerun,
+  isAuthenticating = false,
+  authorizationError,
   onWidgetHeightChange,
 }: ToolResultDisplayProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -696,6 +705,45 @@ export function ToolResultDisplay({
           </div>
 
           {(() => {
+            if (result.authorizationRequired) {
+              return (
+                <div
+                  role="alert"
+                  data-testid="tool-result-auth-required"
+                  className="mx-4 mt-4 flex flex-col gap-3 rounded-md border border-amber-300/60 bg-amber-50 p-3 text-amber-950 sm:flex-row sm:items-start dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-100"
+                >
+                  <LockKeyhole className="mt-0.5 size-4 shrink-0" aria-hidden />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium">Authentication required</p>
+                    <p className="mt-0.5 text-sm opacity-90">
+                      Authenticate to use this tool. The Inspector will rerun it
+                      automatically after authorization.
+                    </p>
+                    {authorizationError && (
+                      <p className="mt-1 text-xs text-red-700 dark:text-red-300">
+                        {authorizationError}
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    data-testid="tool-result-authenticate-rerun"
+                    size="sm"
+                    onClick={() => void onAuthenticateAndRerun?.()}
+                    disabled={!onAuthenticateAndRerun || isAuthenticating}
+                  >
+                    {isAuthenticating ? (
+                      <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                    ) : (
+                      <LockKeyhole className="size-3.5" aria-hidden />
+                    )}
+                    {isAuthenticating
+                      ? "Authenticating…"
+                      : "Authenticate and rerun"}
+                  </Button>
+                </div>
+              );
+            }
+
             // Check for error in result.error or result.result.isError
             const errorMessage =
               result.error || extractErrorMessage(result.result);

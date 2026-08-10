@@ -1,5 +1,11 @@
 import type { McpServer } from "@mcp-use/client/react";
-import { useEffect, useState, type ReactNode, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { useManufactAuth } from "@/client/auth/manufact-auth";
 import { ChatTab } from "@/client/components/ChatTab";
 import { ConnectionSettingsTab } from "@/client/components/ConnectionSettingsTab";
@@ -12,6 +18,7 @@ import { SamplingTab } from "@/client/components/SamplingTab";
 import { ServerMetadataTab } from "@/client/components/ServerMetadataTab";
 import { ToolsTab } from "@/client/components/ToolsTab";
 import { useInspector } from "@/client/context/InspectorContext";
+import { storeInspectorReconnectSession } from "@/client/hooks/useAutoConnect";
 import type { TabType } from "@/client/context/InspectorContext";
 import { isInspectorSamplingAvailable } from "@/client/utils/samplingProtocol";
 import { isLocalhostServerUrl } from "@/client/utils/servers";
@@ -124,6 +131,12 @@ export function LayoutContent({
           }
         : undefined));
 
+  const authenticateSelectedServer = useCallback(async () => {
+    if (!selectedServer) return;
+    storeInspectorReconnectSession(selectedServer);
+    await selectedServer.authenticate();
+  }, [selectedServer]);
+
   // When forceConnected is enabled, render the chat tab directly without a
   // real server connection. The backend (chatApiUrl) manages everything.
   if (!selectedServer && embeddedConfig.forceConnected) {
@@ -212,6 +225,8 @@ export function LayoutContent({
             readResource={selectedServer.readResource}
             serverId={selectedServer.id}
             isConnected={selectedServer.state === "ready"}
+            authenticate={authenticateSelectedServer}
+            isAuthenticating={selectedServer.state === "authenticating"}
             refreshTools={selectedServer.refreshTools}
           />
         </div>

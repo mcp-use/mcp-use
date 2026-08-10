@@ -15,6 +15,28 @@ import { getInspectorBase } from "@/client/utils/basePath";
 /** Survives full page reload; avoids fragile long JSON in query (was resolving to localhost + http). */
 export const INSPECTOR_RECONNECT_STORAGE_KEY = "__mcpUseInspectorReconnect";
 
+/**
+ * Preserve enough connection configuration to restore the Inspector after a
+ * full-page OAuth redirect.
+ */
+export function storeInspectorReconnectSession(
+  server: Pick<McpServer, "url" | "name"> & { transportType?: string }
+): void {
+  try {
+    sessionStorage.setItem(
+      INSPECTOR_RECONNECT_STORAGE_KEY,
+      JSON.stringify({
+        url: server.url,
+        name: server.name || "Auto-connected Server",
+        transportType: server.transportType === "sse" ? "sse" : "http",
+        connectionMode: "auto",
+      })
+    );
+  } catch {
+    // sessionStorage unavailable — best-effort
+  }
+}
+
 /** Sync check on first paint — avoids a dashboard flash before useAutoConnect runs. */
 export function detectPendingAutoConnect(search?: string): boolean {
   const resolvedSearch =

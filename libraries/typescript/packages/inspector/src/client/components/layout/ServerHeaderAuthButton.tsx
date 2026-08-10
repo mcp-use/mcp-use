@@ -1,28 +1,11 @@
 import { Button } from "@/client/components/ui/button";
-import { INSPECTOR_RECONNECT_STORAGE_KEY } from "@/client/hooks/useAutoConnect";
+import { storeInspectorReconnectSession } from "@/client/hooks/useAutoConnect";
 import { cn } from "@/client/lib/utils";
 import type { McpServer } from "@mcp-use/client/react";
 import { Loader2 } from "lucide-react";
 
 const AUTH_BUTTON_CLASS =
   "h-6 px-2 text-xs bg-yellow-500/20 border-0 dark:bg-yellow-400/10 text-yellow-800 dark:text-yellow-500 shrink-0";
-
-function storeReconnectSession(server: McpServer) {
-  try {
-    sessionStorage.setItem(
-      INSPECTOR_RECONNECT_STORAGE_KEY,
-      JSON.stringify({
-        url: server.url,
-        name: server.name || "Auto-connected Server",
-        transportType:
-          (server as { transportType?: string }).transportType || "http",
-        connectionMode: "auto",
-      })
-    );
-  } catch {
-    /* sessionStorage unavailable — best-effort */
-  }
-}
 
 /** Compact Authenticate / Authenticating control for the inspector server header. */
 export function ServerHeaderAuthButton({
@@ -69,7 +52,7 @@ export function ServerHeaderAuthButton({
         className={cn(AUTH_BUTTON_CLASS, className)}
         onClick={(e) => {
           e.stopPropagation();
-          storeReconnectSession(server);
+          storeInspectorReconnectSession(server);
           void authenticate();
         }}
       >
@@ -104,7 +87,7 @@ export function ServerHeaderAuthButton({
             data-testid="server-header-authenticate"
             onClick={(e) => {
               e.stopPropagation();
-              storeReconnectSession(server);
+              storeInspectorReconnectSession(server);
             }}
           />
         }
