@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.1.1-canary.4
+
+### Patch Changes
+
+- b4caaa3: Surface mixed-auth state when protected resource, prompt, skill, completion, or refresh operations require OAuth, so React clients retain their ready anonymous connection and can present authentication for every challenged operation.
+
 ## 2.1.1-canary.3
 
 ### Patch Changes

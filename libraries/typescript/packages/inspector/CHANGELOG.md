@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 20.1.1-canary.3
+
+### Patch Changes
+
+- e05cf0d: Keep hosted mixed-auth tool calls on the browser MCP connection, pause them in Inspector chat with an amber Authenticate action, resume the same client-side chat turn after popup authorization, and automatically replay an interrupted turn after a full-page OAuth redirect.
+
 ## 20.1.1-canary.2
 
 ### Patch Changes
