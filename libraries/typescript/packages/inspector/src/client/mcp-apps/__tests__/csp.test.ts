@@ -23,6 +23,17 @@ describe("CSP diagnostics", () => {
     expect(policy).toContain("frame-src 'none'");
   });
 
+  it("reports an explicitly declared Vite development eval directive", () => {
+    const policy = buildCSPString({
+      resourceDomains: ["https://sandbox.example.com"],
+      scriptDirectives: ["'unsafe-eval'"],
+    });
+
+    expect(policy).toContain(
+      "script-src 'unsafe-inline' data: blob: https://sandbox.example.com 'unsafe-eval'"
+    );
+  });
+
   it("diffs requested and effective policies", () => {
     const requested = getRequestedCspPolicy({
       connectDomains: ["https://api.example.com"],

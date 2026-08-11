@@ -109,4 +109,22 @@ describe("buildMergedResourceCsp", () => {
 
     expect(csp.resourceDomains).toEqual(["https://server.example.com"]);
   });
+
+  it("allows the Vite eval runtime only when HMR is enabled", () => {
+    delete process.env.CSP_URLS;
+    const regular = buildMergedResourceCsp(undefined, {
+      serverOrigin: "https://server.example.com",
+      assetsOrigin: "https://server.example.com",
+      explicitAssetsBase: false,
+    }) as { scriptDirectives?: string[] };
+    const hmr = buildMergedResourceCsp(undefined, {
+      serverOrigin: "https://server.example.com",
+      assetsOrigin: "https://server.example.com",
+      explicitAssetsBase: false,
+      hmrWs: true,
+    }) as { scriptDirectives?: string[] };
+
+    expect(regular.scriptDirectives).toBeUndefined();
+    expect(hmr.scriptDirectives).toEqual(["'unsafe-eval'"]);
+  });
 });

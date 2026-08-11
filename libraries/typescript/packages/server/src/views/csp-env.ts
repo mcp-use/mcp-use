@@ -2,6 +2,11 @@ import type { McpUiResourceCsp } from "@modelcontextprotocol/ext-apps";
 
 import type { ViewResourceFacts } from "./types.js";
 
+type McpUseResourceCsp = McpUiResourceCsp & {
+  /** Inspector-host extension used only by the Vite development runtime. */
+  scriptDirectives?: string[];
+};
+
 type CspCategory =
   | "connectDomains"
   | "resourceDomains"
@@ -104,7 +109,7 @@ export function buildMergedResourceCsp(
   authorFacts: ViewResourceFacts | undefined,
   options: BuildCspOptions
 ): McpUiResourceCsp {
-  const author = authorFacts?.csp;
+  const author = authorFacts?.csp as McpUseResourceCsp | undefined;
 
   const mcpConnectAuto: string[] = [];
   if (options.serverOrigin !== "") {
@@ -143,6 +148,10 @@ export function buildMergedResourceCsp(
     author?.baseUriDomains ?? [],
     readEnvDomainsForCategory("baseUriDomains")
   );
+  const scriptDirectives = mergeDomainLists(
+    author?.scriptDirectives ?? [],
+    options.hmrWs === true ? ["'unsafe-eval'"] : []
+  );
 
   return {
     ...author,
@@ -150,5 +159,6 @@ export function buildMergedResourceCsp(
     resourceDomains,
     frameDomains,
     baseUriDomains,
-  };
+    ...(scriptDirectives.length > 0 ? { scriptDirectives } : {}),
+  } as McpUseResourceCsp;
 }

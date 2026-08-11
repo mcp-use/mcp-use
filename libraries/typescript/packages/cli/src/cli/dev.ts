@@ -89,6 +89,21 @@ type WebHandler = (request: Request) => Promise<Response>;
 /** Coalesce one editor save burst before reconciling a project generation. */
 const RELOAD_SETTLE_MS = 50;
 
+/** Whether two discovery snapshots describe the same view module graph. */
+function sameDiscoveredViews(
+  left: readonly DiscoveredView[],
+  right: readonly DiscoveredView[]
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every(
+      (view, index) =>
+        view.name === right[index]?.name &&
+        view.entryPath === right[index]?.entryPath
+    )
+  );
+}
+
 /**
  * The duck-typed shape the entry's default export must satisfy: an
  * `MCPServer` instance (checked structurally so the runner may load its own
@@ -247,6 +262,7 @@ function appendVaryOrigin(res: ServerResponse): void {
  * CORS for Vite-served module-graph URLs on the dev listener.
  *
  * Tunnel active → `Access-Control-Allow-Origin: *` (foreign / opaque hosts).
+ * Public/wildcard bind → `*` (the listener is intentionally network-visible).
  * No tunnel on a localhost bind → reflect a validated loopback `Origin`
  * (exact value) and set `Vary: Origin`; reflect `null` for opaque sandbox
  * iframes; foreign or missing Origin get no ACAO.
@@ -266,6 +282,7 @@ function applyViteModuleCors(
     return;
   }
   if (!options.localhostBind) {
+    res.setHeader("Access-Control-Allow-Origin", "*");
     return;
   }
   const originHeader = req.headers.origin;
@@ -446,6 +463,12 @@ export async function runDev(options: DevOptions): Promise<void> {
       : [nextStandaloneCompatPlugin(options.cwd)],
     server: {
       middlewareMode: true,
+      // A public/wildcard bind deliberately accepts hostnames that are only
+      // known to the surrounding platform (for example a sandbox URL). Keep
+      // Vite's own static Host allowlist aligned with the listener boundary;
+      // localhost binds retain the stricter default and our dynamic tunnel
+      // path rewrites an authorized tunnel Host to localhost below.
+      ...(!localhostBind && { allowedHosts: true }),
       // Windows file notifications can be coalesced or dropped while Vite is
       // transforming the same module. Polling keeps dev reloads reliable.
       ...(process.platform === "win32" && {
@@ -606,6 +629,7 @@ export async function runDev(options: DevOptions): Promise<void> {
   let desiredRevision = 0;
   let reconciling = false;
   let reloadTimer: ReturnType<typeof setTimeout> | undefined;
+  let viewsDiscoveryTimer: ReturnType<typeof setTimeout> | undefined;
   let skillsReloadTimer: ReturnType<typeof setTimeout> | undefined;
   const isAborted = (): boolean => options.signal?.aborted === true;
 
@@ -714,12 +738,28 @@ export async function runDev(options: DevOptions): Promise<void> {
     scheduleReconcile();
   };
 
+  const scheduleViewsRediscovery = (): void => {
+    if (viewsDiscoveryTimer !== undefined) clearTimeout(viewsDiscoveryTimer);
+    // Remote editors commonly save by replacing the file, which can surface
+    // as unlink + add instead of change. Let the save burst settle and only
+    // rebuild the MCP server when the discovered view registry actually
+    // changed. Content-only replacements remain on Vite's client HMR path,
+    // preserving the mounted view and its React state.
+    viewsDiscoveryTimer = setTimeout(() => {
+      viewsDiscoveryTimer = undefined;
+      const discovered = discoverViews(options.cwd, viewsDirectory);
+      if (!sameDiscoveredViews(currentViews, discovered)) {
+        scheduleReconcile();
+      }
+    }, RELOAD_SETTLE_MS);
+  };
+
   const onViewFilesystemEvent = (file: string): void => {
     if (!isViewPath(file, options.cwd, viewsDirectory)) {
       return;
     }
 
-    scheduleReconcile();
+    scheduleViewsRediscovery();
   };
 
   const onFileAddOrUnlink = (file: string): void => {
@@ -779,7 +819,8 @@ export async function runDev(options: DevOptions): Promise<void> {
   // URLs (onRequest below) emit `*` while a tunnel is active; without a tunnel,
   // localhost binds reflect a validated loopback Origin (exact value +
   // `Vary: Origin`) so a local MCP host can load the module graph, while
-  // foreign / opaque / missing Origin get no ACAO.
+  // foreign / opaque / missing Origin get no ACAO. Public/wildcard binds are
+  // intentionally network-visible and emit `*`, matching a public tunnel.
   const rejectDisallowedRequest = (
     req: IncomingMessage,
     res: ServerResponse
@@ -812,6 +853,7 @@ export async function runDev(options: DevOptions): Promise<void> {
    */
   const teardown = async (): Promise<void> => {
     if (skillsReloadTimer !== undefined) clearTimeout(skillsReloadTimer);
+    if (viewsDiscoveryTimer !== undefined) clearTimeout(viewsDiscoveryTimer);
     vite.watcher.off("change", onSsrFileEvent);
     vite.watcher.off("add", onFileAddOrUnlink);
     vite.watcher.off("unlink", onFileAddOrUnlink);

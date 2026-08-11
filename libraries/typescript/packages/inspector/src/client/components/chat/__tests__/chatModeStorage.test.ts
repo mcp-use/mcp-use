@@ -65,6 +65,12 @@ describe("chatModeStorage", () => {
     expect(resolveInitialForceClientSide(true, null)).toBe(false);
   });
 
+  it("lets an embedded host lock its managed stream over stored BYOK mode", () => {
+    writeStoredChatMode("byok");
+
+    expect(resolveInitialForceClientSide(true, null, true)).toBe(false);
+  });
+
   it("stored managed mode wins over legacy llm-config", () => {
     localStorage.setItem(
       "mcp-inspector-llm-config",
