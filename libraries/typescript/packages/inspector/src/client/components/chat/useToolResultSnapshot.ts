@@ -1,6 +1,6 @@
 import { useRef } from "react";
 
-export interface ToolResultSnapshot<T> {
+interface ToolResultSnapshot<T> {
   fingerprint: string;
   value: T;
 }
