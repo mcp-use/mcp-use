@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 20.1.2-canary.2
+
+### Patch Changes
+
+- 1a277b1: Drop four exports that nothing imports, and declare the `jsdom` devDependency the inspector tool-execution test already relies on through its `@vitest-environment jsdom` pragma. The dropped exports are used only inside their own modules, so this is not a change to any reachable API.
+
 ## 20.1.2-canary.1
 
 ### Patch Changes
