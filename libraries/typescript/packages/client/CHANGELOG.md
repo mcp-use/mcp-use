@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.1.2-canary.0
+
+### Patch Changes
+
+- f18ba62: Replay MCP App invocation state when a Vite or React development runtime initializes a replacement guest App inside the existing iframe.
+
 ## 2.1.1
 
 ### Patch Changes

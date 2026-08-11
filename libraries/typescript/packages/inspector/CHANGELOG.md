@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 20.1.2-canary.1
+
+### Patch Changes
+
+- @mcp-use/agent@2.0.4-canary.0
+
 ## 20.1.2-canary.0
 
 ### Patch Changes

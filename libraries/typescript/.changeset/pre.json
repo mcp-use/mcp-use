@@ -16,6 +16,7 @@
     "cold-views-warm",
     "quiet-pandas-refresh",
     "swift-widgets-refresh",
+    "tidy-widgets-render",
     "warm-zebras-compile"
   ]
 }
