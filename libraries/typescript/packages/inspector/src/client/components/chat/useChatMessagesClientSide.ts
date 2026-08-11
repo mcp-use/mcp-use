@@ -4,7 +4,11 @@ import {
   providerConfigFromOptions,
   type McpConnectionLike,
 } from "@mcp-use/agent";
-import type { McpServer, Skill } from "@mcp-use/client/react";
+import {
+  isOAuthInteractionRequired,
+  type McpServer,
+  type Skill,
+} from "@mcp-use/client/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PromptResult } from "../../hooks/useMCPPrompts";
 import {
@@ -40,6 +44,12 @@ import {
   buildSkillSystemContext,
   createSkillContextConnection,
 } from "./skill-context";
+import {
+  clearPendingChatTurn,
+  readPendingChatTurn,
+  savePendingChatTurn,
+  type PendingChatTurn,
+} from "./chat-auth-retry";
 
 // Type alias for backward compatibility
 type MCPConnection = McpServer;
@@ -69,7 +79,13 @@ export function useChatMessagesClientSide({
   systemPrompt = DEFAULT_CHAT_SYSTEM_PROMPT,
   skills = [],
 }: UseChatMessagesClientSideProps) {
-  const [messages, setMessages] = useState<Message[]>(initialMessages ?? []);
+  const retryServerId = connection.id ?? connection.url;
+  const [initialPendingTurn] = useState(() =>
+    readPendingChatTurn(retryServerId)
+  );
+  const [messages, setMessages] = useState<Message[]>(
+    () => initialPendingTurn?.baseMessages ?? initialMessages ?? []
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
   const [traceState, setTraceState] = useState(EMPTY_TRACE_STATE);
@@ -78,6 +94,22 @@ export function useChatMessagesClientSide({
   const abortControllerRef = useRef<AbortController | null>(null);
   const sendInProgressRef = useRef(false);
   const traceIdRef = useRef(0);
+  const initialPendingTurnRef = useRef(initialPendingTurn);
+  const authorizationGateRef = useRef<{
+    toolCallId: string;
+    resolve: () => void;
+    reject: (error: Error) => void;
+  } | null>(null);
+  const [pendingAuthorization, setPendingAuthorization] = useState<{
+    toolCallId: string;
+    replay: Omit<PendingChatTurn, "savedAt">;
+  } | null>(null);
+  const [authenticatingToolCallId, setAuthenticatingToolCallId] = useState<
+    string | null
+  >(null);
+  const [toolAuthorizationError, setToolAuthorizationError] = useState<
+    string | null
+  >(null);
 
   const recordTrace = useCallback((event: InspectorTraceEventInput) => {
     const next = {
@@ -89,6 +121,7 @@ export function useChatMessagesClientSide({
   }, []);
 
   useEffect(() => {
+    if (initialPendingTurnRef.current) return;
     if (initialMessages !== undefined) {
       setMessages(initialMessages);
     }
@@ -101,7 +134,10 @@ export function useChatMessagesClientSide({
       extraAttachments?: MessageAttachment[],
       options?: SendMessageOptions
     ) => {
-      const allAttachments = [...attachments, ...(extraAttachments ?? [])];
+      const isResuming = options?.resumeExistingTurn === true;
+      const allAttachments = isResuming
+        ? (extraAttachments ?? [])
+        : [...attachments, ...(extraAttachments ?? [])];
       const hasContent =
         userInput.trim() ||
         promptResults.length > 0 ||
@@ -145,7 +181,12 @@ export function useChatMessagesClientSide({
         userMessages.push(userMessage);
       }
 
-      setMessages((prev) => [...prev, ...userMessages]);
+      const baseMessages = isResuming
+        ? messages
+        : [...messages, ...userMessages];
+      if (!isResuming) {
+        setMessages(baseMessages);
+      }
       setIsLoading(true);
       setAttachments([]);
 
@@ -170,7 +211,12 @@ export function useChatMessagesClientSide({
             toolName: string;
             args: Record<string, unknown>;
             result?: any;
-            state?: "pending" | "streaming" | "result" | "error";
+            state?:
+              | "pending"
+              | "streaming"
+              | "authorization-required"
+              | "result"
+              | "error";
             partialArgs?: Record<string, unknown>;
           };
         }> = [];
@@ -203,12 +249,7 @@ export function useChatMessagesClientSide({
           },
         ]);
 
-        const hasImageAttachments = (userMessage.attachments?.length ?? 0) > 0;
-        const historyMessages = [
-          ...messages,
-          ...promptResultsMessages,
-          ...(userInput.trim() || hasImageAttachments ? [userMessage] : []),
-        ];
+        const historyMessages = baseMessages;
 
         const serializedWidgetContext = serializeWidgetModelContexts(
           widgetModelContexts ?? new Map()
@@ -236,6 +277,93 @@ export function useChatMessagesClientSide({
           getSkill: connection.getSkill,
           readResource: connection.readResource,
         });
+        const commitMessageParts = () => {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantMessageId
+                ? { ...msg, parts: [...parts] }
+                : msg
+            )
+          );
+        };
+        const replayTurn: Omit<PendingChatTurn, "savedAt"> = {
+          serverId: retryServerId,
+          userInput,
+          promptResults,
+          attachments: allAttachments,
+          baseMessages,
+        };
+        const authAwareConnection: MCPConnection = {
+          ...connection,
+          callTool: async (toolName, args) => {
+            let authorizationAttempts = 0;
+            while (true) {
+              try {
+                return await connection.callTool(toolName, args);
+              } catch (error) {
+                if (
+                  !isOAuthInteractionRequired(error) ||
+                  authorizationAttempts >= 1
+                ) {
+                  throw error;
+                }
+                authorizationAttempts++;
+
+                const toolPart = [...parts]
+                  .reverse()
+                  .find(
+                    (part) =>
+                      part.type === "tool-invocation" &&
+                      part.toolInvocation?.toolName === toolName &&
+                      part.toolInvocation.state === "pending"
+                  );
+                const toolCallId = toolPart?.toolInvocation?.toolCallId;
+                if (!toolPart?.toolInvocation || !toolCallId) throw error;
+
+                toolPart.toolInvocation.state = "authorization-required";
+                setPendingAuthorization({ toolCallId, replay: replayTurn });
+                setToolAuthorizationError(null);
+                commitMessageParts();
+
+                await new Promise<void>((resolve, reject) => {
+                  const signal = abortControllerRef.current?.signal;
+                  const handleAbort = () => {
+                    if (
+                      authorizationGateRef.current?.toolCallId === toolCallId
+                    ) {
+                      authorizationGateRef.current = null;
+                    }
+                    reject(
+                      new DOMException("Chat turn was cancelled", "AbortError")
+                    );
+                  };
+                  const cleanup = () =>
+                    signal?.removeEventListener("abort", handleAbort);
+                  authorizationGateRef.current = {
+                    toolCallId,
+                    resolve: () => {
+                      cleanup();
+                      resolve();
+                    },
+                    reject: (gateError) => {
+                      cleanup();
+                      reject(gateError);
+                    },
+                  };
+                  signal?.addEventListener("abort", handleAbort, {
+                    once: true,
+                  });
+                });
+
+                toolPart.toolInvocation.state = "pending";
+                setPendingAuthorization(null);
+                setToolAuthorizationError(null);
+                clearPendingChatTurn(retryServerId);
+                commitMessageParts();
+              }
+            }
+          },
+        };
         const agent = new MCPAgent({
           llm: providerConfigFromOptions(llmConfig.provider, llmConfig.model, {
             apiKey: llmConfig.apiKey,
@@ -245,7 +373,7 @@ export function useChatMessagesClientSide({
           }),
           mcpServers: [
             ...(skillConnection ? [skillConnection] : []),
-            connection,
+            authAwareConnection,
             ...(appToolConnections ?? []),
           ],
           systemPrompt: `${systemPrompt}${buildSkillSystemContext(
@@ -259,15 +387,6 @@ export function useChatMessagesClientSide({
           maxSteps: 10,
           autoInitialize: true,
         });
-        const commitMessageParts = () => {
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === assistantMessageId
-                ? { ...msg, parts: [...parts] }
-                : msg
-            )
-          );
-        };
 
         for await (const ev of agent.streamEvents({
           messages: providerMessages,
@@ -526,16 +645,71 @@ export function useChatMessagesClientSide({
       appToolConnections,
       widgetModelContexts,
       recordTrace,
+      retryServerId,
       systemPrompt,
       skills,
     ]
   );
 
+  const authenticatePendingTool = useCallback(
+    async (toolCallId: string) => {
+      if (
+        pendingAuthorization?.toolCallId !== toolCallId ||
+        authenticatingToolCallId
+      ) {
+        return;
+      }
+
+      savePendingChatTurn(pendingAuthorization.replay);
+      setAuthenticatingToolCallId(toolCallId);
+      setToolAuthorizationError(null);
+      try {
+        await connection.authenticate();
+        const gate = authorizationGateRef.current;
+        if (gate?.toolCallId === toolCallId) {
+          authorizationGateRef.current = null;
+          gate.resolve();
+        }
+      } catch (error) {
+        clearPendingChatTurn(retryServerId);
+        setToolAuthorizationError(
+          error instanceof Error ? error.message : "Authentication failed"
+        );
+      } finally {
+        setAuthenticatingToolCallId(null);
+      }
+    },
+    [authenticatingToolCallId, connection, pendingAuthorization, retryServerId]
+  );
+
+  useEffect(() => {
+    const pendingTurn = initialPendingTurnRef.current;
+    if (!pendingTurn || !isConnected || !llmConfig) return;
+
+    initialPendingTurnRef.current = null;
+    clearPendingChatTurn(retryServerId);
+    setMessages(pendingTurn.baseMessages);
+    void sendMessage(
+      pendingTurn.userInput,
+      pendingTurn.promptResults,
+      pendingTurn.attachments,
+      { resumeExistingTurn: true }
+    );
+  }, [isConnected, llmConfig, retryServerId, sendMessage]);
+
   const clearMessages = useCallback(() => {
+    clearPendingChatTurn(retryServerId);
+    authorizationGateRef.current?.reject(
+      new DOMException("Chat turn was cancelled", "AbortError")
+    );
+    authorizationGateRef.current = null;
+    setPendingAuthorization(null);
+    setAuthenticatingToolCallId(null);
+    setToolAuthorizationError(null);
     setMessages([]);
     setTraceState(EMPTY_TRACE_STATE);
     setManagedChatNotice(null);
-  }, []);
+  }, [retryServerId]);
   const clearTrace = useCallback(() => setTraceState(EMPTY_TRACE_STATE), []);
 
   const stop = useCallback(() => {
@@ -598,5 +772,9 @@ export function useChatMessagesClientSide({
     clearTrace,
     traceEvents: traceState.events,
     tokenUsage: traceState.usage,
+    pendingAuthorization,
+    authenticatePendingTool,
+    authenticatingToolCallId,
+    toolAuthorizationError,
   };
 }

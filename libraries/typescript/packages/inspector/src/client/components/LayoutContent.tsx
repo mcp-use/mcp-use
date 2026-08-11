@@ -105,6 +105,7 @@ export function LayoutContent({
   const useManagedClientSide = selectedServer
     ? shouldUseManagedClientSide({
         isLoopback: isLoopbackServer,
+        isMixedAuth: selectedServer.authorization?.mode === "mixed",
         chatApiUrl: embeddedConfig.chatApiUrl,
         enableFreeTierUpgrade: embeddedConfig.chatEnableFreeTierUpgrade,
       })

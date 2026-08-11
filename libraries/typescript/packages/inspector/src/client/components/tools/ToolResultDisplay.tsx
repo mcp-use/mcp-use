@@ -737,6 +737,7 @@ export function ToolResultDisplay({
                       void onAuthenticateAndRerun?.(result.timestamp)
                     }
                     disabled={!canAuthenticateAndRerun || isAuthenticating}
+                    className="bg-amber-600 text-white hover:bg-amber-700 focus-visible:ring-amber-600 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-400"
                   >
                     {canAuthenticateAndRerun && isAuthenticating ? (
                       <Loader2 className="size-3.5 animate-spin" aria-hidden />
