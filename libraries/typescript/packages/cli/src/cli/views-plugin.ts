@@ -21,7 +21,18 @@ export const VIEW_REACT_DEDUPE = ["react", "react-dom"];
  */
 export const VIEW_REACT_OPTIMIZE_DEPS = {
   exclude: ["mcp-use/react"],
-  include: ["react", "react-dom", "react-dom/client"],
+  include: [
+    "react",
+    "react-dom",
+    "react-dom/client",
+    // The ESM view runtime must stay outside the optimizer so it shares the
+    // view's React dispatcher, but its non-React protocol dependencies are
+    // large enough that discovering them lazily makes Vite emit a full reload
+    // during every cold iframe boot. Pre-bundle those leaves up front so the
+    // first document can finish mounting and subsequent edits use Fast Refresh.
+    "mcp-use > @modelcontextprotocol/ext-apps",
+    "mcp-use > @modelcontextprotocol/server",
+  ],
 };
 
 /**
