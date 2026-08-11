@@ -62,7 +62,7 @@ import {
 } from "@/client/utils/localInspectorRecovery";
 import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
-import { INSPECTOR_RECONNECT_STORAGE_KEY } from "@/client/hooks/useAutoConnect";
+import { storeInspectorReconnectSession } from "@/client/hooks/useAutoConnect";
 import type { TabType } from "@/client/context/InspectorContext";
 import { ConnectionSettingsForm } from "./ConnectionSettingsForm";
 import type { CustomHeader } from "./CustomHeadersEditor";
@@ -883,23 +883,7 @@ export function InspectorDashboard() {
                           variant="outline"
                           onClick={(e) => {
                             e.stopPropagation();
-                            // Store connection config so trySessionReconnect() can
-                            // resume after an OAuth redirect (when ?autoConnect is absent).
-                            try {
-                              sessionStorage.setItem(
-                                INSPECTOR_RECONNECT_STORAGE_KEY,
-                                JSON.stringify({
-                                  url: connection.url,
-                                  name:
-                                    connection.name || "Auto-connected Server",
-                                  transportType:
-                                    (connection as any).transportType || "http",
-                                  connectionMode: "auto",
-                                })
-                              );
-                            } catch {
-                              /* sessionStorage unavailable — best-effort */
-                            }
+                            storeInspectorReconnectSession(connection);
                             // Generate a fresh request instead of navigating a
                             // persisted opaque auth URL whose callback and
                             // verifier can no longer be proven current.
@@ -919,23 +903,7 @@ export function InspectorDashboard() {
                               href={connection.authUrl}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                try {
-                                  sessionStorage.setItem(
-                                    INSPECTOR_RECONNECT_STORAGE_KEY,
-                                    JSON.stringify({
-                                      url: connection.url,
-                                      name:
-                                        connection.name ||
-                                        "Auto-connected Server",
-                                      transportType:
-                                        (connection as any).transportType ||
-                                        "http",
-                                      connectionMode: "auto",
-                                    })
-                                  );
-                                } catch {
-                                  /* sessionStorage unavailable — best-effort */
-                                }
+                                storeInspectorReconnectSession(connection);
                               }}
                             />
                           }

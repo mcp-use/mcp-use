@@ -77,6 +77,7 @@ export function useToolExecution({
   const [copiedResult, setCopiedResult] = useState<number | null>(null);
   const executingRef = useRef(false);
   const activeExecutionRef = useRef<AbortController | null>(null);
+  const cancelledExecutionsRef = useRef(new WeakSet<AbortController>());
   const shouldResumeAuthorizationRef = useRef(pendingAuthorization !== null);
   const [resumeVersion, setResumeVersion] = useState(0);
 
@@ -157,6 +158,9 @@ export function useToolExecution({
           ]);
         }
       } catch (error) {
+        if (cancelledExecutionsRef.current.has(controller)) {
+          return;
+        }
         const duration = Date.now() - startTime;
         captureInspectorEvent(
           new MCPToolExecutionEvent({
@@ -337,6 +341,7 @@ export function useToolExecution({
   const cancelExecution = useCallback(() => {
     const controller = activeExecutionRef.current;
     if (!controller) return;
+    cancelledExecutionsRef.current.add(controller);
     controller.abort();
     if (activeExecutionRef.current !== controller) return;
     activeExecutionRef.current = null;

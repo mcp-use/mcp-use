@@ -46,7 +46,7 @@ server.use("*", honoAdapter(oauthMetadata(provider, resource)));
 // A missing token therefore becomes a real HTTP 401 with resource_metadata in
 // WWW-Authenticate, which lets an OAuth-capable client authenticate and retry.
 server.use("/mcp", async (context, next) => {
-  if (!isProtectedToolCall(context.req.raw)) {
+  if (!(await isProtectedToolCall(context.req.raw))) {
     await next();
     return;
   }
@@ -146,9 +146,16 @@ function honoAdapter(middleware: FetchMiddleware): MiddlewareHandler {
     });
 }
 
-function isProtectedToolCall(request: Request): boolean {
+async function isProtectedToolCall(request: Request): Promise<boolean> {
   if (request.method !== "POST") return false;
-  const parsedBody = getRequestBag(request).parsedBody;
+  let parsedBody = getRequestBag(request).parsedBody;
+  if (parsedBody === undefined) {
+    try {
+      parsedBody = await request.clone().json();
+    } catch {
+      return false;
+    }
+  }
   const messages = Array.isArray(parsedBody) ? parsedBody : [parsedBody];
   return messages.some((message) => {
     if (message === null || typeof message !== "object") return false;

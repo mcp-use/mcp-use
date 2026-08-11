@@ -450,6 +450,34 @@ describe("client human-readable output", () => {
     });
   });
 
+  it("points JSON auth recovery back to the auth login command", async () => {
+    await runClient([
+      "connect",
+      "mixed-login-json",
+      "https://mcp.example.com/mcp",
+    ]);
+    stdout = "";
+    stderr = "";
+    mocks.triggerOAuth = true;
+
+    await expect(
+      runClient(["mixed-login-json", "auth", "login", "--json"])
+    ).resolves.toBe(1);
+
+    expect(JSON.parse(stderr)).toMatchObject({
+      error: {
+        code: "oauth_interaction_required",
+        details: {
+          nextSteps: [
+            {
+              command: "mcp-use client mixed-login-json auth login",
+            },
+          ],
+        },
+      },
+    });
+  });
+
   it("separates tool names and descriptions with a hyphen", async () => {
     await expect(
       runClient([

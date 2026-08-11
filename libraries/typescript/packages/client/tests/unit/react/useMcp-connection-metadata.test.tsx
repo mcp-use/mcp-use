@@ -200,6 +200,18 @@ describe("useMcp connection metadata", () => {
     );
   });
 
+  it("stays ready when optional OAuth token projection fails", async () => {
+    authProvider.tokens.mockRejectedValueOnce(new Error("storage unavailable"));
+
+    const { getResult } = await renderFor("modern");
+
+    expect(getResult().state).toBe("ready");
+    expect(getResult().error).toBeUndefined();
+    expect(getResult().log.map((entry) => entry.message)).toContainEqual(
+      expect.stringContaining("Failed to read OAuth tokens")
+    );
+  });
+
   it("exposes tools before auxiliary inventories finish loading", async () => {
     let releaseInventories!: () => void;
     const inventoriesPending = new Promise<void>((resolve) => {
