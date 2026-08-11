@@ -34,11 +34,9 @@ the client detects this after the anonymous connection succeeds:
 
 ```typescript
 const connection = await client.connect("demo");
+const authorization = await connection.discoverAuthorization();
 
-if (
-  connection.authorization?.mode === "mixed" &&
-  !connection.authorization.authenticated
-) {
+if (authorization?.mode === "mixed" && !authorization.authenticated) {
   console.log("Public operations are available without signing in.");
 
   // Optional: authenticate now instead of waiting for a protected operation.
@@ -46,10 +44,13 @@ if (
 }
 ```
 
-`connection.info.authorization` exposes the same state, including the canonical
+After discovery, `connection.authorization` and `connection.info.authorization`
+expose the same state, including the canonical
 resource and advertised scopes when the metadata provides them. Detection is
-best-effort and defaults to enabled for HTTP servers with an OAuth provider. Set
-`detectMixedAuth: false` on the server configuration to skip it.
+best-effort and defaults to enabled for HTTP servers with an OAuth provider.
+Call `discoverAuthorization()` when using `MCPClient` directly; React performs
+the same discovery after publishing the ready connection. Set `detectMixedAuth:
+false` on the server configuration to skip it.
 
 If you stay anonymous, a later wire-level OAuth challenge from a protected
 operation starts the official SDK flow. Automatic flows retry the operation once

@@ -251,7 +251,10 @@ async function savedServerCommand(
     credentials,
     300_000,
     resolveBrowserMode({ noOpen: false, json }),
-    json
+    json,
+    family === "auth" && operation === "login"
+      ? `mcp-use client ${name} auth login`
+      : undefined
   );
   try {
     if (family === "auth" && operation === "login") {

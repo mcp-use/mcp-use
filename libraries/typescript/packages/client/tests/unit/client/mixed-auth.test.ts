@@ -109,12 +109,39 @@ describe("mixed OAuth authorization", () => {
       { finishAuth: vi.fn(async () => {}) }
     );
 
-    const initialization = connector.initialize();
+    await connector.initialize();
+    const discovery = connector.discoverAuthorization();
+    expect(discoverOAuthProtectedResourceMetadata).toHaveBeenCalledOnce();
     await vi.runAllTimersAsync();
 
-    await expect(initialization).resolves.toMatchObject({ tools: {} });
+    await expect(discovery).resolves.toBeUndefined();
     expect(connector.tools.map((tool) => tool.name)).toEqual(["public"]);
     expect(connector.authorization).toBeUndefined();
+  });
+
+  it("retries mixed-auth discovery after a transient metadata failure", async () => {
+    vi.mocked(discoverOAuthProtectedResourceMetadata)
+      .mockRejectedValueOnce(new Error("metadata temporarily unavailable"))
+      .mockResolvedValueOnce({
+        resource: "https://mcp.example.com/mcp",
+        authorization_servers: ["https://auth.example.com"],
+      });
+    const connector = new HttpConnector("https://mcp.example.com/mcp", {
+      authProvider: createProvider(),
+    });
+    attachConnectedClient(
+      connector,
+      { getProtocolEra: () => "modern" },
+      { finishAuth: vi.fn(async () => {}) }
+    );
+
+    await expect(connector.discoverAuthorization()).resolves.toBeUndefined();
+    await expect(connector.discoverAuthorization()).resolves.toEqual({
+      mode: "mixed",
+      authenticated: false,
+      resource: "https://mcp.example.com/mcp",
+    });
+    expect(discoverOAuthProtectedResourceMetadata).toHaveBeenCalledTimes(2);
   });
 
   it("finishes SDK-started OAuth and retries a protected operation once", async () => {
@@ -141,6 +168,10 @@ describe("mixed OAuth authorization", () => {
       "https://auth.example.com"
     );
     expect(callTool).toHaveBeenCalledTimes(2);
+    expect(connector.authorization).toEqual({
+      mode: "mixed",
+      authenticated: true,
+    });
   });
 
   it("leaves a protected operation pending when automatic auth is disabled", async () => {

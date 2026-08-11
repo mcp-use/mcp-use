@@ -47,7 +47,14 @@ type TransportType = "http";
 
 type UseMcpAuthProvider = OAuthClientProvider & {
   tokens?: () => Promise<
-    { access_token?: string; [key: string]: unknown } | undefined
+    | {
+        access_token?: string;
+        token_type?: string;
+        refresh_token?: string;
+        scope?: string;
+        [key: string]: unknown;
+      }
+    | undefined
   >;
   clearStorage?: () => number;
   getLastAttemptedAuthUrl?: () => string | null | undefined;
@@ -1192,7 +1199,17 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
 
         // Get OAuth tokens if authentication was used
         if (authProviderRef.current) {
-          const tokens = await authProviderRef.current.tokens?.();
+          let tokens: Awaited<
+            ReturnType<NonNullable<UseMcpAuthProvider["tokens"]>>
+          >;
+          try {
+            tokens = await authProviderRef.current.tokens?.();
+          } catch (error) {
+            // The MCP connection is already usable. Token projection is
+            // supplemental state and must not tear down a ready connection.
+            addLog("warn", "Failed to read OAuth tokens:", error);
+            tokens = undefined;
+          }
           if (!isMountedRef.current) {
             addLog(
               "debug",

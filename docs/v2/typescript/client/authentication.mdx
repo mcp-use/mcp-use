@@ -48,11 +48,9 @@ When a successfully connected server publishes
 
 ```typescript
 const connection = await client.connect("demo");
+const authorization = await connection.discoverAuthorization();
 
-if (
-  connection.authorization?.mode === "mixed" &&
-  !connection.authorization.authenticated
-) {
+if (authorization?.mode === "mixed" && !authorization.authenticated) {
   console.log("Public operations are available without signing in.");
 
   // Optional: authenticate now instead of waiting for a protected operation.
@@ -60,11 +58,13 @@ if (
 }
 ```
 
-`connection.info.authorization` exposes the same state. It includes `resource`
-and `scopesSupported` when the protected-resource metadata advertises them.
-Mixed-auth discovery is best-effort and defaults to enabled for HTTP servers
-with an OAuth provider. Set `detectMixedAuth: false` on the server configuration
-to skip the discovery request.
+After discovery, `connection.authorization` and `connection.info.authorization`
+expose the same state. It includes `resource` and `scopesSupported` when the
+protected-resource metadata advertises them. Mixed-auth discovery is
+best-effort and defaults to enabled for HTTP servers with an OAuth provider.
+Call `discoverAuthorization()` when using `MCPClient` directly; React performs
+the same discovery after publishing the ready connection. Set `detectMixedAuth:
+false` on the server configuration to skip the discovery request.
 
 If the client stays anonymous, a later wire-level OAuth challenge from a
 protected operation starts the official SDK flow. Automatic flows finish OAuth

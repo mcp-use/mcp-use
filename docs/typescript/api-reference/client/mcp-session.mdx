@@ -26,6 +26,7 @@ connection.info.instructions
 connection.info.extensions
 connection.authorization             // optional mixed-auth state
 connection.info.authorization        // same state in the metadata snapshot
+await connection.discoverAuthorization() // populate optional mixed-auth state
 connection.supports("sampling") // capability check
 ```
 
@@ -35,6 +36,7 @@ connection.supports("sampling") // capability check
 | ------ | ----------- |
 | `connect()` | Start transport |
 | `initialize()` | Run MCP init handshake |
+| `discoverAuthorization()` | Discover optional mixed-auth metadata without forcing login |
 | `authenticate()` | Start optional OAuth for a connected mixed-auth server |
 | `disconnect()` | Close transport |
 

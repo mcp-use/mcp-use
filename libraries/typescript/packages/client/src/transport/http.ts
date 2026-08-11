@@ -289,12 +289,10 @@ export class HttpConnector extends BaseConnector {
         },
       })
         .then(() => {
-          if (this.authorizationCache) {
-            this.authorizationCache = {
-              ...this.authorizationCache,
-              authenticated: true,
-            };
-          }
+          this.authorizationCache = {
+            ...(this.authorizationCache ?? { mode: "mixed" }),
+            authenticated: true,
+          };
         })
         .finally(() => {
           this.pendingOAuthCompletion = null;
@@ -345,7 +343,14 @@ export class HttpConnector extends BaseConnector {
 
     if (this.authorizationDiscovery) return this.authorizationDiscovery;
 
-    this.authorizationDiscovery = this.discoverMixedAuthorization();
+    this.authorizationDiscovery = this.discoverMixedAuthorization().then(
+      (authorization) => {
+        // A missing or temporarily unavailable RFC 9728 endpoint must not be
+        // cached for the lifetime of an otherwise healthy MCP connection.
+        if (!authorization) this.authorizationDiscovery = null;
+        return authorization;
+      }
+    );
     return this.authorizationDiscovery;
   }
 
