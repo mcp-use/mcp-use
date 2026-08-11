@@ -28,6 +28,7 @@ import React, {
 } from "react";
 import { parseCustomProps } from "./parse-custom-props.js";
 import { injectOpenAiFileApis } from "./inject-openai-file-apis.js";
+import { installInitializedSync } from "./initialized-sync.js";
 import { resolveViewResource } from "./resolve-view-resource.js";
 import { buildViewSandboxBlobUrl } from "./sandbox-blob-url.js";
 import type {
@@ -81,17 +82,6 @@ function waitForSandboxProxyReady(iframe: HTMLIFrameElement): Promise<void> {
       }
     };
     window.addEventListener("message", listener);
-  });
-}
-
-function hookInitialized(bridge: AppBridge): Promise<void> {
-  const prev = bridge.oninitialized;
-  return new Promise((resolve) => {
-    bridge.oninitialized = (...args: unknown[]) => {
-      resolve();
-      bridge.oninitialized = prev;
-      (prev as ((...a: unknown[]) => void) | undefined)?.(...args);
-    };
   });
 }
 
@@ -654,7 +644,50 @@ function ViewRendererBase({
           }
         );
 
-        const initPromise = hookInitialized(bridge);
+        const syncGuestToolState = async () => {
+          if (!bridge || disposed) return;
+
+          const currentPartialToolInput = partialToolInputRef.current;
+          const hasCompletedToolResult =
+            toolOutputRef.current !== undefined &&
+            toolOutputRef.current !== null;
+          if (currentPartialToolInput && !hasCompletedToolResult) {
+            await bridge.sendToolInputPartial({
+              arguments: currentPartialToolInput,
+            });
+          } else {
+            const mergedArgs = {
+              ...toolInputRef.current,
+              ...parseCustomProps(customPropsRef.current),
+            };
+            await bridge.sendToolInput({ arguments: mergedArgs });
+          }
+
+          const toolResultPayload = buildToolResultPayload(
+            toolOutputRef.current,
+            customPropsRef.current
+          );
+          if (toolResultPayload) {
+            await bridge.sendToolResult(toolResultPayload);
+          }
+        };
+
+        const initPromise = installInitializedSync(
+          bridge,
+          syncGuestToolState,
+          (error) => {
+            if (disposed) return;
+            const message =
+              error instanceof Error
+                ? error.message
+                : "Failed to synchronize view state";
+            onErrorRef.current?.(message);
+            onLifecycleChangeRef.current?.({
+              status: "error",
+              error: message,
+            });
+          }
+        );
         let transport: Transport = new PostMessageTransport(
           iframe.contentWindow!,
           iframe.contentWindow!
@@ -681,27 +714,6 @@ function ViewRendererBase({
 
         await publishAppTools();
 
-        const currentPartialToolInput = partialToolInputRef.current;
-        const hasCompletedToolResult =
-          toolOutputRef.current !== undefined && toolOutputRef.current !== null;
-        if (currentPartialToolInput && !hasCompletedToolResult) {
-          await bridge.sendToolInputPartial({
-            arguments: currentPartialToolInput,
-          });
-        } else {
-          const mergedArgs = {
-            ...toolInputRef.current,
-            ...parseCustomProps(customPropsRef.current),
-          };
-          await bridge.sendToolInput({ arguments: mergedArgs });
-        }
-        const toolResultPayload = buildToolResultPayload(
-          toolOutputRef.current,
-          customPropsRef.current
-        );
-        if (toolResultPayload) {
-          await bridge.sendToolResult(toolResultPayload);
-        }
         onLifecycleChangeRef.current?.({ status: "ready" });
       } catch (err) {
         if (!disposed) {
