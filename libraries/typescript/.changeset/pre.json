@@ -11,6 +11,7 @@
     "@mcp-use/tunnel": "0.2.0"
   },
   "changesets": [
+    "bright-widgets-connect",
     "swift-widgets-refresh"
   ]
 }

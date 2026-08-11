@@ -1,5 +1,11 @@
 # @mcp-use/cli
 
+## 4.1.2-canary.1
+
+### Patch Changes
+
+- 0ecca60: Route Vite assets and HMR through the configured public MCP origin when the development server runs behind a remote sandbox or proxy.
+
 ## 4.1.2-canary.0
 
 ### Patch Changes
