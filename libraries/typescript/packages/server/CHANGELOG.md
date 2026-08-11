@@ -1,5 +1,19 @@
 # mcp-use
 
+## 2.1.1
+
+### Patch Changes
+
+- e17cd7b: Detect mixed-auth MCP servers without blocking anonymous connections, expose optional authentication in React, the CLI, and the Inspector, resume protected operations through the official SDK OAuth flow, and preserve multiple Set-Cookie headers through the Node bridge for colocated OAuth servers.
+- e17cd7b: Recover mixed-auth metadata discovery after transient failures, preserve ready React connections when optional token projection fails, report authenticated state after challenged OAuth, correct CLI login recovery, suppress failure results for user-cancelled Inspector tools, and keep the mixed-OAuth example's authorization guard aligned with MCP JSON parsing.
+- Updated dependencies [e17cd7b]
+- Updated dependencies [e17cd7b]
+- Updated dependencies [e17cd7b]
+- Updated dependencies [e17cd7b]
+- Updated dependencies [e17cd7b]
+  - @mcp-use/inspector@20.1.1
+  - @mcp-use/cli@4.1.1
+
 ## 2.1.1-canary.3
 
 ### Patch Changes

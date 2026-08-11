@@ -1,5 +1,17 @@
 # @mcp-use/client
 
+## 2.1.1
+
+### Patch Changes
+
+- e17cd7b: Enable the Inspector Skills tab when a dev-server HMR reload adds skills after
+  the initial connection negotiated without the Skills extension.
+- e17cd7b: Detect mixed-auth MCP servers without blocking anonymous connections, expose optional authentication in React, the CLI, and the Inspector, resume protected operations through the official SDK OAuth flow, and preserve multiple Set-Cookie headers through the Node bridge for colocated OAuth servers.
+- e17cd7b: Surface mixed-auth state when protected resource, prompt, skill, completion, or refresh operations require OAuth, so React clients retain their ready anonymous connection and can present authentication for every challenged operation.
+- e17cd7b: Disable reverse-proxy buffering for open-ended MCP SSE responses so v2 subscription acknowledgements reach clients immediately, and move optional mixed-auth discovery off the connection readiness path while preserving asynchronous React updates and CLI reporting.
+- e17cd7b: Recover mixed-auth metadata discovery after transient failures, preserve ready React connections when optional token projection fails, report authenticated state after challenged OAuth, correct CLI login recovery, suppress failure results for user-cancelled Inspector tools, and keep the mixed-OAuth example's authorization guard aligned with MCP JSON parsing.
+- e17cd7b: Fix code mode with a custom executor function: the first `executeCode()` call no longer throws `Custom executor function should be handled in executeCode`, `searchTools()` works instead of always throwing, and `close()` runs executor cleanup. Also forward `detail_level` from the `search_tools` meta tool instead of silently coercing every value to `"full"`.
+
 ## 2.1.1-canary.4
 
 ### Patch Changes
