@@ -1,5 +1,16 @@
 # @mcp-use/inspector
 
+## 20.1.1
+
+### Patch Changes
+
+- e17cd7b: Keep hosted mixed-auth tool calls on the browser MCP connection, pause them in Inspector chat with an amber Authenticate action, resume the same client-side chat turn after popup authorization, and automatically replay an interrupted turn after a full-page OAuth redirect.
+- e17cd7b: Enable the Inspector Skills tab when a dev-server HMR reload adds skills after
+  the initial connection negotiated without the Skills extension.
+- e17cd7b: Detect mixed-auth MCP servers without blocking anonymous connections, expose optional authentication in React, the CLI, and the Inspector, resume protected operations through the official SDK OAuth flow, and preserve multiple Set-Cookie headers through the Node bridge for colocated OAuth servers.
+- e17cd7b: Disable reverse-proxy buffering for open-ended MCP SSE responses so v2 subscription acknowledgements reach clients immediately, and move optional mixed-auth discovery off the connection readiness path while preserving asynchronous React updates and CLI reporting.
+- e17cd7b: Recover mixed-auth metadata discovery after transient failures, preserve ready React connections when optional token projection fails, report authenticated state after challenged OAuth, correct CLI login recovery, suppress failure results for user-cancelled Inspector tools, and keep the mixed-OAuth example's authorization guard aligned with MCP JSON parsing.
+
 ## 20.1.1-canary.3
 
 ### Patch Changes
