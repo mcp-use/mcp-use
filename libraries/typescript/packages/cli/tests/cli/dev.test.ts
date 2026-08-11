@@ -1021,6 +1021,34 @@ async function rawGetBody(
 }
 
 describe("runDev (views)", () => {
+  it("serves Vite modules through a public sandbox hostname", async () => {
+    const cwd = copyFixture("dev-views", "views");
+    cleanups.push(() => removeDir(cwd));
+
+    const port = await getFreePort("0.0.0.0");
+    const dev = await startDev(cwd, port, "0.0.0.0");
+    cleanups.push(dev.stop);
+    const base = dev.url.replace(/\/mcp$/, "");
+    const moduleUrl = `${base}/@vite/client`;
+
+    expect(
+      await rawStatus(
+        moduleUrl,
+        {
+          host: "sandbox.example.com",
+          origin: "https://vibe.example.com",
+        },
+        "GET"
+      )
+    ).toBe(200);
+
+    const response = await fetch(moduleUrl, {
+      headers: { origin: "https://vibe.example.com" },
+    });
+    expect(response.status).toBe(200);
+    expect(response.headers.get("access-control-allow-origin")).toBe("*");
+  });
+
   it("shuts down with active MCP subscriptions and HMR WebSockets", async () => {
     const cwd = copyFixture("dev-active-connections-shutdown", "views");
     cleanups.push(() => removeDir(cwd));
@@ -1470,6 +1498,11 @@ describe("runDev (views)", () => {
 
     const viewPath = join(cwd, "views", "product-search-result", "view.tsx");
     const viewSource = readFileSync(viewPath, "utf8");
+    // Vibe's remote filesystem can surface an editor save as unlink + add
+    // rather than a simple change event. This must stay on the client HMR
+    // path: rebuilding the MCP server publishes catalog invalidations, which
+    // remount the Inspector result and wipes component state.
+    rmSync(viewPath);
     writeFileSync(viewPath, viewSource.replace("results", "hot-results"));
 
     const update = await waitFor(async () =>
@@ -1481,6 +1514,10 @@ describe("runDev (views)", () => {
     );
     expect(update).toBeDefined();
     expect(messages.filter((m) => m.type === "full-reload")).toEqual([]);
+    await new Promise((r) => setTimeout(r, 200));
+    expect(
+      dev.logs.filter((line) => line === "[mcp-use] reloaded server entry")
+    ).toEqual([]);
   }, 60_000);
 
   it("runs two dev servers concurrently with HMR on each main port", async () => {

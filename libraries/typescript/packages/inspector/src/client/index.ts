@@ -50,7 +50,12 @@ export { PromptsTab, type PromptsTabRef } from "./components/PromptsTab.js";
 // ---------------------------------------------------------------------------
 
 // Main chat orchestrator (top-level entry point for embedding)
-export { ChatTab, type ChatTabProps } from "./components/ChatTab.js";
+export {
+  ChatTab,
+  type ChatBridgeAdapter,
+  type ChatBridgeMessage,
+  type ChatTabProps,
+} from "./components/ChatTab.js";
 
 // Chat sub-components (for consumers who want finer-grained control)
 export { MessageList } from "./components/chat/MessageList.js";

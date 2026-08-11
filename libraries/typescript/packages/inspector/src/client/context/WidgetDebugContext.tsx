@@ -37,6 +37,8 @@ export interface WidgetDeclaredCsp {
   resourceDomains?: string[];
   frameDomains?: string[];
   baseUriDomains?: string[];
+  /** mcp-use development extension for Vite's HMR evaluation runtime. */
+  scriptDirectives?: string[];
 }
 
 export interface WidgetInfo {
