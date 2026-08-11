@@ -153,6 +153,15 @@ describe("OAuth core", () => {
     }
   });
 
+  it("rejects verifier options without a key source", () => {
+    expect(() =>
+      createJwtVerifier({
+        issuer: "https://issuer.example.test",
+        resource: canonicalResource,
+      } as JwtVerifierOptions)
+    ).toThrowError("JWT verifier requires either key or jwksUrl");
+  });
+
   it("accepts JWTs whose audience is the protected resource", async () => {
     const key = new TextEncoder().encode(
       "a sufficiently long test signing key"
@@ -162,7 +171,6 @@ describe("OAuth core", () => {
     const issuer = "https://issuer.example.test";
     const verifier = createJwtVerifier({
       issuer,
-      jwksUrl: new URL(`${issuer}/.well-known/jwks.json`),
       key,
       algorithms: ["HS256"],
       resource: expectedResource,
@@ -200,7 +208,6 @@ describe("OAuth core", () => {
     const issuer = "https://issuer.example.test";
     const verifier = createJwtVerifier({
       issuer,
-      jwksUrl: new URL(`${issuer}/.well-known/jwks.json`),
       key,
       algorithms: ["HS256"],
       resource: canonicalResource,
@@ -242,7 +249,6 @@ describe("OAuth core", () => {
     const issuer = "https://issuer.example.test";
     const verifier = createJwtVerifier({
       issuer,
-      jwksUrl: new URL(`${issuer}/.well-known/jwks.json`),
       key,
       algorithms: ["HS256"],
       resource: canonicalResource,
@@ -333,7 +339,6 @@ describe("OAuth core", () => {
     );
     const verifier = createJwtVerifier({
       issuer: "https://issuer.example.test",
-      jwksUrl: new URL("https://issuer.example.test/.well-known/jwks.json"),
       key,
       algorithms: ["HS256"],
       resource: canonicalResource,
@@ -356,7 +361,6 @@ describe("OAuth core", () => {
     );
     const verifier = createJwtVerifier({
       issuer: "https://issuer.example.test",
-      jwksUrl: new URL("https://issuer.example.test/.well-known/jwks.json"),
       key,
       algorithms: ["HS256"],
       resource: canonicalResource,

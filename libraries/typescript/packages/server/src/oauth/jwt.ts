@@ -19,11 +19,9 @@ export { invalidToken } from "./errors.js";
 export type VerifiedPayload = Record<string, unknown>;
 
 /** Options for {@link createJwtVerifier}. */
-export interface JwtVerifierOptions {
+export type JwtVerifierOptions = {
   /** Expected value of the JWT `iss` claim. */
   issuer: string;
-  /** Remote JSON Web Key Set used to verify token signatures. */
-  jwksUrl: URL;
   /** Canonical public MCP endpoint that accepted tokens must target. */
   resource: URL;
   /** Provider-specific JWT audience, when it differs from the MCP resource. */
@@ -36,9 +34,18 @@ export interface JwtVerifierOptions {
   issuerBoundAccessTokens?: boolean;
   /** Allowed JWT signature algorithms. */
   algorithms?: readonly string[];
-  /** Static symmetric verification key to use instead of the remote JWKS. */
-  key?: Uint8Array;
-}
+} & (
+  | {
+      /** Remote JSON Web Key Set used to verify token signatures. */
+      jwksUrl: URL;
+      key?: never;
+    }
+  | {
+      jwksUrl?: never;
+      /** Static symmetric verification key to use instead of a remote JWKS. */
+      key: Uint8Array;
+    }
+);
 
 /**
  * Creates an OAuth access-token verifier backed by `jose` JWT validation.
@@ -69,6 +76,9 @@ export interface JwtVerifierOptions {
 export function createJwtVerifier(
   options: JwtVerifierOptions
 ): OAuthTokenVerifier {
+  if (options.key === undefined && options.jwksUrl === undefined) {
+    throw new TypeError("JWT verifier requires either key or jwksUrl");
+  }
   // jose overloads key material vs JWKS getters; runtime accepts either.
   const key = options.key ?? createRemoteJWKSet(options.jwksUrl);
   const configuredResource = canonicalUrl(options.resource);

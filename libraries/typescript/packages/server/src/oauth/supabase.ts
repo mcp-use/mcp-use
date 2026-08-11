@@ -106,12 +106,14 @@ export function oauthSupabaseProvider(
     createTokenVerifier: (resource) =>
       createJwtVerifier({
         issuer,
-        jwksUrl: new URL(
-          providerEndpoint(supabaseUrl, "auth/v1/.well-known/jwks.json")
-        ),
         ...(secret !== undefined
           ? { key: new TextEncoder().encode(secret), algorithms: ["HS256"] }
-          : { algorithms: ["ES256"] }),
+          : {
+              jwksUrl: new URL(
+                providerEndpoint(supabaseUrl, "auth/v1/.well-known/jwks.json")
+              ),
+              algorithms: ["ES256"],
+            }),
         resource,
         audience,
       }),
