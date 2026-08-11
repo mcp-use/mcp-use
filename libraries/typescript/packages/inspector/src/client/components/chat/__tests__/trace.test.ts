@@ -93,6 +93,75 @@ describe("trace accumulator", () => {
     ).toBeLessThanOrEqual(121);
   });
 
+  it("adds Anthropic cache counters to the total but not OpenAI's", () => {
+    // Anthropic reports cache_read_input_tokens and cache_creation_input_tokens OUTSIDE
+    // input_tokens and bills all of them, so both are added back into the total.
+    expect(
+      inspectorTokenUsageFromUnknown({
+        input_tokens: 3,
+        cache_read_input_tokens: 20000,
+        cache_creation_input_tokens: 1500,
+        output_tokens: 120,
+      })
+    ).toEqual({
+      inputTokens: 3,
+      outputTokens: 120,
+      totalTokens: 21623,
+      cachedInputTokens: 20000,
+      cacheCreationInputTokens: 1500,
+      reasoningTokens: undefined,
+    });
+
+    // A normalized OpenAI record: cachedInputTokens is already inside inputTokens, so it
+    // must NOT be added again. Total is 10 + 4 = 14, not 17.
+    expect(
+      inspectorTokenUsageFromUnknown({
+        inputTokens: 10,
+        outputTokens: 4,
+        cachedInputTokens: 3,
+      })
+    ).toMatchObject({
+      inputTokens: 10,
+      outputTokens: 4,
+      totalTokens: 14,
+      cachedInputTokens: 3,
+    });
+  });
+
+  it("keeps cacheCreationInputTokens through aggregation and the LLM span", () => {
+    const events = [
+      event({ type: "request", request: { model: "test" } }, 1),
+      event(
+        {
+          type: "usage",
+          usage: {
+            inputTokens: 3,
+            outputTokens: 120,
+            totalTokens: 21623,
+            cachedInputTokens: 20000,
+            cacheCreationInputTokens: 1500,
+          },
+        },
+        2
+      ),
+      event(
+        {
+          type: "usage",
+          usage: { cacheCreationInputTokens: 500 },
+        },
+        3
+      ),
+      event({ type: "done" }, 4),
+    ];
+    const state = events.reduce(appendTraceEvent, EMPTY_TRACE_STATE);
+
+    // Survives in the aggregate state...
+    expect(state.usage?.cacheCreationInputTokens).toBe(2000);
+    // ...and on the LLM span's own usage.
+    const llmSpan = state.spans.find((span) => span.kind === "llm");
+    expect(llmSpan?.usage?.cacheCreationInputTokens).toBe(2000);
+  });
+
   it("redacts secrets without hiding token counts", () => {
     expect(
       redactSensitiveRequestFields({

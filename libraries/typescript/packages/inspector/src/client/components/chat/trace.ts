@@ -95,8 +95,14 @@ export function inspectorTokenUsageFromUnknown(
     "cache_creation_input_tokens"
   );
   const reasoningTokens = number("reasoningTokens", "thoughtsTokenCount");
+  // Only the Anthropic-shaped keys sit OUTSIDE inputTokens and must be added back into the
+  // total. cachedInputTokens is provider-neutral, and on OpenAI those tokens are already
+  // inside inputTokens, so adding it here would double count. It is still parsed above for
+  // observability; the total is computed from cache_read_input_tokens only, mirroring the
+  // provider-safe behaviour in agent/src/llm/usage.ts.
+  const cacheReadOutsideInput = number("cache_read_input_tokens");
   const uncountedCache =
-    (cachedInputTokens ?? 0) + (cacheCreationInputTokens ?? 0);
+    (cacheReadOutsideInput ?? 0) + (cacheCreationInputTokens ?? 0);
   const totalTokens =
     number("totalTokens", "total_tokens") ??
     (inputTokens !== undefined && outputTokens !== undefined
@@ -197,6 +203,10 @@ function addUsage(
     outputTokens: sum(current?.outputTokens, next.outputTokens),
     totalTokens: sum(current?.totalTokens, next.totalTokens),
     cachedInputTokens: sum(current?.cachedInputTokens, next.cachedInputTokens),
+    cacheCreationInputTokens: sum(
+      current?.cacheCreationInputTokens,
+      next.cacheCreationInputTokens
+    ),
     reasoningTokens: sum(current?.reasoningTokens, next.reasoningTokens),
   };
 }
