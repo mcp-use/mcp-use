@@ -45,6 +45,7 @@ import {
   resolvePort as resolvePreferredPort,
 } from "../bin/args.js";
 import { discoverEntry } from "./entry.js";
+import { resolveDevClientEndpoint } from "./dev-client-endpoint.js";
 import {
   loadProjectEnv,
   nextStandaloneCompatPlugin,
@@ -419,16 +420,11 @@ export async function runDev(options: DevOptions): Promise<void> {
   const viewsAtStartup = currentViews.length > 0;
   const userViteConfig = resolveUserViteConfig(options.cwd);
 
-  // The bind address is not always a browsable address: `0.0.0.0`/`::`
-  // accept connections on every interface but are not valid request hosts
-  // in every browser, and `127.0.0.1` reads worse than `localhost` in logs.
-  // Anything else (a LAN IP, a hostname) is browsable as itself; bare IPv6
-  // addresses need brackets in URLs.
-  const loopbackOrWildcard = ["127.0.0.1", "localhost", "0.0.0.0", "::", "::1"];
-  const browsableHost = loopbackOrWildcard.includes(host) ? "localhost" : host;
-  const devOrigin = `http://${
-    browsableHost.includes(":") ? `[${browsableHost}]` : browsableHost
-  }:${port}`;
+  const devClientEndpoint = resolveDevClientEndpoint(
+    host,
+    port,
+    process.env["MCP_URL"]
+  );
 
   const vite = await createServer({
     root: options.cwd,
@@ -476,7 +472,7 @@ export async function runDev(options: DevOptions): Promise<void> {
       }),
       // Absolute asset URLs in dev: without `origin`, Vite emits root-relative
       // paths that resolve against the host page inside srcdoc iframes.
-      ...(viewsAtStartup && { origin: devOrigin }),
+      ...(viewsAtStartup && { origin: devClientEndpoint.origin }),
       // CORS on module URLs is owned by onRequest below (permissive ACAO
       // only while the tunnel is active), not by Vite's own middleware —
       // whose default localhost-only policy would block tunnel-rendering
@@ -485,7 +481,9 @@ export async function runDev(options: DevOptions): Promise<void> {
       // View HMR rides the one HTTP listener: Vite attaches its websocket
       // upgrade handler to our server, so no dedicated HMR port exists to
       // collide when several dev processes run side by side.
-      hmr: viewsAtStartup ? { server: httpServer } : false,
+      hmr: viewsAtStartup
+        ? { server: httpServer, ...devClientEndpoint.hmr }
+        : false,
       // Vite 8's Environment API keeps its WebSocket transport enabled when
       // only `hmr: false` is set. Zero-view servers need no socket at all.
       ...(!viewsAtStartup && { ws: false }),
@@ -597,7 +595,7 @@ export async function runDev(options: DevOptions): Promise<void> {
     }
     const mounted = inspectorModule.mountInspector({
       basePath: nextBasePath,
-      autoConnectUrl: `${devOrigin}${nextBasePath}`,
+      autoConnectUrl: `${devClientEndpoint.origin}${nextBasePath}`,
       oauthProxyAllowLoopback: localhostBind || wildcardBind,
       devMode: true,
       manufactChatUrl: process.env["MANUFACT_CHAT_URL"],
@@ -985,9 +983,11 @@ export async function runDev(options: DevOptions): Promise<void> {
       `  ➜ Views:         ${currentViews.map((v) => v.name).join(", ")}`
     );
   }
-  console.log(`  ➜ MCP endpoint:  ${devOrigin}${basePath}`);
+  console.log(`  ➜ MCP endpoint:  ${devClientEndpoint.origin}${basePath}`);
   if (inspectorHandler !== undefined) {
-    console.log(`  ➜ Inspector:     ${devOrigin}${basePath}/inspector`);
+    console.log(
+      `  ➜ Inspector:     ${devClientEndpoint.origin}${basePath}/inspector`
+    );
   } else if (options.inspector !== false) {
     console.warn(
       "[mcp-use] Built-in Inspector is unavailable; reinstall mcp-use to " +
@@ -1025,7 +1025,7 @@ export async function runDev(options: DevOptions): Promise<void> {
     options.open !== false &&
     process.stdout.isTTY === true
   ) {
-    openInBrowser(`${devOrigin}${basePath}/inspector`);
+    openInBrowser(`${devClientEndpoint.origin}${basePath}/inspector`);
   }
 
   // --- Graceful shutdown (SIGINT/SIGTERM or options.signal). ---------------

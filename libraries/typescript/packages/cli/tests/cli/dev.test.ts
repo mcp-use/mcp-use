@@ -113,7 +113,7 @@ async function startDev(
       if (startupError !== undefined) throw startupError;
       return lines.find((l) => l.includes("MCP endpoint"));
     });
-    const url = /(http:\/\/\S+)/.exec(endpointLine)?.[1];
+    const url = /(https?:\/\/\S+)/.exec(endpointLine)?.[1];
     if (url === undefined) throw new Error(`no URL in: ${endpointLine}`);
     return {
       url,
@@ -1022,13 +1022,14 @@ async function rawGetBody(
 
 describe("runDev (views)", () => {
   it("serves Vite modules through a public sandbox hostname", async () => {
+    process.env["MCP_URL"] = "https://sandbox.example.com/mcp";
     const cwd = copyFixture("dev-views", "views");
     cleanups.push(() => removeDir(cwd));
 
     const port = await getFreePort("0.0.0.0");
     const dev = await startDev(cwd, port, "0.0.0.0");
     cleanups.push(dev.stop);
-    const base = dev.url.replace(/\/mcp$/, "");
+    const base = `http://127.0.0.1:${port}`;
     const moduleUrl = `${base}/@vite/client`;
 
     expect(
@@ -1047,6 +1048,10 @@ describe("runDev (views)", () => {
     });
     expect(response.status).toBe(200);
     expect(response.headers.get("access-control-allow-origin")).toBe("*");
+    const viteClient = await response.text();
+    expect(viteClient).toContain("sandbox.example.com");
+    expect(viteClient).toContain('const socketProtocol = "wss"');
+    expect(viteClient).toContain("const hmrPort = 443");
   });
 
   it("shuts down with active MCP subscriptions and HMR WebSockets", async () => {
