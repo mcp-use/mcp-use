@@ -1601,6 +1601,21 @@ export function ChatTab({
               serverBaseUrl={connection.url}
               messagesEndRef={messagesEndRef}
               traceEvents={traceEvents}
+              onAuthenticateTool={
+                effectiveClientSide
+                  ? clientSideChat.authenticatePendingTool
+                  : undefined
+              }
+              authenticatingToolCallId={
+                effectiveClientSide
+                  ? clientSideChat.authenticatingToolCallId
+                  : null
+              }
+              toolAuthorizationError={
+                effectiveClientSide
+                  ? clientSideChat.toolAuthorizationError
+                  : null
+              }
             />
           ) : (
             <ChatRawView events={traceEvents} usage={tokenUsage} />

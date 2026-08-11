@@ -29,16 +29,18 @@ export function shouldShowFreeTierUpgrade({
   return isManaged && enableFreeTierUpgrade && !isAuthenticated;
 }
 
-/** True when localhost MCP should use browser MCPAgent + cloud LLM proxy. */
+/** True when MCP tools must stay in the browser while the cloud proxies only the LLM. */
 export function shouldUseManagedClientSide({
   isLoopback,
+  isMixedAuth = false,
   chatApiUrl,
 }: {
   isLoopback: boolean;
+  isMixedAuth?: boolean;
   chatApiUrl?: string;
   enableFreeTierUpgrade?: boolean;
 }): boolean {
-  return isLoopback && !!chatApiUrl;
+  return (isLoopback || isMixedAuth) && !!chatApiUrl;
 }
 
 /** LLM config for the managed inspector LLM proxy (`/inspector/llm/*`). */
