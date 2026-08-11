@@ -43,7 +43,16 @@ Add a server from the dashboard. Choose the transport, enter the MCP endpoint UR
 
 For most local and public HTTP servers, use **Direct**. Use **Via Proxy** only when the browser cannot reach the server directly because of CORS or network policy. See [Connection settings](/inspector/connection-settings) for the short decision guide.
 
-When a server requires OAuth, the Inspector starts the auth flow for you. Complete the provider approval and return to the Inspector; the server card changes to the connected state after auth finishes.
+When a server protects the whole MCP endpoint with OAuth, the connection waits
+for authentication. Click **Authenticate**, complete the provider approval, and
+return to the Inspector.
+
+A mixed-auth server connects anonymously because its public tools are already
+usable. If it publishes OAuth protected-resource metadata, the server card and
+header show **This server is using mixed auth** with an **Authenticate** button.
+You can authenticate immediately or wait until a protected operation returns a
+wire-level OAuth challenge. The connection stays available for public
+operations while authentication is optional.
 
 ## Run a tool
 
@@ -57,6 +66,11 @@ Open a connected server and select the **Tools** tab. Choose a tool, fill the ge
 </Frame>
 
 The Inspector shows the tool result, structured content, errors, and any widget returned by the tool. Use this view to verify schema validation, result shape, and widget data before testing the same server from a client.
+
+For mixed-auth servers, a protected tool can surface the authentication action
+only when it is needed. Authenticate, then retry the protected call. A normal
+MCP tool result with `isError: true` is still shown as a tool error; the Inspector
+does not infer OAuth from its text.
 
 ## Inspect resources and prompts
 

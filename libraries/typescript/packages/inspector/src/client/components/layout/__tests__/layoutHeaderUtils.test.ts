@@ -43,6 +43,17 @@ describe("Skills navigation state", () => {
     expect(getSkillsState(value)).toBe("available");
   });
 
+  it("treats an HMR-populated catalog as available after initial negotiation", () => {
+    const value = server({
+      extensions: {},
+      skills: [{ uri: "skill://refunds/SKILL.md" }] as McpServer["skills"],
+    });
+
+    expect(supportsSkills(value)).toBe(false);
+    expect(getSkillsState(value)).toBe("available");
+    expect(isTabUsable("skills", value)).toBe(true);
+  });
+
   it("announces only the advertised-empty status in the accessible label", () => {
     expect(getSkillsAccessibleLabel("Skills", "empty")).toBe(
       "Skills: advertised but empty"

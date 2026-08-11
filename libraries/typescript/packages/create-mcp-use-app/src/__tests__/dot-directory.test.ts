@@ -30,10 +30,13 @@ describe("sanitizePackageName", () => {
     expect(sanitizePackageName("my@project!name")).toBe("my-project-name");
   });
 
-  it("trims leading dots and dashes", () => {
+  it("trims leading dots, dashes and underscores", () => {
     expect(sanitizePackageName("..my-project")).toBe("my-project");
     expect(sanitizePackageName("--my-project")).toBe("my-project");
     expect(sanitizePackageName(".-my-project")).toBe("my-project");
+    // npm publish: "name cannot start with an underscore"
+    expect(sanitizePackageName("__my-project")).toBe("my-project");
+    expect(sanitizePackageName("_.-my-project")).toBe("my-project");
   });
 
   it("trims trailing dots and dashes", () => {
@@ -148,6 +151,22 @@ describe("deriveProjectInfo", () => {
     expect(info.projectPath).toBe(resolve("/tmp", "my-app"));
     expect(info.displayName).toBe("my-app");
     expect(info.packageName).toBe("my-app");
+  });
+
+  it("sanitizes a named project too, keeping the directory as typed", () => {
+    // Only the "." branch used to sanitize, so `create-mcp-use-app 'My "App"'`
+    // put the raw name straight into index.ts and produced invalid TypeScript.
+    const info = deriveProjectInfo('My "App"', "/tmp");
+    expect(info.projectPath).toBe(resolve("/tmp", 'My "App"'));
+    expect(info.displayName).toBe('My "App"');
+    expect(info.packageName).toBe("my--app");
+  });
+
+  it("strips a leading underscore from a named project", () => {
+    const info = deriveProjectInfo("_foo", "/tmp");
+    expect(info.projectPath).toBe(resolve("/tmp", "_foo"));
+    expect(info.displayName).toBe("_foo");
+    expect(info.packageName).toBe("foo");
   });
 });
 

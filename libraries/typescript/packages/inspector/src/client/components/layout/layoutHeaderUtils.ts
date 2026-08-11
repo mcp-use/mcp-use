@@ -46,10 +46,15 @@ export const SKILLS_EMPTY_CATALOG_MESSAGE =
 
 export type SkillsState = "unsupported" | "empty" | "available";
 
-/** An advertised empty catalog is unavailable until the server supplies skills. */
+/**
+ * An advertised empty catalog is unavailable until the server supplies skills.
+ * A populated catalog is authoritative even if the extension capability was
+ * negotiated before a dev-server HMR reload added a skills directory.
+ */
 export function getSkillsState(server: McpServer): SkillsState {
+  if ((server.skills?.length ?? 0) > 0) return "available";
   if (!supportsSkills(server)) return "unsupported";
-  return (server.skills?.length ?? 0) === 0 ? "empty" : "available";
+  return "empty";
 }
 
 /** Include the advertised-empty status in an otherwise icon-only tab label. */

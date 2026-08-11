@@ -91,6 +91,7 @@ Per-server configs can override callbacks. Server-level fields inherit from root
 | `authToken` | `string` | Bearer token |
 | `oauth` | `AutoOAuthOptions \| false` | OAuth options or disable |
 | `authProvider` | `OAuthClientProvider` | Custom auth provider |
+| `detectMixedAuth` | `boolean` | Discover RFC 9728 metadata after anonymous connection; defaults to `true` |
 | `onSampling`, `onElicitation`, `onNotification` | callbacks | Per-server overrides |
 | `roots` | `Root[]` | Initial roots |
 | `timeout` | `number` | Connection timeout (ms) |
@@ -122,7 +123,7 @@ Elicitation helpers: `acceptWithDefaults`, `accept`, `decline`, `cancel`, `valid
 
 Connectors: `HttpConnector`, `StdioConnector`, `BaseConnector`
 
-Types: `MCPConnection`, `MCPSession` (deprecated alias), `MCPConnectionInfo`, `Notification`, `Root`, `Tool`
+Types: `MCPConnection`, `MCPSession` (deprecated alias), `MCPConnectionInfo`, `MCPAuthorizationInfo`, `Notification`, `Root`, `Tool`
 
 Re-exports from `@modelcontextprotocol/client`: `auth`, `UnauthorizedError`
 

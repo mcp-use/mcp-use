@@ -1,0 +1,23 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/agent": "2.0.2",
+    "@mcp-use/cli": "4.1.0",
+    "@mcp-use/client": "2.1.0",
+    "create-mcp-use-app": "2.0.2",
+    "@mcp-use/inspector": "20.1.0",
+    "mcp-use": "2.1.0",
+    "@mcp-use/tunnel": "0.2.0"
+  },
+  "changesets": [
+    "bright-chats-auth",
+    "eighty-moons-shave",
+    "fix-hmr-skills-tab",
+    "fresh-tools-auth",
+    "protected-operations-auth",
+    "quick-sse-proxy",
+    "tidy-pumas-smoke",
+    "wise-cats-explore"
+  ]
+}

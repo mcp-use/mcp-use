@@ -11,7 +11,10 @@ import type {
   ExecutionResult,
   ToolSearchResponse,
 } from "../code-mode/executor.js";
-import { BaseCodeExecutor } from "../code-mode/executor.js";
+import {
+  BaseCodeExecutor,
+  FunctionCodeExecutor,
+} from "../code-mode/executor.js";
 import { E2BCodeExecutor } from "../code-mode/executor-e2b.js";
 import { VMCodeExecutor } from "../code-mode/executor-vm.js";
 import { CodeModeConnector } from "../code-mode/connector.js";
@@ -264,7 +267,6 @@ export class MCPClient extends BaseMCPClient {
    */
   public codeMode: boolean = false;
   private _codeExecutor: BaseCodeExecutor | null = null;
-  private _customCodeExecutor: CodeExecutorFunction | null = null;
   private _codeExecutorConfig:
     | CodeExecutorType
     | CodeExecutorFunction
@@ -547,12 +549,8 @@ export class MCPClient extends BaseMCPClient {
       if (config instanceof BaseCodeExecutor) {
         this._codeExecutor = config;
       } else if (typeof config === "function") {
-        // Custom function - wrap it
-        this._customCodeExecutor = config;
-        // Will be handled in executeCode, return a dummy executor
-        throw new Error(
-          "Custom executor function should be handled in executeCode"
-        );
+        // Custom function: adapt it so searchTools() and cleanup() work too.
+        this._codeExecutor = new FunctionCodeExecutor(this, config);
       } else if (config === "e2b") {
         const opts = this._executorOptions as E2BExecutorOptions | undefined;
         if (!opts?.apiKey) {
@@ -651,12 +649,8 @@ export class MCPClient extends BaseMCPClient {
       throw new Error("Code execution mode is not enabled");
     }
 
-    // Use custom executor if provided (e.g., for E2B in Cloudflare Workers)
-    if (this._customCodeExecutor) {
-      return this._customCodeExecutor(code, timeout);
-    }
-
-    // Default to VM-based executor
+    // Resolves to the configured executor: a custom function or instance when
+    // provided, otherwise the VM/E2B default.
     return this._ensureCodeExecutor().execute(code, timeout);
   }
 

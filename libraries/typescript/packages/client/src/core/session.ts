@@ -14,6 +14,18 @@ import type { BaseConnector, NotificationHandler } from "../transport/base.js";
 /** Negotiated protocol era: `"legacy"` or `"modern"`. */
 export type MCPProtocolEra = ProtocolEra;
 
+/** OAuth availability inferred after an anonymous MCP connection succeeds. */
+export interface MCPAuthorizationInfo {
+  /** Mixed auth means public MCP operations succeeded while OAuth is available. */
+  mode: "mixed";
+  /** Whether this client currently has OAuth access tokens. */
+  authenticated: boolean;
+  /** Canonical protected-resource identifier from RFC 9728 metadata. */
+  resource?: string;
+  /** Scopes advertised by the protected resource, when provided. */
+  scopesSupported?: string[];
+}
+
 /**
  * Server information normalized across legacy sessionful and modern sessionless
  * MCP protocols.
@@ -59,6 +71,8 @@ export interface MCPConnectionInfo {
   instructions?: string;
   /** Protocol extension metadata advertised by the server. */
   extensions: Record<string, unknown>;
+  /** Optional OAuth state discovered without forcing authentication. */
+  authorization?: MCPAuthorizationInfo;
 }
 
 /**
@@ -345,6 +359,21 @@ export class MCPConnection {
     return this.connector.serverInfo;
   }
 
+  /** OAuth state discovered for this connection, when available. */
+  get authorization(): MCPAuthorizationInfo | undefined {
+    return this.connector.authorization;
+  }
+
+  /** Discover optional OAuth metadata without delaying MCP readiness. */
+  async discoverAuthorization(): Promise<MCPAuthorizationInfo | undefined> {
+    return this.connector.discoverAuthorization();
+  }
+
+  /** Authenticate an already-connected mixed-auth server. */
+  async authenticate(): Promise<void> {
+    await this.connector.authenticate();
+  }
+
   /**
    * The negotiated protocol era for this session's connection:
    * `"legacy"` (2025-era) or `"modern"` (2026-07-28-era).
@@ -388,6 +417,7 @@ export class MCPConnection {
       capabilities,
       instructions: this.connector.instructions,
       extensions,
+      ...(this.authorization ? { authorization: this.authorization } : {}),
     };
   }
 

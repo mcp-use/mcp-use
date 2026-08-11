@@ -47,7 +47,20 @@ By default the inspector relies on Dynamic Client Registration (DCR), so no cred
 | Client Secret | Use a confidential client; the SDK switches token endpoint auth away from `none`. |
 | Scope | Request a provider-specific space-separated scope list. |
 
-When a server requires OAuth, the connection enters `pending_auth`. Click **Authenticate**, complete the provider flow, and return to the Inspector. If a popup is blocked, use the open-auth-page fallback link.
+When a server protects the whole connection, it enters `pending_auth`. Click
+**Authenticate**, complete the provider flow, and return to the Inspector. If a
+popup is blocked, use the open-auth-page fallback link.
+
+Mixed-auth servers behave differently: the anonymous connection remains
+`ready`, and the Inspector shows **This server is using mixed auth** with an
+**Authenticate** action. Public operations remain available. You can authenticate
+up front, or wait for a protected tool, resource, or prompt to return a
+wire-level OAuth challenge and then authenticate.
+
+The classification comes from RFC 9728 protected-resource metadata discovered
+by the official MCP SDK after a successful anonymous connection. The Inspector
+does not use host-specific rules or interpret tool-level `isError` text as an
+OAuth challenge.
 
 Browser OAuth session values are encrypted at rest with AES-256-GCM. The
 non-extractable origin key is kept in IndexedDB, while versioned ciphertext

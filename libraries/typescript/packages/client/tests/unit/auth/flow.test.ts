@@ -91,6 +91,27 @@ describe("completeOAuthFlow", () => {
     );
   });
 
+  it("finishes a pending flow through the official transport callback", async () => {
+    const finishAuthorization = vi.fn(async () => {});
+    const provider = {
+      hasPendingFlow: true,
+      getAuthorizationResponse: vi.fn(async () => ({
+        code: "auth-code",
+        iss: "https://auth.example.com",
+      })),
+    } as unknown as OAuthClientProvider;
+
+    await completeOAuthFlow(provider, "https://example.com/mcp", {
+      finishAuthorization,
+    });
+
+    expect(finishAuthorization).toHaveBeenCalledWith(
+      "auth-code",
+      "https://auth.example.com"
+    );
+    expect(auth).not.toHaveBeenCalled();
+  });
+
   it("skips the first auth() when hasPendingFlow is set", async () => {
     vi.mocked(auth).mockResolvedValueOnce("AUTHORIZED");
     const getAuthorizationCode = vi.fn(async () => "auth-code");
@@ -127,6 +148,25 @@ describe("completeOAuthFlow", () => {
       expect.objectContaining({ state: "stored-state" })
     );
     expect(markFlowComplete).toHaveBeenCalledOnce();
+  });
+
+  it("launches a prepared browser flow after explicit authentication", async () => {
+    vi.mocked(runAuthPopup).mockResolvedValue({ kind: "success" });
+    const startAuthorization = vi.fn();
+    const provider = {
+      hasPendingFlow: true,
+      preventAutoAuth: true,
+      startAuthorization,
+      getKey: () => "mcp:auth_server_tokens",
+      getLastAttemptedAuthUrl: () =>
+        "https://auth.example.com/authorize?state=stored-state",
+    } as unknown as OAuthClientProvider;
+
+    await completeOAuthFlow(provider, "https://example.com/mcp");
+
+    expect(auth).not.toHaveBeenCalled();
+    expect(startAuthorization).toHaveBeenCalledOnce();
+    expect(runAuthPopup).toHaveBeenCalledOnce();
   });
 
   it("does not resolve a full-page redirect flow before navigation", async () => {

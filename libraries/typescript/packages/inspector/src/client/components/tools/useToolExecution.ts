@@ -1,12 +1,35 @@
-import type { Tool } from "@mcp-use/client/react";
+import { isOAuthInteractionRequired, type Tool } from "@mcp-use/client/react";
 import {
   MCPToolExecutionEvent,
   captureInspectorEvent,
 } from "@/client/telemetry";
 import { copyToClipboard } from "@/client/utils/browser";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ToolResult } from "./ToolResultDisplay";
+import {
+  clearPendingToolExecution,
+  readPendingToolExecution,
+  savePendingToolExecution,
+  type PendingToolExecution,
+} from "./tool-auth-retry";
 import { mergeToolMetadata } from "./tool-metadata";
+
+type ToolExecutionRequest = Omit<PendingToolExecution, "serverId">;
+
+function authorizationRequiredResult(
+  request: ToolExecutionRequest,
+  duration = 0
+): ToolResult {
+  return {
+    toolName: request.toolName,
+    args: request.displayArgs,
+    result: null,
+    authorizationRequired: true,
+    timestamp: request.timestamp,
+    duration,
+    toolMeta: request.toolMeta,
+  };
+}
 
 export function useToolExecution({
   selectedTool,
@@ -15,6 +38,9 @@ export function useToolExecution({
   callTool,
   readResource,
   serverId,
+  isConnected,
+  authenticate,
+  isAuthenticating = false,
 }: {
   selectedTool: Tool | null;
   payloadToSend: Record<string, unknown>;
@@ -30,130 +56,249 @@ export function useToolExecution({
   ) => Promise<unknown>;
   readResource: (uri: string) => Promise<unknown>;
   serverId: string;
+  isConnected: boolean;
+  authenticate?: () => Promise<void>;
+  isAuthenticating?: boolean;
 }) {
-  const [results, setResults] = useState<ToolResult[]>([]);
+  const [pendingAuthorization, setPendingAuthorization] =
+    useState<PendingToolExecution | null>(() =>
+      readPendingToolExecution(serverId)
+    );
+  const [results, setResults] = useState<ToolResult[]>(() =>
+    pendingAuthorization
+      ? [authorizationRequiredResult(pendingAuthorization)]
+      : []
+  );
   const [isExecuting, setIsExecuting] = useState(false);
+  const [isAuthorizing, setIsAuthorizing] = useState(false);
+  const [authorizationError, setAuthorizationError] = useState<string | null>(
+    null
+  );
   const [copiedResult, setCopiedResult] = useState<number | null>(null);
-  const [abortController, setAbortController] =
-    useState<AbortController | null>(null);
+  const executingRef = useRef(false);
+  const activeExecutionRef = useRef<AbortController | null>(null);
+  const cancelledExecutionsRef = useRef(new WeakSet<AbortController>());
+  const shouldResumeAuthorizationRef = useRef(pendingAuthorization !== null);
+  const [resumeVersion, setResumeVersion] = useState(0);
+
+  const executeRequest = useCallback(
+    async (request: ToolExecutionRequest) => {
+      if (executingRef.current) return;
+
+      const controller = new AbortController();
+      executingRef.current = true;
+      activeExecutionRef.current = controller;
+      setIsExecuting(true);
+      const startTime = Date.now();
+
+      try {
+        if (request.widgetResourceUri) {
+          try {
+            await readResource(request.widgetResourceUri);
+          } catch {
+            /* continue */
+          }
+          setResults([
+            {
+              toolName: request.toolName,
+              args: request.args,
+              result: null,
+              timestamp: request.timestamp,
+              duration: 0,
+              toolMeta: request.toolMeta,
+            },
+          ]);
+        }
+
+        const result = await callTool(request.toolName, request.args, {
+          timeout: 600000,
+          resetTimeoutOnProgress: true,
+          signal: controller.signal,
+        });
+        const duration = Date.now() - startTime;
+        const updatedToolMeta = mergeToolMetadata(
+          request.toolMeta,
+          (result as any)?._meta
+        );
+
+        captureInspectorEvent(
+          new MCPToolExecutionEvent({
+            toolName: request.toolName,
+            serverId,
+            success: true,
+            duration,
+          })
+        ).catch(() => {});
+        window.dispatchEvent(new Event("mcp-tool-executed"));
+
+        if (request.widgetResourceUri) {
+          setResults((prev) =>
+            prev.map((entry, index) =>
+              index === 0
+                ? {
+                    ...entry,
+                    result,
+                    duration,
+                    toolMeta: updatedToolMeta,
+                  }
+                : entry
+            )
+          );
+        } else {
+          setResults((prev) => [
+            {
+              toolName: request.toolName,
+              args: request.displayArgs,
+              result,
+              timestamp: request.timestamp,
+              duration,
+              toolMeta: updatedToolMeta,
+            },
+            ...prev,
+          ]);
+        }
+      } catch (error) {
+        if (cancelledExecutionsRef.current.has(controller)) {
+          return;
+        }
+        const duration = Date.now() - startTime;
+        captureInspectorEvent(
+          new MCPToolExecutionEvent({
+            toolName: request.toolName,
+            serverId,
+            success: false,
+            duration,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        ).catch(() => {});
+        window.dispatchEvent(new Event("mcp-tool-executed"));
+
+        if (isOAuthInteractionRequired(error)) {
+          const pending = { ...request, serverId };
+          shouldResumeAuthorizationRef.current = false;
+          setPendingAuthorization(pending);
+          setAuthorizationError(null);
+          const authResult = authorizationRequiredResult(request, duration);
+          if (request.widgetResourceUri) {
+            setResults([authResult]);
+          } else {
+            setResults((prev) => [
+              authResult,
+              ...prev.filter(
+                (entry) =>
+                  !(
+                    entry.authorizationRequired &&
+                    entry.timestamp === request.timestamp
+                  )
+              ),
+            ]);
+          }
+          return;
+        }
+
+        const errorResult: ToolResult = {
+          toolName: request.toolName,
+          args: request.displayArgs,
+          result: null,
+          error: error instanceof Error ? error.message : String(error),
+          timestamp: request.timestamp,
+          duration,
+          toolMeta: request.toolMeta,
+        };
+        if (request.widgetResourceUri) {
+          setResults([errorResult]);
+        } else {
+          setResults((prev) => [errorResult, ...prev]);
+        }
+      } finally {
+        if (activeExecutionRef.current === controller) {
+          activeExecutionRef.current = null;
+          executingRef.current = false;
+          setIsExecuting(false);
+        }
+      }
+    },
+    [callTool, readResource, serverId]
+  );
 
   const executeTool = useCallback(async () => {
-    if (!selectedTool || isExecuting) return;
+    if (!selectedTool || executingRef.current) return;
 
-    const controller = new AbortController();
-    setAbortController(controller);
-    setIsExecuting(true);
-    const startTime = Date.now();
+    const toolMeta = ((selectedTool as any)?._meta ||
+      (selectedTool as any)?.metadata) as Record<string, unknown> | undefined;
+    const widgetResourceUri = (toolMeta as any)?.ui?.resourceUri;
+    await executeRequest({
+      toolName: selectedTool.name,
+      args: payloadToSend,
+      displayArgs: toolArgs,
+      timestamp: Date.now(),
+      toolMeta,
+      ...(typeof widgetResourceUri === "string" ? { widgetResourceUri } : {}),
+    });
+  }, [selectedTool, payloadToSend, toolArgs, executeRequest]);
 
-    try {
-      const parsedArgs = payloadToSend;
-      const toolMeta =
-        (selectedTool as any)?._meta || (selectedTool as any)?.metadata;
-      const mcpAppsResourceUri = toolMeta?.ui?.resourceUri;
-      const widgetResourceUri = mcpAppsResourceUri;
-
-      if (widgetResourceUri && typeof widgetResourceUri === "string") {
-        try {
-          await readResource(widgetResourceUri);
-        } catch {
-          /* continue */
-        }
-        setResults([
-          {
-            toolName: selectedTool.name,
-            args: parsedArgs,
-            result: null,
-            timestamp: startTime,
-            duration: 0,
-            toolMeta,
-          },
-        ]);
-      }
-
-      const result = await callTool(selectedTool.name, parsedArgs, {
-        timeout: 600000,
-        resetTimeoutOnProgress: true,
-        signal: controller.signal,
-      });
-      const duration = Date.now() - startTime;
-      const updatedToolMeta = mergeToolMetadata(
-        toolMeta,
-        (result as any)?._meta
-      );
-
-      captureInspectorEvent(
-        new MCPToolExecutionEvent({
-          toolName: selectedTool.name,
-          serverId,
-          success: true,
-          duration,
-        })
-      ).catch(() => {});
-      window.dispatchEvent(new Event("mcp-tool-executed"));
-
-      if (widgetResourceUri && typeof widgetResourceUri === "string") {
-        setResults((prev) =>
-          prev.map((r, idx) =>
-            idx === 0
-              ? { ...r, result, duration, toolMeta: updatedToolMeta }
-              : r
-          )
-        );
-      } else {
-        setResults((prev) => [
-          {
-            toolName: selectedTool.name,
-            args: toolArgs,
-            result,
-            timestamp: startTime,
-            duration,
-            toolMeta: updatedToolMeta,
-          },
-          ...prev,
-        ]);
-      }
-    } catch (error) {
-      const duration = Date.now() - startTime;
-      captureInspectorEvent(
-        new MCPToolExecutionEvent({
-          toolName: selectedTool.name,
-          serverId,
-          success: false,
-          duration,
-          error: error instanceof Error ? error.message : String(error),
-        })
-      ).catch(() => {});
-      window.dispatchEvent(new Event("mcp-tool-executed"));
-
-      const toolMeta =
-        (selectedTool as any)?._meta || (selectedTool as any)?.metadata;
-      const errorResult: ToolResult = {
-        toolName: selectedTool.name,
-        args: toolArgs,
-        result: null,
-        error: error instanceof Error ? error.message : String(error),
-        timestamp: startTime,
-        duration,
-        toolMeta,
-      };
-      const hasWidgetResource = toolMeta?.ui?.resourceUri;
-      if (hasWidgetResource) {
-        setResults([errorResult]);
-      } else {
-        setResults((prev) => [errorResult, ...prev]);
-      }
-    } finally {
-      setIsExecuting(false);
+  useEffect(() => {
+    if (
+      !pendingAuthorization ||
+      !isConnected ||
+      !shouldResumeAuthorizationRef.current ||
+      executingRef.current
+    ) {
+      return;
     }
+
+    shouldResumeAuthorizationRef.current = false;
+    clearPendingToolExecution(serverId);
+    setPendingAuthorization(null);
+    setAuthorizationError(null);
+    setIsAuthorizing(false);
+    setResults((prev) =>
+      prev.filter(
+        (entry) =>
+          !(
+            entry.authorizationRequired &&
+            entry.timestamp === pendingAuthorization.timestamp
+          )
+      )
+    );
+    void executeRequest(pendingAuthorization);
   }, [
-    selectedTool,
-    payloadToSend,
-    toolArgs,
-    isExecuting,
-    callTool,
-    readResource,
+    executeRequest,
+    isConnected,
+    pendingAuthorization,
+    resumeVersion,
     serverId,
   ]);
+
+  const authenticateAndRerun = useCallback(
+    async (timestamp: number) => {
+      if (
+        !pendingAuthorization ||
+        pendingAuthorization.timestamp !== timestamp ||
+        !authenticate ||
+        isAuthorizing
+      ) {
+        return;
+      }
+
+      savePendingToolExecution(pendingAuthorization);
+      setAuthorizationError(null);
+      setIsAuthorizing(true);
+      try {
+        await authenticate();
+        shouldResumeAuthorizationRef.current = true;
+        setResumeVersion((version) => version + 1);
+      } catch (error) {
+        clearPendingToolExecution(serverId);
+        setAuthorizationError(
+          error instanceof Error ? error.message : "Authentication failed"
+        );
+      } finally {
+        setIsAuthorizing(false);
+      }
+    },
+    [authenticate, isAuthorizing, pendingAuthorization, serverId]
+  );
 
   const handleCopyResult = useCallback(async (index: number, text: string) => {
     try {
@@ -170,8 +315,9 @@ export function useToolExecution({
   }, []);
 
   const filteredResults = useMemo(() => {
-    if (!selectedTool) return [];
-    return results.filter((r) => r.toolName === selectedTool.name);
+    const activeToolName = selectedTool?.name ?? results[0]?.toolName;
+    if (!activeToolName) return [];
+    return results.filter((result) => result.toolName === activeToolName);
   }, [results, selectedTool]);
 
   const handleFullscreen = useCallback(
@@ -193,10 +339,15 @@ export function useToolExecution({
   );
 
   const cancelExecution = useCallback(() => {
-    abortController?.abort();
-    setAbortController(null);
+    const controller = activeExecutionRef.current;
+    if (!controller) return;
+    cancelledExecutionsRef.current.add(controller);
+    controller.abort();
+    if (activeExecutionRef.current !== controller) return;
+    activeExecutionRef.current = null;
+    executingRef.current = false;
     setIsExecuting(false);
-  }, [abortController]);
+  }, []);
 
   return {
     results,
@@ -209,5 +360,9 @@ export function useToolExecution({
     handleFullscreen,
     filteredResults,
     cancelExecution,
+    pendingAuthorization,
+    authenticateAndRerun,
+    isAuthorizing: isAuthorizing || isAuthenticating,
+    authorizationError,
   };
 }

@@ -535,7 +535,7 @@ mcp-use client <name> <scope> <action>
 | `tools`     | `list`, `describe <tool>`, `call <tool> [args...] [--timeout <ms>]` |
 | `resources` | `list`, `read <uri>`                                                |
 | `prompts`   | `list`, `get <prompt> [args...]`                                    |
-| `auth`      | `status`, `logout [--yes]`                                          |
+| `auth`      | `login`, `status`, `logout [--yes]`                                 |
 
 Every action in this table accepts `--json` except where the top-level table does not advertise it.
 
@@ -548,6 +548,7 @@ mcp-use client local tools list
 mcp-use client local tools call read_file path=/tmp/test.txt
 mcp-use client local resources read "file:///tmp/data.json"
 mcp-use client local prompts get greeting name=Alice
+mcp-use client local auth login
 mcp-use client local auth status
 ```
 
@@ -555,7 +556,10 @@ mcp-use client local auth status
 
 - Saved server metadata is stored in `~/.mcp-use/client/servers.json`. Credentials are stored separately under `~/.mcp-use/client/credentials/`.
 - In an interactive TTY, OAuth displays `This server requires OAuth. Press Enter to open your browser.` and opens the browser only after Enter.
-- `--no-open`, `--json`, and non-TTY operation never prompt or open a browser. They print the authorization URL to stderr while the loopback callback continues waiting.
+- When protected-resource metadata identifies mixed auth, `connect` succeeds anonymously, reports that public tools are available, and suggests `mcp-use client <name> auth login`. The JSON connection result includes `authorization` metadata.
+- `auth login` starts OAuth for an already-saved server; otherwise the first wire-level OAuth challenge can start the flow later and the CLI retries that operation once.
+- `--no-open` and non-TTY human output never prompt or open a browser; they print a state-free local launcher URL while the loopback callback continues waiting. The local route redirects to the provider without exposing OAuth state in terminal output.
+- `--json` never opens a browser or prints an OAuth URL or state. If fresh consent is required, it exits `1` with `oauth_interaction_required` and an interactive retry command in `error.details.nextSteps`.
 - `connect --no-oauth` prevents automatic OAuth when the server returns `401`.
 - `--protocol auto` prefers the modern wire and falls back to legacy. `legacy`
   selects only the legacy wire. `modern` selects the stateless, sessionless
@@ -564,7 +568,7 @@ mcp-use client local auth status
 - Tool and prompt arguments accept `key=value`, `key:=<json>`, or a single JSON object argument.
 - `--json` may appear anywhere after `client`. Success emits exactly one JSON value to stdout. Errors emit exactly one JSON error envelope to stderr and no stdout value.
 - Calls, resource reads, and prompt gets emit raw MCP result envelopes. Lists emit arrays, and `tools describe` emits one tool object.
-- Tool `isError` results exit `1` and retain the original protocol result in `error.details` under `--json`.
+- Tool `isError` results exit `1` and retain the original protocol result in `error.details` under `--json`; they and auth-like error text are not interpreted as OAuth challenges.
 
 <Card
   title="CLI Client guide"
