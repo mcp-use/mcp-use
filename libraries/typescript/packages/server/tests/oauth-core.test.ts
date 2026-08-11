@@ -11,7 +11,10 @@ import {
   resolveConfiguredOAuthResource,
   wrapOAuthTokenVerifier,
 } from "../src/oauth/internal.js";
-import { createJwtVerifier } from "../src/oauth/jwt.js";
+import {
+  createJwtVerifier,
+  type JwtVerifierOptions,
+} from "../src/oauth/index.js";
 import { oauthCustomProvider } from "../src/oauth/provider.js";
 
 const metadata = {
@@ -201,7 +204,7 @@ describe("OAuth core", () => {
       key,
       algorithms: ["HS256"],
       resource: canonicalResource,
-    });
+    } satisfies JwtVerifierOptions);
     const sign = (claims: Record<string, unknown>) =>
       new SignJWT({ sub: "user-1", client_id: "client-1", ...claims })
         .setProtectedHeader({ alg: "HS256" })

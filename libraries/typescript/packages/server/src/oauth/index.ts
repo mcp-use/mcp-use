@@ -22,6 +22,7 @@ export type {
 } from "@modelcontextprotocol/server";
 
 export { bearerAuth, oauthMetadata } from "./adapters.js";
+export { createJwtVerifier, type JwtVerifierOptions } from "./jwt.js";
 export {
   oauthCustomProvider,
   type CustomOAuthProviderOptions,

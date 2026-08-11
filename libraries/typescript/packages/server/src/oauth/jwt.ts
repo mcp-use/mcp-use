@@ -18,10 +18,13 @@ export { invalidToken } from "./errors.js";
 /** @internal Record of claims extracted from a verified JWT. */
 export type VerifiedPayload = Record<string, unknown>;
 
-/** @internal Configures issuer, keys, and claims enforced by a JWT verifier. */
+/** Options for {@link createJwtVerifier}. */
 export interface JwtVerifierOptions {
+  /** Expected value of the JWT `iss` claim. */
   issuer: string;
+  /** Remote JSON Web Key Set used to verify token signatures. */
   jwksUrl: URL;
+  /** Canonical public MCP endpoint that accepted tokens must target. */
   resource: URL;
   /** Provider-specific JWT audience, when it differs from the MCP resource. */
   audience?: string | string[];
@@ -31,11 +34,38 @@ export interface JwtVerifierOptions {
    * than an aud/resource claim.
    */
   issuerBoundAccessTokens?: boolean;
+  /** Allowed JWT signature algorithms. */
   algorithms?: readonly string[];
+  /** Static symmetric verification key to use instead of the remote JWKS. */
   key?: Uint8Array;
 }
 
-/** @internal Creates a verifier that rejects JWTs with invalid signatures or required claims. */
+/**
+ * Creates an OAuth access-token verifier backed by `jose` JWT validation.
+ *
+ * The verifier validates the signature, issuer, expiration, subject, and
+ * protected-resource binding before returning SDK authentication information.
+ *
+ * @param options - Issuer, key source, accepted claims, and MCP resource.
+ * @returns An OAuth token verifier for use with {@link oauthCustomProvider}.
+ * @throws A `TypeError` when audience and issuer-bound validation are combined.
+ *
+ * @example
+ * ```ts
+ * import { createJwtVerifier, oauthCustomProvider } from "mcp-use/oauth";
+ *
+ * const oauth = oauthCustomProvider({
+ *   createTokenVerifier: (resource) =>
+ *     createJwtVerifier({
+ *       issuer: "https://auth.example.com",
+ *       jwksUrl: new URL("https://auth.example.com/.well-known/jwks.json"),
+ *       resource,
+ *     }),
+ *   oauthMetadata,
+ *   mapAuthInfo,
+ * });
+ * ```
+ */
 export function createJwtVerifier(
   options: JwtVerifierOptions
 ): OAuthTokenVerifier {
