@@ -55,6 +55,20 @@ function requireConnection(params: Params, operation: string): MCPConnection {
   return connection;
 }
 
+async function executeWithAuthorizationSignal<T>(
+  params: Params,
+  operation: () => Promise<T>
+): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (isOAuthInteractionRequired(error)) {
+      params.onAuthorizationRequired(error);
+    }
+    throw error;
+  }
+}
+
 export function useMcpOperations(params: Params) {
   const callTool = useCallback<UseMcpResult["callTool"]>(
     async (name, args, options) => {
@@ -62,7 +76,9 @@ export function useMcpOperations(params: Params) {
       params.addLog("info", `Calling tool: ${name}`, args);
       const startedAt = Date.now();
       try {
-        const result = await connection.callTool(name, args || {}, options);
+        const result = await executeWithAuthorizationSignal(params, () =>
+          connection.callTool(name, args || {}, options)
+        );
         params.addLog("info", `Tool "${name}" call successful:`, result);
         Tel.getInstance()
           .trackUseMcpToolCall({
@@ -73,9 +89,6 @@ export function useMcpOperations(params: Params) {
           .catch(() => {});
         return result;
       } catch (error) {
-        if (isOAuthInteractionRequired(error)) {
-          params.onAuthorizationRequired(error);
-        }
         params.addLog("error", `Tool "${name}" call failed:`, error);
         Tel.getInstance()
           .trackUseMcpToolCall({
@@ -94,16 +107,20 @@ export function useMcpOperations(params: Params) {
   const listResources = useCallback(async () => {
     const connection = requireConnection(params, "list resources");
     params.addLog("info", "Listing resources");
-    const result = await connection.listAllResources();
+    const result = await executeWithAuthorizationSignal(params, () =>
+      connection.listAllResources()
+    );
     params.setResources(result.resources || []);
-  }, [params.addLog]);
+  }, [params.addLog, params.onAuthorizationRequired]);
 
   const readResource = useCallback(
     async (uri: string) => {
       const connection = requireConnection(params, "read resource");
       params.addLog("info", `Reading resource: ${uri}`);
       try {
-        const result = await connection.readResource(uri);
+        const result = await executeWithAuthorizationSignal(params, () =>
+          connection.readResource(uri)
+        );
         Tel.getInstance()
           .trackUseMcpResourceRead({ resourceUri: uri, success: true })
           .catch(() => {});
@@ -119,78 +136,96 @@ export function useMcpOperations(params: Params) {
         throw error;
       }
     },
-    [params.addLog]
+    [params.addLog, params.onAuthorizationRequired]
   );
 
   const listSkills = useCallback(async () => {
     const connection = requireConnection(params, "list skills");
     params.addLog("info", "Listing skills");
-    const result = await connection.listAllSkills();
+    const result = await executeWithAuthorizationSignal(params, () =>
+      connection.listAllSkills()
+    );
     params.setSkills(result.skills);
-  }, [params.addLog]);
+  }, [params.addLog, params.onAuthorizationRequired]);
 
   const getSkill = useCallback(
     async (uri: string) => {
       const connection = requireConnection(params, "get skill");
       params.addLog("info", `Getting skill: ${uri}`);
-      return connection.getSkill(uri);
+      return executeWithAuthorizationSignal(params, () =>
+        connection.getSkill(uri)
+      );
     },
-    [params.addLog]
+    [params.addLog, params.onAuthorizationRequired]
   );
 
   const readResourceDirectory = useCallback(
     async (uri: string, cursor?: string) => {
       const connection = requireConnection(params, "read resource directory");
       params.addLog("info", `Reading resource directory: ${uri}`);
-      return connection.readResourceDirectory(uri, cursor);
+      return executeWithAuthorizationSignal(params, () =>
+        connection.readResourceDirectory(uri, cursor)
+      );
     },
-    [params.addLog]
+    [params.addLog, params.onAuthorizationRequired]
   );
 
   const listPrompts = useCallback(async () => {
     const connection = requireConnection(params, "list prompts");
     params.addLog("info", "Listing prompts");
-    const result = await connection.listPrompts();
+    const result = await executeWithAuthorizationSignal(params, () =>
+      connection.listPrompts()
+    );
     params.setPrompts(result.prompts || []);
-  }, [params.addLog]);
+  }, [params.addLog, params.onAuthorizationRequired]);
 
   const refreshTools = useCallback(async () => {
     if (params.stateRef.current !== "ready" || !params.connectionRef.current)
       return;
     try {
-      params.setTools((await params.connectionRef.current.listTools()) || []);
+      params.setTools(
+        (await executeWithAuthorizationSignal(params, () =>
+          params.connectionRef.current!.listTools()
+        )) || []
+      );
     } catch (error) {
       params.addLog("error", "Failed to refresh tools:", error);
     }
-  }, [params.addLog]);
+  }, [params.addLog, params.onAuthorizationRequired]);
 
   const refreshResources = useCallback(async () => {
     if (params.stateRef.current !== "ready" || !params.connectionRef.current)
       return;
     try {
-      const result = await params.connectionRef.current.listAllResources();
+      const result = await executeWithAuthorizationSignal(params, () =>
+        params.connectionRef.current!.listAllResources()
+      );
       params.setResources(result.resources || []);
     } catch (error) {
       params.addLog("warn", "Failed to refresh resources:", error);
     }
-  }, [params.addLog]);
+  }, [params.addLog, params.onAuthorizationRequired]);
 
   const refreshPrompts = useCallback(async () => {
     if (params.stateRef.current !== "ready" || !params.connectionRef.current)
       return;
     try {
-      const result = await params.connectionRef.current.listPrompts();
+      const result = await executeWithAuthorizationSignal(params, () =>
+        params.connectionRef.current!.listPrompts()
+      );
       params.setPrompts(result.prompts || []);
     } catch (error) {
       params.addLog("warn", "Failed to refresh prompts:", error);
     }
-  }, [params.addLog]);
+  }, [params.addLog, params.onAuthorizationRequired]);
 
   const refreshSkills = useCallback(async () => {
     if (params.stateRef.current !== "ready" || !params.connectionRef.current)
       return;
     try {
-      const result = await params.connectionRef.current.listAllSkills();
+      const result = await executeWithAuthorizationSignal(params, () =>
+        params.connectionRef.current!.listAllSkills()
+      );
       params.setSkills(result.skills);
     } catch (error) {
       // A development reload may remove the final skills directory, in which
@@ -200,15 +235,17 @@ export function useMcpOperations(params: Params) {
       params.setSkills([]);
       params.addLog("debug", "Skills are unavailable after refresh:", error);
     }
-  }, [params.addLog]);
+  }, [params.addLog, params.onAuthorizationRequired]);
 
   const refreshResourceTemplates = useCallback(async () => {
     const connection = requireConnection(params, "refresh resource templates");
-    const result = await connection.listResourceTemplates();
+    const result = await executeWithAuthorizationSignal(params, () =>
+      connection.listResourceTemplates()
+    );
     if (params.isMounted()) {
       params.setResourceTemplates(result.resourceTemplates || []);
     }
-  }, [params.addLog]);
+  }, [params.addLog, params.onAuthorizationRequired]);
 
   const refreshAll = useCallback(
     () =>
@@ -224,15 +261,21 @@ export function useMcpOperations(params: Params) {
   const getPrompt = useCallback(
     async (name: string, args?: Record<string, unknown>) => {
       const connection = requireConnection(params, "get prompt");
-      return connection.getPrompt(name, args || {});
+      return executeWithAuthorizationSignal(params, () =>
+        connection.getPrompt(name, args || {})
+      );
     },
-    [params.addLog]
+    [params.addLog, params.onAuthorizationRequired]
   );
 
   const complete = useCallback(
-    async (request: CompleteRequestParams): Promise<CompleteResult> =>
-      requireConnection(params, "request completion").complete(request),
-    [params.addLog]
+    async (request: CompleteRequestParams): Promise<CompleteResult> => {
+      const connection = requireConnection(params, "request completion");
+      return executeWithAuthorizationSignal(params, () =>
+        connection.complete(request)
+      );
+    },
+    [params.addLog, params.onAuthorizationRequired]
   );
 
   return {

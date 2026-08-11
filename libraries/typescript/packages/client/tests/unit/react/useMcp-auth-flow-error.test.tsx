@@ -3,6 +3,7 @@
 import React from "react";
 import { act, create } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { UnauthorizedError } from "@modelcontextprotocol/client";
 
 const mocks = vi.hoisted(() => {
   const auth = vi.fn();
@@ -208,6 +209,86 @@ describe("useMcp manual authentication failures", () => {
         mode: "mixed",
         authenticated: false,
       });
+
+      await act(async () => {
+        renderer!.unmount();
+      });
+    }
+  );
+
+  it.each([
+    {
+      operation: "resource",
+      invoke: (result: ReturnType<typeof useMcp>) =>
+        result.readResource("resource://private/profile"),
+    },
+    {
+      operation: "prompt",
+      invoke: (result: ReturnType<typeof useMcp>) =>
+        result.getPrompt("private-profile"),
+    },
+  ])(
+    "surfaces OAuth state when a protected $operation operation is challenged",
+    async ({ invoke }) => {
+      const authorizationError = new UnauthorizedError(
+        "Authorization required"
+      );
+      mocks.provider.getLastAttemptedAuthUrl.mockReturnValue(
+        "https://auth.example.com/authorize?state=prepared"
+      );
+      mocks.client.connect.mockResolvedValue({
+        tools: [{ name: "public", inputSchema: { type: "object" } }],
+        info: {
+          protocolEra: "legacy",
+          protocolVersion: "2025-06-18",
+          server: { name: "mixed", version: "1.0.0" },
+          capabilities: { tools: {} },
+          instructions: undefined,
+          extensions: {},
+        },
+        supports: vi.fn().mockReturnValue(false),
+        listAllResources: vi.fn().mockResolvedValue({ resources: [] }),
+        listResourceTemplates: vi
+          .fn()
+          .mockResolvedValue({ resourceTemplates: [] }),
+        listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
+        readResource: vi.fn().mockRejectedValue(authorizationError),
+        getPrompt: vi.fn().mockRejectedValue(authorizationError),
+      });
+
+      let latest: ReturnType<typeof useMcp> | undefined;
+      function TestComponent() {
+        latest = useMcp({
+          url: "https://mcp.example.com/mcp",
+          autoProxyFallback: false,
+          autoReconnect: false,
+          autoRetry: false,
+          logLevel: "silent",
+        });
+        return null;
+      }
+
+      let renderer: ReturnType<typeof create>;
+      await act(async () => {
+        renderer = create(<TestComponent />);
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(latest?.state).toBe("ready");
+
+      await act(async () => {
+        await expect(invoke(latest!)).rejects.toBe(authorizationError);
+      });
+
+      expect(latest?.state).toBe("ready");
+      expect(latest?.authorization).toEqual({
+        mode: "mixed",
+        authenticated: false,
+      });
+      expect(latest?.authUrl).toBe(
+        "https://auth.example.com/authorize?state=prepared"
+      );
 
       await act(async () => {
         renderer!.unmount();
