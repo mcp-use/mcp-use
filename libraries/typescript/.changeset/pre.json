@@ -17,6 +17,7 @@
     "fresh-tools-auth",
     "protected-operations-auth",
     "quick-sse-proxy",
+    "stable-review-followups",
     "tidy-pumas-smoke",
     "wise-cats-explore"
   ]

@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.1.1-canary.5
+
+### Patch Changes
+
+- 8d53762: Recover mixed-auth metadata discovery after transient failures, preserve ready React connections when optional token projection fails, report authenticated state after challenged OAuth, correct CLI login recovery, suppress failure results for user-cancelled Inspector tools, and keep the mixed-OAuth example's authorization guard aligned with MCP JSON parsing.
+
 ## 2.1.1-canary.4
 
 ### Patch Changes
