@@ -1,5 +1,11 @@
 # mcp-use
 
+## 2.1.2-canary.5
+
+### Patch Changes
+
+- dc33ff5: Restore zero-config OAuth provider setup through the standardized `MCP_USE_OAUTH_*` environment variables while preserving explicit option overrides.
+
 ## 2.1.2-canary.4
 
 ### Patch Changes

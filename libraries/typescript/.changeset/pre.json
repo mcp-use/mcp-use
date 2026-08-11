@@ -12,6 +12,7 @@
   },
   "changesets": [
     "bright-widgets-connect",
+    "calm-otters-auth",
     "cold-views-warm",
     "quiet-pandas-refresh",
     "swift-widgets-refresh",
