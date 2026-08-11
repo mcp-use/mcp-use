@@ -13,6 +13,7 @@
   "changesets": [
     "bright-widgets-connect",
     "cold-views-warm",
+    "quiet-pandas-refresh",
     "swift-widgets-refresh",
     "warm-zebras-compile"
   ]

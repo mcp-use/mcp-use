@@ -1,5 +1,13 @@
 # mcp-use
 
+## 2.1.2-canary.4
+
+### Patch Changes
+
+- 6ec7f98: Ignore Vibe's managed dev-server log in Vite's file watcher so operational log writes do not trigger endless full reloads instead of view HMR.
+- Updated dependencies [6ec7f98]
+  - @mcp-use/cli@4.1.2-canary.4
+
 ## 2.1.2-canary.3
 
 ### Patch Changes
