@@ -1,5 +1,5 @@
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { oauthAuth0Provider } from "../src/oauth/auth0.js";
 import { oauthBetterAuthProvider } from "../src/oauth/better-auth.js";
@@ -15,9 +15,87 @@ const protectedResource = new URL("https://api.example.test/mcp");
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  vi.unstubAllEnvs();
 });
 
 describe("direct OAuth providers", () => {
+  it("restores the v1 zero-config provider environment contract", () => {
+    vi.stubEnv("MCP_USE_OAUTH_AUTH0_DOMAIN", "env.auth0.example");
+    vi.stubEnv("MCP_USE_OAUTH_AUTH0_AUDIENCE", "https://api.example.test/mcp");
+    vi.stubEnv(
+      "MCP_USE_OAUTH_KEYCLOAK_SERVER_URL",
+      "https://keycloak.example.test"
+    );
+    vi.stubEnv("MCP_USE_OAUTH_KEYCLOAK_REALM", "env-realm");
+    vi.stubEnv(
+      "MCP_USE_OAUTH_KEYCLOAK_AUDIENCE",
+      "https://keycloak-api.example.test/mcp"
+    );
+    vi.stubEnv(
+      "MCP_USE_OAUTH_CLERK_FRONTEND_API_URL",
+      "https://env.clerk.accounts.dev"
+    );
+    vi.stubEnv("MCP_USE_OAUTH_WORKOS_SUBDOMAIN", "env-company.authkit.app");
+    vi.stubEnv(
+      "MCP_USE_OAUTH_BETTER_AUTH_URL",
+      "https://auth.example.test/api/auth"
+    );
+    vi.stubEnv("MCP_USE_OAUTH_SUPABASE_PROJECT_ID", "env-project");
+    vi.stubEnv(
+      "MCP_USE_OAUTH_SUPABASE_JWT_SECRET",
+      "0123456789abcdef0123456789abcdef"
+    );
+
+    expect(oauthAuth0Provider()).toMatchObject({
+      resource: "https://api.example.test/mcp",
+      oauthMetadata: { issuer: "https://env.auth0.example/" },
+    });
+    expect(oauthKeycloakProvider()).toMatchObject({
+      resource: "https://keycloak-api.example.test/mcp",
+      oauthMetadata: {
+        issuer: "https://keycloak.example.test/realms/env-realm",
+      },
+    });
+    expect(oauthClerkProvider().oauthMetadata.issuer).toBe(
+      "https://env.clerk.accounts.dev"
+    );
+    expect(oauthWorkOSProvider().oauthMetadata.issuer).toBe(
+      "https://env-company.authkit.app"
+    );
+    expect(oauthBetterAuthProvider().oauthMetadata.issuer).toBe(
+      "https://auth.example.test/api/auth"
+    );
+    expect(oauthSupabaseProvider().oauthMetadata.issuer).toBe(
+      "https://env-project.supabase.co/auth/v1"
+    );
+  });
+
+  it("keeps explicit provider config ahead of v1 environment fallbacks", () => {
+    vi.stubEnv("MCP_USE_OAUTH_AUTH0_DOMAIN", "env.auth0.example");
+    vi.stubEnv(
+      "MCP_USE_OAUTH_AUTH0_AUDIENCE",
+      "https://env-api.example.test/mcp"
+    );
+    vi.stubEnv("MCP_USE_OAUTH_SUPABASE_PROJECT_ID", "env-project");
+    vi.stubEnv("MCP_USE_OAUTH_SUPABASE_URL", "https://env-project.supabase.co");
+
+    expect(
+      oauthAuth0Provider({
+        domain: "explicit.auth0.example",
+        resource: "https://explicit-api.example.test/mcp",
+      })
+    ).toMatchObject({
+      resource: "https://explicit-api.example.test/mcp",
+      oauthMetadata: { issuer: "https://explicit.auth0.example/" },
+    });
+    expect(
+      oauthSupabaseProvider({
+        projectId: "explicit-project",
+        supabaseUrl: "http://localhost:54321",
+      }).oauthMetadata.issuer
+    ).toBe("http://localhost:54321/auth/v1");
+  });
+
   it("verifies Better Auth JWTs and preserves issuer path prefixes", async () => {
     const { privateKey, publicKey } = await generateKeyPair("EdDSA");
     const jwk = await exportJWK(publicKey);
