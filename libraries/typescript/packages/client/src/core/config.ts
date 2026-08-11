@@ -173,6 +173,8 @@ export interface AutoOAuthOptions {
   preferredPort?: number;
   /** Number of Node loopback ports to try. Defaults to `10`. */
   portRange?: number;
+  /** Node: override the on-disk OAuth store directory. */
+  baseDir?: string;
   /** Node loopback callback timeout in milliseconds. Defaults to five minutes. */
   authTimeoutMs?: number;
   /** Node: override browser launch (CLI prints the URL instead). */
@@ -205,7 +207,7 @@ export interface HttpServerConfig extends BaseServerConfig {
   authProvider?: AuthProvider | OAuthClientProvider;
   /**
    * Auto-OAuth options for HTTP servers.
-   * - omit / `{}`: client creates the platform provider on connect
+   * - omit / `{}`: client creates the platform provider after a 401 response
    * - `false`: disable auto-OAuth (e.g. CLI `--no-oauth`)
    * - object: forwarded to `createOAuthProvider`
    *

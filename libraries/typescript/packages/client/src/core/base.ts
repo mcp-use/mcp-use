@@ -66,6 +66,9 @@ export abstract class BaseMCPClient {
    */
   protected sessions: Record<string, MCPSession> = {};
 
+  /** Auto-created OAuth providers whose authorization flow is still pending. */
+  private pendingOAuthProviders: Record<string, OAuthClientProvider> = {};
+
   /**
    * List of server names that have active sessions.
    * This array is kept in sync with the sessions map and can be used
@@ -317,19 +320,9 @@ export abstract class BaseMCPClient {
 
     let serverConfig: ServerConfig = { ...servers[serverName] };
     let oauthProvider: OAuthClientProvider | undefined;
+    const shouldCreateOAuthProvider = shouldAutoProvisionOAuth(serverConfig);
 
-    if (shouldAutoProvisionOAuth(serverConfig)) {
-      const oauthOptions =
-        serverConfig.oauth === false ? undefined : (serverConfig.oauth ?? {});
-      oauthProvider = await this.createDefaultOAuthProvider(
-        serverConfig.url,
-        oauthOptions
-      );
-      serverConfig = {
-        ...serverConfig,
-        authProvider: oauthProvider,
-      };
-    } else if (
+    if (
       "authProvider" in serverConfig &&
       serverConfig.authProvider &&
       isOAuthClientProvider(serverConfig.authProvider)
@@ -355,11 +348,24 @@ export abstract class BaseMCPClient {
       const httpConfig = serverConfig as HttpServerConfig;
       if (
         !autoInitialize ||
-        !oauthProvider ||
         !("url" in httpConfig) ||
-        !isUnauthorized(err)
+        !isUnauthorized(err) ||
+        (!oauthProvider && !shouldCreateOAuthProvider)
       ) {
         throw err;
+      }
+      if (!oauthProvider) {
+        const oauthOptions =
+          httpConfig.oauth === false ? undefined : (httpConfig.oauth ?? {});
+        oauthProvider = await this.createDefaultOAuthProvider(
+          httpConfig.url,
+          oauthOptions
+        );
+        serverConfig = {
+          ...serverConfig,
+          authProvider: oauthProvider,
+        };
+        this.pendingOAuthProviders[serverName] = oauthProvider;
       }
       if (
         (
@@ -373,8 +379,27 @@ export abstract class BaseMCPClient {
       logger.info(
         `[MCPClient] Unauthorized connecting to '${serverName}'; completing OAuth…`
       );
-      await completeOAuthFlow(oauthProvider, httpConfig.url);
-      session = await openSession();
+      try {
+        if (httpConfig.fetch) {
+          await completeOAuthFlow(oauthProvider, httpConfig.url, {
+            fetchFn: httpConfig.fetch,
+          });
+        } else {
+          await completeOAuthFlow(oauthProvider, httpConfig.url);
+        }
+        session = await openSession();
+      } catch (error) {
+        if (this.pendingOAuthProviders[serverName] === oauthProvider) {
+          (
+            oauthProvider as OAuthClientProvider & { dispose?: () => void }
+          ).dispose?.();
+          delete this.pendingOAuthProviders[serverName];
+        }
+        throw error;
+      }
+      if (this.pendingOAuthProviders[serverName] === oauthProvider) {
+        delete this.pendingOAuthProviders[serverName];
+      }
     }
 
     this.sessions[serverName] = session;
@@ -562,6 +587,11 @@ export abstract class BaseMCPClient {
    * @see {@link createSession} for creating new sessions
    */
   public async closeSession(serverName: string): Promise<void> {
+    const pendingOAuthProvider = this.pendingOAuthProviders[serverName] as
+      | (OAuthClientProvider & { dispose?: () => void })
+      | undefined;
+    pendingOAuthProvider?.dispose?.();
+    delete this.pendingOAuthProviders[serverName];
     const session = this.sessions[serverName];
     if (!session) {
       logger.warn(

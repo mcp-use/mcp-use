@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -15,8 +16,8 @@ const mocks = vi.hoisted(() => ({
         mcpServers: Record<
           string,
           {
-            authProvider?: unknown;
             clientOptions?: { supportedProtocolVersions?: string[] };
+            oauth?: false | { openBrowser: (url: string) => Promise<void> };
             protocolNegotiation?: "auto" | "legacy" | { pin: "2026-07-28" };
             url?: string;
           }
@@ -123,13 +124,12 @@ beforeEach(async () => {
   });
   mocks.loadClientPackage.mockResolvedValue({
     logger: mocks.logger,
-    createOAuthProvider: async (
-      _url: string,
-      options: { openBrowser: (url: string) => Promise<void> }
-    ) => ({ options }),
     MCPClient: class {
       constructor(config: {
-        mcpServers: Record<string, { authProvider?: unknown }>;
+        mcpServers: Record<
+          string,
+          { oauth?: false | { openBrowser: (url: string) => Promise<void> } }
+        >;
       }) {
         mocks.config = config;
       }
@@ -137,11 +137,9 @@ beforeEach(async () => {
       async connect(name: string): Promise<typeof connection> {
         mocks.connectCall(name);
         if (mocks.connectError !== undefined) throw mocks.connectError;
-        const provider = mocks.config?.mcpServers[name]?.authProvider as
-          | { options: { openBrowser: (url: string) => Promise<void> } }
-          | undefined;
-        if (mocks.triggerOAuth && provider !== undefined) {
-          await provider.options.openBrowser(AUTHORIZATION_LAUNCHER_URL);
+        const oauth = mocks.config?.mcpServers[name]?.oauth;
+        if (mocks.triggerOAuth && oauth !== false && oauth !== undefined) {
+          await oauth.openBrowser(AUTHORIZATION_LAUNCHER_URL);
           if (mocks.logger.level === "silent") {
             await new Promise<never>(() => {});
           }
@@ -711,6 +709,37 @@ describe("client protocol selection", () => {
 });
 
 describe("client OAuth browser UX", () => {
+  it("passes the saved connection's OAuth options to MCPClient lazily", async () => {
+    const name = "lazy-options";
+
+    await expect(
+      runClient([
+        "connect",
+        name,
+        "https://mcp.example.com/mcp",
+        "--auth-timeout",
+        "12345",
+      ])
+    ).resolves.toBe(0);
+
+    const oauth = mocks.config?.mcpServers[name]?.oauth;
+    expect(oauth).not.toBe(false);
+    expect(oauth).toMatchObject({
+      authTimeoutMs: 12345,
+      baseDir: expect.stringContaining(
+        join(
+          ".mcp-use",
+          "client",
+          "credentials",
+          createHash("sha256").update(name).digest("hex"),
+          "oauth"
+        )
+      ),
+      storageKeyPrefix: `mcp-use-cli:${name}`,
+      openBrowser: expect.any(Function),
+    });
+  });
+
   it("validates saved command options before connecting or starting OAuth", async () => {
     await runClient([
       "connect",

@@ -444,7 +444,7 @@ async function openConnection(
   quiet = false,
   interactiveCommand = `mcp-use client ${name} tools list`
 ): Promise<MCPConnection> {
-  const { createOAuthProvider, MCPClient, logger } = await loadClientPackage({
+  const { MCPClient, logger } = await loadClientPackage({
     allowInstall: !quiet,
   });
   if (quiet) logger.level = "silent";
@@ -456,8 +456,8 @@ async function openConnection(
         })
       : undefined;
   const oauthBase = oauthDirectory(name);
-  const authProvider = definition.oauth
-    ? await createOAuthProvider(definition.url, {
+  const oauthOptions = definition.oauth
+    ? {
         baseDir: oauthBase,
         authTimeoutMs,
         storageKeyPrefix: `mcp-use-cli:${name}`,
@@ -486,10 +486,8 @@ async function openConnection(
           await waitForOAuthEnter();
           openBrowser(url);
         },
-        // Conditional exports select NodeOAuthOptions at runtime. TypeScript
-        // resolves the package's browser-default declaration in this build.
-      } as unknown as Parameters<typeof createOAuthProvider>[1])
-    : undefined;
+      }
+    : false;
   const protocolConfig =
     definition.protocol === "auto"
       ? { protocolNegotiation: "auto" as const }
@@ -512,7 +510,7 @@ async function openConnection(
         ...(credentials.headers !== undefined
           ? { headers: credentials.headers }
           : {}),
-        ...(authProvider !== undefined ? { authProvider } : { oauth: false }),
+        oauth: oauthOptions,
         ...protocolConfig,
       },
     },
@@ -527,7 +525,6 @@ async function openConnection(
       error instanceof CommandError &&
       error.code === "oauth_interaction_required"
     ) {
-      (authProvider as { dispose?: () => void } | undefined)?.dispose?.();
       await (
         client as typeof client & {
           closeSession?: (serverName: string) => Promise<void>;

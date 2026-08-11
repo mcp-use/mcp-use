@@ -1,6 +1,6 @@
 /**
- * MCPClient auto-OAuth: provisions createDefaultOAuthProvider for HTTP servers
- * and completes the 401 dance once before retrying.
+ * MCPClient auto-OAuth: lazily provisions createDefaultOAuthProvider after an
+ * HTTP 401 and completes the OAuth dance once before retrying.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -104,13 +104,10 @@ describe("BaseMCPClient auto-OAuth createSession", () => {
     vi.mocked(flow.completeOAuthFlow).mockClear();
   });
 
-  it("calls createDefaultOAuthProvider for HTTP without bearer", async () => {
+  it("does not create an OAuth provider for a public HTTP server", async () => {
     const client = new TestClient({
       mcpServers: { demo: { url: "https://example.com/mcp" } },
     });
-    const provider = { server: "provider" } as unknown as OAuthClientProvider;
-    client.createDefaultOAuthProvider.mockResolvedValue(provider);
-
     let seenAuthProvider: unknown;
     client.createConnectorFromConfig.mockImplementation((config) => {
       seenAuthProvider = (config as { authProvider?: unknown }).authProvider;
@@ -119,14 +116,11 @@ describe("BaseMCPClient auto-OAuth createSession", () => {
 
     await client.createSession("demo");
 
-    expect(client.createDefaultOAuthProvider).toHaveBeenCalledWith(
-      "https://example.com/mcp",
-      {}
-    );
-    expect(seenAuthProvider).toBe(provider);
+    expect(client.createDefaultOAuthProvider).not.toHaveBeenCalled();
+    expect(seenAuthProvider).toBeUndefined();
   });
 
-  it("forwards oauth options and skips when oauth: false", async () => {
+  it("does not eagerly provision with oauth options or oauth: false", async () => {
     const withOpts = new TestClient({
       mcpServers: {
         demo: {
@@ -139,10 +133,7 @@ describe("BaseMCPClient auto-OAuth createSession", () => {
       makeConnector(async () => {})
     );
     await withOpts.createSession("demo");
-    expect(withOpts.createDefaultOAuthProvider).toHaveBeenCalledWith(
-      "https://example.com/mcp",
-      { clientName: "app", scope: "openid" }
-    );
+    expect(withOpts.createDefaultOAuthProvider).not.toHaveBeenCalled();
 
     const disabled = new TestClient({
       mcpServers: {
@@ -182,6 +173,115 @@ describe("BaseMCPClient auto-OAuth createSession", () => {
       code: 401,
     });
     let attempts = 0;
+    const seenProviders: unknown[] = [];
+    client.createConnectorFromConfig.mockImplementation((config) => {
+      seenProviders.push((config as { authProvider?: unknown }).authProvider);
+      return makeConnector(async () => {
+        attempts += 1;
+        if (attempts === 1) throw unauthorized;
+      });
+    });
+
+    await client.createSession("demo");
+
+    expect(flow.completeOAuthFlow).toHaveBeenCalledWith(
+      provider,
+      "https://example.com/mcp"
+    );
+    expect(client.createDefaultOAuthProvider).toHaveBeenCalledOnce();
+    expect(seenProviders).toEqual([undefined, provider]);
+    expect(attempts).toBe(2);
+  });
+
+  it("propagates a second 401 without retrying again", async () => {
+    const client = new TestClient({
+      mcpServers: { demo: { url: "https://example.com/mcp" } },
+    });
+    const provider = {} as OAuthClientProvider;
+    client.createDefaultOAuthProvider.mockResolvedValue(provider);
+    const unauthorized = Object.assign(new Error("Unauthorized"), {
+      code: 401,
+    });
+    let attempts = 0;
+    client.createConnectorFromConfig.mockImplementation(() =>
+      makeConnector(async () => {
+        attempts += 1;
+        throw unauthorized;
+      })
+    );
+
+    await expect(client.createSession("demo")).rejects.toBe(unauthorized);
+
+    expect(attempts).toBe(2);
+    expect(client.createDefaultOAuthProvider).toHaveBeenCalledOnce();
+    expect(flow.completeOAuthFlow).toHaveBeenCalledOnce();
+  });
+
+  it("propagates a 401 without provisioning when oauth is disabled", async () => {
+    const client = new TestClient({
+      mcpServers: {
+        demo: { url: "https://example.com/mcp", oauth: false },
+      },
+    });
+    const unauthorized = Object.assign(new Error("Unauthorized"), {
+      code: 401,
+    });
+    let attempts = 0;
+    client.createConnectorFromConfig.mockImplementation(() =>
+      makeConnector(async () => {
+        attempts += 1;
+        throw unauthorized;
+      })
+    );
+
+    await expect(client.createSession("demo")).rejects.toBe(unauthorized);
+
+    expect(attempts).toBe(1);
+    expect(client.createDefaultOAuthProvider).not.toHaveBeenCalled();
+    expect(flow.completeOAuthFlow).not.toHaveBeenCalled();
+  });
+
+  it("forwards oauth options only after a 401", async () => {
+    const client = new TestClient({
+      mcpServers: {
+        demo: {
+          url: "https://example.com/mcp",
+          oauth: { clientName: "app", scope: "openid", baseDir: "/tmp/oauth" },
+        },
+      },
+    });
+    const unauthorized = Object.assign(new Error("Unauthorized"), {
+      code: 401,
+    });
+    let attempts = 0;
+    client.createConnectorFromConfig.mockImplementation(() =>
+      makeConnector(async () => {
+        attempts += 1;
+        if (attempts === 1) throw unauthorized;
+      })
+    );
+
+    await client.createSession("demo");
+
+    expect(client.createDefaultOAuthProvider).toHaveBeenCalledWith(
+      "https://example.com/mcp",
+      { clientName: "app", scope: "openid", baseDir: "/tmp/oauth" }
+    );
+  });
+
+  it("uses the configured fetch implementation for lazy OAuth", async () => {
+    const fetchFn = vi.fn<typeof fetch>();
+    const client = new TestClient({
+      mcpServers: {
+        demo: { url: "https://example.com/mcp", fetch: fetchFn },
+      },
+    });
+    const provider = {} as OAuthClientProvider;
+    client.createDefaultOAuthProvider.mockResolvedValue(provider);
+    const unauthorized = Object.assign(new Error("Unauthorized"), {
+      code: 401,
+    });
+    let attempts = 0;
     client.createConnectorFromConfig.mockImplementation(() =>
       makeConnector(async () => {
         attempts += 1;
@@ -193,9 +293,9 @@ describe("BaseMCPClient auto-OAuth createSession", () => {
 
     expect(flow.completeOAuthFlow).toHaveBeenCalledWith(
       provider,
-      "https://example.com/mcp"
+      "https://example.com/mcp",
+      { fetchFn }
     );
-    expect(attempts).toBe(2);
   });
 
   it("does not retry non-401 errors", async () => {
@@ -212,6 +312,7 @@ describe("BaseMCPClient auto-OAuth createSession", () => {
     );
 
     await expect(client.createSession("demo")).rejects.toThrow("boom");
+    expect(client.createDefaultOAuthProvider).not.toHaveBeenCalled();
     expect(flow.completeOAuthFlow).not.toHaveBeenCalled();
   });
 });
