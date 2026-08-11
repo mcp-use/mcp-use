@@ -470,6 +470,9 @@ importers:
       hono:
         specifier: '>=4.12.34'
         version: 4.12.34
+      jsdom:
+        specifier: ^27.0.0
+        version: 27.4.0(@noble/hashes@2.2.0)
       lucide-react:
         specifier: ^0.562.0
         version: 0.562.0(react@19.2.4)

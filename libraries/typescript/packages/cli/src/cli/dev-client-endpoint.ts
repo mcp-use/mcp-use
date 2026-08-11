@@ -1,5 +1,5 @@
 /** Browser-facing development asset origin and Vite HMR socket address. */
-export interface DevClientEndpoint {
+interface DevClientEndpoint {
   origin: string;
   hmr: {
     protocol: "ws" | "wss";

@@ -13,7 +13,7 @@ import {
 import { getInspectorBase } from "@/client/utils/basePath";
 
 /** Survives full page reload; avoids fragile long JSON in query (was resolving to localhost + http). */
-export const INSPECTOR_RECONNECT_STORAGE_KEY = "__mcpUseInspectorReconnect";
+const INSPECTOR_RECONNECT_STORAGE_KEY = "__mcpUseInspectorReconnect";
 
 /**
  * Preserve enough connection configuration to restore the Inspector after a

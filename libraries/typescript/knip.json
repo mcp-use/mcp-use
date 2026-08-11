@@ -8,8 +8,7 @@
   "ignoreWorkspaces": [
     "packages/client/examples/**",
     "packages/create-mcp-use-app/src/templates/**",
-    "packages/server/examples/**",
-    "test_app"
+    "packages/server/examples/**"
   ],
   "workspaces": {
     ".": {
@@ -31,14 +30,7 @@
     "packages/cli": {
       "entry": ["tests/**/*.{mjs,ts,tsx}"],
       "project": ["src/**/*.{ts,tsx}", "tests/**/*.{mjs,ts,tsx}"],
-      "ignoreDependencies": [
-        "@tailwindcss/vite",
-        "@vitejs/plugin-react",
-        "@types/react-dom",
-        "mcp-use",
-        "react-dom",
-        "tailwindcss"
-      ]
+      "ignoreDependencies": ["@types/react-dom", "mcp-use", "react-dom"]
     },
     "packages/client": {
       "entry": ["tests/**/*.{ts,tsx}"],
