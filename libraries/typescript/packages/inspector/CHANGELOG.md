@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 20.1.2-canary.0
+
+### Patch Changes
+
+- a8de03d: Restore embedded MCP App rendering in Vibe and preserve React state during remote view HMR updates.
+
 ## 20.1.1
 
 ### Patch Changes

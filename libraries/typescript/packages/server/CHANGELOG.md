@@ -1,5 +1,14 @@
 # mcp-use
 
+## 2.1.2-canary.0
+
+### Patch Changes
+
+- a8de03d: Restore embedded MCP App rendering in Vibe and preserve React state during remote view HMR updates.
+- Updated dependencies [a8de03d]
+  - @mcp-use/cli@4.1.2-canary.0
+  - @mcp-use/inspector@20.1.2-canary.0
+
 ## 2.1.1
 
 ### Patch Changes
