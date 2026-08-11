@@ -444,7 +444,10 @@ export async function runDev(options: DevOptions): Promise<void> {
     // unversioned optimizer URL while view source receives a versioned URL.
     // Serving the framework entry as ESM keeps both imports on one dispatcher;
     // its CommonJS ReactDOM dependency still needs explicit optimization.
-    optimizeDeps: VIEW_REACT_OPTIMIZE_DEPS,
+    // Tool-only projects do not load a browser view graph. Avoid starting a
+    // dependency optimizer for them: on Windows its background cache commit
+    // can otherwise outlive Vite shutdown and race fixture/project cleanup.
+    ...(viewsAtStartup && { optimizeDeps: VIEW_REACT_OPTIMIZE_DEPS }),
     oxc: { jsx: { runtime: "automatic" } },
     plugins: viewsAtStartup
       ? [
