@@ -153,13 +153,22 @@ describe("OAuth core", () => {
     }
   });
 
-  it("rejects verifier options without a key source", () => {
+  it("requires exactly one verifier key source", () => {
+    const baseOptions = {
+      issuer: "https://issuer.example.test",
+      resource: canonicalResource,
+    };
+
+    expect(() =>
+      createJwtVerifier(baseOptions as JwtVerifierOptions)
+    ).toThrowError("JWT verifier requires exactly one of key or jwksUrl");
     expect(() =>
       createJwtVerifier({
-        issuer: "https://issuer.example.test",
-        resource: canonicalResource,
-      } as JwtVerifierOptions)
-    ).toThrowError("JWT verifier requires either key or jwksUrl");
+        ...baseOptions,
+        key: new TextEncoder().encode("a sufficiently long test signing key"),
+        jwksUrl: new URL("https://issuer.example.test/.well-known/jwks.json"),
+      } as unknown as JwtVerifierOptions)
+    ).toThrowError("JWT verifier requires exactly one of key or jwksUrl");
   });
 
   it("accepts JWTs whose audience is the protected resource", async () => {

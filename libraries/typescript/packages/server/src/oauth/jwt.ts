@@ -55,7 +55,8 @@ export type JwtVerifierOptions = {
  *
  * @param options - Issuer, key source, accepted claims, and MCP resource.
  * @returns An OAuth token verifier for use with {@link oauthCustomProvider}.
- * @throws A `TypeError` when audience and issuer-bound validation are combined.
+ * @throws A `TypeError` when the key source is missing or ambiguous, or when
+ * audience and issuer-bound validation are combined.
  *
  * @example
  * ```ts
@@ -76,11 +77,22 @@ export type JwtVerifierOptions = {
 export function createJwtVerifier(
   options: JwtVerifierOptions
 ): OAuthTokenVerifier {
-  if (options.key === undefined && options.jwksUrl === undefined) {
-    throw new TypeError("JWT verifier requires either key or jwksUrl");
+  let key: Uint8Array | JWTVerifyGetKey;
+  if (options.key !== undefined) {
+    if (options.jwksUrl !== undefined) {
+      throw new TypeError(
+        "JWT verifier requires exactly one of key or jwksUrl"
+      );
+    }
+    key = options.key;
+  } else {
+    if (options.jwksUrl === undefined) {
+      throw new TypeError(
+        "JWT verifier requires exactly one of key or jwksUrl"
+      );
+    }
+    key = createRemoteJWKSet(options.jwksUrl);
   }
-  // jose overloads key material vs JWKS getters; runtime accepts either.
-  const key = options.key ?? createRemoteJWKSet(options.jwksUrl);
   const configuredResource = canonicalUrl(options.resource);
   const configuredAudience = verifierAudience(options.audience);
   if (
