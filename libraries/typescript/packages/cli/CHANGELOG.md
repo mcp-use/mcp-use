@@ -1,5 +1,11 @@
 # @mcp-use/cli
 
+## 4.1.2-canary.2
+
+### Patch Changes
+
+- a0782ad: Pre-bundle the non-React MCP Apps view runtime dependencies so cold dev views finish mounting instead of entering a Vite full-reload loop before HMR can take over.
+
 ## 4.1.2-canary.1
 
 ### Patch Changes

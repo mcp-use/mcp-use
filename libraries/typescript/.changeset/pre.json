@@ -12,6 +12,7 @@
   },
   "changesets": [
     "bright-widgets-connect",
+    "cold-views-warm",
     "swift-widgets-refresh"
   ]
 }
