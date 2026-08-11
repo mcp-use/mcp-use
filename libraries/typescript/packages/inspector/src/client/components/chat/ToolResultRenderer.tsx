@@ -6,6 +6,7 @@ import { McpAppsViewPanel } from "@/client/components/mcp-apps/McpAppsViewPanel"
 import { useWidgetDebug } from "../../context/WidgetDebugContext";
 import { Spinner } from "../ui/spinner";
 import type { LLMConfig } from "./types";
+import { useToolResultSnapshot } from "./useToolResultSnapshot";
 
 function ModelContextBadge({ widgetId }: { widgetId: string }) {
   const { getWidget } = useWidgetDebug();
@@ -59,17 +60,18 @@ export function ToolResultRenderer({
 
   const [displayMode, setDisplayMode] = useState<ViewDisplayMode>("inline");
 
+  const resultSnapshot = useToolResultSnapshot(result);
   const parsedResult = useMemo(() => {
-    if (!result) return null;
-    if (typeof result === "string") {
+    if (!resultSnapshot) return null;
+    if (typeof resultSnapshot === "string") {
       try {
-        return JSON.parse(result);
+        return JSON.parse(resultSnapshot);
       } catch {
-        return result;
+        return resultSnapshot;
       }
     }
-    return result;
-  }, [result]);
+    return resultSnapshot;
+  }, [resultSnapshot]);
 
   const isMcpAppsTool = isViewTool(toolMeta);
   const resourceUri = isMcpAppsTool
