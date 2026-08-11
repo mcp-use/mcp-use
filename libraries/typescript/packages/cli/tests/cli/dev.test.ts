@@ -1452,6 +1452,21 @@ describe("runDev (views)", () => {
     expect(entryJs).toContain("import * as viewModule from");
     expect(entryJs).toContain("bootstrapView(viewModule)");
 
+    const messages: { type: string; updates?: { path: string }[] }[] = [];
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/`, "vite-hmr");
+    ws.addEventListener("message", (event) => {
+      messages.push(
+        JSON.parse(String(event.data)) as (typeof messages)[number]
+      );
+    });
+    await new Promise<void>((resolve, reject) => {
+      ws.addEventListener("open", () => resolve());
+      ws.addEventListener("error", () =>
+        reject(new Error("HMR websocket failed to connect"))
+      );
+    });
+    cleanups.push(() => ws.close());
+
     // Populate the client module graph the way a browser loading the view
     // document would: fetch each module and, recursively, its static
     // imports. A 504 is Vite's "outdated optimize dep" — retry like a
@@ -1481,24 +1496,11 @@ describe("runDev (views)", () => {
     // Fast Refresh wrapped the view component module.
     expect(await viewModule.text()).toContain("RefreshRuntime");
 
-    const messages: { type: string; updates?: { path: string }[] }[] = [];
-    const ws = new WebSocket(`ws://127.0.0.1:${port}/`, "vite-hmr");
-    ws.addEventListener("message", (event) => {
-      messages.push(
-        JSON.parse(String(event.data)) as (typeof messages)[number]
-      );
-    });
-    await new Promise<void>((resolve, reject) => {
-      ws.addEventListener("open", () => resolve());
-      ws.addEventListener("error", () =>
-        reject(new Error("HMR websocket failed to connect"))
-      );
-    });
-    cleanups.push(() => ws.close());
-
-    // Let any dep-optimizer churn from the initial module loads settle so
-    // the assertion window only contains the edit's own messages.
+    // Cold-loading the view runtime must not ask the iframe to reload. Vibe's
+    // srcdoc guest is torn down by a full reload before its module graph can
+    // finish, so lazy optimizer discovery otherwise becomes a reload loop.
     await new Promise((r) => setTimeout(r, 1000));
+    expect(messages.filter((m) => m.type === "full-reload")).toEqual([]);
     messages.length = 0;
 
     const viewPath = join(cwd, "views", "product-search-result", "view.tsx");
