@@ -23,6 +23,11 @@ export type {
 
 export { bearerAuth, oauthMetadata } from "./adapters.js";
 export {
+  createJwtVerifier,
+  type JwtVerifierOptions,
+  type VerifiedPayload,
+} from "./jwt.js";
+export {
   oauthCustomProvider,
   type CustomOAuthProviderOptions,
   type OAuthExtra,

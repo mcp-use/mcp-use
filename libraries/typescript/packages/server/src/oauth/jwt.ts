@@ -15,13 +15,16 @@ import { isLocalhost, isRecord } from "./guards.js";
 
 export { invalidToken } from "./errors.js";
 
-/** @internal Record of claims extracted from a verified JWT. */
+/** Record of claims extracted from a verified JWT. */
 export type VerifiedPayload = Record<string, unknown>;
 
-/** @internal Configures issuer, keys, and claims enforced by a JWT verifier. */
+/** Configures issuer, keys, and claims enforced by a JWT verifier. */
 export interface JwtVerifierOptions {
+  /** Expected `iss` claim. Tokens from any other issuer are rejected. */
   issuer: string;
+  /** JWKS endpoint the signing keys are fetched from and cached. */
   jwksUrl: URL;
+  /** Canonical URL of this MCP resource, matched against the token binding. */
   resource: URL;
   /** Provider-specific JWT audience, when it differs from the MCP resource. */
   audience?: string | string[];
@@ -31,11 +34,23 @@ export interface JwtVerifierOptions {
    * than an aud/resource claim.
    */
   issuerBoundAccessTokens?: boolean;
+  /** Permitted JWS algorithms. Defaults to whatever the JWKS advertises. */
   algorithms?: readonly string[];
+  /** Symmetric key material, for providers that sign without a JWKS. */
   key?: Uint8Array;
 }
 
-/** @internal Creates a verifier that rejects JWTs with invalid signatures or required claims. */
+/**
+ * Creates a verifier that rejects JWTs with invalid signatures or required claims.
+ *
+ * Use this when implementing a custom OAuth provider with
+ * {@link oauthCustomProvider}, so a provider that issues standard JWTs does not
+ * have to reimplement signature, issuer, audience and expiry checking.
+ *
+ * @param options - Issuer, keys, and claims to enforce.
+ * @returns A verifier accepted anywhere an `OAuthTokenVerifier` is taken.
+ * @throws TypeError if `audience` is combined with `issuerBoundAccessTokens`.
+ */
 export function createJwtVerifier(
   options: JwtVerifierOptions
 ): OAuthTokenVerifier {
