@@ -462,17 +462,25 @@ export async function runDev(options: DevOptions): Promise<void> {
       : [nextStandaloneCompatPlugin(options.cwd)],
     server: {
       middlewareMode: true,
+      watch: {
+        // Vibe captures the managed dev process output in the project root.
+        // Watching that continuously-written operational file makes Vite
+        // broadcast `full-reload` forever, so srcdoc view guests repeatedly
+        // remount and surface a compiling spinner instead of Fast Refresh.
+        ignored: "**/.dev-server-logs.txt",
+        // Windows file notifications can be coalesced or dropped while Vite
+        // is transforming the same module. Polling keeps dev reloads reliable.
+        ...(process.platform === "win32" && {
+          usePolling: true,
+          interval: 100,
+        }),
+      },
       // A public/wildcard bind deliberately accepts hostnames that are only
       // known to the surrounding platform (for example a sandbox URL). Keep
       // Vite's own static Host allowlist aligned with the listener boundary;
       // localhost binds retain the stricter default and our dynamic tunnel
       // path rewrites an authorized tunnel Host to localhost below.
       ...(!localhostBind && { allowedHosts: true }),
-      // Windows file notifications can be coalesced or dropped while Vite is
-      // transforming the same module. Polling keeps dev reloads reliable.
-      ...(process.platform === "win32" && {
-        watch: { usePolling: true, interval: 100 },
-      }),
       // Absolute asset URLs in dev: without `origin`, Vite emits root-relative
       // paths that resolve against the host page inside srcdoc iframes.
       ...(viewsAtStartup && { origin: devClientEndpoint.origin }),

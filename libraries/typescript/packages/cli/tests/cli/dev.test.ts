@@ -1503,6 +1503,13 @@ describe("runDev (views)", () => {
     expect(messages.filter((m) => m.type === "full-reload")).toEqual([]);
     messages.length = 0;
 
+    // Vibe writes managed-process output into this root-level file. It is not
+    // application source and must not produce the endless full-reload loop
+    // that tears down the srcdoc guest before Fast Refresh can run.
+    writeFileSync(join(cwd, ".dev-server-logs.txt"), "dev process output\n");
+    await new Promise((r) => setTimeout(r, 300));
+    expect(messages).toEqual([]);
+
     const viewPath = join(cwd, "views", "product-search-result", "view.tsx");
     const viewSource = readFileSync(viewPath, "utf8");
     // Vibe's remote filesystem can surface an editor save as unlink + add
