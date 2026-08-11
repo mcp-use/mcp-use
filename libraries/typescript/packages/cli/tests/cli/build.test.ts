@@ -410,6 +410,7 @@ describe("runBuild (views)", () => {
           "react-dom/client",
           "mcp-use > @modelcontextprotocol/ext-apps",
           "mcp-use > @modelcontextprotocol/server",
+          "zod",
         ],
       },
     });

@@ -32,6 +32,11 @@ export const VIEW_REACT_OPTIMIZE_DEPS = {
     // first document can finish mounting and subsequent edits use Fast Refresh.
     "mcp-use > @modelcontextprotocol/ext-apps",
     "mcp-use > @modelcontextprotocol/server",
+    // The published MCP Apps starter installs Zod at the project root. The
+    // Apps runtime reaches it through a lazy protocol-runtime import, which
+    // Vite's static scan cannot see; discovering it after the HMR socket is
+    // connected otherwise emits a full reload on every iframe cold boot.
+    "zod",
   ],
 };
 
