@@ -1,5 +1,13 @@
 # mcp-use
 
+## 2.1.2-canary.3
+
+### Patch Changes
+
+- 8c731fe: Pre-bundle Zod for dev views so the published MCP Apps starter does not enter a Vite full-reload loop while its protocol runtime initializes.
+- Updated dependencies [8c731fe]
+  - @mcp-use/cli@4.1.2-canary.3
+
 ## 2.1.2-canary.2
 
 ### Patch Changes
