@@ -270,6 +270,7 @@ jobs:
           path: test-results
           merge-multiple: false
       - name: Generate PR comment
+        continue-on-error: true
         uses: actions/github-script@v7
         with:
           script: |
@@ -435,6 +436,7 @@ jobs:
           path: test-results
           merge-multiple: false
       - name: Generate PR comment
+        continue-on-error: true
         uses: actions/github-script@v7
         with:
           script: |
