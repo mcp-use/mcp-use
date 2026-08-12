@@ -269,7 +269,7 @@ jobs:
           path: test-results
           merge-multiple: false
       - name: Generate PR comment
-        continue-on-error: true
+        continue-on-error: ${{ github.event.pull_request.head.repo.fork }}
         uses: actions/github-script@v7
         with:
           script: |
@@ -435,7 +435,7 @@ jobs:
           path: test-results
           merge-multiple: false
       - name: Generate PR comment
-        continue-on-error: true
+        continue-on-error: ${{ github.event.pull_request.head.repo.fork }}
         uses: actions/github-script@v7
         with:
           script: |
