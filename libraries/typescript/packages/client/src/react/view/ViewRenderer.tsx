@@ -435,16 +435,20 @@ function ViewRendererBase({
         return;
       }
 
-      if (event.data?.type === "iframe-console-log" && onLogRef.current) {
-        onLogRef.current({
+      if (event.data?.type === "iframe-console-log") {
+        // Console records share the iframe postMessage channel with MCP Apps
+        // JSON-RPC. Consume them before PostMessageTransport sees them.
+        event.stopImmediatePropagation();
+        onLogRef.current?.({
           level: event.data.level ?? "log",
           data: event.data.args,
         });
+        return;
       }
     };
 
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
+    window.addEventListener("message", handleMessage, true);
+    return () => window.removeEventListener("message", handleMessage, true);
   }, [sandboxOrigin, isBlobSandbox]);
 
   // Bridge lifecycle: sandbox → connect → resource-ready → initialized
@@ -1028,7 +1032,6 @@ export {
   buildViewSandboxBlobUrl,
   buildViewSandboxUrl,
 } from "./sandbox-blob-url.js";
-export { injectOpenAiFileApis } from "./inject-openai-file-apis.js";
 export type {
   ViewConnection,
   ViewDisplayMode,

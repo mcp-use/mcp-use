@@ -1,5 +1,11 @@
 import type { McpServer } from "@mcp-use/client/react";
-import { useEffect, useState, type ReactNode, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { useManufactAuth } from "@/client/auth/manufact-auth";
 import { ChatTab } from "@/client/components/ChatTab";
 import { ConnectionSettingsTab } from "@/client/components/ConnectionSettingsTab";
@@ -7,13 +13,16 @@ import { ElicitationTab } from "@/client/components/ElicitationTab";
 import { NotificationsTab } from "@/client/components/NotificationsTab";
 import { PromptsTab } from "@/client/components/PromptsTab";
 import { ResourcesTab } from "@/client/components/ResourcesTab";
+import { SkillsTab } from "@/client/components/SkillsTab";
 import { SamplingTab } from "@/client/components/SamplingTab";
 import { ServerMetadataTab } from "@/client/components/ServerMetadataTab";
 import { ToolsTab } from "@/client/components/ToolsTab";
 import { useInspector } from "@/client/context/InspectorContext";
+import { storeInspectorReconnectSession } from "@/client/hooks/useAutoConnect";
 import type { TabType } from "@/client/context/InspectorContext";
 import { isInspectorSamplingAvailable } from "@/client/utils/samplingProtocol";
 import { isLocalhostServerUrl } from "@/client/utils/servers";
+import { getSkillsState } from "./layout/layoutHeaderUtils";
 import {
   FALLBACK_MANAGED_MODEL_ID,
   buildManagedAuthHeaders,
@@ -28,6 +37,7 @@ const ALL_KNOWN_TABS: TabType[] = [
   "tools",
   "prompts",
   "resources",
+  "skills",
   "chat",
   "sampling",
   "elicitation",
@@ -95,6 +105,7 @@ export function LayoutContent({
   const useManagedClientSide = selectedServer
     ? shouldUseManagedClientSide({
         isLoopback: isLoopbackServer,
+        isMixedAuth: selectedServer.authorization?.mode === "mixed",
         chatApiUrl: embeddedConfig.chatApiUrl,
         enableFreeTierUpgrade: embeddedConfig.chatEnableFreeTierUpgrade,
       })
@@ -120,6 +131,12 @@ export function LayoutContent({
             apiKey: "server-managed",
           }
         : undefined));
+
+  const authenticateSelectedServer = useCallback(async () => {
+    if (!selectedServer) return;
+    storeInspectorReconnectSession(selectedServer);
+    await selectedServer.authenticate();
+  }, [selectedServer]);
 
   // When forceConnected is enabled, render the chat tab directly without a
   // real server connection. The backend (chatApiUrl) manages everything.
@@ -184,6 +201,9 @@ export function LayoutContent({
     if (tab === "sampling" && !isInspectorSamplingAvailable(selectedServer)) {
       return false;
     }
+    if (tab === "skills" && getSkillsState(selectedServer) !== "available") {
+      return false;
+    }
     if (!embeddedConfig.visibleTabs) return true;
     return embeddedConfig.visibleTabs.includes(tab);
   };
@@ -206,6 +226,8 @@ export function LayoutContent({
             readResource={selectedServer.readResource}
             serverId={selectedServer.id}
             isConnected={selectedServer.state === "ready"}
+            authenticate={authenticateSelectedServer}
+            isAuthenticating={selectedServer.state === "authenticating"}
             refreshTools={selectedServer.refreshTools}
           />
         </div>
@@ -252,6 +274,20 @@ export function LayoutContent({
             isConnected={selectedServer.state === "ready"}
             mcpServerUrl={selectedServer.url || ""}
             refreshResources={selectedServer.refreshResources}
+          />
+        </div>
+      )}
+      {isTabVisible("skills") && mountedTabs.has("skills") && (
+        <div
+          style={{ display: activeTab === "skills" ? "block" : "none" }}
+          className="h-full"
+        >
+          <SkillsTab
+            key={`skills-${selectedServer.id}`}
+            skills={selectedServer.skills ?? []}
+            getSkill={selectedServer.getSkill}
+            readResource={selectedServer.readResource}
+            refreshSkills={selectedServer.listSkills}
           />
         </div>
       )}

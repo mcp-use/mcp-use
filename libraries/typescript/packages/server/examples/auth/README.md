@@ -8,6 +8,7 @@ These examples use direct external authorization servers:
 - [Supabase](./supabase/)
 - [Keycloak](./keycloak/)
 - [Better Auth](./better-auth/)
+- [Mixed OAuth with Better Auth](./mixed-oauth/)
 
 Each server exposes only the `get-user-info` tool. It never issues, proxies, or
 forwards access tokens. For public deployments, set `MCP_URL` to the server
@@ -36,4 +37,6 @@ tunnel deployments must set `MCP_URL` to the server origin. Copy the provider
 The Supabase example is an exception: it runs one standalone Hono app because
 it hosts auth routes alongside the MCP endpoint. The Better Auth example keeps
 the regular `mcp-use` server and runs its Hono authorization server as a second
-process.
+process. The mixed OAuth example is a self-contained runnable demo: public MCP
+operations remain anonymous, while one protected tool is guarded by the same
+OAuth verification helpers.

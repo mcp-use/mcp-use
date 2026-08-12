@@ -96,7 +96,7 @@ const gray = ansi(90, 39);
  * Effective log level: `MCP_USE_LOG_LEVEL` when it names a known level,
  * otherwise the configured level, otherwise `info`.
  */
-export function resolveLogLevel(configured?: LogLevel): LogLevel {
+function resolveLogLevel(configured?: LogLevel): LogLevel {
   const raw =
     typeof process === "undefined"
       ? undefined

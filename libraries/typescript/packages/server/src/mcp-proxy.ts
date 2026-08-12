@@ -59,7 +59,7 @@ export interface ProxyRequestOptions {
 /** Structural connection contract accepted by the low-level proxy overload. */
 export interface ProxyConnection {
   /** Negotiated metadata used to derive the automatic capability namespace. */
-  readonly info: { server: { name: string } };
+  readonly info: { server?: { name: string } };
   /** Whether the upstream advertised a named MCP capability. */
   supports?(capability: string): boolean;
   /** List upstream tools. */
@@ -458,7 +458,12 @@ export async function mountProxyConnection(
       "Cannot call proxy() after the server has started: register upstream servers before listen()/server.fetch."
     );
   }
-  const namespace = connection.info.server.name;
+  const namespace = connection.info.server?.name;
+  if (!namespace) {
+    throw new Error(
+      "Cannot proxy an anonymous MCP connection directly: the upstream server did not report a name for namespace generation."
+    );
+  }
   const plan = await introspect(namespace, connection);
   mountPlan(host, plan);
 }

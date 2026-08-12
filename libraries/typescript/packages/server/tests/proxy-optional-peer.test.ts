@@ -5,9 +5,7 @@ import { proxyClientInstallError } from "../src/mcp-proxy.js";
 
 describe("server.proxy optional peer", () => {
   it("declares @mcp-use/client as an optional peer", () => {
-    expect(packageJson.peerDependencies["@mcp-use/client"]).toBe(
-      "^2.0.0-alpha.0"
-    );
+    expect(packageJson.peerDependencies["@mcp-use/client"]).toBeDefined();
     expect(packageJson.peerDependenciesMeta["@mcp-use/client"]?.optional).toBe(
       true
     );

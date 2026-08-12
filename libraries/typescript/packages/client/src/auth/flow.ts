@@ -1,5 +1,6 @@
 import {
   auth,
+  InsufficientScopeError,
   UnauthorizedError,
   type OAuthClientProvider,
 } from "@modelcontextprotocol/client";
@@ -18,8 +19,13 @@ type FlowProvider = OAuthClientProvider & {
   getKey?: (keySuffix: string) => string;
   getLastAttemptedAuthUrl?: () => string | null;
   markFlowComplete?: () => void;
+  preventAutoAuth?: boolean;
+  startAuthorization?: () => void;
   useRedirectFlow?: boolean;
 };
+
+/** Host callback used to complete the official transport's pending OAuth flow. */
+type FinishOAuthAuthorization = (code: string, iss?: string) => Promise<void>;
 
 /**
  * True if the error (or a wrapped cause) is an HTTP 401 / UnauthorizedError
@@ -44,6 +50,36 @@ export function isUnauthorized(err: unknown, depth = 0): boolean {
 }
 
 /**
+ * True when the official SDK has started an interactive OAuth flow that the
+ * host must finish before retrying the logical MCP operation.
+ */
+export function isOAuthInteractionRequired(err: unknown, depth = 0): boolean {
+  if (!err || depth > 5) return false;
+  if (
+    err instanceof InsufficientScopeError ||
+    err instanceof UnauthorizedError
+  ) {
+    return true;
+  }
+  if (err instanceof Error) {
+    if (
+      err.name === "InsufficientScopeError" ||
+      err.name === "UnauthorizedError"
+    ) {
+      return true;
+    }
+    if (err.cause && isOAuthInteractionRequired(err.cause, depth + 1)) {
+      return true;
+    }
+    const data = (err as { data?: { cause?: unknown } }).data;
+    if (data?.cause && isOAuthInteractionRequired(data.cause, depth + 1)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Complete an in-progress or required OAuth authorization for `provider`.
  *
  * - Node loopback providers expose `getAuthorizationCode()`; we await the
@@ -58,7 +94,11 @@ export function isUnauthorized(err: unknown, depth = 0): boolean {
 export async function completeOAuthFlow(
   provider: OAuthClientProvider,
   serverUrl: string,
-  options: { timeoutMs?: number; fetchFn?: typeof fetch } = {}
+  options: {
+    timeoutMs?: number;
+    fetchFn?: typeof fetch;
+    finishAuthorization?: FinishOAuthAuthorization;
+  } = {}
 ): Promise<void> {
   const flowProvider = provider as FlowProvider;
   const timeoutMs = options.timeoutMs ?? DEFAULT_AUTH_TIMEOUT_MS;
@@ -73,6 +113,16 @@ export async function completeOAuthFlow(
     }
   }
 
+  // With preventAutoAuth, redirectToAuthorization() deliberately only stores
+  // the SDK-prepared URL. An explicit authenticate() call is the user gesture
+  // that should launch that already-prepared request.
+  if (
+    flowProvider.preventAutoAuth === true &&
+    typeof flowProvider.startAuthorization === "function"
+  ) {
+    flowProvider.startAuthorization();
+  }
+
   if (
     typeof flowProvider.getAuthorizationResponse === "function" ||
     typeof flowProvider.getAuthorizationCode === "function"
@@ -81,12 +131,18 @@ export async function completeOAuthFlow(
       typeof flowProvider.getAuthorizationResponse === "function"
         ? await flowProvider.getAuthorizationResponse()
         : { code: await flowProvider.getAuthorizationCode!() };
-    await auth(provider, {
-      serverUrl,
-      authorizationCode: response.code,
-      ...(response.iss !== undefined ? { iss: response.iss } : {}),
-      fetchFn,
-    });
+    if (options.finishAuthorization) {
+      await options.finishAuthorization(response.code, response.iss);
+    } else {
+      // Connect-time authorization may no longer have its failed transport.
+      // Keep the official top-level helper as the fallback for that case.
+      await auth(provider, {
+        serverUrl,
+        authorizationCode: response.code,
+        ...(response.iss !== undefined ? { iss: response.iss } : {}),
+        fetchFn,
+      });
+    }
     return;
   }
 

@@ -22,7 +22,12 @@ export interface Message {
       toolName: string;
       args: Record<string, unknown>;
       result?: any;
-      state?: "pending" | "streaming" | "result" | "error";
+      state?:
+        | "pending"
+        | "streaming"
+        | "authorization-required"
+        | "result"
+        | "error";
       /** Best-effort parsed partial arguments while the LLM is still generating */
       partialArgs?: Record<string, unknown>;
     };
@@ -53,6 +58,8 @@ export type ChatBodyBuilder = (
 export interface SendMessageOptions {
   throwOnError?: boolean;
   onAccepted?: () => void;
+  /** Internal: replay a persisted OAuth-interrupted turn without duplicating its user message. */
+  resumeExistingTurn?: boolean;
 }
 
 export interface LLMConfig {

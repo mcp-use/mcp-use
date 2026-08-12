@@ -54,13 +54,42 @@ This server requires OAuth. Press Enter to open your browser.
 
 Press Enter to open the authorization page. The command keeps waiting for the loopback callback, then verifies and saves the connection.
 
+### Mixed auth
+
+A mixed-auth server lets `connect` succeed anonymously, then protects only some
+operations. When the server advertises OAuth through protected-resource
+metadata, the CLI saves it normally and prints:
+
+```text
+Connected and saved prod.
+This server is using mixed auth. Public tools are available now; run `mcp-use client prod auth login` to authenticate.
+```
+
+You can keep using public tools and let the first wire-level OAuth challenge
+start authorization later, or authenticate before calling protected operations:
+
+```bash
+npx mcp-use client prod auth login
+```
+
+After interactive authorization, the CLI retries the challenged operation once.
+It does not infer OAuth from tool-level `isError` results or error text.
+
 Use `--no-open` to authenticate without launching a browser:
 
 ```bash
 npx mcp-use client connect prod https://mcp.example.com/mcp --no-open
 ```
 
-With `--no-open`, `--json`, or non-interactive stdin, the CLI never prompts or opens a browser. It prints the authorization URL to stderr and continues waiting for the loopback callback. Open that URL yourself to finish authentication.
+With `--no-open` or non-interactive human output, the CLI never prompts or opens
+a browser. It prints a state-free local loopback launcher URL and continues
+waiting for the callback. Open that local URL yourself; it redirects to the
+provider without putting the provider URL or OAuth state in terminal output.
+
+Under `--json`, the CLI never prints the authorization URL or OAuth state and
+never waits for consent. If fresh authorization is required, it exits with
+`oauth_interaction_required` and provides an interactive retry command in
+`error.details.nextSteps`.
 
 Use `--no-oauth` for a public server or when an authorization challenge should fail instead of starting OAuth. Repeated `-H` or `--header` options add static request headers.
 
@@ -70,14 +99,20 @@ npx mcp-use client connect private https://mcp.example.com/mcp \
   -H "Authorization: Bearer $TOKEN" --no-oauth
 ```
 
-Check or clear saved OAuth credentials with auth commands:
+Authenticate, check, or clear saved OAuth credentials with auth commands:
 
 ```bash
+npx mcp-use client prod auth login
 npx mcp-use client prod auth status
 npx mcp-use client prod auth logout
 ```
 
-`auth logout` removes OAuth material but keeps the saved server and its non-OAuth connection metadata.
+`auth login` starts OAuth for a saved server. `auth logout` removes OAuth
+material but keeps the saved server and its non-OAuth connection metadata.
+
+Connection URLs are stored exactly for transport use, but CLI results redact URL
+userinfo, query values, and fragments so signed URLs and embedded credentials
+are not copied into logs.
 
 ## Call tools
 

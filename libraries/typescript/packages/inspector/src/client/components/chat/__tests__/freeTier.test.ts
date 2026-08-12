@@ -89,7 +89,17 @@ describe("shouldUseManagedClientSide", () => {
     ).toBe(true);
   });
 
-  it("does not enable managed client-side for remote servers", () => {
+  it("enables managed client-side chat for remote mixed-auth servers", () => {
+    expect(
+      shouldUseManagedClientSide({
+        isLoopback: false,
+        isMixedAuth: true,
+        chatApiUrl: "https://cloud.manufact.com/api/v1/inspector/chat/stream",
+      })
+    ).toBe(true);
+  });
+
+  it("does not enable managed client-side for ordinary remote servers", () => {
     expect(
       shouldUseManagedClientSide({
         isLoopback: false,

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   detectPendingAutoConnect,
+  findAutoConnectConnection,
   shouldReplaceAutoConnectConnection,
 } from "../useAutoConnect";
 
@@ -24,6 +25,19 @@ describe("detectPendingAutoConnect", () => {
 });
 
 describe("shouldReplaceAutoConnectConnection", () => {
+  it("replaces a stale URL even when the saved connection reached ready", () => {
+    expect(
+      shouldReplaceAutoConnectConnection(
+        {
+          url: "https://legacy-tunnel.example/mcp",
+          state: "ready",
+          transportType: "http",
+        },
+        { url: "http://localhost:3002/mcp", transportType: "http" }
+      )
+    ).toBe(true);
+  });
+
   it("replaces a non-ready saved SSE connection when auto-connect now requires HTTP", () => {
     expect(
       shouldReplaceAutoConnectConnection(
@@ -79,5 +93,19 @@ describe("shouldReplaceAutoConnectConnection", () => {
         }
       )
     ).toBe(true);
+  });
+});
+
+describe("findAutoConnectConnection", () => {
+  it("prefers a matching localhost ID over its stale tunnel URL", () => {
+    const localUrl = "http://localhost:3002/mcp";
+    const staleConnection = {
+      id: localUrl,
+      url: "https://legacy-tunnel.example/mcp",
+    };
+
+    expect(findAutoConnectConnection([staleConnection], localUrl)).toBe(
+      staleConnection
+    );
   });
 });

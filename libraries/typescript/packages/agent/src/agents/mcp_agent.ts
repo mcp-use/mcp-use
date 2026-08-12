@@ -657,5 +657,4 @@ export interface LLMConfig {
 }
 
 export { providerConfigFromOptions, parseLLMStringToProviderConfig };
-export { LlmRequestError } from "../llm/providers/openai-chat-completions.js";
 export { convertMessagesToProvider } from "../llm/messageFormat.js";

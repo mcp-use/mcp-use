@@ -86,6 +86,14 @@ export type {
 } from "@modelcontextprotocol/server";
 
 export type { ServerConfig, CorsOptions } from "./config.js";
+export { registerSkills, SKILLS_EXTENSION_ID } from "./skills/types.js";
+export type {
+  SkillsOptions,
+  SkillsSnapshot,
+  SkillDirectorySnapshot,
+  SkillSnapshotEntry,
+  SkillResourceSnapshot,
+} from "./skills/types.js";
 export type { ServerBranding } from "./branding.js";
 /** Official MCP icon shape used by {@link ServerConfig.icons}. */
 export type { Icon } from "@modelcontextprotocol/server";

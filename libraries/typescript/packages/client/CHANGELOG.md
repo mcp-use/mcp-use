@@ -1,5 +1,121 @@
 # @mcp-use/client
 
+## 2.1.1
+
+### Patch Changes
+
+- e17cd7b: Enable the Inspector Skills tab when a dev-server HMR reload adds skills after
+  the initial connection negotiated without the Skills extension.
+- e17cd7b: Detect mixed-auth MCP servers without blocking anonymous connections, expose optional authentication in React, the CLI, and the Inspector, resume protected operations through the official SDK OAuth flow, and preserve multiple Set-Cookie headers through the Node bridge for colocated OAuth servers.
+- e17cd7b: Surface mixed-auth state when protected resource, prompt, skill, completion, or refresh operations require OAuth, so React clients retain their ready anonymous connection and can present authentication for every challenged operation.
+- e17cd7b: Disable reverse-proxy buffering for open-ended MCP SSE responses so v2 subscription acknowledgements reach clients immediately, and move optional mixed-auth discovery off the connection readiness path while preserving asynchronous React updates and CLI reporting.
+- e17cd7b: Recover mixed-auth metadata discovery after transient failures, preserve ready React connections when optional token projection fails, report authenticated state after challenged OAuth, correct CLI login recovery, suppress failure results for user-cancelled Inspector tools, and keep the mixed-OAuth example's authorization guard aligned with MCP JSON parsing.
+- e17cd7b: Fix code mode with a custom executor function: the first `executeCode()` call no longer throws `Custom executor function should be handled in executeCode`, `searchTools()` works instead of always throwing, and `close()` runs executor cleanup. Also forward `detail_level` from the `search_tools` meta tool instead of silently coercing every value to `"full"`.
+
+## 2.1.1-canary.4
+
+### Patch Changes
+
+- b4caaa3: Surface mixed-auth state when protected resource, prompt, skill, completion, or refresh operations require OAuth, so React clients retain their ready anonymous connection and can present authentication for every challenged operation.
+
+## 2.1.1-canary.3
+
+### Patch Changes
+
+- e7ca969: Enable the Inspector Skills tab when a dev-server HMR reload adds skills after
+  the initial connection negotiated without the Skills extension.
+
+## 2.1.1-canary.2
+
+### Patch Changes
+
+- 6c310bf: Fix code mode with a custom executor function: the first `executeCode()` call no longer throws `Custom executor function should be handled in executeCode`, `searchTools()` works instead of always throwing, and `close()` runs executor cleanup. Also forward `detail_level` from the `search_tools` meta tool instead of silently coercing every value to `"full"`.
+
+## 2.1.1-canary.1
+
+### Patch Changes
+
+- c5262c9: Disable reverse-proxy buffering for open-ended MCP SSE responses so v2 subscription acknowledgements reach clients immediately, and move optional mixed-auth discovery off the connection readiness path while preserving asynchronous React updates and CLI reporting.
+
+## 2.1.1-canary.0
+
+### Patch Changes
+
+- 1c3e40b: Detect mixed-auth MCP servers without blocking anonymous connections, expose optional authentication in React, the CLI, and the Inspector, resume protected operations through the official SDK OAuth flow, and preserve multiple Set-Cookie headers through the Node bridge for colocated OAuth servers.
+
+## 2.1.0
+
+### Minor Changes
+
+- 2daf9c9: Add typed Skills over MCP client operations, a capability-gated Inspector
+  file explorer with integrity verification, and removable progressive skill
+  context in Inspector chat.
+
+### Patch Changes
+
+- 60eb3ac: Populate the Inspector's `window.openai` compatibility bridge with tool lifecycle globals and host actions while preserving the native MCP Apps handshake for V2 views.
+- 792e8eb: Allow widget-declared MCP App sandbox CSPs to use dynamic compilation while preserving their declared domain restrictions.
+- 52f535c: Allow modern MCP connections to remain ready when the server omits optional identity metadata. Direct proxy connections now report a clear error when an anonymous upstream cannot provide a namespace.
+- 6985d78: chore: clear unused TypeScript export surface flagged by knip
+
+  Trim internal barrels, drop dead stubs and duplicate re-exports, and un-export file-local helpers so knip reports a clean export graph without changing published package entry APIs.
+
+## 2.1.0-canary.5
+
+### Minor Changes
+
+- 2daf9c9: Add typed Skills over MCP client operations, a capability-gated Inspector
+  file explorer with integrity verification, and removable progressive skill
+  context in Inspector chat.
+
+### Patch Changes
+
+- 60eb3ac: Populate the Inspector's `window.openai` compatibility bridge with tool lifecycle globals and host actions while preserving the native MCP Apps handshake for V2 views.
+- 792e8eb: Allow widget-declared MCP App sandbox CSPs to use dynamic compilation while preserving their declared domain restrictions.
+- 819ef5b: Prevent iframe console log records from being parsed as MCP Apps JSON-RPC messages in the Inspector.
+- 52f535c: Allow modern MCP connections to remain ready when the server omits optional identity metadata. Direct proxy connections now report a clear error when an anonymous upstream cannot provide a namespace.
+- 6985d78: chore: clear unused TypeScript export surface flagged by knip
+
+  Trim internal barrels, drop dead stubs and duplicate re-exports, and un-export file-local helpers so knip reports a clean export graph without changing published package entry APIs.
+
+## 2.1.0-canary.4
+
+### Patch Changes
+
+- 792e8eb: Allow widget-declared MCP App sandbox CSPs to use dynamic compilation while preserving their declared domain restrictions.
+
+## 2.1.0-canary.3
+
+### Minor Changes
+
+- 2daf9c9: Add typed Skills over MCP client operations, a capability-gated Inspector
+  file explorer with integrity verification, and removable progressive skill
+  context in Inspector chat.
+
+### Patch Changes
+
+- 819ef5b: Prevent iframe console log records from being parsed as MCP Apps JSON-RPC messages in the Inspector.
+
+## 2.0.2-canary.2
+
+### Patch Changes
+
+- 6985d78: chore: clear unused TypeScript export surface flagged by knip
+
+  Trim internal barrels, drop dead stubs and duplicate re-exports, and un-export file-local helpers so knip reports a clean export graph without changing published package entry APIs.
+
+## 2.0.2-canary.1
+
+### Patch Changes
+
+- 60eb3ac: Populate the Inspector's `window.openai` compatibility bridge with tool lifecycle globals and host actions while preserving the native MCP Apps handshake for V2 views.
+
+## 2.0.2-canary.0
+
+### Patch Changes
+
+- 52f535c: Allow modern MCP connections to remain ready when the server omits optional identity metadata. Direct proxy connections now report a clear error when an anonymous upstream cannot provide a namespace.
+
 ## 2.0.1
 
 ### Patch Changes

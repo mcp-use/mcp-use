@@ -2,7 +2,7 @@
 
 Setting up a self-hosted OAuth 2.1 authorization server with Better Auth.
 
-**Learn more:** [Better Auth OAuth Provider Plugin](https://better-auth.com/docs/plugins/oauth-provider) · [Standalone starter template](https://github.com/mcp-use/mcp-oauth-better-auth-template) · [Runnable example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/better-auth)
+**Learn more:** [Better Auth OAuth Provider Plugin](https://better-auth.com/docs/plugins/oauth-provider) · [Standalone starter template](https://github.com/mcp-use/mcp-oauth-better-auth-template) · [Runnable example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/auth/better-auth)
 
 > Covers the `@better-auth/oauth-provider` plugin. The older Better Auth MCP plugin is deprecated — for legacy users, see the [mcp-use adapter](https://better-auth.com/docs/plugins/mcp#framework-adapters).
 
@@ -129,7 +129,7 @@ Better Auth requires a `/sign-in` page and a `/consent` page mounted on the Hono
 - **Consent page:** POST to `/api/auth/oauth2/consent` with `{ accept: boolean, oauth_query: window.location.search.slice(1) }`.
 - Both must use `credentials: 'include'` on fetch calls.
 
-See the [runnable example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/better-auth) for complete HTML/JS.
+See the [runnable example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/auth/better-auth) for complete HTML/JS.
 
 ---
 

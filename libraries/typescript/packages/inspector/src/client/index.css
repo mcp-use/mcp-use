@@ -2,6 +2,60 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+.inspector-url-transition {
+  display: inline-grid;
+  overflow: hidden;
+}
+
+.inspector-url-transition > span {
+  grid-area: 1 / 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inspector-url-transition-out {
+  animation: inspector-url-blur-out 280ms ease both;
+}
+
+.inspector-url-transition-in {
+  animation: inspector-url-blur-in 280ms ease both;
+}
+
+.inspector-url-transition-static {
+  animation: none;
+}
+
+@keyframes inspector-url-blur-out {
+  from {
+    opacity: 1;
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    filter: blur(4px);
+  }
+}
+
+@keyframes inspector-url-blur-in {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inspector-url-transition-out,
+  .inspector-url-transition-in {
+    animation: none;
+  }
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme {

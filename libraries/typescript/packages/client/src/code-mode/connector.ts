@@ -90,6 +90,9 @@ return {
 Remember: Always discover and understand available tools before attempting to use them in code execution.
 `;
 
+/** Detail levels accepted by the `search_tools` meta tool. */
+const DETAIL_LEVELS = new Set(["names", "descriptions", "full"]);
+
 /**
  * CodeModeConnector provides a special "code mode" interface for executing JavaScript/TypeScript
  * code with access to MCP tools. Unlike other connectors, it doesn't establish its own external
@@ -221,9 +224,7 @@ export class CodeModeConnector extends BaseConnector {
 
       const result = await this.mcpClient.searchTools(
         query,
-        detailLevel && detailLevel in ["names", "descriptions", "full"]
-          ? detailLevel
-          : "full"
+        DETAIL_LEVELS.has(detailLevel) ? detailLevel : "full"
       );
 
       return {

@@ -51,6 +51,10 @@ export const examples = [
     scenario: "events",
     headers: { "x-example-request-id": "example-verifier" },
   }),
+  local("skills-over-mcp", {
+    tools: ["refund-order", "create-purchase-order", "get-order-status"],
+    scenario: "skills",
+  }),
 
   // Existing server examples.
   local("conformance", { tools: ["test_simple_text"] }),

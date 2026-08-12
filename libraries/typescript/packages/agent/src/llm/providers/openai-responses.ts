@@ -19,7 +19,7 @@ import {
 } from "./openai-shared.js";
 import { tokenUsageFromRecord } from "../usage.js";
 
-export interface ResponsesSeed {
+interface ResponsesSeed {
   instructions?: string;
   input: unknown[];
 }
@@ -119,7 +119,7 @@ export function seedInputFromMessages(
   };
 }
 
-export function toResponsesTools(tools: ProviderTool[]): unknown[] {
+function toResponsesTools(tools: ProviderTool[]): unknown[] {
   return tools.map((t) => ({
     type: "function",
     name: t.name,
@@ -127,16 +127,6 @@ export function toResponsesTools(tools: ProviderTool[]): unknown[] {
     parameters: t.inputSchema,
     strict: false,
   }));
-}
-
-export function serializeToolOutput(result: unknown): string {
-  const content = toolResultToContent(result);
-  if (typeof content === "string") return content;
-  try {
-    return JSON.stringify(content);
-  } catch {
-    return String(result);
-  }
 }
 
 export function appendToolOutputsToInput(

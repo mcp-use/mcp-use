@@ -250,6 +250,7 @@ export function ChatTab({
   const [followups, setFollowups] = useState<string[]>(chatFollowups);
   const [activeView, setActiveView] = useState<ChatView>(defaultView);
   const [disabledTools, setDisabledTools] = useState<Set<string>>(new Set());
+  const skills = connection.skills ?? [];
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const messagesAreaRef = useRef<HTMLDivElement | null>(null);
   // Track position of trigger for removal in textarea
@@ -330,6 +331,7 @@ export function ChatTab({
     ...chatHookParams,
     initialMessages: restoredMessages ?? initialMessages,
     systemPrompt: resolvedSystemPrompt,
+    skills,
   });
 
   const {
@@ -1264,13 +1266,15 @@ export function ChatTab({
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === "ArrowDown") {
         setPromptFocusedIndex((prev) => {
-          if (filteredPrompts.length === 0) return -1;
-          return (prev + 1) % filteredPrompts.length;
+          const suggestionCount = filteredPrompts.length;
+          if (suggestionCount === 0) return -1;
+          return (prev + 1) % suggestionCount;
         });
       } else if (e.key === "ArrowUp") {
         setPromptFocusedIndex((prev) => {
-          if (filteredPrompts.length === 0) return -1;
-          return (prev - 1 + filteredPrompts.length) % filteredPrompts.length;
+          const suggestionCount = filteredPrompts.length;
+          if (suggestionCount === 0) return -1;
+          return (prev - 1 + suggestionCount) % suggestionCount;
         });
       } else if (e.key === "Escape") {
         e.stopPropagation();
@@ -1597,6 +1601,21 @@ export function ChatTab({
               serverBaseUrl={connection.url}
               messagesEndRef={messagesEndRef}
               traceEvents={traceEvents}
+              onAuthenticateTool={
+                effectiveClientSide
+                  ? clientSideChat.authenticatePendingTool
+                  : undefined
+              }
+              authenticatingToolCallId={
+                effectiveClientSide
+                  ? clientSideChat.authenticatingToolCallId
+                  : null
+              }
+              toolAuthorizationError={
+                effectiveClientSide
+                  ? clientSideChat.toolAuthorizationError
+                  : null
+              }
             />
           ) : (
             <ChatRawView events={traceEvents} usage={tokenUsage} />

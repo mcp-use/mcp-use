@@ -17,10 +17,11 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "pnpm run build:client && pnpm run build:mcp-use && pnpm run build:other",
+    "build": "pnpm run build:client && pnpm run build:tunnel && pnpm run build:mcp-use && pnpm run build:other",
     "build:client": "pnpm --filter @mcp-use/client build",
+    "build:tunnel": "pnpm --filter @mcp-use/tunnel build",
     "build:mcp-use": "pnpm --filter mcp-use build",
-    "build:other": "pnpm --filter '{packages/*}' --filter '!mcp-use' --filter '!@mcp-use/client' build",
+    "build:other": "pnpm --filter \"{packages/*}\" --filter \"!mcp-use\" --filter \"!@mcp-use/client\" --filter \"!@mcp-use/tunnel\" build",
     "test": "pnpm run -r test",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

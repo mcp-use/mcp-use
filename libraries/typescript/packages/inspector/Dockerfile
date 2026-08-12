@@ -22,4 +22,4 @@ EXPOSE 8080
 
 # Start the inspector. Shell form so ${PORT:-8080} expands; exec keeps the
 # node process as PID 1 for signal handling.
-CMD ["sh", "-c", "exec npx @mcp-use/inspector --port \"${PORT:-8080}\""]
+CMD ["sh", "-c", "exec npx @mcp-use/inspector --port \"${PORT:-8080}\" --no-open"]

@@ -1,8 +1,8 @@
 /** Default bind address for Node listeners. */
-export const DEFAULT_LISTEN_HOST = "127.0.0.1";
+const DEFAULT_LISTEN_HOST = "127.0.0.1";
 
 /** Default TCP port for Node listeners. */
-export const DEFAULT_LISTEN_PORT = 3000;
+const DEFAULT_LISTEN_PORT = 3000;
 
 /** Resolve an explicit value, then `HOST`, then configured value, then default. */
 export function resolveListenHost(

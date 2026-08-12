@@ -37,6 +37,7 @@ import type { UseMcpOptions, UseMcpResult } from "./types.js";
 import { loadServerIcon } from "./useMcp-helpers.js";
 import { useMcpOperations } from "./useMcp-operations.js";
 import { getOAuthTokenExpiry } from "./token-expiry.js";
+import { SKILLS_EXTENSION_ID } from "../core/skills.js";
 
 const DEFAULT_RECONNECT_DELAY = 3000;
 const DEFAULT_RETRY_DELAY = 5000;
@@ -46,7 +47,14 @@ type TransportType = "http";
 
 type UseMcpAuthProvider = OAuthClientProvider & {
   tokens?: () => Promise<
-    { access_token?: string; [key: string]: unknown } | undefined
+    | {
+        access_token?: string;
+        token_type?: string;
+        refresh_token?: string;
+        scope?: string;
+        [key: string]: unknown;
+      }
+    | undefined
   >;
   clearStorage?: () => number;
   getLastAttemptedAuthUrl?: () => string | null | undefined;
@@ -133,6 +141,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     autoReconnect = true,
     reconnectionOptions,
     preventAutoAuth = true, // Default to true - require explicit user action for OAuth
+    detectMixedAuth = true,
     useRedirectFlow = false, // Default to false for backward compatibility (use popup)
     onPopupWindow,
     timeout = 30000, // 30 seconds default for connection timeout
@@ -341,6 +350,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     ResourceTemplate[]
   >([]);
   const [prompts, setPrompts] = useState<Prompt[]>([]);
+  const [skills, setSkills] = useState<import("../core/skills.js").Skill[]>([]);
   const [serverInfo, setServerInfo] = useState<UseMcpResult["serverInfo"]>(
     // Only use cached metadata if it has at least a name
     options._initialServerInfo?.name
@@ -361,6 +371,8 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
   const [authUrl, setAuthUrl] = useState<string | undefined>(undefined);
   const [authTokens, setAuthTokens] =
     useState<UseMcpResult["authTokens"]>(undefined);
+  const [authorization, setAuthorization] =
+    useState<UseMcpResult["authorization"]>(undefined);
 
   const clientRef = useRef<BrowserMCPClient | null>(null);
   const connectionRef = useRef<MCPConnection | null>(null);
@@ -384,6 +396,9 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
 
   // --- Refs for values used in callbacks ---
   const stateRef = useRef(state);
+  const authorizationRef = useRef(authorization);
+  const authorizationServerUrlRef = useRef(url);
+  authorizationRef.current = authorization;
   const autoReconnectRef = useRef(autoReconnect);
   const successfulTransportRef = useRef<TransportType | null>(null);
   // Forward refs for functions (declared later) to avoid circular dependencies
@@ -498,6 +513,26 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     [instanceLogger]
   );
 
+  const onAuthorizationRequired = useCallback(
+    (authError: unknown) => {
+      const preparedAuthUrl =
+        authProviderRef.current?.getLastAttemptedAuthUrl?.() ?? undefined;
+      addLog(
+        "info",
+        "This server requires OAuth for the requested operation; waiting for authentication.",
+        authError
+      );
+      const authorizationRequired = {
+        ...(authorizationRef.current ?? { mode: "mixed" as const }),
+        authenticated: false,
+      };
+      authorizationRef.current = authorizationRequired;
+      setAuthorization(authorizationRequired);
+      if (preparedAuthUrl) setAuthUrl(preparedAuthUrl);
+    },
+    [addLog]
+  );
+
   const connectionOperations = useMcpOperations({
     stateRef,
     connectionRef,
@@ -507,7 +542,9 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     setResources,
     setResourceTemplates,
     setPrompts,
+    setSkills,
     addLog,
+    onAuthorizationRequired,
   });
 
   /**
@@ -560,6 +597,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
         setResources([]);
         setResourceTemplates([]);
         setPrompts([]);
+        setSkills([]);
         setError(undefined);
         setAuthUrl(undefined);
         setAuthTokens(undefined);
@@ -730,6 +768,11 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     connectingRef.current = true;
     connectEpochRef.current += 1;
     connectAttemptRef.current += 1;
+    if (authorizationServerUrlRef.current !== url) {
+      authorizationServerUrlRef.current = url;
+      authorizationRef.current = undefined;
+      setAuthorization(undefined);
+    }
     setError(undefined);
     setAuthUrl(undefined);
     successfulTransportRef.current = null;
@@ -738,6 +781,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     setResources([]);
     setResourceTemplates([]);
     setPrompts([]);
+    setSkills([]);
     setServerInfo(undefined);
     setCapabilities(undefined);
     setProtocolEra(undefined);
@@ -835,6 +879,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
           // Protocol era negotiation mode ("legacy" | "auto" | { pin }); the
           // connector defaults to automatic v1/v2 negotiation.
           ...(protocolNegotiation !== undefined && { protocolNegotiation }),
+          detectMixedAuth,
           // Pass user-configurable reconnection options, or when autoReconnect
           // is disabled, disable SDK transport reconnection to prevent
           // unwanted GET polling requests
@@ -915,11 +960,27 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
               notification.method === "notifications/resources/list_changed"
             ) {
               addLog("info", "Resources list changed, auto-refreshing...");
-              connectionOperations
-                .refreshResources()
-                .catch((err) =>
-                  addLog("warn", "Auto-refresh resources failed:", err)
-                );
+              const clientInfoExtensions = (
+                mergedClientInfo as {
+                  capabilities?: { extensions?: Record<string, unknown> };
+                }
+              ).capabilities?.extensions;
+              const optionExtensions = (
+                effectiveClientOptions?.capabilities as
+                  | { extensions?: Record<string, unknown> }
+                  | undefined
+              )?.extensions;
+              const supportsSkills =
+                optionExtensions?.[SKILLS_EXTENSION_ID] !== undefined ||
+                clientInfoExtensions?.[SKILLS_EXTENSION_ID] !== undefined;
+              Promise.all([
+                connectionOperations.refreshResources(),
+                ...(supportsSkills
+                  ? [connectionOperations.refreshSkills()]
+                  : []),
+              ]).catch((err) =>
+                addLog("warn", "Auto-refresh resources failed:", err)
+              );
             } else if (
               notification.method === "notifications/prompts/list_changed"
             ) {
@@ -1014,6 +1075,77 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
 
         // Get tools, resources, and prompts through the protocol-neutral connection.
         setTools(connection.tools || []);
+
+        const {
+          server: serverInfo,
+          capabilities,
+          protocolEra,
+          protocolVersion,
+          instructions,
+          extensions,
+          authorization: connectionAuthorization,
+        } = connection.info;
+
+        if (connectionAuthorization) {
+          setAuthorization(connectionAuthorization);
+          authorizationRef.current = connectionAuthorization;
+        }
+        setProtocolEra(protocolEra);
+        setProtocolVersion(protocolVersion);
+        setInstructions(instructions);
+        setExtensions(extensions);
+
+        if (serverInfo) {
+          addLog("debug", "Server info:", serverInfo);
+          setServerInfo(serverInfo);
+          iconLoadingPromiseRef.current = loadServerIcon({
+            serverInfo,
+            url,
+            isMounted: () => isMountedRef.current,
+            setServerInfo,
+            addLog,
+          });
+        }
+        if (capabilities) {
+          addLog("debug", "Server capabilities:", capabilities);
+          setCapabilities(capabilities);
+        }
+
+        // Tools and normalized connection metadata are sufficient for a usable
+        // connection. Auxiliary inventories must populate progressively rather
+        // than extending the ready-state critical path.
+        successfulTransportRef.current = transportTypeParam;
+        setState("ready");
+        // Optional OAuth metadata is not part of anonymous MCP readiness. Give
+        // React a chance to paint the ready state before starting its network
+        // fallbacks, which may legitimately return 404 for public servers.
+        const discoverAuthorizationAfterReady = () => {
+          if (!isMountedRef.current || connectionRef.current !== connection) {
+            return;
+          }
+          const authorizationDiscovery = connection.discoverAuthorization?.();
+          if (authorizationDiscovery) {
+            void authorizationDiscovery.then((discovered) => {
+              if (
+                !discovered ||
+                !isMountedRef.current ||
+                connectionRef.current !== connection
+              ) {
+                return;
+              }
+              authorizationRef.current = discovered;
+              setAuthorization(discovered);
+            });
+          }
+        };
+        if (typeof globalThis.requestAnimationFrame === "function") {
+          globalThis.requestAnimationFrame(() => {
+            setTimeout(discoverAuthorizationAfterReady, 0);
+          });
+        } else {
+          setTimeout(discoverAuthorizationAfterReady, 0);
+        }
+
         // Capability advertisements in the wild are not always granular: a
         // server may support resources/list while returning Method not found
         // for resources/templates/list. Inventory failures must not tear down
@@ -1050,52 +1182,34 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
         setPrompts(promptsResult.prompts || []);
         setResourceTemplates(templatesResult.resourceTemplates || []);
 
-        const {
-          server: serverInfo,
-          capabilities,
-          protocolEra,
-          protocolVersion,
-          instructions,
-          extensions,
-        } = connection.info;
-
-        // Surface normalized metadata identically for v1 and v2 servers.
+        // Skills are another auxiliary inventory and populate progressively.
         if (isMountedRef.current) {
-          setProtocolEra(protocolEra);
-          setProtocolVersion(protocolVersion);
-          setInstructions(instructions);
-          setExtensions(extensions);
-        }
-
-        if (serverInfo) {
-          addLog("debug", "Server info:", serverInfo);
-          if (!isMountedRef.current) {
-            addLog("debug", "Skipping state update - component unmounted");
-            return "failed";
+          if (extensions["io.modelcontextprotocol/skills"] !== undefined) {
+            try {
+              const result = await connection.listAllSkills();
+              if (isMountedRef.current) setSkills(result.skills);
+            } catch (error) {
+              addLog("warn", "Failed to load initial skills:", error);
+              if (isMountedRef.current) setSkills([]);
+            }
+          } else {
+            setSkills([]);
           }
-          setServerInfo(serverInfo);
-
-          iconLoadingPromiseRef.current = loadServerIcon({
-            serverInfo,
-            url,
-            isMounted: () => isMountedRef.current,
-            setServerInfo,
-            addLog,
-          });
-        }
-
-        if (capabilities) {
-          addLog("debug", "Server capabilities:", capabilities);
-          if (!isMountedRef.current) {
-            addLog("debug", "Skipping state update - component unmounted");
-            return "failed";
-          }
-          setCapabilities(capabilities);
         }
 
         // Get OAuth tokens if authentication was used
         if (authProviderRef.current) {
-          const tokens = await authProviderRef.current.tokens?.();
+          let tokens: Awaited<
+            ReturnType<NonNullable<UseMcpAuthProvider["tokens"]>>
+          >;
+          try {
+            tokens = await authProviderRef.current.tokens?.();
+          } catch (error) {
+            // The MCP connection is already usable. Token projection is
+            // supplemental state and must not tear down a ready connection.
+            addLog("warn", "Failed to read OAuth tokens:", error);
+            tokens = undefined;
+          }
           if (!isMountedRef.current) {
             addLog(
               "debug",
@@ -1104,6 +1218,14 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
             return "failed";
           }
           if (tokens?.access_token) {
+            if (authorizationRef.current?.mode === "mixed") {
+              const authenticatedAuthorization = {
+                ...authorizationRef.current,
+                authenticated: true,
+              };
+              setAuthorization(authenticatedAuthorization);
+              authorizationRef.current = authenticatedAuthorization;
+            }
             const expiresAt = getOAuthTokenExpiry(tokens);
 
             // Best-effort: resolve the OAuth token endpoint + client credentials
@@ -1157,8 +1279,6 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
           }
         }
 
-        successfulTransportRef.current = transportTypeParam;
-        setState("ready");
         return "success";
       } catch (err: unknown) {
         const error = err as Error & { code?: number; message?: string };
@@ -1393,6 +1513,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     headers,
     transportType,
     preventAutoAuth,
+    detectMixedAuth,
     useRedirectFlow,
     onPopupWindow,
     enabled,
@@ -1456,12 +1577,19 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
   const authenticate = useCallback(async () => {
     addLog("info", "Manual authentication requested...");
     const currentState = stateRef.current;
+    const isOptionalMixedAuthentication =
+      currentState === "ready" && authorizationRef.current?.mode === "mixed";
 
     if (currentState === "failed") {
       addLog("info", "Attempting to reconnect and authenticate via retry...");
       retry();
-    } else if (currentState === "pending_auth") {
-      addLog("info", "Proceeding with authentication from pending state...");
+    } else if (
+      currentState === "pending_auth" ||
+      (currentState === "ready" &&
+        authorizationRef.current?.mode === "mixed" &&
+        !authorizationRef.current.authenticated)
+    ) {
+      addLog("info", "Proceeding with authentication...");
 
       try {
         assert(
@@ -1631,16 +1759,20 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
           case "cancelled":
             addLog(
               "warn",
-              "Authentication popup was closed before completing. Returning to pending_auth."
+              isOptionalMixedAuthentication
+                ? "Authentication popup was closed before completing. Public tools remain available."
+                : "Authentication popup was closed before completing. Returning to pending_auth."
             );
-            setState("pending_auth");
+            setState(isOptionalMixedAuthentication ? "ready" : "pending_auth");
             break;
           case "timeout":
             addLog(
               "warn",
-              "Authentication timed out waiting for the popup. Returning to pending_auth."
+              isOptionalMixedAuthentication
+                ? "Authentication timed out waiting for the popup. Public tools remain available."
+                : "Authentication timed out waiting for the popup. Returning to pending_auth."
             );
-            setState("pending_auth");
+            setState(isOptionalMixedAuthentication ? "ready" : "pending_auth");
             break;
           case "error":
             failConnection(`Authentication failed: ${result.error}`);
@@ -2039,6 +2171,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     resources,
     resourceTemplates,
     prompts,
+    skills,
     serverInfo,
     capabilities,
     protocolEra,
@@ -2049,6 +2182,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     log,
     authUrl,
     authTokens,
+    authorization,
     client: clientRef.current,
     ...connectionOperations,
     retry,

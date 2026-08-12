@@ -11,10 +11,7 @@ import {
   useId,
 } from "react";
 
-import {
-  _resetModelContextUnsupportedWarnedForTesting,
-  type ModelContextParams,
-} from "../runtime/model-context-store.js";
+import { _resetModelContextUnsupportedWarnedForTesting } from "../runtime/model-context-store.js";
 import { useViewRuntime } from "../runtime/view-runtime-context.js";
 import { getActiveRuntime } from "../runtime/view-runtime.js";
 
@@ -99,29 +96,6 @@ export function _resetModelContextForTesting(): void {
 }
 
 /** @internal Serialized tree for the active runtime's store (tests). */
-export function _getDescriptionForTesting(): string {
+function _getDescriptionForTesting(): string {
   return getActiveRuntime()?.modelContextStore.getDescriptionForTesting() ?? "";
-}
-
-/**
- * @internal Serialize the active runtime's model-context tree.
- *
- * @returns Description string, or `""` when no runtime is mounted.
- */
-export function buildDescriptionString(): string {
-  return getActiveRuntime()?.modelContextStore.buildDescriptionString() ?? "";
-}
-
-/**
- * @internal Build `ui/update-model-context` params from the active store.
- *
- * @returns Empty content when no runtime is mounted or nothing is registered.
- */
-export function buildModelContextParams(): ModelContextParams {
-  return (
-    getActiveRuntime()?.modelContextStore.buildModelContextParams() ?? {
-      structuredContent: { _uiContext: "" },
-      content: [{ type: "text", text: '{"_uiContext":""}' }],
-    }
-  );
 }

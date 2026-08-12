@@ -142,14 +142,7 @@ export function ServerDropdown({
                     ? getServerDisplayName(selectedServer)
                     : "Select server"}
                 </span>
-                {selectedServer && (
-                  <>
-                    <StatusDot status={selectedServer.state} />
-                    {!compactHeader && (
-                      <ServerHeaderAuthButton server={selectedServer} />
-                    )}
-                  </>
-                )}
+                {selectedServer && <StatusDot status={selectedServer.state} />}
                 <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
               </button>
             }
@@ -157,6 +150,9 @@ export function ServerDropdown({
           />
           {dropdownMenu}
         </DropdownMenu>
+        {selectedServer && !compactHeader && (
+          <ServerHeaderAuthButton server={selectedServer} />
+        )}
       </div>
     );
   }

@@ -57,6 +57,7 @@ const echoInput: StandardSchemaWithJSON<
     },
     jsonSchema: {
       input: () => ({
+        $schema: "https://json-schema.org/draft/2020-12/schema",
         type: "object",
         properties: {
           message: { type: "string", description: "Text to echo back" },
@@ -214,7 +215,7 @@ function buildServer(): MCPServer {
           "python",
           "typescript",
           "go",
-        ]),
+        ]).optional(),
         code: z.string().describe("The code to review"),
       }),
     },
@@ -346,6 +347,7 @@ describe("MCPServer (phase 1, e2e over HTTP)", () => {
     const echo = tools.find((t) => t.name === "echo");
     // inputSchema advertised via the schema's own ~standard.jsonSchema converter.
     expect(echo?.inputSchema).toMatchObject({
+      $schema: "https://json-schema.org/draft/2020-12/schema",
       type: "object",
       required: ["message"],
       properties: {
