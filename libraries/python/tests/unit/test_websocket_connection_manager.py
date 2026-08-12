@@ -81,8 +81,14 @@ class TestWebSocketConnectionManager:
         except TypeError as e:
             pytest.fail(f"WebSocketConnectionManager failed to accept headers parameter: {e}")
 
-    def test_headers_raise_clear_error_when_websocket_client_does_not_support_them(self):
+    def test_headers_raise_clear_error_when_websocket_client_does_not_support_them(self, monkeypatch):
         """Configured headers should not be silently ignored by websocket_client."""
+
+        def websocket_client_without_headers(_url):
+            return None
+
+        monkeypatch.setattr(websocket_module, "websocket_client", websocket_client_without_headers)
+
         manager = WebSocketConnectionManager("ws://example.com", {"Authorization": "Bearer test-token"})
 
         with pytest.raises(RuntimeError, match="does not support forwarding handshake headers"):
