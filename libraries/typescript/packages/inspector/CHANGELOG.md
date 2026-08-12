@@ -1,5 +1,17 @@
 # @mcp-use/inspector
 
+## 20.2.0
+
+### Minor Changes
+
+- 4104309: Expose CSP mode and audit commands through the embedded Chat bridge so hosts and coding agents can verify MCP Apps in Widget-Declared mode.
+
+### Patch Changes
+
+- 4104309: Ship a canonical client stylesheet containing the Inspector surface, shadow, hover, and active theme contract so embedded dialogs, dropdowns, and selects render with the same styling as the standalone Inspector.
+- 4104309: Drop four exports that nothing imports, and declare the `jsdom` devDependency the inspector tool-execution test already relies on through its `@vitest-environment jsdom` pragma. The dropped exports are used only inside their own modules, so this is not a change to any reachable API.
+- 4104309: Restore embedded MCP App rendering in Vibe and preserve React state during remote view HMR updates.
+
 ## 20.2.0-canary.4
 
 ### Minor Changes

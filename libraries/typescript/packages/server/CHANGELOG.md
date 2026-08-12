@@ -1,5 +1,30 @@
 # mcp-use
 
+## 2.2.0
+
+### Minor Changes
+
+- 4104309: Export `createJwtVerifier` and its `JwtVerifierOptions` and `VerifiedPayload` types from `mcp-use/oauth`, so a custom OAuth provider built with `oauthCustomProvider` can reuse the built-in JWT verification instead of reimplementing it.
+
+### Patch Changes
+
+- 4104309: Route Vite assets and HMR through the configured public MCP origin when the development server runs behind a remote sandbox or proxy.
+- 4104309: Restore zero-config OAuth provider setup through the standardized `MCP_USE_OAUTH_*` environment variables while preserving explicit option overrides.
+- 4104309: Pre-bundle the non-React MCP Apps view runtime dependencies so cold dev views finish mounting instead of entering a Vite full-reload loop before HMR can take over.
+- 4104309: Ignore Vibe's managed dev-server log in Vite's file watcher so operational log writes do not trigger endless full reloads instead of view HMR.
+- 4104309: Restore embedded MCP App rendering in Vibe and preserve React state during remote view HMR updates.
+- 4104309: Pre-bundle Zod for dev views so the published MCP Apps starter does not enter a Vite full-reload loop while its protocol runtime initializes.
+- Updated dependencies [4104309]
+- Updated dependencies [4104309]
+- Updated dependencies [4104309]
+- Updated dependencies [4104309]
+- Updated dependencies [4104309]
+- Updated dependencies [4104309]
+- Updated dependencies [4104309]
+- Updated dependencies [4104309]
+  - @mcp-use/cli@4.1.2
+  - @mcp-use/inspector@20.2.0
+
 ## 2.2.0-canary.10
 
 ### Minor Changes
