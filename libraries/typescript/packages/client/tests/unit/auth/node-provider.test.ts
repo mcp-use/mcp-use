@@ -1,4 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { createServer as createNetServer } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import {
   NodeOAuthClientProvider,
@@ -27,6 +31,87 @@ class MemoryKVStore implements KVStore {
 }
 
 describe("NodeOAuthClientProvider", () => {
+  it("prefers the persisted callback port over the configured default", async () => {
+    const probe = createNetServer();
+    await new Promise<void>((resolve) => probe.listen(0, "127.0.0.1", resolve));
+    const address = probe.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Port probe did not bind to a TCP port");
+    }
+    const persistedPort = address.port;
+    await new Promise<void>((resolve, reject) =>
+      probe.close((error) => (error ? reject(error) : resolve()))
+    );
+
+    const kv = new MemoryKVStore();
+    kv.set("port", String(persistedPort));
+    const provider = await NodeOAuthClientProvider.create(
+      "https://mcp.example.com/mcp",
+      {
+        kvStore: kv,
+        preferredPort: persistedPort === 33_418 ? 33_419 : 33_418,
+        portRange: 100,
+      }
+    );
+
+    expect(provider.callbackPort).toBe(persistedPort);
+  });
+
+  it("does not create OAuth state on disk until authorization starts", async () => {
+    const root = mkdtempSync(join(tmpdir(), "mcp-use-node-oauth-"));
+    const baseDir = join(root, "oauth");
+    let provider: NodeOAuthClientProvider | undefined;
+
+    try {
+      provider = await NodeOAuthClientProvider.create(
+        "https://public.example.com/mcp",
+        {
+          baseDir,
+          openBrowser: vi.fn(),
+          preferredPort: 33_000 + (process.pid % 1_000),
+          portRange: 100,
+        }
+      );
+
+      expect(existsSync(baseDir)).toBe(false);
+
+      const authorizationUrl = new URL("https://auth.example.com/authorize");
+      authorizationUrl.searchParams.set("state", "test-state");
+      await provider.redirectToAuthorization(authorizationUrl);
+
+      const portFile = join(baseDir, provider.serverUrlHash, "port");
+      expect(readFileSync(portFile, "utf8")).toBe(
+        String(provider.callbackPort)
+      );
+    } finally {
+      provider?.dispose();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("persists its callback port only when authorization starts", async () => {
+    const kv = new MemoryKVStore();
+    const set = vi.spyOn(kv, "set");
+    const provider = await NodeOAuthClientProvider.create(
+      "https://mcp.example.com/mcp",
+      {
+        kvStore: kv,
+        openBrowser: vi.fn(),
+        preferredPort: 34_000 + (process.pid % 1_000),
+        portRange: 100,
+      }
+    );
+
+    expect(set).not.toHaveBeenCalled();
+
+    const authorizationUrl = new URL("https://auth.example.com/authorize");
+    authorizationUrl.searchParams.set("state", "test-state");
+    await provider.redirectToAuthorization(authorizationUrl);
+
+    expect(set).toHaveBeenCalledWith("port", String(provider.callbackPort));
+    provider.dispose();
+  });
+
   it("preserves RFC 9207 iss from the loopback callback", async () => {
     const openBrowser = vi.fn();
     const provider = await NodeOAuthClientProvider.create(
