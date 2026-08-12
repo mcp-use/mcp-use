@@ -311,14 +311,14 @@
                       "v2/typescript/server/index",
                       "v2/typescript/server/migration",
                       "v2/typescript/server/examples",
+                      "v2/typescript/server/skills",
                       {
                         "group": "Core Components",
                         "icon": "box",
                         "pages": [
                           "v2/typescript/server/tools",
                           "v2/typescript/server/resources",
-                          "v2/typescript/server/prompts",
-                          "v2/typescript/server/skills"
+                          "v2/typescript/server/prompts"
                         ]
                       },
                       {
