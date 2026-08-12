@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 20.2.0-canary.4
+
+### Minor Changes
+
+- 7398543: Expose CSP mode and audit commands through the embedded Chat bridge so hosts and coding agents can verify MCP Apps in Widget-Declared mode.
+
 ## 20.1.2-canary.3
 
 ### Patch Changes

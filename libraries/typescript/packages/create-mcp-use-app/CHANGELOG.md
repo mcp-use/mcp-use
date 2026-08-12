@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 2.0.4-canary.0
+
+### Patch Changes
+
+- 7398543: Install the canary SDK and mcp-apps-builder skill branch from canary scaffold releases instead of silently falling back to latest and main.
+
 ## 2.0.3
 
 ### Patch Changes
