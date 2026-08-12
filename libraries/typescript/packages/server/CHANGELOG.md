@@ -1,5 +1,11 @@
 # mcp-use
 
+## 2.2.0-canary.10
+
+### Minor Changes
+
+- a175e1e: Export `createJwtVerifier` and its `JwtVerifierOptions` and `VerifiedPayload` types from `mcp-use/oauth`, so a custom OAuth provider built with `oauthCustomProvider` can reuse the built-in JWT verification instead of reimplementing it.
+
 ## 2.1.2-canary.9
 
 ### Patch Changes
