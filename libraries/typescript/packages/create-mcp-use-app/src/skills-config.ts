@@ -2,12 +2,19 @@ const SKILLS_REPO = "https://github.com/mcp-use/mcp-use.git";
 export const SKILLS_SPARSE_PATH = "skills/mcp-apps-builder";
 export const SKILLS_AGENT_DIRS = [".cursor", ".claude", ".agents"] as const;
 
-export function getDefaultDistTag(packageVersion: string): "beta" | "latest" {
-  return packageVersion.includes("-beta.") ? "beta" : "latest";
+export function getDefaultDistTag(
+  packageVersion: string
+): "beta" | "canary" | "latest" {
+  if (packageVersion.includes("-beta.")) return "beta";
+  if (packageVersion.includes("-canary.")) return "canary";
+  return "latest";
 }
 
-export function getSkillsBranch(packageVersion: string): "beta" | "main" {
-  return getDefaultDistTag(packageVersion) === "beta" ? "beta" : "main";
+export function getSkillsBranch(
+  packageVersion: string
+): "beta" | "canary" | "main" {
+  const channel = getDefaultDistTag(packageVersion);
+  return channel === "latest" ? "main" : channel;
 }
 
 export function getSkillsManualInstallCommand(packageVersion: string): string {
