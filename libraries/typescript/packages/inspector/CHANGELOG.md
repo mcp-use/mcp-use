@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 20.1.2-canary.3
+
+### Patch Changes
+
+- b55d902: Ship a canonical client stylesheet containing the Inspector surface, shadow, hover, and active theme contract so embedded dialogs, dropdowns, and selects render with the same styling as the standalone Inspector.
+
 ## 20.1.2-canary.2
 
 ### Patch Changes
