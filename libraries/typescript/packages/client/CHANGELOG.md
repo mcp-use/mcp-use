@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.1.3-canary.0
+
+### Patch Changes
+
+- 77ceb91: Defer Node OAuth store creation and callback port persistence until an authorization flow actually begins.
+
 ## 2.1.2
 
 ### Patch Changes
