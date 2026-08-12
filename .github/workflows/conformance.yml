@@ -323,6 +323,7 @@ jobs:
 
       - name: Post Python v1 score
         if: steps.download-python-results.outcome == 'success'
+        continue-on-error: ${{ github.event.pull_request.head.repo.fork }}
         uses: mcp-use/mcp-conformance-action@v1
         with:
           mode: comment
@@ -339,6 +340,7 @@ jobs:
 
       - name: Post TypeScript v2 score
         if: steps.download-typescript-results.outcome == 'success'
+        continue-on-error: ${{ github.event.pull_request.head.repo.fork }}
         uses: actions/github-script@v7
         env:
           RESULTS_ROOT: typescript-v2-conformance-results
