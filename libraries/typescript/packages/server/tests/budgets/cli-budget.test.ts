@@ -3,6 +3,7 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import { init, parse } from "es-module-lexer";
 import { describe, expect, it } from "vitest";
 import packageJson from "../../package.json";
+import cliPackageJson from "../../../cli/package.json";
 
 const DIST = new URL("../../dist/", import.meta.url);
 const CLI_DIST = new URL("../../../cli/dist/", import.meta.url);
@@ -117,6 +118,23 @@ describe("published CLI boundaries", () => {
 
   it("keeps the unpacked framework artifact below five MiB", async () => {
     expect(await directoryBytes(DIST)).toBeLessThanOrEqual(5 * 1024 * 1024);
+  });
+
+  it("keeps skill discovery in the CLI without a runtime dependency", async () => {
+    expect(packageJson.dependencies).not.toHaveProperty("yaml");
+    expect(packageJson.devDependencies).not.toHaveProperty("yaml");
+    expect(cliPackageJson.dependencies).not.toHaveProperty("yaml");
+    expect(cliPackageJson.devDependencies).not.toHaveProperty("yaml");
+
+    const graph = await buildStaticGraph(
+      new URL("internal/skills-loader.js", CLI_DIST)
+    );
+    expect(
+      [...graph.staticPackages].filter((specifier) => !isBuiltin(specifier))
+    ).toEqual([]);
+    const source = [...graph.files.values()].join("\n");
+    expect(source).not.toContain('from"yaml"');
+    expect(source).not.toContain("Dynamic require");
   });
 
   it("declares every external package used by the Node bundle", async () => {

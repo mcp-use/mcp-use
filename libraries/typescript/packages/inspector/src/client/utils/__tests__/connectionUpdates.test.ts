@@ -234,6 +234,28 @@ describe("InspectorConnectionStorageProvider v2 recovery", () => {
     });
   });
 
+  it("recovers a localhost connection URL before its client wrapper mounts", () => {
+    const localUrl = "http://localhost:3001/mcp";
+    localStorage.setItem(
+      "mcp-inspector-connections",
+      JSON.stringify({
+        [localUrl]: {
+          url: "https://mcp-wss-tunnel.example.workers.dev/mcp",
+          connectionMode: "auto",
+        },
+      })
+    );
+
+    const servers = new InspectorConnectionStorageProvider().getServers();
+
+    expect(servers[localUrl]?.url).toBe(localUrl);
+    expect(
+      JSON.parse(localStorage.getItem("mcp-inspector-connections") ?? "{}")[
+        localUrl
+      ]?.url
+    ).toBe(localUrl);
+  });
+
   it("returns recovered connections when browser storage rejects migration writes", () => {
     const stored = JSON.stringify({
       "https://example.com/mcp": { url: "https://example.com/mcp" },

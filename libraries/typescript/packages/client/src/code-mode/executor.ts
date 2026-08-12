@@ -1,5 +1,5 @@
 import type { Tool } from "@modelcontextprotocol/client";
-import type { MCPClient } from "../core/node.js";
+import type { CodeExecutorFunction, MCPClient } from "../core/node.js";
 import { logger } from "../utils/logging.js";
 
 export interface ExecutionResult {
@@ -202,5 +202,31 @@ export abstract class BaseCodeExecutor {
         results: filteredTools,
       };
     };
+  }
+}
+
+/**
+ * Adapts a plain `(code, timeout) => Promise<ExecutionResult>` function to the
+ * {@link BaseCodeExecutor} interface so a custom executor participates in the
+ * normal executor lifecycle (`searchTools`, `close()` cleanup).
+ *
+ * The function is invoked with the `MCPClient` as its `this`, matching how a
+ * custom executor was called before this adapter existed. Cleanup is a no-op:
+ * the caller owns whatever runtime the function wraps.
+ */
+export class FunctionCodeExecutor extends BaseCodeExecutor {
+  private fn: CodeExecutorFunction;
+
+  constructor(client: MCPClient, fn: CodeExecutorFunction) {
+    super(client);
+    this.fn = fn;
+  }
+
+  async execute(code: string, timeout?: number): Promise<ExecutionResult> {
+    return this.fn.call(this.client, code, timeout);
+  }
+
+  async cleanup(): Promise<void> {
+    // Nothing to release: the caller owns whatever runtime the function uses.
   }
 }

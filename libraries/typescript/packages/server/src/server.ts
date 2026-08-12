@@ -107,6 +107,13 @@ import type {
 } from "./tools.js";
 import { resolveToolInputSchema } from "./tools.js";
 import { isUsageDisabled, recordUsage } from "./usage.js";
+import { registerSkillsRuntime } from "./skills/runtime.js";
+import {
+  registerSkills,
+  SKILLS_EXTENSION_ID,
+  type SkillsOptions,
+  type SkillsSnapshot,
+} from "./skills/types.js";
 import { supportsViews } from "./views/capabilities.js";
 import type { ViewResourceFacts } from "./views/types.js";
 import {
@@ -277,33 +284,6 @@ export interface ListenOptions {
   host?: string;
 }
 
-function omitRootSchemaDialect<T>(schema: T): T {
-  if (
-    typeof schema !== "object" ||
-    schema === null ||
-    Array.isArray(schema) ||
-    !("$schema" in schema)
-  ) {
-    return schema;
-  }
-
-  const emittedSchema = { ...schema } as T & Record<string, unknown>;
-  delete emittedSchema["$schema"];
-  return emittedSchema;
-}
-
-function omitToolSchemaDialects(
-  tools: McpMiddlewareResult<"tools/list">
-): McpMiddlewareResult<"tools/list"> {
-  return tools.map((tool) => ({
-    ...tool,
-    inputSchema: omitRootSchemaDialect(tool.inputSchema),
-    ...(tool.outputSchema === undefined
-      ? {}
-      : { outputSchema: omitRootSchemaDialect(tool.outputSchema) }),
-  }));
-}
-
 function registerFetchMiddleware<TEnv extends Env>(
   app: Hono<TEnv>,
   middleware: FetchMiddleware
@@ -350,6 +330,9 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   >();
   readonly #prompts = new Map<string, PromptEntry<TUser, TEnv>>();
   readonly #views = new Map<string, ViewManifestEntry>();
+  #skills: SkillsSnapshot | undefined;
+  #skillsPrimed = false;
+  #skillsDiscovery: Promise<void> | undefined;
   /**
    * One-to-one tool→view bindings. Each view name maps to the single tool
    * that bound it; that tool's `view:` config is the sole source of
@@ -488,6 +471,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     this.delete = this.app.delete.bind(this.app) as Hono<TEnv>["delete"];
     this.all = this.app.all.bind(this.app) as Hono<TEnv>["all"];
     this.fetch = async (request, env, executionCtx) => {
+      await this.#ensureSkillsPrimed();
       this.#ensureMounted("handler");
       return this.#httpApp!.fetch(request, env, executionCtx);
     };
@@ -642,6 +626,45 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     this[registerViews](views, options);
   }
 
+  /**
+   * Prime an immutable Skills over MCP snapshot before the server starts.
+   *
+   * @param snapshot - Validated snapshot, or `undefined` when convention
+   * discovery found no skills directory.
+   * @throws If the server already started.
+   *
+   * @internal
+   */
+  [registerSkills](snapshot: SkillsSnapshot | undefined): void {
+    this.#assertNotStarted("skills", "snapshot");
+    this.#skills = snapshot;
+    this.#skillsPrimed = true;
+  }
+
+  /** String-keyed tooling alias for {@link registerSkills}. */
+  __primeSkills(snapshot: SkillsSnapshot | undefined): void {
+    this[registerSkills](snapshot);
+  }
+
+  /** Return file-discovery configuration to Node build tooling. @internal */
+  __skillsConfig(): boolean | SkillsOptions | undefined {
+    return this.#config.skills;
+  }
+
+  async #discoverSkills(
+    projectRoot: string,
+    conventionalDirectory: string
+  ): Promise<SkillsSnapshot | undefined> {
+    const { discoverConfiguredSkills } = await import("#mcp-use-skills-loader");
+    const snapshot = discoverConfiguredSkills(
+      this.#config.skills,
+      projectRoot,
+      conventionalDirectory
+    );
+    this[registerSkills](snapshot);
+    return snapshot;
+  }
+
   /** Register a static resource readable at `definition.uri`. */
   resource(
     definition: ResourceDefinition,
@@ -720,7 +743,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    * `@mcp-use/client` v2 peer. Each key automatically namespaces its mounted
    * tools, resources, and prompts. You may instead pass an existing ready
    * {@link ProxyConnection}; its negotiated server name becomes the namespace
-   * and the connection remains caller-owned.
+   * and the connection remains caller-owned. Anonymous connections cannot use
+   * this overload because they do not provide a namespace.
    *
    * Connection, introspection, and collision failures are diagnosed and
    * skipped without discarding capabilities that can be mounted.
@@ -745,8 +769,9 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    *
    * @param connection - Ready connection to introspect and forward through.
    * The connection's negotiated server name automatically namespaces every
-   * mounted capability. Introspection and collision failures are diagnosed and
-   * skipped without discarding capabilities that can be mounted.
+   * mounted capability. Anonymous connections are rejected because they do not
+   * provide a namespace. Introspection and collision failures are diagnosed
+   * and skipped without discarding capabilities that can be mounted.
    *
    * @throws If the server already started or closed.
    *
@@ -876,6 +901,11 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
 
   /** Mount and validate the Hono/MCP application without serving a request. @internal */
   __mount(): void {
+    if (!this.#skillsPrimed) {
+      throw new Error(
+        "Cannot mount before skills discovery. CLI tooling must call __primeSkills first."
+      );
+    }
     this.#ensureMounted("handler");
   }
 
@@ -888,6 +918,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    * ```
    */
   async notifyToolsChanged(): Promise<void> {
+    await this.#ensureSkillsPrimed();
     await this.#ensureMounted("handler").handler.notify.toolsChanged();
   }
 
@@ -900,6 +931,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    * ```
    */
   async notifyPromptsChanged(): Promise<void> {
+    await this.#ensureSkillsPrimed();
     await this.#ensureMounted("handler").handler.notify.promptsChanged();
   }
 
@@ -912,6 +944,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    * ```
    */
   async notifyResourcesChanged(): Promise<void> {
+    await this.#ensureSkillsPrimed();
     await this.#ensureMounted("handler").handler.notify.resourcesChanged();
   }
 
@@ -926,6 +959,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    * ```
    */
   async notifyResourceUpdated(uri: string): Promise<void> {
+    await this.#ensureSkillsPrimed();
     await this.#ensureMounted("handler").handler.notify.resourceUpdated(uri);
   }
 
@@ -959,6 +993,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     url: string;
   }> {
     this.#assertOpen("listen()");
+    await this.#ensureSkillsPrimed();
     const host = resolveListenHost(options.host, this.#config.host);
     const requestedPort = resolveListenPort(port, this.#config.port);
     this.#assertListenOAuthConfiguration(host);
@@ -1250,6 +1285,15 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         this.#proxyPromptsDiscovered += prompts;
       },
     };
+  }
+
+  async #ensureSkillsPrimed(): Promise<void> {
+    if (this.#skillsPrimed) return;
+    this.#skillsDiscovery ??= this.#discoverSkills(
+      typeof process === "undefined" ? "." : process.cwd(),
+      "skills"
+    ).then(() => undefined);
+    await this.#skillsDiscovery;
   }
 
   /**
@@ -1592,6 +1636,11 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           tools: { listChanged: true },
           prompts: { listChanged: true },
           resources: { listChanged: true, subscribe: true },
+          ...(this.#skills !== undefined && {
+            extensions: {
+              [SKILLS_EXTENSION_ID]: { directoryRead: true },
+            },
+          }),
         },
         ...(instructions !== undefined && { instructions }),
         ...(authInfo !== undefined && { authInfo }),
@@ -1628,6 +1677,9 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         viewMetaOptions,
         basePath
       );
+    }
+    if (this.#skills !== undefined) {
+      registerSkillsRuntime(server, this.#skills);
     }
     this.#wrapListHandlers(server);
     return server;
@@ -1850,7 +1902,9 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       handlers.set(method, wrapped);
     };
 
-    wrapListMethod("tools/list", "tools", omitToolSchemaDialects);
+    // JSON Schema's root `$schema` declaration selects the dialect used for
+    // validation. Do not normalize it away from a tool descriptor.
+    wrapListMethod("tools/list", "tools");
     wrapListMethod("resources/list", "resources");
     wrapListMethod("prompts/list", "prompts");
   }

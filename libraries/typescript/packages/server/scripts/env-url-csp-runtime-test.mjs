@@ -17,7 +17,7 @@ import { spawnSync } from "node:child_process";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_PKG = join(__dirname, "..");
-const FIXTURE = join(SERVER_PKG, "tests/cli/fixtures/views");
+const FIXTURE = join(SERVER_PKG, "../cli/tests/cli/fixtures/views");
 const WORK = "/tmp/mcp-env-url-csp-test";
 const BUILD_DIR = join(WORK, ".mcp-use/build");
 

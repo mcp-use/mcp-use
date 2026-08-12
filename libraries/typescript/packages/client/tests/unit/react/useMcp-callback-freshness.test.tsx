@@ -27,6 +27,7 @@ function makeConnection() {
     listTools: vi.fn().mockResolvedValue([]),
     listAllResources: vi.fn().mockResolvedValue({ resources: [] }),
     listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
+    listAllSkills: vi.fn().mockResolvedValue({ skills: [] }),
     listResourceTemplates: vi.fn().mockResolvedValue({ resourceTemplates: [] }),
     getPrompt: vi.fn(),
     complete: vi.fn(),
@@ -250,6 +251,79 @@ describe("useMcp callback freshness", () => {
     });
     expect(samplingV2).toHaveBeenCalledTimes(1);
     expect(elicitV2).toHaveBeenCalledTimes(1);
+  });
+
+  it("refreshes skills on resource changes for clients that support the extension", async () => {
+    let latest: ReturnType<typeof useMcp> | undefined;
+    const skillsClientInfo = {
+      name: "skills-host",
+      version: "1.0.0",
+      capabilities: {
+        extensions: { "io.modelcontextprotocol/skills": {} },
+      },
+    };
+
+    function TestComponent() {
+      latest = useMcp({
+        url: "http://localhost/mcp",
+        enabled: true,
+        authProvider: mockAuthProvider,
+        autoProxyFallback: false,
+        autoRetry: false,
+        autoReconnect: false,
+        logLevel: "silent",
+        clientInfo: skillsClientInfo,
+      });
+      return null;
+    }
+
+    await act(async () => {
+      create(<TestComponent />);
+    });
+    await flushMicrotasks();
+
+    expect(latest?.skills).toEqual([]);
+    expect(activeConnection?.listAllSkills).not.toHaveBeenCalled();
+
+    const notificationHandler = sharedClient.addServer.mock.calls[0][1]
+      .onNotification as (notification: { method: string }) => void;
+    activeConnection?.listAllSkills.mockResolvedValue({
+      skills: [
+        {
+          uri: "skill://shipping/SKILL.md",
+          frontmatter: { name: "shipping", description: "Track shipments" },
+          resources: [],
+        },
+      ],
+    });
+    notificationHandler({ method: "notifications/resources/list_changed" });
+    await flushMicrotasks(5);
+    expect(latest?.skills[0]?.frontmatter.description).toBe("Track shipments");
+
+    activeConnection?.listAllSkills.mockResolvedValue({
+      skills: [
+        {
+          uri: "skill://shipping/SKILL.md",
+          frontmatter: {
+            name: "shipping",
+            description: "Updated shipment tracking",
+          },
+          resources: [],
+        },
+      ],
+    });
+    notificationHandler({ method: "notifications/resources/list_changed" });
+    await flushMicrotasks(5);
+    expect(latest?.skills[0]?.frontmatter.description).toBe(
+      "Updated shipment tracking"
+    );
+
+    activeConnection?.listAllSkills.mockRejectedValue(
+      Object.assign(new Error("Method not found"), { code: -32601 })
+    );
+    notificationHandler({ method: "notifications/resources/list_changed" });
+    await flushMicrotasks(5);
+    expect(latest?.skills).toEqual([]);
   });
 
   it("defers callback presence changes until a normal reconnect", async () => {

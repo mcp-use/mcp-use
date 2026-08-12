@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { inputRequired } from "@modelcontextprotocol/server";
 
 import {
   toPromptResult,
@@ -158,6 +159,21 @@ describe("toPromptResult", () => {
         },
       ],
     };
+    expect(toPromptResult(raw)).toBe(raw);
+  });
+
+  it("passes through InputRequiredResult", () => {
+    const raw = inputRequired({
+      inputRequests: {
+        follow_up: inputRequired.createMessage({
+          messages: [
+            { role: "user", content: { type: "text", text: "Need more?" } },
+          ],
+          maxTokens: 32,
+        }),
+      },
+    });
+
     expect(toPromptResult(raw)).toBe(raw);
   });
 

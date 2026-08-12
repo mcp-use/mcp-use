@@ -3,5 +3,5 @@
  *
  * @internal
  */
-export { main } from "../../server/src/bin/main.js";
-export type { CliMainOptions } from "../../server/src/bin/main.js";
+export { main } from "./bin/main.js";
+export type { CliMainOptions } from "./bin/main.js";

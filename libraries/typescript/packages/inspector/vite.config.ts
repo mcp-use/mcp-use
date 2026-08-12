@@ -45,7 +45,7 @@ export default defineConfig({
       transformIndexHtml(html) {
         return html.replace(
           "</head>",
-          `  <script>window.__INSPECTOR_VERSION__ = "${packageJson.version}";</script>\n  </head>`
+          `  <script>window.__INSPECTOR_VERSION__ = "${packageJson.version}";</script>\n  <script>window.__MCP_INSPECTOR_MODE__ = "development";</script>\n  </head>`
         );
       },
     },

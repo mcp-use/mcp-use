@@ -95,6 +95,7 @@ function isSameMcpServer(left: McpServer, right: McpServer): boolean {
     left.error === right.error &&
     left.authUrl === right.authUrl &&
     sameSerializedValue(left.authTokens, right.authTokens) &&
+    sameSerializedValue(left.authorization, right.authorization) &&
     left.protocolEra === right.protocolEra &&
     left.protocolVersion === right.protocolVersion &&
     sameSerializedValue(left.serverInfo, right.serverInfo) &&
@@ -105,6 +106,7 @@ function isSameMcpServer(left: McpServer, right: McpServer): boolean {
     sameSerializedValue(left.resources, right.resources) &&
     sameSerializedValue(left.resourceTemplates, right.resourceTemplates) &&
     sameSerializedValue(left.prompts, right.prompts) &&
+    sameSerializedValue(left.skills, right.skills) &&
     sameSerializedValue(left.notifications, right.notifications) &&
     left.unreadNotificationCount === right.unreadNotificationCount &&
     sameSerializedValue(
@@ -405,6 +407,7 @@ function McpServerWrapper({
     mcp.resources,
     mcp.resourceTemplates,
     mcp.prompts,
+    mcp.skills,
     mcp.serverInfo,
     mcp.capabilities,
     mcp.protocolEra,
@@ -412,6 +415,7 @@ function McpServerWrapper({
     mcp.instructions,
     mcp.extensions,
     mcp.authTokens,
+    mcp.authorization,
     // Functions excluded - they're stable via useCallback in useMcp
     // mcp.log excluded - log changes shouldn't trigger provider updates
     // mcp.client excluded - client reference stability handled by manual check

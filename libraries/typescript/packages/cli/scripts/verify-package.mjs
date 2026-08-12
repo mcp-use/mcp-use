@@ -1,9 +1,19 @@
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const files = walk(join(root, "dist"));
+const packageJson = JSON.parse(
+  readFileSync(join(root, "package.json"), "utf8")
+);
+
+if (
+  packageJson.dependencies?.yaml !== undefined ||
+  packageJson.devDependencies?.yaml !== undefined
+) {
+  throw new Error("The vendored Skills parser must not add a yaml dependency");
+}
 
 if (!files.includes(join("dist", "bin.js"))) {
   throw new Error("Missing dist/bin.js");
@@ -11,11 +21,44 @@ if (!files.includes(join("dist", "bin.js"))) {
 if (!files.includes(join("dist", "index.js"))) {
   throw new Error("Missing dist/index.js");
 }
+const bundledLicenses = new Map([
+  ["modelcontextprotocol-server-LICENSE", ["Apache License", "MIT License"]],
+  ["modelcontextprotocol-core-LICENSE", ["Apache License", "MIT License"]],
+  ["zod-LICENSE", ["MIT License"]],
+]);
+for (const [filename, expectedTerms] of bundledLicenses) {
+  const license = join("dist", "third-party-licenses", filename);
+  if (!files.includes(license)) {
+    throw new Error(`Missing ${license} for bundled dependency code`);
+  }
+  const licenseText = readFileSync(join(root, license), "utf8");
+  if (expectedTerms.some((term) => !licenseText.includes(term))) {
+    throw new Error(`${license} does not contain the expected license terms`);
+  }
+}
+if (!files.includes(join("dist", "internal", "skills-loader.js"))) {
+  throw new Error("Missing dist/internal/skills-loader.js");
+}
 if (!existsSync(join(root, "types", "vite-client.d.ts"))) {
   throw new Error("Missing types/vite-client.d.ts");
 }
+if (!existsSync(join(root, "types", "internal", "skills-loader.d.ts"))) {
+  throw new Error("Missing types/internal/skills-loader.d.ts");
+}
+if (!existsSync(join(root, "THIRD_PARTY_NOTICES.md"))) {
+  throw new Error("Missing THIRD_PARTY_NOTICES.md");
+}
 if (files.some((file) => file.endsWith(".map"))) {
   throw new Error("CLI package must not publish source maps");
+}
+const javascript = files
+  .filter((file) => file.endsWith(".js"))
+  .map((file) => readFileSync(join(root, file), "utf8"));
+if (!javascript.some((source) => source.includes("api.tunnel.mcp-use.run"))) {
+  throw new Error("CLI package is missing bundled tunnel support");
+}
+if (javascript.some((source) => source.includes("@mcp-use/tunnel"))) {
+  throw new Error("CLI package must not require @mcp-use/tunnel at runtime");
 }
 
 function walk(directory) {

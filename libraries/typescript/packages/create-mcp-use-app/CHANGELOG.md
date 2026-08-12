@@ -1,5 +1,48 @@
 # create-mcp-use-app
 
+## 2.0.3
+
+### Patch Changes
+
+- e17cd7b: Strip leading underscores when sanitizing a project name into an npm package name. `create-mcp-use-app _foo` produced `"name": "_foo"`, which npm publish rejects with "name cannot start with an underscore".
+- e17cd7b: Sanitize the npm package name for named projects, not just `.`. A name like `My "App"` was written verbatim into the template's `index.ts`, producing invalid TypeScript.
+
+## 2.0.3-canary.1
+
+### Patch Changes
+
+- cb8bb56: Strip leading underscores when sanitizing a project name into an npm package name. `create-mcp-use-app _foo` produced `"name": "_foo"`, which npm publish rejects with "name cannot start with an underscore".
+
+## 2.0.3-canary.0
+
+### Patch Changes
+
+- a56231e: Sanitize the npm package name for named projects, not just `.`. A name like `My "App"` was written verbatim into the template's `index.ts`, producing invalid TypeScript.
+
+## 2.0.2
+
+### Patch Changes
+
+- 6985d78: chore: clear unused TypeScript export surface flagged by knip
+
+  Trim internal barrels, drop dead stubs and duplicate re-exports, and un-export file-local helpers so knip reports a clean export graph without changing published package entry APIs.
+
+## 2.0.2-canary.1
+
+### Patch Changes
+
+- 6985d78: chore: clear unused TypeScript export surface flagged by knip
+
+  Trim internal barrels, drop dead stubs and duplicate re-exports, and un-export file-local helpers so knip reports a clean export graph without changing published package entry APIs.
+
+## 2.0.2-canary.0
+
+### Patch Changes
+
+- 6985d78: chore: clear unused TypeScript export surface flagged by knip
+
+  Trim internal barrels, drop dead stubs and duplicate re-exports, and un-export file-local helpers so knip reports a clean export graph without changing published package entry APIs.
+
 ## 2.0.1
 
 ### Patch Changes

@@ -80,3 +80,11 @@ export default function ProductView() {
 - Do not deploy or mutate external systems unless the user explicitly requests it.
 
 Run `node <skill-dir>/scripts/check-v2.mjs <project-root>` during migrations and reviews, then complete the focused checks in [Verification](references/verification.md).
+
+## Agent Skills
+
+Put reusable agent workflows in `skills/<name>/SKILL.md`; the directory is
+served automatically, so normally omit the `skills` server option. Use
+`skills: false` to disable it or `skills: { directory: "server-skills" }` to
+override the project-relative directory. Keep supporting references, scripts,
+templates, and assets in the skill instead of inflating tool descriptions.

@@ -19,12 +19,22 @@ export type {
   PendingSamplingRequest,
   PendingElicitationRequest,
 } from "./types.js";
+export type {
+  Skill,
+  SkillDirectoryEntry,
+  SkillDirectoryReadResult,
+  SkillGetResult,
+  SkillResource,
+  SkillsListResult,
+} from "../core/skills.js";
+export { SKILLS_EXTENSION_ID } from "../core/skills.js";
 export { pickPersistedServerConfig, toPersistedServerConfig } from "./types.js";
 export { useMcp } from "./useMcp.js";
 export { detectFavicon } from "../utils/favicon.js";
 
 // Re-export auth callback handler for the OAuth flow
 export { onMcpAuthorization } from "../auth/callback.js";
+export { isOAuthInteractionRequired } from "../auth/flow.js";
 
 // Re-export browser telemetry (browser-specific implementation)
 export {

@@ -4,7 +4,7 @@ import type { MessageAttachment } from "./types";
 export const MAX_WIDGET_IMAGE_SIZE = 10 * 1024 * 1024;
 export const MAX_WIDGET_MESSAGE_SIZE = 20 * 1024 * 1024;
 
-export const SUPPORTED_WIDGET_IMAGE_TYPES = new Set([
+const SUPPORTED_WIDGET_IMAGE_TYPES = new Set([
   "image/png",
   "image/jpeg",
   "image/jpg",
@@ -13,7 +13,7 @@ export const SUPPORTED_WIDGET_IMAGE_TYPES = new Set([
   "image/svg+xml",
 ]);
 
-export interface NormalizedWidgetMessage {
+interface NormalizedWidgetMessage {
   text: string;
   attachments: MessageAttachment[];
 }

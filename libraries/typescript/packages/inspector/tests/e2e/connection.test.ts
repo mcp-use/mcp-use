@@ -67,6 +67,19 @@ test.describe("Inspector MCP Server Connections", () => {
     await expect(page.getByTestId("server-tile-status-ready")).toBeVisible();
   });
 
+  test("shows the Skills tab and empty state without the extension", async ({
+    page,
+  }) => {
+    const skillsTab = page.locator('[data-testid="tab-skills"]:visible');
+    await expect(skillsTab).toBeVisible();
+    await expect(skillsTab).not.toContainText(/\d/);
+    await skillsTab.click();
+    await expect(page.getByText("No skills available")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Validate all" })
+    ).toBeDisabled();
+  });
+
   test("new servers appear first and the scroll area keeps bottom spacing", async ({
     page,
   }) => {

@@ -1,8 +1,9 @@
 import { readFileSync, readdirSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 import { gunzipSync } from "node:zlib";
 
-const root = new URL("../", import.meta.url).pathname;
+const root = fileURLToPath(new URL("../", import.meta.url));
 const dist = join(root, "dist");
 const files = walk(dist);
 const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
@@ -59,6 +60,6 @@ function walk(directory) {
     const absolute = join(directory, entry.name);
     if (entry.isDirectory()) return walk(absolute);
     if (!entry.isFile()) return [];
-    return [relative(root, absolute)];
+    return [relative(root, absolute).split(sep).join("/")];
   });
 }

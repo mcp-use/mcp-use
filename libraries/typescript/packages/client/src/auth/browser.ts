@@ -589,8 +589,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
    * @param authorizationUrl - The fully constructed authorization URL from the SDK.
    */
   async redirectToAuthorization(authorizationUrl: URL): Promise<void> {
-    const sanitizedAuthUrl =
-      await this.prepareAuthorizationUrl(authorizationUrl);
+    await this.prepareAuthorizationUrl(authorizationUrl);
 
     // If auto-auth is prevented, just store the URL but don't redirect/popup
     if (this.preventAutoAuth) {
@@ -600,12 +599,28 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       return;
     }
 
+    this.startAuthorization();
+  }
+
+  /**
+   * Open the authorization URL prepared by the official SDK.
+   *
+   * This is the explicit-user-action counterpart to `preventAutoAuth`: the
+   * provider still lets the SDK own discovery and PKCE state, while a host can
+   * launch the stored authorization request later from an Authenticate button.
+   */
+  startAuthorization(): void {
+    const authorizationUrl = this.lastAttemptedAuthUrl;
+    if (!authorizationUrl) {
+      throw new Error("No prepared OAuth authorization is available");
+    }
+
     // Use redirect flow if enabled (avoids popup blockers)
     if (this.useRedirectFlow) {
       console.info(
         `[${this.storageKeyPrefix}] Redirecting to authorization URL (full-page redirect).`
       );
-      window.location.href = sanitizedAuthUrl;
+      window.location.href = authorizationUrl;
       return;
     }
 
@@ -614,13 +629,13 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       "width=600,height=700,resizable=yes,scrollbars=yes,status=yes";
     try {
       const popup = window.open(
-        sanitizedAuthUrl,
+        authorizationUrl,
         `mcp_auth_${this.serverUrlHash}`,
         popupFeatures
       );
 
       if (this.onPopupWindow) {
-        this.onPopupWindow(sanitizedAuthUrl, popupFeatures, popup);
+        this.onPopupWindow(authorizationUrl, popupFeatures, popup);
       }
 
       if (!popup || popup.closed || typeof popup.closed === "undefined") {

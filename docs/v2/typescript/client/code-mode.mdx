@@ -48,6 +48,26 @@ await client.close();
 }}
 ```
 
+A custom function receives `(code, timeout?)` and returns an `ExecutionResult`.
+It owns cleanup for whatever runtime it wraps — `client.close()` does not
+release anything on its behalf. A non-arrow function is invoked with the
+`MCPClient` as its `this`, so it can reach the client without closing over it:
+
+```typescript
+{ codeMode: {
+    enabled: true,
+    executor: async function (this: MCPClient, code, timeout) {
+      const servers = this.getServerNames();
+      return {
+        result: await myRuntime.run(code, timeout, servers),
+        logs: [],
+        error: null,
+        execution_time: 0,
+      };
+    },
+}}
+```
+
 ## Agent integration
 
 Use with `@mcp-use/agent` and `PROMPTS.CODE_MODE`:

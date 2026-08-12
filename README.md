@@ -46,7 +46,7 @@
 </div>
 
 > [!NOTE]
-> **Migrating from v1? Give it to your agent:** [Read the migration guide →](https://docs.mcp-use.com/v2/typescript/server/migration)
+> **Migrating from v1? Give it to your agent:**
 >
 > ```text
 > Migrate this mcp-use project to v2 following
@@ -269,7 +269,7 @@ Ship to [Manufact](https://manufact.com) and get observability, analytics, evals
 npm run deploy
 ```
 
-Prefer to run it yourself? Follow the [self-hosting guide →](https://mcpuse-codex-v1-v2-docs-split.mintlify.site/v2/typescript/server/deployment/runtime-patterns).
+Prefer to run it yourself? Follow the [self-hosting guide →](https://docs.mcp-use.com/typescript/server/deployment/runtime-patterns).
 
 ## How mcp-use compares
 
@@ -335,6 +335,7 @@ Remix a complete MCP App, inspect the source, or deploy it as a starting point:
 | [`@mcp-use/client`](https://www.npmjs.com/package/@mcp-use/client) | Connect to MCP servers from Node.js, browsers, React, and sandboxes |
 | [`@mcp-use/agent`](https://www.npmjs.com/package/@mcp-use/agent) | Build model-powered agents on top of MCP clients |
 | [`@mcp-use/inspector`](https://www.npmjs.com/package/@mcp-use/inspector) | Inspect and debug MCP servers and apps |
+| [`@mcp-use/tunnel`](https://www.npmjs.com/package/@mcp-use/tunnel) | Expose local HTTP, WebSocket, and MCP servers through the managed relay |
 | [`create-mcp-use-app`](https://www.npmjs.com/package/create-mcp-use-app) | Scaffold servers and interactive apps |
 | [`mcp-use` for Python](https://pypi.org/project/mcp-use/) | Build Python MCP servers, clients, and agents |
 

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import {
+  existsSync,
   mkdtempSync,
   mkdirSync,
   readFileSync,
@@ -23,6 +24,7 @@ const artifactDirectory = suppliedArtifactDirectory
   : join(scratch, "artifacts");
 const installDirectory = join(scratch, "install");
 const cliInstallDirectory = join(scratch, "cli-install");
+const tunnelInstallDirectory = join(scratch, "tunnel-install");
 const allowedExtraneous = new Set([
   "@emnapi/core",
   "@emnapi/runtime",
@@ -36,11 +38,13 @@ try {
   if (!suppliedArtifactDirectory) mkdirSync(artifactDirectory);
   mkdirSync(installDirectory);
   mkdirSync(cliInstallDirectory);
+  mkdirSync(tunnelInstallDirectory);
   const tarballs = new Map();
   for (const name of [
     "@mcp-use/client",
     "@mcp-use/cli",
     "@mcp-use/inspector",
+    "@mcp-use/tunnel",
     "mcp-use",
   ]) {
     if (suppliedArtifactDirectory) {
@@ -71,7 +75,16 @@ try {
   );
   const install = runResult(
     "npm",
-    ["install", "--omit=dev", ...tarballs.values()],
+    [
+      "install",
+      "--omit=dev",
+      ...[
+        "@mcp-use/client",
+        "@mcp-use/cli",
+        "@mcp-use/inspector",
+        "mcp-use",
+      ].map((name) => tarballs.get(name)),
+    ],
     installDirectory
   );
   assert.equal(install.status, 0, install.stderr || install.stdout);
@@ -94,9 +107,29 @@ try {
     ["install", "--omit=dev", tarballs.get("@mcp-use/cli")],
     cliInstallDirectory
   );
+  writeFileSync(
+    join(tunnelInstallDirectory, "package.json"),
+    `${JSON.stringify({ name: "tunnel-release-install", private: true, type: "module" }, null, 2)}\n`
+  );
+  run(
+    "npm",
+    ["install", "--omit=dev", tarballs.get("@mcp-use/tunnel")],
+    tunnelInstallDirectory
+  );
   const cliManifest = readJson(
     join(cliInstallDirectory, "node_modules", "@mcp-use", "cli", "package.json")
   );
+  const tunnelManifest = readJson(
+    join(
+      tunnelInstallDirectory,
+      "node_modules",
+      "@mcp-use",
+      "tunnel",
+      "package.json"
+    )
+  );
+  assert.equal(frameworkManifest.dependencies?.["@mcp-use/tunnel"], undefined);
+  assert.equal(cliManifest.dependencies?.["@mcp-use/tunnel"], undefined);
   assert.notEqual(frameworkManifest.version, cliManifest.version);
   const frameworkBin = join(
     installDirectory,
@@ -105,28 +138,48 @@ try {
     "dist",
     "bin.js"
   );
+  const installedFrameworkBin = installedBin(installDirectory, "mcp-use");
+  const installedCliBin = installedBin(cliInstallDirectory, "mcp-use");
   assert.equal(
-    run(process.execPath, [frameworkBin, "--version"], installDirectory).trim(),
+    runInstalledBin(
+      installedFrameworkBin,
+      ["--version"],
+      installDirectory
+    ).trim(),
     frameworkManifest.version
+  );
+  assert.equal(
+    runInstalledBin(installedCliBin, ["--version"], cliInstallDirectory).trim(),
+    cliManifest.version
+  );
+  assert.match(
+    runInstalledBin(
+      installedBin(tunnelInstallDirectory, "mcp-tunnel"),
+      ["--help"],
+      tunnelInstallDirectory
+    ),
+    /Usage: mcp-tunnel/
   );
   assert.equal(
     run(
       process.execPath,
       [
-        join(
-          cliInstallDirectory,
-          "node_modules",
-          "@mcp-use",
-          "cli",
-          "dist",
-          "bin.js"
-        ),
-        "--version",
+        "--input-type=module",
+        "--eval",
+        'const tunnel = await import("@mcp-use/tunnel"); console.log(typeof tunnel.createTunnelManager)',
       ],
-      cliInstallDirectory
+      tunnelInstallDirectory
     ).trim(),
-    cliManifest.version
+    "function"
   );
+
+  for (const directory of [installDirectory, cliInstallDirectory]) {
+    assert.equal(
+      existsSync(join(directory, "node_modules", "@mcp-use", "tunnel")),
+      false,
+      "embedded tunnel support must not install @mcp-use/tunnel"
+    );
+  }
 
   verifyDependencyGraph(installDirectory, frameworkManifest);
   verifyRuntimeImport(installDirectory, []);
@@ -177,6 +230,7 @@ try {
         npm: run("npm", ["--version"], installDirectory).trim(),
         frameworkVersion: frameworkManifest.version,
         cliVersion: cliManifest.version,
+        tunnelVersion: tunnelManifest.version,
         installedBytes,
         installedMiB: installedBytes / 1024 / 1024,
         toolBuildBytes: directoryBytes(buildDirectory),
@@ -272,17 +326,22 @@ function verifyRuntimeImport(directory, conditions) {
         .join("\n")
     );
   } else {
-    assert.ok(
-      builtins.every((url) => url === "node:process"),
-      `unexpected Node builtins: ${builtins.join(", ")}`
-    );
-    const processResolution = resolutions.find(
-      ({ url }) => url === "node:process"
-    );
-    if (processResolution) {
+    const allowedBuiltins = new Map([
+      [
+        "node:process",
+        /(?:@modelcontextprotocol\/server\/dist\/shimsNode|\/mcp-use\/dist\/index-node)\.(?:mjs|js)$/,
+      ],
+      ["node:http", /\/mcp-use\/dist\/index-node\.js$/],
+    ]);
+    for (const resolution of resolutions.filter(({ url }) =>
+      url.startsWith("node:")
+    )) {
+      const allowedParent = allowedBuiltins.get(resolution.url);
+      assert.ok(allowedParent, `unexpected Node builtin: ${resolution.url}`);
       assert.match(
-        processResolution.parentURL ?? "",
-        /@modelcontextprotocol\/server\/dist\/shimsNode\.mjs$/
+        resolution.parentURL ?? "",
+        allowedParent,
+        `${resolution.url} loaded by unexpected parent`
       );
     }
   }
@@ -374,6 +433,30 @@ function runResult(command, args, cwd, extraEnv = {}) {
     stdio: ["ignore", "pipe", "pipe"],
     maxBuffer: 20 * 1024 * 1024,
   });
+}
+
+function installedBin(directory, name) {
+  return join(
+    directory,
+    "node_modules",
+    ".bin",
+    process.platform === "win32" ? `${name}.cmd` : name
+  );
+}
+
+function runInstalledBin(command, args, cwd) {
+  if (process.platform !== "win32") return run(command, args, cwd);
+  const result = spawnSync(command, args, {
+    cwd,
+    env: process.env,
+    encoding: "utf8",
+    shell: true,
+    stdio: ["ignore", "pipe", "pipe"],
+    maxBuffer: 20 * 1024 * 1024,
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) throw new Error(result.stderr || result.stdout);
+  return result.stdout;
 }
 
 function readJson(file) {

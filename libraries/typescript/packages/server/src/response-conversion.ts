@@ -3,10 +3,12 @@ import type {
   CallToolResult,
   ContentBlock,
   GetPromptResult,
+  InputRequiredResult,
   PromptMessage,
   ReadResourceResult,
   TextResourceContents,
 } from "@modelcontextprotocol/server";
+import { isInputRequiredResult } from "@modelcontextprotocol/server";
 
 type ResourceContentsEntry = TextResourceContents | BlobResourceContents;
 
@@ -120,19 +122,20 @@ function contentBlockToResourceContents(
 }
 
 /**
- * Convert a helper/`CallToolResult` (or pass through a raw prompt result) to
- * {@link GetPromptResult}.
+ * Convert a helper/`CallToolResult` (or pass through a raw prompt or
+ * input-required result) to the prompt handler result.
  *
  * Each tool {@link ContentBlock} becomes a `user` {@link PromptMessage}
  * (prompt messages already accept the same content-block union).
  *
- * @param result - Tool-shaped or prompt result from a prompt callback.
- * @returns Official prompt get envelope.
+ * @param result - Tool-shaped, prompt, or input-required result from a
+ * prompt callback.
+ * @returns Official completed or input-required prompt envelope.
  */
 export function toPromptResult(
-  result: CallToolResult | GetPromptResult
-): GetPromptResult {
-  if (isGetPromptResult(result)) {
+  result: CallToolResult | GetPromptResult | InputRequiredResult
+): GetPromptResult | InputRequiredResult {
+  if (isInputRequiredResult(result) || isGetPromptResult(result)) {
     return result;
   }
 
