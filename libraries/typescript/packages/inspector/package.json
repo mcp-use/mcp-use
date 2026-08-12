@@ -28,6 +28,9 @@
     "./client": {
       "types": "./dist/client/index.d.ts",
       "import": "./dist/client/index.js"
+    },
+    "./client/styles.css": {
+      "default": "./dist/client/styles.css"
     }
   },
   "main": "./dist/server/index.js",
@@ -50,7 +53,7 @@
     "preview:app": "vite preview --config vite.app.config.ts --host 127.0.0.1",
     "serve:app": "pnpm build:app && pnpm preview:app",
     "analyze:app": "ANALYZE=true vite build --config vite.app.config.ts",
-    "build:client-exports": "tsup --config tsup.client.ts",
+    "build:client-exports": "tsup --config tsup.client.ts && node scripts/copy-client-styles.mjs",
     "build:server": "tsup --config tsup.server.ts",
     "verify:package": "node scripts/verify-package.mjs",
     "prepublishOnly": "pnpm --filter @mcp-use/client build && pnpm build",

@@ -116,6 +116,22 @@ The UI assets, proxy, and OAuth backend all come from the installed package; no 
 
 ## 📖 Usage Guide
 
+### Embedding the React client
+
+Applications that import components from `@mcp-use/inspector/client` must also
+load the Inspector theme contract from their global Tailwind stylesheet:
+
+```css
+@import "tailwindcss";
+@import "@mcp-use/inspector/client/styles.css";
+
+@source "../node_modules/@mcp-use/inspector/dist/client";
+```
+
+The stylesheet supplies the surface, shadow, hover, and active tokens used by
+portaled dialogs, dropdowns, selects, and other Inspector UI primitives. The
+standalone Inspector bundles these styles automatically.
+
 ### Dashboard
 
 The main dashboard is your central hub for managing MCP server connections:

@@ -36,11 +36,26 @@ for (const required of [
   "dist/server/index.d.ts",
   "dist/client/index.js",
   "dist/client/index.d.ts",
+  "dist/client/styles.css",
   "dist/cli.js",
   "dist/app/inspector.js.gz",
   "dist/app/inspector.css.gz",
 ]) {
   if (!files.includes(required)) throw new Error(`Missing ${required}`);
+}
+
+const clientStyles = readFileSync(join(dist, "client/styles.css"), "utf8");
+for (const requiredToken of [
+  "--color-surface-5",
+  "--surface-5",
+  "--shadow-surface-5",
+  "--shadow-5",
+  "--color-hover",
+  "--color-active",
+]) {
+  if (!clientStyles.includes(requiredToken)) {
+    throw new Error(`Inspector client styles are missing ${requiredToken}`);
+  }
 }
 
 const appJavaScript = gunzipSync(
