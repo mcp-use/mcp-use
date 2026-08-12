@@ -38,7 +38,29 @@ Guard host-specific features with their support signal. Treat tool calls as asyn
 
 ## CSP and assets
 
-Declare external origins in the bound View's `csp` configuration. Keep local View code and CSS inside the View folder. Put shared public assets in `public/` and resolve them through the request-provided public asset base rather than hard-coded localhost URLs.
+Declare every external origin in the bound View's `csp` configuration. Use the
+installed v2 types and the narrow field that matches the browser operation:
+
+- `connectDomains` for `fetch`, EventSource, and WebSocket connections
+- `resourceDomains` for scripts, styles, images, fonts, and media
+- `frameDomains` for embedded frames
+- `baseUriDomains` only when the View intentionally sets an external base URI
+
+Use exact origins such as `https://api.example.com`, not paths. Keep the policy
+least-privilege: never add `*`, leave Inspector in Permissive mode, or weaken the
+host CSP to hide a violation. CORS is a separate server response contract and
+must still be configured for cross-origin requests.
+
+After rendering the View, enforce **Widget-Declared** mode and inspect the CSP
+audit. In Vibe, use `chat_set_csp_mode` and `chat_read_csp_audit`; apply the
+reported exact-origin suggestions to `view.csp`, render again, and repeat until
+the audit reports `clean: true`. Also re-run `chat_read_runtime_errors` and take
+a final screenshot. A successful tool result or a View that only works in
+Permissive mode is not completion.
+
+Keep local View code and CSS inside the View folder. Put shared public assets in
+`public/` and resolve them through the request-provided public asset base rather
+than hard-coded localhost URLs.
 
 ## Type generation
 

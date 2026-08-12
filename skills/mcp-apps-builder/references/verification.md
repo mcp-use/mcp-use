@@ -35,6 +35,20 @@ npx mcp-use client dev tools call show-product id=item-1 --screenshot
 
 Reload once to catch state and asset assumptions masked by hot reload.
 
+For Views, finish with a CSP repair loop:
+
+1. Render the tool output in Widget-Declared mode.
+2. Read the CSP audit and runtime errors after the iframe has loaded.
+3. Add only the reported external origins to the correct `view.csp` category.
+4. Render again and repeat until the audit is clean and the View remains usable.
+5. Take a final screenshot in Widget-Declared mode.
+
+When Vibe bridge tools are available, call `chat_set_csp_mode` with
+`widget-declared`, trigger the rendering tool through `chat_send_message`, then
+call `chat_read_csp_audit`, `chat_read_runtime_errors`, and `screenshot_widget`.
+Do not infer CSP success from compilation, an MCP tool result, or Permissive
+mode.
+
 ## Package checks
 
 When changing exports, dependencies, or packaging, pack the relevant package and install it in an empty temporary consumer. Import public entry points there. A workspace build cannot prove the published dependency boundary.

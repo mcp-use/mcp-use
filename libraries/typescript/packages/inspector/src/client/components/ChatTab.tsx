@@ -66,6 +66,7 @@ import type { ChatSystemPromptProvider } from "./chat/system-prompt/types";
 import { useWidgetDebug } from "../context/WidgetDebugContext";
 import type { ChatBodyBuilder, MessageAttachment } from "./chat/types";
 import { resolveChatToolPolicy } from "./chat/chat-tool-policy";
+import { buildChatCspAudit } from "./chat/csp-bridge";
 
 // Structural type — avoids nominal incompatibility when pnpm creates
 // multiple peer-variant copies of mcp-use with duplicate class declarations.
@@ -316,7 +317,14 @@ export function ChatTab({
       lockManagedMode,
     });
 
-  const { getModelContexts, getAppToolConnections } = useWidgetDebug();
+  const {
+    getModelContexts,
+    getAppToolConnections,
+    playground,
+    widgets,
+    clearCspViolations,
+    updatePlaygroundSettings,
+  } = useWidgetDebug();
   const modelContextScope = `chat:${serverId}`;
   const widgetModelContexts = getModelContexts(modelContextScope);
   const appToolConnections = getAppToolConnections(modelContextScope);
@@ -795,6 +803,7 @@ export function ChatTab({
         setQuickQuestions: true,
         setFollowups: true,
         loadMessages: true,
+        cspAudit: true,
       },
     });
   }, [postBridgeEvent]);
@@ -828,6 +837,8 @@ export function ChatTab({
         prompt?: string;
         questions?: unknown;
         followups?: unknown;
+        mode?: unknown;
+        toolCallId?: unknown;
       };
 
       if (!data.type?.startsWith("mcp-inspector:chat:")) return;
@@ -915,6 +926,34 @@ export function ChatTab({
         }
         setMessages(rawMessages as ChatMessage[]);
         postResult(true, { count: rawMessages.length });
+        return;
+      }
+
+      if (data.type === "mcp-inspector:chat:set_csp_mode") {
+        if (data.mode !== "permissive" && data.mode !== "widget-declared") {
+          postResult(false, {
+            error: "mode must be permissive or widget-declared",
+          });
+          return;
+        }
+        for (const widgetId of widgets.keys()) clearCspViolations(widgetId);
+        updatePlaygroundSettings({ cspMode: data.mode });
+        postResult(true, { cspMode: data.mode });
+        return;
+      }
+
+      if (data.type === "mcp-inspector:chat:get_csp_audit") {
+        const audit = buildChatCspAudit(
+          playground.cspMode,
+          widgets,
+          typeof data.toolCallId === "string" ? data.toolCallId : undefined
+        );
+        postBridgeEvent("mcp-inspector:chat:csp_audit", {
+          requestId,
+          audit,
+          timestamp: Date.now(),
+        });
+        postResult(true, { cspMode: audit.mode, cspClean: audit.clean });
         return;
       }
 
@@ -1085,6 +1124,7 @@ export function ChatTab({
     return () => window.removeEventListener("message", handleWindowMessage);
   }, [
     bridge,
+    clearCspViolations,
     clearChatToLanding,
     dismissLandingShader,
     setMessages,
@@ -1099,6 +1139,9 @@ export function ChatTab({
     serverId,
     llmConfig,
     isConnected,
+    playground.cspMode,
+    updatePlaygroundSettings,
+    widgets,
   ]);
 
   // Register keyboard shortcuts (only active when ChatTab is mounted and enabled)
