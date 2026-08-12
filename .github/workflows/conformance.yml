@@ -315,15 +315,14 @@ jobs:
     steps:
       - name: Download Python v1 results
         id: download-python-results
-        continue-on-error: ${{ github.event.pull_request.head.repo.fork }}
+        continue-on-error: true
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: conformance-results
           path: conformance-results
 
       - name: Post Python v1 score
-        if: steps.download-python-results.outcome == 'success'
-        continue-on-error: ${{ github.event.pull_request.head.repo.fork }}
+        if: steps.download-python-results.outcome == 'success' && github.event.pull_request.head.repo.fork != true
         uses: mcp-use/mcp-conformance-action@v1
         with:
           mode: comment
@@ -339,8 +338,7 @@ jobs:
           path: typescript-v2-conformance-results
 
       - name: Post TypeScript v2 score
-        if: steps.download-typescript-results.outcome == 'success'
-        continue-on-error: true
+        if: steps.download-typescript-results.outcome == 'success' && github.event.pull_request.head.repo.fork != true
         uses: actions/github-script@v7
         env:
           RESULTS_ROOT: typescript-v2-conformance-results
