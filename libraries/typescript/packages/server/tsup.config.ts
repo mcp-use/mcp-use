@@ -50,6 +50,8 @@ export default defineConfig([
       "node-bridge": "src/node-bridge.ts",
       "internal/node-http": "src/node-http.ts",
       "internal/node-http-unavailable": "src/node-http-unavailable.ts",
+      "internal/skills-loader-unavailable":
+        "src/skills/node-loader-unavailable.ts",
       "next/index": "src/next/index.ts",
     },
     // ESM-only: the v2 @modelcontextprotocol/* packages ship no CJS entry, so a
@@ -60,7 +62,12 @@ export default defineConfig([
     splitting: true,
     sourcemap: false,
     clean: true,
-    external: ["@mcp-use/client", "@mcp-use/cli", "#mcp-use-node-http"],
+    external: [
+      "@mcp-use/client",
+      "@mcp-use/cli",
+      "#mcp-use-node-http",
+      "#mcp-use-skills-loader",
+    ],
     define: packageVersionDefine,
     esbuildOptions: minifyFrameworkOutput,
   },
@@ -77,7 +84,7 @@ export default defineConfig([
     splitting: false,
     sourcemap: false,
     clean: false,
-    external: ["@mcp-use/client", "@mcp-use/cli"],
+    external: ["@mcp-use/client", "@mcp-use/cli", "#mcp-use-skills-loader"],
     noExternal: [
       "hono",
       "@modelcontextprotocol/core",

@@ -92,4 +92,20 @@ describe("Node response bridge", () => {
       "data: first\n\ndata: second\n\n"
     );
   });
+
+  it("preserves multiple Set-Cookie response headers", async () => {
+    listener = await listenFetch(async () => {
+      const headers = new Headers();
+      headers.append("set-cookie", "session_token=token; Path=/; HttpOnly");
+      headers.append("set-cookie", "session_data=data; Path=/; HttpOnly");
+      return new Response("ok", { headers });
+    });
+
+    const response = await fetch(listener.url);
+
+    expect(response.headers.getSetCookie()).toEqual([
+      "session_token=token; Path=/; HttpOnly",
+      "session_data=data; Path=/; HttpOnly",
+    ]);
+  });
 });

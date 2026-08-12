@@ -24,7 +24,12 @@ interface Message {
       toolName: string;
       args: Record<string, unknown>;
       result?: any;
-      state?: "pending" | "streaming" | "result" | "error";
+      state?:
+        | "pending"
+        | "streaming"
+        | "authorization-required"
+        | "result"
+        | "error";
       partialArgs?: Record<string, unknown>;
     };
   }>;
@@ -55,6 +60,9 @@ interface MessageListProps {
   llmConfig?: LLMConfig | null;
   /** Keep tool-call chrome but omit MCP App result bodies (e.g. chat drawer). */
   renderToolResults?: boolean;
+  onAuthenticateTool?: (toolCallId: string) => Promise<void> | void;
+  authenticatingToolCallId?: string | null;
+  toolAuthorizationError?: string | null;
 }
 
 export const MessageList = memo(
@@ -70,6 +78,9 @@ export const MessageList = memo(
     modelContextScope,
     llmConfig,
     renderToolResults = true,
+    onAuthenticateTool,
+    authenticatingToolCallId,
+    toolAuthorizationError,
   }: MessageListProps) => {
     const widgetMessageInFlightRef = useRef(false);
     const isLoadingRef = useRef(isLoading);
@@ -261,18 +272,33 @@ export const MessageList = memo(
                         <div key={partKey}>
                           <ToolCallDisplay
                             toolName={part.toolInvocation.toolName}
+                            toolCallId={part.toolInvocation.toolCallId}
                             args={part.toolInvocation.args}
                             result={part.toolInvocation.result}
                             state={
-                              part.toolInvocation.state === "error"
-                                ? "error"
-                                : part.toolInvocation.state === "streaming"
-                                  ? "call"
-                                  : part.toolInvocation.state === "pending"
+                              part.toolInvocation.state ===
+                              "authorization-required"
+                                ? "authorization-required"
+                                : part.toolInvocation.state === "error"
+                                  ? "error"
+                                  : part.toolInvocation.state === "streaming"
                                     ? "call"
-                                    : "result"
+                                    : part.toolInvocation.state === "pending"
+                                      ? "call"
+                                      : "result"
                             }
                             partialArgs={part.toolInvocation.partialArgs}
+                            onAuthenticate={onAuthenticateTool}
+                            isAuthenticating={
+                              authenticatingToolCallId ===
+                              part.toolInvocation.toolCallId
+                            }
+                            authorizationError={
+                              part.toolInvocation.state ===
+                              "authorization-required"
+                                ? toolAuthorizationError
+                                : null
+                            }
                           />
                           {/* Render tool result / widget */}
                           {/* Render immediately for widget tools or streaming tools, even if result is null */}

@@ -61,10 +61,12 @@ For detailed usage instructions and guides, visit [mcp-use.com/docs/inspector](h
 | **🎨 Beautiful UI**        | Modern, responsive interface built with React and Tailwind              |
 | **🔍 Tool Explorer**       | Browse and execute all available tools with schema validation           |
 | **📁 Resource Browser**    | View and copy resource URIs with syntax highlighting                    |
+| **🧩 Skills Explorer**     | Browse, verify, and preview Skills over MCP files                        |
 | **💬 Prompt Manager**      | Test and manage prompts with argument templates                         |
 | **🌐 Universal Support**   | Works with HTTP/SSE and WebSocket connections                           |
 | **🎨 Widget Support**      | Full support for MCP-UI and OpenAI Apps SDK widgets                     |
 | **🔑 BYOK Chat**           | Bring Your Own Key chat interface for testing conversational flows      |
+| **📚 Skill-aware Chat**    | Test progressive skill loading with removable per-chat context          |
 | **💾 Saved Tool Calls**    | Save and replay tool executions for repeated testing                    |
 | **⌨️ Quick Actions**       | Cmd + K keyboard shortcuts for rapid navigation                         |
 | **🐳 Docker Ready**        | Self-host with a single Docker container for production use             |

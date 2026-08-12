@@ -22,20 +22,6 @@ export function stashClientCapabilities(
 }
 
 /**
- * Read stashed client capabilities for an HTTP request.
- *
- * @internal
- */
-export function getStashedClientCapabilities(
-  request: Request | undefined
-): ClientCapabilities | undefined {
-  if (request === undefined) {
-    return undefined;
-  }
-  return clientCapabilitiesByRequest.get(request);
-}
-
-/**
  * Extract `clientCapabilities` from a parsed JSON-RPC body, when present.
  *
  * @internal

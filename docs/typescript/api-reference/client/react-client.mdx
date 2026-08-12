@@ -75,7 +75,12 @@ Returns `McpServer | undefined` for one server.
 
 Standalone hook for a single HTTP connection. Returns `UseMcpResult`.
 
-Key options: `url`, `headers`, `enabled`, `callbackUrl`, `oauth`, `oauthProxyUrl`, `preventAutoAuth`, `useRedirectFlow`, `autoProxyFallback`, `autoReconnect`, `reconnectionOptions`, `onSampling`, `onElicitation`, `onNotification`, `clientInfo`, `fetch`.
+Key options: `url`, `headers`, `enabled`, `callbackUrl`, `oauth`, `oauthProxyUrl`, `preventAutoAuth`, `detectMixedAuth`, `useRedirectFlow`, `autoProxyFallback`, `autoReconnect`, `reconnectionOptions`, `onSampling`, `onElicitation`, `onNotification`, `clientInfo`, `fetch`.
+
+`detectMixedAuth` defaults to `true`. After an anonymous connection discovers
+RFC 9728 protected-resource metadata, `authorization` is
+`{ mode: "mixed", authenticated: false, resource?, scopesSupported? }` while
+the connection remains `ready`.
 
 ## McpServer
 
@@ -88,6 +93,7 @@ Extends connection state with provider metadata:
 | `tools`, `resources`, `resourceTemplates`, `prompts` | Discovered items |
 | `serverInfo` | Negotiated server metadata |
 | `protocolEra`, `protocolVersion` | Negotiated protocol |
+| `authorization` | Optional mixed-auth state discovered after anonymous connection |
 | `callTool`, `readResource`, `getPrompt`, `complete`, … | Same as `UseMcpResult` |
 | `authenticate()`, `retry()`, `disconnect()` | Connection control |
 | `notifications`, `unreadNotificationCount` | Notification queue |

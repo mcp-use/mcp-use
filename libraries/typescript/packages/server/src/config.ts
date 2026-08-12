@@ -2,6 +2,7 @@ import type { Icon, ServerOptions } from "@modelcontextprotocol/server";
 
 import type { LoggingOptions } from "./logging.js";
 import type { OAuthProvider } from "./oauth/index.js";
+import type { SkillsOptions } from "./skills/types.js";
 
 /**
  * Common server identity and behavior, passed to `new MCPServer(...)`.
@@ -176,6 +177,26 @@ interface BaseServerConfig {
    */
   logging?: LoggingOptions;
   /**
+   * Experimental Agent Skills discovery.
+   *
+   * Omit this field to automatically serve a conventional `skills/`
+   * directory when present. Set `false` to disable discovery even when that
+   * directory exists, `true` to require it, or provide an object to require a
+   * custom project-relative directory.
+   *
+   * @defaultValue Automatic discovery of `skills/` when present
+   *
+   * @example
+   * ```ts
+   * new MCPServer({
+   *   name: "shop",
+   *   version: "1.0.0",
+   *   skills: { directory: "server-skills" },
+   * });
+   * ```
+   */
+  skills?: boolean | SkillsOptions;
+  /**
    * Integrity verification for `requestState` echoed across
    * `input_required` rounds.
    *
@@ -237,11 +258,13 @@ export interface CorsOptions {
  *
  * @throws TypeError When `basePath` is present but not an absolute URL
  * pathname without empty segments, trailing slash, query, fragment, or
- * whitespace.
+ * whitespace, or when `skills` is not a boolean or valid configuration
+ * object.
  */
 export function assertServerConfig(config: {
   basePath?: unknown;
   port?: unknown;
+  skills?: unknown;
 }): void {
   if (config.basePath !== undefined) {
     if (typeof config.basePath !== "string") {
@@ -271,6 +294,19 @@ export function assertServerConfig(config: {
       config.port > 65535)
   ) {
     throw new TypeError("port must be an integer between 0 and 65535");
+  }
+  if (config.skills !== undefined && typeof config.skills !== "boolean") {
+    if (
+      typeof config.skills !== "object" ||
+      config.skills === null ||
+      Array.isArray(config.skills)
+    ) {
+      throw new TypeError("skills must be a boolean or configuration object");
+    }
+    const directory = (config.skills as Record<string, unknown>)["directory"];
+    if (directory !== undefined && typeof directory !== "string") {
+      throw new TypeError("skills.directory must be a string when provided");
+    }
   }
 }
 

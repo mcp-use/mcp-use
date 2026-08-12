@@ -26,7 +26,9 @@ export function PromptsDropdown({
   // Scroll to focused index
   useEffect(() => {
     if (focusedIndex >= 0) {
-      const element = document.getElementById(`prompt-${focusedIndex}`);
+      const element = document.getElementById(
+        `prompt-suggestion-${focusedIndex}`
+      );
       if (element) {
         element.scrollIntoView({ behavior: "smooth", block: "nearest" });
       }
@@ -39,15 +41,17 @@ export function PromptsDropdown({
       data-testid="chat-prompts-dropdown"
     >
       <div className="p-2">
-        <div className="text-xs font-medium text-zinc-900 dark:text-zinc-100 mb-2">
-          Prompts
-        </div>
+        {prompts.length > 0 && (
+          <div className="text-xs font-medium text-zinc-900 dark:text-zinc-100 mb-2">
+            Prompts
+          </div>
+        )}
         {prompts.map((prompt, index) => (
           <Tooltip key={index}>
             <TooltipTrigger
               render={
                 <Button
-                  id={`prompt-${index}`}
+                  id={`prompt-suggestion-${index}`}
                   type="button"
                   variant="ghost"
                   className={cn(

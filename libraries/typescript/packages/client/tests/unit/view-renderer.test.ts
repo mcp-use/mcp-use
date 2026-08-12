@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { JSDOM } from "jsdom";
 import { resolveViewResource } from "../../src/react/view/resolve-view-resource.js";
 import {
   buildViewSandboxBlobUrl,
@@ -31,6 +32,47 @@ describe("buildViewSandboxBlobUrl", () => {
     expect(buildSandboxProxyBlobHtml(search)).toBe(
       buildSandboxProxyBlobHtml(search)
     );
+  });
+
+  it("builds restrictive widget-declared CSP with only declared domains", () => {
+    const dom = new JSDOM(
+      buildSandboxProxyBlobHtml("?csp_mode=widget-declared"),
+      { runScripts: "dangerously", url: "https://sandbox.example" }
+    );
+
+    try {
+      const { window } = dom;
+      window.dispatchEvent(
+        new window.MessageEvent("message", {
+          source: window.parent,
+          data: {
+            method: "ui/notifications/sandbox-resource-ready",
+            params: {
+              html: "<html><head></head><body></body></html>",
+              csp: {
+                connectDomains: ["https://api.example.com"],
+                frameDomains: ["https://frames.example.com"],
+                resourceDomains: ["https://cdn.example.com"],
+              },
+              permissive: false,
+            },
+          },
+        })
+      );
+
+      const srcdoc = window.document.querySelector("iframe")?.srcdoc;
+      expect(srcdoc).toContain(
+        "script-src 'unsafe-inline' data: blob: https://cdn.example.com"
+      );
+      expect(srcdoc).not.toContain("script-src 'unsafe-inline' 'unsafe-eval'");
+      expect(srcdoc).toContain("connect-src https://api.example.com");
+      expect(srcdoc).toContain("frame-src https://frames.example.com");
+      expect(srcdoc).toContain("img-src data: blob: https://cdn.example.com");
+      expect(srcdoc).not.toContain("connect-src *");
+      expect(srcdoc).not.toContain("frame-src *");
+    } finally {
+      dom.window.close();
+    }
   });
 });
 

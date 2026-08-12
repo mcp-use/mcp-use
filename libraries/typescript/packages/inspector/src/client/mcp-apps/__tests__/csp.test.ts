@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildCSPString,
   diagnoseCsp,
   diffCspPolicies,
   getEffectiveCspPolicy,
@@ -8,6 +9,20 @@ import {
 } from "../csp";
 
 describe("CSP diagnostics", () => {
+  it("keeps eval disabled while retaining widget-declared domains", () => {
+    const policy = buildCSPString({
+      connectDomains: ["https://api.example.com"],
+      resourceDomains: ["https://cdn.example.com"],
+    });
+
+    expect(policy).toContain(
+      "script-src 'unsafe-inline' data: blob: https://cdn.example.com"
+    );
+    expect(policy).not.toContain("'unsafe-eval'");
+    expect(policy).toContain("connect-src https://api.example.com");
+    expect(policy).toContain("frame-src 'none'");
+  });
+
   it("diffs requested and effective policies", () => {
     const requested = getRequestedCspPolicy({
       connectDomains: ["https://api.example.com"],

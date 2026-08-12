@@ -61,7 +61,7 @@ overrides:
   zod: 4.4.3
   jsondiffpatch: ">=0.7.2"
   esbuild: 0.27.1
-  vite: ">=8.0.5"
+  vite: "8.0.16"
   prismjs: ">=1.30.0"
   glob: ">=10.5.0"
   js-yaml: ">=4.1.2"

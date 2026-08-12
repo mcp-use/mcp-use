@@ -5,8 +5,6 @@ import { useViewRuntime } from "../runtime/view-runtime-context.js";
 import type { DeepPartial, RegisteredTools } from "../types/register.js";
 import type { ToolContextError } from "../types/result-types.js";
 
-export type { ToolContextError } from "../types/result-types.js";
-
 type ToolOutput<Name extends keyof RegisteredTools> =
   Name extends keyof RegisteredTools
     ? RegisteredTools[Name]["output"]

@@ -1,8 +1,5 @@
 import { inspectorApi } from "@/client/utils/basePath";
-import {
-  isLocalhostServerUrl,
-  isMcpUseTunnelUrl,
-} from "@/client/utils/servers";
+import { isLocalhostServerUrl } from "@/client/utils/servers";
 import {
   LocalStorageProvider,
   type McpServer,
@@ -559,8 +556,16 @@ export class InspectorConnectionStorageProvider extends LocalStorageProvider {
       }
 
       const normalized = sanitizePersistedInspectorConfig(value);
-      const url =
+      const storedUrl =
         typeof normalized.url === "string" ? normalized.url.trim() : id.trim();
+      // Older tunnel switching kept the localhost connection ID but rewrote
+      // its URL to the public tunnel. Recover that mismatch before the client
+      // wrapper mounts; otherwise it starts connecting to the stale URL before
+      // Layout effects have a chance to repair it.
+      const url =
+        isLocalhostServerUrl(id) && storedUrl !== id.trim()
+          ? id.trim()
+          : storedUrl;
       try {
         const parsed = new URL(url);
         if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
@@ -601,12 +606,12 @@ export class InspectorConnectionStorageProvider extends LocalStorageProvider {
         sanitizePersistedInspectorConfig({
           ...pickInspectorConnectionExtras(prev[id]),
           ...config,
-          // Tunnel switching is a live transport override. Persist the stable
-          // localhost endpoint so a later dev-process restart cannot boot into
-          // an expired tunnel URL.
+          // Recover connections written by the legacy tunnel-switching flow.
+          // The mounted Inspector should always persist its stable localhost
+          // endpoint rather than an ephemeral public tunnel URL.
           ...(isLocalhostServerUrl(id) &&
           typeof config.url === "string" &&
-          isMcpUseTunnelUrl(config.url)
+          config.url !== id
             ? { url: id }
             : {}),
         }),

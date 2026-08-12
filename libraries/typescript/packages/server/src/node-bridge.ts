@@ -29,7 +29,10 @@ export interface NodeIncomingMessageLike extends AsyncIterable<
 /** Minimal duck-typed shape of a Node.js `ServerResponse`. */
 export interface NodeServerResponseLike {
   /** Writes the HTTP status and response headers. */
-  writeHead(statusCode: number, headers?: Record<string, string>): unknown;
+  writeHead(
+    statusCode: number,
+    headers?: Record<string, string | string[]>
+  ): unknown;
   /** Writes a response-body chunk and returns `false` when backpressure applies. */
   write(chunk: string | Uint8Array): unknown;
   /** Completes the response, optionally with a final body chunk. */
@@ -120,8 +123,15 @@ export function toNodeHandler(
       response = internalServerErrorResponse(echoableRequestId(parsedBody));
     }
 
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string | string[]> = {};
+    const setCookies = (
+      response.headers as Headers & { getSetCookie?: () => string[] }
+    ).getSetCookie?.();
     for (const [name, value] of response.headers) {
+      if (name === "set-cookie" && setCookies?.length) {
+        headers[name] = setCookies;
+        continue;
+      }
       headers[name] = value;
     }
     res.writeHead(response.status, headers);

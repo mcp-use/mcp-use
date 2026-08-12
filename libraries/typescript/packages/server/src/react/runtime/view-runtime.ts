@@ -371,7 +371,7 @@ function hostSnapshotChanged(
  *
  * @internal
  */
-export interface CreateMcpAppRuntimeOptions {
+interface CreateMcpAppRuntimeOptions {
   /**
    * Transport used by the runtime's single {@link McpAppRuntime.connect}
    * attempt (tests).
