@@ -45,6 +45,7 @@ import {
   resolvePort as resolvePreferredPort,
 } from "../bin/args.js";
 import { discoverEntry } from "./entry.js";
+import { resolveDevClientEndpoint } from "./dev-client-endpoint.js";
 import {
   loadProjectEnv,
   nextStandaloneCompatPlugin,
@@ -88,6 +89,21 @@ type WebHandler = (request: Request) => Promise<Response>;
 
 /** Coalesce one editor save burst before reconciling a project generation. */
 const RELOAD_SETTLE_MS = 50;
+
+/** Whether two discovery snapshots describe the same view module graph. */
+function sameDiscoveredViews(
+  left: readonly DiscoveredView[],
+  right: readonly DiscoveredView[]
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every(
+      (view, index) =>
+        view.name === right[index]?.name &&
+        view.entryPath === right[index]?.entryPath
+    )
+  );
+}
 
 /**
  * The duck-typed shape the entry's default export must satisfy: an
@@ -247,6 +263,7 @@ function appendVaryOrigin(res: ServerResponse): void {
  * CORS for Vite-served module-graph URLs on the dev listener.
  *
  * Tunnel active → `Access-Control-Allow-Origin: *` (foreign / opaque hosts).
+ * Public/wildcard bind → `*` (the listener is intentionally network-visible).
  * No tunnel on a localhost bind → reflect a validated loopback `Origin`
  * (exact value) and set `Vary: Origin`; reflect `null` for opaque sandbox
  * iframes; foreign or missing Origin get no ACAO.
@@ -266,6 +283,7 @@ function applyViteModuleCors(
     return;
   }
   if (!options.localhostBind) {
+    res.setHeader("Access-Control-Allow-Origin", "*");
     return;
   }
   const originHeader = req.headers.origin;
@@ -402,16 +420,11 @@ export async function runDev(options: DevOptions): Promise<void> {
   const viewsAtStartup = currentViews.length > 0;
   const userViteConfig = resolveUserViteConfig(options.cwd);
 
-  // The bind address is not always a browsable address: `0.0.0.0`/`::`
-  // accept connections on every interface but are not valid request hosts
-  // in every browser, and `127.0.0.1` reads worse than `localhost` in logs.
-  // Anything else (a LAN IP, a hostname) is browsable as itself; bare IPv6
-  // addresses need brackets in URLs.
-  const loopbackOrWildcard = ["127.0.0.1", "localhost", "0.0.0.0", "::", "::1"];
-  const browsableHost = loopbackOrWildcard.includes(host) ? "localhost" : host;
-  const devOrigin = `http://${
-    browsableHost.includes(":") ? `[${browsableHost}]` : browsableHost
-  }:${port}`;
+  const devClientEndpoint = resolveDevClientEndpoint(
+    host,
+    port,
+    process.env["MCP_URL"]
+  );
 
   const vite = await createServer({
     root: options.cwd,
@@ -431,7 +444,10 @@ export async function runDev(options: DevOptions): Promise<void> {
     // unversioned optimizer URL while view source receives a versioned URL.
     // Serving the framework entry as ESM keeps both imports on one dispatcher;
     // its CommonJS ReactDOM dependency still needs explicit optimization.
-    optimizeDeps: VIEW_REACT_OPTIMIZE_DEPS,
+    // Tool-only projects do not load a browser view graph. Avoid starting a
+    // dependency optimizer for them: on Windows its background cache commit
+    // can otherwise outlive Vite shutdown and race fixture/project cleanup.
+    ...(viewsAtStartup && { optimizeDeps: VIEW_REACT_OPTIMIZE_DEPS }),
     oxc: { jsx: { runtime: "automatic" } },
     plugins: viewsAtStartup
       ? [
@@ -446,14 +462,28 @@ export async function runDev(options: DevOptions): Promise<void> {
       : [nextStandaloneCompatPlugin(options.cwd)],
     server: {
       middlewareMode: true,
-      // Windows file notifications can be coalesced or dropped while Vite is
-      // transforming the same module. Polling keeps dev reloads reliable.
-      ...(process.platform === "win32" && {
-        watch: { usePolling: true, interval: 100 },
-      }),
+      watch: {
+        // Vibe captures the managed dev process output in the project root.
+        // Watching that continuously-written operational file makes Vite
+        // broadcast `full-reload` forever, so srcdoc view guests repeatedly
+        // remount and surface a compiling spinner instead of Fast Refresh.
+        ignored: "**/.dev-server-logs.txt",
+        // Windows file notifications can be coalesced or dropped while Vite
+        // is transforming the same module. Polling keeps dev reloads reliable.
+        ...(process.platform === "win32" && {
+          usePolling: true,
+          interval: 100,
+        }),
+      },
+      // A public/wildcard bind deliberately accepts hostnames that are only
+      // known to the surrounding platform (for example a sandbox URL). Keep
+      // Vite's own static Host allowlist aligned with the listener boundary;
+      // localhost binds retain the stricter default and our dynamic tunnel
+      // path rewrites an authorized tunnel Host to localhost below.
+      ...(!localhostBind && { allowedHosts: true }),
       // Absolute asset URLs in dev: without `origin`, Vite emits root-relative
       // paths that resolve against the host page inside srcdoc iframes.
-      ...(viewsAtStartup && { origin: devOrigin }),
+      ...(viewsAtStartup && { origin: devClientEndpoint.origin }),
       // CORS on module URLs is owned by onRequest below (permissive ACAO
       // only while the tunnel is active), not by Vite's own middleware —
       // whose default localhost-only policy would block tunnel-rendering
@@ -462,7 +492,9 @@ export async function runDev(options: DevOptions): Promise<void> {
       // View HMR rides the one HTTP listener: Vite attaches its websocket
       // upgrade handler to our server, so no dedicated HMR port exists to
       // collide when several dev processes run side by side.
-      hmr: viewsAtStartup ? { server: httpServer } : false,
+      hmr: viewsAtStartup
+        ? { server: httpServer, ...devClientEndpoint.hmr }
+        : false,
       // Vite 8's Environment API keeps its WebSocket transport enabled when
       // only `hmr: false` is set. Zero-view servers need no socket at all.
       ...(!viewsAtStartup && { ws: false }),
@@ -574,7 +606,7 @@ export async function runDev(options: DevOptions): Promise<void> {
     }
     const mounted = inspectorModule.mountInspector({
       basePath: nextBasePath,
-      autoConnectUrl: `${devOrigin}${nextBasePath}`,
+      autoConnectUrl: `${devClientEndpoint.origin}${nextBasePath}`,
       oauthProxyAllowLoopback: localhostBind || wildcardBind,
       devMode: true,
       manufactChatUrl: process.env["MANUFACT_CHAT_URL"],
@@ -606,6 +638,7 @@ export async function runDev(options: DevOptions): Promise<void> {
   let desiredRevision = 0;
   let reconciling = false;
   let reloadTimer: ReturnType<typeof setTimeout> | undefined;
+  let viewsDiscoveryTimer: ReturnType<typeof setTimeout> | undefined;
   let skillsReloadTimer: ReturnType<typeof setTimeout> | undefined;
   const isAborted = (): boolean => options.signal?.aborted === true;
 
@@ -714,12 +747,28 @@ export async function runDev(options: DevOptions): Promise<void> {
     scheduleReconcile();
   };
 
+  const scheduleViewsRediscovery = (): void => {
+    if (viewsDiscoveryTimer !== undefined) clearTimeout(viewsDiscoveryTimer);
+    // Remote editors commonly save by replacing the file, which can surface
+    // as unlink + add instead of change. Let the save burst settle and only
+    // rebuild the MCP server when the discovered view registry actually
+    // changed. Content-only replacements remain on Vite's client HMR path,
+    // preserving the mounted view and its React state.
+    viewsDiscoveryTimer = setTimeout(() => {
+      viewsDiscoveryTimer = undefined;
+      const discovered = discoverViews(options.cwd, viewsDirectory);
+      if (!sameDiscoveredViews(currentViews, discovered)) {
+        scheduleReconcile();
+      }
+    }, RELOAD_SETTLE_MS);
+  };
+
   const onViewFilesystemEvent = (file: string): void => {
     if (!isViewPath(file, options.cwd, viewsDirectory)) {
       return;
     }
 
-    scheduleReconcile();
+    scheduleViewsRediscovery();
   };
 
   const onFileAddOrUnlink = (file: string): void => {
@@ -779,7 +828,8 @@ export async function runDev(options: DevOptions): Promise<void> {
   // URLs (onRequest below) emit `*` while a tunnel is active; without a tunnel,
   // localhost binds reflect a validated loopback Origin (exact value +
   // `Vary: Origin`) so a local MCP host can load the module graph, while
-  // foreign / opaque / missing Origin get no ACAO.
+  // foreign / opaque / missing Origin get no ACAO. Public/wildcard binds are
+  // intentionally network-visible and emit `*`, matching a public tunnel.
   const rejectDisallowedRequest = (
     req: IncomingMessage,
     res: ServerResponse
@@ -812,6 +862,7 @@ export async function runDev(options: DevOptions): Promise<void> {
    */
   const teardown = async (): Promise<void> => {
     if (skillsReloadTimer !== undefined) clearTimeout(skillsReloadTimer);
+    if (viewsDiscoveryTimer !== undefined) clearTimeout(viewsDiscoveryTimer);
     vite.watcher.off("change", onSsrFileEvent);
     vite.watcher.off("add", onFileAddOrUnlink);
     vite.watcher.off("unlink", onFileAddOrUnlink);
@@ -943,9 +994,11 @@ export async function runDev(options: DevOptions): Promise<void> {
       `  ➜ Views:         ${currentViews.map((v) => v.name).join(", ")}`
     );
   }
-  console.log(`  ➜ MCP endpoint:  ${devOrigin}${basePath}`);
+  console.log(`  ➜ MCP endpoint:  ${devClientEndpoint.origin}${basePath}`);
   if (inspectorHandler !== undefined) {
-    console.log(`  ➜ Inspector:     ${devOrigin}${basePath}/inspector`);
+    console.log(
+      `  ➜ Inspector:     ${devClientEndpoint.origin}${basePath}/inspector`
+    );
   } else if (options.inspector !== false) {
     console.warn(
       "[mcp-use] Built-in Inspector is unavailable; reinstall mcp-use to " +
@@ -983,7 +1036,7 @@ export async function runDev(options: DevOptions): Promise<void> {
     options.open !== false &&
     process.stdout.isTTY === true
   ) {
-    openInBrowser(`${devOrigin}${basePath}/inspector`);
+    openInBrowser(`${devClientEndpoint.origin}${basePath}/inspector`);
   }
 
   // --- Graceful shutdown (SIGINT/SIGTERM or options.signal). ---------------

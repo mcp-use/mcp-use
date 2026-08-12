@@ -44,7 +44,7 @@ export const SKILLS_UNSUPPORTED_MESSAGE =
 export const SKILLS_EMPTY_CATALOG_MESSAGE =
   "This server advertises Skills over MCP, but returned an empty catalog.";
 
-export type SkillsState = "unsupported" | "empty" | "available";
+type SkillsState = "unsupported" | "empty" | "available";
 
 /**
  * An advertised empty catalog is unavailable until the server supplies skills.

@@ -10,7 +10,7 @@ type ResourceContent = {
   blob?: string;
 };
 
-export interface SkillContextConnection {
+interface SkillContextConnection {
   tools: Array<{
     name: string;
     description: string;

@@ -6,6 +6,7 @@
 
 import type { AuthInfo, OAuthMetadata } from "@modelcontextprotocol/server";
 
+import { oauthEnvironmentValue } from "./environment.js";
 import { isRecord } from "./guards.js";
 import {
   booleanValue,
@@ -51,18 +52,26 @@ export interface KeycloakOAuthUser {
 
 /** Configures Keycloak JWT verification and protected-resource metadata. */
 export interface KeycloakOAuthProviderOptions extends OAuthResourceOptions {
-  /** Base URL of the Keycloak server. */
-  serverUrl: URL | string;
-  /** Keycloak realm that issues accepted access tokens. */
-  realm: string;
+  /**
+   * Base URL of the Keycloak server.
+   *
+   * @defaultValue `MCP_USE_OAUTH_KEYCLOAK_SERVER_URL`
+   */
+  serverUrl?: URL | string;
+  /**
+   * Keycloak realm that issues accepted access tokens.
+   *
+   * @defaultValue `MCP_USE_OAUTH_KEYCLOAK_REALM`
+   */
+  realm?: string;
 }
 
 /**
  * Creates a provider that verifies Keycloak access tokens and maps their claims.
  *
- * @param options - Keycloak server URL, realm, and resource-server settings.
+ * @param options - Keycloak server URL, realm, and resource-server settings. Defaults to v1 environment variables.
  * @returns A provider that rejects tokens not issued for the resolved MCP resource.
- * @throws A `TypeError` if `serverUrl` or `realm` is invalid.
+ * @throws An `Error` if the server URL or realm is missing, or a `TypeError` if either is invalid.
  *
  * @example
  * ```ts
@@ -75,25 +84,36 @@ export interface KeycloakOAuthProviderOptions extends OAuthResourceOptions {
  * ```
  */
 export function oauthKeycloakProvider(
-  options: KeycloakOAuthProviderOptions
+  options: KeycloakOAuthProviderOptions = {}
 ): OAuthProvider<KeycloakOAuthUser> {
+  const serverUrlValue =
+    options.serverUrl ??
+    oauthEnvironmentValue("MCP_USE_OAUTH_KEYCLOAK_SERVER_URL");
+  const realm =
+    options.realm ?? oauthEnvironmentValue("MCP_USE_OAUTH_KEYCLOAK_REALM");
+  const audience = oauthEnvironmentValue("MCP_USE_OAUTH_KEYCLOAK_AUDIENCE");
+  if (serverUrlValue === undefined || realm === undefined) {
+    throw new Error("Keycloak serverUrl and realm are required.");
+  }
   if (
-    typeof options.realm !== "string" ||
-    options.realm.trim().length === 0 ||
-    /[/?#]/.test(options.realm)
+    typeof realm !== "string" ||
+    realm.trim().length === 0 ||
+    /[/?#]/.test(realm)
   ) {
     throw new TypeError("Keycloak realm is invalid");
   }
-  const serverUrl = normalizedProviderUrl(
-    options.serverUrl,
-    "Keycloak serverUrl"
-  );
+  const resolvedOptions = {
+    ...options,
+    ...(options.resource === undefined &&
+      audience !== undefined && { resource: audience }),
+  };
+  const serverUrl = normalizedProviderUrl(serverUrlValue, "Keycloak serverUrl");
   const issuer = providerEndpoint(
     serverUrl,
-    `realms/${encodeURIComponent(options.realm)}`
+    `realms/${encodeURIComponent(realm)}`
   ).replace(/\/$/, "");
   return oauthCustomProvider<KeycloakOAuthUser>({
-    ...options,
+    ...resolvedOptions,
     createTokenVerifier: (resource) =>
       createJwtVerifier({
         issuer,

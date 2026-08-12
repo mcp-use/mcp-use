@@ -113,7 +113,7 @@ async function startDev(
       if (startupError !== undefined) throw startupError;
       return lines.find((l) => l.includes("MCP endpoint"));
     });
-    const url = /(http:\/\/\S+)/.exec(endpointLine)?.[1];
+    const url = /(https?:\/\/\S+)/.exec(endpointLine)?.[1];
     if (url === undefined) throw new Error(`no URL in: ${endpointLine}`);
     return {
       url,
@@ -1021,6 +1021,39 @@ async function rawGetBody(
 }
 
 describe("runDev (views)", () => {
+  it("serves Vite modules through a public sandbox hostname", async () => {
+    process.env["MCP_URL"] = "https://sandbox.example.com/mcp";
+    const cwd = copyFixture("dev-views", "views");
+    cleanups.push(() => removeDir(cwd));
+
+    const port = await getFreePort("0.0.0.0");
+    const dev = await startDev(cwd, port, "0.0.0.0");
+    cleanups.push(dev.stop);
+    const base = `http://127.0.0.1:${port}`;
+    const moduleUrl = `${base}/@vite/client`;
+
+    expect(
+      await rawStatus(
+        moduleUrl,
+        {
+          host: "sandbox.example.com",
+          origin: "https://vibe.example.com",
+        },
+        "GET"
+      )
+    ).toBe(200);
+
+    const response = await fetch(moduleUrl, {
+      headers: { origin: "https://vibe.example.com" },
+    });
+    expect(response.status).toBe(200);
+    expect(response.headers.get("access-control-allow-origin")).toBe("*");
+    const viteClient = await response.text();
+    expect(viteClient).toContain("sandbox.example.com");
+    expect(viteClient).toContain('const socketProtocol = "wss"');
+    expect(viteClient).toContain("const hmrPort = 443");
+  });
+
   it("shuts down with active MCP subscriptions and HMR WebSockets", async () => {
     const cwd = copyFixture("dev-active-connections-shutdown", "views");
     cleanups.push(() => removeDir(cwd));
@@ -1419,6 +1452,21 @@ describe("runDev (views)", () => {
     expect(entryJs).toContain("import * as viewModule from");
     expect(entryJs).toContain("bootstrapView(viewModule)");
 
+    const messages: { type: string; updates?: { path: string }[] }[] = [];
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/`, "vite-hmr");
+    ws.addEventListener("message", (event) => {
+      messages.push(
+        JSON.parse(String(event.data)) as (typeof messages)[number]
+      );
+    });
+    await new Promise<void>((resolve, reject) => {
+      ws.addEventListener("open", () => resolve());
+      ws.addEventListener("error", () =>
+        reject(new Error("HMR websocket failed to connect"))
+      );
+    });
+    cleanups.push(() => ws.close());
+
     // Populate the client module graph the way a browser loading the view
     // document would: fetch each module and, recursively, its static
     // imports. A 504 is Vite's "outdated optimize dep" — retry like a
@@ -1448,28 +1496,27 @@ describe("runDev (views)", () => {
     // Fast Refresh wrapped the view component module.
     expect(await viewModule.text()).toContain("RefreshRuntime");
 
-    const messages: { type: string; updates?: { path: string }[] }[] = [];
-    const ws = new WebSocket(`ws://127.0.0.1:${port}/`, "vite-hmr");
-    ws.addEventListener("message", (event) => {
-      messages.push(
-        JSON.parse(String(event.data)) as (typeof messages)[number]
-      );
-    });
-    await new Promise<void>((resolve, reject) => {
-      ws.addEventListener("open", () => resolve());
-      ws.addEventListener("error", () =>
-        reject(new Error("HMR websocket failed to connect"))
-      );
-    });
-    cleanups.push(() => ws.close());
-
-    // Let any dep-optimizer churn from the initial module loads settle so
-    // the assertion window only contains the edit's own messages.
+    // Cold-loading the view runtime must not ask the iframe to reload. Vibe's
+    // srcdoc guest is torn down by a full reload before its module graph can
+    // finish, so lazy optimizer discovery otherwise becomes a reload loop.
     await new Promise((r) => setTimeout(r, 1000));
+    expect(messages.filter((m) => m.type === "full-reload")).toEqual([]);
     messages.length = 0;
+
+    // Vibe writes managed-process output into this root-level file. It is not
+    // application source and must not produce the endless full-reload loop
+    // that tears down the srcdoc guest before Fast Refresh can run.
+    writeFileSync(join(cwd, ".dev-server-logs.txt"), "dev process output\n");
+    await new Promise((r) => setTimeout(r, 300));
+    expect(messages).toEqual([]);
 
     const viewPath = join(cwd, "views", "product-search-result", "view.tsx");
     const viewSource = readFileSync(viewPath, "utf8");
+    // Vibe's remote filesystem can surface an editor save as unlink + add
+    // rather than a simple change event. This must stay on the client HMR
+    // path: rebuilding the MCP server publishes catalog invalidations, which
+    // remount the Inspector result and wipes component state.
+    rmSync(viewPath);
     writeFileSync(viewPath, viewSource.replace("results", "hot-results"));
 
     const update = await waitFor(async () =>
@@ -1481,6 +1528,10 @@ describe("runDev (views)", () => {
     );
     expect(update).toBeDefined();
     expect(messages.filter((m) => m.type === "full-reload")).toEqual([]);
+    await new Promise((r) => setTimeout(r, 200));
+    expect(
+      dev.logs.filter((line) => line === "[mcp-use] reloaded server entry")
+    ).toEqual([]);
   }, 60_000);
 
   it("runs two dev servers concurrently with HMR on each main port", async () => {

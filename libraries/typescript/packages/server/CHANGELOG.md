@@ -1,5 +1,87 @@
 # mcp-use
 
+## 2.2.0-canary.10
+
+### Minor Changes
+
+- a175e1e: Export `createJwtVerifier` and its `JwtVerifierOptions` and `VerifiedPayload` types from `mcp-use/oauth`, so a custom OAuth provider built with `oauthCustomProvider` can reuse the built-in JWT verification instead of reimplementing it.
+
+## 2.1.2-canary.9
+
+### Patch Changes
+
+- Updated dependencies [7398543]
+  - @mcp-use/inspector@20.2.0-canary.4
+
+## 2.1.2-canary.8
+
+### Patch Changes
+
+- Updated dependencies [b55d902]
+  - @mcp-use/inspector@20.1.2-canary.3
+
+## 2.1.2-canary.7
+
+### Patch Changes
+
+- Updated dependencies [1a277b1]
+  - @mcp-use/inspector@20.1.2-canary.2
+  - @mcp-use/cli@4.1.2-canary.5
+
+## 2.1.2-canary.6
+
+### Patch Changes
+
+- @mcp-use/cli@4.1.2-canary.4
+- @mcp-use/inspector@20.1.2-canary.1
+
+## 2.1.2-canary.5
+
+### Patch Changes
+
+- dc33ff5: Restore zero-config OAuth provider setup through the standardized `MCP_USE_OAUTH_*` environment variables while preserving explicit option overrides.
+
+## 2.1.2-canary.4
+
+### Patch Changes
+
+- 6ec7f98: Ignore Vibe's managed dev-server log in Vite's file watcher so operational log writes do not trigger endless full reloads instead of view HMR.
+- Updated dependencies [6ec7f98]
+  - @mcp-use/cli@4.1.2-canary.4
+
+## 2.1.2-canary.3
+
+### Patch Changes
+
+- 8c731fe: Pre-bundle Zod for dev views so the published MCP Apps starter does not enter a Vite full-reload loop while its protocol runtime initializes.
+- Updated dependencies [8c731fe]
+  - @mcp-use/cli@4.1.2-canary.3
+
+## 2.1.2-canary.2
+
+### Patch Changes
+
+- a0782ad: Pre-bundle the non-React MCP Apps view runtime dependencies so cold dev views finish mounting instead of entering a Vite full-reload loop before HMR can take over.
+- Updated dependencies [a0782ad]
+  - @mcp-use/cli@4.1.2-canary.2
+
+## 2.1.2-canary.1
+
+### Patch Changes
+
+- 0ecca60: Route Vite assets and HMR through the configured public MCP origin when the development server runs behind a remote sandbox or proxy.
+- Updated dependencies [0ecca60]
+  - @mcp-use/cli@4.1.2-canary.1
+
+## 2.1.2-canary.0
+
+### Patch Changes
+
+- a8de03d: Restore embedded MCP App rendering in Vibe and preserve React state during remote view HMR updates.
+- Updated dependencies [a8de03d]
+  - @mcp-use/cli@4.1.2-canary.0
+  - @mcp-use/inspector@20.1.2-canary.0
+
 ## 2.1.1
 
 ### Patch Changes

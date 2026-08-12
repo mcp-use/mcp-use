@@ -66,6 +66,7 @@ import type { ChatSystemPromptProvider } from "./chat/system-prompt/types";
 import { useWidgetDebug } from "../context/WidgetDebugContext";
 import type { ChatBodyBuilder, MessageAttachment } from "./chat/types";
 import { resolveChatToolPolicy } from "./chat/chat-tool-policy";
+import { buildChatCspAudit } from "./chat/csp-bridge";
 
 // Structural type — avoids nominal incompatibility when pnpm creates
 // multiple peer-variant copies of mcp-use with duplicate class declarations.
@@ -73,6 +74,20 @@ type MCPConnection = {
   [K in keyof McpServer]: McpServer[K];
 };
 type ChatMessage = import("./chat/types").Message;
+
+export type ChatBridgeMessage = Record<string, unknown> & {
+  type: string;
+};
+
+/**
+ * Optional host-owned bridge used when ChatTab is embedded directly in a React
+ * tree instead of inside an iframe. The default iframe integration continues
+ * to use window.postMessage when this adapter is omitted.
+ */
+export interface ChatBridgeAdapter {
+  subscribe(listener: (message: ChatBridgeMessage) => void): () => void;
+  emit(message: ChatBridgeMessage): void;
+}
 
 export interface ChatTabProps {
   connection: MCPConnection;
@@ -156,6 +171,10 @@ export interface ChatTabProps {
   systemPromptProvider?: ChatSystemPromptProvider;
   /** Raise ChatHeader above host chrome (cloud embed). */
   elevatedHeader?: boolean;
+  /** Host bridge for direct React embeds that cannot use parent postMessage. */
+  bridge?: ChatBridgeAdapter;
+  /** Keep a host-managed stream authoritative over persisted Inspector BYOK mode. */
+  lockManagedMode?: boolean;
 }
 
 // Check text up to caret position for " /" or "/" at start of line or textarea
@@ -202,6 +221,8 @@ export function ChatTab({
   defaultView = "conv",
   systemPromptProvider: externalSystemPromptProvider,
   elevatedHeader,
+  bridge,
+  lockManagedMode = false,
 }: ChatTabProps) {
   const isMcpWidgetFullscreen = useMcpWidgetFullscreen();
   const { isEmbedded } = useInspector();
@@ -293,9 +314,17 @@ export function ChatTab({
       useClientSide,
       managedLlmConfig,
       localLlmConfig,
+      lockManagedMode,
     });
 
-  const { getModelContexts, getAppToolConnections } = useWidgetDebug();
+  const {
+    getModelContexts,
+    getAppToolConnections,
+    playground,
+    widgets,
+    clearCspViolations,
+    updatePlaygroundSettings,
+  } = useWidgetDebug();
   const modelContextScope = `chat:${serverId}`;
   const widgetModelContexts = getModelContexts(modelContextScope);
   const appToolConnections = getAppToolConnections(modelContextScope);
@@ -750,17 +779,19 @@ export function ChatTab({
 
   const postBridgeEvent = useCallback(
     (type: string, payload: Record<string, unknown> = {}) => {
+      const message: ChatBridgeMessage = {
+        type,
+        serverId,
+        ...payload,
+      };
+      if (bridge) {
+        bridge.emit(message);
+        return;
+      }
       if (typeof window === "undefined" || window.parent === window) return;
-      window.parent.postMessage(
-        {
-          type,
-          serverId,
-          ...payload,
-        },
-        "*"
-      );
+      window.parent.postMessage(message, "*");
     },
-    [serverId]
+    [bridge, serverId]
   );
 
   useEffect(() => {
@@ -772,6 +803,7 @@ export function ChatTab({
         setQuickQuestions: true,
         setFollowups: true,
         loadMessages: true,
+        cspAudit: true,
       },
     });
   }, [postBridgeEvent]);
@@ -794,10 +826,10 @@ export function ChatTab({
   ]);
 
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (!event.data || typeof event.data !== "object") return;
+    const handleBridgeMessage = (message: ChatBridgeMessage) => {
+      if (!message || typeof message !== "object") return;
 
-      const data = event.data as {
+      const data = message as {
         type?: string;
         requestId?: string;
         serverId?: string;
@@ -805,6 +837,8 @@ export function ChatTab({
         prompt?: string;
         questions?: unknown;
         followups?: unknown;
+        mode?: unknown;
+        toolCallId?: unknown;
       };
 
       if (!data.type?.startsWith("mcp-inspector:chat:")) return;
@@ -895,6 +929,34 @@ export function ChatTab({
         return;
       }
 
+      if (data.type === "mcp-inspector:chat:set_csp_mode") {
+        if (data.mode !== "permissive" && data.mode !== "widget-declared") {
+          postResult(false, {
+            error: "mode must be permissive or widget-declared",
+          });
+          return;
+        }
+        for (const widgetId of widgets.keys()) clearCspViolations(widgetId);
+        updatePlaygroundSettings({ cspMode: data.mode });
+        postResult(true, { cspMode: data.mode });
+        return;
+      }
+
+      if (data.type === "mcp-inspector:chat:get_csp_audit") {
+        const audit = buildChatCspAudit(
+          playground.cspMode,
+          widgets,
+          typeof data.toolCallId === "string" ? data.toolCallId : undefined
+        );
+        postBridgeEvent("mcp-inspector:chat:csp_audit", {
+          requestId,
+          audit,
+          timestamp: Date.now(),
+        });
+        postResult(true, { cspMode: audit.mode, cspClean: audit.clean });
+        return;
+      }
+
       if (data.type === "mcp-inspector:chat:screenshot") {
         const targetToolCallId = (data as any).toolCallId as
           | string
@@ -905,14 +967,18 @@ export function ChatTab({
           try {
             let target: HTMLElement | null = null;
 
+            const screenshotRoot = messagesAreaRef.current;
+
             if (targetToolCallId) {
-              target = document.querySelector(
+              target = screenshotRoot?.querySelector(
                 `[data-tool-call-id="${targetToolCallId}"]`
-              );
+              ) as HTMLElement | null;
             }
 
-            if (!target) {
-              const widgets = document.querySelectorAll("[data-tool-call-id]");
+            if (!target && screenshotRoot) {
+              const widgets = screenshotRoot.querySelectorAll(
+                "[data-tool-call-id]"
+              );
               if (widgets.length > 0) {
                 target = widgets[widgets.length - 1] as HTMLElement;
               }
@@ -1045,9 +1111,20 @@ export function ChatTab({
       }
     };
 
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
+    if (bridge) {
+      return bridge.subscribe(handleBridgeMessage);
+    }
+
+    const handleWindowMessage = (event: MessageEvent) => {
+      if (!event.data || typeof event.data !== "object") return;
+      handleBridgeMessage(event.data as ChatBridgeMessage);
+    };
+
+    window.addEventListener("message", handleWindowMessage);
+    return () => window.removeEventListener("message", handleWindowMessage);
   }, [
+    bridge,
+    clearCspViolations,
     clearChatToLanding,
     dismissLandingShader,
     setMessages,
@@ -1062,6 +1139,9 @@ export function ChatTab({
     serverId,
     llmConfig,
     isConnected,
+    playground.cspMode,
+    updatePlaygroundSettings,
+    widgets,
   ]);
 
   // Register keyboard shortcuts (only active when ChatTab is mounted and enabled)
@@ -1592,7 +1672,7 @@ export function ChatTab({
             <MessageList
               messages={messages}
               isLoading={isLoading}
-              serverId={connection.url}
+              serverId={serverId}
               readResource={readResource}
               tools={connection.tools}
               sendMessage={sendWidgetMessage}

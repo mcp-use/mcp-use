@@ -404,7 +404,14 @@ describe("runBuild (views)", () => {
       resolve: { dedupe: ["react", "react-dom"] },
       optimizeDeps: {
         exclude: ["mcp-use/react"],
-        include: ["react", "react-dom", "react-dom/client"],
+        include: [
+          "react",
+          "react-dom",
+          "react-dom/client",
+          "mcp-use > @modelcontextprotocol/ext-apps",
+          "mcp-use > @modelcontextprotocol/server",
+          "zod",
+        ],
       },
     });
 

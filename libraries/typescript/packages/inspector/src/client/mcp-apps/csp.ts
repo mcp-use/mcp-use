@@ -30,6 +30,9 @@ export function buildCSPString(csp: WidgetDeclaredCsp): string {
   const baseUriDomains = (csp.baseUriDomains || [])
     .map(sanitize)
     .filter(Boolean);
+  const scriptDirectives = (csp.scriptDirectives || []).filter((directive) =>
+    ["'unsafe-eval'", "'wasm-unsafe-eval'"].includes(directive)
+  );
 
   const connectSrc =
     connectDomains.length > 0 ? connectDomains.join(" ") : "'none'";
@@ -43,7 +46,9 @@ export function buildCSPString(csp: WidgetDeclaredCsp): string {
 
   return [
     "default-src 'none'",
-    `script-src 'unsafe-inline' ${resourceSrc}`,
+    `script-src 'unsafe-inline' ${resourceSrc}${
+      scriptDirectives.length > 0 ? ` ${scriptDirectives.join(" ")}` : ""
+    }`,
     `style-src 'unsafe-inline' ${resourceSrc}`,
     `img-src ${resourceSrc}`,
     `font-src ${resourceSrc}`,

@@ -6,6 +6,7 @@
 
 import type { AuthInfo, OAuthMetadata } from "@modelcontextprotocol/server";
 
+import { oauthEnvironmentValue } from "./environment.js";
 import {
   booleanValue,
   createJwtVerifier,
@@ -45,8 +46,12 @@ export interface BetterAuthOAuthUser {
 
 /** Configures Better Auth JWT verification and protected-resource metadata. */
 export interface BetterAuthOAuthProviderOptions extends OAuthResourceOptions {
-  /** Full Better Auth issuer URL, including its base path. */
-  authURL: URL | string;
+  /**
+   * Full Better Auth issuer URL, including its base path.
+   *
+   * @defaultValue `MCP_USE_OAUTH_BETTER_AUTH_URL`
+   */
+  authURL?: URL | string;
 }
 
 /**
@@ -56,9 +61,9 @@ export interface BetterAuthOAuthProviderOptions extends OAuthResourceOptions {
  * mcp-use advertises those endpoints and verifies the resulting access-token
  * JWTs against Better Auth's JWKS endpoint.
  *
- * @param options - Better Auth issuer URL and resource-server settings.
+ * @param options - Better Auth issuer URL and resource-server settings. Defaults to v1 environment variables.
  * @returns A provider that rejects tokens not issued for the resolved MCP resource.
- * @throws A `TypeError` if `authURL` is not a valid HTTP or HTTPS URL.
+ * @throws An `Error` if no issuer URL is configured, or a `TypeError` if it is not a valid HTTP or HTTPS URL.
  *
  * @example
  * ```ts
@@ -70,10 +75,15 @@ export interface BetterAuthOAuthProviderOptions extends OAuthResourceOptions {
  * ```
  */
 export function oauthBetterAuthProvider(
-  options: BetterAuthOAuthProviderOptions
+  options: BetterAuthOAuthProviderOptions = {}
 ): OAuthProvider<BetterAuthOAuthUser> {
+  const authURL =
+    options.authURL ?? oauthEnvironmentValue("MCP_USE_OAUTH_BETTER_AUTH_URL");
+  if (authURL === undefined) {
+    throw new Error("Better Auth authURL is required.");
+  }
   const issuer = normalizedProviderUrl(
-    options.authURL,
+    authURL,
     "Better Auth authURL"
   ).href.replace(/\/$/, "");
 

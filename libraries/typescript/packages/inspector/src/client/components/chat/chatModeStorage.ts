@@ -23,8 +23,10 @@ export function writeStoredChatMode(mode: ChatMode): void {
 /** Sync read for useState initializers (before localLlmConfig loads from useEffect). */
 export function resolveInitialForceClientSide(
   hostUsesServerManagedStream: boolean,
-  localLlmConfig: { provider: string; model: string } | null
+  localLlmConfig: { provider: string; model: string } | null,
+  lockManagedMode = false
 ): boolean {
+  if (lockManagedMode && hostUsesServerManagedStream) return false;
   const stored = readStoredChatMode();
   if (stored === "byok") return true;
   if (stored === "managed") return false;

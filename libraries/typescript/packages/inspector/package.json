@@ -1,7 +1,7 @@
 {
   "name": "@mcp-use/inspector",
   "type": "module",
-  "version": "20.1.1",
+  "version": "20.2.0-canary.4",
   "description": "MCP Inspector - A tool for inspecting and debugging MCP servers",
   "author": "",
   "license": "MIT",
@@ -28,6 +28,9 @@
     "./client": {
       "types": "./dist/client/index.d.ts",
       "import": "./dist/client/index.js"
+    },
+    "./client/styles.css": {
+      "default": "./dist/client/styles.css"
     }
   },
   "main": "./dist/server/index.js",
@@ -50,7 +53,7 @@
     "preview:app": "vite preview --config vite.app.config.ts --host 127.0.0.1",
     "serve:app": "pnpm build:app && pnpm preview:app",
     "analyze:app": "ANALYZE=true vite build --config vite.app.config.ts",
-    "build:client-exports": "tsup --config tsup.client.ts",
+    "build:client-exports": "tsup --config tsup.client.ts && node scripts/copy-client-styles.mjs",
     "build:server": "tsup --config tsup.server.ts",
     "verify:package": "node scripts/verify-package.mjs",
     "prepublishOnly": "pnpm --filter @mcp-use/client build && pnpm build",
@@ -82,14 +85,14 @@
   },
   "peerDependencies": {
     "@base-ui/react": "^1.6.0",
-    "@mcp-use/agent": "^2.0.3",
-    "@mcp-use/client": "^2.0.1 || ^2.1.0 || ^2.1.1",
+    "@mcp-use/agent": "^2.0.4-canary.0",
+    "@mcp-use/client": "^2.0.1 || ^2.1.0 || ^2.1.1 || ^2.1.2-canary.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "express": "^4.21.2 || ^5.0.0",
     "lucide-react": "^0.562.0",
     "markdown-to-jsx": "^9.7.4",
-    "mcp-use": "^2.0.4 || ^2.0.5 || ^2.1.0 || ^2.1.1",
+    "mcp-use": "^2.0.4 || ^2.0.5 || ^2.1.0 || ^2.1.1 || ^2.1.2-canary.0 || ^2.2.0-canary.0",
     "motion": "^12.34.2",
     "react": "^18.0.0 || ^19.0.0",
     "react-dom": "^18.0.0 || ^19.0.0",
@@ -163,6 +166,7 @@
     "eslint": "^9.39.2",
     "express": "^5.2.1",
     "hono": "^4.12.34",
+    "jsdom": "^27.0.0",
     "lucide-react": "^0.562.0",
     "markdown-to-jsx": "^9.7.4",
     "motion": "^12.34.2",
