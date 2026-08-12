@@ -25,7 +25,8 @@ export class FileKVStore implements KVStore {
   constructor(serverUrlHash: string, baseDir?: string) {
     const root = baseDir ?? join(homedir(), ".mcp-use", "oauth");
     this.dir = join(root, serverUrlHash);
-    this.ensureDir();
+    // Keep construction and reads side-effect free. The directory is created
+    // only by set(), when OAuth state actually needs to be persisted.
   }
 
   private ensureDir(): void {

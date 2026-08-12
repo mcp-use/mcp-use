@@ -7,7 +7,13 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { FileKVStore } from "../../../src/auth/storage-file.js";
-import { mkdtempSync, rmSync, statSync, readdirSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  statSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -24,6 +30,21 @@ afterEach(() => {
 });
 
 describe("FileKVStore", () => {
+  it("does not create its directory until the first write", () => {
+    const dir = join(baseDir, "abc123");
+    const kv = new FileKVStore("abc123", baseDir);
+
+    expect(existsSync(dir)).toBe(false);
+    expect(kv.get("missing")).toBeNull();
+    expect(kv.keys()).toEqual([]);
+    expect(() => kv.remove("missing")).not.toThrow();
+    expect(existsSync(dir)).toBe(false);
+
+    kv.set("tokens", "secret");
+
+    expect(existsSync(dir)).toBe(true);
+  });
+
   it("round-trips simple keys", () => {
     const kv = new FileKVStore("abc123", baseDir);
     kv.set("tokens", '{"access":"x"}');
