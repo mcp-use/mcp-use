@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.1.4-canary.0
+
+### Patch Changes
+
+- c9c944b: Recover browser OAuth discovery when a fresh MCP `resource_metadata` challenge conflicts with incomplete or stale persisted discovery state.
+
 ## 2.1.3
 
 ### Patch Changes
