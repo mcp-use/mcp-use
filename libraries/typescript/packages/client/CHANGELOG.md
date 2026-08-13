@@ -1,5 +1,17 @@
 # @mcp-use/client
 
+## 2.1.4-canary.1
+
+### Patch Changes
+
+- 6343150: Refresh persisted browser OAuth discovery whenever an MCP server sends a new protected-resource metadata challenge, including when the metadata URL is unchanged.
+
+## 2.1.4-canary.0
+
+### Patch Changes
+
+- c9c944b: Recover browser OAuth discovery when a fresh MCP `resource_metadata` challenge conflicts with incomplete or stale persisted discovery state.
+
 ## 2.1.3
 
 ### Patch Changes

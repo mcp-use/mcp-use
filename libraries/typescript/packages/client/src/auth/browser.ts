@@ -1,11 +1,12 @@
 // browser-provider.ts
-import type {
-  OAuthClientInformation,
-  OAuthClientInformationContext,
-  OAuthClientMetadata,
-  OAuthClientProvider,
-  OAuthDiscoveryState,
-  OAuthTokens,
+import {
+  extractWWWAuthenticateParams,
+  type OAuthClientInformation,
+  type OAuthClientInformationContext,
+  type OAuthClientMetadata,
+  type OAuthClientProvider,
+  type OAuthDiscoveryState,
+  type OAuthTokens,
 } from "@modelcontextprotocol/client";
 import { LocalStorageKVStore } from "./storage.js";
 import { OAuthSessionStore } from "./session-store.js";
@@ -99,6 +100,8 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   private proxyOAuthRequests: boolean;
   private lastAttemptedAuthUrl: string | null = null;
   private authorizationPending = false;
+  /** Latest protected-resource metadata URL advertised by an MCP 401. */
+  private challengedResourceMetadataUrl: string | undefined;
   /** Callback invoked immediately before an authorization popup opens. */
   readonly onPopupWindow:
     | ((
@@ -233,6 +236,14 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     }
   }
 
+  private rememberResourceMetadataChallenge(response: Response): boolean {
+    if (response.status !== 401) return false;
+    const { resourceMetadataUrl } = extractWWWAuthenticateParams(response);
+    if (!resourceMetadataUrl) return false;
+    this.challengedResourceMetadataUrl = resourceMetadataUrl.toString();
+    return true;
+  }
+
   /**
    * Returns a `fetch` function, scoped to this provider, that routes OAuth
    * metadata and non-browser OAuth endpoint requests through the configured
@@ -293,10 +304,12 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       // This is scoped to discovery; MCP traffic and OAuth endpoint POSTs keep
       // their caller-provided cache behavior.
       if (!oauthProxyUrl) {
-        return await base(
+        const response = await base(
           isMetadata ? url : input,
           isMetadata ? { ...init, cache: "no-store" } : init
         );
+        if (!isMetadata) this.rememberResourceMetadataChallenge(response);
+        return response;
       }
 
       if (!restoredDiscovery) {
@@ -321,7 +334,14 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
         );
 
       if (!isMetadata && !isProxiedEndpoint) {
-        return await base(input, init);
+        const response = await base(input, init);
+        if (this.rememberResourceMetadataChallenge(response)) {
+          // Endpoints restored before the MCP request may belong to discovery
+          // that the fresh challenge has just made stale. Fresh metadata will
+          // repopulate this routing set as the SDK rediscovers it.
+          discoveredEndpoints.clear();
+        }
+        return response;
       }
 
       // Don't intercept requests already going to our OAuth proxy (avoid circular proxying)
@@ -525,8 +545,24 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   }
 
   /** Return previously saved OAuth discovery state, or `undefined`. */
-  discoveryState(): Promise<OAuthDiscoveryState | undefined> {
-    return this.session.discoveryState();
+  async discoveryState(): Promise<OAuthDiscoveryState | undefined> {
+    const state = await this.session.discoveryState();
+    const challengedUrl = this.challengedResourceMetadataUrl;
+    this.challengedResourceMetadataUrl = undefined;
+
+    if (challengedUrl && state) {
+      // A fresh MCP challenge is authoritative. RFC 9728 section 5.2 says it
+      // can indicate that protected-resource metadata has changed even when
+      // the metadata URL itself is unchanged. Always rediscover after such a
+      // challenge instead of trusting a complete-but-stale persisted document.
+      // Let the SDK rediscover from the challenge while preserving issuer-keyed
+      // tokens and client registrations until normal issuer validation decides
+      // whether either credential is reusable.
+      await this.session.invalidateCredentials("discovery");
+      return undefined;
+    }
+
+    return state;
   }
 
   /**
