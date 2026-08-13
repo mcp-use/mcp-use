@@ -149,6 +149,8 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
   private kv: KVStore;
   private authTimeoutMs: number;
   private openBrowserOverride?: (url: string) => Promise<void> | void;
+  /** Whether the selected callback port still needs to be written to storage. */
+  private shouldPersistSelectedPort: boolean;
 
   private server: Server | null = null;
   /** Provider authorization URL, exposed only through the local redirect route. */
@@ -164,7 +166,8 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
     port: number,
     session: OAuthSessionStore,
     kv: KVStore,
-    options: NodeOAuthOptions
+    options: NodeOAuthOptions,
+    shouldPersistSelectedPort: boolean
   ) {
     this.serverUrl = serverUrl;
     this.port = port;
@@ -172,6 +175,7 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
     this.kv = kv;
     this.authTimeoutMs = options.authTimeoutMs ?? DEFAULT_AUTH_TIMEOUT_MS;
     this.openBrowserOverride = options.openBrowser;
+    this.shouldPersistSelectedPort = shouldPersistSelectedPort;
   }
 
   /**
@@ -215,10 +219,6 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
       });
     }
 
-    if (port !== persistedPort) {
-      await kv.set("port", String(port));
-    }
-
     const callbackUrl = `http://127.0.0.1:${port}/callback`;
     const session = new OAuthSessionStore(
       serverUrl,
@@ -226,7 +226,14 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
       kv
     );
 
-    return new NodeOAuthClientProvider(serverUrl, port, session, kv, options);
+    return new NodeOAuthClientProvider(
+      serverUrl,
+      port,
+      session,
+      kv,
+      options,
+      port !== persistedPort
+    );
   }
 
   // --- Identity passthroughs (parallel to BrowserOAuthClientProvider) ---
@@ -369,6 +376,11 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
       throw new Error(
         "NodeOAuthClientProvider: an authorization is already in progress"
       );
+    }
+
+    if (this.shouldPersistSelectedPort) {
+      await this.kv.set("port", String(this.port));
+      this.shouldPersistSelectedPort = false;
     }
 
     const sanitizedUrl = await this.session.storeAuthorizationState(

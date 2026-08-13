@@ -4,7 +4,7 @@
  * Run with: pnpm test:run tests/unit/client/connector-callback-ordering.test.ts
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const lifecycle = vi.hoisted(() => ({
   events: [] as string[],
@@ -17,7 +17,18 @@ vi.mock("@modelcontextprotocol/client", async (importOriginal) => {
 
   class MockClient {
     _notificationHandlers = new Map();
-    fallbackNotificationHandler?: (notification: unknown) => Promise<void>;
+    private notificationHandler?: (notification: unknown) => Promise<void>;
+
+    set fallbackNotificationHandler(
+      handler: ((notification: unknown) => Promise<void>) | undefined
+    ) {
+      this.notificationHandler = handler;
+      lifecycle.events.push("handler:notifications");
+    }
+
+    get fallbackNotificationHandler() {
+      return this.notificationHandler;
+    }
 
     constructor() {
       lifecycle.events.push("client:construct");
@@ -71,6 +82,10 @@ describe("HttpConnector inbound handler ordering", () => {
     lifecycle.terminateSession.mockResolvedValue(undefined);
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("registers v1 handlers once before streamable HTTP Client.connect()", async () => {
     const connector = new TestHttpConnector("http://localhost:3000/mcp", {
       onSampling: vi.fn().mockResolvedValue({
@@ -89,6 +104,7 @@ describe("HttpConnector inbound handler ordering", () => {
       "handler:roots/list",
       "handler:sampling/createMessage",
       "handler:elicitation/create",
+      "handler:notifications",
       "client:connect",
     ]);
 
@@ -109,5 +125,24 @@ describe("HttpConnector inbound handler ordering", () => {
       "client:close",
       "transport:close",
     ]);
+  });
+
+  it("does not wait for the optional legacy push stream before becoming ready", async () => {
+    vi.useFakeTimers();
+    const connector = new TestHttpConnector("http://localhost:3000/mcp", {
+      timeout: 10_000,
+    });
+
+    let connected = false;
+    const connecting = connector.connect().then(() => {
+      connected = true;
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(connected).toBe(true);
+    expect(lifecycle.events).toContain("handler:notifications");
+    await connecting;
+    await connector.disconnect();
   });
 });
