@@ -4,7 +4,9 @@ import { describe, expect, it } from "vitest";
 import {
   INSPECTOR_API_RATE_LIMIT,
   INSPECTOR_ASSET_RATE_LIMIT,
+  INSPECTOR_GLOBAL_API_RATE_LIMIT,
   inspectorRateLimitResponse,
+  inspectorServerRateLimitKey,
 } from "../../src/server/rate-limit.js";
 
 describe("Inspector route rate limits", () => {
@@ -62,7 +64,40 @@ describe("Inspector route rate limits", () => {
 
   it("keeps the security patch defaults stable", () => {
     expect(INSPECTOR_API_RATE_LIMIT).toBe(120);
+    expect(INSPECTOR_GLOBAL_API_RATE_LIMIT).toBe(1200);
     expect(INSPECTOR_ASSET_RATE_LIMIT).toBe(600);
+  });
+
+  it("isolates MCP and OAuth budgets by logical server without retaining query secrets", () => {
+    expect(
+      inspectorServerRateLimitKey(
+        "mcp",
+        "https://Example.com:443/mcp/?access_token=secret#fragment"
+      )
+    ).toBe("mcp:https://example.com/mcp");
+    expect(
+      inspectorServerRateLimitKey("oauth", "https://example.com/mcp")
+    ).toBe("oauth:https://example.com/mcp");
+    expect(inspectorServerRateLimitKey("mcp", undefined)).toBe("mcp:unknown");
+    expect(inspectorServerRateLimitKey("oauth", "not a URL")).toBe(
+      "oauth:unknown"
+    );
+  });
+
+  it("lets unrelated targets consume independent per-server budgets", async () => {
+    const limiter = new RateLimiterMemory({ points: 1, duration: 60 });
+    const first = inspectorServerRateLimitKey(
+      "mcp",
+      "https://first.example.com/mcp"
+    );
+    const second = inspectorServerRateLimitKey(
+      "mcp",
+      "https://second.example.com/mcp"
+    );
+
+    await expect(limiter.consume(first)).resolves.toBeDefined();
+    await expect(limiter.consume(first)).rejects.toBeDefined();
+    await expect(limiter.consume(second)).resolves.toBeDefined();
   });
 
   it("uses the fallback Retry-After for non-finite limiter values", async () => {

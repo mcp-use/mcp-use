@@ -365,7 +365,9 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
         ? `${oauthProxyUrl}/metadata?serverUrl=${encodeURIComponent(
             this.serverUrl
           )}&url=${encodeURIComponent(url)}`
-        : `${oauthProxyUrl}/proxy`;
+        : `${oauthProxyUrl}/proxy?serverUrl=${encodeURIComponent(
+            this.serverUrl
+          )}`;
 
       if (isMetadata) {
         const response = await base(proxyEndpoint, {

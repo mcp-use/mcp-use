@@ -3,6 +3,7 @@ import { RateLimiterMemory } from "rate-limiter-flexible";
 import { mountMcpProxy, mountOAuthProxy } from "./proxy/index.js";
 import {
   INSPECTOR_API_RATE_LIMIT,
+  INSPECTOR_GLOBAL_API_RATE_LIMIT,
   INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
 } from "./rate-limit.js";
 
@@ -32,6 +33,10 @@ export function registerInspectorProxyRoutes(
     points: INSPECTOR_API_RATE_LIMIT,
     duration: INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
   });
+  const globalApiRateLimiter = new RateLimiterMemory({
+    points: INSPECTOR_GLOBAL_API_RATE_LIMIT,
+    duration: INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
+  });
 
   app.get(p("/inspector/health"), (c) => {
     return c.json({
@@ -46,6 +51,7 @@ export function registerInspectorProxyRoutes(
     path: p("/inspector/api/proxy"),
     allowLoopback,
     rateLimiter: apiRateLimiter,
+    globalRateLimiter: globalApiRateLimiter,
   });
 
   if (mountOAuth) {
@@ -56,6 +62,7 @@ export function registerInspectorProxyRoutes(
       allowedOrigins: config?.oauthProxyAllowedOrigins ?? [],
       allowLoopback,
       rateLimiter: apiRateLimiter,
+      globalRateLimiter: globalApiRateLimiter,
     });
   }
 

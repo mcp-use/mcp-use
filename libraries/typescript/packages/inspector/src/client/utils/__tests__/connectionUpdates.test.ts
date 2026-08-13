@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { McpServer } from "@mcp-use/client/react";
 import {
+  INSPECTOR_AUTO_RECONNECT_CONFIG,
   MODERN_MCP_PROTOCOL_VERSION,
   InspectorConnectionStorageProvider,
   isAliasOnlyConnectionUpdate,
@@ -10,6 +11,16 @@ import {
   toMcpServerConfig,
   type EditableConnectionConfig,
 } from "../connectionUpdates";
+
+describe("inspector connection health", () => {
+  it("keeps reconnection enabled without probing saved servers every ten seconds", () => {
+    expect(INSPECTOR_AUTO_RECONNECT_CONFIG).toEqual({
+      enabled: true,
+      healthCheckInterval: 60_000,
+      healthCheckTimeout: 180_000,
+    });
+  });
+});
 
 function createLocalStorage(): Storage {
   const values = new Map<string, string>();

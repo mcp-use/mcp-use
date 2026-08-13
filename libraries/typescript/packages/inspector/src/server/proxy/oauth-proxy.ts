@@ -16,8 +16,10 @@ import type { Context, Hono, Next } from "hono";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 import {
   INSPECTOR_API_RATE_LIMIT,
+  INSPECTOR_GLOBAL_API_RATE_LIMIT,
   INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
   inspectorRateLimitResponse,
+  inspectorServerRateLimitKey,
 } from "../rate-limit.js";
 
 type OAuthEndpointKind =
@@ -77,8 +79,10 @@ interface OAuthProxyOptions {
     serverUrl: string,
     c: Context
   ) => Promise<boolean> | boolean;
-  /** Shared process-local limiter for Inspector proxy and OAuth routes. */
+  /** Process-local limiter shared by Inspector proxy and OAuth routes. */
   rateLimiter?: RateLimiterMemory;
+  /** Higher process-wide backstop that prevents target-key rotation abuse. */
+  globalRateLimiter?: RateLimiterMemory;
 }
 
 const SAFE_REQUEST_HEADERS = new Set([
@@ -126,15 +130,20 @@ export function mountOAuthProxy(
       points: INSPECTOR_API_RATE_LIMIT,
       duration: INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
     }),
+    globalRateLimiter = new RateLimiterMemory({
+      points: INSPECTOR_GLOBAL_API_RATE_LIMIT,
+      duration: INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
+    }),
   } = options;
   const origins = new Set(allowedOrigins.map(normalizeOrigin));
   const bindings = new Map<string, Binding>();
   const confidentialClients = new Map<string, ConfidentialClient>();
   const rateLimit = async (c: Context, next: Next) => {
     try {
-      // RateLimiterMemory prefixes and stringifies keys. The Hono request
-      // wrapper therefore maps every request to one mounted-instance budget.
-      await configuredRateLimiter.consume(c.req as unknown as string);
+      await globalRateLimiter.consume("inspector-api:global");
+      await configuredRateLimiter.consume(
+        inspectorServerRateLimitKey("oauth", c.req.query("serverUrl"))
+      );
     } catch (error) {
       return inspectorRateLimitResponse(c, error);
     }
