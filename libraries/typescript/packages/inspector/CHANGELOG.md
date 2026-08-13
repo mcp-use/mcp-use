@@ -1,5 +1,7 @@
 # @mcp-use/inspector
 
+## 20.2.2
+
 ## 20.2.2-canary.0
 
 ### Patch Changes
