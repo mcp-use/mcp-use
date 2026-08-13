@@ -650,28 +650,15 @@ export class HttpConnector extends BaseConnector {
         headers: this.headers,
       });
 
-      let markPushStreamReady: (() => void) | undefined;
-      const pushStreamReady = new Promise<void>((resolve) => {
-        markPushStreamReady = resolve;
-      });
       const baseFetch = this.customFetch ?? globalThis.fetch.bind(globalThis);
       const observedFetch: typeof fetch = async (input, init) => {
         const response = await baseFetch(input, init);
-        const method =
-          init?.method ?? (input instanceof Request ? input.method : "GET");
         const requestHeaders = new Headers(
           input instanceof Request ? input.headers : undefined
         );
         new Headers(init?.headers).forEach((value, key) => {
           requestHeaders.set(key, value);
         });
-        if (
-          method.toUpperCase() === "GET" &&
-          response.ok &&
-          response.headers.get("content-type")?.includes("text/event-stream")
-        ) {
-          markPushStreamReady?.();
-        }
         // subscriptions/listen owns its SSE reader and acknowledgement state.
         // Re-wrapping that response breaks the SDK's per-request stream hooks;
         // the progress observer is only for ordinary request/response calls.
@@ -730,8 +717,9 @@ export class HttpConnector extends BaseConnector {
       this.setupRootsHandler();
       this.setupSamplingHandler();
       this.setupElicitationHandler();
+      this.setupNotificationHandler();
       logger.debug(
-        "Roots/sampling/elicitation handlers registered before connect"
+        "Roots/sampling/elicitation/notification handlers registered before connect"
       );
 
       try {
@@ -758,31 +746,12 @@ export class HttpConnector extends BaseConnector {
           if (connectTimeout !== undefined) clearTimeout(connectTimeout);
         });
 
-        // The official SDK opens the v1 standalone GET stream in the
-        // background after initialization. Wait until its response headers
-        // arrive so reverse RPC and notifications cannot race connect().
-        if (
-          (this.client.getProtocolEra?.() ?? "legacy") === "legacy" &&
-          streamableTransport.sessionId
-        ) {
-          let readinessTimeout: ReturnType<typeof setTimeout> | undefined;
-          const attached = await Promise.race([
-            pushStreamReady.then(() => true),
-            new Promise<false>(
-              (resolve) =>
-                (readinessTimeout = setTimeout(
-                  () => resolve(false),
-                  Math.min(this.timeout, 5000)
-                ))
-            ),
-          ]);
-          if (readinessTimeout) clearTimeout(readinessTimeout);
-          if (!attached) {
-            logger.warn(
-              "Legacy server push stream did not attach before connect completed"
-            );
-          }
-        }
+        // The official SDK opens the optional v1 standalone GET stream in the
+        // background after initialization. Do not gate ordinary request/response
+        // readiness on that long-lived stream: proxies may buffer its headers,
+        // while tools/list and other client operations are already usable.
+        // Inbound request and notification handlers are registered above before
+        // connect(), so the stream can attach later without racing handler setup.
 
         // Streamable HTTP servers may optionally assign a session ID.
         const sessionId = streamableTransport.sessionId;
@@ -832,7 +801,6 @@ export class HttpConnector extends BaseConnector {
 
       this.connected = true;
       this.transportType = "streamable-http";
-      this.setupNotificationHandler();
       // Inbound request handlers (roots/sampling/elicitation) were registered before connect()
       logger.debug(
         `Successfully connected to MCP implementation via streamable HTTP: ${baseUrl}`
