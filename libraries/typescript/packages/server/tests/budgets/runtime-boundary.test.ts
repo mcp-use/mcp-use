@@ -29,9 +29,11 @@ describe("runtime package boundaries", () => {
     const resolutions = await traceImport([]);
     const builtins = builtinResolutions(resolutions);
 
-    expect(builtins.map(({ url }) => url)).toEqual([
-      "node:process",
+    // Sorted: the case asserts which builtins load, and resolution order is
+    // not guaranteed between them.
+    expect(builtins.map(({ url }) => url).sort()).toEqual([
       "node:http",
+      "node:process",
     ]);
     expect(
       builtins.find(({ url }) => url === "node:process")?.parentURL
