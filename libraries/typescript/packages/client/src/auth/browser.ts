@@ -236,10 +236,12 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     }
   }
 
-  private rememberResourceMetadataChallenge(response: Response): void {
-    if (response.status !== 401) return;
+  private rememberResourceMetadataChallenge(response: Response): boolean {
+    if (response.status !== 401) return false;
     const { resourceMetadataUrl } = extractWWWAuthenticateParams(response);
-    this.challengedResourceMetadataUrl = resourceMetadataUrl?.toString();
+    if (!resourceMetadataUrl) return false;
+    this.challengedResourceMetadataUrl = resourceMetadataUrl.toString();
+    return true;
   }
 
   /**
@@ -333,7 +335,12 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
 
       if (!isMetadata && !isProxiedEndpoint) {
         const response = await base(input, init);
-        this.rememberResourceMetadataChallenge(response);
+        if (this.rememberResourceMetadataChallenge(response)) {
+          // Endpoints restored before the MCP request may belong to discovery
+          // that the fresh challenge has just made stale. Fresh metadata will
+          // repopulate this routing set as the SDK rediscovers it.
+          discoveredEndpoints.clear();
+        }
         return response;
       }
 
@@ -543,15 +550,11 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     const challengedUrl = this.challengedResourceMetadataUrl;
     this.challengedResourceMetadataUrl = undefined;
 
-    if (
-      challengedUrl &&
-      state &&
-      (state.resourceMetadataUrl !== challengedUrl || !state.resourceMetadata)
-    ) {
-      // A fresh MCP challenge is authoritative. Older clients could persist
-      // authorization-server discovery without successfully resolving the
-      // RFC 9728 document (even while saving its URL), or retain discovery for
-      // a server whose advertised metadata URL changed.
+    if (challengedUrl && state) {
+      // A fresh MCP challenge is authoritative. RFC 9728 section 5.2 says it
+      // can indicate that protected-resource metadata has changed even when
+      // the metadata URL itself is unchanged. Always rediscover after such a
+      // challenge instead of trusting a complete-but-stale persisted document.
       // Let the SDK rediscover from the challenge while preserving issuer-keyed
       // tokens and client registrations until normal issuer validation decides
       // whether either credential is reusable.
