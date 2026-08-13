@@ -33,6 +33,12 @@ type Binding = {
   updatedAt: number;
 };
 
+type ProtectedResourceMetadataTarget = {
+  type: "protected-resource";
+  /** Resource identifier used to construct this RFC 9728 well-known URL. */
+  resourceIdentifier: URL;
+};
+
 type ConfidentialClient = {
   clientSecret: string;
   authMethod: "client_secret_basic" | "client_secret_post";
@@ -225,6 +231,7 @@ export function mountOAuthProxy(
         await bindProtectedResource(
           metadata,
           serverUrl,
+          metadataKind.resourceIdentifier,
           binding,
           allowLoopback
         );
@@ -457,16 +464,18 @@ function classifyMetadataTarget(
   target: URL,
   binding: Binding
 ):
-  | { type: "protected-resource" }
+  | ProtectedResourceMetadataTarget
   | { type: "authorization-server"; issuer: string }
   | undefined {
   const targetUrl = canonicalUrl(target);
-  if (
-    protectedResourceMetadataUrls(serverUrl).some(
-      (candidate) => canonicalUrl(candidate) === targetUrl
-    )
-  ) {
-    return { type: "protected-resource" };
+  const protectedResourceTarget = protectedResourceMetadataTargets(
+    serverUrl
+  ).find((candidate) => canonicalUrl(candidate.url) === targetUrl);
+  if (protectedResourceTarget) {
+    return {
+      type: "protected-resource",
+      resourceIdentifier: protectedResourceTarget.resourceIdentifier,
+    };
   }
   for (const issuer of binding.authorizationServers) {
     if (
@@ -480,11 +489,23 @@ function classifyMetadataTarget(
   return undefined;
 }
 
-function protectedResourceMetadataUrls(serverUrl: URL): URL[] {
+function protectedResourceMetadataTargets(serverUrl: URL): Array<{
+  url: URL;
+  resourceIdentifier: URL;
+}> {
   const path = serverUrl.pathname === "/" ? "" : serverUrl.pathname;
   return [
-    new URL(`/.well-known/oauth-protected-resource${path}`, serverUrl.origin),
-    new URL("/.well-known/oauth-protected-resource", serverUrl.origin),
+    {
+      url: new URL(
+        `/.well-known/oauth-protected-resource${path}`,
+        serverUrl.origin
+      ),
+      resourceIdentifier: serverUrl,
+    },
+    {
+      url: new URL("/.well-known/oauth-protected-resource", serverUrl.origin),
+      resourceIdentifier: new URL(serverUrl.origin),
+    },
   ];
 }
 
@@ -500,13 +521,19 @@ function authorizationServerMetadataUrls(issuer: URL): URL[] {
 async function bindProtectedResource(
   metadata: Record<string, unknown>,
   serverUrl: URL,
+  resourceIdentifier: URL,
   binding: Binding,
   allowLoopback: boolean
 ): Promise<void> {
-  if (
-    typeof metadata.resource !== "string" ||
-    canonicalUrl(new URL(metadata.resource)) !== canonicalUrl(serverUrl)
-  ) {
+  const advertisedResource = parseResourceUrl(metadata.resource, allowLoopback);
+  const matchesDiscoveredResource =
+    advertisedResource !== undefined &&
+    canonicalUrl(advertisedResource) === canonicalUrl(resourceIdentifier);
+  const matchesCompatibleParentResource =
+    advertisedResource !== undefined &&
+    isCompatibleParentResource(serverUrl, advertisedResource);
+
+  if (!matchesDiscoveredResource && !matchesCompatibleParentResource) {
     throw new InvalidUpstreamError(
       "Protected-resource metadata does not match serverUrl"
     );
@@ -533,6 +560,58 @@ async function bindProtectedResource(
   binding.authorizationServers = issuers;
   binding.endpoints.clear();
   binding.tokenEndpointAuthMethods.clear();
+}
+
+/**
+ * Parse an advertised RFC 9728 resource without allowing URI shapes that are
+ * unsafe or invalid as OAuth resource indicators.
+ */
+function parseResourceUrl(
+  value: unknown,
+  allowLoopback: boolean
+): URL | undefined {
+  if (typeof value !== "string" || value.length === 0) return undefined;
+  try {
+    const url = new URL(value);
+    const allowedProtocol =
+      url.protocol === "https:" ||
+      (allowLoopback &&
+        url.protocol === "http:" &&
+        isLoopbackHostname(url.hostname));
+    if (!allowedProtocol || url.username || url.password || url.hash) {
+      return undefined;
+    }
+    return url;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Compatibility policy used by the official MCP TypeScript SDK: an MCP
+ * endpoint may advertise a broader resource on the same origin when the
+ * advertised path is a segment-aware parent of the endpoint path.
+ *
+ * This intentionally rejects cross-origin resources and sibling paths. The
+ * advertised value is not rewritten; the OAuth client sends it verbatim in
+ * authorization, token, and refresh requests.
+ */
+function isCompatibleParentResource(
+  serverUrl: URL,
+  advertisedResource: URL
+): boolean {
+  if (serverUrl.origin !== advertisedResource.origin) return false;
+  if (serverUrl.pathname.length < advertisedResource.pathname.length) {
+    return false;
+  }
+
+  const serverPath = serverUrl.pathname.endsWith("/")
+    ? serverUrl.pathname
+    : `${serverUrl.pathname}/`;
+  const resourcePath = advertisedResource.pathname.endsWith("/")
+    ? advertisedResource.pathname
+    : `${advertisedResource.pathname}/`;
+  return serverPath.startsWith(resourcePath);
 }
 
 async function bindAuthorizationServer(
@@ -575,8 +654,8 @@ async function hydrateBinding(
   timeoutMs: number,
   maxResponseBodyBytes: number
 ): Promise<void> {
-  for (const metadataUrl of protectedResourceMetadataUrls(serverUrl)) {
-    const response = await safeFetch(metadataUrl, {
+  for (const target of protectedResourceMetadataTargets(serverUrl)) {
+    const response = await safeFetch(target.url, {
       method: "GET",
       headers: { Accept: "application/json" },
       redirect: "manual",
@@ -591,6 +670,7 @@ async function hydrateBinding(
     await bindProtectedResource(
       parseObject(await readCapped(response, maxResponseBodyBytes)),
       serverUrl,
+      target.resourceIdentifier,
       binding,
       allowLoopback
     );
