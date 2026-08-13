@@ -376,7 +376,31 @@ export function ConnectionSettingsForm({
     />
   );
 
-  const configurationFields = (
+  const protocolFields = (testId: string) => (
+    <div className="space-y-2">
+      <Label className={cn("text-sm", labelClassName)}>Protocol Version</Label>
+      <Select
+        value={protocolMode}
+        onValueChange={(value) =>
+          setProtocolMode(value as InspectorProtocolMode)
+        }
+      >
+        <SelectTrigger
+          className={cn("w-full", inputClassName)}
+          data-testid={testId}
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="auto">Auto</SelectItem>
+          <SelectItem value="v1">Legacy (2025-11-25)</SelectItem>
+          <SelectItem value="v2">Modern (2026-07-28)</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
+  const configurationFields = (includeProtocol = true) => (
     <div className="grid gap-4 sm:grid-cols-2">
       <div className="space-y-2">
         <Label className="text-sm">Connection Mode</Label>
@@ -401,31 +425,33 @@ export function ConnectionSettingsForm({
           Direct bypasses the proxy; Proxy always routes through it.
         </p>
       </div>
-      <div className="space-y-2">
-        <Label className="text-sm">Protocol</Label>
-        <Select
-          value={protocolMode}
-          onValueChange={(value) =>
-            setProtocolMode(value as InspectorProtocolMode)
-          }
-        >
-          <SelectTrigger
-            className="w-full"
-            data-testid="config-dialog-protocol-mode-select"
+      {includeProtocol && (
+        <div className="space-y-2">
+          <Label className="text-sm">Protocol Version</Label>
+          <Select
+            value={protocolMode}
+            onValueChange={(value) =>
+              setProtocolMode(value as InspectorProtocolMode)
+            }
           >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="auto">Auto (recommended)</SelectItem>
-            <SelectItem value="v1">Force v1 (2024/2025)</SelectItem>
-            <SelectItem value="v2">Force v2 (2026-07-28)</SelectItem>
-          </SelectContent>
-        </Select>
-        <p className="text-xs text-muted-foreground">
-          Auto probes for v2 and falls back to the legacy v1 initialize flow.
-          Forced modes fail when the server is incompatible.
-        </p>
-      </div>
+            <SelectTrigger
+              className="w-full"
+              data-testid="connection-settings-protocol-mode-select"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="auto">Auto</SelectItem>
+              <SelectItem value="v1">Legacy (2025-11-25)</SelectItem>
+              <SelectItem value="v2">Modern (2026-07-28)</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Auto probes for Modern and falls back to the Legacy initialize flow.
+            Legacy and modern modes fail when the server is incompatible.
+          </p>
+        </div>
+      )}
       <div className="space-y-2">
         <Label className="text-sm">Proxy Endpoint</Label>
         <Input
@@ -556,6 +582,17 @@ export function ConnectionSettingsForm({
         <Card className="border">
           <CardHeader>
             <CardTitle className="text-base font-medium">
+              Configuration
+            </CardTitle>
+            <CardDescription>
+              Connection mode, protocol, proxy, and request timeouts
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">{configurationFields()}</CardContent>
+        </Card>
+        <Card className="border">
+          <CardHeader>
+            <CardTitle className="text-base font-medium">
               Authentication
             </CardTitle>
             <CardDescription>OAuth 2.0 client credentials</CardDescription>
@@ -573,17 +610,6 @@ export function ConnectionSettingsForm({
           </CardHeader>
           <CardContent className="pt-0">{headersFields}</CardContent>
         </Card>
-        <Card className="border">
-          <CardHeader>
-            <CardTitle className="text-base font-medium">
-              Configuration
-            </CardTitle>
-            <CardDescription>
-              Connection mode, proxy, and request timeouts
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-0">{configurationFields}</CardContent>
-        </Card>
       </div>
     );
   }
@@ -596,6 +622,9 @@ export function ConnectionSettingsForm({
       {copyConfigButton}
 
       {endpointFields}
+
+      {!inlineSections &&
+        protocolFields("connection-form-protocol-mode-select")}
 
       {inlineSections && !cardSections && (
         <div className="space-y-8 pt-2">
@@ -615,7 +644,7 @@ export function ConnectionSettingsForm({
             <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Configuration
             </h3>
-            {configurationFields}
+            {configurationFields()}
           </section>
         </div>
       )}
@@ -718,7 +747,7 @@ export function ConnectionSettingsForm({
                 <DialogTitle>Configuration</DialogTitle>
               </DialogHeader>
               <DialogBody className="space-y-4">
-                {configurationFields}
+                {configurationFields(false)}
                 <div className="flex justify-end">
                   <Button onClick={() => setConfigDialogOpen(false)}>
                     Save
