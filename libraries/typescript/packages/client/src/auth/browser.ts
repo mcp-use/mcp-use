@@ -1,11 +1,12 @@
 // browser-provider.ts
-import type {
-  OAuthClientInformation,
-  OAuthClientInformationContext,
-  OAuthClientMetadata,
-  OAuthClientProvider,
-  OAuthDiscoveryState,
-  OAuthTokens,
+import {
+  extractWWWAuthenticateParams,
+  type OAuthClientInformation,
+  type OAuthClientInformationContext,
+  type OAuthClientMetadata,
+  type OAuthClientProvider,
+  type OAuthDiscoveryState,
+  type OAuthTokens,
 } from "@modelcontextprotocol/client";
 import { LocalStorageKVStore } from "./storage.js";
 import { OAuthSessionStore } from "./session-store.js";
@@ -99,6 +100,8 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   private proxyOAuthRequests: boolean;
   private lastAttemptedAuthUrl: string | null = null;
   private authorizationPending = false;
+  /** Latest protected-resource metadata URL advertised by an MCP 401. */
+  private challengedResourceMetadataUrl: string | undefined;
   /** Callback invoked immediately before an authorization popup opens. */
   readonly onPopupWindow:
     | ((
@@ -233,6 +236,12 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     }
   }
 
+  private rememberResourceMetadataChallenge(response: Response): void {
+    if (response.status !== 401) return;
+    const { resourceMetadataUrl } = extractWWWAuthenticateParams(response);
+    this.challengedResourceMetadataUrl = resourceMetadataUrl?.toString();
+  }
+
   /**
    * Returns a `fetch` function, scoped to this provider, that routes OAuth
    * metadata and non-browser OAuth endpoint requests through the configured
@@ -293,10 +302,12 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       // This is scoped to discovery; MCP traffic and OAuth endpoint POSTs keep
       // their caller-provided cache behavior.
       if (!oauthProxyUrl) {
-        return await base(
+        const response = await base(
           isMetadata ? url : input,
           isMetadata ? { ...init, cache: "no-store" } : init
         );
+        if (!isMetadata) this.rememberResourceMetadataChallenge(response);
+        return response;
       }
 
       if (!restoredDiscovery) {
@@ -321,7 +332,9 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
         );
 
       if (!isMetadata && !isProxiedEndpoint) {
-        return await base(input, init);
+        const response = await base(input, init);
+        this.rememberResourceMetadataChallenge(response);
+        return response;
       }
 
       // Don't intercept requests already going to our OAuth proxy (avoid circular proxying)
@@ -525,8 +538,28 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   }
 
   /** Return previously saved OAuth discovery state, or `undefined`. */
-  discoveryState(): Promise<OAuthDiscoveryState | undefined> {
-    return this.session.discoveryState();
+  async discoveryState(): Promise<OAuthDiscoveryState | undefined> {
+    const state = await this.session.discoveryState();
+    const challengedUrl = this.challengedResourceMetadataUrl;
+    this.challengedResourceMetadataUrl = undefined;
+
+    if (
+      challengedUrl &&
+      state &&
+      (state.resourceMetadataUrl !== challengedUrl || !state.resourceMetadata)
+    ) {
+      // A fresh MCP challenge is authoritative. Older clients could persist
+      // authorization-server discovery without successfully resolving the
+      // RFC 9728 document (even while saving its URL), or retain discovery for
+      // a server whose advertised metadata URL changed.
+      // Let the SDK rediscover from the challenge while preserving issuer-keyed
+      // tokens and client registrations until normal issuer validation decides
+      // whether either credential is reusable.
+      await this.session.invalidateCredentials("discovery");
+      return undefined;
+    }
+
+    return state;
   }
 
   /**
