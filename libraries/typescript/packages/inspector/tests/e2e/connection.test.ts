@@ -83,15 +83,17 @@ test.describe("Inspector MCP Server Connections", () => {
     ).toBeVisible();
   });
 
-  test("keeps protocol selection out of the Configuration modal", async ({
+  test("shows protocol selection in the Configuration modal", async ({
     page,
   }) => {
     await page.goto("http://localhost:3000/inspector");
     await page.getByTestId("connection-form-config-button").click();
 
+    const configurationDialog = page.getByRole("dialog");
+    await expect(configurationDialog).toBeVisible();
     await expect(
-      page.getByRole("dialog").getByText("Protocol Version", { exact: true })
-    ).toHaveCount(0);
+      configurationDialog.getByText("Protocol Version", { exact: true })
+    ).toBeVisible();
   });
 
   test("shows Configuration as the second connection settings card", async ({

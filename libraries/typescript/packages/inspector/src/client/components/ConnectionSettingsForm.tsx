@@ -416,7 +416,7 @@ export function ConnectionSettingsForm({
     </div>
   );
 
-  const configurationFields = (includeProtocol = true) => (
+  const configurationFields = (
     <div className="grid gap-4 sm:grid-cols-2">
       <div className="space-y-2">
         <Label className="text-sm">Connection Mode</Label>
@@ -441,11 +441,10 @@ export function ConnectionSettingsForm({
           Direct bypasses the proxy; Proxy always routes through it.
         </p>
       </div>
-      {includeProtocol &&
-        protocolFields({
-          testId: "connection-settings-protocol-mode-select",
-          showHelpText: true,
-        })}
+      {protocolFields({
+        testId: "connection-settings-protocol-mode-select",
+        showHelpText: true,
+      })}
       <div className="space-y-2">
         <Label className="text-sm">Proxy Endpoint</Label>
         <Input
@@ -582,7 +581,7 @@ export function ConnectionSettingsForm({
               Connection mode, protocol, proxy, and request timeouts
             </CardDescription>
           </CardHeader>
-          <CardContent className="pt-0">{configurationFields()}</CardContent>
+          <CardContent className="pt-0">{configurationFields}</CardContent>
         </Card>
         <Card className="border">
           <CardHeader>
@@ -641,7 +640,7 @@ export function ConnectionSettingsForm({
             <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Configuration
             </h3>
-            {configurationFields()}
+            {configurationFields}
           </section>
         </div>
       )}
@@ -744,7 +743,7 @@ export function ConnectionSettingsForm({
                 <DialogTitle>Configuration</DialogTitle>
               </DialogHeader>
               <DialogBody className="space-y-4">
-                {configurationFields(false)}
+                {configurationFields}
                 <div className="flex justify-end">
                   <Button onClick={() => setConfigDialogOpen(false)}>
                     Save
