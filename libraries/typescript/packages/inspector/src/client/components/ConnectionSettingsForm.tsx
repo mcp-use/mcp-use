@@ -376,9 +376,19 @@ export function ConnectionSettingsForm({
     />
   );
 
-  const protocolFields = (testId: string) => (
+  const protocolFields = ({
+    testId,
+    styled = false,
+    showHelpText = false,
+  }: {
+    testId: string;
+    styled?: boolean;
+    showHelpText?: boolean;
+  }) => (
     <div className="space-y-2">
-      <Label className={cn("text-sm", labelClassName)}>Protocol Version</Label>
+      <Label className={cn("text-sm", styled && labelClassName)}>
+        Protocol Version
+      </Label>
       <Select
         value={protocolMode}
         onValueChange={(value) =>
@@ -386,7 +396,7 @@ export function ConnectionSettingsForm({
         }
       >
         <SelectTrigger
-          className={cn("w-full", inputClassName)}
+          className={cn("w-full", styled && inputClassName)}
           data-testid={testId}
         >
           <SelectValue />
@@ -397,6 +407,12 @@ export function ConnectionSettingsForm({
           <SelectItem value="v2">Modern (2026-07-28)</SelectItem>
         </SelectContent>
       </Select>
+      {showHelpText && (
+        <p className="text-xs text-muted-foreground">
+          Auto probes for Modern and falls back to the Legacy initialize flow.
+          Legacy and modern modes fail when the server is incompatible.
+        </p>
+      )}
     </div>
   );
 
@@ -425,33 +441,11 @@ export function ConnectionSettingsForm({
           Direct bypasses the proxy; Proxy always routes through it.
         </p>
       </div>
-      {includeProtocol && (
-        <div className="space-y-2">
-          <Label className="text-sm">Protocol Version</Label>
-          <Select
-            value={protocolMode}
-            onValueChange={(value) =>
-              setProtocolMode(value as InspectorProtocolMode)
-            }
-          >
-            <SelectTrigger
-              className="w-full"
-              data-testid="connection-settings-protocol-mode-select"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="auto">Auto</SelectItem>
-              <SelectItem value="v1">Legacy (2025-11-25)</SelectItem>
-              <SelectItem value="v2">Modern (2026-07-28)</SelectItem>
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">
-            Auto probes for Modern and falls back to the Legacy initialize flow.
-            Legacy and modern modes fail when the server is incompatible.
-          </p>
-        </div>
-      )}
+      {includeProtocol &&
+        protocolFields({
+          testId: "connection-settings-protocol-mode-select",
+          showHelpText: true,
+        })}
       <div className="space-y-2">
         <Label className="text-sm">Proxy Endpoint</Label>
         <Input
@@ -624,7 +618,10 @@ export function ConnectionSettingsForm({
       {endpointFields}
 
       {!inlineSections &&
-        protocolFields("connection-form-protocol-mode-select")}
+        protocolFields({
+          testId: "connection-form-protocol-mode-select",
+          styled: isStyled,
+        })}
 
       {inlineSections && !cardSections && (
         <div className="space-y-8 pt-2">

@@ -90,8 +90,8 @@ test.describe("Inspector MCP Server Connections", () => {
     await page.getByTestId("connection-form-config-button").click();
 
     await expect(
-      page.getByTestId("connection-settings-protocol-mode-select")
-    ).not.toBeVisible();
+      page.getByRole("dialog").getByText("Protocol Version", { exact: true })
+    ).toHaveCount(0);
   });
 
   test("shows Configuration as the second connection settings card", async ({
