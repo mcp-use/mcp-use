@@ -10,5 +10,7 @@
     "mcp-use": "2.2.2",
     "@mcp-use/tunnel": "0.2.0"
   },
-  "changesets": []
+  "changesets": [
+    "surface-protocol-selection"
+  ]
 }
