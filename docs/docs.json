@@ -371,6 +371,7 @@
                     "pages": [
                       "v2/typescript/mcp-apps",
                       "v2/typescript/mcp-apps/quickstart",
+                      "v2/typescript/mcp-apps/generative-ui",
                       "v2/typescript/mcp-apps/interactivity",
                       "v2/typescript/mcp-apps/model-context",
                       "v2/typescript/mcp-apps/content-security-policy"

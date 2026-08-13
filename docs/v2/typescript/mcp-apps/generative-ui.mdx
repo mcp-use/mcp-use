@@ -1,0 +1,243 @@
+---
+title: "Generative UI"
+description: "Create an MCP App that generates UI on the fly"
+icon: "sparkles"
+---
+
+Generative UI allows models to create custom UI on the fly through a JSON Schema.
+
+## What you'll build
+
+You will create an MCP App that allows for dynamically generated content, powered by [JSON-Render](https://json-render.dev/docs).
+
+The app:
+
+- gives the model a catalog of allowed components and actions
+- accepts a type-safe JSON-Render specification as structured input
+- streams partial specifications into the mounted view
+- renders the completed specification from `structuredContent`
+
+The complete implementation is available in the [`generative-ui` example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/views/generative-ui). For details about catalogs, specifications, and renderers, use the [official JSON-Render documentation](https://json-render.dev/docs).
+
+## How the integration works
+
+A JSON-Render catalog defines the components and actions the model can use. The catalog also produces the Zod schema and prompt guidance for the MCP tool.
+
+The model writes a JSON-Render `spec` into the tool's structured arguments. While the tool call is pending, MCP Apps hosts send partial arguments to the view through `ui/notifications/tool-input-partial`. After validation, the tool returns the final specification in `structuredContent`.
+
+The tool argument must be a structured object. Do not ask the model to stream a stringified JSON document. Structured input lets the MCP host parse and deliver usable partial values without repairing incomplete JSON strings in the view.
+
+## Install JSON-Render
+
+Install the JSON-Render core, React renderer, and shadcn component catalog:
+
+```bash
+npm install @json-render/core @json-render/react @json-render/shadcn
+```
+
+This guide uses the prebuilt shadcn catalog. You can define a smaller custom catalog when your app needs tighter control over the generated interface.
+
+## Define the component catalog
+
+Create `views/generative-ui/catalog.ts` and export one catalog for both the server and the React view:
+
+```ts
+import { defineCatalog } from "@json-render/core";
+import { schema } from "@json-render/react/schema";
+import { shadcnComponentDefinitions } from "@json-render/shadcn/catalog";
+
+export const catalog = defineCatalog(schema, {
+  components: {
+    ...shadcnComponentDefinitions,
+  },
+  actions: {},
+});
+```
+
+The catalog is the model's UI vocabulary and the runtime validation boundary. Only catalog components can appear in a valid specification.
+
+For a production app, expose only the components the model needs. You can also add your own typed component definitions and actions. See [Catalogs in the JSON-Render documentation](https://json-render.dev/docs/catalog).
+
+## Create the generative UI tool
+
+Generate the tool's input schema from the catalog instead of maintaining a separate schema:
+
+```ts
+import { MCPServer } from "mcp-use";
+import { z } from "zod";
+
+import { catalog } from "../views/generative-ui/catalog.js";
+
+const server = new MCPServer({
+  name: "generative-ui",
+  version: "1.0.0",
+});
+
+const specSchema = catalog.zodSchema();
+
+function catalogGuidance(): string {
+  const prompt = catalog.prompt();
+  const dynamicListsStart = prompt.indexOf("DYNAMIC LISTS (repeat field):");
+  const componentStart = prompt.indexOf("AVAILABLE COMPONENTS");
+
+  if (dynamicListsStart === -1 || componentStart === -1) return prompt;
+
+  return `STATE MODEL:
+Put initial values in the top-level spec.state object. Use JSON Pointer paths such as /todos to refer to that state.
+
+${prompt.slice(dynamicListsStart, componentStart)}${prompt.slice(componentStart)}`;
+}
+
+export const renderUi = server.tool(
+  {
+    name: "render-ui",
+    title: "Render UI",
+    description: `Render an interactive UI with the available JSON-Render catalog.
+
+Generate one complete structured object in the spec argument. Do not emit JSONL patches or a stringified JSON document. Write spec.root and its root element first, then add referenced elements progressively. Every child reference in the final spec must exist.
+
+${catalogGuidance()}`,
+    inputSchema: z.object({
+      spec: specSchema.describe(
+        "A JSON-Render specification that streams into the view while it is generated.",
+      ),
+    }),
+    outputSchema: z.object({
+      spec: specSchema,
+      elementCount: z.number(),
+    }),
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false,
+    },
+    view: {
+      name: "generative-ui",
+      description: "A live generative interface",
+      prefersBorder: false,
+    },
+  },
+  async ({ spec }) => {
+    const elementCount = Object.keys(spec.elements).length;
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Rendered ${elementCount} UI elements.`,
+        },
+      ],
+      structuredContent: { spec, elementCount },
+    };
+  },
+);
+
+export default server;
+```
+
+The tool description tells the model to write `spec.root` and the root element first. This ordering gives the view enough information to mount before the rest of the element map arrives.
+
+<Warning>
+  `catalog.prompt()` includes output instructions for JSONL patch streaming. The
+  `catalogGuidance()` helper removes those instructions because this MCP tool
+  accepts one structured `spec` object. It preserves the catalog's component,
+  action, state, and event guidance.
+</Warning>
+
+Return the final specification in `structuredContent`. The view uses it after the tool completes and on hosts that provide a result without partial tool-input notifications. Keep `content` concise because it is the result the model reads.
+
+## Register the React components
+
+Create `views/generative-ui/view.tsx`. Define a registry that maps each catalog component to its React implementation:
+
+```tsx
+import { defineRegistry } from "@json-render/react";
+import { shadcnComponents } from "@json-render/shadcn";
+
+import { catalog } from "./catalog.js";
+
+const { registry } = defineRegistry(catalog, {
+  components: {
+    ...shadcnComponents,
+  },
+});
+```
+
+The catalog describes what the model may generate. The registry supplies the components that render those names. When you add a custom catalog component, add its React implementation to the registry too.
+
+## Stream the generated interface
+
+`useToolContext()` updates `toolInput` as the model generates the structured `spec` argument. Read that live input first, then use the validated `toolOutput` after the call completes:
+
+```tsx
+import { JSONUIProvider, Renderer } from "@json-render/react";
+import { ThemeProvider, useToolContext } from "mcp-use/react";
+
+function GenerativeUiContent() {
+  const view = useToolContext<"render-ui">();
+
+  if (view.status === "error") {
+    return <div role="alert">{view.error.message}</div>;
+  }
+
+  const spec = toRenderableSpec(
+    view.toolInput?.spec ??
+      (view.status === "ready" ? view.toolOutput.spec : undefined),
+  );
+
+  if (!spec) {
+    return <div aria-busy="true">Waiting for a renderable UI spec…</div>;
+  }
+
+  return (
+    <JSONUIProvider registry={registry} initialState={spec.state ?? {}}>
+      <Renderer
+        spec={spec}
+        registry={registry}
+        loading={view.status === "pending"}
+      />
+    </JSONUIProvider>
+  );
+}
+
+export default function GenerativeUi() {
+  return (
+    <ThemeProvider colorScheme>
+      <GenerativeUiContent />
+    </ThemeProvider>
+  );
+}
+```
+
+The `toRenderableSpec()` helper checks whether the partial input contains a root element and removes elements that have not received their props yet. Copy the helper from the [complete example](https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/server/examples/views/generative-ui/views/generative-ui/view.tsx) rather than treating a pending value as a complete `Spec`.
+
+`loading` tells JSON-Render that referenced children may still be on the way. The view can render the usable part of the interface without warning about missing children. When the host does not send partial input, the loading state remains visible until `structuredContent` arrives.
+
+`ThemeProvider` applies the host's color scheme and CSS variables.
+
+## Add state and interactions
+
+JSON-Render specifications can include initial state, event bindings, and actions. Describe those capabilities in the tool instructions so the model generates working interactions instead of static controls.
+
+For example, an addable task list needs:
+
+- an array in `spec.state`
+- a repeated element bound to that array
+- an input bound to the new-task value
+- a button event bound to an action such as `pushState`
+
+Only promise an interaction in visible text when the specification contains the matching state and event binding. See the [JSON-Render React API](https://json-render.dev/docs/api/react) for providers, actions, visibility, validation, and state.
+
+## Prepare the integration for production
+
+- Keep the catalog limited to components and actions your app supports.
+- Validate the completed specification with `catalog.zodSchema()`.
+- Return the final specification through `structuredContent`.
+- Include a concise text result for the model and hosts without views.
+- Configure [Content Security Policy](/v2/typescript/mcp-apps/content-security-policy) for external images, APIs, scripts, or embeds.
+
+## Next steps
+
+- Run the complete [`generative-ui` example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/views/generative-ui).
+- Learn how to build a view with the [MCP Apps quickstart](/v2/typescript/mcp-apps/quickstart).
+- Add tool calls and follow-up messages with [MCP App interactivity](/v2/typescript/mcp-apps/interactivity).
+- Read the [JSON-Render quick start](https://json-render.dev/docs/quick-start) for custom catalogs and renderers.

@@ -1,0 +1,114 @@
+@import "tailwindcss";
+
+/* json-render's shadcn components are dependency source, so opt it into
+ * Tailwind's class scan in addition to this view's local source. */
+@source "../../node_modules/@json-render/shadcn/dist";
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+}
+
+[data-theme="dark"] {
+  --background: var(--color-background-secondary, oklch(0.145 0 0));
+  --foreground: var(--color-text-primary, oklch(0.985 0 0));
+  --card: var(--color-background-primary, oklch(0.205 0 0));
+  --card-foreground: var(--color-text-primary, oklch(0.985 0 0));
+  --popover: var(--color-background-primary, oklch(0.205 0 0));
+  --popover-foreground: var(--color-text-primary, oklch(0.985 0 0));
+  --primary: var(--color-text-primary, oklch(0.922 0 0));
+  --primary-foreground: var(--color-background-primary, oklch(0.205 0 0));
+  --secondary: var(--color-background-tertiary, oklch(0.269 0 0));
+  --secondary-foreground: var(--color-text-primary, oklch(0.985 0 0));
+  --muted: var(--color-background-tertiary, oklch(0.269 0 0));
+  --muted-foreground: var(--color-text-secondary, oklch(0.708 0 0));
+  --accent: var(--color-background-tertiary, oklch(0.269 0 0));
+  --accent-foreground: var(--color-text-primary, oklch(0.985 0 0));
+  --destructive: var(--color-text-danger, oklch(0.704 0.191 22.216));
+  --border: var(--color-border-primary, oklch(1 0 0 / 10%));
+  --input: var(--color-border-secondary, oklch(1 0 0 / 15%));
+  --ring: var(--color-ring-primary, oklch(0.556 0 0));
+}
+
+.generative-ui-canvas {
+  width: 100%;
+  color: var(--foreground);
+  font-family: var(
+    --vscode-font-family,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif
+  );
+}
+
+.generative-ui-status {
+  padding: 1rem;
+  color: var(--muted-foreground);
+  font-family: system-ui, sans-serif;
+  font-size: 0.875rem;
+}
+
+.generative-ui-error {
+  color: var(--destructive);
+}
+
+.generative-avatar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: var(--color-background-tertiary, #27272a);
+  color: var(--color-text-secondary, #a1a1aa);
+}
+
+.generative-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
