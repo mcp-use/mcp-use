@@ -97,25 +97,31 @@ describe("BrowserOAuthClientProvider — scoped OAuth proxy fetch", () => {
     });
   });
 
-  it("keeps discovery that is bound to the current resource_metadata challenge", async () => {
+  it("drops complete discovery after a fresh challenge at the same metadata URL", async () => {
     const resourceMetadataUrl =
       "https://server-a.example.com/.well-known/oauth-protected-resource/mcp";
-    const discovery = {
-      authorizationServerUrl: "https://auth.example.com",
+    const staleDiscovery = {
+      authorizationServerUrl: "https://server-a.example.com",
       resourceMetadataUrl,
       resourceMetadata: {
         resource: "https://server-a.example.com/mcp",
-        authorization_servers: ["https://auth.example.com"],
+        authorization_servers: ["https://server-a.example.com"],
       },
       authorizationServerMetadata: {
-        issuer: "https://auth.example.com",
-        authorization_endpoint: "https://auth.example.com/authorize",
-        token_endpoint: "https://auth.example.com/token",
+        issuer: "https://server-a.example.com",
+        authorization_endpoint: "https://server-a.example.com/authorize",
+        token_endpoint: "https://server-a.example.com/token",
+        registration_endpoint: "https://server-a.example.com/register",
         response_types_supported: ["code"],
       },
     };
     const provider = makeProvider({ oauthProxyUrl: PROXY_URL });
-    await provider.saveDiscoveryState(discovery);
+    await provider.saveDiscoveryState(staleDiscovery);
+    await provider.saveClientInformation({ client_id: "existing-client" });
+    await provider.saveTokens({
+      access_token: "existing-token",
+      token_type: "Bearer",
+    });
     globalFetchSpy.mockResolvedValueOnce(
       new Response(null, {
         status: 401,
@@ -127,7 +133,76 @@ describe("BrowserOAuthClientProvider — scoped OAuth proxy fetch", () => {
 
     await provider.getProxyFetch()!("https://server-a.example.com/mcp");
 
-    expect(await provider.discoveryState()).toEqual(discovery);
+    expect(await provider.discoveryState()).toBeUndefined();
+    expect(await provider.clientInformation()).toMatchObject({
+      client_id: "existing-client",
+    });
+    expect(await provider.tokens()).toMatchObject({
+      access_token: "existing-token",
+    });
+
+    const refreshedDiscovery = {
+      ...staleDiscovery,
+      authorizationServerUrl: "https://server-a.example.com/api/auth",
+      resourceMetadata: {
+        ...staleDiscovery.resourceMetadata,
+        authorization_servers: ["https://server-a.example.com/api/auth"],
+      },
+      authorizationServerMetadata: {
+        ...staleDiscovery.authorizationServerMetadata,
+        issuer: "https://server-a.example.com/api/auth",
+        authorization_endpoint:
+          "https://server-a.example.com/api/auth/oauth2/authorize",
+        token_endpoint: "https://server-a.example.com/api/auth/oauth2/token",
+        registration_endpoint:
+          "https://server-a.example.com/api/auth/oauth2/register",
+      },
+    };
+    await provider.saveDiscoveryState(refreshedDiscovery);
+
+    // The challenge is consumed once; freshly persisted discovery is reusable.
+    expect(await provider.discoveryState()).toEqual(refreshedDiscovery);
+  });
+
+  it("stops proxying endpoints restored from discovery after a fresh challenge", async () => {
+    const resourceMetadataUrl =
+      "https://server-a.example.com/.well-known/oauth-protected-resource/mcp";
+    const staleRegistrationEndpoint =
+      "https://server-a.example.com/clients/legacy-enroll";
+    const provider = makeProvider({ oauthProxyUrl: PROXY_URL });
+    await provider.saveDiscoveryState({
+      authorizationServerUrl: "https://server-a.example.com",
+      resourceMetadataUrl,
+      resourceMetadata: {
+        resource: "https://server-a.example.com/mcp",
+        authorization_servers: ["https://server-a.example.com"],
+      },
+      authorizationServerMetadata: {
+        issuer: "https://server-a.example.com",
+        authorization_endpoint: "https://server-a.example.com/authorize",
+        token_endpoint: "https://server-a.example.com/token",
+        registration_endpoint: staleRegistrationEndpoint,
+        response_types_supported: ["code"],
+      },
+    });
+    globalFetchSpy
+      .mockResolvedValueOnce(
+        new Response(null, {
+          status: 401,
+          headers: {
+            "www-authenticate": `Bearer resource_metadata="${resourceMetadataUrl}"`,
+          },
+        })
+      )
+      .mockResolvedValueOnce(new Response("{}", { status: 200 }));
+    const scoped = provider.getProxyFetch()!;
+
+    await scoped("https://server-a.example.com/mcp");
+    await scoped(staleRegistrationEndpoint, { method: "POST" });
+
+    expect(String(globalFetchSpy.mock.calls[1][0])).toBe(
+      staleRegistrationEndpoint
+    );
   });
 
   it("routes OAuth metadata requests through the proxy without touching non-OAuth requests", async () => {
