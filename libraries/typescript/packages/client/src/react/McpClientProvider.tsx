@@ -61,6 +61,14 @@ export interface McpClientContextType {
     id: string,
     options: Partial<McpServerConfig>
   ) => Promise<void>;
+  /**
+   * Disconnect, clear persisted OAuth credentials, remount, and start a fresh
+   * authorization flow for a managed server.
+   *
+   * The provider owns the full transition, so consumers do not need to wait
+   * for `discovering` to become `pending_auth` before calling `authenticate()`.
+   */
+  reauthenticateServer: (id: string) => Promise<void>;
   /** Returns a managed server by ID. */
   getServer: (id: string) => McpServer | undefined;
   /** Whether storage has finished loading (true if no storage provider) */
@@ -169,6 +177,12 @@ interface McpServerWrapperProps {
   ) => Promise<void>;
   onUpdateDisplayName: (id: string, displayName: string) => Promise<void>;
   onReconnect: (id: string) => Promise<void>;
+  reauthenticationRequest?: number;
+  onReauthenticationComplete: (
+    id: string,
+    request: number,
+    error?: unknown
+  ) => void;
   rpcWrapTransport?: (transport: Transport, serverId: string) => Transport;
   onGlobalSamplingRequest?: (
     request: PendingSamplingRequest,
@@ -215,6 +229,8 @@ function McpServerWrapper({
   onUpdateConfig,
   onUpdateDisplayName,
   onReconnect,
+  reauthenticationRequest,
+  onReauthenticationComplete,
   rpcWrapTransport,
   onGlobalSamplingRequest,
   onGlobalElicitationRequest,
@@ -352,6 +368,61 @@ function McpServerWrapper({
   );
 
   const reconnect = useCallback(() => onReconnect(id), [id, onReconnect]);
+
+  const handledReauthenticationRef = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (
+      reauthenticationRequest === undefined ||
+      handledReauthenticationRef.current === reauthenticationRequest
+    ) {
+      return;
+    }
+
+    const canAuthenticate =
+      mcp.state === "pending_auth" ||
+      (mcp.state === "ready" &&
+        mcp.authorization?.mode === "mixed" &&
+        !mcp.authorization.authenticated);
+
+    if (!canAuthenticate) {
+      if (mcp.state === "failed") {
+        handledReauthenticationRef.current = reauthenticationRequest;
+        onReauthenticationComplete(
+          id,
+          reauthenticationRequest,
+          new Error(mcp.error || "MCP server failed before authentication")
+        );
+      } else if (mcp.state === "ready") {
+        handledReauthenticationRef.current = reauthenticationRequest;
+        if (mcp.authorization?.authenticated) {
+          onReauthenticationComplete(id, reauthenticationRequest);
+        } else {
+          onReauthenticationComplete(
+            id,
+            reauthenticationRequest,
+            new Error("MCP server did not advertise an authentication flow")
+          );
+        }
+      }
+      return;
+    }
+
+    handledReauthenticationRef.current = reauthenticationRequest;
+    void mcp
+      .authenticate()
+      .then(() => onReauthenticationComplete(id, reauthenticationRequest))
+      .catch((error) =>
+        onReauthenticationComplete(id, reauthenticationRequest, error)
+      );
+  }, [
+    id,
+    mcp.state,
+    mcp.error,
+    mcp.authorization,
+    mcp.authenticate,
+    reauthenticationRequest,
+    onReauthenticationComplete,
+  ]);
 
   // Update parent when state changes
   const onUpdateRef = useRef(onUpdate);
@@ -652,6 +723,17 @@ export function McpClientProvider({
   const [serverRevisions, setServerRevisions] = useState<
     Record<string, number>
   >({});
+  const [reauthenticationRequests, setReauthenticationRequests] = useState<
+    Record<string, number>
+  >({});
+  const reauthenticationResolversRef = useRef<
+    Record<
+      string,
+      { request: number; resolve: () => void; reject: (error: unknown) => void }
+    >
+  >({});
+  const reauthenticatingServerIdsRef = useRef(new Set<string>());
+  const nextReauthenticationRequestRef = useRef<Record<string, number>>({});
   const [storageLoaded, setStorageLoaded] = useState(false);
   const didLoadInitialServers = useRef(false);
 
@@ -1071,6 +1153,78 @@ export function McpClientProvider({
     [serverConfigs]
   );
 
+  const handleReauthenticationComplete = useCallback(
+    (id: string, request: number, error?: unknown) => {
+      const pending = reauthenticationResolversRef.current[id];
+      if (!pending || pending.request !== request) return;
+
+      delete reauthenticationResolversRef.current[id];
+      reauthenticatingServerIdsRef.current.delete(id);
+      setReauthenticationRequests((prev) => {
+        if (prev[id] !== request) return prev;
+        const { [id]: _completed, ...remaining } = prev;
+        return remaining;
+      });
+
+      if (error !== undefined) pending.reject(error);
+      else pending.resolve();
+    },
+    []
+  );
+
+  const reauthenticateServer = useCallback(
+    async (id: string) => {
+      const currentConfig = serverConfigs.find((server) => server.id === id);
+      if (!currentConfig) {
+        throw new Error(`Cannot reauthenticate unknown MCP server "${id}"`);
+      }
+      if (reauthenticatingServerIdsRef.current.has(id)) {
+        throw new Error(
+          `Reauthentication is already in progress for MCP server "${id}"`
+        );
+      }
+
+      const captured = serversRef.current.find((server) => server.id === id);
+      if (!captured) {
+        throw new Error(`MCP server "${id}" is not mounted yet`);
+      }
+
+      // Claim the operation before the first await so two callers cannot both
+      // tear down the current wrapper and race to install replacement flows.
+      reauthenticatingServerIdsRef.current.add(id);
+
+      // Teardown must finish before credentials are removed and a replacement
+      // wrapper is mounted; otherwise the old connection can race the fresh flow.
+      try {
+        await captured.disconnect();
+        await captured.clearStorage();
+      } catch (error) {
+        reauthenticatingServerIdsRef.current.delete(id);
+        throw error;
+      }
+
+      const request = (nextReauthenticationRequestRef.current[id] ?? 0) + 1;
+      nextReauthenticationRequestRef.current[id] = request;
+      const completion = new Promise<void>((resolve, reject) => {
+        reauthenticationResolversRef.current[id] = {
+          request,
+          resolve,
+          reject,
+        };
+      });
+
+      setServers((prev) => prev.filter((server) => server.id !== id));
+      setServerRevisions((prev) => ({
+        ...prev,
+        [id]: (prev[id] ?? 0) + 1,
+      }));
+      setReauthenticationRequests((prev) => ({ ...prev, [id]: request }));
+
+      return completion;
+    },
+    [serverConfigs]
+  );
+
   const updateServerMetadata = useCallback(
     async (id: string, metadata: { name: string }) => {
       return new Promise<void>((resolve) => {
@@ -1122,6 +1276,7 @@ export function McpClientProvider({
       removeServer,
       updateServerMetadata,
       updateServer,
+      reauthenticateServer,
       getServer,
       storageLoaded,
     }),
@@ -1131,6 +1286,7 @@ export function McpClientProvider({
       removeServer,
       updateServerMetadata,
       updateServer,
+      reauthenticateServer,
       getServer,
       storageLoaded,
     ]
@@ -1203,6 +1359,8 @@ export function McpClientProvider({
               updateServerMetadata(id, { name: displayName })
             }
             onReconnect={reconnectServer}
+            reauthenticationRequest={reauthenticationRequests[config.id]}
+            onReauthenticationComplete={handleReauthenticationComplete}
             rpcWrapTransport={rpcWrapTransport}
             onGlobalSamplingRequest={onSamplingRequest}
             onGlobalElicitationRequest={onElicitationRequest}
