@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.1.3-canary.1
+
+### Patch Changes
+
+- 0e65b00: Stop blocking legacy HTTP connection readiness for up to five seconds while the optional standalone SSE stream attaches. Notification and reverse-RPC handlers are now registered before the handshake so request/response operations can proceed immediately without racing inbound messages.
+
 ## 2.1.3-canary.0
 
 ### Patch Changes
