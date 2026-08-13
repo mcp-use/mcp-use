@@ -1,5 +1,7 @@
 # @mcp-use/cli
 
+## 4.1.4
+
 ## 4.1.4-canary.0
 
 ### Patch Changes
