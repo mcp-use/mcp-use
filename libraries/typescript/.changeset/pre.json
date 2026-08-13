@@ -12,6 +12,7 @@
   },
   "changesets": [
     "client-background-legacy-sse",
+    "inspector-oauth-parent-resource",
     "lazy-node-oauth-state"
   ]
 }
