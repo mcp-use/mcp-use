@@ -1,7 +1,7 @@
 {
   "name": "mcp-use",
   "type": "module",
-  "version": "2.2.3-canary.0",
+  "version": "2.2.3",
   "description": "MCP framework and CLI built on the official v2 SDK",
   "author": "mcp-use, Inc.",
   "license": "MIT",
