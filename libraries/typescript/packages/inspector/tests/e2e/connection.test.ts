@@ -67,6 +67,49 @@ test.describe("Inspector MCP Server Connections", () => {
     await expect(page.getByTestId("server-tile-status-ready")).toBeVisible();
   });
 
+  test("shows protocol selection in the connect form", async ({ page }) => {
+    await page.goto("http://localhost:3000/inspector");
+
+    const protocolSelect = page.getByTestId(
+      "connection-form-protocol-mode-select"
+    );
+    await expect(protocolSelect).toContainText("Auto");
+    await protocolSelect.click();
+    await expect(
+      page.getByRole("option", { name: "Legacy (2025-11-25)" })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("option", { name: "Modern (2026-07-28)" })
+    ).toBeVisible();
+  });
+
+  test("shows protocol selection in the Configuration modal", async ({
+    page,
+  }) => {
+    await page.goto("http://localhost:3000/inspector");
+    await page.getByTestId("connection-form-config-button").click();
+
+    const configurationDialog = page.getByRole("dialog");
+    await expect(configurationDialog).toBeVisible();
+    await expect(
+      configurationDialog.getByText("Protocol Version", { exact: true })
+    ).toBeVisible();
+  });
+
+  test("shows Configuration as the second connection settings card", async ({
+    page,
+  }) => {
+    await page.goto("http://localhost:3000/inspector");
+    await page.getByTestId("server-tile-settings").click();
+
+    await expect(page.locator('[data-slot="card-title"]')).toHaveAllText([
+      "Endpoint",
+      "Configuration",
+      "Authentication",
+      "Custom Headers",
+    ]);
+  });
+
   test("shows the Skills tab and empty state without the extension", async ({
     page,
   }) => {
@@ -325,19 +368,14 @@ test.describe("Inspector MCP Server Connections", () => {
     await expect(textContent).toContainText("Echo: After settings update");
   });
 
-  test("should persist force-v1 protocol mode and reconnect", async ({
+  test("should persist legacy protocol mode and reconnect", async ({
     page,
   }) => {
     await page.goto("http://localhost:3000/inspector");
 
     await page.getByTestId("server-tile-settings").click();
-    await page.getByTestId("connection-form-config-button").click();
-    await page.getByTestId("config-dialog-protocol-mode-select").click();
-    await page.getByRole("option", { name: "Force v1 (2024/2025)" }).click();
-    await page
-      .getByRole("dialog")
-      .getByRole("button", { name: "Save" })
-      .click();
+    await page.getByTestId("connection-settings-protocol-mode-select").click();
+    await page.getByRole("option", { name: "Legacy (2025-11-25)" }).click();
     await page.getByTestId("connection-form-save-button").click();
 
     await expect(
@@ -362,10 +400,9 @@ test.describe("Inspector MCP Server Connections", () => {
       timeout: 10000,
     });
     await page.getByTestId("server-tile-settings").click();
-    await page.getByTestId("connection-form-config-button").click();
     await expect(
-      page.getByTestId("config-dialog-protocol-mode-select")
-    ).toContainText("Force v1 (2024/2025)");
+      page.getByTestId("connection-settings-protocol-mode-select")
+    ).toContainText("Legacy (2025-11-25)");
   });
 
   test("should show red when URL is invalid, then green after reconnecting from connection settings tab", async ({

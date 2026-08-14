@@ -1,7 +1,7 @@
 {
   "name": "@mcp-use/inspector",
   "type": "module",
-  "version": "20.2.2",
+  "version": "20.2.3-canary.0",
   "description": "MCP Inspector - A tool for inspecting and debugging MCP servers",
   "author": "",
   "license": "MIT",
@@ -92,7 +92,7 @@
     "express": "^4.21.2 || ^5.0.0",
     "lucide-react": "^0.562.0",
     "markdown-to-jsx": "^9.7.4",
-    "mcp-use": "^2.2.2",
+    "mcp-use": "^2.2.3-canary.0",
     "motion": "^12.34.2",
     "react": "^18.0.0 || ^19.0.0",
     "react-dom": "^18.0.0 || ^19.0.0",
