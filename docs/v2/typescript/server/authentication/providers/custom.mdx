@@ -13,14 +13,13 @@ Import `MCPServer` from `mcp-use` and the provider contract from `mcp-use/oauth`
 ```typescript
 import { MCPServer } from "mcp-use";
 import {
+  createJwtVerifier,
   oauthCustomProvider,
   type OAuthAuthInfo,
   type OAuthMetadata,
 } from "mcp-use/oauth";
-import { createRemoteJWKSet, jwtVerify } from "jose";
 
 const issuer = "https://auth.example.com";
-const jwks = createRemoteJWKSet(new URL(`${issuer}/.well-known/jwks.json`));
 
 const oauthMetadata = {
   issuer,
@@ -45,37 +44,11 @@ const server = new MCPServer({
     oauthMetadata,
 
     createTokenVerifier(resource) {
-      return {
-        async verifyAccessToken(token) {
-          const { payload } = await jwtVerify(token, jwks, {
-            issuer,
-            audience: resource.href,
-          });
-
-          if (!payload.sub || !payload.exp) {
-            throw new Error("Token is missing sub or exp");
-          }
-
-          const scopes =
-            typeof payload.scope === "string"
-              ? payload.scope.split(/\s+/).filter(Boolean)
-              : [];
-
-          return {
-            token,
-            clientId:
-              typeof payload.client_id === "string"
-                ? payload.client_id
-                : typeof payload.azp === "string"
-                  ? payload.azp
-                  : "",
-            scopes,
-            expiresAt: payload.exp,
-            resource,
-            extra: { payload: payload as Record<string, unknown> },
-          };
-        },
-      };
+      return createJwtVerifier({
+        issuer,
+        jwksUrl: new URL(`${issuer}/.well-known/jwks.json`),
+        resource,
+      });
     },
 
     mapAuthInfo(authInfo: OAuthAuthInfo) {
@@ -108,6 +81,10 @@ export default server;
 ```
 
 `createTokenVerifier(resource)` receives the resolved canonical MCP resource. The verifier must validate token signature or introspection, issuer, expiry, and that resource, then return SDK auth information including `scopes`, `expiresAt`, and the validated `resource`.
+
+If your authorization server issues standard JWTs, `createJwtVerifier` does all of that for you, and is the same helper the built-in providers use. Given a `jwksUrl` it checks the signature, the issuer, the required `exp` and `sub` claims, and the resource binding, then returns the auth information in the shape the SDK expects. Pass `audience` when the provider's JWT audience differs from the MCP resource. With no `audience`, the token must carry a matching RFC 8707 `resource` claim or an `aud` claim containing the resource URL.
+
+Write the verifier by hand when the provider does not issue JWTs, for example when you have to call a token introspection endpoint.
 
 `oauthMetadata` is the authorization server's RFC 8414 metadata. It must describe the actual upstream endpoints and include the `registration_endpoint` used by MCP clients.
 
