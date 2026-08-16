@@ -11,12 +11,14 @@
   "plugins": [
     {
       "name": "all-skills",
-      "description": "Complete collection of mcp-use skills including MCP server building and ChatGPT app development",
+      "description": "Complete collection of mcp-use skills including MCP server building, MCP Apps, OpenAPI-to-MCP, and ChatGPT app development",
       "source": "./",
       "strict": false,
       "skills": [
+        "./skills/mcp-apps-builder",
         "./skills/mcp-builder",
-        "./skills/chatgpt-app-builder"
+        "./skills/chatgpt-app-builder",
+        "./skills/openapi-to-mcp"
       ]
     },
     {
@@ -35,6 +37,24 @@
       "strict": false,
       "skills": [
         "./skills/chatgpt-app-builder"
+      ]
+    },
+    {
+      "name": "mcp-apps-builder",
+      "description": "Build TypeScript MCP servers and interactive MCP Apps with mcp-use v2. Includes tools, resources, prompts, Views, OAuth, middleware, Inspector, and migration guidance.",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/mcp-apps-builder"
+      ]
+    },
+    {
+      "name": "openapi-to-mcp",
+      "description": "Build and deploy an MCP server from an OpenAPI or Swagger spec using the mcp-use TypeScript SDK. Includes spec ingestion, operation-to-tool mapping, auth wiring, and inspector testing.",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/openapi-to-mcp"
       ]
     }
   ]
