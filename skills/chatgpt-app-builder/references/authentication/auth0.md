@@ -48,7 +48,7 @@ server.tool(
   { name: "whoami", description: "Get authenticated user info" },
   async (_args, ctx) =>
     object({
-      userId: ctx.auth.user.userId,
+      userId: ctx.auth.user.id,
       email: ctx.auth.user.email,
       permissions: ctx.auth.permissions,
     })
@@ -165,7 +165,7 @@ server.tool(
   { name: "get-user-info", description: "Get authenticated user info" },
   async (_args, ctx) =>
     object({
-      userId: ctx.auth.user.userId,
+      userId: ctx.auth.user.id,
       email: ctx.auth.user.email,
       name: ctx.auth.user.name,
       nickname: ctx.auth.user.nickname,

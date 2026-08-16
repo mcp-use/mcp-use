@@ -45,7 +45,7 @@ server.tool(
   },
   async (_args, ctx) =>
     object({
-      userId: ctx.auth.user.userId,
+      userId: ctx.auth.user.id,
       email: ctx.auth.user.email,
       name: ctx.auth.user.name,
     })

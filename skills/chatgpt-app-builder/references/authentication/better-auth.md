@@ -182,7 +182,7 @@ server.tool(
   { name: "get-user-info", description: "Get information about the authenticated user" },
   async (_args, ctx) =>
     object({
-      userId: ctx.auth.user.userId,
+      userId: ctx.auth.user.id,
       email: ctx.auth.user.email,
       name: ctx.auth.user.name,
       scopes: ctx.auth.scopes,

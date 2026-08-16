@@ -21,7 +21,7 @@ server.tool(
   { name: "whoami", description: "Get authenticated user info" },
   async (_args, ctx) =>
     object({
-      userId: ctx.auth.user.userId,
+      userId: ctx.auth.user.id,
       username: ctx.auth.user.username,
       email: ctx.auth.user.email,
       roles: ctx.auth.user.roles,

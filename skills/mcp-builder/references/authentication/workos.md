@@ -21,7 +21,7 @@ server.tool(
   { name: "whoami", description: "Get authenticated user info" },
   async (_args, ctx) =>
     object({
-      userId: ctx.auth.user.userId,
+      userId: ctx.auth.user.id,
       email: ctx.auth.user.email,
       name: ctx.auth.user.name,
     })
@@ -154,7 +154,7 @@ server.tool(
     if (!WORKOS_API_KEY) return error("WorkOS API key not configured");
 
     const res = await fetch(
-      `https://api.workos.com/user_management/users/${ctx.auth.user.userId}`,
+      `https://api.workos.com/user_management/users/${ctx.auth.user.id}`,
       {
         headers: {
           Authorization: `Bearer ${WORKOS_API_KEY}`,
