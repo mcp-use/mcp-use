@@ -1,0 +1,100 @@
+---
+title: "Scalekit Provider"
+description: "Configure Scalekit MCP Auth for an MCP server."
+icon: "shield-halved"
+---
+
+Use `oauthScalekitProvider` when Scalekit is the authorization server. MCP clients register directly with Scalekit. mcp-use verifies Scalekit access tokens against the resource id. The resource server does not hold a client secret.
+
+## Configure Scalekit
+
+In the [Scalekit Dashboard](https://app.scalekit.com), create an MCP server resource and copy:
+
+1. The **Environment URL**.
+2. The **resource id** (`res_…`). This is the JWT audience.
+3. The public MCP URL. It must match the URL mcp-use advertises, with no trailing slash.
+
+Authorization-server metadata advertises the resource-scoped issuer (`{environmentUrl}/resources/{resourceId}`). The verifier also accepts the environment-root issuer so tokens issued during Scalekit's issuer migration still verify. A token minted for a different `res_…` in the same environment is rejected.
+
+Do not set `issuerBoundAccessTokens: true`. Scalekit binds tokens to the resource id, not to sharing an environment issuer.
+
+## Configure the server
+
+```bash
+SCALEKIT_ENVIRONMENT_URL=https://your-env.scalekit.dev
+SCALEKIT_RESOURCE_ID=res_your_resource
+MCP_URL=https://mcp.example.com/mcp
+```
+
+```typescript
+import { MCPServer } from "mcp-use";
+import { oauthScalekitProvider } from "mcp-use/oauth/scalekit";
+
+const environmentUrl = process.env.SCALEKIT_ENVIRONMENT_URL;
+const resourceId = process.env.SCALEKIT_RESOURCE_ID;
+if (!environmentUrl) throw new Error("SCALEKIT_ENVIRONMENT_URL is required");
+if (!resourceId) throw new Error("SCALEKIT_RESOURCE_ID is required");
+
+const server = new MCPServer({
+  name: "scalekit-server",
+  version: "1.0.0",
+  oauth: oauthScalekitProvider({
+    environmentUrl,
+    resourceId,
+  }),
+});
+
+export default server;
+```
+
+## Use the caller
+
+Scalekit maps `sub` to `ctx.auth.user.id` and sets `subjectType` to `"user"` or `"machine"`. Optional `org_id` and `sid` become `organizationId` and `sessionId`. Token permissions are top-level `ctx.auth.permissions`.
+
+```typescript
+server.tool(
+  {
+    name: "whoami",
+    description: "Return the authenticated Scalekit caller.",
+  },
+  async (_args, ctx) => {
+    if (ctx.auth.user.subjectType === "machine") {
+      return {
+        isError: true,
+        content: [{ type: "text", text: "User session required" }],
+      };
+    }
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            id: ctx.auth.user.id,
+            organizationId: ctx.auth.user.organizationId,
+            scopes: ctx.auth.scopes,
+            permissions: ctx.auth.permissions,
+          }),
+        },
+      ],
+    };
+  },
+);
+```
+
+<CardGroup cols={2}>
+  <Card
+    title="Scalekit documentation"
+    icon="book-open"
+    href="https://docs.scalekit.com"
+  >
+    Review Scalekit MCP authorization and resource ids.
+  </Card>
+  <Card
+    title="User Context"
+    icon="user"
+    href="/v2/typescript/server/authentication/user-context"
+  >
+    Use Scalekit caller, organization, and permissions.
+  </Card>
+</CardGroup>

@@ -1,0 +1,130 @@
+---
+title: "Scalekit Provider"
+description: "Configure Scalekit MCP Auth for a TypeScript MCP server."
+icon: "shield-halved"
+---
+
+Use the Scalekit provider when Scalekit is your OAuth 2.1 authorization server for MCP. Clients register directly with Scalekit through Dynamic Client Registration or a client id metadata document. Your MCP server verifies Scalekit access tokens. It does not hold a client secret.
+
+This guide covers the Scalekit setup path. Use the [auth providers API reference](/typescript/api-reference/server/auth-providers#oauthscalekitprovider) for exact `oauthScalekitProvider()` options, environment variable fallbacks, defaults, and errors.
+
+## Configure Scalekit
+
+In the [Scalekit Dashboard](https://app.scalekit.com):
+
+1. Create or open an environment.
+2. Create an MCP server resource and copy its **resource id** (`res_…`).
+3. Copy the **Environment URL**.
+4. Set the MCP server's public URL to the same origin and path your mcp-use server advertises (`MCP_URL` plus the MCP base path, with no trailing slash).
+
+The resource id is the JWT audience. A Server URL may also appear in `aud`; it does not replace the resource-id check. A token minted for a different `res_…` in the same environment is rejected.
+
+Authorization-server metadata advertises the **resource-scoped** issuer (`{environmentUrl}/resources/{resourceId}`). The verifier also accepts the environment-root issuer so tokens issued during Scalekit's issuer migration still verify.
+
+## Set environment variables
+
+```bash
+MCP_USE_OAUTH_SCALEKIT_ENVIRONMENT_URL=https://your-env.scalekit.dev
+MCP_USE_OAUTH_SCALEKIT_RESOURCE_ID=res_your_resource
+MCP_URL=https://mcp.example.com/mcp
+```
+
+## Configure the MCP server
+
+```typescript
+import { MCPServer } from "mcp-use";
+import { oauthScalekitProvider } from "mcp-use/oauth/scalekit";
+
+const server = new MCPServer({
+  name: "scalekit-server",
+  version: "1.0.0",
+  oauth: oauthScalekitProvider(),
+});
+
+await server.listen(3000);
+```
+
+You can pass the environment URL and resource id directly instead of using environment variables:
+
+```typescript
+oauth: oauthScalekitProvider({
+  environmentUrl: "https://your-env.scalekit.dev",
+  resourceId: "res_your_resource",
+});
+```
+
+Do not set `issuerBoundAccessTokens: true`. Scalekit binds tokens to the resource id, not to sharing an environment issuer.
+
+## Use the caller in tools
+
+Scalekit maps `sub` to `ctx.auth.user.id` and sets `subjectType` to `"user"` or `"machine"`. Organization and session ids are optional. Token permissions are available at `ctx.auth.permissions`.
+
+```typescript
+import { error, object } from "mcp-use";
+
+server.tool(
+  {
+    name: "whoami",
+    description: "Return the authenticated Scalekit caller.",
+  },
+  async (_args, ctx) => {
+    if (!ctx.auth) {
+      return error("Unauthorized");
+    }
+
+    return object({
+      id: ctx.auth.user.id,
+      subjectType: ctx.auth.user.subjectType,
+      organizationId: ctx.auth.user.organizationId,
+      sessionId: ctx.auth.user.sessionId,
+      scopes: ctx.auth.scopes,
+      permissions: ctx.auth.permissions,
+    });
+  },
+);
+```
+
+Treat `subjectType: "machine"` as a client, not a person.
+
+Use [User Context](/typescript/server/authentication/user-context) for broader access-control patterns.
+
+## Verify the setup
+
+Run the server and connect with an OAuth-capable MCP client.
+
+```bash
+npm run dev
+```
+
+Confirm these cases:
+
+- The client discovers your server's protected-resource metadata.
+- The client registers with Scalekit (DCR or CIMD) and completes login.
+- Authenticated tool calls include `ctx.auth.user.id` and `subjectType`.
+- A token whose audience is a different resource id is rejected.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Scalekit MCP Auth"
+    icon="book-open"
+    href="https://docs.scalekit.com"
+  >
+    Review Scalekit MCP authorization, DCR, and resource ids.
+  </Card>
+  <Card
+    title="User Context"
+    icon="user"
+    href="/typescript/server/authentication/user-context"
+  >
+    Read Scalekit caller and permission data inside tools.
+  </Card>
+  <Card
+    title="Scalekit provider API reference"
+    icon="terminal"
+    href="/typescript/api-reference/server/auth-providers#oauthscalekitprovider"
+  >
+    Look up exact provider options and defaults.
+  </Card>
+</CardGroup>

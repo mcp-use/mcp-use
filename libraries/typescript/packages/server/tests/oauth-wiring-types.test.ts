@@ -17,6 +17,10 @@ import {
   type SupabaseOAuthUser,
 } from "../src/oauth/supabase.js";
 import {
+  oauthScalekitProvider,
+  type ScalekitOAuthUser,
+} from "../src/oauth/scalekit.js";
+import {
   oauthWorkOSProvider,
   type WorkOSOAuthUser,
 } from "../src/oauth/workos.js";
@@ -192,6 +196,23 @@ function verifyOAuthCallbackTyping(): void {
       ctx.auth.user.realmAccess;
     assertOAuthAuthFields(auth);
     void [user, realmAccess];
+    return { content: [] };
+  });
+
+  const scalekit = new MCPServer({
+    name: "scalekit",
+    version: "1.0.0",
+    oauth: oauthScalekitProvider({
+      environmentUrl: "https://scalekit.example.com",
+      resourceId: "res_example",
+    }),
+  });
+  scalekit.tool({ name: "scalekit-user" }, (_params, ctx) => {
+    const auth: OAuthAuth<ScalekitOAuthUser> = ctx.auth;
+    const user: ScalekitOAuthUser = ctx.auth.user;
+    const subjectType: "user" | "machine" = ctx.auth.user.subjectType;
+    assertOAuthAuthFields(auth);
+    void [user, subjectType];
     return { content: [] };
   });
 

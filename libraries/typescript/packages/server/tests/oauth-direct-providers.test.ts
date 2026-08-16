@@ -6,6 +6,7 @@ import { oauthBetterAuthProvider } from "../src/oauth/better-auth.js";
 import { oauthClerkProvider } from "../src/oauth/clerk.js";
 import { wrapOAuthTokenVerifier } from "../src/oauth/internal.js";
 import { oauthKeycloakProvider } from "../src/oauth/keycloak.js";
+import { oauthScalekitProvider } from "../src/oauth/scalekit.js";
 import { oauthSupabaseProvider } from "../src/oauth/supabase.js";
 import { oauthWorkOSProvider } from "../src/oauth/workos.js";
 
@@ -45,6 +46,11 @@ describe("direct OAuth providers", () => {
       "MCP_USE_OAUTH_SUPABASE_JWT_SECRET",
       "0123456789abcdef0123456789abcdef"
     );
+    vi.stubEnv(
+      "MCP_USE_OAUTH_SCALEKIT_ENVIRONMENT_URL",
+      "https://env.scalekit.example"
+    );
+    vi.stubEnv("MCP_USE_OAUTH_SCALEKIT_RESOURCE_ID", "res_env");
 
     expect(oauthAuth0Provider()).toMatchObject({
       resource: "https://api.example.test/mcp",
@@ -67,6 +73,9 @@ describe("direct OAuth providers", () => {
     );
     expect(oauthSupabaseProvider().oauthMetadata.issuer).toBe(
       "https://env-project.supabase.co/auth/v1"
+    );
+    expect(oauthScalekitProvider().oauthMetadata.issuer).toBe(
+      "https://env.scalekit.example/resources/res_env"
     );
   });
 
@@ -631,6 +640,181 @@ describe("direct OAuth providers", () => {
     });
   });
 
+  it("rejects Scalekit options that would weaken audience or issuer checks", () => {
+    expect(() =>
+      oauthScalekitProvider({
+        environmentUrl: "not a url",
+        resourceId: "res_example",
+      })
+    ).toThrow(/environmentUrl/);
+    expect(() =>
+      oauthScalekitProvider({
+        environmentUrl: "https://scalekit.example.test",
+        resourceId: "",
+      })
+    ).toThrow(/resourceId/);
+    expect(() =>
+      oauthScalekitProvider({
+        environmentUrl: "https://scalekit.example.test",
+        resourceId: "mcp_server",
+      })
+    ).toThrow(/resourceId/);
+    expect(() =>
+      oauthScalekitProvider({
+        environmentUrl: "https://scalekit.example.test",
+        resourceId: "res_example",
+        audience: " ",
+      })
+    ).toThrow(/audience/);
+    expect(() =>
+      oauthScalekitProvider({
+        environmentUrl: "https://scalekit.example.test",
+        resourceId: "res_example",
+        issuerBoundAccessTokens: true,
+      })
+    ).toThrow(/issuerBoundAccessTokens/);
+  });
+
+  it("verifies Scalekit JWTs for both issuers and binds audience to the resource id", async () => {
+    const { privateKey, publicKey } = await generateKeyPair("RS256");
+    const jwk = await exportJWK(publicKey);
+    jwk.kid = "scalekit-key";
+    globalThis.fetch = jwksFixture(jwk);
+
+    const environmentUrl = "https://scalekit.example.test";
+    const resourceId = "res_example";
+    const resourceIssuer = `${environmentUrl}/resources/${resourceId}`;
+    const provider = oauthScalekitProvider({
+      environmentUrl,
+      resourceId,
+      resource: protectedResource.href,
+    });
+    expect(provider.oauthMetadata).toMatchObject({
+      issuer: resourceIssuer,
+      authorization_endpoint: `${resourceIssuer}/oauth/authorize`,
+      token_endpoint: `${resourceIssuer}/oauth/token`,
+      jwks_uri: `${environmentUrl}/keys`,
+      registration_endpoint: `${environmentUrl}/api/v1/resources/${resourceId}/clients:register`,
+      client_id_metadata_document_supported: true,
+    });
+
+    const userClaims = {
+      sub: "usr_example",
+      client_id: "m2m_example",
+      scope: "openid offline_access email profile",
+      org_id: "org_example",
+      sid: "ses_example",
+    };
+    const verifier = wrapOAuthTokenVerifier(provider, protectedResource);
+
+    await expect(
+      verifier.verifyAccessToken(
+        await signedToken(
+          privateKey,
+          "scalekit-key",
+          environmentUrl,
+          [protectedResource.href, resourceId],
+          userClaims
+        )
+      )
+    ).resolves.toMatchObject({
+      clientId: "m2m_example",
+      scopes: ["openid", "offline_access", "email", "profile"],
+      extra: {
+        user: {
+          id: "usr_example",
+          subjectType: "user",
+          organizationId: "org_example",
+          sessionId: "ses_example",
+        },
+      },
+    });
+
+    await expect(
+      verifier.verifyAccessToken(
+        await signedToken(
+          privateKey,
+          "scalekit-key",
+          resourceIssuer,
+          resourceId,
+          userClaims
+        )
+      )
+    ).resolves.toMatchObject({
+      extra: { user: { id: "usr_example", subjectType: "user" } },
+    });
+
+    await expect(
+      verifier.verifyAccessToken(
+        await signedToken(
+          privateKey,
+          "scalekit-key",
+          environmentUrl,
+          "res_other",
+          userClaims
+        )
+      )
+    ).rejects.toMatchObject({ code: "invalid_token" });
+
+    await expect(
+      verifier.verifyAccessToken(
+        await signedToken(
+          privateKey,
+          "scalekit-key",
+          environmentUrl,
+          resourceId,
+          { sub: "m2m_example", client_id: "m2m_example" }
+        )
+      )
+    ).resolves.toMatchObject({
+      extra: { user: { id: "m2m_example", subjectType: "machine" } },
+    });
+
+    await expect(
+      verifier.verifyAccessToken(
+        await signedToken(
+          privateKey,
+          "scalekit-key",
+          environmentUrl,
+          resourceId,
+          { ...userClaims, resource: "https://other.example/mcp" }
+        )
+      )
+    ).rejects.toMatchObject({
+      code: "invalid_token",
+      message: "Token resource claim does not match protected resource",
+    });
+
+    await expect(
+      verifier.verifyAccessToken(
+        await new SignJWT({ ...userClaims })
+          .setProtectedHeader({ alg: "RS256", kid: "scalekit-key" })
+          .setIssuer(environmentUrl)
+          .setAudience(resourceId)
+          .setExpirationTime(now() - 1)
+          .sign(privateKey)
+      )
+    ).rejects.toMatchObject({ code: "invalid_token" });
+
+    await expect(verifier.verifyAccessToken("not-a-jwt")).rejects.toMatchObject(
+      {
+        code: "invalid_token",
+      }
+    );
+    await expect(
+      verifier.verifyAccessToken(
+        await new SignJWT({ ...userClaims })
+          .setProtectedHeader({ alg: "HS256" })
+          .setIssuer(environmentUrl)
+          .setAudience(resourceId)
+          .setExpirationTime(now() + 60)
+          .sign(
+            new TextEncoder().encode("a sufficiently long test signing key")
+          )
+      )
+    ).rejects.toMatchObject({ code: "invalid_token" });
+  });
+
   it("leaves unexpected JWKS network errors as ordinary errors", async () => {
     const { privateKey } = await generateKeyPair("RS256");
     globalThis.fetch = async () => {
@@ -667,7 +851,7 @@ function signedToken(
   privateKey: Parameters<SignJWT["sign"]>[0],
   kid: string,
   issuer: string,
-  audience: string | undefined,
+  audience: string | string[] | undefined,
   claims: Record<string, unknown>,
   algorithm = "RS256"
 ): Promise<string> {

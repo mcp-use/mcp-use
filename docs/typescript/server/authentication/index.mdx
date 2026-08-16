@@ -14,7 +14,7 @@ Most MCP servers should use a Dynamic Client Registration provider. Use OAuth Pr
 
 | Situation                                                            | Use                                                                    |
 | -------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| You use Auth0, Better Auth, Clerk, Keycloak, Supabase, or WorkOS     | A built-in provider                                                    |
+| You use Auth0, Better Auth, Clerk, Keycloak, Scalekit, Supabase, or WorkOS | A built-in provider                                                    |
 | Your provider advertises a `registration_endpoint`                   | [Custom Provider](/typescript/server/authentication/providers/custom)  |
 | Your provider only gives you one fixed `clientId` and `clientSecret` | [OAuth Proxy](/typescript/server/authentication/providers/oauth-proxy) |
 | You only need local development without identity                     | No OAuth provider                                                      |
@@ -33,6 +33,7 @@ Choose the provider that matches your identity system:
 - [Keycloak](/typescript/server/authentication/providers/keycloak): Keycloak realm authentication with role mapping.
 - [Supabase](/typescript/server/authentication/providers/supabase): Supabase OAuth 2.1 server authentication.
 - [WorkOS](/typescript/server/authentication/providers/workos): WorkOS AuthKit authentication with organization context.
+- [Scalekit](/typescript/server/authentication/providers/scalekit): Scalekit MCP Auth with resource-id audience binding.
 - [Custom Provider](/typescript/server/authentication/providers/custom): Any DCR-capable OAuth provider with custom token verification.
 
 ## Configure the server
