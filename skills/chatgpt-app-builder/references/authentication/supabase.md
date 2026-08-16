@@ -13,7 +13,8 @@ Setting up OAuth with Supabase's OAuth 2.1 server. Supabase hosts `/authorize`, 
 ## Quick Start
 
 ```typescript
-import { MCPServer, oauthSupabaseProvider, object } from "mcp-use/server";
+import { MCPServer, object } from "mcp-use";
+import { oauthSupabaseProvider } from "mcp-use/oauth/supabase";
 
 const server = new MCPServer({
   name: "my-server",

@@ -87,7 +87,8 @@ You need three things beyond the standard `MCPServer` setup:
 3. Mount login and consent pages
 
 ```typescript
-import { MCPServer, oauthBetterAuthProvider } from "mcp-use/server";
+import { MCPServer } from "mcp-use";
+import { oauthBetterAuthProvider } from "mcp-use/oauth/better-auth";
 import { auth } from "./auth.js";
 import {
   oauthProviderAuthServerMetadata,
