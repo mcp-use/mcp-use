@@ -756,6 +756,55 @@ describe("direct OAuth providers", () => {
       )
     ).rejects.toMatchObject({ code: "invalid_token" });
 
+    const extraAudience = protectedResource.href;
+    const bothVerifier = wrapOAuthTokenVerifier(
+      oauthScalekitProvider({
+        environmentUrl,
+        resourceId,
+        resource: protectedResource.href,
+        audience: extraAudience,
+      }),
+      protectedResource
+    );
+    await expect(
+      bothVerifier.verifyAccessToken(
+        await signedToken(
+          privateKey,
+          "scalekit-key",
+          environmentUrl,
+          [extraAudience, resourceId],
+          userClaims
+        )
+      )
+    ).resolves.toMatchObject({
+      extra: { user: { id: "usr_example", subjectType: "user" } },
+    });
+    await expect(
+      bothVerifier.verifyAccessToken(
+        await signedToken(
+          privateKey,
+          "scalekit-key",
+          environmentUrl,
+          resourceId,
+          userClaims
+        )
+      )
+    ).rejects.toMatchObject({
+      code: "invalid_token",
+      message: "Token audience does not include configured audience",
+    });
+    await expect(
+      bothVerifier.verifyAccessToken(
+        await signedToken(
+          privateKey,
+          "scalekit-key",
+          environmentUrl,
+          extraAudience,
+          userClaims
+        )
+      )
+    ).rejects.toMatchObject({ code: "invalid_token" });
+
     await expect(
       verifier.verifyAccessToken(
         await signedToken(

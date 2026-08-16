@@ -18,6 +18,8 @@ Authorization-server metadata advertises the resource-scoped issuer (`{environme
 
 Do not set `issuerBoundAccessTokens: true`. Scalekit binds tokens to the resource id, not to sharing an environment issuer.
 
+Optional `audience` is an extra value that must also appear in `aud`. It does not replace the resource-id check.
+
 ## Configure the server
 
 ```bash
@@ -49,7 +51,7 @@ export default server;
 
 ## Use the caller
 
-Scalekit maps `sub` to `ctx.auth.user.id` and sets `subjectType` to `"user"` or `"machine"`. Optional `org_id` and `sid` become `organizationId` and `sessionId`. Token permissions are top-level `ctx.auth.permissions`.
+Scalekit maps `sub` to `ctx.auth.user.id`. `subjectType` is `"machine"` only when `sub` equals `client_id` or `azp`. User tokens also carry a host `client_id`, so presence of that claim is not a machine signal. Optional `org_id` and `sid` become `organizationId` and `sessionId`. Token permissions are top-level `ctx.auth.permissions`.
 
 ```typescript
 server.tool(

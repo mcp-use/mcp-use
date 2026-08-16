@@ -49,10 +49,11 @@ export interface ScalekitOAuthProviderOptions extends OAuthResourceOptions {
    */
   resourceId?: string;
   /**
-   * Override expected JWT audience.
+   * Extra JWT audience required *together with* the resource id.
    *
-   * Default is {@link ScalekitOAuthProviderOptions.resourceId}. Use only if
-   * your tokens carry a different audience and not `res_…`.
+   * Default verification only requires `resourceId` in `aud`. Set this when
+   * tokens also carry a Server URL and you want both values present. This
+   * does not replace the resource-id check.
    */
   audience?: string;
   /**
@@ -115,20 +116,43 @@ export function oauthScalekitProvider(
       oauthEnvironmentValue("MCP_USE_OAUTH_SCALEKIT_RESOURCE_ID")
   );
   const resourceIssuer = `${environmentIssuer}/resources/${resourceId}`;
-  const audience = options.audience?.trim() ?? resourceId;
+  const extraAudience = options.audience?.trim();
 
   return oauthCustomProvider<ScalekitOAuthUser>({
     ...options,
-    createTokenVerifier: (resource) =>
-      createJwtVerifier({
+    createTokenVerifier: (resource) => {
+      const verifier = createJwtVerifier({
         issuer: [environmentIssuer, resourceIssuer],
         jwksUrl: new URL(providerEndpoint(environmentIssuer, "keys")),
         resource,
-        audience,
-      }),
+        audience: resourceId,
+      });
+      if (extraAudience === undefined) {
+        return verifier;
+      }
+      return {
+        async verifyAccessToken(token) {
+          const authInfo = await verifier.verifyAccessToken(token);
+          assertAudienceIncludes(payloadFromAuthInfo(authInfo), extraAudience);
+          return authInfo;
+        },
+      };
+    },
     oauthMetadata: metadata(environmentIssuer, resourceId, resourceIssuer),
     mapAuthInfo: mapUser,
   });
+}
+
+function assertAudienceIncludes(
+  payload: Record<string, unknown>,
+  expected: string
+): void {
+  const aud = payload.aud;
+  const audiences =
+    typeof aud === "string" ? [aud] : Array.isArray(aud) ? aud : [];
+  if (!audiences.includes(expected)) {
+    throw invalidToken("Token audience does not include configured audience");
+  }
 }
 
 function normalizeResourceId(value: string | undefined): string {
@@ -182,6 +206,7 @@ function mapUser(authInfo: AuthInfo) {
   const payload = payloadFromAuthInfo(authInfo);
   const id = requiredString(payload, "sub");
   if (id === undefined) throw invalidToken("Missing Scalekit subject");
+  // User tokens also carry the host `client_id`. Machine only when sub is that client.
   const clientId =
     requiredString(payload, "client_id") ?? requiredString(payload, "azp");
   const subjectType: ScalekitOAuthUser["subjectType"] =

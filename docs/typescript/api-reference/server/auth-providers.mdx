@@ -205,7 +205,7 @@ Create a Scalekit OAuth provider for an MCP server.
 import { oauthScalekitProvider } from "mcp-use/oauth/scalekit";
 ```
 
-Builds an `OAuthProvider` backed by Scalekit MCP Auth. Advertised metadata uses the resource-scoped issuer. The verifier accepts both the environment-root issuer and the resource-scoped issuer, and binds audience to the `res_…` resource id. `environmentUrl` falls back to `MCP_USE_OAUTH_SCALEKIT_ENVIRONMENT_URL` and `resourceId` falls back to `MCP_USE_OAUTH_SCALEKIT_RESOURCE_ID`. Throws `Error` if `environmentUrl` is missing, and `TypeError` if `resourceId` is missing, empty, or does not start with `res_`, if `audience` is empty, or if `issuerBoundAccessTokens` is `true`.
+Builds an `OAuthProvider` backed by Scalekit MCP Auth. Advertised metadata uses the resource-scoped issuer. The verifier accepts both the environment-root issuer and the resource-scoped issuer, and binds audience to the `res_…` resource id. `environmentUrl` falls back to `MCP_USE_OAUTH_SCALEKIT_ENVIRONMENT_URL` and `resourceId` falls back to `MCP_USE_OAUTH_SCALEKIT_RESOURCE_ID`. Throws `Error` if `environmentUrl` or `resourceId` is missing, and `TypeError` if `resourceId` is empty or does not start with `res_`, if `audience` is empty, or if `issuerBoundAccessTokens` is `true`. An optional `audience` is required *together with* the resource id. It does not replace the `res_…` check.
 
 **Parameters**
 
