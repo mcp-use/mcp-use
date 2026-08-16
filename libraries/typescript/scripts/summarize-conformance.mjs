@@ -38,17 +38,27 @@ const expectedFailures = expectedFailuresFile
       .filter(Boolean)
   : [];
 
+// Entries that classified at least one failure or warning. Anything left over
+// no longer describes a real outcome, so it is silently suppressing whatever
+// that check does next.
+const matchedExpectedFailures = new Set();
+
 function isExpectedOutcome(suite, check) {
   if (!suite.startsWith("2025-11-25/server/")) return false;
-  return expectedFailures.some((entry) => {
+  let matched = false;
+  for (const entry of expectedFailures) {
     const separator = entry.indexOf(":");
     const scenario = separator === -1 ? entry : entry.slice(0, separator);
     const checkId = separator === -1 ? undefined : entry.slice(separator + 1);
-    return (
+    if (
       suite.includes(`/server/server-${scenario}-`) &&
       (!checkId || check.id === checkId)
-    );
-  });
+    ) {
+      matchedExpectedFailures.add(entry);
+      matched = true;
+    }
+  }
+  return matched;
 }
 
 for (const file of files.sort()) {
@@ -110,6 +120,19 @@ const lines = [
       `| \`${row.suite}\` | ${row.passed}/${row.total} | ${row.expectedFailures} | ${row.unexpectedFailures} | ${row.expectedWarnings} | ${row.unexpectedWarnings} |`
   ),
 ];
+
+const obsoleteExpectedFailures = expectedFailures.filter(
+  (entry) => !matchedExpectedFailures.has(entry)
+);
+
+if (obsoleteExpectedFailures.length > 0) {
+  lines.push(
+    "",
+    "**Obsolete expected-failure entries.** These matched no failing or warning check in this run, so they are no longer describing a real outcome. Remove them, or they will absorb the next regression of that check. If a run skips the suites they cover, they will show up here too.",
+    "",
+    ...obsoleteExpectedFailures.map((entry) => `- \`${entry}\``)
+  );
+}
 
 const summary = `${lines.join("\n")}\n`;
 if (output) writeFileSync(output, summary);
