@@ -49,7 +49,7 @@ That's it. JWT verification, OAuth discovery, and `.well-known` passthrough are 
 3. Copy the **Environment URL**.
 4. Set the public MCP URL to the URL mcp-use advertises, with no trailing slash.
 
-The verifier accepts both the environment-root issuer and the resource-scoped issuer (`{environmentUrl}/resources/{resourceId}`). Advertised metadata always uses the resource-scoped issuer. Do not set `issuerBoundAccessTokens: true`.
+The verifier accepts both the environment-root issuer and the resource-scoped issuer (`{environmentUrl}/resources/{resourceId}`). Advertised metadata always uses the resource-scoped issuer. Scalekit binds tokens to the resource id.
 
 ---
 
@@ -83,8 +83,7 @@ oauth: oauthScalekitProvider({
 |--------|------|---------|-------------|
 | `environmentUrl` | `URL \| string` | env var | Scalekit environment URL |
 | `resourceId` | `string` | env var | MCP resource id (`res_…`) |
-| `audience` | `string?` | `resourceId` | Override expected JWT audience |
-| `issuerBoundAccessTokens` | `boolean?` | unset | Must not be `true` |
+| `audience` | `string?` | unset | Extra `aud` value required together with `resourceId` |
 
 ---
 
@@ -107,7 +106,7 @@ Permissions from the token are on `ctx.auth.permissions`, not on the user object
 
 - **Audience is the resource id** — Do not bind verification only to the MCP URL. A token for another `res_…` in the same environment must be rejected.
 - **Wrong JWKS path** — JWKS is `{environmentUrl}/keys`. `{environmentUrl}/resources/{resourceId}/keys` is a 404.
-- **Issuer-bound tokens** — `issuerBoundAccessTokens: true` is rejected. Scalekit binds tokens to the resource id.
+- **Custom claims** — Read them from `ctx.auth.payload`. They are not copied onto `ctx.auth.user`.
 - **Missing `res_` prefix** — `resourceId` must start with `res_`. A wrong value weakens audience binding.
 
 ---

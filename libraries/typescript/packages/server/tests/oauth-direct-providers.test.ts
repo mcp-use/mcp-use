@@ -666,13 +666,6 @@ describe("direct OAuth providers", () => {
         audience: " ",
       })
     ).toThrow(/audience/);
-    expect(() =>
-      oauthScalekitProvider({
-        environmentUrl: "https://scalekit.example.test",
-        resourceId: "res_example",
-        issuerBoundAccessTokens: true,
-      })
-    ).toThrow(/issuerBoundAccessTokens/);
   });
 
   it("verifies Scalekit JWTs for both issuers and binds audience to the resource id", async () => {

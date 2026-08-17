@@ -56,11 +56,6 @@ export interface ScalekitOAuthProviderOptions extends OAuthResourceOptions {
    * does not replace the resource-id check.
    */
   audience?: string;
-  /**
-   * Rejected when `true`. Scalekit tokens are bound by resource id, not by
-   * sharing an environment issuer.
-   */
-  issuerBoundAccessTokens?: boolean;
 }
 
 /**
@@ -72,7 +67,7 @@ export interface ScalekitOAuthProviderOptions extends OAuthResourceOptions {
  *
  * @param options - Scalekit environment URL, resource id, and resource-server settings. Defaults to v1 environment variables.
  * @returns A provider that verifies Scalekit-issued access tokens against the resource id.
- * @throws An `Error` if environment URL or resource id is missing. Throws a `TypeError` if they are invalid, `resourceId` does not start with `res_`, `audience` is empty, or `issuerBoundAccessTokens` is `true`.
+ * @throws An `Error` if environment URL or resource id is missing. Throws a `TypeError` if they are invalid, `resourceId` does not start with `res_`, or `audience` is empty.
  *
  * @example
  * ```ts
@@ -87,11 +82,6 @@ export interface ScalekitOAuthProviderOptions extends OAuthResourceOptions {
 export function oauthScalekitProvider(
   options: ScalekitOAuthProviderOptions = {}
 ): OAuthProvider<ScalekitOAuthUser> {
-  if (options.issuerBoundAccessTokens === true) {
-    throw new TypeError(
-      "issuerBoundAccessTokens cannot be true. Scalekit binds tokens to the resource id, not the environment issuer."
-    );
-  }
   if (
     options.audience !== undefined &&
     (typeof options.audience !== "string" ||
@@ -138,6 +128,9 @@ export function oauthScalekitProvider(
         },
       };
     },
+    // mcp-use requires this object. Scalekit serves the live AS document.
+    // issuer is what protected-resource metadata advertises. The SDK also
+    // copies this blob to /.well-known/oauth-authorization-server here.
     oauthMetadata: metadata(environmentIssuer, resourceId, resourceIssuer),
     mapAuthInfo: mapUser,
   });

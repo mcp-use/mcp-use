@@ -14,9 +14,7 @@ In the [Scalekit Dashboard](https://app.scalekit.com), create an MCP server reso
 2. The **resource id** (`res_…`). This is the JWT audience.
 3. The public MCP URL. It must match the URL mcp-use advertises, with no trailing slash.
 
-Authorization-server metadata advertises the resource-scoped issuer (`{environmentUrl}/resources/{resourceId}`). The verifier also accepts the environment-root issuer so tokens issued during Scalekit's issuer migration still verify. A token minted for a different `res_…` in the same environment is rejected.
-
-Do not set `issuerBoundAccessTokens: true`. Scalekit binds tokens to the resource id, not to sharing an environment issuer.
+Authorization-server metadata advertises the resource-scoped issuer (`{environmentUrl}/resources/{resourceId}`). Scalekit serves the live document. mcp-use also needs a static copy so protected-resource metadata can name that issuer. The verifier accepts both the environment-root issuer and the resource-scoped issuer so tokens issued during Scalekit's issuer migration still verify. A token minted for a different `res_…` in the same environment is rejected.
 
 Optional `audience` is an extra value that must also appear in `aud`. It does not replace the resource-id check.
 
@@ -51,7 +49,7 @@ export default server;
 
 ## Use the caller
 
-Scalekit maps `sub` to `ctx.auth.user.id`. `subjectType` is `"machine"` only when `sub` equals `client_id` or `azp`. User tokens also carry a host `client_id`, so presence of that claim is not a machine signal. Optional `org_id` and `sid` become `organizationId` and `sessionId`. Token permissions are top-level `ctx.auth.permissions`.
+Scalekit maps `sub` to `ctx.auth.user.id`. `subjectType` is `"machine"` only when `sub` equals `client_id` or `azp`. User tokens also carry a host `client_id`, so presence of that claim is not a machine signal. Optional `org_id` and `sid` become `organizationId` and `sessionId`. Token permissions are top-level `ctx.auth.permissions`. Custom claims and every other JWT field are on `ctx.auth.payload`. Read them there. Do not put them on `ctx.auth.user`.
 
 ```typescript
 server.tool(
