@@ -4,7 +4,7 @@ This directory contains examples for both Python and TypeScript implementations 
 
 ## Templates — ready-to-deploy example apps
 
-If you're looking for **full example apps** you can deploy in one click (Chart Builder, Diagram Builder, Slide Deck, Maps Explorer, Widget Gallery, and more), see the dedicated **[Templates gallery](https://github.com/mcp-use/mcp-use#templates)** in the main README — or browse the [Templates page in the docs](https://mcp-use.com/docs/home/templates). Each template lives in its own repo with a live demo URL and a one-click deploy button.
+If you're looking for **full example apps** you can deploy in one click (Chart Builder, Diagram Builder, Slide Deck, Maps Explorer, Widget Gallery, and more), see the dedicated **[Templates gallery](https://github.com/mcp-use/mcp-use#templates)** in the main README — or browse the [Templates page in the docs](https://docs.mcp-use.com/v2/typescript/getting-started/templates). Each template lives in its own repo with a live demo URL and a one-click deploy button.
 
 The examples below are **in-repo code samples** meant to illustrate specific APIs and patterns — not deployable apps.
 
