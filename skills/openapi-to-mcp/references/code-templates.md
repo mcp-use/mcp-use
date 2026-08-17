@@ -477,7 +477,7 @@ function joinUrl(base: string, path: string): string {
 
 ## 9. `index.ts`
 
-Replace the scaffolded `index.ts` with this — preserving the MCPServer fields the scaffold gave you (title, baseUrl, favicon, icons) and adding the OpenAPI tool registration loop in place of the commented examples.
+Replace the scaffolded `index.ts` with this — preserving the MCPServer fields the scaffold gave you (title, favicon, icons) and adding the OpenAPI tool registration loop in place of the commented examples.
 
 ```ts
 import "dotenv/config";              // load .env into process.env
@@ -491,7 +491,6 @@ const server = new MCPServer({
   title: "OpenAPI MCP",
   version: "1.0.0",
   description: "MCP server wrapping the <API name> REST API",
-  baseUrl: process.env.MCP_URL || "http://localhost:3000",
   favicon: "favicon.ico",
   icons: [{ src: "icon.svg", mimeType: "image/svg+xml", sizes: ["512x512"] }],
 });
