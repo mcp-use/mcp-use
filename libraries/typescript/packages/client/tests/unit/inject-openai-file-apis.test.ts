@@ -224,7 +224,7 @@ describe("injectOpenAiFileApis", () => {
     cleanup();
   });
 
-  it("keeps widget state private and updates it synchronously", () => {
+  it("keeps widget state private, updates synchronously, and returns a promise", async () => {
     vi.useFakeTimers();
     const { guest, cleanup } = mountInjectedBridge();
     const postMessage = vi.spyOn(guest.parent, "postMessage");
@@ -232,7 +232,7 @@ describe("injectOpenAiFileApis", () => {
       guest as typeof guest & {
         openai: {
           widgetState: unknown;
-          setWidgetState: (state: unknown) => unknown;
+          setWidgetState: (state: unknown) => Promise<void>;
         };
       }
     ).openai;
@@ -242,7 +242,11 @@ describe("injectOpenAiFileApis", () => {
       imageIds: ["file-1"],
     };
 
-    expect(openai.setWidgetState(state)).toBeUndefined();
+    // v1 useWidget() chains .catch() on this Apps SDK method. The shim must
+    // preserve that promise contract even though the local update is sync.
+    await expect(
+      openai.setWidgetState(state).catch(() => {})
+    ).resolves.toBeUndefined();
     expect(openai.widgetState).toEqual(state);
     expect(postMessage).not.toHaveBeenCalledWith(
       expect.objectContaining({ method: "ui/update-model-context" }),

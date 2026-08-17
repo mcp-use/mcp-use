@@ -156,6 +156,10 @@ const OPENAI_COMPATIBILITY_BRIDGE_SCRIPT = `<script>
   };
   api.setWidgetState = api.setWidgetState || function (state) {
     dispatchGlobals({ widgetState: state });
+    // The Apps SDK setter is promise-based. Keep the local state update
+    // synchronous, but return a promise so legacy useWidget() code can safely
+    // await or chain .catch() on the compatibility API.
+    return Promise.resolve();
   };
   api.notifyIntrinsicHeight = api.notifyIntrinsicHeight || function (height) {
     sendNotification("ui/notifications/size-changed", { height: height });
