@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.1.5-canary.0
+
+### Patch Changes
+
+- bdd8ec8: fix the OpenAI compatibility shim to return a promise from `setWidgetState`, preserving the v1 `useWidget()` contract while keeping native v2 MCP Apps behavior unchanged.
+
 ## 2.1.4
 
 ### Patch Changes
