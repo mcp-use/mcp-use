@@ -12,6 +12,7 @@
   },
   "changesets": [
     "anthropic-cache-usage-agent",
-    "anthropic-cache-usage-inspector"
+    "anthropic-cache-usage-inspector",
+    "scope-inspector-chat-sessions"
   ]
 }
