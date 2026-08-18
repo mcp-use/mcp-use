@@ -9,7 +9,7 @@ import {
   type McpServer,
   type Skill,
 } from "@mcp-use/client/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState, type SetStateAction } from "react";
 import type { PromptResult } from "../../hooks/useMCPPrompts";
 import {
   convertMessagesToProvider,
@@ -50,11 +50,45 @@ import {
   savePendingChatTurn,
   type PendingChatTurn,
 } from "./chat-auth-retry";
+import { createChatSessionId } from "./chat-session";
+import {
+  resolveStateAction,
+  useChatSession,
+  useChatSessionStore,
+  type ChatSessionStore,
+} from "./chat-session-store";
 
 // Type alias for backward compatibility
 type MCPConnection = McpServer;
 
+// Chat history is optional. Give an in-flight creation a short chance to
+// provide a backend-minted id for redirect recovery, but never let it prevent
+// the user from starting OAuth indefinitely.
+const CHAT_CREATION_AUTH_WAIT_MS = 1_000;
+
+async function waitForPersistedChatId(
+  creation: Promise<string | null>
+): Promise<string | null> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      creation,
+      new Promise<null>((resolve) => {
+        timeout = setTimeout(resolve, CHAT_CREATION_AUTH_WAIT_MS, null);
+      }),
+    ]);
+  } finally {
+    if (timeout !== undefined) clearTimeout(timeout);
+  }
+}
+
 interface UseChatMessagesClientSideProps {
+  /** Store holding one record per chat session. Defaults to a private store. */
+  sessionStore?: ChatSessionStore;
+  /** Session this hook renders. Defaults to a single private session. */
+  sessionId?: string;
+  /** Fires for every session whose messages change, including background ones. */
+  onMessagesChange?: (sessionId: string, messages: Message[]) => void;
   connection: MCPConnection;
   llmConfig: LLMConfig | null;
   isConnected: boolean;
@@ -62,12 +96,16 @@ interface UseChatMessagesClientSideProps {
   widgetModelContexts?: Map<string, WidgetModelContext | undefined>;
   disabledTools?: Set<string>;
   appToolConnections?: McpConnectionLike[];
+  /** Seeds the session on first use; a session already in the store is kept. */
   initialMessages?: Message[];
   systemPrompt?: string;
   skills?: Skill[];
 }
 
 export function useChatMessagesClientSide({
+  sessionStore,
+  sessionId,
+  onMessagesChange,
   connection,
   llmConfig,
   isConnected,
@@ -80,52 +118,52 @@ export function useChatMessagesClientSide({
   skills = [],
 }: UseChatMessagesClientSideProps) {
   const retryServerId = connection.id ?? connection.url;
-  const [initialPendingTurn] = useState(() =>
-    readPendingChatTurn(retryServerId)
-  );
-  const [messages, setMessages] = useState<Message[]>(
-    () => initialPendingTurn?.baseMessages ?? initialMessages ?? []
-  );
-  const [isLoading, setIsLoading] = useState(false);
-  const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
-  const [traceState, setTraceState] = useState(EMPTY_TRACE_STATE);
-  const [managedChatNotice, setManagedChatNotice] =
-    useState<ManagedChatNotice | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const sendInProgressRef = useRef(false);
-  const traceIdRef = useRef(0);
-  const initialPendingTurnRef = useRef(initialPendingTurn);
-  const authorizationGateRef = useRef<{
-    toolCallId: string;
-    resolve: () => void;
-    reject: (error: Error) => void;
-  } | null>(null);
-  const [pendingAuthorization, setPendingAuthorization] = useState<{
-    toolCallId: string;
-    replay: Omit<PendingChatTurn, "savedAt">;
-  } | null>(null);
-  const [authenticatingToolCallId, setAuthenticatingToolCallId] = useState<
-    string | null
-  >(null);
-  const [toolAuthorizationError, setToolAuthorizationError] = useState<
-    string | null
-  >(null);
+  const privateStore = useChatSessionStore();
+  const store = sessionStore ?? privateStore;
+  const [privateSessionId] = useState(createChatSessionId);
+  const activeSessionId = sessionId ?? privateSessionId;
 
-  const recordTrace = useCallback((event: InspectorTraceEventInput) => {
-    const next = {
-      ...event,
-      id: `trace-${++traceIdRef.current}`,
-      timestamp: Date.now(),
-    } as InspectorTraceEvent;
-    setTraceState((state) => appendTraceEvent(state, next));
-  }, []);
+  // Seeding is skipped once the session exists, so returning to a chat that is
+  // still streaming never replaces the messages it is writing.
+  if (initialMessages?.length && !store.has(activeSessionId)) {
+    store.seed(activeSessionId, initialMessages);
+  }
 
-  useEffect(() => {
-    if (initialPendingTurnRef.current) return;
-    if (initialMessages !== undefined) {
-      setMessages(initialMessages);
-    }
-  }, [initialMessages]);
+  const [session, updateSession] = useChatSession(store, activeSessionId);
+  const {
+    messages,
+    isLoading,
+    attachments,
+    managedChatNotice,
+    pendingAuthorization,
+    authenticatingToolCallId,
+    toolAuthorizationError,
+    runtime,
+  } = session;
+  const traceState = session.trace;
+
+  const setMessages = useCallback(
+    (action: SetStateAction<Message[]>) => {
+      const next = store.update(activeSessionId, (current) => ({
+        messages: resolveStateAction(current.messages, action),
+      }));
+      onMessagesChange?.(activeSessionId, next.messages);
+    },
+    [activeSessionId, onMessagesChange, store]
+  );
+  const recordTrace = useCallback(
+    (event: InspectorTraceEventInput) => {
+      const next = {
+        ...event,
+        id: `trace-${++runtime.traceId}`,
+        timestamp: Date.now(),
+      } as InspectorTraceEvent;
+      updateSession((current) => ({
+        trace: appendTraceEvent(current.trace, next),
+      }));
+    },
+    [runtime, updateSession]
+  );
 
   const sendMessage = useCallback(
     async (
@@ -159,11 +197,11 @@ export function useChatMessagesClientSide({
         rejectOrReturn("The MCP server is not connected");
         return;
       }
-      if (sendInProgressRef.current) {
+      if (runtime.sendInProgress) {
         rejectOrReturn("Chat is busy with another turn");
         return;
       }
-      sendInProgressRef.current = true;
+      runtime.sendInProgress = true;
 
       const promptResultsMessages =
         convertPromptResultsToMessages(promptResults);
@@ -187,10 +225,9 @@ export function useChatMessagesClientSide({
       if (!isResuming) {
         setMessages(baseMessages);
       }
-      setIsLoading(true);
-      setAttachments([]);
+      updateSession({ isLoading: true, attachments: [] });
 
-      abortControllerRef.current = new AbortController();
+      runtime.abortController = new AbortController();
       const startTime = Date.now();
       let toolCallsCount = 0;
       const assistantMessageId = `assistant-${Date.now()}`;
@@ -288,6 +325,7 @@ export function useChatMessagesClientSide({
         };
         const replayTurn: Omit<PendingChatTurn, "savedAt"> = {
           serverId: retryServerId,
+          sessionId: activeSessionId,
           userInput,
           promptResults,
           attachments: allAttachments,
@@ -321,17 +359,17 @@ export function useChatMessagesClientSide({
                 if (!toolPart?.toolInvocation || !toolCallId) throw error;
 
                 toolPart.toolInvocation.state = "authorization-required";
-                setPendingAuthorization({ toolCallId, replay: replayTurn });
-                setToolAuthorizationError(null);
+                updateSession({
+                  pendingAuthorization: { toolCallId, replay: replayTurn },
+                  toolAuthorizationError: null,
+                });
                 commitMessageParts();
 
                 await new Promise<void>((resolve, reject) => {
-                  const signal = abortControllerRef.current?.signal;
+                  const signal = runtime.abortController?.signal;
                   const handleAbort = () => {
-                    if (
-                      authorizationGateRef.current?.toolCallId === toolCallId
-                    ) {
-                      authorizationGateRef.current = null;
+                    if (runtime.authorizationGate?.toolCallId === toolCallId) {
+                      runtime.authorizationGate = null;
                     }
                     reject(
                       new DOMException("Chat turn was cancelled", "AbortError")
@@ -339,7 +377,7 @@ export function useChatMessagesClientSide({
                   };
                   const cleanup = () =>
                     signal?.removeEventListener("abort", handleAbort);
-                  authorizationGateRef.current = {
+                  runtime.authorizationGate = {
                     toolCallId,
                     resolve: () => {
                       cleanup();
@@ -356,9 +394,11 @@ export function useChatMessagesClientSide({
                 });
 
                 toolPart.toolInvocation.state = "pending";
-                setPendingAuthorization(null);
-                setToolAuthorizationError(null);
-                clearPendingChatTurn(retryServerId);
+                updateSession({
+                  pendingAuthorization: null,
+                  toolAuthorizationError: null,
+                });
+                clearPendingChatTurn(retryServerId, activeSessionId);
                 commitMessageParts();
               }
             }
@@ -390,10 +430,10 @@ export function useChatMessagesClientSide({
 
         for await (const ev of agent.streamEvents({
           messages: providerMessages,
-          signal: abortControllerRef.current?.signal,
+          signal: runtime.abortController?.signal,
         })) {
           markAccepted();
-          if (abortControllerRef.current?.signal.aborted) break;
+          if (runtime.abortController?.signal.aborted) break;
 
           // Keep inspector compatible with an older installed agent build while
           // the additive usage event rolls through workspace package outputs.
@@ -522,7 +562,7 @@ export function useChatMessagesClientSide({
           }
         }
 
-        if (abortControllerRef.current?.signal.aborted) {
+        if (runtime.abortController?.signal.aborted) {
           for (const part of parts) {
             if (
               part.type === "tool-invocation" &&
@@ -572,7 +612,7 @@ export function useChatMessagesClientSide({
           ? managedNoticeFromLlmError(error)
           : null;
         if (notice) {
-          setManagedChatNotice(notice);
+          updateSession({ managedChatNotice: notice });
           setMessages((prev) =>
             prev.filter((m) => m.id !== assistantMessageId)
           );
@@ -629,12 +669,13 @@ export function useChatMessagesClientSide({
           throw new Error(errorDetail);
         }
       } finally {
-        setIsLoading(false);
-        abortControllerRef.current = null;
-        sendInProgressRef.current = false;
+        updateSession({ isLoading: false });
+        runtime.abortController = null;
+        runtime.sendInProgress = false;
       }
     },
     [
+      activeSessionId,
       connection,
       llmConfig,
       isConnected,
@@ -646,48 +687,71 @@ export function useChatMessagesClientSide({
       widgetModelContexts,
       recordTrace,
       retryServerId,
+      runtime,
       systemPrompt,
       skills,
+      setMessages,
+      updateSession,
     ]
   );
 
   const authenticatePendingTool = useCallback(
     async (toolCallId: string) => {
+      const currentSession = store.get(activeSessionId);
+      const currentAuthorization = currentSession.pendingAuthorization;
       if (
-        pendingAuthorization?.toolCallId !== toolCallId ||
-        authenticatingToolCallId
+        currentAuthorization?.toolCallId !== toolCallId ||
+        currentSession.authenticatingToolCallId
       ) {
         return;
       }
 
-      savePendingChatTurn(pendingAuthorization.replay);
-      setAuthenticatingToolCallId(toolCallId);
-      setToolAuthorizationError(null);
+      // Store updates are synchronous, so this is also the lock against rapid
+      // repeated calls before React has had a chance to re-render.
+      updateSession({
+        authenticatingToolCallId: toolCallId,
+        toolAuthorizationError: null,
+      });
       try {
+        const persistedChatId =
+          currentSession.persistedChatId ??
+          (currentSession.creation
+            ? await waitForPersistedChatId(currentSession.creation)
+            : null);
+        savePendingChatTurn({
+          ...currentAuthorization.replay,
+          ...(persistedChatId ? { persistedChatId } : {}),
+        });
         await connection.authenticate();
-        const gate = authorizationGateRef.current;
+        const gate = runtime.authorizationGate;
         if (gate?.toolCallId === toolCallId) {
-          authorizationGateRef.current = null;
+          runtime.authorizationGate = null;
           gate.resolve();
         }
       } catch (error) {
-        clearPendingChatTurn(retryServerId);
-        setToolAuthorizationError(
-          error instanceof Error ? error.message : "Authentication failed"
-        );
+        clearPendingChatTurn(retryServerId, activeSessionId);
+        updateSession({
+          toolAuthorizationError:
+            error instanceof Error ? error.message : "Authentication failed",
+        });
       } finally {
-        setAuthenticatingToolCallId(null);
+        updateSession({ authenticatingToolCallId: null });
       }
     },
-    [authenticatingToolCallId, connection, pendingAuthorization, retryServerId]
+    [activeSessionId, connection, retryServerId, runtime, store, updateSession]
   );
 
+  // A full-page OAuth redirect drops the turn that was in flight. The session it
+  // belonged to is reactivated by whoever owns the store, so replay it here once
+  // that session is connected again.
   useEffect(() => {
-    const pendingTurn = initialPendingTurnRef.current;
-    if (!pendingTurn || !isConnected || !llmConfig) return;
+    if (runtime.pendingTurnResumed || !isConnected || !llmConfig) return;
+    runtime.pendingTurnResumed = true;
 
-    initialPendingTurnRef.current = null;
-    clearPendingChatTurn(retryServerId);
+    const pendingTurn = readPendingChatTurn(retryServerId, activeSessionId);
+    if (!pendingTurn) return;
+
+    clearPendingChatTurn(retryServerId, activeSessionId);
     setMessages(pendingTurn.baseMessages);
     void sendMessage(
       pendingTurn.userInput,
@@ -695,67 +759,91 @@ export function useChatMessagesClientSide({
       pendingTurn.attachments,
       { resumeExistingTurn: true }
     );
-  }, [isConnected, llmConfig, retryServerId, sendMessage]);
+  }, [
+    activeSessionId,
+    isConnected,
+    llmConfig,
+    retryServerId,
+    runtime,
+    sendMessage,
+    setMessages,
+  ]);
 
   const clearMessages = useCallback(() => {
-    clearPendingChatTurn(retryServerId);
-    authorizationGateRef.current?.reject(
+    runtime.pendingTurnResumed = true;
+    clearPendingChatTurn(retryServerId, activeSessionId);
+    runtime.authorizationGate?.reject(
       new DOMException("Chat turn was cancelled", "AbortError")
     );
-    authorizationGateRef.current = null;
-    setPendingAuthorization(null);
-    setAuthenticatingToolCallId(null);
-    setToolAuthorizationError(null);
+    runtime.authorizationGate = null;
     setMessages([]);
-    setTraceState(EMPTY_TRACE_STATE);
-    setManagedChatNotice(null);
-  }, [retryServerId]);
-  const clearTrace = useCallback(() => setTraceState(EMPTY_TRACE_STATE), []);
+    updateSession({
+      pendingAuthorization: null,
+      authenticatingToolCallId: null,
+      toolAuthorizationError: null,
+      trace: EMPTY_TRACE_STATE,
+      managedChatNotice: null,
+    });
+  }, [activeSessionId, retryServerId, runtime, setMessages, updateSession]);
+  const clearTrace = useCallback(
+    () => updateSession({ trace: EMPTY_TRACE_STATE }),
+    [updateSession]
+  );
 
   const stop = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-  }, []);
+    runtime.abortController?.abort();
+  }, [runtime]);
 
-  const addAttachment = useCallback(async (file: File) => {
-    try {
-      const attachment = await fileToAttachment(file);
+  const addAttachment = useCallback(
+    async (file: File) => {
+      try {
+        const attachment = await fileToAttachment(file);
 
-      setAttachments((prev) => {
-        const newAttachments = [...prev, attachment];
-        if (!isValidTotalSize(newAttachments)) {
-          alert("Total attachment size exceeds 20MB limit");
-          return prev;
+        updateSession((current) => {
+          const newAttachments = [...current.attachments, attachment];
+          if (!isValidTotalSize(newAttachments)) {
+            alert("Total attachment size exceeds 20MB limit");
+            return {};
+          }
+          return { attachments: newAttachments };
+        });
+      } catch (error) {
+        if (error instanceof Error) {
+          alert(error.message);
+        } else {
+          alert("Failed to add attachment");
         }
-        return newAttachments;
-      });
-    } catch (error) {
-      if (error instanceof Error) {
-        alert(error.message);
-      } else {
-        alert("Failed to add attachment");
       }
-    }
-  }, []);
+    },
+    [updateSession]
+  );
 
-  const removeAttachment = useCallback((index: number) => {
-    setAttachments((prev) => prev.filter((_, i) => i !== index));
-  }, []);
+  const removeAttachment = useCallback(
+    (index: number) => {
+      updateSession((current) => ({
+        attachments: current.attachments.filter((_, i) => i !== index),
+      }));
+    },
+    [updateSession]
+  );
 
   const clearAttachments = useCallback(() => {
-    setAttachments([]);
-  }, []);
+    updateSession({ attachments: [] });
+  }, [updateSession]);
 
   const clearManagedChatNotice = useCallback(() => {
-    setManagedChatNotice(null);
-  }, []);
+    updateSession({ managedChatNotice: null });
+  }, [updateSession]);
 
-  const showManagedChatNotice = useCallback((notice: ManagedChatNotice) => {
-    setManagedChatNotice(notice);
-  }, []);
+  const showManagedChatNotice = useCallback(
+    (notice: ManagedChatNotice) => {
+      updateSession({ managedChatNotice: notice });
+    },
+    [updateSession]
+  );
 
   return {
+    sessionId: activeSessionId,
     messages,
     isLoading,
     attachments,

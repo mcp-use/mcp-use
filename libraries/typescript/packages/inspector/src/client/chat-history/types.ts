@@ -26,6 +26,13 @@ export interface ChatStorageProvider {
   ): Promise<{ items: ChatSession[]; total: number }>;
   getMessages(chatId: string): Promise<Message[]>;
   createChat(params: {
+    /**
+     * Id the caller already uses for this chat session. Providers should adopt
+     * it so runtime and persisted state share one identity, and should return
+     * the existing chat when it is already stored. Providers that must mint
+     * their own id may ignore it — the caller keeps the returned id instead.
+     */
+    id?: string;
     agentId: string;
     title?: string;
     agentName?: string;

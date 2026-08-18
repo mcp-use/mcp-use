@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState, type SetStateAction } from "react";
 import { inspectorApi } from "@/client/utils/basePath";
 import type { PromptResult } from "../../hooks/useMCPPrompts";
 import {
@@ -34,8 +34,21 @@ import {
   widgetModelContextProviderMessage,
   type WidgetModelContext,
 } from "./widget-model-context";
+import { createChatSessionId } from "./chat-session";
+import {
+  resolveStateAction,
+  useChatSession,
+  useChatSessionStore,
+  type ChatSessionStore,
+} from "./chat-session-store";
 
 interface UseChatMessagesProps {
+  /** Store holding one record per chat session. Defaults to a private store. */
+  sessionStore?: ChatSessionStore;
+  /** Session this hook renders. Defaults to a single private session. */
+  sessionId?: string;
+  /** Fires for every session whose messages change, including background ones. */
+  onMessagesChange?: (sessionId: string, messages: Message[]) => void;
   mcpServerUrl: string;
   llmConfig: LLMConfig | null;
   authConfig: AuthConfig | null;
@@ -48,7 +61,7 @@ interface UseChatMessagesProps {
   waitForChatApiUrl?: () => Promise<string | undefined>;
   /** Active widget model contexts to inject into the LLM conversation */
   widgetModelContexts?: Map<string, WidgetModelContext | undefined>;
-  /** Pre-populate the chat with messages from a previous session (e.g. when restoring history). */
+  /** Seeds the session on first use; a session already in the store is kept. */
   initialMessages?: Message[];
   /** Tool names the user has disabled via the tool selector. Sent to the server so it can exclude them. */
   disabledTools?: Set<string>;
@@ -74,6 +87,9 @@ interface UseChatMessagesProps {
 }
 
 export function useChatMessages({
+  sessionStore,
+  sessionId,
+  onMessagesChange,
   mcpServerUrl,
   llmConfig,
   authConfig,
@@ -89,28 +105,50 @@ export function useChatMessages({
   extraHeaders,
   body: bodyBuilder,
 }: UseChatMessagesProps) {
-  const [messages, setMessages] = useState<Message[]>(initialMessages ?? []);
-  const [isLoading, setIsLoading] = useState(false);
-  const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
-  const [traceState, setTraceState] = useState(EMPTY_TRACE_STATE);
-  const [managedChatNotice, setManagedChatNotice] =
-    useState<ManagedChatNotice | null>(null);
-  const [mcpServerAuthRequired, setMcpServerAuthRequired] = useState<{
-    mcpServerUrl: string;
-    message?: string;
-  } | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const sendInProgressRef = useRef(false);
-  const traceIdRef = useRef(0);
+  const privateStore = useChatSessionStore();
+  const store = sessionStore ?? privateStore;
+  const [privateSessionId] = useState(createChatSessionId);
+  const activeSessionId = sessionId ?? privateSessionId;
 
-  const recordTrace = useCallback((event: InspectorTraceEventInput) => {
-    const next = {
-      ...event,
-      id: `trace-${++traceIdRef.current}`,
-      timestamp: Date.now(),
-    } as InspectorTraceEvent;
-    setTraceState((state) => appendTraceEvent(state, next));
-  }, []);
+  // Seeding is skipped once the session exists, so returning to a chat that is
+  // still streaming never replaces the messages it is writing.
+  if (initialMessages?.length && !store.has(activeSessionId)) {
+    store.seed(activeSessionId, initialMessages);
+  }
+
+  const [session, updateSession] = useChatSession(store, activeSessionId);
+  const {
+    messages,
+    isLoading,
+    attachments,
+    managedChatNotice,
+    mcpServerAuthRequired,
+    runtime,
+  } = session;
+  const traceState = session.trace;
+
+  const setMessages = useCallback(
+    (action: SetStateAction<Message[]>) => {
+      const next = store.update(activeSessionId, (current) => ({
+        messages: resolveStateAction(current.messages, action),
+      }));
+      onMessagesChange?.(activeSessionId, next.messages);
+    },
+    [activeSessionId, onMessagesChange, store]
+  );
+  const recordTrace = useCallback(
+    (event: InspectorTraceEventInput) => {
+      const next = {
+        ...event,
+        id: `trace-${++runtime.traceId}`,
+        timestamp: Date.now(),
+      } as InspectorTraceEvent;
+      updateSession((current) => ({
+        trace: appendTraceEvent(current.trace, next),
+      }));
+    },
+    [runtime, updateSession]
+  );
 
   const sendMessage = useCallback(
     async (
@@ -142,11 +180,11 @@ export function useChatMessages({
         rejectOrReturn("The MCP server is not connected");
         return;
       }
-      if (sendInProgressRef.current) {
+      if (runtime.sendInProgress) {
         rejectOrReturn("Chat is busy with another turn");
         return;
       }
-      sendInProgressRef.current = true;
+      runtime.sendInProgress = true;
 
       const promptResultsMessages =
         convertPromptResultsToMessages(promptResults);
@@ -167,13 +205,10 @@ export function useChatMessages({
       }
 
       setMessages((prev) => [...prev, ...userMessages]);
-      setIsLoading(true);
-
-      // Clear attachments after sending
-      setAttachments([]);
+      updateSession({ isLoading: true, attachments: [] });
 
       // Create abort controller for cancellation
-      abortControllerRef.current = new AbortController();
+      runtime.abortController = new AbortController();
 
       try {
         // Server-side chat must forward the same OAuth credentials as the browser
@@ -289,7 +324,7 @@ export function useChatMessages({
             "Content-Type": "application/json",
             ...extraHeaders,
           },
-          signal: abortControllerRef.current.signal,
+          signal: runtime.abortController.signal,
           ...(credentials ? { credentials } : {}),
           body: JSON.stringify(requestBody),
         });
@@ -302,7 +337,7 @@ export function useChatMessages({
               errBody
             );
             if (notice) {
-              setManagedChatNotice(notice);
+              updateSession({ managedChatNotice: notice });
               if (options?.throwOnError) {
                 throw new Error(
                   `Chat request failed with HTTP ${response.status}`
@@ -313,10 +348,13 @@ export function useChatMessages({
           }
           if (response.status === 401) {
             if (errBody?.error === "mcp_auth_required") {
-              setMcpServerAuthRequired({
-                mcpServerUrl:
-                  (errBody.mcpServerUrl as string | undefined) ?? mcpServerUrl,
-                message: errBody.message as string | undefined,
+              updateSession({
+                mcpServerAuthRequired: {
+                  mcpServerUrl:
+                    (errBody.mcpServerUrl as string | undefined) ??
+                    mcpServerUrl,
+                  message: errBody.message as string | undefined,
+                },
               });
               if (options?.throwOnError) {
                 throw new Error("The MCP server requires authentication");
@@ -485,7 +523,7 @@ export function useChatMessages({
 
         let buffer = "";
         while (true) {
-          if (abortControllerRef.current?.signal.aborted) {
+          if (runtime.abortController?.signal.aborted) {
             await reader.cancel();
             break;
           }
@@ -757,7 +795,7 @@ export function useChatMessages({
         }
 
         // If aborted, mark any pending tool calls as cancelled
-        if (abortControllerRef.current?.signal.aborted) {
+        if (runtime.abortController?.signal.aborted) {
           for (const part of parts) {
             if (
               part.type === "tool-invocation" &&
@@ -792,7 +830,9 @@ export function useChatMessages({
         }
 
         if (chatApiUrl && isCloudFetchFailure(error)) {
-          setManagedChatNotice({ kind: "cloud_unavailable" });
+          updateSession({
+            managedChatNotice: { kind: "cloud_unavailable" },
+          });
           if (options?.throwOnError) {
             throw new Error("Chat service is unavailable");
           }
@@ -827,9 +867,9 @@ export function useChatMessages({
           throw new Error(errorDetail);
         }
       } finally {
-        setIsLoading(false);
-        abortControllerRef.current = null;
-        sendInProgressRef.current = false;
+        updateSession({ isLoading: false });
+        runtime.abortController = null;
+        runtime.sendInProgress = false;
       }
     },
     [
@@ -849,69 +889,87 @@ export function useChatMessages({
       extraHeaders,
       bodyBuilder,
       recordTrace,
+      runtime,
+      setMessages,
+      updateSession,
     ]
   );
 
   const clearMessages = useCallback(() => {
     setMessages([]);
-    setManagedChatNotice(null);
-    setMcpServerAuthRequired(null);
-    setTraceState(EMPTY_TRACE_STATE);
-  }, []);
+    updateSession({
+      managedChatNotice: null,
+      mcpServerAuthRequired: null,
+      trace: EMPTY_TRACE_STATE,
+    });
+  }, [setMessages, updateSession]);
 
   const clearManagedChatNotice = useCallback(() => {
-    setManagedChatNotice(null);
-  }, []);
+    updateSession({ managedChatNotice: null });
+  }, [updateSession]);
 
-  const showManagedChatNotice = useCallback((notice: ManagedChatNotice) => {
-    setManagedChatNotice(notice);
-  }, []);
+  const showManagedChatNotice = useCallback(
+    (notice: ManagedChatNotice) => {
+      updateSession({ managedChatNotice: notice });
+    },
+    [updateSession]
+  );
 
-  const clearTrace = useCallback(() => setTraceState(EMPTY_TRACE_STATE), []);
+  const clearTrace = useCallback(
+    () => updateSession({ trace: EMPTY_TRACE_STATE }),
+    [updateSession]
+  );
 
   const clearMcpServerAuthRequired = useCallback(() => {
-    setMcpServerAuthRequired(null);
-  }, []);
+    updateSession({ mcpServerAuthRequired: null });
+  }, [updateSession]);
 
   const stop = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-  }, []);
+    runtime.abortController?.abort();
+  }, [runtime]);
 
-  const addAttachment = useCallback(async (file: File) => {
-    try {
-      const attachment = await fileToAttachment(file);
+  const addAttachment = useCallback(
+    async (file: File) => {
+      try {
+        const attachment = await fileToAttachment(file);
 
-      setAttachments((prev) => {
-        const newAttachments = [...prev, attachment];
+        updateSession((current) => {
+          const newAttachments = [...current.attachments, attachment];
 
-        // Check total size
-        if (!isValidTotalSize(newAttachments)) {
-          alert("Total attachment size exceeds 20MB limit");
-          return prev;
+          // Check total size
+          if (!isValidTotalSize(newAttachments)) {
+            alert("Total attachment size exceeds 20MB limit");
+            return {};
+          }
+
+          return { attachments: newAttachments };
+        });
+      } catch (error) {
+        if (error instanceof Error) {
+          alert(error.message);
+        } else {
+          alert("Failed to add attachment");
         }
-
-        return newAttachments;
-      });
-    } catch (error) {
-      if (error instanceof Error) {
-        alert(error.message);
-      } else {
-        alert("Failed to add attachment");
       }
-    }
-  }, []);
+    },
+    [updateSession]
+  );
 
-  const removeAttachment = useCallback((index: number) => {
-    setAttachments((prev) => prev.filter((_, i) => i !== index));
-  }, []);
+  const removeAttachment = useCallback(
+    (index: number) => {
+      updateSession((current) => ({
+        attachments: current.attachments.filter((_, i) => i !== index),
+      }));
+    },
+    [updateSession]
+  );
 
   const clearAttachments = useCallback(() => {
-    setAttachments([]);
-  }, []);
+    updateSession({ attachments: [] });
+  }, [updateSession]);
 
   return {
+    sessionId: activeSessionId,
     messages,
     isLoading,
     attachments,
