@@ -253,7 +253,6 @@ export function ChatTab({
     activeChatId,
     selectChat,
     startNewChat,
-    ensureActiveChat,
     persistSessionMessages,
   } = useChatSessions({
     retryServerId: connection.id ?? connection.url,
@@ -440,18 +439,6 @@ export function ChatTab({
     );
     await startNewChat();
   }, [effectiveChatStorage, startNewChat]);
-
-  // Sending into a chat history has not seen yet shows a placeholder title
-  // until title generation replaces it.
-  const prepareActiveChat = useCallback(() => {
-    if (
-      effectiveChatStorage &&
-      !chatSessions.get(activeSessionId).persistedChatId
-    ) {
-      setInternalChatTitle(CHAT_TITLE_PLACEHOLDER);
-    }
-    return ensureActiveChat();
-  }, [activeSessionId, chatSessions, effectiveChatStorage, ensureActiveChat]);
 
   const handleTitleGenerated = useCallback(
     (chatId: string, title: string) => {
@@ -1298,18 +1285,24 @@ export function ChatTab({
     if (messages.length === 0) {
       dismissLandingShader();
     }
-    void prepareActiveChat().then(() => {
-      sendMessage(inputValue, results);
-      setInputValue("");
-      clearPromptResults();
-    });
+    if (
+      effectiveChatStorage &&
+      !chatSessions.get(activeSessionId).persistedChatId
+    ) {
+      setInternalChatTitle(CHAT_TITLE_PLACEHOLDER);
+    }
+    void sendMessage(inputValue, results);
+    setInputValue("");
+    clearPromptResults();
   }, [
     inputValue,
     results,
     sendMessage,
     clearPromptResults,
     attachments,
-    prepareActiveChat,
+    activeSessionId,
+    chatSessions,
+    effectiveChatStorage,
     messages.length,
     dismissLandingShader,
   ]);

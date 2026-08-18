@@ -38,7 +38,6 @@ import { createChatSessionId } from "./chat-session";
 import {
   resolveStateAction,
   useChatSession,
-  useChatSessionField,
   useChatSessionStore,
   type ChatSessionStore,
 } from "./chat-session-store";
@@ -117,7 +116,7 @@ export function useChatMessages({
     store.seed(activeSessionId, initialMessages);
   }
 
-  const session = useChatSession(store, activeSessionId);
+  const [session, updateSession] = useChatSession(store, activeSessionId);
   const {
     messages,
     isLoading,
@@ -137,24 +136,6 @@ export function useChatMessages({
     },
     [activeSessionId, onMessagesChange, store]
   );
-  const setIsLoading = useChatSessionField(store, activeSessionId, "isLoading");
-  const setAttachments = useChatSessionField(
-    store,
-    activeSessionId,
-    "attachments"
-  );
-  const setTraceState = useChatSessionField(store, activeSessionId, "trace");
-  const setManagedChatNotice = useChatSessionField(
-    store,
-    activeSessionId,
-    "managedChatNotice"
-  );
-  const setMcpServerAuthRequired = useChatSessionField(
-    store,
-    activeSessionId,
-    "mcpServerAuthRequired"
-  );
-
   const recordTrace = useCallback(
     (event: InspectorTraceEventInput) => {
       const next = {
@@ -162,9 +143,11 @@ export function useChatMessages({
         id: `trace-${++runtime.traceId}`,
         timestamp: Date.now(),
       } as InspectorTraceEvent;
-      setTraceState((state) => appendTraceEvent(state, next));
+      updateSession((current) => ({
+        trace: appendTraceEvent(current.trace, next),
+      }));
     },
-    [runtime, setTraceState]
+    [runtime, updateSession]
   );
 
   const sendMessage = useCallback(
@@ -222,10 +205,7 @@ export function useChatMessages({
       }
 
       setMessages((prev) => [...prev, ...userMessages]);
-      setIsLoading(true);
-
-      // Clear attachments after sending
-      setAttachments([]);
+      updateSession({ isLoading: true, attachments: [] });
 
       // Create abort controller for cancellation
       runtime.abortController = new AbortController();
@@ -357,7 +337,7 @@ export function useChatMessages({
               errBody
             );
             if (notice) {
-              setManagedChatNotice(notice);
+              updateSession({ managedChatNotice: notice });
               if (options?.throwOnError) {
                 throw new Error(
                   `Chat request failed with HTTP ${response.status}`
@@ -368,10 +348,13 @@ export function useChatMessages({
           }
           if (response.status === 401) {
             if (errBody?.error === "mcp_auth_required") {
-              setMcpServerAuthRequired({
-                mcpServerUrl:
-                  (errBody.mcpServerUrl as string | undefined) ?? mcpServerUrl,
-                message: errBody.message as string | undefined,
+              updateSession({
+                mcpServerAuthRequired: {
+                  mcpServerUrl:
+                    (errBody.mcpServerUrl as string | undefined) ??
+                    mcpServerUrl,
+                  message: errBody.message as string | undefined,
+                },
               });
               if (options?.throwOnError) {
                 throw new Error("The MCP server requires authentication");
@@ -847,7 +830,9 @@ export function useChatMessages({
         }
 
         if (chatApiUrl && isCloudFetchFailure(error)) {
-          setManagedChatNotice({ kind: "cloud_unavailable" });
+          updateSession({
+            managedChatNotice: { kind: "cloud_unavailable" },
+          });
           if (options?.throwOnError) {
             throw new Error("Chat service is unavailable");
           }
@@ -882,7 +867,7 @@ export function useChatMessages({
           throw new Error(errorDetail);
         }
       } finally {
-        setIsLoading(false);
+        updateSession({ isLoading: false });
         runtime.abortController = null;
         runtime.sendInProgress = false;
       }
@@ -905,45 +890,39 @@ export function useChatMessages({
       bodyBuilder,
       recordTrace,
       runtime,
-      setAttachments,
-      setIsLoading,
-      setManagedChatNotice,
-      setMcpServerAuthRequired,
       setMessages,
+      updateSession,
     ]
   );
 
   const clearMessages = useCallback(() => {
     setMessages([]);
-    setManagedChatNotice(null);
-    setMcpServerAuthRequired(null);
-    setTraceState(EMPTY_TRACE_STATE);
-  }, [
-    setManagedChatNotice,
-    setMcpServerAuthRequired,
-    setMessages,
-    setTraceState,
-  ]);
+    updateSession({
+      managedChatNotice: null,
+      mcpServerAuthRequired: null,
+      trace: EMPTY_TRACE_STATE,
+    });
+  }, [setMessages, updateSession]);
 
   const clearManagedChatNotice = useCallback(() => {
-    setManagedChatNotice(null);
-  }, [setManagedChatNotice]);
+    updateSession({ managedChatNotice: null });
+  }, [updateSession]);
 
   const showManagedChatNotice = useCallback(
     (notice: ManagedChatNotice) => {
-      setManagedChatNotice(notice);
+      updateSession({ managedChatNotice: notice });
     },
-    [setManagedChatNotice]
+    [updateSession]
   );
 
   const clearTrace = useCallback(
-    () => setTraceState(EMPTY_TRACE_STATE),
-    [setTraceState]
+    () => updateSession({ trace: EMPTY_TRACE_STATE }),
+    [updateSession]
   );
 
   const clearMcpServerAuthRequired = useCallback(() => {
-    setMcpServerAuthRequired(null);
-  }, [setMcpServerAuthRequired]);
+    updateSession({ mcpServerAuthRequired: null });
+  }, [updateSession]);
 
   const stop = useCallback(() => {
     runtime.abortController?.abort();
@@ -954,16 +933,16 @@ export function useChatMessages({
       try {
         const attachment = await fileToAttachment(file);
 
-        setAttachments((prev) => {
-          const newAttachments = [...prev, attachment];
+        updateSession((current) => {
+          const newAttachments = [...current.attachments, attachment];
 
           // Check total size
           if (!isValidTotalSize(newAttachments)) {
             alert("Total attachment size exceeds 20MB limit");
-            return prev;
+            return {};
           }
 
-          return newAttachments;
+          return { attachments: newAttachments };
         });
       } catch (error) {
         if (error instanceof Error) {
@@ -973,19 +952,21 @@ export function useChatMessages({
         }
       }
     },
-    [setAttachments]
+    [updateSession]
   );
 
   const removeAttachment = useCallback(
     (index: number) => {
-      setAttachments((prev) => prev.filter((_, i) => i !== index));
+      updateSession((current) => ({
+        attachments: current.attachments.filter((_, i) => i !== index),
+      }));
     },
-    [setAttachments]
+    [updateSession]
   );
 
   const clearAttachments = useCallback(() => {
-    setAttachments([]);
-  }, [setAttachments]);
+    updateSession({ attachments: [] });
+  }, [updateSession]);
 
   return {
     sessionId: activeSessionId,

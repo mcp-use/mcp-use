@@ -91,11 +91,3 @@ export function createChatSessionId(): string {
   const suffix = Math.random().toString(36).slice(2, 10);
   return `chat-${Date.now().toString(36)}-${suffix}`;
 }
-
-export function resolveActiveChatId(
-  isControlled: boolean,
-  controlledChatId: string | undefined,
-  internalChatId: string | null
-): string | null {
-  return isControlled ? (controlledChatId ?? null) : internalChatId;
-}

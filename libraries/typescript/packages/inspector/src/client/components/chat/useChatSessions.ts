@@ -1,11 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChatStorageProvider } from "../../chat-history/types";
 import { readPendingChatTurnForServer } from "./chat-auth-retry";
-import {
-  createChatSessionId,
-  resolveActiveChatId,
-  type ChatSessionState,
-} from "./chat-session";
+import { createChatSessionId, type ChatSessionState } from "./chat-session";
 import {
   useChatSessionStore,
   type ChatSessionStore,
@@ -37,8 +33,6 @@ export interface ChatSessions {
   selectChat: (chatId: string) => Promise<ChatSessionState | null>;
   /** Switches to a brand new session; in-flight sessions keep running. */
   startNewChat: () => Promise<string>;
-  /** Resolves the chat id backing the active session, creating it if needed. */
-  ensureActiveChat: () => Promise<string | null>;
   /** Writes a session's messages to its own chat, whichever chat is on screen. */
   persistSessionMessages: (sessionId: string, messages: Message[]) => void;
 }
@@ -63,35 +57,41 @@ export function useChatSessions({
   onChatCreated,
 }: UseChatSessionsParams): ChatSessions {
   const store = useChatSessionStore();
+  const isControlled =
+    controlledActiveChatId !== undefined || onActiveChatIdChange !== undefined;
+  const [pendingTurnOnMount] = useState(() =>
+    readPendingChatTurnForServer(retryServerId)
+  );
 
   // A full-page OAuth redirect drops everything in memory, so the session that
   // was interrupted is read back from storage and reopened here.
   const [activeSessionId, setActiveSessionId] = useState(() => {
-    const pendingTurn = readPendingChatTurnForServer(retryServerId);
     const resumable =
-      pendingTurn != null &&
+      pendingTurnOnMount != null &&
       (!controlledActiveChatId ||
-        pendingTurn.sessionId === controlledActiveChatId);
+        pendingTurnOnMount.sessionId === controlledActiveChatId);
     const sessionId =
       controlledActiveChatId ??
-      (resumable ? pendingTurn.sessionId : createChatSessionId());
-    const seed = resumable ? pendingTurn.baseMessages : initialMessages;
-    if (seed?.length) store.seed(sessionId, seed);
+      (resumable ? pendingTurnOnMount.sessionId : createChatSessionId());
+    const seed = resumable ? pendingTurnOnMount.baseMessages : initialMessages;
+    store.seed(sessionId, seed ?? []);
+    const persistedChatId =
+      controlledActiveChatId ??
+      (resumable ? pendingTurnOnMount.persistedChatId : undefined);
+    if (persistedChatId) store.update(sessionId, { persistedChatId });
     return sessionId;
   });
   const activeSessionIdRef = useRef(activeSessionId);
   activeSessionIdRef.current = activeSessionId;
 
-  const isControlled =
-    controlledActiveChatId !== undefined || onActiveChatIdChange !== undefined;
   const [internalActiveChatId, setInternalActiveChatId] = useState<
     string | null
-  >(null);
-  const activeChatId = resolveActiveChatId(
-    isControlled,
-    controlledActiveChatId,
-    internalActiveChatId
+  >(() =>
+    isControlled ? null : (pendingTurnOnMount?.persistedChatId ?? null)
   );
+  const activeChatId = isControlled
+    ? (controlledActiveChatId ?? null)
+    : internalActiveChatId;
 
   const setActiveChatId = useCallback(
     (chatId: string | null) => {
@@ -108,19 +108,40 @@ export function useChatSessions({
   // session that was just started alone.
   useEffect(() => {
     if (!controlledActiveChatId) return;
-    const session = store.findByPersistedChatId(controlledActiveChatId);
-    setActiveSessionId(session?.id ?? controlledActiveChatId);
+    const session =
+      store.findByPersistedChatId(controlledActiveChatId) ??
+      store.update(controlledActiveChatId, {
+        persistedChatId: controlledActiveChatId,
+      });
+    activeSessionIdRef.current = session.id;
+    setActiveSessionId(session.id);
   }, [controlledActiveChatId, store]);
 
-  const hostMessagesRef = useRef(initialMessages);
+  const hostStateRef = useRef({
+    activeChatId: controlledActiveChatId,
+    messages: initialMessages,
+  });
   useEffect(() => {
-    if (hostMessagesRef.current === initialMessages) return;
-    hostMessagesRef.current = initialMessages;
+    const previous = hostStateRef.current;
+    if (
+      previous.activeChatId === controlledActiveChatId &&
+      previous.messages === initialMessages
+    ) {
+      return;
+    }
+    hostStateRef.current = {
+      activeChatId: controlledActiveChatId,
+      messages: initialMessages,
+    };
     if (initialMessages === undefined) return;
-    store.update(activeSessionIdRef.current, { messages: initialMessages });
-  }, [initialMessages, store]);
+    const sessionId = controlledActiveChatId
+      ? (store.findByPersistedChatId(controlledActiveChatId)?.id ??
+        controlledActiveChatId)
+      : activeSessionIdRef.current;
+    store.update(sessionId, { messages: initialMessages });
+  }, [controlledActiveChatId, initialMessages, store]);
 
-  const ensureSessionChat = useCallback(
+  const getOrCreatePersistedChat = useCallback(
     (sessionId: string): Promise<string | null> => {
       if (!storage) return Promise.resolve(null);
       const session = store.get(sessionId);
@@ -157,12 +178,20 @@ export function useChatSessions({
   const persistSessionMessages = useCallback(
     (sessionId: string, messages: Message[]) => {
       const saveMessages = storage?.saveMessages?.bind(storage);
-      if (!saveMessages || messages.length === 0) return;
-      void ensureSessionChat(sessionId).then((chatId) => {
+      if (!saveMessages) return;
+      const session = store.get(sessionId);
+      if (
+        messages.length === 0 &&
+        !session.persistedChatId &&
+        !session.creation
+      ) {
+        return;
+      }
+      void getOrCreatePersistedChat(sessionId).then((chatId) => {
         if (chatId) void saveMessages(chatId, messages);
       });
     },
-    [ensureSessionChat, storage]
+    [getOrCreatePersistedChat, storage, store]
   );
 
   const selectChat = useCallback(
@@ -200,14 +229,9 @@ export function useChatSessions({
     ) {
       store.delete(previous.id);
     }
-    await ensureSessionChat(sessionId);
+    await getOrCreatePersistedChat(sessionId);
     return sessionId;
-  }, [ensureSessionChat, setActiveChatId, store]);
-
-  const ensureActiveChat = useCallback(
-    () => ensureSessionChat(activeSessionId),
-    [activeSessionId, ensureSessionChat]
-  );
+  }, [getOrCreatePersistedChat, setActiveChatId, store]);
 
   return {
     store,
@@ -215,7 +239,6 @@ export function useChatSessions({
     activeChatId,
     selectChat,
     startNewChat,
-    ensureActiveChat,
     persistSessionMessages,
   };
 }

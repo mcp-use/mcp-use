@@ -13,6 +13,8 @@ export interface PendingChatTurn {
   serverId: string;
   /** Chat session that owns the interrupted turn. */
   sessionId: string;
+  /** Persisted id when the storage backend minted one instead of adopting the session id. */
+  persistedChatId?: string;
   userInput: string;
   promptResults: PromptResult[];
   attachments: MessageAttachment[];
@@ -46,6 +48,8 @@ function isPendingChatTurn(value: unknown): value is PendingChatTurn {
   return (
     typeof value.serverId === "string" &&
     typeof value.sessionId === "string" &&
+    (value.persistedChatId === undefined ||
+      typeof value.persistedChatId === "string") &&
     typeof value.userInput === "string" &&
     Array.isArray(value.promptResults) &&
     Array.isArray(value.attachments) &&

@@ -54,7 +54,6 @@ import { createChatSessionId } from "./chat-session";
 import {
   resolveStateAction,
   useChatSession,
-  useChatSessionField,
   useChatSessionStore,
   type ChatSessionStore,
 } from "./chat-session-store";
@@ -109,7 +108,7 @@ export function useChatMessagesClientSide({
     store.seed(activeSessionId, initialMessages);
   }
 
-  const session = useChatSession(store, activeSessionId);
+  const [session, updateSession] = useChatSession(store, activeSessionId);
   const {
     messages,
     isLoading,
@@ -131,34 +130,6 @@ export function useChatMessagesClientSide({
     },
     [activeSessionId, onMessagesChange, store]
   );
-  const setIsLoading = useChatSessionField(store, activeSessionId, "isLoading");
-  const setAttachments = useChatSessionField(
-    store,
-    activeSessionId,
-    "attachments"
-  );
-  const setTraceState = useChatSessionField(store, activeSessionId, "trace");
-  const setManagedChatNotice = useChatSessionField(
-    store,
-    activeSessionId,
-    "managedChatNotice"
-  );
-  const setPendingAuthorization = useChatSessionField(
-    store,
-    activeSessionId,
-    "pendingAuthorization"
-  );
-  const setAuthenticatingToolCallId = useChatSessionField(
-    store,
-    activeSessionId,
-    "authenticatingToolCallId"
-  );
-  const setToolAuthorizationError = useChatSessionField(
-    store,
-    activeSessionId,
-    "toolAuthorizationError"
-  );
-
   const recordTrace = useCallback(
     (event: InspectorTraceEventInput) => {
       const next = {
@@ -166,9 +137,11 @@ export function useChatMessagesClientSide({
         id: `trace-${++runtime.traceId}`,
         timestamp: Date.now(),
       } as InspectorTraceEvent;
-      setTraceState((state) => appendTraceEvent(state, next));
+      updateSession((current) => ({
+        trace: appendTraceEvent(current.trace, next),
+      }));
     },
-    [runtime, setTraceState]
+    [runtime, updateSession]
   );
 
   const sendMessage = useCallback(
@@ -231,8 +204,7 @@ export function useChatMessagesClientSide({
       if (!isResuming) {
         setMessages(baseMessages);
       }
-      setIsLoading(true);
-      setAttachments([]);
+      updateSession({ isLoading: true, attachments: [] });
 
       runtime.abortController = new AbortController();
       const startTime = Date.now();
@@ -366,8 +338,10 @@ export function useChatMessagesClientSide({
                 if (!toolPart?.toolInvocation || !toolCallId) throw error;
 
                 toolPart.toolInvocation.state = "authorization-required";
-                setPendingAuthorization({ toolCallId, replay: replayTurn });
-                setToolAuthorizationError(null);
+                updateSession({
+                  pendingAuthorization: { toolCallId, replay: replayTurn },
+                  toolAuthorizationError: null,
+                });
                 commitMessageParts();
 
                 await new Promise<void>((resolve, reject) => {
@@ -399,8 +373,10 @@ export function useChatMessagesClientSide({
                 });
 
                 toolPart.toolInvocation.state = "pending";
-                setPendingAuthorization(null);
-                setToolAuthorizationError(null);
+                updateSession({
+                  pendingAuthorization: null,
+                  toolAuthorizationError: null,
+                });
                 clearPendingChatTurn(retryServerId, activeSessionId);
                 commitMessageParts();
               }
@@ -615,7 +591,7 @@ export function useChatMessagesClientSide({
           ? managedNoticeFromLlmError(error)
           : null;
         if (notice) {
-          setManagedChatNotice(notice);
+          updateSession({ managedChatNotice: notice });
           setMessages((prev) =>
             prev.filter((m) => m.id !== assistantMessageId)
           );
@@ -672,7 +648,7 @@ export function useChatMessagesClientSide({
           throw new Error(errorDetail);
         }
       } finally {
-        setIsLoading(false);
+        updateSession({ isLoading: false });
         runtime.abortController = null;
         runtime.sendInProgress = false;
       }
@@ -693,12 +669,8 @@ export function useChatMessagesClientSide({
       runtime,
       systemPrompt,
       skills,
-      setAttachments,
-      setIsLoading,
-      setManagedChatNotice,
       setMessages,
-      setPendingAuthorization,
-      setToolAuthorizationError,
+      updateSession,
     ]
   );
 
@@ -711,9 +683,18 @@ export function useChatMessagesClientSide({
         return;
       }
 
-      savePendingChatTurn(pendingAuthorization.replay);
-      setAuthenticatingToolCallId(toolCallId);
-      setToolAuthorizationError(null);
+      const currentSession = store.get(activeSessionId);
+      const persistedChatId =
+        currentSession.persistedChatId ??
+        (currentSession.creation ? await currentSession.creation : null);
+      savePendingChatTurn({
+        ...pendingAuthorization.replay,
+        ...(persistedChatId ? { persistedChatId } : {}),
+      });
+      updateSession({
+        authenticatingToolCallId: toolCallId,
+        toolAuthorizationError: null,
+      });
       try {
         await connection.authenticate();
         const gate = runtime.authorizationGate;
@@ -723,11 +704,12 @@ export function useChatMessagesClientSide({
         }
       } catch (error) {
         clearPendingChatTurn(retryServerId, activeSessionId);
-        setToolAuthorizationError(
-          error instanceof Error ? error.message : "Authentication failed"
-        );
+        updateSession({
+          toolAuthorizationError:
+            error instanceof Error ? error.message : "Authentication failed",
+        });
       } finally {
-        setAuthenticatingToolCallId(null);
+        updateSession({ authenticatingToolCallId: null });
       }
     },
     [
@@ -737,8 +719,8 @@ export function useChatMessagesClientSide({
       pendingAuthorization,
       retryServerId,
       runtime,
-      setAuthenticatingToolCallId,
-      setToolAuthorizationError,
+      store,
+      updateSession,
     ]
   );
 
@@ -777,26 +759,18 @@ export function useChatMessagesClientSide({
       new DOMException("Chat turn was cancelled", "AbortError")
     );
     runtime.authorizationGate = null;
-    setPendingAuthorization(null);
-    setAuthenticatingToolCallId(null);
-    setToolAuthorizationError(null);
     setMessages([]);
-    setTraceState(EMPTY_TRACE_STATE);
-    setManagedChatNotice(null);
-  }, [
-    activeSessionId,
-    retryServerId,
-    runtime,
-    setAuthenticatingToolCallId,
-    setManagedChatNotice,
-    setMessages,
-    setPendingAuthorization,
-    setToolAuthorizationError,
-    setTraceState,
-  ]);
+    updateSession({
+      pendingAuthorization: null,
+      authenticatingToolCallId: null,
+      toolAuthorizationError: null,
+      trace: EMPTY_TRACE_STATE,
+      managedChatNotice: null,
+    });
+  }, [activeSessionId, retryServerId, runtime, setMessages, updateSession]);
   const clearTrace = useCallback(
-    () => setTraceState(EMPTY_TRACE_STATE),
-    [setTraceState]
+    () => updateSession({ trace: EMPTY_TRACE_STATE }),
+    [updateSession]
   );
 
   const stop = useCallback(() => {
@@ -808,13 +782,13 @@ export function useChatMessagesClientSide({
       try {
         const attachment = await fileToAttachment(file);
 
-        setAttachments((prev) => {
-          const newAttachments = [...prev, attachment];
+        updateSession((current) => {
+          const newAttachments = [...current.attachments, attachment];
           if (!isValidTotalSize(newAttachments)) {
             alert("Total attachment size exceeds 20MB limit");
-            return prev;
+            return {};
           }
-          return newAttachments;
+          return { attachments: newAttachments };
         });
       } catch (error) {
         if (error instanceof Error) {
@@ -824,29 +798,31 @@ export function useChatMessagesClientSide({
         }
       }
     },
-    [setAttachments]
+    [updateSession]
   );
 
   const removeAttachment = useCallback(
     (index: number) => {
-      setAttachments((prev) => prev.filter((_, i) => i !== index));
+      updateSession((current) => ({
+        attachments: current.attachments.filter((_, i) => i !== index),
+      }));
     },
-    [setAttachments]
+    [updateSession]
   );
 
   const clearAttachments = useCallback(() => {
-    setAttachments([]);
-  }, [setAttachments]);
+    updateSession({ attachments: [] });
+  }, [updateSession]);
 
   const clearManagedChatNotice = useCallback(() => {
-    setManagedChatNotice(null);
-  }, [setManagedChatNotice]);
+    updateSession({ managedChatNotice: null });
+  }, [updateSession]);
 
   const showManagedChatNotice = useCallback(
     (notice: ManagedChatNotice) => {
-      setManagedChatNotice(notice);
+      updateSession({ managedChatNotice: notice });
     },
-    [setManagedChatNotice]
+    [updateSession]
   );
 
   return {

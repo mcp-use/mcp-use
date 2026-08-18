@@ -101,11 +101,18 @@ export function useChatSessionStore(): ChatSessionStore {
   return storeRef.current;
 }
 
-/** Subscribes to one session; other sessions' updates never re-render here. */
+/**
+ * Subscribes to one session and returns an updater bound to that session id.
+ * An in-flight callback therefore keeps writing to its original session after
+ * the UI switches elsewhere, while unrelated session updates do not re-render.
+ */
 export function useChatSession(
   store: ChatSessionStore,
   sessionId: string
-): ChatSessionState {
+): readonly [
+  ChatSessionState,
+  (update: ChatSessionUpdate) => ChatSessionState,
+] {
   const subscribe = useCallback(
     (onStoreChange: () => void) => store.subscribe(sessionId, onStoreChange),
     [store, sessionId]
@@ -114,29 +121,10 @@ export function useChatSession(
     () => store.get(sessionId),
     [store, sessionId]
   );
-  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-}
-
-/**
- * `useState`-style setter bound to one field of one session. The session id is
- * captured, so an in-flight turn keeps writing to its own record after the user
- * has moved on to another chat.
- */
-export function useChatSessionField<K extends keyof ChatSessionPatch>(
-  store: ChatSessionStore,
-  sessionId: string,
-  field: K
-): (action: SetStateAction<ChatSessionState[K]>) => void {
-  return useCallback(
-    (action: SetStateAction<ChatSessionState[K]>) => {
-      store.update(
-        sessionId,
-        (session) =>
-          ({
-            [field]: resolveStateAction(session[field], action),
-          }) as ChatSessionPatch
-      );
-    },
-    [field, sessionId, store]
+  const session = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  const updateSession = useCallback(
+    (update: ChatSessionUpdate) => store.update(sessionId, update),
+    [sessionId, store]
   );
+  return [session, updateSession] as const;
 }

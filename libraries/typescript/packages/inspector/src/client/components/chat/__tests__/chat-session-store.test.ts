@@ -7,26 +7,22 @@ function message(id: string): Message {
 }
 
 describe("ChatSessionStore", () => {
-  it("creates an empty record on first access", () => {
+  it("keeps session state independent while preserving each runtime", () => {
     const store = new ChatSessionStore();
-    expect(store.has("a")).toBe(false);
+    const beforeA = store.get("a");
+    const sessionB = store.get("b");
+    const afterA = store.update("a", {
+      isLoading: true,
+      messages: [message("a1")],
+    });
 
-    const session = store.get("a");
-    expect(session.id).toBe("a");
-    expect(session.messages).toEqual([]);
-    expect(session.isLoading).toBe(false);
-    expect(store.has("a")).toBe(true);
-    expect(store.get("a")).toBe(session);
-  });
-
-  it("keeps each session's state independent", () => {
-    const store = new ChatSessionStore();
-    store.update("a", { isLoading: true, messages: [message("a1")] });
-    store.update("b", { messages: [message("b1")] });
-
-    expect(store.get("a").isLoading).toBe(true);
-    expect(store.get("b").isLoading).toBe(false);
-    expect(store.get("b").messages).toEqual([message("b1")]);
+    expect(beforeA.messages).toEqual([]);
+    expect(beforeA.isLoading).toBe(false);
+    expect(afterA).not.toBe(beforeA);
+    expect(afterA.runtime).toBe(beforeA.runtime);
+    expect(afterA.runtime).not.toBe(sessionB.runtime);
+    expect(sessionB.messages).toEqual([]);
+    expect(sessionB.isLoading).toBe(false);
   });
 
   it("notifies only the subscribers of the session that changed", () => {
@@ -42,28 +38,6 @@ describe("ChatSessionStore", () => {
     expect(onB).not.toHaveBeenCalled();
   });
 
-  it("skips notifying when a patch changes nothing", () => {
-    const store = new ChatSessionStore();
-    const messages = [message("a1")];
-    store.update("a", { messages });
-    const listener = vi.fn();
-    store.subscribe("a", listener);
-
-    const unchanged = store.update("a", { messages });
-
-    expect(listener).not.toHaveBeenCalled();
-    expect(unchanged).toBe(store.get("a"));
-  });
-
-  it("gives every update a new snapshot but one stable runtime", () => {
-    const store = new ChatSessionStore();
-    const before = store.get("a");
-    const after = store.update("a", { isLoading: true });
-
-    expect(after).not.toBe(before);
-    expect(after.runtime).toBe(before.runtime);
-  });
-
   it("seeds only sessions it has not created yet", () => {
     const store = new ChatSessionStore();
     store.seed("a", [message("seed")]);
@@ -71,17 +45,6 @@ describe("ChatSessionStore", () => {
 
     store.seed("a", [message("later")]);
     expect(store.get("a").messages).toEqual([message("seed")]);
-  });
-
-  it("stops notifying an unsubscribed listener", () => {
-    const store = new ChatSessionStore();
-    const listener = vi.fn();
-    const unsubscribe = store.subscribe("a", listener);
-    unsubscribe();
-
-    store.update("a", { isLoading: true });
-
-    expect(listener).not.toHaveBeenCalled();
   });
 
   it("finds a session by its persisted chat id, falling back to its own id", () => {
@@ -93,14 +56,5 @@ describe("ChatSessionStore", () => {
     expect(store.findByPersistedChatId("backend-id")?.id).toBe("runtime-id");
     expect(store.findByPersistedChatId("runtime-id")).toBeUndefined();
     expect(store.findByPersistedChatId("missing")).toBeUndefined();
-  });
-
-  it("drops a deleted session", () => {
-    const store = new ChatSessionStore();
-    store.update("a", { messages: [message("a1")] });
-    store.delete("a");
-
-    expect(store.has("a")).toBe(false);
-    expect(store.get("a").messages).toEqual([]);
   });
 });

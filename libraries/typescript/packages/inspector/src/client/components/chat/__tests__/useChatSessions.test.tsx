@@ -9,7 +9,7 @@ import type {
 } from "../../../chat-history/types";
 import { savePendingChatTurn } from "../chat-auth-retry";
 import type { ChatSessionState } from "../chat-session";
-import { useChatSession } from "../chat-session-store";
+import { useChatSession, type ChatSessionUpdate } from "../chat-session-store";
 import { useChatSessions, type ChatSessions } from "../useChatSessions";
 import type { Message } from "../types";
 
@@ -75,6 +75,7 @@ class BackendIdChatStorage extends FakeChatStorage {
 interface Harness {
   sessions: ChatSessions;
   session: ChatSessionState;
+  updateSession: (update: ChatSessionUpdate) => ChatSessionState;
 }
 
 function userMessage(text: string): Message {
@@ -90,22 +91,22 @@ function assistantMessage(text: string): Message {
   };
 }
 
-/**
- * Mimics a chat hook's send: the session id is captured when the turn starts,
- * so every later write lands on that session even if the user moves on.
- */
-function startTurn(sessions: ChatSessions, text: string) {
+function startTurn(current: Harness, text: string) {
+  const { sessions, updateSession } = current;
   const sessionId = sessions.activeSessionId;
-  const store = sessions.store;
-  const sent = [...store.get(sessionId).messages, userMessage(text)];
-  store.update(sessionId, { isLoading: true, messages: sent });
-  sessions.persistSessionMessages(sessionId, sent);
+  const sent = updateSession((session) => ({
+    isLoading: true,
+    messages: [...session.messages, userMessage(text)],
+  }));
+  sessions.persistSessionMessages(sessionId, sent.messages);
   return {
     sessionId,
     finish(reply: string) {
-      const done = [...store.get(sessionId).messages, assistantMessage(reply)];
-      store.update(sessionId, { isLoading: false, messages: done });
-      sessions.persistSessionMessages(sessionId, done);
+      const done = updateSession((session) => ({
+        isLoading: false,
+        messages: [...session.messages, assistantMessage(reply)],
+      }));
+      sessions.persistSessionMessages(sessionId, done.messages);
     },
   };
 }
@@ -129,8 +130,11 @@ describe("useChatSessions", () => {
       onActiveChatIdChange: props.onActiveChatIdChange,
       initialMessages: props.initialMessages,
     });
-    const session = useChatSession(sessions.store, sessions.activeSessionId);
-    harness = { sessions, session };
+    const [session, updateSession] = useChatSession(
+      sessions.store,
+      sessions.activeSessionId
+    );
+    harness = { sessions, session, updateSession };
     return null;
   }
 
@@ -175,7 +179,7 @@ describe("useChatSessions", () => {
     const sessionId = harness.sessions.activeSessionId;
 
     await act(async () => {
-      startTurn(harness.sessions, "hello").finish("hi");
+      startTurn(harness, "hello").finish("hi");
     });
 
     expect(storage.createChatCalls).toEqual([sessionId]);
@@ -190,7 +194,7 @@ describe("useChatSessions", () => {
 
     let turn!: ReturnType<typeof startTurn>;
     await act(async () => {
-      turn = startTurn(harness.sessions, "long running");
+      turn = startTurn(harness, "long running");
     });
     expect(harness.session.isLoading).toBe(true);
 
@@ -208,7 +212,7 @@ describe("useChatSessions", () => {
     // The background turn finishes against the chat that started it.
     await act(async () => {
       turn.finish("done");
-      startTurn(harness.sessions, "second chat");
+      startTurn(harness, "second chat");
     });
 
     expect(
@@ -226,7 +230,7 @@ describe("useChatSessions", () => {
 
     let turn!: ReturnType<typeof startTurn>;
     await act(async () => {
-      turn = startTurn(harness.sessions, "first");
+      turn = startTurn(harness, "first");
     });
     await act(async () => {
       await harness.sessions.startNewChat();
@@ -259,7 +263,7 @@ describe("useChatSessions", () => {
 
     let turn!: ReturnType<typeof startTurn>;
     await act(async () => {
-      turn = startTurn(harness.sessions, "streaming");
+      turn = startTurn(harness, "streaming");
     });
     await act(async () => {
       await harness.sessions.startNewChat();
@@ -290,7 +294,7 @@ describe("useChatSessions", () => {
     await render(<ControlledProbe storage={storage} />);
 
     await act(async () => {
-      startTurn(harness.sessions, "first").finish("reply");
+      startTurn(harness, "first").finish("reply");
     });
     const firstSessionId = harness.sessions.activeSessionId;
     expect(harness.sessions.activeChatId).toBe(firstSessionId);
@@ -307,6 +311,33 @@ describe("useChatSessions", () => {
     );
     expect(harness.session.messages).toEqual([]);
     expect(harness.session.isLoading).toBe(false);
+  });
+
+  it("applies controlled messages to the chat selected in the same render", async () => {
+    const storage = new FakeChatStorage();
+    const firstMessages = [userMessage("first")];
+    const secondMessages = [userMessage("second")];
+
+    await render(
+      <Probe
+        storage={storage}
+        activeChatId="chat-1"
+        initialMessages={firstMessages}
+      />
+    );
+    await render(
+      <Probe
+        storage={storage}
+        activeChatId="chat-2"
+        initialMessages={secondMessages}
+      />
+    );
+
+    expect(harness.sessions.activeSessionId).toBe("chat-2");
+    expect(harness.session.messages).toEqual(secondMessages);
+    expect(harness.sessions.store.get("chat-1").messages).toEqual(
+      firstMessages
+    );
   });
 
   it("reopens the session an OAuth redirect interrupted", async () => {
@@ -335,6 +366,36 @@ describe("useChatSessions", () => {
     expect(harness.sessions.activeSessionId).not.toBe(interrupted);
   });
 
+  it("restores a backend-minted chat id after an OAuth redirect", async () => {
+    const storage = new BackendIdChatStorage();
+    await storage.createChat({ agentId: AGENT_ID });
+    storage.createChatCalls = [];
+    savePendingChatTurn({
+      serverId: SERVER_ID,
+      sessionId: "runtime-session",
+      persistedChatId: "backend-1",
+      userInput: "read my profile",
+      promptResults: [],
+      attachments: [],
+      baseMessages: [userMessage("read my profile")],
+    });
+
+    await render(<Probe storage={storage} />);
+    await act(async () => {
+      harness.sessions.persistSessionMessages("runtime-session", [
+        userMessage("resumed"),
+      ]);
+      await Promise.resolve();
+    });
+
+    expect(harness.sessions.activeSessionId).toBe("runtime-session");
+    expect(harness.sessions.activeChatId).toBe("backend-1");
+    expect(storage.createChatCalls).toEqual([]);
+    expect(storage.messages.get("backend-1")?.map((m) => m.content)).toEqual([
+      "resumed",
+    ]);
+  });
+
   it("ignores a restored turn that belongs to another chat in controlled mode", async () => {
     const storage = new FakeChatStorage();
     savePendingChatTurn({
@@ -358,7 +419,7 @@ describe("useChatSessions", () => {
     const sessionId = harness.sessions.activeSessionId;
 
     await act(async () => {
-      startTurn(harness.sessions, "hello").finish("hi");
+      startTurn(harness, "hello").finish("hi");
     });
 
     const chatId = harness.sessions.activeChatId;
@@ -377,6 +438,32 @@ describe("useChatSessions", () => {
     expect(harness.session.messages).toHaveLength(2);
   });
 
+  it("treats a controlled chat id as an existing persisted chat", async () => {
+    const storage = new BackendIdChatStorage();
+    await storage.createChat({ agentId: AGENT_ID });
+    storage.createChatCalls = [];
+
+    await render(
+      <Probe
+        storage={storage}
+        activeChatId="backend-1"
+        initialMessages={[userMessage("existing")]}
+      />
+    );
+
+    await act(async () => {
+      harness.sessions.persistSessionMessages("backend-1", [
+        userMessage("updated"),
+      ]);
+      await Promise.resolve();
+    });
+
+    expect(storage.createChatCalls).toEqual([]);
+    expect(storage.messages.get("backend-1")?.map((m) => m.content)).toEqual([
+      "updated",
+    ]);
+  });
+
   it("creates one chat when a session is written to concurrently", async () => {
     const storage = new FakeChatStorage();
     await render(<Probe storage={storage} />);
@@ -390,11 +477,29 @@ describe("useChatSessions", () => {
         userMessage("a"),
         assistantMessage("b"),
       ]);
-      await sessions.ensureActiveChat();
+      await Promise.resolve();
     });
 
     expect(storage.createChatCalls).toHaveLength(1);
     expect(storage.chats.size).toBe(1);
+  });
+
+  it("persists an empty message list when clearing an existing chat", async () => {
+    const storage = new FakeChatStorage();
+    await render(<Probe storage={storage} />);
+
+    await act(async () => {
+      startTurn(harness, "hello").finish("hi");
+    });
+    const sessionId = harness.sessions.activeSessionId;
+    expect(storage.messages.get(sessionId)).toHaveLength(2);
+
+    await act(async () => {
+      harness.sessions.persistSessionMessages(sessionId, []);
+      await Promise.resolve();
+    });
+
+    expect(storage.messages.get(sessionId)).toEqual([]);
   });
 
   it("works without storage, giving each new chat its own session", async () => {
@@ -402,7 +507,7 @@ describe("useChatSessions", () => {
     const first = harness.sessions.activeSessionId;
 
     await act(async () => {
-      startTurn(harness.sessions, "hello");
+      startTurn(harness, "hello");
     });
     await act(async () => {
       await harness.sessions.startNewChat();
