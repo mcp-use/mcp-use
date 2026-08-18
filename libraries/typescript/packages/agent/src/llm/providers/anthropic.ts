@@ -8,7 +8,7 @@ import type {
   ProviderTool,
   TokenUsage,
 } from "../types.js";
-import { tokenUsageFromRecord } from "../usage.js";
+import { mergeTokenUsage, tokenUsageFromRecord } from "../usage.js";
 
 interface ChatParams {
   config: ProviderConfig;
@@ -205,7 +205,14 @@ export async function* streamChat(
       usage = tokenUsageFromRecord(parsed?.message?.usage);
     } else if (t === "message_delta") {
       const deltaUsage = tokenUsageFromRecord(parsed?.usage);
-      if (deltaUsage) usage = { ...usage, ...deltaUsage };
+      if (deltaUsage) {
+        // `message_delta` carries `output_tokens` only. A spread merge replaced the input
+        // and cache counters captured at `message_start` with `undefined`, because
+        // `tokenUsageFromRecord` returns every key and sets absent ones to `undefined`.
+        usage = mergeTokenUsage(usage, deltaUsage);
+        // The total is deliberately not recomputed here. `message_stop` owns it, so there
+        // is one place that knows how Anthropic bills rather than two that can drift.
+      }
     } else if (t === "content_block_start") {
       const idx = parsed.index as number;
       const cb = parsed.content_block ?? {};
@@ -279,11 +286,19 @@ export async function* streamChat(
       }
     } else if (t === "message_stop") {
       if (usage) {
+        // Anthropic reports the cache counters alongside `input_tokens` and bills all of
+        // them, so input + output understates the call. `message_delta` revises
+        // `output_tokens` after `message_start` set a total, so the earlier total is stale
+        // by this point and is recomputed rather than trusted.
+        const billed =
+          (usage.inputTokens ?? 0) +
+          (usage.cachedInputTokens ?? 0) +
+          (usage.cacheCreationInputTokens ?? 0) +
+          (usage.outputTokens ?? 0);
         const totalTokens =
-          usage.totalTokens ??
-          (usage.inputTokens !== undefined && usage.outputTokens !== undefined
-            ? usage.inputTokens + usage.outputTokens
-            : undefined);
+          usage.inputTokens === undefined && usage.outputTokens === undefined
+            ? usage.totalTokens
+            : billed;
         yield { type: "usage", usage: { ...usage, totalTokens } };
       }
     } else if (t === "error") {
