@@ -47,9 +47,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.auth_provider = auth_provider
         self.exclude_paths = (
-            exclude_paths
-            if exclude_paths is not None
-            else ["/health", "/docs", "/inspector", "/openmcp.json"]
+            exclude_paths if exclude_paths is not None else ["/health", "/docs", "/inspector", "/openmcp.json"]
         )
         self.protected_paths = protected_paths if protected_paths is not None else ["/mcp"]
 

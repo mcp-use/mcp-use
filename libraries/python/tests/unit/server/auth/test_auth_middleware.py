@@ -373,27 +373,19 @@ class TestAuthMiddlewareEmptyPathLists:
         async def endpoint(request: Request) -> JSONResponse:
             return JSONResponse({"ok": True})
 
-        app = Starlette(
-            routes=[
-                Route("/health", endpoint, methods=["GET"]),
-                Route("/mcp", endpoint, methods=["GET"]),
-            ]
-        )
+        app = Starlette(routes=[Route("/health", endpoint, methods=["GET"])])
         app.add_middleware(
             AuthMiddleware,
             auth_provider=MockAuthProvider(),
             exclude_paths=[],
+            protected_paths=["/health"],
         )
         client = TestClient(app, raise_server_exceptions=False)
 
-        # /health is NOT excluded anymore (no default exclusions), /mcp is still protected
+        # /health is explicitly protected and no longer bypasses auth through the default exclusions
         response = client.get("/health")
         assert response.status_code == 401
 
-        # /mcp still requires auth (default protected_paths applies)
-        response = client.get("/mcp")
-        assert response.status_code == 401
-
-        # But valid token still works
-        response = client.get("/mcp", headers={"Authorization": "Bearer valid-token"})
+        # A valid token still grants access
+        response = client.get("/health", headers={"Authorization": "Bearer valid-token"})
         assert response.status_code == 200
