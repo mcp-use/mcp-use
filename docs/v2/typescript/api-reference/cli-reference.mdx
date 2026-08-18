@@ -485,9 +485,9 @@ mcp-use servers env <subcommand> [options]
 
 | Subcommand                 | Purpose                                   | Required arguments       | Other options                 |
 | -------------------------- | ----------------------------------------- | ------------------------ | ----------------------------- |
-| `list <server>`            | List environment variable metadata.       | Server ID or slug        | `--branch <name>`             |
-| `set <server> <KEY=VALUE>` | Create or update an environment variable. | Server ID or slug, value | `--branch <name>`, `--secret` |
-| `unset <server> <key>`     | Delete an environment variable by key.    | Server ID or slug, key   | `--branch <name>`, `--yes`    |
+| `list <server>`            | List environment variable metadata.       | Server ID or slug        | `--org <id-or-slug>`, `--branch <name>`             |
+| `set <server> <KEY=VALUE>` | Create or update an environment variable. | Server ID or slug, value | `--org <id-or-slug>`, `--branch <name>`, `--secret` |
+| `unset <server> <key>`     | Delete an environment variable by key.    | Server ID or slug, key   | `--org <id-or-slug>`, `--branch <name>`, `--yes`    |
 
 **Examples:**
 
