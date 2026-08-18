@@ -61,6 +61,27 @@ import {
 // Type alias for backward compatibility
 type MCPConnection = McpServer;
 
+// Chat history is optional. Give an in-flight creation a short chance to
+// provide a backend-minted id for redirect recovery, but never let it prevent
+// the user from starting OAuth indefinitely.
+const CHAT_CREATION_AUTH_WAIT_MS = 1_000;
+
+async function waitForPersistedChatId(
+  creation: Promise<string | null>
+): Promise<string | null> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      creation,
+      new Promise<null>((resolve) => {
+        timeout = setTimeout(resolve, CHAT_CREATION_AUTH_WAIT_MS, null);
+      }),
+    ]);
+  } finally {
+    if (timeout !== undefined) clearTimeout(timeout);
+  }
+}
+
 interface UseChatMessagesClientSideProps {
   /** Store holding one record per chat session. Defaults to a private store. */
   sessionStore?: ChatSessionStore;
@@ -676,26 +697,31 @@ export function useChatMessagesClientSide({
 
   const authenticatePendingTool = useCallback(
     async (toolCallId: string) => {
+      const currentSession = store.get(activeSessionId);
+      const currentAuthorization = currentSession.pendingAuthorization;
       if (
-        pendingAuthorization?.toolCallId !== toolCallId ||
-        authenticatingToolCallId
+        currentAuthorization?.toolCallId !== toolCallId ||
+        currentSession.authenticatingToolCallId
       ) {
         return;
       }
 
-      const currentSession = store.get(activeSessionId);
-      const persistedChatId =
-        currentSession.persistedChatId ??
-        (currentSession.creation ? await currentSession.creation : null);
-      savePendingChatTurn({
-        ...pendingAuthorization.replay,
-        ...(persistedChatId ? { persistedChatId } : {}),
-      });
+      // Store updates are synchronous, so this is also the lock against rapid
+      // repeated calls before React has had a chance to re-render.
       updateSession({
         authenticatingToolCallId: toolCallId,
         toolAuthorizationError: null,
       });
       try {
+        const persistedChatId =
+          currentSession.persistedChatId ??
+          (currentSession.creation
+            ? await waitForPersistedChatId(currentSession.creation)
+            : null);
+        savePendingChatTurn({
+          ...currentAuthorization.replay,
+          ...(persistedChatId ? { persistedChatId } : {}),
+        });
         await connection.authenticate();
         const gate = runtime.authorizationGate;
         if (gate?.toolCallId === toolCallId) {
@@ -712,16 +738,7 @@ export function useChatMessagesClientSide({
         updateSession({ authenticatingToolCallId: null });
       }
     },
-    [
-      activeSessionId,
-      authenticatingToolCallId,
-      connection,
-      pendingAuthorization,
-      retryServerId,
-      runtime,
-      store,
-      updateSession,
-    ]
+    [activeSessionId, connection, retryServerId, runtime, store, updateSession]
   );
 
   // A full-page OAuth redirect drops the turn that was in flight. The session it

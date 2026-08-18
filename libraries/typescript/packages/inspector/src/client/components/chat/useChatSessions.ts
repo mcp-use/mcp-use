@@ -69,15 +69,17 @@ export function useChatSessions({
     const resumable =
       pendingTurnOnMount != null &&
       (!controlledActiveChatId ||
-        pendingTurnOnMount.sessionId === controlledActiveChatId);
+        pendingTurnOnMount.sessionId === controlledActiveChatId ||
+        pendingTurnOnMount.persistedChatId === controlledActiveChatId);
     const sessionId =
-      controlledActiveChatId ??
-      (resumable ? pendingTurnOnMount.sessionId : createChatSessionId());
+      resumable && pendingTurnOnMount
+        ? pendingTurnOnMount.sessionId
+        : (controlledActiveChatId ?? createChatSessionId());
     const seed = resumable ? pendingTurnOnMount.baseMessages : initialMessages;
     store.seed(sessionId, seed ?? []);
-    const persistedChatId =
-      controlledActiveChatId ??
-      (resumable ? pendingTurnOnMount.persistedChatId : undefined);
+    const persistedChatId = resumable
+      ? (pendingTurnOnMount.persistedChatId ?? controlledActiveChatId)
+      : controlledActiveChatId;
     if (persistedChatId) store.update(sessionId, { persistedChatId });
     return sessionId;
   });
@@ -103,6 +105,23 @@ export function useChatSessions({
     },
     [isControlled, onActiveChatIdChange]
   );
+
+  // A callback marks the hook as host-controlled even when the host has not
+  // supplied an id yet. Publish an OAuth-restored persisted id once so that
+  // callback-only hosts can reconnect their external state to the session.
+  const restoredChatReportedRef = useRef(false);
+  useEffect(() => {
+    if (
+      restoredChatReportedRef.current ||
+      controlledActiveChatId !== undefined ||
+      !onActiveChatIdChange ||
+      !pendingTurnOnMount?.persistedChatId
+    ) {
+      return;
+    }
+    restoredChatReportedRef.current = true;
+    onActiveChatIdChange(pendingTurnOnMount.persistedChatId);
+  }, [controlledActiveChatId, onActiveChatIdChange, pendingTurnOnMount]);
 
   // Under host control the chat id names the session; clearing it leaves the
   // session that was just started alone.

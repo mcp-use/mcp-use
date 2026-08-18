@@ -396,6 +396,63 @@ describe("useChatSessions", () => {
     ]);
   });
 
+  it("resumes a controlled backend-minted chat using its runtime session", async () => {
+    const storage = new BackendIdChatStorage();
+    const restoredMessages = [userMessage("read my profile")];
+    savePendingChatTurn({
+      serverId: SERVER_ID,
+      sessionId: "runtime-session",
+      persistedChatId: "backend-1",
+      userInput: "read my profile",
+      promptResults: [],
+      attachments: [],
+      baseMessages: restoredMessages,
+    });
+
+    await render(
+      <Probe storage={storage} activeChatId="backend-1" initialMessages={[]} />
+    );
+
+    expect(harness.sessions.activeSessionId).toBe("runtime-session");
+    expect(harness.sessions.activeChatId).toBe("backend-1");
+    expect(harness.session.messages).toEqual(restoredMessages);
+    expect(harness.sessions.store.get("runtime-session").persistedChatId).toBe(
+      "backend-1"
+    );
+  });
+
+  it("reports a restored chat id to a callback-only controlled host", async () => {
+    const storage = new BackendIdChatStorage();
+    const reportedChatIds: (string | null)[] = [];
+    savePendingChatTurn({
+      serverId: SERVER_ID,
+      sessionId: "runtime-session",
+      persistedChatId: "backend-1",
+      userInput: "read my profile",
+      promptResults: [],
+      attachments: [],
+      baseMessages: [userMessage("read my profile")],
+    });
+
+    await render(
+      <Probe
+        storage={storage}
+        onActiveChatIdChange={(chatId) => reportedChatIds.push(chatId)}
+      />
+    );
+
+    expect(harness.sessions.activeSessionId).toBe("runtime-session");
+    expect(reportedChatIds).toEqual(["backend-1"]);
+
+    await render(
+      <Probe
+        storage={storage}
+        onActiveChatIdChange={(chatId) => reportedChatIds.push(chatId)}
+      />
+    );
+    expect(reportedChatIds).toEqual(["backend-1"]);
+  });
+
   it("ignores a restored turn that belongs to another chat in controlled mode", async () => {
     const storage = new FakeChatStorage();
     savePendingChatTurn({
