@@ -21,8 +21,8 @@ Optional `audience` is an extra value that must also appear in `aud`. It does no
 ## Configure the server
 
 ```bash
-SCALEKIT_ENVIRONMENT_URL=https://your-env.scalekit.dev
-SCALEKIT_RESOURCE_ID=res_your_resource
+MCP_USE_OAUTH_SCALEKIT_ENVIRONMENT_URL=https://your-env.scalekit.dev
+MCP_USE_OAUTH_SCALEKIT_RESOURCE_ID=res_your_resource
 MCP_URL=https://mcp.example.com/mcp
 ```
 
@@ -30,18 +30,10 @@ MCP_URL=https://mcp.example.com/mcp
 import { MCPServer } from "mcp-use";
 import { oauthScalekitProvider } from "mcp-use/oauth/scalekit";
 
-const environmentUrl = process.env.SCALEKIT_ENVIRONMENT_URL;
-const resourceId = process.env.SCALEKIT_RESOURCE_ID;
-if (!environmentUrl) throw new Error("SCALEKIT_ENVIRONMENT_URL is required");
-if (!resourceId) throw new Error("SCALEKIT_RESOURCE_ID is required");
-
 const server = new MCPServer({
   name: "scalekit-server",
   version: "1.0.0",
-  oauth: oauthScalekitProvider({
-    environmentUrl,
-    resourceId,
-  }),
+  oauth: oauthScalekitProvider(),
 });
 
 export default server;
