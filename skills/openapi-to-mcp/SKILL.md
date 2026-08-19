@@ -80,7 +80,7 @@ npm install @apidevtools/swagger-parser dotenv
 
 What you get from `blank` (`mcp-apps` is a superset with `resources/` + widget infrastructure):
 
-- `index.ts` at the root with a configured `MCPServer` instance — `name`, `title`, `version`, `description`, `baseUrl`, `favicon`, and an `icons[]` array. Commented-out examples for tools, resources, and prompts. Listens on `process.env.PORT` (default 3000).
+- `index.ts` at the root with a configured `MCPServer` instance — `name`, `title`, `version`, `description`. Commented-out examples for tools, resources, and prompts. Listens on `process.env.PORT` (default 3000).
 - `package.json` with scripts wired to the `mcp-use` CLI: `dev` (hot reload + inspector), `build`, `start`, `deploy`. `tsx`, `zod`, and `typescript` are already in dev/regular deps; don't reinstall them.
 - `tsconfig.json` pre-configured for ESM (`"type": "module"`).
 - `public/` with a favicon and an SVG icon — served as static assets.
@@ -162,14 +162,13 @@ import { operations } from "./src/operations";
 import { callOperation } from "./src/client";
 import { operationToZod } from "./src/schema";
 
-// Keep the MCPServer fields the scaffold gave you (title, baseUrl, favicon, icons).
+// Keep the MCPServer fields from the example (title, favicon, icons).
 // Just adjust `name`, `title`, and `description` to match the API you're wrapping.
 const server = new MCPServer({
   name: "<api-name>",
   title: "<API name>",
   version: "1.0.0",
   description: "MCP server wrapping the <API name> REST API",
-  baseUrl: process.env.MCP_URL || "http://localhost:3000",
   favicon: "favicon.ico",
   icons: [{ src: "icon.svg", mimeType: "image/svg+xml", sizes: ["512x512"] }],
 });
