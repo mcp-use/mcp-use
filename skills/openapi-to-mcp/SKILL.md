@@ -162,7 +162,7 @@ import { operations } from "./src/operations";
 import { callOperation } from "./src/client";
 import { operationToZod } from "./src/schema";
 
-// Keep the MCPServer fields the scaffold gave you (title, favicon, icons).
+// Keep the MCPServer fields from the example (title, favicon, icons).
 // Just adjust `name`, `title`, and `description` to match the API you're wrapping.
 const server = new MCPServer({
   name: "<api-name>",
