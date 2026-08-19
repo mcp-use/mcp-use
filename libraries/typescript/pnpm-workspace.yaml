@@ -91,7 +91,7 @@ overrides:
   "@eslint/plugin-kit": ">=0.3.4"
   protobufjs: ">=7.5.6 <8"
   "@protobufjs/utf8": ">=1.1.1"
-  vitest: ">=4.1.9"
+  vitest: 4.1.10
   ws: ">=8.20.1"
   uuid: ">=13.0.1 <14"
   fast-uri: ">=3.1.4"
