@@ -80,7 +80,7 @@ npm install @apidevtools/swagger-parser dotenv
 
 What you get from `blank` (`mcp-apps` is a superset with `resources/` + widget infrastructure):
 
-- `index.ts` at the root with a configured `MCPServer` instance — `name`, `title`, `version`, `description`, `favicon`, and an `icons[]` array. Commented-out examples for tools, resources, and prompts. Listens on `process.env.PORT` (default 3000).
+- `index.ts` at the root with a configured `MCPServer` instance — `name`, `title`, `version`, `description`. Commented-out examples for tools, resources, and prompts. Listens on `process.env.PORT` (default 3000).
 - `package.json` with scripts wired to the `mcp-use` CLI: `dev` (hot reload + inspector), `build`, `start`, `deploy`. `tsx`, `zod`, and `typescript` are already in dev/regular deps; don't reinstall them.
 - `tsconfig.json` pre-configured for ESM (`"type": "module"`).
 - `public/` with a favicon and an SVG icon — served as static assets.
