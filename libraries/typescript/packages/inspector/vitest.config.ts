@@ -10,9 +10,6 @@ export default defineConfig({
       "src/**/__tests__/**/*.{test,spec}.{ts,tsx}",
     ],
     exclude: ["node_modules", "dist", "tests/e2e/**"],
-    // Matches agent, client, cli and server. These cases mount a server and
-    // decompress the bundled app, so a CI runner regularly needs several times
-    // the local wall clock for them.
     testTimeout: 60000,
     hookTimeout: 60000,
   },
