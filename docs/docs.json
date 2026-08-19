@@ -337,6 +337,7 @@
                               "v2/typescript/server/authentication/providers/keycloak",
                               "v2/typescript/server/authentication/providers/supabase",
                               "v2/typescript/server/authentication/providers/workos",
+                              "v2/typescript/server/authentication/providers/scalekit",
                               "v2/typescript/server/authentication/providers/custom"
                             ]
                           }

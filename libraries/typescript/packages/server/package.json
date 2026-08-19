@@ -81,6 +81,10 @@
       "types": "./dist/oauth/better-auth.d.ts",
       "import": "./dist/oauth/better-auth.js"
     },
+    "./oauth/scalekit": {
+      "types": "./dist/oauth/scalekit.d.ts",
+      "import": "./dist/oauth/scalekit.js"
+    },
     "./node": {
       "types": "./dist/node-bridge.d.ts",
       "import": "./dist/node-bridge.js",
