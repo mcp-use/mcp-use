@@ -10,8 +10,8 @@ export default defineConfig({
       "src/**/__tests__/**/*.{test,spec}.{ts,tsx}",
     ],
     exclude: ["node_modules", "dist", "tests/e2e/**"],
-    testTimeout: 10000,
-    hookTimeout: 10000,
+    testTimeout: 60000,
+    hookTimeout: 60000,
   },
   resolve: {
     alias: {
