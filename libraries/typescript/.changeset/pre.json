@@ -13,6 +13,7 @@
   "changesets": [
     "anthropic-cache-usage-agent",
     "anthropic-cache-usage-inspector",
+    "scalekit-oauth-provider",
     "scope-inspector-chat-sessions"
   ]
 }
