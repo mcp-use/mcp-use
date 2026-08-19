@@ -20,7 +20,7 @@ These factory functions build the `oauth` value you pass to [`new MCPServer({ ..
 
 There are two integration modes:
 
-- **DCR-direct providers** (`oauthAuth0Provider`, `oauthBetterAuthProvider`, `oauthClerkProvider`, `oauthKeycloakProvider`, `oauthScalekitProvider`, `oauthSupabaseProvider`, `oauthWorkOSProvider`, `oauthCustomProvider`). The MCP server proxies metadata discovery to the upstream authorization server and verifies tokens. Clients communicate directly with the upstream for authorize, token, and register.
+- **DCR-direct providers** (`oauthAuth0Provider`, `oauthBetterAuthProvider`, `oauthClerkProvider`, `oauthKeycloakProvider`, `oauthSupabaseProvider`, `oauthWorkOSProvider`, `oauthCustomProvider`). The MCP server proxies metadata discovery to the upstream authorization server and verifies tokens. Clients communicate directly with the upstream for authorize, token, and register.
 - **Proxy mode** (`oauthProxy`) for providers without Dynamic Client Registration support (Google, GitHub, Okta, Microsoft Entra ID, and enterprise IdPs). The server mediates the flow: it exposes a `/register` endpoint returning the configured `clientId`, injects `clientId`/`clientSecret` at token exchange, and passes upstream tokens through without minting its own.
 
 All factories import from `mcp-use/server`.
@@ -195,54 +195,6 @@ server.tool(
 );
 
 server.listen();
-```
-
-### oauthScalekitProvider
-
-Create a Scalekit OAuth provider for an MCP server.
-
-```ts
-import { oauthScalekitProvider } from "mcp-use/oauth/scalekit";
-```
-
-Builds an `OAuthProvider` backed by Scalekit MCP Auth. Advertised metadata uses the resource-scoped issuer. The verifier accepts both the environment-root issuer and the resource-scoped issuer, and binds audience to the `res_…` resource id. `environmentUrl` falls back to `MCP_USE_OAUTH_SCALEKIT_ENVIRONMENT_URL` and `resourceId` falls back to `MCP_USE_OAUTH_SCALEKIT_RESOURCE_ID`. Throws `Error` if `environmentUrl` or `resourceId` is missing, and `TypeError` if `resourceId` is empty or does not start with `res_`, or if `audience` is empty. An optional `audience` is required *together with* the resource id. It does not replace the `res_…` check.
-
-**Parameters**
-
-> <ParamField body="options" type="ScalekitOAuthProviderOptions" default="{}">
->   {" "}
->   Scalekit environment URL, resource id, optional audience override, and MCP
->   resource metadata. Values passed here override the corresponding
->   environment variables.{" "}
-> </ParamField>
-
-**Returns**
-
-> <ResponseField name="returns" type="OAuthProvider<ScalekitOAuthUser>" />
-
-**Signature**
-
-```ts wrap
-function oauthScalekitProvider(
-  options?: ScalekitOAuthProviderOptions,
-): OAuthProvider<ScalekitOAuthUser>;
-```
-
-**Example**
-
-```ts wrap
-import { MCPServer } from "mcp-use";
-import { oauthScalekitProvider } from "mcp-use/oauth/scalekit";
-
-const server = new MCPServer({
-  name: "scalekit-oauth-example",
-  version: "1.0.0",
-  description: "MCP server with Scalekit OAuth authentication",
-  oauth: oauthScalekitProvider({
-    environmentUrl: "https://your-env.scalekit.dev",
-    resourceId: "res_example",
-  }),
-});
 ```
 
 ### oauthKeycloakProvider

@@ -2,10 +2,10 @@
 
 Adding OAuth 2.0/2.1 authentication to your MCP server.
 
-**Use for:** Protecting tools behind user authentication, accessing user identity in tool handlers, integrating with identity providers (Auth0, Better Auth, Clerk, WorkOS, Supabase, Keycloak, Scalekit, Google, GitHub, Okta, Azure AD, and more).
+**Use for:** Protecting tools behind user authentication, accessing user identity in tool handlers, integrating with identity providers (Auth0, Better Auth, Clerk, WorkOS, Supabase, Keycloak, Google, GitHub, Okta, Azure AD, and more).
 
 > **Two integration modes.** Pick by whether your identity provider supports Dynamic Client Registration (DCR):
-> - **Remote auth** (`oauthAuth0Provider`, `oauthBetterAuthProvider`, `oauthClerkProvider`, `oauthKeycloakProvider`, `oauthScalekitProvider`, `oauthSupabaseProvider`, `oauthWorkOSProvider`, `oauthCustomProvider`) — clients register and authenticate directly with the upstream provider; your server only verifies the resulting bearer token. Requires DCR on the upstream.
+> - **Remote auth** (`oauthAuth0Provider`, `oauthBetterAuthProvider`, `oauthClerkProvider`, `oauthKeycloakProvider`, `oauthSupabaseProvider`, `oauthWorkOSProvider`, `oauthCustomProvider`) — clients register and authenticate directly with the upstream provider; your server only verifies the resulting bearer token. Requires DCR on the upstream.
 > - **OAuth proxy** (`oauthProxy` + `jwksVerifier`) — your server holds pre-registered client credentials and mediates the token exchange. Use this for Google, GitHub, Okta, Azure AD, or any provider where you register the app in a dashboard and receive a fixed `clientId` / `clientSecret`.
 
 ---
@@ -147,7 +147,6 @@ Or pass config explicitly to override env vars. See each provider's guide for av
 | **WorkOS** | `oauthWorkOSProvider()` | `subdomain` (env: `MCP_USE_OAUTH_WORKOS_SUBDOMAIN`) | [workos.md](workos.md) |
 | **Supabase** | `oauthSupabaseProvider()` | `projectId` (env: `MCP_USE_OAUTH_SUPABASE_PROJECT_ID`) | [supabase.md](supabase.md) |
 | **Keycloak** | `oauthKeycloakProvider()` | `serverUrl`, `realm` (env: `MCP_USE_OAUTH_KEYCLOAK_SERVER_URL`, `MCP_USE_OAUTH_KEYCLOAK_REALM`) | [keycloak.md](keycloak.md) |
-| **Scalekit** | `oauthScalekitProvider()` | `environmentUrl`, `resourceId` (env: `MCP_USE_OAUTH_SCALEKIT_ENVIRONMENT_URL`, `MCP_USE_OAUTH_SCALEKIT_RESOURCE_ID`) | [scalekit.md](scalekit.md) |
 | **Custom (DCR)** | `oauthCustomProvider({ ... })` | `issuer`, endpoints, `verifyToken` | [custom.md](custom.md) |
 
 ### OAuth proxy (non-DCR)
@@ -204,7 +203,6 @@ Provider-specific examples (Supabase, Keycloak, Auth0, etc.) live in each provid
 - **WorkOS setup** → [workos.md](workos.md)
 - **Supabase setup** → [supabase.md](supabase.md)
 - **Keycloak setup** → [keycloak.md](keycloak.md)
-- **Scalekit setup** → [scalekit.md](scalekit.md)
 - **Custom provider / OAuth proxy** → [custom.md](custom.md)
 - **Build tools** → [../server/tools.md](../server/tools.md)
 - **See examples** → [../patterns/common-patterns.md](../patterns/common-patterns.md)

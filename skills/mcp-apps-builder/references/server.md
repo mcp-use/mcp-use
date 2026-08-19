@@ -5,7 +5,7 @@
 - Server framework and helpers: `mcp-use`
 - React View runtime: `mcp-use/react`
 - OAuth core: `mcp-use/oauth`
-- Provider adapters: `mcp-use/oauth/auth0`, `/clerk`, `/keycloak`, `/scalekit`, `/supabase`, `/workos`, and `/better-auth`
+- Provider adapters: `mcp-use/oauth/auth0`, `/clerk`, `/keycloak`, `/supabase`, `/workos`, and `/better-auth`
 - Client and Agent packages: `@mcp-use/client` and `@mcp-use/agent`
 
 The server entry must default-export its `MCPServer`. Use named exports for tool refs consumed by Views.

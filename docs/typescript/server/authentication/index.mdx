@@ -14,7 +14,7 @@ Most MCP servers should use a Dynamic Client Registration provider. Use OAuth Pr
 
 | Situation                                                            | Use                                                                    |
 | -------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| You use Auth0, Better Auth, Clerk, Keycloak, Scalekit, Supabase, or WorkOS | A built-in provider                                                    |
+| You use Auth0, Better Auth, Clerk, Keycloak, Supabase, or WorkOS     | A built-in provider                                                    |
 | Your provider advertises a `registration_endpoint`                   | [Custom Provider](/typescript/server/authentication/providers/custom)  |
 | Your provider only gives you one fixed `clientId` and `clientSecret` | [OAuth Proxy](/typescript/server/authentication/providers/oauth-proxy) |
 | You only need local development without identity                     | No OAuth provider                                                      |
