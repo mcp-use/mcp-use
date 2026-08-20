@@ -1,5 +1,17 @@
 # mcp-use
 
+## 2.3.0
+
+### Minor Changes
+
+- d0107b3: Add `oauthScalekitProvider` for Scalekit MCP Auth. The verifier accepts environment-root and resource-scoped issuers, binds audience to the `res_…` resource id, and advertises DCR plus CIMD.
+
+### Patch Changes
+
+- Updated dependencies [d0107b3]
+- Updated dependencies [d0107b3]
+  - @mcp-use/inspector@20.2.5
+
 ## 2.3.0-canary.2
 
 ### Minor Changes
