@@ -20,8 +20,11 @@ export type VerifiedPayload = Record<string, unknown>;
 
 /** Configures issuer, keys, and claims enforced by a JWT verifier. */
 export interface JwtVerifierOptions {
-  /** Expected `iss` claim. Tokens from any other issuer are rejected. */
-  issuer: string;
+  /**
+   * Expected `iss` claim. Tokens from any other issuer are rejected.
+   * A list accepts any of the listed issuers.
+   */
+  issuer: string | string[];
   /** JWKS endpoint the signing keys are fetched from and cached. */
   jwksUrl: URL;
   /** Canonical URL of this MCP resource, matched against the token binding. */

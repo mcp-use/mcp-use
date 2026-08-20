@@ -80,14 +80,21 @@ export class LocalChatStorageProvider implements ChatStorageProvider {
   }
 
   async createChat(params: {
+    id?: string;
     agentId: string;
     title?: string;
     agentName?: string;
   }): Promise<ChatSession> {
     const store = readStore();
+    if (params.id) {
+      // Re-attaching to a known id (e.g. after an OAuth redirect) must reuse the
+      // stored chat rather than fork a duplicate row.
+      const existing = store.sessions.find((s) => s.id === params.id);
+      if (existing) return existing;
+    }
     const ts = nowIso();
     const session: ChatSession = {
-      id: crypto.randomUUID(),
+      id: params.id ?? crypto.randomUUID(),
       title: params.title ?? DEFAULT_TITLE,
       agent_id: params.agentId,
       agent_name: params.agentName ?? "MCP Server",

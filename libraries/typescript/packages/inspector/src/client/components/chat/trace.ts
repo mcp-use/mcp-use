@@ -3,6 +3,7 @@ export interface InspectorTokenUsage {
   outputTokens?: number;
   totalTokens?: number;
   cachedInputTokens?: number;
+  cacheCreationInputTokens?: number;
   reasoningTokens?: number;
 }
 
@@ -82,19 +83,52 @@ export function inspectorTokenUsageFromUnknown(
     "output_tokens",
     "completionTokens"
   );
+  // Anthropic reports these alongside input_tokens and bills all of them, so a total of
+  // input + output understates what the call cost. OpenAI's cached_tokens sits inside
+  // prompt_tokens, so only the Anthropic-shaped keys are added here.
+  const cachedInputTokens = number(
+    "cachedInputTokens",
+    "cache_read_input_tokens"
+  );
+  const cacheCreationInputTokens = number(
+    "cacheCreationInputTokens",
+    "cache_creation_input_tokens"
+  );
+  const reasoningTokens = number("reasoningTokens", "thoughtsTokenCount");
+  // Only the Anthropic-shaped keys sit OUTSIDE inputTokens and must be added back into the
+  // total. cachedInputTokens is provider-neutral, and on OpenAI those tokens are already
+  // inside inputTokens, so adding it here would double count. It is still parsed above for
+  // observability; the total is computed from cache_read_input_tokens only, mirroring the
+  // provider-safe behaviour in agent/src/llm/usage.ts.
+  const cacheReadOutsideInput = number("cache_read_input_tokens");
+  const uncountedCache =
+    (cacheReadOutsideInput ?? 0) + (cacheCreationInputTokens ?? 0);
   const totalTokens =
     number("totalTokens", "total_tokens") ??
     (inputTokens !== undefined && outputTokens !== undefined
-      ? inputTokens + outputTokens
+      ? inputTokens + outputTokens + uncountedCache
       : undefined);
   if (
     inputTokens === undefined &&
     outputTokens === undefined &&
-    totalTokens === undefined
+    totalTokens === undefined &&
+    cachedInputTokens === undefined &&
+    cacheCreationInputTokens === undefined &&
+    reasoningTokens === undefined
   ) {
     return undefined;
   }
-  return { inputTokens, outputTokens, totalTokens };
+  // cachedInputTokens and reasoningTokens were declared on InspectorTokenUsage and read by
+  // the trace view, but this function never returned them, so both have always rendered as
+  // absent no matter what the provider sent.
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    cachedInputTokens,
+    cacheCreationInputTokens,
+    reasoningTokens,
+  };
 }
 
 const SECRET_REQUEST_KEYS = new Set([
@@ -169,6 +203,10 @@ function addUsage(
     outputTokens: sum(current?.outputTokens, next.outputTokens),
     totalTokens: sum(current?.totalTokens, next.totalTokens),
     cachedInputTokens: sum(current?.cachedInputTokens, next.cachedInputTokens),
+    cacheCreationInputTokens: sum(
+      current?.cacheCreationInputTokens,
+      next.cacheCreationInputTokens
+    ),
     reasoningTokens: sum(current?.reasoningTokens, next.reasoningTokens),
   };
 }

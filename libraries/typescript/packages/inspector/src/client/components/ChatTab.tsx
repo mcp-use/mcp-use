@@ -67,6 +67,7 @@ import { useWidgetDebug } from "../context/WidgetDebugContext";
 import type { ChatBodyBuilder, MessageAttachment } from "./chat/types";
 import { resolveChatToolPolicy } from "./chat/chat-tool-policy";
 import { buildChatCspAudit } from "./chat/csp-bridge";
+import { useChatSessions } from "./chat/useChatSessions";
 
 // Structural type — avoids nominal incompatibility when pnpm creates
 // multiple peer-variant copies of mcp-use with duplicate class declarations.
@@ -240,29 +241,32 @@ export function ChatTab({
       ? localChatStorageRef.current
       : null);
 
-  const [internalActiveChatId, setInternalActiveChatId] = useState<
-    string | null
-  >(null);
-  const activeChatId = controlledActiveChatId ?? internalActiveChatId;
-  const setActiveChatId = useCallback(
-    (chatId: string | null) => {
-      if (onActiveChatIdChange) {
-        onActiveChatIdChange(chatId);
-      } else {
-        setInternalActiveChatId(chatId);
-      }
-    },
-    [onActiveChatIdChange]
-  );
-
   const [showHistoryPanel, setShowHistoryPanel] = useState(false);
   const [historyRefetchKey, setHistoryRefetchKey] = useState(0);
+  const bumpHistoryRefetch = useCallback(() => {
+    setHistoryRefetchKey((k) => k + 1);
+  }, []);
+
+  const {
+    store: chatSessions,
+    activeSessionId,
+    activeChatId,
+    selectChat,
+    startNewChat,
+    persistSessionMessages,
+  } = useChatSessions({
+    retryServerId: connection.id ?? connection.url,
+    agentId: serverId,
+    agentName: connection.displayName || connection.name || "MCP Server",
+    storage: effectiveChatStorage,
+    activeChatId: controlledActiveChatId,
+    onActiveChatIdChange,
+    initialMessages,
+    onChatCreated: bumpHistoryRefetch,
+  });
   const [internalChatTitle, setInternalChatTitle] = useState<
     string | undefined
   >();
-  const [restoredMessages, setRestoredMessages] = useState<
-    import("./chat/types").Message[] | undefined
-  >(undefined);
   const [inputValue, setInputValue] = useState("");
   const [promptsDropdownOpen, setPromptsDropdownOpen] = useState(false);
   const [promptFocusedIndex, setPromptFocusedIndex] = useState(-1);
@@ -331,6 +335,9 @@ export function ChatTab({
 
   // Use client-side or server-side chat implementation
   const chatHookParams = {
+    sessionStore: chatSessions,
+    sessionId: activeSessionId,
+    onMessagesChange: persistSessionMessages,
     connection,
     llmConfig,
     isConnected,
@@ -341,6 +348,9 @@ export function ChatTab({
   };
 
   const serverSideChat = useChatMessages({
+    sessionStore: chatSessions,
+    sessionId: activeSessionId,
+    onMessagesChange: persistSessionMessages,
     mcpServerUrl: connection.url ?? "",
     llmConfig,
     authConfig: userAuthConfig,
@@ -349,7 +359,6 @@ export function ChatTab({
     chatApiUrl,
     waitForChatApiUrl,
     widgetModelContexts,
-    initialMessages: restoredMessages ?? initialMessages,
     disabledTools: effectiveDisabledTools,
     streamProtocol,
     credentials,
@@ -358,7 +367,6 @@ export function ChatTab({
   });
   const clientSideChat = useChatMessagesClientSide({
     ...chatHookParams,
-    initialMessages: restoredMessages ?? initialMessages,
     systemPrompt: resolvedSystemPrompt,
     skills,
   });
@@ -373,7 +381,6 @@ export function ChatTab({
     stop,
     addAttachment,
     removeAttachment,
-    clearTrace,
     traceEvents,
     tokenUsage,
   } = effectiveClientSide ? clientSideChat : serverSideChat;
@@ -412,74 +419,26 @@ export function ChatTab({
   const handleSelectChat = useCallback(
     async (chatId: string) => {
       if (!effectiveChatStorage) return;
-      const [msgs, listed] = await Promise.all([
-        effectiveChatStorage.getMessages(chatId),
-        effectiveChatStorage.listChats({ agentId: serverId }),
-      ]);
-      setRestoredMessages(msgs);
-      clearTrace();
-      setMessages(msgs);
-      setShaderPhase(msgs.length === 0 ? "visible" : "hidden");
-      setActiveChatId(chatId);
+      const listing = effectiveChatStorage.listChats({ agentId: serverId });
+      const session = await selectChat(chatId);
+      setShaderPhase(
+        (session?.messages.length ?? 0) === 0 ? "visible" : "hidden"
+      );
+      const listed = await listing;
       setInternalChatTitle(
-        listed.items.find((session) => session.id === chatId)?.title
+        listed.items.find((entry) => entry.id === chatId)?.title
       );
     },
-    [effectiveChatStorage, clearTrace, setMessages, setActiveChatId, serverId]
+    [effectiveChatStorage, selectChat, serverId]
   );
 
   const handleNewChat = useCallback(async () => {
-    clearMessages();
-    setRestoredMessages([]);
     setShaderPhase("visible");
-    setInternalChatTitle(CHAT_TITLE_PLACEHOLDER);
-    setActiveChatId(null);
-    if (effectiveChatStorage) {
-      const session = await effectiveChatStorage.createChat({
-        agentId: serverId,
-        agentName: connection.displayName || connection.name || "MCP Server",
-      });
-      setActiveChatId(session.id);
-      setHistoryRefetchKey((k) => k + 1);
-    } else {
-      setInternalChatTitle(undefined);
-    }
-  }, [
-    clearMessages,
-    effectiveChatStorage,
-    serverId,
-    connection.displayName,
-    connection.name,
-    setActiveChatId,
-  ]);
-
-  const ensureActiveChat = useCallback(async () => {
-    if (!effectiveChatStorage || activeChatId) return activeChatId;
-    const session = await effectiveChatStorage.createChat({
-      agentId: serverId,
-      agentName: connection.displayName || connection.name || "MCP Server",
-    });
-    setActiveChatId(session.id);
-    setInternalChatTitle(CHAT_TITLE_PLACEHOLDER);
-    setHistoryRefetchKey((k) => k + 1);
-    return session.id;
-  }, [
-    effectiveChatStorage,
-    activeChatId,
-    serverId,
-    connection.displayName,
-    connection.name,
-    setActiveChatId,
-  ]);
-
-  useEffect(() => {
-    if (!effectiveChatStorage?.saveMessages || !activeChatId) return;
-    void effectiveChatStorage.saveMessages(activeChatId, messages);
-  }, [effectiveChatStorage, activeChatId, messages]);
-
-  const bumpHistoryRefetch = useCallback(() => {
-    setHistoryRefetchKey((k) => k + 1);
-  }, []);
+    setInternalChatTitle(
+      effectiveChatStorage ? CHAT_TITLE_PLACEHOLDER : undefined
+    );
+    await startNewChat();
+  }, [effectiveChatStorage, startNewChat]);
 
   const handleTitleGenerated = useCallback(
     (chatId: string, title: string) => {
@@ -1148,7 +1107,7 @@ export function ChatTab({
   useKeyboardShortcuts(
     enableKeyboardShortcuts
       ? {
-          onNewChat: effectiveChatStorage ? handleNewChat : clearChatToLanding,
+          onNewChat: handleNewChat,
         }
       : {}
   );
@@ -1326,18 +1285,24 @@ export function ChatTab({
     if (messages.length === 0) {
       dismissLandingShader();
     }
-    void ensureActiveChat().then(() => {
-      sendMessage(inputValue, results);
-      setInputValue("");
-      clearPromptResults();
-    });
+    if (
+      effectiveChatStorage &&
+      !chatSessions.get(activeSessionId).persistedChatId
+    ) {
+      setInternalChatTitle(CHAT_TITLE_PLACEHOLDER);
+    }
+    void sendMessage(inputValue, results);
+    setInputValue("");
+    clearPromptResults();
   }, [
     inputValue,
     results,
     sendMessage,
     clearPromptResults,
     attachments,
-    ensureActiveChat,
+    activeSessionId,
+    chatSessions,
+    effectiveChatStorage,
     messages.length,
     dismissLandingShader,
   ]);
@@ -1618,7 +1583,7 @@ export function ChatTab({
         hasMessages={messages.length > 0}
         configDialogOpen={configDialogOpen}
         onConfigDialogOpenChange={setConfigDialogOpen}
-        onClearChat={effectiveChatStorage ? handleNewChat : clearChatToLanding}
+        onClearChat={handleNewChat}
         tempProvider={tempProvider}
         tempModel={tempModel}
         tempApiKey={tempApiKey}

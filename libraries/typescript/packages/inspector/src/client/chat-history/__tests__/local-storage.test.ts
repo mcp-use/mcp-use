@@ -57,6 +57,26 @@ describe("LocalChatStorageProvider", () => {
     expect(storage.getItem).toHaveBeenCalledWith(STORAGE_KEY);
   });
 
+  it("adopts a caller-supplied id and reuses the chat it already stored", async () => {
+    const provider = new LocalChatStorageProvider();
+
+    const created = await provider.createChat({
+      id: "session-1",
+      agentId: "server-1",
+    });
+    expect(created.id).toBe("session-1");
+
+    // Re-attaching after an OAuth redirect must not fork a duplicate row.
+    const reattached = await provider.createChat({
+      id: "session-1",
+      agentId: "server-1",
+    });
+    expect(reattached.id).toBe("session-1");
+
+    const listed = await provider.listChats({ agentId: "server-1" });
+    expect(listed.total).toBe(1);
+  });
+
   it("round-trips messages and auto-titles from first user message", async () => {
     vi.useFakeTimers();
     const provider = new LocalChatStorageProvider();

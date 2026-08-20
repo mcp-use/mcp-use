@@ -114,6 +114,8 @@ export interface TokenUsage {
   totalTokens?: number;
   /** Input tokens served from a provider cache. */
   cachedInputTokens?: number;
+  /** Input tokens written to a provider cache. Billed, and on Anthropic above base rate. */
+  cacheCreationInputTokens?: number;
   /** Tokens used for model reasoning. */
   reasoningTokens?: number;
 }

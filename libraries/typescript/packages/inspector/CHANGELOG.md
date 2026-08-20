@@ -1,5 +1,18 @@
 # @mcp-use/inspector
 
+## 20.2.5-canary.1
+
+### Patch Changes
+
+- d79b9eb: Give each Inspector chat session one id and one state record, so **New Chat** starts a fresh chat while an earlier one is still streaming. Session state, persistence, and OAuth retry now share that id: `ChatStorageProvider.createChat` accepts it via the new optional `id` param, and providers that already stored it should return the existing chat.
+
+## 20.2.5-canary.0
+
+### Patch Changes
+
+- 0833b32: Keep `cacheCreationInputTokens` visible in the inspector: it now survives aggregation, the LLM span usage, and the aggregate `tokenUsage` written to the raw-chat payload. The token total also no longer double-counts OpenAI cache reads. The fallback total adds only the Anthropic-shaped `cache_read_input_tokens`, since OpenAI's cached tokens are already inside `inputTokens`.
+  - mcp-use@2.2.5-canary.0
+
 ## 20.2.4
 
 ## 20.2.4-canary.0
