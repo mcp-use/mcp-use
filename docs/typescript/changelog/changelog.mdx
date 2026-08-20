@@ -6,6 +6,83 @@ tag: "New"
 rss: true
 ---
 
+<Update label="v2.3.0" description="August 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=2.3.0&title=Scalekit%20OAuth%20provider&date=2026-08&lang=typescript" alt="Release 2.3.0" />
+  </Frame>
+  ## Scalekit OAuth provider
+  Minor release adding a built-in Scalekit verifier and improving Inspector chat usage and session isolation.
+
+- **New** (server/oauth): `oauthScalekitProvider` validates environment-root and resource-scoped issuers, binds the JWT audience to the Scalekit `res_…` resource identifier, and advertises Dynamic Client Registration and Client ID Metadata Document support (`#2272`)
+- **Fix** (@mcp-use/inspector): Anthropic cache-creation tokens survive usage aggregation and Inspector traces without double-counting OpenAI cache reads; see the Inspector changelog (`#2127`)
+- **Fix** (@mcp-use/inspector): chat state, persistence, streaming, and OAuth retry are isolated by session so **New Chat** can start while another session is streaming; see the Inspector changelog (`#2232`)
+- **Update**: Updated @mcp-use/inspector to v20.2.5
+</Update>
+
+<Update label="v2.2.4" description="August 2026">
+  ## Workspace package alignment
+  Patch release aligning the published workspace dependency versions.
+
+- **Update**: Updated @mcp-use/inspector to v20.2.4
+- **Update**: Updated @mcp-use/cli to v4.1.5
+</Update>
+
+<Update label="v2.2.3" description="August 2026">
+  ## Inspector protocol selection
+  Patch release exposing protocol version controls in Inspector connections.
+
+- **Enhancement** (@mcp-use/inspector): connection setup and settings expose MCP protocol version selection and make configuration options easier to find; see the Inspector changelog
+- **Update**: Updated @mcp-use/inspector to v20.2.3
+</Update>
+
+<Update label="v2.2.2" description="August 2026">
+  ## Workspace package alignment
+  Patch release aligning the published workspace dependency versions.
+
+- **Update**: Updated @mcp-use/inspector to v20.2.2
+- **Update**: Updated @mcp-use/cli to v4.1.4
+</Update>
+
+<Update label="v2.2.1" description="August 2026">
+  ## OAuth protected-resource compatibility
+  Patch release accepting secure parent-path resource metadata in OAuth discovery.
+
+- **Fix** (auth): protected-resource metadata may identify a same-origin, segment-aware parent of the MCP endpoint, matching the official MCP TypeScript SDK while still rejecting unsafe resource values
+- **Update**: Updated @mcp-use/inspector to v20.2.1
+- **Update**: Updated @mcp-use/cli to v4.1.3
+</Update>
+
+<Update label="v2.2.0" description="August 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=2.2.0&title=Custom%20OAuth%20verification%20%26%20remote%20development&date=2026-08&lang=typescript" alt="Release 2.2.0" />
+  </Frame>
+  ## Custom OAuth verification & remote development
+  Minor release exporting JWT verification primitives and making remote MCP App development more reliable.
+
+- **New** (server/oauth): export `createJwtVerifier`, `JwtVerifierOptions`, and `VerifiedPayload` from `mcp-use/oauth` for custom OAuth providers
+- **Fix** (server): restore zero-config OAuth provider setup through `MCP_USE_OAUTH_*` environment variables while preserving explicit overrides
+- **Fix** (@mcp-use/cli): route Vite assets and HMR through the configured public MCP origin, pre-bundle view runtime dependencies and Zod, and ignore managed dev-server logs so remote views mount and update reliably
+- **Enhancement** (@mcp-use/inspector): embedded Chat exposes CSP mode and audit commands and ships the canonical Inspector style contract; see the Inspector changelog
+- **Fix** (create-mcp-use-app): canary scaffolds install canary SDK and skill sources instead of falling back to stable branches
+- **Update**: Updated @mcp-use/inspector to v20.2.0
+- **Update**: Updated @mcp-use/cli to v4.1.2
+- **Update**: Updated create-mcp-use-app to v2.0.4
+</Update>
+
+<Update label="v2.1.1" description="August 2026">
+  ## Mixed-auth recovery & scaffold names
+  Patch release supporting optional OAuth without blocking anonymous MCP connections and fixing generated npm package names.
+
+- **Enhancement** (auth): detect mixed-auth servers without blocking anonymous connections, resume protected operations through the official SDK OAuth flow, and preserve multiple `Set-Cookie` headers through the Node bridge
+- **Fix** (auth): recover optional OAuth discovery and CLI login after transient failures, keep ready React connections stable, and avoid reporting user-cancelled Inspector tool calls as failures
+- **Fix** (server): disable reverse-proxy buffering for open-ended MCP SSE responses so subscription acknowledgements are delivered immediately
+- **Fix** (create-mcp-use-app): sanitize named projects into valid npm package names, including quoted names and names beginning with underscores
+- **Enhancement** (@mcp-use/inspector): mixed-auth tool calls pause for authentication and resume the same chat turn; see the Inspector changelog
+- **Update**: Updated @mcp-use/inspector to v20.1.1
+- **Update**: Updated @mcp-use/cli to v4.1.1
+- **Update**: Updated create-mcp-use-app to v2.0.3
+</Update>
+
 <Update label="v2.1.0" description="August 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=2.1.0&title=Skills%20over%20MCP%20%26%20v2%20server%20tooling&date=2026-08&lang=typescript" alt="Release 2.1.0" />
@@ -42,6 +119,17 @@ rss: true
 
 - **Fix**: Publish a package-root README and verify that it stays synchronized with the repository README before packing
 - **Update**: Updated @mcp-use/inspector to v20.0.3
+</Update>
+
+<Update label="v2.0.1" description="August 2026">
+  ## Safer Inspector proxy & clearer CLI feedback
+  Patch release hardening hosted Inspector proxy defaults and making successful CLI commands visible.
+
+- **Fix** (@mcp-use/inspector): embedded and hosted Inspector mounts block loopback OAuth proxy targets by default; standalone local development keeps loopback access unless running in production
+- **Enhancement** (@mcp-use/cli): `mcp-use start --with-inspector` prints the mounted Inspector URL, and successful `mcp-use typecheck` runs print a completion message with elapsed time
+- **Update**: runtime and bundled dependencies use patched stable releases with tightened transitive resolutions
+- **Update**: Updated @mcp-use/inspector to v20.0.1
+- **Update**: Updated @mcp-use/cli to v4.0.1
 </Update>
 
 <Update label="v2.0.0" description="August 2026">
@@ -1396,6 +1484,15 @@ rss: true
 - **Fix**: Import paths in CLI to avoid mixing dependencies
 - **Fix**: UUID generation and URL handling improvements
 - **Fix**: Various formatting and linting improvements
+</Update>
+
+<Update label="v1.10.6" description="December 2025">
+  ## Deno stateless mode
+  Patch release fixing stateless server mode when running on Deno.
+
+- **Fix**: stateless mode works correctly on Deno
+- **Update**: Updated @mcp-use/inspector to v0.12.6
+- **Update**: Updated @mcp-use/cli to v2.5.6
 </Update>
 
 <Update label="v1.10.0" description="December 2025">

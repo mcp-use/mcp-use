@@ -6,6 +6,70 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v20.2.5" description="August 2026">
+  ## Isolated chat sessions & accurate cache usage
+  Patch release paired with `mcp-use` v2.3.0, keeping concurrent chat sessions independent and preserving provider cache-token accounting.
+
+- **Fix**: each chat session owns one identifier and state record, so **New Chat** starts a fresh session while another is streaming; persistence and OAuth retry use the same identifier, and `ChatStorageProvider.createChat` accepts an optional caller-supplied `id` (`#2232`)
+- **Fix**: Anthropic `cacheCreationInputTokens` survives aggregation, LLM spans, and raw-chat `tokenUsage`, while totals avoid double-counting OpenAI cached input tokens (`#2127`)
+- **Update**: Updated mcp-use to v2.3.0
+</Update>
+
+<Update label="v20.2.4" description="August 2026">
+  ## Workspace package alignment
+  Patch release paired with `mcp-use` v2.2.4; there are no Inspector-specific source changes.
+
+- **Update**: Updated mcp-use to v2.2.4
+</Update>
+
+<Update label="v20.2.3" description="August 2026">
+  ## Protocol version controls
+  Patch release making MCP protocol selection visible in connection setup.
+
+- **Enhancement**: the connect form and connection settings expose protocol version selection and make configuration options easier to find
+- **Update**: Updated mcp-use to v2.2.3
+</Update>
+
+<Update label="v20.2.2" description="August 2026">
+  ## Workspace package alignment
+  Patch release paired with `mcp-use` v2.2.2; there are no Inspector-specific source changes.
+
+- **Update**: Updated mcp-use to v2.2.2
+</Update>
+
+<Update label="v20.2.1" description="August 2026">
+  ## OAuth protected-resource compatibility
+  Patch release accepting secure parent-path resource metadata during OAuth discovery.
+
+- **Fix**: protected-resource metadata may identify a same-origin, segment-aware parent of the MCP endpoint, matching the official MCP TypeScript SDK while rejecting cross-origin, sibling-path, credential-bearing, fragmented, and insecure non-loopback values
+- **Update**: Updated mcp-use to v2.2.1
+</Update>
+
+<Update label="v20.2.0" description="August 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=20.2.0&title=CSP%20auditing%20%26%20embedded%20Inspector%20styles&date=2026-08&lang=inspector" alt="Release 20.2.0" />
+  </Frame>
+  ## CSP auditing & embedded Inspector styles
+  Minor release paired with `mcp-use` v2.2.0, adding host-visible CSP verification and a consistent embedded surface contract.
+
+- **New**: the embedded Chat bridge exposes CSP mode and audit commands so hosts and coding agents can verify MCP Apps in Widget-Declared mode
+- **Enhancement**: a canonical client stylesheet provides the Inspector surface, shadow, hover, and active theme contract for embedded dialogs, dropdowns, and selects
+- **Fix**: embedded MCP Apps render in Vibe and preserve React state during remote HMR updates
+- **Fix**: remove unreachable exports and declare the Inspector tool-execution test's `jsdom` development dependency explicitly
+- **Update**: Updated mcp-use to v2.2.0
+</Update>
+
+<Update label="v20.1.1" description="August 2026">
+  ## Mixed-auth chat recovery
+  Patch release paired with `mcp-use` v2.1.1, allowing anonymous sessions to authenticate only when a protected operation requires it.
+
+- **Enhancement**: mixed-auth tool calls stay on the browser MCP connection, pause with an Authenticate action, and resume the same client-side turn after popup or redirect authorization
+- **Enhancement**: the Skills tab becomes available when a development HMR reload adds Skills after the initial connection negotiated without the extension
+- **Fix**: optional OAuth discovery and token projection no longer block connection readiness, transient metadata failures recover, and authenticated state remains accurate after a challenge
+- **Fix**: reverse-proxy buffering is disabled for open-ended MCP SSE responses so subscription acknowledgements arrive immediately
+- **Update**: Updated mcp-use to v2.1.1
+</Update>
+
 <Update label="v20.1.0" description="August 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=20.1.0&title=Skills%20over%20MCP%20%26%20Inspector%20runtime&date=2026-08&lang=inspector" alt="Release 20.1.0" />
@@ -35,6 +99,15 @@ tag: "New"
 
 - **Fix**: Publish a package-root README and verify that it stays synchronized with the repository README before packing
 - **Update**: Updated mcp-use to v2.0.3
+</Update>
+
+<Update label="v20.0.1" description="August 2026">
+  ## Safer loopback proxy defaults
+  Patch release paired with `mcp-use` v2.0.1, preventing publicly reachable Inspector mounts from proxying requests to host loopback services by default.
+
+- **Fix**: `mountInspector` defaults `oauthProxyAllowLoopback` to `false`; the standalone CLI permits loopback for local development but blocks it in production unless `INSPECTOR_ALLOW_LOOPBACK=true`
+- **Update**: runtime and bundled dependencies use patched stable releases with tightened transitive resolutions
+- **Update**: Updated mcp-use to v2.0.1
 </Update>
 
 <Update label="v20.0.0" description="August 2026">
