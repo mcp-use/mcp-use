@@ -84,10 +84,19 @@ export function createChatSession(
 
 /** Mints the identity a session keeps for its whole lifetime. */
 export function createChatSessionId(): string {
-  const uuid = globalThis.crypto?.randomUUID?.();
+  const crypto = globalThis.crypto;
+  const uuid = crypto?.randomUUID?.();
   if (uuid) return uuid;
-  // randomUUID is unavailable outside secure contexts; ids only need to be
-  // unique within this tab, so a timestamp plus randomness is enough.
-  const suffix = Math.random().toString(36).slice(2, 10);
-  return `chat-${Date.now().toString(36)}-${suffix}`;
+
+  if (!crypto?.getRandomValues) {
+    throw new Error("Secure random generation is unavailable");
+  }
+
+  // randomUUID is unavailable outside secure contexts, while getRandomValues
+  // remains available and provides collision-resistant persisted identifiers.
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  const suffix = Array.from(bytes, (byte) =>
+    byte.toString(16).padStart(2, "0")
+  ).join("");
+  return `chat-${suffix}`;
 }
