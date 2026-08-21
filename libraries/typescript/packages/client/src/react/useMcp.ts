@@ -1,7 +1,6 @@
 // useMcp.ts
 import { auth } from "@modelcontextprotocol/client";
 import type {
-  OAuthClientProvider,
   Prompt,
   ProtocolEra,
   Resource,
@@ -38,6 +37,16 @@ import { loadServerIcon } from "./useMcp-helpers.js";
 import { useMcpOperations } from "./useMcp-operations.js";
 import { getOAuthTokenExpiry } from "./token-expiry.js";
 import { SKILLS_EXTENSION_ID } from "../core/skills.js";
+import {
+  attachLifecycleConnection,
+  closeRetiredLifecycleAfterConnectFailure,
+  createConnectionLifecycle,
+  isCurrentLifecycle,
+  retireLifecycle,
+  type ConnectionLifecycle,
+  type ConnectionLifecycleTrigger,
+  type UseMcpAuthProvider,
+} from "./useMcp-lifecycle.js";
 
 const DEFAULT_RECONNECT_DELAY = 3000;
 const DEFAULT_RETRY_DELAY = 5000;
@@ -45,38 +54,11 @@ const DEFAULT_RETRY_DELAY = 5000;
 // Streamable HTTP is the only supported remote transport.
 type TransportType = "http";
 
-type UseMcpAuthProvider = OAuthClientProvider & {
-  tokens?: () => Promise<
-    | {
-        access_token?: string;
-        token_type?: string;
-        refresh_token?: string;
-        scope?: string;
-        [key: string]: unknown;
-      }
-    | undefined
-  >;
-  clearStorage?: () => number;
-  getLastAttemptedAuthUrl?: () => string | null | undefined;
-  getTokenEndpoint?: () => Promise<string | null>;
-  getResource?: () => Promise<string | null>;
-  getClientCredentials?: () => Promise<{
-    client_id: string;
-    client_secret?: string;
-  } | null>;
-  /**
-   * Returns a `fetch` scoped to this provider that routes OAuth requests
-   * through the configured OAuth proxy (bypassing CORS) while leaving the
-   * global `fetch` untouched. Passed to the SDK transport / `auth()` so proxy
-   * behavior is confined to this server's connection.
-   */
-  getProxyFetch?: (baseFetch?: typeof fetch) => typeof fetch | undefined;
-  serverUrl?: string;
-  /** localStorage key for a given suffix (e.g. "tokens"). */
-  getKey?: (keySuffix: string) => string;
-  /** Stable hash of the server URL, used to scope OAuth result messages. */
-  serverUrlHash?: string;
+type ConnectionSnapshot = {
+  url: string;
+  gatewayUrl?: string;
 };
+type Lifecycle = ConnectionLifecycle<ConnectionSnapshot>;
 
 type UseMcpInternalOptions = UseMcpOptions & {
   _initialServerInfo?: {
@@ -373,20 +355,23 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     useState<UseMcpResult["authTokens"]>(undefined);
   const [authorization, setAuthorization] =
     useState<UseMcpResult["authorization"]>(undefined);
+  const [reconnectRequestId, setReconnectRequestId] = useState(0);
 
   const clientRef = useRef<BrowserMCPClient | null>(null);
   const connectionRef = useRef<MCPConnection | null>(null);
+  const lifecycleRef = useRef<Lifecycle | null>(null);
+  const nextLifecycleIdRef = useRef(0);
   const authProviderRef = useRef<UseMcpAuthProvider | null>(
     (providedAuthProvider as UseMcpAuthProvider | undefined) ?? null
   );
   const iconLoadingPromiseRef = useRef<Promise<string | null> | null>(null);
-  const connectingRef = useRef<boolean>(false);
   const isMountedRef = useRef<boolean>(true);
-  const connectAttemptRef = useRef<number>(0);
-  /** Bumped at the start of each connect(); disconnect only clears clientRef if epoch unchanged. */
-  const connectEpochRef = useRef(0);
   const authTimeoutRef = useRef<number | null>(null);
   const retryScheduledRef = useRef<boolean>(false);
+  const reconnectRequestPendingRef = useRef(false);
+  const reconnectTriggerRef =
+    useRef<ConnectionLifecycleTrigger>("configuration");
+  const manuallyDisconnectedRef = useRef(false);
   /**
    * True while a manual `authenticate()` popup flow owns the OAuth result.
    * The always-on `mcp_auth_callback` listener defers to the popup runner
@@ -401,8 +386,6 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
   authorizationRef.current = authorization;
   const autoReconnectRef = useRef(autoReconnect);
   const successfulTransportRef = useRef<TransportType | null>(null);
-  // Forward refs for functions (declared later) to avoid circular dependencies
-  const connectRef = useRef<(() => Promise<void>) | null>(null);
   const failConnectionRef = useRef<
     ((message: string, error?: Error) => void) | null
   >(null);
@@ -463,6 +446,13 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
   }, [state, autoReconnect]);
 
   useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
     authProviderRef.current =
       (providedAuthProvider as UseMcpAuthProvider | undefined) ?? null;
   }, [providedAuthProvider]);
@@ -513,6 +503,44 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     [instanceLogger]
   );
 
+  /**
+   * Event handlers request a replacement lifecycle by updating a primitive
+   * signal. The main Effect remains the only place that creates clients and
+   * starts connections.
+   */
+  const requestReconnect = useCallback(
+    (reason: ConnectionLifecycleTrigger): boolean => {
+      if (!isMountedRef.current || manuallyDisconnectedRef.current) {
+        return false;
+      }
+      if (reconnectRequestPendingRef.current) {
+        addLog(
+          "debug",
+          `Reconnect request already pending; ignoring ${reason}.`
+        );
+        return false;
+      }
+
+      const lifecycle = lifecycleRef.current;
+      if (
+        lifecycle?.phase === "connecting" &&
+        !(reason === "oauth-success" && lifecycle.trigger !== "oauth-success")
+      ) {
+        addLog(
+          "debug",
+          `Connection lifecycle already starting; coalescing ${reason}.`
+        );
+        return false;
+      }
+
+      reconnectRequestPendingRef.current = true;
+      reconnectTriggerRef.current = reason;
+      setReconnectRequestId((requestId) => requestId + 1);
+      return true;
+    },
+    [addLog]
+  );
+
   const onAuthorizationRequired = useCallback(
     (authError: unknown) => {
       const preparedAuthUrl =
@@ -537,6 +565,14 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     stateRef,
     connectionRef,
     hasClient: () => clientRef.current !== null,
+    isConnectionCurrent: (connection) => {
+      const lifecycle = lifecycleRef.current;
+      return (
+        lifecycle !== null &&
+        lifecycle.connection === connection &&
+        isCurrentLifecycle(lifecycleRef, lifecycle)
+      );
+    },
     isMounted: () => isMountedRef.current,
     setTools,
     setResources,
@@ -554,44 +590,48 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
   const disconnect = useCallback(
     async (quiet = false) => {
       if (!quiet) addLog("info", "Disconnecting...");
-      connectingRef.current = false;
+      if (!quiet) manuallyDisconnectedRef.current = true;
       if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current);
       authTimeoutRef.current = null;
 
-      const epochAtStart = connectEpochRef.current;
-      const clientToClose = clientRef.current;
-      if (clientToClose) {
+      const lifecycle = lifecycleRef.current;
+      if (lifecycle) {
+        // Invalidate ownership before beginning asynchronous teardown. A late
+        // connect result is attached to this retired lifecycle and closed by
+        // retireLifecycle without being allowed to publish into the hook.
+        if (lifecycleRef.current === lifecycle) lifecycleRef.current = null;
+        if (clientRef.current === lifecycle.client) clientRef.current = null;
+        if (connectionRef.current === lifecycle.connection) {
+          connectionRef.current = null;
+        }
+
+        // Logical disconnection is synchronous. Transport teardown continues
+        // below, but the retired lifecycle can no longer appear ready.
+        if (isMountedRef.current && !quiet) {
+          setState("discovering");
+          setTools([]);
+          setResources([]);
+          setResourceTemplates([]);
+          setPrompts([]);
+          setSkills([]);
+          setError(undefined);
+          setAuthUrl(undefined);
+          setAuthTokens(undefined);
+          setServerInfo(undefined);
+          setCapabilities(undefined);
+          setProtocolEra(undefined);
+          setProtocolVersion(undefined);
+          setInstructions(undefined);
+          setExtensions({});
+        }
         try {
-          const serverName = USE_MCP_SERVER_NAME;
-          const connection =
-            clientToClose === clientRef.current ? connectionRef.current : null;
-
-          // Clean up health check monitoring if it exists
-          if (connection && (connection as any)._healthCheckCleanup) {
-            (connection as any)._healthCheckCleanup();
-            (connection as any)._healthCheckCleanup = null;
-          }
-
-          // Only try to close if a connection exists (avoids noisy warning logs)
-          if (connection) {
-            await clientToClose.closeSession(serverName);
-          }
+          await retireLifecycle(lifecycle);
         } catch (err) {
           if (!quiet) addLog("warn", "Error closing connection:", err);
         }
       }
-      // A newer connect() (e.g. dashboard environment / URL change) may have
-      // bumped the epoch — possibly reusing the same client instance — while
-      // closeSession was in flight. If so, this disconnect is stale: it must
-      // neither null the (now newer) clientRef nor reset the live state.
-      const supersededByNewerConnect = connectEpochRef.current !== epochAtStart;
 
-      if (clientRef.current === clientToClose && !supersededByNewerConnect) {
-        clientRef.current = null;
-        connectionRef.current = null;
-      }
-
-      if (isMountedRef.current && !quiet && !supersededByNewerConnect) {
+      if (isMountedRef.current && !quiet && !lifecycle) {
         setState("discovering");
         setTools([]);
         setResources([]);
@@ -618,7 +658,14 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
    * @returns true if automatic fallback was triggered (caller should not set failed state)
    */
   const failConnection = useCallback(
-    (errorMessage: string, connectionError?: Error): boolean => {
+    (
+      lifecycle: Lifecycle | null,
+      errorMessage: string,
+      connectionError?: Error
+    ): boolean => {
+      if (!lifecycle || !isCurrentLifecycle(lifecycleRef, lifecycle)) {
+        return false;
+      }
       addLog("error", errorMessage, connectionError ?? "");
 
       // Extract HTTP status code from error if available
@@ -666,14 +713,16 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
           `Direct connection failed with ${errorType}. Trying with proxy...`
         );
 
-        // Clear client/auth refs to force fresh initialization with proxy.
-        // Keep externally provided auth providers intact. Synchronous clear;
-        // reconnect is deferred via setTimeout below, so no disconnect race.
-        clientRef.current = null;
+        // Force the replacement Effect to create an OAuth provider configured
+        // for the newly selected gateway. The current lifecycle retains its
+        // captured provider while it is retired.
         if (!providedAuthProvider) {
           authProviderRef.current = null;
         }
-        addLog("debug", "Cleared client and auth provider for proxy fallback");
+        void retireLifecycle(lifecycle).catch((error) => {
+          addLog("warn", "Error retiring direct connection:", error);
+        });
+        addLog("debug", "Retired direct lifecycle for proxy fallback");
 
         // Set proxy configuration and trigger reconnect
         setEffectiveProxyConfig({
@@ -686,22 +735,16 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
           setState("discovering");
         }
 
-        // Trigger reconnection after a brief delay
-        setTimeout(() => {
-          if (isMountedRef.current) {
-            connectRef.current?.();
-          }
-        }, 1000);
-
         return true; // Signal that we're retrying - caller should not set failed state
       }
 
       // Normal failure handling
       if (isMountedRef.current) {
         addLog("info", "Setting state to FAILED:", errorMessage);
+        lifecycle.phase = "failed";
         setState("failed");
         setError(errorMessage);
-        const manualUrl = authProviderRef.current?.getLastAttemptedAuthUrl?.();
+        const manualUrl = lifecycle.authProvider.getLastAttemptedAuthUrl?.();
         if (manualUrl) {
           setAuthUrl(manualUrl);
           addLog(
@@ -711,8 +754,6 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
           );
         }
       }
-      connectingRef.current = false;
-
       // Track failed connection
       if (url) {
         Tel.getInstance()
@@ -721,7 +762,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
             transportType: transportType,
             success: false,
             errorType: connectionError?.name || "UnknownError",
-            hasOAuth: !!authProviderRef.current,
+            hasOAuth: !!lifecycle.authProvider,
             hasSampling: hasSamplingCallbackRef.current,
             hasElicitation: hasElicitationCallbackRef.current,
           })
@@ -744,611 +785,583 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
    * Connect to the MCP server over streamable HTTP.
    * @internal
    */
-  const connect = useCallback(async () => {
-    // Don't connect if not enabled or no URL provided
-    if (!enabled || !url) {
-      addLog(
-        "debug",
-        enabled
-          ? "No server URL provided, skipping connection."
-          : "Connection disabled via enabled flag."
-      );
-      return;
-    }
-
-    if (connectingRef.current) {
-      addLog("debug", "Connection attempt already in progress.");
-      return;
-    }
-    if (!isMountedRef.current) {
-      addLog("debug", "Connect called after unmount, aborting.");
-      return;
-    }
-
-    connectingRef.current = true;
-    connectEpochRef.current += 1;
-    connectAttemptRef.current += 1;
-    if (authorizationServerUrlRef.current !== url) {
-      authorizationServerUrlRef.current = url;
-      authorizationRef.current = undefined;
-      setAuthorization(undefined);
-    }
-    setError(undefined);
-    setAuthUrl(undefined);
-    successfulTransportRef.current = null;
-    setState("discovering");
-    setTools([]);
-    setResources([]);
-    setResourceTemplates([]);
-    setPrompts([]);
-    setSkills([]);
-    setServerInfo(undefined);
-    setCapabilities(undefined);
-    setProtocolEra(undefined);
-    setProtocolVersion(undefined);
-    setInstructions(undefined);
-    setExtensions({});
-    addLog(
-      "info",
-      `Connecting attempt #${connectAttemptRef.current} to ${url}...`
-    );
-
-    // NOTE: We intentionally do NOT clear OAuth storage before connecting.
-    // The clearStorage() function clears tokens and client_info which should
-    // persist across connections. Clearing them would force re-authentication
-    // even when valid tokens exist from a previous OAuth flow.
-    //
-    // Stale state/verifier items are cleaned up:
-    // - By the callback handler after successful token exchange
-    // - By the unmount cleanup when OAuth flow is interrupted
-    // - By the state expiry check in the callback handler
-
-    if (!authProviderRef.current) {
-      const { provider, oauthProxyUrl } = createBrowserOAuthProvider({
-        effectiveOAuthUrl,
-        storageKeyPrefix,
-        oauthClientConfig,
-        callbackUrl,
-        preventAutoAuth,
-        useRedirectFlow,
-        gatewayUrl,
-        oauthProxyUrl: oauthProxyUrlOption,
-        onPopupWindow,
-        proxyOAuthRequests: true,
-        staticClientInfo,
-        clientMetadataUrl: oauthClientMetadataUrl,
-        scope: oauthScope,
-      });
-      authProviderRef.current = provider;
-      if (oauthProxyUrl) {
-        addLog("debug", `OAuth BFF enabled: ${oauthProxyUrl}`);
-      }
-      addLog(
-        "debug",
-        `BrowserOAuthClientProvider initialized with URL: ${effectiveOAuthUrl}, proxy: ${oauthProxyUrl ? "enabled" : "disabled"}, gateway: ${gatewayUrl ? "enabled" : "disabled"}`
-      );
-    }
-    if (!clientRef.current) {
-      clientRef.current = new BrowserMCPClient();
-      addLog("debug", "BrowserMCPClient initialized in connect.");
-    } else {
-      addLog("debug", "BrowserMCPClient already exists, reusing.");
-    }
-
-    const tryConnectWithTransport = async (
-      transportTypeParam: TransportType
-    ): Promise<"success" | "fallback" | "auth_redirect" | "failed"> => {
-      // Check if component unmounted
-      if (!isMountedRef.current) {
-        addLog("debug", "Connection attempt aborted - component unmounted");
-        return "failed";
+  const runLifecycle = useCallback(
+    async (lifecycle: Lifecycle) => {
+      // Don't connect if not enabled or no URL provided
+      if (!enabled || !url) {
+        addLog(
+          "debug",
+          enabled
+            ? "No server URL provided, skipping connection."
+            : "Connection disabled via enabled flag."
+        );
+        return;
       }
 
-      addLog(
-        "info",
-        `Attempting connection with transport: ${transportTypeParam}`
-      );
-      addLog(
-        "debug",
-        `Client ref status at start of tryConnectWithTransport: ${clientRef.current ? "initialized" : "NULL"}`
-      );
+      if (!isCurrentLifecycle(lifecycleRef, lifecycle)) {
+        return;
+      }
 
-      try {
-        const serverName = USE_MCP_SERVER_NAME;
+      if (authorizationServerUrlRef.current !== url) {
+        authorizationServerUrlRef.current = url;
+        authorizationRef.current = undefined;
+        setAuthorization(undefined);
+      }
+      setError(undefined);
+      setAuthUrl(undefined);
+      successfulTransportRef.current = null;
+      setState("discovering");
+      setTools([]);
+      setResources([]);
+      setResourceTemplates([]);
+      setPrompts([]);
+      setSkills([]);
+      setServerInfo(undefined);
+      setCapabilities(undefined);
+      setProtocolEra(undefined);
+      setProtocolVersion(undefined);
+      setInstructions(undefined);
+      setExtensions({});
+      addLog("info", `Connecting lifecycle #${lifecycle.id} to ${url}...`);
 
-        // Build server config
-        const serverConfig: any = {
-          url: url, // Use original URL, not transformed proxy URL
-          timeout,
-          clientInfo: mergedClientInfo,
-          // Pass a fetch that scopes OAuth-proxy routing to this server's
-          // transport/auth calls. getProxyFetch wraps `customFetch` (e.g. the
-          // OAuth retry fetch for scope step-up), bypasses the browser cache
-          // for OAuth metadata, and optionally routes OAuth through the BFF.
-          // It never mutates the global fetch.
-          ...(() => {
-            const scopedFetch =
-              authProviderRef.current?.getProxyFetch?.(customFetch) ??
-              customFetch;
-            return scopedFetch ? { fetch: scopedFetch } : {};
-          })(),
-          // Pass clientOptions for custom capabilities (e.g., MCP Apps extension)
-          ...(effectiveClientOptions && {
-            clientOptions: effectiveClientOptions,
-          }),
-          // Protocol era negotiation mode ("legacy" | "auto" | { pin }); the
-          // connector defaults to automatic v1/v2 negotiation.
-          ...(protocolNegotiation !== undefined && { protocolNegotiation }),
-          detectMixedAuth,
-          // Pass user-configurable reconnection options, or when autoReconnect
-          // is disabled, disable SDK transport reconnection to prevent
-          // unwanted GET polling requests
-          ...(reconnectionOptions
-            ? { reconnectionOptions }
-            : autoReconnect === false
-              ? { reconnectionOptions: { maxRetries: 0 } }
-              : {}),
-        };
+      // NOTE: We intentionally do NOT clear OAuth storage before connecting.
+      // The clearStorage() function clears tokens and client_info which should
+      // persist across connections. Clearing them would force re-authentication
+      // even when valid tokens exist from a previous OAuth flow.
+      //
+      // Stale state/verifier items are cleaned up:
+      // - By the callback handler after successful token exchange
+      // - By the unmount cleanup when OAuth flow is interrupted
+      // - By the state expiry check in the callback handler
 
-        // Add gateway URL if using proxy
-        if (gatewayUrl) {
-          serverConfig.gatewayUrl = gatewayUrl;
-          addLog(
-            "debug",
-            `Using proxy gateway: ${gatewayUrl} for target: ${url}`
-          );
-        }
+      const client = lifecycle.client;
+      const authProvider = lifecycle.authProvider;
 
-        // Add custom headers if provided (includes proxy headers)
-        if (allHeaders && Object.keys(allHeaders).length > 0) {
-          serverConfig.headers = allHeaders;
-        }
-
-        // Client should be initialized by the parent connect() function
-        // If it's not AND component is still mounted, this is a programming error
-        if (!clientRef.current) {
-          if (!isMountedRef.current) {
-            addLog(
-              "debug",
-              "Connection aborted - component unmounted, client cleaned up"
-            );
-            return "failed";
-          }
-          const initError = new Error(
-            "Client not initialized - this is a bug in the connection flow"
-          );
-          addLog(
-            "error",
-            "Client ref is null in tryConnectWithTransport but component is still mounted"
-          );
-          throw initError;
-        }
-
-        // Add server to client with OAuth provider.
-        // Pass stable proxies (when a callback is present) so capability
-        // advertisement happens on initial connect, while dispatch always
-        // reaches the latest React handler via refs — even after reconnects
-        // that reuse a connect() closure created with a different identity.
-        clientRef.current.addServer(serverName, {
-          ...serverConfig,
-          authProvider: authProviderRef.current,
-          onSampling: hasSamplingCallbackRef.current
-            ? stableOnSampling
-            : undefined,
-          onElicitation: hasElicitationCallbackRef.current
-            ? stableOnElicitation
-            : undefined,
-          onNotification: (
-            notification: Parameters<typeof stableOnNotification>[0]
-          ) => {
-            addLog(
-              "debug",
-              "Notification received:",
-              notification.method,
-              notification
-            );
-            stableOnNotification(notification);
-
-            if (notification.method === "notifications/tools/list_changed") {
-              addLog("info", "Tools list changed, auto-refreshing...");
-              connectionOperations
-                .refreshTools()
-                .catch((err) =>
-                  addLog("warn", "Auto-refresh tools failed:", err)
-                );
-            } else if (
-              notification.method === "notifications/resources/list_changed"
-            ) {
-              addLog("info", "Resources list changed, auto-refreshing...");
-              const clientInfoExtensions = (
-                mergedClientInfo as {
-                  capabilities?: { extensions?: Record<string, unknown> };
-                }
-              ).capabilities?.extensions;
-              const optionExtensions = (
-                effectiveClientOptions?.capabilities as
-                  | { extensions?: Record<string, unknown> }
-                  | undefined
-              )?.extensions;
-              const supportsSkills =
-                optionExtensions?.[SKILLS_EXTENSION_ID] !== undefined ||
-                clientInfoExtensions?.[SKILLS_EXTENSION_ID] !== undefined;
-              Promise.all([
-                connectionOperations.refreshResources(),
-                ...(supportsSkills
-                  ? [connectionOperations.refreshSkills()]
-                  : []),
-              ]).catch((err) =>
-                addLog("warn", "Auto-refresh resources failed:", err)
-              );
-            } else if (
-              notification.method === "notifications/prompts/list_changed"
-            ) {
-              addLog("info", "Prompts list changed, auto-refreshing...");
-              connectionOperations
-                .refreshPrompts()
-                .catch((err) =>
-                  addLog("warn", "Auto-refresh prompts failed:", err)
-                );
-            }
-          },
-          wrapTransport: wrapTransport
-            ? (transport: Transport) => {
-                addLog(
-                  "debug",
-                  "Applying transport wrapper for server:",
-                  serverName,
-                  "url:",
-                  url
-                );
-                return wrapTransport(transport, serverId ?? url);
-              }
-            : undefined,
-        });
-
-        // MCPClient owns protocol negotiation and any legacy initialization.
-        // Modern connections remain stateless and are not initialized twice.
-        const connection = await clientRef.current.connect(serverName);
-        connectionRef.current = connection;
-
-        if (!isMountedRef.current) {
-          addLog(
-            "debug",
-            "Connection aborted after connection creation - component unmounted"
-          );
+      const tryConnectWithTransport = async (
+        transportTypeParam: TransportType
+      ): Promise<"success" | "fallback" | "auth_redirect" | "failed"> => {
+        if (!isCurrentLifecycle(lifecycleRef, lifecycle)) {
           return "failed";
         }
 
-        addLog("info", "✅ Successfully connected to MCP server");
-        addLog("info", "Server info:", connection.info.server);
-        addLog("info", "Server capabilities:", connection.info.capabilities);
+        addLog(
+          "info",
+          `Attempting connection with transport: ${transportTypeParam}`
+        );
+        addLog(
+          "debug",
+          `Client status at start of tryConnectWithTransport: initialized`
+        );
 
-        // Only set up monitoring if autoReconnect is enabled and health checks are not disabled
-        if (
-          autoReconnectConfig.enabled &&
-          autoReconnectConfig.healthCheckInterval !== false
-        ) {
-          const cleanup = startConnectionHealthMonitoring({
-            gatewayUrl,
-            url,
-            allHeaders,
-            getAuthHeaders: async (): Promise<Record<string, string>> => {
-              try {
-                const tokens = await authProviderRef.current?.tokens?.();
-                if (tokens?.access_token) {
-                  const tokenType = tokens.token_type || "bearer";
-                  return {
-                    Authorization: `${tokenType.charAt(0).toUpperCase() + tokenType.slice(1)} ${tokens.access_token}`,
-                  };
-                }
-              } catch {
-                // Intentionally empty - fall through to return {}
-              }
-              return {};
-            },
-            isMountedRef,
-            stateRef,
-            autoReconnectRef,
-            setState,
-            addLog,
-            connect,
-            defaultReconnectDelay: autoReconnectConfig.initialDelay,
-            healthCheckIntervalMs: autoReconnectConfig.healthCheckInterval,
-            healthCheckTimeoutMs: autoReconnectConfig.healthCheckTimeout,
-          });
+        try {
+          const serverName = USE_MCP_SERVER_NAME;
 
-          // Store cleanup function for later
-          (connection as any)._healthCheckCleanup = cleanup;
-        }
+          // Build server config
+          const serverConfig: any = {
+            url: url, // Use original URL, not transformed proxy URL
+            timeout,
+            clientInfo: mergedClientInfo,
+            // Pass a fetch that scopes OAuth-proxy routing to this server's
+            // transport/auth calls. getProxyFetch wraps `customFetch` (e.g. the
+            // OAuth retry fetch for scope step-up), bypasses the browser cache
+            // for OAuth metadata, and optionally routes OAuth through the BFF.
+            // It never mutates the global fetch.
+            ...(() => {
+              const scopedFetch =
+                authProvider.getProxyFetch?.(customFetch) ?? customFetch;
+              return scopedFetch ? { fetch: scopedFetch } : {};
+            })(),
+            // Pass clientOptions for custom capabilities (e.g., MCP Apps extension)
+            ...(effectiveClientOptions && {
+              clientOptions: effectiveClientOptions,
+            }),
+            // Protocol era negotiation mode ("legacy" | "auto" | { pin }); the
+            // connector defaults to automatic v1/v2 negotiation.
+            ...(protocolNegotiation !== undefined && { protocolNegotiation }),
+            detectMixedAuth,
+            // Pass user-configurable reconnection options, or when autoReconnect
+            // is disabled, disable SDK transport reconnection to prevent
+            // unwanted GET polling requests
+            ...(reconnectionOptions
+              ? { reconnectionOptions }
+              : autoReconnect === false
+                ? { reconnectionOptions: { maxRetries: 0 } }
+                : {}),
+          };
 
-        // Track successful connection
-        Tel.getInstance()
-          .trackUseMcpConnection({
-            url,
-            transportType: transportTypeParam,
-            success: true,
-            hasOAuth: !!authProviderRef.current,
-            hasSampling: hasSamplingCallbackRef.current,
-            hasElicitation: hasElicitationCallbackRef.current,
-          })
-          .catch(() => {});
-
-        // Get tools, resources, and prompts through the protocol-neutral connection.
-        setTools(connection.tools || []);
-
-        const {
-          server: serverInfo,
-          capabilities,
-          protocolEra,
-          protocolVersion,
-          instructions,
-          extensions,
-          authorization: connectionAuthorization,
-        } = connection.info;
-
-        if (connectionAuthorization) {
-          setAuthorization(connectionAuthorization);
-          authorizationRef.current = connectionAuthorization;
-        }
-        setProtocolEra(protocolEra);
-        setProtocolVersion(protocolVersion);
-        setInstructions(instructions);
-        setExtensions(extensions);
-
-        if (serverInfo) {
-          addLog("debug", "Server info:", serverInfo);
-          setServerInfo(serverInfo);
-          iconLoadingPromiseRef.current = loadServerIcon({
-            serverInfo,
-            url,
-            isMounted: () => isMountedRef.current,
-            setServerInfo,
-            addLog,
-          });
-        }
-        if (capabilities) {
-          addLog("debug", "Server capabilities:", capabilities);
-          setCapabilities(capabilities);
-        }
-
-        // Tools and normalized connection metadata are sufficient for a usable
-        // connection. Auxiliary inventories must populate progressively rather
-        // than extending the ready-state critical path.
-        successfulTransportRef.current = transportTypeParam;
-        setState("ready");
-        // Optional OAuth metadata is not part of anonymous MCP readiness. Give
-        // React a chance to paint the ready state before starting its network
-        // fallbacks, which may legitimately return 404 for public servers.
-        const discoverAuthorizationAfterReady = () => {
-          if (!isMountedRef.current || connectionRef.current !== connection) {
-            return;
+          // Add gateway URL if using proxy
+          if (gatewayUrl) {
+            serverConfig.gatewayUrl = gatewayUrl;
+            addLog(
+              "debug",
+              `Using proxy gateway: ${gatewayUrl} for target: ${url}`
+            );
           }
-          const authorizationDiscovery = connection.discoverAuthorization?.();
-          if (authorizationDiscovery) {
-            void authorizationDiscovery.then((discovered) => {
-              if (
-                !discovered ||
-                !isMountedRef.current ||
-                connectionRef.current !== connection
+
+          // Add custom headers if provided (includes proxy headers)
+          if (allHeaders && Object.keys(allHeaders).length > 0) {
+            serverConfig.headers = allHeaders;
+          }
+
+          if (!isCurrentLifecycle(lifecycleRef, lifecycle)) return "failed";
+
+          // Add server to client with OAuth provider.
+          // Pass stable proxies (when a callback is present) so capability
+          // advertisement happens on initial connect, while dispatch always
+          // reaches the latest React handler via refs — even after reconnects
+          // that reuse a connect() closure created with a different identity.
+          client.addServer(serverName, {
+            ...serverConfig,
+            authProvider,
+            onSampling: hasSamplingCallbackRef.current
+              ? async (params) => {
+                  if (!isCurrentLifecycle(lifecycleRef, lifecycle)) {
+                    throw new Error("Connection lifecycle is no longer active");
+                  }
+                  return stableOnSampling(params);
+                }
+              : undefined,
+            onElicitation: hasElicitationCallbackRef.current
+              ? async (params) => {
+                  if (!isCurrentLifecycle(lifecycleRef, lifecycle)) {
+                    throw new Error("Connection lifecycle is no longer active");
+                  }
+                  return stableOnElicitation(params);
+                }
+              : undefined,
+            onNotification: (
+              notification: Parameters<typeof stableOnNotification>[0]
+            ) => {
+              if (!isCurrentLifecycle(lifecycleRef, lifecycle)) return;
+              addLog(
+                "debug",
+                "Notification received:",
+                notification.method,
+                notification
+              );
+              stableOnNotification(notification);
+
+              if (notification.method === "notifications/tools/list_changed") {
+                addLog("info", "Tools list changed, auto-refreshing...");
+                connectionOperations.refreshTools().catch((err) => {
+                  if (isCurrentLifecycle(lifecycleRef, lifecycle)) {
+                    addLog("warn", "Auto-refresh tools failed:", err);
+                  }
+                });
+              } else if (
+                notification.method === "notifications/resources/list_changed"
               ) {
-                return;
+                addLog("info", "Resources list changed, auto-refreshing...");
+                const clientInfoExtensions = (
+                  mergedClientInfo as {
+                    capabilities?: { extensions?: Record<string, unknown> };
+                  }
+                ).capabilities?.extensions;
+                const optionExtensions = (
+                  effectiveClientOptions?.capabilities as
+                    | { extensions?: Record<string, unknown> }
+                    | undefined
+                )?.extensions;
+                const supportsSkills =
+                  optionExtensions?.[SKILLS_EXTENSION_ID] !== undefined ||
+                  clientInfoExtensions?.[SKILLS_EXTENSION_ID] !== undefined;
+                Promise.all([
+                  connectionOperations.refreshResources(),
+                  ...(supportsSkills
+                    ? [connectionOperations.refreshSkills()]
+                    : []),
+                ]).catch((err) => {
+                  if (isCurrentLifecycle(lifecycleRef, lifecycle)) {
+                    addLog("warn", "Auto-refresh resources failed:", err);
+                  }
+                });
+              } else if (
+                notification.method === "notifications/prompts/list_changed"
+              ) {
+                addLog("info", "Prompts list changed, auto-refreshing...");
+                connectionOperations.refreshPrompts().catch((err) => {
+                  if (isCurrentLifecycle(lifecycleRef, lifecycle)) {
+                    addLog("warn", "Auto-refresh prompts failed:", err);
+                  }
+                });
               }
-              authorizationRef.current = discovered;
-              setAuthorization(discovered);
+            },
+            wrapTransport: wrapTransport
+              ? (transport: Transport) => {
+                  addLog(
+                    "debug",
+                    "Applying transport wrapper for server:",
+                    serverName,
+                    "url:",
+                    url
+                  );
+                  return wrapTransport(transport, serverId ?? url);
+                }
+              : undefined,
+          });
+
+          // MCPClient owns protocol negotiation and any legacy initialization.
+          // Modern connections remain stateless and are not initialized twice.
+          if (!isCurrentLifecycle(lifecycleRef, lifecycle)) return "failed";
+          const connection = await client.connect(serverName);
+          const staleClose = attachLifecycleConnection(lifecycle, connection);
+          if (!isCurrentLifecycle(lifecycleRef, lifecycle)) {
+            if (staleClose) void staleClose.catch(() => {});
+            return "failed";
+          }
+          connectionRef.current = connection;
+
+          addLog("info", "✅ Successfully connected to MCP server");
+          addLog("info", "Server info:", connection.info.server);
+          addLog("info", "Server capabilities:", connection.info.capabilities);
+
+          // Only set up monitoring if autoReconnect is enabled and health checks are not disabled
+          if (
+            autoReconnectConfig.enabled &&
+            autoReconnectConfig.healthCheckInterval !== false
+          ) {
+            const lifecycleMountedRef = {
+              get current() {
+                return isCurrentLifecycle(lifecycleRef, lifecycle);
+              },
+            };
+            const cleanup = startConnectionHealthMonitoring({
+              gatewayUrl,
+              url,
+              allHeaders,
+              getAuthHeaders: async (): Promise<Record<string, string>> => {
+                try {
+                  const tokens = await authProvider.tokens?.();
+                  if (!isCurrentLifecycle(lifecycleRef, lifecycle)) return {};
+                  if (tokens?.access_token) {
+                    const tokenType = tokens.token_type || "bearer";
+                    return {
+                      Authorization: `${tokenType.charAt(0).toUpperCase() + tokenType.slice(1)} ${tokens.access_token}`,
+                    };
+                  }
+                } catch {
+                  // Intentionally empty - fall through to return {}
+                }
+                return {};
+              },
+              isMountedRef: lifecycleMountedRef,
+              stateRef,
+              autoReconnectRef,
+              setState: (nextState) => {
+                if (isCurrentLifecycle(lifecycleRef, lifecycle)) {
+                  setState(nextState);
+                }
+              },
+              addLog: (level, message, ...args) => {
+                if (isCurrentLifecycle(lifecycleRef, lifecycle)) {
+                  addLog(level, message, ...args);
+                }
+              },
+              connect: () => {
+                if (isCurrentLifecycle(lifecycleRef, lifecycle)) {
+                  requestReconnect("health-check");
+                }
+              },
+              defaultReconnectDelay: autoReconnectConfig.initialDelay,
+              healthCheckIntervalMs: autoReconnectConfig.healthCheckInterval,
+              healthCheckTimeoutMs: autoReconnectConfig.healthCheckTimeout,
+            });
+
+            lifecycle.healthCleanup = cleanup;
+          }
+
+          // Track successful connection
+          Tel.getInstance()
+            .trackUseMcpConnection({
+              url,
+              transportType: transportTypeParam,
+              success: true,
+              hasOAuth: !!authProvider,
+              hasSampling: hasSamplingCallbackRef.current,
+              hasElicitation: hasElicitationCallbackRef.current,
+            })
+            .catch(() => {});
+
+          // Get tools, resources, and prompts through the protocol-neutral connection.
+          setTools(connection.tools || []);
+
+          const {
+            server: serverInfo,
+            capabilities,
+            protocolEra,
+            protocolVersion,
+            instructions,
+            extensions,
+            authorization: connectionAuthorization,
+          } = connection.info;
+
+          if (connectionAuthorization) {
+            setAuthorization(connectionAuthorization);
+            authorizationRef.current = connectionAuthorization;
+          }
+          setProtocolEra(protocolEra);
+          setProtocolVersion(protocolVersion);
+          setInstructions(instructions);
+          setExtensions(extensions);
+
+          if (serverInfo) {
+            addLog("debug", "Server info:", serverInfo);
+            setServerInfo(serverInfo);
+            iconLoadingPromiseRef.current = loadServerIcon({
+              serverInfo,
+              url,
+              isMounted: () => isCurrentLifecycle(lifecycleRef, lifecycle),
+              setServerInfo,
+              addLog: (level, message, ...args) => {
+                if (isCurrentLifecycle(lifecycleRef, lifecycle)) {
+                  addLog(level, message, ...args);
+                }
+              },
             });
           }
-        };
-        if (typeof globalThis.requestAnimationFrame === "function") {
-          globalThis.requestAnimationFrame(() => {
-            setTimeout(discoverAuthorizationAfterReady, 0);
-          });
-        } else {
-          setTimeout(discoverAuthorizationAfterReady, 0);
-        }
+          if (capabilities) {
+            addLog("debug", "Server capabilities:", capabilities);
+            setCapabilities(capabilities);
+          }
 
-        // Capability advertisements in the wild are not always granular: a
-        // server may support resources/list while returning Method not found
-        // for resources/templates/list. Inventory failures must not tear down
-        // an otherwise healthy MCP connection.
-        const [resourcesResult, promptsResult, templatesResult] =
-          await Promise.all([
-            connection.listAllResources().catch((error) => {
-              addLog("warn", "Failed to load initial resources:", error);
-              return { resources: [] };
-            }),
-            connection.listPrompts().catch((error) => {
-              addLog("warn", "Failed to load initial prompts:", error);
-              return { prompts: [] };
-            }),
-            connection.supports("resources")
-              ? connection.listResourceTemplates().catch((error) => {
-                  addLog(
-                    "warn",
-                    "Failed to load initial resource templates:",
-                    error
-                  );
-                  return { resourceTemplates: [] };
-                })
-              : Promise.resolve({ resourceTemplates: [] }),
-          ]);
-        if (!isMountedRef.current) {
-          addLog(
-            "debug",
-            "Connection aborted after discovery - component unmounted"
-          );
-          return "failed";
-        }
-        setResources(resourcesResult.resources || []);
-        setPrompts(promptsResult.prompts || []);
-        setResourceTemplates(templatesResult.resourceTemplates || []);
-
-        // Skills are another auxiliary inventory and populate progressively.
-        if (isMountedRef.current) {
-          if (extensions["io.modelcontextprotocol/skills"] !== undefined) {
-            try {
-              const result = await connection.listAllSkills();
-              if (isMountedRef.current) setSkills(result.skills);
-            } catch (error) {
-              addLog("warn", "Failed to load initial skills:", error);
-              if (isMountedRef.current) setSkills([]);
+          // Tools and normalized connection metadata are sufficient for a usable
+          // connection. Auxiliary inventories must populate progressively rather
+          // than extending the ready-state critical path.
+          successfulTransportRef.current = transportTypeParam;
+          lifecycle.phase = "ready";
+          setState("ready");
+          // Optional OAuth metadata is not part of anonymous MCP readiness. Give
+          // React a chance to paint the ready state before starting its network
+          // fallbacks, which may legitimately return 404 for public servers.
+          const discoverAuthorizationAfterReady = () => {
+            if (
+              !isCurrentLifecycle(lifecycleRef, lifecycle) ||
+              connectionRef.current !== connection
+            ) {
+              return;
             }
+            const authorizationDiscovery = connection.discoverAuthorization?.();
+            if (authorizationDiscovery) {
+              void authorizationDiscovery.then((discovered) => {
+                if (
+                  !discovered ||
+                  !isCurrentLifecycle(lifecycleRef, lifecycle) ||
+                  connectionRef.current !== connection
+                ) {
+                  return;
+                }
+                authorizationRef.current = discovered;
+                setAuthorization(discovered);
+              });
+            }
+          };
+          if (typeof globalThis.requestAnimationFrame === "function") {
+            globalThis.requestAnimationFrame(() => {
+              setTimeout(discoverAuthorizationAfterReady, 0);
+            });
           } else {
-            setSkills([]);
+            setTimeout(discoverAuthorizationAfterReady, 0);
           }
-        }
 
-        // Get OAuth tokens if authentication was used
-        if (authProviderRef.current) {
-          let tokens: Awaited<
-            ReturnType<NonNullable<UseMcpAuthProvider["tokens"]>>
-          >;
-          try {
-            tokens = await authProviderRef.current.tokens?.();
-          } catch (error) {
-            // The MCP connection is already usable. Token projection is
-            // supplemental state and must not tear down a ready connection.
-            addLog("warn", "Failed to read OAuth tokens:", error);
-            tokens = undefined;
-          }
-          if (!isMountedRef.current) {
-            addLog(
-              "debug",
-              "Connection aborted after token fetch for auth tokens - component unmounted"
-            );
+          // Capability advertisements in the wild are not always granular: a
+          // server may support resources/list while returning Method not found
+          // for resources/templates/list. Inventory failures must not tear down
+          // an otherwise healthy MCP connection.
+          const [resourcesResult, promptsResult, templatesResult] =
+            await Promise.all([
+              connection.listAllResources().catch((error) => {
+                if (isCurrentLifecycle(lifecycleRef, lifecycle)) {
+                  addLog("warn", "Failed to load initial resources:", error);
+                }
+                return { resources: [] };
+              }),
+              connection.listPrompts().catch((error) => {
+                if (isCurrentLifecycle(lifecycleRef, lifecycle)) {
+                  addLog("warn", "Failed to load initial prompts:", error);
+                }
+                return { prompts: [] };
+              }),
+              connection.supports("resources")
+                ? connection.listResourceTemplates().catch((error) => {
+                    if (isCurrentLifecycle(lifecycleRef, lifecycle)) {
+                      addLog(
+                        "warn",
+                        "Failed to load initial resource templates:",
+                        error
+                      );
+                    }
+                    return { resourceTemplates: [] };
+                  })
+                : Promise.resolve({ resourceTemplates: [] }),
+            ]);
+          if (!isCurrentLifecycle(lifecycleRef, lifecycle)) {
             return "failed";
           }
-          if (tokens?.access_token) {
-            if (authorizationRef.current?.mode === "mixed") {
-              const authenticatedAuthorization = {
-                ...authorizationRef.current,
-                authenticated: true,
-              };
-              setAuthorization(authenticatedAuthorization);
-              authorizationRef.current = authenticatedAuthorization;
-            }
-            const expiresAt = getOAuthTokenExpiry(tokens);
+          setResources(resourcesResult.resources || []);
+          setPrompts(promptsResult.prompts || []);
+          setResourceTemplates(templatesResult.resourceTemplates || []);
 
-            // Best-effort: resolve the OAuth token endpoint + client credentials
-            // so consumers can persist them for server-side proactive refresh.
-            // Never blocks auth.
-            let tokenEndpoint: string | null = null;
-            let resource: string | null = null;
-            let clientCreds: {
-              client_id: string;
-              client_secret?: string;
-            } | null = null;
-            try {
-              tokenEndpoint =
-                (await authProviderRef.current.getTokenEndpoint?.()) ?? null;
-            } catch {
-              tokenEndpoint = null;
+          // Skills are another auxiliary inventory and populate progressively.
+          if (isCurrentLifecycle(lifecycleRef, lifecycle)) {
+            if (extensions["io.modelcontextprotocol/skills"] !== undefined) {
+              try {
+                const result = await connection.listAllSkills();
+                if (isCurrentLifecycle(lifecycleRef, lifecycle)) {
+                  setSkills(result.skills);
+                }
+              } catch (error) {
+                if (isCurrentLifecycle(lifecycleRef, lifecycle)) {
+                  addLog("warn", "Failed to load initial skills:", error);
+                  setSkills([]);
+                }
+              }
+            } else {
+              setSkills([]);
             }
-            try {
-              resource =
-                (await authProviderRef.current.getResource?.()) ?? null;
-            } catch {
-              resource = null;
-            }
-            try {
-              clientCreds =
-                (await authProviderRef.current.getClientCredentials?.()) ??
-                null;
-            } catch {
-              clientCreds = null;
-            }
+          }
 
-            if (!isMountedRef.current) {
-              addLog("debug", "Skipping state update - component unmounted");
+          // Get OAuth tokens if authentication was used
+          if (authProvider) {
+            let tokens: Awaited<
+              ReturnType<NonNullable<UseMcpAuthProvider["tokens"]>>
+            >;
+            try {
+              tokens = await authProvider.tokens?.();
+            } catch (error) {
+              // The MCP connection is already usable. Token projection is
+              // supplemental state and must not tear down a ready connection.
+              if (isCurrentLifecycle(lifecycleRef, lifecycle)) {
+                addLog("warn", "Failed to read OAuth tokens:", error);
+              }
+              tokens = undefined;
+            }
+            if (!isCurrentLifecycle(lifecycleRef, lifecycle)) {
               return "failed";
             }
-            setAuthTokens({
-              access_token: tokens.access_token,
-              token_type: tokens.token_type || "Bearer",
-              expires_at: expiresAt,
-              refresh_token: tokens.refresh_token,
-              scope: tokens.scope,
-              ...(tokenEndpoint ? { token_endpoint: tokenEndpoint } : {}),
-              ...(resource ? { resource } : {}),
-              ...(clientCreds?.client_id
-                ? { client_id: clientCreds.client_id }
-                : {}),
-              ...(clientCreds?.client_secret
-                ? { client_secret: clientCreds.client_secret }
-                : {}),
-            });
+            if (tokens?.access_token) {
+              if (authorizationRef.current?.mode === "mixed") {
+                const authenticatedAuthorization = {
+                  ...authorizationRef.current,
+                  authenticated: true,
+                };
+                setAuthorization(authenticatedAuthorization);
+                authorizationRef.current = authenticatedAuthorization;
+              }
+              const expiresAt = getOAuthTokenExpiry(tokens);
+
+              // Best-effort: resolve the OAuth token endpoint + client credentials
+              // so consumers can persist them for server-side proactive refresh.
+              // Never blocks auth.
+              let tokenEndpoint: string | null = null;
+              let resource: string | null = null;
+              let clientCreds: {
+                client_id: string;
+                client_secret?: string;
+              } | null = null;
+              try {
+                tokenEndpoint =
+                  (await authProvider.getTokenEndpoint?.()) ?? null;
+              } catch {
+                tokenEndpoint = null;
+              }
+              if (!isCurrentLifecycle(lifecycleRef, lifecycle)) return "failed";
+              try {
+                resource = (await authProvider.getResource?.()) ?? null;
+              } catch {
+                resource = null;
+              }
+              if (!isCurrentLifecycle(lifecycleRef, lifecycle)) return "failed";
+              try {
+                clientCreds =
+                  (await authProvider.getClientCredentials?.()) ?? null;
+              } catch {
+                clientCreds = null;
+              }
+
+              if (!isCurrentLifecycle(lifecycleRef, lifecycle)) {
+                return "failed";
+              }
+              setAuthTokens({
+                access_token: tokens.access_token,
+                token_type: tokens.token_type || "Bearer",
+                expires_at: expiresAt,
+                refresh_token: tokens.refresh_token,
+                scope: tokens.scope,
+                ...(tokenEndpoint ? { token_endpoint: tokenEndpoint } : {}),
+                ...(resource ? { resource } : {}),
+                ...(clientCreds?.client_id
+                  ? { client_id: clientCreds.client_id }
+                  : {}),
+                ...(clientCreds?.client_secret
+                  ? { client_secret: clientCreds.client_secret }
+                  : {}),
+              });
+            }
           }
-        }
 
-        return "success";
-      } catch (err: unknown) {
-        const error = err as Error & { code?: number; message?: string };
-        const errorMessage = error?.message || String(err);
-
-        // A prepared authorization URL means OAuth discovery already succeeded on
-        // an earlier pass. A later failure (token refresh, SSE fallback, or a
-        // metadata probe that fell back to the transport origin) must NOT be
-        // misclassified as "server does not support OAuth" — that drops us to
-        // `failed` and hides the Authenticate button. When we already have a
-        // stored auth URL and an OAuth provider, surface `pending_auth` instead.
-        const preparedAuthUrl =
-          authProviderRef.current?.getLastAttemptedAuthUrl?.();
-        if (preparedAuthUrl && authProviderRef.current && preventAutoAuth) {
-          addLog(
-            "info",
-            "OAuth already discovered (stored auth URL present); awaiting manual authentication."
-          );
-          if (isMountedRef.current) {
-            setState("pending_auth");
-            setAuthUrl(preparedAuthUrl);
+          return "success";
+        } catch (err: unknown) {
+          if (!isCurrentLifecycle(lifecycleRef, lifecycle)) {
+            void closeRetiredLifecycleAfterConnectFailure(lifecycle)?.catch(
+              () => {}
+            );
+            return "failed";
           }
-          connectingRef.current = false;
-          return "auth_redirect";
-        }
+          const error = err as Error & { code?: number; message?: string };
+          const errorMessage = error?.message || String(err);
 
-        // Check if OAuth discovery failed (indicates server doesn't support OAuth)
-        // This happens when a 401 triggers OAuth discovery but the server has no OAuth endpoints
-        const oauthDiscoveryFailed = isOAuthDiscoveryFailure(err);
+          // A prepared authorization URL means OAuth discovery already succeeded on
+          // an earlier pass. A later failure (token refresh, SSE fallback, or a
+          // metadata probe that fell back to the transport origin) must NOT be
+          // misclassified as "server does not support OAuth" — that drops us to
+          // `failed` and hides the Authenticate button. When we already have a
+          // stored auth URL and an OAuth provider, surface `pending_auth` instead.
+          const preparedAuthUrl = authProvider.getLastAttemptedAuthUrl?.();
+          if (preparedAuthUrl && preventAutoAuth) {
+            addLog(
+              "info",
+              "OAuth already discovered (stored auth URL present); awaiting manual authentication."
+            );
+            if (isMountedRef.current) {
+              lifecycle.phase = "waiting_for_auth";
+              setState("pending_auth");
+              setAuthUrl(preparedAuthUrl);
+            }
+            return "auth_redirect";
+          }
 
-        // Check if this is a 401 error
-        const is401Error = isUnauthorized(err);
+          // Check if OAuth discovery failed (indicates server doesn't support OAuth)
+          // This happens when a 401 triggers OAuth discovery but the server has no OAuth endpoints
+          const oauthDiscoveryFailed = isOAuthDiscoveryFailure(err);
 
-        // If OAuth discovery failed with custom headers provided, this was likely a 401 with wrong credentials
-        // The error message might say "404" (from OAuth endpoint attempts) but the root cause was 401
-        if (
-          oauthDiscoveryFailed &&
-          headers &&
-          Object.keys(headers).length > 0
-        ) {
-          failConnection(
-            "Authentication failed (HTTP 401). Server does not support OAuth. " +
-              "Check your Authorization header value is correct."
-          );
-          return "failed";
-        }
+          // Check if this is a 401 error
+          const is401Error = isUnauthorized(err);
 
-        // If OAuth discovery failed without custom headers, the server likely requires
-        // authentication but doesn't support OAuth discovery
-        // This handles cases where the server returns 401 but the error message shows "404"
-        // from the OAuth endpoint attempts
-        if (
-          oauthDiscoveryFailed &&
-          (!headers || Object.keys(headers).length === 0)
-        ) {
-          failConnection(
-            "Authentication required (HTTP 401). Server does not support OAuth. " +
-              "Add an Authorization header in the Custom Headers section " +
-              "(e.g., Authorization: Bearer YOUR_API_KEY)."
-          );
-          return "failed";
-        }
-
-        // Handle 401 errors
-        if (is401Error) {
-          // If OAuth discovery failed, the server doesn't support OAuth
-          // Show a clear message about this
-          if (oauthDiscoveryFailed) {
-            // No OAuth support and no custom headers - suggest adding API key
+          // If OAuth discovery failed with custom headers provided, this was likely a 401 with wrong credentials
+          // The error message might say "404" (from OAuth endpoint attempts) but the root cause was 401
+          if (
+            oauthDiscoveryFailed &&
+            headers &&
+            Object.keys(headers).length > 0
+          ) {
             failConnection(
+              lifecycle,
+              "Authentication failed (HTTP 401). Server does not support OAuth. " +
+                "Check your Authorization header value is correct."
+            );
+            return "failed";
+          }
+
+          // If OAuth discovery failed without custom headers, the server likely requires
+          // authentication but doesn't support OAuth discovery
+          // This handles cases where the server returns 401 but the error message shows "404"
+          // from the OAuth endpoint attempts
+          if (
+            oauthDiscoveryFailed &&
+            (!headers || Object.keys(headers).length === 0)
+          ) {
+            failConnection(
+              lifecycle,
               "Authentication required (HTTP 401). Server does not support OAuth. " +
                 "Add an Authorization header in the Custom Headers section " +
                 "(e.g., Authorization: Bearer YOUR_API_KEY)."
@@ -1356,210 +1369,236 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
             return "failed";
           }
 
-          // OAuth discovery didn't fail, so OAuth might be available
-          // Check if OAuth provider is configured
-          if (authProviderRef.current) {
-            // OAuth is configured
-            addLog(
-              "info",
-              "Authentication required. OAuth provider available."
-            );
+          // Handle 401 errors
+          if (is401Error) {
+            // If OAuth discovery failed, the server doesn't support OAuth
+            // Show a clear message about this
+            if (oauthDiscoveryFailed) {
+              // No OAuth support and no custom headers - suggest adding API key
+              failConnection(
+                lifecycle,
+                "Authentication required (HTTP 401). Server does not support OAuth. " +
+                  "Add an Authorization header in the Custom Headers section " +
+                  "(e.g., Authorization: Bearer YOUR_API_KEY)."
+              );
+              return "failed";
+            }
 
-            // Check if we should trigger auth automatically or wait for user
-            if (preventAutoAuth) {
-              // Don't trigger auth flow automatically - let the user click "Authenticate"
-              // This prevents unnecessary metadata discovery requests that may fail with CORS/404
+            // OAuth discovery didn't fail, so OAuth might be available
+            // Check if OAuth provider is configured
+            if (authProvider) {
+              // OAuth is configured
               addLog(
                 "info",
-                "Waiting for user to initiate authentication flow..."
+                "Authentication required. OAuth provider available."
               );
 
-              if (isMountedRef.current) {
-                setState("pending_auth");
-                // Retrieve the stored auth URL if it was prepared during OAuth discovery
-                const storedAuthUrl =
-                  authProviderRef.current?.getLastAttemptedAuthUrl?.();
-                if (storedAuthUrl) {
-                  setAuthUrl(storedAuthUrl);
-                  addLog(
-                    "info",
-                    "Retrieved stored auth URL for manual authentication"
-                  );
-                }
-              }
-              connectingRef.current = false;
-              return "auth_redirect";
-            } else {
-              // preventAutoAuth is false - trigger auth flow automatically
-              addLog(
-                "info",
-                "Triggering automatic OAuth authentication flow..."
-              );
+              // Check if we should trigger auth automatically or wait for user
+              if (preventAutoAuth) {
+                // Don't trigger auth flow automatically - let the user click "Authenticate"
+                // This prevents unnecessary metadata discovery requests that may fail with CORS/404
+                addLog(
+                  "info",
+                  "Waiting for user to initiate authentication flow..."
+                );
 
-              try {
-                // The SDK owns protected-resource discovery and parses the
-                // original transport 401. Do not issue a duplicate probe.
-                const authResult = await auth(authProviderRef.current, {
-                  serverUrl: url,
-                  fetchFn: authProviderRef.current.getProxyFetch?.(),
-                });
-
-                if (authResult === "REDIRECT") {
-                  // Step 2: Get the authorization response captured during
-                  // redirectToAuthorization, including RFC 9207 `iss` when
-                  // the provider exposes it.
-                  const flowProvider = authProviderRef.current as any;
-                  const authResponse =
-                    await flowProvider.getAuthorizationResponse?.();
-                  const authCode =
-                    authResponse?.code ??
-                    (await flowProvider.getAuthorizationCode?.());
-                  if (typeof authCode !== "string") {
-                    throw new Error(
-                      "Authorization code not captured by headless provider"
+                if (isMountedRef.current) {
+                  lifecycle.phase = "waiting_for_auth";
+                  setState("pending_auth");
+                  // Retrieve the stored auth URL if it was prepared during OAuth discovery
+                  const storedAuthUrl =
+                    authProvider.getLastAttemptedAuthUrl?.();
+                  if (storedAuthUrl) {
+                    setAuthUrl(storedAuthUrl);
+                    addLog(
+                      "info",
+                      "Retrieved stored auth URL for manual authentication"
                     );
                   }
-
-                  // Step 3: Complete the OAuth flow by exchanging code for tokens
-                  await auth(authProviderRef.current, {
-                    serverUrl: url,
-                    authorizationCode: authCode,
-                    ...(authResponse?.iss !== undefined
-                      ? { iss: authResponse.iss }
-                      : {}),
-                    fetchFn: authProviderRef.current.getProxyFetch?.(),
-                  });
                 }
-
-                addLog("info", "OAuth flow completed, reconnecting...");
-                // Reconnect after successful auth
-                return await tryConnectWithTransport(transportTypeParam);
-              } catch (authError) {
-                const authErrorMessage =
-                  authError instanceof Error
-                    ? authError.message
-                    : String(authError);
-                failConnection(
-                  `Automatic OAuth authentication failed: ${authErrorMessage}`,
-                  authError instanceof Error
-                    ? authError
-                    : new Error(String(authError))
+                return "auth_redirect";
+              } else {
+                // preventAutoAuth is false - trigger auth flow automatically
+                addLog(
+                  "info",
+                  "Triggering automatic OAuth authentication flow..."
                 );
-                return "failed";
+
+                try {
+                  // The SDK owns protected-resource discovery and parses the
+                  // original transport 401. Do not issue a duplicate probe.
+                  lifecycle.phase = "authenticating";
+                  const authResult = await auth(authProvider, {
+                    serverUrl: url,
+                    fetchFn: authProvider.getProxyFetch?.(),
+                  });
+                  if (!isCurrentLifecycle(lifecycleRef, lifecycle)) {
+                    return "failed";
+                  }
+
+                  if (authResult === "REDIRECT") {
+                    // Step 2: Get the authorization response captured during
+                    // redirectToAuthorization, including RFC 9207 `iss` when
+                    // the provider exposes it.
+                    const flowProvider = authProvider as any;
+                    const authResponse =
+                      await flowProvider.getAuthorizationResponse?.();
+                    if (!isCurrentLifecycle(lifecycleRef, lifecycle)) {
+                      return "failed";
+                    }
+                    const authCode =
+                      authResponse?.code ??
+                      (await flowProvider.getAuthorizationCode?.());
+                    if (!isCurrentLifecycle(lifecycleRef, lifecycle)) {
+                      return "failed";
+                    }
+                    if (typeof authCode !== "string") {
+                      throw new Error(
+                        "Authorization code not captured by headless provider"
+                      );
+                    }
+
+                    // Step 3: Complete the OAuth flow by exchanging code for tokens
+                    await auth(authProvider, {
+                      serverUrl: url,
+                      authorizationCode: authCode,
+                      ...(authResponse?.iss !== undefined
+                        ? { iss: authResponse.iss }
+                        : {}),
+                      fetchFn: authProvider.getProxyFetch?.(),
+                    });
+                    if (!isCurrentLifecycle(lifecycleRef, lifecycle)) {
+                      return "failed";
+                    }
+                  }
+
+                  addLog("info", "OAuth flow completed, reconnecting...");
+                  requestReconnect("oauth-success");
+                  return "auth_redirect";
+                } catch (authError) {
+                  const authErrorMessage =
+                    authError instanceof Error
+                      ? authError.message
+                      : String(authError);
+                  failConnection(
+                    lifecycle,
+                    `Automatic OAuth authentication failed: ${authErrorMessage}`,
+                    authError instanceof Error
+                      ? authError
+                      : new Error(String(authError))
+                  );
+                  return "failed";
+                }
               }
             }
-          }
 
-          // Check if custom headers were provided (invalid credentials)
-          if (headers && Object.keys(headers).length > 0) {
+            // Check if custom headers were provided (invalid credentials)
+            if (headers && Object.keys(headers).length > 0) {
+              failConnection(
+                lifecycle,
+                "Authentication failed: Server returned 401 Unauthorized. " +
+                  "Check your Authorization header value is correct."
+              );
+              return "failed";
+            }
+
+            // No OAuth and no custom headers - suggest adding them
             failConnection(
-              "Authentication failed: Server returned 401 Unauthorized. " +
-                "Check your Authorization header value is correct."
+              lifecycle,
+              "Authentication required: Server returned 401 Unauthorized. " +
+                "Add an Authorization header in the Custom Headers section " +
+                "(e.g., Authorization: Bearer YOUR_API_KEY)."
             );
             return "failed";
           }
 
-          // No OAuth and no custom headers - suggest adding them
-          failConnection(
-            "Authentication required: Server returned 401 Unauthorized. " +
-              "Add an Authorization header in the Custom Headers section " +
-              "(e.g., Authorization: Bearer YOUR_API_KEY)."
+          // Handle other errors
+          const isRetryingWithProxy = failConnection(
+            lifecycle,
+            errorMessage,
+            error instanceof Error ? error : new Error(String(error))
           );
-          return "failed";
+          // If failConnection triggered automatic proxy fallback, return a special
+          // status so the caller does not treat this as a hard connection failure
+          return isRetryingWithProxy ? "auth_redirect" : "failed";
         }
+      };
 
-        // Handle other errors
-        const isRetryingWithProxy = failConnection(
-          errorMessage,
-          error instanceof Error ? error : new Error(String(error))
+      let finalStatus: "success" | "auth_redirect" | "failed" | "fallback" =
+        "failed";
+
+      addLog("debug", "Connecting via streamable HTTP");
+      finalStatus = await tryConnectWithTransport("http");
+      if (isCurrentLifecycle(lifecycleRef, lifecycle)) {
+        addLog(
+          "debug",
+          `Connection sequence finished with status: ${finalStatus}`
         );
-        // If failConnection triggered automatic proxy fallback, return a special
-        // status so the caller does not treat this as a hard connection failure
-        return isRetryingWithProxy ? "auth_redirect" : "failed";
       }
-    };
+    },
+    [
+      addLog,
+      failConnection,
+      requestReconnect,
+      url,
+      storageKeyPrefix,
+      callbackUrl,
+      oauthClientConfig.name,
+      oauthClientConfig.version,
+      oauthClientConfig.uri,
+      oauthClientConfig.logo_uri,
+      staticClientInfo,
+      oauthClientMetadataUrl,
+      oauthScope,
+      headers,
+      transportType,
+      preventAutoAuth,
+      detectMixedAuth,
+      useRedirectFlow,
+      onPopupWindow,
+      enabled,
+      timeout,
+      mergedClientInfo,
+      effectiveClientOptions,
+      protocolNegotiation,
+      // IMPORTANT: Include proxy-related dependencies so connect() uses updated values after fallback
+      gatewayUrl,
+      oauthProxyUrlOption,
+      allHeaders,
+      effectiveOAuthUrl,
+      // Stable reverse-request proxies (empty-deps useCallbacks). Listed for
+      // correctness; their identities never change, so they do not reconnect.
+      stableOnSampling,
+      stableOnElicitation,
+      stableOnNotification,
+    ]
+  );
 
-    let finalStatus: "success" | "auth_redirect" | "failed" | "fallback" =
-      "failed";
-
-    addLog("debug", "Connecting via streamable HTTP");
-    finalStatus = await tryConnectWithTransport("http");
-
-    // Reset connecting flag for all terminal states and auth_redirect
-    // auth_redirect needs to reset the flag so the auth callback can reconnect
-    if (
-      finalStatus === "success" ||
-      finalStatus === "failed" ||
-      finalStatus === "auth_redirect"
-    ) {
-      connectingRef.current = false;
-    }
-
-    addLog("debug", `Connection sequence finished with status: ${finalStatus}`);
-  }, [
-    addLog,
-    failConnection,
-    disconnect,
-    url,
-    storageKeyPrefix,
-    callbackUrl,
-    oauthClientConfig.name,
-    oauthClientConfig.version,
-    oauthClientConfig.uri,
-    oauthClientConfig.logo_uri,
-    staticClientInfo,
-    oauthClientMetadataUrl,
-    oauthScope,
-    headers,
-    transportType,
-    preventAutoAuth,
-    detectMixedAuth,
-    useRedirectFlow,
-    onPopupWindow,
-    enabled,
-    timeout,
-    mergedClientInfo,
-    effectiveClientOptions,
-    protocolNegotiation,
-    // IMPORTANT: Include proxy-related dependencies so connect() uses updated values after fallback
-    gatewayUrl,
-    oauthProxyUrlOption,
-    allHeaders,
-    effectiveOAuthUrl,
-    // Stable reverse-request proxies (empty-deps useCallbacks). Listed for
-    // correctness; their identities never change, so they do not reconnect.
-    stableOnSampling,
-    stableOnElicitation,
-    stableOnNotification,
-  ]);
-
-  /**
-   * Effect: Update function refs to prevent stale closures
-   * Used by retry and OAuth callback handlers
-   */
   useEffect(() => {
-    connectRef.current = connect;
-    failConnectionRef.current = failConnection;
-  }, [connect, failConnection]);
+    failConnectionRef.current = (message, error) =>
+      failConnection(lifecycleRef.current, message, error);
+  }, [failConnection]);
 
   /**
    * Retry connection after failure
    * Only works if current state is 'failed'
-   * Note: Uses connectRef to avoid circular dependency with connect
    */
   const retry = useCallback(() => {
-    if (stateRef.current === "failed") {
+    const lifecycle = lifecycleRef.current;
+    if (
+      stateRef.current === "failed" &&
+      lifecycle?.phase === "failed" &&
+      !manuallyDisconnectedRef.current
+    ) {
       addLog("info", "Retry requested...");
-      // Use connectRef to avoid circular dependency
-      // connectRef is kept updated via useEffect
-      connectRef.current?.();
+      requestReconnect("manual-retry");
     } else {
       addLog(
         "warn",
         `Retry called but state is not 'failed' (state: ${stateRef.current}). Ignoring.`
       );
     }
-  }, [addLog]);
+  }, [addLog, requestReconnect]);
 
   /**
    * Trigger manual OAuth authentication flow
@@ -1576,6 +1615,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
    */
   const authenticate = useCallback(async () => {
     addLog("info", "Manual authentication requested...");
+    const authenticationLifecycle = lifecycleRef.current;
     const currentState = stateRef.current;
     const isOptionalMixedAuthentication =
       currentState === "ready" && authorizationRef.current?.mode === "mixed";
@@ -1597,6 +1637,9 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
           "Auth Provider not available for manual auth"
         );
         assert(url, "Server URL is required for authentication");
+        if (authenticationLifecycle) {
+          authenticationLifecycle.phase = "authenticating";
+        }
 
         if (providedAuthProvider) {
           addLog(
@@ -1610,7 +1653,12 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
             serverUrl: baseUrl,
             fetchFn: authProviderRef.current.getProxyFetch?.(),
           });
-          connectRef.current?.();
+          if (
+            authenticationLifecycle &&
+            isCurrentLifecycle(lifecycleRef, authenticationLifecycle)
+          ) {
+            requestReconnect("oauth-success");
+          }
           return;
         }
 
@@ -1685,11 +1733,21 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
           serverUrl: baseUrl,
           fetchFn: freshAuthProvider.getProxyFetch?.(),
         });
+        if (
+          !authenticationLifecycle ||
+          !isCurrentLifecycle(lifecycleRef, authenticationLifecycle)
+        ) {
+          return;
+        }
 
         if (authResult === "AUTHORIZED") {
           addLog("info", "OAuth flow completed (tokens obtained)");
-          connectingRef.current = false;
-          connectRef.current?.();
+          if (
+            authenticationLifecycle &&
+            isCurrentLifecycle(lifecycleRef, authenticationLifecycle)
+          ) {
+            requestReconnect("oauth-success");
+          }
           return;
         }
 
@@ -1746,6 +1804,12 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
         }
 
         if (!isMountedRef.current) return;
+        if (
+          !authenticationLifecycle ||
+          !isCurrentLifecycle(lifecycleRef, authenticationLifecycle)
+        ) {
+          return;
+        }
 
         switch (result.kind) {
           case "success":
@@ -1753,8 +1817,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
               "info",
               "Authentication succeeded; reconnecting to MCP server..."
             );
-            connectingRef.current = false;
-            connectRef.current?.();
+            requestReconnect("oauth-success");
             break;
           case "cancelled":
             addLog(
@@ -1763,6 +1826,9 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
                 ? "Authentication popup was closed before completing. Public tools remain available."
                 : "Authentication popup was closed before completing. Returning to pending_auth."
             );
+            authenticationLifecycle.phase = isOptionalMixedAuthentication
+              ? "ready"
+              : "waiting_for_auth";
             setState(isOptionalMixedAuthentication ? "ready" : "pending_auth");
             break;
           case "timeout":
@@ -1772,10 +1838,16 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
                 ? "Authentication timed out waiting for the popup. Public tools remain available."
                 : "Authentication timed out waiting for the popup. Returning to pending_auth."
             );
+            authenticationLifecycle.phase = isOptionalMixedAuthentication
+              ? "ready"
+              : "waiting_for_auth";
             setState(isOptionalMixedAuthentication ? "ready" : "pending_auth");
             break;
           case "error":
-            failConnection(`Authentication failed: ${result.error}`);
+            failConnection(
+              authenticationLifecycle,
+              `Authentication failed: ${result.error}`
+            );
             break;
           default:
             // Exhaustive over AuthPopupResult["kind"]; nothing to do.
@@ -1785,7 +1857,11 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
         if (!isMountedRef.current) return;
         const error =
           authError instanceof Error ? authError : new Error(String(authError));
-        failConnection(`Manual authentication failed: ${error.message}`, error);
+        failConnection(
+          authenticationLifecycle,
+          `Manual authentication failed: ${error.message}`,
+          error
+        );
       }
     } else if (currentState === "authenticating") {
       addLog(
@@ -1821,6 +1897,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     callbackUrl,
     mergedClientInfo,
     providedAuthProvider,
+    requestReconnect,
   ]);
 
   /**
@@ -1905,27 +1982,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
           "Authentication successful via popup. Reconnecting client..."
         );
 
-        // Check if already connecting
-        if (connectingRef.current) {
-          addLog(
-            "debug",
-            "Connection attempt already in progress, resetting flag to allow reconnection."
-          );
-        }
-
-        // Reset the connecting flag and reconnect since auth just succeeded
-        connectingRef.current = false;
-
-        // Small delay to ensure state is clean before reconnecting
-        setTimeout(() => {
-          if (isMountedRef.current) {
-            addLog(
-              "debug",
-              "Initiating reconnection after successful auth callback."
-            );
-            connectRef.current?.();
-          }
-        }, 100);
+        requestReconnect("oauth-success");
       } else {
         // Don't clobber a connection that already became ready (or moved on):
         // a late/duplicate failure message must not knock a healthy client
@@ -1988,7 +2045,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
       }
       if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current);
     };
-  }, [addLog]);
+  }, [addLog, requestReconnect]);
 
   /**
    * Effect: Main connection lifecycle
@@ -1999,7 +2056,10 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
    * - Cleans up on unmount or when URL changes
    */
   useEffect(() => {
-    isMountedRef.current = true;
+    const trigger = reconnectRequestPendingRef.current
+      ? reconnectTriggerRef.current
+      : "configuration";
+    reconnectRequestPendingRef.current = false;
 
     // Skip connection if disabled or no URL provided
     if (!enabled || !url) {
@@ -2010,15 +2070,18 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
           : "Connection disabled via enabled flag."
       );
       setState("discovering");
-      return () => {
-        isMountedRef.current = false;
-      };
+      return;
     }
 
-    addLog("debug", "useMcp mounted, initiating connection.");
-    connectAttemptRef.current = 0;
+    // A manual disconnect suspends only the current Effect scope. A genuine
+    // dependency change or an accepted reconnect request starts a new scope.
+    manuallyDisconnectedRef.current = false;
+    addLog("debug", `Starting connection lifecycle (${trigger}).`);
+
+    let authProvider: UseMcpAuthProvider;
     if (providedAuthProvider) {
-      authProviderRef.current = providedAuthProvider as UseMcpAuthProvider;
+      authProvider = providedAuthProvider as UseMcpAuthProvider;
+      authProviderRef.current = authProvider;
       addLog("debug", "Using externally provided authProvider");
     } else if (
       !authProviderRef.current ||
@@ -2039,7 +2102,8 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
         clientMetadataUrl: oauthClientMetadataUrl,
         scope: oauthScope,
       });
-      authProviderRef.current = provider;
+      authProvider = provider;
+      authProviderRef.current = authProvider;
       if (oauthProxyUrl) {
         addLog("debug", `OAuth proxy URL in effect: ${oauthProxyUrl}`);
       }
@@ -2047,11 +2111,38 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
         "debug",
         `BrowserOAuthClientProvider initialized/updated with URL: ${effectiveOAuthUrl}, proxy: ${oauthProxyUrl ? "enabled" : "disabled"}, gateway: ${gatewayUrl ? "enabled" : "disabled"}`
       );
+    } else {
+      authProvider = authProviderRef.current;
     }
-    connect();
+
+    const lifecycle = createConnectionLifecycle<ConnectionSnapshot>({
+      id: ++nextLifecycleIdRef.current,
+      trigger,
+      serverName: USE_MCP_SERVER_NAME,
+      client: new BrowserMCPClient(),
+      authProvider,
+      snapshot: { url, gatewayUrl },
+    });
+    lifecycleRef.current = lifecycle;
+    clientRef.current = lifecycle.client;
+    connectionRef.current = null;
+    iconLoadingPromiseRef.current = null;
+
+    // Deferring startup lets React Strict Mode retire its development-only
+    // preflight lifecycle before any transport handshake begins.
+    queueMicrotask(() => {
+      if (!isCurrentLifecycle(lifecycleRef, lifecycle)) return;
+      lifecycle.started = true;
+      void runLifecycle(lifecycle);
+    });
+
     return () => {
-      isMountedRef.current = false;
-      addLog("debug", "useMcp unmounting, disconnecting.");
+      addLog("debug", `Retiring connection lifecycle #${lifecycle.id}.`);
+      if (lifecycleRef.current === lifecycle) lifecycleRef.current = null;
+      if (clientRef.current === lifecycle.client) clientRef.current = null;
+      if (connectionRef.current === lifecycle.connection) {
+        connectionRef.current = null;
+      }
 
       // NOTE: We intentionally do NOT clear OAuth storage on unmount, even
       // mid-flow. Wrapper remounts (provider revision changes, route
@@ -2065,7 +2156,11 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
       // reconnects cleanly. Explicit logout still clears storage via
       // `clearStorage()` / `removeServer(id, { clearCredentials: true })`.
 
-      disconnect(true);
+      void retireLifecycle(lifecycle).catch((error) => {
+        if (isMountedRef.current) {
+          addLog("warn", "Error retiring connection lifecycle:", error);
+        }
+      });
     };
   }, [
     url,
@@ -2081,10 +2176,12 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     oauthScope,
     useRedirectFlow,
     mergedClientInfo,
-    effectiveOAuthUrl, // Triggers reconnection when proxy fallback changes OAuth URL
+    effectiveOAuthUrl,
+    gatewayUrl,
     proxyConfig, // Triggers reconnection when proxy config (including headers) changes
     autoProxyFallbackConfig.proxyAddress,
     providedAuthProvider,
+    reconnectRequestId,
   ]);
 
   /**
@@ -2094,31 +2191,29 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
    * after the specified delay.
    * Uses a ref to prevent duplicate scheduling which can cause render loops.
    */
-  const retryRef = useRef(retry);
-  const addLogRef = useRef(addLog);
-
-  useEffect(() => {
-    retryRef.current = retry;
-    addLogRef.current = addLog;
-  }, [retry, addLog]);
-
   useEffect(() => {
     let retryTimeoutId: number | null = null;
+    const failedLifecycle = lifecycleRef.current;
 
-    if (state === "failed" && autoRetry && connectAttemptRef.current > 0) {
+    if (
+      state === "failed" &&
+      autoRetry &&
+      failedLifecycle?.phase === "failed"
+    ) {
       // Prevent duplicate scheduling - only schedule if not already scheduled
       if (!retryScheduledRef.current) {
         retryScheduledRef.current = true;
         const delay =
           typeof autoRetry === "number" ? autoRetry : DEFAULT_RETRY_DELAY;
-        addLogRef.current(
-          "info",
-          `Connection failed, auto-retrying in ${delay}ms...`
-        );
+        addLog("info", `Connection failed, auto-retrying in ${delay}ms...`);
         retryTimeoutId = setTimeout(() => {
           retryScheduledRef.current = false;
-          if (isMountedRef.current && stateRef.current === "failed") {
-            retryRef.current();
+          if (
+            failedLifecycle === lifecycleRef.current &&
+            isCurrentLifecycle(lifecycleRef, failedLifecycle) &&
+            stateRef.current === "failed"
+          ) {
+            requestReconnect("auto-retry");
           }
         }, delay) as any;
       }
@@ -2133,7 +2228,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
         retryScheduledRef.current = false;
       }
     };
-  }, [state, autoRetry]);
+  }, [state, autoRetry, addLog, requestReconnect]);
 
   /**
    * Ensure the server icon is loaded and available
