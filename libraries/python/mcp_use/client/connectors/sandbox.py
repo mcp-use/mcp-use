@@ -131,7 +131,6 @@ class SandboxConnector(BaseConnector):
         self.sandbox: Sandbox | None = None
         self.process: CommandHandle | None = None
         self.client_session: ClientSession | None = None
-        self.errlog = sys.stderr
         self.base_url: str | None = None
         self._connected = False
         self._connection_manager: SseConnectionManager | None = None
@@ -148,12 +147,12 @@ class SandboxConnector(BaseConnector):
     def _handle_stdout(self, data: str) -> None:
         """Handle stdout data from the sandbox process."""
         self.stdout_lines.append(data)
-        logger.debug(f"[SANDBOX STDOUT] {data}", end="", flush=True)
+        logger.debug(f"[SANDBOX STDOUT] {data}")
 
     def _handle_stderr(self, data: str) -> None:
         """Handle stderr data from the sandbox process."""
         self.stderr_lines.append(data)
-        logger.debug(f"[SANDBOX STDERR] {data}", file=self.errlog, end="", flush=True)
+        logger.debug(f"[SANDBOX STDERR] {data}")
 
     async def wait_for_server_response(self, base_url: str, timeout: int = 30) -> bool:
         """Wait for the server to respond to HTTP requests.
@@ -217,7 +216,7 @@ class SandboxConnector(BaseConnector):
 
         try:
             # Create and start the sandbox
-            self.sandbox = Sandbox(
+            self.sandbox = Sandbox.create(
                 template=self.sandbox_template_id,
                 api_key=self.api_key,
             )
