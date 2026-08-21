@@ -278,7 +278,9 @@ export abstract class BaseMCPClient {
    * lifecycle of connections and provide methods for calling tools, listing
    * resources, and more.
    *
-   * If a session already exists for the server, it will be replaced with a new one.
+   * If a session already exists for the server, it will be replaced with a new
+   * one and the previous session is disconnected; any previously returned
+   * reference to it becomes unusable.
    *
    * @param serverName - The name of the server as defined in the client configuration
    * @param autoInitialize - Whether to automatically initialize the session (default: true)
@@ -377,10 +379,27 @@ export abstract class BaseMCPClient {
       session = await openSession();
     }
 
+    const previous = this.sessions[serverName];
     this.sessions[serverName] = session;
     if (!this.activeSessions.includes(serverName)) {
       this.activeSessions.push(serverName);
     }
+
+    // The slot only holds one session per server, so a replaced session would
+    // no longer be reachable from closeSession()/closeAllSessions(). Disconnect
+    // it here, after the new session is installed, so consumers calling
+    // getSession() during the await still see a live session.
+    if (previous && previous !== session) {
+      try {
+        logger.debug(`Disconnecting replaced session for server ${serverName}`);
+        await previous.disconnect();
+      } catch (e) {
+        logger.error(
+          `Error disconnecting replaced session for server '${serverName}': ${e}`
+        );
+      }
+    }
+
     return session;
   }
 
