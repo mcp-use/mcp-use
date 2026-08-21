@@ -15,6 +15,7 @@ import { useRpcLogVirtualizer } from "@/client/hooks/use-rpc-log-virtualizer";
 import { cn } from "@/client/lib/utils";
 import { ensureRpcTrafficBridge } from "@/client/rpc-traffic-bridge";
 import { getRpcTrafficMethod } from "@/client/rpc-traffic-coalesce";
+import { buildRpcTrafficResponseLabels } from "@/client/rpc-traffic-correlation";
 import {
   rpcTrafficStore,
   type RpcTrafficEntry,
@@ -86,6 +87,11 @@ export function JsonRpcLoggerView({
     return items.filter((item) => serverIdSet.has(item.serverId));
   }, [items, serverIds]);
 
+  const responseLabels = useMemo(
+    () => buildRpcTrafficResponseLabels(items),
+    [items]
+  );
+
   const sourceCheckedIndices = useMemo(() => {
     const indices = new Set<number>();
     if (sourceFilters.has("mcp")) indices.add(0);
@@ -112,7 +118,7 @@ export function JsonRpcLoggerView({
     const queryLower = searchQuery.trim().toLowerCase();
     if (queryLower) {
       result = result.filter((item) => {
-        const method = getMethod(item);
+        const method = getMethod(item, responseLabels);
         return (
           item.serverId.toLowerCase().includes(queryLower) ||
           item.widgetId?.toLowerCase().includes(queryLower) ||
@@ -125,7 +131,7 @@ export function JsonRpcLoggerView({
     }
 
     return [...result].reverse();
-  }, [scopedItems, searchQuery, sourceFilters]);
+  }, [responseLabels, scopedItems, searchQuery, sourceFilters]);
 
   const { totalHeight, visibleItems } = useRpcLogVirtualizer(
     filteredItems,
@@ -311,6 +317,7 @@ export function JsonRpcLoggerView({
               <RpcLogRow
                 key={item.id}
                 item={item}
+                method={getMethod(item, responseLabels)}
                 top={top}
                 height={height}
                 expanded={expanded.has(item.id)}
@@ -327,6 +334,7 @@ export function JsonRpcLoggerView({
 
 function RpcLogRow({
   item,
+  method,
   top,
   height,
   expanded,
@@ -334,13 +342,13 @@ function RpcLogRow({
   onCopy,
 }: {
   item: RpcTrafficEntry;
+  method: string;
   top: number;
   height: number;
   expanded: boolean;
   onToggle: () => void;
   onCopy: () => void;
 }) {
-  const method = getMethod(item);
   const direction = getDirectionLabel(item);
   const repeatSuffix =
     item.repeatCount && item.repeatCount > 1 ? ` ×${item.repeatCount}` : "";
@@ -438,7 +446,13 @@ function RpcLogRow({
   );
 }
 
-function getMethod(entry: RpcTrafficEntry): string {
+function getMethod(
+  entry: RpcTrafficEntry,
+  responseLabels: ReadonlyMap<string, string>
+): string {
+  const responseLabel = responseLabels.get(entry.id);
+  if (responseLabel) return responseLabel;
+
   const fromMessage = getRpcTrafficMethod(entry.message);
   if (fromMessage) return fromMessage;
   const message = entry.message as {
