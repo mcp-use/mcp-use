@@ -8,6 +8,7 @@ through WebSocket connections.
 import asyncio
 import json
 import uuid
+from datetime import timedelta
 from typing import Any
 
 import httpx
@@ -178,7 +179,12 @@ class WebSocketConnector(BaseConnector):
         if errors:
             logger.warning(f"Encountered {len(errors)} errors during resource cleanup")
 
-    async def _send_request(self, method: str, params: dict[str, Any] | None = None) -> Any:
+    async def _send_request(
+        self,
+        method: str,
+        params: dict[str, Any] | None = None,
+        read_timeout_seconds: timedelta | None = None,
+    ) -> Any:
         """Send a request and wait for a response."""
         if not self.ws:
             raise RuntimeError("WebSocket is not connected")
@@ -197,7 +203,11 @@ class WebSocketConnector(BaseConnector):
 
         # Wait for the response
         try:
-            return await future
+            if read_timeout_seconds is None:
+                return await future
+
+            timeout = read_timeout_seconds.total_seconds()
+            return await asyncio.wait_for(future, timeout=timeout)
         except Exception as e:
             # Remove the request from pending requests
             self.pending_requests.pop(request_id, None)
@@ -229,10 +239,19 @@ class WebSocketConnector(BaseConnector):
             raise RuntimeError("MCP client is not initialized")
         return self._tools
 
-    async def call_tool(self, name: str, arguments: dict[str, Any]) -> Any:
+    async def call_tool(
+        self,
+        name: str,
+        arguments: dict[str, Any],
+        read_timeout_seconds: timedelta | None = None,
+    ) -> Any:
         """Call an MCP tool with the given arguments."""
         logger.debug(f"Calling tool '{name}' with arguments: {arguments}")
-        return await self._send_request("tools/call", {"name": name, "arguments": arguments})
+        return await self._send_request(
+            "tools/call",
+            {"name": name, "arguments": arguments},
+            read_timeout_seconds,
+        )
 
     async def list_resources(self) -> list[dict[str, Any]]:
         """List all available resources from the MCP implementation."""
