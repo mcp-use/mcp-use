@@ -225,7 +225,7 @@ class WebSocketConnector(BaseConnector):
     @property
     def tools(self) -> list[Tool]:
         """Get the list of available tools."""
-        if not self._tools:
+        if self._tools is None:
             raise RuntimeError("MCP client is not initialized")
         return self._tools
 
