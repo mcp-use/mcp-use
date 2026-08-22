@@ -64,9 +64,13 @@ jobs:
             });
             const paths = files.map(f => f.filename);
 
+            // Matches the path filters in ci.yml: a change to the workflow itself
+            // has to run the jobs it configures.
+            const ciWorkflow = paths.includes('.github/workflows/ci.yml');
+
             const python = paths.some(p => p.startsWith('libraries/python/'));
-            const typescript = paths.some(p => p.startsWith('libraries/typescript/'));
-            const create_mcp_use_app = paths.some(p => p.startsWith('libraries/typescript/packages/create-mcp-use-app/'));
+            const typescript = ciWorkflow || paths.some(p => p.startsWith('libraries/typescript/'));
+            const create_mcp_use_app = ciWorkflow || paths.some(p => p.startsWith('libraries/typescript/packages/create-mcp-use-app/'));
 
             core.setOutput('python', String(python));
             core.setOutput('typescript', String(typescript));
