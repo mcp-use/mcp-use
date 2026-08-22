@@ -21,24 +21,32 @@ export interface Skill {
 
 /** Paginated result returned by `skills/list`. */
 export interface SkillsListResult {
+  /** Skills on this page, in server order. */
   skills: Skill[];
+  /** Cursor for the next page, absent on the final page. */
   nextCursor?: string;
 }
 
 /** Result returned by `skills/get`. */
 export interface SkillGetResult {
+  /** The requested skill. */
   skill: Skill;
 }
 
 /** One child returned by `resources/directory/read`. */
 export interface SkillDirectoryEntry {
+  /** Resource URI of the child. */
   uri: string;
+  /** Display name of the child when the server provides one. */
   name?: string;
+  /** MIME type of the child when the server provides one. */
   mimeType?: string;
 }
 
 /** Paginated result returned by `resources/directory/read`. */
 export interface SkillDirectoryReadResult {
+  /** Directory children on this page, in server order. */
   resources: SkillDirectoryEntry[];
+  /** Cursor for the next page, absent on the final page. */
   nextCursor?: string;
 }

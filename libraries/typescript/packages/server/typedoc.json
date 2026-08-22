@@ -63,12 +63,7 @@
     "react.ErrorBoundary.getDerivedStateFromError.__type.hasError",
     "react.RegisteredTools.__type.input",
     "react.RegisteredTools.__type.output",
-    "react.ToolError.result.__type.isError",
-    "react.UseWidgetResult.__type.isPending",
-    "react.UseWidgetResult.__type.props",
-    "react.UserAgent.capabilities.__type.hover",
-    "react.UserAgent.capabilities.__type.touch",
-    "react.UserAgent.device.__type.type"
+    "react.ToolError.result.__type.isError"
   ],
   "intentionallyNotExported": [
     "BaseServerConfig",
@@ -97,7 +92,7 @@
     "StripCompleteSuffix",
     "StripMcpPrefix",
     "ToolsFromModule",
-    "UseWidgetResultBase",
+    "TurbopackConfig",
     "ViewControlsProps"
   ],
   "externalSymbolLinkMappings": {
