@@ -126,7 +126,10 @@ jobs:
             core.setOutput('python', String(py));
             core.setOutput('typescript', String(ts));
             core.setOutput('create-mcp-use-app', String(create));
-            const releaseChannel = fromWfCall ? ts : ("${{ steps.filter.outputs.release-channel }}" === 'true');
+            // The reusable-workflow caller only reports python/typescript/create-app,
+            // so it cannot tell us whether a release workflow changed. The helper test
+            // takes a few seconds, so run it on every workflow_call rather than guess.
+            const releaseChannel = fromWfCall ? true : ("${{ steps.filter.outputs.release-channel }}" === 'true');
             core.setOutput('release-channel', String(releaseChannel));
 
   # Python Jobs
