@@ -14,5 +14,6 @@
   "readme": "none",
   "includeVersion": false,
   "cleanOutputDir": true,
-  "githubPages": false
+  "githubPages": false,
+  "treatWarningsAsErrors": true
 }
