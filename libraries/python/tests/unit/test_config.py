@@ -95,6 +95,10 @@ class TestConnectorCreation(unittest.TestCase):
         self.assertEqual(connector.base_url, "http://test.com")
         self.assertEqual(connector.headers, {})
         self.assertIsNone(connector._auth)
+        # Regression: omitting "auth" from config must not implicitly construct
+        # an OAuth object (previously config.py defaulted auth to {} instead of
+        # None, and HttpConnector treats any non-None dict as OAuth config).
+        self.assertIsNone(connector._oauth)
 
     def test_create_websocket_connector(self):
         """Test creating a WebSocket connector from config."""
@@ -143,6 +147,17 @@ class TestConnectorCreation(unittest.TestCase):
         self.assertIsInstance(connector, WebSocketConnector)
         self.assertEqual(connector.url, "ws://test.com")
         self.assertEqual(connector.headers, {})
+
+    def test_create_websocket_connector_minimal_does_not_warn_about_auth(self):
+        """Regression: omitting "auth" from config must not implicitly pass an
+        empty dict to WebSocketConnector, which would hit its "only supports
+        bearer token authentication" warning path for a non-None, non-str auth."""
+        server_config = {"ws_url": "ws://test.com"}
+
+        with patch("mcp_use.client.connectors.websocket.logger") as mock_logger:
+            create_connector_from_config(server_config)
+
+        mock_logger.warning.assert_not_called()
 
     def test_create_stdio_connector(self):
         """Test creating a stdio connector from config."""
