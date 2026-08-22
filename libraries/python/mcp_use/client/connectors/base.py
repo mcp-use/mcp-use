@@ -8,7 +8,7 @@ must implement.
 import warnings
 from abc import ABC, abstractmethod
 from datetime import timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from mcp import ClientSession, Implementation
 from mcp.client.session import (
@@ -44,6 +44,9 @@ from mcp_use.client.middleware import Middleware, MiddlewareManager
 from mcp_use.client.task_managers import ConnectionManager
 from mcp_use.logging import logger
 from mcp_use.telemetry.telemetry import telemetry
+
+if TYPE_CHECKING:
+    from mcp_use.client.connectors.transformed import TransformedConnector
 
 
 class BaseConnector(ABC):
@@ -553,3 +556,59 @@ class BaseConnector(ABC):
         logger.debug(f"Getting prompt: {name}")
         result = await self.client_session.get_prompt(name, arguments)
         return result
+
+    # --- Transformation Methods ---
+
+    def with_prefix(self, prefix: str, separator: str = "_") -> "TransformedConnector":
+        """Wrap this connector with a tool name prefix.
+
+        Args:
+            prefix: The prefix to apply to all tool names.
+            separator: The separator between prefix and tool name (default: "_").
+
+        Returns:
+            A TransformedConnector wrapping this connector.
+        """
+        from mcp_use.client.connectors.transformed import (
+            TransformedConnector,
+            Transforms,
+        )
+
+        return TransformedConnector(self, Transforms(prefix=prefix, separator=separator))
+
+    def with_tools(
+        self, allowed: list[str] | None = None, disallowed: list[str] | None = None
+    ) -> "TransformedConnector":
+        """Wrap this connector with tool name filtering.
+
+        Args:
+            allowed: Optional list of allowed tool names (everything else is hidden).
+            disallowed: Optional list of forbidden tool names (everything else is shown).
+
+        Returns:
+            A TransformedConnector wrapping this connector.
+        """
+        from mcp_use.client.connectors.transformed import (
+            TransformedConnector,
+            Transforms,
+        )
+
+        return TransformedConnector(self, Transforms(allowed_tools=allowed, disallowed_tools=disallowed))
+
+    def with_middleware(self, middleware: list[Middleware]) -> "TransformedConnector":
+        """Wrap this connector with additional middleware.
+
+        Note: These middlewares are executed when calling tools via the wrapper.
+
+        Args:
+            middleware: List of Middleware to apply.
+
+        Returns:
+            A TransformedConnector wrapping this connector.
+        """
+        from mcp_use.client.connectors.transformed import (
+            TransformedConnector,
+            Transforms,
+        )
+
+        return TransformedConnector(self, Transforms(middleware=middleware))

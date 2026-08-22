@@ -12,6 +12,7 @@ from .code_mode import CodeModeConnector  # noqa: F401
 from .http import HttpConnector  # noqa: F401
 from .sandbox import SandboxConnector  # noqa: F401
 from .stdio import StdioConnector  # noqa: F401
+from .transformed import TransformedConnector, Transforms  # noqa: F401
 from .websocket import WebSocketConnector  # noqa: F401
 
 __all__ = [
@@ -21,5 +22,7 @@ __all__ = [
     "WebSocketConnector",
     "SandboxConnector",
     "CodeModeConnector",
+    "TransformedConnector",
+    "Transforms",
     "Root",
 ]
