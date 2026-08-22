@@ -4,6 +4,7 @@ WebSocket connection management for MCP implementations.
 This module provides a connection manager for WebSocket-based MCP connections.
 """
 
+from inspect import signature
 from typing import Any
 
 from mcp.client.websocket import websocket_client
@@ -34,6 +35,23 @@ class WebSocketConnectionManager(ConnectionManager[tuple[Any, Any]]):
         self.url = url
         self.headers = headers or {}
 
+    def _websocket_client_kwargs(self) -> dict[str, dict[str, str]]:
+        """Return supported keyword arguments for websocket_client."""
+        if not self.headers:
+            return {}
+
+        parameters = signature(websocket_client).parameters
+        for headers_parameter in ("headers", "extra_headers", "additional_headers"):
+            if headers_parameter in parameters:
+                return {headers_parameter: self.headers}
+
+        raise RuntimeError(
+            "WebSocket headers/auth were configured, but the installed MCP "
+            "websocket_client does not support forwarding handshake headers. "
+            "Upgrade the mcp package to a version that supports websocket "
+            "headers or remove the websocket headers/auth configuration."
+        )
+
     async def _establish_connection(self) -> tuple[Any, Any]:
         """Establish a WebSocket connection.
 
@@ -45,9 +63,7 @@ class WebSocketConnectionManager(ConnectionManager[tuple[Any, Any]]):
         """
         logger.debug(f"Connecting to WebSocket: {self.url}")
         # Create the context manager
-        # Note: The current MCP websocket_client implementation doesn't support headers
-        # If headers need to be passed, this would need to be updated when MCP supports it
-        self._ws_ctx = websocket_client(self.url)
+        self._ws_ctx = websocket_client(self.url, **self._websocket_client_kwargs())
 
         # Enter the context manager
         read_stream, write_stream = await self._ws_ctx.__aenter__()
