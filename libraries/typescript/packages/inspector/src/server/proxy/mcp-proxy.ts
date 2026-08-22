@@ -13,8 +13,10 @@ import { logger } from "hono/logger";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 import {
   INSPECTOR_API_RATE_LIMIT,
+  INSPECTOR_GLOBAL_API_RATE_LIMIT,
   INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
   inspectorRateLimitResponse,
+  inspectorServerRateLimitKey,
 } from "../rate-limit.js";
 // ponytail: vendored from mcp-use/src/server/middleware/mcp-proxy.ts — keep in sync manually.
 import { isSafeProxyTarget } from "./oauth-proxy.js";
@@ -71,8 +73,10 @@ interface McpProxyOptions {
    * @default true
    */
   enableLogging?: boolean;
-  /** Shared process-local limiter for Inspector proxy and OAuth routes. */
+  /** Process-local limiter shared by Inspector proxy and OAuth routes. */
   rateLimiter?: RateLimiterMemory;
+  /** Higher process-wide backstop that prevents target-key rotation abuse. */
+  globalRateLimiter?: RateLimiterMemory;
 }
 
 /** Whether an MCP response must remain streaming instead of being buffered. */
@@ -135,11 +139,18 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
       points: INSPECTOR_API_RATE_LIMIT,
       duration: INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
     });
+  const globalRateLimiter =
+    options.globalRateLimiter ??
+    new RateLimiterMemory({
+      points: INSPECTOR_GLOBAL_API_RATE_LIMIT,
+      duration: INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
+    });
   const rateLimit = async (c: Context, next: Next) => {
     try {
-      // RateLimiterMemory prefixes and stringifies keys. The Hono request
-      // wrapper therefore maps every request to one mounted-instance budget.
-      await rateLimiter.consume(c.req as unknown as string);
+      await globalRateLimiter.consume("inspector-api:global");
+      await rateLimiter.consume(
+        inspectorServerRateLimitKey("mcp", c.req.header("X-Target-URL"))
+      );
     } catch (error) {
       return inspectorRateLimitResponse(c, error);
     }

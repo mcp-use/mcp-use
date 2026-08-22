@@ -18,6 +18,18 @@ export type ConnectionMode = "auto" | "direct" | "proxy";
 
 export const MODERN_MCP_PROTOCOL_VERSION = "2026-07-28";
 
+/**
+ * Hosted Inspector keeps transport reconnection enabled but probes each saved
+ * server at a deliberately low cadence. A 10-second default multiplied across
+ * saved connections and open tabs creates avoidable upstream traffic and can
+ * consume the proxy rate-limit budget before a real MCP request arrives.
+ */
+export const INSPECTOR_AUTO_RECONNECT_CONFIG = {
+  enabled: true,
+  healthCheckInterval: 60_000,
+  healthCheckTimeout: 180_000,
+} as const;
+
 export type InspectorProtocolMode = "auto" | "v1" | "v2";
 
 type ProtocolNegotiation = NonNullable<McpServerConfig["protocolNegotiation"]>;

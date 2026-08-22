@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import RateLimiterMemory from "rate-limiter-flexible/lib/RateLimiterMemory.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { mountMcpProxy } from "../../src/server/proxy/mcp-proxy";
 
@@ -9,6 +10,60 @@ afterEach(() => {
 });
 
 describe("Inspector MCP proxy request isolation", () => {
+  it("does not let one MCP target exhaust another target's budget", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(async () => new Response("ok"))
+    );
+    const app = new Hono();
+    mountMcpProxy(app, {
+      path: "/inspector/api/proxy",
+      enableLogging: false,
+      rateLimiter: new RateLimiterMemory({ points: 1, duration: 60 }),
+      globalRateLimiter: new RateLimiterMemory({ points: 10, duration: 60 }),
+    });
+
+    const request = (target: string) =>
+      app.fetch(
+        new Request(proxyUrl, {
+          headers: { "X-Target-URL": target },
+        })
+      );
+
+    expect((await request("https://93.184.216.34/mcp")).status).toBe(200);
+    expect((await request("https://93.184.216.34/mcp")).status).toBe(429);
+    expect((await request("https://93.184.216.35/mcp")).status).toBe(200);
+  });
+
+  it("retains a global backstop across rotated MCP targets", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(async () => new Response("ok"))
+    );
+    const app = new Hono();
+    mountMcpProxy(app, {
+      path: "/inspector/api/proxy",
+      enableLogging: false,
+      rateLimiter: new RateLimiterMemory({ points: 10, duration: 60 }),
+      globalRateLimiter: new RateLimiterMemory({ points: 1, duration: 60 }),
+    });
+
+    const first = await app.fetch(
+      new Request(proxyUrl, {
+        headers: { "X-Target-URL": "https://93.184.216.34/mcp" },
+      })
+    );
+    const second = await app.fetch(
+      new Request(proxyUrl, {
+        headers: { "X-Target-URL": "https://93.184.216.35/mcp" },
+      })
+    );
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(429);
+    expect(Number(second.headers.get("Retry-After"))).toBeGreaterThan(0);
+  });
+
   it("does not forward Inspector cookies or browser-origin headers", async () => {
     const fetchFn = vi.fn<typeof fetch>(async (_input, init) => {
       const headers = new Headers(init?.headers);

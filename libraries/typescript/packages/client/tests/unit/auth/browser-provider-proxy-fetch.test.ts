@@ -276,7 +276,13 @@ describe("BrowserOAuthClientProvider — scoped OAuth proxy fetch", () => {
       body: new URLSearchParams({ grant_type: "authorization_code" }),
     });
 
-    expect(String(globalFetchSpy.mock.calls[1][0])).toBe(`${PROXY_URL}/proxy`);
+    const proxyEndpoint = new URL(String(globalFetchSpy.mock.calls[1][0]));
+    expect(`${proxyEndpoint.origin}${proxyEndpoint.pathname}`).toBe(
+      `${PROXY_URL}/proxy`
+    );
+    expect(proxyEndpoint.searchParams.get("serverUrl")).toBe(
+      "https://server-a.example.com/mcp"
+    );
     expect(
       JSON.parse(String(globalFetchSpy.mock.calls[1][1]?.body)).serverUrl
     ).toBe("https://server-a.example.com/mcp");
@@ -357,7 +363,13 @@ describe("BrowserOAuthClientProvider — scoped OAuth proxy fetch", () => {
       body: new URLSearchParams({ grant_type: "authorization_code" }),
     });
 
-    expect(String(globalFetchSpy.mock.calls[0][0])).toBe(`${PROXY_URL}/proxy`);
+    const proxyEndpoint = new URL(String(globalFetchSpy.mock.calls[0][0]));
+    expect(`${proxyEndpoint.origin}${proxyEndpoint.pathname}`).toBe(
+      `${PROXY_URL}/proxy`
+    );
+    expect(proxyEndpoint.searchParams.get("serverUrl")).toBe(
+      "https://server-a.example.com/mcp"
+    );
   });
 
   it("fails closed when the OAuth proxy request fails", async () => {

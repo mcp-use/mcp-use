@@ -22,6 +22,7 @@ import { getPackageVersion, initInspectorTelemetry } from "@/client/telemetry";
 import { getInspectorBase } from "./utils/basePath";
 import {
   getDefaultInspectorProxyAddress,
+  INSPECTOR_AUTO_RECONNECT_CONFIG,
   InspectorConnectionStorageProvider,
 } from "./utils/connectionUpdates";
 import { wrapTransportForLegacySampling } from "./utils/samplingProtocol";
@@ -138,6 +139,7 @@ function App() {
               proxyAddress ? { enabled: true, proxyAddress } : false
             }
             defaultServerConfig={{
+              autoReconnect: INSPECTOR_AUTO_RECONNECT_CONFIG,
               preventAutoAuth: true,
               useRedirectFlow: true,
               wrapTransport: wrapTransportForLegacySampling,
