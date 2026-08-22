@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { oauthAuth0Provider } from "../src/oauth/auth0.js";
 import { oauthBetterAuthProvider } from "../src/oauth/better-auth.js";
+import { oauthConvexProvider } from "../src/oauth/convex.js";
 import { oauthClerkProvider } from "../src/oauth/clerk.js";
 import { wrapOAuthTokenVerifier } from "../src/oauth/internal.js";
 import { oauthKeycloakProvider } from "../src/oauth/keycloak.js";
@@ -154,6 +155,59 @@ describe("direct OAuth providers", () => {
           sessionId: "session-1",
         },
         permissions: ["tools:read"],
+      },
+    });
+  });
+
+  it("verifies Convex JWTs and keeps the mounted oauth base path", async () => {
+    const { privateKey, publicKey } = await generateKeyPair("EdDSA");
+    const jwk = await exportJWK(publicKey);
+    jwk.kid = "convex-key";
+    globalThis.fetch = jwksFixture(jwk);
+
+    // Convex mounts the component under a base path and issues tokens whose
+    // `iss` includes it, so the whole URL is the issuer.
+    const issuer = "https://example.convex.site/oauth";
+    const provider = oauthConvexProvider({ authURL: `${issuer}/` });
+    expect(provider.oauthMetadata).toMatchObject({
+      issuer,
+      authorization_endpoint: `${issuer}/authorize`,
+      token_endpoint: `${issuer}/token`,
+      registration_endpoint: `${issuer}/register`,
+      jwks_uri: `${issuer}/.well-known/jwks.json`,
+      code_challenge_methods_supported: ["S256"],
+    });
+
+    await expect(
+      wrapOAuthTokenVerifier(provider, protectedResource).verifyAccessToken(
+        await signedToken(
+          privateKey,
+          "convex-key",
+          issuer,
+          protectedResource.href,
+          {
+            sub: "convex-user-1",
+            cid: "mcp-client-1",
+            scope: "openid email",
+            scp: ["openid", "email"],
+            email: "user@example.test",
+            email_verified: true,
+            name: "Convex User",
+          },
+          "EdDSA"
+        )
+      )
+    ).resolves.toMatchObject({
+      scopes: ["openid", "email"],
+      extra: {
+        user: {
+          id: "convex-user-1",
+          email: "user@example.test",
+          emailVerified: true,
+          name: "Convex User",
+          clientId: "mcp-client-1",
+        },
+        permissions: ["openid", "email"],
       },
     });
   });
