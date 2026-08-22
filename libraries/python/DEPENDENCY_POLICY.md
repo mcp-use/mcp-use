@@ -12,15 +12,16 @@ This document describes how mcp-use manages its dependencies for the Python SDK.
 
 The `mcp` package is our core dependency — it provides the MCP protocol implementation.
 
-- **Current minimum**: `mcp>=1.24.0`
+- **Supported range**: `mcp>=1.24.0,<2.0.0`
 - **Update policy**: We bump the minimum when we adopt new MCP SDK features (e.g., `streamable_http_client` introduced in 1.24.0). Minimum version bumps are documented in the changelog.
+- **Major-version compatibility**: MCP SDK 2.x contains breaking API changes that mcp-use has not migrated to yet. Keep the `<2.0.0` upper bound until 2.x compatibility is implemented and validated, then remove it as part of that migration.
 - **Breaking changes**: If a new MCP SDK version introduces breaking changes, we release a new minor version of mcp-use with the updated minimum and document the migration in the changelog.
 
 ## Core Dependencies
 
 | Package | Version Constraint | Update Policy |
 |---------|-------------------|---------------|
-| `mcp` | `>=1.24.0` | Bump minimum when adopting new features |
+| `mcp` | `>=1.24.0,<2.0.0` | Bump minimum when adopting new features; uncap after the MCP SDK 2.x migration |
 | `langchain` | `>=1.0.0` | Follow LangChain major versions |
 | `httpx` | `>=0.27.1` | Update for security patches and new features |
 | `pydantic` | `>=2.11.0,<3.0.0` | Stay within Pydantic v2; v3 migration will be a major release |
