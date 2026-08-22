@@ -11,10 +11,12 @@ import uuid
 from typing import Any
 
 import httpx
-from mcp.types import Tool
+from mcp.client.session import ElicitationFnT, ListRootsFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
+from mcp.types import Root, Tool
 from websockets import ClientConnection
 
 from mcp_use.client.connectors.base import BaseConnector
+from mcp_use.client.middleware import Middleware
 from mcp_use.client.task_managers import ConnectionManager, WebSocketConnectionManager
 from mcp_use.logging import logger
 
@@ -31,6 +33,13 @@ class WebSocketConnector(BaseConnector):
         url: str,
         headers: dict[str, str] | None = None,
         auth: str | dict[str, Any] | httpx.Auth | None = None,
+        sampling_callback: SamplingFnT | None = None,
+        elicitation_callback: ElicitationFnT | None = None,
+        message_handler: MessageHandlerFnT | None = None,
+        logging_callback: LoggingFnT | None = None,
+        middleware: list[Middleware] | None = None,
+        roots: list[Root] | None = None,
+        list_roots_callback: ListRootsFnT | None = None,
     ):
         """Initialize a new WebSocket connector.
 
@@ -41,7 +50,26 @@ class WebSocketConnector(BaseConnector):
                 - A string token: Use Bearer token authentication
                 - A dict: Not supported for WebSocket (will log warning)
                 - An httpx.Auth object: Not supported for WebSocket (will log warning)
+            sampling_callback: Optional sampling callback.
+            elicitation_callback: Optional elicitation callback.
+            message_handler: Optional callback to handle messages.
+            logging_callback: Optional callback to handle log messages.
+            middleware: Optional list of middleware.
+            roots: Optional initial list of roots to advertise to the server.
+            list_roots_callback: Optional custom callback to handle roots/list requests.
         """
+        # Must initialise base class so is_connected, middleware_manager, set_roots(),
+        # and telemetry attributes are available on this instance.
+        super().__init__(
+            sampling_callback=sampling_callback,
+            elicitation_callback=elicitation_callback,
+            message_handler=message_handler,
+            logging_callback=logging_callback,
+            middleware=middleware,
+            roots=roots,
+            list_roots_callback=list_roots_callback,
+        )
+
         self.url = url
         self.headers = headers or {}
 
@@ -54,10 +82,8 @@ class WebSocketConnector(BaseConnector):
                 logger.warning("WebSocket connector only supports bearer token authentication")
 
         self.ws: ClientConnection | None = None
-        self._connection_manager: ConnectionManager | None = None
         self._receiver_task: asyncio.Task | None = None
         self.pending_requests: dict[str, asyncio.Future] = {}
-        self._tools: list[Tool] | None = None
         self._connected = False
 
     async def connect(self) -> None:
@@ -187,22 +213,33 @@ class WebSocketConnector(BaseConnector):
         request_id = str(uuid.uuid4())
 
         # Create a future to receive the response
-        future = asyncio.Future()
+        future: asyncio.Future = asyncio.get_event_loop().create_future()
         self.pending_requests[request_id] = future
 
-        # Send the request
-        await self.ws.send(json.dumps({"id": request_id, "method": method, "params": params or {}}))
-
-        logger.debug(f"Sent request {request_id} method: {method}")
-
-        # Wait for the response
+        # The try/finally scope covers both send() and await future so that
+        # pending_requests is always cleaned up regardless of how this coroutine
+        # exits (normal return, exception from send(), generic exception while
+        # awaiting, or asyncio.CancelledError).
+        #
+        # Note: asyncio.CancelledError is a BaseException (not Exception) in
+        # Python 3.8+, so the except clause uses BaseException to catch it.
         try:
+            # Send the request
+            await self.ws.send(json.dumps({"id": request_id, "method": method, "params": params or {}}))
+
+            logger.debug(f"Sent request {request_id} method: {method}")
+
+            # Wait for the response.
             return await future
-        except Exception as e:
-            # Remove the request from pending requests
-            self.pending_requests.pop(request_id, None)
-            logger.error(f"Error waiting for response to request {request_id}: {e}")
+        except BaseException:
+            # Cancel the future so _receive_messages won't call set_result on it
+            # after we've stopped waiting (avoids a resolved-but-unawaited future).
+            if not future.done():
+                future.cancel()
             raise
+        finally:
+            # Always clean up; pop is a no-op if receiver already removed the entry.
+            self.pending_requests.pop(request_id, None)
 
     async def initialize(self) -> dict[str, Any]:
         """Initialize the MCP session and return session information."""
