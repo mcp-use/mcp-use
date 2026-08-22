@@ -302,9 +302,12 @@ jobs:
     needs:
       - python-conformance-test
       - typescript-v2-conformance-test
+    # Posting the score needs pull-requests: write, which GITHUB_TOKEN never has
+    # on a pull request from a fork, so the job can only fail there.
     if: >
       always() &&
       github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
       (needs.python-conformance-test.result != 'skipped' ||
       needs.typescript-v2-conformance-test.result != 'skipped')
     runs-on: ubuntu-latest
