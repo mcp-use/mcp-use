@@ -57,7 +57,7 @@
   },
   "peerDependencies": {
     "@mcp-use/client": "^2.0.1 || ^2.1.0 || ^2.1.1 || ^2.1.2 || ^2.1.3 || ^2.1.4 || ^2.1.5",
-    "@mcp-use/inspector": "^20.2.4 || ^20.2.5"
+    "@mcp-use/inspector": "^20.2.4 || ^20.2.5 || ^20.3.0-canary.0"
   },
   "peerDependenciesMeta": {
     "@mcp-use/client": {
