@@ -38,7 +38,7 @@ import {
   type InspectorProtocolMode,
 } from "@/client/utils/connectionUpdates";
 
-interface ConnectionSettingsFormProps {
+export interface ConnectionSettingsFormProps {
   // Form state
   alias: string;
   setAlias: (value: string) => void;
@@ -81,6 +81,8 @@ interface ConnectionSettingsFormProps {
   inlineSections?: boolean;
   /** When true with inlineSections, each group renders in its own settings card. */
   cardSections?: boolean;
+  /** Optional consumer validation for the URL field. Return an error message to block Connect. */
+  validateUrl?: (value: string) => string | undefined;
 }
 
 /**
@@ -134,6 +136,7 @@ export function ConnectionSettingsForm({
   isConnecting = false,
   inlineSections = false,
   cardSections = false,
+  validateUrl,
 }: ConnectionSettingsFormProps) {
   // UI state for sub-dialogs
   const [headersDialogOpen, setHeadersDialogOpen] = useState(false);
@@ -217,6 +220,7 @@ export function ConnectionSettingsForm({
   const buttonClassName = isStyled
     ? "bg-white/10 border-white/20 text-white hover:bg-white/20"
     : "";
+  const urlValidationError = validateUrl?.(url.trim());
 
   // Handle paste event to detect config JSON
   const handlePaste = async (e: React.ClipboardEvent) => {
@@ -353,7 +357,7 @@ export function ConnectionSettingsForm({
           onChange={(e) => setClientSecret(e.target.value)}
         />
         <p className="text-xs text-muted-foreground">
-          Stored in your browser&apos;s localStorage.
+          Used only for the current connection flow.
         </p>
       </div>
       <div className="space-y-2 sm:col-span-2">
@@ -530,6 +534,11 @@ export function ConnectionSettingsForm({
           Tip: You can paste a copied connection config (JSON) to auto-populate
           the form
         </p>
+        {urlValidationError && (
+          <p className="text-xs text-destructive" role="alert">
+            {urlValidationError}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -760,7 +769,7 @@ export function ConnectionSettingsForm({
         <Button
           data-testid="connection-form-connect-button"
           onClick={onConnect}
-          disabled={!url.trim() || isConnecting}
+          disabled={!url.trim() || Boolean(urlValidationError) || isConnecting}
           size={isStyled ? "lg" : undefined}
           className={cn(
             "w-full font-semibold",
