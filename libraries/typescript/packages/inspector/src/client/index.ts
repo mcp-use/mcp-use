@@ -8,6 +8,25 @@
  */
 
 export { AddToClientDropdown } from "./components/AddToClientDropdown.js";
+export {
+  ConnectionSettingsForm,
+  type ConnectionSettingsFormProps,
+} from "./components/ConnectionSettingsForm.js";
+export {
+  CustomHeadersEditor,
+  type CustomHeader,
+} from "./components/CustomHeadersEditor.js";
+export { useConnectionFormState } from "./hooks/useConnectionFormState.js";
+export type {
+  ConnectionMode,
+  EditableConnectionConfig,
+  InspectorProtocolMode,
+} from "./utils/connectionUpdates.js";
+export {
+  normalizeConnectionMode,
+  protocolModeFromNegotiation,
+  protocolNegotiationForMode,
+} from "./utils/connectionUpdates.js";
 export * from "./utils/mcpClientUtils.js";
 
 // Tool execution components
