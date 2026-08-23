@@ -61,13 +61,30 @@ const response = ({
 });
 
 describe("RPC traffic response correlation", () => {
+  it("keeps response method, latency, and outcome separate for presentation", () => {
+    const labels = buildRpcTrafficResponseLabels([
+      request({ entryId: "rpc-1", rpcId: 7, method: "tools/call" }),
+      response({ entryId: "rpc-2", rpcId: 7, error: true }),
+    ]);
+
+    expect(labels.get("rpc-2")).toEqual({
+      method: "tools/call",
+      latencyMs: 42,
+      outcome: "error",
+    });
+  });
+
   it("labels successful responses with the request method and latency", () => {
     const labels = buildRpcTrafficResponseLabels([
       request({ entryId: "rpc-1", rpcId: 7, method: "tools/call" }),
       response({ entryId: "rpc-2", rpcId: 7 }),
     ]);
 
-    expect(labels.get("rpc-2")).toBe("tools/call · 42 ms");
+    expect(labels.get("rpc-2")).toEqual({
+      method: "tools/call",
+      latencyMs: 42,
+      outcome: "result",
+    });
   });
 
   it("keeps correlated error responses distinguishable", () => {
@@ -76,7 +93,11 @@ describe("RPC traffic response correlation", () => {
       response({ entryId: "rpc-2", rpcId: 7, error: true }),
     ]);
 
-    expect(labels.get("rpc-2")).toBe("tools/call · 42 ms · error");
+    expect(labels.get("rpc-2")).toEqual({
+      method: "tools/call",
+      latencyMs: 42,
+      outcome: "error",
+    });
   });
 
   it("matches simultaneous bidirectional requests with the same id", () => {
@@ -103,8 +124,15 @@ describe("RPC traffic response correlation", () => {
     ]);
 
     expect([...labels]).toEqual([
-      ["rpc-3", "tools/call · 50 ms"],
-      ["rpc-4", "sampling/createMessage · 70 ms"],
+      ["rpc-3", { method: "tools/call", latencyMs: 50, outcome: "result" }],
+      [
+        "rpc-4",
+        {
+          method: "sampling/createMessage",
+          latencyMs: 70,
+          outcome: "result",
+        },
+      ],
     ]);
   });
 
@@ -137,10 +165,10 @@ describe("RPC traffic response correlation", () => {
     ]);
 
     expect([...labels.values()]).toEqual([
-      "string · 42 ms",
-      "other-server · 42 ms",
-      "widget-call · 42 ms",
-      "numeric · 42 ms",
+      { method: "string", latencyMs: 42, outcome: "result" },
+      { method: "other-server", latencyMs: 42, outcome: "result" },
+      { method: "widget-call", latencyMs: 42, outcome: "result" },
+      { method: "numeric", latencyMs: 42, outcome: "result" },
     ]);
   });
 });

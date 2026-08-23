@@ -8,11 +8,17 @@ interface PendingRpcRequest {
   timestampMs: number;
 }
 
+export interface RpcTrafficResponseLabel {
+  method: string;
+  latencyMs: number;
+  outcome: "result" | "error";
+}
+
 export function buildRpcTrafficResponseLabels(
   entries: readonly RpcTrafficEntry[]
-): ReadonlyMap<string, string> {
+): ReadonlyMap<string, RpcTrafficResponseLabel> {
   const pendingRequests = new Map<string, PendingRpcRequest>();
-  const responseLabels = new Map<string, string>();
+  const responseLabels = new Map<string, RpcTrafficResponseLabel>();
 
   entries.forEach((entry) => {
     const message = entry.message as {
@@ -47,11 +53,11 @@ export function buildRpcTrafficResponseLabels(
     const latencyMs = responseTimestampMs - request.timestampMs;
     if (Number.isNaN(responseTimestampMs) || latencyMs < 0) return;
 
-    const errorSuffix = outcome === "error" ? " · error" : "";
-    responseLabels.set(
-      entry.id,
-      `${request.method} · ${latencyMs} ms${errorSuffix}`
-    );
+    responseLabels.set(entry.id, {
+      method: request.method,
+      latencyMs,
+      outcome,
+    });
   });
 
   return responseLabels;

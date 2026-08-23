@@ -15,7 +15,10 @@ import { useRpcLogVirtualizer } from "@/client/hooks/use-rpc-log-virtualizer";
 import { cn } from "@/client/lib/utils";
 import { ensureRpcTrafficBridge } from "@/client/rpc-traffic-bridge";
 import { getRpcTrafficMethod } from "@/client/rpc-traffic-coalesce";
-import { buildRpcTrafficResponseLabels } from "@/client/rpc-traffic-correlation";
+import {
+  buildRpcTrafficResponseLabels,
+  type RpcTrafficResponseLabel,
+} from "@/client/rpc-traffic-correlation";
 import {
   rpcTrafficStore,
   type RpcTrafficEntry,
@@ -318,6 +321,7 @@ export function JsonRpcLoggerView({
                 key={item.id}
                 item={item}
                 method={getMethod(item, responseLabels)}
+                responseLabel={responseLabels.get(item.id)}
                 top={top}
                 height={height}
                 expanded={expanded.has(item.id)}
@@ -335,6 +339,7 @@ export function JsonRpcLoggerView({
 function RpcLogRow({
   item,
   method,
+  responseLabel,
   top,
   height,
   expanded,
@@ -343,6 +348,7 @@ function RpcLogRow({
 }: {
   item: RpcTrafficEntry;
   method: string;
+  responseLabel?: RpcTrafficResponseLabel;
   top: number;
   height: number;
   expanded: boolean;
@@ -400,7 +406,19 @@ function RpcLogRow({
         </Tooltip>
 
         <span className="min-w-0 flex-1 truncate font-mono text-xs text-foreground">
-          {method}
+          {responseLabel ? (
+            <>
+              <span>{responseLabel.method}</span>
+              <span className="ml-1 text-[9px] tabular-nums text-muted-foreground/80">
+                · {responseLabel.latencyMs} ms
+              </span>
+              {responseLabel.outcome === "error" ? (
+                <span className="text-muted-foreground"> · error</span>
+              ) : null}
+            </>
+          ) : (
+            method
+          )}
           {repeatSuffix ? (
             <span className="text-muted-foreground">{repeatSuffix}</span>
           ) : null}
@@ -448,10 +466,13 @@ function RpcLogRow({
 
 function getMethod(
   entry: RpcTrafficEntry,
-  responseLabels: ReadonlyMap<string, string>
+  responseLabels: ReadonlyMap<string, RpcTrafficResponseLabel>
 ): string {
   const responseLabel = responseLabels.get(entry.id);
-  if (responseLabel) return responseLabel;
+  if (responseLabel) {
+    const errorSuffix = responseLabel.outcome === "error" ? " · error" : "";
+    return `${responseLabel.method} · ${responseLabel.latencyMs} ms${errorSuffix}`;
+  }
 
   const fromMessage = getRpcTrafficMethod(entry.message);
   if (fromMessage) return fromMessage;
