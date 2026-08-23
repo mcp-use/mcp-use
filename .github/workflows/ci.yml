@@ -736,8 +736,10 @@ jobs:
       - name: Run Knip
         run: |
           set -o pipefail
-          pnpm exec knip --no-progress 2>&1 | tee /tmp/knip-output.txt
-          status=${PIPESTATUS[0]}
+          # Do not let the failing pipeline abort the step under `bash -e`, or
+          # the findings below are never written on the runs that have any.
+          status=0
+          pnpm exec knip --no-progress 2>&1 | tee /tmp/knip-output.txt || status=$?
           {
             echo "## Knip Findings"
             echo ""
