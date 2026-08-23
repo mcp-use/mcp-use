@@ -615,6 +615,9 @@ body {
   border-radius: 9999px;
   padding: 0.75rem 3rem 0.75rem 1rem;
   margin: 1rem 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .hero-powered .gh-icon { width: 18px; height: 18px; margin-right: 0.25rem; vertical-align: -0.2em; }
 .hero-powered .gh-shield { height: 18px; width: auto; margin-left: 0.4rem; vertical-align: -0.2em; }
