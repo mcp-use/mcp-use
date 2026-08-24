@@ -2040,7 +2040,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         // from the authored domain. Applied on read only, matching v1.
         const meta = await applyClaudeResourceDomain(
           buildResourceUiMeta(authorFacts, readOptions),
-          requestClientInfo(ctx)
+          requestClientInfo(ctx),
+          (req ?? metaOptions.request)?.headers.get("user-agent")
         );
         return {
           contents: [

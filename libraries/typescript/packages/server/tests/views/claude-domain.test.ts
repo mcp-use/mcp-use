@@ -81,6 +81,32 @@ describe("Claude resource domains", () => {
     expect(applied["ui"]).toEqual({ domain: "https://example.com/mcp" });
   });
 
+  it("uses HTTP User-Agent for legacy Claude requests without client info", async () => {
+    const meta = { ui: { domain: "https://example.com/mcp" } };
+
+    const applied = await applyClaudeResourceDomain(
+      meta,
+      {},
+      "Claude-User/1.0"
+    );
+
+    expect(applied["ui"]).toEqual({
+      domain: "c3d80a4ed901ee05b21755a88273b4a4.claudemcpcontent.com",
+    });
+  });
+
+  it("prefers advertised client info over HTTP User-Agent", async () => {
+    const meta = { ui: { domain: "https://example.com/mcp" } };
+
+    const applied = await applyClaudeResourceDomain(
+      meta,
+      { name: "test-client", version: "1.0.0" },
+      "Claude-User/1.0"
+    );
+
+    expect(applied).toBe(meta);
+  });
+
   it("leaves metadata without an authored domain unchanged for Claude", async () => {
     const meta = { ui: { csp: { connectDomains: [] } } };
 

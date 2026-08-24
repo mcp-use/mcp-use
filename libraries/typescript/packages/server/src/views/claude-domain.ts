@@ -70,13 +70,22 @@ export async function computeClaudeResourceDomain(
  *
  * @param meta - Resource `_meta` as built for this read.
  * @param clientInfo - Client identity for the current request.
+ * @param userAgent - HTTP user-agent fallback for legacy requests that carry
+ * no per-request client identity.
  * @returns Resource `_meta` to send on the wire.
  */
 export async function applyClaudeResourceDomain(
   meta: Record<string, unknown>,
-  clientInfo: Partial<Implementation> | undefined
+  clientInfo: Partial<Implementation> | undefined,
+  userAgent?: string | null
 ): Promise<Record<string, unknown>> {
-  if (!isClaudeClient(clientInfo)) {
+  const effectiveClientInfo =
+    typeof clientInfo?.name === "string" ||
+    typeof userAgent !== "string" ||
+    userAgent.trim().length === 0
+      ? clientInfo
+      : { ...clientInfo, name: userAgent.trim() };
+  if (!isClaudeClient(effectiveClientInfo)) {
     return meta;
   }
 
