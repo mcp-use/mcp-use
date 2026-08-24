@@ -17,3 +17,4 @@ export {
   type BuildResourceUiMetaOptions,
 } from "./wire.js";
 export { viewResourceUri } from "./constants.js";
+export { applyClaudeResourceDomain } from "./claude-domain.js";

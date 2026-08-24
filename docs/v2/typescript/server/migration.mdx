@@ -546,8 +546,6 @@ explicit domain handle. Do not key business state to an MCP transport session.
 - Static typing sees exported `ToolRef` values only.
 - Cross-lifetime `useViewState()` restoration is host-specific.
 - `useFiles()` is host-specific and must be capability-checked.
-- View resource facts are static per bound tool. v2 has no supported hook for
-  rewriting `domain` or other View resource metadata per client.
 - Raw `uiResource`, `@mcp-ui/server` adapters, `exposeAsTool`, and a shared View
   bound to multiple server tools have no native equivalent.
 
