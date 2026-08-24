@@ -339,22 +339,48 @@ function normalizeUserContext(
   };
 }
 
-function toClientContext(ctx: ServerContext): RequestClientContext {
-  // SDK beta.5 currently emits RequestMetaEnvelope as `{}` even though the
-  // validated runtime envelope carries these required modern fields. Keep the
-  // declaration workaround contained at this projection boundary.
-  const envelope = ctx.mcpReq.envelope as
+/**
+ * SDK beta.5 currently emits RequestMetaEnvelope as `{}` even though the
+ * validated runtime envelope carries these required modern fields. Keep the
+ * declaration workaround contained at this projection boundary.
+ */
+function requestEnvelope(ctx: ServerContext):
+  | {
+      [CLIENT_CAPABILITIES_META_KEY]?: ClientCapabilities;
+      [CLIENT_INFO_META_KEY]?: Implementation;
+    }
+  | undefined {
+  return ctx.mcpReq.envelope as
     | {
         [CLIENT_CAPABILITIES_META_KEY]?: ClientCapabilities;
         [CLIENT_INFO_META_KEY]?: Implementation;
       }
     | undefined;
+}
+
+/**
+ * The requesting client's advertised identity for this request.
+ *
+ * Read from the per-request `_meta` envelope, so it is the identity of the
+ * client that sent *this* request. Empty on 2025-era (legacy) traffic, which
+ * carries no per-request envelope.
+ *
+ * @param ctx - SDK per-request server context.
+ * @returns The declared `clientInfo`, or an empty object when the request
+ * carried none.
+ *
+ * @internal
+ */
+export function requestClientInfo(ctx: ServerContext): Partial<Implementation> {
+  return { ...(requestEnvelope(ctx)?.[CLIENT_INFO_META_KEY] ?? {}) };
+}
+
+function toClientContext(ctx: ServerContext): RequestClientContext {
+  const envelope = requestEnvelope(ctx);
   const capabilities: ClientCapabilities = {
     ...(envelope?.[CLIENT_CAPABILITIES_META_KEY] ?? {}),
   };
-  const info: Partial<Implementation> = {
-    ...(envelope?.[CLIENT_INFO_META_KEY] ?? {}),
-  };
+  const info: Partial<Implementation> = requestClientInfo(ctx);
   const user = normalizeUserContext(ctx.mcpReq._meta);
   return {
     can(capability: string): boolean {

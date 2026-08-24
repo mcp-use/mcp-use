@@ -254,6 +254,7 @@ describe("views server core (e2e over HTTP)", () => {
   let uiClient: Client;
   let plainClient: Client;
   let legacyClient: Client;
+  let claudeClient: Client;
 
   beforeAll(async () => {
     const started = await server.listen(0);
@@ -292,12 +293,22 @@ describe("views server core (e2e over HTTP)", () => {
       { capabilities: { sampling: {} } }
     );
     await legacyClient.connect(new StreamableHTTPClientTransport(new URL(url)));
+
+    claudeClient = new Client(
+      { name: "claude-desktop", version: "1.0.0" },
+      {
+        versionNegotiation: { mode: { pin: "2026-07-28" } },
+        capabilities: UI_CAPABILITIES,
+      }
+    );
+    await claudeClient.connect(new StreamableHTTPClientTransport(new URL(url)));
   });
 
   afterAll(async () => {
     await uiClient.close();
     await plainClient.close();
     await legacyClient.close();
+    await claudeClient.close();
     await server.close();
   });
 
@@ -499,6 +510,41 @@ describe("views server core (e2e over HTTP)", () => {
       domain: "https://views.example.com",
       prefersBorder: true,
     });
+  });
+
+  it("hashes ui.domain on resources/read for Claude clients", async () => {
+    const read = await claudeClient.readResource({
+      uri: "ui://views/product-search-result.html",
+    });
+    const ui = read.contents[0]?._meta?.["ui"] as
+      | Record<string, unknown>
+      | undefined;
+    expect(ui?.["domain"]).toBe(
+      "36009c725adb9960af4aebe6278959e8.claudemcpcontent.com"
+    );
+    // Only the domain is rewritten; the rest of _meta.ui is untouched.
+    expect(ui?.["permissions"]).toEqual({ clipboardWrite: {} });
+    expect(ui?.["prefersBorder"]).toBe(true);
+  });
+
+  it("leaves ui.domain verbatim on resources/read for non-Claude clients", async () => {
+    const read = await uiClient.readResource({
+      uri: "ui://views/product-search-result.html",
+    });
+    const ui = read.contents[0]?._meta?.["ui"] as
+      | Record<string, unknown>
+      | undefined;
+    expect(ui?.["domain"]).toBe("https://views.example.com");
+  });
+
+  it("leaves ui.domain verbatim on resources/list for Claude clients", async () => {
+    const { resources } = await claudeClient.listResources();
+    const view = resources.find(
+      (r) => r.uri === "ui://views/product-search-result.html"
+    );
+    expect(
+      (view?._meta?.["ui"] as Record<string, unknown> | undefined)?.["domain"]
+    ).toBe("https://views.example.com");
   });
 
   it("auto-appends the serving origin to csp.resourceDomains on resources/read", async () => {
