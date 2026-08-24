@@ -49,7 +49,7 @@ exclude_path = [
   "libraries/typescript/packages/cli/CHANGELOG\\.md$",
   "libraries/typescript/packages/create-mcp-use-app/CHANGELOG\\.md$",
   "libraries/typescript/packages/inspector/CHANGELOG\\.md$",
-  "libraries/typescript/packages/mcp-use/CHANGELOG\\.md$",
+  "libraries/typescript/packages/server/CHANGELOG\\.md$",
 ]
 
 exclude_loopback = true
