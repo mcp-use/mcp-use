@@ -30,6 +30,10 @@ class MockSandbox:
         self.commands = MagicMock()
         self.commands.run = MagicMock(return_value=MockCommandHandle())
 
+    @classmethod
+    def create(cls, *args, **kwargs):
+        return cls(*args, **kwargs)
+
     def get_host(self, port):
         return "test-host.sandbox.e2b.dev"
 
@@ -184,7 +188,7 @@ class TestSandboxConnectorConnection:
         # Setup mocks to raise an exception during sandbox creation
         mock_sandbox_instance = MagicMock()
         mock_sandbox_instance.get_host.side_effect = Exception("Sandbox creation error")
-        mock_sandbox_class.return_value = mock_sandbox_instance
+        mock_sandbox_class.create.return_value = mock_sandbox_instance
 
         # Create connector and attempt to connect
         sandbox_options = SandboxOptions(api_key="test-api-key")
@@ -309,3 +313,29 @@ class TestSandboxConnectorCleanup:
             assert connector.stdout_lines == []
             assert connector.stderr_lines == []
             assert connector.base_url is None
+
+
+class TestSandboxConnectorOutputHandlers:
+    """Tests for SandboxConnector stdout/stderr handlers."""
+
+    @patch("mcp_use.client.connectors.sandbox.logger")
+    def test_handle_stdout(self, mock_logger, mock_sandbox_modules):
+        """Test _handle_stdout logs without throwing TypeError."""
+        sandbox_options = SandboxOptions(api_key="test-api-key")
+        connector = SandboxConnector("npx", ["test-command"], e2b_options=sandbox_options)
+
+        connector._handle_stdout("server output line")
+
+        assert connector.stdout_lines == ["server output line"]
+        mock_logger.debug.assert_called_once_with("[SANDBOX STDOUT] server output line")
+
+    @patch("mcp_use.client.connectors.sandbox.logger")
+    def test_handle_stderr(self, mock_logger, mock_sandbox_modules):
+        """Test _handle_stderr logs without throwing TypeError."""
+        sandbox_options = SandboxOptions(api_key="test-api-key")
+        connector = SandboxConnector("npx", ["test-command"], e2b_options=sandbox_options)
+
+        connector._handle_stderr("server error line")
+
+        assert connector.stderr_lines == ["server error line"]
+        mock_logger.debug.assert_called_once_with("[SANDBOX STDERR] server error line")
