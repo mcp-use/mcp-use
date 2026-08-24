@@ -783,6 +783,9 @@ jobs:
     name: "typescript/cli (${{ matrix.os }}, node-${{ matrix.node-version }})"
     runs-on: ${{ matrix.os }}
     strategy:
+      # Keep the other OS running when one fails: comparing the two is the
+      # whole reason this job has an os matrix.
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
         node-version: [22.23.1]
