@@ -11,6 +11,7 @@
     "@mcp-use/tunnel": "0.2.0"
   },
   "changesets": [
+    "claude-resource-domain-hashing",
     "quiet-mails-smile",
     "quiet-prompts-forward"
   ]
