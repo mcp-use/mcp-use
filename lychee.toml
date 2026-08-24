@@ -38,9 +38,14 @@ exclude = [
 
 ]
 
-# Skip generated changelogs - historical release notes reference docs URLs
-# that were valid at release time; rewriting them is misleading
 exclude_path = [
+  # Vite entry HTML. Its `/favicon-black.svg` and `/src/client/main.tsx` are
+  # dev-server paths resolved by Vite, not filesystem paths, so lychee reports
+  # "Cannot resolve root-relative link" for a file that is served fine.
+  "libraries/typescript/packages/inspector/index\\.html$",
+
+  # Skip generated changelogs - historical release notes reference docs URLs
+  # that were valid at release time; rewriting them is misleading
   "libraries/typescript/packages/cli/CHANGELOG\\.md$",
   "libraries/typescript/packages/create-mcp-use-app/CHANGELOG\\.md$",
   "libraries/typescript/packages/inspector/CHANGELOG\\.md$",
