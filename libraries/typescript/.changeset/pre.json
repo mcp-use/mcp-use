@@ -10,5 +10,7 @@
     "mcp-use": "2.3.1",
     "@mcp-use/tunnel": "0.2.0"
   },
-  "changesets": []
+  "changesets": [
+    "quiet-prompts-forward"
+  ]
 }

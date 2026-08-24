@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.2.0-canary.0
+
+### Minor Changes
+
+- 3461646: Support passing MCP `RequestOptions` through prompt reads.
+
 ## 2.1.5
 
 ### Patch Changes
