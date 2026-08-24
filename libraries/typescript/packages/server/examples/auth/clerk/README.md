@@ -5,7 +5,7 @@ tool: `get-user-info`.
 
 ## Configure Clerk
 
-1. Create or select an application in the [Clerk Dashboard](https://dashboard.clerk.com/).
+1. Create or select an application in the [Clerk Dashboard](https://dashboard.clerk.com/sign-in).
 2. Enable Clerk OAuth. Enable OpenID Connect if your client requires it.
 3. Under **Configure** > **OAuth Applications**, enable Dynamic Client
    Registration so MCP clients can register directly with Clerk.
