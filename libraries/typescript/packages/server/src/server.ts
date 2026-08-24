@@ -125,7 +125,6 @@ import {
   synthesizeViewDocument,
   viewResourceConfig,
   viewResourceUri,
-  applyClaudeResourceDomain,
   buildResourceUiMeta,
   buildToolResultUiMeta,
   buildToolUiMeta,
@@ -2037,7 +2036,10 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           viewName
         );
         // Claude serves view resources from a hashed sandbox origin derived
-        // from the authored domain. Applied on read only, matching v1.
+        // from the authored domain. Applied on read only, matching v1. Loaded
+        // lazily so the helper stays out of the edge entry's static graph.
+        const { applyClaudeResourceDomain } =
+          await import("./views/claude-domain.js");
         const meta = await applyClaudeResourceDomain(
           buildResourceUiMeta(authorFacts, readOptions),
           requestClientInfo(ctx),
