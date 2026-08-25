@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 2.0.5-canary.0
+
+### Patch Changes
+
+- 08639bc: Point the scaffold's closing "Learn more" line at `docs.mcp-use.com` instead of `manufact.com/docs`, which now redirects to Manufact's dashboard docs rather than to mcp-use documentation.
+
 ## 2.0.4
 
 ### Patch Changes
