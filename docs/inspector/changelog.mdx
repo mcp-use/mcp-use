@@ -6,6 +6,25 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v20.3.1" description="August 2026">
+  ## Correlated JSON-RPC responses
+  Patch release paired with `mcp-use` v2.3.2, adding request context and timing to JSON-RPC response rows.
+
+- **Enhancement**: response rows show the matched request method and elapsed time and flag errors while keeping simultaneous bidirectional requests isolated by source, server, widget, direction, and ID type (`#2303`)
+- **Update**: Updated mcp-use to v2.3.2
+</Update>
+
+<Update label="v20.3.0" description="August 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=20.3.0&title=Reusable%20connection%20settings&date=2026-08&lang=inspector" alt="Release 20.3.0" />
+  </Frame>
+  ## Reusable connection settings
+  Minor release paired with `mcp-use` v2.3.1, exposing the Inspector connection form and configuration state for embedded consumers.
+
+- **New**: `@mcp-use/inspector/client` exports `ConnectionSettingsForm`, `useConnectionFormState`, custom-header controls, connection configuration types, and normalization helpers, with optional consumer URL validation (`#2319`)
+- **Update**: Updated mcp-use to v2.3.1
+</Update>
+
 <Update label="v20.2.5" description="August 2026">
   ## Isolated chat sessions & accurate cache usage
   Patch release paired with `mcp-use` v2.3.0, keeping concurrent chat sessions independent and preserving provider cache-token accounting.

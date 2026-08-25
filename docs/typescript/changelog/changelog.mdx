@@ -6,6 +6,26 @@ tag: "New"
 rss: true
 ---
 
+<Update label="v2.3.2" description="August 2026">
+  ## Claude view compatibility & request diagnostics
+  Patch release restoring Claude's resource-domain contract, exposing prompt request controls, and making Inspector RPC responses easier to diagnose.
+
+- **Fix** (server/views): `resources/read` rewrites authored view domains to the stable SHA-256-based `*.claudemcpcontent.com` domain expected by Claude clients, using per-request client identity with a legacy `User-Agent` fallback while leaving other clients and `resources/list` unchanged (`#2326`)
+- **Enhancement** (@mcp-use/client): prompt reads accept MCP `RequestOptions` through both `MCPClientSession.getPrompt` and the underlying connector (`#2302`)
+- **Enhancement** (@mcp-use/inspector): JSON-RPC response rows show the correlated request method and elapsed time and flag error responses; see the Inspector changelog (`#2303`)
+- **Update**: Updated @mcp-use/inspector to v20.3.1
+- **Update**: Updated @mcp-use/cli to v4.1.6
+</Update>
+
+<Update label="v2.3.1" description="August 2026">
+  ## Responsive server URLs & reusable connection settings
+  Patch release keeping long landing-page URLs contained and exposing Inspector connection controls for embedded consumers.
+
+- **Fix** (server): long MCP server URLs truncate inside the landing-page hero on narrow viewports while remaining available through the copy button (`#2313`)
+- **Enhancement** (@mcp-use/inspector): export `ConnectionSettingsForm`, `useConnectionFormState`, connection configuration types, and optional consumer URL validation from `@mcp-use/inspector/client`; see the Inspector changelog (`#2319`)
+- **Update**: Updated @mcp-use/inspector to v20.3.0
+</Update>
+
 <Update label="v2.3.0" description="August 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=2.3.0&title=Scalekit%20OAuth%20provider&date=2026-08&lang=typescript" alt="Release 2.3.0" />
