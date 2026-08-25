@@ -18,6 +18,7 @@ export default [
       "**/*.min.js",
       "**/.turbo/**",
       "**/.tsup/**",
+      "**/.typedoc/**",
       "packages/*/dist/**",
       "packages/*/build/**",
       "packages/*/node_modules/**",

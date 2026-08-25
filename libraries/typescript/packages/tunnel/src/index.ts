@@ -138,11 +138,19 @@ export interface TunnelManager {
    * @param port - Bound local HTTP port to expose.
    * @returns The public origin and assigned tunnel identifier.
    */
-  start(port: number): Promise<{ url: string; subdomain: string }>;
+  start(port: number): Promise<{
+    /** Public origin the tunnel is reachable on. */
+    url: string;
+    /** Tunnel identifier assigned by the relay. */
+    subdomain: string;
+  }>;
   /** Stop the WebSocket relay and release its reservation. */
   stop(): Promise<void>;
   /** Current tunnel public origin URL, or `null` when inactive. */
-  status(): { url: string | null };
+  status(): {
+    /** Public origin while the tunnel is active, `null` otherwise. */
+    url: string | null;
+  };
 }
 
 /** Options shared by embedded and standalone tunnel clients. */
