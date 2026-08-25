@@ -34,6 +34,7 @@ permissions:
 #    ├─ typescript/inspector: Unit tests for inspector package
 #    ├─ typescript/cli: Unit tests for CLI package
 #    ├─ typescript/tunnel: Protocol and local relay integration tests
+#    ├─ typescript-release-channel-test: release-channel helper suite (main + canary PRs)
 #    └─ typescript-changeset-check: PR validation (PRs only)
 #
 # 4. create-mcp-use-app Tests (runs if packages/create-mcp-use-app/** changed)
@@ -86,6 +87,7 @@ jobs:
       python: ${{ steps.out.outputs.python }}
       typescript: ${{ steps.out.outputs.typescript }}
       create-mcp-use-app: ${{ steps.out.outputs.create-mcp-use-app }}
+      release-channel: ${{ steps.out.outputs.release-channel }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -102,6 +104,12 @@ jobs:
               - 'libraries/typescript/**'
             create-mcp-use-app:
               - 'libraries/typescript/packages/create-mcp-use-app/**'
+            release-channel:
+              - 'libraries/typescript/scripts/release-channel.mjs'
+              - 'libraries/typescript/scripts/release-channel.test.mjs'
+              - 'libraries/typescript/package.json'
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/typescript-release.yml'
       - name: Compute outputs
         id: out
         uses: actions/github-script@v7
@@ -118,6 +126,11 @@ jobs:
             core.setOutput('python', String(py));
             core.setOutput('typescript', String(ts));
             core.setOutput('create-mcp-use-app', String(create));
+            // The reusable-workflow caller only reports python/typescript/create-app,
+            // so it cannot tell us whether a release workflow changed. The helper test
+            // takes a few seconds, so run it on every workflow_call rather than guess.
+            const releaseChannel = fromWfCall ? true : ("${{ steps.filter.outputs.release-channel }}" === 'true');
+            core.setOutput('release-channel', String(releaseChannel));
 
   # Python Jobs
   python-lint:
@@ -842,6 +855,37 @@ jobs:
         run: pnpm build:tunnel
       - name: Run Tunnel Tests
         run: pnpm --filter @mcp-use/tunnel test:run
+
+  typescript-release-channel-test:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.release-channel == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: libraries/typescript
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.13.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.1
+          cache: "pnpm"
+          cache-dependency-path: libraries/typescript/pnpm-lock.yaml
+
+      - name: Install Dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Test release-channel helper
+        run: pnpm test:release-channel
 
   typescript-changeset-check:
     needs: detect-changes
