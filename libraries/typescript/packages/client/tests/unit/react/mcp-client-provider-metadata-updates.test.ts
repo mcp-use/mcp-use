@@ -10,7 +10,9 @@ import { MemoryStorageProvider } from "../../../src/react/storage.js";
 let mountCount = 0;
 const disconnectSpies: Array<ReturnType<typeof vi.fn>> = [];
 const clearStorageSpies: Array<ReturnType<typeof vi.fn>> = [];
+const authenticateSpies: Array<ReturnType<typeof vi.fn>> = [];
 let latestClient: ReturnType<typeof useMcpClient> | null = null;
+let mockState: "discovering" | "pending_auth" | "ready" | "failed" = "ready";
 let mockProtocolEra: "legacy" | "modern" = "legacy";
 let mockInstructions = "legacy instructions";
 let mockAuthorization: { mode: "mixed"; authenticated: boolean } | undefined;
@@ -34,11 +36,16 @@ vi.mock("../../../src/react/useMcp.js", () => {
     useMcp: () => {
       const disconnect = React.useMemo(() => vi.fn(), []);
       const clearStorage = React.useMemo(() => vi.fn(), []);
+      const authenticate = React.useMemo(
+        () => vi.fn().mockResolvedValue(undefined),
+        []
+      );
 
       useEffect(() => {
         mountCount += 1;
         disconnectSpies.push(disconnect);
         clearStorageSpies.push(clearStorage);
+        authenticateSpies.push(authenticate);
       }, [disconnect, clearStorage]);
 
       return {
@@ -50,7 +57,7 @@ vi.mock("../../../src/react/useMcp.js", () => {
         skills: mockSkills,
         serverInfo,
         capabilities,
-        state: "ready" as const,
+        state: mockState,
         error: undefined,
         authUrl: undefined,
         authTokens: undefined,
@@ -65,6 +72,7 @@ vi.mock("../../../src/react/useMcp.js", () => {
         refresh: vi.fn(),
         reconnect: vi.fn(),
         disconnect,
+        authenticate,
         clearStorage,
         client,
       };
@@ -106,12 +114,72 @@ describe("McpClientProvider metadata-only updates", () => {
     mountCount = 0;
     disconnectSpies.length = 0;
     clearStorageSpies.length = 0;
+    authenticateSpies.length = 0;
     latestClient = null;
+    mockState = "ready";
     mockProtocolEra = "legacy";
     mockInstructions = "legacy instructions";
     mockAuthorization = undefined;
     mockSkills = [];
     vi.restoreAllMocks();
+  });
+
+  it("atomically tears down, clears credentials, remounts, and authenticates", async () => {
+    let renderer: ReturnType<typeof create>;
+    await act(async () => {
+      renderer = create(
+        React.createElement(
+          McpClientProvider,
+          null,
+          React.createElement(TestHarness)
+        )
+      );
+    });
+    await flushUpdates();
+
+    const firstDisconnect = disconnectSpies[0];
+    const firstClearStorage = clearStorageSpies[0];
+    const order: string[] = [];
+    firstDisconnect.mockImplementation(async () => {
+      order.push("disconnect:start");
+      await Promise.resolve();
+      order.push("disconnect:end");
+    });
+    firstClearStorage.mockImplementation(() => {
+      order.push("clearStorage");
+    });
+
+    mockState = "discovering";
+    let reauthentication: Promise<void> | undefined;
+    await act(async () => {
+      reauthentication = latestClient!.reauthenticateServer("sandbox");
+      await Promise.resolve();
+    });
+    await flushUpdates();
+    expect(authenticateSpies[1]).not.toHaveBeenCalled();
+
+    mockState = "pending_auth";
+    await act(async () => {
+      renderer!.update(
+        React.createElement(
+          McpClientProvider,
+          null,
+          React.createElement(TestHarness)
+        )
+      );
+    });
+    await act(async () => {
+      await reauthentication;
+    });
+
+    expect(order).toEqual([
+      "disconnect:start",
+      "disconnect:end",
+      "clearStorage",
+    ]);
+    expect(mountCount).toBe(2);
+    expect(authenticateSpies[0]).not.toHaveBeenCalled();
+    expect(authenticateSpies[1]).toHaveBeenCalledTimes(1);
   });
 
   it("updates configured server metadata without reconnecting", async () => {
