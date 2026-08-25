@@ -6,7 +6,6 @@
 
 import { existsSync, readdirSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
-import react from "@vitejs/plugin-react";
 import type { ViteDevServer } from "vite";
 
 import type { ViewsManifest } from "../views/types.js";
@@ -177,7 +176,7 @@ export async function createBindingValidationServer(
       alias: nextStandaloneAliases(cwd),
     },
     oxc: { jsx: { runtime: "automatic" } },
-    plugins: [nextStandaloneCompatPlugin(cwd), react()],
+    plugins: [nextStandaloneCompatPlugin(cwd)],
     server: { middlewareMode: true, hmr: false, ws: false },
     ssr: {
       ...nextStandaloneSsrOptions(cwd),
