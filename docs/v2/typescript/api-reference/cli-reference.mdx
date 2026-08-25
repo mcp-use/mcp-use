@@ -445,13 +445,13 @@ mcp-use servers <subcommand> [options]
 
 **Subcommands:**
 
-| Subcommand                              | Purpose                                     | Options                                                                                                                                                                                                                                                |
-| --------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `list` / `ls`                           | List servers for an organization.           | `--org <slug-or-id>`, `--limit <n>`, `--skip <n>`, `--sort <field:direction>`                                                                                                                                                                          |
-| `get <id-or-slug>`                      | Show server details and recent deployments. | `--org <slug-or-id>`                                                                                                                                                                                                                                   |
-| `update <id-or-slug>`                   | Update server configuration.                | `--branch <name>`, `--name <name>`, `--description <text>`, `--build-command <cmd>`, `--start-command <cmd>`, `--root-dir <path>`, `--watch-paths <glob...>`, `--deploy-branches <glob...>`, `--wait-for-ci`, `--no-wait-for-ci`, `--org <slug-or-id>` |
-| `delete <server-id>` / `rm <server-id>` | Delete a server and its deployments.        | `-y, --yes`, `--org <slug-or-id>`                                                                                                                                                                                                                      |
-| `env <subcommand>`                      | Manage server environment variables.        | See [Server environment commands](#server-environment-commands).                                                                                                                                                                                       |
+| Subcommand            | Purpose                                     | Options                                                                                                                                                                                                                                                |
+| --------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `list`                | List servers for an organization.           | `--org <slug-or-id>`, `--limit <n>`, `--skip <n>`                                                                                                                                                                                                      |
+| `get <id-or-slug>`    | Show server details and recent deployments. | `--org <slug-or-id>`                                                                                                                                                                                                                                   |
+| `update <id-or-slug>` | Update server configuration.                | `--branch <name>`, `--name <name>`, `--description <text>`, `--build-command <cmd>`, `--start-command <cmd>`, `--root-dir <path>`, `--watch-paths <glob...>`, `--deploy-branches <glob...>`, `--wait-for-ci`, `--no-wait-for-ci`, `--org <slug-or-id>` |
+| `delete <server-id>`  | Delete a server and its deployments.        | `-y, --yes`, `--org <slug-or-id>`                                                                                                                                                                                                                      |
+| `env <subcommand>`    | Manage server environment variables.        | See [Server environment commands](#server-environment-commands).                                                                                                                                                                                       |
 
 **Examples:**
 
@@ -473,7 +473,7 @@ mcp-use servers delete srv_abc123 --yes
 
 ## Server environment commands
 
-**Purpose:** List, add, update, and remove environment variables on a cloud server.
+**Purpose:** List, set, and unset environment variables on a cloud server.
 
 **Syntax:**
 
@@ -483,31 +483,29 @@ mcp-use servers env <subcommand> [options]
 
 **Subcommands:**
 
-| Subcommand                              | Purpose                                        | Required options | Other options                                                                                 |
-| --------------------------------------- | ---------------------------------------------- | ---------------- | --------------------------------------------------------------------------------------------- |
-| `list` / `ls`                           | List environment variables.                    | `--server <id>`  | `--branch <name>`, `--show-values`                                                            |
-| `add <KEY=VALUE>`                       | Add an environment variable.                   | `--server <id>`  | `--env <environments>`, `--branch <name>`, `--sensitive`                                      |
-| `update <key-or-id>`                    | Update an environment variable by key or UUID. | `--server <id>`  | `--value <value>`, `--env <environments>`, `--branch <name>`, `--sensitive`, `--no-sensitive` |
-| `remove <key-or-id>` / `rm <key-or-id>` | Remove an environment variable by key or UUID. | `--server <id>`  | `--branch <name>`                                                                             |
+| Subcommand                 | Purpose                                   | Required arguments       | Other options                 |
+| -------------------------- | ----------------------------------------- | ------------------------ | ----------------------------- |
+| `list <server>`            | List environment variable metadata.       | Server ID or slug        | `--org <id-or-slug>`, `--branch <name>`             |
+| `set <server> <KEY=VALUE>` | Create or update an environment variable. | Server ID or slug, value | `--org <id-or-slug>`, `--branch <name>`, `--secret` |
+| `unset <server> <key>`     | Delete an environment variable by key.    | Server ID or slug, key   | `--org <id-or-slug>`, `--branch <name>`, `--yes`    |
 
 **Examples:**
 
 ```bash
-mcp-use servers env list --server srv_abc123
-mcp-use servers env list --server srv_abc123 --show-values
-mcp-use servers env add --server srv_abc123 API_KEY=secret --sensitive
-mcp-use servers env add --server srv_abc123 FEATURE_FLAG=true --env preview,development
-mcp-use servers env update API_KEY --server srv_abc123 --value new-secret --sensitive
-mcp-use servers env remove API_KEY --server srv_abc123
+mcp-use servers env list srv_abc123
+mcp-use servers env list srv_abc123 --branch feature/example
+mcp-use servers env set srv_abc123 API_KEY=secret --secret
+mcp-use servers env set srv_abc123 FEATURE_FLAG=true --branch feature/example
+mcp-use servers env unset srv_abc123 API_KEY --yes
 ```
 
 **Notes and behavior:**
 
-- Values are masked by default. `--show-values` reveals non-sensitive values.
-- `--env <environments>` accepts comma-separated `production`, `preview`, and `development`.
-- `env add --env` defaults to all three environments when omitted.
+- `env list` returns metadata only. Values are never returned.
+- `env set` creates a production variable when `--branch` is omitted, or a preview variable when it is supplied.
+- `--secret` marks a value sensitive.
 - `--branch <name>` scopes preview environment variables to a branch. Omit `--branch` for production resolution.
-- `env update` and `env remove` accept either a variable key or UUID.
+- `env unset` prompts for confirmation unless `--yes` is set.
 
 ## `client`
 
