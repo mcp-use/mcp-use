@@ -31,6 +31,7 @@ import { assertServerConfig, type ServerConfig } from "./config.js";
 import { resolveListenHost, resolveListenPort } from "./listen-address.js";
 import { toNodeHandler } from "./node-bridge.js";
 import {
+  requestClientInfo,
   toAuthenticatedRequestContext,
   toRequestContext,
   type RequestContext,
@@ -124,6 +125,7 @@ import {
   synthesizeViewDocument,
   viewResourceConfig,
   viewResourceUri,
+  applyClaudeResourceDomain,
   buildResourceUiMeta,
   buildToolResultUiMeta,
   buildToolUiMeta,
@@ -2034,13 +2036,20 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           basePath,
           viewName
         );
+        // Claude serves view resources from a hashed sandbox origin derived
+        // from the authored domain. Applied on read only, matching v1.
+        const meta = await applyClaudeResourceDomain(
+          buildResourceUiMeta(authorFacts, readOptions),
+          requestClientInfo(ctx),
+          (req ?? metaOptions.request)?.headers.get("user-agent")
+        );
         return {
           contents: [
             {
               uri: readUri.href,
               mimeType: resourceConfig.mimeType,
               text: html,
-              _meta: buildResourceUiMeta(authorFacts, readOptions),
+              _meta: meta,
             },
           ],
         };

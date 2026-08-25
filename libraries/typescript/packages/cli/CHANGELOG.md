@@ -1,5 +1,11 @@
 # @mcp-use/cli
 
+## 4.1.6-canary.0
+
+### Patch Changes
+
+- @mcp-use/inspector@20.3.1-canary.0
+
 ## 4.1.5
 
 ## 4.1.5-canary.0

@@ -899,16 +899,21 @@ export abstract class BaseConnector {
    *
    * @param name - Prompt name.
    * @param args - Prompt arguments.
+   * @param options - Per-request timeout, cancellation, and progress options.
    * @returns The rendered prompt returned by the server.
    */
-  async getPrompt(name: string, args: Record<string, any>) {
+  async getPrompt(
+    name: string,
+    args: Record<string, any>,
+    options?: RequestOptions
+  ) {
     if (!this.client) {
       throw new Error("MCP client is not connected");
     }
 
     logger.debug(`Getting prompt ${name}`);
     return await this.executeRequest(() =>
-      this.client!.getPrompt({ name, arguments: args })
+      this.client!.getPrompt({ name, arguments: args }, options)
     );
   }
 

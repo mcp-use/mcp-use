@@ -594,6 +594,7 @@ export class MCPConnection {
    *
    * @param name - Name of the prompt to get
    * @param args - Arguments for the prompt
+   * @param options - Per-request timeout, cancellation, and progress options
    * @returns Prompt result
    *
    * @example
@@ -602,8 +603,12 @@ export class MCPConnection {
    * console.log(prompt.messages);
    * ```
    */
-  async getPrompt(name: string, args: Record<string, any>) {
-    return this.connector.getPrompt(name, args);
+  async getPrompt(
+    name: string,
+    args: Record<string, any>,
+    options?: RequestOptions
+  ) {
+    return this.connector.getPrompt(name, args, options);
   }
 
   /**

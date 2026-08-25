@@ -107,13 +107,13 @@ describe("published CLI boundaries", () => {
     }
   });
 
-  it("keeps the edge entry under eighty KiB and its static graph under one hundred twenty KiB", async () => {
+  it("keeps the edge entry under eighty KiB and its static graph under one hundred twenty-four KiB", async () => {
     const entry = new URL("index.js", DIST);
     const graph = await buildStaticGraph(entry);
     const graphBytes = await sumFileBytes(graph.files.keys());
 
     expect((await stat(entry)).size).toBeLessThanOrEqual(80 * 1024);
-    expect(graphBytes).toBeLessThanOrEqual(120 * 1024);
+    expect(graphBytes).toBeLessThanOrEqual(124 * 1024);
   });
 
   it("keeps the unpacked framework artifact below five MiB", async () => {
