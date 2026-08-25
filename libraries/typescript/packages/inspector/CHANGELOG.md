@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 20.3.1
+
+### Patch Changes
+
+- 1af9beb: Show the correlated request method and latency on JSON-RPC response rows.
+
 ## 20.3.1-canary.1
 
 ### Patch Changes
