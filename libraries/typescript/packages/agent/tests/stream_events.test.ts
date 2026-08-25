@@ -345,8 +345,7 @@ describe("mCPAgent streamEvents()", () => {
       // Just consume events
     }
 
-    // Note: cleanup only happens if initialized in this call and no client
-    // This is hard to test with our current mocking setup, but the logic is there
+    expect(closeSpy).toHaveBeenCalled();
   });
 });
 
