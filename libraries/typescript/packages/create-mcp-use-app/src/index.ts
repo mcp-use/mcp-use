@@ -1137,11 +1137,7 @@ async function main(): Promise<void> {
     );
     console.log("");
   }
-  console.log(
-    ansi.cyan(
-      "📚 Learn more: https://docs.mcp-use.com/v2/typescript/getting-started/quickstart"
-    )
-  );
+  console.log(ansi.cyan("📚 Learn more: https://docs.mcp-use.com"));
   console.log(ansi.gray("💬 For feedback and bug reporting visit:"));
   console.log(
     ansi.gray("   https://github.com/mcp-use/mcp-use or https://manufact.com")
