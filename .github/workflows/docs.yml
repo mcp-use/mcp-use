@@ -2,13 +2,13 @@ name: Documentation
 
 on:
   push:
-    branches: [main, monorepo]
+    branches: [main, canary]
     paths:
       - "libraries/python/**"
       - "libraries/typescript/**"
       - "docs/**"
   pull_request:
-    branches: [main, monorepo]
+    branches: [main, canary]
     paths:
       - "libraries/python/**"
       - "libraries/typescript/**"
