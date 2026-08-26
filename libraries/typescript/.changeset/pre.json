@@ -1,0 +1,19 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/agent": "2.0.9",
+    "@mcp-use/cli": "4.1.6",
+    "@mcp-use/client": "2.2.0",
+    "create-mcp-use-app": "2.0.4",
+    "@mcp-use/inspector": "20.3.1",
+    "mcp-use": "2.3.2",
+    "@mcp-use/tunnel": "0.2.0"
+  },
+  "changesets": [
+    "disconnect-replaced-session",
+    "olive-cats-argue",
+    "scaffold-learn-more-link",
+    "warm-tools-warn"
+  ]
+}

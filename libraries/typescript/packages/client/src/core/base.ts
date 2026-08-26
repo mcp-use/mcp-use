@@ -67,6 +67,16 @@ export abstract class BaseMCPClient {
   protected sessions: Record<string, MCPSession> = {};
 
   /**
+   * Tracks teardown by session identity so overlapping cleanup paths share the
+   * same disconnect. In particular, createSession() can replace a session while
+   * closeSession() is already disconnecting it.
+   */
+  private readonly sessionDisconnects = new WeakMap<
+    MCPSession,
+    Promise<void>
+  >();
+
+  /**
    * List of server names that have active sessions.
    * This array is kept in sync with the sessions map and can be used
    * to iterate over active connections.
@@ -99,6 +109,19 @@ export abstract class BaseMCPClient {
     if (config) {
       this.config = config;
     }
+  }
+
+  private disconnectSession(session: MCPSession): Promise<void> {
+    const existingDisconnect = this.sessionDisconnects.get(session);
+    if (existingDisconnect) {
+      return existingDisconnect;
+    }
+
+    // Install the promise before invoking the connector so even synchronous
+    // re-entry observes and reuses this teardown.
+    const disconnect = Promise.resolve().then(() => session.disconnect());
+    this.sessionDisconnects.set(session, disconnect);
+    return disconnect;
   }
 
   /**
@@ -278,7 +301,9 @@ export abstract class BaseMCPClient {
    * lifecycle of connections and provide methods for calling tools, listing
    * resources, and more.
    *
-   * If a session already exists for the server, it will be replaced with a new one.
+   * If a session already exists for the server, it will be replaced with a new
+   * one and the previous session is disconnected; any previously returned
+   * reference to it becomes unusable.
    *
    * @param serverName - The name of the server as defined in the client configuration
    * @param autoInitialize - Whether to automatically initialize the session (default: true)
@@ -377,10 +402,27 @@ export abstract class BaseMCPClient {
       session = await openSession();
     }
 
+    const previous = this.sessions[serverName];
     this.sessions[serverName] = session;
     if (!this.activeSessions.includes(serverName)) {
       this.activeSessions.push(serverName);
     }
+
+    // The slot only holds one session per server, so a replaced session would
+    // no longer be reachable from closeSession()/closeAllSessions(). Disconnect
+    // it here, after the new session is installed, so consumers calling
+    // getSession() during the await still see a live session.
+    if (previous && previous !== session) {
+      try {
+        logger.debug(`Disconnecting replaced session for server ${serverName}`);
+        await this.disconnectSession(previous);
+      } catch (e) {
+        logger.error(
+          `Error disconnecting replaced session for server '${serverName}': ${e}`
+        );
+      }
+    }
+
     return session;
   }
 
@@ -571,7 +613,7 @@ export abstract class BaseMCPClient {
     }
     try {
       logger.debug(`Closing session for server ${serverName}`);
-      await session.disconnect();
+      await this.disconnectSession(session);
     } catch (e) {
       logger.error(`Error closing session for server '${serverName}': ${e}`);
     } finally {

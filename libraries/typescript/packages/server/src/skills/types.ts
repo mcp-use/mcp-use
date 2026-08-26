@@ -43,7 +43,12 @@ export interface SkillSnapshotEntry {
   /** Verbatim YAML frontmatter rendered as JSON. */
   frontmatter: Record<string, unknown>;
   /** Complete, deterministic file set for this skill. */
-  resources: Array<{ uri: string; digest: string }>;
+  resources: Array<{
+    /** Resource URI of one file belonging to the skill. */
+    uri: string;
+    /** SHA-256 digest of that file's raw bytes. */
+    digest: string;
+  }>;
 }
 
 /** One directory resource retained for scoped directory reads. */

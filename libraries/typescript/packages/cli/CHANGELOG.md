@@ -1,5 +1,17 @@
 # @mcp-use/cli
 
+## 4.1.7-canary.1
+
+### Patch Changes
+
+- 874f3ad: Stop loading the React plugin in the binding-validation server. The server performs build-time binding validation and does not need JSX transformation; loading the plugin caused Vite to add `react`, `react-dom` and the JSX runtimes to `optimizeDeps`, where they may be unresolved in projects without React dependencies. A fresh `mcp-server`, `blank` or `starter` project no longer prints four "Failed to resolve dependency" warnings on its first build.
+
+## 4.1.7-canary.0
+
+### Patch Changes
+
+- @mcp-use/inspector@20.3.2-canary.0
+
 ## 4.1.6
 
 ## 4.1.6-canary.0

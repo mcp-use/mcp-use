@@ -6,6 +6,14 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v20.3.2" description="August 2026">
+  ## Model tool-limit warnings
+  Patch release paired with `mcp-use` v2.3.3, making model tool limits visible before a chat request is sent.
+
+- **Enhancement**: chat warns when a connected MCP server exposes more than the documented 128 tools supported by OpenAI or Gemini models (`#2333`)
+- **Update**: Updated mcp-use to v2.3.3
+</Update>
+
 <Update label="v20.3.1" description="August 2026">
   ## Correlated JSON-RPC responses
   Patch release paired with `mcp-use` v2.3.2, adding request context and timing to JSON-RPC response rows.

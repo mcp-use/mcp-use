@@ -452,8 +452,12 @@ describe("MCPAgent Telemetry Integration", () => {
         // Expected to fail
       }
 
-      // Telemetry might not be called if initialization fails early
-      // The agent needs to be initialized before tracking
+      const exec = lastExecution();
+      expect(exec).toBeDefined();
+      expect(exec).toMatchObject({
+        success: false,
+        errorType: "execution_error",
+      });
     });
   });
 
