@@ -58,6 +58,7 @@ import { useChatMessagesClientSide } from "./chat/useChatMessagesClientSide";
 import { useConfig } from "./chat/useConfig";
 import { useHostedChatMode } from "./chat/useHostedChatMode";
 import { McpReconnectBanner } from "./chat/McpReconnectBanner";
+import { ToolLimitWarningBanner } from "./chat/ToolLimitWarningBanner";
 import { ChatManagedNotice } from "./chat/ChatManagedNotice";
 import { ChatRawView, type ChatView } from "./chat/ChatTraceView";
 import { useLocalSystemPrompt } from "./chat/system-prompt/useLocalSystemPrompt";
@@ -607,6 +608,17 @@ export function ChatTab({
           managedCloudModel.selectedModel.provider
         )
       : undefined;
+
+  const toolLimitProvider =
+    isManaged && managedCloudModel?.selectedModel
+      ? managedCloudModel.selectedModel.provider
+      : llmConfig?.provider;
+  const toolLimitWarningNode = (
+    <ToolLimitWarningBanner
+      provider={toolLimitProvider}
+      toolCount={modelVisibleTools.length}
+    />
+  );
 
   const handleSaveManagedCloud = useCallback(() => {
     setForceClientSide(false);
@@ -1527,7 +1539,12 @@ export function ChatTab({
 
         <ChatLandingForm
           serverDisplayName={getServerDisplayName(connection)}
-          composerNotice={managedChatNoticeNode}
+          composerNotice={
+            <>
+              {toolLimitWarningNode}
+              {managedChatNoticeNode}
+            </>
+          }
           inputValue={inputValue}
           isConnected={
             isConnected && !managedChatNotice && !mcpServerAuthRequired
@@ -1678,6 +1695,7 @@ export function ChatTab({
       {llmConfig && (
         <div className="relative shrink-0" data-chat-composer>
           <FullscreenChatOverlay messages={messages} isLoading={isLoading} />
+          {toolLimitWarningNode}
           {managedChatNoticeNode}
           <ChatInputArea
             variant={isMcpWidgetFullscreen ? "fullscreen" : "default"}
