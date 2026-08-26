@@ -22,7 +22,7 @@ import {
 } from "./jwt.js";
 import {
   oauthCustomProvider,
-  type OAuthProvider,
+  type DirectOAuthProvider,
   type OAuthResourceOptions,
 } from "./provider.js";
 
@@ -85,7 +85,7 @@ export interface KeycloakOAuthProviderOptions extends OAuthResourceOptions {
  */
 export function oauthKeycloakProvider(
   options: KeycloakOAuthProviderOptions = {}
-): OAuthProvider<KeycloakOAuthUser> {
+): DirectOAuthProvider<KeycloakOAuthUser> {
   const serverUrlValue =
     options.serverUrl ??
     oauthEnvironmentValue("MCP_USE_OAUTH_KEYCLOAK_SERVER_URL");

@@ -4,6 +4,7 @@ import type {
   OAuthTokenVerifier,
 } from "@modelcontextprotocol/server";
 
+import type { FetchMiddleware } from "../fetch-app.js";
 import { assertSecureHttpUrl, parseAbsoluteUrl } from "./internal.js";
 
 /** Additional verified identity information exposed by mcp-use callbacks. */
@@ -42,17 +43,62 @@ export interface CustomOAuthProviderOptions<
   mapAuthInfo: (authInfo: OAuthAuthInfo) => OAuthExtra<TUser>;
 }
 
+/** Effective OAuth behavior returned after a provider binds to a resource. */
+export interface OAuthProviderBinding<TUser> {
+  /** RFC 8414 metadata effective for the resolved resource. */
+  readonly oauthMetadata: OAuthMetadata;
+  /** Raw token verifier bound to the resolved resource. */
+  readonly tokenVerifier: OAuthTokenVerifier;
+  /** Maps verified SDK auth information into mcp-use callback identity data. */
+  readonly mapAuthInfo: (authInfo: OAuthAuthInfo) => OAuthExtra<TUser>;
+  /** Endpoint-wide scopes enforced by the SDK bearer gate. */
+  readonly requiredScopes?: readonly string[];
+  /** Scopes advertised by protected-resource metadata. */
+  readonly scopesSupported?: readonly string[];
+  /** Human-readable name advertised by protected-resource metadata. */
+  readonly resourceName?: string;
+  /** Documentation URL advertised by protected-resource metadata. */
+  readonly serviceDocumentationUrl?: URL;
+  /** Provider-owned HTTP middleware installed for this resource. */
+  readonly middleware?: FetchMiddleware;
+}
+
+/** Legacy provider whose metadata and verifier factory are known up front. */
+export type DirectOAuthProvider<TUser> = CustomOAuthProviderOptions<TUser>;
+
+/** Provider whose effective behavior is resolved from the canonical resource. */
+export interface ResourceBoundOAuthProvider<
+  TUser,
+> extends OAuthResourceOptions {
+  /** Resolves resource-dependent OAuth behavior for one server mount. */
+  readonly bind: (resource: URL) => OAuthProviderBinding<TUser>;
+}
+
 /** OAuth resource-server provider accepted by the mcp-use server constructor. */
-export type OAuthProvider<TUser> = CustomOAuthProviderOptions<TUser>;
+export type OAuthProvider<TUser> =
+  | DirectOAuthProvider<TUser>
+  | ResourceBoundOAuthProvider<TUser>;
 
 /** OAuth provider state bound to one canonical MCP resource. @internal */
 export interface BoundOAuthProvider<TUser> {
-  /** Original provider, retained so callback invocation semantics stay intact. */
-  readonly provider: OAuthProvider<TUser>;
   /** Canonical protected-resource identity for this server mount. */
   readonly resource: URL;
-  /** Provider verifier created for {@link resource}. */
+  /** Effective RFC 8414 metadata snapshotted at bind time. */
+  readonly oauthMetadata: OAuthMetadata;
+  /** Raw provider verifier created for {@link resource}. */
   readonly tokenVerifier: OAuthTokenVerifier;
+  /** Effective verified-identity mapper snapshotted at bind time. */
+  readonly mapAuthInfo: (authInfo: OAuthAuthInfo) => OAuthExtra<TUser>;
+  /** Effective endpoint-wide bearer scopes. */
+  readonly requiredScopes?: readonly string[];
+  /** Effective protected-resource metadata scopes. */
+  readonly scopesSupported?: readonly string[];
+  /** Effective protected-resource display name. */
+  readonly resourceName?: string;
+  /** Effective protected-resource documentation URL. */
+  readonly serviceDocumentationUrl?: URL;
+  /** Effective provider-owned HTTP middleware. */
+  readonly middleware?: FetchMiddleware;
 }
 
 /**
@@ -80,7 +126,7 @@ export interface BoundOAuthProvider<TUser> {
  */
 export function oauthCustomProvider<TUser>(
   options: CustomOAuthProviderOptions<TUser>
-): OAuthProvider<TUser> {
+): DirectOAuthProvider<TUser> {
   if (
     options === null ||
     typeof options !== "object" ||
@@ -115,7 +161,7 @@ export function oauthCustomProvider<TUser>(
     );
   }
 
-  const provider: OAuthProvider<TUser> = {
+  const provider: DirectOAuthProvider<TUser> = {
     createTokenVerifier: options.createTokenVerifier,
     oauthMetadata: options.oauthMetadata,
     mapAuthInfo: options.mapAuthInfo,

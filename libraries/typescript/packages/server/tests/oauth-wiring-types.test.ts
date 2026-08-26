@@ -52,6 +52,54 @@ function verifyStructuralProviderTyping(
     }),
   };
   void directProvider;
+
+  const resourceBoundProvider: OAuthProvider<TestUser> = {
+    resource: "https://api.example.test/mcp",
+    bind: (resource) => ({
+      oauthMetadata: {
+        issuer: new URL("/oauth", resource.origin).href,
+      } as OAuthMetadata,
+      tokenVerifier,
+      mapAuthInfo: () => ({
+        user: { id: "user-1" },
+        payload: {},
+        permissions: [],
+      }),
+      requiredScopes: ["mcp"],
+      middleware: async (_request, next) => next(),
+    }),
+  };
+  new MCPServer({
+    name: "resource-bound-provider",
+    version: "1.0.0",
+    oauth: resourceBoundProvider,
+  });
+
+  const inferredResourceBoundServer = new MCPServer({
+    name: "inferred-resource-bound-provider",
+    version: "1.0.0",
+    oauth: {
+      resource: "https://api.example.test/mcp",
+      bind: () => ({
+        oauthMetadata,
+        tokenVerifier,
+        mapAuthInfo: () => ({
+          user: { id: "user-1", role: "admin" as const },
+          payload: {},
+          permissions: [],
+        }),
+      }),
+    },
+  });
+  inferredResourceBoundServer.tool(
+    { name: "bound-user" },
+    (_params, context) => {
+      const id: string = context.auth.user.id;
+      const role: "admin" = context.auth.user.role;
+      void [id, role];
+      return { content: [] };
+    }
+  );
 }
 
 function assertOAuthAuthFields<TUser>(auth: OAuthAuth<TUser>): void {

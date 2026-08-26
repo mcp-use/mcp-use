@@ -31,7 +31,7 @@ export function bearerAuth<TUser>(
 export function bearerAuthForBoundProvider<TUser>(
   boundProvider: BoundOAuthProvider<TUser>
 ): FetchMiddleware {
-  const options = getOAuthProviderOptions(boundProvider.provider);
+  const options = getOAuthProviderOptions(boundProvider);
   const gate = requireBearerAuth({
     verifier: wrapBoundOAuthTokenVerifier(boundProvider),
     resourceMetadataUrl: getOAuthProtectedResourceMetadataUrl(
@@ -63,6 +63,9 @@ export function oauthMetadata<TUser>(
   provider: OAuthProvider<TUser>,
   resource: URL
 ): FetchMiddleware {
+  if ("bind" in provider) {
+    return oauthMetadataForBoundProvider(bindOAuthProvider(provider, resource));
+  }
   return createOAuthMetadataMiddleware(provider, resource);
 }
 
@@ -70,14 +73,18 @@ export function oauthMetadata<TUser>(
 export function oauthMetadataForBoundProvider<TUser>(
   boundProvider: BoundOAuthProvider<TUser>
 ): FetchMiddleware {
-  return createOAuthMetadataMiddleware(
-    boundProvider.provider,
-    boundProvider.resource
-  );
+  return createOAuthMetadataMiddleware(boundProvider, boundProvider.resource);
 }
 
 function createOAuthMetadataMiddleware<TUser>(
-  provider: OAuthProvider<TUser>,
+  provider: Pick<
+    BoundOAuthProvider<TUser>,
+    | "oauthMetadata"
+    | "requiredScopes"
+    | "scopesSupported"
+    | "resourceName"
+    | "serviceDocumentationUrl"
+  >,
   resource: URL
 ): FetchMiddleware {
   const options = getOAuthProviderOptions(provider);

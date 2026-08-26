@@ -20,7 +20,7 @@ import {
 } from "./jwt.js";
 import {
   oauthCustomProvider,
-  type OAuthProvider,
+  type DirectOAuthProvider,
   type OAuthResourceOptions,
 } from "./provider.js";
 
@@ -76,7 +76,7 @@ export interface BetterAuthOAuthProviderOptions extends OAuthResourceOptions {
  */
 export function oauthBetterAuthProvider(
   options: BetterAuthOAuthProviderOptions = {}
-): OAuthProvider<BetterAuthOAuthUser> {
+): DirectOAuthProvider<BetterAuthOAuthUser> {
   const authURL =
     options.authURL ?? oauthEnvironmentValue("MCP_USE_OAUTH_BETTER_AUTH_URL");
   if (authURL === undefined) {

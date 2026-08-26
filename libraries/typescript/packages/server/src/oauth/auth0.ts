@@ -20,7 +20,7 @@ import {
 } from "./jwt.js";
 import {
   oauthCustomProvider,
-  type OAuthProvider,
+  type DirectOAuthProvider,
   type OAuthResourceOptions,
 } from "./provider.js";
 
@@ -72,7 +72,7 @@ export interface Auth0OAuthProviderOptions extends OAuthResourceOptions {
  */
 export function oauthAuth0Provider(
   options: Auth0OAuthProviderOptions = {}
-): OAuthProvider<Auth0OAuthUser> {
+): DirectOAuthProvider<Auth0OAuthUser> {
   const domain =
     options.domain ?? oauthEnvironmentValue("MCP_USE_OAUTH_AUTH0_DOMAIN");
   const audience = oauthEnvironmentValue("MCP_USE_OAUTH_AUTH0_AUDIENCE");

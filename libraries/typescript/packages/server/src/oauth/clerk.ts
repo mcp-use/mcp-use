@@ -20,7 +20,7 @@ import {
 } from "./jwt.js";
 import {
   oauthCustomProvider,
-  type OAuthProvider,
+  type DirectOAuthProvider,
   type OAuthResourceOptions,
 } from "./provider.js";
 
@@ -78,7 +78,7 @@ export interface ClerkOAuthProviderOptions extends OAuthResourceOptions {
  */
 export function oauthClerkProvider(
   options: ClerkOAuthProviderOptions = {}
-): OAuthProvider<ClerkOAuthUser> {
+): DirectOAuthProvider<ClerkOAuthUser> {
   if (
     options.audience !== undefined &&
     (typeof options.audience !== "string" ||

@@ -18,7 +18,7 @@ import {
 } from "./jwt.js";
 import {
   oauthCustomProvider,
-  type OAuthProvider,
+  type DirectOAuthProvider,
   type OAuthResourceOptions,
 } from "./provider.js";
 
@@ -81,7 +81,7 @@ export interface ScalekitOAuthProviderOptions extends OAuthResourceOptions {
  */
 export function oauthScalekitProvider(
   options: ScalekitOAuthProviderOptions = {}
-): OAuthProvider<ScalekitOAuthUser> {
+): DirectOAuthProvider<ScalekitOAuthUser> {
   if (
     options.audience !== undefined &&
     (typeof options.audience !== "string" ||

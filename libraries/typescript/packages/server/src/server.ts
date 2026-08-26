@@ -1400,6 +1400,9 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       for (const middleware of middlewares) {
         registerFetchMiddleware(httpApp, middleware);
       }
+      if (boundOAuthProvider?.middleware !== undefined) {
+        registerFetchMiddleware(httpApp, boundOAuthProvider.middleware);
+      }
 
       const { handler, fetch: mcpFetch } = createMcpMount(
         (ctx) => this.#buildSdkServer(ctx),

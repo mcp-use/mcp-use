@@ -20,7 +20,7 @@ import {
 } from "./jwt.js";
 import {
   oauthCustomProvider,
-  type OAuthProvider,
+  type DirectOAuthProvider,
   type OAuthResourceOptions,
 } from "./provider.js";
 
@@ -78,7 +78,7 @@ export interface WorkOSOAuthProviderOptions extends OAuthResourceOptions {
  */
 export function oauthWorkOSProvider(
   options: WorkOSOAuthProviderOptions = {}
-): OAuthProvider<WorkOSOAuthUser> {
+): DirectOAuthProvider<WorkOSOAuthUser> {
   const subdomain =
     options.subdomain ??
     oauthEnvironmentValue("MCP_USE_OAUTH_WORKOS_SUBDOMAIN");

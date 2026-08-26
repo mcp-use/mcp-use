@@ -20,7 +20,7 @@ import {
 } from "./jwt.js";
 import {
   oauthCustomProvider,
-  type OAuthProvider,
+  type DirectOAuthProvider,
   type OAuthResourceOptions,
 } from "./provider.js";
 
@@ -103,7 +103,7 @@ export interface SupabaseOAuthProviderOptions extends OAuthResourceOptions {
  */
 export function oauthSupabaseProvider(
   options: SupabaseOAuthProviderOptions = {}
-): OAuthProvider<SupabaseOAuthUser> {
+): DirectOAuthProvider<SupabaseOAuthUser> {
   const projectId =
     options.projectId ??
     oauthEnvironmentValue("MCP_USE_OAUTH_SUPABASE_PROJECT_ID");

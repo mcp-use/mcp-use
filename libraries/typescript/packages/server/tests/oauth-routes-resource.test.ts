@@ -6,6 +6,7 @@ import {
   OAuthErrorCode,
   oauthCustomProvider,
   type OAuthMetadata,
+  type OAuthProvider,
 } from "../src/oauth/index.js";
 
 const issuer = "https://issuer.example.test";
@@ -134,6 +135,243 @@ describe("OAuth HTTP route acceptance", () => {
       expect(response.status).not.toBe(401);
     }
     expect(verifierCreations).toBe(1);
+  });
+
+  it("uses one immutable resource-bound provider binding for middleware, metadata, and auth", async () => {
+    const order: string[] = [];
+    const effectiveMetadata = {
+      issuer: "https://bound-issuer.example.test",
+      authorization_endpoint:
+        "https://bound-issuer.example.test/oauth/authorize",
+    } as OAuthMetadata;
+    const effectiveRequiredScopes = ["bound:read"];
+    const effectiveSupportedScopes = ["bound:read", "bound:write"];
+    let bindCalls = 0;
+    let boundResource: URL | undefined;
+    let observedAuth:
+      | {
+          user: { id: string };
+          payload: Record<string, unknown>;
+          permissions: string[];
+        }
+      | undefined;
+
+    const resourceBoundProvider: OAuthProvider<{ id: string }> = {
+      resource: "https://canonical.example.test/mcp",
+      bind: (resource) => {
+        bindCalls += 1;
+        boundResource = new URL(resource);
+        resource.hostname = "mutated-by-provider.example.test";
+        return {
+          oauthMetadata: effectiveMetadata,
+          tokenVerifier: {
+            verifyAccessToken: async (token) => ({
+              token,
+              clientId: "bound-client",
+              scopes: ["bound:read"],
+              expiresAt: Date.now() / 1000 + 60,
+              resource: boundResource!,
+              extra: { upstream: true },
+            }),
+          },
+          mapAuthInfo: (authInfo) => ({
+            user: { id: `bound:${authInfo.clientId}` },
+            payload: { token: authInfo.token },
+            permissions: ["bound:permission"],
+          }),
+          requiredScopes: effectiveRequiredScopes,
+          scopesSupported: effectiveSupportedScopes,
+          resourceName: "Bound OAuth server",
+          serviceDocumentationUrl: new URL(
+            "https://bound-issuer.example.test/docs"
+          ),
+          middleware: async (request, next) => {
+            const path = new URL(request.url).pathname;
+            order.push(`provider:before:${path}`);
+            if (path === "/oauth/local") {
+              order.push("provider:handled");
+              return Response.json({ issuer: effectiveMetadata.issuer });
+            }
+            const response = await next();
+            order.push(`provider:after:${path}`);
+            return response;
+          },
+        };
+      },
+    };
+    const oauthServer = new MCPServer({
+      name: "resource-bound-oauth-test",
+      version: "1.0.0",
+      logging: { enabled: false },
+      allowedOrigins: ["https://allowed.example.test"],
+      oauth: resourceBoundProvider,
+    });
+    oauthServer.use("*", async (_context, next) => {
+      order.push("user:before");
+      await next();
+      order.push("user:after");
+    });
+    oauthServer.get("/unrelated", (context) => context.text("unrelated"));
+    oauthServer.tool({ name: "whoami" }, async (_params, context) => {
+      observedAuth = {
+        user: context.auth.user,
+        payload: context.auth.payload,
+        permissions: [...context.auth.permissions],
+      };
+      return { content: [{ type: "text", text: context.auth.user.id }] };
+    });
+
+    const blocked = await oauthServer.fetch(
+      request("/oauth/local", {
+        method: "POST",
+        headers: { origin: "https://blocked.example.test" },
+      })
+    );
+    expect(blocked.status).toBe(403);
+    expect(order).toEqual([]);
+
+    const owned = await oauthServer.fetch(request("/oauth/local"));
+    expect(owned.status).toBe(200);
+    expect(await owned.json()).toEqual({
+      issuer: "https://bound-issuer.example.test",
+    });
+    expect(order).toEqual(["provider:before:/oauth/local", "provider:handled"]);
+    expect(bindCalls).toBe(1);
+    expect(boundResource?.href).toBe("https://canonical.example.test/mcp");
+
+    effectiveMetadata.issuer = "https://mutated.example.test";
+    effectiveRequiredScopes.push("mutated:scope");
+    effectiveSupportedScopes.push("mutated:scope");
+
+    order.length = 0;
+    const metadata = await oauthServer.fetch(
+      request("/.well-known/oauth-protected-resource/mcp")
+    );
+    expect(await metadata.json()).toMatchObject({
+      resource: "https://canonical.example.test/mcp",
+      authorization_servers: ["https://bound-issuer.example.test"],
+      scopes_supported: ["bound:read", "bound:write"],
+      resource_name: "Bound OAuth server",
+    });
+    const authorizationMetadata = await oauthServer.fetch(
+      request("/.well-known/oauth-authorization-server")
+    );
+    expect(await authorizationMetadata.json()).toMatchObject({
+      issuer: "https://bound-issuer.example.test",
+      authorization_endpoint:
+        "https://bound-issuer.example.test/oauth/authorize",
+    });
+    expect(order).toEqual([]);
+
+    const unrelated = await oauthServer.fetch(request("/unrelated"));
+    expect(await unrelated.text()).toBe("unrelated");
+    expect(order).toEqual([
+      "provider:before:/unrelated",
+      "user:before",
+      "user:after",
+      "provider:after:/unrelated",
+    ]);
+
+    order.length = 0;
+    const unauthorized = await oauthServer.fetch(
+      request("/mcp", { method: "POST" })
+    );
+    expect(unauthorized.status).toBe(401);
+    expect(order).toEqual(["provider:before:/mcp", "provider:after:/mcp"]);
+
+    order.length = 0;
+    const authenticated = await oauthServer.fetch(
+      request("/mcp", {
+        method: "POST",
+        headers: {
+          authorization: "Bearer bound-token",
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+          "mcp-protocol-version": "2026-07-28",
+          "mcp-method": "tools/call",
+          "mcp-name": "whoami",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/call",
+          params: {
+            name: "whoami",
+            arguments: {},
+            _meta: {
+              "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+              "io.modelcontextprotocol/clientInfo": {
+                name: "bound-provider-test",
+                version: "1.0.0",
+              },
+              "io.modelcontextprotocol/clientCapabilities": {},
+            },
+          },
+        }),
+      })
+    );
+    expect(authenticated.status).toBe(200);
+    expect(observedAuth).toEqual({
+      user: { id: "bound:bound-client" },
+      payload: { token: "bound-token" },
+      permissions: ["bound:permission"],
+    });
+    expect(bindCalls).toBe(1);
+  });
+
+  it("rejects invalid resource-bound provider bindings at mount", async () => {
+    const validBinding = () => ({
+      oauthMetadata: {
+        issuer: "https://bound-issuer.example.test",
+      } as OAuthMetadata,
+      tokenVerifier: {
+        verifyAccessToken: async () => ({
+          token: "token",
+          clientId: "client",
+          scopes: [],
+          expiresAt: Date.now() / 1000 + 60,
+          resource: new URL("https://canonical.example.test/mcp"),
+        }),
+      },
+      mapAuthInfo: () => ({
+        user: { id: "user" },
+        payload: {},
+        permissions: [],
+      }),
+    });
+    const invalidBindings: Array<[string, unknown]> = [
+      ["bind must return an object", null],
+      ["oauthMetadata", { ...validBinding(), oauthMetadata: {} }],
+      ["OAuthTokenVerifier", { ...validBinding(), tokenVerifier: {} }],
+      ["mapAuthInfo", { ...validBinding(), mapAuthInfo: undefined }],
+      ["requiredScopes", { ...validBinding(), requiredScopes: [123] }],
+      ["resourceName", { ...validBinding(), resourceName: "   " }],
+      [
+        "serviceDocumentationUrl",
+        {
+          ...validBinding(),
+          serviceDocumentationUrl: "https://example.test/docs",
+        },
+      ],
+      ["middleware", { ...validBinding(), middleware: {} }],
+    ];
+
+    for (const [message, binding] of invalidBindings) {
+      const invalidProvider: OAuthProvider<{ id: string }> = {
+        resource: "https://canonical.example.test/mcp",
+        bind: () => binding as never,
+      };
+      const invalidServer = new MCPServer({
+        name: "invalid-bound-provider",
+        version: "1.0.0",
+        oauth: invalidProvider,
+      });
+      await expect(
+        invalidServer.fetch(
+          request("/.well-known/oauth-protected-resource/mcp")
+        )
+      ).rejects.toThrow(message);
+    }
   });
 
   it("returns OAuth wire errors and a canonical path-aware challenge", async () => {
