@@ -6,8 +6,12 @@ import {
 } from "@modelcontextprotocol/server";
 
 import { getRequestBag, type FetchMiddleware } from "../fetch-app.js";
-import { getOAuthProviderOptions, wrapOAuthTokenVerifier } from "./internal.js";
-import type { OAuthProvider } from "./provider.js";
+import {
+  bindOAuthProvider,
+  getOAuthProviderOptions,
+  wrapBoundOAuthTokenVerifier,
+} from "./internal.js";
+import type { BoundOAuthProvider, OAuthProvider } from "./provider.js";
 
 /**
  * Fetch middleware that requires a bearer token for a canonical resource.
@@ -20,10 +24,19 @@ export function bearerAuth<TUser>(
   provider: OAuthProvider<TUser>,
   resource: URL
 ): FetchMiddleware {
-  const options = getOAuthProviderOptions(provider);
+  return bearerAuthForBoundProvider(bindOAuthProvider(provider, resource));
+}
+
+/** @internal Creates bearer auth middleware from an existing provider binding. */
+export function bearerAuthForBoundProvider<TUser>(
+  boundProvider: BoundOAuthProvider<TUser>
+): FetchMiddleware {
+  const options = getOAuthProviderOptions(boundProvider.provider);
   const gate = requireBearerAuth({
-    verifier: wrapOAuthTokenVerifier(provider, resource),
-    resourceMetadataUrl: getOAuthProtectedResourceMetadataUrl(resource),
+    verifier: wrapBoundOAuthTokenVerifier(boundProvider),
+    resourceMetadataUrl: getOAuthProtectedResourceMetadataUrl(
+      boundProvider.resource
+    ),
     ...(options.requiredScopes !== undefined && {
       requiredScopes: [...options.requiredScopes],
     }),
@@ -47,6 +60,23 @@ export function bearerAuth<TUser>(
  * @param resource - Canonical public MCP endpoint URL.
  */
 export function oauthMetadata<TUser>(
+  provider: OAuthProvider<TUser>,
+  resource: URL
+): FetchMiddleware {
+  return createOAuthMetadataMiddleware(provider, resource);
+}
+
+/** @internal Creates discovery middleware from an existing provider binding. */
+export function oauthMetadataForBoundProvider<TUser>(
+  boundProvider: BoundOAuthProvider<TUser>
+): FetchMiddleware {
+  return createOAuthMetadataMiddleware(
+    boundProvider.provider,
+    boundProvider.resource
+  );
+}
+
+function createOAuthMetadataMiddleware<TUser>(
   provider: OAuthProvider<TUser>,
   resource: URL
 ): FetchMiddleware {

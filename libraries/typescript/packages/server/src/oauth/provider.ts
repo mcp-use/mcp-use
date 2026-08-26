@@ -45,6 +45,16 @@ export interface CustomOAuthProviderOptions<
 /** OAuth resource-server provider accepted by the mcp-use server constructor. */
 export type OAuthProvider<TUser> = CustomOAuthProviderOptions<TUser>;
 
+/** OAuth provider state bound to one canonical MCP resource. @internal */
+export interface BoundOAuthProvider<TUser> {
+  /** Original provider, retained so callback invocation semantics stay intact. */
+  readonly provider: OAuthProvider<TUser>;
+  /** Canonical protected-resource identity for this server mount. */
+  readonly resource: URL;
+  /** Provider verifier created for {@link resource}. */
+  readonly tokenVerifier: OAuthTokenVerifier;
+}
+
 /**
  * Creates an OAuth provider backed by an external authorization server.
  *

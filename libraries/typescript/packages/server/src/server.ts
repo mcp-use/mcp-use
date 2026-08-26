@@ -69,15 +69,14 @@ import { normalizeCompletions } from "./resource-completion.js";
 import { registerOpenAPITools } from "./openapi/index.js";
 import type { FromOpenAPIOptions } from "./openapi/types.js";
 import {
-  getOAuthProtectedResourceMetadataUrl,
-  requireBearerAuth,
-} from "./oauth/index.js";
-import { authInfoFromRequest, oauthMetadata } from "./oauth/adapters.js";
+  authInfoFromRequest,
+  bearerAuthForBoundProvider,
+  oauthMetadataForBoundProvider,
+} from "./oauth/adapters.js";
 import {
-  getOAuthProviderOptions,
+  bindOAuthProvider,
   resolveConfiguredOAuthResource,
   resolveLocalOAuthResource,
-  wrapOAuthTokenVerifier,
 } from "./oauth/internal.js";
 import type {
   InferPromptInput,
@@ -1390,9 +1389,12 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       this.#validateViewBindingsAtMount();
 
       const resource = this.#resolveOAuthResource(mode, listenPort, listenHost);
-      if (resource !== undefined) {
-        const provider = this.#config.oauth!;
-        middlewares.push(oauthMetadata(provider, resource));
+      const boundOAuthProvider =
+        resource === undefined
+          ? undefined
+          : bindOAuthProvider(this.#config.oauth!, resource);
+      if (boundOAuthProvider !== undefined) {
+        middlewares.push(oauthMetadataForBoundProvider(boundOAuthProvider));
       }
 
       for (const middleware of middlewares) {
@@ -1422,25 +1424,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         request: Request,
         next: () => Promise<Response>
       ) => Promise<Response> = async (_request, next) => next();
-      if (resource !== undefined) {
-        const provider = this.#config.oauth!;
-        const providerOptions = getOAuthProviderOptions(provider);
-        const gate = requireBearerAuth({
-          verifier: wrapOAuthTokenVerifier(provider, resource),
-          resourceMetadataUrl: getOAuthProtectedResourceMetadataUrl(resource),
-          ...(providerOptions.requiredScopes !== undefined && {
-            requiredScopes: providerOptions.requiredScopes,
-          }),
-        });
-        protectWithBearer = async (request, next) => {
-          const result = await gate(request);
-          if (result instanceof Response) {
-            return result;
-          }
-          const bag = getRequestBag(request);
-          bag.authInfo = result;
-          return next();
-        };
+      if (boundOAuthProvider !== undefined) {
+        protectWithBearer = bearerAuthForBoundProvider(boundOAuthProvider);
 
         // Authenticate the exact MCP route before the user-owned Hono app
         // runs. This makes verified identity available to route middleware

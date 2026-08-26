@@ -84,6 +84,58 @@ function challenge(response: Response): string {
 }
 
 describe("OAuth HTTP route acceptance", () => {
+  it("creates one token verifier for the mounted OAuth provider", async () => {
+    let verifierCreations = 0;
+    const structuralProvider = {
+      resource: "https://canonical.example.test/mcp",
+      createTokenVerifier: (resource: URL) => {
+        verifierCreations += 1;
+        return {
+          verifyAccessToken: async (token: string) => ({
+            token,
+            clientId: "test-client",
+            scopes: ["tools:read"],
+            expiresAt: Date.now() / 1000 + 60,
+            resource,
+          }),
+        };
+      },
+      oauthMetadata: { issuer } as OAuthMetadata,
+      mapAuthInfo: () => ({
+        user: { id: "user-1" },
+        payload: { sub: "user-1" },
+        permissions: ["tools:read"],
+      }),
+    };
+    const oauthServer = new MCPServer({
+      name: "oauth-binding-test",
+      version: "1.0.0",
+      oauth: structuralProvider,
+    });
+
+    expect(verifierCreations).toBe(0);
+
+    const metadata = await oauthServer.fetch(
+      request("/.well-known/oauth-protected-resource/mcp")
+    );
+    expect(metadata.status).toBe(200);
+    expect(await metadata.json()).toMatchObject({
+      resource: "https://canonical.example.test/mcp",
+      authorization_servers: [issuer],
+    });
+
+    for (const token of ["first-token", "second-token"]) {
+      const response = await oauthServer.fetch(
+        request("/mcp", {
+          method: "POST",
+          headers: { authorization: `Bearer ${token}` },
+        })
+      );
+      expect(response.status).not.toBe(401);
+    }
+    expect(verifierCreations).toBe(1);
+  });
+
   it("returns OAuth wire errors and a canonical path-aware challenge", async () => {
     const handler = server({
       basePath: "/api/mcp",

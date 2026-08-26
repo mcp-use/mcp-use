@@ -10,7 +10,11 @@ import {
   parseAbsoluteUrl,
 } from "./guards.js";
 import { invalidToken } from "./errors.js";
-import type { OAuthExtra, OAuthProvider } from "./provider.js";
+import type {
+  BoundOAuthProvider,
+  OAuthExtra,
+  OAuthProvider,
+} from "./provider.js";
 
 export {
   assertSecureHttpUrl,
@@ -80,11 +84,11 @@ export function validateOAuthResource(
   return url;
 }
 
-/** @internal Wraps a provider verifier with mcp-use's verified auth mapping. */
-export function wrapOAuthTokenVerifier<TUser>(
+/** @internal Binds a provider to one canonical resource and creates its verifier. */
+export function bindOAuthProvider<TUser>(
   provider: OAuthProvider<TUser>,
   expectedResource: URL
-): OAuthTokenVerifier {
+): BoundOAuthProvider<TUser> {
   const canonicalResource = normalizeResourceUrl(expectedResource);
   const tokenVerifier = provider.createTokenVerifier(
     new URL(canonicalResource.href)
@@ -98,6 +102,23 @@ export function wrapOAuthTokenVerifier<TUser>(
       "OAuth provider createTokenVerifier must return an OAuthTokenVerifier"
     );
   }
+
+  return {
+    provider,
+    resource: canonicalResource,
+    tokenVerifier,
+  };
+}
+
+/** @internal Wraps a bound verifier with mcp-use's verified auth mapping. */
+export function wrapBoundOAuthTokenVerifier<TUser>(
+  boundProvider: BoundOAuthProvider<TUser>
+): OAuthTokenVerifier {
+  const {
+    provider,
+    resource: canonicalResource,
+    tokenVerifier,
+  } = boundProvider;
 
   return {
     async verifyAccessToken(token: string): Promise<AuthInfo> {
@@ -120,6 +141,20 @@ export function wrapOAuthTokenVerifier<TUser>(
       };
     },
   };
+}
+
+/**
+ * @internal Wraps a provider verifier with mcp-use's verified auth mapping.
+ * Prefer binding once and calling {@link wrapBoundOAuthTokenVerifier} when a
+ * provider is shared by multiple pieces of mount wiring.
+ */
+export function wrapOAuthTokenVerifier<TUser>(
+  provider: OAuthProvider<TUser>,
+  expectedResource: URL
+): OAuthTokenVerifier {
+  return wrapBoundOAuthTokenVerifier(
+    bindOAuthProvider(provider, expectedResource)
+  );
 }
 
 function assertResourceBinding(
