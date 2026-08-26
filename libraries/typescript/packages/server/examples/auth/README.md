@@ -1,6 +1,6 @@
-# Direct authentication examples
+# Authentication examples
 
-These examples use direct external authorization servers:
+These examples verify tokens from external authorization servers directly:
 
 - [Clerk](./clerk/)
 - [Auth0](./auth0/)
@@ -10,9 +10,15 @@ These examples use direct external authorization servers:
 - [Better Auth](./better-auth/)
 - [Mixed OAuth with Better Auth](./mixed-oauth/)
 
-Each server exposes only the `get-user-info` tool. It never issues, proxies, or
-forwards access tokens. For public deployments, set `MCP_URL` to the server
-origin (for example, `https://mcp.example.com`), not the `/mcp` endpoint.
+The [GitHub OAuth Proxy](./github-oauth-proxy/) example brokers one fixed
+GitHub OAuth App for MCP clients because GitHub does not provide Dynamic Client
+Registration for OAuth Apps.
+
+Each direct-provider example exposes only the `get-user-info` tool and never
+issues, proxies, or forwards access tokens. The GitHub proxy example instead
+uses the server-only upstream token to call GitHub. For public deployments, set
+`MCP_URL` to the server origin (for example, `https://mcp.example.com`), not the
+`/mcp` endpoint.
 
 OAuth protects the browser landing page at `/mcp` by default. These examples
 set `publicLandingPage: true` so people can open the HTML connection guide

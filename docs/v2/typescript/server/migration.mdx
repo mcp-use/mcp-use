@@ -473,17 +473,26 @@ Move existing widget CSP domains to `view.csp`.
 
 ## Update authentication, proxies, and security
 
-Native v2 acts as an OAuth resource server backed by an external authorization
-server. Import provider adapters from `mcp-use/oauth/*`, supply their required
-locator options, and use the provider-specific `ctx.auth.user` type.
+Native v2 can act as an OAuth resource server backed by an external
+authorization server or run an embedded OAuth Proxy for a fixed upstream OAuth
+application. Import provider adapters from `mcp-use/oauth/*` and use the
+provider-specific `ctx.auth.user` type.
 
 Replace generic `userId` assumptions with the provider's mapped field, commonly
 `id`. Replace `getAuth`, `hasScope`, and `requireScope` with verified
 `ctx.auth`, scopes, permissions, and application authorization checks.
 
-OAuth proxy or authorization-server mode has no native v2 migration. Do not
-translate `oauthProxy`, `jwksVerifier`, or `mountOAuthProxy` as resource-server
-configuration.
+Migrate v1 `oauthProxy()` to the v2 factory from `mcp-use/oauth`. Configure
+`tokenEndpointAuthMethod` explicitly and provide a store when sessions must
+survive restarts or span instances. v2 issues local opaque tokens instead of
+passing provider tokens through: `ctx.auth.accessToken` is now the local MCP
+bearer, while `ctx.auth.providerAccessToken` is the token for upstream API
+calls. See [OAuth Proxy](/v2/typescript/server/authentication/providers/oauth-proxy)
+for the complete boundary.
+
+`mountOAuthProxy` is a browser-client BFF and is not the server authentication
+factory. Migrate custom JWT verification to the v2 verifier APIs or the
+`verifyToken` hook appropriate to the selected provider.
 
 v2 upstream composition accepts HTTP remotes or a ready compatible client
 connection. A v1 stdio child-process proxy requires an architecture change.
@@ -528,14 +537,11 @@ server.
 Move durable state to application storage keyed by verified user, tenant, or an
 explicit domain handle. Do not key business state to an MCP transport session.
 
-### OAuth, proxy, and OpenAPI
+### OAuth and OpenAPI
 
-- OAuth proxy and authorization-server mode are deferred. Direct
-  resource-server authentication is implemented.
 - Unsigned token bypasses such as `verifyJwt: false` are not supported.
-- Verify proxy requirements for upstream OAuth, templates, completions,
-  subscriptions, list synchronization, sampling, and elicitation before
-  migrating.
+- OAuth Proxy revokes local token families but does not call upstream provider
+  revocation endpoints automatically.
 - Verify OpenAPI servers that depend on external references, cookies, non-JSON
   request bodies, callbacks, webhooks, or automatic security-scheme discovery.
 

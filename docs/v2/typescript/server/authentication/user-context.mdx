@@ -15,6 +15,7 @@ type OAuthAuth<TUser> = {
   user: TUser;
   payload: Record<string, unknown>;
   accessToken: string;
+  providerAccessToken?: string;
   scopes: string[];
   permissions: string[];
   clientId?: string;
@@ -25,7 +26,9 @@ type OAuthAuth<TUser> = {
 
 - `user` is the provider's normalized user type.
 - `payload` contains the verified token claims or introspection data.
-- `accessToken` is the verified bearer token. Forward it only when calling an upstream API on behalf of the user.
+- `accessToken` is the bearer token presented to the MCP server.
+- `providerAccessToken` is present only for OAuth Proxy. Send this token—not
+  `accessToken`—when calling the upstream provider on behalf of the user.
 - `scopes` are copied from the auth information returned by the token verifier.
 - `permissions` are produced by the provider's mapping.
 - `clientId` is present when the token has a client identifier.

@@ -1,18 +1,250 @@
 ---
-title: "OAuth Proxy support boundary"
-description: "Understand the support boundary for fixed-client OAuth providers."
+title: "OAuth Proxy"
+description: "Broker a fixed OAuth application for MCP clients when the upstream provider does not support Dynamic Client Registration."
 icon: "shuffle"
 ---
 
-mcp-use does not provide a server-side OAuth proxy factory or implement authorization, callback, token-exchange, or fixed-client brokering routes. This page is intentionally excluded from navigation.
+Use `oauthProxy()` when an upstream provider requires you to create one OAuth
+application with a fixed client ID and secret. The proxy gives every MCP client
+its own local public registration, consent, authorization code, access token,
+and refresh token. Upstream credentials and tokens stay on the server.
 
-If your identity provider supports Dynamic Client Registration, use a [built-in provider](/v2/typescript/server/authentication/index) or [Custom Provider](/v2/typescript/server/authentication/providers/custom). The MCP client then registers directly with the authorization server, while mcp-use acts only as the protected resource server.
+If the provider supports Dynamic Client Registration, use a
+[built-in provider](/v2/typescript/server/authentication/index) or
+[Custom Provider](/v2/typescript/server/authentication/providers/custom)
+instead.
 
-If the provider gives you only a fixed `clientId` and `clientSecret`, deploy a standards-compliant external authorization server or broker that:
+## Configure the upstream application
 
-- publishes OAuth authorization-server metadata, including a registration endpoint;
-- registers MCP clients and enforces redirect URI and PKCE requirements;
-- performs the upstream authorization and token exchange without exposing the fixed secret;
-- issues or validates tokens bound to the MCP resource.
+Create an OAuth application in the provider dashboard and register this
+callback URL:
 
-Point a custom provider at that external authorization server and implement resource-bound token verification. mcp-use has no server-side fixed-client brokering equivalent.
+```text
+https://mcp.example.com/oauth/callback
+```
+
+For local development on the default port, use:
+
+```text
+http://localhost:3000/oauth/callback
+```
+
+The callback belongs to the MCP server, not to an individual MCP client. The
+server validates each MCP client's redirect URI separately after local Dynamic
+Client Registration.
+
+## Add the proxy
+
+Import `oauthProxy` from `mcp-use/oauth`. You must choose the upstream token
+endpoint authentication method explicitly. Use the method documented by the
+provider; mcp-use never guesses it.
+
+```typescript
+import { MCPServer } from "mcp-use";
+import { oauthProxy, type OAuthProxyJsonObject } from "mcp-use/oauth";
+
+const clientId = process.env.OAUTH_CLIENT_ID;
+const clientSecret = process.env.OAUTH_CLIENT_SECRET;
+if (!clientId || !clientSecret) {
+  throw new Error("OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET are required");
+}
+
+const server = new MCPServer({
+  name: "oauth-proxy-server",
+  version: "1.0.0",
+  oauth: oauthProxy({
+    authEndpoint: "https://provider.example.com/oauth/authorize",
+    tokenEndpoint: "https://provider.example.com/oauth/token",
+    issuer: "https://provider.example.com",
+    clientId,
+    clientSecret,
+    tokenEndpointAuthMethod: "client_secret_post",
+    scopes: ["profile", "email"],
+    async verifyToken(providerAccessToken) {
+      const response = await fetch("https://provider.example.com/userinfo", {
+        headers: { Authorization: `Bearer ${providerAccessToken}` },
+      });
+      if (!response.ok) throw new Error("Invalid provider access token");
+
+      const user = (await response.json()) as {
+        id: string;
+        email?: string;
+        name?: string;
+      };
+      const payload: OAuthProxyJsonObject = {
+        sub: user.id,
+        email: user.email ?? null,
+        name: user.name ?? null,
+      };
+      return { payload };
+    },
+  }),
+});
+
+export default server;
+```
+
+`verifyToken` must authenticate the upstream access token and return trusted,
+JSON-serializable identity data. The default user mapper requires a string
+`sub` claim and maps `email`, `name`, `preferred_username`, and `picture` when
+present. Pass `getUserInfo(payload)` to return an application-specific user
+type.
+
+## Use the correct access token
+
+OAuth Proxy maintains two token boundaries:
+
+- `ctx.auth.accessToken` is the local opaque bearer token presented by the MCP
+  client. Never send it to the upstream provider.
+- `ctx.auth.providerAccessToken` is the upstream access token. Send it only to
+  the configured provider's API.
+
+```typescript
+server.tool(
+  {
+    name: "get-provider-profile",
+    description: "Read the authenticated profile from the provider.",
+  },
+  async (_args, ctx) => {
+    const token = ctx.auth.providerAccessToken;
+    if (!token) throw new Error("Provider access token is unavailable");
+
+    const response = await fetch("https://provider.example.com/userinfo", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return {
+      content: [{ type: "text", text: await response.text() }],
+    };
+  },
+);
+```
+
+The proxy never exposes the upstream refresh token or ID token. Revoking a
+local token immediately stops that local token or refresh family from reaching
+the MCP server. The initial release does not call the provider's revocation
+endpoint automatically.
+
+## Understand the authorization flow
+
+The proxy runs two bound authorization flows:
+
+1. The MCP client registers with the local `/oauth/register` endpoint.
+2. The local `/oauth/authorize` endpoint validates the registered redirect URI,
+   exact MCP resource, requested scopes, state, and S256 PKCE challenge.
+3. The user approves the MCP client on a server-owned consent page.
+4. The server starts a separate upstream authorization request with fresh
+   state and S256 PKCE values.
+5. The provider redirects to `/oauth/callback`. The server validates the
+   upstream transaction and exchanges the provider code.
+6. The server redirects a new local code to the MCP client's registered URI.
+7. The MCP client exchanges that code for local opaque access and refresh
+   tokens.
+
+Every local refresh token rotates after use. Replaying an old refresh token
+revokes its local token family. If an upstream refresh request has an ambiguous
+network result, the proxy fails closed and requires authorization again.
+
+## Configure provider-specific behavior
+
+`extraAuthorizeParams` adds fixed authorization parameters such as
+`prompt: "consent"`. Reserved protocol parameters—including `client_id`,
+`redirect_uri`, `state`, `scope`, PKCE fields, `nonce`, and `resource`—cannot be
+overridden.
+
+The downstream MCP `resource` is never forwarded upstream automatically. If a
+provider requires RFC 8707 resource indicators, map them explicitly:
+
+```typescript
+oauthProxy({
+  // ...required options
+  mapUpstreamResource({ phase }) {
+    return phase === "authorization"
+      ? "https://provider.example.com/api"
+      : undefined;
+  },
+});
+```
+
+Set `issuer` to the expected upstream RFC 9207 authorization-response issuer.
+Set `requireAuthorizationResponseIssuer: true` only when the provider always
+returns `iss`. This upstream value is separate from the local issuer published
+at `https://mcp.example.com/oauth`.
+
+Supply `verifyIdToken(idToken)` only when you verify its signature, issuer, and
+audience. Providing the hook enables an upstream OpenID Connect nonce and
+validates the nonce only against claims returned by that trusted hook.
+
+## Choose token storage
+
+Without `store`, each `oauthProxy()` call creates a private in-memory store. It
+needs no encryption key, but registrations and sessions disappear on restart
+and are not shared across server instances.
+
+For a persistent custom store, choose one of these protections:
+
+- configure SDK encryption with an AES-256-GCM keyring; or
+- declare `secretProtection: "store-encrypted"` when the custom store encrypts
+  every payload itself.
+
+A persistent store that declares `secretProtection: "none"` is rejected unless
+you configure SDK encryption. The SDK never derives an encryption key from the
+upstream client secret.
+
+Custom stores implement byte-oriented create, read, replace, consume, and
+multi-key transaction operations. Transactions must be serializable across all
+instances that share the store. Import `OAuthProxyStore` and
+`OAuthProxyEncryptionOptions` from `mcp-use/oauth` for the complete contracts.
+
+## Configuration reference
+
+| Option                               | Behavior                                                                 |
+| ------------------------------------ | ------------------------------------------------------------------------ |
+| `authEndpoint`                       | Required upstream authorization endpoint.                                |
+| `tokenEndpoint`                      | Required upstream token endpoint.                                        |
+| `issuer`                             | Optional expected upstream RFC 9207 authorization-response issuer.       |
+| `requireAuthorizationResponseIssuer` | Requires the upstream callback to return the configured `issuer`.        |
+| `clientId`                           | Required fixed upstream application client ID.                           |
+| `tokenEndpointAuthMethod`            | Required: `client_secret_basic`, `client_secret_post`, or `none`.        |
+| `clientSecret`                       | Required for secret methods and forbidden for `none`.                    |
+| `scopes`                             | Locally grantable scopes; defaults to `openid`, `email`, and `profile`.  |
+| `upstreamScopes`                     | Scopes requested upstream; defaults to `scopes`.                         |
+| `verifyToken`                        | Required upstream access-token verification and trusted payload mapping. |
+| `getUserInfo`                        | Optional synchronous application user mapper.                            |
+| `extraAuthorizeParams`               | Fixed non-reserved upstream authorization parameters.                    |
+| `verifyIdToken`                      | Trusted ID-token verifier that enables upstream nonce validation.        |
+| `mapUpstreamResource`                | Explicit provider-specific resource mapping for authorization/refresh.   |
+| `authorizationServerPath`            | Local route prefix; defaults to `/oauth`.                                |
+| `store` and `encryption`             | Optional state storage and SDK encryption configuration.                 |
+| `resource` / `requiredScopes`        | Canonical MCP resource override and scopes enforced by the bearer gate.  |
+| `resourceName`                       | Human-readable protected-resource metadata name.                         |
+| `serviceDocumentationUrl`            | Protected-resource documentation URL.                                    |
+| `fetch`                              | Optional Fetch implementation for upstream calls.                        |
+| `timeoutMs` / `maxResponseBytes`     | Bounds upstream requests and responses.                                  |
+| `maxBodyBytes`                       | Bounds local registration and form bodies.                               |
+
+## Test with GitHub
+
+The runnable
+[GitHub OAuth Proxy example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/auth/github-oauth-proxy)
+shows a provider that uses `client_secret_post`. It also demonstrates calling
+the GitHub API with `ctx.auth.providerAccessToken`.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="User Context"
+    icon="user"
+    href="/v2/typescript/server/authentication/user-context"
+  >
+    Authorize tools with the mapped user, scopes, permissions, and token
+    boundaries.
+  </Card>
+  <Card
+    title="GitHub example"
+    icon="github"
+    href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/auth/github-oauth-proxy"
+  >
+    Run a fixed-client OAuth Proxy locally.
+  </Card>
+</CardGroup>

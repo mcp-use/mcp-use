@@ -8,7 +8,8 @@ Configure an OAuth provider when an MCP server must identify callers or authoriz
 
 ## Choose a provider
 
-mcp-use supports resource-server providers whose authorization server supports Dynamic Client Registration (DCR).
+mcp-use supports direct resource-server providers and an embedded OAuth Proxy
+for providers that require a fixed OAuth application.
 
 | Identity system                          | Provider                                                                  |
 | ---------------------------------------- | ------------------------------------------------------------------------- |
@@ -20,8 +21,11 @@ mcp-use supports resource-server providers whose authorization server supports D
 | WorkOS                                   | [WorkOS](/v2/typescript/server/authentication/providers/workos)           |
 | Scalekit                                 | [Scalekit](/v2/typescript/server/authentication/providers/scalekit)       |
 | Another DCR-capable authorization server | [Custom Provider](/v2/typescript/server/authentication/providers/custom)  |
+| Fixed OAuth application without DCR      | [OAuth Proxy](/v2/typescript/server/authentication/providers/oauth-proxy) |
 
-The MCP client registers and performs the authorization flow directly with the authorization server. Your MCP server does not handle authorization codes or exchange them for tokens.
+With a direct provider, the MCP client registers and performs authorization
+with the external authorization server. With OAuth Proxy, the MCP server runs a
+local authorization server and keeps the fixed upstream credentials private.
 
 ## Configure the server
 
@@ -97,6 +101,13 @@ When `oauth` is configured:
     href="/v2/typescript/server/authentication/providers/custom"
   >
     Integrate another DCR-capable authorization server.
+  </Card>
+  <Card
+    title="OAuth Proxy"
+    icon="shuffle"
+    href="/v2/typescript/server/authentication/providers/oauth-proxy"
+  >
+    Broker a fixed OAuth application for dynamically registered MCP clients.
   </Card>
   <Card
     title="Client Authentication"
