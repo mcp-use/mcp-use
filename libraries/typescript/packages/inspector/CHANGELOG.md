@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 20.3.2
+
+### Patch Changes
+
+- f2f4fdb: Warn in Inspector chat when an MCP server exceeds the documented 128-tool limit for OpenAI or Gemini models.
+
 ## 20.3.2-canary.1
 
 ### Patch Changes
