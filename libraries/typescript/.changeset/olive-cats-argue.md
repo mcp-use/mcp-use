@@ -2,4 +2,4 @@
 "@mcp-use/cli": patch
 ---
 
-Stop loading the React plugin in the binding-validation server. That server only runs for projects with no views, so it has no JSX to transform, and the plugin pulled react, react-dom and the jsx runtimes into `optimizeDeps` where they cannot resolve. A fresh `mcp-server`, `blank` or `starter` project no longer prints four "Failed to resolve dependency" warnings on its first build.
+Stop loading the React plugin in the binding-validation server. The server performs build-time binding validation and does not need JSX transformation; loading the plugin caused Vite to add `react`, `react-dom` and the JSX runtimes to `optimizeDeps`, where they may be unresolved in projects without React dependencies. A fresh `mcp-server`, `blank` or `starter` project no longer prints four "Failed to resolve dependency" warnings on its first build.

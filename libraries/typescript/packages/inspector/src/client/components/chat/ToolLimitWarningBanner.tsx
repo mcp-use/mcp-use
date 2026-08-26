@@ -23,9 +23,9 @@ export function ToolLimitWarningBanner({
         <div className="min-w-0 flex-1">
           <div className="font-medium">Tool limit exceeded</div>
           <div className="text-xs opacity-90">
-            This server has {warning.toolCount} tools, but this model supports
-            up to {warning.limit}. Exceeding this limit may cause unexpected
-            model behavior due to context constraints.
+            This server exposes {warning.toolCount} model-visible tools, but
+            this model supports up to {warning.limit}. Exceeding this limit may
+            cause unexpected model behavior due to context constraints.
           </div>
         </div>
       </div>

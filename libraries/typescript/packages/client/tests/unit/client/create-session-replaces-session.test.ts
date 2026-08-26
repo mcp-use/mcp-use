@@ -48,6 +48,14 @@ function makeClient() {
   });
 }
 
+function makeDeferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+}
+
 describe("BaseMCPClient.createSession replacing an existing session", () => {
   it("disconnects the session it replaces", async () => {
     const client = makeClient();
@@ -76,6 +84,34 @@ describe("BaseMCPClient.createSession replacing an existing session", () => {
     const second = await client.createSession("server", false);
 
     expect(client.getSessionSlot("server")).toBe(second);
+    expect(client.activeSessions).toEqual(["server"]);
+  });
+
+  it("deduplicates replacement cleanup with an in-progress closeSession", async () => {
+    const client = makeClient();
+    const first = await client.createSession("server", false);
+    const deferred = makeDeferred();
+    (
+      client.connectors[0].disconnect as ReturnType<typeof vi.fn>
+    ).mockImplementation(() => deferred.promise);
+
+    const closePromise = client.closeSession("server");
+    const replacementPromise = client.createSession("server", false);
+
+    // Let both cleanup paths reach the shared disconnect promise.
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(client.connectors[0].disconnect).toHaveBeenCalledTimes(1);
+
+    const replacement = client.getSessionSlot("server");
+    expect(replacement).toBeDefined();
+    expect(replacement).not.toBe(first);
+
+    deferred.resolve();
+    await Promise.all([closePromise, replacementPromise]);
+
+    expect(client.connectors[0].disconnect).toHaveBeenCalledTimes(1);
+    expect(client.getSessionSlot("server")).toBe(replacement);
     expect(client.activeSessions).toEqual(["server"]);
   });
 

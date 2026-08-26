@@ -67,6 +67,16 @@ export abstract class BaseMCPClient {
   protected sessions: Record<string, MCPSession> = {};
 
   /**
+   * Tracks teardown by session identity so overlapping cleanup paths share the
+   * same disconnect. In particular, createSession() can replace a session while
+   * closeSession() is already disconnecting it.
+   */
+  private readonly sessionDisconnects = new WeakMap<
+    MCPSession,
+    Promise<void>
+  >();
+
+  /**
    * List of server names that have active sessions.
    * This array is kept in sync with the sessions map and can be used
    * to iterate over active connections.
@@ -99,6 +109,19 @@ export abstract class BaseMCPClient {
     if (config) {
       this.config = config;
     }
+  }
+
+  private disconnectSession(session: MCPSession): Promise<void> {
+    const existingDisconnect = this.sessionDisconnects.get(session);
+    if (existingDisconnect) {
+      return existingDisconnect;
+    }
+
+    // Install the promise before invoking the connector so even synchronous
+    // re-entry observes and reuses this teardown.
+    const disconnect = Promise.resolve().then(() => session.disconnect());
+    this.sessionDisconnects.set(session, disconnect);
+    return disconnect;
   }
 
   /**
@@ -392,7 +415,7 @@ export abstract class BaseMCPClient {
     if (previous && previous !== session) {
       try {
         logger.debug(`Disconnecting replaced session for server ${serverName}`);
-        await previous.disconnect();
+        await this.disconnectSession(previous);
       } catch (e) {
         logger.error(
           `Error disconnecting replaced session for server '${serverName}': ${e}`
@@ -590,7 +613,7 @@ export abstract class BaseMCPClient {
     }
     try {
       logger.debug(`Closing session for server ${serverName}`);
-      await session.disconnect();
+      await this.disconnectSession(session);
     } catch (e) {
       logger.error(`Error closing session for server '${serverName}': ${e}`);
     } finally {
