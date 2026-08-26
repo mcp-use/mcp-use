@@ -409,7 +409,10 @@ function assertMappedExtra<TUser>(
     mapped.user === undefined ||
     !isRecord(mapped.payload) ||
     !Array.isArray(mapped.permissions) ||
-    !mapped.permissions.every((permission) => typeof permission === "string")
+    !mapped.permissions.every((permission) => typeof permission === "string") ||
+    (mapped.providerAccessToken !== undefined &&
+      (typeof mapped.providerAccessToken !== "string" ||
+        mapped.providerAccessToken.length === 0))
   ) {
     throw invalidToken(
       "Token identity mapping must return user, payload, and string permissions"

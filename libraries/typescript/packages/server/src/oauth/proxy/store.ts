@@ -14,7 +14,7 @@ const MAX_IN_MEMORY_ENTRIES = 10_000;
 const MAX_IN_MEMORY_PAYLOAD_BYTES = 64 * 1024 * 1024;
 const textEncoder = new TextEncoder();
 
-/** @internal Persistence and at-rest secret-protection guarantees of a proxy store. */
+/** Persistence and at-rest secret-protection guarantees of an OAuth proxy store. */
 export interface OAuthProxyStoreCapabilities {
   /** Whether values survive process restart. */
   readonly persistence: "process-local" | "persistent";
@@ -22,30 +22,30 @@ export interface OAuthProxyStoreCapabilities {
   readonly secretProtection: "none" | "store-encrypted";
 }
 
-/** @internal Result of creating a new non-overwriting proxy store entry. */
+/** Result of creating a new non-overwriting OAuth proxy store entry. */
 export type OAuthProxyStoreCreateResult =
   | { readonly status: "created" }
   | { readonly status: "conflict" };
 
-/** @internal Result of reading a proxy store entry. */
+/** Result of reading an OAuth proxy store entry. */
 export type OAuthProxyStoreReadResult =
   | { readonly status: "found"; readonly payload: Uint8Array }
   | { readonly status: "missing" }
   | { readonly status: "replayed" };
 
-/** @internal Result of atomically consuming a one-time proxy store entry. */
+/** Result of atomically consuming a one-time OAuth proxy store entry. */
 export type OAuthProxyStoreConsumeResult =
   | { readonly status: "consumed"; readonly payload: Uint8Array }
   | { readonly status: "missing" }
   | { readonly status: "replayed" };
 
-/** @internal Result of replacing an existing live proxy store entry. */
+/** Result of replacing an existing live OAuth proxy store entry. */
 export type OAuthProxyStoreReplaceResult =
   | { readonly status: "replaced" }
   | { readonly status: "missing" }
   | { readonly status: "replayed" };
 
-/** @internal Operations available inside one serializable proxy store transaction. */
+/** Operations available inside one serializable OAuth proxy store transaction. */
 export interface OAuthProxyStoreTransaction {
   /** Creates a declared key without overwriting a live value or tombstone. */
   create(
@@ -66,8 +66,8 @@ export interface OAuthProxyStoreTransaction {
 }
 
 /**
- * @internal Byte-oriented storage boundary for OAuth proxy secrets. Implementations
- * must make all operations serializable across every process sharing the store.
+ * Byte-oriented storage boundary for OAuth proxy secrets. Implementations must
+ * make all operations serializable across every process sharing the store.
  */
 export interface OAuthProxyStore extends OAuthProxyStoreTransaction {
   /** Explicit persistence and secret-protection guarantees. */
@@ -148,7 +148,15 @@ type InMemoryEntry =
     }
   | { readonly kind: "tombstone"; readonly expiresAt: number };
 
-function inMemoryOAuthStore(now: () => number = Date.now): OAuthProxyStore {
+/**
+ * Creates an isolated process-local OAuth proxy store.
+ *
+ * Sessions are lost when the process restarts and are not shared with other
+ * processes or server instances. Because values never leave the process, SDK
+ * encryption is optional for this store.
+ */
+export function inMemoryOAuthStore(): OAuthProxyStore {
+  const now = Date.now;
   const entries = new Map<string, InMemoryEntry>();
   const mutex = asyncMutex();
   let storedPayloadBytes = 0;

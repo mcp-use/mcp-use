@@ -7,7 +7,7 @@ const AAD_SCHEMA = "mcp-use/oauth-proxy/byte-payload/v1";
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder("utf-8", { fatal: true });
 
-/** @internal One named, raw AES-256 key in an OAuth proxy encryption keyring. */
+/** One named, raw AES-256 key in an OAuth proxy encryption keyring. */
 export interface OAuthProxyEncryptionKey {
   /** Non-empty identifier serialized with ciphertext for later key rotation. */
   readonly id: string;
@@ -15,7 +15,7 @@ export interface OAuthProxyEncryptionKey {
   readonly key: Uint8Array;
 }
 
-/** @internal SDK-managed encryption configuration for persisted proxy payloads. */
+/** SDK-managed encryption configuration for persisted OAuth proxy payloads. */
 export interface OAuthProxyEncryptionOptions {
   /** Key identifier used for new writes. */
   readonly primaryKeyId: string;

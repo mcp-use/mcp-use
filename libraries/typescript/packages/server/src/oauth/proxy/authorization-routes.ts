@@ -30,7 +30,7 @@ const encoder = new TextEncoder();
 
 type CryptoImplementation = Pick<Crypto, "getRandomValues">;
 
-/** @internal Provider-specific context for an explicit upstream resource mapping. */
+/** Provider-specific context for an explicit upstream resource mapping. */
 export interface OAuthProxyUpstreamResourceContext {
   readonly phase: "authorization" | "refresh";
   readonly localResource: string;

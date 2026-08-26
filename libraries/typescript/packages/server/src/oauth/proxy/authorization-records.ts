@@ -7,7 +7,7 @@ const MAX_JSON_NODES = 20_000;
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
 
-/** @internal JSON data that can safely cross the OAuth proxy persistence boundary. */
+/** JSON data that can safely cross the OAuth proxy persistence boundary. */
 export type OAuthProxyJsonValue =
   | null
   | boolean
@@ -16,7 +16,7 @@ export type OAuthProxyJsonValue =
   | readonly OAuthProxyJsonValue[]
   | OAuthProxyJsonObject;
 
-/** @internal Persistable object payload returned by an upstream identity verifier. */
+/** Persistable object payload returned by an upstream identity verifier. */
 export interface OAuthProxyJsonObject {
   readonly [key: string]: OAuthProxyJsonValue;
 }

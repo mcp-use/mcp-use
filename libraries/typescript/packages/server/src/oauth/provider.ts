@@ -15,6 +15,11 @@ export type OAuthExtra<TUser> = Record<string, unknown> & {
   payload: Record<string, unknown>;
   /** Verified permissions granted to the user. */
   permissions: string[];
+  /**
+   * Upstream provider access token for proxy-backed API calls. The downstream
+   * bearer token remains available separately as `ctx.auth.accessToken`.
+   */
+  providerAccessToken?: string;
 };
 
 /** Resource-server metadata and bearer-gate configuration. */

@@ -400,6 +400,25 @@ describe("OAuth core", () => {
       mapAuthInfo: () =>
         ({ user: { id: "user-1" }, payload: {}, permissions: [123] }) as never,
     });
+    const malformedProviderToken = oauthCustomProvider({
+      createTokenVerifier: () => ({
+        verifyAccessToken: async () => ({
+          token: "verified-token",
+          clientId: "client-1",
+          scopes: [],
+          expiresAt: Date.now() / 1000 + 60,
+          resource: canonicalResource,
+        }),
+      }),
+      oauthMetadata: metadata,
+      mapAuthInfo: () =>
+        ({
+          user: { id: "user-1" },
+          payload: {},
+          permissions: [],
+          providerAccessToken: 123,
+        }) as never,
+    });
 
     await expect(
       wrapOAuthTokenVerifier(
@@ -410,6 +429,12 @@ describe("OAuth core", () => {
     await expect(
       wrapOAuthTokenVerifier(
         malformedMapping,
+        canonicalResource
+      ).verifyAccessToken("presented-token")
+    ).rejects.toMatchObject({ code: OAuthErrorCode.InvalidToken });
+    await expect(
+      wrapOAuthTokenVerifier(
+        malformedProviderToken,
         canonicalResource
       ).verifyAccessToken("presented-token")
     ).rejects.toMatchObject({ code: OAuthErrorCode.InvalidToken });

@@ -153,6 +153,11 @@ export type OAuthAuth<TUser> = {
   payload: Record<string, unknown>;
   /** Raw bearer token for authenticated downstream requests. */
   accessToken: string;
+  /**
+   * Upstream provider access token when authentication is mediated by
+   * `oauthProxy()`. Never contains an upstream refresh or ID token.
+   */
+  providerAccessToken?: string;
   /** OAuth scopes granted to the access token. */
   scopes: string[];
   /** Provider-normalized permissions granted to the user. */
@@ -503,6 +508,9 @@ export function toAuthenticatedRequestContext<TUser, TEnv extends Env = Env>(
       user: authInfo.extra.user,
       payload: authInfo.extra.payload,
       accessToken: authInfo.token,
+      ...(authInfo.extra.providerAccessToken !== undefined && {
+        providerAccessToken: authInfo.extra.providerAccessToken,
+      }),
       scopes: [...authInfo.scopes],
       permissions: [...authInfo.extra.permissions],
       ...(authInfo.clientId.length > 0 && { clientId: authInfo.clientId }),
