@@ -62,18 +62,32 @@ beforeEach(() => {
 
 afterEach(async () => {
   tunnelState.url = null;
-  while (cleanups.length > 0) {
-    await cleanups.pop()?.();
+  const errors: unknown[] = [];
+  try {
+    while (cleanups.length > 0) {
+      try {
+        await cleanups.pop()?.();
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+  } finally {
+    if (originalMcpUrl === undefined) {
+      delete process.env["MCP_URL"];
+    } else {
+      process.env["MCP_URL"] = originalMcpUrl;
+    }
+    if (originalPort === undefined) {
+      delete process.env["PORT"];
+    } else {
+      process.env["PORT"] = originalPort;
+    }
   }
-  if (originalMcpUrl === undefined) {
-    delete process.env["MCP_URL"];
-  } else {
-    process.env["MCP_URL"] = originalMcpUrl;
+  if (errors.length === 1) {
+    throw errors[0];
   }
-  if (originalPort === undefined) {
-    delete process.env["PORT"];
-  } else {
-    process.env["PORT"] = originalPort;
+  if (errors.length > 1) {
+    throw new AggregateError(errors, "test cleanup failed");
   }
 });
 

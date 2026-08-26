@@ -46,7 +46,16 @@ export function copyFixture(
 
 /** Remove a scratch dir, ignoring failures. */
 export function removeDir(dir: string): void {
-  rmSync(dir, { recursive: true, force: true });
+  try {
+    rmSync(dir, {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 100,
+    });
+  } catch {
+    // best effort: Vite may still be finishing optimizer temp cleanup.
+  }
 }
 
 /** Bind the basic fixture's add tool to a named view for CLI error tests. */
