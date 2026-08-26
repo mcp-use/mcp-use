@@ -6,6 +6,19 @@ tag: "New"
 rss: true
 ---
 
+<Update label="v2.3.3" description="August 2026">
+  ## Safer session replacement & scaffolds
+  Patch release cleaning up replaced client sessions, fresh-project validation, and scaffold guidance.
+
+- **Fix** (@mcp-use/client): `MCPClient.createSession()` disconnects an existing session before replacing it, preventing unreachable stdio children and HTTP sessions from remaining open (`#1964`)
+- **Fix** (@mcp-use/cli): binding validation no longer loads the React Vite plugin for projects without views, eliminating first-build dependency-resolution warnings in fresh `mcp-server`, `blank`, and `starter` projects (`#2307`)
+- **Fix** (create-mcp-use-app): scaffold output sends its “Learn more” link to `docs.mcp-use.com` instead of Manufact dashboard documentation (`#2328`)
+- **Enhancement** (@mcp-use/inspector): chat warns when a server exceeds the documented 128-tool limit for OpenAI or Gemini models; see the Inspector changelog (`#2333`)
+- **Update**: Updated @mcp-use/inspector to v20.3.2
+- **Update**: Updated @mcp-use/cli to v4.1.7
+- **Update**: Updated create-mcp-use-app to v2.0.5
+</Update>
+
 <Update label="v2.3.2" description="August 2026">
   ## Claude view compatibility & request diagnostics
   Patch release restoring Claude's resource-domain contract, exposing prompt request controls, and making Inspector RPC responses easier to diagnose.
