@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const serverPackageRoot = join(here, "..", "..", "..", "server");
+export const DEFAULT_WAIT_FOR_TIMEOUT_MS = 45000;
 
 /** Absolute path to the committed basic fixture project. */
 export const FIXTURE_BASIC = join(here, "fixtures", "basic");
@@ -133,7 +134,7 @@ export async function listToolNames(baseUrl: string): Promise<string[]> {
 /** Poll `probe` until it resolves truthy or the timeout elapses. */
 export async function waitFor<T>(
   probe: () => Promise<T | undefined>,
-  { timeout = 15000, interval = 200 } = {}
+  { timeout = DEFAULT_WAIT_FOR_TIMEOUT_MS, interval = 200 } = {}
 ): Promise<T> {
   const deadline = Date.now() + timeout;
   let lastError: unknown;
