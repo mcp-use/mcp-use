@@ -141,7 +141,9 @@ describe("UpstreamOAuthClient authorization", () => {
       resource: "https://api.example.test/upstream",
     });
     expect(created.transaction.state).toMatch(/^[A-Za-z0-9_-]{43}$/);
-    expect(created.transaction.codeVerifier).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(created.transaction.codeVerifier).toMatch(
+      /^[A-Za-z0-9._~-]{43,128}$/
+    );
     expect(created.transaction.nonce).toMatch(/^[A-Za-z0-9_-]{43}$/);
     const digest = await crypto.subtle.digest(
       "SHA-256",
@@ -221,6 +223,41 @@ describe("UpstreamOAuthClient authorization", () => {
         scopes: "openid  profile",
       })
     ).rejects.toThrow(/non-empty/);
+  });
+
+  it("preserves the lexical redirect URI including an explicit default port", async () => {
+    const { calls, fetch } = recordingFetch(
+      jsonResponse({ access_token: "access", token_type: "Bearer" })
+    );
+    const client = createClient(fetch);
+    const lexicalRedirectUri =
+      "https://mcp.example.test:443/oauth/callback?return=%2fhome";
+    const created = await client.createAuthorizationRequest({
+      redirectUri: lexicalRedirectUri,
+    });
+
+    expect(created.url.searchParams.get("redirect_uri")).toBe(
+      lexicalRedirectUri
+    );
+    expect(created.transaction.redirectUri).toBe(lexicalRedirectUri);
+
+    await client.exchangeAuthorizationCode({
+      authorizationResponse: new URLSearchParams({
+        code: "code",
+        state: created.transaction.state,
+        iss: issuer,
+      }),
+      transaction: created.transaction,
+    });
+    expect(bodyParams(calls[0]!).get("redirect_uri")).toBe(lexicalRedirectUri);
+  });
+
+  it("rejects timeout values outside the platform timer range", () => {
+    const { fetch } = recordingFetch();
+
+    expect(() => createClient(fetch, { timeoutMs: 2_147_483_648 })).toThrow(
+      /must not exceed 2147483647/
+    );
   });
 });
 
@@ -314,6 +351,38 @@ describe("UpstreamOAuthClient token operations", () => {
       client_id: "client-id",
       client_secret: "client secret",
     });
+  });
+
+  it("forwards provider token parameters but rejects reserved overrides", async () => {
+    const { calls, fetch } = recordingFetch(
+      jsonResponse({ access_token: "access", token_type: "Bearer" }),
+      jsonResponse({ access_token: "next", token_type: "Bearer" })
+    );
+    const client = createClient(fetch);
+    const created = await authorization(client);
+
+    await client.exchangeAuthorizationCode({
+      authorizationResponse: new URLSearchParams({
+        code: "code",
+        state: created.transaction.state,
+        iss: issuer,
+      }),
+      transaction: created.transaction,
+      extraParams: { audience: "provider-api" },
+    });
+    await client.refreshToken({
+      refreshToken: "refresh",
+      extraParams: { audience: "provider-api" },
+    });
+
+    expect(bodyParams(calls[0]!).get("audience")).toBe("provider-api");
+    expect(bodyParams(calls[1]!).get("audience")).toBe("provider-api");
+    await expect(
+      client.refreshToken({
+        refreshToken: "refresh",
+        extraParams: { grant_type: "client_credentials" },
+      })
+    ).rejects.toThrow(/reserved parameter grant_type/);
   });
 
   it("does not auto-forward an authorization resource into token exchange", async () => {
@@ -458,7 +527,7 @@ describe("UpstreamOAuthClient response validation", () => {
       jsonResponse({
         access_token: "access",
         token_type: "Bearer",
-        expires_in: 1.5,
+        expires_in: "not-a-number",
       })
     );
     const client = createClient(fetch);
@@ -479,12 +548,14 @@ describe("UpstreamOAuthClient response validation", () => {
   });
 
   it("never leaks configured or transaction secrets in normalized errors", async () => {
+    const basicAuthorization = `Basic ${Buffer.from(
+      "client-id:client+secret"
+    ).toString("base64")}`;
     const { fetch } = recordingFetch(
       jsonResponse(
         {
           error: "invalid_client",
-          error_description:
-            "client secret and authorization-code must not escape",
+          error_description: `client secret, authorization-code, and ${basicAuthorization} must not escape`,
         },
         401
       )
@@ -501,7 +572,7 @@ describe("UpstreamOAuthClient response validation", () => {
     expect(JSON.stringify(thrown)).not.toContain("client secret");
     expect(String(thrown)).not.toContain("client secret");
     expect((thrown as UpstreamOAuthError).description).toBe(
-      "[REDACTED] and [REDACTED] must not escape"
+      "[REDACTED], [REDACTED], and [REDACTED] must not escape"
     );
   });
 
@@ -533,6 +604,28 @@ describe("UpstreamOAuthClient response validation", () => {
     const client = createClient(fetch, { timeoutMs: 10 });
 
     await expect(exchange(client)).rejects.toMatchObject({ code: "timeout" });
+  });
+
+  it("times out a stalled synthetic response-body read", async () => {
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      pull: () => new Promise<void>(() => undefined),
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+      Promise.resolve(
+        new Response(body, {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        })
+      )
+    );
+    const client = createClient(fetch, { timeoutMs: 10 });
+
+    await expect(exchange(client)).rejects.toMatchObject({ code: "timeout" });
+    expect(cancelled).toBe(true);
   });
 
   it("composes caller cancellation with the internal timeout", async () => {
