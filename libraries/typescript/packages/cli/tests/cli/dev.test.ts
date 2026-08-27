@@ -173,7 +173,7 @@ function installFakeInspector(cwd: string): void {
     const url = new URL(request.url);
     const prefix = options.basePath + "/inspector";
     if (url.pathname === prefix + "/config.json") {
-      return Response.json({ autoConnectUrl: options.autoConnectUrl });
+      return Response.json({ autoConnectUrl: options.autoConnectUrl, logPrefix: options.logPrefix });
     }
     if (url.pathname === prefix || url.pathname.startsWith(prefix + "/")) {
       return new Response("mounted:" + options.basePath, {
@@ -459,8 +459,12 @@ describe("runDev", () => {
     expect(await shell.text()).toBe("mounted:/mcp");
     expect(
       await (await fetch(`${origin}/mcp/inspector/config.json`)).json()
-    ).toEqual({ autoConnectUrl: `${origin}/mcp` });
+    ).toEqual({ autoConnectUrl: `${origin}/mcp`, logPrefix: "[inspector]" });
     expect(dev.logs.some((line) => line.includes("➜ Inspector:"))).toBe(true);
+    await mcpRequest(dev.url, "tools/list");
+    expect(dev.logs.some((line) => line.includes("[server] tools/list"))).toBe(
+      true
+    );
 
     const entry = join(cwd, "src", "index.ts");
     writeFileSync(
@@ -478,7 +482,10 @@ describe("runDev", () => {
     expect((await fetch(`${origin}/mcp/inspector`)).status).toBe(404);
     expect(
       await (await fetch(`${origin}/api/mcp/inspector/config.json`)).json()
-    ).toEqual({ autoConnectUrl: `${origin}/api/mcp` });
+    ).toEqual({
+      autoConnectUrl: `${origin}/api/mcp`,
+      logPrefix: "[inspector]",
+    });
   });
 
   it("serves the built-in Inspector without a project dependency", async () => {
