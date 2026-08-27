@@ -250,6 +250,14 @@ describe("OAuth proxy store resolution", () => {
       ).toThrow(/capabilit/);
     }
   });
+
+  it("rejects null stores instead of silently using process-local storage", () => {
+    expect(() =>
+      resolveOAuthProxyStore({
+        store: null as unknown as OAuthProxyStore,
+      })
+    ).toThrow(/store must be an object/);
+  });
 });
 
 describe("process-local OAuth proxy store", () => {
@@ -311,6 +319,16 @@ describe("process-local OAuth proxy store", () => {
     if (secondRead.status === "found") {
       expect(text(secondRead.payload)).toBe("secret");
     }
+  });
+
+  it("bounds the total number of process-local entries", async () => {
+    const { store } = resolveOAuthProxyStore();
+    for (let index = 0; index < 10_000; index += 1) {
+      await store.create(`bounded:${index}`, new Uint8Array(), future());
+    }
+    await expect(
+      store.create("bounded:overflow", new Uint8Array(), future())
+    ).rejects.toThrow(/capacity exceeded/);
   });
 });
 
@@ -511,6 +529,43 @@ describe("OAuth proxy encryption", () => {
     );
   });
 
+  it("snapshots encrypted payloads before asynchronous work", async () => {
+    const persistent = new TestStore({
+      persistence: "persistent",
+      secretProtection: "none",
+    });
+    const { store } = resolveOAuthProxyStore({
+      store: persistent,
+      encryption: encryption(),
+    });
+    const direct = bytes("direct-secret");
+    const directWrite = store.create("token:direct", direct, future());
+    direct.fill(0);
+    await directWrite;
+
+    await store.transaction(["token:transaction"], async (transaction) => {
+      const transactional = bytes("transaction-secret");
+      const transactionalWrite = transaction.create(
+        "token:transaction",
+        transactional,
+        future()
+      );
+      transactional.fill(0);
+      await transactionalWrite;
+    });
+
+    const directRead = await store.read("token:direct");
+    const transactionalRead = await store.read("token:transaction");
+    expect(directRead).toMatchObject({ status: "found" });
+    expect(transactionalRead).toMatchObject({ status: "found" });
+    if (directRead.status === "found") {
+      expect(text(directRead.payload)).toBe("direct-secret");
+    }
+    if (transactionalRead.status === "found") {
+      expect(text(transactionalRead.payload)).toBe("transaction-secret");
+    }
+  });
+
   it("binds ciphertext to the store key and fails closed on tamper or wrong keys", async () => {
     const codec = createOAuthProxyEncryptionCodec(encryption());
     const serialized = await codec.encode(
@@ -581,6 +636,20 @@ describe("OAuth proxy encryption", () => {
         createOAuthProxyEncryptionCodec(options as OAuthProxyEncryptionOptions)
       ).toThrow();
     }
+  });
+
+  it("rejects incomplete injected Web Crypto implementations", () => {
+    expect(() =>
+      createOAuthProxyEncryptionCodec({
+        ...encryption(),
+        crypto: {
+          getRandomValues: globalThis.crypto.getRandomValues.bind(
+            globalThis.crypto
+          ),
+          subtle: {} as SubtleCrypto,
+        },
+      })
+    ).toThrow(/requires Web Crypto/);
   });
 
   it("encrypts before handing plaintext-unprotected persistent stores a payload", async () => {

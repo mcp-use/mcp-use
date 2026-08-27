@@ -176,7 +176,10 @@ function validateOptions(options: OAuthProxyEncryptionOptions): {
     cryptoImplementation === null ||
     typeof cryptoImplementation.getRandomValues !== "function" ||
     typeof cryptoImplementation.subtle !== "object" ||
-    cryptoImplementation.subtle === null
+    cryptoImplementation.subtle === null ||
+    typeof cryptoImplementation.subtle.importKey !== "function" ||
+    typeof cryptoImplementation.subtle.encrypt !== "function" ||
+    typeof cryptoImplementation.subtle.decrypt !== "function"
   ) {
     throw new TypeError("OAuth proxy encryption requires Web Crypto");
   }

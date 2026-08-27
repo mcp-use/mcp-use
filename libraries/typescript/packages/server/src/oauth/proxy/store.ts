@@ -10,6 +10,8 @@ const MAX_PAYLOAD_BYTES = 1024 * 1024;
 const MAX_STORED_PAYLOAD_BYTES = 2 * 1024 * 1024;
 const MAX_TRANSACTION_KEYS = 64;
 const MAX_TRANSACTION_KEY_DECLARATIONS = 256;
+const MAX_IN_MEMORY_ENTRIES = 10_000;
+const MAX_IN_MEMORY_PAYLOAD_BYTES = 64 * 1024 * 1024;
 const textEncoder = new TextEncoder();
 
 /** @internal Persistence and at-rest secret-protection guarantees of a proxy store. */
@@ -111,7 +113,8 @@ export function resolveOAuthProxyStore(
       "OAuth proxy store resolution options must be an object"
     );
   }
-  const underlying = options.store ?? inMemoryOAuthStore();
+  const underlying =
+    options.store === undefined ? inMemoryOAuthStore() : options.store;
   const capabilities = validateStore(underlying);
 
   if (
@@ -148,6 +151,7 @@ type InMemoryEntry =
 function inMemoryOAuthStore(now: () => number = Date.now): OAuthProxyStore {
   const entries = new Map<string, InMemoryEntry>();
   const mutex = asyncMutex();
+  let storedPayloadBytes = 0;
 
   const runTransaction = async <T>(
     keys: readonly string[],
@@ -161,12 +165,55 @@ function inMemoryOAuthStore(now: () => number = Date.now): OAuthProxyStore {
     }
     return mutex(async () => {
       const declared = new Set(canonicalKeys);
-      const staged = cloneEntries(entries);
-      cleanupExpired(staged, now());
+      const staged = new Map<string, InMemoryEntry>();
+      const transactionStartedAt = now();
+      for (const key of canonicalKeys) {
+        const entry = entries.get(key);
+        if (entry !== undefined && entry.expiresAt > transactionStartedAt) {
+          staged.set(key, cloneEntry(entry));
+        }
+      }
       const result = await work(mapTransaction(staged, declared, now));
-      entries.clear();
-      for (const [key, entry] of staged) {
-        entries.set(key, cloneEntry(entry));
+
+      const commitTime = now();
+      cleanupExpired(staged, commitTime);
+      let projected = projectedInMemoryUsage(
+        entries,
+        staged,
+        canonicalKeys,
+        storedPayloadBytes
+      );
+      if (
+        projected.entries > MAX_IN_MEMORY_ENTRIES ||
+        projected.payloadBytes > MAX_IN_MEMORY_PAYLOAD_BYTES
+      ) {
+        storedPayloadBytes -= cleanupExpired(entries, commitTime);
+        projected = projectedInMemoryUsage(
+          entries,
+          staged,
+          canonicalKeys,
+          storedPayloadBytes
+        );
+      }
+      if (
+        projected.entries > MAX_IN_MEMORY_ENTRIES ||
+        projected.payloadBytes > MAX_IN_MEMORY_PAYLOAD_BYTES
+      ) {
+        throw new RangeError("OAuth proxy in-memory store capacity exceeded");
+      }
+
+      for (const key of canonicalKeys) {
+        const previous = entries.get(key);
+        if (previous !== undefined) {
+          storedPayloadBytes -= entryPayloadBytes(previous);
+          entries.delete(key);
+        }
+        const next = staged.get(key);
+        if (next !== undefined) {
+          const snapshot = cloneEntry(next);
+          entries.set(key, snapshot);
+          storedPayloadBytes += entryPayloadBytes(snapshot);
+        }
       }
       return result;
     });
@@ -294,16 +341,18 @@ function codecStore(
     capabilities,
     transaction: runTransaction,
     create(key, payload, expiresAt) {
+      const snapshot = snapshotBytes(payload);
       return runTransaction([key], (transaction) =>
-        transaction.create(key, payload, expiresAt)
+        transaction.create(key, snapshot, expiresAt)
       );
     },
     read(key) {
       return runTransaction([key], (transaction) => transaction.read(key));
     },
     replace(key, payload, expiresAt) {
+      const snapshot = snapshotBytes(payload);
       return runTransaction([key], (transaction) =>
-        transaction.replace(key, payload, expiresAt)
+        transaction.replace(key, snapshot, expiresAt)
       );
     },
     consume(key) {
@@ -322,7 +371,7 @@ function codecTransaction(
       assertDeclaredKey(key, declared);
       assertPayload(payload);
       assertFutureExpiry(expiresAt, Date.now());
-      const encoded = await codec.encode(key, payload);
+      const encoded = await codec.encode(key, Uint8Array.from(payload));
       const result: unknown = await underlying.create(key, encoded, expiresAt);
       validateCreateResult(result);
       return result;
@@ -345,7 +394,7 @@ function codecTransaction(
       assertDeclaredKey(key, declared);
       assertPayload(payload);
       assertFutureExpiry(expiresAt, Date.now());
-      const encoded = await codec.encode(key, payload);
+      const encoded = await codec.encode(key, Uint8Array.from(payload));
       const result: unknown = await underlying.replace(key, encoded, expiresAt);
       validateReplaceResult(result);
       return result;
@@ -408,12 +457,6 @@ function asyncMutex(): <T>(work: () => T | Promise<T>) => Promise<T> {
   };
 }
 
-function cloneEntries(
-  entries: ReadonlyMap<string, InMemoryEntry>
-): Map<string, InMemoryEntry> {
-  return new Map([...entries].map(([key, entry]) => [key, cloneEntry(entry)]));
-}
-
 function cloneEntry(entry: InMemoryEntry): InMemoryEntry {
   return entry.kind === "live"
     ? {
@@ -427,12 +470,46 @@ function cloneEntry(entry: InMemoryEntry): InMemoryEntry {
 function cleanupExpired(
   entries: Map<string, InMemoryEntry>,
   now: number
-): void {
+): number {
+  let removedPayloadBytes = 0;
   for (const [key, entry] of entries) {
     if (entry.expiresAt <= now) {
+      removedPayloadBytes += entryPayloadBytes(entry);
       entries.delete(key);
     }
   }
+  return removedPayloadBytes;
+}
+
+function projectedInMemoryUsage(
+  entries: ReadonlyMap<string, InMemoryEntry>,
+  staged: ReadonlyMap<string, InMemoryEntry>,
+  keys: readonly string[],
+  storedPayloadBytes: number
+): { readonly entries: number; readonly payloadBytes: number } {
+  let entryCount = entries.size;
+  let payloadBytes = storedPayloadBytes;
+  for (const key of keys) {
+    const previous = entries.get(key);
+    if (previous !== undefined) {
+      entryCount -= 1;
+      payloadBytes -= entryPayloadBytes(previous);
+    }
+    const next = staged.get(key);
+    if (next !== undefined) {
+      entryCount += 1;
+      payloadBytes += entryPayloadBytes(next);
+    }
+  }
+  return { entries: entryCount, payloadBytes };
+}
+
+function entryPayloadBytes(entry: InMemoryEntry): number {
+  return entry.kind === "live" ? entry.payload.byteLength : 0;
+}
+
+function snapshotBytes(payload: Uint8Array): Uint8Array {
+  return payload instanceof Uint8Array ? Uint8Array.from(payload) : payload;
 }
 
 function validateCreateResult(
