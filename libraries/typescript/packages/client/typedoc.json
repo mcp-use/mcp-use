@@ -1,6 +1,11 @@
 {
   "$schema": "https://typedoc.org/schema.json",
-  "entryPoints": ["src/index.ts", "src/index-browser.ts", "src/react/index.ts"],
+  "entryPoints": [
+    "src/index.ts",
+    "src/index-browser.ts",
+    "src/react/index.ts",
+    "src/sandbox.ts"
+  ],
   "tsconfig": "tsconfig.json",
   "readme": "none",
   "validation": {
