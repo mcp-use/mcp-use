@@ -424,11 +424,18 @@ function RpcLogRow({
         <Tooltip>
           <TooltipTrigger
             render={
-              <span className="shrink-0 cursor-default font-mono text-[10px] tabular-nums text-muted-foreground underline decoration-dotted underline-offset-2">
-                {responseLabel
-                  ? `${responseLabel.latencyMs} ms`
-                  : new Date(item.timestamp).toLocaleTimeString()}
-              </span>
+              responseLabel ? (
+                <span className="shrink-0 cursor-default font-mono text-[10px] tabular-nums text-muted-foreground underline decoration-dotted underline-offset-2">
+                  {responseLabel.latencyMs} ms
+                </span>
+              ) : (
+                <time
+                  dateTime={item.timestamp}
+                  className="shrink-0 cursor-default font-mono text-[10px] tabular-nums text-muted-foreground underline decoration-dotted underline-offset-2"
+                >
+                  {new Date(item.timestamp).toLocaleTimeString()}
+                </time>
+              )
             }
             nativeButton={false}
           />
