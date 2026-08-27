@@ -704,6 +704,25 @@ describe("UpstreamOAuthClient response validation", () => {
     );
   });
 
+  it("redacts percent-encoded secrets regardless of hex digit casing", async () => {
+    const { fetch } = recordingFetch(
+      jsonResponse(
+        {
+          error: "invalid_client",
+          error_description:
+            "client%2fsecret and client%2Fsecret must not escape",
+        },
+        401
+      )
+    );
+    const client = createClient(fetch, { clientSecret: "client/secret" });
+
+    await expect(exchange(client)).rejects.toMatchObject({
+      code: "invalid_client",
+      description: "[REDACTED] and [REDACTED] must not escape",
+    });
+  });
+
   it("rejects redirects because every upstream POST uses manual redirect mode", async () => {
     const { calls, fetch } = recordingFetch(
       new Response(null, {
@@ -774,6 +793,21 @@ describe("UpstreamOAuthClient response validation", () => {
     controller.abort();
 
     await expect(pending).rejects.toMatchObject({ code: "aborted" });
+  });
+
+  it("rejects an already-aborted caller signal without starting a request", async () => {
+    const { fetch } = recordingFetch();
+    const client = createClient(fetch);
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      client.refreshToken({
+        refreshToken: "refresh",
+        signal: controller.signal,
+      })
+    ).rejects.toMatchObject({ code: "aborted" });
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("normalizes invalid UTF-8 as a malformed response", async () => {

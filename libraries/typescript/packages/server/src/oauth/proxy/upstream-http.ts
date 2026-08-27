@@ -79,6 +79,12 @@ export class UpstreamOAuthHttpClient {
 
   /** Executes one manual-redirect, bounded, cancellable form POST. */
   async postForm(request: UpstreamFormPost): Promise<Record<string, unknown>> {
+    if (request.signal?.aborted) {
+      throw oauthFailure(
+        "aborted",
+        `Upstream OAuth ${request.operation} was cancelled`
+      );
+    }
     const headers = new Headers(request.headers);
     headers.set(
       "accept",
@@ -248,7 +254,10 @@ async function raceWithAbort<T>(
   promise: Promise<T>,
   signal: AbortSignal
 ): Promise<T> {
-  if (signal.aborted) throw abortError();
+  if (signal.aborted) {
+    void promise.catch(() => undefined);
+    throw abortError();
+  }
   return new Promise<T>((resolve, reject) => {
     const onAbort = () => reject(abortError());
     signal.addEventListener("abort", onAbort, { once: true });
@@ -402,14 +411,35 @@ function redact(
   let result = value;
   for (const sensitive of sensitiveValues) {
     if (sensitive === undefined || sensitive.length === 0) continue;
+    result = result.replaceAll(sensitive, "[REDACTED]");
+    result = result.replaceAll(base64Utf8(sensitive), "[REDACTED]");
     for (const variant of new Set([
-      sensitive,
       encodeURIComponent(sensitive),
       formEncode(sensitive),
-      base64Utf8(sensitive),
     ])) {
-      result = result.replaceAll(variant, "[REDACTED]");
+      result = replacePercentEncodedVariant(result, variant);
     }
   }
   return result;
+}
+
+function replacePercentEncodedVariant(value: string, variant: string): string {
+  const normalizedVariant = normalizePercentTriplets(variant);
+  let result = value;
+  let normalizedResult = normalizePercentTriplets(result);
+  let searchFrom = 0;
+  while (true) {
+    const index = normalizedResult.indexOf(normalizedVariant, searchFrom);
+    if (index === -1) return result;
+    result =
+      result.slice(0, index) +
+      "[REDACTED]" +
+      result.slice(index + variant.length);
+    normalizedResult = normalizePercentTriplets(result);
+    searchFrom = index + "[REDACTED]".length;
+  }
+}
+
+function normalizePercentTriplets(value: string): string {
+  return value.replace(/%[0-9A-Fa-f]{2}/g, (triplet) => triplet.toUpperCase());
 }
