@@ -5,7 +5,7 @@
  * protocol method instead of the transport method:
  *
  * ```text
- * 12:45:01 tools/call greet /mcp 200 client=raw-request/0.0.0 12ms
+ * tools/call greet /mcp 200 client=raw-request/0.0.0 12ms
  * ```
  *
  * Three verbosity levels, resolved per request from the `MCP_USE_LOG_LEVEL`
@@ -548,7 +548,6 @@ function isNoisyRequest(httpMethod: string, pathname: string): boolean {
 }
 
 interface RequestLogLine {
-  timestamp: string;
   prefix: string | undefined;
   description: RequestDescription;
   detail: McpDetail | undefined;
@@ -562,7 +561,6 @@ interface RequestLogLine {
 function formatRequestLogLine(line: RequestLogLine): string {
   const { description, detail } = line;
   return [
-    dim(line.timestamp),
     ...(line.prefix === undefined ? [] : [bold(line.prefix)]),
     methodStyle(description.method)(description.method),
     ...(detail?.subject === undefined ? [] : [bold(sanitize(detail.subject))]),
@@ -631,7 +629,6 @@ export function requestLogger(
     ): void => {
       console.log(
         formatRequestLogLine({
-          timestamp: new Date().toISOString().substring(11, 19),
           prefix: options.prefix,
           description,
           detail,

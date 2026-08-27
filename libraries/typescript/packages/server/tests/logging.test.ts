@@ -113,7 +113,7 @@ describe("requestLogger (via MCPServer.fetch)", () => {
     const lines = loggedLines();
     expect(lines).toHaveLength(1);
     expect(lines[0]).toMatch(
-      /^\d{2}:\d{2}:\d{2} tools\/call greet \/mcp 200 client=raw-request\/0\.0\.0 \d+ms$/
+      /^tools\/call greet \/mcp 200 client=raw-request\/0\.0\.0 \d+ms$/
     );
     await server.close();
   });
@@ -260,7 +260,7 @@ describe("requestLogger (via MCPServer.fetch)", () => {
     );
     const lines = loggedLines();
     expect(lines).toHaveLength(1);
-    expect(lines[0]).toMatch(/^\d{2}:\d{2}:\d{2} GET \/health 404 \d+ms$/);
+    expect(lines[0]).toMatch(/^GET \/health 404 \d+ms$/);
     await server.close();
   });
 
@@ -280,12 +280,8 @@ describe("requestLogger (via MCPServer.fetch)", () => {
         body: "{not json",
       })
     );
-    expect(loggedLines()[0]).toMatch(
-      /^\d{2}:\d{2}:\d{2} PATCH \/health 404 \d+ms$/
-    );
-    expect(loggedLines()[1]).toMatch(
-      /^\d{2}:\d{2}:\d{2} POST \/mcp 400 \d+ms$/
-    );
+    expect(loggedLines()[0]).toMatch(/^PATCH \/health 404 \d+ms$/);
+    expect(loggedLines()[1]).toMatch(/^POST \/mcp 400 \d+ms$/);
     await server.close();
   });
 
@@ -360,9 +356,7 @@ describe("requestLogger (via MCPServer.fetch)", () => {
       new Request("http://localhost/favicon.ico", { method: "GET" })
     );
     expect(loggedLines()).toHaveLength(1);
-    expect(loggedLines()[0]).toMatch(
-      /^\d{2}:\d{2}:\d{2} GET \/mcp\/inspector 404 \d+ms$/
-    );
+    expect(loggedLines()[0]).toMatch(/^GET \/mcp\/inspector 404 \d+ms$/);
     await server.close();
   });
 
