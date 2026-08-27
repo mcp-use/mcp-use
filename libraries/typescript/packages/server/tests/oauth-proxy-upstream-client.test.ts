@@ -183,6 +183,49 @@ describe("UpstreamOAuthClient authorization", () => {
     ).rejects.toThrow(/collides with configured parameters/);
   });
 
+  it("keeps offline-access prompt policy explicitly proxy-owned", async () => {
+    const { fetch } = recordingFetch();
+    const unconfigured = createClient(fetch);
+    const withoutPrompt = await unconfigured.createAuthorizationRequest({
+      redirectUri,
+      scopes: ["offline_access"],
+    });
+    expect(withoutPrompt.url.searchParams.getAll("prompt")).toEqual([]);
+
+    const endpointConfigured = createClient(fetch, {
+      authorizationEndpoint: `${authorizationEndpoint}?prompt=login`,
+    });
+    const withEndpointPrompt =
+      await endpointConfigured.createAuthorizationRequest({
+        redirectUri,
+        scopes: ["offline_access"],
+      });
+    expect(withEndpointPrompt.url.searchParams.getAll("prompt")).toEqual([
+      "login",
+    ]);
+
+    const parameterConfigured = createClient(fetch, {
+      authorizationParams: { prompt: "consent" },
+    });
+    const withConfiguredPrompt =
+      await parameterConfigured.createAuthorizationRequest({
+        redirectUri,
+        scopes: ["offline_access"],
+      });
+    expect(withConfiguredPrompt.url.searchParams.getAll("prompt")).toEqual([
+      "consent",
+    ]);
+
+    const withRequestPrompt = await unconfigured.createAuthorizationRequest({
+      redirectUri,
+      scopes: ["offline_access"],
+      extraParams: { prompt: "select_account" },
+    });
+    expect(withRequestPrompt.url.searchParams.getAll("prompt")).toEqual([
+      "select_account",
+    ]);
+  });
+
   it("requires an explicit, internally consistent client authentication method", () => {
     const { fetch } = recordingFetch();
     expect(() =>
@@ -546,6 +589,91 @@ describe("UpstreamOAuthClient response validation", () => {
       code: "malformed_response",
     });
   });
+
+  it.each([
+    [
+      "empty access token",
+      jsonResponse({ access_token: "", token_type: "Bearer" }),
+    ],
+    [
+      "empty token type",
+      jsonResponse({ access_token: "access", token_type: "" }),
+    ],
+    [
+      "negative expiry",
+      jsonResponse({
+        access_token: "access",
+        token_type: "Bearer",
+        expires_in: -1,
+      }),
+    ],
+    [
+      "fractional expiry",
+      jsonResponse({
+        access_token: "access",
+        token_type: "Bearer",
+        expires_in: 1.5,
+      }),
+    ],
+    [
+      "null expiry",
+      jsonResponse({
+        access_token: "access",
+        token_type: "Bearer",
+        expires_in: null,
+      }),
+    ],
+    [
+      "empty form expiry",
+      formResponse("access_token=access&token_type=Bearer&expires_in="),
+    ],
+    [
+      "non-decimal form expiry",
+      formResponse("access_token=access&token_type=Bearer&expires_in=0x10"),
+    ],
+    [
+      "empty refresh token",
+      jsonResponse({
+        access_token: "access",
+        token_type: "Bearer",
+        refresh_token: "",
+      }),
+    ],
+    [
+      "empty ID token",
+      jsonResponse({
+        access_token: "access",
+        token_type: "Bearer",
+        id_token: "",
+      }),
+    ],
+    [
+      "malformed scope",
+      jsonResponse({
+        access_token: "access",
+        token_type: "Bearer",
+        scope: "read  write",
+      }),
+    ],
+    [
+      "duplicate scope",
+      jsonResponse({
+        access_token: "access",
+        token_type: "Bearer",
+        scope: "read read",
+      }),
+    ],
+  ])(
+    "rejects a semantically invalid token response: %s",
+    async (_name, response) => {
+      const { fetch } = recordingFetch(response);
+      const client = createClient(fetch);
+
+      await expect(exchange(client)).rejects.toMatchObject({
+        code: "malformed_response",
+      });
+    }
+  );
 
   it("never leaks configured or transaction secrets in normalized errors", async () => {
     const basicAuthorization = `Basic ${Buffer.from(

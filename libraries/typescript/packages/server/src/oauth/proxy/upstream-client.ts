@@ -2,7 +2,6 @@ import {
   exchangeAuthorization,
   IssuerMismatchError,
   refreshAuthorization,
-  selectClientAuthMethod,
   startAuthorization,
   validateAuthorizationResponseIssuer,
   type AuthorizationServerMetadata,
@@ -140,14 +139,6 @@ export class UpstreamOAuthClient {
       token_endpoint_auth_method: this.#authMethod,
     };
     this.#clientInformation = clientInformation;
-    if (
-      selectClientAuthMethod(this.#clientInformation, [this.#authMethod]) !==
-      this.#authMethod
-    ) {
-      throw new TypeError(
-        "tokenEndpointAuthMethod is inconsistent with client credentials"
-      );
-    }
 
     this.#authorizationParams = validateExtraParams(
       options.authorizationParams,
@@ -229,6 +220,14 @@ export class UpstreamOAuthClient {
         "authorization_request_failed",
         "Upstream OAuth authorization request construction failed"
       );
+    }
+    // The SDK adds prompt=consent for offline_access. Prompt policy belongs to
+    // the proxy/provider, so retain only values explicitly configured here.
+    authorizationUrl.searchParams.delete("prompt");
+    const endpointPrompt =
+      this.#authorizationEndpoint.searchParams.get("prompt");
+    if (endpointPrompt !== null) {
+      authorizationUrl.searchParams.set("prompt", endpointPrompt);
     }
     setParams(authorizationUrl.searchParams, this.#authorizationParams);
     setParams(authorizationUrl.searchParams, extraParams);
@@ -323,7 +322,7 @@ export class UpstreamOAuthClient {
           request.signal
         ),
       });
-      return normalizeTokenSet(tokens);
+      return normalizeTokenSet(tokens, "token exchange");
     } catch (error) {
       throw normalizeHelperError(error, "token exchange");
     }
@@ -363,7 +362,7 @@ export class UpstreamOAuthClient {
           request.signal
         ),
       });
-      const normalized = normalizeTokenSet(tokens);
+      const normalized = normalizeTokenSet(tokens, "token refresh");
       return {
         ...normalized,
         ...(normalized.scope === undefined && request.scope !== undefined
@@ -479,6 +478,7 @@ export class UpstreamOAuthClient {
         sensitiveValues,
         ...(signal === undefined ? {} : { signal }),
       });
+      assertSafeTokenResponseCoercion(parsed, operation);
       return new Response(JSON.stringify(parsed), {
         status: 200,
         headers: { "content-type": "application/json" },
@@ -734,19 +734,85 @@ function constantTimeStringEqual(left: string, right: string): boolean {
   return difference === 0;
 }
 
-function normalizeTokenSet(tokens: OAuthTokens): UpstreamTokenSet {
+function normalizeTokenSet(
+  tokens: OAuthTokens,
+  operation: string
+): UpstreamTokenSet {
+  const accessToken = tokenString(
+    tokens.access_token,
+    "access_token",
+    operation
+  );
+  const tokenType = tokenString(tokens.token_type, "token_type", operation);
+  const expiresIn = tokens.expires_in;
+  if (
+    expiresIn !== undefined &&
+    (!Number.isSafeInteger(expiresIn) || expiresIn < 0)
+  ) {
+    throw invalidTokenResponse(operation, "expires_in");
+  }
+  const refreshToken = optionalTokenString(
+    tokens.refresh_token,
+    "refresh_token",
+    operation
+  );
+  const idToken = optionalTokenString(tokens.id_token, "id_token", operation);
+  let scope: string | undefined;
+  if (tokens.scope !== undefined) {
+    try {
+      scope = normalizeScope(tokenString(tokens.scope, "scope", operation));
+    } catch (error) {
+      if (error instanceof UpstreamOAuthError) throw error;
+      throw invalidTokenResponse(operation, "scope");
+    }
+  }
   return {
-    accessToken: tokens.access_token,
-    tokenType: tokens.token_type,
-    ...(tokens.expires_in === undefined
-      ? {}
-      : { expiresIn: tokens.expires_in }),
-    ...(tokens.refresh_token === undefined
-      ? {}
-      : { refreshToken: tokens.refresh_token }),
-    ...(tokens.scope === undefined ? {} : { scope: tokens.scope }),
-    ...(tokens.id_token === undefined ? {} : { idToken: tokens.id_token }),
+    accessToken,
+    tokenType,
+    ...(expiresIn === undefined ? {} : { expiresIn }),
+    ...(refreshToken === undefined ? {} : { refreshToken }),
+    ...(scope === undefined ? {} : { scope }),
+    ...(idToken === undefined ? {} : { idToken }),
   };
+}
+
+function assertSafeTokenResponseCoercion(
+  parsed: Readonly<Record<string, unknown>>,
+  operation: string
+): void {
+  const expiresIn = parsed.expires_in;
+  if (
+    expiresIn !== undefined &&
+    typeof expiresIn !== "number" &&
+    !(typeof expiresIn === "string" && /^\d+$/.test(expiresIn))
+  ) {
+    throw invalidTokenResponse(operation, "expires_in");
+  }
+}
+
+function tokenString(value: unknown, field: string, operation: string): string {
+  if (typeof value !== "string" || value.length === 0) {
+    throw invalidTokenResponse(operation, field);
+  }
+  return value;
+}
+
+function optionalTokenString(
+  value: unknown,
+  field: string,
+  operation: string
+): string | undefined {
+  return value === undefined ? undefined : tokenString(value, field, operation);
+}
+
+function invalidTokenResponse(
+  operation: string,
+  field: string
+): UpstreamOAuthError {
+  return oauthFailure(
+    "malformed_response",
+    `Upstream OAuth ${operation} returned an invalid ${field}`
+  );
 }
 
 function normalizeHelperError(

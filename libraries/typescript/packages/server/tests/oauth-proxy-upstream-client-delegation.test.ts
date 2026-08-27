@@ -1,7 +1,6 @@
 import {
   exchangeAuthorization,
   refreshAuthorization,
-  selectClientAuthMethod,
   startAuthorization,
   validateAuthorizationResponseIssuer,
 } from "@modelcontextprotocol/client";
@@ -16,7 +15,6 @@ vi.mock("@modelcontextprotocol/client", async (importOriginal) => {
     ...actual,
     exchangeAuthorization: vi.fn(actual.exchangeAuthorization),
     refreshAuthorization: vi.fn(actual.refreshAuthorization),
-    selectClientAuthMethod: vi.fn(actual.selectClientAuthMethod),
     startAuthorization: vi.fn(actual.startAuthorization),
     validateAuthorizationResponseIssuer: vi.fn(
       actual.validateAuthorizationResponseIssuer
@@ -62,7 +60,6 @@ describe("UpstreamOAuthClient SDK delegation", () => {
       fetch,
     });
 
-    expect(selectClientAuthMethod).toHaveBeenCalledOnce();
     const created = await client.createAuthorizationRequest({ redirectUri });
     expect(startAuthorization).toHaveBeenCalledOnce();
     expect(vi.mocked(startAuthorization).mock.calls[0]?.[1]).toMatchObject({
