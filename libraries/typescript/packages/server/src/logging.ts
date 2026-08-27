@@ -265,6 +265,60 @@ function methodStyle(method: string): Style {
   return blue;
 }
 
+interface RequestDescription {
+  /** HTTP method, MCP method, or a compact batch method list. */
+  method: string;
+  /** Client identity from MCP metadata, or `unknown`. */
+  client: string;
+  /** First MCP request, used for subject and debug details. */
+  mcpRequest: JSONRPCRequest | undefined;
+  /** Whether reading the response would consume an open-ended stream. */
+  streaming: boolean;
+}
+
+/** Classify one request before the handler runs. */
+function describeRequest(
+  httpMethod: string,
+  pathname: string,
+  mcpPath: string | undefined,
+  body: unknown
+): RequestDescription {
+  if (pathname !== mcpPath) {
+    return {
+      method: httpMethod,
+      client: "unknown",
+      mcpRequest: undefined,
+      streaming: false,
+    };
+  }
+
+  const requests = Array.isArray(body)
+    ? body.filter(isJSONRPCRequest)
+    : isJSONRPCRequest(body)
+      ? [body]
+      : [];
+  const mcpRequest = requests[0];
+  if (mcpRequest === undefined) {
+    return {
+      method: httpMethod,
+      client: "unknown",
+      mcpRequest: undefined,
+      streaming: false,
+    };
+  }
+
+  const method =
+    requests.length === 1
+      ? sanitize(mcpRequest.method)
+      : `batch(${requests.map((request) => sanitize(request.method)).join(",")})`;
+  return {
+    method,
+    client: formatMcpClient(mcpRequest) ?? "unknown",
+    mcpRequest,
+    streaming: mcpRequest.method === "subscriptions/listen",
+  };
+}
+
 /* ------------------------------------------------------------------------ *
  * Response outcome
  * ------------------------------------------------------------------------ */
@@ -493,6 +547,33 @@ function isNoisyRequest(httpMethod: string, pathname: string): boolean {
   return pathname.endsWith("/favicon.ico");
 }
 
+interface RequestLogLine {
+  timestamp: string;
+  prefix: string | undefined;
+  description: RequestDescription;
+  detail: McpDetail | undefined;
+  pathname: string;
+  status: number;
+  durationMs: number;
+  suffix: string[];
+}
+
+/** Render the stable single-line field order in one place. */
+function formatRequestLogLine(line: RequestLogLine): string {
+  const { description, detail } = line;
+  return [
+    dim(line.timestamp),
+    ...(line.prefix === undefined ? [] : [bold(line.prefix)]),
+    methodStyle(description.method)(description.method),
+    ...(detail?.subject === undefined ? [] : [bold(sanitize(detail.subject))]),
+    line.pathname,
+    styleStatus(line.status),
+    dim(`client=${sanitize(description.client)}`),
+    dim(`${line.durationMs}ms`),
+    ...line.suffix,
+  ].join(" ");
+}
+
 /**
  * Fetch middleware logging every request in the compact single-line format (see
  * the module docs). `MCPServer` registers it automatically unless
@@ -535,102 +616,79 @@ export function requestLogger(
       }
     }
 
-    const mcpRequests =
-      pathname === options.mcpPath
-        ? Array.isArray(requestBody)
-          ? requestBody.filter(isJSONRPCRequest)
-          : isJSONRPCRequest(requestBody)
-            ? [requestBody]
-            : []
-        : [];
-    const firstMcpRequest = mcpRequests[0];
-    const method =
-      mcpRequests.length === 0
-        ? httpMethod
-        : mcpRequests.length === 1
-          ? sanitize(firstMcpRequest!.method)
-          : `batch(${mcpRequests.map((message) => sanitize(message.method)).join(",")})`;
-    const client = firstMcpRequest
-      ? (formatMcpClient(firstMcpRequest) ?? "unknown")
-      : "unknown";
-    const isStreamingMethod =
-      firstMcpRequest?.method === "subscriptions/listen";
+    const description = describeRequest(
+      httpMethod,
+      pathname,
+      options.mcpPath,
+      requestBody
+    );
+    const logLine = (
+      status: number,
+      detail: McpDetail | undefined,
+      suffix: string[] = []
+    ): void => {
+      console.log(
+        formatRequestLogLine({
+          timestamp: new Date().toISOString().substring(11, 19),
+          prefix: options.prefix,
+          description,
+          detail,
+          pathname,
+          status,
+          durationMs: Date.now() - startedAt,
+          suffix,
+        })
+      );
+    };
 
     let response: Response;
     try {
       response = await next();
     } catch (error) {
-      const durationMs = Date.now() - startedAt;
-      const timestamp = new Date().toISOString().substring(11, 19);
-      console.log(
-        [
-          dim(timestamp),
-          ...(options.prefix === undefined ? [] : [bold(options.prefix)]),
-          methodStyle(method)(method),
-          pathname,
-          styleStatus(500),
-          dim(`client=${sanitize(client)}`),
-          dim(`${durationMs}ms`),
-          red(
-            `ERROR ${sanitize(error instanceof Error ? error.message : String(error))}`
-          ),
-        ].join(" ")
-      );
+      logLine(500, undefined, [
+        red(
+          `ERROR ${sanitize(error instanceof Error ? error.message : String(error))}`
+        ),
+      ]);
       throw error;
     }
 
-    const durationMs = Date.now() - startedAt;
-    const timestamp = new Date().toISOString().substring(11, 19);
-    const parts: string[] = [
-      dim(timestamp),
-      ...(options.prefix === undefined ? [] : [bold(options.prefix)]),
-      methodStyle(method)(method),
-    ];
-
-    if (firstMcpRequest !== undefined) {
-      const detail = formatDetail(firstMcpRequest);
-      if (detail.subject !== undefined)
-        parts.push(bold(sanitize(detail.subject)));
-    }
-    parts.push(
-      pathname,
-      styleStatus(response.status),
-      dim(`client=${sanitize(client)}`),
-      dim(`${durationMs}ms`)
-    );
-
-    if (firstMcpRequest !== undefined) {
-      const detail = formatDetail(firstMcpRequest);
+    const detail =
+      description.mcpRequest === undefined
+        ? undefined
+        : formatDetail(description.mcpRequest);
+    const suffix: string[] = [];
+    if (description.mcpRequest !== undefined && detail !== undefined) {
       const echoPayloads = level !== "info";
       if (echoPayloads && detail.input !== undefined) {
-        parts.push(inlineJson(detail.input));
+        suffix.push(inlineJson(detail.input));
       }
-      const outcome: ResponseOutcome = isStreamingMethod
+      const outcome: ResponseOutcome = description.streaming
         ? { errorMessage: null }
         : await extractResponseOutcome(response);
       if (
         echoPayloads &&
-        firstMcpRequest.method === "tools/call" &&
+        description.mcpRequest.method === "tools/call" &&
         outcome.errorMessage === null &&
         outcome.result !== undefined
       ) {
-        parts.push(dim("->"), inlineJson(compactToolResult(outcome.result)));
+        suffix.push(dim("->"), inlineJson(compactToolResult(outcome.result)));
       }
       if (outcome.errorMessage !== null) {
-        parts.push(red(`ERROR ${sanitize(outcome.errorMessage)}`));
+        suffix.push(red(`ERROR ${sanitize(outcome.errorMessage)}`));
       } else if (response.status >= 400) {
-        parts.push(red(`ERROR (HTTP ${response.status})`));
+        suffix.push(red(`ERROR (HTTP ${response.status})`));
       }
     }
 
-    console.log(parts.join(" "));
+    logLine(response.status, detail, suffix);
 
     if (level === "trace") {
       await printTraceDump(
         response,
         requestHeaders,
         requestBody,
-        !isStreamingMethod
+        !description.streaming
       );
     }
 
