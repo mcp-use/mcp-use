@@ -268,8 +268,8 @@ function methodStyle(method: string): Style {
 interface RequestDescription {
   /** HTTP method, MCP method, or a compact batch method list. */
   method: string;
-  /** Client identity from MCP metadata, or `unknown`. */
-  client: string;
+  /** Client identity for MCP traffic; omitted for HTTP-formatted requests. */
+  client: string | undefined;
   /** First MCP request, used for subject and debug details. */
   mcpRequest: JSONRPCRequest | undefined;
   /** Whether reading the response would consume an open-ended stream. */
@@ -286,7 +286,7 @@ function describeRequest(
   if (pathname !== mcpPath) {
     return {
       method: httpMethod,
-      client: "unknown",
+      client: undefined,
       mcpRequest: undefined,
       streaming: false,
     };
@@ -301,7 +301,7 @@ function describeRequest(
   if (mcpRequest === undefined) {
     return {
       method: httpMethod,
-      client: "unknown",
+      client: undefined,
       mcpRequest: undefined,
       streaming: false,
     };
@@ -568,7 +568,9 @@ function formatRequestLogLine(line: RequestLogLine): string {
     ...(detail?.subject === undefined ? [] : [bold(sanitize(detail.subject))]),
     line.pathname,
     styleStatus(line.status),
-    dim(`client=${sanitize(description.client)}`),
+    ...(description.client === undefined
+      ? []
+      : [dim(`client=${sanitize(description.client)}`)]),
     dim(`${line.durationMs}ms`),
     ...line.suffix,
   ].join(" ");

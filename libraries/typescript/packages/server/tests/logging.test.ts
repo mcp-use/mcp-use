@@ -260,9 +260,7 @@ describe("requestLogger (via MCPServer.fetch)", () => {
     );
     const lines = loggedLines();
     expect(lines).toHaveLength(1);
-    expect(lines[0]).toMatch(
-      /^\d{2}:\d{2}:\d{2} GET \/health 404 client=unknown \d+ms$/
-    );
+    expect(lines[0]).toMatch(/^\d{2}:\d{2}:\d{2} GET \/health 404 \d+ms$/);
     await server.close();
   });
 
@@ -283,10 +281,10 @@ describe("requestLogger (via MCPServer.fetch)", () => {
       })
     );
     expect(loggedLines()[0]).toMatch(
-      /^\d{2}:\d{2}:\d{2} PATCH \/health 404 client=unknown \d+ms$/
+      /^\d{2}:\d{2}:\d{2} PATCH \/health 404 \d+ms$/
     );
     expect(loggedLines()[1]).toMatch(
-      /^\d{2}:\d{2}:\d{2} POST \/mcp 400 client=unknown \d+ms$/
+      /^\d{2}:\d{2}:\d{2} POST \/mcp 400 \d+ms$/
     );
     await server.close();
   });
@@ -348,7 +346,7 @@ describe("requestLogger (via MCPServer.fetch)", () => {
       )
     ).rejects.toThrow("socket closed");
     expect(loggedLines()[0]).toMatch(
-      /DELETE \/mcp 500 client=unknown \d+ms ERROR socket closed/
+      /DELETE \/mcp 500 \d+ms ERROR socket closed/
     );
   });
 
@@ -363,7 +361,7 @@ describe("requestLogger (via MCPServer.fetch)", () => {
     );
     expect(loggedLines()).toHaveLength(1);
     expect(loggedLines()[0]).toMatch(
-      /^\d{2}:\d{2}:\d{2} GET \/mcp\/inspector 404 client=unknown \d+ms$/
+      /^\d{2}:\d{2}:\d{2} GET \/mcp\/inspector 404 \d+ms$/
     );
     await server.close();
   });
