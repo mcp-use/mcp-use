@@ -909,9 +909,14 @@ async function applyConfidentialClientAuthentication(options: {
   if (!clientId) return body;
 
   const key = confidentialClientKey(bindingKey, clientId);
-  let client = await storeGet<ConfidentialClient>(stateStore, key);
-  if (client !== undefined) clients.set(key, client);
-  else client = clients.get(key);
+  const persistedClient = await storeGet<unknown>(stateStore, key);
+  let client: ConfidentialClient | undefined;
+  if (isConfidentialClient(persistedClient)) {
+    client = persistedClient;
+    clients.set(key, persistedClient);
+  } else {
+    client = clients.get(key);
+  }
   if (client === undefined && resolveConfidentialClient) {
     const resolved = await resolveConfidentialClient({
       serverUrl,
@@ -967,6 +972,18 @@ function pruneConfidentialClients(
   for (const [key, client] of clients) {
     if (client.expiresAt <= now) clients.delete(key);
   }
+}
+
+function isConfidentialClient(value: unknown): value is ConfidentialClient {
+  return Boolean(
+    value &&
+    typeof value === "object" &&
+    typeof (value as ConfidentialClient).clientSecret === "string" &&
+    ((value as ConfidentialClient).authMethod === "client_secret_basic" ||
+      (value as ConfidentialClient).authMethod === "client_secret_post") &&
+    typeof (value as ConfidentialClient).expiresAt === "number" &&
+    Number.isFinite((value as ConfidentialClient).expiresAt)
+  );
 }
 
 async function readRequestCapped(
@@ -1099,6 +1116,14 @@ function serializeBinding(binding: Binding): SerializedBinding {
 }
 
 function deserializeBinding(value: SerializedBinding): Binding {
+  if (
+    !Array.isArray(value.authorizationServers) ||
+    !Array.isArray(value.endpoints) ||
+    !Array.isArray(value.tokenEndpointAuthMethods) ||
+    typeof value.updatedAt !== "number"
+  ) {
+    throw new InvalidUpstreamError("OAuth proxy state is invalid");
+  }
   return {
     authorizationServers: new Set(value.authorizationServers),
     endpoints: new Map(value.endpoints),
