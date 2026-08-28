@@ -153,15 +153,19 @@ function usePreviewErrorSignal(
  * re-initialization sync failure (e.g. the widget's own dev-mode HMR reload
  * failing to resynchronize) — see `installInitializedSync`'s `onLaterError`
  * in `@mcp-use/client`. That happens only after the view already initialized
- * once, so it must not retroactively fail an otherwise-successful capture;
- * once `"initialized"`/`"ready"` is seen, further `"error"` events are
- * ignored until a fresh `"resolving"` phase (a genuine new connect attempt)
- * re-arms the check.
+ * once, without ever emitting `"resolving"` or `"connecting"` again (the
+ * bridge is already connected), so it must not retroactively fail an
+ * otherwise-successful capture. Once `"initialized"`/`"ready"` is seen,
+ * further `"error"` events are ignored until a fresh `"resolving"` (a new
+ * resource resolve) or `"connecting"` (a bridge reconnect on the same
+ * resource — its effect has a dependency set disjoint from the resolve
+ * effect's, so it can re-run on its own) re-arms the check.
  */
 function useViewLifecycleErrorSignal(): (event: ViewLifecycleEvent) => void {
   const initializedRef = useRef(false);
   return useCallback((event: ViewLifecycleEvent) => {
-    if (event.status === "resolving") initializedRef.current = false;
+    if (event.status === "resolving" || event.status === "connecting")
+      initializedRef.current = false;
     else if (event.status === "initialized" || event.status === "ready")
       initializedRef.current = true;
 
