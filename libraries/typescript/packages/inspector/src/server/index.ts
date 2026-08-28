@@ -14,3 +14,13 @@ export {
   registerInspectorProxyRoutes,
   type InspectorProxyRoutesConfig,
 } from "./proxy-routes.js";
+export {
+  createMemoryOAuthProxyStateStore,
+  createRedisOAuthProxyStateStore,
+  decodeOAuthProxyEncryptionKey,
+  type OAuthProxyStateStore,
+} from "./proxy/oauth-state-store.js";
+export type {
+  OAuthProxyConfidentialClient,
+  OAuthProxyConfidentialClientResolver,
+} from "./proxy/oauth-proxy.js";

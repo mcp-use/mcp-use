@@ -1,6 +1,11 @@
 import type { Hono } from "hono";
 import { RateLimiterMemory } from "rate-limiter-flexible";
-import { mountMcpProxy, mountOAuthProxy } from "./proxy/index.js";
+import {
+  mountMcpProxy,
+  mountOAuthProxy,
+  type OAuthProxyConfidentialClientResolver,
+  type OAuthProxyStateStore,
+} from "./proxy/index.js";
 import {
   INSPECTOR_API_RATE_LIMIT,
   INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
@@ -11,10 +16,18 @@ export type InspectorProxyRoutesConfig = {
   autoConnectUrl?: string | null;
   /** Explicit cross-origin callers of the OAuth BFF. Same-origin is implicit. */
   oauthProxyAllowedOrigins?: readonly string[];
+  /** Explicit cross-origin callers of the MCP CORS proxy. */
+  mcpProxyAllowedOrigins?: readonly string[];
   /** Allow the OAuth BFF to reach loopback servers in local development. */
   oauthProxyAllowLoopback?: boolean;
   /** Mount OAuth BFF routes (default true). */
   oauth?: boolean;
+  /** Mount MCP CORS proxy routes (default true). */
+  mcp?: boolean;
+  /** Durable state shared by every OAuth proxy replica. */
+  oauthProxyStateStore?: OAuthProxyStateStore;
+  /** Server-side provider configuration for confidential OAuth clients. */
+  oauthProxyConfidentialClientResolver?: OAuthProxyConfidentialClientResolver;
 };
 
 /**
@@ -42,11 +55,14 @@ export function registerInspectorProxyRoutes(
     });
   });
 
-  mountMcpProxy(app, {
-    path: p("/inspector/api/proxy"),
-    allowLoopback,
-    rateLimiter: apiRateLimiter,
-  });
+  if (config?.mcp !== false) {
+    mountMcpProxy(app, {
+      path: p("/inspector/api/proxy"),
+      allowLoopback,
+      rateLimiter: apiRateLimiter,
+      allowedOrigins: config?.mcpProxyAllowedOrigins,
+    });
+  }
 
   if (mountOAuth) {
     mountOAuthProxy(app, {
@@ -56,6 +72,9 @@ export function registerInspectorProxyRoutes(
       allowedOrigins: config?.oauthProxyAllowedOrigins ?? [],
       allowLoopback,
       rateLimiter: apiRateLimiter,
+      stateStore: config?.oauthProxyStateStore,
+      resolveConfidentialClient:
+        config?.oauthProxyConfidentialClientResolver,
     });
   }
 

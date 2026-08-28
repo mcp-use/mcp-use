@@ -2,10 +2,15 @@
 
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
-import { cors } from "hono/cors";
 import open from "open";
 import { registerInspectorShell } from "./inspector-shell.js";
 import { registerInspectorProxyRoutes } from "./proxy-routes.js";
+import {
+  createMemoryOAuthProxyStateStore,
+  createRedisOAuthProxyStateStore,
+  decodeOAuthProxyEncryptionKey,
+} from "./proxy/index.js";
+import type { OAuthProxyConfidentialClientResolver } from "./proxy/oauth-proxy.js";
 import {
   findAvailablePort,
   formatErrorDiagnostic,
@@ -77,14 +82,6 @@ Examples:
 }
 
 const app = new Hono();
-
-app.use(
-  "*",
-  cors({
-    origin: "*",
-    exposeHeaders: ["*"],
-  })
-);
 // The CLI is primarily local dev tooling, where proxying to localhost MCP
 // servers is the main use case — but the published Docker image runs this same
 // CLI with NODE_ENV=production on a public port, where loopback proxying is
@@ -94,10 +91,44 @@ const allowLoopback = process.env.INSPECTOR_ALLOW_LOOPBACK
   ? process.env.INSPECTOR_ALLOW_LOOPBACK === "true"
   : process.env.NODE_ENV !== "production";
 
+const oauthAllowedOrigins = parseOrigins(
+  process.env.INSPECTOR_OAUTH_ALLOWED_ORIGINS
+);
+const mcpAllowedOrigins = parseOrigins(
+  process.env.INSPECTOR_MCP_ALLOWED_ORIGINS ??
+    process.env.INSPECTOR_OAUTH_ALLOWED_ORIGINS
+);
+const production = process.env.NODE_ENV === "production";
+const redisUrl =
+  process.env.INSPECTOR_OAUTH_REDIS_URL ?? process.env.REDIS_URL;
+const encryptionKeyValue = process.env.INSPECTOR_OAUTH_ENCRYPTION_KEY;
+if (production && (!redisUrl || !encryptionKeyValue)) {
+  throw new Error(
+    "Production Inspector OAuth requires INSPECTOR_OAUTH_REDIS_URL (or REDIS_URL) and INSPECTOR_OAUTH_ENCRYPTION_KEY"
+  );
+}
+if (production && oauthAllowedOrigins.length === 0) {
+  throw new Error(
+    "Production Inspector OAuth requires INSPECTOR_OAUTH_ALLOWED_ORIGINS"
+  );
+}
+const oauthProxyStateStore = redisUrl
+  ? createRedisOAuthProxyStateStore({
+      url: redisUrl,
+      encryptionKey: decodeOAuthProxyEncryptionKey(encryptionKeyValue ?? ""),
+    })
+  : createMemoryOAuthProxyStateStore();
+const oauthProxyConfidentialClientResolver = createConfidentialClientResolver(
+  process.env.INSPECTOR_OAUTH_CONFIDENTIAL_CLIENTS_JSON
+);
+
 registerInspectorProxyRoutes(app, {
   autoConnectUrl: mcpUrl,
-  oauthProxyAllowedOrigins: [],
+  oauthProxyAllowedOrigins: oauthAllowedOrigins,
+  mcpProxyAllowedOrigins: mcpAllowedOrigins,
   oauthProxyAllowLoopback: allowLoopback,
+  oauthProxyStateStore,
+  oauthProxyConfidentialClientResolver,
 });
 
 registerInspectorShell(app, {
@@ -141,3 +172,82 @@ async function startServer() {
 }
 
 startServer();
+
+function parseOrigins(value: string | undefined): string[] {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+}
+
+function createConfidentialClientResolver(
+  value: string | undefined
+): OAuthProxyConfidentialClientResolver | undefined {
+  if (!value) return undefined;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new Error("INSPECTOR_OAUTH_CONFIDENTIAL_CLIENTS_JSON must be valid JSON");
+  }
+  if (!Array.isArray(parsed)) {
+    throw new Error(
+      "INSPECTOR_OAUTH_CONFIDENTIAL_CLIENTS_JSON must be an array"
+    );
+  }
+  const clients = parsed.map((entry) => {
+    if (!entry || typeof entry !== "object") {
+      throw new Error("Invalid Inspector confidential client entry");
+    }
+    const record = entry as Record<string, unknown>;
+    const serverUrls = Array.isArray(record.serverUrls)
+      ? record.serverUrls.filter((url): url is string => typeof url === "string")
+      : [];
+    const clientId = record.clientId;
+    const clientSecret = record.clientSecret;
+    const authMethod = record.authMethod;
+    if (
+      serverUrls.length === 0 ||
+      typeof clientId !== "string" ||
+      typeof clientSecret !== "string" ||
+      (authMethod !== "client_secret_basic" &&
+        authMethod !== "client_secret_post")
+    ) {
+      throw new Error("Invalid Inspector confidential client entry");
+    }
+    return {
+      serverUrls: serverUrls.map((url) => canonicalUrl(url)),
+      clientId,
+      clientSecret,
+      authMethod: authMethod as
+        | "client_secret_basic"
+        | "client_secret_post",
+    };
+  });
+  return ({ serverUrl, clientId }) => {
+    const match = clients.find(
+      (client) =>
+        client.clientId === clientId &&
+        client.serverUrls.some((url) => url === canonicalUrl(serverUrl))
+    );
+    return match
+      ? {
+          clientSecret: match.clientSecret,
+          authMethod: match.authMethod,
+        }
+      : undefined;
+  };
+}
+
+function canonicalUrl(value: string): string {
+  const url = new URL(value);
+  url.hash = "";
+  if (
+    (url.protocol === "https:" && url.port === "443") ||
+    (url.protocol === "http:" && url.port === "80")
+  ) {
+    url.port = "";
+  }
+  return url.toString().replace(/\/$/, "");
+}

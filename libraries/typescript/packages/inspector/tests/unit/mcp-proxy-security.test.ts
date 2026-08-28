@@ -9,6 +9,43 @@ afterEach(() => {
 });
 
 describe("Inspector MCP proxy request isolation", () => {
+  it("allows only configured browser origins and MCP protocol headers", async () => {
+    const app = new Hono();
+    mountMcpProxy(app, {
+      path: "/inspector/api/proxy",
+      enableLogging: false,
+      allowedOrigins: ["https://manufact.com", "https://mochipi.dev"],
+    });
+
+    const allowed = await app.fetch(
+      new Request(proxyUrl, {
+        method: "OPTIONS",
+        headers: {
+          Origin: "https://mochipi.dev",
+          "Access-Control-Request-Method": "POST",
+          "Access-Control-Request-Headers": "mcp-method, x-target-url",
+        },
+      }),
+    );
+    expect(allowed.status).toBe(204);
+    expect(allowed.headers.get("access-control-allow-origin")).toBe(
+      "https://mochipi.dev",
+    );
+    expect(allowed.headers.get("access-control-allow-headers")).toContain(
+      "Mcp-Method",
+    );
+
+    const denied = await app.fetch(
+      new Request(proxyUrl, {
+        method: "OPTIONS",
+        headers: { Origin: "https://attacker.example" },
+      }),
+    );
+    expect(denied.headers.get("access-control-allow-origin")).not.toBe(
+      "https://attacker.example",
+    );
+  });
+
   it("does not forward Inspector cookies or browser-origin headers", async () => {
     const fetchFn = vi.fn<typeof fetch>(async (_input, init) => {
       const headers = new Headers(init?.headers);

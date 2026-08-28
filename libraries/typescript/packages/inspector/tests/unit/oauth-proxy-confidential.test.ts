@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { mountOAuthProxy } from "../../src/server/proxy/oauth-proxy";
+import type { OAuthProxyStateStore } from "../../src/server/proxy/oauth-state-store";
 
 const inspectorOrigin = "https://inspector.example.com";
 const serverUrl = "https://93.184.216.34/mcp";
@@ -46,6 +47,21 @@ function proxyRequest(url: string, body: unknown): Request {
       body,
     }),
   });
+}
+
+function sharedStateStore(): OAuthProxyStateStore {
+  const values = new Map<string, unknown>();
+  return {
+    async get<T>(key: string) {
+      return values.get(key) as T | undefined;
+    },
+    async set<T>(key: string, value: T) {
+      values.set(key, structuredClone(value));
+    },
+    async delete(key: string) {
+      values.delete(key);
+    },
+  };
 }
 
 afterEach(() => {
@@ -153,6 +169,69 @@ describe("Inspector OAuth BFF confidential clients", () => {
     expect(await token.json()).toMatchObject({
       status: 200,
       body: { access_token: "redacted", token_type: "Bearer" },
+    });
+  });
+
+  it("shares bindings and DCR credentials across proxy replicas", async () => {
+    const fetchFn = vi.fn<typeof fetch>(async (input, init) => {
+      const url = input.toString();
+      if (url === resourceMetadataUrl) {
+        return jsonResponse({
+          resource: serverUrl,
+          authorization_servers: [issuer],
+        });
+      }
+      if (url === authorizationMetadataUrl) {
+        return jsonResponse({
+          issuer,
+          registration_endpoint: registrationUrl,
+          token_endpoint: tokenUrl,
+          token_endpoint_auth_methods_supported: ["client_secret_post"],
+        });
+      }
+      if (url === registrationUrl) {
+        return jsonResponse({
+          client_id: "shared-client",
+          client_secret: "shared-secret",
+          client_secret_expires_at: 0,
+          token_endpoint_auth_method: "client_secret_post",
+        });
+      }
+      if (url === tokenUrl) {
+        const params = new URLSearchParams(String(init?.body));
+        expect(params.get("client_secret")).toBe("shared-secret");
+        return jsonResponse({ access_token: "shared-token" });
+      }
+      return new Response("not found", { status: 404 });
+    });
+    vi.stubGlobal("fetch", fetchFn);
+
+    const stateStore = sharedStateStore();
+    const firstReplica = new Hono();
+    const secondReplica = new Hono();
+    mountOAuthProxy(firstReplica, { basePath: "/oauth", enableLogging: false, stateStore });
+    mountOAuthProxy(secondReplica, { basePath: "/oauth", enableLogging: false, stateStore });
+
+    expect((await firstReplica.fetch(metadataRequest(resourceMetadataUrl))).status).toBe(200);
+    expect((await firstReplica.fetch(metadataRequest(authorizationMetadataUrl))).status).toBe(200);
+
+    const registration = await firstReplica.fetch(
+      proxyRequest(registrationUrl, { client_name: "shared" }),
+    );
+    expect((await registration.json()).body).toMatchObject({
+      client_id: "shared-client",
+      token_endpoint_auth_method: "none",
+    });
+
+    const token = await secondReplica.fetch(
+      proxyRequest(tokenUrl, {
+        grant_type: "authorization_code",
+        client_id: "shared-client",
+      }),
+    );
+    expect(await token.json()).toMatchObject({
+      status: 200,
+      body: { access_token: "shared-token" },
     });
   });
 });

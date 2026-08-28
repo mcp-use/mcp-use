@@ -357,13 +357,40 @@ services:
 
 ### Environment Variables
 
-All configuration is optional. The inspector works out of the box with sensible defaults.
+Local development works with in-memory OAuth state. A production deployment
+must provide a shared Redis store and encryption key because OAuth registration
+and token requests may land on different replicas.
 
 | Variable   | Default    | Description                  |
 | ---------- | ---------- | ---------------------------- |
 | `NODE_ENV` | production | Node.js environment          |
 | `PORT`     | 8080       | Port to run the inspector on |
 | `HOST`     | 0.0.0.0    | Host to bind to              |
+| `INSPECTOR_OAUTH_REDIS_URL` (or `REDIS_URL`) | — | Shared Redis URL required in production |
+| `INSPECTOR_OAUTH_ENCRYPTION_KEY` | — | Base64-encoded 32-byte AES key required in production |
+| `INSPECTOR_OAUTH_ALLOWED_ORIGINS` | — | Comma-separated exact browser origins allowed for OAuth |
+| `INSPECTOR_MCP_ALLOWED_ORIGINS` | OAuth origins | Comma-separated exact browser origins allowed for MCP |
+| `INSPECTOR_OAUTH_CONFIDENTIAL_CLIENTS_JSON` | — | Server-only JSON array of configured confidential clients |
+| `INSPECTOR_ALLOW_LOOPBACK` | `true` locally, `false` in production | Permit loopback upstream targets |
+
+`INSPECTOR_OAUTH_CONFIDENTIAL_CLIENTS_JSON` is intentionally read only by the
+server. Its shape is:
+
+```json
+[
+  {
+    "serverUrls": ["https://mcp.example.com/mcp"],
+    "clientId": "server-issued-client-id",
+    "clientSecret": "server-issued-client-secret",
+    "authMethod": "client_secret_post"
+  }
+]
+```
+
+Secrets are never included in browser responses or logs. Do not use `*` for
+OAuth origins; list every product origin explicitly. For a multi-replica
+deployment, configure these values in the secret manager (Infisical/Railway)
+before routing application OAuth traffic to the hosted Inspector.
 
 ---
 
