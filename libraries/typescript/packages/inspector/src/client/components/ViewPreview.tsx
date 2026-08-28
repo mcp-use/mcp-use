@@ -145,14 +145,31 @@ function usePreviewErrorSignal(
 
 /**
  * Track {@link ViewRenderer}'s lifecycle and mark `view_load_failed` only for
- * its `"error"` status — resource resolution failures, sandbox connect
- * failures, and initialize-handshake failures. A later successful stage
- * (e.g. a retried `"connecting"`) clears the mark.
+ * an `"error"` status reached before the view first initializes — resource
+ * resolution failures, sandbox connect failures, and initialize-handshake
+ * failures.
+ *
+ * `ViewRenderer` also reports `"error"` for a *later* guest
+ * re-initialization sync failure (e.g. the widget's own dev-mode HMR reload
+ * failing to resynchronize) — see `installInitializedSync`'s `onLaterError`
+ * in `@mcp-use/client`. That happens only after the view already initialized
+ * once, so it must not retroactively fail an otherwise-successful capture;
+ * once `"initialized"`/`"ready"` is seen, further `"error"` events are
+ * ignored until a fresh `"resolving"` phase (a genuine new connect attempt)
+ * re-arms the check.
  */
 function useViewLifecycleErrorSignal(): (event: ViewLifecycleEvent) => void {
+  const initializedRef = useRef(false);
   return useCallback((event: ViewLifecycleEvent) => {
-    if (event.status === "error") markViewLoadFailed(event.error);
-    else clearViewLoadFailed();
+    if (event.status === "resolving") initializedRef.current = false;
+    else if (event.status === "initialized" || event.status === "ready")
+      initializedRef.current = true;
+
+    if (event.status === "error") {
+      if (!initializedRef.current) markViewLoadFailed(event.error);
+      return;
+    }
+    clearViewLoadFailed();
   }, []);
 }
 
