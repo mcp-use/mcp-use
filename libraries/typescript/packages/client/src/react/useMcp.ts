@@ -1111,9 +1111,94 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
           setCapabilities(capabilities);
         }
 
-        // Tools and normalized connection metadata are sufficient for a usable
-        // connection. Auxiliary inventories must populate progressively rather
-        // than extending the ready-state critical path.
+        // Project OAuth credentials before publishing the ready state. Consumers
+        // use ready as the signal that all connection-critical state can be read
+        // from this render, including authTokens when OAuth was used.
+        if (authProviderRef.current) {
+          let tokens: Awaited<
+            ReturnType<NonNullable<UseMcpAuthProvider["tokens"]>>
+          >;
+          try {
+            tokens = await authProviderRef.current.tokens?.();
+          } catch (error) {
+            // The MCP connection is already usable. Token projection is
+            // supplemental state and must not tear down the connection.
+            addLog("warn", "Failed to read OAuth tokens:", error);
+            tokens = undefined;
+          }
+          if (!isMountedRef.current) {
+            addLog(
+              "debug",
+              "Connection aborted after token fetch for auth tokens - component unmounted"
+            );
+            return "failed";
+          }
+          if (tokens?.access_token) {
+            if (authorizationRef.current?.mode === "mixed") {
+              const authenticatedAuthorization = {
+                ...authorizationRef.current,
+                authenticated: true,
+              };
+              setAuthorization(authenticatedAuthorization);
+              authorizationRef.current = authenticatedAuthorization;
+            }
+            const expiresAt = getOAuthTokenExpiry(tokens);
+
+            // Best-effort: resolve the OAuth token endpoint + client credentials
+            // so consumers can persist them for server-side proactive refresh.
+            // Complete this projection before ready so consumers receive one
+            // coherent connection snapshot.
+            let tokenEndpoint: string | null = null;
+            let resource: string | null = null;
+            let clientCreds: {
+              client_id: string;
+              client_secret?: string;
+            } | null = null;
+            try {
+              tokenEndpoint =
+                (await authProviderRef.current.getTokenEndpoint?.()) ?? null;
+            } catch {
+              tokenEndpoint = null;
+            }
+            try {
+              resource =
+                (await authProviderRef.current.getResource?.()) ?? null;
+            } catch {
+              resource = null;
+            }
+            try {
+              clientCreds =
+                (await authProviderRef.current.getClientCredentials?.()) ??
+                null;
+            } catch {
+              clientCreds = null;
+            }
+
+            if (!isMountedRef.current) {
+              addLog("debug", "Skipping state update - component unmounted");
+              return "failed";
+            }
+            setAuthTokens({
+              access_token: tokens.access_token,
+              token_type: tokens.token_type || "Bearer",
+              expires_at: expiresAt,
+              refresh_token: tokens.refresh_token,
+              scope: tokens.scope,
+              ...(tokenEndpoint ? { token_endpoint: tokenEndpoint } : {}),
+              ...(resource ? { resource } : {}),
+              ...(clientCreds?.client_id
+                ? { client_id: clientCreds.client_id }
+                : {}),
+              ...(clientCreds?.client_secret
+                ? { client_secret: clientCreds.client_secret }
+                : {}),
+            });
+          }
+        }
+
+        // Tools and normalized connection metadata, plus any OAuth credentials,
+        // are sufficient for a usable connection. Auxiliary inventories populate
+        // progressively rather than extending the ready-state critical path.
         successfulTransportRef.current = transportTypeParam;
         setState("ready");
         // Optional OAuth metadata is not part of anonymous MCP readiness. Give
@@ -1194,88 +1279,6 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
             }
           } else {
             setSkills([]);
-          }
-        }
-
-        // Get OAuth tokens if authentication was used
-        if (authProviderRef.current) {
-          let tokens: Awaited<
-            ReturnType<NonNullable<UseMcpAuthProvider["tokens"]>>
-          >;
-          try {
-            tokens = await authProviderRef.current.tokens?.();
-          } catch (error) {
-            // The MCP connection is already usable. Token projection is
-            // supplemental state and must not tear down a ready connection.
-            addLog("warn", "Failed to read OAuth tokens:", error);
-            tokens = undefined;
-          }
-          if (!isMountedRef.current) {
-            addLog(
-              "debug",
-              "Connection aborted after token fetch for auth tokens - component unmounted"
-            );
-            return "failed";
-          }
-          if (tokens?.access_token) {
-            if (authorizationRef.current?.mode === "mixed") {
-              const authenticatedAuthorization = {
-                ...authorizationRef.current,
-                authenticated: true,
-              };
-              setAuthorization(authenticatedAuthorization);
-              authorizationRef.current = authenticatedAuthorization;
-            }
-            const expiresAt = getOAuthTokenExpiry(tokens);
-
-            // Best-effort: resolve the OAuth token endpoint + client credentials
-            // so consumers can persist them for server-side proactive refresh.
-            // Never blocks auth.
-            let tokenEndpoint: string | null = null;
-            let resource: string | null = null;
-            let clientCreds: {
-              client_id: string;
-              client_secret?: string;
-            } | null = null;
-            try {
-              tokenEndpoint =
-                (await authProviderRef.current.getTokenEndpoint?.()) ?? null;
-            } catch {
-              tokenEndpoint = null;
-            }
-            try {
-              resource =
-                (await authProviderRef.current.getResource?.()) ?? null;
-            } catch {
-              resource = null;
-            }
-            try {
-              clientCreds =
-                (await authProviderRef.current.getClientCredentials?.()) ??
-                null;
-            } catch {
-              clientCreds = null;
-            }
-
-            if (!isMountedRef.current) {
-              addLog("debug", "Skipping state update - component unmounted");
-              return "failed";
-            }
-            setAuthTokens({
-              access_token: tokens.access_token,
-              token_type: tokens.token_type || "Bearer",
-              expires_at: expiresAt,
-              refresh_token: tokens.refresh_token,
-              scope: tokens.scope,
-              ...(tokenEndpoint ? { token_endpoint: tokenEndpoint } : {}),
-              ...(resource ? { resource } : {}),
-              ...(clientCreds?.client_id
-                ? { client_id: clientCreds.client_id }
-                : {}),
-              ...(clientCreds?.client_secret
-                ? { client_secret: clientCreds.client_secret }
-                : {}),
-            });
           }
         }
 
