@@ -577,43 +577,59 @@ mcp-use client local auth status
   examples, and scripting patterns.
 </Card>
 
-## `generate-types`
+## `screenshot`
 
-**Purpose:** Generate TypeScript module augmentation for MCP tool schemas.
+**Purpose:** Call a view-backed MCP tool and capture its rendered MCP App as a PNG.
 
 **Syntax:**
 
 ```bash
-mcp-use generate-types [options]
+mcp-use screenshot (--server <name> | --mcp <url>) --tool <name> [args...] [options]
 ```
 
-**Options:**
+Pass tool arguments after the options, either as one JSON object or as
+`key=value` / `key:=<json>` pairs.
 
-| Option              | Description        | Default           |
-| ------------------- | ------------------ | ----------------- |
-| `-p, --path <path>` | Project directory. | Current directory |
-| `--server <file>`   | Server entry file. | `index.ts`        |
+**Source options:**
+
+| Option                        | Description                                                              |
+| ----------------------------- | ------------------------------------------------------------------------ |
+| `--server <name>`             | Use a server saved by `mcp-use client`.                                   |
+| `--mcp <url>`                 | Connect directly to an HTTP(S) MCP endpoint.                              |
+| `-H, --header <"Key: Value">` | Header for `--mcp`. Repeatable, and incompatible with `--server`.         |
+
+**Capture options:**
+
+| Option                      | Description                                                       | Default                      |
+| --------------------------- | ----------------------------------------------------------------- | ---------------------------- |
+| `--tool <name>`             | View-backed tool to call. Required.                                | None                         |
+| `--output <path>`           | Output PNG path.                                                   | Timestamped view name        |
+| `--width <px>`              | Host and widget width.                                             | `768`                        |
+| `--height <px>`             | Host viewport height; the PNG is cropped to the widget bounds.     | `720`                        |
+| `--device-scale-factor <n>` | Pixel density, greater than 0 and at most 4.                       | `1`                          |
+| `--theme <light\|dark>`     | Host theme.                                                        | `light`                      |
+| `--wait-for <selector>`     | Wait for a selector before capture.                                | None                         |
+| `--delay <ms>`              | Additional delay after readiness.                                  | `0`                          |
+| `--timeout <ms>`            | Tool, browser, and readiness timeout.                              | `30000`                      |
+| `--inspector <url>`         | Use an existing Inspector origin.                                  | Starts one                   |
+| `--cdp-url <url>`           | Use an existing Chrome DevTools endpoint.                          | Launches Chrome              |
+| `--json`                    | Emit one result or error and never prompt.                         | Off                          |
 
 **Examples:**
 
 ```bash
-mcp-use generate-types
-mcp-use generate-types -p ./my-server
-mcp-use generate-types --server src/server.ts
+mcp-use screenshot --server demo --tool show-app appName=Demo
+mcp-use screenshot --mcp https://example.com/mcp --tool show-app \
+  '{"appName":"CI"}' --theme dark --output app.png --json
 ```
 
-**Notes and behavior:**
+**Exit codes:**
 
-- The command writes `.mcp-use/tool-registry.d.ts`.
-- `mcp-use dev` runs type generation automatically.
-- `mcp-use build` also attempts type generation when it can find a server entry, but build-time generation failures are non-blocking.
-- Include `.mcp-use/**/*` in `tsconfig.json` so widget code can see generated types.
-
-```json
-{
-  "include": ["index.ts", "src/**/*", "resources/**/*", ".mcp-use/**/*"]
-}
-```
+| Code | Meaning                                                              |
+| ---- | -------------------------------------------------------------------- |
+| `0`  | Capture succeeded, or help was requested.                             |
+| `2`  | Invalid arguments.                                                    |
+| `1`  | MCP, tool, Inspector, browser, readiness, or write failure.           |
 
 ## Environment variables
 
@@ -634,9 +650,9 @@ mcp-use generate-types --server src/server.ts
 | `MCP_USE_API_KEY`           | `login`                                   | API key for non-interactive login.                                                                                                                                                                          | None                                |
 | `MCP_USE_API`               | Tunnel cleanup and local tunnel API calls | Tunnel service API base used by integrated tunnel cleanup paths.                                                                                                                                            | `https://local.mcp-use.run`         |
 | `MCP_USE_WS_RELAY`          | `dev --tunnel`, `start --tunnel`          | WebSocket relay API origin used when creating authenticated local tunnels.                                                                                                                                  | `https://api.tunnel.mcp-use.run`    |
-| `MCP_USE_CHROME_PATH`       | `client screenshot`                       | Chrome executable path for screenshots.                                                                                                                                                                     | Auto-detected                       |
-| `PUPPETEER_EXECUTABLE_PATH` | `client screenshot`                       | Fallback Chrome executable path.                                                                                                                                                                            | Auto-detected                       |
-| `CHROME_PATH`               | `client screenshot`                       | Fallback Chrome executable path.                                                                                                                                                                            | Auto-detected                       |
+| `MCP_USE_CHROME_PATH`       | `screenshot`                              | Chrome executable path for screenshots.                                                                                                                                                                     | Auto-detected                       |
+| `PUPPETEER_EXECUTABLE_PATH` | `screenshot`                              | Fallback Chrome executable path.                                                                                                                                                                            | Auto-detected                       |
+| `CHROME_PATH`               | `screenshot`                              | Fallback Chrome executable path.                                                                                                                                                                            | Auto-detected                       |
 
 **Examples:**
 
@@ -645,7 +661,7 @@ PORT=8080 mcp-use start
 MCP_URL=https://my-server.example.com MCP_ASSETS_URL=https://cdn.example.com/bucket mcp-use build
 MCP_USE_API_KEY=mcp_... mcp-use login --org my-org
 MCP_USE_CHROME_PATH=/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
-  mcp-use client local screenshot --tool show-board
+  mcp-use screenshot --server local --tool show-board
 ```
 
 ## Related references
