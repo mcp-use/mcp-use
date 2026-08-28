@@ -147,9 +147,7 @@
       "optional": true
     }
   },
-  "dependencies": {
-    "redis": "^5.8.2"
-  },
+  "dependencies": {},
   "publishConfig": {
     "access": "public"
   },
@@ -179,6 +177,7 @@
     "react-router": "^8.3.0",
     "react-resizable-panels": "^4.6.4",
     "rate-limiter-flexible": "^11.2.0",
+    "redis": "^5.8.2",
     "rollup-plugin-visualizer": "^6.0.3",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",

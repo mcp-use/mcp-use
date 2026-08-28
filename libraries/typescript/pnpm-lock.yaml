@@ -427,9 +427,6 @@ importers:
       mcp-use:
         specifier: workspace:*
         version: link:../server
-      redis:
-        specifier: ^5.8.2
-        version: 5.12.1(@opentelemetry/api@1.9.1)
     devDependencies:
       '@base-ui/react':
         specifier: ^1.6.0
@@ -503,6 +500,9 @@ importers:
       react-resizable-panels:
         specifier: ^4.6.4
         version: 4.6.4(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      redis:
+        specifier: ^5.8.2
+        version: 5.12.1(@opentelemetry/api@1.9.1)
       react-router:
         specifier: ^8.3.0
         version: 8.3.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
