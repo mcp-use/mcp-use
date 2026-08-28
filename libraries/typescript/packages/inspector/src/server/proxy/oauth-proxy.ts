@@ -348,12 +348,7 @@ export function mountOAuthProxy(
           timeoutMs,
           maxResponseBodyBytes
         );
-        await saveBinding(
-          durableStateStore,
-          bindings,
-          bindingKey,
-          binding
-        );
+        await saveBinding(durableStateStore, bindings, bindingKey, binding);
       } catch (error) {
         return proxyError(c, error, enableLogging);
       }
@@ -865,12 +860,7 @@ async function retainConfidentialClient(options: {
   } satisfies ConfidentialClient;
   const key = confidentialClientKey(bindingKey, clientId);
   clients.set(key, client);
-  await storeSet(
-    stateStore,
-    key,
-    client,
-    Math.max(1, expiresAt - Date.now())
-  );
+  await storeSet(stateStore, key, client, Math.max(1, expiresAt - Date.now()));
   while (clients.size > MAX_CONFIDENTIAL_CLIENTS) {
     const oldest = clients.keys().next().value as string | undefined;
     if (!oldest) break;
@@ -1353,9 +1343,7 @@ async function storeDelete(
     await store.delete(key);
   } catch (error) {
     throw new OAuthProxyStateStoreError(
-      error instanceof Error
-        ? error.message
-        : "OAuth proxy state delete failed"
+      error instanceof Error ? error.message : "OAuth proxy state delete failed"
     );
   }
 }

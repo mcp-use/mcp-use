@@ -25,24 +25,24 @@ describe("Inspector MCP proxy request isolation", () => {
           "Access-Control-Request-Method": "POST",
           "Access-Control-Request-Headers": "mcp-method, x-target-url",
         },
-      }),
+      })
     );
     expect(allowed.status).toBe(204);
     expect(allowed.headers.get("access-control-allow-origin")).toBe(
-      "https://mochipi.dev",
+      "https://mochipi.dev"
     );
     expect(allowed.headers.get("access-control-allow-headers")).toContain(
-      "Mcp-Method",
+      "Mcp-Method"
     );
 
     const denied = await app.fetch(
       new Request(proxyUrl, {
         method: "OPTIONS",
         headers: { Origin: "https://attacker.example" },
-      }),
+      })
     );
     expect(denied.headers.get("access-control-allow-origin")).not.toBe(
-      "https://attacker.example",
+      "https://attacker.example"
     );
   });
 

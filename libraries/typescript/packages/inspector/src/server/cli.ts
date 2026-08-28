@@ -99,8 +99,7 @@ const mcpAllowedOrigins = parseOrigins(
     process.env.INSPECTOR_OAUTH_ALLOWED_ORIGINS
 );
 const production = process.env.NODE_ENV === "production";
-const redisUrl =
-  process.env.INSPECTOR_OAUTH_REDIS_URL ?? process.env.REDIS_URL;
+const redisUrl = process.env.INSPECTOR_OAUTH_REDIS_URL ?? process.env.REDIS_URL;
 const encryptionKeyValue = process.env.INSPECTOR_OAUTH_ENCRYPTION_KEY;
 if (production && (!redisUrl || !encryptionKeyValue)) {
   throw new Error(
@@ -189,7 +188,9 @@ function createConfidentialClientResolver(
   try {
     parsed = JSON.parse(value);
   } catch {
-    throw new Error("INSPECTOR_OAUTH_CONFIDENTIAL_CLIENTS_JSON must be valid JSON");
+    throw new Error(
+      "INSPECTOR_OAUTH_CONFIDENTIAL_CLIENTS_JSON must be valid JSON"
+    );
   }
   if (!Array.isArray(parsed)) {
     throw new Error(
@@ -202,7 +203,9 @@ function createConfidentialClientResolver(
     }
     const record = entry as Record<string, unknown>;
     const serverUrls = Array.isArray(record.serverUrls)
-      ? record.serverUrls.filter((url): url is string => typeof url === "string")
+      ? record.serverUrls.filter(
+          (url): url is string => typeof url === "string"
+        )
       : [];
     const clientId = record.clientId;
     const clientSecret = record.clientSecret;
@@ -220,9 +223,7 @@ function createConfidentialClientResolver(
       serverUrls: serverUrls.map((url) => canonicalUrl(url)),
       clientId,
       clientSecret,
-      authMethod: authMethod as
-        | "client_secret_basic"
-        | "client_secret_post",
+      authMethod: authMethod as "client_secret_basic" | "client_secret_post",
     };
   });
   return ({ serverUrl, clientId }) => {

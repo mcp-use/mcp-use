@@ -209,14 +209,27 @@ describe("Inspector OAuth BFF confidential clients", () => {
     const stateStore = sharedStateStore();
     const firstReplica = new Hono();
     const secondReplica = new Hono();
-    mountOAuthProxy(firstReplica, { basePath: "/oauth", enableLogging: false, stateStore });
-    mountOAuthProxy(secondReplica, { basePath: "/oauth", enableLogging: false, stateStore });
+    mountOAuthProxy(firstReplica, {
+      basePath: "/oauth",
+      enableLogging: false,
+      stateStore,
+    });
+    mountOAuthProxy(secondReplica, {
+      basePath: "/oauth",
+      enableLogging: false,
+      stateStore,
+    });
 
-    expect((await firstReplica.fetch(metadataRequest(resourceMetadataUrl))).status).toBe(200);
-    expect((await firstReplica.fetch(metadataRequest(authorizationMetadataUrl))).status).toBe(200);
+    expect(
+      (await firstReplica.fetch(metadataRequest(resourceMetadataUrl))).status
+    ).toBe(200);
+    expect(
+      (await firstReplica.fetch(metadataRequest(authorizationMetadataUrl)))
+        .status
+    ).toBe(200);
 
     const registration = await firstReplica.fetch(
-      proxyRequest(registrationUrl, { client_name: "shared" }),
+      proxyRequest(registrationUrl, { client_name: "shared" })
     );
     expect((await registration.json()).body).toMatchObject({
       client_id: "shared-client",
@@ -227,7 +240,7 @@ describe("Inspector OAuth BFF confidential clients", () => {
       proxyRequest(tokenUrl, {
         grant_type: "authorization_code",
         client_id: "shared-client",
-      }),
+      })
     );
     expect(await token.json()).toMatchObject({
       status: 200,
