@@ -9,6 +9,43 @@ afterEach(() => {
 });
 
 describe("Inspector MCP proxy request isolation", () => {
+  it("allows only configured browser origins and MCP protocol headers", async () => {
+    const app = new Hono();
+    mountMcpProxy(app, {
+      path: "/inspector/api/proxy",
+      enableLogging: false,
+      allowedOrigins: ["https://manufact.com", "https://mochipi.dev"],
+    });
+
+    const allowed = await app.fetch(
+      new Request(proxyUrl, {
+        method: "OPTIONS",
+        headers: {
+          Origin: "https://mochipi.dev",
+          "Access-Control-Request-Method": "POST",
+          "Access-Control-Request-Headers": "mcp-method, x-target-url",
+        },
+      }),
+    );
+    expect(allowed.status).toBe(204);
+    expect(allowed.headers.get("access-control-allow-origin")).toBe(
+      "https://mochipi.dev",
+    );
+    expect(allowed.headers.get("access-control-allow-headers")).toContain(
+      "Mcp-Method",
+    );
+
+    const denied = await app.fetch(
+      new Request(proxyUrl, {
+        method: "OPTIONS",
+        headers: { Origin: "https://attacker.example" },
+      }),
+    );
+    expect(denied.headers.get("access-control-allow-origin")).not.toBe(
+      "https://attacker.example",
+    );
+  });
+
   it("prefixes proxy logs only when sharing the dev server process", async () => {
     vi.stubGlobal(
       "fetch",
@@ -28,9 +65,7 @@ describe("Inspector MCP proxy request isolation", () => {
     await embedded.fetch(request());
     expect(logSpy.mock.calls).not.toHaveLength(0);
     expect(
-      logSpy.mock.calls.every(([line]) =>
-        String(line).startsWith("[inspector]")
-      )
+      logSpy.mock.calls.every(([line]) => String(line).startsWith("[inspector]"))
     ).toBe(true);
 
     logSpy.mockClear();
@@ -39,9 +74,7 @@ describe("Inspector MCP proxy request isolation", () => {
     await standalone.fetch(request());
     expect(logSpy.mock.calls).not.toHaveLength(0);
     expect(
-      logSpy.mock.calls.every(
-        ([line]) => !String(line).startsWith("[inspector]")
-      )
+      logSpy.mock.calls.every(([line]) => !String(line).startsWith("[inspector]"))
     ).toBe(true);
     logSpy.mockRestore();
   });

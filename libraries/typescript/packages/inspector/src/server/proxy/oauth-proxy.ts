@@ -19,6 +19,10 @@ import {
   INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
   inspectorRateLimitResponse,
 } from "../rate-limit.js";
+import {
+  createMemoryOAuthProxyStateStore,
+  type OAuthProxyStateStore,
+} from "./oauth-state-store.js";
 
 type OAuthEndpointKind =
   | "registration"
@@ -44,6 +48,21 @@ type ConfidentialClient = {
   authMethod: "client_secret_basic" | "client_secret_post";
   expiresAt: number;
 };
+
+export type OAuthProxyConfidentialClient = {
+  clientSecret: string;
+  authMethod: "client_secret_basic" | "client_secret_post";
+  expiresAt?: number;
+};
+
+export type OAuthProxyConfidentialClientResolver = (options: {
+  serverUrl: string;
+  targetUrl: string;
+  clientId: string;
+}) =>
+  | OAuthProxyConfidentialClient
+  | undefined
+  | Promise<OAuthProxyConfidentialClient | undefined>;
 
 type ProxyRequest = {
   serverUrl?: unknown;
@@ -81,6 +100,10 @@ interface OAuthProxyOptions {
   ) => Promise<boolean> | boolean;
   /** Shared process-local limiter for Inspector proxy and OAuth routes. */
   rateLimiter?: RateLimiterMemory;
+  /** Durable store shared by every Inspector replica. */
+  stateStore?: OAuthProxyStateStore;
+  /** Server-side resolver for configured confidential clients (never browser-visible). */
+  resolveConfidentialClient?: OAuthProxyConfidentialClientResolver;
 }
 
 const SAFE_REQUEST_HEADERS = new Set([
@@ -129,7 +152,10 @@ export function mountOAuthProxy(
       points: INSPECTOR_API_RATE_LIMIT,
       duration: INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
     }),
+    stateStore,
+    resolveConfidentialClient,
   } = options;
+  const durableStateStore = stateStore ?? createMemoryOAuthProxyStateStore();
   const origins = new Set(allowedOrigins.map(normalizeOrigin));
   const bindings = new Map<string, Binding>();
   const confidentialClients = new Map<string, ConfidentialClient>();
@@ -183,7 +209,12 @@ export function mountOAuthProxy(
     }
     const target = targetResult.url;
     const key = canonicalUrl(serverUrl);
-    const binding = getBinding(bindings, key);
+    let binding: Binding;
+    try {
+      binding = await loadBinding(durableStateStore, bindings, key);
+    } catch (error) {
+      return proxyError(c, error, enableLogging);
+    }
     let metadataKind = classifyMetadataTarget(serverUrl, target, binding);
     if (!metadataKind && binding.authorizationServers.size === 0) {
       try {
@@ -194,9 +225,12 @@ export function mountOAuthProxy(
           timeoutMs,
           maxResponseBodyBytes
         );
-        bindings.set(key, binding);
+        await saveBinding(durableStateStore, bindings, key, binding);
         metadataKind = classifyMetadataTarget(serverUrl, target, binding);
-      } catch {
+      } catch (error) {
+        if (error instanceof OAuthProxyStateStoreError) {
+          return proxyError(c, error, enableLogging);
+        }
         // The requested target remains unauthorized below.
       }
     }
@@ -247,8 +281,7 @@ export function mountOAuthProxy(
         );
       }
       binding.updatedAt = Date.now();
-      bindings.set(key, binding);
-      pruneBindings(bindings);
+      await saveBinding(durableStateStore, bindings, key, binding);
 
       return c.body(raw, 200, {
         "Content-Type":
@@ -303,7 +336,12 @@ export function mountOAuthProxy(
     }
 
     const bindingKey = canonicalUrl(serverUrl);
-    const binding = getBinding(bindings, bindingKey);
+    let binding: Binding;
+    try {
+      binding = await loadBinding(durableStateStore, bindings, bindingKey);
+    } catch (error) {
+      return proxyError(c, error, enableLogging);
+    }
     if (binding.endpoints.size === 0) {
       try {
         await hydrateBinding(
@@ -313,8 +351,12 @@ export function mountOAuthProxy(
           timeoutMs,
           maxResponseBodyBytes
         );
-        bindings.set(bindingKey, binding);
-        pruneBindings(bindings);
+        await saveBinding(
+          durableStateStore,
+          bindings,
+          bindingKey,
+          binding
+        );
       } catch (error) {
         return proxyError(c, error, enableLogging, logPrefix);
       }
@@ -340,11 +382,15 @@ export function mountOAuthProxy(
           new URL(callbackPath, publicOrigin).toString()
         );
       } else {
-        body = applyConfidentialClientAuthentication({
+        body = await applyConfidentialClientAuthentication({
           body,
           headers,
           bindingKey,
           clients: confidentialClients,
+          stateStore: durableStateStore,
+          serverUrl: serverUrl.toString(),
+          targetUrl: target.toString(),
+          resolveConfidentialClient,
         });
       }
       if (
@@ -385,11 +431,12 @@ export function mountOAuthProxy(
         typeof responseBody === "object" &&
         !Array.isArray(responseBody)
       ) {
-        responseBody = retainConfidentialClient({
+        responseBody = await retainConfidentialClient({
           responseBody: responseBody as Record<string, unknown>,
           binding,
           bindingKey,
           clients: confidentialClients,
+          stateStore: durableStateStore,
         });
       }
       return c.json({
@@ -784,16 +831,17 @@ function serializeBody(body: unknown, headers: Headers): string | undefined {
 }
 
 function confidentialClientKey(bindingKey: string, clientId: string): string {
-  return `${bindingKey}\u0000${clientId}`;
+  return `client:${Buffer.from(`${bindingKey}\u0000${clientId}`, "utf8").toString("base64url")}`;
 }
 
-function retainConfidentialClient(options: {
+async function retainConfidentialClient(options: {
   responseBody: Record<string, unknown>;
   binding: Binding;
   bindingKey: string;
   clients: Map<string, ConfidentialClient>;
-}): Record<string, unknown> {
-  const { responseBody, binding, bindingKey, clients } = options;
+  stateStore: OAuthProxyStateStore;
+}): Promise<Record<string, unknown>> {
+  const { responseBody, binding, bindingKey, clients, stateStore } = options;
   const clientId = responseBody.client_id;
   const clientSecret = responseBody.client_secret;
   if (typeof clientId !== "string" || typeof clientSecret !== "string") {
@@ -811,21 +859,30 @@ function retainConfidentialClient(options: {
   const upstreamExpiry = responseBody.client_secret_expires_at;
   const expiresAt =
     upstreamExpiry === 0
-      ? Number.POSITIVE_INFINITY
+      ? Date.now() + CONFIDENTIAL_CLIENT_TTL_MS
       : typeof upstreamExpiry === "number" && upstreamExpiry > 0
         ? upstreamExpiry * 1000
         : Date.now() + CONFIDENTIAL_CLIENT_TTL_MS;
 
   pruneConfidentialClients(clients);
-  clients.set(confidentialClientKey(bindingKey, clientId), {
+  const client = {
     clientSecret,
     authMethod,
     expiresAt,
-  });
+  } satisfies ConfidentialClient;
+  const key = confidentialClientKey(bindingKey, clientId);
+  clients.set(key, client);
+  await storeSet(
+    stateStore,
+    key,
+    client,
+    Math.max(1, expiresAt - Date.now())
+  );
   while (clients.size > MAX_CONFIDENTIAL_CLIENTS) {
     const oldest = clients.keys().next().value as string | undefined;
     if (!oldest) break;
     clients.delete(oldest);
+    await storeDelete(stateStore, oldest);
   }
 
   const browserSafe = { ...responseBody };
@@ -835,13 +892,26 @@ function retainConfidentialClient(options: {
   return browserSafe;
 }
 
-function applyConfidentialClientAuthentication(options: {
+async function applyConfidentialClientAuthentication(options: {
   body: string | undefined;
   headers: Headers;
   bindingKey: string;
   clients: Map<string, ConfidentialClient>;
-}): string | undefined {
-  const { body, headers, bindingKey, clients } = options;
+  stateStore: OAuthProxyStateStore;
+  serverUrl: string;
+  targetUrl: string;
+  resolveConfidentialClient?: OAuthProxyConfidentialClientResolver;
+}): Promise<string | undefined> {
+  const {
+    body,
+    headers,
+    bindingKey,
+    clients,
+    stateStore,
+    serverUrl,
+    targetUrl,
+    resolveConfidentialClient,
+  } = options;
   if (
     !body ||
     !(headers.get("content-type") ?? "").includes(
@@ -856,10 +926,37 @@ function applyConfidentialClientAuthentication(options: {
   if (!clientId) return body;
 
   const key = confidentialClientKey(bindingKey, clientId);
-  const client = clients.get(key);
+  let client = clients.get(key);
+  if (client === undefined) {
+    client = await storeGet<ConfidentialClient>(stateStore, key);
+    if (client !== undefined) clients.set(key, client);
+  }
+  if (client === undefined && resolveConfidentialClient) {
+    const resolved = await resolveConfidentialClient({
+      serverUrl,
+      targetUrl,
+      clientId,
+    });
+    if (resolved) {
+      client = {
+        clientSecret: resolved.clientSecret,
+        authMethod: resolved.authMethod,
+        expiresAt:
+          resolved.expiresAt ?? Date.now() + CONFIDENTIAL_CLIENT_TTL_MS,
+      };
+      clients.set(key, client);
+      await storeSet(
+        stateStore,
+        key,
+        client,
+        Math.max(1, client.expiresAt - Date.now())
+      );
+    }
+  }
   if (!client) return body;
   if (client.expiresAt <= Date.now()) {
     clients.delete(key);
+    await storeDelete(stateStore, key);
     return body;
   }
 
@@ -954,18 +1051,83 @@ function parseObject(value: string): Record<string, unknown> {
   return parsed as Record<string, unknown>;
 }
 
-function getBinding(bindings: Map<string, Binding>, key: string): Binding {
+async function loadBinding(
+  stateStore: OAuthProxyStateStore,
+  bindings: Map<string, Binding>,
+  key: string
+): Promise<Binding> {
+  const persisted = await storeGet<SerializedBinding>(
+    stateStore,
+    bindingStoreKey(key)
+  );
+  if (persisted !== undefined) {
+    const binding = deserializeBinding(persisted);
+    if (Date.now() - binding.updatedAt <= BINDING_TTL_MS) {
+      bindings.set(key, binding);
+      return binding;
+    }
+    await storeDelete(stateStore, bindingStoreKey(key));
+  }
   const existing = bindings.get(key);
   if (existing && Date.now() - existing.updatedAt <= BINDING_TTL_MS) {
     return existing;
   }
   bindings.delete(key);
+  return emptyBinding();
+}
+
+async function saveBinding(
+  stateStore: OAuthProxyStateStore,
+  bindings: Map<string, Binding>,
+  key: string,
+  binding: Binding
+): Promise<void> {
+  bindings.set(key, binding);
+  await storeSet(
+    stateStore,
+    bindingStoreKey(key),
+    serializeBinding(binding),
+    BINDING_TTL_MS
+  );
+  pruneBindings(bindings);
+}
+
+function emptyBinding(): Binding {
   return {
     authorizationServers: new Set(),
     endpoints: new Map(),
     tokenEndpointAuthMethods: new Set(),
     updatedAt: Date.now(),
   };
+}
+
+type SerializedBinding = {
+  authorizationServers: string[];
+  endpoints: Array<[string, OAuthEndpointKind]>;
+  tokenEndpointAuthMethods: string[];
+  updatedAt: number;
+};
+
+function serializeBinding(binding: Binding): SerializedBinding {
+  return {
+    authorizationServers: [...binding.authorizationServers],
+    endpoints: [...binding.endpoints.entries()],
+    tokenEndpointAuthMethods: [...binding.tokenEndpointAuthMethods],
+    updatedAt: binding.updatedAt,
+  };
+}
+
+function deserializeBinding(value: SerializedBinding): Binding {
+  return {
+    authorizationServers: new Set(value.authorizationServers),
+    endpoints: new Map(value.endpoints),
+    tokenEndpointAuthMethods: new Set(value.tokenEndpointAuthMethods),
+    updatedAt: value.updatedAt,
+  };
+}
+
+function bindingStoreKey(key: string): string {
+  return `binding:${Buffer.from(key, "utf8").toString("base64url")}`;
 }
 
 function pruneBindings(bindings: Map<string, Binding>): void {
@@ -1163,6 +1325,9 @@ function proxyError(
       message
     );
   }
+  if (error instanceof OAuthProxyStateStoreError) {
+    return c.json({ error: "OAuth proxy state store unavailable" }, 503);
+  }
   if (error instanceof BodyTooLargeError) {
     return c.json({ error: "Upstream response too large" }, 502);
   }
@@ -1177,3 +1342,47 @@ function proxyError(
 
 class BodyTooLargeError extends Error {}
 class InvalidUpstreamError extends Error {}
+class OAuthProxyStateStoreError extends Error {}
+
+async function storeGet<T>(
+  store: OAuthProxyStateStore,
+  key: string
+): Promise<T | undefined> {
+  try {
+    return await store.get<T>(key);
+  } catch (error) {
+    throw new OAuthProxyStateStoreError(
+      error instanceof Error ? error.message : "OAuth proxy state read failed"
+    );
+  }
+}
+
+async function storeSet<T>(
+  store: OAuthProxyStateStore,
+  key: string,
+  value: T,
+  ttlMs: number
+): Promise<void> {
+  try {
+    await store.set(key, value, ttlMs);
+  } catch (error) {
+    throw new OAuthProxyStateStoreError(
+      error instanceof Error ? error.message : "OAuth proxy state write failed"
+    );
+  }
+}
+
+async function storeDelete(
+  store: OAuthProxyStateStore,
+  key: string
+): Promise<void> {
+  try {
+    await store.delete(key);
+  } catch (error) {
+    throw new OAuthProxyStateStoreError(
+      error instanceof Error
+        ? error.message
+        : "OAuth proxy state delete failed"
+    );
+  }
+}

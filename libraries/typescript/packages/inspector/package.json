@@ -147,7 +147,9 @@
       "optional": true
     }
   },
-  "dependencies": {},
+  "dependencies": {
+    "redis": "^5.8.2"
+  },
   "publishConfig": {
     "access": "public"
   },

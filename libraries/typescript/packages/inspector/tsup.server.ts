@@ -6,6 +6,7 @@ const bundledServerDependencies = [
   "@hono/node-server",
   "@mcp-use/client",
   "open",
+  "redis",
   "rate-limiter-flexible",
 ];
 const rateLimiterMemoryShim = fileURLToPath(

@@ -75,6 +75,8 @@ interface McpProxyOptions {
   rateLimiter?: RateLimiterMemory;
   /** Optional source label for logs when Inspector shares a dev server process. */
   logPrefix?: string;
+  /** Explicit browser origins; an empty list preserves the anonymous wildcard default. */
+  allowedOrigins?: readonly string[];
 }
 
 /** Whether an MCP response must remain streaming instead of being buffered. */
@@ -155,7 +157,7 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
   app.use(
     `${basePath}/*`,
     cors({
-      origin: "*",
+      origin: createCorsOriginResolver(options.allowedOrigins ?? []),
       allowHeaders: [
         "Authorization",
         "Content-Type",
@@ -165,10 +167,21 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
         "Mcp-Session-Id",
         "mcp-session-id",
         "mcp-protocol-version",
+        "Mcp-Protocol-Version",
+        "Mcp-Method",
+        "Mcp-Name",
+        "Last-Event-ID",
         "X-Server-Id",
         "X-Requested-With",
       ],
-      exposeHeaders: ["*"],
+      exposeHeaders: [
+        "Mcp-Session-Id",
+        "Mcp-Protocol-Version",
+        "WWW-Authenticate",
+        "Location",
+        "Retry-After",
+        "X-Accel-Buffering",
+      ],
     })
   );
 
@@ -377,6 +390,29 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
       );
     }
   });
+}
+
+function createCorsOriginResolver(
+  allowedOrigins: readonly string[]
+): "*" | ((origin: string) => string) {
+  if (allowedOrigins.length === 0) return "*";
+  const origins = new Set(allowedOrigins.map(normalizeOrigin));
+  return (origin: string) => {
+    try {
+      const normalized = normalizeOrigin(origin);
+      return origins.has(normalized) ? normalized : "";
+    } catch {
+      return "";
+    }
+  };
+}
+
+function normalizeOrigin(origin: string): string {
+  const url = new URL(origin);
+  if (url.pathname !== "/" || url.search || url.hash) {
+    throw new Error(`MCP proxy allowed origin must be an origin: ${origin}`);
+  }
+  return url.origin;
 }
 
 function deleteHeader(headers: Record<string, string>, name: string): void {
