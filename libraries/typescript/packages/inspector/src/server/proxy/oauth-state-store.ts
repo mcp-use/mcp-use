@@ -77,7 +77,9 @@ export function createRedisOAuthProxyStateStore(options: {
     },
     async set<T>(key: string, value: T, ttlMs: number): Promise<void> {
       const encoded = await encrypt(value, options.encryptionKey);
-      await (await ready()).set(keyPrefix + key, encoded, {
+      await (
+        await ready()
+      ).set(keyPrefix + key, encoded, {
         PX: Math.max(1, Math.ceil(ttlMs)),
       });
     },

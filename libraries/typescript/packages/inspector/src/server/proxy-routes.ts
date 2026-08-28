@@ -77,8 +77,7 @@ export function registerInspectorProxyRoutes(
       allowLoopback,
       rateLimiter: apiRateLimiter,
       stateStore: config?.oauthProxyStateStore,
-      resolveConfidentialClient:
-        config?.oauthProxyConfidentialClientResolver,
+      resolveConfidentialClient: config?.oauthProxyConfidentialClientResolver,
     });
   }
 
