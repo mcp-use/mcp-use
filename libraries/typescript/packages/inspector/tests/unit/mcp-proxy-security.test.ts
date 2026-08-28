@@ -6,6 +6,7 @@ const proxyUrl = "http://localhost/inspector/api/proxy";
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe("Inspector MCP proxy request isolation", () => {
@@ -183,5 +184,109 @@ describe("Inspector MCP proxy request isolation", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("private, no-store");
     expect(response.headers.get("x-accel-buffering")).toBe("no");
+  });
+
+  it("returns a safe 502 with the underlying network error code", async () => {
+    const networkError = Object.assign(new Error("connect ECONNREFUSED"), {
+      code: "ECONNREFUSED",
+      syscall: "connect",
+      address: "93.184.216.34",
+      port: 443,
+    });
+    const cause = new AggregateError([networkError], "connection failed");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(async () => {
+        throw new TypeError("fetch failed", { cause });
+      })
+    );
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const app = new Hono();
+    mountMcpProxy(app, {
+      path: "/inspector/api/proxy",
+      enableLogging: false,
+    });
+
+    const response = await app.fetch(
+      new Request(proxyUrl, {
+        headers: {
+          "X-Target-URL":
+            "https://93.184.216.34/mcp?access_token=must-not-leak",
+        },
+      })
+    );
+    const body = await response.json();
+    const logged = warn.mock.calls.flat().join(" ");
+
+    expect(response.status).toBe(502);
+    expect(body).toEqual({
+      error: "Proxy request failed",
+      details: "Could not reach upstream MCP server",
+      code: "ECONNREFUSED",
+      targetUrl: "https://93.184.216.34/mcp",
+    });
+    expect(logged).toContain('"code":"ECONNREFUSED"');
+    expect(logged).toContain('"syscall":"connect"');
+    expect(logged).not.toContain("must-not-leak");
+  });
+
+  it("maps Undici connection timeouts to a 504", async () => {
+    const cause = Object.assign(new Error("connection timed out"), {
+      code: "UND_ERR_CONNECT_TIMEOUT",
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(async () => {
+        throw new TypeError("fetch failed", { cause });
+      })
+    );
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const app = new Hono();
+    mountMcpProxy(app, {
+      path: "/inspector/api/proxy",
+      enableLogging: false,
+    });
+
+    const response = await app.fetch(
+      new Request(proxyUrl, {
+        headers: {
+          "X-Target-URL": "https://93.184.216.34/mcp",
+        },
+      })
+    );
+
+    expect(response.status).toBe(504);
+    expect(await response.json()).toMatchObject({
+      details: "Upstream MCP server timed out",
+      code: "UND_ERR_CONNECT_TIMEOUT",
+    });
+  });
+
+  it("uses a stable fallback code when fetch has no structured cause", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(async () => {
+        throw new TypeError("fetch failed");
+      })
+    );
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const app = new Hono();
+    mountMcpProxy(app, {
+      path: "/inspector/api/proxy",
+      enableLogging: false,
+    });
+
+    const response = await app.fetch(
+      new Request(proxyUrl, {
+        headers: {
+          "X-Target-URL": "https://93.184.216.34/mcp",
+        },
+      })
+    );
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toMatchObject({
+      code: "UPSTREAM_FETCH_FAILED",
+    });
   });
 });

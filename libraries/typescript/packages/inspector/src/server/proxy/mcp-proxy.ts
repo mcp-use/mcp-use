@@ -20,6 +20,142 @@ import {
 import { isSafeProxyTarget } from "./oauth-proxy.js";
 
 const MAX_REDIRECTS = 3;
+const UPSTREAM_TIMEOUT_CODES = new Set([
+  "ETIMEDOUT",
+  "UND_ERR_BODY_TIMEOUT",
+  "UND_ERR_CONNECT_TIMEOUT",
+  "UND_ERR_HEADERS_TIMEOUT",
+]);
+
+type UpstreamFetchDiagnostic = {
+  code: string;
+  causeName?: string;
+  syscall?: string;
+  hostname?: string;
+  address?: string;
+  port?: string | number;
+};
+
+function errorCauseChain(error: unknown): Record<string, unknown>[] {
+  const chain: Record<string, unknown>[] = [];
+  const seen = new Set<unknown>();
+  const pending: unknown[] = [error];
+  while (pending.length > 0 && chain.length < 8) {
+    const current = pending.shift();
+    if (current === null || typeof current !== "object" || seen.has(current)) {
+      continue;
+    }
+    seen.add(current);
+    const record = current as Record<string, unknown>;
+    chain.push(record);
+    pending.push(record.cause);
+    if (Array.isArray(record.errors)) {
+      pending.push(...record.errors.slice(0, 4));
+    }
+  }
+  return chain;
+}
+
+function firstStringField(
+  chain: Record<string, unknown>[],
+  field: string
+): string | undefined {
+  for (const item of chain) {
+    const value = item[field];
+    if (typeof value === "string" && value.length > 0)
+      return value.slice(0, 200);
+  }
+  return undefined;
+}
+
+/** Extract bounded, non-secret network fields from a Node/Undici fetch error. */
+export function upstreamFetchDiagnostic(
+  error: unknown
+): UpstreamFetchDiagnostic {
+  const chain = errorCauseChain(error);
+  const cause = chain.at(1) ?? chain.at(0);
+  const syscall = firstStringField(chain, "syscall");
+  const hostname = firstStringField(chain, "hostname");
+  const address = firstStringField(chain, "address");
+  let port: string | number | undefined;
+  for (const item of chain) {
+    const value = item.port;
+    if (
+      typeof value === "string" ||
+      (typeof value === "number" && Number.isFinite(value))
+    ) {
+      port = typeof value === "string" ? value.slice(0, 20) : value;
+      break;
+    }
+  }
+
+  return {
+    code: firstStringField(chain, "code") ?? "UPSTREAM_FETCH_FAILED",
+    ...(typeof cause?.name === "string" && cause.name
+      ? { causeName: cause.name.slice(0, 100) }
+      : {}),
+    ...(syscall ? { syscall } : {}),
+    ...(hostname ? { hostname } : {}),
+    ...(address ? { address } : {}),
+    ...(port !== undefined ? { port } : {}),
+  };
+}
+
+/** Remove URL credentials, query parameters, and fragments before logging. */
+export function sanitizedProxyTarget(targetUrl: string | undefined): string {
+  if (!targetUrl) return "unknown";
+  try {
+    const parsed = new URL(targetUrl);
+    parsed.username = "";
+    parsed.password = "";
+    parsed.search = "";
+    parsed.hash = "";
+    return parsed.toString();
+  } catch {
+    return "invalid";
+  }
+}
+
+function isUpstreamTimeout(
+  error: unknown,
+  diagnostic: UpstreamFetchDiagnostic
+): boolean {
+  if (UPSTREAM_TIMEOUT_CODES.has(diagnostic.code)) return true;
+  return errorCauseChain(error).some(
+    (item) => item.name === "TimeoutError" || item.name === "AbortError"
+  );
+}
+
+function upstreamFetchErrorResponse(
+  c: Context,
+  error: unknown,
+  targetUrl: string
+): Response {
+  const diagnostic = upstreamFetchDiagnostic(error);
+  const timedOut = isUpstreamTimeout(error, diagnostic);
+  const status = timedOut ? 504 : 502;
+  const safeTargetUrl = sanitizedProxyTarget(targetUrl);
+
+  console.warn(
+    `[MCP Proxy] Upstream fetch failed ${JSON.stringify({
+      targetUrl: safeTargetUrl,
+      status,
+      ...diagnostic,
+    })}`
+  );
+
+  return c.json(
+    {
+      error: "Proxy request failed",
+      details: timedOut
+        ? "Upstream MCP server timed out"
+        : "Could not reach upstream MCP server",
+      code: diagnostic.code,
+      targetUrl: safeTargetUrl,
+    },
+    status
+  );
+}
 
 /**
  * Options for configuring the MCP proxy middleware
@@ -288,12 +424,17 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
       // Follow a bounded redirect chain manually so every destination passes
       // the network policy and request bytes are never reused after detachment.
       for (let redirectCount = 0; ; redirectCount += 1) {
-        const response = await fetch(currentUrl, {
-          method: currentMethod,
-          headers,
-          body: currentBody,
-          redirect: "manual",
-        });
+        let response: Response;
+        try {
+          response = await fetch(currentUrl, {
+            method: currentMethod,
+            headers,
+            body: currentBody,
+            redirect: "manual",
+          });
+        } catch (error) {
+          return upstreamFetchErrorResponse(c, error, currentUrl);
+        }
         const location = response.headers.get("location");
         if (!(response.status >= 300 && response.status < 400 && location)) {
           return proxyResponse(response);
@@ -330,40 +471,19 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
         currentUrl = redirectUrl.toString();
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
+      const targetUrl = sanitizedProxyTarget(c.req.header("X-Target-URL"));
 
-      // Get targetUrl for better error logging
-      const targetUrl = c.req.header("X-Target-URL");
-
-      // Check if this is a connection refused error (common when a stored server isn't running)
-      const isConnectionRefused =
-        error instanceof Error &&
-        (error.message.includes("ECONNREFUSED") ||
-          error.message.includes("fetch failed"));
-
-      if (isConnectionRefused) {
-        // This is expected when reconnecting to a stored server that's not running
-        // Log as a warning instead of error, without stack trace
-        console.warn(
-          `[MCP Proxy] Connection refused to ${targetUrl || "unknown target"} - server may not be running`
-        );
-      } else {
-        // Log other errors with full details
-        console.error(
-          "[MCP Proxy] Request failed:",
-          message,
-          "\nTarget URL:",
-          targetUrl || "unknown",
-          "\nError:",
-          error
-        );
-      }
+      console.error("[MCP Proxy] Internal request failure:", {
+        targetUrl,
+        errorName: error instanceof Error ? error.name : typeof error,
+      });
 
       return c.json(
         {
           error: "Proxy request failed",
-          details: message,
-          targetUrl: targetUrl || "unknown",
+          details: "The MCP proxy could not process the request",
+          code: "PROXY_INTERNAL_ERROR",
+          targetUrl,
         },
         500
       );
