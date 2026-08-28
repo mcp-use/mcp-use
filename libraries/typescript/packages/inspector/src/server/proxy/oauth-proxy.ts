@@ -916,11 +916,9 @@ async function applyConfidentialClientAuthentication(options: {
   if (!clientId) return body;
 
   const key = confidentialClientKey(bindingKey, clientId);
-  let client = clients.get(key);
-  if (client === undefined) {
-    client = await storeGet<ConfidentialClient>(stateStore, key);
-    if (client !== undefined) clients.set(key, client);
-  }
+  let client = await storeGet<ConfidentialClient>(stateStore, key);
+  if (client !== undefined) clients.set(key, client);
+  else client = clients.get(key);
   if (client === undefined && resolveConfidentialClient) {
     const resolved = await resolveConfidentialClient({
       serverUrl,
