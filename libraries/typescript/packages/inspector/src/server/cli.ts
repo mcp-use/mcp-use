@@ -135,6 +135,13 @@ registerInspectorShell(app, {
   manufactChatUrl: process.env.MANUFACT_CHAT_URL,
 });
 
+process.once("SIGTERM", () => {
+  void oauthProxyStateStore.close?.();
+});
+process.once("SIGINT", () => {
+  void oauthProxyStateStore.close?.();
+});
+
 async function startServer() {
   try {
     const port = await findAvailablePort(startPort);
