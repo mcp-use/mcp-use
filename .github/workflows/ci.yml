@@ -18,7 +18,7 @@ permissions:
 #
 # 2. Python Tests (runs if libraries/python/** changed)
 #    ├─ python-lint: Ruff linting and formatting checks
-#    ├─ python-unit-tests: Matrix [Python 3.11, 3.12]
+#    ├─ python-unit-tests: Matrix [Python 3.11, 3.12, 3.13, 3.14]
 #    ├─ python-transport-tests: Matrix [stdio, sse, streamable_http]
 #    │  └─ python-transport-tests-report: Posts PR comment with test results table
 #    ├─ python-primitive-tests: Matrix [7 MCP primitives]
@@ -203,8 +203,16 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
         deps: ["latest", "minimum"]
+        exclude:
+          # Minimum direct-dependency versions (e.g. pydantic 2.11 via
+          # pydantic-core 2.33, pillow 10.4 via fastembed 0.3) predate
+          # Python 3.14 and ship no wheels for it, so lowest-direct
+          # resolution cannot install. Minimum bounds stay covered on
+          # 3.11-3.13; 3.14 is tested with latest resolution.
+          - python-version: "3.14"
+            deps: "minimum"
     defaults:
       run:
         working-directory: libraries/python
