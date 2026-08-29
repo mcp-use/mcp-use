@@ -26,7 +26,7 @@ permissions:
 #    ├─ python-integration-tests: Other integration tests
 #    └─ python-agent-tests: Matrix [4 agent test suites] (requires API keys)
 #
-# 3. TypeScript Tests (runs if libraries/typescript/** changed)
+# 3. TypeScript Tests (runs if libraries/typescript/** or this workflow changed)
 #    ├─ typescript-lint: ESLint checks
 #    ├─ typescript-build: Build all packages
 #    ├─ typescript-knip: Unused code/deps check (fails CI on findings)
@@ -37,7 +37,7 @@ permissions:
 #    ├─ typescript-release-channel-test: release-channel helper suite (main + canary PRs)
 #    └─ typescript-changeset-check: PR validation (PRs only)
 #
-# 4. create-mcp-use-app Tests (runs if packages/create-mcp-use-app/** changed)
+# 4. create-mcp-use-app Tests (runs if that package or this workflow changed)
 #    ├─ create-mcp-use-app-build: Build, unit test, and pack the CLI
 #    └─ create-app-tests: Matrix [3 OS × 3 PM × 3 templates × 2 flags]
 #       - Tests project creation across Ubuntu/macOS/Windows
@@ -103,11 +103,13 @@ jobs:
               - 'libraries/python/**'
             typescript:
               - 'libraries/typescript/**'
+              - '.github/workflows/ci.yml'
             knip:
               - 'libraries/typescript/**'
               - '.github/workflows/ci.yml'
             create-mcp-use-app:
               - 'libraries/typescript/packages/create-mcp-use-app/**'
+              - '.github/workflows/ci.yml'
             release-channel:
               - 'libraries/typescript/scripts/release-channel.mjs'
               - 'libraries/typescript/scripts/release-channel.test.mjs'
