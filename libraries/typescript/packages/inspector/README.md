@@ -63,7 +63,7 @@ For detailed usage instructions and guides, visit [mcp-use.com/docs/inspector](h
 | **📁 Resource Browser**    | View and copy resource URIs with syntax highlighting                    |
 | **🧩 Skills Explorer**     | Browse, verify, and preview Skills over MCP files                        |
 | **💬 Prompt Manager**      | Test and manage prompts with argument templates                         |
-| **🌐 Universal Support**   | Works with HTTP/SSE and WebSocket connections                           |
+| **🌐 Universal Support**   | Works with HTTP/SSE server connections                               |
 | **🎨 Widget Support**      | Full support for MCP-UI and OpenAI Apps SDK widgets                     |
 | **🔑 BYOK Chat**           | Bring Your Own Key chat interface for testing conversational flows      |
 | **📚 Skill-aware Chat**    | Test progressive skill loading with removable per-chat context          |
@@ -145,10 +145,7 @@ The main dashboard is your central hub for managing MCP server connections:
 To connect to an MCP server:
 
 1. **Open Connect Panel**: Click the Connect panel on the right side of the dashboard
-2. **Configure Transport**:
-   - Select "Streamable HTTP" for SSE connections
-   - Select "WebSocket" for WS connections
-   - Configure "stdin/stdio" for local process connections
+2. **Configure Transport**: The Inspector connects over Streamable HTTP (SSE is supported for legacy servers; WebSocket and stdio are not supported)
 3. **Enter Server URL**: Input the MCP server endpoint (e.g., `https://mcp.linear.app/mcp`)
 4. **Configure Authentication** (if needed): Add OAuth credentials or API headers
 5. **Click Connect**: Establish the connection
