@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 20.3.3-canary.1
+
+### Patch Changes
+
+- 1be37ef: Show RPC response latency in the traffic timing column instead of repeating it in the method label.
+
 ## 20.3.3-canary.0
 
 ### Patch Changes
