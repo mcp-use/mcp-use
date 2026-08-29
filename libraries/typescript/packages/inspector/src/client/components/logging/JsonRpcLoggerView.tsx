@@ -409,9 +409,6 @@ function RpcLogRow({
           {responseLabel ? (
             <>
               <span>{responseLabel.method}</span>
-              <span className="ml-1 text-[9px] tabular-nums text-muted-foreground/80">
-                · {responseLabel.latencyMs} ms
-              </span>
               {responseLabel.outcome === "error" ? (
                 <span className="text-muted-foreground"> · error</span>
               ) : null}
@@ -427,12 +424,18 @@ function RpcLogRow({
         <Tooltip>
           <TooltipTrigger
             render={
-              <time
-                dateTime={item.timestamp}
-                className="shrink-0 cursor-default font-mono text-[10px] tabular-nums text-muted-foreground underline decoration-dotted underline-offset-2"
-              >
-                {new Date(item.timestamp).toLocaleTimeString()}
-              </time>
+              responseLabel ? (
+                <span className="shrink-0 cursor-default font-mono text-[10px] tabular-nums text-muted-foreground underline decoration-dotted underline-offset-2">
+                  {responseLabel.latencyMs} ms
+                </span>
+              ) : (
+                <time
+                  dateTime={item.timestamp}
+                  className="shrink-0 cursor-default font-mono text-[10px] tabular-nums text-muted-foreground underline decoration-dotted underline-offset-2"
+                >
+                  {new Date(item.timestamp).toLocaleTimeString()}
+                </time>
+              )
             }
             nativeButton={false}
           />
