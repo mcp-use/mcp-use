@@ -4,12 +4,19 @@
  */
 
 import { connect, createServer } from "node:net";
+import type { Server } from "node:net";
 
 /** How many consecutive ports to probe before giving up. */
 const MAX_PROBES = 100;
 
 /** Short timeout for loopback connect probes (ms). */
 const CONNECT_PROBE_MS = 300;
+
+/** Bind retries for {@link listenWithRetry} before giving up on the same port. */
+const LISTEN_RETRY_ATTEMPTS = 5;
+
+/** Delay between bind retries in {@link listenWithRetry} (ms). */
+const LISTEN_RETRY_DELAY_MS = 100;
 
 /**
  * Outcome of {@link resolvePort}.
@@ -93,4 +100,53 @@ export async function resolvePort(
   throw new Error(
     `No free port found between ${requested} and ${requested + MAX_PROBES - 1} on ${host}.`
   );
+}
+
+/**
+ * Bind `server` to `port`/`host`, retrying the *same* port a few times on
+ * `EADDRINUSE` before giving up.
+ *
+ * {@link resolvePort} confirms a port is free well before this call — the
+ * caller's own entry import and dev-server setup run in between (the port is
+ * committed early so entry-module code can read it via `process.env.PORT`
+ * before this bind happens). That gap is long enough for another transient
+ * prober — a concurrent `resolvePort` probe, a test's own free-port check —
+ * to grab and release the same port. Retrying the same port rides out that
+ * transient hold; picking a different port this late is not an option, since
+ * URLs already baked into the entry's own config would no longer match what
+ * the CLI actually binds to.
+ *
+ * @param server - The (unbound) server to bind.
+ * @param port - The port to bind, already confirmed free by {@link resolvePort}.
+ * @param host - The host to bind.
+ * @throws The last `EADDRINUSE` error after {@link LISTEN_RETRY_ATTEMPTS}
+ * attempts, or any other bind error immediately.
+ *
+ * @internal
+ */
+export async function listenWithRetry(
+  server: Pick<Server, "listen" | "once" | "removeListener">,
+  port: number,
+  host: string
+): Promise<void> {
+  for (let attempt = 1; attempt <= LISTEN_RETRY_ATTEMPTS; attempt++) {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const onError = (error: NodeJS.ErrnoException): void => reject(error);
+        server.once("error", onError);
+        server.listen(port, host, () => {
+          server.removeListener("error", onError);
+          resolve();
+        });
+      });
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException)?.code;
+      if (code !== "EADDRINUSE" || attempt === LISTEN_RETRY_ATTEMPTS)
+        throw error;
+      await new Promise((resolve) =>
+        setTimeout(resolve, LISTEN_RETRY_DELAY_MS)
+      );
+    }
+  }
 }

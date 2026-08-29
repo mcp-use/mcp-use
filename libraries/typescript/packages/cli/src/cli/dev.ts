@@ -51,7 +51,7 @@ import {
   nextStandaloneCompatPlugin,
   nextStandaloneSsrOptions,
 } from "./next-compat.js";
-import { resolvePort } from "./port.js";
+import { listenWithRetry, resolvePort } from "./port.js";
 import { resolveTailwindCss, resolveUserViteConfig } from "./vite-config.js";
 import { createDevApiHandler } from "./dev-api.js";
 import {
@@ -983,10 +983,7 @@ export async function runDev(options: DevOptions): Promise<void> {
   };
   httpServer.on("request", onRequest);
 
-  await new Promise<void>((resolve, reject) => {
-    httpServer.once("error", reject);
-    httpServer.listen(port, host, () => resolve());
-  });
+  await listenWithRetry(httpServer, port, host);
 
   console.log(`[mcp-use] dev server ready`);
   if (currentViews.length > 0) {

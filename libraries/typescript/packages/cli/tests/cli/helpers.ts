@@ -130,10 +130,17 @@ export async function listToolNames(baseUrl: string): Promise<string[]> {
   return result.tools.map((t) => t.name).sort();
 }
 
-/** Poll `probe` until it resolves truthy or the timeout elapses. */
+/**
+ * Poll `probe` until it resolves truthy or the timeout elapses.
+ *
+ * Default timeout is well under `vitest.config.ts`'s 60s `testTimeout`
+ * (rather than a bare quarter of it) so a genuinely slow CI runner gets a
+ * fairer budget before this helper's own deadline cuts a probe off early and
+ * surfaces as a `waitFor timed out` message instead of the real error.
+ */
 export async function waitFor<T>(
   probe: () => Promise<T | undefined>,
-  { timeout = 15000, interval = 200 } = {}
+  { timeout = 30000, interval = 200 } = {}
 ): Promise<T> {
   const deadline = Date.now() + timeout;
   let lastError: unknown;
