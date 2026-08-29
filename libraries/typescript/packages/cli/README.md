@@ -1,15 +1,12 @@
 # `@mcp-use/cli`
 
-Prebuilt CLI, development server, and build pipeline for
+Prebuilt CLI, development server, build pipeline, and MCP client for
 [mcp-use](https://github.com/mcp-use/mcp-use).
 
-Most people never install this package directly. `mcp-use` depends on it and
-exposes the same `mcp-use` executable, so a project that installs the framework
-already has it:
-
 ```bash
-npm install mcp-use
 npx mcp-use dev
+npx mcp-use client connect demo https://example.com/mcp
+npx mcp-use client demo tools list
 ```
 
 ## Commands
