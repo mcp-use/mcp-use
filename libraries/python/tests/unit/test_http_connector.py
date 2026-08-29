@@ -12,7 +12,7 @@ from mcp.types import EmptyResult, ErrorData, Prompt, Resource, Tool
 from mcp_use.client.auth.bearer import BearerAuth
 from mcp_use.client.connectors.http import HttpConnector
 from mcp_use.client.middleware.middleware import CallbackClientSession
-from mcp_use.client.task_managers import SseConnectionManager
+from mcp_use.client.task_managers import SseConnectionManager, StreamableHttpConnectionManager
 
 
 @patch("mcp_use.client.connectors.base.logger")
@@ -96,16 +96,24 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
         self.mock_client_session = MagicMock()
         self.mock_client_session.__aenter__ = AsyncMock()
 
+    @patch("mcp_use.client.connectors.http.logger")
     @patch("mcp_use.client.connectors.http.SseConnectionManager")
     @patch("mcp_use.client.connectors.http.StreamableHttpConnectionManager")
     @patch("mcp_use.client.connectors.http.ClientSession")
-    async def test_connect_with_sse(self, mock_client_session_class, mock_streamable_cm_class, mock_sse_cm_class, _):
+    async def test_connect_with_sse(
+        self,
+        mock_client_session_class,
+        mock_streamable_cm_class,
+        mock_sse_cm_class,
+        mock_http_logger,
+        _,
+    ):
         """Test connecting to the MCP implementation using SSE fallback."""
         # Setup streamable HTTP to fail during initialization
-        mock_streamable_cm_instance = MagicMock()
+        mock_streamable_cm_instance = MagicMock(spec_set=StreamableHttpConnectionManager)
         mock_streamable_cm_instance.start = AsyncMock()
         mock_streamable_cm_instance.start.return_value = ("read_stream", "write_stream")
-        mock_streamable_cm_instance.close = AsyncMock()
+        mock_streamable_cm_instance.stop = AsyncMock()
         mock_streamable_cm_class.return_value = mock_streamable_cm_instance
 
         # Setup SSE to succeed
@@ -117,6 +125,8 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
         # Setup client sessions
         call_count = 0
 
+        streamable_error = McpError(ErrorData(code=1, message="Connection closed"))
+
         def mock_client_session_factory(*args, **kwargs):
             nonlocal call_count
             call_count += 1
@@ -127,7 +137,7 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
 
             if call_count == 1:
                 # First call (streamable HTTP) - initialization fails
-                mock_instance.initialize.side_effect = McpError(ErrorData(code=1, message="Connection closed"))
+                mock_instance.initialize.side_effect = streamable_error
             else:
                 # Second call (SSE) - succeeds
                 mock_init_result = MagicMock()
@@ -160,6 +170,11 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
         self.assertEqual(self.connector._connection_manager, mock_sse_cm_instance)
         self.assertTrue(self.connector._connected)
         self.assertIsNotNone(self.connector.client_session)
+        mock_streamable_cm_instance.stop.assert_awaited_once_with()
+        mock_http_logger.warning.assert_called_once_with(
+            "Streamable HTTP connection failed (%s)", type(streamable_error).__name__
+        )
+        mock_http_logger.info.assert_called_once_with("Falling back to SSE transport")
 
     @patch("mcp_use.client.connectors.http.StreamableHttpConnectionManager")
     @patch("mcp_use.client.connectors.http.ClientSession")
@@ -236,15 +251,19 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
         # Verify connection manager was not created or started
         mock_cm_class.assert_not_called()
 
+    @patch("mcp_use.client.connectors.http.logger")
     @patch("mcp_use.client.connectors.http.SseConnectionManager")
     @patch("mcp_use.client.connectors.http.StreamableHttpConnectionManager")
-    async def test_connect_failure(self, mock_streamable_cm_class, mock_sse_cm_class, _):
+    async def test_connect_failure(self, mock_streamable_cm_class, mock_sse_cm_class, mock_http_logger, _):
         """Test handling connection failures."""
         # Setup mocks for streamable HTTP failure
-        mock_streamable_cm_instance = MagicMock()
+        streamable_error = Exception("Streamable HTTP failed")
+        cleanup_error = Exception("Streamable HTTP cleanup failed")
+        mock_streamable_cm_instance = MagicMock(spec_set=StreamableHttpConnectionManager)
         mock_streamable_cm_instance.start = AsyncMock()
-        mock_streamable_cm_instance.close = AsyncMock()
-        mock_streamable_cm_instance.start.side_effect = Exception("Streamable HTTP failed")
+        mock_streamable_cm_instance.stop = AsyncMock()
+        mock_streamable_cm_instance.start.side_effect = streamable_error
+        mock_streamable_cm_instance.stop.side_effect = cleanup_error
         mock_streamable_cm_class.return_value = mock_streamable_cm_instance
 
         # Setup mocks for SSE failure (fallback)
@@ -269,6 +288,14 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
         self.assertIsNone(self.connector.client_session)
         self.assertIsNone(self.connector._connection_manager)
         self.assertFalse(self.connector._connected)
+        mock_streamable_cm_instance.stop.assert_awaited_once_with()
+        mock_http_logger.warning.assert_has_calls(
+            [
+                call("Streamable HTTP connection failed (%s)", type(streamable_error).__name__),
+                call("Failed to stop streamable HTTP connection (%s)", type(cleanup_error).__name__),
+            ]
+        )
+        mock_http_logger.info.assert_called_once_with("Falling back to SSE transport")
 
     async def test_disconnect(self, _):
         """Test disconnecting from the MCP implementation."""
