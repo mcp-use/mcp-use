@@ -12,6 +12,7 @@
   },
   "changesets": [
     "bright-tools-connect",
-    "tidy-rpc-latency"
+    "tidy-rpc-latency",
+    "windows-native-watch"
   ]
 }
