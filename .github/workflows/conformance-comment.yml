@@ -67,9 +67,33 @@ jobs:
 
             const body = fs.readFileSync(summaryPath, 'utf8').trim()
             const marker = '<!-- mcp-use-typescript-conformance-results -->'
-            const issue = context.payload.workflow_run.pull_requests?.[0]
+
+            // `workflow_run.pull_requests` is empty for fork-originated runs, so
+            // resolve the pull request from the run's own head instead. The PR
+            // number is never read from the downloaded artifact, which a fork
+            // controls.
+            const run = context.payload.workflow_run
+            const headOwner = run.head_repository?.owner?.login
+            const headBranch = run.head_branch
+            if (!headOwner || !headBranch) {
+              core.info('Conformance run carried no head repository or branch')
+              return
+            }
+
+            const { data: candidates } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${headOwner}:${headBranch}`,
+              per_page: 10,
+            })
+            // Only comment when the open PR still points at the commit this run
+            // scored, so a slow run cannot overwrite a newer result.
+            const issue = candidates.find((pr) => pr.head.sha === run.head_sha)
             if (!issue) {
-              core.info('Conformance workflow was not associated with a pull request')
+              core.info(
+                `No open pull request at ${headOwner}:${headBranch} with head ${run.head_sha}`
+              )
               return
             }
 
