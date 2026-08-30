@@ -12,6 +12,7 @@
   },
   "changesets": [
     "bright-tools-connect",
+    "single-line-dev-logs",
     "tidy-rpc-latency",
     "windows-native-watch"
   ]

@@ -1,5 +1,14 @@
 # mcp-use
 
+## 2.3.4-canary.3
+
+### Patch Changes
+
+- 0637059: Consolidate MCP request logging into one record and label colocated dev server and Inspector logs.
+- Updated dependencies [0637059]
+  - @mcp-use/cli@4.1.8-canary.2
+  - @mcp-use/inspector@20.3.3-canary.2
+
 ## 2.3.4-canary.2
 
 ### Patch Changes
