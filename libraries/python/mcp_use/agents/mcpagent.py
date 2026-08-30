@@ -596,7 +596,7 @@ class MCPAgent:
 
         try:
             for field_name, field_info in output_schema.model_fields.items():
-                required = not hasattr(field_info, "default") or field_info.default is None
+                required = field_info.is_required()
                 if required:
                     value = getattr(structured_result, field_name, None)
                     if value is None or (isinstance(value, str) and not value.strip()):
@@ -616,7 +616,7 @@ class MCPAgent:
         try:
             for field_name, field_info in output_schema.model_fields.items():
                 description = getattr(field_info, "description", "") or field_name
-                required = not hasattr(field_info, "default") or field_info.default is None
+                required = field_info.is_required()
                 schema_fields.append(f"- {field_name}: {description} {'(required)' if required else '(optional)'}")
 
             schema_description = "\n".join(schema_fields)
@@ -889,7 +889,7 @@ class MCPAgent:
                     schema_fields = []
                     for field_name, field_info in output_schema.model_fields.items():
                         description = getattr(field_info, "description", "") or field_name
-                        required = not hasattr(field_info, "default") or field_info.default is None
+                        required = field_info.is_required()
                         schema_fields.append(
                             f"- {field_name}: {description} " + ("(required)" if required else "(optional)")
                         )

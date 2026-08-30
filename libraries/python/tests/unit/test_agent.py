@@ -2,11 +2,13 @@
 Unit tests for the MCPAgent class.
 """
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 from langchain_core.agents import AgentFinish
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from pydantic import BaseModel, Field
 
 from mcp_use.agents.mcpagent import MCPAgent
 from mcp_use.client import MCPClient
@@ -383,3 +385,61 @@ class TestMCPAgentStreamEvents:
         assert any(isinstance(message, AIMessage) and message.content == ai_message.content for message in history), (
             "Final AI message should be stored by stream_events()"
         )
+
+
+class _StructuredOutputSchema(BaseModel):
+    """Schema with one genuinely required field and one explicitly optional field."""
+
+    title: str = Field(description="A required title")
+    note: str | None = Field(default=None, description="An optional note")
+
+
+class TestMCPAgentStructuredOutputRequiredFields:
+    """Regression tests for required-vs-optional field detection on pydantic output schemas.
+
+    A required pydantic field has ``default = PydanticUndefined`` (not ``None``), so the old
+    ``not hasattr(field_info, "default") or field_info.default is None`` check inverted the
+    result: required fields read as optional and ``Optional[x] = None`` fields read as required.
+    """
+
+    def _agent(self):
+        llm = MagicMock()
+        llm._llm_type = "test-provider"
+        llm._identifying_params = {"model": "test-model"}
+        return MCPAgent(llm=llm, client=MagicMock(spec=MCPClient))
+
+    def test_enhance_query_marks_fields_correctly(self):
+        agent = self._agent()
+
+        enhanced = agent._enhance_query_with_schema("do the thing", _StructuredOutputSchema)
+
+        assert "title: A required title (required)" in enhanced
+        assert "note: An optional note (optional)" in enhanced
+
+    @pytest.mark.asyncio
+    async def test_attempt_structured_output_rejects_missing_required_field(self):
+        agent = self._agent()
+        structured_llm = MagicMock()
+
+        async def _ainvoke(_prompt):
+            return SimpleNamespace(title=None, note=None)
+
+        structured_llm.ainvoke = _ainvoke
+
+        with pytest.raises(ValueError, match="Required field 'title'"):
+            await agent._attempt_structured_output("raw", structured_llm, _StructuredOutputSchema, "schema")
+
+    @pytest.mark.asyncio
+    async def test_attempt_structured_output_allows_missing_optional_field(self):
+        agent = self._agent()
+        structured_llm = MagicMock()
+
+        async def _ainvoke(_prompt):
+            return SimpleNamespace(title="A title", note=None)
+
+        structured_llm.ainvoke = _ainvoke
+
+        result = await agent._attempt_structured_output("raw", structured_llm, _StructuredOutputSchema, "schema")
+
+        assert result.title == "A title"
+        assert result.note is None
