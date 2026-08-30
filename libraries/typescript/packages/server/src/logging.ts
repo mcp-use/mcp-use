@@ -28,6 +28,10 @@ import {
   type RequestTypeMap,
 } from "@modelcontextprotocol/server";
 
+import {
+  isBufferedResponse,
+  trackBufferedResponse,
+} from "./buffered-response.js";
 import { getRequestBag, type FetchMiddleware } from "./fetch-app.js";
 
 /** Verbosity of the request logger. */
@@ -111,11 +115,14 @@ interface McpDetail {
   input?: unknown;
 }
 
-/** Internal transport context supplied by {@link MCPServer}. */
-interface RequestLoggerContext {
-  /** MCP endpoint path. Only requests here may be labelled with an RPC method. */
+/** Options for the standalone {@link requestLogger} middleware. */
+export interface RequestLoggerOptions extends LoggingOptions {
+  /**
+   * MCP endpoint path. Only requests to this exact path are labelled with
+   * their JSON-RPC method instead of their HTTP method.
+   */
   mcpPath?: string;
-  /** Optional source label used when colocated dev services share stdout. */
+  /** Source label used when colocated development services share stdout. */
   prefix?: string | undefined;
 }
 
@@ -131,7 +138,7 @@ type DetailFormatter<M extends RequestMethod> = (
 function formatClientInfo(
   info: Implementation | undefined
 ): string | undefined {
-  if (info === undefined) return undefined;
+  if (info === undefined || typeof info.name !== "string") return undefined;
   return typeof info.version === "string" && info.version !== ""
     ? `${info.name}/${info.version}`
     : info.name;
@@ -359,12 +366,20 @@ interface ResponseOutcome {
  * successful `result` payload. Handles both `application/json` and
  * `text/event-stream` bodies.
  */
-async function extractResponseOutcome(res: Response): Promise<ResponseOutcome> {
+async function extractResponseOutcome(
+  res: Response,
+  request: Request
+): Promise<ResponseOutcome> {
   if (!res.body) return { errorMessage: null };
 
   let text: string;
   try {
-    text = await res.clone().text();
+    const wasBuffered = isBufferedResponse(res, request);
+    const clone = res.clone();
+    // Cloning tees the body and changes its identity. Re-associate a
+    // framework-buffered response so downstream adapters can still trust it.
+    if (wasBuffered) trackBufferedResponse(request, res);
+    text = await clone.text();
   } catch {
     return { errorMessage: null };
   }
@@ -580,7 +595,7 @@ function formatRequestLogLine(line: RequestLogLine): string {
  * `config.logging.enabled` is `false`.
  */
 export function requestLogger(
-  options: LoggingOptions & RequestLoggerContext = {}
+  options: RequestLoggerOptions = {}
 ): FetchMiddleware {
   if (options.enabled === false) {
     return (_request, next) => next();
@@ -610,6 +625,13 @@ export function requestLogger(
       } else {
         try {
           requestBody = await request.clone().json();
+          if (
+            (request.headers.get("content-type") ?? "").includes(
+              "application/json"
+            )
+          ) {
+            getRequestBag(request).parsedBody = requestBody;
+          }
         } catch {
           // Non-JSON body — the summary line logs without MCP detail.
         }
@@ -664,7 +686,7 @@ export function requestLogger(
       }
       const outcome: ResponseOutcome = description.streaming
         ? { errorMessage: null }
-        : await extractResponseOutcome(response);
+        : await extractResponseOutcome(response, request);
       if (
         echoPayloads &&
         description.mcpRequest.method === "tools/call" &&

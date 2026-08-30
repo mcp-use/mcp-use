@@ -6,6 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { getRequestBag, jsonBodyMiddleware } from "../src/fetch-app.js";
 import { MCPServer, requestLogger } from "../src/index.js";
 import type { ServerConfig } from "../src/index.js";
 
@@ -223,6 +224,34 @@ describe("requestLogger (via MCPServer.fetch)", () => {
     await server.close();
   });
 
+  it("does not let a malformed legacy clientInfo name mask initialize errors", async () => {
+    const server = buildServer();
+    const response = await server.fetch(
+      new Request("http://localhost/mcp", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: {
+            protocolVersion: "2025-06-18",
+            capabilities: {},
+            clientInfo: { name: 123, version: "2.1.0" },
+          },
+        }),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.text()).resolves.toContain('"error"');
+    expect(loggedLines()[0]).toMatch(/initialize \/mcp 200 client=unknown/);
+    await server.close();
+  });
+
   it("appends ERROR with the tool's message for isError results", async () => {
     const server = buildServer();
     await server.fetch(
@@ -330,6 +359,49 @@ describe("requestLogger (via MCPServer.fetch)", () => {
       "[server] tools/list /mcp 204 client=unknown"
     );
     expect(loggedLines()[1]).not.toContain("[server]");
+  });
+
+  it("stashes its parsed JSON body for jsonBodyMiddleware to reuse", async () => {
+    const body = { jsonrpc: "2.0", id: 1, method: "tools/list", params: {} };
+    const request = new Request("http://localhost/mcp", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const parseSpy = vi.spyOn(JSON, "parse");
+    const terminal = vi.fn(async () => {
+      expect(getRequestBag(request).parsedBody).toEqual(body);
+      return new Response(null, { status: 204 });
+    });
+
+    try {
+      const response = await requestLogger({ mcpPath: "/mcp" })(request, () =>
+        jsonBodyMiddleware()(request, terminal)
+      );
+
+      expect(response.status).toBe(204);
+      expect(parseSpy).toHaveBeenCalledTimes(1);
+      expect(terminal).toHaveBeenCalledTimes(1);
+    } finally {
+      parseSpy.mockRestore();
+    }
+  });
+
+  it("leaves malformed JSON for jsonBodyMiddleware to reject", async () => {
+    const request = new Request("http://localhost/mcp", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{not json",
+    });
+    const terminal = vi.fn(async () => new Response(null, { status: 204 }));
+
+    const response = await requestLogger({ mcpPath: "/mcp" })(request, () =>
+      jsonBodyMiddleware()(request, terminal)
+    );
+
+    expect(response.status).toBe(400);
+    expect(getRequestBag(request).parsedBody).toBeUndefined();
+    expect(terminal).not.toHaveBeenCalled();
   });
 
   it("logs a 500 single-line record before rethrowing a handler failure", async () => {

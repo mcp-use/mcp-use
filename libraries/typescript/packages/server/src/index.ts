@@ -22,7 +22,11 @@ export {
 export type { FetchHandler, FetchMiddleware, RequestBag } from "./fetch-app.js";
 export { registerViews } from "./views/index.js";
 export { requestLogger } from "./logging.js";
-export type { LoggingOptions, LogLevel } from "./logging.js";
+export type {
+  LoggingOptions,
+  LogLevel,
+  RequestLoggerOptions,
+} from "./logging.js";
 export type {
   LandingPageOptions,
   LandingPagePrompt,
