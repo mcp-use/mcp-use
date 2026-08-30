@@ -15,6 +15,8 @@ export type InspectorProxyRoutesConfig = {
   oauthProxyAllowLoopback?: boolean;
   /** Mount OAuth BFF routes (default true). */
   oauth?: boolean;
+  /** Optional source label for logs when Inspector shares a dev server process. */
+  logPrefix?: string;
 };
 
 /**
@@ -46,6 +48,7 @@ export function registerInspectorProxyRoutes(
     path: p("/inspector/api/proxy"),
     allowLoopback,
     rateLimiter: apiRateLimiter,
+    logPrefix: config?.logPrefix,
   });
 
   if (mountOAuth) {
@@ -53,6 +56,7 @@ export function registerInspectorProxyRoutes(
       basePath: p("/inspector/api/oauth"),
       callbackPath: p("/inspector/oauth/callback"),
       enableLogging: true,
+      logPrefix: config?.logPrefix,
       allowedOrigins: config?.oauthProxyAllowedOrigins ?? [],
       allowLoopback,
       rateLimiter: apiRateLimiter,

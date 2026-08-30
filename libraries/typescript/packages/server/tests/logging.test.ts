@@ -1,13 +1,13 @@
 /**
- * Request-logging tests: the compact two-line format (HTTP summary line plus
- * indented MCP detail line), error surfacing, level handling, and noise
+ * Request-logging tests: the compact single-line format, error surfacing, level handling, and noise
  * skipping — driven through `MCPServer.fetch` with synthetic
  * 2026-07-28 requests, capturing `console.log`.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { MCPServer } from "../src/index.js";
+import { getRequestBag, jsonBodyMiddleware } from "../src/fetch-app.js";
+import { MCPServer, requestLogger } from "../src/index.js";
 import type { ServerConfig } from "../src/index.js";
 
 /** The per-request `_meta` envelope every 2026-07-28 request carries. */
@@ -100,7 +100,7 @@ describe("requestLogger (via MCPServer.fetch)", () => {
       .flatMap((entry) => entry.split("\n"));
   }
 
-  it("logs a two-line summary + detail for tools/call", async () => {
+  it("logs one complete MCP record for tools/call", async () => {
     const server = buildServer();
     const response = await server.fetch(
       mcpRequest(
@@ -112,10 +112,10 @@ describe("requestLogger (via MCPServer.fetch)", () => {
     expect(response.status).toBe(200);
 
     const lines = loggedLines();
-    expect(lines).toHaveLength(2);
-    expect(lines[0]).toMatch(/^\d{2}:\d{2}:\d{2} POST \/mcp 200 in \d+ms$/);
-    // info level: no request/response payloads on the detail line.
-    expect(lines[1]).toBe("  tools/call greet raw-request/0.0.0");
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatch(
+      /^tools\/call greet \/mcp 200 client=raw-request\/0\.0\.0 \d+ms$/
+    );
     await server.close();
   });
 
@@ -130,10 +130,11 @@ describe("requestLogger (via MCPServer.fetch)", () => {
     );
     const lines = loggedLines();
     // debug adds inline payloads but no trace dump.
-    expect(lines).toHaveLength(2);
-    expect(lines[1]).toBe(
-      '  tools/call greet {"who":"world"} -> "hi world" raw-request/0.0.0'
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain(
+      "tools/call greet /mcp 200 client=raw-request/0.0.0"
     );
+    expect(lines[0]).toContain('{"who":"world"} -> "hi world"');
     await server.close();
   });
 
@@ -146,11 +147,12 @@ describe("requestLogger (via MCPServer.fetch)", () => {
         { "mcp-name": "greet" }
       )
     );
-    const detail = loggedLines()[1] ?? "";
+    const detail = loggedLines()[0] ?? "";
     expect(detail).toContain('{"who":"xxx');
     expect(detail).toContain("...");
     // 80-char cap plus the ellipsis.
-    const inputSegment = detail.split(" ")[4] ?? "";
+    const inputSegment =
+      detail.split(" ").find((part) => part.startsWith('{"who"')) ?? "";
     expect(inputSegment.length).toBeLessThanOrEqual(83);
     await server.close();
   });
@@ -164,8 +166,8 @@ describe("requestLogger (via MCPServer.fetch)", () => {
         { "mcp-name": "config://settings" }
       )
     );
-    expect(loggedLines()[1]).toBe(
-      "  resources/read config://settings raw-request/0.0.0"
+    expect(loggedLines()[0]).toMatch(
+      /resources\/read config:\/\/settings \/mcp 200 client=raw-request\/0\.0\.0 \d+ms/
     );
     await server.close();
   });
@@ -179,14 +181,18 @@ describe("requestLogger (via MCPServer.fetch)", () => {
         { "mcp-name": "standup" }
       )
     );
-    expect(loggedLines()[1]).toBe("  prompts/get standup raw-request/0.0.0");
+    expect(loggedLines()[0]).toMatch(
+      /prompts\/get standup \/mcp 200 client=raw-request\/0\.0\.0 \d+ms/
+    );
     await server.close();
   });
 
   it("logs methods without a subject as the bare method name", async () => {
     const server = buildServer();
     await server.fetch(mcpRequest("tools/list", {}));
-    expect(loggedLines()[1]).toBe("  tools/list raw-request/0.0.0");
+    expect(loggedLines()[0]).toMatch(
+      /tools\/list \/mcp 200 client=raw-request\/0\.0\.0 \d+ms/
+    );
     await server.close();
   });
 
@@ -212,7 +218,37 @@ describe("requestLogger (via MCPServer.fetch)", () => {
         }),
       })
     );
-    expect(loggedLines()[1]).toBe("  initialize legacy-client/2.1.0");
+    expect(loggedLines()[0]).toMatch(
+      /initialize legacy-client\/2\.1\.0 \/mcp 200 client=legacy-client\/2\.1\.0 \d+ms/
+    );
+    await server.close();
+  });
+
+  it("does not let a malformed legacy clientInfo name mask initialize errors", async () => {
+    const server = buildServer();
+    const response = await server.fetch(
+      new Request("http://localhost/mcp", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: {
+            protocolVersion: "2025-06-18",
+            capabilities: {},
+            clientInfo: { name: 123, version: "2.1.0" },
+          },
+        }),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.text()).resolves.toContain('"error"');
+    expect(loggedLines()[0]).toMatch(/initialize \/mcp 200 client=unknown/);
     await server.close();
   });
 
@@ -225,8 +261,8 @@ describe("requestLogger (via MCPServer.fetch)", () => {
         { "mcp-name": "fail" }
       )
     );
-    expect(loggedLines()[1]).toBe(
-      "  tools/call fail raw-request/0.0.0 ERROR failed: on purpose"
+    expect(loggedLines()[0]).toMatch(
+      /tools\/call fail \/mcp 200 client=raw-request\/0\.0\.0 \d+ms ERROR failed: on purpose/
     );
     await server.close();
   });
@@ -240,8 +276,8 @@ describe("requestLogger (via MCPServer.fetch)", () => {
         { "mcp-name": "no-such-tool" }
       )
     );
-    const detail = loggedLines()[1];
-    expect(detail).toContain("  tools/call no-such-tool");
+    const detail = loggedLines()[0];
+    expect(detail).toContain("tools/call no-such-tool /mcp");
     expect(detail).toMatch(/ERROR .*no-such-tool/);
     await server.close();
   });
@@ -253,8 +289,133 @@ describe("requestLogger (via MCPServer.fetch)", () => {
     );
     const lines = loggedLines();
     expect(lines).toHaveLength(1);
-    expect(lines[0]).toMatch(/^\d{2}:\d{2}:\d{2} GET \/health 404 in \d+ms$/);
+    expect(lines[0]).toMatch(/^GET \/health 404 \d+ms$/);
     await server.close();
+  });
+
+  it("uses the HTTP method for malformed and non-MCP endpoint bodies", async () => {
+    const server = buildServer();
+    await server.fetch(
+      new Request("http://localhost/health", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", method: "tools/list" }),
+      })
+    );
+    await server.fetch(
+      new Request("http://localhost/mcp", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{not json",
+      })
+    );
+    expect(loggedLines()[0]).toMatch(/^PATCH \/health 404 \d+ms$/);
+    expect(loggedLines()[1]).toMatch(/^POST \/mcp 400 \d+ms$/);
+    await server.close();
+  });
+
+  it("labels JSON-RPC batches and missing client metadata without throwing", async () => {
+    const server = buildServer();
+    await server.fetch(
+      new Request("http://localhost/mcp", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify([
+          { jsonrpc: "2.0", id: 1, method: "tools/list", params: {} },
+          { jsonrpc: "2.0", id: 2, method: "prompts/list", params: {} },
+        ]),
+      })
+    );
+    expect(loggedLines()[0]).toMatch(
+      /batch\(tools\/list,prompts\/list\) \/mcp \d+ client=unknown \d+ms/
+    );
+    await server.close();
+  });
+
+  it("adds an explicit source prefix only when one is configured", async () => {
+    const body = JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/list",
+      params: {},
+    });
+    await requestLogger({ mcpPath: "/mcp", prefix: "[server]" })(
+      new Request("http://localhost/mcp", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body,
+      }),
+      async () => new Response(null, { status: 204 })
+    );
+    await requestLogger({ mcpPath: "/mcp" })(
+      new Request("http://localhost/mcp", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body,
+      }),
+      async () => new Response(null, { status: 204 })
+    );
+    expect(loggedLines()[0]).toContain(
+      "[server] tools/list /mcp 204 client=unknown"
+    );
+    expect(loggedLines()[1]).not.toContain("[server]");
+  });
+
+  it("stashes its parsed JSON body for jsonBodyMiddleware to reuse", async () => {
+    const body = { jsonrpc: "2.0", id: 1, method: "tools/list", params: {} };
+    const request = new Request("http://localhost/mcp", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const parseSpy = vi.spyOn(JSON, "parse");
+    const terminal = vi.fn(async () => {
+      expect(getRequestBag(request).parsedBody).toEqual(body);
+      return new Response(null, { status: 204 });
+    });
+
+    try {
+      const response = await requestLogger({ mcpPath: "/mcp" })(request, () =>
+        jsonBodyMiddleware()(request, terminal)
+      );
+
+      expect(response.status).toBe(204);
+      expect(parseSpy).toHaveBeenCalledTimes(1);
+      expect(terminal).toHaveBeenCalledTimes(1);
+    } finally {
+      parseSpy.mockRestore();
+    }
+  });
+
+  it("leaves malformed JSON for jsonBodyMiddleware to reject", async () => {
+    const request = new Request("http://localhost/mcp", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{not json",
+    });
+    const terminal = vi.fn(async () => new Response(null, { status: 204 }));
+
+    const response = await requestLogger({ mcpPath: "/mcp" })(request, () =>
+      jsonBodyMiddleware()(request, terminal)
+    );
+
+    expect(response.status).toBe(400);
+    expect(getRequestBag(request).parsedBody).toBeUndefined();
+    expect(terminal).not.toHaveBeenCalled();
+  });
+
+  it("logs a 500 single-line record before rethrowing a handler failure", async () => {
+    await expect(
+      requestLogger({ mcpPath: "/mcp" })(
+        new Request("http://localhost/mcp", { method: "DELETE" }),
+        async () => {
+          throw new Error("socket closed");
+        }
+      )
+    ).rejects.toThrow("socket closed");
+    expect(loggedLines()[0]).toMatch(
+      /DELETE \/mcp 500 \d+ms ERROR socket closed/
+    );
   });
 
   it("logs unknown inspector paths and skips favicon noise", async () => {
@@ -267,9 +428,7 @@ describe("requestLogger (via MCPServer.fetch)", () => {
       new Request("http://localhost/favicon.ico", { method: "GET" })
     );
     expect(loggedLines()).toHaveLength(1);
-    expect(loggedLines()[0]).toMatch(
-      /^\d{2}:\d{2}:\d{2} GET \/mcp\/inspector 404 in \d+ms$/
-    );
+    expect(loggedLines()[0]).toMatch(/^GET \/mcp\/inspector 404 \d+ms$/);
     await server.close();
   });
 
@@ -297,7 +456,10 @@ describe("requestLogger (via MCPServer.fetch)", () => {
     expect(output).toContain("Response Body:");
     expect(output).toContain('"who": "dump"');
     // Trace includes debug's inline echo too.
-    expect(output).toContain('  tools/call greet {"who":"dump"}');
+    expect(output).toContain(
+      "tools/call greet /mcp 200 client=raw-request/0.0.0"
+    );
+    expect(output).toContain('{"who":"dump"}');
     await server.close();
   });
 
@@ -327,10 +489,8 @@ describe("requestLogger (via MCPServer.fetch)", () => {
     );
     const lines = loggedLines();
     // The injected newline must not produce a third log line.
-    expect(lines).toHaveLength(2);
-    expect(lines[1]).toBe(
-      "  tools/call fail raw-request/0.0.0 ERROR failed: line1 FORGED 200 OK"
-    );
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain("ERROR failed: line1 FORGED 200 OK");
     await server.close();
   });
 
@@ -353,7 +513,9 @@ describe("requestLogger (via MCPServer.fetch)", () => {
         { "mcp-name": "greet", host: "api.example.com" }
       )
     );
-    expect(loggedLines()[1]).toBe("  tools/call greet raw-request/0.0.0");
+    expect(loggedLines()[0]).toMatch(
+      /tools\/call greet \/mcp 200 client=raw-request\/0\.0\.0 \d+ms/
+    );
     await server.close();
   });
 });

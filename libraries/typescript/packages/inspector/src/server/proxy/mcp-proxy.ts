@@ -73,6 +73,8 @@ interface McpProxyOptions {
   enableLogging?: boolean;
   /** Shared process-local limiter for Inspector proxy and OAuth routes. */
   rateLimiter?: RateLimiterMemory;
+  /** Optional source label for logs when Inspector shares a dev server process. */
+  logPrefix?: string;
 }
 
 /** Whether an MCP response must remain streaming instead of being buffered. */
@@ -129,6 +131,7 @@ export function isOpenEndedSseResponse(
 export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
   const basePath = options.path || "/mcp/proxy";
   const enableLogging = options.enableLogging !== false;
+  const logPrefix = options.logPrefix;
   const rateLimiter =
     options.rateLimiter ??
     new RateLimiterMemory({
@@ -171,7 +174,12 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
 
   // Apply logger middleware to proxy routes
   if (enableLogging) {
-    app.use(`${basePath}/*`, logger());
+    app.use(
+      `${basePath}/*`,
+      logPrefix === undefined
+        ? logger()
+        : logger((message, ...args) => console.log(logPrefix, message, ...args))
+    );
   }
 
   app.use(`${basePath}/*`, rateLimit);

@@ -323,6 +323,8 @@ function registerFetchMiddleware<TEnv extends Env>(
  */
 export class MCPServer<TUser = never, TEnv extends Env = Env> {
   readonly #config: ServerConfig<TUser>;
+  /** Dev-only source label injected before mounting colocated Inspector routes. */
+  #requestLogPrefix: string | undefined;
   readonly #branding: ReturnType<typeof normalizeServerBranding>;
   readonly #tools = new Map<string, ToolEntry<TUser, TEnv>>();
   readonly #resources = new Map<string, ResourceEntry<TUser, TEnv>>();
@@ -901,6 +903,12 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     this.#eventBus = bus;
   }
 
+  /** Set a development-only label for request logs before the app is mounted. @internal */
+  __setRequestLogPrefix(prefix: string | undefined): void {
+    this.#assertNotStarted("request log prefix", "development");
+    this.#requestLogPrefix = prefix;
+  }
+
   /** Mount and validate the Hono/MCP application without serving a request. @internal */
   __mount(): void {
     if (!this.#skillsPrimed) {
@@ -1348,8 +1356,12 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       const nestedBasePath = basePath === "/" ? "" : basePath;
       const httpApp = new Hono<TEnv>();
       const middlewares = [
+        requestLogger({
+          ...this.#config.logging,
+          mcpPath: basePath,
+          prefix: this.#requestLogPrefix,
+        }),
         jsonBodyMiddleware(),
-        requestLogger(this.#config.logging),
       ];
 
       const corsConfig = this.#config.cors;
