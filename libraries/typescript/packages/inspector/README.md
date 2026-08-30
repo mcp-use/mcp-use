@@ -145,7 +145,7 @@ The main dashboard is your central hub for managing MCP server connections:
 To connect to an MCP server:
 
 1. **Open Connect Panel**: Click the Connect panel on the right side of the dashboard
-2. **Configure Transport**: The Inspector connects over Streamable HTTP (SSE is supported for legacy servers; WebSocket and stdio are not supported)
+2. **Configure Transport**: The Inspector supports Streamable HTTP only.
 3. **Enter Server URL**: Input the MCP server endpoint (e.g., `https://mcp.linear.app/mcp`)
 4. **Configure Authentication** (if needed): Add OAuth credentials or API headers
 5. **Click Connect**: Establish the connection
