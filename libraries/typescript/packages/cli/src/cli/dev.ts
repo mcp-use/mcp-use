@@ -468,12 +468,6 @@ export async function runDev(options: DevOptions): Promise<void> {
         // broadcast `full-reload` forever, so srcdoc view guests repeatedly
         // remount and surface a compiling spinner instead of Fast Refresh.
         ignored: "**/.dev-server-logs.txt",
-        // Windows file notifications can be coalesced or dropped while Vite
-        // is transforming the same module. Polling keeps dev reloads reliable.
-        ...(process.platform === "win32" && {
-          usePolling: true,
-          interval: 100,
-        }),
       },
       // A public/wildcard bind deliberately accepts hostnames that are only
       // known to the surrounding platform (for example a sandbox URL). Keep

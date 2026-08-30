@@ -432,7 +432,7 @@ describe("runDev", () => {
       })
     ).toMatchObject({ result: { contents: [{ text: "Guidance v1\n" }] } });
 
-    writeFileSync(guide, "Guidance v2\n");
+    writeFileSync(guide, "Skills Guidance v2\n");
     await waitFor(async () => {
       const body = await mcpRequest(dev.url, "resources/read", {
         uri: "skill://product-search-result/guide.md",
@@ -440,7 +440,9 @@ describe("runDev", () => {
       const result = body["result"] as {
         contents?: Array<{ text?: string }>;
       };
-      return result.contents?.[0]?.text === "Guidance v2\n" ? true : undefined;
+      return result.contents?.[0]?.text === "Skills Guidance v2\n"
+        ? true
+        : undefined;
     });
   });
 
