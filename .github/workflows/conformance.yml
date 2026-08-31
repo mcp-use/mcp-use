@@ -273,6 +273,11 @@ jobs:
 
           exit "$exit_code"
 
+      - name: Run conformance summary regression tests
+        if: always()
+        working-directory: libraries/typescript
+        run: pnpm test:summarize-conformance
+
       - name: Summarize TypeScript conformance scores
         if: always()
         working-directory: .
