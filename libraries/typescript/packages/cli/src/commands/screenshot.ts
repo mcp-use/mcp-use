@@ -472,6 +472,35 @@ async function waitForDocument(
   );
 }
 
+interface ReadyState {
+  ready?: boolean;
+  error?: string | null;
+  errorMessage?: string | null;
+  selector?: boolean;
+}
+
+/**
+ * Turn the Inspector preview's polled DOM state into a failure, or
+ * `undefined` when there is none yet.
+ *
+ * Only an explicit MCP App initialization failure (a bad resource, a
+ * sandbox connect failure, an initialize-handshake failure, or a missing
+ * screenshot bundle) fails the capture here — never a widget's own
+ * `console.error`, uncaught error, or unhandled rejection logged after it
+ * has successfully initialized. See ViewPreview.tsx in \@mcp-use/inspector.
+ */
+export function readyStateFailure(
+  state: ReadyState | undefined
+): CommandError | undefined {
+  if (state?.error !== "view_load_failed") return undefined;
+  return new CommandError(
+    "view_load_failed",
+    state.errorMessage
+      ? `MCP App failed to initialize: ${state.errorMessage}`
+      : "MCP App failed to initialize."
+  );
+}
+
 async function waitForReady(
   browser: BrowserHandle,
   selector: string | undefined,
@@ -482,23 +511,17 @@ async function waitForReady(
     const expression = `(() => ({
       ready: document.body?.dataset.viewReady === "true",
       error: document.body?.dataset.viewError || null,
+      errorMessage: document.body?.dataset.viewErrorMessage || null,
       selector: ${JSON.stringify(selector)} === undefined || !!document.querySelector(${JSON.stringify(selector ?? "")})
     }))()`;
     const response = (await browser.cdp.send(
       "Runtime.evaluate",
       { expression, returnByValue: true },
       browser.sessionId
-    )) as {
-      result?: {
-        value?: { ready?: boolean; error?: string | null; selector?: boolean };
-      };
-    };
+    )) as { result?: { value?: ReadyState } };
     const state = response.result?.value;
-    if (state?.error)
-      throw new CommandError(
-        "preview_failed",
-        `Inspector preview failed: ${state.error}`
-      );
+    const failure = readyStateFailure(state);
+    if (failure) throw failure;
     if (state?.ready === true && state.selector === true) return;
     await sleep(100);
   }
