@@ -30,6 +30,8 @@ export interface MountInspectorOptions {
   oauthProxyAllowedOrigins?: readonly string[];
   /** Allow OAuth and MCP proxy requests to loopback targets (default `true`). */
   oauthProxyAllowLoopback?: boolean;
+  /** Optional source label for logs when Inspector shares a dev server process. */
+  logPrefix?: string;
   /**
    * Server-wide MCP path prefix (default `/mcp`; `""` = root). The Inspector
    * is served from `${basePath}/inspector` and its API from
@@ -130,6 +132,7 @@ function registerInspectorRoutes(
     // where loopback proxying is SSRF into the host's own services. Default to
     // blocking loopback; local dev tooling opts in explicitly.
     oauthProxyAllowLoopback: options?.oauthProxyAllowLoopback ?? false,
+    logPrefix: options?.logPrefix,
   };
   if (options?.autoConnectUrl !== undefined) {
     routesConfig.autoConnectUrl = options.autoConnectUrl;

@@ -6,6 +6,19 @@ tag: "New"
 rss: true
 ---
 
+<Update label="v2.3.4" description="August 2026">
+  ## Compact request logs & OAuth-ready tokens
+  Patch release collapsing MCP request logs to one line, projecting React OAuth tokens before ready, and using native Windows file watching in `mcp-use dev`.
+
+- **Enhancement** (server): request logs collapse to one compact line per HTTP request (`tools/call greet /mcp 200 client=… 12ms`); default `info` omits payloads, `debug`/`trace` add detail, and colocated `mcp-use dev` prefixes server lines with `[server]` (`#2351`)
+- **Fix** (@mcp-use/client): `useMcp` exposes OAuth `authTokens` in the same render that marks an authenticated connection as ready (`#2358`)
+- **Fix** (@mcp-use/cli): `mcp-use dev` uses Vite's native file watching on Windows instead of 100ms polling, so an edit during startup is not swallowed as the watch baseline (`#2338`)
+- **Enhancement** (@mcp-use/inspector): JSON-RPC traffic rows show response latency in the timing column; see the Inspector changelog (`#2349`)
+- **Documentation** (@mcp-use/cli): published package README so the npm page is no longer blank (`#2350`)
+- **Update**: Updated @mcp-use/inspector to v20.3.3
+- **Update**: Updated @mcp-use/cli to v4.1.8
+</Update>
+
 <Update label="v2.3.3" description="August 2026">
   ## Safer session replacement & scaffolds
   Patch release cleaning up replaced client sessions, fresh-project validation, and scaffold guidance.
@@ -181,6 +194,18 @@ rss: true
 - **Update**: Updated @mcp-use/inspector to v20.0.0
 - **Update**: Updated @mcp-use/cli to v4.0.0
 - **Update**: Updated create-mcp-use-app to v2.0.0
+</Update>
+
+<Update label="v1.34.6" description="July 2026">
+  ## Proxied OAuth fallback & token refresh
+  Last v1 patch before 2.0.0. Ships the unpublished 1.34.4/1.34.5 canary fixes on the `mcp-use@1.34.6` tag.
+
+- **Fix**: default `useMcp` auto-proxy fallback uses `https://inspector.manufact.com/inspector/api/proxy` instead of the retired `inspector.mcp-use.com` host, whose 301 broke CORS preflight
+- **Fix**: refresh expiring OAuth access tokens with the discovered protected-resource URL, retain rotated refresh tokens, and do not reuse an expired token after refresh fails
+- **Fix**: proxied browser OAuth resource validation succeeds, and discovery failures surface immediately instead of waiting for a popup timeout
+- **Documentation**: CLI client example and Inspector README drop dead documentation links
+- **Update**: Updated @mcp-use/inspector to v12.0.6
+- **Update**: Updated @mcp-use/cli to v3.6.7
 </Update>
 
 <Update label="v1.34.3" description="July 2026">

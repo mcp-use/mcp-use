@@ -113,6 +113,7 @@ function sameDiscoveredViews(
 interface ServerLike {
   fetch(request: Request): Response | Promise<Response>;
   __setEventBus(bus: ServerEventBus): void;
+  __setRequestLogPrefix(prefix: string | undefined): void;
   __mount(): void;
   /** URL path prefix the MCP endpoint is mounted at (default `"/mcp"`). */
   readonly basePath?: string;
@@ -468,12 +469,6 @@ export async function runDev(options: DevOptions): Promise<void> {
         // broadcast `full-reload` forever, so srcdoc view guests repeatedly
         // remount and surface a compiling spinner instead of Fast Refresh.
         ignored: "**/.dev-server-logs.txt",
-        // Windows file notifications can be coalesced or dropped while Vite
-        // is transforming the same module. Polling keeps dev reloads reliable.
-        ...(process.platform === "win32" && {
-          usePolling: true,
-          interval: 100,
-        }),
       },
       // A public/wildcard bind deliberately accepts hostnames that are only
       // known to the surrounding platform (for example a sandbox URL). Keep
@@ -580,22 +575,6 @@ export async function runDev(options: DevOptions): Promise<void> {
     }
   };
 
-  let currentHandler: WebHandler;
-  let basePath: string;
-  let currentSkillsDirectory: string | undefined;
-  try {
-    const { server, skillsDirectory } = await importServer(currentViews);
-    server.__setEventBus(eventBus);
-    server.__mount();
-    currentHandler = async (request) => server.fetch(request);
-    basePath = server.basePath ?? "/mcp";
-    currentSkillsDirectory = skillsDirectory;
-  } catch (error) {
-    await runner.close();
-    await vite.close();
-    throw error;
-  }
-
   let inspectorModule: ProjectInspectorModule | undefined;
   let inspectorHandler: DevInspectorHandler | undefined;
   let inspectorMountPath: string | undefined;
@@ -610,6 +589,7 @@ export async function runDev(options: DevOptions): Promise<void> {
       oauthProxyAllowLoopback: localhostBind || wildcardBind,
       devMode: true,
       manufactChatUrl: process.env["MANUFACT_CHAT_URL"],
+      logPrefix: "[inspector]",
     });
     if (typeof mounted !== "function") {
       throw new Error(
@@ -621,7 +601,13 @@ export async function runDev(options: DevOptions): Promise<void> {
     inspectorMountPath = nextBasePath;
   };
 
+  let currentHandler: WebHandler;
+  let basePath: string;
+  let currentSkillsDirectory: string | undefined;
   try {
+    const { server, skillsDirectory } = await importServer(currentViews);
+    server.__setEventBus(eventBus);
+    basePath = server.basePath ?? "/mcp";
     if (options.inspector !== false) {
       const loadedInspector = await loadProjectInspector(options.cwd);
       if (loadedInspector.installed) {
@@ -629,6 +615,12 @@ export async function runDev(options: DevOptions): Promise<void> {
         mountDevInspector(basePath);
       }
     }
+    server.__setRequestLogPrefix(
+      inspectorHandler === undefined ? undefined : "[server]"
+    );
+    server.__mount();
+    currentHandler = async (request) => server.fetch(request);
+    currentSkillsDirectory = skillsDirectory;
   } catch (error) {
     await runner.close();
     await vite.close();
@@ -658,6 +650,9 @@ export async function runDev(options: DevOptions): Promise<void> {
           runner.evaluatedModules.clear();
           const { server, skillsDirectory } = await importServer(viewsSnapshot);
           server.__setEventBus(eventBus);
+          server.__setRequestLogPrefix(
+            inspectorHandler === undefined ? undefined : "[server]"
+          );
           server.__mount();
 
           if (isAborted()) return;

@@ -1,5 +1,24 @@
 # @mcp-use/inspector
 
+## 20.3.3-canary.2
+
+### Patch Changes
+
+- 0637059: Consolidate MCP request logging into one record and label colocated dev server and Inspector logs.
+
+## 20.3.3-canary.1
+
+### Patch Changes
+
+- 1be37ef: Show RPC response latency in the traffic timing column instead of repeating it in the method label.
+
+## 20.3.3-canary.0
+
+### Patch Changes
+
+- @mcp-use/agent@2.0.11-canary.0
+- mcp-use@2.3.4-canary.0
+
 ## 20.3.2
 
 ### Patch Changes

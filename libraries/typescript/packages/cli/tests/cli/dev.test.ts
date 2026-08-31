@@ -62,18 +62,32 @@ beforeEach(() => {
 
 afterEach(async () => {
   tunnelState.url = null;
-  while (cleanups.length > 0) {
-    await cleanups.pop()?.();
+  const errors: unknown[] = [];
+  try {
+    while (cleanups.length > 0) {
+      try {
+        await cleanups.pop()?.();
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+  } finally {
+    if (originalMcpUrl === undefined) {
+      delete process.env["MCP_URL"];
+    } else {
+      process.env["MCP_URL"] = originalMcpUrl;
+    }
+    if (originalPort === undefined) {
+      delete process.env["PORT"];
+    } else {
+      process.env["PORT"] = originalPort;
+    }
   }
-  if (originalMcpUrl === undefined) {
-    delete process.env["MCP_URL"];
-  } else {
-    process.env["MCP_URL"] = originalMcpUrl;
+  if (errors.length === 1) {
+    throw errors[0];
   }
-  if (originalPort === undefined) {
-    delete process.env["PORT"];
-  } else {
-    process.env["PORT"] = originalPort;
+  if (errors.length > 1) {
+    throw new AggregateError(errors, "test cleanup failed");
   }
 });
 
@@ -159,7 +173,7 @@ function installFakeInspector(cwd: string): void {
     const url = new URL(request.url);
     const prefix = options.basePath + "/inspector";
     if (url.pathname === prefix + "/config.json") {
-      return Response.json({ autoConnectUrl: options.autoConnectUrl });
+      return Response.json({ autoConnectUrl: options.autoConnectUrl, logPrefix: options.logPrefix });
     }
     if (url.pathname === prefix || url.pathname.startsWith(prefix + "/")) {
       return new Response("mounted:" + options.basePath, {
@@ -418,7 +432,7 @@ describe("runDev", () => {
       })
     ).toMatchObject({ result: { contents: [{ text: "Guidance v1\n" }] } });
 
-    writeFileSync(guide, "Guidance v2\n");
+    writeFileSync(guide, "Skills Guidance v2\n");
     await waitFor(async () => {
       const body = await mcpRequest(dev.url, "resources/read", {
         uri: "skill://product-search-result/guide.md",
@@ -426,7 +440,9 @@ describe("runDev", () => {
       const result = body["result"] as {
         contents?: Array<{ text?: string }>;
       };
-      return result.contents?.[0]?.text === "Guidance v2\n" ? true : undefined;
+      return result.contents?.[0]?.text === "Skills Guidance v2\n"
+        ? true
+        : undefined;
     });
   });
 
@@ -445,8 +461,12 @@ describe("runDev", () => {
     expect(await shell.text()).toBe("mounted:/mcp");
     expect(
       await (await fetch(`${origin}/mcp/inspector/config.json`)).json()
-    ).toEqual({ autoConnectUrl: `${origin}/mcp` });
+    ).toEqual({ autoConnectUrl: `${origin}/mcp`, logPrefix: "[inspector]" });
     expect(dev.logs.some((line) => line.includes("➜ Inspector:"))).toBe(true);
+    await mcpRequest(dev.url, "tools/list");
+    expect(dev.logs.some((line) => line.includes("[server] tools/list"))).toBe(
+      true
+    );
 
     const entry = join(cwd, "src", "index.ts");
     writeFileSync(
@@ -464,7 +484,10 @@ describe("runDev", () => {
     expect((await fetch(`${origin}/mcp/inspector`)).status).toBe(404);
     expect(
       await (await fetch(`${origin}/api/mcp/inspector/config.json`)).json()
-    ).toEqual({ autoConnectUrl: `${origin}/api/mcp` });
+    ).toEqual({
+      autoConnectUrl: `${origin}/api/mcp`,
+      logPrefix: "[inspector]",
+    });
   });
 
   it("serves the built-in Inspector without a project dependency", async () => {

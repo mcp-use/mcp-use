@@ -70,6 +70,8 @@ interface OAuthProxyOptions {
   callbackPath?: string;
   /** @default true */
   enableLogging?: boolean;
+  /** Optional source label for logs when Inspector shares a dev server process. */
+  logPrefix?: string;
   /** Optional authentication applied before any outbound request. */
   authenticate?: (c: Context) => Promise<boolean> | boolean;
   /** Optional deployment policy applied after built-in URL and network checks. */
@@ -120,6 +122,7 @@ export function mountOAuthProxy(
     maxResponseBodyBytes = 1024 * 1024,
     callbackPath = "/oauth/callback",
     enableLogging = true,
+    logPrefix,
     authenticate,
     validateServerUrl,
     rateLimiter: configuredRateLimiter = new RateLimiterMemory({
@@ -205,7 +208,7 @@ export function mountOAuthProxy(
     }
 
     try {
-      log(enableLogging, `GET ${target}`);
+      log(enableLogging, logPrefix, `GET ${target}`);
       const upstream = await safeFetch(target, {
         method: "GET",
         headers: { Accept: "application/json" },
@@ -252,7 +255,7 @@ export function mountOAuthProxy(
           upstream.headers.get("content-type") ?? "application/json",
       });
     } catch (error) {
-      return proxyError(c, error, enableLogging);
+      return proxyError(c, error, enableLogging, logPrefix);
     }
   });
 
@@ -313,7 +316,7 @@ export function mountOAuthProxy(
         bindings.set(bindingKey, binding);
         pruneBindings(bindings);
       } catch (error) {
-        return proxyError(c, error, enableLogging);
+        return proxyError(c, error, enableLogging, logPrefix);
       }
     }
     const endpointKind = binding.endpoints.get(canonicalUrl(target));
@@ -350,7 +353,7 @@ export function mountOAuthProxy(
         return c.json({ error: "OAuth request body too large" }, 413);
       }
 
-      log(enableLogging, `POST ${endpointKind} ${target}`);
+      log(enableLogging, logPrefix, `POST ${endpointKind} ${target}`);
       const upstream = await safeFetch(target, {
         method: "POST",
         headers,
@@ -396,11 +399,15 @@ export function mountOAuthProxy(
         body: responseBody,
       });
     } catch (error) {
-      return proxyError(c, error, enableLogging);
+      return proxyError(c, error, enableLogging, logPrefix);
     }
   });
 
-  log(enableLogging, `Mounted at ${basePath}/metadata and ${basePath}/proxy`);
+  log(
+    enableLogging,
+    logPrefix,
+    `Mounted at ${basePath}/metadata and ${basePath}/proxy`
+  );
 }
 
 async function validateUrl(
@@ -1129,13 +1136,33 @@ function isPublicAddress(address: string): boolean {
   );
 }
 
-function log(enabled: boolean, message: string): void {
-  if (enabled) console.log(`[OAuth BFF] ${message}`);
+function log(
+  enabled: boolean,
+  prefix: string | undefined,
+  message: string
+): void {
+  if (enabled) {
+    console.log(
+      prefix === undefined
+        ? `[OAuth BFF] ${message}`
+        : `${prefix} [OAuth BFF] ${message}`
+    );
+  }
 }
 
-function proxyError(c: Context, error: unknown, logging: boolean): Response {
+function proxyError(
+  c: Context,
+  error: unknown,
+  logging: boolean,
+  prefix: string | undefined
+): Response {
   const message = error instanceof Error ? error.message : "Unknown error";
-  if (logging) console.error("[OAuth BFF]", message);
+  if (logging) {
+    console.error(
+      prefix === undefined ? "[OAuth BFF]" : `${prefix} [OAuth BFF]`,
+      message
+    );
+  }
   if (error instanceof BodyTooLargeError) {
     return c.json({ error: "Upstream response too large" }, 502);
   }

@@ -9,6 +9,43 @@ afterEach(() => {
 });
 
 describe("Inspector MCP proxy request isolation", () => {
+  it("prefixes proxy logs only when sharing the dev server process", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(async () => new Response("ok"))
+    );
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const request = () =>
+      new Request(proxyUrl, {
+        headers: { "X-Target-URL": "https://93.184.216.34/mcp" },
+      });
+
+    const embedded = new Hono();
+    mountMcpProxy(embedded, {
+      path: "/inspector/api/proxy",
+      logPrefix: "[inspector]",
+    });
+    await embedded.fetch(request());
+    expect(logSpy.mock.calls).not.toHaveLength(0);
+    expect(
+      logSpy.mock.calls.every(([line]) =>
+        String(line).startsWith("[inspector]")
+      )
+    ).toBe(true);
+
+    logSpy.mockClear();
+    const standalone = new Hono();
+    mountMcpProxy(standalone, { path: "/inspector/api/proxy" });
+    await standalone.fetch(request());
+    expect(logSpy.mock.calls).not.toHaveLength(0);
+    expect(
+      logSpy.mock.calls.every(
+        ([line]) => !String(line).startsWith("[inspector]")
+      )
+    ).toBe(true);
+    logSpy.mockRestore();
+  });
+
   it("does not forward Inspector cookies or browser-origin headers", async () => {
     const fetchFn = vi.fn<typeof fetch>(async (_input, init) => {
       const headers = new Headers(init?.headers);

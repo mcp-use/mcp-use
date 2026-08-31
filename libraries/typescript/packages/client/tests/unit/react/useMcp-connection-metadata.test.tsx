@@ -212,6 +212,40 @@ describe("useMcp connection metadata", () => {
     );
   });
 
+  it("publishes OAuth tokens atomically with the ready state", async () => {
+    let releaseTokens!: () => void;
+    const tokensPending = new Promise<{
+      access_token: string;
+      token_type: string;
+      refresh_token: string;
+    }>((resolve) => {
+      releaseTokens = () =>
+        resolve({
+          access_token: "access-token",
+          token_type: "Bearer",
+          refresh_token: "refresh-token",
+        });
+    });
+    authProvider.tokens.mockReturnValueOnce(tokensPending);
+
+    const { getResult } = await renderFor("modern");
+
+    expect(getResult().state).toBe("discovering");
+    expect(getResult().authTokens).toBeUndefined();
+
+    await act(async () => {
+      releaseTokens();
+      await tokensPending;
+      await Promise.resolve();
+    });
+
+    expect(getResult().state).toBe("ready");
+    expect(getResult().authTokens).toMatchObject({
+      access_token: "access-token",
+      refresh_token: "refresh-token",
+    });
+  });
+
   it("exposes tools before auxiliary inventories finish loading", async () => {
     let releaseInventories!: () => void;
     const inventoriesPending = new Promise<void>((resolve) => {
