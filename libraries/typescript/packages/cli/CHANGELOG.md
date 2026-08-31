@@ -1,5 +1,12 @@
 # @mcp-use/cli
 
+## 4.1.8
+
+### Patch Changes
+
+- 82772dc: Consolidate MCP request logging into one record and label colocated dev server and Inspector logs.
+- 82772dc: Use Vite's native file watching on Windows instead of forcing 100ms polling. Polling delays the watcher's initial scan, which can swallow an edit made during startup so no change event is ever emitted.
+
 ## 4.1.8-canary.2
 
 ### Patch Changes
