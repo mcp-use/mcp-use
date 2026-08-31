@@ -421,28 +421,23 @@ function RpcLogRow({
           ) : null}
         </span>
 
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              responseLabel ? (
+        {responseLabel ? (
+          <Tooltip>
+            <TooltipTrigger
+              render={
                 <span className="shrink-0 cursor-default font-mono text-[10px] tabular-nums text-muted-foreground underline decoration-dotted underline-offset-2">
                   {responseLabel.latencyMs} ms
                 </span>
-              ) : (
-                <time
-                  dateTime={item.timestamp}
-                  className="shrink-0 cursor-default font-mono text-[10px] tabular-nums text-muted-foreground underline decoration-dotted underline-offset-2"
-                >
-                  {new Date(item.timestamp).toLocaleTimeString()}
-                </time>
-              )
-            }
-            nativeButton={false}
-          />
-          <TooltipContent side="left">
-            {new Date(item.timestamp).toLocaleString()}
-          </TooltipContent>
-        </Tooltip>
+              }
+              nativeButton={false}
+            />
+            <TooltipContent side="left">
+              {`Request took ${responseLabel.latencyMs} ms (${new Date(
+                item.timestamp
+              ).toLocaleString()})`}
+            </TooltipContent>
+          </Tooltip>
+        ) : null}
       </button>
 
       {expanded ? (
@@ -472,10 +467,7 @@ function getMethod(
   responseLabels: ReadonlyMap<string, RpcTrafficResponseLabel>
 ): string {
   const responseLabel = responseLabels.get(entry.id);
-  if (responseLabel) {
-    const errorSuffix = responseLabel.outcome === "error" ? " · error" : "";
-    return `${responseLabel.method} · ${responseLabel.latencyMs} ms${errorSuffix}`;
-  }
+  if (responseLabel) return responseLabel.method;
 
   const fromMessage = getRpcTrafficMethod(entry.message);
   if (fromMessage) return fromMessage;
