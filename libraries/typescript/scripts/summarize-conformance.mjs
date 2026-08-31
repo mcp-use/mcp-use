@@ -115,4 +115,4 @@ const summary = `${lines.join("\n")}\n`;
 if (output) writeFileSync(output, summary);
 else process.stdout.write(summary);
 
-if (totals.unexpectedFailures > 0) process.exitCode = 1;
+if (totals.unexpectedFailures > 0 || totals.unexpectedWarnings > 0) process.exitCode = 1;
