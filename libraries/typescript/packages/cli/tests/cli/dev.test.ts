@@ -345,7 +345,7 @@ describe("runDev", () => {
 
     writeFileSync(
       addedSkillFile,
-      "---\nname: returns\ndescription: Updated returns\n---\n# Returns\n"
+      "---\nname: returns\ndescription: Updated returns policy\n---\n# Returns\n"
     );
     await waitFor(async () => {
       const body = await mcpRequest(dev.url, "skills/list");
@@ -353,7 +353,7 @@ describe("runDev", () => {
         skills?: Array<{ frontmatter?: { description?: string } }>;
       };
       return result.skills?.some(
-        (skill) => skill.frontmatter?.description === "Updated returns"
+        (skill) => skill.frontmatter?.description === "Updated returns policy"
       )
         ? true
         : undefined;
@@ -394,7 +394,7 @@ describe("runDev", () => {
       })
     ).toMatchObject({ result: { contents: [{ text: "Policy v1\n" }] } });
 
-    writeFileSync(policy, "Policy v2\n");
+    writeFileSync(policy, "Policy v2 revised\n");
     await waitFor(async () => {
       const body = await mcpRequest(dev.url, "resources/read", {
         uri: "skill://refunds/references/policy.md",
@@ -402,7 +402,9 @@ describe("runDev", () => {
       const result = body["result"] as {
         contents?: Array<{ text?: string }>;
       };
-      return result.contents?.[0]?.text === "Policy v2\n" ? true : undefined;
+      return result.contents?.[0]?.text === "Policy v2 revised\n"
+        ? true
+        : undefined;
     });
   });
 
