@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 20.3.4-canary.0
+
+### Patch Changes
+
+- 11534a3: Inspector RPC logger: replace the per-row timestamp with the request duration in milliseconds
+  - mcp-use@2.3.5-canary.0
+
 ## 20.3.3
 
 ### Patch Changes
