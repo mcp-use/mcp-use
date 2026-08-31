@@ -6,6 +6,15 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v20.3.3" description="August 2026">
+  ## RPC latency in the timing column
+  Patch release paired with `mcp-use` v2.3.4, moving response latency into the traffic timing column and labeling colocated Inspector logs.
+
+- **Enhancement**: response rows show latency in the traffic timing column instead of repeating it in the method label; unmatched rows still show the wall-clock time (`#2349`)
+- **Enhancement**: when Inspector shares the `mcp-use dev` process, proxy and OAuth BFF logs are prefixed `[inspector]` (`#2351`)
+- **Update**: Updated mcp-use to v2.3.4
+</Update>
+
 <Update label="v20.3.2" description="August 2026">
   ## Model tool-limit warnings
   Patch release paired with `mcp-use` v2.3.3, making model tool limits visible before a chat request is sent.
@@ -150,6 +159,15 @@ tag: "New"
 - **Fix**: OAuth session values are encrypted at rest, secret connection fields are not persisted, browser launches and Inspector routes are hardened, and proxy/OAuth APIs are rate-limited
 - **Enhancement**: Immutable CDN asset resolution and zero-dependency packaging prevent mixed-version assets and keep standalone installs clean
 - **Update**: Updated mcp-use to v2.0.0
+</Update>
+
+<Update label="v12.0.6" description="July 2026">
+  ## CLI version heading
+  Patch release paired with `mcp-use` v1.34.6; includes the unpublished 12.0.4 docs-link fix.
+
+- **Enhancement**: the CLI help heading shows the installed Inspector version
+- **Documentation**: Inspector README drops dead documentation links
+- **Update**: Updated mcp-use to v1.34.6
 </Update>
 
 <Update label="v12.0.3" description="July 2026">
