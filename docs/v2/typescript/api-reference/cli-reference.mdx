@@ -365,15 +365,20 @@ mcp-use whoami
 **Syntax:**
 
 ```bash
-mcp-use logout
+mcp-use logout [options]
 ```
 
-**Options:** None.
+**Options:**
+
+| Option       | Description                | Default             |
+| ------------ | -------------------------- | ------------------- |
+| `--yes`      | Skip the confirmation prompt. | Prompts          |
+| `--json`     | Emit one machine-readable JSON result. | Human-readable text |
 
 **Examples:**
 
 ```bash
-mcp-use logout
+mcp-use logout --yes
 ```
 
 **Notes and behavior:** The command removes credentials from `~/.mcp-use/config.json`.
@@ -386,7 +391,7 @@ Organization commands control the active Manufact Cloud organization for cloud c
 | ------------- | ------------------------------------------------------- | --------------------- |
 | `org list`    | List organizations available to the authenticated user. | `mcp-use org list`    |
 | `org current` | Show the active organization.                           | `mcp-use org current` |
-| `org switch`  | Select a different active organization interactively.   | `mcp-use org switch`  |
+| `org use`     | Select a different active organization interactively.   | `mcp-use org use`     |
 
 **Notes and behavior:**
 
