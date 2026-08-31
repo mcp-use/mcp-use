@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { BrowserOAuthClientProvider } from "../auth/browser.js";
 import type { OAuthClientInformation } from "@modelcontextprotocol/client";
 import type { MCPServerInfo } from "../core/session.js";
@@ -10,6 +11,59 @@ export function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
     throw new Error(message);
   }
+}
+
+/**
+ * Performs a deep structural equality check for primitives, arrays, and plain objects.
+ * Handles key ordering differences, null/undefined, and nested data structures.
+ */
+export function isEqualDeep(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (
+    typeof a !== "object" ||
+    a === null ||
+    typeof b !== "object" ||
+    b === null
+  ) {
+    return false;
+  }
+  if (Array.isArray(a)) {
+    if (!Array.isArray(b) || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (!isEqualDeep(a[i], b[i])) return false;
+    }
+    return true;
+  }
+  if (Array.isArray(b)) return false;
+
+  const keysA = Object.keys(a as Record<string, unknown>);
+  const keysB = Object.keys(b as Record<string, unknown>);
+  if (keysA.length !== keysB.length) return false;
+
+  for (const key of keysA) {
+    if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
+    if (
+      !isEqualDeep(
+        (a as Record<string, unknown>)[key],
+        (b as Record<string, unknown>)[key]
+      )
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Hook that maintains a stable reference to a value across renders as long
+ * as its structural content remains equal.
+ */
+export function useStableValue<T>(value: T): T {
+  const ref = useRef<T>(value);
+  if (!isEqualDeep(ref.current, value)) {
+    ref.current = value;
+  }
+  return ref.current;
 }
 
 type ServerInfoWithIcon = MCPServerInfo & { icon?: string };

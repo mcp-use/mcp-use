@@ -65,3 +65,44 @@ describe("startConnectionHealthMonitoring", () => {
     cleanup();
   });
 });
+
+describe("isEqualDeep", () => {
+  it("compares primitives correctly", async () => {
+    const { isEqualDeep } =
+      await import("../../../src/react/useMcp-helpers.js");
+    expect(isEqualDeep(1, 1)).toBe(true);
+    expect(isEqualDeep(1, 2)).toBe(false);
+    expect(isEqualDeep("a", "a")).toBe(true);
+    expect(isEqualDeep("a", "b")).toBe(false);
+    expect(isEqualDeep(null, null)).toBe(true);
+    expect(isEqualDeep(undefined, undefined)).toBe(true);
+    expect(isEqualDeep(null, undefined)).toBe(false);
+  });
+
+  it("compares objects with different key order", async () => {
+    const { isEqualDeep } =
+      await import("../../../src/react/useMcp-helpers.js");
+    expect(isEqualDeep({ a: 1, b: 2 }, { b: 2, a: 1 })).toBe(true);
+    expect(isEqualDeep({ a: 1, b: 2 }, { a: 1, b: 3 })).toBe(false);
+    expect(isEqualDeep({ a: 1 }, { a: 1, b: 2 })).toBe(false);
+  });
+
+  it("compares nested objects and arrays", async () => {
+    const { isEqualDeep } =
+      await import("../../../src/react/useMcp-helpers.js");
+    const obj1 = {
+      name: "test",
+      nested: { x: [1, 2, 3], y: "hello" },
+    };
+    const obj2 = {
+      nested: { y: "hello", x: [1, 2, 3] },
+      name: "test",
+    };
+    const obj3 = {
+      nested: { y: "hello", x: [1, 2, 4] },
+      name: "test",
+    };
+    expect(isEqualDeep(obj1, obj2)).toBe(true);
+    expect(isEqualDeep(obj1, obj3)).toBe(false);
+  });
+});

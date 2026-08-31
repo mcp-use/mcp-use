@@ -31,6 +31,7 @@ import {
   deriveOAuthClientConfigFromClientInfo,
   isOAuthDiscoveryFailure,
   startConnectionHealthMonitoring,
+  useStableValue,
   USE_MCP_SERVER_NAME,
 } from "./useMcp-helpers.js";
 import type { UseMcpOptions, UseMcpResult } from "./types.js";
@@ -131,15 +132,15 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
       : "/oauth/callback",
     storageKeyPrefix = "mcp:auth",
     authProvider: providedAuthProvider,
-    headers: headersOption,
-    proxyConfig,
+    headers: rawHeadersOption,
+    proxyConfig: rawProxyConfig,
     oauthProxyUrl: oauthProxyUrlOption,
     connectionMode,
     autoProxyFallback = false,
     logLevel: logLevelOption = "silent",
     autoRetry = false,
     autoReconnect = true,
-    reconnectionOptions,
+    reconnectionOptions: rawReconnectionOptions,
     preventAutoAuth = true, // Default to true - require explicit user action for OAuth
     detectMixedAuth = true,
     useRedirectFlow = false, // Default to false for backward compatibility (use popup)
@@ -148,13 +149,21 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     wrapTransport,
     serverId,
     fetch: customFetch,
-    clientOptions,
+    clientOptions: rawClientOptions,
     protocolNegotiation,
     onNotification,
     onSampling: onSamplingOption,
     onElicitation: onElicitationOption,
-    oauth: oauthOptions,
+    oauth: rawOauthOptions,
   } = options;
+
+  const clientInfo = useStableValue(options.clientInfo);
+  const proxyConfig = useStableValue(rawProxyConfig);
+  const headersOption = useStableValue(rawHeadersOption);
+  const clientOptions = useStableValue(rawClientOptions);
+  const oauthOptions = useStableValue(rawOauthOptions);
+  const reconnectionOptions = useStableValue(rawReconnectionOptions);
+
   const transportType: TransportType = "http";
   const requestedProxyAddress = proxyConfig?.proxyAddress;
 
@@ -207,10 +216,8 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
 
   const mergedClientInfo = useMemo(
     () =>
-      options.clientInfo
-        ? { ...defaultClientInfo, ...options.clientInfo }
-        : defaultClientInfo,
-    [options.clientInfo, defaultClientInfo]
+      clientInfo ? { ...defaultClientInfo, ...clientInfo } : defaultClientInfo,
+    [clientInfo, defaultClientInfo]
   );
 
   // Derive OAuth client registration config from clientInfo.
