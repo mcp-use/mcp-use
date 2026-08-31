@@ -160,20 +160,40 @@ function usePreviewErrorSignal(
  * resource resolve) or `"connecting"` (a bridge reconnect on the same
  * resource — its effect has a dependency set disjoint from the resolve
  * effect's, so it can re-run on its own) re-arms the check.
+ *
+ * The marker is cleared only for stages that positively belong to the active
+ * attempt (`"resolving"`/`"connecting"` starting one, `"initialized"`/
+ * `"ready"` completing one). `"tearing-down"` and `"closed"` are ignored:
+ * they can arrive late from a superseded bridge attempt, and a sequence such
+ * as connecting → error → (old) closed would otherwise erase the current
+ * attempt's failure and let the screenshot CLI time out or capture a broken
+ * view instead of failing.
  */
-function useViewLifecycleErrorSignal(): (event: ViewLifecycleEvent) => void {
+export function useViewLifecycleErrorSignal(): (
+  event: ViewLifecycleEvent
+) => void {
   const initializedRef = useRef(false);
   return useCallback((event: ViewLifecycleEvent) => {
-    if (event.status === "resolving" || event.status === "connecting")
+    if (event.status === "resolving" || event.status === "connecting") {
       initializedRef.current = false;
-    else if (event.status === "initialized" || event.status === "ready")
+      clearViewLoadFailed();
+      return;
+    }
+
+    if (event.status === "initialized" || event.status === "ready") {
       initializedRef.current = true;
+      clearViewLoadFailed();
+      return;
+    }
 
     if (event.status === "error") {
       if (!initializedRef.current) markViewLoadFailed(event.error);
       return;
     }
-    clearViewLoadFailed();
+
+    // "sandbox-loading" only follows a "resolving" that already cleared, and
+    // "tearing-down"/"closed" may belong to an older attempt — neither may
+    // erase the current attempt's marker.
   }, []);
 }
 
