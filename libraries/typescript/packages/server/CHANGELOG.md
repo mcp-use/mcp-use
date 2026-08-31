@@ -1,5 +1,16 @@
 # mcp-use
 
+## 2.3.4
+
+### Patch Changes
+
+- 82772dc: Consolidate MCP request logging into one record and label colocated dev server and Inspector logs.
+- Updated dependencies [82772dc]
+- Updated dependencies [82772dc]
+- Updated dependencies [82772dc]
+  - @mcp-use/cli@4.1.8
+  - @mcp-use/inspector@20.3.3
+
 ## 2.3.4-canary.3
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.2.2
+
+### Patch Changes
+
+- 82772dc: Ensure `useMcp` exposes OAuth tokens in the same render that marks an authenticated connection as ready.
+
 ## 2.2.2-canary.0
 
 ### Patch Changes
