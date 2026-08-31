@@ -405,15 +405,14 @@ mcp-use deployments <subcommand> [options]
 
 **Subcommands:**
 
-| Subcommand                                      | Purpose                                      | Options                                                 |
-| ----------------------------------------------- | -------------------------------------------- | ------------------------------------------------------- |
-| `list` / `ls`                                   | List deployments.                            | `--limit <n>`, `--skip <n>`, `--sort <field:direction>` |
-| `get <deployment-id>`                           | Show deployment details.                     | None                                                    |
-| `logs <deployment-id>`                          | View runtime logs.                           | `-b, --build`, `-f, --follow`                           |
-| `restart <deployment-id>`                       | Trigger a new deployment on the same server. | `-f, --follow`, `--branch <name>`                       |
-| `stop <deployment-id>`                          | Stop a running deployment.                   | None                                                    |
-| `start <deployment-id>`                         | Start a stopped deployment.                  | None                                                    |
-| `delete <deployment-id>` / `rm <deployment-id>` | Delete a deployment.                         | `-y, --yes`                                             |
+| Subcommand                | Purpose                                      | Options                                                                          |
+| ------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------- |
+| `list`                    | List deployments.                            | `--org <id-or-slug>`, `--server <id>`, `--limit <n>`, `--skip <n>`, `--json`     |
+| `get <deployment-id>`     | Show deployment details.                     | None                                                                             |
+| `logs <deployment-id>`    | View runtime logs.                           | `--build`, `--follow`                                                            |
+| `restart <deployment-id>` | Trigger a new deployment on the same server. | `--follow`, `--branch <name>`                                                    |
+| `stop <deployment-id>`    | Stop a running deployment.                   | `--yes`                                                                          |
+| `delete <deployment-id>`  | Delete a deployment.                         | `--yes`                                                                          |
 
 **Examples:**
 
@@ -422,8 +421,7 @@ mcp-use deployments list
 mcp-use deployments get dep_abc123
 mcp-use deployments logs dep_abc123 --build --follow
 mcp-use deployments restart dep_abc123 --branch main --follow
-mcp-use deployments stop dep_abc123
-mcp-use deployments start dep_abc123
+mcp-use deployments stop dep_abc123 --yes
 mcp-use deployments delete dep_abc123 --yes
 ```
 
@@ -431,7 +429,7 @@ mcp-use deployments delete dep_abc123 --yes
 
 - `logs` shows runtime logs by default. Use `--build` for build logs.
 - `restart` redeploys the same server and uses the deployment branch unless `--branch` is set.
-- `delete` prompts for confirmation unless `--yes` is set.
+- `stop` and `delete` both prompt for confirmation unless `--yes` is set.
 
 ## Server management commands
 
