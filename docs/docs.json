@@ -92,6 +92,7 @@
                               "typescript/server/authentication/providers/auth0",
                               "typescript/server/authentication/providers/better-auth",
                               "typescript/server/authentication/providers/clerk",
+                              "typescript/server/authentication/providers/convex",
                               "typescript/server/authentication/providers/keycloak",
                               "typescript/server/authentication/providers/supabase",
                               "typescript/server/authentication/providers/workos",

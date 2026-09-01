@@ -22,15 +22,11 @@ Connect an OAuth-capable MCP client (or the Inspector at
 browser flow is sent to your Convex deployment. After approval, the `whoami`
 tool returns the verified Convex subject.
 
-By default this example points at:
-
-```text
-https://helpful-sturgeon-388.convex.site/oauth
-```
-
-Override with `MCP_USE_OAUTH_CONVEX_AUTH_URL` if needed. Copy `.env.example` to
-`.env` for local overrides. For public or tunnel deployments, set `MCP_URL` to
-the MCP server origin (not the `/mcp` path).
+By default this example reads the Convex OAuth Provider base URL from the
+`MCP_USE_OAUTH_CONVEX_AUTH_URL` environment variable. Copy `.env.example` to
+`.env` and set the variable to your own Convex deployment URL before starting
+the server. For public or tunnel deployments, also set `MCP_URL` to the MCP
+server origin (not the `/mcp` path).
 
 Enable Dynamic Client Registration on the Convex OAuth component so MCP
 clients can register against the advertised `registration_endpoint`. Set the

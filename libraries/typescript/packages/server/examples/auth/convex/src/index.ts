@@ -1,9 +1,7 @@
 import { MCPServer } from "mcp-use";
 import { oauthConvexProvider } from "mcp-use/oauth/convex";
 
-const authURL =
-  process.env["MCP_USE_OAUTH_CONVEX_AUTH_URL"] ??
-  "https://helpful-sturgeon-388.convex.site/oauth";
+const authURL = requireEnv("MCP_USE_OAUTH_CONVEX_AUTH_URL");
 
 const server = new MCPServer({
   name: "convex-oauth-example",
@@ -37,6 +35,14 @@ server.tool(
     ],
   })
 );
+
+function requireEnv(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
+}
 
 // The mcp-use CLI imports this server and owns the MCP socket.
 export default server;

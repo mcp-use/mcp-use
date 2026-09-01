@@ -1,0 +1,135 @@
+---
+title: "Convex Provider"
+description: "Configure Convex OAuth authentication for a TypeScript MCP server."
+icon: "database"
+---
+
+Use the Convex provider when you host your own OAuth authorization server using the [Convex OAuth component](https://www.convex.dev/components). MCP clients register directly with your Convex deployment through Dynamic Client Registration, and your MCP server verifies Convex-issued tokens.
+
+This guide covers the Convex setup path. Use the [auth providers API reference](/typescript/api-reference/server/auth-providers#oauthconvexprovider) for exact `oauthConvexProvider()` options, defaults, and errors.
+
+## Configure Convex
+
+In your Convex deployment, set up the OAuth Provider component:
+
+1. Install the [Convex OAuth component](https://www.convex.dev/components) in your Convex project.
+2. Enable **Dynamic Client Registration** on the OAuth component so MCP clients can register automatically.
+3. Configure the allowed scopes for your deployment. At minimum, include `openid profile email`.
+4. Deploy your Convex project and note the base URL of your Convex site. It will look like:
+
+```text
+https://your-deployment-name.convex.site/oauth
+```
+
+## Set environment variables
+
+```bash
+MCP_USE_OAUTH_CONVEX_AUTH_URL=https://your-deployment-name.convex.site/oauth
+```
+
+This must be the base URL of your Convex OAuth Provider endpoint, without a trailing slash.
+
+## Configure the MCP server
+
+```typescript
+import { MCPServer } from "mcp-use";
+import { oauthConvexProvider } from "mcp-use/oauth/convex";
+
+const server = new MCPServer({
+  name: "convex-server",
+  version: "1.0.0",
+  oauth: oauthConvexProvider({
+    authURL: process.env.MCP_USE_OAUTH_CONVEX_AUTH_URL!,
+  }),
+});
+
+await server.listen(3000);
+```
+
+You can also pass the URL directly instead of reading from an environment variable:
+
+```typescript
+oauth: oauthConvexProvider({
+  authURL: "https://your-deployment-name.convex.site/oauth",
+});
+```
+
+## Use Convex identity in tools
+
+When a request is authenticated, tools receive the verified Convex identity on `ctx.auth`.
+
+```typescript
+import { error, object } from "mcp-use";
+
+server.tool(
+  {
+    name: "whoami",
+    description: "Return the verified Convex identity for this request.",
+  },
+  async (_args, ctx) => {
+    if (!ctx.auth) {
+      return error("Unauthorized");
+    }
+
+    return object({
+      id: ctx.auth.user.id,
+      clientId: ctx.auth.user.clientId,
+      scopes: ctx.auth.scopes,
+      permissions: ctx.auth.permissions,
+      expiresAt: ctx.auth.expiresAt,
+    });
+  },
+);
+```
+
+Use [User Context](/typescript/server/authentication/user-context) for broader access-control patterns inside tools.
+
+## Verify the setup
+
+Run the server and connect with an OAuth-capable MCP client.
+
+```bash
+npm run dev
+```
+
+Confirm these cases:
+
+- The client discovers Convex OAuth metadata from your MCP server.
+- The client registers with your Convex deployment.
+- Authenticated tool calls include `ctx.auth.user.id`.
+- Tool calls without a valid bearer token are rejected.
+
+When using the Inspector, set the **Scope** to `openid profile email` if the client does not send a scope by default.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Runnable Convex example"
+    icon="github"
+    href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/auth/convex"
+  >
+    Compare your setup with a working mcp-use Convex server.
+  </Card>
+  <Card
+    title="Convex OAuth component"
+    icon="book-open"
+    href="https://www.convex.dev/components"
+  >
+    Set up the OAuth Provider component in your Convex deployment.
+  </Card>
+  <Card
+    title="User Context"
+    icon="user"
+    href="/typescript/server/authentication/user-context"
+  >
+    Use Convex identity data inside tools.
+  </Card>
+  <Card
+    title="Convex provider API reference"
+    icon="terminal"
+    href="/typescript/api-reference/server/auth-providers#oauthconvexprovider"
+  >
+    Look up exact provider options and defaults.
+  </Card>
+</CardGroup>
