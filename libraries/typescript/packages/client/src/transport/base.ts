@@ -734,7 +734,11 @@ export abstract class BaseConnector {
     /** Resources returned across all result pages. */
     resources: any[];
   }> {
-    if (!this.client) {
+    // Held across the pagination loop below: `disconnect()` clears
+    // `this.client`, and re-reading it once per page would throw a raw
+    // TypeError instead of the not-connected error every other method reports.
+    const client = this.client;
+    if (!client) {
       throw new Error("MCP client is not connected");
     }
 
@@ -752,7 +756,7 @@ export abstract class BaseConnector {
 
         do {
           const result: { resources?: any[]; nextCursor?: string } =
-            await this.client!.listResources({ cursor }, options);
+            await client.listResources({ cursor }, options);
           allResources.push(...(result.resources || []));
           cursor = result.nextCursor;
         } while (cursor);
