@@ -79,6 +79,7 @@ import {
   resolveLocalOAuthResource,
   wrapOAuthTokenVerifier,
 } from "./oauth/internal.js";
+import type { OAuthProviderHost } from "./oauth/provider.js";
 import type {
   InferPromptInput,
   PromptCallback,
@@ -363,6 +364,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   #oauthResource: URL | undefined;
   #oauthResourceResolved = false;
   #oauthResourceConfigurationAbsent = false;
+  /** Instructions text set by an OAuth provider's setup hook. */
+  #instructionsOverride: string | undefined;
   /** Whether the mounted app validates Host headers (fixed at first mount). */
   #hostValidated = false;
   readonly #mcpMiddlewares: McpMiddlewareEntry[] = [];
@@ -1240,6 +1243,64 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     return this.#usageScope;
   }
 
+  /**
+   * Build the surface handed to an OAuth provider's `setup` hook. Runs inside
+   * `#ensureMounted` before `#handler` is assigned, so delegated
+   * registrations pass `#assertNotStarted`.
+   */
+  #createOAuthProviderHost(
+    httpApp: Hono<TEnv>,
+    resource: URL,
+    basePath: string
+  ): OAuthProviderHost {
+    return {
+      resource,
+      basePath,
+      use: (pattern, handler) => {
+        this.use(
+          pattern,
+          handler as unknown as McpMiddlewareFnFor<typeof pattern, TEnv>
+        );
+      },
+      registerTool: (definition, callback) => {
+        if (this.#tools.has(definition.name)) {
+          throw new Error(
+            `[mcp-use] Tool "${definition.name}" is reserved by the OAuth ` +
+              `provider; rename the application tool.`
+          );
+        }
+        this.tool(
+          definition,
+          callback as unknown as ToolCallback<
+            Record<string, unknown>,
+            never,
+            TUser,
+            HasOAuth<TUser>,
+            TEnv
+          >
+        );
+      },
+      registerResource: (definition, callback) => {
+        if (this.#resources.has(definition.name)) {
+          throw new Error(
+            `[mcp-use] Resource "${definition.name}" is reserved by the OAuth ` +
+              `provider; rename the application resource.`
+          );
+        }
+        this.resource(
+          definition,
+          callback as unknown as ResourceCallback<TUser, HasOAuth<TUser>, TEnv>
+        );
+      },
+      route: (path, handler) => {
+        httpApp.get(path, (context) => handler(context.req.raw));
+      },
+      instructions: (transform) => {
+        this.#instructionsOverride = transform(this.#config.instructions);
+      },
+    };
+  }
+
   #proxyHost(): ProxyMountHost {
     return {
       isStarted: () => this.#handler !== undefined,
@@ -1397,6 +1458,17 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
 
       for (const middleware of middlewares) {
         registerFetchMiddleware(httpApp, middleware);
+      }
+
+      if (resource !== undefined) {
+        // Providers extend the server before any request is served and while
+        // #handler is still unset, so their registrations pass the same
+        // pre-start checks as user registrations. Runs after the shared
+        // middleware chain is registered so provider routes still get CORS,
+        // logging, and host validation.
+        this.#config.oauth!.setup?.(
+          this.#createOAuthProviderHost(httpApp, resource, basePath)
+        );
       }
 
       const { handler, fetch: mcpFetch } = createMcpMount(
@@ -1625,7 +1697,9 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
 
   /** Build a fully registered SDK server from the immutable registry. */
   #buildSdkServer(ctx: McpRequestContext): SdkMcpServer {
-    const { name, version, title, description, instructions } = this.#config;
+    const { name, version, title, description } = this.#config;
+    const instructions =
+      this.#instructionsOverride ?? this.#config.instructions;
     const authInfo = ctx.authInfo;
     const server = new SdkMcpServer(
       {

@@ -96,6 +96,46 @@ Write the verifier by hand when the provider does not issue JWTs, for example wh
 
 The server exposes those values as `ctx.auth.user`, `ctx.auth.payload`, and `ctx.auth.permissions`. `ctx.auth.scopes` remains the verifier's verified `authInfo.scopes`.
 
+## Extend the server from the provider
+
+Some authorization models need more than token verification: a consent step exposed as a tool, a policy check before every tool call, or a discovery document at an extra path. Pass an optional `setup(host)` hook and the server invokes it once while mounting, before the first request is served.
+
+```typescript
+import { oauthCustomProvider, type OAuthProviderHost } from "mcp-use/oauth";
+
+const oauth = oauthCustomProvider({
+  createTokenVerifier,
+  oauthMetadata,
+  mapAuthInfo,
+  setup(host: OAuthProviderHost) {
+    host.use("mcp:tools/call", async (ctx, next) => {
+      if (!(await isAllowed(ctx.auth, ctx.params.name))) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: "Complete consent first." }],
+        };
+      }
+      return next();
+    });
+
+    host.registerTool(
+      { name: "grant_consent", description: "Record consent." },
+      async (_params, ctx) => recordConsent(ctx.auth),
+    );
+
+    host.route("/.well-known/oauth-protected-resource", () =>
+      Response.json(protectedResourceDocument(host.resource)),
+    );
+
+    host.instructions((current) =>
+      `${current ?? ""}\n\nCall grant_consent before other tools.`.trim(),
+    );
+  },
+});
+```
+
+The host exposes the resolved canonical `resource` and `basePath`, `use` for `mcp:` middleware, `registerTool` and `registerResource` for provider-owned registrations, `route` for extra public `GET` routes, and `instructions` to rewrite the text advertised on `initialize`. Provider-owned tools and resources run under the same bearer gate as application registrations and receive the mapped `ctx.auth`. Registering a name that the application already uses throws, so reserved names never silently replace user tools.
+
 ## Verify the integration
 
 Test that:
