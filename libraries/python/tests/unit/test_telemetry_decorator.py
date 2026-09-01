@@ -22,6 +22,10 @@ class TelemetryProbe:
         await asyncio.sleep(0)
         raise ValueError("boom")
 
+    @telemetry("async_cancelled")
+    async def wait_forever(self) -> None:
+        await asyncio.Event().wait()
+
     @telemetry("sync_success")
     def sync_value(self) -> str:
         return "done"
@@ -32,7 +36,8 @@ async def test_async_telemetry_is_captured_after_completion() -> None:
     probe = TelemetryProbe()
     gate = asyncio.Event()
 
-    with patch("mcp_use.telemetry.telemetry.time.time", side_effect=[10.0, 10.25]):
+    with patch("mcp_use.telemetry.telemetry.time") as mock_time:
+        mock_time.time.side_effect = [10.0, 10.25]
         task = asyncio.create_task(probe.wait_for(gate))
         await asyncio.sleep(0)
 
@@ -58,6 +63,22 @@ async def test_async_telemetry_captures_awaited_failure() -> None:
     assert event.EVENT_NAME == "async_failure"
     assert event.success is False
     assert event.error_type == "ValueError"
+
+
+@pytest.mark.asyncio
+async def test_async_telemetry_captures_cancellation() -> None:
+    probe = TelemetryProbe()
+    task = asyncio.create_task(probe.wait_forever())
+    await asyncio.sleep(0)
+
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    event = probe.telemetry.capture.call_args.kwargs["event"]
+    assert event.EVENT_NAME == "async_cancelled"
+    assert event.success is False
+    assert event.error_type == "CancelledError"
 
 
 @pytest.mark.asyncio

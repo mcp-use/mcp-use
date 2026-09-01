@@ -1,3 +1,4 @@
+import asyncio
 import inspect
 import logging
 import os
@@ -90,6 +91,10 @@ def telemetry(event_name: str, additional_properties: dict[str, Any] | None = No
 
                 try:
                     return await func(self, *args, **kwargs)
+                except asyncio.CancelledError as e:
+                    success = False
+                    error_type = type(e).__name__
+                    raise
                 except Exception as e:
                     success = False
                     error_type = type(e).__name__
