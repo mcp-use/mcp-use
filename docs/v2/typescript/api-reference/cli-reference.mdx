@@ -279,7 +279,6 @@ mcp-use deploy --no-github
 mcp-use deploy --name my-server --open
 mcp-use deploy --env DATABASE_URL=postgres://... --env API_KEY=secret
 mcp-use deploy --env-file .env.production
-mcp-use deploy --runtime python
 mcp-use deploy --root-dir apps/mcp-server
 mcp-use deploy --root-dir apps/mcp-server --watch-paths "apps/mcp-server/**" "packages/shared/**"
 mcp-use deploy --new --name my-server-v2
