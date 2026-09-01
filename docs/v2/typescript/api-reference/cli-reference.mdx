@@ -370,10 +370,10 @@ mcp-use logout [options]
 
 **Options:**
 
-| Option       | Description                | Default             |
-| ------------ | -------------------------- | ------------------- |
-| `--yes`      | Skip the confirmation prompt. | Prompts          |
-| `--json`     | Emit one machine-readable JSON result. | Human-readable text |
+| Option   | Description                                                    | Default             |
+| -------- | -------------------------------------------------------------- | ------------------- |
+| `--yes`  | Skip confirmation. Required for non-interactive and JSON runs. | Prompts on a TTY    |
+| `--json` | Emit one machine-readable JSON result.                         | Human-readable text |
 
 **Examples:**
 
@@ -387,11 +387,11 @@ mcp-use logout --yes
 
 Organization commands control the active Manufact Cloud organization for cloud commands.
 
-| Command       | Purpose                                                 | Syntax                |
-| ------------- | ------------------------------------------------------- | --------------------- |
-| `org list`    | List organizations available to the authenticated user. | `mcp-use org list`    |
-| `org current` | Show the active organization.                           | `mcp-use org current` |
-| `org use`     | Select a different active organization interactively.   | `mcp-use org use`     |
+| Command                  | Purpose                                                 | Syntax                           |
+| ------------------------ | ------------------------------------------------------- | -------------------------------- |
+| `org list`               | List organizations available to the authenticated user. | `mcp-use org list`               |
+| `org current`            | Show the active organization.                           | `mcp-use org current`            |
+| `org use <id-or-slug>`   | Select and persist a different active organization.     | `mcp-use org use <id-or-slug>`   |
 
 **Notes and behavior:**
 
