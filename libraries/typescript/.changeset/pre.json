@@ -11,6 +11,7 @@
     "@mcp-use/tunnel": "0.2.0"
   },
   "changesets": [
+    "add-convex-oauth-provider",
     "late-times-exist",
     "rpc-logger-duration"
   ]
