@@ -408,11 +408,11 @@ mcp-use deployments <subcommand> [options]
 | Subcommand                | Purpose                                      | Options                                                                          |
 | ------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------- |
 | `list`                    | List deployments.                            | `--org <id-or-slug>`, `--server <id>`, `--limit <n>`, `--skip <n>`, `--json`     |
-| `get <deployment-id>`     | Show deployment details.                     | None                                                                             |
-| `logs <deployment-id>`    | View runtime logs.                           | `--build`, `--follow`                                                            |
-| `restart <deployment-id>` | Trigger a new deployment on the same server. | `--follow`, `--branch <name>`                                                    |
-| `stop <deployment-id>`    | Stop a running deployment.                   | `--yes`                                                                          |
-| `delete <deployment-id>`  | Delete a deployment.                         | `--yes`                                                                          |
+| `get <deployment-id>`     | Show deployment details.                     | `--json`                                                                         |
+| `logs <deployment-id>`    | View runtime logs.                           | `--build`, `--follow`, `--json`                                                  |
+| `restart <deployment-id>` | Trigger a new deployment on the same server. | `--follow`, `--branch <name>`, `--json`                                          |
+| `stop <deployment-id>`    | Stop a running deployment.                   | `--yes`, `--json`                                                               |
+| `delete <deployment-id>`  | Delete a deployment.                         | `--yes`, `--json`                                                               |
 
 **Examples:**
 
@@ -429,7 +429,7 @@ mcp-use deployments delete dep_abc123 --yes
 
 - `logs` shows runtime logs by default. Use `--build` for build logs.
 - `restart` redeploys the same server and uses the deployment branch unless `--branch` is set.
-- `stop` and `delete` both prompt for confirmation unless `--yes` is set.
+- `stop` and `delete` prompt for confirmation on a TTY. Pass `--yes` in non-interactive or JSON runs.
 
 ## Server management commands
 
