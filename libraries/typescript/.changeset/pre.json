@@ -12,6 +12,7 @@
   },
   "changesets": [
     "add-convex-oauth-provider",
+    "calm-clients-stop",
     "late-times-exist",
     "rpc-logger-duration"
   ]

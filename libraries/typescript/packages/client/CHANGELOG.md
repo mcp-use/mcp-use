@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.2.3-canary.0
+
+### Patch Changes
+
+- 0eca6f2: Stop OAuth authorization retries after the client disconnects.
+
 ## 2.2.2
 
 ### Patch Changes
