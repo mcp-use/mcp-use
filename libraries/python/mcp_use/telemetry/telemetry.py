@@ -1,3 +1,4 @@
+import inspect
 import logging
 import os
 import platform
@@ -53,6 +54,51 @@ def telemetry(event_name: str, additional_properties: dict[str, Any] | None = No
     """Decorator to automatically track feature usage"""
 
     def decorator(func: Callable) -> Callable:
+        def capture_event(self, start_time: float, success: bool, error_type: str | None) -> None:
+            telemetry_client = None
+            if hasattr(self, "telemetry"):
+                telemetry_client = self.telemetry
+            elif hasattr(self, "_telemetry"):
+                telemetry_client = self._telemetry
+            else:
+                telemetry_client = Telemetry()
+
+            if telemetry_client:
+                telemetry_client.capture(
+                    event=GenericTelemetryEvent(
+                        EVENT_NAME=event_name,
+                        **{
+                            **(additional_properties or {}),
+                            "success": success,
+                            "execution_time_ms": int((time.time() - start_time) * 1000),
+                            "error_type": error_type,
+                        },
+                    )
+                )
+
+        if inspect.iscoroutinefunction(func):
+
+            @wraps(func)
+            async def async_wrapper(self, *args, **kwargs):
+                record_telemetry = getattr(self, "_record_telemetry", None)
+                if record_telemetry is not None and not record_telemetry:
+                    return await func(self, *args, **kwargs)
+
+                start_time = time.time()
+                success = True
+                error_type = None
+
+                try:
+                    return await func(self, *args, **kwargs)
+                except Exception as e:
+                    success = False
+                    error_type = type(e).__name__
+                    raise
+                finally:
+                    capture_event(self, start_time, success, error_type)
+
+            return async_wrapper
+
         @wraps(func)
         def wrapper(self, *args, **kwargs):
             # Check if telemetry is disabled on this instance
@@ -72,28 +118,7 @@ def telemetry(event_name: str, additional_properties: dict[str, Any] | None = No
                 error_type = type(e).__name__
                 raise
             finally:
-                execution_time_ms = int((time.time() - start_time) * 1000)
-
-                telemetry = None
-                if hasattr(self, "telemetry"):
-                    telemetry = self.telemetry
-                elif hasattr(self, "_telemetry"):
-                    telemetry = self._telemetry
-                else:
-                    telemetry = Telemetry()
-
-                if telemetry:
-                    telemetry.capture(
-                        event=GenericTelemetryEvent(
-                            EVENT_NAME=event_name,
-                            **{
-                                **(additional_properties or {}),
-                                "success": success,
-                                "execution_time_ms": execution_time_ms,
-                                "error_type": error_type,
-                            },
-                        )
-                    )
+                capture_event(self, start_time, success, error_type)
 
         return wrapper
 
