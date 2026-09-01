@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { oauthAuth0Provider } from "../src/oauth/auth0.js";
 import { oauthBetterAuthProvider } from "../src/oauth/better-auth.js";
 import { oauthClerkProvider } from "../src/oauth/clerk.js";
+import { oauthConvexProvider } from "../src/oauth/convex.js";
 import { wrapOAuthTokenVerifier } from "../src/oauth/internal.js";
 import { oauthKeycloakProvider } from "../src/oauth/keycloak.js";
 import { oauthScalekitProvider } from "../src/oauth/scalekit.js";
@@ -41,6 +42,10 @@ describe("direct OAuth providers", () => {
       "MCP_USE_OAUTH_BETTER_AUTH_URL",
       "https://auth.example.test/api/auth"
     );
+    vi.stubEnv(
+      "MCP_USE_OAUTH_CONVEX_AUTH_URL",
+      "https://env.convex.site/oauth"
+    );
     vi.stubEnv("MCP_USE_OAUTH_SUPABASE_PROJECT_ID", "env-project");
     vi.stubEnv(
       "MCP_USE_OAUTH_SUPABASE_JWT_SECRET",
@@ -71,6 +76,9 @@ describe("direct OAuth providers", () => {
     expect(oauthBetterAuthProvider().oauthMetadata.issuer).toBe(
       "https://auth.example.test/api/auth"
     );
+    expect(oauthConvexProvider().oauthMetadata.issuer).toBe(
+      "https://env.convex.site/oauth"
+    );
     expect(oauthSupabaseProvider().oauthMetadata.issuer).toBe(
       "https://env-project.supabase.co/auth/v1"
     );
@@ -87,6 +95,10 @@ describe("direct OAuth providers", () => {
     );
     vi.stubEnv("MCP_USE_OAUTH_SUPABASE_PROJECT_ID", "env-project");
     vi.stubEnv("MCP_USE_OAUTH_SUPABASE_URL", "https://env-project.supabase.co");
+    vi.stubEnv(
+      "MCP_USE_OAUTH_CONVEX_AUTH_URL",
+      "https://env.convex.site/oauth"
+    );
 
     expect(
       oauthAuth0Provider({
@@ -103,6 +115,11 @@ describe("direct OAuth providers", () => {
         supabaseUrl: "http://localhost:54321",
       }).oauthMetadata.issuer
     ).toBe("http://localhost:54321/auth/v1");
+    expect(
+      oauthConvexProvider({
+        authURL: "https://explicit.convex.site/oauth",
+      }).oauthMetadata.issuer
+    ).toBe("https://explicit.convex.site/oauth");
   });
 
   it("verifies Better Auth JWTs and preserves issuer path prefixes", async () => {
@@ -180,6 +197,152 @@ describe("direct OAuth providers", () => {
     await expect(
       provider.createTokenVerifier(protectedResource).verifyAccessToken(token)
     ).rejects.toMatchObject({ code: "invalid_token" });
+  });
+
+  it("verifies Convex JWTs and keeps the mounted oauth issuer path", async () => {
+    const { privateKey, publicKey } = await generateKeyPair("RS256");
+    const jwk = await exportJWK(publicKey);
+    jwk.kid = "convex-key";
+    globalThis.fetch = jwksFixture(jwk);
+
+    expect(() => oauthConvexProvider()).toThrow(/Convex authURL is required/);
+    expect(() =>
+      oauthConvexProvider({ authURL: "http://auth.example.test/oauth" })
+    ).toThrow(/HTTPS|localhost/);
+
+    const issuer = "https://example.convex.site/oauth";
+    expect(
+      oauthConvexProvider({
+        authURL: "https://example.convex.site/oauth/",
+      }).oauthMetadata
+    ).toMatchObject({
+      issuer,
+      jwks_uri: `${issuer}/.well-known/jwks.json`,
+    });
+
+    const provider = oauthConvexProvider({
+      authURL: "https://example.convex.site/oauth///",
+    });
+    expect(provider.oauthMetadata).toMatchObject({
+      issuer,
+      authorization_endpoint: `${issuer}/authorize`,
+      token_endpoint: `${issuer}/token`,
+      registration_endpoint: `${issuer}/register`,
+      userinfo_endpoint: `${issuer}/userinfo`,
+      jwks_uri: `${issuer}/.well-known/jwks.json`,
+      code_challenge_methods_supported: ["S256"],
+      scopes_supported: ["openid", "profile", "email", "offline_access"],
+    });
+
+    const convexClaims = {
+      sub: "convex-user-1",
+      client_id: "mcp-client-1",
+      cid: "mcp-client-1",
+      // AuthInfo.scopes is derived from the space-delimited `scope` claim.
+      scope: "openid profile email",
+      // Convex also emits `scp` as the granted OAuth scopes array. That is
+      // not mcp-use permissions; deliberately diverge so a scp→permissions
+      // mapping would fail this assertion.
+      scp: ["openid", "profile", "email", "offline_access"],
+    };
+    const verifier = wrapOAuthTokenVerifier(provider, protectedResource);
+
+    const authInfo = await verifier.verifyAccessToken(
+      await signedToken(
+        privateKey,
+        "convex-key",
+        issuer,
+        protectedResource.href,
+        convexClaims
+      )
+    );
+    expect(authInfo.clientId).toBe("mcp-client-1");
+    expect(authInfo.scopes).toEqual(["openid", "profile", "email"]);
+    expect(authInfo.resource).toEqual(protectedResource);
+    expect(authInfo.extra).toMatchObject({
+      user: { id: "convex-user-1", clientId: "mcp-client-1" },
+      permissions: [],
+    });
+    expect(authInfo.extra?.["permissions"]).toEqual([]);
+
+    await expect(
+      verifier.verifyAccessToken(
+        await signedToken(
+          privateKey,
+          "convex-key",
+          "https://other.convex.site/oauth",
+          protectedResource.href,
+          convexClaims
+        )
+      )
+    ).rejects.toMatchObject({ code: "invalid_token" });
+
+    await expect(
+      verifier.verifyAccessToken(
+        await signedToken(
+          privateKey,
+          "convex-key",
+          issuer,
+          "https://other.example.test/mcp",
+          convexClaims
+        )
+      )
+    ).rejects.toMatchObject({ code: "invalid_token" });
+
+    await expect(
+      verifier.verifyAccessToken(
+        await new SignJWT(convexClaims)
+          .setProtectedHeader({ alg: "RS256", kid: "convex-key" })
+          .setIssuer(issuer)
+          .setAudience(protectedResource.href)
+          .setIssuedAt(now())
+          .setExpirationTime(now() - 1)
+          .sign(privateKey)
+      )
+    ).rejects.toMatchObject({ code: "invalid_token" });
+
+    await expect(
+      verifier.verifyAccessToken(
+        await new SignJWT(convexClaims)
+          .setProtectedHeader({ alg: "HS256" })
+          .setIssuer(issuer)
+          .setAudience(protectedResource.href)
+          .setIssuedAt(now())
+          .setExpirationTime(now() + 60)
+          .sign(
+            new TextEncoder().encode("a sufficiently long test signing key")
+          )
+      )
+    ).rejects.toMatchObject({ code: "invalid_token" });
+
+    await expect(
+      verifier.verifyAccessToken(
+        await signedToken(
+          privateKey,
+          "convex-key",
+          issuer,
+          protectedResource.href,
+          {
+            client_id: "mcp-client-1",
+            scope: "openid",
+            scp: ["openid"],
+          }
+        )
+      )
+    ).rejects.toMatchObject({ code: "invalid_token" });
+
+    await expect(verifier.verifyAccessToken("not-a-jwt")).rejects.toMatchObject(
+      {
+        code: "invalid_token",
+      }
+    );
+
+    const localhostProvider = oauthConvexProvider({
+      authURL: "http://localhost:3210/oauth",
+    });
+    expect(localhostProvider.oauthMetadata.issuer).toBe(
+      "http://localhost:3210/oauth"
+    );
   });
 
   it("verifies Auth0 JWTs with cached remote JWKS and maps claims", async () => {
