@@ -89,6 +89,10 @@
       "types": "./dist/oauth/convex.d.ts",
       "import": "./dist/oauth/convex.js"
     },
+    "./oauth/lane": {
+      "types": "./dist/oauth/lane.d.ts",
+      "import": "./dist/oauth/lane.js"
+    },
     "./node": {
       "types": "./dist/node-bridge.d.ts",
       "import": "./dist/node-bridge.js",

@@ -1,0 +1,137 @@
+---
+title: "Lane Provider"
+description: "Configure Lane OAuth authentication and Lane's consent gate for a TypeScript MCP server."
+icon: "id-card"
+---
+
+Use the Lane provider when your MCP server sells to agents acting for KYC-verified people through [Lane](https://www.getonlane.com). Lane is a standard OAuth 2.1 authorization server: MCP clients register with it through Dynamic Client Registration and complete the authorization flow directly. On top of that, Lane adds a consent gate on the server: application tools refuse until the calling agent runs the reserved `lane_register_session` tool, which performs a server-side token exchange and records a connection for the calling credential.
+
+The provider verifies Lane access tokens and installs the gate, the two reserved tools, the `lane://auth-guide` resource, the root-path protected-resource document, and the instructions that steer agents to the step-up.
+
+## Before you start
+
+Lane must know about your server before tokens for it can be issued.
+
+1. Ask Lane to claim the exact public host of your MCP endpoint. Tokens are audienced to that host, and a token minted for one host is refused on every other. `localhost` cannot be claimed; use a tunnel hostname or a deployed URL.
+2. Ask Lane for a confidential client (id and secret) with the token-exchange grant enabled. It is used only for the step-up exchange. Clients registered through Lane's public registration endpoint cannot perform the exchange.
+3. Have a Lane account to log in with when you test.
+
+## Set environment variables
+
+```bash
+MCP_URL=https://shop.example.com
+MCP_USE_OAUTH_LANE_CLIENT_ID=your-confidential-client-id
+MCP_USE_OAUTH_LANE_CLIENT_SECRET=your-confidential-client-secret
+# MCP_USE_OAUTH_LANE_ISSUER=https://auth.getonlane.com/auth/mcp
+```
+
+`MCP_URL` is the server origin; the canonical resource is that origin plus the MCP base path, `/mcp` by default. The issuer defaults to Lane's production authorization server.
+
+## Configure the MCP server
+
+```typescript
+import { MCPServer } from "mcp-use";
+import {
+  memoryLaneConnectionStore,
+  oauthLaneProvider,
+} from "mcp-use/oauth/lane";
+
+const server = new MCPServer({
+  name: "storefront",
+  version: "1.0.0",
+  instructions: "Browse and buy digital goods.",
+  oauth: oauthLaneProvider({
+    connections: memoryLaneConnectionStore(),
+    scopes: {
+      checkout: "email",
+    },
+    onGateEvent: (event) => console.log("[lane]", event),
+  }),
+});
+
+server.tool({ name: "browse", description: "Browse the catalog." }, browse);
+server.tool({ name: "checkout", description: "Buy an item." }, checkout);
+
+export default server;
+```
+
+Client credentials and the issuer are read from the environment when the options are omitted. Pass `clientId`, `clientSecret`, `issuer`, and `resource` explicitly to override.
+
+### Options
+
+| Option | Default | Purpose |
+| --- | --- | --- |
+| `connections` | required | Where completed step-ups are recorded. |
+| `clientId`, `clientSecret` | env | Confidential client used only for the token exchange. |
+| `issuer` | Lane production | Lane authorization server. |
+| `scopes` | `{}` | Connection scopes each tool requires, by tool name. Tools not listed are callable by any connected caller. |
+| `enforcement` | `"gate-all"` | `"log-only"` never refuses and emits `would-have-blocked` events instead. |
+| `onGateEvent` | none | Observer for `allowed`, `blocked`, and `would-have-blocked` decisions. |
+| `sessionInfoTool` | `true` | Register `lane_session_info`. |
+| `authGuide` | `true` | Register the `lane://auth-guide` resource. |
+| `exchanger`, `createTokenVerifier` | Lane defaults | Injection points for tests and development seams. |
+
+## How the gate works
+
+Every request to the MCP endpoint needs a valid Lane bearer, the same as any other mcp-use OAuth provider. After that:
+
+1. A verified caller with no recorded connection gets an error result from every application tool naming `lane_register_session`. The `initialize` instructions and the auth guide say the same thing.
+2. The agent calls `lane_register_session`. The server exchanges the caller's bearer for a token scoped to this server using the confidential client, records the granted scopes under the caller's subject and token `jti`, and returns `{ ok, personalized, scopes }`. The exchanged token never reaches the model.
+3. Application tools now run. A tool listed in `scopes` additionally requires every listed scope on the connection, or it returns an `insufficient_scope` error result.
+
+Connections are keyed by the token `jti`, so a refreshed access token is a new credential and the agent must run the step-up again. `lane_session_info` reports the current state at any point and accepts an optional `probe_scope`.
+
+Authority comes from the recorded connection, never from the bearer's own `scope` claim. `ctx.auth.permissions` is therefore always empty; `ctx.auth.user` carries the pairwise `id`, the calling `agentId`, and the `credentialId`.
+
+## Connection store
+
+`memoryLaneConnectionStore()` is correct for one process. When more than one instance answers for the same resource, implement `LaneConnectionStore` over a shared store such as a KV or database:
+
+```typescript
+import type { LaneConnectionStore } from "mcp-use/oauth/lane";
+
+const connections: LaneConnectionStore = {
+  async get(key) {
+    return (await kv.get(`lane:${key.sub}:${key.jti}`)) ?? null;
+  },
+  async put(key, value) {
+    const record = { ...value, createdAt: Date.now() };
+    await kv.set(`lane:${key.sub}:${key.jti}`, record);
+    return record;
+  },
+  async delete(key) {
+    await kv.delete(`lane:${key.sub}:${key.jti}`);
+  },
+};
+```
+
+## Verify the setup
+
+Run the server on the host Lane claimed and connect with an OAuth-capable MCP client.
+
+Confirm these cases:
+
+- `GET /.well-known/oauth-protected-resource` and the path-inserted form both name Lane's issuer.
+- The client completes the authorization flow with Lane.
+- `lane_session_info` reports `connected: false` before the step-up.
+- An application tool returns the "Login incomplete" error result before the step-up.
+- `lane_register_session` returns `ok: true`, and the same tool then succeeds.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Runnable Lane example"
+    icon="github"
+    href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/auth/lane"
+  >
+    A port of Lane's UCP index server on mcp-use.
+  </Card>
+  <Card
+    title="User Context"
+    icon="user"
+    href="/v2/typescript/server/authentication/user-context"
+  >
+    Use Lane identity data inside tools.
+  </Card>
+</CardGroup>
