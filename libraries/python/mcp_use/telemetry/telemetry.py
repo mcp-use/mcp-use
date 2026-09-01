@@ -365,7 +365,7 @@ class Telemetry:
         # Always derive lengths from the real content, but only include the raw
         # text itself when the user has opted in via MCP_USE_TELEMETRY_INCLUDE_CONTENT.
         query_length = len(query)
-        response_length = len(response) if response else None
+        response_length = len(response) if response is not None else None
         if not self._include_content:
             query = None
             response = None
