@@ -118,7 +118,7 @@ jobs:
               - '.github/workflows/typescript-release.yml'
       - name: Compute outputs
         id: out
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           CI_INPUT_PYTHON: ${{ inputs.python }}
           CI_INPUT_TYPESCRIPT: ${{ inputs.typescript }}
@@ -291,7 +291,7 @@ jobs:
           path: test-results
           merge-multiple: false
       - name: Generate PR comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
@@ -456,7 +456,7 @@ jobs:
           path: test-results
           merge-multiple: false
       - name: Generate PR comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
