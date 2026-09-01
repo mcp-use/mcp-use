@@ -14,7 +14,7 @@ Most MCP servers should use a Dynamic Client Registration provider. Use OAuth Pr
 
 | Situation                                                            | Use                                                                    |
 | -------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| You use Auth0, Better Auth, Clerk, Convex, Keycloak, Supabase, or WorkOS | A built-in provider                                                    |
+| You use Auth0, Better Auth, Clerk, Keycloak, Supabase, or WorkOS     | A built-in provider                                                    |
 | Your provider advertises a `registration_endpoint`                   | [Custom Provider](/typescript/server/authentication/providers/custom)  |
 | Your provider only gives you one fixed `clientId` and `clientSecret` | [OAuth Proxy](/typescript/server/authentication/providers/oauth-proxy) |
 | You only need local development without identity                     | No OAuth provider                                                      |
@@ -30,7 +30,6 @@ Choose the provider that matches your identity system:
 - [Auth0](/typescript/server/authentication/providers/auth0): Auth0 OAuth with Dynamic Client Registration.
 - [Better Auth](/typescript/server/authentication/providers/better-auth): Self-hosted OAuth with Better Auth's OAuth Provider plugin.
 - [Clerk](/typescript/server/authentication/providers/clerk): Clerk OAuth with user and organization claims.
-- [Convex](/typescript/server/authentication/providers/convex): Convex OAuth Provider with Dynamic Client Registration.
 - [Keycloak](/typescript/server/authentication/providers/keycloak): Keycloak realm authentication with role mapping.
 - [Supabase](/typescript/server/authentication/providers/supabase): Supabase OAuth 2.1 server authentication.
 - [WorkOS](/typescript/server/authentication/providers/workos): WorkOS AuthKit authentication with organization context.

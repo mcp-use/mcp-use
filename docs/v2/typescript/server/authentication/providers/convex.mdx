@@ -4,15 +4,13 @@ description: "Configure Convex OAuth authentication for a TypeScript MCP server.
 icon: "database"
 ---
 
-Use the Convex provider when you host your own OAuth authorization server using the [Convex OAuth component](https://www.convex.dev/components). MCP clients register directly with your Convex deployment through Dynamic Client Registration, and your MCP server verifies Convex-issued tokens.
-
-This guide covers the Convex setup path. Use the [auth providers API reference](/typescript/api-reference/server/auth-providers#oauthconvexprovider) for exact `oauthConvexProvider()` options, defaults, and errors.
+Use the Convex provider when you host your own OAuth authorization server using the [Convex OAuth Provider component](https://www.convex.dev/components/codefox-inc/oauth-provider). MCP clients register directly with your Convex deployment through Dynamic Client Registration, and your MCP server verifies Convex-issued tokens.
 
 ## Configure Convex
 
 In your Convex deployment, set up the OAuth Provider component:
 
-1. Install the [Convex OAuth component](https://www.convex.dev/components) in your Convex project.
+1. Install the [Convex OAuth Provider component](https://www.convex.dev/components/codefox-inc/oauth-provider) in your Convex project.
 2. Enable **Dynamic Client Registration** on the OAuth component so MCP clients can register automatically.
 3. Configure the allowed scopes for your deployment. At minimum, include `openid profile email`.
 4. Deploy your Convex project and note the base URL of your Convex site. It will look like:
@@ -82,7 +80,7 @@ server.tool(
 );
 ```
 
-Use [User Context](/typescript/server/authentication/user-context) for broader access-control patterns inside tools.
+Use [User Context](/v2/typescript/server/authentication/user-context) for broader access-control patterns inside tools.
 
 ## Verify the setup
 
@@ -112,24 +110,17 @@ When using the Inspector, set the **Scope** to `openid profile email` if the cli
     Compare your setup with a working mcp-use Convex server.
   </Card>
   <Card
-    title="Convex OAuth component"
+    title="Convex OAuth Provider component"
     icon="book-open"
-    href="https://www.convex.dev/components"
+    href="https://www.convex.dev/components/codefox-inc/oauth-provider"
   >
     Set up the OAuth Provider component in your Convex deployment.
   </Card>
   <Card
     title="User Context"
     icon="user"
-    href="/typescript/server/authentication/user-context"
+    href="/v2/typescript/server/authentication/user-context"
   >
     Use Convex identity data inside tools.
-  </Card>
-  <Card
-    title="Convex provider API reference"
-    icon="terminal"
-    href="/typescript/api-reference/server/auth-providers#oauthconvexprovider"
-  >
-    Look up exact provider options and defaults.
   </Card>
 </CardGroup>
