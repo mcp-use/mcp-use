@@ -9,7 +9,7 @@ on:
         type: number
 
 permissions:
-  contents: write
+  contents: read
   pull-requests: read
 
 concurrency:
@@ -19,6 +19,11 @@ concurrency:
 jobs:
   promote:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      PR_NUMBER: ${{ inputs.pull_number }}
     outputs:
       sha: ${{ steps.promote.outputs.sha }}
       branch: ${{ steps.promote.outputs.branch }}
@@ -31,7 +36,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const prNumber = Number(core.getInput('pull_number'));
+            const prNumber = Number(process.env.PR_NUMBER);
             const { owner, repo } = context.repo;
             const pr = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
 
@@ -57,7 +62,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const prNumber = Number(core.getInput('pull_number'));
+            const prNumber = Number(process.env.PR_NUMBER);
             const { owner, repo } = context.repo;
             const files = await github.paginate(github.rest.pulls.listFiles, {
               owner, repo, pull_number: prNumber, per_page: 100
@@ -65,8 +70,9 @@ jobs:
             const paths = files.map(f => f.filename);
 
             const python = paths.some(p => p.startsWith('libraries/python/'));
-            const typescript = paths.some(p => p.startsWith('libraries/typescript/'));
-            const create_mcp_use_app = paths.some(p => p.startsWith('libraries/typescript/packages/create-mcp-use-app/'));
+            const ciChanged = paths.includes('.github/workflows/ci.yml') || paths.includes('.github/workflows/approve-fork-pr.yml');
+            const typescript = ciChanged || paths.some(p => p.startsWith('libraries/typescript/'));
+            const create_mcp_use_app = ciChanged || paths.some(p => p.startsWith('libraries/typescript/packages/create-mcp-use-app/'));
 
             core.setOutput('python', String(python));
             core.setOutput('typescript', String(typescript));
@@ -76,7 +82,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const prNumber = Number(core.getInput('pull_number'));
+            const prNumber = Number(process.env.PR_NUMBER);
             const branch = "${{ steps.promote.outputs.branch }}";
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const body = `Approved CI for fork PR.\nPromoted head to \`${branch}\`.\nRunning CI now.\n\nWorkflow: ${runUrl}`;
@@ -89,6 +95,10 @@ jobs:
 
   run-ci:
     needs: promote
+    permissions:
+      contents: read
+      # Required by the reusable workflow's PR-reporting jobs.
+      pull-requests: write
     uses: ./.github/workflows/ci.yml
     with:
       ref: ${{ needs.promote.outputs.sha }}

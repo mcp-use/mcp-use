@@ -92,11 +92,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
+          ref: ${{ inputs.ref || github.sha }}
           fetch-depth: 0
       - uses: dorny/paths-filter@v3
         id: filter
-        if: github.event_name != 'workflow_call'
+        # Reusable workflows keep the caller's event name; ref is required for calls.
+        if: ${{ !inputs.ref }}
         with:
           filters: |
             python:
@@ -120,12 +121,13 @@ jobs:
         id: out
         uses: actions/github-script@v9
         env:
+          CI_INPUT_REF: ${{ inputs.ref }}
           CI_INPUT_PYTHON: ${{ inputs.python }}
           CI_INPUT_TYPESCRIPT: ${{ inputs.typescript }}
           CI_INPUT_CREATE: ${{ inputs.create_mcp_use_app }}
         with:
           script: |
-            const fromWfCall = context.eventName === 'workflow_call';
+            const fromWfCall = Boolean(process.env.CI_INPUT_REF);
             const py = fromWfCall ? (process.env.CI_INPUT_PYTHON === 'true') : ("${{ steps.filter.outputs.python }}" === 'true');
             const ts = fromWfCall ? (process.env.CI_INPUT_TYPESCRIPT === 'true') : ("${{ steps.filter.outputs.typescript }}" === 'true');
             const knip = fromWfCall ? (process.env.CI_INPUT_TYPESCRIPT === 'true') : ("${{ steps.filter.outputs.knip }}" === 'true');
@@ -151,7 +153,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
+          ref: ${{ inputs.ref || github.sha }}
       - name: Set up Python 3.11
         uses: actions/setup-python@v7
         with:
@@ -182,7 +184,7 @@ jobs:
   #   steps:
   #     - uses: actions/checkout@v7
   #       with:
-  #         ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
+  #         ref: ${{ inputs.ref || github.sha }}
   #     - name: Set up Python 3.11
   #       uses: actions/setup-python@v7
   #       with:
@@ -209,7 +211,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
+          ref: ${{ inputs.ref || github.sha }}
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v7
         with:
@@ -241,7 +243,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
+          ref: ${{ inputs.ref || github.sha }}
       - name: Set up Python 3.11
         uses: actions/setup-python@v7
         with:
@@ -406,7 +408,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
+          ref: ${{ inputs.ref || github.sha }}
       - name: Set up Python 3.11
         uses: actions/setup-python@v7
         with:
@@ -557,7 +559,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
+          ref: ${{ inputs.ref || github.sha }}
       - name: Set up Python 3.11
         uses: actions/setup-python@v7
         with:
@@ -589,7 +591,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
+          ref: ${{ inputs.ref || github.sha }}
       - name: Set up Python 3.11
         uses: actions/setup-python@v7
         with:
@@ -623,7 +625,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
+          ref: ${{ inputs.ref || github.sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -666,7 +668,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
+          ref: ${{ inputs.ref || github.sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -701,7 +703,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
+          ref: ${{ inputs.ref || github.sha }}
       - uses: pnpm/action-setup@v4
         with:
           version: 11.13.1
@@ -744,7 +746,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
+          ref: ${{ inputs.ref || github.sha }}
       - uses: pnpm/action-setup@v4
         with:
           version: 11.13.1
@@ -771,7 +773,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
+          ref: ${{ inputs.ref || github.sha }}
       - uses: pnpm/action-setup@v4
         with:
           version: 11.13.1
@@ -806,7 +808,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
+          ref: ${{ inputs.ref || github.sha }}
       - uses: pnpm/action-setup@v4
         with:
           version: 11.13.1
@@ -839,6 +841,8 @@ jobs:
         working-directory: libraries/typescript
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
       - uses: pnpm/action-setup@v4
         with:
           version: 11.13.1
@@ -865,7 +869,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
+          ref: ${{ inputs.ref || github.sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -887,7 +891,7 @@ jobs:
 
   typescript-changeset-check:
     needs: detect-changes
-    if: ${{ (github.event_name == 'workflow_call' && inputs.run_changeset_check) || (github.event_name == 'pull_request' && github.base_ref != 'canary' && needs.detect-changes.outputs.typescript == 'true') }}
+    if: ${{ (inputs.ref && inputs.run_changeset_check) || (!inputs.ref && github.event_name == 'pull_request' && github.base_ref != 'canary' && needs.detect-changes.outputs.typescript == 'true') }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -896,7 +900,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
+          ref: ${{ inputs.ref || github.sha }}
           fetch-depth: 0
 
       - name: Setup pnpm
@@ -951,7 +955,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
+          ref: ${{ inputs.ref || github.sha }}
       - uses: pnpm/action-setup@v4
         with:
           version: 11.13.1
@@ -1016,7 +1020,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
+          ref: ${{ inputs.ref || github.sha }}
       - uses: pnpm/action-setup@v4
         if: matrix.pm == 'pnpm'
         with:
