@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 from dotenv import load_dotenv
 from langchain.agents import create_agent
-from langchain.chat_models import init_chat_model
+from langchain_openai import ChatOpenAI
 
 from mcp_use import MCPClient
 from mcp_use.agents.adapters import LangChainAdapter
@@ -47,7 +47,7 @@ async def main():
         langchain_tools = adapter.tools + adapter.resources + adapter.prompts
 
         # Create chat model
-        model = init_chat_model("gpt-4o-mini", temperature=0.5, timeout=10, max_tokens=1000)
+        model = ChatOpenAI(model="gpt-4o-mini", temperature=0.5, timeout=10, max_tokens=1000)
         # Create the LangChain agent
         agent = create_agent(
             model=model,

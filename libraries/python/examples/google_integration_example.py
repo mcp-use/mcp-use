@@ -16,8 +16,7 @@ load_dotenv()
 
 async def main():
     config = {
-        "mcpServers": {"playwright": {"command": "npx", "args": ["@playwright/mcp@latest"], "env": {"DISPLAY": ":1"}}}
-    }
+        "mcpServers": {"playwright": {"command": "npx", "args": ["@playwright/mcp@latest"], "env": {"DISPLAY": ":1"}}}}
 
     try:
         client = MCPClient(config=config)
@@ -51,7 +50,7 @@ async def main():
             )
         ]
         # Initial request
-        response = gemini.models.generate_content(
+        response = await gemini.aio.models.generate_content(
             model="gemini-flash-lite-latest", contents=messages, config=types.GenerateContentConfig(tools=google_tools)
         )
 
@@ -114,7 +113,7 @@ async def main():
                 messages.append(function_response_content)
                 # Send the tool's result back to the model to get the next response
 
-            response = gemini.models.generate_content(
+            response = await gemini.aio.models.generate_content(
                 model="gemini-flash-lite-latest",
                 contents=messages,
                 config=types.GenerateContentConfig(tools=google_tools),
