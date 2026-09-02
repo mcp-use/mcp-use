@@ -2,7 +2,6 @@
 import { randomBytes } from "node:crypto";
 import {
   cpSync,
-  existsSync,
   mkdirSync,
   realpathSync,
   readFileSync,
@@ -29,33 +28,47 @@ export const FIXTURE_VIEWS = join(here, "fixtures", "views");
  * Scratch root for mutable fixture copies, under the OS temp directory like
  * the rest of the suite.
  *
- * Resolved through `realpathSync` because macOS hands out `/var/folders/...`
- * for a directory that really lives at `/private/var/folders/...`. Vite
- * compares the two and serves anything it thinks is outside the project root
- * through `/@fs/`, so a fixture's own assets would come back with the wrong
- * URL if the root kept the unresolved form.
+ * Resolved through `realpathSync.native` because the OS temp path is not the
+ * real one: macOS hands out `/var/folders/...` for a directory that lives at
+ * `/private/var/folders/...`, and Windows hands out an 8.3 short path. Vite
+ * compares the project root against resolved file paths and serves anything it
+ * thinks is outside the root through `/@fs/`, so a fixture's own assets come
+ * back with the wrong URL if the root keeps the unresolved form.
  */
 export const TMP_ROOT = createTmpRoot();
 
 function createTmpRoot(): string {
   const root = join(tmpdir(), "mcp-use-cli-tests");
   mkdirSync(root, { recursive: true });
-  return realpathSync(root);
+  // .native so Windows returns the long form too, not C:\Users\RUNNER~1\...
+  return realpathSync.native(root);
 }
 
 /**
- * Link the CLI package's installed dependencies next to the scratch copies.
- *
- * Fixture projects import `zod`, run `tsc`, and start Vite. While the copies
- * lived under `tests/cli`, they resolved all of that by walking up into the
- * CLI package's own `node_modules`; from the OS temp directory there is
- * nothing to walk up into. One link at the scratch root restores that lookup
- * for every copy beneath it without giving each one its own install.
+ * Packages a fixture project resolves from its own `node_modules`: the sources
+ * import `zod`, `typecheck` resolves `typescript` from the project being
+ * checked, and the views fixture declares React.
  */
-function linkDependencies(): void {
-  const link = join(TMP_ROOT, "node_modules");
-  if (!existsSync(link)) {
-    symlinkSync(cliPackageModules, link, "junction");
+const FIXTURE_DEPENDENCIES = ["zod", "typescript", "react", "react-dom"];
+
+/**
+ * Give a scratch copy the dependencies it used to inherit from the repo.
+ *
+ * While the copies lived under `tests/cli` these resolved by walking up into
+ * the CLI package's own `node_modules`. From the OS temp directory there is
+ * nothing to walk up into, and on Windows the temp directory is not even on
+ * the same volume as the checkout, so each copy gets its own links instead of
+ * one shared link higher up. Targets go through `realpathSync` because the
+ * entries in the CLI package are pnpm links into `.pnpm`; pointing at the real
+ * directory keeps each package beside the peers pnpm installed for it.
+ */
+function linkDependencies(nodeModules: string): void {
+  for (const name of FIXTURE_DEPENDENCIES) {
+    symlinkSync(
+      realpathSync.native(join(cliPackageModules, name)),
+      join(nodeModules, name),
+      "junction"
+    );
   }
 }
 
@@ -64,7 +77,6 @@ export function copyFixture(
   label: string,
   fixture: "basic" | "views" = "basic"
 ): string {
-  linkDependencies();
   const source = fixture === "views" ? FIXTURE_VIEWS : FIXTURE_BASIC;
   const dest = join(TMP_ROOT, `${label}-${randomBytes(4).toString("hex")}`);
   mkdirSync(dest, { recursive: true });
@@ -72,6 +84,7 @@ export function copyFixture(
   const nodeModules = join(dest, "node_modules");
   mkdirSync(nodeModules, { recursive: true });
   symlinkSync(serverPackageRoot, join(nodeModules, "mcp-use"), "junction");
+  linkDependencies(nodeModules);
   return dest;
 }
 
