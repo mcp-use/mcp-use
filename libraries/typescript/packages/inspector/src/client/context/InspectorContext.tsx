@@ -91,6 +91,8 @@ export interface EmbeddedConfig {
   chatQuickQuestions?: string[];
   /** Initial followup suggestions shown above input in chat mode. */
   chatFollowups?: string[];
+  /** Maximum agent steps for client-side chat. Defaults to 10 and is capped at 100. */
+  maxSteps?: number;
   /** When true, hides the "New Chat" / clear button in the chat header. */
   chatHideClearButton?: boolean;
   /** When true, hides the tool selector (wrench icon) in the chat input. */

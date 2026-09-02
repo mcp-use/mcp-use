@@ -100,6 +100,7 @@ interface UseChatMessagesClientSideProps {
   initialMessages?: Message[];
   systemPrompt?: string;
   skills?: Skill[];
+  maxSteps?: number;
 }
 
 export function useChatMessagesClientSide({
@@ -116,6 +117,7 @@ export function useChatMessagesClientSide({
   initialMessages,
   systemPrompt = DEFAULT_CHAT_SYSTEM_PROMPT,
   skills = [],
+  maxSteps,
 }: UseChatMessagesClientSideProps) {
   const retryServerId = connection.id ?? connection.url;
   const privateStore = useChatSessionStore();
@@ -424,7 +426,10 @@ export function useChatMessagesClientSide({
             disabledTools && disabledTools.size > 0
               ? [...disabledTools].sort()
               : undefined,
-          maxSteps: 10,
+          maxSteps:
+            typeof maxSteps === "number" && Number.isFinite(maxSteps)
+              ? Math.min(100, Math.max(1, Math.trunc(maxSteps)))
+              : 10,
           autoInitialize: true,
         });
 

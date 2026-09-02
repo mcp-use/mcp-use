@@ -185,6 +185,7 @@ export function LayoutContent({
         clearButtonVariant={embeddedConfig.chatClearButtonVariant}
         chatQuickQuestions={embeddedConfig.chatQuickQuestions}
         chatFollowups={embeddedConfig.chatFollowups}
+        maxSteps={embeddedConfig.maxSteps}
         hideClearButton={embeddedConfig.chatHideClearButton}
         hideToolSelector={embeddedConfig.chatHideToolSelector}
         enableKeyboardShortcuts={false}
@@ -334,6 +335,7 @@ export function LayoutContent({
             clearButtonVariant={embeddedConfig.chatClearButtonVariant}
             chatQuickQuestions={embeddedConfig.chatQuickQuestions}
             chatFollowups={embeddedConfig.chatFollowups}
+            maxSteps={embeddedConfig.maxSteps}
             hideClearButton={embeddedConfig.chatHideClearButton}
             hideToolSelector={embeddedConfig.chatHideToolSelector}
             streamProtocol={embeddedConfig.chatStreamProtocol}
