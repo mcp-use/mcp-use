@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.2.3-canary.1
+
+### Patch Changes
+
+- 676902b: Fix `listAllResources` throwing a raw `TypeError` when a disconnect lands between pages. The pagination loop read `this.client` once per page, so `disconnect()` clearing it mid-listing surfaced `Cannot read properties of null (reading 'listResources')` instead of the transport's own error.
+
 ## 2.2.3-canary.0
 
 ### Patch Changes
