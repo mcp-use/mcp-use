@@ -167,10 +167,13 @@ describe("NodeOAuthClientProvider", () => {
         kvStore: new MemoryKVStore(),
         openBrowser: vi.fn(),
         preferredPort: port,
-        portRange: 1,
+        portRange: 100,
       }
     );
-    expect(provider.callbackPort).toBe(port);
+    // Occupy whatever port reservePort actually settled on rather than the
+    // preferred one: the preferred port may already be taken by an unrelated
+    // process, in which case the provider falls back within the range.
+    const boundPort = provider.callbackPort;
 
     const authorizationUrl = new URL("https://auth.example.com/authorize");
     authorizationUrl.searchParams.set("state", "test-state");
@@ -182,7 +185,7 @@ describe("NodeOAuthClientProvider", () => {
     const occupier = createNetServer();
     await new Promise<void>((resolve, reject) => {
       occupier.once("error", reject);
-      occupier.listen(port, "127.0.0.1", () => {
+      occupier.listen(boundPort, "127.0.0.1", () => {
         occupier.removeListener("error", reject);
         resolve();
       });
