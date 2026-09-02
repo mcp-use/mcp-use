@@ -68,6 +68,25 @@ class TestConnectionManagerTimeout:
         assert manager.close_call_count == 2
 
     @pytest.mark.asyncio
+    async def test_start_while_stop_in_progress_serializes_cleanly(self):
+        manager = MockConnectionManager(close_delay=0.05)
+        await manager.start()
+
+        # Initiate stop in the background
+        stop_task = asyncio.create_task(manager.stop())
+        await asyncio.sleep(0.01)
+
+        # Start should serialize behind stop and establish fresh valid connection
+        connection = await manager.start()
+        await stop_task
+        assert connection == "test_connection"
+        assert manager._connection is not None
+        assert manager.close_call_count == 1
+
+        await manager.stop()
+        assert manager.close_call_count == 2
+
+    @pytest.mark.asyncio
     async def test_stop_with_default_timeout(self):
         manager = MockConnectionManager(close_delay=0.1)
         await manager.start()

@@ -67,6 +67,10 @@ class ConnectionManager(Generic[T], ABC):
         Raises:
             Exception: If connection cannot be established.
         """
+        # Ensure any in-progress task or cleanup completes before restarting
+        if self._task is not None and not self._done_event.is_set():
+            await self.stop()
+
         # Reset state
         self._ready_event.clear()
         self._done_event.clear()
