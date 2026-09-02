@@ -161,6 +161,102 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
         self.assertTrue(self.connector._connected)
         self.assertIsNotNone(self.connector.client_session)
 
+    @patch("mcp_use.client.connectors.http.logger")
+    @patch("mcp_use.client.connectors.http.SseConnectionManager")
+    @patch("mcp_use.client.connectors.http.StreamableHttpConnectionManager")
+    @patch("mcp_use.client.connectors.http.ClientSession")
+    async def test_streamable_http_failure_and_sse_fallback_log_levels(
+        self, mock_client_session_class, mock_streamable_cm_class, mock_sse_cm_class, mock_logger, _
+    ):
+        """Test that streamable HTTP failure logs warning and SSE fallback logs info."""
+        mock_streamable_cm_instance = MagicMock()
+        mock_streamable_cm_instance.start = AsyncMock(return_value=("read_stream", "write_stream"))
+        mock_streamable_cm_instance.close = AsyncMock()
+        mock_streamable_cm_class.return_value = mock_streamable_cm_instance
+
+        mock_sse_cm_instance = MagicMock()
+        mock_sse_cm_instance.start = AsyncMock(return_value=("sse_read_stream", "sse_write_stream"))
+        mock_sse_cm_class.return_value = mock_sse_cm_instance
+
+        call_count = 0
+
+        def mock_client_session_factory(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            mock_instance = MagicMock()
+            mock_instance.__aenter__ = AsyncMock()
+            mock_instance.__aexit__ = AsyncMock()
+            mock_instance.initialize = AsyncMock()
+            if call_count == 1:
+                mock_instance.initialize.side_effect = McpError(ErrorData(code=1, message="Streamable dropped"))
+            else:
+                mock_instance.initialize.return_value = MagicMock(
+                    capabilities=MagicMock(tools=True, resources=True, prompts=True)
+                )
+            mock_instance.list_tools = AsyncMock(return_value=MagicMock(tools=[]))
+            mock_instance.list_resources = AsyncMock(return_value=MagicMock(resources=[]))
+            mock_instance.list_prompts = AsyncMock(return_value=MagicMock(prompts=[]))
+            return mock_instance
+
+        mock_client_session_class.side_effect = mock_client_session_factory
+
+        await self.connector.connect()
+
+        # Streamable HTTP failure must be logged as warning
+        warning_calls = [call[0][0] for call in mock_logger.warning.call_args_list]
+        self.assertTrue(any("Streamable HTTP failed:" in msg for msg in warning_calls))
+
+        # SSE fallback attempt must be logged as info
+        info_calls = [call[0][0] for call in mock_logger.info.call_args_list]
+        self.assertTrue(any("Attempting SSE fallback connection to:" in msg for msg in info_calls))
+
+    @patch("mcp_use.client.connectors.http.logger")
+    @patch("mcp_use.client.connectors.http.SseConnectionManager")
+    @patch("mcp_use.client.connectors.http.StreamableHttpConnectionManager")
+    @patch("mcp_use.client.connectors.http.ClientSession")
+    async def test_streamable_cleanup_error_logged_at_warning(
+        self, mock_client_session_class, mock_streamable_cm_class, mock_sse_cm_class, mock_logger, _
+    ):
+        """Test that failure during cleanup of streamable connection manager is logged at warning."""
+        mock_streamable_cm_instance = MagicMock()
+        mock_streamable_cm_instance.start = AsyncMock(return_value=("read_stream", "write_stream"))
+        mock_streamable_cm_instance.close = AsyncMock(side_effect=RuntimeError("Close failed"))
+        mock_streamable_cm_class.return_value = mock_streamable_cm_instance
+
+        mock_sse_cm_instance = MagicMock()
+        mock_sse_cm_instance.start = AsyncMock(return_value=("sse_read_stream", "sse_write_stream"))
+        mock_sse_cm_class.return_value = mock_sse_cm_instance
+
+        call_count = 0
+
+        def mock_client_session_factory(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            mock_instance = MagicMock()
+            mock_instance.__aenter__ = AsyncMock()
+            mock_instance.__aexit__ = AsyncMock()
+            mock_instance.initialize = AsyncMock()
+            if call_count == 1:
+                mock_instance.initialize.side_effect = McpError(ErrorData(code=1, message="Streamable dropped"))
+            else:
+                mock_instance.initialize.return_value = MagicMock(
+                    capabilities=MagicMock(tools=True, resources=True, prompts=True)
+                )
+            mock_instance.list_tools = AsyncMock(return_value=MagicMock(tools=[]))
+            mock_instance.list_resources = AsyncMock(return_value=MagicMock(resources=[]))
+            mock_instance.list_prompts = AsyncMock(return_value=MagicMock(prompts=[]))
+            return mock_instance
+
+        mock_client_session_class.side_effect = mock_client_session_factory
+
+        await self.connector.connect()
+
+        # Cleanup error must be logged as warning with exception detail
+        warning_calls = [call[0][0] for call in mock_logger.warning.call_args_list]
+        self.assertTrue(
+            any("Error cleaning up failed streamable connection manager: Close failed" in msg for msg in warning_calls)
+        )
+
     @patch("mcp_use.client.connectors.http.StreamableHttpConnectionManager")
     @patch("mcp_use.client.connectors.http.ClientSession")
     async def test_connect_with_streamable_http(self, mock_client_session_class, mock_cm_class, _):

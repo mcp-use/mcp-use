@@ -254,14 +254,16 @@ class HttpConnector(BaseConnector):
         # Exception from the inner try is propagated here and in
         # the most cases is an McpError, so checking instances is useless
         except Exception as streamable_error:
-            logger.debug(f"Streamable HTTP failed: {streamable_error}")
+            logger.warning(f"Streamable HTTP failed: {streamable_error}")
 
             # Clean up the failed streamable HTTP connection manager
             if connection_manager:
                 try:
                     await connection_manager.close()
-                except Exception:
-                    pass
+                except Exception as cleanup_error:
+                    logger.warning(
+                        f"Error cleaning up failed streamable connection manager: {cleanup_error}"
+                    )
 
             # It doesn't make sense to check error types. Because client
             # always return a McpError, if he can't reach the server
@@ -271,7 +273,7 @@ class HttpConnector(BaseConnector):
             if should_fallback:
                 try:
                     # Fall back to the old SSE transport
-                    logger.debug(f"Attempting SSE fallback connection to: {self.base_url}")
+                    logger.info(f"Attempting SSE fallback connection to: {self.base_url}")
                     connection_manager = SseConnectionManager(
                         self.base_url,
                         self.headers,
