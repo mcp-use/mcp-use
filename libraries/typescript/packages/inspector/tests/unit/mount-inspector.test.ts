@@ -1,5 +1,6 @@
 import express from "express";
 import { Hono } from "hono";
+import http from "node:http";
 import { describe, expect, it } from "vitest";
 import { mountInspector } from "../../src/server/index.js";
 
@@ -233,4 +234,97 @@ describe("mountInspector", () => {
       });
     }
   });
+
+  it("releases the upstream stream when the Express client disconnects mid-response", async () => {
+    // Upstream MCP-style SSE server: writes an initial chunk immediately, then
+    // keeps the connection open indefinitely with periodic pings, and reports
+    // when the *inbound* request (the proxy's fetch to it) is closed.
+    let upstreamRequestClosed = false;
+    let resolveUpstreamClosed: () => void = () => {};
+    const upstreamClosed = new Promise<void>((resolve) => {
+      resolveUpstreamClosed = resolve;
+    });
+    let upstreamInterval: ReturnType<typeof setInterval> | undefined;
+
+    const upstream = http.createServer((req, res) => {
+      res.writeHead(200, {
+        "content-type": "text/event-stream",
+        "cache-control": "no-cache",
+      });
+      res.write(": ping\n\n");
+      upstreamInterval = setInterval(() => {
+        res.write(": ping\n\n");
+      }, 20);
+      req.on("close", () => {
+        upstreamRequestClosed = true;
+        resolveUpstreamClosed();
+      });
+    });
+    await new Promise<void>((resolve) => upstream.listen(0, resolve));
+
+    const app = express();
+    // Loopback opt-in: this test proxies to its own 127.0.0.1 SSE server.
+    mountInspector(app, { basePath: "/mcp", oauthProxyAllowLoopback: true });
+    const server = app.listen(0);
+
+    let controller: AbortController | undefined;
+    try {
+      const upstreamAddress = upstream.address();
+      const appAddress = server.address();
+      if (
+        !upstreamAddress ||
+        typeof upstreamAddress === "string" ||
+        !appAddress ||
+        typeof appAddress === "string"
+      ) {
+        throw new Error("Test servers did not bind TCP ports");
+      }
+      const upstreamOrigin = `http://127.0.0.1:${upstreamAddress.port}`;
+      const appOrigin = `http://127.0.0.1:${appAddress.port}`;
+
+      controller = new AbortController();
+      const response = await fetch(`${appOrigin}/mcp/inspector/api/proxy`, {
+        headers: { "x-target-url": `${upstreamOrigin}/stream` },
+        signal: controller.signal,
+      });
+      expect(response.status).toBe(200);
+      if (!response.body) {
+        throw new Error("Proxied response had no body");
+      }
+
+      // Prove the stream is actually flowing end-to-end before disconnecting.
+      const reader = response.body.getReader();
+      const first = await reader.read();
+      expect(first.done).toBe(false);
+
+      // Simulate the Express client disconnecting mid-stream.
+      controller.abort();
+
+      // A fixed middleware releases the upstream promptly; an unfixed one
+      // never does, so bound the wait instead of hanging the suite.
+      await Promise.race([
+        upstreamClosed,
+        new Promise<void>((_resolve, reject) =>
+          setTimeout(
+            () =>
+              reject(
+                new Error(
+                  "upstream connection was not released after client disconnect"
+                )
+              ),
+            3000
+          )
+        ),
+      ]);
+
+      expect(upstreamRequestClosed).toBe(true);
+    } finally {
+      if (upstreamInterval) clearInterval(upstreamInterval);
+      controller?.abort();
+      server.closeAllConnections();
+      upstream.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await new Promise<void>((resolve) => upstream.close(() => resolve()));
+    }
+  }, 10000);
 });
