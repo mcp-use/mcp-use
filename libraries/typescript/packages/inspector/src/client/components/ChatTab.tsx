@@ -138,6 +138,8 @@ export interface ChatTabProps {
   chatQuickQuestions?: string[];
   /** Initial followups shown above input in active chat mode. */
   chatFollowups?: string[];
+  /** Maximum agent steps for client-side chat. Defaults to 10 and is capped at 100. */
+  maxSteps?: number;
   /**
    * Wire protocol used by the streaming endpoint.
    * - `"sse"` (default): Inspector SSE protocol
@@ -209,6 +211,7 @@ export function ChatTab({
   hideToolSelector,
   chatQuickQuestions = [],
   chatFollowups = [],
+  maxSteps,
   streamProtocol,
   credentials,
   extraHeaders,
@@ -346,6 +349,7 @@ export function ChatTab({
     widgetModelContexts,
     disabledTools: effectiveDisabledTools,
     appToolConnections,
+    maxSteps,
   };
 
   const serverSideChat = useChatMessages({
