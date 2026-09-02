@@ -70,17 +70,50 @@ function CloseIcon() {
   );
 }
 
-function waitForSandboxProxyReady(iframe: HTMLIFrameElement): Promise<void> {
-  return new Promise((resolve) => {
+function waitForSandboxProxyReady(
+  iframe: HTMLIFrameElement,
+  options?: { timeoutMs?: number; signal?: AbortSignal }
+): Promise<void> {
+  const timeoutMs = options?.timeoutMs ?? 15_000;
+  return new Promise((resolve, reject) => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const cleanup = () => {
+      window.removeEventListener("message", listener);
+      if (timer !== undefined) clearTimeout(timer);
+      options?.signal?.removeEventListener("abort", onAbort);
+    };
+
     const listener = (event: MessageEvent) => {
       if (
         event.source === iframe.contentWindow &&
         event.data?.method === SANDBOX_PROXY_READY
       ) {
-        window.removeEventListener("message", listener);
+        cleanup();
         resolve();
       }
     };
+
+    const onAbort = () => {
+      cleanup();
+      reject(new Error("View sandbox initialization was aborted"));
+    };
+
+    if (options?.signal?.aborted) {
+      onAbort();
+      return;
+    }
+    options?.signal?.addEventListener("abort", onAbort, { once: true });
+
+    if (timeoutMs > 0 && timeoutMs !== Infinity) {
+      timer = setTimeout(() => {
+        cleanup();
+        reject(
+          new Error(`Sandbox proxy did not become ready within ${timeoutMs}ms`)
+        );
+      }, timeoutMs);
+    }
+
     window.addEventListener("message", listener);
   });
 }
@@ -449,6 +482,7 @@ function ViewRendererBase({
 
     let disposed = false;
     let bridge: AppBridge | null = null;
+    const abortController = new AbortController();
 
     const run = async () => {
       try {
@@ -462,7 +496,9 @@ function ViewRendererBase({
           iframe.setAttribute("allow", allowAttribute);
         }
 
-        const readyPromise = waitForSandboxProxyReady(iframe);
+        const readyPromise = waitForSandboxProxyReady(iframe, {
+          signal: abortController.signal,
+        });
         if (activeSandboxUrl.protocol === "blob:") {
           const response = await fetch(activeSandboxUrl.href);
           const sandboxHtml = await response.text();
@@ -716,7 +752,7 @@ function ViewRendererBase({
 
         onLifecycleChangeRef.current?.({ status: "ready" });
       } catch (err) {
-        if (!disposed) {
+        if (!disposed && !abortController.signal.aborted) {
           const message =
             err instanceof Error ? err.message : "Failed to connect view";
           setLoadError(message);
@@ -730,6 +766,7 @@ function ViewRendererBase({
 
     return () => {
       disposed = true;
+      abortController.abort();
       const toClose = bridge;
       bridgeRef.current = null;
       onAppToolsChangedRef.current?.(null);
