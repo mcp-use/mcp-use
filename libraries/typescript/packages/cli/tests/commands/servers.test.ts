@@ -84,6 +84,62 @@ describe("server environment output safety", () => {
       updated: true,
     });
   });
+
+  it("preserves an existing sensitive flag when --secret is not repeated on update", async () => {
+    api.request
+      .mockResolvedValueOnce([{ id: "env_1", key: "TOKEN", sensitive: true }])
+      .mockResolvedValueOnce({
+        id: "env_1",
+        key: "TOKEN",
+        value: "rotated",
+      });
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(
+      runServers(["env", "set", "server_1", "TOKEN=rotated", "--json"])
+    ).resolves.toBe(0);
+
+    expect(api.request).toHaveBeenLastCalledWith(
+      "/servers/server_1/env-variables/env_1",
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          key: "TOKEN",
+          value: "rotated",
+          branch: null,
+          environments: ["production"],
+          sensitive: true,
+        }),
+      }
+    );
+  });
+
+  it("does not mark a brand-new variable sensitive by default", async () => {
+    api.request.mockResolvedValueOnce([]).mockResolvedValueOnce({
+      id: "env_2",
+      key: "NEW_VAR",
+      value: "value",
+    });
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(
+      runServers(["env", "set", "server_1", "NEW_VAR=value", "--json"])
+    ).resolves.toBe(0);
+
+    expect(api.request).toHaveBeenLastCalledWith(
+      "/servers/server_1/env-variables",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          key: "NEW_VAR",
+          value: "value",
+          branch: null,
+          environments: ["production"],
+          sensitive: false,
+        }),
+      }
+    );
+  });
 });
 
 describe("server human output", () => {

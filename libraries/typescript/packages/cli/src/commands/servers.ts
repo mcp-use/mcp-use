@@ -290,12 +290,14 @@ async function envSet(argv: readonly string[], json: boolean): Promise<number> {
     (variable) =>
       variable.key === key && (variable.branch ?? undefined) === values.branch
   );
+  const sensitive =
+    values.secret === true ? true : (existing?.sensitive ?? false);
   const body = {
     key,
     value,
     branch: values.branch ?? null,
     environments: values.branch === undefined ? ["production"] : ["preview"],
-    sensitive: values.secret === true,
+    sensitive,
   };
   if (existing === undefined) {
     await api.request<unknown>(
@@ -313,7 +315,7 @@ async function envSet(argv: readonly string[], json: boolean): Promise<number> {
     key,
     scope: values.branch === undefined ? "production" : "preview",
     branch: values.branch ?? null,
-    secret: values.secret === true,
+    secret: sensitive,
     updated: existing !== undefined,
   };
   printResult(result, json, `Set ${key}.`);
