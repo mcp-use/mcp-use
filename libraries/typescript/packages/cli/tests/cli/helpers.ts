@@ -2,18 +2,22 @@
 import { randomBytes } from "node:crypto";
 import {
   cpSync,
+  existsSync,
   mkdirSync,
+  realpathSync,
   readFileSync,
   rmSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { createServer, type Server } from "node:net";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const serverPackageRoot = join(here, "..", "..", "..", "server");
+const cliPackageModules = join(here, "..", "..", "node_modules");
 
 /** Absolute path to the committed basic fixture project. */
 export const FIXTURE_BASIC = join(here, "fixtures", "basic");
@@ -22,18 +26,45 @@ export const FIXTURE_BASIC = join(here, "fixtures", "basic");
 export const FIXTURE_VIEWS = join(here, "fixtures", "views");
 
 /**
- * Scratch root for mutable fixture copies. Each copy receives a local
- * `node_modules/mcp-use` link, matching the package layout of an installed
- * consumer without creating a workspace dependency cycle between the CLI and
- * server packages.
+ * Scratch root for mutable fixture copies, under the OS temp directory like
+ * the rest of the suite.
+ *
+ * Resolved through `realpathSync` because macOS hands out `/var/folders/...`
+ * for a directory that really lives at `/private/var/folders/...`. Vite
+ * compares the two and serves anything it thinks is outside the project root
+ * through `/@fs/`, so a fixture's own assets would come back with the wrong
+ * URL if the root kept the unresolved form.
  */
-export const TMP_ROOT = join(here, ".tmp");
+export const TMP_ROOT = createTmpRoot();
+
+function createTmpRoot(): string {
+  const root = join(tmpdir(), "mcp-use-cli-tests");
+  mkdirSync(root, { recursive: true });
+  return realpathSync(root);
+}
+
+/**
+ * Link the CLI package's installed dependencies next to the scratch copies.
+ *
+ * Fixture projects import `zod`, run `tsc`, and start Vite. While the copies
+ * lived under `tests/cli`, they resolved all of that by walking up into the
+ * CLI package's own `node_modules`; from the OS temp directory there is
+ * nothing to walk up into. One link at the scratch root restores that lookup
+ * for every copy beneath it without giving each one its own install.
+ */
+function linkDependencies(): void {
+  const link = join(TMP_ROOT, "node_modules");
+  if (!existsSync(link)) {
+    symlinkSync(cliPackageModules, link, "junction");
+  }
+}
 
 /** Copy a committed fixture into a fresh scratch dir; returns its path. */
 export function copyFixture(
   label: string,
   fixture: "basic" | "views" = "basic"
 ): string {
+  linkDependencies();
   const source = fixture === "views" ? FIXTURE_VIEWS : FIXTURE_BASIC;
   const dest = join(TMP_ROOT, `${label}-${randomBytes(4).toString("hex")}`);
   mkdirSync(dest, { recursive: true });
