@@ -695,6 +695,7 @@ export function useChatMessagesClientSide({
       runtime,
       systemPrompt,
       skills,
+      maxSteps,
       setMessages,
       updateSession,
     ]
