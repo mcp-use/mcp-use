@@ -11,7 +11,7 @@ import httpx
 from mcp import ClientSession
 from mcp.client.session import ElicitationFnT, ListRootsFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
 from mcp.shared.exceptions import McpError
-from mcp.types import Root
+from mcp.types import InitializeResult, Root
 
 from mcp_use.client.auth.oauth import BearerAuth, OAuth, OAuthClientProvider
 from mcp_use.client.connectors.base import BaseConnector
@@ -80,6 +80,7 @@ class HttpConnector(BaseConnector):
         self._auth: httpx.Auth | None = None
         self._oauth: OAuth | None = None
         self.verify = verify
+        self._streamable_initialize_result: InitializeResult | None = None
 
         # Handle authentication
         if auth is not None:
@@ -205,7 +206,6 @@ class HttpConnector(BaseConnector):
                 # If we get here, streamable HTTP works
                 self.client_session = test_client
                 self.transport_type = "streamable HTTP"
-                self._initialized = True  # Mark as initialized since we just called initialize()
 
                 # Populate tools, resources, and prompts since we've initialized
                 server_capabilities = result.capabilities
@@ -230,6 +230,10 @@ class HttpConnector(BaseConnector):
                     self._prompts = prompts_result.prompts if prompts_result else []
                 else:
                     self._prompts = []
+
+                self._streamable_initialize_result = result
+                self.capabilities = server_capabilities
+                self._initialized = True  # Mark as initialized since we just called initialize()
 
             # Only McpError is raised from client's initialization because
             # exceptions are handled internally.
@@ -325,6 +329,17 @@ class HttpConnector(BaseConnector):
         self._connection_manager = connection_manager
         self._connected = True
         logger.debug(f"Successfully connected to MCP implementation via {self.transport_type}: {self.base_url}")
+
+    async def _cleanup_resources(self) -> None:
+        """Clean up HTTP resources and discard any cached probe result."""
+        await super()._cleanup_resources()
+        self._streamable_initialize_result = None
+
+    async def initialize(self) -> InitializeResult | None:
+        """Return the Streamable HTTP probe result without repeating the handshake."""
+        if self._initialized and self._streamable_initialize_result is not None:
+            return self._streamable_initialize_result
+        return await super().initialize()
 
     def _build_httpx_factory(self):
         verify = self.verify

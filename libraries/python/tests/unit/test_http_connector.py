@@ -224,6 +224,11 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
         self.assertEqual(len(self.connector._resources), 1)
         self.assertEqual(len(self.connector._prompts), 1)
 
+        # The connection probe is the one and only initialization handshake.
+        self.assertIs(self.connector.capabilities, mock_init_result.capabilities)
+        self.assertIs(await self.connector.initialize(), mock_init_result)
+        mock_client_session_instance.initialize.assert_called_once()
+
     @patch("mcp_use.client.connectors.http.StreamableHttpConnectionManager")
     async def test_sse_connect_already_connected(self, mock_cm_class, _):
         """Test connecting when already connected."""
