@@ -1,5 +1,30 @@
 # @mcp-use/inspector
 
+## 20.3.4-canary.3
+
+### Patch Changes
+
+- 7d7ab2a: Allow embedded client-side chats to configure up to 100 agent steps.
+
+## 20.3.4-canary.2
+
+### Patch Changes
+
+- @mcp-use/agent@2.0.12-canary.0
+
+## 20.3.4-canary.1
+
+### Patch Changes
+
+- 44b15ca: `mcp-use screenshot` now fails with a stable `view_load_failed` code instead of writing a PNG when the MCP App itself fails to initialize (a bad resource, a sandbox connect failure, or an initialize-handshake failure). This is baseline behavior, not opt-in. `console.error` calls, uncaught errors, and unhandled rejections a widget logs after it has successfully initialized continue to be ignored, since those are frequently recoverable and treating them as failures would create false positives.
+
+## 20.3.4-canary.0
+
+### Patch Changes
+
+- 11534a3: Inspector RPC logger: replace the per-row timestamp with the request duration in milliseconds
+  - mcp-use@2.3.5-canary.0
+
 ## 20.3.3
 
 ### Patch Changes

@@ -174,6 +174,45 @@ describe("mixed OAuth authorization", () => {
     });
   });
 
+  it("does not retry a protected operation after disconnecting during OAuth", async () => {
+    let finishAuthorization!: () => void;
+    const authorization = new Promise<void>((resolve) => {
+      finishAuthorization = resolve;
+    });
+    const callTool = vi
+      .fn()
+      .mockRejectedValueOnce(new UnauthorizedError("Authentication required"));
+    const connector = new HttpConnector("https://mcp.example.com/mcp", {
+      authProvider: createProvider({
+        getAuthorizationResponse: vi.fn(async () => {
+          await authorization;
+          return {
+            code: "authorization-code",
+            iss: "https://auth.example.com",
+          };
+        }),
+      }),
+      detectMixedAuth: false,
+    });
+    attachConnectedClient(
+      connector,
+      { callTool, getProtocolEra: () => "modern" },
+      {
+        finishAuth: vi.fn(async () => {}),
+      }
+    );
+
+    const request = connector.callTool("build", {});
+    await vi.waitFor(() => {
+      expect(callTool).toHaveBeenCalledOnce();
+    });
+    await connector.disconnect();
+    finishAuthorization();
+
+    await expect(request).rejects.toThrow("MCP client is not connected");
+    expect(callTool).toHaveBeenCalledOnce();
+  });
+
   it("leaves a protected operation pending when automatic auth is disabled", async () => {
     const finishAuth = vi.fn(async () => {});
     const connector = new HttpConnector("https://mcp.example.com/mcp", {

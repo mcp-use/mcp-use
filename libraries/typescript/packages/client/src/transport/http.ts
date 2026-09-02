@@ -318,6 +318,9 @@ export class HttpConnector extends BaseConnector {
         throw error;
       }
       await this.completeInteractiveAuthorization();
+      if (!this.connected || !this.client) {
+        throw new Error("MCP client is not connected");
+      }
       return operation();
     }
   }

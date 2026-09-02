@@ -1,7 +1,7 @@
 {
   "name": "mcp-use",
   "type": "module",
-  "version": "2.3.4",
+  "version": "2.4.0-canary.4",
   "description": "MCP framework and CLI built on the official v2 SDK",
   "author": "mcp-use, Inc.",
   "license": "MIT",
@@ -85,6 +85,10 @@
       "types": "./dist/oauth/scalekit.d.ts",
       "import": "./dist/oauth/scalekit.js"
     },
+    "./oauth/convex": {
+      "types": "./dist/oauth/convex.d.ts",
+      "import": "./dist/oauth/convex.js"
+    },
     "./node": {
       "types": "./dist/node-bridge.d.ts",
       "import": "./dist/node-bridge.js",
@@ -127,7 +131,7 @@
     "jose": "^6.1.3"
   },
   "peerDependencies": {
-    "@mcp-use/client": "^2.0.1 || ^2.1.0 || ^2.1.1 || ^2.1.2 || ^2.1.3 || ^2.1.4 || ^2.1.5 || ^2.2.0 || ^2.2.1 || ^2.2.2",
+    "@mcp-use/client": "^2.0.1 || ^2.1.0 || ^2.1.1 || ^2.1.2 || ^2.1.3 || ^2.1.4 || ^2.1.5 || ^2.2.0 || ^2.2.1 || ^2.2.2 || ^2.2.3-canary.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
