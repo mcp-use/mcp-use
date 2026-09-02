@@ -839,6 +839,8 @@ jobs:
         working-directory: libraries/typescript
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
       - uses: pnpm/action-setup@v4
         with:
           version: 11.13.1
