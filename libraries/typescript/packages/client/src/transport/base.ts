@@ -735,8 +735,8 @@ export abstract class BaseConnector {
     resources: any[];
   }> {
     // Held across the pagination loop below: `disconnect()` clears
-    // `this.client`, and re-reading it once per page would throw a raw
-    // TypeError instead of the not-connected error every other method reports.
+    // `this.client`, and re-reading it once per page would dereference null
+    // mid-listing instead of failing on the closed transport.
     const client = this.client;
     if (!client) {
       throw new Error("MCP client is not connected");
