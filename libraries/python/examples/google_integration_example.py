@@ -127,7 +127,7 @@ async def main():
             print("The model did not return a final text response.")
             print(response)
 
-        gemini.close()
+        await gemini.aio.aclose()
     except Exception as e:
         print(f"Error: {e}")
         raise e
