@@ -63,7 +63,7 @@ For detailed usage instructions and guides, visit [mcp-use.com/docs/inspector](h
 | **📁 Resource Browser**    | View and copy resource URIs with syntax highlighting                    |
 | **🧩 Skills Explorer**     | Browse, verify, and preview Skills over MCP files                        |
 | **💬 Prompt Manager**      | Test and manage prompts with argument templates                         |
-| **🌐 Universal Support**   | Works with HTTP/SSE server connections                               |
+| **🌐 Universal Support**   | Works with Streamable HTTP server connections                           |
 | **🎨 Widget Support**      | Full support for MCP-UI and OpenAI Apps SDK widgets                     |
 | **🔑 BYOK Chat**           | Bring Your Own Key chat interface for testing conversational flows      |
 | **📚 Skill-aware Chat**    | Test progressive skill loading with removable per-chat context          |

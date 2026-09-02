@@ -341,7 +341,7 @@ Use the MCP server with any MCP-compatible client:
 
 ```typescript
 import { MCPClient } from "@mcp-use/client";
-import { MCPAgent } from "@mcp-use/agent";
+import { MCPAgent } from "@mcp-use/agent/langchain";
 import { ChatOpenAI } from "@langchain/openai";
 
 const client = new MCPClient({
