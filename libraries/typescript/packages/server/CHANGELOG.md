@@ -1,5 +1,19 @@
 # mcp-use
 
+## 2.4.0
+
+### Minor Changes
+
+- 32da345: Add `oauthConvexProvider` for authenticating MCP servers via a Convex OAuth Provider deployment. Exports from `mcp-use/oauth/convex`.
+
+### Patch Changes
+
+- Updated dependencies [32da345]
+- Updated dependencies [32da345]
+- Updated dependencies [32da345]
+  - @mcp-use/inspector@20.3.4
+  - @mcp-use/cli@4.1.9
+
 ## 2.4.0-canary.4
 
 ### Patch Changes
