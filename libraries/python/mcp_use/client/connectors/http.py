@@ -136,6 +136,14 @@ class HttpConnector(BaseConnector):
             logger.debug("Already connected to MCP implementation")
             return
 
+        # A reconnect uses a new transport, so discard initialization state from the dropped session.
+        self._initialized = False
+        self._streamable_initialize_result = None
+        self.capabilities = None
+        self._tools = None
+        self._resources = None
+        self._prompts = None
+
         # Handle OAuth if needed
         if self._oauth:
             try:

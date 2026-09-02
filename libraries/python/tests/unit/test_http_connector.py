@@ -229,6 +229,78 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
         self.assertIs(await self.connector.initialize(), mock_init_result)
         mock_client_session_instance.initialize.assert_called_once()
 
+    @patch("mcp_use.client.connectors.http.SseConnectionManager")
+    @patch("mcp_use.client.connectors.http.StreamableHttpConnectionManager")
+    @patch("mcp_use.client.connectors.http.ClientSession")
+    async def test_reconnect_sse_fallback_reinitializes_session(
+        self, mock_client_session_class, mock_streamable_cm_class, mock_sse_cm_class, _
+    ):
+        """Test that SSE fallback does not reuse initialization state from a dropped streamable session."""
+        old_result = MagicMock(name="old_result")
+        old_capabilities = MagicMock(name="old_capabilities", tools=True, resources=True, prompts=True)
+        old_result.capabilities = old_capabilities
+        old_tools = [MagicMock(spec=Tool)]
+        old_resources = [MagicMock(spec=Resource)]
+        old_prompts = [MagicMock(spec=Prompt)]
+        self.connector._initialized = True
+        self.connector._streamable_initialize_result = old_result
+        self.connector.capabilities = old_capabilities
+        self.connector._tools = old_tools
+        self.connector._resources = old_resources
+        self.connector._prompts = old_prompts
+        self.connector._connected = False
+
+        mock_streamable_cm_instance = MagicMock()
+        mock_streamable_cm_instance.start = AsyncMock(return_value=("read_stream", "write_stream"))
+        mock_streamable_cm_instance.close = AsyncMock()
+        mock_streamable_cm_class.return_value = mock_streamable_cm_instance
+
+        mock_sse_cm_instance = MagicMock()
+        mock_sse_cm_instance.start = AsyncMock(return_value=("sse_read_stream", "sse_write_stream"))
+        mock_sse_cm_class.return_value = mock_sse_cm_instance
+
+        streamable_client = MagicMock()
+        streamable_client.__aenter__ = AsyncMock()
+        streamable_client.__aexit__ = AsyncMock()
+        streamable_client.initialize = AsyncMock(side_effect=McpError(ErrorData(code=1, message="Connection closed")))
+
+        sse_client = MagicMock()
+        sse_client.__aenter__ = AsyncMock()
+        sse_client.__aexit__ = AsyncMock()
+        sse_client.initialize = AsyncMock()
+        fresh_result = MagicMock(name="fresh_result")
+        fresh_capabilities = MagicMock(name="fresh_capabilities", tools=True, resources=True, prompts=True)
+        fresh_result.capabilities = fresh_capabilities
+        sse_client.initialize.return_value = fresh_result
+        fresh_tools = [MagicMock(spec=Tool)]
+        fresh_resources = [MagicMock(spec=Resource)]
+        fresh_prompts = [MagicMock(spec=Prompt)]
+        sse_client.list_tools = AsyncMock(return_value=MagicMock(tools=fresh_tools))
+        sse_client.list_resources = AsyncMock(return_value=MagicMock(resources=fresh_resources))
+        sse_client.list_prompts = AsyncMock(return_value=MagicMock(prompts=fresh_prompts))
+        mock_client_session_class.side_effect = [streamable_client, sse_client]
+
+        await self.connector.connect()
+
+        self.assertFalse(self.connector._initialized)
+        self.assertIsNone(self.connector._streamable_initialize_result)
+        self.assertIsNone(self.connector.capabilities)
+        self.assertIsNone(self.connector._tools)
+        self.assertIsNone(self.connector._resources)
+        self.assertIsNone(self.connector._prompts)
+
+        result = await self.connector.initialize()
+
+        self.assertIs(result, fresh_result)
+        sse_client.initialize.assert_awaited_once()
+        self.assertIs(self.connector.capabilities, fresh_capabilities)
+        self.assertEqual(self.connector._tools, fresh_tools)
+        self.assertEqual(self.connector._resources, fresh_resources)
+        self.assertEqual(self.connector._prompts, fresh_prompts)
+        self.assertIsNot(self.connector._tools, old_tools)
+        self.assertIsNot(self.connector._resources, old_resources)
+        self.assertIsNot(self.connector._prompts, old_prompts)
+
     @patch("mcp_use.client.connectors.http.StreamableHttpConnectionManager")
     async def test_sse_connect_already_connected(self, mock_cm_class, _):
         """Test connecting when already connected."""
