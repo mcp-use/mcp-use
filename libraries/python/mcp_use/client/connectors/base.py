@@ -449,13 +449,27 @@ class BaseConnector(ABC):
 
         while True:
             page = await fetch_page() if cursor is None else await fetch_page(cursor)
-            items.extend(getattr(page, items_attribute))
+            if page is None:
+                return items
+
+            page_items = getattr(page, items_attribute, None)
+            if page_items is None:
+                return items
+            items.extend(page_items)
 
             next_cursor = getattr(page, "nextCursor", None)
-            if not isinstance(next_cursor, str) or not next_cursor:
+            if next_cursor is None:
+                return items
+            if not isinstance(next_cursor, str):
+                logger.warning(
+                    f"{method_name} returned non-string pagination cursor {next_cursor!r}; stopping pagination"
+                )
                 return items
             if next_cursor in seen_cursors:
-                raise RuntimeError(f"{method_name} returned repeated pagination cursor {next_cursor!r}")
+                logger.warning(
+                    f"{method_name} returned repeated pagination cursor {next_cursor!r}; stopping pagination"
+                )
+                return items
 
             seen_cursors.add(next_cursor)
             cursor = next_cursor

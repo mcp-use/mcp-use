@@ -468,6 +468,102 @@ class TestHttpConnectorOperations(IsolatedAsyncioTestCase):
         self.assertEqual(self.connector._tools, [first_tool, second_tool])
         self.connector.client_session.list_tools.assert_has_awaits([call(), call("tools-page-2")])
 
+    async def test_list_tools_follows_empty_cursor(self, _):
+        """An empty string is a valid cursor and should fetch the next page."""
+        first_tool = Tool(name="first", inputSchema={"type": "object", "properties": {}})
+        second_tool = Tool(name="second", inputSchema={"type": "object", "properties": {}})
+        self.connector.client_session.list_tools.side_effect = [
+            ListToolsResult(tools=[first_tool], nextCursor=""),
+            ListToolsResult(tools=[second_tool]),
+        ]
+
+        result = await self.connector.list_tools()
+
+        self.assertEqual(result, [first_tool, second_tool])
+        self.assertEqual(self.connector._tools, [first_tool, second_tool])
+        self.connector.client_session.list_tools.assert_has_awaits([call(), call("")])
+        self.assertEqual(self.connector.client_session.list_tools.await_count, 2)
+
+    async def test_list_tools_stops_on_later_none_page_preserving_items(self, _):
+        """A missing later page should preserve the items collected so far."""
+        first_tool = Tool(name="first", inputSchema={"type": "object", "properties": {}})
+        self.connector.client_session.list_tools.side_effect = [
+            ListToolsResult(tools=[first_tool], nextCursor="tools-page-2"),
+            None,
+        ]
+
+        result = await self.connector.list_tools()
+
+        self.assertEqual(result, [first_tool])
+        self.assertEqual(self.connector._tools, [first_tool])
+        self.connector.client_session.list_tools.assert_has_awaits([call(), call("tools-page-2")])
+        self.assertEqual(self.connector.client_session.list_tools.await_count, 2)
+
+    async def test_list_tools_stops_on_later_missing_collection_preserving_items(self, _):
+        """A later page without the collection attribute should preserve prior items."""
+        first_tool = Tool(name="first", inputSchema={"type": "object", "properties": {}})
+        self.connector.client_session.list_tools.side_effect = [
+            ListToolsResult(tools=[first_tool], nextCursor="tools-page-2"),
+            object(),
+        ]
+
+        result = await self.connector.list_tools()
+
+        self.assertEqual(result, [first_tool])
+        self.assertEqual(self.connector._tools, [first_tool])
+        self.connector.client_session.list_tools.assert_has_awaits([call(), call("tools-page-2")])
+        self.assertEqual(self.connector.client_session.list_tools.await_count, 2)
+
+    async def test_list_tools_stops_on_later_none_collection_preserving_items(self, _):
+        """A later page with a None collection should preserve prior items."""
+        first_tool = Tool(name="first", inputSchema={"type": "object", "properties": {}})
+        self.connector.client_session.list_tools.side_effect = [
+            ListToolsResult(tools=[first_tool], nextCursor="tools-page-2"),
+            MagicMock(tools=None),
+        ]
+
+        result = await self.connector.list_tools()
+
+        self.assertEqual(result, [first_tool])
+        self.assertEqual(self.connector._tools, [first_tool])
+        self.connector.client_session.list_tools.assert_has_awaits([call(), call("tools-page-2")])
+        self.assertEqual(self.connector.client_session.list_tools.await_count, 2)
+
+    async def test_list_tools_stops_on_non_string_cursor_preserving_items(self, mock_logger):
+        """A non-string cursor should warn and preserve the current page's items."""
+        first_tool = Tool(name="first", inputSchema={"type": "object", "properties": {}})
+        self.connector.client_session.list_tools.return_value = MagicMock(tools=[first_tool], nextCursor=123)
+
+        result = await self.connector.list_tools()
+
+        self.assertEqual(result, [first_tool])
+        self.assertEqual(self.connector._tools, [first_tool])
+        self.connector.client_session.list_tools.assert_awaited_once_with()
+        mock_logger.warning.assert_called_once_with(
+            "list_tools returned non-string pagination cursor 123; stopping pagination"
+        )
+
+    async def test_list_tools_stops_on_repeated_cursor_preserving_page_items(self, mock_logger):
+        """A cursor cycle should return all fetched items and emit one warning."""
+        first_tool = Tool(name="first", inputSchema={"type": "object", "properties": {}})
+        second_tool = Tool(name="second", inputSchema={"type": "object", "properties": {}})
+        third_tool = Tool(name="third", inputSchema={"type": "object", "properties": {}})
+        self.connector.client_session.list_tools.side_effect = [
+            ListToolsResult(tools=[first_tool], nextCursor="tools-page-2"),
+            ListToolsResult(tools=[second_tool], nextCursor="tools-page-3"),
+            ListToolsResult(tools=[third_tool], nextCursor="tools-page-2"),
+        ]
+
+        result = await self.connector.list_tools()
+
+        self.assertEqual(result, [first_tool, second_tool, third_tool])
+        self.assertEqual(self.connector._tools, [first_tool, second_tool, third_tool])
+        self.connector.client_session.list_tools.assert_has_awaits([call(), call("tools-page-2"), call("tools-page-3")])
+        self.assertEqual(self.connector.client_session.list_tools.await_count, 3)
+        mock_logger.warning.assert_called_once_with(
+            "list_tools returned repeated pagination cursor 'tools-page-2'; stopping pagination"
+        )
+
     async def test_list_resources_collects_all_pages(self, _):
         """Resource discovery should follow nextCursor until every page is collected."""
         first_resource = Resource(uri="file:///first.txt", name="first")
