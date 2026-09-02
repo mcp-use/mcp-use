@@ -1,0 +1,24 @@
+{
+  "name": "mcp-use-example-auth-lane",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Example: Lane's UCP index server, authenticated and gated by Lane on mcp-use.",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "scripts": {
+    "dev": "mcp-use dev --port 43128",
+    "build": "mcp-use build",
+    "start": "mcp-use start --port 43128",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "mcp-use": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "typescript": "^7.0.2"
+  }
+}
