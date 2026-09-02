@@ -34,6 +34,7 @@ export default defineConfig([
       "oauth/better-auth": "src/oauth/better-auth.ts",
       "oauth/scalekit": "src/oauth/scalekit.ts",
       "oauth/convex": "src/oauth/convex.ts",
+      "oauth/lane": "src/oauth/lane.ts",
       // Keep the OpenAPI integration in a sibling chunk. `MCPServer` imports
       // it synchronously so `fromOpenAPI()` stays a synchronous constructor,
       // while the root entry retains its independently enforced size budget.
