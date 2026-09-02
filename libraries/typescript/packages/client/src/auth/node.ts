@@ -492,10 +492,7 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
     const server = createHttpServer((req, res) => {
       this.handleCallback(req.url ?? "/", res);
     });
-    // Assign before awaiting the bind so an overlapping call and `dispose()`
-    // both observe the in-flight listener, then drop it if the bind fails: a
-    // server that never listened must not satisfy the guard above, or every
-    // later call short-circuits without ever binding.
+    // Track the server during binding so dispose() can find it.
     this.server = server;
     try {
       await new Promise<void>((resolve, reject) => {
