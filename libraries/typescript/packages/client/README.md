@@ -70,11 +70,11 @@ try {
 import { useMcp } from "@mcp-use/client/react";
 
 function App() {
-  const { status, tools, callTool } = useMcp({
+  const { state, tools, callTool } = useMcp({
     url: "https://api.example.com/mcp",
   });
 
-  if (status !== "ready") return <p>{status}</p>;
+  if (state !== "ready") return <p>{state}</p>;
 
   return (
     <ul>
