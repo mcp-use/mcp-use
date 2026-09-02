@@ -87,6 +87,18 @@ describe("isEqualDeep", () => {
     expect(isEqualDeep({ a: 1 }, { a: 1, b: 2 })).toBe(false);
   });
 
+  it("compares top-level arrays, length mismatches, and array-vs-object shapes", async () => {
+    const { isEqualDeep } =
+      await import("../../../src/react/useMcp-helpers.js");
+    expect(isEqualDeep([1, 2], [1, 2])).toBe(true);
+    expect(isEqualDeep([1, 2], [1, 2, 3])).toBe(false);
+    expect(isEqualDeep([1, 2, 3], [1, 2])).toBe(false);
+    expect(isEqualDeep([1, 2], { 0: 1, 1: 2 })).toBe(false);
+    expect(isEqualDeep({ 0: 1, 1: 2 }, [1, 2])).toBe(false);
+    expect(isEqualDeep([{ id: "a" }], [{ id: "a" }])).toBe(true);
+    expect(isEqualDeep([{ id: "a" }], [{ id: "b" }])).toBe(false);
+  });
+
   it("compares nested objects and arrays", async () => {
     const { isEqualDeep } =
       await import("../../../src/react/useMcp-helpers.js");

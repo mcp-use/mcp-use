@@ -269,4 +269,48 @@ describe("useMcp reference stability", () => {
 
     root.unmount();
   });
+
+  it("does not reconnect when parent re-renders with inline clientOptions", async () => {
+    let triggerRender: () => void = () => {};
+
+    function TestComponent() {
+      const [count, setCount] = useState(0);
+      triggerRender = () => setCount((c) => c + 1);
+
+      useMcp({
+        url: "http://localhost:3000/mcp",
+        clientOptions: {
+          capabilities: {
+            roots: { listChanged: true },
+          },
+        },
+      });
+
+      return null;
+    }
+
+    let root: any;
+    await act(async () => {
+      root = create(<TestComponent />);
+    });
+    await flushMicrotasks();
+
+    const initialAddCount = addServerCalls.length;
+    expect(initialAddCount).toBeGreaterThan(0);
+
+    const reRender = async () => {
+      await act(async () => {
+        triggerRender();
+      });
+      await flushMicrotasks();
+    };
+
+    for (let i = 0; i < 5; i++) {
+      await reRender();
+    }
+
+    expect(addServerCalls.length).toBe(initialAddCount);
+
+    root.unmount();
+  });
 });
