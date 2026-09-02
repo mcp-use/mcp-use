@@ -290,8 +290,7 @@ async function envSet(argv: readonly string[], json: boolean): Promise<number> {
     (variable) =>
       variable.key === key && (variable.branch ?? undefined) === values.branch
   );
-  const sensitive =
-    values.secret === true ? true : (existing?.sensitive ?? false);
+  const sensitive = values.secret === true || (existing?.sensitive ?? false);
   const body = {
     key,
     value,
