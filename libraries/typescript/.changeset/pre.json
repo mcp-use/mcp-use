@@ -13,6 +13,7 @@
   "changesets": [
     "add-convex-oauth-provider",
     "calm-clients-stop",
+    "fuzzy-spoons-chat",
     "late-times-exist",
     "olive-donkeys-repeat",
     "rpc-logger-duration"

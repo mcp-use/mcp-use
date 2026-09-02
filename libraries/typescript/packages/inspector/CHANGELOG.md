@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 20.3.4-canary.3
+
+### Patch Changes
+
+- 7d7ab2a: Allow embedded client-side chats to configure up to 100 agent steps.
+
 ## 20.3.4-canary.2
 
 ### Patch Changes
