@@ -212,22 +212,19 @@ class HttpConnector(BaseConnector):
 
                 if server_capabilities.tools:
                     # Get available tools directly from client session
-                    tools_result = await self.client_session.list_tools()
-                    self._tools = tools_result.tools if tools_result else []
+                    self._tools = await self._collect_paginated("list_tools", "tools")
                 else:
                     self._tools = []
 
                 if server_capabilities.resources:
                     # Get available resources directly from client session
-                    resources_result = await self.client_session.list_resources()
-                    self._resources = resources_result.resources if resources_result else []
+                    self._resources = await self._collect_paginated("list_resources", "resources")
                 else:
                     self._resources = []
 
                 if server_capabilities.prompts:
                     # Get available prompts directly from client session
-                    prompts_result = await self.client_session.list_prompts()
-                    self._prompts = prompts_result.prompts if prompts_result else []
+                    self._prompts = await self._collect_paginated("list_prompts", "prompts")
                 else:
                     self._prompts = []
 

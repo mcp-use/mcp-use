@@ -267,8 +267,7 @@ class BaseConnector(ABC):
         if self.capabilities.tools:
             # Get available tools directly from client session
             try:
-                tools_result = await self.client_session.list_tools()
-                self._tools = tools_result.tools if tools_result else []
+                self._tools = await self._collect_paginated("list_tools", "tools")
             except Exception as e:
                 logger.error(f"Error listing tools for connector {self.public_identifier}: {e}")
                 self._tools = []
@@ -278,8 +277,7 @@ class BaseConnector(ABC):
         if self.capabilities.resources:
             # Get available resources directly from client session
             try:
-                resources_result = await self.client_session.list_resources()
-                self._resources = resources_result.resources if resources_result else []
+                self._resources = await self._collect_paginated("list_resources", "resources")
             except Exception as e:
                 logger.error(f"Error listing resources for connector {self.public_identifier}: {e}")
                 self._resources = []
@@ -289,8 +287,7 @@ class BaseConnector(ABC):
         if self.capabilities.prompts:
             # Get available prompts directly from client session
             try:
-                prompts_result = await self.client_session.list_prompts()
-                self._prompts = prompts_result.prompts if prompts_result else []
+                self._prompts = await self._collect_paginated("list_prompts", "prompts")
             except Exception as e:
                 logger.error(f"Error listing prompts for connector {self.public_identifier}: {e}")
                 self._prompts = []
@@ -440,6 +437,29 @@ class BaseConnector(ABC):
                     "Connection to MCP server has been lost. Auto-reconnection is disabled. Please reconnect manually."
                 )
 
+    async def _collect_paginated(self, method_name: str, items_attribute: str) -> list[Any]:
+        """Collect every page returned by an MCP list operation."""
+        if not self.client_session:
+            raise RuntimeError("MCP client is not connected")
+
+        fetch_page = getattr(self.client_session, method_name)
+        items: list[Any] = []
+        cursor: str | None = None
+        seen_cursors: set[str] = set()
+
+        while True:
+            page = await fetch_page() if cursor is None else await fetch_page(cursor)
+            items.extend(getattr(page, items_attribute))
+
+            next_cursor = getattr(page, "nextCursor", None)
+            if not isinstance(next_cursor, str) or not next_cursor:
+                return items
+            if next_cursor in seen_cursors:
+                raise RuntimeError(f"{method_name} returned repeated pagination cursor {next_cursor!r}")
+
+            seen_cursors.add(next_cursor)
+            cursor = next_cursor
+
     @telemetry("connector_call_tool")
     async def call_tool(
         self,
@@ -490,9 +510,8 @@ class BaseConnector(ABC):
 
         logger.debug("Listing tools")
         try:
-            result = await self.client_session.list_tools()
-            self._tools = result.tools
-            return result.tools
+            self._tools = await self._collect_paginated("list_tools", "tools")
+            return self._tools
         except McpError as e:
             logger.error(f"Error listing tools for connector {self.public_identifier}: {e}")
             return []
@@ -510,9 +529,8 @@ class BaseConnector(ABC):
 
         logger.debug("Listing resources")
         try:
-            result = await self.client_session.list_resources()
-            self._resources = result.resources
-            return result.resources
+            self._resources = await self._collect_paginated("list_resources", "resources")
+            return self._resources
         except McpError as e:
             logger.warning(f"Error listing resources for connector {self.public_identifier}: {e}")
             return []
@@ -538,9 +556,8 @@ class BaseConnector(ABC):
 
         logger.debug("Listing prompts")
         try:
-            result = await self.client_session.list_prompts()
-            self._prompts = result.prompts
-            return result.prompts
+            self._prompts = await self._collect_paginated("list_prompts", "prompts")
+            return self._prompts
         except McpError as e:
             logger.error(f"Error listing prompts for connector {self.public_identifier}: {e}")
             return []

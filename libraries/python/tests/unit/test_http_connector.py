@@ -7,7 +7,16 @@ from unittest import IsolatedAsyncioTestCase
 from unittest.mock import ANY, AsyncMock, MagicMock, call, patch
 
 from mcp import McpError
-from mcp.types import EmptyResult, ErrorData, Prompt, Resource, Tool
+from mcp.types import (
+    EmptyResult,
+    ErrorData,
+    ListPromptsResult,
+    ListResourcesResult,
+    ListToolsResult,
+    Prompt,
+    Resource,
+    Tool,
+)
 
 from mcp_use.client.auth.bearer import BearerAuth
 from mcp_use.client.connectors.http import HttpConnector
@@ -180,8 +189,14 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
         mock_client_session_instance.initialize.return_value = mock_init_result
 
         # Add mocks for list_tools, list_resources, and list_prompts since HttpConnector calls these
-        mock_client_session_instance.list_tools = AsyncMock()
-        mock_client_session_instance.list_tools.return_value = MagicMock(tools=[MagicMock(spec=Tool)])
+        first_tool = Tool(name="first", inputSchema={"type": "object", "properties": {}})
+        second_tool = Tool(name="second", inputSchema={"type": "object", "properties": {}})
+        mock_client_session_instance.list_tools = AsyncMock(
+            side_effect=[
+                ListToolsResult(tools=[first_tool], nextCursor="tools-page-2"),
+                ListToolsResult(tools=[second_tool]),
+            ]
+        )
         mock_client_session_instance.list_resources = AsyncMock()
         mock_client_session_instance.list_resources.return_value = MagicMock(resources=[MagicMock(spec=Resource)])
         mock_client_session_instance.list_prompts = AsyncMock()
@@ -211,7 +226,7 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
         mock_client_session_instance.initialize.assert_called_once()
 
         # Verify tools/resources/prompts were populated during connect
-        mock_client_session_instance.list_tools.assert_called_once()
+        mock_client_session_instance.list_tools.assert_has_awaits([call(), call("tools-page-2")])
         mock_client_session_instance.list_resources.assert_called_once()
         mock_client_session_instance.list_prompts.assert_called_once()
 
@@ -220,7 +235,7 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
         self.assertEqual(self.connector._connection_manager, mock_cm_instance)
         self.assertTrue(self.connector._connected)
         self.assertTrue(self.connector._initialized)
-        self.assertEqual(len(self.connector._tools), 1)
+        self.assertEqual(self.connector._tools, [first_tool, second_tool])
         self.assertEqual(len(self.connector._resources), 1)
         self.assertEqual(len(self.connector._prompts), 1)
 
@@ -361,6 +376,39 @@ class TestHttpConnectorOperations(IsolatedAsyncioTestCase):
         self.assertEqual(len(self.connector._resources), 1)
         self.assertEqual(len(self.connector._prompts), 1)
 
+    async def test_initialize_collects_all_discovery_pages(self, _):
+        """Initialization should cache every tools, resources, and prompts page."""
+        mock_init_result = MagicMock()
+        mock_init_result.capabilities = MagicMock(tools=True, resources=True, prompts=True)
+        self.connector.client_session.initialize.return_value = mock_init_result
+
+        first_tool = Tool(name="first", inputSchema={"type": "object", "properties": {}})
+        second_tool = Tool(name="second", inputSchema={"type": "object", "properties": {}})
+        self.connector.client_session.list_tools.side_effect = [
+            ListToolsResult(tools=[first_tool], nextCursor="tools-page-2"),
+            ListToolsResult(tools=[second_tool]),
+        ]
+
+        first_resource = Resource(uri="file:///first.txt", name="first")
+        second_resource = Resource(uri="file:///second.txt", name="second")
+        self.connector.client_session.list_resources.side_effect = [
+            ListResourcesResult(resources=[first_resource], nextCursor="resources-page-2"),
+            ListResourcesResult(resources=[second_resource]),
+        ]
+
+        first_prompt = Prompt(name="first")
+        second_prompt = Prompt(name="second")
+        self.connector.client_session.list_prompts.side_effect = [
+            ListPromptsResult(prompts=[first_prompt], nextCursor="prompts-page-2"),
+            ListPromptsResult(prompts=[second_prompt]),
+        ]
+
+        await self.connector.initialize()
+
+        self.assertEqual(self.connector._tools, [first_tool, second_tool])
+        self.assertEqual(self.connector._resources, [first_resource, second_resource])
+        self.assertEqual(self.connector._prompts, [first_prompt, second_prompt])
+
     async def test_initialize_no_client(self, _):
         """Test initializing without a client."""
         self.connector.client_session = None
@@ -404,6 +452,51 @@ class TestHttpConnectorOperations(IsolatedAsyncioTestCase):
         self.connector.client_session.list_resources.assert_called_once_with()
         # The connector's list_resources method should return the list of resources directly.
         self.assertEqual(result, expected_resources_list)
+
+    async def test_list_tools_collects_all_pages(self, _):
+        """Tool discovery should follow nextCursor until every page is collected."""
+        first_tool = Tool(name="first", inputSchema={"type": "object", "properties": {}})
+        second_tool = Tool(name="second", inputSchema={"type": "object", "properties": {}})
+        self.connector.client_session.list_tools.side_effect = [
+            ListToolsResult(tools=[first_tool], nextCursor="tools-page-2"),
+            ListToolsResult(tools=[second_tool]),
+        ]
+
+        result = await self.connector.list_tools()
+
+        self.assertEqual(result, [first_tool, second_tool])
+        self.assertEqual(self.connector._tools, [first_tool, second_tool])
+        self.connector.client_session.list_tools.assert_has_awaits([call(), call("tools-page-2")])
+
+    async def test_list_resources_collects_all_pages(self, _):
+        """Resource discovery should follow nextCursor until every page is collected."""
+        first_resource = Resource(uri="file:///first.txt", name="first")
+        second_resource = Resource(uri="file:///second.txt", name="second")
+        self.connector.client_session.list_resources.side_effect = [
+            ListResourcesResult(resources=[first_resource], nextCursor="resources-page-2"),
+            ListResourcesResult(resources=[second_resource]),
+        ]
+
+        result = await self.connector.list_resources()
+
+        self.assertEqual(result, [first_resource, second_resource])
+        self.assertEqual(self.connector._resources, [first_resource, second_resource])
+        self.connector.client_session.list_resources.assert_has_awaits([call(), call("resources-page-2")])
+
+    async def test_list_prompts_collects_all_pages(self, _):
+        """Prompt discovery should follow nextCursor until every page is collected."""
+        first_prompt = Prompt(name="first")
+        second_prompt = Prompt(name="second")
+        self.connector.client_session.list_prompts.side_effect = [
+            ListPromptsResult(prompts=[first_prompt], nextCursor="prompts-page-2"),
+            ListPromptsResult(prompts=[second_prompt]),
+        ]
+
+        result = await self.connector.list_prompts()
+
+        self.assertEqual(result, [first_prompt, second_prompt])
+        self.assertEqual(self.connector._prompts, [first_prompt, second_prompt])
+        self.connector.client_session.list_prompts.assert_has_awaits([call(), call("prompts-page-2")])
 
     async def test_list_resources_no_client(self, _):
         """Test listing resources when not connected."""
