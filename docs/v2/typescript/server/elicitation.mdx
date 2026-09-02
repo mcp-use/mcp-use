@@ -103,12 +103,13 @@ The stable key correlates the embedded request with the matching value in
 invalid accepted content makes `acceptedContent()` return `undefined`, so the
 handler returns another `input_required` round.
 
-For an elicitation key, `inputResponse()` returns one of:
+For an elicitation key, `inputResponse()` returns one of these. The full union
+also carries `kind: "roots"` and `kind: "sampling"` for the other request types:
 
 | Response                             | Meaning                                                              |
 | ------------------------------------ | -------------------------------------------------------------------- |
 | `kind: "missing"`                     | No response for this key yet, so return another `input_required` round |
-| `kind: "elicit"`, `action: "accept"`  | The user submitted; read form data with `acceptedContent()`            |
+| `kind: "elicit"`, `action: "accept"`  | The user submitted; in form mode read it with `acceptedContent()`, URL mode carries no form data |
 | `kind: "elicit"`, `action: "decline"` | The user explicitly refused                                            |
 | `kind: "elicit"`, `action: "cancel"`  | The user dismissed or interrupted the flow                             |
 
@@ -123,9 +124,9 @@ mode. Submitted form values pass through the MCP client.
 
 ## URL mode
 
-Pass an absolute URL string as the third argument. Keep the external flow's
-state in a trusted backend and look it up with a stable, unguessable handle
-from the original tool input:
+Pass the absolute URL to `inputRequired.elicitUrl()` instead of a schema. Keep
+the external flow's state in a trusted backend and look it up with a stable,
+unguessable handle from the original tool input:
 
 ```typescript
 const flow = await githubAuth.getOrCreateFlow(connectionId);
