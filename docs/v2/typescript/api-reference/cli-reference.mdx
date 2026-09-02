@@ -467,6 +467,7 @@ mcp-use servers delete srv_abc123 --yes
 **Notes and behavior:**
 
 - `servers update --branch` changes the production branch for future production deploys.
+- `--watch-paths` and `--deploy-branches` are repeatable. Pass the flag once per pattern; a second bare value is read as a positional, not as another pattern.
 - Pass an empty string to `--build-command`, `--start-command`, `--root-dir`, `--watch-paths`, or `--deploy-branches` to clear that setting.
 - `--wait-for-ci` and `--no-wait-for-ci` control whether auto-deploys wait for other check runs before deploying.
 - `servers delete` prompts for confirmation unless `--yes` is set.
