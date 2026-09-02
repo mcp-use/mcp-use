@@ -104,12 +104,14 @@ jobs:
             typescript:
               - 'libraries/typescript/**'
               - '.github/workflows/ci.yml'
+              - '.github/scripts/dev-server-smoke*'
             knip:
               - 'libraries/typescript/**'
               - '.github/workflows/ci.yml'
             create-mcp-use-app:
               - 'libraries/typescript/packages/create-mcp-use-app/**'
               - '.github/workflows/ci.yml'
+              - '.github/scripts/dev-server-smoke*'
             release-channel:
               - 'libraries/typescript/scripts/release-channel.mjs'
               - 'libraries/typescript/scripts/release-channel.test.mjs'
@@ -942,6 +944,26 @@ jobs:
             echo "If this PR doesn't require a changeset (docs, tests, internal changes), you can ignore this message."
           fi
 
+  dev-server-smoke-tests:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.create-mcp-use-app == 'true'
+    name: "dev-server-smoke/${{ matrix.os }}"
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.23.1
+      - name: Test readiness failures and process-tree cleanup
+        timeout-minutes: 5
+        run: node --test .github/scripts/dev-server-smoke.test.mjs
+
   # create-mcp-use-app Tests (only when CLI package changes)
   create-mcp-use-app-build:
     needs: [detect-changes, typescript-lint]
@@ -1061,44 +1083,16 @@ jobs:
           [ -f "test-app/index.ts" ] || exit 1
           echo "✅ Project created successfully"
 
-      - name: Test dev command (non --dev flag only)
+      # --template deliberately skips dependency installation in the scaffolder.
+      # Install with the matrix PM so its real local executable shim is tested.
+      - name: Install generated app dependencies
         if: matrix.flag == ''
         shell: bash
         working-directory: test-app
-        run: |
-          # Start dev server in background
-          case "${{ matrix.pm }}" in
-            npm)
-              npm run dev &
-              ;;
-            yarn)
-              yarn dev &
-              ;;
-            pnpm)
-              pnpm dev &
-              ;;
-          esac
+        run: ${{ matrix.pm }} install
 
-          DEV_PID=$!
-
-          # Wait for server to start (10 seconds should be enough)
-          sleep 10
-
-          # Kill the dev server
-          if [ "${{ runner.os }}" == "Windows" ]; then
-            # On Windows, kill by port is more reliable than DEV_PID
-            # because bash's $! may not map to the actual Windows process ID
-            DEV_PORT=3000
-            for pid in $(netstat -ano 2>/dev/null | grep ":$DEV_PORT " | grep "LISTENING" | awk '{print $5}' | sort -u); do
-              taskkill //PID $pid //F 2>/dev/null || true
-            done
-            # Also try the process tree kill as fallback
-            taskkill //PID $DEV_PID //T //F 2>/dev/null || true
-          else
-            kill $DEV_PID 2>/dev/null || true
-          fi
-
-          # Wait for process to exit
-          wait $DEV_PID 2>/dev/null || true
-
-          echo "✅ Dev server started and stopped successfully"
+      - name: Test dev command (non --dev flag only)
+        if: matrix.flag == ''
+        working-directory: test-app
+        timeout-minutes: 3
+        run: node ../.github/scripts/dev-server-smoke.mjs ${{ matrix.pm }}
