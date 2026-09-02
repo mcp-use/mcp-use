@@ -492,6 +492,11 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
     const server = createHttpServer((req, res) => {
       this.handleCallback(req.url ?? "/", res);
     });
+    // Assign before awaiting the bind so an overlapping call and `dispose()`
+    // both observe the in-flight listener, then drop it if the bind fails: a
+    // server that never listened must not satisfy the guard above, or every
+    // later call short-circuits without ever binding.
+    this.server = server;
     try {
       await new Promise<void>((resolve, reject) => {
         server.once("error", reject);
@@ -501,13 +506,12 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
         });
       });
     } catch (err) {
-      // Bind failed (e.g. EADDRINUSE) — don't leave `this.server` pointing at
-      // a server that isn't listening, or every future call short-circuits
-      // on the `if (this.server) return;` guard above without ever binding.
+      if (this.server === server) {
+        this.server = null;
+      }
       server.close();
       throw err;
     }
-    this.server = server;
   }
 
   private stopLoopback(): void {
