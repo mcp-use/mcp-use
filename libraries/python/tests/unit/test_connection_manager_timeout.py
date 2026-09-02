@@ -49,6 +49,25 @@ class TestConnectionManagerTimeout:
         assert manager.close_called
 
     @pytest.mark.asyncio
+    async def test_start_after_stop_restarts_connection(self):
+        manager = MockConnectionManager()
+
+        await manager.start()
+        await manager.stop()
+        assert manager.close_call_count == 1
+
+        connection = await manager.start()
+        assert connection == "test_connection"
+
+        await asyncio.sleep(0)
+        assert manager._task is not None
+        assert not manager._task.done()
+        assert manager.close_call_count == 1
+
+        await manager.stop()
+        assert manager.close_call_count == 2
+
+    @pytest.mark.asyncio
     async def test_stop_with_default_timeout(self):
         manager = MockConnectionManager(close_delay=0.1)
         await manager.start()

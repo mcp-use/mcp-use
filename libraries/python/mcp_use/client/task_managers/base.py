@@ -70,6 +70,7 @@ class ConnectionManager(Generic[T], ABC):
         # Reset state
         self._ready_event.clear()
         self._done_event.clear()
+        self._stop_event.clear()
         self._exception = None
 
         # Create a task to establish and maintain the connection
