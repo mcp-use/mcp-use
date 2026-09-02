@@ -103,14 +103,14 @@ The stable key correlates the embedded request with the matching value in
 invalid accepted content makes `acceptedContent()` return `undefined`, so the
 handler returns another `input_required` round.
 
-The result statuses are:
+For an elicitation key, `inputResponse()` returns one of:
 
-| Status     | Meaning                                                           |
-| ---------- | ----------------------------------------------------------------- |
-| `required` | Return `result` directly so the client can collect input          |
-| `accept`   | Valid form data is available as `data`; URL mode has no form data |
-| `decline`  | The user explicitly refused                                       |
-| `cancel`   | The user dismissed or interrupted the flow                        |
+| Response                             | Meaning                                                              |
+| ------------------------------------ | -------------------------------------------------------------------- |
+| `kind: "missing"`                     | No response for this key yet, so return another `input_required` round |
+| `kind: "elicit"`, `action: "accept"`  | The user submitted; read form data with `acceptedContent()`            |
+| `kind: "elicit"`, `action: "decline"` | The user explicitly refused                                            |
+| `kind: "elicit"`, `action: "cancel"`  | The user dismissed or interrupted the flow                             |
 
 ## Form mode
 
