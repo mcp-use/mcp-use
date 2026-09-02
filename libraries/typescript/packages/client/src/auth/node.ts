@@ -492,14 +492,22 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
     const server = createHttpServer((req, res) => {
       this.handleCallback(req.url ?? "/", res);
     });
-    this.server = server;
-    await new Promise<void>((resolve, reject) => {
-      server.once("error", reject);
-      server.listen(this.port, "127.0.0.1", () => {
-        server.removeListener("error", reject);
-        resolve();
+    try {
+      await new Promise<void>((resolve, reject) => {
+        server.once("error", reject);
+        server.listen(this.port, "127.0.0.1", () => {
+          server.removeListener("error", reject);
+          resolve();
+        });
       });
-    });
+    } catch (err) {
+      // Bind failed (e.g. EADDRINUSE) — don't leave `this.server` pointing at
+      // a server that isn't listening, or every future call short-circuits
+      // on the `if (this.server) return;` guard above without ever binding.
+      server.close();
+      throw err;
+    }
+    this.server = server;
   }
 
   private stopLoopback(): void {
