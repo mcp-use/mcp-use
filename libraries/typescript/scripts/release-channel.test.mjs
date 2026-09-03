@@ -5,6 +5,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
+import {
+  packedArtifactErrors,
+  packedFilesFromNpmPackJson,
+  requiredPackedEntries,
+} from "./release-artifact.mjs";
+
 const script = new URL("./release-channel.mjs", import.meta.url).pathname;
 
 function fixture({ localVersion, latest, canary, published = [] }) {
@@ -59,6 +65,74 @@ function writePreState(root, initialVersions, changesets = []) {
     })
   );
 }
+
+test("requires declared package files and entry points in packed artifacts", () => {
+  const manifest = {
+    name: "@mcp-use/client",
+    files: ["dist"],
+    module: "./dist/index.js",
+    types: "./dist/index.d.ts",
+    exports: {
+      ".": {
+        node: { import: "./dist/index.js", types: "./dist/index.d.ts" },
+        browser: {
+          import: "./dist/index-browser.js",
+          types: "./dist/index-browser.d.ts",
+        },
+      },
+      "./react": {
+        import: "./dist/react/index.js",
+        types: "./dist/react/index.d.ts",
+      },
+    },
+  };
+
+  assert.deepEqual(requiredPackedEntries(manifest), {
+    exact: [
+      "dist/index-browser.d.ts",
+      "dist/index-browser.js",
+      "dist/index.d.ts",
+      "dist/index.js",
+      "dist/react/index.d.ts",
+      "dist/react/index.js",
+    ],
+    prefixes: ["dist"],
+  });
+  assert.deepEqual(
+    packedArtifactErrors(manifest, [
+      { path: "README.md" },
+      { path: "package.json" },
+    ]),
+    [
+      "missing entry point dist/index-browser.d.ts",
+      "missing entry point dist/index-browser.js",
+      "missing entry point dist/index.d.ts",
+      "missing entry point dist/index.js",
+      "missing entry point dist/react/index.d.ts",
+      "missing entry point dist/react/index.js",
+      "files entry dist matched no packed files",
+    ]
+  );
+  assert.deepEqual(
+    packedArtifactErrors(
+      manifest,
+      requiredPackedEntries(manifest).exact.map((path) => ({ path }))
+    ),
+    []
+  );
+});
+
+test("accepts both npm pack JSON result shapes", () => {
+  const packed = { files: [{ path: "package.json" }] };
+  assert.deepEqual(
+    packedFilesFromNpmPackJson(JSON.stringify([packed])),
+    packed.files
+  );
+  assert.deepEqual(
+    packedFilesFromNpmPackJson(JSON.stringify(packed)),
+    packed.files
+  );
+});
 
 test("rejects a stable source version below npm latest", () => {
   const { root, registryFile } = fixture({
@@ -335,6 +409,53 @@ test("accepts a Canary major with an explicit major changeset", () => {
           type: "major",
           oldVersion: "2.0.5-canary.6",
           newVersion: "3.0.0-canary.7",
+        },
+      ],
+      preState: { mode: "pre", tag: "canary" },
+    })
+  );
+
+  const result = run(
+    root,
+    registryFile,
+    "validate",
+    "--channel",
+    "canary",
+    "--plan",
+    planFile
+  );
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test("ignores unchanged packages in a Canary release plan", () => {
+  const { root, registryFile } = fixture({
+    localVersion: "2.0.4",
+    latest: "2.0.4",
+    canary: "2.0.4-canary.0",
+    published: ["2.0.4"],
+  });
+  const planFile = join(root, "changeset-status.json");
+  writeFileSync(
+    planFile,
+    JSON.stringify({
+      changesets: [
+        {
+          id: "client-fix",
+          releases: [{ name: "@mcp-use/client", type: "patch" }],
+        },
+      ],
+      releases: [
+        {
+          name: "@mcp-use/client",
+          type: "patch",
+          oldVersion: "2.2.4",
+          newVersion: "2.2.5-canary.0",
+        },
+        {
+          name: "@mcp-use/cli",
+          type: "none",
+          oldVersion: "4.1.10",
+          newVersion: "4.1.10",
         },
       ],
       preState: { mode: "pre", tag: "canary" },

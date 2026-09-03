@@ -1,0 +1,16 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/agent": "2.0.13",
+    "@mcp-use/cli": "4.1.10",
+    "@mcp-use/client": "2.2.4",
+    "create-mcp-use-app": "2.0.6",
+    "@mcp-use/inspector": "20.3.5",
+    "mcp-use": "2.4.1",
+    "@mcp-use/tunnel": "0.2.0"
+  },
+  "changesets": [
+    "safe-client-publish-artifact"
+  ]
+}

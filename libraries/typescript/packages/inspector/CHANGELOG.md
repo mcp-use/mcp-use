@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 20.3.6-canary.0
+
+### Patch Changes
+
+- 8c619f2: Prevent concurrent package publishing from removing the Client build while its tarball is being created, and verify every published artifact contains its declared files and entry points.
+  - @mcp-use/agent@2.0.14-canary.0
+  - mcp-use@2.4.2-canary.0
+
 ## 20.3.5
 
 ### Patch Changes

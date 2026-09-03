@@ -1,7 +1,13 @@
+import { spawnSync } from "node:child_process";
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import semver from "semver";
+
+import {
+  packedArtifactErrors,
+  packedFilesFromNpmPackJson,
+} from "./release-artifact.mjs";
 
 const workspaceRoot = process.cwd();
 const packageRoot = join(workspaceRoot, "packages");
@@ -32,6 +38,42 @@ function manifestEntries() {
 
 function manifests() {
   return manifestEntries().map(({ manifest }) => manifest);
+}
+
+function packedFiles(name, version) {
+  const result = spawnSync(
+    "npm",
+    ["pack", "--dry-run", "--ignore-scripts", "--json", `${name}@${version}`],
+    { cwd: workspaceRoot, encoding: "utf8" }
+  );
+  if (result.status !== 0) {
+    throw new Error(
+      `could not inspect ${name}@${version}: ${result.stderr || result.stdout}`
+    );
+  }
+  try {
+    return packedFilesFromNpmPackJson(result.stdout);
+  } catch (error) {
+    throw new Error(
+      `could not parse npm pack file list for ${name}@${version}: ${error.message}`
+    );
+  }
+}
+
+function verifyPackedArtifact(release) {
+  const manifest = manifests().find(({ name }) => name === release.name);
+  if (!manifest) throw new Error(`No local manifest for ${release.name}`);
+  const errors = packedArtifactErrors(
+    manifest,
+    packedFiles(release.name, release.version)
+  );
+  if (errors.length) {
+    throw new Error(
+      `${release.name}@${release.version} has an invalid npm artifact: ${errors.join(
+        ", "
+      )}`
+    );
+  }
 }
 
 function prereleaseState() {
@@ -205,6 +247,7 @@ function validateReleasePlan(channel, planFile) {
   const errors = [];
 
   for (const release of plan.releases ?? []) {
+    if (release.type === "none") continue;
     const plannedMajor =
       release.type === "major" ||
       semver.major(release.newVersion) > semver.major(release.oldVersion);
@@ -367,6 +410,12 @@ async function verifyOnce(plan) {
     if (release.target) {
       if (!Object.hasOwn(versions, release.version)) {
         errors.push(`${release.name}@${release.version} is missing from npm`);
+      } else if (!option("--registry-file")) {
+        try {
+          verifyPackedArtifact(release);
+        } catch (error) {
+          errors.push(error instanceof Error ? error.message : String(error));
+        }
       }
       if (afterTags[release.channelTag] !== release.version) {
         errors.push(
