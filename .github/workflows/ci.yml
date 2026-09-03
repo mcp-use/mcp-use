@@ -284,7 +284,8 @@ jobs:
     if: always() && github.event_name == 'pull_request' && needs.python-transport-tests.result != 'skipped'
     runs-on: ubuntu-latest
     permissions:
-      pull-requests: write
+      # Fork pull_request runs receive a read-only token from GitHub.
+      issues: write
     steps:
       - name: Download all test results
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -292,7 +293,7 @@ jobs:
           pattern: transport-test-results-*
           path: test-results
           merge-multiple: false
-      - name: Generate PR comment
+      - name: Generate test report
         uses: actions/github-script@v9
         with:
           script: |
@@ -355,6 +356,17 @@ jobs:
             |-----------|--------|-------|--------|--------|--------|------|
             ${tableRows.join('\n')}
             `;
+
+            // Always keep the report visible, including for fork PRs where the
+            // token cannot (and must not) mutate repository issues.
+            await core.summary.addRaw(comment).write();
+
+            const headRepo = context.payload.pull_request.head.repo?.full_name;
+            const baseRepo = `${context.repo.owner}/${context.repo.repo}`;
+            if (headRepo !== baseRepo) {
+              core.info('Fork pull request detected; skipping issue comment mutation.');
+              return;
+            }
 
             // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
@@ -449,7 +461,8 @@ jobs:
     if: always() && github.event_name == 'pull_request' && needs.python-primitive-tests.result != 'skipped'
     runs-on: ubuntu-latest
     permissions:
-      pull-requests: write
+      # Fork pull_request runs receive a read-only token from GitHub.
+      issues: write
     steps:
       - name: Download all test results
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -457,7 +470,7 @@ jobs:
           pattern: primitive-test-results-*
           path: test-results
           merge-multiple: false
-      - name: Generate PR comment
+      - name: Generate test report
         uses: actions/github-script@v9
         with:
           script: |
@@ -520,6 +533,17 @@ jobs:
             |-----------|--------|-------|--------|--------|--------|------|
             ${tableRows.join('\n')}
             `;
+
+            // Always keep the report visible, including for fork PRs where the
+            // token cannot (and must not) mutate repository issues.
+            await core.summary.addRaw(comment).write();
+
+            const headRepo = context.payload.pull_request.head.repo?.full_name;
+            const baseRepo = `${context.repo.owner}/${context.repo.repo}`;
+            if (headRepo !== baseRepo) {
+              core.info('Fork pull request detected; skipping issue comment mutation.');
+              return;
+            }
 
             // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
