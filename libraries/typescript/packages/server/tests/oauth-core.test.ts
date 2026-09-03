@@ -269,6 +269,44 @@ describe("OAuth core", () => {
       code: OAuthErrorCode.InvalidToken,
       message: "Token resource claim does not match protected resource",
     });
+
+    // Multi-resource array per RFC 8707 / RFC 9068
+    await expect(
+      verifier.verifyAccessToken(
+        await sign({
+          aud: "provider-api",
+          resource: [canonicalResource.href, "https://other.example/mcp"],
+        })
+      )
+    ).resolves.toMatchObject({ resource: canonicalResource });
+
+    await expect(
+      verifier.verifyAccessToken(
+        await sign({
+          aud: "provider-api",
+          resource: [
+            "https://other1.example/mcp",
+            "https://other2.example/mcp",
+          ],
+        })
+      )
+    ).rejects.toMatchObject({
+      code: OAuthErrorCode.InvalidToken,
+      message: "Token resource claim does not match protected resource",
+    });
+
+    await expect(
+      verifier.verifyAccessToken(
+        await sign({
+          aud: "provider-api",
+          resource: 12345,
+        })
+      )
+    ).rejects.toMatchObject({
+      code: OAuthErrorCode.InvalidToken,
+      message:
+        "Token resource claim must be an absolute URL or array of absolute URLs",
+    });
   });
 
   it("rejects verifier output that does not prove resource binding", async () => {

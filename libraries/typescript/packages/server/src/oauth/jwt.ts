@@ -240,11 +240,16 @@ function verifiedResource(
 ): URL {
   const value = claims["resource"];
   if (value !== undefined) {
-    if (typeof value !== "string") {
-      throw invalidToken("Token resource claim must be an absolute URL");
+    if (!validResourceClaim(value)) {
+      throw invalidToken(
+        "Token resource claim must be an absolute URL or array of absolute URLs"
+      );
     }
-    const resource = canonicalUrl(value);
-    if (resource.href !== configuredResource.href) {
+    const rawResources = typeof value === "string" ? [value] : value;
+    const resources = rawResources.map(canonicalUrl);
+    if (
+      !resources.some((resource) => resource.href === configuredResource.href)
+    ) {
       throw invalidToken(
         "Token resource claim does not match protected resource"
       );
@@ -295,6 +300,15 @@ function verifierAudience(
 }
 
 function validAudience(value: unknown): value is string | string[] {
+  return (
+    typeof value === "string" ||
+    (Array.isArray(value) &&
+      value.length > 0 &&
+      value.every((item) => typeof item === "string"))
+  );
+}
+
+function validResourceClaim(value: unknown): value is string | string[] {
   return (
     typeof value === "string" ||
     (Array.isArray(value) &&
