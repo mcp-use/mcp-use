@@ -11,9 +11,11 @@ These examples use direct external authorization servers:
 - [Convex](./convex/)
 - [Mixed OAuth with Better Auth](./mixed-oauth/)
 
-Each server exposes only the `get-user-info` tool. It never issues, proxies, or
-forwards access tokens. For public deployments, set `MCP_URL` to the server
-origin (for example, `https://mcp.example.com`), not the `/mcp` endpoint.
+Each server exposes a single read-only identity tool, named `get-user-info` or
+`whoami` depending on the example. The mixed OAuth example exposes `public_ping`
+and `protected_profile` instead. None of them issue, proxy, or forward access
+tokens. For public deployments, set `MCP_URL` to the server origin (for
+example, `https://mcp.example.com`), not the `/mcp` endpoint.
 
 OAuth protects the browser landing page at `/mcp` by default. These examples
 set `publicLandingPage: true` so people can open the HTML connection guide
