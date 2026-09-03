@@ -30,13 +30,18 @@ minimumReleaseAgeExclude:
   # exact versions in package.json, so bumps are always an explicit, reviewed
   # change rather than an automatic resolution.
   - "@modelcontextprotocol/*"
-  - nanoid@3.3.8 || 5.0.9
+  - nanoid@3.3.8 || 3.3.18 || 5.0.9
   - lodash-es@4.17.23 || 4.17.24
   - brace-expansion@5.0.6
   - joi@18.2.1
   - form-data@4.0.6
-  - dompurify@3.4.8 || 3.4.9 || 3.4.11
-  - js-yaml@4.1.2
+  - dompurify@3.4.8 || 3.4.9 || 3.4.11 || 3.4.13
+  - js-yaml@4.1.2 || 4.3.1
+  - qs@6.16.0
+  - mermaid@11.16.1
+  - browserslist@4.28.7
+  - "@humanfs/node@0.16.8"
+  - fast-uri@4.1.3
   - "@babel/core@7.29.1"
   - hono@4.12.34
   - brace-expansion@5.0.9
@@ -56,7 +61,7 @@ overrides:
   "@types/react-dom": ^19.2.3
   react-router: ^8.3.0
   react-router-dom: ^8.3.0
-  qs: ">=6.15.2"
+  qs: ">=6.16.0"
   preact: ">=10.28.2"
   zod: 4.4.3
   jsondiffpatch: ">=0.7.2"
@@ -64,14 +69,17 @@ overrides:
   vite: "8.0.16"
   prismjs: ">=1.30.0"
   glob: ">=10.5.0"
-  js-yaml: ">=4.1.2"
+  js-yaml: ">=4.3.1 <5"
   flatted: ">=3.4.2"
   tar: ">=7.5.21"
   undici: ">=7.29.0 <8"
   "@hono/node-server": ">=2.0.5"
   hono: ">=4.12.34"
   express-rate-limit: ">=8.2.2"
-  dompurify: ">=3.4.11"
+  dompurify: ">=3.4.13"
+  mermaid: ">=11.16.1"
+  browserslist: ">=4.28.7"
+  "@humanfs/node": ">=0.16.8"
   minimatch: ">=10.2.6"
   rollup: ">=4.59.0"
   "@modelcontextprotocol/sdk": ">=1.25.2"
@@ -94,16 +102,17 @@ overrides:
   vitest: 4.1.10
   ws: ">=8.20.1"
   uuid: ">=13.0.1 <14"
-  fast-uri: ">=3.1.4"
+  fast-uri: ">=4.1.3"
   ip-address: ">=10.2.2"
   postcss: ">=8.5.23"
   sharp: ">=0.35.0"
   langsmith: ">=0.6.0"
   follow-redirects: ">=1.16.0"
-  better-auth: ">=1.6.2"
+  better-auth: ">=1.7.2"
+  "@better-auth/oauth-provider": ">=1.7.2"
   "@ungap/structured-clone": ">=1.3.3"
   brace-expansion@>=5.0.0 <5.0.6: ^5.0.9
-  nanoid@<3.3.8: ^3.3.8
+  nanoid@<3.3.18: ^3.3.18
   nanoid@>=4.0.0 <5.0.9: ^5.0.9
 
 allowBuilds:
