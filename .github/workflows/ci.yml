@@ -16,7 +16,7 @@ permissions:
 #    - Outputs: python, typescript, knip, create-mcp-use-app
 #    - Subsequent jobs use these outputs to conditionally run
 #
-# 2. Python Tests (runs if libraries/python/** changed)
+# 2. Python Tests (runs if libraries/python/** or this workflow changed)
 #    ├─ python-lint: Ruff linting and formatting checks
 #    ├─ python-unit-tests: Matrix [Python 3.11, 3.12]
 #    ├─ python-transport-tests: Matrix [stdio, sse, streamable_http]
@@ -102,6 +102,7 @@ jobs:
           filters: |
             python:
               - 'libraries/python/**'
+              - '.github/workflows/ci.yml'
             typescript:
               - 'libraries/typescript/**'
               - '.github/workflows/ci.yml'
