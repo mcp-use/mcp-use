@@ -30,10 +30,16 @@ import {
 
 // Controllable tunnel state. Tests flip `url` to pin the tunnel-gated CORS
 // contract on Vite module URLs.
-const tunnelState = vi.hoisted(() => ({ url: null as string | null }));
+const tunnelState = vi.hoisted(() => ({
+  url: null as string | null,
+  failStart: false,
+}));
 vi.mock("@mcp-use/tunnel", () => ({
   createTunnelManager: () => ({
     start: async (port: number) => {
+      if (tunnelState.failStart) {
+        throw new Error("Tunnel connection failed on start");
+      }
       tunnelState.url = `https://fake.local.mcp-use.run`;
       void port;
       return { url: tunnelState.url, subdomain: "fake" };
@@ -1614,4 +1620,23 @@ describe("runDev (views)", () => {
       expect(docHtml).toContain("/@vite/client");
     }
   }, 90_000);
+
+  it("propagates startup errors cleanly without masking from teardown", async () => {
+    const cwd = copyFixture("dev-views-a", "views");
+    cleanups.push(() => removeDir(cwd));
+
+    tunnelState.failStart = true;
+    cleanups.push(() => {
+      tunnelState.failStart = false;
+    });
+
+    const port = await getFreePort();
+    await expect(
+      runDev({
+        cwd,
+        port,
+        tunnel: true,
+      })
+    ).rejects.toThrow("Tunnel connection failed on start");
+  });
 });

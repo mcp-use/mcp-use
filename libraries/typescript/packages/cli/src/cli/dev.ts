@@ -869,8 +869,14 @@ export async function runDev(options: DevOptions): Promise<void> {
     // vite.close() below owns upgraded HMR WebSockets.
     const httpClosed = new Promise<void>((resolve, reject) => {
       httpServer.close((error) => {
-        if (error !== undefined) reject(error);
-        else resolve();
+        if (
+          error !== undefined &&
+          (error as NodeJS.ErrnoException).code !== "ERR_SERVER_NOT_RUNNING"
+        ) {
+          reject(error);
+        } else {
+          resolve();
+        }
       });
     });
     httpServer.closeAllConnections();
