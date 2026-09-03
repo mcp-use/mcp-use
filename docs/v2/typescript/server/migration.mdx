@@ -280,17 +280,33 @@ v2 elicitation returns an input-required result and re-runs the handler when
 the client supplies input:
 
 ```typescript
-const response = await ctx.elicit(
-  "confirm-booking",
-  "Book this flight?",
-  z.object({ confirmed: z.boolean() }),
-);
+import { acceptedContent, inputRequired, inputResponse } from "mcp-use";
+import { z } from "zod";
 
-if (response.status === "required") {
-  return response.result;
+const confirmationSchema = z.object({ confirmed: z.boolean() });
+
+const response = inputResponse(ctx.inputResponses, "confirm-booking");
+if (response.kind === "elicit" && response.action !== "accept") {
+  return { content: [{ type: "text", text: "Cancelled" }] };
 }
 
-if (response.status !== "accept" || !response.data.confirmed) {
+const confirmation = acceptedContent(
+  ctx.inputResponses,
+  "confirm-booking",
+  confirmationSchema,
+);
+if (confirmation === undefined) {
+  return inputRequired({
+    inputRequests: {
+      "confirm-booking": inputRequired.elicit({
+        message: "Book this flight?",
+        requestedSchema: confirmationSchema,
+      }),
+    },
+  });
+}
+
+if (!confirmation.confirmed) {
   return { content: [{ type: "text", text: "Cancelled" }] };
 }
 
