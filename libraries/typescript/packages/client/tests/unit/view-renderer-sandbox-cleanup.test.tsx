@@ -70,7 +70,7 @@ describe("ViewRenderer sandbox cleanup & timeout", () => {
     );
   });
 
-  it("cleans up listener and transitions to ready when SANDBOX_PROXY_READY is received", async () => {
+  it("cleans up listener when SANDBOX_PROXY_READY is received", async () => {
     const sandboxWindow = {} as Window;
     const lifecycleEvents: ViewLifecycleEvent[] = [];
     const removeEventListenerSpy = vi.spyOn(window, "removeEventListener");
@@ -119,11 +119,12 @@ describe("ViewRenderer sandbox cleanup & timeout", () => {
     });
   });
 
-  it("handles sandbox handshake timeout and transitions to error status", async () => {
+  it("handles sandbox handshake timeout, transitions to error status, and cleans up listener", async () => {
     vi.useFakeTimers();
     const sandboxWindow = {} as Window;
     const lifecycleEvents: ViewLifecycleEvent[] = [];
     const onError = vi.fn();
+    const removeEventListenerSpy = vi.spyOn(window, "removeEventListener");
     let renderer!: ReactTestRenderer;
 
     await act(async () => {
@@ -163,6 +164,10 @@ describe("ViewRenderer sandbox cleanup & timeout", () => {
         status: "error",
         error: expect.stringContaining("Sandbox proxy did not become ready"),
       })
+    );
+    expect(removeEventListenerSpy).toHaveBeenCalledWith(
+      "message",
+      expect.any(Function)
     );
 
     await act(async () => {

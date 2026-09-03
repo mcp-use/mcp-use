@@ -496,19 +496,23 @@ function ViewRendererBase({
           iframe.setAttribute("allow", allowAttribute);
         }
 
-        const readyPromise = waitForSandboxProxyReady(iframe, {
-          signal: abortController.signal,
-        });
         if (activeSandboxUrl.protocol === "blob:") {
           const response = await fetch(activeSandboxUrl.href);
           const sandboxHtml = await response.text();
-          if (disposed) return;
+          if (disposed || abortController.signal.aborted) return;
+          const readyPromise = waitForSandboxProxyReady(iframe, {
+            signal: abortController.signal,
+          });
           iframe.srcdoc = sandboxHtml;
+          await readyPromise;
         } else {
+          const readyPromise = waitForSandboxProxyReady(iframe, {
+            signal: abortController.signal,
+          });
           iframe.src = activeSandboxUrl.href;
+          await readyPromise;
         }
-        await readyPromise;
-        if (disposed) return;
+        if (disposed || abortController.signal.aborted) return;
 
         const capabilities: McpUiHostCapabilities = {
           ...effectiveHostCapabilities,
