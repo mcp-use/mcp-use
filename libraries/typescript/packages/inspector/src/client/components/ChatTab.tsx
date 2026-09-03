@@ -1658,7 +1658,7 @@ export function ChatTab({
             <MessageList
               messages={messages}
               isLoading={isLoading}
-              serverId={serverId}
+              serverId={connection.id}
               readResource={readResource}
               tools={connection.tools}
               sendMessage={sendWidgetMessage}
