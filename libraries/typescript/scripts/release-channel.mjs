@@ -1,7 +1,10 @@
+import { spawnSync } from "node:child_process";
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import semver from "semver";
+
+import { packedArtifactErrors } from "./release-artifact.mjs";
 
 const workspaceRoot = process.cwd();
 const packageRoot = join(workspaceRoot, "packages");
@@ -32,6 +35,40 @@ function manifestEntries() {
 
 function manifests() {
   return manifestEntries().map(({ manifest }) => manifest);
+}
+
+function packedFiles(name, version) {
+  const result = spawnSync(
+    "npm",
+    ["pack", "--dry-run", "--ignore-scripts", "--json", `${name}@${version}`],
+    { cwd: workspaceRoot, encoding: "utf8" }
+  );
+  if (result.status !== 0) {
+    throw new Error(
+      `could not inspect ${name}@${version}: ${result.stderr || result.stdout}`
+    );
+  }
+  const [packed] = JSON.parse(result.stdout);
+  if (!packed?.files) {
+    throw new Error(`npm pack returned no file list for ${name}@${version}`);
+  }
+  return packed.files;
+}
+
+function verifyPackedArtifact(release) {
+  const manifest = manifests().find(({ name }) => name === release.name);
+  if (!manifest) throw new Error(`No local manifest for ${release.name}`);
+  const errors = packedArtifactErrors(
+    manifest,
+    packedFiles(release.name, release.version)
+  );
+  if (errors.length) {
+    throw new Error(
+      `${release.name}@${release.version} has an invalid npm artifact: ${errors.join(
+        ", "
+      )}`
+    );
+  }
 }
 
 function prereleaseState() {
@@ -367,6 +404,12 @@ async function verifyOnce(plan) {
     if (release.target) {
       if (!Object.hasOwn(versions, release.version)) {
         errors.push(`${release.name}@${release.version} is missing from npm`);
+      } else if (!option("--registry-file")) {
+        try {
+          verifyPackedArtifact(release);
+        } catch (error) {
+          errors.push(error instanceof Error ? error.message : String(error));
+        }
       }
       if (afterTags[release.channelTag] !== release.version) {
         errors.push(

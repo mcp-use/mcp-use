@@ -5,6 +5,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
+import {
+  packedArtifactErrors,
+  requiredPackedEntries,
+} from "./release-artifact.mjs";
+
 const script = new URL("./release-channel.mjs", import.meta.url).pathname;
 
 function fixture({ localVersion, latest, canary, published = [] }) {
@@ -59,6 +64,62 @@ function writePreState(root, initialVersions, changesets = []) {
     })
   );
 }
+
+test("requires declared package files and entry points in packed artifacts", () => {
+  const manifest = {
+    name: "@mcp-use/client",
+    files: ["dist"],
+    module: "./dist/index.js",
+    types: "./dist/index.d.ts",
+    exports: {
+      ".": {
+        node: { import: "./dist/index.js", types: "./dist/index.d.ts" },
+        browser: {
+          import: "./dist/index-browser.js",
+          types: "./dist/index-browser.d.ts",
+        },
+      },
+      "./react": {
+        import: "./dist/react/index.js",
+        types: "./dist/react/index.d.ts",
+      },
+    },
+  };
+
+  assert.deepEqual(requiredPackedEntries(manifest), {
+    exact: [
+      "dist/index-browser.d.ts",
+      "dist/index-browser.js",
+      "dist/index.d.ts",
+      "dist/index.js",
+      "dist/react/index.d.ts",
+      "dist/react/index.js",
+    ],
+    prefixes: ["dist"],
+  });
+  assert.deepEqual(
+    packedArtifactErrors(manifest, [
+      { path: "README.md" },
+      { path: "package.json" },
+    ]),
+    [
+      "missing entry point dist/index-browser.d.ts",
+      "missing entry point dist/index-browser.js",
+      "missing entry point dist/index.d.ts",
+      "missing entry point dist/index.js",
+      "missing entry point dist/react/index.d.ts",
+      "missing entry point dist/react/index.js",
+      "files entry dist matched no packed files",
+    ]
+  );
+  assert.deepEqual(
+    packedArtifactErrors(
+      manifest,
+      requiredPackedEntries(manifest).exact.map((path) => ({ path }))
+    ),
+    []
+  );
+});
 
 test("rejects a stable source version below npm latest", () => {
   const { root, registryFile } = fixture({

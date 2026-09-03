@@ -56,7 +56,6 @@
     "build:client-exports": "tsup --config tsup.client.ts && node scripts/copy-client-styles.mjs",
     "build:server": "tsup --config tsup.server.ts",
     "verify:package": "node scripts/verify-package.mjs",
-    "prepublishOnly": "pnpm --filter @mcp-use/client build && pnpm build",
     "start": "node dist/cli.js --port 3000",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",

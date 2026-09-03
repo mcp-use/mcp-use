@@ -138,6 +138,10 @@ jobs:
         id: publish-canary
         continue-on-error: true
         working-directory: libraries/typescript
+        env:
+          # Packages were built and packed above. Keep concurrent publishing from
+          # running lifecycle hooks that can mutate another package's artifacts.
+          NPM_CONFIG_IGNORE_SCRIPTS: "true"
         run: |
           # Using npm trusted publishing (OIDC) - no token needed
           pnpm changeset publish
@@ -400,6 +404,9 @@ jobs:
           steps.check-release.outputs.should_publish == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Packages were built and packed above. Keep concurrent publishing from
+          # running lifecycle hooks that can mutate another package's artifacts.
+          NPM_CONFIG_IGNORE_SCRIPTS: "true"
         id: publish-main
         continue-on-error: true
         run: |
