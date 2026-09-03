@@ -26,6 +26,7 @@ export { FileKVStore } from "./auth/storage-file.js";
 export * from "./core/config.js";
 export * from "./core/node.js";
 export * from "./core/session.js";
+export * from "./adapters/ai-sdk.js";
 
 // Connectors
 export * from "./transport/base.js";

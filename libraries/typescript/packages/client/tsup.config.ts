@@ -27,6 +27,7 @@ export default defineConfig({
     "@modelcontextprotocol/client",
     "@modelcontextprotocol/ext-apps",
     "@modelcontextprotocol/ext-apps/app-bridge",
+    "@ai-sdk/provider-utils",
   ],
   define: {
     __MCP_USE_PACKAGE_VERSION__: JSON.stringify(version),

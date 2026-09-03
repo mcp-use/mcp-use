@@ -27,6 +27,7 @@ export { auth, UnauthorizedError } from "@modelcontextprotocol/client";
 export { BrowserMCPClient as MCPClient } from "./core/browser.js";
 export * from "./core/session.js";
 export * from "./core/config.js";
+export * from "./adapters/ai-sdk.js";
 
 export * from "./transport/base.js";
 export * from "./transport/http.js";

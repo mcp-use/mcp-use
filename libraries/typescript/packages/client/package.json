@@ -57,9 +57,11 @@
     "build": "rimraf dist && tsup && tsc --emitDeclarationOnly --declaration",
     "dev": "tsc --watch",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "test:package": "pnpm build && node --test tests/package/ai-sdk-package.test.mjs"
   },
   "dependencies": {
+    "@ai-sdk/provider-utils": "^4.0.19",
     "@modelcontextprotocol/client": "2.0.0",
     "@modelcontextprotocol/core": "2.0.0",
     "@modelcontextprotocol/ext-apps": "npm:@mcp-use/ext-apps@1.7.4-pr720.1"
