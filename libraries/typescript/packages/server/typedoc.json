@@ -12,6 +12,7 @@
     "src/oauth/keycloak.ts",
     "src/oauth/better-auth.ts",
     "src/oauth/scalekit.ts",
+    "src/oauth/convex.ts",
     "src/node-bridge.ts",
     "src/next/index.ts"
   ],

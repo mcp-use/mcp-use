@@ -1,5 +1,36 @@
 # @mcp-use/client
 
+## 2.2.4
+
+### Patch Changes
+
+- 5e7e350: Rebind the OAuth loopback listener after a failed bind. `startLoopback()` assigned `this.server` before `listen()` resolved, so a bind failure left a server that was never listening; the `if (this.server) return` guard then made every later authorization skip binding and hang until the auth timeout.
+
+## 2.2.4-canary.0
+
+### Patch Changes
+
+- b951f1f: Rebind the OAuth loopback listener after a failed bind. `startLoopback()` assigned `this.server` before `listen()` resolved, so a bind failure left a server that was never listening; the `if (this.server) return` guard then made every later authorization skip binding and hang until the auth timeout.
+
+## 2.2.3
+
+### Patch Changes
+
+- 32da345: Stop OAuth authorization retries after the client disconnects.
+- 32da345: Fix `listAllResources` throwing a raw `TypeError` when a disconnect lands between pages. The pagination loop read `this.client` once per page, so `disconnect()` clearing it mid-listing surfaced `Cannot read properties of null (reading 'listResources')` instead of the transport's own error.
+
+## 2.2.3-canary.1
+
+### Patch Changes
+
+- 676902b: Fix `listAllResources` throwing a raw `TypeError` when a disconnect lands between pages. The pagination loop read `this.client` once per page, so `disconnect()` clearing it mid-listing surfaced `Cannot read properties of null (reading 'listResources')` instead of the transport's own error.
+
+## 2.2.3-canary.0
+
+### Patch Changes
+
+- 0eca6f2: Stop OAuth authorization retries after the client disconnects.
+
 ## 2.2.2
 
 ### Patch Changes

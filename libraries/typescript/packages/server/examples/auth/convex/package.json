@@ -1,0 +1,23 @@
+{
+  "name": "mcp-use-example-auth-convex",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Example: a mcp-use server authenticated by a Convex OAuth Provider deployment.",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "scripts": {
+    "dev": "mcp-use dev --port 43127",
+    "build": "mcp-use build",
+    "start": "mcp-use start --port 43127",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "mcp-use": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "typescript": "^7.0.2"
+  }
+}

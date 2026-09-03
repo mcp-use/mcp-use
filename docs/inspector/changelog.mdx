@@ -6,6 +6,24 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v20.3.5" description="September 2026">
+  ## Chat widgets use the connection id
+  Patch release paired with `mcp-use` v2.4.1, rendering chat MCP Apps against the registered connection.
+
+- **Fix**: chat MCP Apps render with the registered MCP connection id while preserving the logical server id for chat state and storage (`#2404`)
+- **Update**: Updated mcp-use to v2.4.1
+</Update>
+
+<Update label="v20.3.4" description="September 2026">
+  ## Request duration & screenshot init failures
+  Patch release paired with `mcp-use` v2.4.0, showing RPC duration, failing screenshots when an MCP App fails to initialize, and raising the embedded chat step cap.
+
+- **Enhancement**: RPC traffic rows show request duration in milliseconds instead of wall-clock time; unmatched rows omit the timing column (`#2364`)
+- **Fix**: `mcp-use screenshot` fails with `view_load_failed` when the MCP App fails to initialize (`#2355`)
+- **Enhancement**: embedded client-side chats can configure up to 100 agent steps (`#2401`)
+- **Update**: Updated mcp-use to v2.4.0
+</Update>
+
 <Update label="v20.3.3" description="August 2026">
   ## RPC latency in the timing column
   Patch release paired with `mcp-use` v2.3.4, moving response latency into the traffic timing column and labeling colocated Inspector logs.

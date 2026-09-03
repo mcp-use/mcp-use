@@ -257,7 +257,7 @@ mcp-use deploy [options]
 | `--open`                  | Open the deployment in a browser after a successful deploy.                            | Disabled           |
 | `--name <name>`           | Deployment or server name.                                                             | Auto-generated     |
 | `--new`                   | Create a new deployment instead of reusing the linked project.                         | Disabled           |
-| `--env <key=value...>`    | Environment variable assignment. Repeatable.                                           | None               |
+| `--env <key=value>`       | Environment variable assignment. Repeatable.                                           | None               |
 | `--env-file <path>`       | Load environment variables from a `.env` file.                                         | None               |
 | `--branch <name>`         | Branch to deploy. Also scopes env sync to that branch preview environment.             | Current git branch |
 | `--root-dir <path>`       | Root directory inside the repository for monorepos.                                    | Repository root    |
@@ -267,7 +267,7 @@ mcp-use deploy [options]
 | `--build-command <cmd>`   | Build command override.                                                                | Auto-detected      |
 | `--start-command <cmd>`   | Start command override.                                                                | Auto-detected      |
 | `--dockerfile <path>`     | Non-default Dockerfile path, relative to `--root-dir` or repository root.              | None               |
-| `--watch-paths <glob...>` | Only auto-deploy when matching files change. Set on new-server creation for monorepos. | All changes        |
+| `--watch-paths <glob>`    | Only auto-deploy when matching files change. Repeatable. Set on new-server creation for monorepos. | All changes        |
 | `--wait-for-ci`           | Hold GitHub auto-deploys until other check runs pass. Set on new-server creation.      | Disabled           |
 | `--no-github`             | Upload local source without connecting GitHub.                                         | Disabled           |
 
@@ -280,7 +280,7 @@ mcp-use deploy --name my-server --open
 mcp-use deploy --env DATABASE_URL=postgres://... --env API_KEY=secret
 mcp-use deploy --env-file .env.production
 mcp-use deploy --root-dir apps/mcp-server
-mcp-use deploy --root-dir apps/mcp-server --watch-paths "apps/mcp-server/**" "packages/shared/**"
+mcp-use deploy --root-dir apps/mcp-server --watch-paths "apps/mcp-server/**" --watch-paths "packages/shared/**"
 mcp-use deploy --new --name my-server-v2
 mcp-use deploy --org manufact-inc --region EU --yes
 ```
@@ -449,8 +449,8 @@ mcp-use servers <subcommand> [options]
 | --------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `list`                | List servers for an organization.           | `--org <slug-or-id>`, `--limit <n>`, `--skip <n>`                                                                                                                                                                                                      |
 | `get <id-or-slug>`    | Show server details and recent deployments. | `--org <slug-or-id>`                                                                                                                                                                                                                                   |
-| `update <id-or-slug>` | Update server configuration.                | `--branch <name>`, `--name <name>`, `--description <text>`, `--build-command <cmd>`, `--start-command <cmd>`, `--root-dir <path>`, `--watch-paths <glob...>`, `--deploy-branches <glob...>`, `--wait-for-ci`, `--no-wait-for-ci`, `--org <slug-or-id>` |
-| `delete <server-id>`  | Delete a server and its deployments.        | `-y, --yes`, `--org <slug-or-id>`                                                                                                                                                                                                                      |
+| `update <id-or-slug>` | Update server configuration.                | `--branch <name>`, `--name <name>`, `--description <text>`, `--build-command <cmd>`, `--start-command <cmd>`, `--root-dir <path>`, `--watch-paths <glob>`, `--deploy-branches <glob>`, `--wait-for-ci`, `--no-wait-for-ci`, `--org <slug-or-id>` |
+| `delete <server-id>`  | Delete a server and its deployments.        | `--yes`, `--org <slug-or-id>`                                                                                                                                                                                                                      |
 | `env <subcommand>`    | Manage server environment variables.        | See [Server environment commands](#server-environment-commands).                                                                                                                                                                                       |
 
 **Examples:**
@@ -460,13 +460,14 @@ mcp-use servers list
 mcp-use servers get srv_abc123
 mcp-use servers update srv_abc123 --branch main
 mcp-use servers update srv_abc123 --build-command "npm run build"
-mcp-use servers update srv_abc123 --watch-paths "apps/api/**" "packages/shared/**" --deploy-branches "release/*"
+mcp-use servers update srv_abc123 --watch-paths "apps/api/**" --watch-paths "packages/shared/**" --deploy-branches "release/*"
 mcp-use servers delete srv_abc123 --yes
 ```
 
 **Notes and behavior:**
 
 - `servers update --branch` changes the production branch for future production deploys.
+- `--watch-paths` and `--deploy-branches` are repeatable. Pass the flag once per pattern; a second bare value is read as a positional, not as another pattern.
 - Pass an empty string to `--build-command`, `--start-command`, `--root-dir`, `--watch-paths`, or `--deploy-branches` to clear that setting.
 - `--wait-for-ci` and `--no-wait-for-ci` control whether auto-deploys wait for other check runs before deploying.
 - `servers delete` prompts for confirmation unless `--yes` is set.

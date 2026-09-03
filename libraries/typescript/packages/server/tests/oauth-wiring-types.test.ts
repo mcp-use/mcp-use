@@ -8,6 +8,10 @@ import {
 } from "../src/oauth/better-auth.js";
 import { oauthClerkProvider, type ClerkOAuthUser } from "../src/oauth/clerk.js";
 import {
+  oauthConvexProvider,
+  type ConvexOAuthUser,
+} from "../src/oauth/convex.js";
+import {
   oauthKeycloakProvider,
   type KeycloakOAuthUser,
 } from "../src/oauth/keycloak.js";
@@ -126,6 +130,22 @@ function verifyOAuthCallbackTyping(): void {
     const isAnonymous: boolean | undefined = ctx.auth.user.isAnonymous;
     assertOAuthAuthFields(auth);
     void [user, isAnonymous];
+    return { content: [] };
+  });
+
+  const convex = new MCPServer({
+    name: "convex",
+    version: "1.0.0",
+    oauth: oauthConvexProvider({
+      authURL: "https://example.convex.site/oauth",
+    }),
+  });
+  convex.tool({ name: "convex-user" }, (_params, ctx) => {
+    const auth: OAuthAuth<ConvexOAuthUser> = ctx.auth;
+    const user: ConvexOAuthUser = ctx.auth.user;
+    const clientId: string | undefined = ctx.auth.user.clientId;
+    assertOAuthAuthFields(auth);
+    void [user, clientId];
     return { content: [] };
   });
   clerk.tool({ name: "clerk-user" }, (_params, ctx) => {

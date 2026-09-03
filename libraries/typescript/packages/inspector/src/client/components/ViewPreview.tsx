@@ -17,10 +17,22 @@
  *
  * In both modes, `body[data-view-ready="true"]` is set once the renderer
  * signals readiness + fonts have loaded + two animation frames have elapsed.
+ *
+ * If the MCP App fails to *initialize* — a bad resource, a sandbox connect
+ * failure, an initialize-handshake failure, or (bundle mode only) a missing
+ * screenshot bundle — `body[data-view-error="view_load_failed"]` is set
+ * instead, with an optional `body[data-view-error-message]` detail. This
+ * never fires for a widget's own `console.error`, uncaught errors, or
+ * unhandled rejections logged after it has successfully initialized; see
+ * `markViewLoadFailed` below.
  */
 
-import { ViewRenderer, useMcpClient } from "@mcp-use/client/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  ViewRenderer,
+  useMcpClient,
+  type ViewLifecycleEvent,
+} from "@mcp-use/client/react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 import { useViewHostProps } from "@/client/hooks/useViewHostProps";
 import { getBasePath } from "@/client/utils/basePath";
@@ -97,26 +109,92 @@ function usePreviewViewport(): void {
   }, []);
 }
 
-/** Expose non-secret preview failures to CDP callers. */
+/**
+ * Mark `body[data-view-error="view_load_failed"]` for the screenshot CLI to
+ * poll for. Reserved for explicit MCP App *initialization* failures — the
+ * widget never became ready to render — never for arbitrary `console.error`
+ * calls, uncaught errors, or unhandled rejections a widget logs after it has
+ * successfully initialized. Those are frequently recoverable and would
+ * otherwise turn a working screenshot into a false-positive failure.
+ */
+function markViewLoadFailed(message?: string): void {
+  document.body.dataset.viewError = "view_load_failed";
+  if (message) document.body.dataset.viewErrorMessage = message;
+  else delete document.body.dataset.viewErrorMessage;
+}
+
+function clearViewLoadFailed(): void {
+  delete document.body.dataset.viewError;
+  delete document.body.dataset.viewErrorMessage;
+}
+
+/** Surface a missing screenshot bundle as an initialization failure. */
 function usePreviewErrorSignal(
   bundleRequired: boolean,
   bundlePresent: boolean
 ): void {
   useEffect(() => {
-    const markRuntimeError = () => {
-      document.body.dataset.viewError = "runtime_error";
-    };
     if (bundleRequired && !bundlePresent) {
-      document.body.dataset.viewError = "invalid_payload";
+      markViewLoadFailed(
+        "Screenshot bundle was not injected before navigation."
+      );
     }
-    window.addEventListener("error", markRuntimeError);
-    window.addEventListener("unhandledrejection", markRuntimeError);
-    return () => {
-      window.removeEventListener("error", markRuntimeError);
-      window.removeEventListener("unhandledrejection", markRuntimeError);
-      delete document.body.dataset.viewError;
-    };
+    return () => clearViewLoadFailed();
   }, [bundleRequired, bundlePresent]);
+}
+
+/**
+ * Track {@link ViewRenderer}'s lifecycle and mark `view_load_failed` only for
+ * an `"error"` status reached before the view first initializes — resource
+ * resolution failures, sandbox connect failures, and initialize-handshake
+ * failures.
+ *
+ * `ViewRenderer` also reports `"error"` for a *later* guest
+ * re-initialization sync failure (e.g. the widget's own dev-mode HMR reload
+ * failing to resynchronize) — see `installInitializedSync`'s `onLaterError`
+ * in `@mcp-use/client`. That happens only after the view already initialized
+ * once, without ever emitting `"resolving"` or `"connecting"` again (the
+ * bridge is already connected), so it must not retroactively fail an
+ * otherwise-successful capture. Once `"initialized"`/`"ready"` is seen,
+ * further `"error"` events are ignored until a fresh `"resolving"` (a new
+ * resource resolve) or `"connecting"` (a bridge reconnect on the same
+ * resource — its effect has a dependency set disjoint from the resolve
+ * effect's, so it can re-run on its own) re-arms the check.
+ *
+ * The marker is cleared only for stages that positively belong to the active
+ * attempt (`"resolving"`/`"connecting"` starting one, `"initialized"`/
+ * `"ready"` completing one). `"tearing-down"` and `"closed"` are ignored:
+ * they can arrive late from a superseded bridge attempt, and a sequence such
+ * as connecting → error → (old) closed would otherwise erase the current
+ * attempt's failure and let the screenshot CLI time out or capture a broken
+ * view instead of failing.
+ */
+export function useViewLifecycleErrorSignal(): (
+  event: ViewLifecycleEvent
+) => void {
+  const initializedRef = useRef(false);
+  return useCallback((event: ViewLifecycleEvent) => {
+    if (event.status === "resolving" || event.status === "connecting") {
+      initializedRef.current = false;
+      clearViewLoadFailed();
+      return;
+    }
+
+    if (event.status === "initialized" || event.status === "ready") {
+      initializedRef.current = true;
+      clearViewLoadFailed();
+      return;
+    }
+
+    if (event.status === "error") {
+      if (!initializedRef.current) markViewLoadFailed(event.error);
+      return;
+    }
+
+    // "sandbox-loading" only follows a "resolving" that already cleared, and
+    // "tearing-down"/"closed" may belong to an older attempt — neither may
+    // erase the current attempt's marker.
+  }, []);
 }
 
 /**
@@ -248,6 +326,7 @@ function ViewPreviewBundle({
   const containerRef = useRef<HTMLDivElement>(null);
   usePreviewViewport();
   useBundleReadinessSignal(rendererReady, containerRef);
+  const onLifecycleChange = useViewLifecycleErrorSignal();
 
   const readResource = useMemo(() => {
     return async (uri: string) => {
@@ -272,6 +351,7 @@ function ViewPreviewBundle({
         inlineMaxWidth={widthOverride}
         chromeless
         onReady={() => setRendererReady(true)}
+        onLifecycleChange={onLifecycleChange}
         source={{
           kind: "live",
           connection: {
