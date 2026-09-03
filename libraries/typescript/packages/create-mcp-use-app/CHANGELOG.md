@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 2.0.6
+
+### Patch Changes
+
+- 5e7e350: Remove `--no-git` from the help output. Scaffolding stopped initializing a git repository in #820, and nothing has read the flag since, so the line described behaviour the tool no longer had.
+
 ## 2.0.6-canary.0
 
 ### Patch Changes
