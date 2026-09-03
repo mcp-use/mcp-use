@@ -446,14 +446,23 @@ class BaseConnector(ABC):
         items: list[Any] = []
         cursor: str | None = None
         seen_cursors: set[str] = set()
+        missing_page_items = object()
 
         while True:
             page = await fetch_page() if cursor is None else await fetch_page(cursor)
             if page is None:
+                logger.warning(f"{method_name} returned no page; stopping pagination")
                 return items
 
-            page_items = getattr(page, items_attribute, None)
+            page_items = getattr(page, items_attribute, missing_page_items)
+            if page_items is missing_page_items:
+                logger.warning(f"{method_name} returned page missing {items_attribute!r}; stopping pagination")
+                return items
             if page_items is None:
+                logger.warning(f"{method_name} returned page with None {items_attribute!r}; stopping pagination")
+                return items
+            if not isinstance(page_items, list):
+                logger.warning(f"{method_name} returned non-list {items_attribute!r}; stopping pagination")
                 return items
             items.extend(page_items)
 

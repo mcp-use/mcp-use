@@ -484,7 +484,7 @@ class TestHttpConnectorOperations(IsolatedAsyncioTestCase):
         self.connector.client_session.list_tools.assert_has_awaits([call(), call("")])
         self.assertEqual(self.connector.client_session.list_tools.await_count, 2)
 
-    async def test_list_tools_stops_on_later_none_page_preserving_items(self, _):
+    async def test_list_tools_stops_on_later_none_page_preserving_items(self, mock_logger):
         """A missing later page should preserve the items collected so far."""
         first_tool = Tool(name="first", inputSchema={"type": "object", "properties": {}})
         self.connector.client_session.list_tools.side_effect = [
@@ -498,8 +498,9 @@ class TestHttpConnectorOperations(IsolatedAsyncioTestCase):
         self.assertEqual(self.connector._tools, [first_tool])
         self.connector.client_session.list_tools.assert_has_awaits([call(), call("tools-page-2")])
         self.assertEqual(self.connector.client_session.list_tools.await_count, 2)
+        mock_logger.warning.assert_called_once_with("list_tools returned no page; stopping pagination")
 
-    async def test_list_tools_stops_on_later_missing_collection_preserving_items(self, _):
+    async def test_list_tools_stops_on_later_missing_collection_preserving_items(self, mock_logger):
         """A later page without the collection attribute should preserve prior items."""
         first_tool = Tool(name="first", inputSchema={"type": "object", "properties": {}})
         self.connector.client_session.list_tools.side_effect = [
@@ -513,8 +514,9 @@ class TestHttpConnectorOperations(IsolatedAsyncioTestCase):
         self.assertEqual(self.connector._tools, [first_tool])
         self.connector.client_session.list_tools.assert_has_awaits([call(), call("tools-page-2")])
         self.assertEqual(self.connector.client_session.list_tools.await_count, 2)
+        mock_logger.warning.assert_called_once_with("list_tools returned page missing 'tools'; stopping pagination")
 
-    async def test_list_tools_stops_on_later_none_collection_preserving_items(self, _):
+    async def test_list_tools_stops_on_later_none_collection_preserving_items(self, mock_logger):
         """A later page with a None collection should preserve prior items."""
         first_tool = Tool(name="first", inputSchema={"type": "object", "properties": {}})
         self.connector.client_session.list_tools.side_effect = [
@@ -528,6 +530,23 @@ class TestHttpConnectorOperations(IsolatedAsyncioTestCase):
         self.assertEqual(self.connector._tools, [first_tool])
         self.connector.client_session.list_tools.assert_has_awaits([call(), call("tools-page-2")])
         self.assertEqual(self.connector.client_session.list_tools.await_count, 2)
+        mock_logger.warning.assert_called_once_with("list_tools returned page with None 'tools'; stopping pagination")
+
+    async def test_list_tools_stops_on_non_list_collection_preserving_items(self, mock_logger):
+        """A later page with a non-list collection should preserve prior items."""
+        first_tool = Tool(name="first", inputSchema={"type": "object", "properties": {}})
+        self.connector.client_session.list_tools.side_effect = [
+            ListToolsResult(tools=[first_tool], nextCursor="tools-page-2"),
+            MagicMock(tools=("not", "a", "list")),
+        ]
+
+        result = await self.connector.list_tools()
+
+        self.assertEqual(result, [first_tool])
+        self.assertEqual(self.connector._tools, [first_tool])
+        self.connector.client_session.list_tools.assert_has_awaits([call(), call("tools-page-2")])
+        self.assertEqual(self.connector.client_session.list_tools.await_count, 2)
+        mock_logger.warning.assert_called_once_with("list_tools returned non-list 'tools'; stopping pagination")
 
     async def test_list_tools_stops_on_non_string_cursor_preserving_items(self, mock_logger):
         """A non-string cursor should warn and preserve the current page's items."""
