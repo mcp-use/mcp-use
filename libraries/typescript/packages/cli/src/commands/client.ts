@@ -184,6 +184,11 @@ async function remove(argv: readonly string[], json: boolean): Promise<number> {
   });
   const name = one(positionals, "mcp-use client remove <name>");
   const saved = await readServers();
+  if (saved.servers[name] === undefined) {
+    throw new UsageError(
+      `Unknown saved server: ${name}. Run \`mcp-use client list\` to see saved servers.`
+    );
+  }
   delete saved.servers[name];
   await writePrivateJson(SERVERS_PATH, saved);
   await rm(credentialsDirectory(name), { recursive: true, force: true });

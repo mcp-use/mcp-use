@@ -2,6 +2,7 @@ import { parseArgs } from "node:util";
 
 import { cloudApiForOrganization, type CloudApi } from "./cloud-api.js";
 import {
+  CommandError,
   confirm,
   printResult,
   reportError,
@@ -352,12 +353,18 @@ async function envUnset(
     (variable) =>
       variable.key === key && (variable.branch ?? undefined) === values.branch
   );
-  if (existing !== undefined) {
-    await api.request(
-      `/servers/${encodeURIComponent(server)}/env-variables/${encodeURIComponent(existing.id)}`,
-      { method: "DELETE" }
+  if (existing === undefined) {
+    const scope =
+      values.branch === undefined ? "production" : `branch ${values.branch}`;
+    throw new CommandError(
+      "env_variable_not_found",
+      `Environment variable not found on ${server} (${scope}): ${key}`
     );
   }
+  await api.request(
+    `/servers/${encodeURIComponent(server)}/env-variables/${encodeURIComponent(existing.id)}`,
+    { method: "DELETE" }
+  );
   printResult({ deleted: key }, json, `Deleted ${key}.`);
   return 0;
 }
