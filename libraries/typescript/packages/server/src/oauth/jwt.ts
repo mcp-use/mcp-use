@@ -299,7 +299,7 @@ function verifierAudience(
   );
 }
 
-function validAudience(value: unknown): value is string | string[] {
+function isStringOrStringArray(value: unknown): value is string | string[] {
   return (
     typeof value === "string" ||
     (Array.isArray(value) &&
@@ -308,13 +308,12 @@ function validAudience(value: unknown): value is string | string[] {
   );
 }
 
+function validAudience(value: unknown): value is string | string[] {
+  return isStringOrStringArray(value);
+}
+
 function validResourceClaim(value: unknown): value is string | string[] {
-  return (
-    typeof value === "string" ||
-    (Array.isArray(value) &&
-      value.length > 0 &&
-      value.every((item) => typeof item === "string"))
-  );
+  return isStringOrStringArray(value);
 }
 
 function canonicalUrl(value: URL | string): URL {

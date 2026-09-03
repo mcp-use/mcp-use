@@ -299,6 +299,19 @@ describe("OAuth core", () => {
       verifier.verifyAccessToken(
         await sign({
           aud: "provider-api",
+          resource: [],
+        })
+      )
+    ).rejects.toMatchObject({
+      code: OAuthErrorCode.InvalidToken,
+      message:
+        "Token resource claim must be an absolute URL or array of absolute URLs",
+    });
+
+    await expect(
+      verifier.verifyAccessToken(
+        await sign({
+          aud: "provider-api",
           resource: 12345,
         })
       )
