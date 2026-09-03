@@ -122,7 +122,7 @@ test("requires declared package files and entry points in packed artifacts", () 
   );
 });
 
-test("accepts both npm pack JSON result shapes", () => {
+test("accepts npm pack array, direct object, and package-keyed JSON", () => {
   const packed = { files: [{ path: "package.json" }] };
   assert.deepEqual(
     packedFilesFromNpmPackJson(JSON.stringify([packed])),
@@ -130,6 +130,10 @@ test("accepts both npm pack JSON result shapes", () => {
   );
   assert.deepEqual(
     packedFilesFromNpmPackJson(JSON.stringify(packed)),
+    packed.files
+  );
+  assert.deepEqual(
+    packedFilesFromNpmPackJson(JSON.stringify({ "@mcp-use/client": packed })),
     packed.files
   );
 });

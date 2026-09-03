@@ -65,7 +65,11 @@ export function packedArtifactErrors(manifest, files) {
 
 export function packedFilesFromNpmPackJson(output) {
   const parsed = JSON.parse(output);
-  const packed = Array.isArray(parsed) ? parsed[0] : parsed;
+  const packed = Array.isArray(parsed)
+    ? parsed[0]
+    : parsed?.files
+      ? parsed
+      : Object.values(parsed ?? {}).find((value) => value?.files);
   if (!packed?.files) {
     throw new Error("npm pack returned no file list");
   }
