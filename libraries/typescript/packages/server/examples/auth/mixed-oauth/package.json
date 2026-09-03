@@ -14,8 +14,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@better-auth/oauth-provider": "^1.7.2",
-    "better-auth": "^1.7.2",
+    "@better-auth/oauth-provider": "^1.6.2",
+    "better-auth": "^1.6.2",
     "hono": "^4.12.34",
     "mcp-use": "workspace:*"
   },
