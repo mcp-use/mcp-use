@@ -70,13 +70,17 @@ function CloseIcon() {
   );
 }
 
-function waitForSandboxProxyReady(
+/** @internal */
+export function waitForSandboxProxyReady(
   iframe: HTMLIFrameElement,
-  options?: { signal?: AbortSignal }
+  options?: { signal?: AbortSignal; timeoutMs?: number }
 ): Promise<void> {
   return new Promise((resolve, reject) => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
     const cleanup = () => {
       window.removeEventListener("message", listener);
+      if (timer !== undefined) clearTimeout(timer);
       options?.signal?.removeEventListener("abort", onAbort);
     };
 
@@ -100,6 +104,17 @@ function waitForSandboxProxyReady(
       return;
     }
     options?.signal?.addEventListener("abort", onAbort, { once: true });
+
+    if (options?.timeoutMs !== undefined && options.timeoutMs > 0) {
+      timer = setTimeout(() => {
+        cleanup();
+        reject(
+          new Error(
+            `Sandbox proxy did not become ready within ${options.timeoutMs}ms`
+          )
+        );
+      }, options.timeoutMs);
+    }
 
     window.addEventListener("message", listener);
   });

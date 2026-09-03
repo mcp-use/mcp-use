@@ -3,7 +3,10 @@
 import React from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ViewRenderer } from "../../src/react/view/ViewRenderer.js";
+import {
+  ViewRenderer,
+  waitForSandboxProxyReady,
+} from "../../src/react/view/ViewRenderer.js";
 import type {
   ViewLifecycleEvent,
   ViewRendererSource,
@@ -127,5 +130,47 @@ describe("ViewRenderer sandbox lifecycle cleanup", () => {
     await act(async () => {
       renderer.unmount();
     });
+  });
+
+  it("handles timeout and cleans up window message listener", async () => {
+    vi.useFakeTimers();
+    const sandboxWindow = {} as Window;
+    const iframe = { contentWindow: sandboxWindow } as HTMLIFrameElement;
+    const removeEventListenerSpy = vi.spyOn(window, "removeEventListener");
+
+    const promise = waitForSandboxProxyReady(iframe, { timeoutMs: 5000 });
+    const expectation = expect(promise).rejects.toThrow(
+      "Sandbox proxy did not become ready within 5000ms"
+    );
+
+    await vi.advanceTimersByTimeAsync(5001);
+    await expectation;
+
+    expect(removeEventListenerSpy).toHaveBeenCalledWith(
+      "message",
+      expect.any(Function)
+    );
+  });
+
+  it("handles abort signal and cleans up window message listener", async () => {
+    const sandboxWindow = {} as Window;
+    const iframe = { contentWindow: sandboxWindow } as HTMLIFrameElement;
+    const removeEventListenerSpy = vi.spyOn(window, "removeEventListener");
+    const abortController = new AbortController();
+
+    const promise = waitForSandboxProxyReady(iframe, {
+      signal: abortController.signal,
+    });
+    const expectation = expect(promise).rejects.toThrow(
+      "View sandbox initialization was aborted"
+    );
+
+    abortController.abort();
+    await expectation;
+
+    expect(removeEventListenerSpy).toHaveBeenCalledWith(
+      "message",
+      expect.any(Function)
+    );
   });
 });
