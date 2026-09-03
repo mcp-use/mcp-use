@@ -222,6 +222,28 @@ class TestSandboxConnectorConnection:
         assert connector._connected is False
 
 
+class TestSandboxConnectorLogging:
+    """Tests for SandboxConnector stdout/stderr logging."""
+
+    def test_handle_stdout_and_stderr_do_not_raise_with_real_logger(self, mock_sandbox_modules, mock_os_environ):
+        """_handle_stdout/_handle_stderr must call logger.debug with args logging.Logger accepts."""
+        import logging
+
+        from mcp_use.client.connectors import sandbox as sandbox_module
+
+        real_logger = logging.getLogger("test-sandbox-real-logger")
+        real_logger.setLevel(logging.DEBUG)
+        with patch.object(sandbox_module, "logger", real_logger):
+            sandbox_options = SandboxOptions(api_key="test-api-key")
+            connector = SandboxConnector("npx", ["test-command"], e2b_options=sandbox_options)
+
+            connector._handle_stdout("some output")
+            connector._handle_stderr("some error")
+
+        assert connector.stdout_lines == ["some output"]
+        assert connector.stderr_lines == ["some error"]
+
+
 class TestSandboxConnectorCleanup:
     """Tests for SandboxConnector cleanup methods."""
 
