@@ -1,5 +1,18 @@
 # @mcp-use/inspector
 
+## 20.3.5-canary.1
+
+### Patch Changes
+
+- 302af01: Render chat MCP Apps with the registered MCP connection id while preserving the logical server id for chat state and storage.
+
+## 20.3.5-canary.0
+
+### Patch Changes
+
+- @mcp-use/agent@2.0.13-canary.0
+- mcp-use@2.4.1-canary.0
+
 ## 20.3.4
 
 ### Patch Changes

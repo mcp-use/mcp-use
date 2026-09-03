@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.2.4-canary.0
+
+### Patch Changes
+
+- b951f1f: Rebind the OAuth loopback listener after a failed bind. `startLoopback()` assigned `this.server` before `listen()` resolved, so a bind failure left a server that was never listening; the `if (this.server) return` guard then made every later authorization skip binding and hang until the auth timeout.
+
 ## 2.2.3
 
 ### Patch Changes

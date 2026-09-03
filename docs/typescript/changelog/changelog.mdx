@@ -6,6 +6,37 @@ tag: "New"
 rss: true
 ---
 
+<Update label="v2.4.1" description="September 2026">
+  ## OAuth loopback recovery & scaffold help
+  Patch release recovering Node OAuth after a failed loopback bind, dropping a dead scaffold flag, and fixing Inspector chat widget connections.
+
+- **Fix** (@mcp-use/client): Node OAuth rebinds the loopback listener after a failed bind instead of hanging until `authTimeoutMs` (`#2393`)
+- **Fix** (create-mcp-use-app): help no longer lists `--no-git`; scaffolding has not initialized a git repository since #820 (`#2392`)
+- **Fix** (@mcp-use/inspector): chat MCP Apps use the registered connection id while keeping the logical server id for chat state and storage; see the Inspector changelog (`#2404`)
+- **Update**: Updated @mcp-use/inspector to v20.3.5
+- **Update**: Updated @mcp-use/cli to v4.1.10
+- **Update**: Updated create-mcp-use-app to v2.0.6
+</Update>
+
+<Update label="v2.4.0" description="September 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=2.4.0&title=Convex%20OAuth%20provider&date=2026-09&lang=typescript" alt="Release 2.4.0" />
+  </Frame>
+  ## Convex OAuth provider
+  Minor release adding a built-in Convex verifier, failing screenshots on MCP App init errors, and stopping client OAuth retries after disconnect.
+
+- **New** (server/oauth): `oauthConvexProvider` verifies Convex OAuth Provider JWTs and exports from `mcp-use/oauth/convex` (`#2372`)
+- **Fix** (@mcp-use/client): OAuth authorization retries stop after the client disconnects (`#2367`)
+- **Fix** (@mcp-use/client): `listAllResources` holds one client reference across pagination so a mid-list disconnect surfaces the transport error instead of `TypeError` (`#2387`)
+- **Fix** (@mcp-use/cli): `mcp-use screenshot` fails with `view_load_failed` instead of writing a PNG when the MCP App fails to initialize (`#2355`)
+- **Enhancement** (@mcp-use/inspector): RPC traffic shows request duration instead of wall-clock time; see the Inspector changelog (`#2364`)
+- **Enhancement** (@mcp-use/inspector): embedded client-side chats can configure up to 100 agent steps; see the Inspector changelog (`#2401`)
+- **Documentation**: Convex provider guide under v2 TypeScript authentication (`#2372`)
+- **Documentation** (@mcp-use/cli): CLI reference corrections for org use, `logout --yes`, `deployments`, `client remove --json`, and removal of non-existent deploy flags (`#2376`, `#2379`, `#2380`, `#2382`)
+- **Update**: Updated @mcp-use/inspector to v20.3.4
+- **Update**: Updated @mcp-use/cli to v4.1.9
+</Update>
+
 <Update label="v2.3.4" description="August 2026">
   ## Compact request logs & OAuth-ready tokens
   Patch release collapsing MCP request logs to one line, projecting React OAuth tokens before ready, and using native Windows file watching in `mcp-use dev`.

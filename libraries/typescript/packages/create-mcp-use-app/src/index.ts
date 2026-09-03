@@ -758,7 +758,6 @@ Options:
   --no-install              Skip installing dependencies
   --skills                  Install skills for all agents
   --no-skills               Skip installing skills
-  --no-git                  Skip initializing a git repository
   --dev                     Use workspace dependencies for development
   --sdk-version <version>   Pin mcp-use to an npm version or dist-tag (e.g. canary, 1.34.0)
   --npm                     Use npm as package manager
