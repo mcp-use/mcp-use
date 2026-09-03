@@ -4,7 +4,10 @@ import { join } from "node:path";
 
 import semver from "semver";
 
-import { packedArtifactErrors } from "./release-artifact.mjs";
+import {
+  packedArtifactErrors,
+  packedFilesFromNpmPackJson,
+} from "./release-artifact.mjs";
 
 const workspaceRoot = process.cwd();
 const packageRoot = join(workspaceRoot, "packages");
@@ -48,11 +51,13 @@ function packedFiles(name, version) {
       `could not inspect ${name}@${version}: ${result.stderr || result.stdout}`
     );
   }
-  const [packed] = JSON.parse(result.stdout);
-  if (!packed?.files) {
-    throw new Error(`npm pack returned no file list for ${name}@${version}`);
+  try {
+    return packedFilesFromNpmPackJson(result.stdout);
+  } catch (error) {
+    throw new Error(
+      `could not parse npm pack file list for ${name}@${version}: ${error.message}`
+    );
   }
-  return packed.files;
 }
 
 function verifyPackedArtifact(release) {

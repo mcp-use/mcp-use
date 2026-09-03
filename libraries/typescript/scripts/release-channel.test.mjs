@@ -7,6 +7,7 @@ import test from "node:test";
 
 import {
   packedArtifactErrors,
+  packedFilesFromNpmPackJson,
   requiredPackedEntries,
 } from "./release-artifact.mjs";
 
@@ -118,6 +119,18 @@ test("requires declared package files and entry points in packed artifacts", () 
       requiredPackedEntries(manifest).exact.map((path) => ({ path }))
     ),
     []
+  );
+});
+
+test("accepts both npm pack JSON result shapes", () => {
+  const packed = { files: [{ path: "package.json" }] };
+  assert.deepEqual(
+    packedFilesFromNpmPackJson(JSON.stringify([packed])),
+    packed.files
+  );
+  assert.deepEqual(
+    packedFilesFromNpmPackJson(JSON.stringify(packed)),
+    packed.files
   );
 });
 
