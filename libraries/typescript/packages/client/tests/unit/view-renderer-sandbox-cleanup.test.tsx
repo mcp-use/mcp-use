@@ -173,4 +173,60 @@ describe("ViewRenderer sandbox lifecycle cleanup", () => {
       expect.any(Function)
     );
   });
+
+  it("handles default handshake timeout in ViewRenderer and transitions to error status", async () => {
+    vi.useFakeTimers();
+    const sandboxWindow = {} as Window;
+    const lifecycleEvents: ViewLifecycleEvent[] = [];
+    const onError = vi.fn();
+    const removeEventListenerSpy = vi.spyOn(window, "removeEventListener");
+    let renderer!: ReactTestRenderer;
+
+    await act(async () => {
+      renderer = create(
+        <ViewRenderer
+          viewId="default-timeout-test"
+          source={source}
+          sandboxUrl={sandboxUrl}
+          onError={onError}
+          onLifecycleChange={(event) => lifecycleEvents.push(event)}
+        />,
+        {
+          createNodeMock: (element) =>
+            element.type === "iframe"
+              ? {
+                  contentWindow: sandboxWindow,
+                  setAttribute: vi.fn(),
+                  src: "",
+                }
+              : {},
+        }
+      );
+    });
+
+    expect(lifecycleEvents).toContainEqual({ status: "connecting" });
+
+    // Advance timers past default 15s handshake timeout
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(16000);
+    });
+
+    expect(onError).toHaveBeenCalledWith(
+      expect.stringContaining("Sandbox proxy did not become ready")
+    );
+    expect(lifecycleEvents).toContainEqual(
+      expect.objectContaining({
+        status: "error",
+        error: expect.stringContaining("Sandbox proxy did not become ready"),
+      })
+    );
+    expect(removeEventListenerSpy).toHaveBeenCalledWith(
+      "message",
+      expect.any(Function)
+    );
+
+    await act(async () => {
+      renderer.unmount();
+    });
+  });
 });

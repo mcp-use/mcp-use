@@ -75,6 +75,7 @@ export function waitForSandboxProxyReady(
   iframe: HTMLIFrameElement,
   options?: { signal?: AbortSignal; timeoutMs?: number }
 ): Promise<void> {
+  const timeoutMs = options?.timeoutMs ?? 15_000;
   return new Promise((resolve, reject) => {
     let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -105,15 +106,13 @@ export function waitForSandboxProxyReady(
     }
     options?.signal?.addEventListener("abort", onAbort, { once: true });
 
-    if (options?.timeoutMs !== undefined && options.timeoutMs > 0) {
+    if (timeoutMs > 0 && timeoutMs !== Infinity) {
       timer = setTimeout(() => {
         cleanup();
         reject(
-          new Error(
-            `Sandbox proxy did not become ready within ${options.timeoutMs}ms`
-          )
+          new Error(`Sandbox proxy did not become ready within ${timeoutMs}ms`)
         );
-      }, options.timeoutMs);
+      }, timeoutMs);
     }
 
     window.addEventListener("message", listener);
