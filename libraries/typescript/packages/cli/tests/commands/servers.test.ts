@@ -86,6 +86,41 @@ describe("server environment output safety", () => {
   });
 });
 
+describe("server environment deletion", () => {
+  it("fails instead of reporting a delete that never happened", async () => {
+    // The key exists in production, but the caller scoped the unset to a branch.
+    api.request.mockResolvedValueOnce([
+      { id: "env_1", key: "TOKEN", branch: null },
+    ]);
+    const stderr = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+
+    await expect(
+      runServers([
+        "env",
+        "unset",
+        "server_1",
+        "TOKEN",
+        "--branch",
+        "feature",
+        "--yes",
+        "--json",
+      ])
+    ).resolves.toBe(1);
+
+    // Only the lookup ran; nothing was deleted.
+    expect(api.request).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(stderr.mock.calls.flat().join(""))).toEqual({
+      error: {
+        code: "env_variable_not_found",
+        message:
+          "Environment variable not found on server_1 (branch feature): TOKEN",
+      },
+    });
+  });
+});
+
 describe("server human output", () => {
   it("renders a compact list instead of raw API JSON", async () => {
     api.request.mockResolvedValue({
