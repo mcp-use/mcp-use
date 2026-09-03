@@ -25,6 +25,11 @@ const provider = oauthBetterAuthProvider({
   resourceName: "mcp-use mixed OAuth demo",
 });
 const auth = createDemoAuth({ origin: origin.origin, resource: resource.href });
+// Remove this cast with the workaround in auth.ts once Better Auth #10213 lands.
+const metadataAuth = auth as unknown as Parameters<
+  typeof oauthProviderAuthServerMetadata
+>[0] &
+  Parameters<typeof oauthProviderOpenIdConfigMetadata>[0];
 
 const server = new MCPServer({
   name: "mixed-oauth-demo",
@@ -88,8 +93,8 @@ server.tool(
   })
 );
 
-const authServerMetadata = oauthProviderAuthServerMetadata(auth);
-const openIdConfiguration = oauthProviderOpenIdConfigMetadata(auth);
+const authServerMetadata = oauthProviderAuthServerMetadata(metadataAuth);
+const openIdConfiguration = oauthProviderOpenIdConfigMetadata(metadataAuth);
 
 // Better Auth uses a pathful issuer. Expose both RFC 8414 discovery forms and
 // its issuer-appended OIDC form so SDK discovery works in every supported era.
