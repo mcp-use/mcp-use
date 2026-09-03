@@ -242,6 +242,7 @@ function validateReleasePlan(channel, planFile) {
   const errors = [];
 
   for (const release of plan.releases ?? []) {
+    if (release.type === "none") continue;
     const plannedMajor =
       release.type === "major" ||
       semver.major(release.newVersion) > semver.major(release.oldVersion);

@@ -414,6 +414,53 @@ test("accepts a Canary major with an explicit major changeset", () => {
   assert.equal(result.status, 0, result.stderr);
 });
 
+test("ignores unchanged packages in a Canary release plan", () => {
+  const { root, registryFile } = fixture({
+    localVersion: "2.0.4",
+    latest: "2.0.4",
+    canary: "2.0.4-canary.0",
+    published: ["2.0.4"],
+  });
+  const planFile = join(root, "changeset-status.json");
+  writeFileSync(
+    planFile,
+    JSON.stringify({
+      changesets: [
+        {
+          id: "client-fix",
+          releases: [{ name: "@mcp-use/client", type: "patch" }],
+        },
+      ],
+      releases: [
+        {
+          name: "@mcp-use/client",
+          type: "patch",
+          oldVersion: "2.2.4",
+          newVersion: "2.2.5-canary.0",
+        },
+        {
+          name: "@mcp-use/cli",
+          type: "none",
+          oldVersion: "4.1.10",
+          newVersion: "4.1.10",
+        },
+      ],
+      preState: { mode: "pre", tag: "canary" },
+    })
+  );
+
+  const result = run(
+    root,
+    registryFile,
+    "validate",
+    "--channel",
+    "canary",
+    "--plan",
+    planFile
+  );
+  assert.equal(result.status, 0, result.stderr);
+});
+
 test("registry verification accepts a completed target after a publish error", () => {
   const { root, registryFile } = fixture({
     localVersion: "2.0.5-canary.0",
