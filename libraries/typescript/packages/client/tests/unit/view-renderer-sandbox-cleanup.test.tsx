@@ -9,7 +9,7 @@ import type {
   ViewRendererSource,
 } from "../../src/react/view/types.js";
 
-describe("ViewRenderer sandbox cleanup & timeout", () => {
+describe("ViewRenderer sandbox lifecycle cleanup", () => {
   const source: ViewRendererSource = {
     kind: "preloaded",
     html: "<html><body>widget</body></html>",
@@ -24,8 +24,10 @@ describe("ViewRenderer sandbox cleanup & timeout", () => {
     vi.restoreAllMocks();
   });
 
-  it("removes window message listener when unmounted before proxy ready", async () => {
+  it("removes window message listener and cancels silently when unmounted before proxy ready", async () => {
     const sandboxWindow = {} as Window;
+    const onError = vi.fn();
+    const lifecycleEvents: ViewLifecycleEvent[] = [];
     let renderer!: ReactTestRenderer;
     const addEventListenerSpy = vi.spyOn(window, "addEventListener");
     const removeEventListenerSpy = vi.spyOn(window, "removeEventListener");
@@ -36,6 +38,8 @@ describe("ViewRenderer sandbox cleanup & timeout", () => {
           viewId="cleanup-test"
           source={source}
           sandboxUrl={sandboxUrl}
+          onError={onError}
+          onLifecycleChange={(event) => lifecycleEvents.push(event)}
         />,
         {
           createNodeMock: (element) =>
@@ -67,6 +71,12 @@ describe("ViewRenderer sandbox cleanup & timeout", () => {
     );
     expect(messageRemoveCalls.length).toBeGreaterThanOrEqual(
       messageAddCalls.length
+    );
+
+    // Unmount should cancel silently without triggering onError or error lifecycle event
+    expect(onError).not.toHaveBeenCalled();
+    expect(lifecycleEvents).not.toContainEqual(
+      expect.objectContaining({ status: "error" })
     );
   });
 
@@ -109,62 +119,6 @@ describe("ViewRenderer sandbox cleanup & timeout", () => {
     });
 
     // The ready listener should clean itself up upon resolution
-    expect(removeEventListenerSpy).toHaveBeenCalledWith(
-      "message",
-      expect.any(Function)
-    );
-
-    await act(async () => {
-      renderer.unmount();
-    });
-  });
-
-  it("handles sandbox handshake timeout, transitions to error status, and cleans up listener", async () => {
-    vi.useFakeTimers();
-    const sandboxWindow = {} as Window;
-    const lifecycleEvents: ViewLifecycleEvent[] = [];
-    const onError = vi.fn();
-    const removeEventListenerSpy = vi.spyOn(window, "removeEventListener");
-    let renderer!: ReactTestRenderer;
-
-    await act(async () => {
-      renderer = create(
-        <ViewRenderer
-          viewId="timeout-test"
-          source={source}
-          sandboxUrl={sandboxUrl}
-          onError={onError}
-          onLifecycleChange={(event) => lifecycleEvents.push(event)}
-        />,
-        {
-          createNodeMock: (element) =>
-            element.type === "iframe"
-              ? {
-                  contentWindow: sandboxWindow,
-                  setAttribute: vi.fn(),
-                  src: "",
-                }
-              : {},
-        }
-      );
-    });
-
-    expect(lifecycleEvents).toContainEqual({ status: "connecting" });
-
-    // Advance timers past default 15s handshake timeout
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(16000);
-    });
-
-    expect(onError).toHaveBeenCalledWith(
-      expect.stringContaining("Sandbox proxy did not become ready")
-    );
-    expect(lifecycleEvents).toContainEqual(
-      expect.objectContaining({
-        status: "error",
-        error: expect.stringContaining("Sandbox proxy did not become ready"),
-      })
-    );
     expect(removeEventListenerSpy).toHaveBeenCalledWith(
       "message",
       expect.any(Function)

@@ -72,15 +72,11 @@ function CloseIcon() {
 
 function waitForSandboxProxyReady(
   iframe: HTMLIFrameElement,
-  options?: { timeoutMs?: number; signal?: AbortSignal }
+  options?: { signal?: AbortSignal }
 ): Promise<void> {
-  const timeoutMs = options?.timeoutMs ?? 15_000;
   return new Promise((resolve, reject) => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-
     const cleanup = () => {
       window.removeEventListener("message", listener);
-      if (timer !== undefined) clearTimeout(timer);
       options?.signal?.removeEventListener("abort", onAbort);
     };
 
@@ -104,15 +100,6 @@ function waitForSandboxProxyReady(
       return;
     }
     options?.signal?.addEventListener("abort", onAbort, { once: true });
-
-    if (timeoutMs > 0 && timeoutMs !== Infinity) {
-      timer = setTimeout(() => {
-        cleanup();
-        reject(
-          new Error(`Sandbox proxy did not become ready within ${timeoutMs}ms`)
-        );
-      }, timeoutMs);
-    }
 
     window.addEventListener("message", listener);
   });
