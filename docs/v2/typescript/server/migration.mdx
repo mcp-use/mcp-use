@@ -280,6 +280,9 @@ v2 elicitation returns an input-required result and re-runs the handler when
 the client supplies input:
 
 ```typescript
+import { acceptedContent, inputRequired, inputResponse } from "mcp-use";
+import { z } from "zod";
+
 const confirmationSchema = z.object({ confirmed: z.boolean() });
 
 const response = inputResponse(ctx.inputResponses, "confirm-booking");
