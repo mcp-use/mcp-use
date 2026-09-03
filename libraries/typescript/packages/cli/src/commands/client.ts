@@ -184,7 +184,7 @@ async function remove(argv: readonly string[], json: boolean): Promise<number> {
   });
   const name = one(positionals, "mcp-use client remove <name>");
   const saved = await readServers();
-  if (saved.servers[name] === undefined) {
+  if (!Object.hasOwn(saved.servers, name)) {
     throw new UsageError(
       `Unknown saved server: ${name}. Run \`mcp-use client list\` to see saved servers.`
     );
