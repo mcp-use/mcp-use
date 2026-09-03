@@ -10,5 +10,7 @@
     "mcp-use": "2.4.2",
     "@mcp-use/tunnel": "0.2.0"
   },
-  "changesets": []
+  "changesets": [
+    "olive-pianos-repeat"
+  ]
 }
