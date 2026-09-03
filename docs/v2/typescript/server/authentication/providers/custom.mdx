@@ -82,7 +82,9 @@ export default server;
 
 `createTokenVerifier(resource)` receives the resolved canonical MCP resource. The verifier must validate token signature or introspection, issuer, expiry, and that resource, then return SDK auth information including `scopes`, `expiresAt`, and the validated `resource`.
 
-If your authorization server issues standard JWTs, `createJwtVerifier` does all of that for you, and is the same helper the built-in providers use. Given a `jwksUrl` it checks the signature, the issuer, the required `exp` and `sub` claims, and the resource binding, then returns the auth information in the shape the SDK expects. Pass `audience` when the provider's JWT audience differs from the MCP resource. With no `audience`, the token must carry a matching RFC 8707 `resource` claim or an `aud` claim containing the resource URL.
+If your authorization server issues standard JWTs, `createJwtVerifier` does all of that for you and is the same helper the built-in providers use. Given a `jwksUrl`, it checks the signature, issuer, required `exp` and `sub` claims, and resource binding. It then returns the auth information in the shape the SDK expects.
+
+For standards-conformant JWT access tokens, the verifier checks the [`aud` claim](https://www.rfc-editor.org/rfc/rfc7519.html#section-4.1.3) for the MCP resource URL. The `aud` claim can be a string or an array containing the resource URL. [RFC 8707](https://www.rfc-editor.org/rfc/rfc8707.html#section-2) defines `resource` as an authorization and token request parameter, not as a JWT access-token claim. For compatibility with providers that include a non-standard `resource` claim, the verifier accepts a string-valued `resource` claim equal to the MCP resource URL and uses it instead of `aud`. Pass `audience` when the provider's JWT audience differs from the MCP resource.
 
 Write the verifier by hand when the provider does not issue JWTs, for example when you have to call a token introspection endpoint.
 
