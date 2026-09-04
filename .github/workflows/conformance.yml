@@ -51,6 +51,9 @@ jobs:
   # Detect which languages had changes so we only run the relevant tests.
   # On workflow_dispatch the manual inputs take precedence instead.
   detect-changes:
+    permissions:
+      contents: read
+      pull-requests: read
     runs-on: ubuntu-latest
     outputs:
       python: ${{ steps.compute.outputs.python }}
@@ -156,7 +159,7 @@ jobs:
   typescript-v2-conformance-test:
     name: TypeScript Conformance Tests (v2; legacy + modern modes)
     needs: detect-changes
-    if: needs.detect-changes.outputs.typescript == 'true'
+    if: needs.detect-changes.outputs.typescript == 'true' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 

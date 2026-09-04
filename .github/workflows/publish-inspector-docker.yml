@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: publish-inspector-docker-${{ github.event.workflow_run.head_sha || github.run_id }}
+  group: publish-inspector-docker
   cancel-in-progress: false
 
 jobs:
@@ -22,14 +22,43 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: read
+    timeout-minutes: 30
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
+      - name: Find verified release marker
+        id: marker
+        if: github.event_name == 'workflow_run'
+        uses: actions/github-script@v9
         with:
-          ref: ${{ github.event.workflow_run.head_sha || 'main' }}
+          script: |
+            const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
+              ...context.repo, run_id: context.payload.workflow_run.id,
+            });
+            core.setOutput('exists', artifacts.some(a => a.name === 'railway-deploy-marker' && !a.expired));
+      - uses: actions/download-artifact@v8
+        if: steps.marker.outputs.exists == 'true'
+        with:
+          name: railway-deploy-marker
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: release-marker
+      - name: Read verified source revision
+        id: source
+        if: steps.marker.outputs.exists == 'true'
+        shell: bash
+        run: |
+          sha=$(sed -n 's/^sha=//p' release-marker/railway-deploy-marker.txt)
+          [[ "$sha" =~ ^[a-f0-9]{40}$ ]] || exit 1
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      - name: Checkout source
+        if: github.event_name == 'workflow_dispatch' || steps.marker.outputs.exists == 'true'
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.source.outputs.sha || 'main' }}
           fetch-depth: 0
 
       - name: Determine stable Inspector version
+        if: github.event_name == 'workflow_dispatch' || steps.marker.outputs.exists == 'true'
         id: version
         run: |
           set -euo pipefail

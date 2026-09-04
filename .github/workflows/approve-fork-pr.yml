@@ -29,7 +29,6 @@ jobs:
       branch: ${{ steps.promote.outputs.branch }}
       python: ${{ steps.changed.outputs.python }}
       typescript: ${{ steps.changed.outputs.typescript }}
-      create_mcp_use_app: ${{ steps.changed.outputs.create_mcp_use_app }}
     steps:
       - name: Promote PR head into base-repo branch
         id: promote
@@ -71,12 +70,10 @@ jobs:
 
             const python = paths.some(p => p.startsWith('libraries/python/'));
             const ciChanged = paths.includes('.github/workflows/ci.yml') || paths.includes('.github/workflows/approve-fork-pr.yml');
-            const typescript = ciChanged || paths.some(p => p.startsWith('libraries/typescript/'));
-            const create_mcp_use_app = ciChanged || paths.some(p => p.startsWith('libraries/typescript/packages/create-mcp-use-app/'));
+            const typescript = ciChanged || paths.some(p => p.startsWith('libraries/typescript/') || p.startsWith('.github/workflows/typescript-') || p.startsWith('.github/actions/setup-typescript/') || p.startsWith('.github/scripts/'));
 
             core.setOutput('python', String(python));
             core.setOutput('typescript', String(typescript));
-            core.setOutput('create_mcp_use_app', String(create_mcp_use_app));
 
       - name: Comment on PR with promoted branch
         uses: actions/github-script@v7
@@ -104,6 +101,4 @@ jobs:
       ref: ${{ needs.promote.outputs.sha }}
       python: ${{ needs.promote.outputs.python == 'true' }}
       typescript: ${{ needs.promote.outputs.typescript == 'true' }}
-      create_mcp_use_app: ${{ needs.promote.outputs.create_mcp_use_app == 'true' }}
-      run_changeset_check: false
     secrets: inherit

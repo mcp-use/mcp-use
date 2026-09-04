@@ -1,0 +1,50 @@
+name: TypeScript checks
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Exact commit to test
+        required: true
+        type: string
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: typescript-checks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  MCP_USE_ANONYMIZED_TELEMETRY: "false"
+  HUSKY: "0"
+
+jobs:
+  check:
+    name: TypeScript checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: libraries/typescript
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup-typescript
+      - name: Build workspace once
+        run: pnpm build
+      - name: Check formatting and lint
+        run: pnpm format:check && pnpm lint
+      - name: Check unused dependencies
+        run: pnpm exec knip --reporter github-actions
+      - name: Test release tooling
+        run: pnpm test:release-channel
+      - name: Test packages without API credentials
+        run: pnpm test:ci
+      - name: Check stable promotion baseline
+        if: github.event_name == 'pull_request' && github.base_ref == 'main' && github.head_ref == 'canary'
+        run: pnpm release-channel preflight --channel stable

@@ -1,162 +1,108 @@
 name: Create App E2E (Canary)
 
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: [TypeScript Release]
+    types: [completed]
+    branches: [canary]
+
 permissions:
   actions: read
   contents: read
 
-on:
-  workflow_dispatch:
-  workflow_run:
-    workflows: ["TypeScript Release"]
-    types:
-      - completed
-    branches:
-      - canary
+concurrency:
+  group: create-app-canary
+  cancel-in-progress: true
 
 jobs:
-  check-published:
-    name: Check if packages were published
-    runs-on: ubuntu-latest
+  versions:
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
-      should_run: ${{ steps.check.outputs.should_run }}
+      run: ${{ steps.versions.outputs.run }}
+      scaffolder: ${{ steps.versions.outputs.scaffolder }}
+      sdk: ${{ steps.versions.outputs.sdk }}
     steps:
-      - name: Download deployment marker
+      - name: Find verified release marker
+        id: marker
         if: github.event_name == 'workflow_run'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
+              ...context.repo, run_id: context.payload.workflow_run.id,
+            });
+            core.setOutput('exists', artifacts.some(a => a.name === 'railway-deploy-marker' && !a.expired));
+      - uses: actions/download-artifact@v8
+        if: steps.marker.outputs.exists == 'true'
         with:
           name: railway-deploy-marker
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
-      
-      - name: Check if packages were published
-        id: check
+      - name: Select exact npm versions
+        id: versions
         env:
-          EVENT_NAME: ${{ github.event_name }}
+          EVENT: ${{ github.event_name }}
         run: |
-          if [ "$EVENT_NAME" == "workflow_dispatch" ]; then
-            echo "should_run=true" >> $GITHUB_OUTPUT
-            echo "Manual trigger, will run e2e tests"
-          elif [ -f .railway-deploy-marker ] && grep -q "packages_published=true" .railway-deploy-marker; then
-            echo "should_run=true" >> $GITHUB_OUTPUT
-            echo "Packages were published, will run e2e tests"
+          if [ "$EVENT" = workflow_dispatch ]; then
+            scaffolder=$(npm view --prefer-online create-mcp-use-app@latest version)
+            sdk=$(npm view --prefer-online mcp-use@canary version)
+          elif [ -f railway-deploy-marker.txt ]; then
+            scaffolder=$(sed -n 's/^scaffolder=//p' railway-deploy-marker.txt)
+            sdk=$(sed -n 's/^sdk=//p' railway-deploy-marker.txt)
           else
-            echo "should_run=false" >> $GITHUB_OUTPUT
-            echo "No packages were published, skipping e2e tests"
+            echo 'run=false' >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          [[ "$scaffolder" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-canary\.[0-9]+)?$ ]] || exit 1
+          [[ "$sdk" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-canary\.[0-9]+)?$ ]] || exit 1
+          printf 'run=true\nscaffolder=%s\nsdk=%s\n' "$scaffolder" "$sdk" >> "$GITHUB_OUTPUT"
 
-  wait-for-npm:
-    name: Wait for packages on npm
-    needs: check-published
-    if: needs.check-published.outputs.should_run == 'true'
+  smoke:
+    needs: versions
+    if: needs.versions.outputs.run == 'true'
+    name: Scaffold / ${{ matrix.pm }} / ${{ matrix.template }}
     runs-on: ubuntu-latest
-    steps:
-      - name: Wait for canary packages to be available on npm
-        run: |
-          echo "Waiting for canary packages to be available on npm..."
-          
-          MAX_RETRIES=30
-          SLEEP_TIME=20
-          
-          for i in $(seq 1 $MAX_RETRIES); do
-            echo "Attempt $i/$MAX_RETRIES: Checking npm registry..."
-            
-            # Check all three packages
-            if npm view mcp-use@canary version && \
-               npm view @mcp-use/cli@canary version && \
-               npm view @mcp-use/inspector@canary version; then
-              echo "All canary packages are available on npm"
-              exit 0
-            fi
-            
-            echo "Packages not yet available, waiting ${SLEEP_TIME}s..."
-            sleep $SLEEP_TIME
-          done
-          
-          echo "Timeout waiting for canary packages"
-          exit 1
-
-  e2e-npm:
-    name: e2e/npm/${{ matrix.template }}
-    needs: wait-for-npm
-    runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
+        pm: [npm, yarn]
         template: [starter, mcp-apps, blank]
+    env:
+      SCAFFOLDER: ${{ needs.versions.outputs.scaffolder }}
+      SDK: ${{ needs.versions.outputs.sdk }}
+      MCP_USE_ANONYMIZED_TELEMETRY: "false"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
-      
-      - name: Create app with npm and sdk-version canary
-        run: |
-          npx create-mcp-use-app@canary test-app-${{ matrix.template }} --template ${{ matrix.template }} --sdk-version canary
-          echo "Project created successfully"
-      
-      - name: Install dependencies
-        working-directory: test-app-${{ matrix.template }}
-        run: |
-          npm install
-          echo "Dependencies installed"
-      
-      - name: Run dev server and kill it
-        working-directory: test-app-${{ matrix.template }}
-        run: |
-          npm run dev &
-          DEV_PID=$!
-          sleep 5
-          kill $DEV_PID 2>/dev/null || true
-          wait $DEV_PID 2>/dev/null || true
-          echo "Dev server started and stopped successfully"
-      
-      - name: Build project
-        working-directory: test-app-${{ matrix.template }}
-        run: |
-          npm run build
-          echo "Build completed successfully"
-
-  e2e-yarn:
-    name: e2e/yarn/${{ matrix.template }}
-    needs: wait-for-npm
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        template: [starter, mcp-apps, blank]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - name: Setup Yarn
+          node-version: "24"
+      - if: matrix.pm == 'yarn'
         run: corepack enable
-      
-      - name: Create app with yarn and sdk-version canary
+      - name: Generate app with the verified versions
         run: |
-          yarn dlx create-mcp-use-app@canary test-app-${{ matrix.template }} --template ${{ matrix.template }} --sdk-version canary
-          echo "Project created successfully"
-      
-      - name: Install dependencies
-        working-directory: test-app-${{ matrix.template }}
+          if [ '${{ matrix.pm }}' = npm ]; then
+            npx --yes "create-mcp-use-app@$SCAFFOLDER" test-app --template '${{ matrix.template }}' --sdk-version "$SDK"
+          else
+            yarn dlx "create-mcp-use-app@$SCAFFOLDER" test-app --template '${{ matrix.template }}' --sdk-version "$SDK"
+          fi
+      - name: Install and build generated app
+        working-directory: test-app
         run: |
-          yarn install
-          echo "Dependencies installed"
-      
-      - name: Run dev server and kill it
-        working-directory: test-app-${{ matrix.template }}
+          ${{ matrix.pm }} install
+          ${{ matrix.pm }} run build
+      - name: Observe dev server readiness
+        working-directory: test-app
         run: |
-          yarn dev &
-          DEV_PID=$!
-          sleep 5
-          kill $DEV_PID 2>/dev/null || true
-          wait $DEV_PID 2>/dev/null || true
-          echo "Dev server started and stopped successfully"
-      
-      - name: Build project
-        working-directory: test-app-${{ matrix.template }}
-        run: |
-          yarn build
-          echo "Build completed successfully"
+          ${{ matrix.pm }} run dev > dev.log 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 60); do
+            if curl --silent --output /dev/null --fail http://127.0.0.1:3000/mcp; then exit 0; fi
+            sleep 1
+          done
+          cat dev.log
+          echo '::error::Generated app did not become ready'
+          exit 1

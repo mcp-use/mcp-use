@@ -1,0 +1,183 @@
+name: TypeScript scaffold compatibility
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: typescript-scaffold-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  create-mcp-use-app-build:
+    name: "typescript/create-mcp-use-app/build"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.13.1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.23.1
+          cache: "pnpm"
+          cache-dependency-path: libraries/typescript/pnpm-lock.yaml
+      - name: Install Dependencies
+        working-directory: libraries/typescript
+        run: pnpm install --frozen-lockfile
+      - name: Build All Packages
+        working-directory: libraries/typescript
+        run: pnpm build
+      - name: Run create-mcp-use-app Unit Tests
+        working-directory: libraries/typescript
+        run: pnpm --filter create-mcp-use-app test
+      - name: Pack create-mcp-use-app
+        working-directory: libraries/typescript/packages/create-mcp-use-app
+        run: npm pack
+      - name: Pack @mcp-use/cli
+        working-directory: libraries/typescript/packages/cli
+        run: npm pack
+      - name: Pack @mcp-use/inspector
+        working-directory: libraries/typescript/packages/inspector
+        run: npm pack
+      - name: Pack mcp-use
+        working-directory: libraries/typescript/packages/server
+        run: npm pack
+      - name: Upload All Package Artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: workspace-packages
+          path: |
+            libraries/typescript/packages/create-mcp-use-app/create-mcp-use-app-*.tgz
+            libraries/typescript/packages/server/mcp-use-*.tgz
+            libraries/typescript/packages/cli/mcp-use-cli-*.tgz
+            libraries/typescript/packages/inspector/mcp-use-inspector-*.tgz
+          retention-days: 1
+
+  create-mcp-use-app-tests:
+    needs: create-mcp-use-app-build
+    name: "typescript/create-app-tests"
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        pm: [npm, yarn, pnpm]
+        template: [starter, mcp-apps, blank]
+        flag: ["", "--dev"]
+        exclude:
+          # Only test --dev on ubuntu with npm
+          - os: macos-latest
+            flag: "--dev"
+          - os: windows-latest
+            flag: "--dev"
+          - pm: yarn
+            flag: "--dev"
+          - pm: pnpm
+            flag: "--dev"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: pnpm/action-setup@v4
+        if: matrix.pm == 'pnpm'
+        with:
+          version: 11.13.1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.23.1
+      - name: Setup Yarn
+        if: matrix.pm == 'yarn'
+        run: corepack enable
+      - name: Download Package Artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: workspace-packages
+          path: ./packages
+      - name: Test CLI Creation
+        shell: bash
+        run: |
+          # Get package path
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            PACKAGE_PATH=$(powershell -Command "(Get-ChildItem -Recurse -Filter 'create-mcp-use-app-*.tgz' | Select-Object -First 1).FullName")
+          else
+            PACKAGE_PATH=$(realpath $(find ./packages -name 'create-mcp-use-app-*.tgz' -type f | head -n1))
+          fi
+
+          # Run create command based on PM
+          case "${{ matrix.pm }}" in
+            npm)
+              npx --yes --package="$PACKAGE_PATH" create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }}
+              ;;
+            yarn)
+              yarn dlx -p "create-mcp-use-app@file:$PACKAGE_PATH" create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }}
+              ;;
+            pnpm)
+              pnpm --package="$PACKAGE_PATH" dlx create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }}
+              ;;
+          esac
+
+          # Verify creation
+          [ -d "test-app" ] || exit 1
+          [ -f "test-app/package.json" ] || exit 1
+          [ -f "test-app/index.ts" ] || exit 1
+          echo "✅ Project created successfully"
+
+      - name: Test dev command (non --dev flag only)
+        if: matrix.flag == ''
+        shell: bash
+        working-directory: test-app
+        run: |
+          # Start dev server in background
+          case "${{ matrix.pm }}" in
+            npm)
+              npm run dev &
+              ;;
+            yarn)
+              yarn dev &
+              ;;
+            pnpm)
+              pnpm dev &
+              ;;
+          esac
+
+          DEV_PID=$!
+
+          # Readiness must be observed before cleanup; a crashed process fails.
+          ready=false
+          for attempt in $(seq 1 60); do
+            if curl --silent --output /dev/null --fail http://127.0.0.1:3000/mcp; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" != true ]; then
+            echo "::error::Generated application's dev server did not become ready"
+            exit 1
+          fi
+
+          # Kill the dev server
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            # On Windows, kill by port is more reliable than DEV_PID
+            # because bash's $! may not map to the actual Windows process ID
+            DEV_PORT=3000
+            for pid in $(netstat -ano 2>/dev/null | grep ":$DEV_PORT " | grep "LISTENING" | awk '{print $5}' | sort -u); do
+              taskkill //PID $pid //F 2>/dev/null || true
+            done
+            # Also try the process tree kill as fallback
+            taskkill //PID $DEV_PID //T //F 2>/dev/null || true
+          else
+            kill $DEV_PID 2>/dev/null || true
+          fi
+
+          # Wait for process to exit
+          wait $DEV_PID 2>/dev/null || true
+
+          echo "✅ Dev server started and stopped successfully"

@@ -594,3 +594,90 @@ test("registry verification rejects an unrelated dist-tag change", () => {
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /unrelated dist-tags changed/u);
 });
+
+test("recovers a published canary without a git tag using npm's source revision", () => {
+  const { root, registryFile } = fixture({
+    localVersion: "2.0.5-canary.0",
+    latest: "2.0.4",
+    canary: "2.0.5-canary.0",
+    published: ["2.0.5-canary.0"],
+  });
+  const metadata = JSON.parse(readFileSync(registryFile, "utf8"));
+  const sourceSha = "a".repeat(40);
+  metadata["mcp-use"].versions["2.0.5-canary.0"].gitHead = sourceSha;
+  writeFileSync(registryFile, JSON.stringify(metadata));
+  const planFile = join(root, "plan.json");
+  const result = run(
+    root,
+    registryFile,
+    "snapshot",
+    "--channel",
+    "canary",
+    "--recover-tags",
+    "true",
+    "--output",
+    planFile
+  );
+  assert.equal(result.status, 0, result.stderr);
+  const recovered = JSON.parse(readFileSync(planFile, "utf8")).releases[0];
+  assert.equal(recovered.target, true);
+  assert.equal(recovered.published, true);
+  assert.equal(recovered.sourceSha, sourceSha);
+});
+
+test("does not invent a source revision for recovery", () => {
+  const { root, registryFile } = fixture({
+    localVersion: "2.0.5-canary.0",
+    latest: "2.0.4",
+    canary: "2.0.5-canary.0",
+    published: ["2.0.5-canary.0"],
+  });
+  const result = run(
+    root,
+    registryFile,
+    "snapshot",
+    "--channel",
+    "canary",
+    "--recover-tags",
+    "true"
+  );
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /npm has no source gitHead/);
+});
+
+test("rejects a different npm tarball even when its version and tag match", () => {
+  const { root, registryFile } = fixture({
+    localVersion: "2.0.5-canary.0",
+    latest: "2.0.4",
+    canary: "2.0.5-canary.0",
+    published: ["2.0.5-canary.0"],
+  });
+  const planFile = join(root, "plan.json");
+  writeFileSync(
+    planFile,
+    JSON.stringify({
+      releases: [
+        {
+          name: "mcp-use",
+          version: "2.0.5-canary.0",
+          target: true,
+          published: false,
+          channelTag: "canary",
+          integrity: "expected-hash",
+          distTagsBefore: { latest: "2.0.4", canary: "2.0.5-canary.0" },
+        },
+      ],
+    })
+  );
+  const result = spawnSync(
+    process.execPath,
+    [script, "verify", "--plan", planFile, "--registry-file", registryFile],
+    {
+      cwd: root,
+      encoding: "utf8",
+      env: { ...process.env, VERIFY_ATTEMPTS: "1" },
+    }
+  );
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /tarball integrity differs/);
+});
