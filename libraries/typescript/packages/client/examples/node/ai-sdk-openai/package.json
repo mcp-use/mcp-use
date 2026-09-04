@@ -1,0 +1,20 @@
+{
+  "name": "@mcp-use/client-ai-sdk-openai-example",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "scripts": {
+    "prestart": "pnpm --dir ../../.. build",
+    "start": "tsx index.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^4.0.58",
+    "@mcp-use/client": "file:../../..",
+    "ai": "^7.0.92"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.13"
+  }
+}
