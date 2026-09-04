@@ -11,7 +11,7 @@ interface CliOptions extends TunnelManagerOptions {
 /** Return standalone command usage text. */
 export function usage(): string {
   return [
-    "Usage: mcp-tunnel <LOCAL_PORT> [--relay RELAY_URL] [--subdomain SUBDOMAIN]",
+    "Usage: mcp-tunnel <LOCAL_PORT> [--relay RELAY_URL] [--subdomain SUBDOMAIN] [--local-host HOST]",
     "",
     "Environment:",
     "  MCP_USE_WS_RELAY  Override the WebSocket relay API origin",
@@ -34,6 +34,14 @@ export function parseArgs(args: readonly string[]): CliOptions {
       const value = args[index + 1];
       if (value === undefined) throw new Error("--subdomain requires a value");
       options.subdomain = value;
+      index += 1;
+    } else if (
+      argument === "--local-host" ||
+      argument === "--local-host-header"
+    ) {
+      const value = args[index + 1];
+      if (value === undefined) throw new Error(`${argument} requires a value`);
+      options.localHostHeader = value;
       index += 1;
     } else if (argument?.startsWith("-")) {
       throw new Error(`Unknown option: ${argument}`);
@@ -64,6 +72,7 @@ export async function runTunnelCli(args: readonly string[]): Promise<void> {
     {
       ...(options.relayUrl !== undefined && { relayUrl: options.relayUrl }),
       ...(options.subdomain !== undefined && { subdomain: options.subdomain }),
+      localHostHeader: options.localHostHeader ?? "localhost",
     }
   );
   const tunnel = await manager.start(options.port);
