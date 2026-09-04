@@ -89,7 +89,7 @@ describe("createAiSdkTools", () => {
     expect(Object.keys(fromDefinitions)).toEqual(["supplied"]);
   });
 
-  it("preserves MCP metadata and uses a dynamic JSON-schema tool", async () => {
+  it("preserves MCP metadata and uses a dependency-free dynamic JSON-schema tool", async () => {
     const { connection } = makeConnection();
     const tools = await createAiSdkTools(connection, { clientName: "cloud" });
     const tool = tools.search as AiSdkTool;
@@ -116,6 +116,9 @@ describe("createAiSdkTools", () => {
 
     const schema = tool.inputSchema as {
       jsonSchema: Record<string, unknown>;
+      validate(value: unknown): { success: true; value: unknown };
+      [Symbol.for("vercel.ai.schema")]: boolean;
+      [Symbol.for("vercel.ai.validator")]: boolean;
     };
     expect(schema.jsonSchema).toEqual({
       type: "object",
@@ -124,11 +127,16 @@ describe("createAiSdkTools", () => {
       },
       required: ["query"],
       $defs: { query: { type: "string" } },
-      additionalProperties: false,
+    });
+    expect(schema[Symbol.for("vercel.ai.schema")]).toBe(true);
+    expect(schema[Symbol.for("vercel.ai.validator")]).toBe(true);
+    expect(schema.validate({ query: "mcp" })).toEqual({
+      success: true,
+      value: { query: "mcp" },
     });
   });
 
-  it("transforms input schemas while applying safe object defaults", async () => {
+  it("preserves the transformed input schema exactly", async () => {
     const { connection } = makeConnection([
       makeTool({
         name: "empty",
@@ -152,7 +160,7 @@ describe("createAiSdkTools", () => {
     expect(schema.jsonSchema).toEqual({
       type: "object",
       properties: { added: { type: "boolean" } },
-      additionalProperties: false,
+      additionalProperties: true,
     });
   });
 
@@ -212,6 +220,15 @@ describe("createAiSdkTools", () => {
     await expect(createAiSdkTools(connection)).rejects.toThrow(
       "Duplicate MCP tool name: search"
     );
+  });
+
+  it("supports a legal MCP tool named __proto__", async () => {
+    const { connection } = makeConnection([makeTool({ name: "__proto__" })]);
+    const tools = await createAiSdkTools(connection);
+
+    expect(Object.hasOwn(tools, "__proto__")).toBe(true);
+    expect(Object.keys(tools)).toEqual(["__proto__"]);
+    expect(tools.__proto__.type).toBe("dynamic");
   });
 
   it.each([

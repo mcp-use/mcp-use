@@ -16,11 +16,22 @@ const packageRoot = resolve(import.meta.dirname, "../..");
 const manifestPath = join(packageRoot, "package.json");
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 
-test("client package declares and exports the provider-utils adapter", () => {
-  assert.equal(manifest.dependencies["@ai-sdk/provider-utils"], "^4.0.19");
-  assert.equal(manifest.peerDependencies["@ai-sdk/provider-utils"], undefined);
-  assert.equal(manifest.dependencies.ai, undefined);
-  assert.equal(manifest.peerDependencies.ai, undefined);
+test("client package exports the adapter without an AI SDK dependency", () => {
+  for (const field of [
+    "dependencies",
+    "devDependencies",
+    "peerDependencies",
+    "optionalDependencies",
+  ]) {
+    const aiSdkDependencies = Object.keys(manifest[field] ?? {}).filter(
+      (name) => name === "ai" || name.startsWith("@ai-sdk/")
+    );
+    assert.deepEqual(
+      aiSdkDependencies,
+      [],
+      `${field} must not contain AI SDK packages`
+    );
+  }
   assert.equal(manifest.dependencies["@modelcontextprotocol/sdk"], undefined);
   assert.equal(manifest.exports["."]["node"].import, "./dist/index.js");
   assert.equal(
@@ -39,6 +50,7 @@ test("built Node and browser declarations expose the adapter", () => {
   assert.match(readFileSync(nodeDeclaration, "utf8"), /adapters\/ai-sdk/);
   assert.match(readFileSync(browserDeclaration, "utf8"), /adapters\/ai-sdk/);
   assert.match(readFileSync(adapterDeclaration, "utf8"), /createAiSdkTools/);
+  assert.doesNotMatch(readFileSync(adapterDeclaration, "utf8"), /@ai-sdk\//);
 });
 
 test("packed client imports without the full ai package", () => {
@@ -92,10 +104,8 @@ test("packed client imports without the full ai package", () => {
     ).trim();
     assert.equal(existsSync(join(consumerDirectory, "node_modules/ai")), false);
     assert.equal(
-      existsSync(
-        join(consumerDirectory, "node_modules/@ai-sdk/provider-utils")
-      ),
-      true
+      existsSync(join(consumerDirectory, "node_modules/@ai-sdk")),
+      false
     );
     assert.equal(importedType, "ok");
   } finally {

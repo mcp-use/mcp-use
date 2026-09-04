@@ -259,9 +259,6 @@ importers:
 
   packages/client:
     dependencies:
-      '@ai-sdk/provider-utils':
-        specifier: ^4.0.19
-        version: 4.0.19(zod@4.4.3)
       '@modelcontextprotocol/client':
         specifier: 2.0.0
         version: 2.0.0
