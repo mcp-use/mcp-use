@@ -30,6 +30,8 @@ import {
   createBrowserOAuthProvider,
   deriveOAuthClientConfigFromClientInfo,
   isOAuthDiscoveryFailure,
+  serializeClientIcons,
+  serializeProxyHeaders,
   startConnectionHealthMonitoring,
   USE_MCP_SERVER_NAME,
 } from "./useMcp-helpers.js";
@@ -132,7 +134,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     storageKeyPrefix = "mcp:auth",
     authProvider: providedAuthProvider,
     headers: headersOption,
-    proxyConfig,
+    proxyConfig: rawProxyConfig,
     oauthProxyUrl: oauthProxyUrlOption,
     connectionMode,
     autoProxyFallback = false,
@@ -155,6 +157,40 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     onElicitation: onElicitationOption,
     oauth: oauthOptions,
   } = options;
+
+  const rawClientInfo = options.clientInfo;
+  const clientInfoName = rawClientInfo?.name;
+  const clientInfoTitle = rawClientInfo?.title;
+  const clientInfoVersion = rawClientInfo?.version;
+  const clientInfoDescription = rawClientInfo?.description;
+  const clientInfoWebsiteUrl = rawClientInfo?.websiteUrl;
+  const serializedClientIcons = serializeClientIcons(rawClientInfo?.icons);
+
+  const clientInfo = useMemo(() => {
+    if (!rawClientInfo) return undefined;
+    return { ...rawClientInfo };
+  }, [
+    clientInfoName,
+    clientInfoTitle,
+    clientInfoVersion,
+    clientInfoDescription,
+    clientInfoWebsiteUrl,
+    serializedClientIcons,
+  ]);
+
+  const rawProxyAddress = rawProxyConfig?.proxyAddress;
+  const serializedProxyHeaders = serializeProxyHeaders(
+    rawProxyConfig?.headers,
+    rawProxyConfig?.customHeaders
+  );
+
+  const proxyConfig = useMemo(() => {
+    if (!rawProxyConfig) return undefined;
+    return { ...rawProxyConfig };
+  }, [rawProxyAddress, serializedProxyHeaders]);
+
+  const headers = headersOption ?? {};
+
   const transportType: TransportType = "http";
   const requestedProxyAddress = proxyConfig?.proxyAddress;
 
@@ -179,7 +215,6 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     return inst;
   }, [url, logLevelOption]);
 
-  const headers = headersOption ?? {};
   const effectiveClientOptions = useMemo(
     () => resolveClientOptions(clientOptions),
     [clientOptions]
@@ -207,10 +242,8 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
 
   const mergedClientInfo = useMemo(
     () =>
-      options.clientInfo
-        ? { ...defaultClientInfo, ...options.clientInfo }
-        : defaultClientInfo,
-    [options.clientInfo, defaultClientInfo]
+      clientInfo ? { ...defaultClientInfo, ...clientInfo } : defaultClientInfo,
+    [clientInfo, defaultClientInfo]
   );
 
   // Derive OAuth client registration config from clientInfo.
