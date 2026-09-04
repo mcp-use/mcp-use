@@ -6,6 +6,7 @@ import {
   registerInspectorProxyRoutes,
   type InspectorProxyRoutesConfig,
 } from "./proxy-routes.js";
+import type { InspectorRelayAuthenticator } from "./relay-auth.js";
 
 /** Web-standard handler returned by {@link mountInspector}. */
 export type InspectorFetchHandler = (
@@ -31,7 +32,7 @@ export interface MountInspectorOptions {
   /** Explicit cross-origin callers of the MCP proxy. Omission preserves legacy wildcard CORS. */
   mcpProxyAllowedOrigins?: readonly string[];
   /** Optional product authentication; upstream Authorization remains separate. */
-  authenticate?: InspectorProxyRoutesConfig["authenticate"];
+  authenticate?: InspectorRelayAuthenticator;
   /** Shared OAuth state store for a mounted multi-replica Inspector. */
   oauthProxyStateStore?: InspectorProxyRoutesConfig["oauthProxyStateStore"];
   /** Server-side confidential-client resolver for hosted OAuth. */

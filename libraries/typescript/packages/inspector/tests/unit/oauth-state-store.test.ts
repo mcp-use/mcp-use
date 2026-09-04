@@ -39,6 +39,25 @@ describe("Inspector OAuth state stores", () => {
       revision: 3,
       updatedAt: 3,
     });
+
+    await store.set("deletion-race", { revision: 4, updatedAt: 4 });
+    expect(
+      await store.deleteIfVersion?.("deletion-race", {
+        revision: 3,
+        updatedAt: 5,
+      })
+    ).toBe(false);
+    expect(await store.get("deletion-race")).toEqual({
+      revision: 4,
+      updatedAt: 4,
+    });
+    expect(
+      await store.deleteIfVersion?.("deletion-race", {
+        revision: 4,
+        updatedAt: 4,
+      })
+    ).toBe(true);
+    expect(await store.get("deletion-race")).toBeUndefined();
     await store.close?.();
   });
 

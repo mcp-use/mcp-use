@@ -22,7 +22,14 @@ export interface OAuthProxyStateStore {
   set<T>(key: string, value: T, ttlMs?: number): Promise<void>;
   setIfNewer?<T>(key: string, value: T, ttlMs?: number): Promise<boolean>;
   delete(key: string): Promise<void>;
+  /** Delete only when the stored version still equals the expected version. */
+  deleteIfVersion?(
+    key: string,
+    expected: { revision: number; updatedAt: number }
+  ): Promise<boolean>;
   ready?(): Promise<void>;
+  /** Active connectivity probe for health/readiness endpoints. */
+  probe?(): Promise<void>;
   close?(): Promise<void>;
 }
 
@@ -91,7 +98,23 @@ export function createMemoryOAuthProxyStateStore(): OAuthProxyStateStore {
     async delete(key: string): Promise<void> {
       values.delete(key);
     },
+    async deleteIfVersion(
+      key: string,
+      expected: { revision: number; updatedAt: number }
+    ): Promise<boolean> {
+      const current = values.get(key);
+      if (!current || current.expiresAt <= Date.now()) {
+        values.delete(key);
+        return false;
+      }
+      if (compareStateVersion(current.value, expected) !== 0) return false;
+      values.delete(key);
+      return true;
+    },
     async ready(): Promise<void> {
+      // The memory store is always ready.
+    },
+    async probe(): Promise<void> {
       // The memory store is always ready.
     },
     async close(): Promise<void> {
@@ -256,8 +279,48 @@ export function createRedisOAuthProxyStateStore(options: {
       await ready();
       await client.del(keyPrefix + key);
     },
+    async deleteIfVersion(
+      key: string,
+      expected: { revision: number; updatedAt: number }
+    ): Promise<boolean> {
+      return runTransaction(async () => {
+        const fullKey = keyPrefix + key;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          await transactionReady();
+          await transactionClient.watch(fullKey);
+          try {
+            const raw = await transactionClient.get(fullKey);
+            if (raw === null) {
+              await transactionClient.unwatch();
+              return false;
+            }
+            const current = await decrypt(raw, keys);
+            if (compareStateVersion(current, expected) !== 0) {
+              await transactionClient.unwatch();
+              return false;
+            }
+            const transaction = transactionClient.multi();
+            transaction.del(fullKey);
+            try {
+              const result = await transaction.exec();
+              if (result !== null) return true;
+            } catch (error) {
+              if (!isRedisWatchConflict(error)) throw error;
+            }
+          } finally {
+            await transactionClient.unwatch().catch(() => undefined);
+          }
+        }
+        throw new Error("Redis state deletion conflicted repeatedly");
+      });
+    },
     async ready(): Promise<void> {
       await ready();
+    },
+    async probe(): Promise<void> {
+      await ready();
+      const result = await client.ping();
+      if (result !== "PONG") throw new Error("Redis readiness check failed");
     },
     async close(): Promise<void> {
       closing = true;

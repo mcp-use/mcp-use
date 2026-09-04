@@ -16,11 +16,20 @@ import type { Context, Hono } from "hono";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 import {
   INSPECTOR_API_RATE_LIMIT,
-  INSPECTOR_GLOBAL_API_RATE_LIMIT,
+  defaultInspectorGlobalPreAuthRateLimiter,
+  defaultInspectorGlobalRateLimiter,
+  defaultInspectorPreAuthRateLimiter,
   INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
+  inspectorRelayPreAuthKey,
   inspectorServerRateLimitKey,
   inspectorRateLimitResponse,
 } from "../rate-limit.js";
+import {
+  INSPECTOR_RELAY_CAPABILITY_HEADER,
+  inspectorRelayTarget,
+  type InspectorRelayAuthenticator,
+  type InspectorRelayTarget,
+} from "../relay-auth.js";
 import {
   createMemoryOAuthProxyStateStore,
   type OAuthProxyStateStore,
@@ -104,7 +113,7 @@ interface OAuthProxyOptions {
   /** Optional source label for logs when Inspector shares a dev server process. */
   logPrefix?: string;
   /** Optional authentication applied before any outbound request. */
-  authenticate?: (c: Context) => Promise<boolean> | boolean;
+  authenticate?: InspectorRelayAuthenticator;
   /** Optional deployment policy applied after built-in URL and network checks. */
   validateServerUrl?: (
     serverUrl: string,
@@ -114,6 +123,10 @@ interface OAuthProxyOptions {
   rateLimiter?: RateLimiterMemory;
   /** Higher process-wide backstop against target-key rotation abuse. */
   globalRateLimiter?: RateLimiterMemory;
+  /** Per-client limiter protecting the product authentication callback. */
+  preAuthRateLimiter?: RateLimiterMemory;
+  /** Process-wide limiter protecting the product authentication callback. */
+  globalPreAuthRateLimiter?: RateLimiterMemory;
   /** Durable store shared by every Inspector replica. */
   stateStore?: OAuthProxyStateStore;
   /** Server-side resolver for configured confidential clients (never browser-visible). */
@@ -166,10 +179,9 @@ export function mountOAuthProxy(
       points: INSPECTOR_API_RATE_LIMIT,
       duration: INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
     }),
-    globalRateLimiter = new RateLimiterMemory({
-      points: INSPECTOR_GLOBAL_API_RATE_LIMIT,
-      duration: INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
-    }),
+    globalRateLimiter = defaultInspectorGlobalRateLimiter,
+    preAuthRateLimiter = defaultInspectorPreAuthRateLimiter,
+    globalPreAuthRateLimiter = defaultInspectorGlobalPreAuthRateLimiter,
     stateStore,
     resolveConfidentialClient,
   } = options;
@@ -190,8 +202,29 @@ export function mountOAuthProxy(
     await next();
     if (origin) setCorsHeaders(c.res.headers, origin);
   });
+  app.use(`${basePath}/*`, async (c, next) => {
+    if (c.req.method === "OPTIONS" || !authenticate) return next();
+    try {
+      await preAuthRateLimiter.consume(
+        inspectorRelayPreAuthKey(
+          c.req.header("CF-Connecting-IP"),
+          c.req.header("X-Forwarded-For")
+        )
+      );
+      await globalPreAuthRateLimiter.consume("inspector-relay:preauth:global");
+    } catch (error) {
+      return inspectorRateLimitResponse(c, error);
+    }
+    return next();
+  });
   app.get(`${basePath}/metadata`, async (c) => {
-    if (!(await isAuthenticated(c, authenticate))) {
+    if (
+      !(await isAuthenticated(
+        c,
+        authenticate,
+        inspectorRelayTarget(c.req.query("url"), "GET")
+      ))
+    ) {
       return c.json({ error: "Unauthorized" }, 401);
     }
 
@@ -242,7 +275,7 @@ export function mountOAuthProxy(
               timeoutMs,
               maxResponseBodyBytes
             );
-            await saveBinding(durableStateStore, bindings, key, latest);
+            return saveBinding(durableStateStore, bindings, key, latest);
           }
           return latest;
         });
@@ -313,10 +346,6 @@ export function mountOAuthProxy(
   });
 
   app.post(`${basePath}/proxy`, async (c) => {
-    if (!(await isAuthenticated(c, authenticate))) {
-      return c.json({ error: "Unauthorized" }, 401);
-    }
-
     let request: ProxyRequest;
     try {
       request = JSON.parse(
@@ -332,6 +361,16 @@ export function mountOAuthProxy(
         },
         error instanceof BodyTooLargeError ? 413 : 400
       );
+    }
+
+    if (
+      !(await isAuthenticated(
+        c,
+        authenticate,
+        inspectorRelayTarget(request.url, "POST")
+      ))
+    ) {
+      return c.json({ error: "Unauthorized" }, 401);
     }
 
     const serverUrlResult = await validateUrl(request.serverUrl, allowLoopback);
@@ -385,7 +424,7 @@ export function mountOAuthProxy(
               timeoutMs,
               maxResponseBodyBytes
             );
-            await saveBinding(durableStateStore, bindings, bindingKey, latest);
+            return saveBinding(durableStateStore, bindings, bindingKey, latest);
           }
           return latest;
         });
@@ -469,36 +508,31 @@ export function mountOAuthProxy(
           }
         }
       }
-      if (endpoint.kind === "registration" && upstream.ok) {
+      if (endpoint.kind === "registration") {
         if (
           !contentType.includes("json") ||
           !responseBody ||
           typeof responseBody !== "object" ||
           Array.isArray(responseBody)
         ) {
+          // DCR responses can contain provider-issued credentials even on an
+          // error status. Never return a primitive or array body verbatim.
           return c.json(
             { error: "OAuth registration response is invalid" },
             502
           );
         }
-        responseBody = await retainConfidentialClient({
-          responseBody: responseBody as Record<string, unknown>,
-          binding,
-          bindingKey,
-          authorizationServer: endpoint.authorizationServer,
-          targetUrl: target.toString(),
-          clients: confidentialClients,
-          stateStore: durableStateStore,
-        });
-      } else if (
-        endpoint.kind === "registration" &&
-        responseBody &&
-        typeof responseBody === "object" &&
-        !Array.isArray(responseBody)
-      ) {
-        responseBody = sanitizeDcrResponse(
-          responseBody as Record<string, unknown>
-        );
+        responseBody = upstream.ok
+          ? await retainConfidentialClient({
+              responseBody: responseBody as Record<string, unknown>,
+              binding,
+              bindingKey,
+              authorizationServer: endpoint.authorizationServer,
+              targetUrl: target.toString(),
+              clients: confidentialClients,
+              stateStore: durableStateStore,
+            })
+          : sanitizeDcrResponse(responseBody as Record<string, unknown>);
       }
       return c.json({
         status: upstream.status,
@@ -846,6 +880,7 @@ function filterRequestHeaders(value: unknown): Headers {
     return result;
   for (const [name, rawValue] of Object.entries(value)) {
     const lower = name.toLowerCase();
+    if (lower === INSPECTOR_RELAY_CAPABILITY_HEADER.toLowerCase()) continue;
     if (SAFE_REQUEST_HEADERS.has(lower) && typeof rawValue === "string") {
       result.set(lower, rawValue);
     }
@@ -1087,8 +1122,20 @@ async function applyConfidentialClientAuthentication(options: {
   if (!client) return body;
   if (isExpired(client.expiresAt)) {
     clients.delete(key);
-    await storeDelete(stateStore, key);
-    return body;
+    const deleted = await storeDeleteIfVersion(stateStore, key, client);
+    if (!deleted) {
+      const latest = normalizeConfidentialClient(
+        await storeGet<unknown>(stateStore, key)
+      );
+      if (latest && !isExpired(latest.expiresAt)) {
+        cacheConfidentialClient(clients, key, latest);
+        client = latest;
+      } else {
+        return body;
+      }
+    } else {
+      return body;
+    }
   }
 
   params.delete("client_secret");
@@ -1264,7 +1311,28 @@ async function loadBinding(
       return local;
     }
     if (!local || Date.now() - local.updatedAt > BINDING_TTL_MS) {
-      await storeDelete(stateStore, bindingStoreKey(key));
+      const deleted = await storeDeleteIfVersion(
+        stateStore,
+        bindingStoreKey(key),
+        binding
+      );
+      if (!deleted) {
+        // Another replica may have refreshed the binding after the stale read
+        // but before the compare-and-delete. Adopt that value instead of
+        // allowing an unconditional cleanup to erase the fresh state.
+        const latest = await storeGet<SerializedBinding>(
+          stateStore,
+          bindingStoreKey(key)
+        );
+        if (latest !== undefined) {
+          const latestBinding = deserializeBinding(latest);
+          if (Date.now() - latestBinding.updatedAt <= BINDING_TTL_MS) {
+            bindings.set(key, latestBinding);
+            pruneBindings(bindings);
+            return latestBinding;
+          }
+        }
+      }
     } else {
       return local;
     }
@@ -1282,7 +1350,7 @@ async function saveBinding(
   bindings: Map<string, Binding>,
   key: string,
   binding: Binding
-): Promise<void> {
+): Promise<Binding> {
   const now = Date.now();
   const next: Binding = {
     ...binding,
@@ -1302,17 +1370,21 @@ async function saveBinding(
     );
     if (latest !== undefined) {
       const latestBinding = deserializeBinding(latest);
-      bindings.set(
-        key,
-        compareVersions(next, latestBinding) < 0 ? latestBinding : next
-      );
+      const authoritative =
+        compareVersions(next, latestBinding) <= 0 ? latestBinding : next;
+      bindings.set(key, authoritative);
+      pruneBindings(bindings);
+      return authoritative;
     } else {
       bindings.set(key, next);
+      pruneBindings(bindings);
+      return next;
     }
   } else {
     bindings.set(key, next);
+    pruneBindings(bindings);
+    return next;
   }
-  pruneBindings(bindings);
 }
 
 function emptyBinding(): Binding {
@@ -1504,7 +1576,7 @@ function corsResponse(origin: string | undefined): Response {
   headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   headers.set(
     "Access-Control-Allow-Headers",
-    "Accept, Authorization, Content-Type, DPoP"
+    `Accept, Authorization, Content-Type, DPoP, ${INSPECTOR_RELAY_CAPABILITY_HEADER}`
   );
   headers.set("Access-Control-Max-Age", "600");
   return new Response(null, { status: 204, headers });
@@ -1517,9 +1589,10 @@ function setCorsHeaders(headers: Headers, origin: string): void {
 
 async function isAuthenticated(
   c: Context,
-  authenticate: OAuthProxyOptions["authenticate"]
+  authenticate: OAuthProxyOptions["authenticate"],
+  target: InspectorRelayTarget | undefined
 ): Promise<boolean> {
-  return authenticate ? authenticate(c) : true;
+  return authenticate ? authenticate(c, target) : true;
 }
 
 function isRedirect(status: number): boolean {
@@ -1661,12 +1734,17 @@ async function storeSetIfNewer<T>(
   }
 }
 
-async function storeDelete(
+async function storeDeleteIfVersion(
   store: OAuthProxyStateStore,
-  key: string
-): Promise<void> {
+  key: string,
+  expected: { revision: number; updatedAt: number }
+): Promise<boolean> {
   try {
-    await store.delete(key);
+    // Stores without the optional atomic primitive must not perform an
+    // unsafe get-then-delete. Expiry remains enforced by the store TTL.
+    return store.deleteIfVersion
+      ? await store.deleteIfVersion(key, expected)
+      : false;
   } catch {
     throw new OAuthProxyStateStoreError("OAuth proxy state delete failed");
   }

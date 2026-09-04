@@ -25,3 +25,8 @@ export type {
   OAuthProxyConfidentialClient,
   OAuthProxyConfidentialClientResolver,
 } from "./proxy/oauth-proxy.js";
+export {
+  INSPECTOR_RELAY_CAPABILITY_HEADER,
+  type InspectorRelayAuthenticator,
+  type InspectorRelayTarget,
+} from "./relay-auth.js";

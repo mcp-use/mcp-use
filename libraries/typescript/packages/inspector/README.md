@@ -401,8 +401,23 @@ the hosted Inspector.
 Exact-origin CORS is not caller authentication. The reusable `mountInspector`
 and `mountOAuthProxy` APIs accept an `authenticate` callback so the embedding
 application can verify its own session or signed capability before any
-upstream request. The standalone CLI intentionally does not invent a browser
-credential. A publicly reachable product relay therefore remains a rollout
+upstream request. The callback is invoked as `(c, target)`; existing one-
+argument callbacks remain valid, while hosted verifiers should use the target
+context below to bind a capability without parsing or cloning the request body:
+
+```ts
+type InspectorRelayTarget = {
+  origin: string;
+  pathname: string;
+  method: string;
+};
+```
+
+The browser-facing capability belongs in the distinct
+`X-Inspector-Relay-Token` header. Both relay preflights allow it, and the
+relay strips it before every upstream request. Upstream `Authorization` is a
+separate application credential and must not be reused as the relay
+capability. A publicly reachable product relay therefore remains a rollout
 blocker until Cloud or an edge gateway supplies that user/session- and
 target-bound authentication boundary, plus a distributed rate limit. The
 Inspector's built-in rate limiter is a bounded per-process backstop, not a

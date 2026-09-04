@@ -1,15 +1,16 @@
-import type { Context, Hono } from "hono";
+import type { Hono } from "hono";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 import {
   mountMcpProxy,
   mountOAuthProxy,
+  type InspectorRelayAuthenticator,
   type OAuthProxyConfidentialClientResolver,
   type OAuthProxyStateStore,
 } from "./proxy/index.js";
 import {
   INSPECTOR_API_RATE_LIMIT,
-  INSPECTOR_GLOBAL_API_RATE_LIMIT,
   INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
+  defaultInspectorGlobalRateLimiter,
 } from "./rate-limit.js";
 
 export type InspectorProxyRoutesConfig = {
@@ -32,7 +33,7 @@ export type InspectorProxyRoutesConfig = {
   /** Server-side provider configuration for confidential OAuth clients. */
   oauthProxyConfidentialClientResolver?: OAuthProxyConfidentialClientResolver;
   /** Authentication boundary for the product relay (upstream Authorization is separate). */
-  authenticate?: (c: Context) => Promise<boolean> | boolean;
+  authenticate?: InspectorRelayAuthenticator;
 };
 
 /**
@@ -50,18 +51,16 @@ export function registerInspectorProxyRoutes(
     points: INSPECTOR_API_RATE_LIMIT,
     duration: INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
   });
-  const globalRateLimiter = new RateLimiterMemory({
-    points: INSPECTOR_GLOBAL_API_RATE_LIMIT,
-    duration: INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
-  });
+  const globalRateLimiter = defaultInspectorGlobalRateLimiter;
 
   app.get(p("/inspector/health"), async (c) => {
-    if (config?.oauthProxyStateStore?.ready) {
+    const stateStore = config?.oauthProxyStateStore;
+    const stateStoreProbe = stateStore?.probe
+      ? stateStore.probe.bind(stateStore)
+      : stateStore?.ready?.bind(stateStore);
+    if (stateStoreProbe) {
       try {
-        await Promise.race([
-          config.oauthProxyStateStore.ready(),
-          healthTimeout(1_000),
-        ]);
+        await withHealthTimeout(stateStoreProbe, 1_000);
       } catch {
         return c.json({ status: "unavailable" }, 503);
       }
@@ -110,11 +109,21 @@ export function registerInspectorProxyRoutes(
   }
 }
 
-function healthTimeout(ms: number): Promise<never> {
-  return new Promise((_, reject) =>
-    setTimeout(
+async function withHealthTimeout(
+  operation: () => Promise<void>,
+  ms: number
+): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
       () => reject(new Error("Inspector state store readiness timeout")),
       ms
-    )
-  );
+    );
+    timer.unref?.();
+  });
+  try {
+    await Promise.race([operation(), timeout]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
 }

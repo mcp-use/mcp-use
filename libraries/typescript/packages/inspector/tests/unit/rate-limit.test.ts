@@ -1,12 +1,18 @@
 import { Hono } from "hono";
 import RateLimiterMemory from "rate-limiter-flexible/lib/RateLimiterMemory.js";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { mountMcpProxy } from "../../src/server/proxy/mcp-proxy.js";
 import {
   INSPECTOR_API_RATE_LIMIT,
   INSPECTOR_ASSET_RATE_LIMIT,
+  defaultInspectorGlobalRateLimiter,
   inspectorRateLimitResponse,
   inspectorServerRateLimitKey,
 } from "../../src/server/rate-limit.js";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("Inspector route rate limits", () => {
   it("uses separate budgets for assets and proxy/OAuth traffic", async () => {
@@ -74,6 +80,46 @@ describe("Inspector route rate limits", () => {
       )
     ).toBe("oauth:https://example.com/mcp");
     expect(inspectorServerRateLimitKey("mcp", "not a URL")).toBe("mcp:unknown");
+  });
+
+  it("bounds long target paths while keeping distinct buckets", () => {
+    const first = inspectorServerRateLimitKey(
+      "mcp",
+      `https://example.com/${"a".repeat(2_000)}`
+    );
+    const second = inspectorServerRateLimitKey(
+      "mcp",
+      `https://example.com/${"b".repeat(2_000)}`
+    );
+    expect(first.length).toBeLessThan(256);
+    expect(first).not.toBe(second);
+  });
+
+  it("shares the default process-global limiter across mounted instances", async () => {
+    const previousPoints = defaultInspectorGlobalRateLimiter.points;
+    defaultInspectorGlobalRateLimiter.points = 1;
+    await defaultInspectorGlobalRateLimiter.delete("inspector-api:global");
+    try {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn<typeof fetch>(async () => new Response("ok"))
+      );
+      const first = new Hono();
+      const second = new Hono();
+      mountMcpProxy(first, { path: "/proxy", enableLogging: false });
+      mountMcpProxy(second, { path: "/proxy", enableLogging: false });
+      const request = () =>
+        new Request("http://localhost/proxy", {
+          headers: { "X-Target-URL": "https://93.184.216.34/mcp" },
+        });
+      const responseFromFirst = await first.fetch(request());
+      const responseFromSecond = await second.fetch(request());
+      expect(responseFromFirst.status).toBe(200);
+      expect(responseFromSecond.status).toBe(429);
+    } finally {
+      defaultInspectorGlobalRateLimiter.points = previousPoints;
+      await defaultInspectorGlobalRateLimiter.delete("inspector-api:global");
+    }
   });
 
   it("uses the fallback Retry-After for non-finite limiter values", async () => {

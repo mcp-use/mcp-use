@@ -39,6 +39,7 @@ describeRedis("Redis Inspector OAuth state store", () => {
       await oldStore.ready?.();
       await rotatedStore.ready?.();
       await wrongKeyStore.ready?.();
+      await rotatedStore.probe?.();
 
       await oldStore.set("rotation", { revision: 1, updatedAt: 1 });
       expect(await rotatedStore.get("rotation")).toEqual({
@@ -58,9 +59,24 @@ describeRedis("Redis Inspector OAuth state store", () => {
         revision: 2,
         updatedAt: 2,
       });
+
+      await rotatedStore.set("delete-cas", { revision: 3, updatedAt: 3 });
+      expect(
+        await rotatedStore.deleteIfVersion?.("delete-cas", {
+          revision: 2,
+          updatedAt: 4,
+        })
+      ).toBe(false);
+      expect(
+        await rotatedStore.deleteIfVersion?.("delete-cas", {
+          revision: 3,
+          updatedAt: 3,
+        })
+      ).toBe(true);
     } finally {
       await oldStore.delete("rotation").catch(() => undefined);
       await oldStore.delete("cas").catch(() => undefined);
+      await oldStore.delete("delete-cas").catch(() => undefined);
       await Promise.all([
         oldStore.close?.(),
         rotatedStore.close?.(),
