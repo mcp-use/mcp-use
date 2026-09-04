@@ -59,7 +59,10 @@ export function createJwtVerifier(
 ): OAuthTokenVerifier {
   // jose overloads key material vs JWKS getters; runtime accepts either.
   const key = options.key ?? createRemoteJWKSet(options.jwksUrl);
-  const configuredResource = canonicalUrl(options.resource);
+  const configuredResource = normalizedProviderUrl(
+    options.resource,
+    "resource"
+  );
   const configuredAudience = verifierAudience(options.audience);
   if (
     configuredAudience !== undefined &&
@@ -303,7 +306,8 @@ function validAudience(value: unknown): value is string | string[] {
   );
 }
 
-function canonicalUrl(value: URL | string): URL {
+/** Canonicalizes the `resource` claim carried by a token. */
+function canonicalUrl(value: string): URL {
   try {
     const url = new URL(value);
     if (!isAllowedHttpUrl(url)) {
