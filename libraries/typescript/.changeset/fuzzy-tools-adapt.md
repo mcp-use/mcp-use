@@ -2,4 +2,4 @@
 "@mcp-use/client": minor
 ---
 
-Add a Vercel AI SDK adapter backed by the `@ai-sdk/provider-utils` runtime dependency. It exposes MCP tools as dynamic tools while preserving MCP metadata and raw tool results.
+Add a dependency-free Vercel AI SDK adapter that exposes MCP tools as dynamic tools. The adapter is structurally compatible with AI SDK v5 through v7, preserves MCP metadata and raw tool results, and does not add an AI SDK dependency to `@mcp-use/client`.
