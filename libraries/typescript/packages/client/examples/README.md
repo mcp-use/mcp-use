@@ -28,6 +28,9 @@ Run the complete matrix:
 ## Feature examples
 
 - `node/basic-http.ts` — tools + automatic v1/v2 negotiation.
+- `node/ai-sdk-openai/` — a runnable AI SDK `generateText` tool loop against a
+  remote MCP server. It is an isolated example package, so AI SDK dependencies
+  are not dependencies of `@mcp-use/client`.
 - `node/communication/sampling-client.ts` — v1 reverse request and v2
   `input_required` sampling.
 - `node/communication/elicitation-client.ts` — v1 reverse request and v2

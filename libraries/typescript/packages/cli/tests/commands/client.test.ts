@@ -495,6 +495,20 @@ describe("client human-readable output", () => {
     expect(stderr).toBe("");
   });
 
+  it("fails instead of reporting a remove that never happened", async () => {
+    await expect(runClient(["remove", "never-saved", "--json"])).resolves.toBe(
+      2
+    );
+    expect(stdout).toBe("");
+    expect(JSON.parse(stderr)).toEqual({
+      error: {
+        code: "usage_error",
+        message:
+          "Unknown saved server: never-saved. Run `mcp-use client list` to see saved servers.",
+      },
+    });
+  });
+
   it("removes without confirmation and supports JSON anywhere", async () => {
     await expect(
       runClient([
