@@ -17,17 +17,18 @@ export function assert(condition: unknown, message: string): asserts condition {
  *
  * Compares icon properties (`src`, `mimeType`, and sorted `sizes`) so that
  * inline array and object literals with identical values remain reference-stable
- * across parent re-renders.
+ * across parent re-renders while preserving absent versus empty values.
  */
 export function serializeClientIcons(
   icons?: Array<{ src: string; mimeType?: string; sizes?: string[] }>
 ): string {
-  if (!icons || icons.length === 0) return "";
+  if (icons === undefined) return "null";
+  if (icons.length === 0) return "[]";
   return JSON.stringify(
     icons.map((icon) => [
       icon.src,
-      icon.mimeType ?? "",
-      icon.sizes ? [...icon.sizes].sort() : [],
+      icon.mimeType === undefined ? null : icon.mimeType,
+      icon.sizes === undefined ? null : [...icon.sizes].sort(),
     ])
   );
 }
@@ -35,18 +36,22 @@ export function serializeClientIcons(
 /**
  * Serializes proxy headers to a deterministic string representation.
  *
- * Sorts header keys alphabetically so differing insertion orders do not cause
- * unnecessary reconnections while legitimate header value changes trigger updates.
+ * Sorts header keys alphabetically within each header field (`headers` and
+ * legacy `customHeaders`) so differing insertion orders do not cause
+ * unnecessary reconnections, while preserving source field distinction and
+ * value changes to trigger updates.
  */
 export function serializeProxyHeaders(
   headers?: Record<string, string>,
   customHeaders?: Record<string, string>
 ): string {
-  if (!headers && !customHeaders) return "";
-  const merged: Record<string, string> = { ...customHeaders, ...headers };
-  const keys = Object.keys(merged).sort();
-  if (keys.length === 0) return "";
-  return JSON.stringify(keys.map((k) => [k, merged[k]]));
+  if (headers === undefined && customHeaders === undefined) return "";
+  const serializeEntries = (record?: Record<string, string>): string => {
+    if (record === undefined) return "null";
+    const keys = Object.keys(record).sort();
+    return JSON.stringify(keys.map((k) => [k, record[k]]));
+  };
+  return `${serializeEntries(headers)}|${serializeEntries(customHeaders)}`;
 }
 
 type ServerInfoWithIcon = MCPServerInfo & { icon?: string };

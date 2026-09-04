@@ -424,4 +424,92 @@ describe("useMcp reference stability", () => {
 
     root.unmount();
   });
+
+  it("reconnects when an icon changes from omitted sizes to explicit empty array", async () => {
+    function TestComponent({ sizes }: { sizes?: string[] }) {
+      useMcp({
+        url: "http://localhost:3000/mcp",
+        clientInfo: {
+          name: "Dashboard App",
+          version: "1.0.0",
+          icons: [{ src: "https://example.com/icon.png", sizes }],
+        },
+      });
+
+      return null;
+    }
+
+    let root: any;
+    await act(async () => {
+      root = create(<TestComponent sizes={undefined} />);
+    });
+    await flushMicrotasks();
+
+    expect(addServerCalls.length).toBe(1);
+
+    await act(async () => {
+      root.update(<TestComponent sizes={[]} />);
+    });
+    await flushMicrotasks();
+
+    expect(addServerCalls.length).toBe(2);
+    expect(addServerCalls[1].clientInfo.icons[0].sizes).toEqual([]);
+    expect(sharedClient.closeSession).toHaveBeenCalled();
+
+    root.unmount();
+  });
+
+  it("reconnects and normalizes headers when proxyConfig changes from customHeaders to headers", async () => {
+    function TestComponent({
+      proxyConfig,
+    }: {
+      proxyConfig: {
+        proxyAddress: string;
+        headers?: Record<string, string>;
+        customHeaders?: Record<string, string>;
+      };
+    }) {
+      useMcp({
+        url: "http://localhost:3000/mcp",
+        proxyConfig,
+      });
+
+      return null;
+    }
+
+    let root: any;
+    await act(async () => {
+      root = create(
+        <TestComponent
+          proxyConfig={{
+            proxyAddress: "https://gateway.example.com",
+            customHeaders: { "x-token": "123" },
+          }}
+        />
+      );
+    });
+    await flushMicrotasks();
+
+    expect(addServerCalls.length).toBe(1);
+    expect(addServerCalls[0].headers["x-token"]).toBe("123");
+
+    // Change to modern headers property with identical values
+    await act(async () => {
+      root.update(
+        <TestComponent
+          proxyConfig={{
+            proxyAddress: "https://gateway.example.com",
+            headers: { "x-token": "123" },
+          }}
+        />
+      );
+    });
+    await flushMicrotasks();
+
+    expect(addServerCalls.length).toBe(2);
+    expect(addServerCalls[1].headers["x-token"]).toBe("123");
+    expect(sharedClient.closeSession).toHaveBeenCalled();
+
+    root.unmount();
+  });
 });

@@ -67,11 +67,27 @@ describe("startConnectionHealthMonitoring", () => {
 });
 
 describe("serializeClientIcons", () => {
-  it("returns empty string when icons are undefined or empty", async () => {
+  it("returns null for undefined icons and [] for empty icons array", async () => {
     const { serializeClientIcons } =
       await import("../../../src/react/useMcp-helpers.js");
-    expect(serializeClientIcons(undefined)).toBe("");
-    expect(serializeClientIcons([])).toBe("");
+    expect(serializeClientIcons(undefined)).toBe("null");
+    expect(serializeClientIcons([])).toBe("[]");
+  });
+
+  it("preserves absent versus explicit empty optional fields", async () => {
+    const { serializeClientIcons } =
+      await import("../../../src/react/useMcp-helpers.js");
+    const omittedMime = [{ src: "https://example.com/icon.png" }];
+    const emptyMime = [{ src: "https://example.com/icon.png", mimeType: "" }];
+    expect(serializeClientIcons(omittedMime)).not.toBe(
+      serializeClientIcons(emptyMime)
+    );
+
+    const omittedSizes = [{ src: "https://example.com/icon.png" }];
+    const emptySizes = [{ src: "https://example.com/icon.png", sizes: [] }];
+    expect(serializeClientIcons(omittedSizes)).not.toBe(
+      serializeClientIcons(emptySizes)
+    );
   });
 
   it("serializes icons deterministically regardless of sizes order", async () => {
@@ -104,11 +120,10 @@ describe("serializeClientIcons", () => {
 });
 
 describe("serializeProxyHeaders", () => {
-  it("returns empty string when headers and customHeaders are undefined or empty", async () => {
+  it("returns empty string when headers and customHeaders are both undefined", async () => {
     const { serializeProxyHeaders } =
       await import("../../../src/react/useMcp-helpers.js");
     expect(serializeProxyHeaders(undefined, undefined)).toBe("");
-    expect(serializeProxyHeaders({}, {})).toBe("");
   });
 
   it("produces the same serialized output regardless of header key insertion order", async () => {
@@ -121,18 +136,12 @@ describe("serializeProxyHeaders", () => {
     );
   });
 
-  it("merges customHeaders with headers where headers take precedence", async () => {
+  it("preserves distinction between customHeaders and headers sources", async () => {
     const { serializeProxyHeaders } =
       await import("../../../src/react/useMcp-helpers.js");
-    const custom = { "X-A": "1", "X-B": "2" };
-    const headers = { "X-B": "overridden", "X-C": "3" };
-    expect(serializeProxyHeaders(headers, custom)).toBe(
-      JSON.stringify([
-        ["X-A", "1"],
-        ["X-B", "overridden"],
-        ["X-C", "3"],
-      ])
-    );
+    const asHeaders = serializeProxyHeaders({ "X-A": "1" }, undefined);
+    const asCustomHeaders = serializeProxyHeaders(undefined, { "X-A": "1" });
+    expect(asHeaders).not.toBe(asCustomHeaders);
   });
 
   it("produces different output when a header value changes", async () => {
