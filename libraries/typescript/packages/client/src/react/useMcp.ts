@@ -186,14 +186,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
 
   const proxyConfig = useMemo(() => {
     if (!rawProxyConfig) return undefined;
-    const mergedHeaders =
-      rawProxyConfig.headers || rawProxyConfig.customHeaders
-        ? { ...rawProxyConfig.customHeaders, ...rawProxyConfig.headers }
-        : undefined;
-    return {
-      ...rawProxyConfig,
-      ...(mergedHeaders !== undefined ? { headers: mergedHeaders } : {}),
-    };
+    return rawProxyConfig;
   }, [rawProxyAddress, serializedProxyHeaders]);
 
   const headers = headersOption ?? {};
