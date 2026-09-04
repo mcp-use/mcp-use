@@ -106,4 +106,5 @@ jobs:
       typescript: ${{ needs.promote.outputs.typescript == 'true' }}
       create_mcp_use_app: ${{ needs.promote.outputs.create_mcp_use_app == 'true' }}
       run_changeset_check: false
+      pr_number: ${{ inputs.pull_number }}
     secrets: inherit

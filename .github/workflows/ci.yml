@@ -79,6 +79,10 @@ on:
         required: false
         type: boolean
         default: false
+      pr_number:
+        description: "PR number for the reporting jobs to comment on"
+        required: false
+        type: number
 
 jobs:
   detect-changes:
@@ -281,7 +285,7 @@ jobs:
 
   python-transport-tests-report:
     needs: python-transport-tests
-    if: always() && github.event_name == 'pull_request' && needs.python-transport-tests.result != 'skipped'
+    if: always() && (inputs.pr_number || github.event_name == 'pull_request') && needs.python-transport-tests.result != 'skipped'
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
@@ -294,10 +298,13 @@ jobs:
           merge-multiple: false
       - name: Generate PR comment
         uses: actions/github-script@v9
+        env:
+          PR_NUMBER: ${{ inputs.pr_number }}
         with:
           script: |
             const fs = require('fs');
             const path = require('path');
+            const issueNumber = Number(process.env.PR_NUMBER) || context.issue.number;
 
             const transports = ['stdio', 'sse', 'streamable_http'];
             let tableRows = [];
@@ -360,7 +367,7 @@ jobs:
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: context.issue.number,
+              issue_number: issueNumber,
             });
 
             const botComment = comments.find(c => 
@@ -379,7 +386,7 @@ jobs:
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                issue_number: context.issue.number,
+                issue_number: issueNumber,
                 body: comment,
               });
             }
@@ -446,7 +453,7 @@ jobs:
 
   python-primitive-tests-report:
     needs: python-primitive-tests
-    if: always() && github.event_name == 'pull_request' && needs.python-primitive-tests.result != 'skipped'
+    if: always() && (inputs.pr_number || github.event_name == 'pull_request') && needs.python-primitive-tests.result != 'skipped'
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
@@ -459,10 +466,13 @@ jobs:
           merge-multiple: false
       - name: Generate PR comment
         uses: actions/github-script@v9
+        env:
+          PR_NUMBER: ${{ inputs.pr_number }}
         with:
           script: |
             const fs = require('fs');
             const path = require('path');
+            const issueNumber = Number(process.env.PR_NUMBER) || context.issue.number;
 
             const primitives = ['sampling', 'tools', 'resources', 'prompts', 'elicitation', 'notifications', 'auth', 'roots'];
             let tableRows = [];
@@ -525,7 +535,7 @@ jobs:
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: context.issue.number,
+              issue_number: issueNumber,
             });
 
             const botComment = comments.find(c => 
@@ -544,7 +554,7 @@ jobs:
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                issue_number: context.issue.number,
+                issue_number: issueNumber,
                 body: comment,
               });
             }
