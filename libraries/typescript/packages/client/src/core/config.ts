@@ -167,7 +167,11 @@ export interface AutoOAuthOptions {
   clientMetadataUrl?: string;
   /** Space-delimited OAuth scopes to request. */
   scope?: string;
-  /** Pre-registered public client id (skips DCR). */
+  /**
+   * Pre-registered OAuth client information (skips DCR). Browser client
+   * secrets require an OAuth proxy and popup flow; Node providers may use
+   * confidential credentials directly.
+   */
   staticClientInfo?: OAuthClientInformation;
   /** Preferred Node loopback port. Defaults to `33418`. */
   preferredPort?: number;

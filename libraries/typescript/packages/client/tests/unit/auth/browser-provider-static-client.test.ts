@@ -249,7 +249,7 @@ describe("BrowserOAuthClientProvider — pre-registered client_id", () => {
     expect(stored.providerOptions.scope).toBe("openid profile");
   });
 
-  it("rejects a static browser client secret", () => {
+  it("requires an OAuth proxy for a static browser client secret", () => {
     expect(
       () =>
         new BrowserOAuthClientProvider(SERVER_URL, {
@@ -259,7 +259,54 @@ describe("BrowserOAuthClientProvider — pre-registered client_id", () => {
             client_secret: "shh-secret",
           },
         })
-    ).toThrow(/public clients/);
+    ).toThrow(/require oauthProxyUrl/);
+  });
+
+  it("rejects redirect flow for a static browser client secret", () => {
+    expect(
+      () =>
+        new BrowserOAuthClientProvider(SERVER_URL, {
+          callbackUrl: "https://app.example.com/oauth/callback",
+          oauthProxyUrl: "https://app.example.com/inspector/api/oauth",
+          useRedirectFlow: true,
+          staticClientInfo: {
+            client_id: "preregistered-abc",
+            client_secret: "shh-secret",
+          },
+        })
+    ).toThrow(/require popup OAuth/);
+  });
+
+  it("keeps a static client secret in opener memory and out of callback state", async () => {
+    const provider = new BrowserOAuthClientProvider(SERVER_URL, {
+      callbackUrl: "https://app.example.com/oauth/callback",
+      oauthProxyUrl: "https://app.example.com/inspector/api/oauth",
+      staticClientInfo: {
+        client_id: "preregistered-abc",
+        client_secret: "shh-secret",
+      },
+    });
+
+    expect(await provider.clientInformation()).toMatchObject({
+      client_id: "preregistered-abc",
+      client_secret: "shh-secret",
+    });
+    expect(provider.completeAuthorizationInOpener).toBe(true);
+
+    await provider.prepareAuthorizationUrl(
+      new URL("https://auth.example.com/authorize")
+    );
+    const stateKey = Object.keys(localStorage).find((key) =>
+      key.includes("_state_")
+    );
+    const serialized = await new LocalStorageKVStore().get(stateKey!);
+    expect(serialized).not.toContain("shh-secret");
+    expect(JSON.parse(serialized!)).toMatchObject({
+      completeAuthorizationInOpener: true,
+      providerOptions: {
+        staticClientInfo: { client_id: "preregistered-abc" },
+      },
+    });
   });
 
   it("validates and persists clientMetadataUrl for callback reconstruction", async () => {
