@@ -66,55 +66,82 @@ describe("startConnectionHealthMonitoring", () => {
   });
 });
 
-describe("isEqualDeep", () => {
-  it("compares primitives correctly", async () => {
-    const { isEqualDeep } =
+describe("serializeClientIcons", () => {
+  it("returns empty string when icons are undefined or empty", async () => {
+    const { serializeClientIcons } =
       await import("../../../src/react/useMcp-helpers.js");
-    expect(isEqualDeep(1, 1)).toBe(true);
-    expect(isEqualDeep(1, 2)).toBe(false);
-    expect(isEqualDeep("a", "a")).toBe(true);
-    expect(isEqualDeep("a", "b")).toBe(false);
-    expect(isEqualDeep(null, null)).toBe(true);
-    expect(isEqualDeep(undefined, undefined)).toBe(true);
-    expect(isEqualDeep(null, undefined)).toBe(false);
+    expect(serializeClientIcons(undefined)).toBe("");
+    expect(serializeClientIcons([])).toBe("");
   });
 
-  it("compares objects with different key order", async () => {
-    const { isEqualDeep } =
+  it("serializes icons deterministically regardless of sizes order", async () => {
+    const { serializeClientIcons } =
       await import("../../../src/react/useMcp-helpers.js");
-    expect(isEqualDeep({ a: 1, b: 2 }, { b: 2, a: 1 })).toBe(true);
-    expect(isEqualDeep({ a: 1, b: 2 }, { a: 1, b: 3 })).toBe(false);
-    expect(isEqualDeep({ a: 1 }, { a: 1, b: 2 })).toBe(false);
+    const icons1 = [
+      {
+        src: "https://example.com/icon.png",
+        mimeType: "image/png",
+        sizes: ["48x48", "16x16"],
+      },
+    ];
+    const icons2 = [
+      {
+        src: "https://example.com/icon.png",
+        mimeType: "image/png",
+        sizes: ["16x16", "48x48"],
+      },
+    ];
+    expect(serializeClientIcons(icons1)).toBe(serializeClientIcons(icons2));
   });
 
-  it("compares top-level arrays, length mismatches, and array-vs-object shapes", async () => {
-    const { isEqualDeep } =
+  it("produces different output when icon properties change", async () => {
+    const { serializeClientIcons } =
       await import("../../../src/react/useMcp-helpers.js");
-    expect(isEqualDeep([1, 2], [1, 2])).toBe(true);
-    expect(isEqualDeep([1, 2], [1, 2, 3])).toBe(false);
-    expect(isEqualDeep([1, 2, 3], [1, 2])).toBe(false);
-    expect(isEqualDeep([1, 2], { 0: 1, 1: 2 })).toBe(false);
-    expect(isEqualDeep({ 0: 1, 1: 2 }, [1, 2])).toBe(false);
-    expect(isEqualDeep([{ id: "a" }], [{ id: "a" }])).toBe(true);
-    expect(isEqualDeep([{ id: "a" }], [{ id: "b" }])).toBe(false);
+    const icons1 = [{ src: "https://example.com/icon1.png" }];
+    const icons2 = [{ src: "https://example.com/icon2.png" }];
+    expect(serializeClientIcons(icons1)).not.toBe(serializeClientIcons(icons2));
+  });
+});
+
+describe("serializeProxyHeaders", () => {
+  it("returns empty string when headers and customHeaders are undefined or empty", async () => {
+    const { serializeProxyHeaders } =
+      await import("../../../src/react/useMcp-helpers.js");
+    expect(serializeProxyHeaders(undefined, undefined)).toBe("");
+    expect(serializeProxyHeaders({}, {})).toBe("");
   });
 
-  it("compares nested objects and arrays", async () => {
-    const { isEqualDeep } =
+  it("produces the same serialized output regardless of header key insertion order", async () => {
+    const { serializeProxyHeaders } =
       await import("../../../src/react/useMcp-helpers.js");
-    const obj1 = {
-      name: "test",
-      nested: { x: [1, 2, 3], y: "hello" },
-    };
-    const obj2 = {
-      nested: { y: "hello", x: [1, 2, 3] },
-      name: "test",
-    };
-    const obj3 = {
-      nested: { y: "hello", x: [1, 2, 4] },
-      name: "test",
-    };
-    expect(isEqualDeep(obj1, obj2)).toBe(true);
-    expect(isEqualDeep(obj1, obj3)).toBe(false);
+    const headersA = { Authorization: "Bearer token", "X-Custom": "val" };
+    const headersB = { "X-Custom": "val", Authorization: "Bearer token" };
+    expect(serializeProxyHeaders(headersA)).toBe(
+      serializeProxyHeaders(headersB)
+    );
+  });
+
+  it("merges customHeaders with headers where headers take precedence", async () => {
+    const { serializeProxyHeaders } =
+      await import("../../../src/react/useMcp-helpers.js");
+    const custom = { "X-A": "1", "X-B": "2" };
+    const headers = { "X-B": "overridden", "X-C": "3" };
+    expect(serializeProxyHeaders(headers, custom)).toBe(
+      JSON.stringify([
+        ["X-A", "1"],
+        ["X-B", "overridden"],
+        ["X-C", "3"],
+      ])
+    );
+  });
+
+  it("produces different output when a header value changes", async () => {
+    const { serializeProxyHeaders } =
+      await import("../../../src/react/useMcp-helpers.js");
+    const headers1 = { "X-Custom": "val1" };
+    const headers2 = { "X-Custom": "val2" };
+    expect(serializeProxyHeaders(headers1)).not.toBe(
+      serializeProxyHeaders(headers2)
+    );
   });
 });

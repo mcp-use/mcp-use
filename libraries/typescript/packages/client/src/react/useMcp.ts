@@ -30,8 +30,9 @@ import {
   createBrowserOAuthProvider,
   deriveOAuthClientConfigFromClientInfo,
   isOAuthDiscoveryFailure,
+  serializeClientIcons,
+  serializeProxyHeaders,
   startConnectionHealthMonitoring,
-  useStableValue,
   USE_MCP_SERVER_NAME,
 } from "./useMcp-helpers.js";
 import type { UseMcpOptions, UseMcpResult } from "./types.js";
@@ -132,7 +133,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
       : "/oauth/callback",
     storageKeyPrefix = "mcp:auth",
     authProvider: providedAuthProvider,
-    headers: rawHeadersOption,
+    headers: headersOption,
     proxyConfig: rawProxyConfig,
     oauthProxyUrl: oauthProxyUrlOption,
     connectionMode,
@@ -140,7 +141,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     logLevel: logLevelOption = "silent",
     autoRetry = false,
     autoReconnect = true,
-    reconnectionOptions: rawReconnectionOptions,
+    reconnectionOptions,
     preventAutoAuth = true, // Default to true - require explicit user action for OAuth
     detectMixedAuth = true,
     useRedirectFlow = false, // Default to false for backward compatibility (use popup)
@@ -149,20 +150,46 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     wrapTransport,
     serverId,
     fetch: customFetch,
-    clientOptions: rawClientOptions,
+    clientOptions,
     protocolNegotiation,
     onNotification,
     onSampling: onSamplingOption,
     onElicitation: onElicitationOption,
-    oauth: rawOauthOptions,
+    oauth: oauthOptions,
   } = options;
 
-  const clientInfo = useStableValue(options.clientInfo);
-  const proxyConfig = useStableValue(rawProxyConfig);
-  const headers = useStableValue(rawHeadersOption ?? {});
-  const clientOptions = useStableValue(rawClientOptions);
-  const oauthOptions = useStableValue(rawOauthOptions);
-  const reconnectionOptions = useStableValue(rawReconnectionOptions);
+  const rawClientInfo = options.clientInfo;
+  const clientInfoName = rawClientInfo?.name;
+  const clientInfoTitle = rawClientInfo?.title;
+  const clientInfoVersion = rawClientInfo?.version;
+  const clientInfoDescription = rawClientInfo?.description;
+  const clientInfoWebsiteUrl = rawClientInfo?.websiteUrl;
+  const serializedClientIcons = serializeClientIcons(rawClientInfo?.icons);
+
+  const clientInfo = useMemo(() => {
+    if (!rawClientInfo) return undefined;
+    return rawClientInfo;
+  }, [
+    clientInfoName,
+    clientInfoTitle,
+    clientInfoVersion,
+    clientInfoDescription,
+    clientInfoWebsiteUrl,
+    serializedClientIcons,
+  ]);
+
+  const rawProxyAddress = rawProxyConfig?.proxyAddress;
+  const serializedProxyHeaders = serializeProxyHeaders(
+    rawProxyConfig?.headers,
+    rawProxyConfig?.customHeaders
+  );
+
+  const proxyConfig = useMemo(() => {
+    if (!rawProxyConfig) return undefined;
+    return rawProxyConfig;
+  }, [rawProxyAddress, serializedProxyHeaders]);
+
+  const headers = headersOption ?? {};
 
   const transportType: TransportType = "http";
   const requestedProxyAddress = proxyConfig?.proxyAddress;
@@ -2094,9 +2121,6 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     proxyConfig, // Triggers reconnection when proxy config (including headers) changes
     autoProxyFallbackConfig.proxyAddress,
     providedAuthProvider,
-    headers, // Triggers reconnection when custom headers legitimately change
-    effectiveClientOptions, // Triggers reconnection when client capabilities change
-    protocolNegotiation, // Triggers reconnection when protocol era negotiation mode changes
   ]);
 
   /**

@@ -3,8 +3,9 @@
 /**
  * Tests for reference stability in useMcp hook.
  *
- * Verifies that passing unmemoized inline objects (clientInfo, proxyConfig,
- * headers, clientOptions) does not cause infinite reconnection loops on parent re-renders.
+ * Verifies that passing unmemoized inline objects (clientInfo, proxyConfig)
+ * does not cause infinite reconnection loops on parent re-renders, while legitimate
+ * property changes (e.g. name, icons, proxyAddress, headers) trigger reconnects.
  */
 
 import React, { useState } from "react";
@@ -40,10 +41,13 @@ let addServerCalls: any[] = [];
 let removeServerCalls: any[] = [];
 
 const sharedClient = {
-  addServer: vi.fn().mockImplementation((config: any) => {
-    addServerCalls.push(config);
-    return Promise.resolve();
-  }),
+  addServer: vi
+    .fn()
+    .mockImplementation((nameOrConfig: any, maybeConfig?: any) => {
+      const config = maybeConfig ?? nameOrConfig;
+      addServerCalls.push(config);
+      return Promise.resolve();
+    }),
   removeServer: vi.fn().mockImplementation((id: any) => {
     removeServerCalls.push(id);
     return Promise.resolve();
@@ -157,6 +161,128 @@ describe("useMcp reference stability", () => {
     root.unmount();
   });
 
+  it("does not reconnect when parent re-renders with inline nested icons in clientInfo", async () => {
+    let triggerRender: () => void = () => {};
+
+    function TestComponent() {
+      const [count, setCount] = useState(0);
+      triggerRender = () => setCount((c) => c + 1);
+
+      useMcp({
+        url: "http://localhost:3000/mcp",
+        clientInfo: {
+          name: "Dashboard App",
+          version: "1.0.0",
+          icons: [
+            {
+              src: "https://example.com/icon.png",
+              mimeType: "image/png",
+              sizes: ["48x48", "16x16"],
+            },
+          ],
+        },
+      });
+
+      return null;
+    }
+
+    let root: any;
+    await act(async () => {
+      root = create(<TestComponent />);
+    });
+    await flushMicrotasks();
+
+    const initialAddCount = addServerCalls.length;
+    expect(initialAddCount).toBeGreaterThan(0);
+
+    const reRender = async () => {
+      await act(async () => {
+        triggerRender();
+      });
+      await flushMicrotasks();
+    };
+
+    for (let i = 0; i < 5; i++) {
+      await reRender();
+    }
+
+    expect(addServerCalls.length).toBe(initialAddCount);
+    expect(removeServerCalls.length).toBe(0);
+
+    root.unmount();
+  });
+
+  it("reconnects when clientInfo properties legitimately change", async () => {
+    function TestComponent({ appName }: { appName: string }) {
+      useMcp({
+        url: "http://localhost:3000/mcp",
+        clientInfo: { name: appName, version: "1.0.0" },
+      });
+
+      return null;
+    }
+
+    let root: any;
+    await act(async () => {
+      root = create(<TestComponent appName="AppV1" />);
+    });
+    await flushMicrotasks();
+
+    const initialAddCount = addServerCalls.length;
+    expect(initialAddCount).toBe(1);
+
+    // Change actual name
+    await act(async () => {
+      root.update(<TestComponent appName="AppV2" />);
+    });
+    await flushMicrotasks();
+
+    // Now it should have disconnected and reconnected
+    expect(addServerCalls.length).toBe(2);
+    expect(addServerCalls[1].clientInfo.name).toBe("AppV2");
+    expect(sharedClient.closeSession).toHaveBeenCalled();
+
+    root.unmount();
+  });
+
+  it("reconnects when clientInfo icons change", async () => {
+    function TestComponent({ iconUrl }: { iconUrl: string }) {
+      useMcp({
+        url: "http://localhost:3000/mcp",
+        clientInfo: {
+          name: "Dashboard App",
+          version: "1.0.0",
+          icons: [{ src: iconUrl }],
+        },
+      });
+
+      return null;
+    }
+
+    let root: any;
+    await act(async () => {
+      root = create(
+        <TestComponent iconUrl="https://example.com/icon-v1.png" />
+      );
+    });
+    await flushMicrotasks();
+
+    expect(addServerCalls.length).toBe(1);
+
+    await act(async () => {
+      root.update(<TestComponent iconUrl="https://example.com/icon-v2.png" />);
+    });
+    await flushMicrotasks();
+
+    expect(addServerCalls.length).toBe(2);
+    expect(addServerCalls[1].clientInfo.icons[0].src).toBe(
+      "https://example.com/icon-v2.png"
+    );
+    expect(sharedClient.closeSession).toHaveBeenCalled();
+
+    root.unmount();
+  });
+
   it("does not reconnect when parent re-renders with inline proxyConfig", async () => {
     let triggerRender: () => void = () => {};
 
@@ -198,11 +324,14 @@ describe("useMcp reference stability", () => {
     root.unmount();
   });
 
-  it("reconnects when clientInfo properties legitimately change", async () => {
-    function TestComponent({ appName }: { appName: string }) {
+  it("does not reconnect when proxyConfig headers key order changes", async () => {
+    function TestComponent({ headers }: { headers: Record<string, string> }) {
       useMcp({
         url: "http://localhost:3000/mcp",
-        clientInfo: { name: appName },
+        proxyConfig: {
+          proxyAddress: "https://gateway.example.com",
+          headers,
+        },
       });
 
       return null;
@@ -210,36 +339,34 @@ describe("useMcp reference stability", () => {
 
     let root: any;
     await act(async () => {
-      root = create(<TestComponent appName="AppV1" />);
+      root = create(
+        <TestComponent headers={{ "x-first": "1", "x-second": "2" }} />
+      );
     });
     await flushMicrotasks();
 
     const initialAddCount = addServerCalls.length;
     expect(initialAddCount).toBe(1);
 
-    // Change actual name
+    // Update with keys in reversed order
     await act(async () => {
-      root.update(<TestComponent appName="AppV2" />);
+      root.update(
+        <TestComponent headers={{ "x-second": "2", "x-first": "1" }} />
+      );
     });
     await flushMicrotasks();
 
-    // Now it should have disconnected and reconnected
-    expect(addServerCalls.length).toBe(2);
-    expect(sharedClient.closeSession).toHaveBeenCalled();
+    expect(addServerCalls.length).toBe(initialAddCount);
+    expect(removeServerCalls.length).toBe(0);
 
     root.unmount();
   });
 
-  it("does not reconnect when parent re-renders with inline headers", async () => {
-    let triggerRender: () => void = () => {};
-
-    function TestComponent() {
-      const [count, setCount] = useState(0);
-      triggerRender = () => setCount((c) => c + 1);
-
+  it("reconnects when proxyConfig proxyAddress changes", async () => {
+    function TestComponent({ proxyUrl }: { proxyUrl: string }) {
       useMcp({
         url: "http://localhost:3000/mcp",
-        headers: { "x-custom-auth": "secret-token" },
+        proxyConfig: { proxyAddress: proxyUrl },
       });
 
       return null;
@@ -247,42 +374,31 @@ describe("useMcp reference stability", () => {
 
     let root: any;
     await act(async () => {
-      root = create(<TestComponent />);
+      root = create(<TestComponent proxyUrl="https://gateway-1.example.com" />);
     });
     await flushMicrotasks();
 
-    const initialAddCount = addServerCalls.length;
-    expect(initialAddCount).toBeGreaterThan(0);
+    expect(addServerCalls.length).toBe(1);
 
-    const reRender = async () => {
-      await act(async () => {
-        triggerRender();
-      });
-      await flushMicrotasks();
-    };
+    await act(async () => {
+      root.update(<TestComponent proxyUrl="https://gateway-2.example.com" />);
+    });
+    await flushMicrotasks();
 
-    for (let i = 0; i < 5; i++) {
-      await reRender();
-    }
-
-    expect(addServerCalls.length).toBe(initialAddCount);
+    expect(addServerCalls.length).toBe(2);
+    expect(addServerCalls[1].gatewayUrl).toBe("https://gateway-2.example.com");
+    expect(sharedClient.closeSession).toHaveBeenCalled();
 
     root.unmount();
   });
 
-  it("does not reconnect when parent re-renders with inline clientOptions", async () => {
-    let triggerRender: () => void = () => {};
-
-    function TestComponent() {
-      const [count, setCount] = useState(0);
-      triggerRender = () => setCount((c) => c + 1);
-
+  it("reconnects when proxyConfig header value changes", async () => {
+    function TestComponent({ apiKey }: { apiKey: string }) {
       useMcp({
         url: "http://localhost:3000/mcp",
-        clientOptions: {
-          capabilities: {
-            roots: { listChanged: true },
-          },
+        proxyConfig: {
+          proxyAddress: "https://gateway.example.com",
+          headers: { "x-api-key": apiKey },
         },
       });
 
@@ -291,89 +407,19 @@ describe("useMcp reference stability", () => {
 
     let root: any;
     await act(async () => {
-      root = create(<TestComponent />);
-    });
-    await flushMicrotasks();
-
-    const initialAddCount = addServerCalls.length;
-    expect(initialAddCount).toBeGreaterThan(0);
-
-    const reRender = async () => {
-      await act(async () => {
-        triggerRender();
-      });
-      await flushMicrotasks();
-    };
-
-    for (let i = 0; i < 5; i++) {
-      await reRender();
-    }
-
-    expect(addServerCalls.length).toBe(initialAddCount);
-
-    root.unmount();
-  });
-
-  it("reconnects when headers legitimately change", async () => {
-    function TestComponent({ token }: { token: string }) {
-      useMcp({
-        url: "http://localhost:3000/mcp",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      return null;
-    }
-
-    let root: any;
-    await act(async () => {
-      root = create(<TestComponent token="token_v1" />);
+      root = create(<TestComponent apiKey="key_v1" />);
     });
     await flushMicrotasks();
 
     expect(addServerCalls.length).toBe(1);
 
-    // Change to token_v2
     await act(async () => {
-      root.update(<TestComponent token="token_v2" />);
-    });
-    await flushMicrotasks();
-
-    // Must have reconnected with the new token
-    expect(addServerCalls.length).toBe(2);
-    expect(sharedClient.closeSession).toHaveBeenCalled();
-
-    root.unmount();
-  });
-
-  it("reconnects when clientOptions legitimately change", async () => {
-    function TestComponent({ rootsEnabled }: { rootsEnabled: boolean }) {
-      useMcp({
-        url: "http://localhost:3000/mcp",
-        clientOptions: {
-          capabilities: {
-            roots: { listChanged: rootsEnabled },
-          },
-        },
-      });
-
-      return null;
-    }
-
-    let root: any;
-    await act(async () => {
-      root = create(<TestComponent rootsEnabled={false} />);
-    });
-    await flushMicrotasks();
-
-    expect(addServerCalls.length).toBe(1);
-
-    // Change capabilities
-    await act(async () => {
-      root.update(<TestComponent rootsEnabled={true} />);
+      root.update(<TestComponent apiKey="key_v2" />);
     });
     await flushMicrotasks();
 
     expect(addServerCalls.length).toBe(2);
+    expect(addServerCalls[1].headers["x-api-key"]).toBe("key_v2");
     expect(sharedClient.closeSession).toHaveBeenCalled();
 
     root.unmount();

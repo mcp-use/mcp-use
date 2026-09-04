@@ -1,4 +1,3 @@
-import { useRef } from "react";
 import { BrowserOAuthClientProvider } from "../auth/browser.js";
 import type { OAuthClientInformation } from "@modelcontextprotocol/client";
 import type { MCPServerInfo } from "../core/session.js";
@@ -14,56 +13,40 @@ export function assert(condition: unknown, message: string): asserts condition {
 }
 
 /**
- * Performs a deep structural equality check for primitives, arrays, and plain objects.
- * Handles key ordering differences, null/undefined, and nested data structures.
+ * Serializes client icons to a deterministic string representation.
+ *
+ * Compares icon properties (`src`, `mimeType`, and sorted `sizes`) so that
+ * inline array and object literals with identical values remain reference-stable
+ * across parent re-renders.
  */
-export function isEqualDeep(a: unknown, b: unknown): boolean {
-  if (Object.is(a, b)) return true;
-  if (
-    typeof a !== "object" ||
-    a === null ||
-    typeof b !== "object" ||
-    b === null
-  ) {
-    return false;
-  }
-  if (Array.isArray(a)) {
-    if (!Array.isArray(b) || a.length !== b.length) return false;
-    for (let i = 0; i < a.length; i++) {
-      if (!isEqualDeep(a[i], b[i])) return false;
-    }
-    return true;
-  }
-  if (Array.isArray(b)) return false;
-
-  const keysA = Object.keys(a as Record<string, unknown>);
-  const keysB = Object.keys(b as Record<string, unknown>);
-  if (keysA.length !== keysB.length) return false;
-
-  for (const key of keysA) {
-    if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
-    if (
-      !isEqualDeep(
-        (a as Record<string, unknown>)[key],
-        (b as Record<string, unknown>)[key]
-      )
-    ) {
-      return false;
-    }
-  }
-  return true;
+export function serializeClientIcons(
+  icons?: Array<{ src: string; mimeType?: string; sizes?: string[] }>
+): string {
+  if (!icons || icons.length === 0) return "";
+  return JSON.stringify(
+    icons.map((icon) => [
+      icon.src,
+      icon.mimeType ?? "",
+      icon.sizes ? [...icon.sizes].sort() : [],
+    ])
+  );
 }
 
 /**
- * Hook that maintains a stable reference to a value across renders as long
- * as its structural content remains equal.
+ * Serializes proxy headers to a deterministic string representation.
+ *
+ * Sorts header keys alphabetically so differing insertion orders do not cause
+ * unnecessary reconnections while legitimate header value changes trigger updates.
  */
-export function useStableValue<T>(value: T): T {
-  const ref = useRef<T>(value);
-  if (!isEqualDeep(ref.current, value)) {
-    ref.current = value;
-  }
-  return ref.current;
+export function serializeProxyHeaders(
+  headers?: Record<string, string>,
+  customHeaders?: Record<string, string>
+): string {
+  if (!headers && !customHeaders) return "";
+  const merged: Record<string, string> = { ...customHeaders, ...headers };
+  const keys = Object.keys(merged).sort();
+  if (keys.length === 0) return "";
+  return JSON.stringify(keys.map((k) => [k, merged[k]]));
 }
 
 type ServerInfoWithIcon = MCPServerInfo & { icon?: string };
