@@ -275,6 +275,7 @@ interface PromptEntry<TUser, TEnv extends Env> {
 /** Node HTTP listener returned by `listen()`. */
 interface NodeHttpListener {
   close(callback?: (error?: Error) => void): void;
+  closeAllConnections?(): void;
   once(event: "error", listener: (error: unknown) => void): void;
   listen(port: number, hostname: string, callback?: () => void): NodeHttpServer;
   address(): { port: number } | string | null;
@@ -361,6 +362,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   #eventBus: ServerEventBus | undefined;
   #httpServer: NodeHttpListener | undefined;
   #listenPromise: Promise<{ port: number; url: string }> | undefined;
+  #listenCleanupPromise: Promise<void> | undefined;
   #oauthResource: URL | undefined;
   #oauthResourceResolved = false;
   #oauthResourceConfigurationAbsent = false;
@@ -1035,28 +1037,44 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           void nodeHandler(req, res);
         }) as NodeHttpListener;
 
-        const rejectAndClose = (error: unknown) => {
-          if (!settled) {
-            settled = true;
-            reject(error);
-          }
+        let cleanupPromise: Promise<void> | undefined;
+        const rejectAndClose = (error: unknown): Promise<void> => {
           rejectFetch?.(error);
-          void new Promise<void>((closeResolve) =>
-            server.close(() => closeResolve())
-          )
-            .catch(() => undefined)
-            .finally(() => {
-              if (this.#httpServer === server) {
-                this.#httpServer = undefined;
+          if (!cleanupPromise) {
+            try {
+              server.closeAllConnections?.();
+            } catch {
+              // ignore if not supported
+            }
+            cleanupPromise = new Promise<void>((closeResolve) => {
+              try {
+                server.close(() => closeResolve());
+              } catch {
+                closeResolve();
               }
-            });
+            })
+              .catch(() => undefined)
+              .finally(() => {
+                if (this.#httpServer === server) {
+                  this.#httpServer = undefined;
+                }
+                if (!settled) {
+                  settled = true;
+                  reject(error);
+                }
+              });
+            this.#listenCleanupPromise = cleanupPromise;
+          }
+          return cleanupPromise;
         };
 
-        server.once("error", rejectAndClose);
+        server.once("error", (error) => {
+          void rejectAndClose(error);
+        });
         server.listen(requestedPort, host, () => {
           try {
             if (this.#closed) {
-              rejectAndClose(
+              void rejectAndClose(
                 new Error("Cannot use the server after it has closed.")
               );
               return;
@@ -1077,7 +1095,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
               });
             }
           } catch (error) {
-            rejectAndClose(error);
+            void rejectAndClose(error);
           }
         });
       });
@@ -1105,6 +1123,10 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     if (this.#listenPromise !== undefined) {
       await this.#listenPromise.catch(() => undefined);
     }
+    if (this.#listenCleanupPromise !== undefined) {
+      await this.#listenCleanupPromise;
+      this.#listenCleanupPromise = undefined;
+    }
     await Promise.allSettled([...this.#proxyOperations]);
 
     const errors: unknown[] = [];
@@ -1123,6 +1145,11 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     }
     const httpServer = this.#httpServer;
     if (httpServer !== undefined) {
+      try {
+        httpServer.closeAllConnections?.();
+      } catch {
+        // ignore if not supported
+      }
       try {
         await new Promise<void>((resolve, reject) => {
           httpServer.close((err) => (err ? reject(err) : resolve()));

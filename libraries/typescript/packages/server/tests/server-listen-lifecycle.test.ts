@@ -13,6 +13,18 @@ function isPortOpen(port: number): Promise<boolean> {
   });
 }
 
+function getFreePort(): Promise<number> {
+  return new Promise((resolve) => {
+    const s = http.createServer();
+    s.listen(0, "127.0.0.1", () => {
+      const address = s.address();
+      const port =
+        typeof address === "object" && address !== null ? address.port : 0;
+      s.close(() => resolve(port));
+    });
+  });
+}
+
 describe("MCPServer.listen lifecycle and concurrency", () => {
   it("rejects repeated listen() on an active server without leaking listeners", async () => {
     const server = new MCPServer({ name: "lifecycle-test", version: "1.0.0" });
@@ -90,20 +102,74 @@ describe("MCPServer.listen lifecycle and concurrency", () => {
   });
 
   it("cleans up listener when close() is called while listen() is in-flight", async () => {
+    const targetPort = await getFreePort();
     const server = new MCPServer({
       name: "close-inflight-test",
       version: "1.0.0",
     });
-    const listenPromise = server.listen(0);
+    const listenPromise = server.listen(targetPort);
     const closePromise = server.close();
 
-    const [listenResult] = await Promise.allSettled([
+    const [listenResult, closeResult] = await Promise.allSettled([
       listenPromise,
       closePromise,
     ]);
-    // Either listen was aborted or closed
-    if (listenResult.status === "fulfilled") {
-      expect(await isPortOpen(listenResult.value.port)).toBe(false);
+
+    expect(closeResult.status).toBe("fulfilled");
+    expect(listenResult.status).toBe("rejected");
+    if (listenResult.status === "rejected") {
+      expect((listenResult.reason as Error).message).toContain("closed");
     }
+
+    // Deterministically verify the target port is closed and not leaking
+    expect(await isPortOpen(targetPort)).toBe(false);
+
+    // Verify the port is immediately reusable without EADDRINUSE
+    const restartServer = new MCPServer({
+      name: "restart-test",
+      version: "1.0.0",
+    });
+    const restartListen = await restartServer.listen(targetPort);
+    expect(restartListen.port).toBe(targetPort);
+    expect(await isPortOpen(targetPort)).toBe(true);
+
+    await restartServer.close();
+    expect(await isPortOpen(targetPort)).toBe(false);
+  });
+
+  it("terminates active connections promptly when shutdown races listen()", async () => {
+    const targetPort = await getFreePort();
+    const server = new MCPServer({
+      name: "race-active-req-test",
+      version: "1.0.0",
+    });
+
+    const listenPromise = server.listen(targetPort);
+
+    // Send a request immediately as the port is binding
+    const req = http.get(`http://127.0.0.1:${targetPort}/mcp`);
+    req.on("error", () => {
+      // Expected connection reset or abort
+    });
+
+    const closePromise = server.close();
+
+    const [, closeResult] = await Promise.allSettled([
+      listenPromise,
+      closePromise,
+    ]);
+
+    expect(closeResult.status).toBe("fulfilled");
+    expect(await isPortOpen(targetPort)).toBe(false);
+
+    // An immediate restart must succeed
+    const restartServer = new MCPServer({
+      name: "restart-after-race-test",
+      version: "1.0.0",
+    });
+    const restartListen = await restartServer.listen(targetPort);
+    expect(restartListen.port).toBe(targetPort);
+    await restartServer.close();
+    expect(await isPortOpen(targetPort)).toBe(false);
   });
 });
