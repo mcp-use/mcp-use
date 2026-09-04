@@ -1,0 +1,24 @@
+{
+  "name": "mcp-use-example-auth-github-oauth-proxy",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Example: mcp-use OAuth Proxy with a fixed GitHub OAuth App.",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "scripts": {
+    "dev": "mcp-use dev --port 3000",
+    "build": "mcp-use build",
+    "start": "mcp-use start --port 3000",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "mcp-use": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "typescript": "^7.0.2"
+  }
+}

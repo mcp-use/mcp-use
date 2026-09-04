@@ -30,6 +30,7 @@ interface CallbackObservation {
   user: TestUser;
   payload: Record<string, unknown>;
   accessToken: string;
+  providerAccessToken?: string | undefined;
   scopes: string[];
   permissions: string[];
   clientId?: string | undefined;
@@ -56,6 +57,7 @@ function createAuthInfo(id: string): AuthInfo {
       user: { id },
       payload: { subject: id, issuer: "https://issuer.example.test" },
       permissions: [`resource:${id}:read`],
+      providerAccessToken: `provider-token-${id}`,
     },
   };
 }
@@ -91,6 +93,7 @@ function observeContext(
     user: callbackContext.auth.user,
     payload: callbackContext.auth.payload,
     accessToken: callbackContext.auth.accessToken,
+    providerAccessToken: callbackContext.auth.providerAccessToken,
     scopes: [...callbackContext.auth.scopes],
     permissions: [...callbackContext.auth.permissions],
     clientId: callbackContext.auth.clientId,
@@ -243,6 +246,9 @@ describe("createMcpMount OAuth request context", () => {
         expect(observation.rawAuthInfo).toBe(expected);
         expect(observation.payload).toEqual(expected.extra!.payload);
         expect(observation.accessToken).toBe(expected.token);
+        expect(observation.providerAccessToken).toBe(
+          expected.extra!.providerAccessToken
+        );
         expect(observation.scopes).toEqual(expected.scopes);
         expect(observation.permissions).toEqual(expected.extra!.permissions);
         expect(observation.clientId).toBe(expected.clientId);

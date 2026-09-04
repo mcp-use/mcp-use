@@ -6,8 +6,12 @@ import {
 } from "@modelcontextprotocol/server";
 
 import { getRequestBag, type FetchMiddleware } from "../fetch-app.js";
-import { getOAuthProviderOptions, wrapOAuthTokenVerifier } from "./internal.js";
-import type { OAuthProvider } from "./provider.js";
+import {
+  bindOAuthProvider,
+  getOAuthProviderOptions,
+  wrapBoundOAuthTokenVerifier,
+} from "./internal.js";
+import type { BoundOAuthProvider, OAuthProvider } from "./provider.js";
 
 /**
  * Fetch middleware that requires a bearer token for a canonical resource.
@@ -20,10 +24,19 @@ export function bearerAuth<TUser>(
   provider: OAuthProvider<TUser>,
   resource: URL
 ): FetchMiddleware {
-  const options = getOAuthProviderOptions(provider);
+  return bearerAuthForBoundProvider(bindOAuthProvider(provider, resource));
+}
+
+/** @internal Creates bearer auth middleware from an existing provider binding. */
+export function bearerAuthForBoundProvider<TUser>(
+  boundProvider: BoundOAuthProvider<TUser>
+): FetchMiddleware {
+  const options = getOAuthProviderOptions(boundProvider);
   const gate = requireBearerAuth({
-    verifier: wrapOAuthTokenVerifier(provider, resource),
-    resourceMetadataUrl: getOAuthProtectedResourceMetadataUrl(resource),
+    verifier: wrapBoundOAuthTokenVerifier(boundProvider),
+    resourceMetadataUrl: getOAuthProtectedResourceMetadataUrl(
+      boundProvider.resource
+    ),
     ...(options.requiredScopes !== undefined && {
       requiredScopes: [...options.requiredScopes],
     }),
@@ -50,9 +63,45 @@ export function oauthMetadata<TUser>(
   provider: OAuthProvider<TUser>,
   resource: URL
 ): FetchMiddleware {
+  return createOAuthMetadataMiddleware(provider, resource);
+}
+
+/** @internal Creates discovery middleware from an existing provider binding. */
+export function oauthMetadataForBoundProvider<TUser>(
+  boundProvider: BoundOAuthProvider<TUser>
+): FetchMiddleware {
+  return createOAuthMetadataMiddleware(boundProvider, boundProvider.resource);
+}
+
+function createOAuthMetadataMiddleware<TUser>(
+  provider: Pick<
+    BoundOAuthProvider<TUser>,
+    | "oauthMetadata"
+    | "requiredScopes"
+    | "scopesSupported"
+    | "resourceName"
+    | "serviceDocumentationUrl"
+  >,
+  resource: URL
+): FetchMiddleware {
   const options = getOAuthProviderOptions(provider);
+  const issuer = new URL(options.oauthMetadata.issuer);
+  // RFC 8414 inserts the well-known segment before an issuer's path. The
+  // SDK helper currently serves only the root authorization-server path.
+  // Only alias a local issuer: external providers own their own discovery.
+  const issuerMetadataPath =
+    issuer.origin === resource.origin && issuer.pathname !== "/"
+      ? `/.well-known/oauth-authorization-server${issuer.pathname.replace(/\/+$/, "")}`
+      : undefined;
   return async (request, next) => {
-    const response = oauthMetadataResponse(request, {
+    const metadataRequest =
+      new URL(request.url).pathname === issuerMetadataPath
+        ? new Request(
+            new URL("/.well-known/oauth-authorization-server", request.url),
+            { method: request.method, headers: request.headers }
+          )
+        : request;
+    const response = oauthMetadataResponse(metadataRequest, {
       oauthMetadata: options.oauthMetadata,
       resourceServerUrl: resource,
       ...(options.scopesSupported !== undefined && {

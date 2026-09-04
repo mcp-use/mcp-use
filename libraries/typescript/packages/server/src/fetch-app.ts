@@ -26,6 +26,36 @@ export interface RequestBag {
 
 const requestBags = new WeakMap<Request, RequestBag>();
 
+// The Node root and OAuth subpath can bundle separate copies of this module.
+// A shared, non-wire symbol keeps privacy decisions attached to the actual
+// request across those bundles without trusting a client-controlled header.
+const sensitiveHttpRequest = Symbol.for("mcp-use.sensitive-http-request");
+
+/**
+ * Mark an HTTP request as summary-only for logging, including error responses.
+ *
+ * @param request - Credential-bearing request whose headers and bodies must not be logged.
+ * @internal
+ */
+export function markSensitiveHttpRequest(request: Request): void {
+  Object.defineProperty(request, sensitiveHttpRequest, { value: true });
+}
+
+/**
+ * Read the non-wire privacy marker shared by separate framework bundles.
+ *
+ * @param request - Incoming request whose logging policy to inspect.
+ * @returns Whether the request is restricted to method/path/status summaries.
+ * @internal
+ */
+export function isSensitiveHttpRequest(request: Request): boolean {
+  return (
+    (request as Request & { [sensitiveHttpRequest]?: boolean })[
+      sensitiveHttpRequest
+    ] === true
+  );
+}
+
 /**
  * Mutable per-request bag; created on first access.
  *

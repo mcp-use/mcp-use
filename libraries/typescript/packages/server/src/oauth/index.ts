@@ -32,5 +32,29 @@ export {
   type CustomOAuthProviderOptions,
   type OAuthExtra,
   type OAuthProvider,
+  type OAuthProviderBinding,
   type OAuthResourceOptions,
+  type ResourceBoundOAuthProvider,
+  type ServerOAuthProvider,
 } from "./provider.js";
+export {
+  oauthProxy,
+  type OAuthProxyConfig,
+  type OAuthProxyJsonObject,
+  type OAuthProxyJsonValue,
+  type OAuthProxyOptions,
+  type OAuthProxyTokenEndpointAuthMethod,
+  type OAuthProxyUpstreamResourceContext,
+  type OAuthProxyUser,
+  type OAuthProxyVerifiedToken,
+} from "./proxy/provider.js";
+export {
+  inMemoryOAuthStore,
+  type OAuthProxyStore,
+  type OAuthProxyStoreCapabilities,
+  type OAuthProxyStoreConsumeResult,
+  type OAuthProxyStoreCreateResult,
+  type OAuthProxyStoreReadResult,
+  type OAuthProxyStoreReplaceResult,
+  type OAuthProxyStoreTransaction,
+} from "./proxy/store.js";

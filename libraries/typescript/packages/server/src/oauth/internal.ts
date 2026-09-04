@@ -10,7 +10,13 @@ import {
   parseAbsoluteUrl,
 } from "./guards.js";
 import { invalidToken } from "./errors.js";
-import type { OAuthExtra, OAuthProvider } from "./provider.js";
+import type {
+  BoundOAuthProvider,
+  OAuthExtra,
+  OAuthProviderBinding,
+  ResourceBoundOAuthProvider,
+  ServerOAuthProvider,
+} from "./provider.js";
 
 export {
   assertSecureHttpUrl,
@@ -20,7 +26,7 @@ export {
 
 /** @internal Resolves configured resource identity, or undefined when none is configured. */
 export function resolveConfiguredOAuthResource<TUser>(options: {
-  provider: OAuthProvider<TUser>;
+  provider: ServerOAuthProvider<TUser>;
   basePath: string;
   mcpUrl?: string | URL;
 }): URL | undefined {
@@ -80,24 +86,197 @@ export function validateOAuthResource(
   return url;
 }
 
-/** @internal Wraps a provider verifier with mcp-use's verified auth mapping. */
-export function wrapOAuthTokenVerifier<TUser>(
-  provider: OAuthProvider<TUser>,
+/** @internal Binds a provider to one canonical resource and creates its verifier. */
+export function bindOAuthProvider<TUser>(
+  provider: ServerOAuthProvider<TUser>,
   expectedResource: URL
-): OAuthTokenVerifier {
+): BoundOAuthProvider<TUser> {
   const canonicalResource = normalizeResourceUrl(expectedResource);
-  const tokenVerifier = provider.createTokenVerifier(
-    new URL(canonicalResource.href)
-  );
+  const resourceBoundProvider = isResourceBoundOAuthProvider(provider);
+  if ("bind" in provider && typeof provider.bind !== "function") {
+    throw new TypeError("OAuth provider bind must be a function");
+  }
+
+  const rawBinding: OAuthProviderBinding<TUser> = resourceBoundProvider
+    ? provider.bind(new URL(canonicalResource.href))
+    : {
+        oauthMetadata: provider.oauthMetadata,
+        tokenVerifier: provider.createTokenVerifier(
+          new URL(canonicalResource.href)
+        ),
+        mapAuthInfo: provider.mapAuthInfo,
+        ...(provider.requiredScopes !== undefined && {
+          requiredScopes: provider.requiredScopes,
+        }),
+        ...(provider.scopesSupported !== undefined && {
+          scopesSupported: provider.scopesSupported,
+        }),
+        ...(provider.resourceName !== undefined && {
+          resourceName: provider.resourceName,
+        }),
+        ...(provider.serviceDocumentationUrl !== undefined && {
+          serviceDocumentationUrl: provider.serviceDocumentationUrl,
+        }),
+      };
+
+  assertOAuthProviderBinding(rawBinding, resourceBoundProvider);
+  const tokenVerifier = rawBinding.tokenVerifier;
+  const mapAuthInfo = rawBinding.mapAuthInfo;
+  const mapperOwner: object = resourceBoundProvider ? rawBinding : provider;
+
+  return Object.freeze({
+    resource: canonicalResource,
+    oauthMetadata: snapshotOAuthMetadata(rawBinding.oauthMetadata),
+    tokenVerifier,
+    mapAuthInfo: (authInfo: AuthInfo) =>
+      mapAuthInfo.call(mapperOwner, authInfo),
+    ...(rawBinding.requiredScopes !== undefined && {
+      requiredScopes: Object.freeze([...rawBinding.requiredScopes]),
+    }),
+    ...(rawBinding.scopesSupported !== undefined && {
+      scopesSupported: Object.freeze([...rawBinding.scopesSupported]),
+    }),
+    ...(rawBinding.resourceName !== undefined && {
+      resourceName: rawBinding.resourceName,
+    }),
+    ...(rawBinding.serviceDocumentationUrl !== undefined && {
+      serviceDocumentationUrl: new URL(rawBinding.serviceDocumentationUrl.href),
+    }),
+    ...(rawBinding.middleware !== undefined && {
+      middleware: rawBinding.middleware,
+    }),
+    ...(rawBinding.sensitivePaths !== undefined && {
+      sensitivePaths: Object.freeze([...rawBinding.sensitivePaths]),
+    }),
+  });
+}
+
+function isResourceBoundOAuthProvider<TUser>(
+  provider: ServerOAuthProvider<TUser>
+): provider is ResourceBoundOAuthProvider<TUser> {
+  return "bind" in provider && typeof provider.bind === "function";
+}
+
+function assertOAuthProviderBinding<TUser>(
+  binding: OAuthProviderBinding<TUser>,
+  resourceBoundProvider: boolean
+): asserts binding is OAuthProviderBinding<TUser> {
+  if (binding === null || typeof binding !== "object") {
+    throw new TypeError("OAuth provider bind must return an object");
+  }
+  assertBindingOAuthMetadata(binding.oauthMetadata);
+  const tokenVerifier = binding.tokenVerifier;
   if (
     tokenVerifier === null ||
     typeof tokenVerifier !== "object" ||
     typeof tokenVerifier.verifyAccessToken !== "function"
   ) {
     throw new TypeError(
-      "OAuth provider createTokenVerifier must return an OAuthTokenVerifier"
+      resourceBoundProvider
+        ? "OAuth provider binding tokenVerifier must be an OAuthTokenVerifier"
+        : "OAuth provider createTokenVerifier must return an OAuthTokenVerifier"
     );
   }
+  if (typeof binding.mapAuthInfo !== "function") {
+    throw new TypeError(
+      "OAuth provider binding mapAuthInfo must be a function"
+    );
+  }
+  assertBindingStringArray(binding.requiredScopes, "requiredScopes");
+  assertBindingStringArray(binding.scopesSupported, "scopesSupported");
+  assertBindingStringArray(binding.sensitivePaths, "sensitivePaths");
+  if (
+    binding.sensitivePaths?.some(
+      (path) =>
+        !path.startsWith("/") ||
+        new URL(path, "https://validation.invalid").pathname !== path
+    )
+  ) {
+    throw new TypeError(
+      "OAuth provider sensitivePaths must contain exact absolute pathnames"
+    );
+  }
+  if (
+    binding.resourceName !== undefined &&
+    (typeof binding.resourceName !== "string" ||
+      binding.resourceName.trim().length === 0)
+  ) {
+    throw new TypeError("resourceName must be a non-empty string");
+  }
+  if (binding.serviceDocumentationUrl !== undefined) {
+    if (!(binding.serviceDocumentationUrl instanceof URL)) {
+      throw new TypeError("serviceDocumentationUrl must be a URL");
+    }
+    assertSecureHttpUrl(
+      binding.serviceDocumentationUrl,
+      "serviceDocumentationUrl"
+    );
+  }
+  if (
+    binding.middleware !== undefined &&
+    typeof binding.middleware !== "function"
+  ) {
+    throw new TypeError("OAuth provider binding middleware must be a function");
+  }
+}
+
+function assertBindingOAuthMetadata(metadata: unknown): void {
+  if (
+    metadata === null ||
+    typeof metadata !== "object" ||
+    !("issuer" in metadata) ||
+    typeof metadata.issuer !== "string"
+  ) {
+    throw new TypeError(
+      "OAuth provider binding oauthMetadata must include a string issuer"
+    );
+  }
+  assertSecureHttpUrl(
+    parseAbsoluteUrl(
+      metadata.issuer,
+      "OAuth provider binding oauthMetadata.issuer"
+    ),
+    "OAuth provider binding oauthMetadata.issuer"
+  );
+}
+
+function assertBindingStringArray(value: unknown, name: string): void {
+  if (
+    value !== undefined &&
+    (!Array.isArray(value) || !value.every((item) => typeof item === "string"))
+  ) {
+    throw new TypeError(
+      `OAuth provider binding ${name} must be an array of strings`
+    );
+  }
+}
+
+function snapshotOAuthMetadata(
+  metadata: BoundOAuthProvider<unknown>["oauthMetadata"]
+): BoundOAuthProvider<unknown>["oauthMetadata"] {
+  return Object.freeze(
+    Object.fromEntries(
+      Object.entries(metadata as Record<string, unknown>).map(
+        ([key, value]) => [
+          key,
+          Array.isArray(value)
+            ? Object.freeze((value as unknown[]).slice())
+            : value,
+        ]
+      )
+    )
+  ) as BoundOAuthProvider<unknown>["oauthMetadata"];
+}
+
+/** @internal Wraps a bound verifier with mcp-use's verified auth mapping. */
+export function wrapBoundOAuthTokenVerifier<TUser>(
+  boundProvider: BoundOAuthProvider<TUser>
+): OAuthTokenVerifier {
+  const {
+    resource: canonicalResource,
+    tokenVerifier,
+    mapAuthInfo,
+  } = boundProvider;
 
   return {
     async verifyAccessToken(token: string): Promise<AuthInfo> {
@@ -107,19 +286,37 @@ export function wrapOAuthTokenVerifier<TUser>(
 
       let mapped: OAuthExtra<TUser>;
       try {
-        mapped = provider.mapAuthInfo(authInfo);
+        mapped = mapAuthInfo(authInfo);
       } catch (error) {
         throw invalidToken("Token identity mapping failed", error);
       }
       assertMappedExtra(mapped);
+      const extra = { ...authInfo.extra, ...mapped };
+      // Optional reserved fields can also originate in the verifier extras.
+      // Validate the effective context, not only values the mapper supplied.
+      assertMappedExtra(extra);
 
       return {
         ...authInfo,
         scopes: [...authInfo.scopes],
-        extra: { ...authInfo.extra, ...mapped },
+        extra,
       };
     },
   };
+}
+
+/**
+ * @internal Wraps a provider verifier with mcp-use's verified auth mapping.
+ * Prefer binding once and calling {@link wrapBoundOAuthTokenVerifier} when a
+ * provider is shared by multiple pieces of mount wiring.
+ */
+export function wrapOAuthTokenVerifier<TUser>(
+  provider: ServerOAuthProvider<TUser>,
+  expectedResource: URL
+): OAuthTokenVerifier {
+  return wrapBoundOAuthTokenVerifier(
+    bindOAuthProvider(provider, expectedResource)
+  );
 }
 
 function assertResourceBinding(
@@ -168,9 +365,16 @@ function normalizeResourceUrl(resource: URL): URL {
 
 /** @internal Gets immutable provider metadata for Hono adapter wiring. */
 export function getOAuthProviderOptions<TUser>(
-  provider: OAuthProvider<TUser>
+  provider: Pick<
+    BoundOAuthProvider<TUser>,
+    | "oauthMetadata"
+    | "requiredScopes"
+    | "scopesSupported"
+    | "resourceName"
+    | "serviceDocumentationUrl"
+  >
 ): {
-  oauthMetadata: OAuthProvider<TUser>["oauthMetadata"];
+  oauthMetadata: BoundOAuthProvider<TUser>["oauthMetadata"];
   requiredScopes?: string[];
   scopesSupported?: string[];
   resourceName?: string;
@@ -228,6 +432,15 @@ function assertMappedExtra<TUser>(
   ) {
     throw invalidToken(
       "Token identity mapping must return user, payload, and string permissions"
+    );
+  }
+  if (
+    mapped.providerAccessToken !== undefined &&
+    (typeof mapped.providerAccessToken !== "string" ||
+      mapped.providerAccessToken.trim().length === 0)
+  ) {
+    throw invalidToken(
+      "Token identity mapping providerAccessToken must be a non-blank string"
     );
   }
 }

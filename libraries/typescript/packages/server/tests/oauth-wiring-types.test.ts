@@ -1,6 +1,6 @@
 import { MCPServer } from "../src/index.js";
 import { toAuthenticatedRequestContext } from "../src/context.js";
-import type { OAuthProvider } from "../src/oauth/index.js";
+import type { OAuthProvider, ServerOAuthProvider } from "../src/oauth/index.js";
 import { oauthAuth0Provider, type Auth0OAuthUser } from "../src/oauth/auth0.js";
 import {
   oauthBetterAuthProvider,
@@ -40,8 +40,6 @@ interface TestUser {
   id: string;
 }
 
-declare const provider: OAuthProvider<TestUser>;
-
 function verifyStructuralProviderTyping(
   tokenVerifier: OAuthTokenVerifier,
   oauthMetadata: OAuthMetadata
@@ -55,7 +53,61 @@ function verifyStructuralProviderTyping(
       permissions: [],
     }),
   };
-  void directProvider;
+  // OAuthProvider remains the direct contract: these fields stay guaranteed.
+  const providerVerifierFactory: OAuthProvider<TestUser>["createTokenVerifier"] =
+    directProvider.createTokenVerifier;
+  const providerMetadata: OAuthMetadata = directProvider.oauthMetadata;
+  const providerMapper: OAuthProvider<TestUser>["mapAuthInfo"] =
+    directProvider.mapAuthInfo;
+  void [providerVerifierFactory, providerMetadata, providerMapper];
+
+  const resourceBoundProvider: ServerOAuthProvider<TestUser> = {
+    resource: "https://api.example.test/mcp",
+    bind: (resource) => ({
+      oauthMetadata: {
+        issuer: new URL("/oauth", resource.origin).href,
+      } as OAuthMetadata,
+      tokenVerifier,
+      mapAuthInfo: () => ({
+        user: { id: "user-1" },
+        payload: {},
+        permissions: [],
+      }),
+      requiredScopes: ["mcp"],
+      middleware: async (_request, next) => next(),
+    }),
+  };
+  new MCPServer({
+    name: "resource-bound-provider",
+    version: "1.0.0",
+    oauth: resourceBoundProvider,
+  });
+
+  const inferredResourceBoundServer = new MCPServer({
+    name: "inferred-resource-bound-provider",
+    version: "1.0.0",
+    oauth: {
+      resource: "https://api.example.test/mcp",
+      bind: () => ({
+        oauthMetadata,
+        tokenVerifier,
+        mapAuthInfo: () => ({
+          user: { id: "user-1", role: "admin" as const },
+          payload: {},
+          permissions: [],
+        }),
+      }),
+    },
+  });
+  inferredResourceBoundServer.tool(
+    { name: "bound-user" },
+    (_params, context) => {
+      const id: string = context.auth.user.id;
+      const role: "admin" = context.auth.user.role;
+      void [id, role];
+      return { content: [] };
+    }
+  );
 }
 
 function assertOAuthAuthFields<TUser>(auth: OAuthAuth<TUser>): void {
@@ -79,7 +131,7 @@ function assertOAuthAuthFields<TUser>(auth: OAuthAuth<TUser>): void {
 
 // This function is intentionally not invoked: tsconfig.test.json typechecks
 // the callback contracts while Vitest has no runtime provider to configure.
-function verifyOAuthCallbackTyping(): void {
+function verifyOAuthCallbackTyping(provider: OAuthProvider<TestUser>): void {
   const authenticated = new MCPServer({
     name: "authenticated",
     version: "1.0.0",

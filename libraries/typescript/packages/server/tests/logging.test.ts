@@ -8,6 +8,10 @@ import { z } from "zod";
 
 import { getRequestBag, jsonBodyMiddleware } from "../src/fetch-app.js";
 import { MCPServer, requestLogger } from "../src/index.js";
+import {
+  isBufferedResponse,
+  trackBufferedResponse,
+} from "../src/buffered-response.js";
 import type { ServerConfig } from "../src/index.js";
 
 /** The per-request `_meta` envelope every 2026-07-28 request carries. */
@@ -518,4 +522,61 @@ describe("requestLogger (via MCPServer.fetch)", () => {
     );
     await server.close();
   });
+
+  it.each(["info", "debug", "trace"] as const)(
+    "preserves known-buffered header wrappers after logger cloning at %s level",
+    async (level) => {
+      const request = mcpRequest("tools/list", {});
+      const source = trackBufferedResponse(
+        request,
+        Response.json({ jsonrpc: "2.0", id: 1, result: { tools: [] } })
+      );
+      const wrapped = new Response(source.body, {
+        headers: source.headers,
+      });
+      expect(isBufferedResponse(wrapped, request)).toBe(true);
+
+      const response = await requestLogger({ level })(
+        request,
+        async () => wrapped
+      );
+
+      expect(isBufferedResponse(response, request)).toBe(true);
+      // A subsequent Hono/header-only wrapper must retain the updated stream
+      // identity too; the logger's clone tees the previous body stream.
+      const finalWrapper = new Response(response.body, {
+        headers: response.headers,
+      });
+      expect(isBufferedResponse(finalWrapper, request)).toBe(true);
+      expect(await finalWrapper.json()).toEqual({
+        jsonrpc: "2.0",
+        id: 1,
+        result: { tools: [] },
+      });
+    }
+  );
+
+  it.each(["info", "debug", "trace"] as const)(
+    "does not promote a replacement or arbitrary body to buffered at %s level",
+    async (level) => {
+      const request = mcpRequest("tools/list", {});
+      trackBufferedResponse(request, Response.json({ original: true }));
+      const replacement = Response.json({
+        jsonrpc: "2.0",
+        id: 1,
+        result: { tools: [] },
+      });
+      expect(isBufferedResponse(replacement, request)).toBe(false);
+
+      const response = await requestLogger({ level })(
+        request,
+        async () => replacement
+      );
+
+      expect(isBufferedResponse(response, request)).toBe(false);
+      expect(isBufferedResponse(new Response(response.body), request)).toBe(
+        false
+      );
+    }
+  );
 });

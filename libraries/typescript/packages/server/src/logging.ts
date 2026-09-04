@@ -18,6 +18,9 @@
  *   `tools/call greet {"who":"world"} -> "hi world" raw-request/0.0.0`.
  * - `trace`: debug plus a full request/response dump (headers and bodies)
  *   after the summary.
+ *
+ * Credential-bearing routes marked sensitive by the framework always log
+ * only the HTTP summary, even for malformed requests and at trace level.
  */
 import {
   CLIENT_INFO_META_KEY,
@@ -32,7 +35,11 @@ import {
   isBufferedResponse,
   trackBufferedResponse,
 } from "./buffered-response.js";
-import { getRequestBag, type FetchMiddleware } from "./fetch-app.js";
+import {
+  getRequestBag,
+  isSensitiveHttpRequest,
+  type FetchMiddleware,
+} from "./fetch-app.js";
 
 /** Verbosity of the request logger. */
 export type LogLevel = "info" | "debug" | "trace";
@@ -50,6 +57,7 @@ export interface LoggingOptions {
    * (adds compact truncated input/output on the detail line), or `trace`
    * (debug plus full request/response header and body dumps). The
    * `MCP_USE_LOG_LEVEL` environment variable overrides this when set.
+   * Embedded OAuth routes always log only method, path, status, and duration.
    */
   level?: LogLevel;
 }
@@ -610,15 +618,18 @@ export function requestLogger(
       return next();
     }
 
+    // Credential-bearing routes must not have their payloads buffered or dumped.
+    // The marker is applied by an outer framework middleware before logging.
+    const sensitive = isSensitiveHttpRequest(request);
     const requestHeaders: Record<string, string> = {};
-    if (level === "trace") {
+    if (!sensitive && level === "trace") {
       request.headers.forEach((value, key) => {
         requestHeaders[key] = value;
       });
     }
 
     let requestBody: unknown;
-    if (httpMethod !== "GET" && httpMethod !== "HEAD") {
+    if (!sensitive && httpMethod !== "GET" && httpMethod !== "HEAD") {
       const parsedBody = getRequestBag(request).parsedBody;
       if (parsedBody !== undefined) {
         requestBody = parsedBody;
@@ -673,6 +684,7 @@ export function requestLogger(
       ]);
       throw error;
     }
+    const wasBuffered = isBufferedResponse(response, request);
 
     const detail =
       description.mcpRequest === undefined
@@ -704,7 +716,7 @@ export function requestLogger(
 
     logLine(response.status, detail, suffix);
 
-    if (level === "trace") {
+    if (!sensitive && level === "trace") {
       await printTraceDump(
         response,
         requestHeaders,
@@ -713,6 +725,9 @@ export function requestLogger(
       );
     }
 
-    return response;
+    // Cloning for logging tees the response stream. Preserve the known SDK
+    // buffered contract using its new stream identity, but never promote an
+    // unmarked custom or body-replacing response merely because it is JSON.
+    return wasBuffered ? trackBufferedResponse(request, response) : response;
   };
 }

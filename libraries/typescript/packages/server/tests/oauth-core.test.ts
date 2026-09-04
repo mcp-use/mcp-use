@@ -400,6 +400,25 @@ describe("OAuth core", () => {
       mapAuthInfo: () =>
         ({ user: { id: "user-1" }, payload: {}, permissions: [123] }) as never,
     });
+    const malformedProviderToken = oauthCustomProvider({
+      createTokenVerifier: () => ({
+        verifyAccessToken: async () => ({
+          token: "verified-token",
+          clientId: "client-1",
+          scopes: [],
+          expiresAt: Date.now() / 1000 + 60,
+          resource: canonicalResource,
+        }),
+      }),
+      oauthMetadata: metadata,
+      mapAuthInfo: () =>
+        ({
+          user: { id: "user-1" },
+          payload: {},
+          permissions: [],
+          providerAccessToken: 123,
+        }) as never,
+    });
 
     await expect(
       wrapOAuthTokenVerifier(
@@ -413,7 +432,67 @@ describe("OAuth core", () => {
         canonicalResource
       ).verifyAccessToken("presented-token")
     ).rejects.toMatchObject({ code: OAuthErrorCode.InvalidToken });
+    await expect(
+      wrapOAuthTokenVerifier(
+        malformedProviderToken,
+        canonicalResource
+      ).verifyAccessToken("presented-token")
+    ).rejects.toMatchObject({ code: OAuthErrorCode.InvalidToken });
   });
+
+  it.each(["", "   ", 123])(
+    "rejects malformed provider access tokens with a useful error: %j",
+    async (providerAccessToken) => {
+      const provider = oauthCustomProvider({
+        createTokenVerifier: () => ({
+          verifyAccessToken: async () => ({
+            token: "local-token",
+            clientId: "client-1",
+            scopes: [],
+            expiresAt: Date.now() / 1000 + 60,
+            resource: canonicalResource,
+          }),
+        }),
+        oauthMetadata: metadata,
+        mapAuthInfo: () => ({
+          user: { id: "user-1" },
+          payload: {},
+          permissions: [],
+          providerAccessToken: providerAccessToken as string,
+        }),
+      });
+      await expect(
+        wrapOAuthTokenVerifier(provider, canonicalResource).verifyAccessToken(
+          "local-token"
+        )
+      ).rejects.toMatchObject({
+        code: OAuthErrorCode.InvalidToken,
+        message: expect.stringContaining("providerAccessToken"),
+      });
+    }
+  );
+
+  it.each([123, "   "])(
+    "also validates reserved provider tokens inherited from verifier extras: %j",
+    async (providerAccessToken) => {
+      const provider = createProvider({
+        token: "local-token",
+        clientId: "client-1",
+        scopes: [],
+        expiresAt: Date.now() / 1000 + 60,
+        resource: canonicalResource,
+        extra: { providerAccessToken },
+      });
+      await expect(
+        wrapOAuthTokenVerifier(provider, canonicalResource).verifyAccessToken(
+          "local-token"
+        )
+      ).rejects.toMatchObject({
+        code: OAuthErrorCode.InvalidToken,
+        message: expect.stringContaining("providerAccessToken"),
+      });
+    }
+  );
 
   it("leaves unexpected verifier failures untouched", async () => {
     const verifierFailure = new Error("verifier unavailable");

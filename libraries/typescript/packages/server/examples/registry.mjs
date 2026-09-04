@@ -76,6 +76,7 @@ export const examples = [
   external("auth/better-auth"),
   external("auth/clerk"),
   external("auth/convex"),
+  external("auth/github-oauth-proxy"),
   external("auth/keycloak"),
   external("auth/supabase"),
   external("auth/workos"),

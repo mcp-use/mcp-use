@@ -1,7 +1,7 @@
 import type { Icon, ServerOptions } from "@modelcontextprotocol/server";
 
 import type { LoggingOptions } from "./logging.js";
-import type { OAuthProvider } from "./oauth/index.js";
+import type { ServerOAuthProvider } from "./oauth/index.js";
 import type { SkillsOptions } from "./skills/types.js";
 
 /**
@@ -328,5 +328,5 @@ export type ServerConfig<TUser = never> = BaseServerConfig &
          * External OAuth resource-server provider. Callback contexts receive
          * this provider's user type as required `ctx.auth.user`.
          */
-        oauth: OAuthProvider<TUser>;
+        oauth: ServerOAuthProvider<TUser>;
       });
