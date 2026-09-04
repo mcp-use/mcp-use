@@ -41,28 +41,15 @@ describe("mcp-tunnel CLI", () => {
     });
   });
 
-  it("parses local-host option", () => {
-    expect(parseArgs(["3000", "--local-host", "127.0.0.1"])).toEqual({
-      help: false,
-      port: 3000,
-      localHostHeader: "127.0.0.1",
-    });
-  });
-
   it("rejects invalid ports and unsupported options", () => {
     expect(() => parseArgs(["0"])).toThrow("Invalid local port");
     expect(() => parseArgs(["3000", "--unknown", "value"])).toThrow(
       "Unknown option"
     );
-    expect(() => parseArgs(["3000", "--local-host"])).toThrow(
-      "--local-host requires a value"
-    );
   });
 
-  it("documents WebSocket relay and local-host configuration", () => {
+  it("documents WebSocket relay configuration", () => {
     expect(usage()).toContain("MCP_USE_WS_RELAY");
-    expect(usage()).toContain("[--local-host HOST]");
-    expect(usage()).toContain("x-forwarded-host");
   });
 
   it("defaults localHostHeader to localhost in runTunnelCli", async () => {
@@ -83,27 +70,6 @@ describe("mcp-tunnel CLI", () => {
     expect(tunnelMocks.create).toHaveBeenCalledWith(
       expect.stringContaining("tunnel.json"),
       { localHostHeader: "localhost" }
-    );
-  });
-
-  it("passes custom localHostHeader in runTunnelCli", async () => {
-    tunnelMocks.create.mockClear();
-    tunnelMocks.start.mockResolvedValueOnce({
-      url: "https://demo.tunnel.mcp-use.run",
-      subdomain: "demo",
-    });
-    tunnelMocks.stop.mockResolvedValueOnce(undefined);
-
-    const promise = runTunnelCli(["4000", "--local-host", "custom.host"]);
-    await vi.waitFor(() =>
-      expect(tunnelMocks.start).toHaveBeenCalledWith(4000)
-    );
-    process.emit("SIGTERM");
-    await promise;
-
-    expect(tunnelMocks.create).toHaveBeenCalledWith(
-      expect.stringContaining("tunnel.json"),
-      { localHostHeader: "custom.host" }
     );
   });
 });
