@@ -159,7 +159,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
 
   const clientInfo = useStableValue(options.clientInfo);
   const proxyConfig = useStableValue(rawProxyConfig);
-  const headersOption = useStableValue(rawHeadersOption);
+  const headers = useStableValue(rawHeadersOption ?? {});
   const clientOptions = useStableValue(rawClientOptions);
   const oauthOptions = useStableValue(rawOauthOptions);
   const reconnectionOptions = useStableValue(rawReconnectionOptions);
@@ -188,7 +188,6 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     return inst;
   }, [url, logLevelOption]);
 
-  const headers = headersOption ?? {};
   const effectiveClientOptions = useMemo(
     () => resolveClientOptions(clientOptions),
     [clientOptions]
@@ -2095,6 +2094,9 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     proxyConfig, // Triggers reconnection when proxy config (including headers) changes
     autoProxyFallbackConfig.proxyAddress,
     providedAuthProvider,
+    headers, // Triggers reconnection when custom headers legitimately change
+    effectiveClientOptions, // Triggers reconnection when client capabilities change
+    protocolNegotiation, // Triggers reconnection when protocol era negotiation mode changes
   ]);
 
   /**

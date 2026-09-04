@@ -313,4 +313,69 @@ describe("useMcp reference stability", () => {
 
     root.unmount();
   });
+
+  it("reconnects when headers legitimately change", async () => {
+    function TestComponent({ token }: { token: string }) {
+      useMcp({
+        url: "http://localhost:3000/mcp",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      return null;
+    }
+
+    let root: any;
+    await act(async () => {
+      root = create(<TestComponent token="token_v1" />);
+    });
+    await flushMicrotasks();
+
+    expect(addServerCalls.length).toBe(1);
+
+    // Change to token_v2
+    await act(async () => {
+      root.update(<TestComponent token="token_v2" />);
+    });
+    await flushMicrotasks();
+
+    // Must have reconnected with the new token
+    expect(addServerCalls.length).toBe(2);
+    expect(sharedClient.closeSession).toHaveBeenCalled();
+
+    root.unmount();
+  });
+
+  it("reconnects when clientOptions legitimately change", async () => {
+    function TestComponent({ rootsEnabled }: { rootsEnabled: boolean }) {
+      useMcp({
+        url: "http://localhost:3000/mcp",
+        clientOptions: {
+          capabilities: {
+            roots: { listChanged: rootsEnabled },
+          },
+        },
+      });
+
+      return null;
+    }
+
+    let root: any;
+    await act(async () => {
+      root = create(<TestComponent rootsEnabled={false} />);
+    });
+    await flushMicrotasks();
+
+    expect(addServerCalls.length).toBe(1);
+
+    // Change capabilities
+    await act(async () => {
+      root.update(<TestComponent rootsEnabled={true} />);
+    });
+    await flushMicrotasks();
+
+    expect(addServerCalls.length).toBe(2);
+    expect(sharedClient.closeSession).toHaveBeenCalled();
+
+    root.unmount();
+  });
 });
