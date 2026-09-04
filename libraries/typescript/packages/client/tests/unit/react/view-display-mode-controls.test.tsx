@@ -91,31 +91,34 @@ describe("useViewDisplayModeControls document chrome coordinator", () => {
     ).toBe(false);
   });
 
-  it("does not strip fullscreen attributes when an inline sibling mounts or updates", async () => {
+  it("does not strip fullscreen attributes when an inline sibling transitions, mounts, or updates", async () => {
     let root!: ReactTestRenderer;
 
     function MultiWidgetTimeline({
       widget1Mode,
       widget2Mode,
+      showWidget3 = false,
     }: {
       widget1Mode: ViewDisplayMode;
       widget2Mode: ViewDisplayMode;
+      showWidget3?: boolean;
     }) {
       return (
         <div>
           <WidgetHost displayMode={widget1Mode} />
           <WidgetHost displayMode={widget2Mode} />
+          {showWidget3 && <WidgetHost displayMode="inline" />}
         </div>
       );
     }
 
+    // Mount with Widget 1 in fullscreen and Widget 2 in pip
     await act(async () => {
       root = create(
-        <MultiWidgetTimeline widget1Mode="fullscreen" widget2Mode="inline" />
+        <MultiWidgetTimeline widget1Mode="fullscreen" widget2Mode="pip" />
       );
     });
 
-    // Widget 1 is fullscreen, Widget 2 is inline. Root document must reflect fullscreen!
     expect(
       document.documentElement.getAttribute(WIDGET_DISPLAY_MODE_ATTR)
     ).toBe("fullscreen");
@@ -123,10 +126,29 @@ describe("useViewDisplayModeControls document chrome coordinator", () => {
       document.documentElement.hasAttribute(WIDGET_FULLSCREEN_DOCUMENT_ATTR)
     ).toBe(true);
 
-    // Re-rendering or updating Widget 2 in inline mode must not clobber Widget 1's fullscreen
+    // Transition sibling Widget 2 from pip -> inline (re-running its effect) while Widget 1 stays fullscreen
     await act(async () => {
       root.update(
         <MultiWidgetTimeline widget1Mode="fullscreen" widget2Mode="inline" />
+      );
+    });
+
+    // Fullscreen must remain active and not be stripped by Widget 2 transitioning to inline
+    expect(
+      document.documentElement.getAttribute(WIDGET_DISPLAY_MODE_ATTR)
+    ).toBe("fullscreen");
+    expect(
+      document.documentElement.hasAttribute(WIDGET_FULLSCREEN_DOCUMENT_ATTR)
+    ).toBe(true);
+
+    // Dynamically mount a 3rd inline widget
+    await act(async () => {
+      root.update(
+        <MultiWidgetTimeline
+          widget1Mode="fullscreen"
+          widget2Mode="inline"
+          showWidget3={true}
+        />
       );
     });
 
@@ -140,7 +162,11 @@ describe("useViewDisplayModeControls document chrome coordinator", () => {
     // When Widget 1 returns to inline, document attributes clear
     await act(async () => {
       root.update(
-        <MultiWidgetTimeline widget1Mode="inline" widget2Mode="inline" />
+        <MultiWidgetTimeline
+          widget1Mode="inline"
+          widget2Mode="inline"
+          showWidget3={true}
+        />
       );
     });
 
