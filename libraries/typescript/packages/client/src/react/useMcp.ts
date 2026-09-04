@@ -168,7 +168,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
 
   const clientInfo = useMemo(() => {
     if (!rawClientInfo) return undefined;
-    return rawClientInfo;
+    return { ...rawClientInfo };
   }, [
     clientInfoName,
     clientInfoTitle,
@@ -186,7 +186,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
 
   const proxyConfig = useMemo(() => {
     if (!rawProxyConfig) return undefined;
-    return rawProxyConfig;
+    return { ...rawProxyConfig };
   }, [rawProxyAddress, serializedProxyHeaders]);
 
   const headers = headersOption ?? {};

@@ -755,4 +755,45 @@ describe("useMcp reference stability", () => {
       root.unmount();
     });
   });
+
+  it("reconnects when a caller mutates an existing proxyConfig object in place", async () => {
+    const config = {
+      proxyAddress: "https://gateway.example.com",
+      headers: { "x-token": "initial" },
+    };
+
+    function TestComponent() {
+      useMcp({
+        url: "http://localhost:3000/mcp",
+        proxyConfig: config,
+      });
+
+      return null;
+    }
+
+    let root: any;
+    await act(async () => {
+      root = create(<TestComponent />);
+    });
+    mountedRoots.push(root);
+    await flushMicrotasks();
+
+    expect(addServerCalls.length).toBe(1);
+    expect(addServerCalls[0].headers["x-token"]).toBe("initial");
+
+    // Mutate proxyConfig object in place and trigger re-render
+    config.headers = { "x-token": "updated" };
+    await act(async () => {
+      root.update(<TestComponent />);
+    });
+    await flushMicrotasks();
+
+    expect(addServerCalls.length).toBe(2);
+    expect(addServerCalls[1].headers["x-token"]).toBe("updated");
+    expect(sharedClient.closeSession).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
 });
