@@ -35,6 +35,11 @@ const resource = new URL("/mcp", mcpURL).href;
 const resourceOrigin = mcpURL.origin;
 
 const auth = createAuth({ origin, resource });
+// Remove this cast with the workaround in auth.ts once Better Auth #10213 lands.
+const metadataAuth = auth as unknown as Parameters<
+  typeof oauthProviderAuthServerMetadata
+>[0] &
+  Parameters<typeof oauthProviderOpenIdConfigMetadata>[0];
 const app = new Hono();
 
 // Browser-based MCP clients call registration and token endpoints from the
@@ -53,10 +58,10 @@ const metadataHeaders = {
   "Access-Control-Allow-Origin": resourceOrigin,
   "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
 };
-const authServerMetadata = oauthProviderAuthServerMetadata(auth, {
+const authServerMetadata = oauthProviderAuthServerMetadata(metadataAuth, {
   headers: metadataHeaders,
 });
-const openIdConfiguration = oauthProviderOpenIdConfigMetadata(auth, {
+const openIdConfiguration = oauthProviderOpenIdConfigMetadata(metadataAuth, {
   headers: metadataHeaders,
 });
 

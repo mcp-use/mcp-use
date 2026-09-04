@@ -35,6 +35,8 @@ export function createDemoAuth({ origin, resource }: CreateDemoAuthOptions) {
     plugins: [
       anonymous(),
       jwt(),
+      // @ts-expect-error Better Auth 1.7.2 is incompatible with
+      // exactOptionalPropertyTypes: https://github.com/better-auth/better-auth/issues/10213
       oauthProvider({
         loginPage: "/sign-in",
         consentPage: "/consent",
@@ -43,12 +45,13 @@ export function createDemoAuth({ origin, resource }: CreateDemoAuthOptions) {
         clientRegistrationAllowedScopes: [...demoScopes],
         allowDynamicClientRegistration: true,
         allowUnauthenticatedClientRegistration: true,
-        validAudiences: [resource],
+        resources: [resource],
+        clientRegistrationDefaultResources: [resource],
+        clientRegistrationAllowedResources: [resource],
         customAccessTokenClaims: ({ user }) => ({
           name: user?.name,
           is_anonymous: user?.isAnonymous ?? false,
         }),
-        silenceWarnings: { oauthAuthServerConfig: true },
       }),
     ],
   });
