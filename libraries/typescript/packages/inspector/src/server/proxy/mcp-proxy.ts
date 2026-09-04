@@ -301,6 +301,7 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
           headers,
           body: currentBody,
           redirect: "manual",
+          signal: c.req.raw.signal,
         });
         const location = response.headers.get("location");
         if (!(response.status >= 300 && response.status < 400 && location)) {

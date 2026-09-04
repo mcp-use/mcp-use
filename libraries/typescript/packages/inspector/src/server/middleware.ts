@@ -200,7 +200,14 @@ function createExpressInspectorMiddleware(
       .then((fetchResponse) =>
         writeFetchResponse(res, fetchResponse, abort.signal)
       )
-      .catch(next)
+      .catch((error) => {
+        // The client going away aborts the outbound fetch and the body
+        // read. That is a completed request, not an Express error.
+        if (abort.signal.aborted) {
+          return;
+        }
+        next(error);
+      })
       .finally(() => {
         finished = true;
       });
