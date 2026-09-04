@@ -5,6 +5,7 @@ import {
   INSPECTOR_API_RATE_LIMIT,
   INSPECTOR_ASSET_RATE_LIMIT,
   inspectorRateLimitResponse,
+  inspectorServerRateLimitKey,
 } from "../../src/server/rate-limit.js";
 
 describe("Inspector route rate limits", () => {
@@ -63,6 +64,16 @@ describe("Inspector route rate limits", () => {
   it("keeps the security patch defaults stable", () => {
     expect(INSPECTOR_API_RATE_LIMIT).toBe(120);
     expect(INSPECTOR_ASSET_RATE_LIMIT).toBe(600);
+  });
+
+  it("canonicalizes target keys without query, fragment, or credentials", () => {
+    expect(
+      inspectorServerRateLimitKey(
+        "oauth",
+        "https://user:password@example.com/mcp/?token=secret#fragment"
+      )
+    ).toBe("oauth:https://example.com/mcp");
+    expect(inspectorServerRateLimitKey("mcp", "not a URL")).toBe("mcp:unknown");
   });
 
   it("uses the fallback Retry-After for non-finite limiter values", async () => {

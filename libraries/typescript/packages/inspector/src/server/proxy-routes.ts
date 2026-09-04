@@ -1,4 +1,4 @@
-import type { Hono } from "hono";
+import type { Context, Hono } from "hono";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 import {
   mountMcpProxy,
@@ -8,6 +8,7 @@ import {
 } from "./proxy/index.js";
 import {
   INSPECTOR_API_RATE_LIMIT,
+  INSPECTOR_GLOBAL_API_RATE_LIMIT,
   INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
 } from "./rate-limit.js";
 
@@ -30,6 +31,8 @@ export type InspectorProxyRoutesConfig = {
   oauthProxyStateStore?: OAuthProxyStateStore;
   /** Server-side provider configuration for confidential OAuth clients. */
   oauthProxyConfidentialClientResolver?: OAuthProxyConfidentialClientResolver;
+  /** Authentication boundary for the product relay (upstream Authorization is separate). */
+  authenticate?: (c: Context) => Promise<boolean> | boolean;
 };
 
 /**
@@ -47,8 +50,22 @@ export function registerInspectorProxyRoutes(
     points: INSPECTOR_API_RATE_LIMIT,
     duration: INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
   });
+  const globalRateLimiter = new RateLimiterMemory({
+    points: INSPECTOR_GLOBAL_API_RATE_LIMIT,
+    duration: INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
+  });
 
-  app.get(p("/inspector/health"), (c) => {
+  app.get(p("/inspector/health"), async (c) => {
+    if (config?.oauthProxyStateStore?.ready) {
+      try {
+        await Promise.race([
+          config.oauthProxyStateStore.ready(),
+          healthTimeout(1_000),
+        ]);
+      } catch {
+        return c.json({ status: "unavailable" }, 503);
+      }
+    }
     return c.json({
       status: "ok",
       protocol: "mcp-use-inspector-preview",
@@ -62,8 +79,10 @@ export function registerInspectorProxyRoutes(
       path: p("/inspector/api/proxy"),
       allowLoopback,
       rateLimiter: apiRateLimiter,
+      globalRateLimiter,
       logPrefix: config?.logPrefix,
       allowedOrigins: config?.mcpProxyAllowedOrigins,
+      authenticate: config?.authenticate,
     });
   }
 
@@ -76,8 +95,10 @@ export function registerInspectorProxyRoutes(
       allowedOrigins: config?.oauthProxyAllowedOrigins ?? [],
       allowLoopback,
       rateLimiter: apiRateLimiter,
+      globalRateLimiter,
       stateStore: config?.oauthProxyStateStore,
       resolveConfidentialClient: config?.oauthProxyConfidentialClientResolver,
+      authenticate: config?.authenticate,
     });
   }
 
@@ -87,4 +108,13 @@ export function registerInspectorProxyRoutes(
       return c.json({ autoConnectUrl: autoConnectUrl ?? null });
     });
   }
+}
+
+function healthTimeout(ms: number): Promise<never> {
+  return new Promise((_, reject) =>
+    setTimeout(
+      () => reject(new Error("Inspector state store readiness timeout")),
+      ms
+    )
+  );
 }

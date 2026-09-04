@@ -12,11 +12,13 @@
 import { lookup } from "node:dns/promises";
 import { Buffer } from "node:buffer";
 import { isIP } from "node:net";
-import type { Context, Hono, Next } from "hono";
+import type { Context, Hono } from "hono";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 import {
   INSPECTOR_API_RATE_LIMIT,
+  INSPECTOR_GLOBAL_API_RATE_LIMIT,
   INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
+  inspectorServerRateLimitKey,
   inspectorRateLimitResponse,
 } from "../rate-limit.js";
 import {
@@ -32,9 +34,15 @@ type OAuthEndpointKind =
 
 type Binding = {
   authorizationServers: Set<string>;
-  endpoints: Map<string, OAuthEndpointKind>;
+  endpoints: Map<string, BoundEndpoint>;
   tokenEndpointAuthMethods: Set<string>;
+  revision: number;
   updatedAt: number;
+};
+
+type BoundEndpoint = {
+  kind: OAuthEndpointKind;
+  authorizationServer?: string;
 };
 
 type ProtectedResourceMetadataTarget = {
@@ -46,12 +54,15 @@ type ProtectedResourceMetadataTarget = {
 type ConfidentialClient = {
   clientSecret: string;
   authMethod: "client_secret_basic" | "client_secret_post";
-  expiresAt: number;
+  expiresAt: number | null;
+  revision: number;
+  updatedAt: number;
 };
 
 export type OAuthProxyConfidentialClient = {
   clientSecret: string;
   authMethod: "client_secret_basic" | "client_secret_post";
+  /** `0` means no expiry, matching OAuth DCR semantics. */
   expiresAt?: number;
 };
 
@@ -59,6 +70,7 @@ export type OAuthProxyConfidentialClientResolver = (options: {
   serverUrl: string;
   targetUrl: string;
   clientId: string;
+  authorizationServer?: string;
 }) =>
   | OAuthProxyConfidentialClient
   | undefined
@@ -100,6 +112,8 @@ interface OAuthProxyOptions {
   ) => Promise<boolean> | boolean;
   /** Shared process-local limiter for Inspector proxy and OAuth routes. */
   rateLimiter?: RateLimiterMemory;
+  /** Higher process-wide backstop against target-key rotation abuse. */
+  globalRateLimiter?: RateLimiterMemory;
   /** Durable store shared by every Inspector replica. */
   stateStore?: OAuthProxyStateStore;
   /** Server-side resolver for configured confidential clients (never browser-visible). */
@@ -152,6 +166,10 @@ export function mountOAuthProxy(
       points: INSPECTOR_API_RATE_LIMIT,
       duration: INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
     }),
+    globalRateLimiter = new RateLimiterMemory({
+      points: INSPECTOR_GLOBAL_API_RATE_LIMIT,
+      duration: INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
+    }),
     stateStore,
     resolveConfidentialClient,
   } = options;
@@ -159,16 +177,7 @@ export function mountOAuthProxy(
   const origins = new Set(allowedOrigins.map(normalizeOrigin));
   const bindings = new Map<string, Binding>();
   const confidentialClients = new Map<string, ConfidentialClient>();
-  const rateLimit = async (c: Context, next: Next) => {
-    try {
-      // RateLimiterMemory prefixes and stringifies keys. The Hono request
-      // wrapper therefore maps every request to one mounted-instance budget.
-      await configuredRateLimiter.consume(c.req as unknown as string);
-    } catch (error) {
-      return inspectorRateLimitResponse(c, error);
-    }
-    return next();
-  };
+  const bindingLocks = new Map<string, Promise<void>>();
 
   app.use(`${basePath}/*`, async (c, next) => {
     const origin = c.req.header("Origin");
@@ -181,8 +190,6 @@ export function mountOAuthProxy(
     await next();
     if (origin) setCorsHeaders(c.res.headers, origin);
   });
-  app.use(`${basePath}/*`, rateLimit);
-
   app.get(`${basePath}/metadata`, async (c) => {
     if (!(await isAuthenticated(c, authenticate))) {
       return c.json({ error: "Unauthorized" }, 401);
@@ -196,6 +203,13 @@ export function mountOAuthProxy(
       return c.json({ error: serverUrlResult.error }, 400);
     }
     const serverUrl = serverUrlResult.url;
+    const rateLimitResponse = await consumeRateLimit(
+      c,
+      configuredRateLimiter,
+      globalRateLimiter,
+      inspectorServerRateLimitKey("oauth", serverUrl.toString())
+    );
+    if (rateLimitResponse) return rateLimitResponse;
     if (
       validateServerUrl &&
       !(await validateServerUrl(serverUrl.toString(), c))
@@ -213,23 +227,29 @@ export function mountOAuthProxy(
     try {
       binding = await loadBinding(durableStateStore, bindings, key);
     } catch (error) {
-      return proxyError(c, error, enableLogging);
+      return proxyError(c, error, enableLogging, logPrefix);
     }
     let metadataKind = classifyMetadataTarget(serverUrl, target, binding);
     if (!metadataKind && binding.authorizationServers.size === 0) {
       try {
-        await hydrateBinding(
-          serverUrl,
-          binding,
-          allowLoopback,
-          timeoutMs,
-          maxResponseBodyBytes
-        );
-        await saveBinding(durableStateStore, bindings, key, binding);
+        binding = await withKeyLock(bindingLocks, key, async () => {
+          const latest = await loadBinding(durableStateStore, bindings, key);
+          if (latest.authorizationServers.size === 0) {
+            await hydrateBinding(
+              serverUrl,
+              latest,
+              allowLoopback,
+              timeoutMs,
+              maxResponseBodyBytes
+            );
+            await saveBinding(durableStateStore, bindings, key, latest);
+          }
+          return latest;
+        });
         metadataKind = classifyMetadataTarget(serverUrl, target, binding);
       } catch (error) {
         if (error instanceof OAuthProxyStateStoreError) {
-          return proxyError(c, error, enableLogging);
+          return proxyError(c, error, enableLogging, logPrefix);
         }
         // The requested target remains unauthorized below.
       }
@@ -319,6 +339,13 @@ export function mountOAuthProxy(
       return c.json({ error: serverUrlResult.error }, 400);
     }
     const serverUrl = serverUrlResult.url;
+    const rateLimitResponse = await consumeRateLimit(
+      c,
+      configuredRateLimiter,
+      globalRateLimiter,
+      inspectorServerRateLimitKey("oauth", serverUrl.toString())
+    );
+    if (rateLimitResponse) return rateLimitResponse;
     if (
       validateServerUrl &&
       !(await validateServerUrl(serverUrl.toString(), c))
@@ -340,24 +367,34 @@ export function mountOAuthProxy(
     try {
       binding = await loadBinding(durableStateStore, bindings, bindingKey);
     } catch (error) {
-      return proxyError(c, error, enableLogging);
+      return proxyError(c, error, enableLogging, logPrefix);
     }
     if (binding.endpoints.size === 0) {
       try {
-        await hydrateBinding(
-          serverUrl,
-          binding,
-          allowLoopback,
-          timeoutMs,
-          maxResponseBodyBytes
-        );
-        await saveBinding(durableStateStore, bindings, bindingKey, binding);
+        binding = await withKeyLock(bindingLocks, bindingKey, async () => {
+          const latest = await loadBinding(
+            durableStateStore,
+            bindings,
+            bindingKey
+          );
+          if (latest.endpoints.size === 0) {
+            await hydrateBinding(
+              serverUrl,
+              latest,
+              allowLoopback,
+              timeoutMs,
+              maxResponseBodyBytes
+            );
+            await saveBinding(durableStateStore, bindings, bindingKey, latest);
+          }
+          return latest;
+        });
       } catch (error) {
         return proxyError(c, error, enableLogging, logPrefix);
       }
     }
-    const endpointKind = binding.endpoints.get(canonicalUrl(target));
-    if (!endpointKind) {
+    const endpoint = binding.endpoints.get(canonicalUrl(target));
+    if (!endpoint) {
       return c.json(
         { error: "OAuth endpoint is not bound to this MCP server" },
         403
@@ -367,7 +404,7 @@ export function mountOAuthProxy(
     try {
       const headers = filterRequestHeaders(request.headers);
       let body = serializeBody(request.body, headers);
-      if (endpointKind === "registration") {
+      if (endpoint.kind === "registration") {
         const publicOrigin = normalizeOrigin(
           c.req.header("Origin") ?? new URL(c.req.url).origin
         );
@@ -385,6 +422,7 @@ export function mountOAuthProxy(
           stateStore: durableStateStore,
           serverUrl: serverUrl.toString(),
           targetUrl: target.toString(),
+          authorizationServer: endpoint.authorizationServer,
           resolveConfidentialClient,
         });
       }
@@ -394,7 +432,7 @@ export function mountOAuthProxy(
         return c.json({ error: "OAuth request body too large" }, 413);
       }
 
-      log(enableLogging, logPrefix, `POST ${endpointKind} ${target}`);
+      log(enableLogging, logPrefix, `POST ${endpoint.kind} ${target}`);
       const upstream = await safeFetch(target, {
         method: "POST",
         headers,
@@ -412,27 +450,55 @@ export function mountOAuthProxy(
       const responseHeaders = filterResponseHeaders(upstream.headers);
       const contentType = upstream.headers.get("content-type") ?? "";
       let responseBody: unknown = raw;
+      if (endpoint.kind === "registration" && !contentType.includes("json")) {
+        // DCR responses are JSON. Do not pass an unexpected plaintext response
+        // through, since it may contain a provider-issued secret.
+        return c.json({ error: "OAuth registration response is invalid" }, 502);
+      }
       if (contentType.includes("json")) {
         try {
           responseBody = JSON.parse(raw);
         } catch {
-          // Preserve malformed upstream bodies; the OAuth client will reject them.
+          if (endpoint.kind === "registration") {
+            // A malformed successful DCR response may contain a plaintext
+            // client_secret. Never echo it to the browser.
+            return c.json(
+              { error: "OAuth registration response is invalid" },
+              502
+            );
+          }
         }
       }
-      if (
-        endpointKind === "registration" &&
-        upstream.ok &&
-        responseBody &&
-        typeof responseBody === "object" &&
-        !Array.isArray(responseBody)
-      ) {
+      if (endpoint.kind === "registration" && upstream.ok) {
+        if (
+          !contentType.includes("json") ||
+          !responseBody ||
+          typeof responseBody !== "object" ||
+          Array.isArray(responseBody)
+        ) {
+          return c.json(
+            { error: "OAuth registration response is invalid" },
+            502
+          );
+        }
         responseBody = await retainConfidentialClient({
           responseBody: responseBody as Record<string, unknown>,
           binding,
           bindingKey,
+          authorizationServer: endpoint.authorizationServer,
+          targetUrl: target.toString(),
           clients: confidentialClients,
           stateStore: durableStateStore,
         });
+      } else if (
+        endpoint.kind === "registration" &&
+        responseBody &&
+        typeof responseBody === "object" &&
+        !Array.isArray(responseBody)
+      ) {
+        responseBody = sanitizeDcrResponse(
+          responseBody as Record<string, unknown>
+        );
       }
       return c.json({
         status: upstream.status,
@@ -692,7 +758,10 @@ async function bindAuthorizationServer(
     if ("error" in result) {
       throw new InvalidUpstreamError(`Unsafe ${field}: ${result.error}`);
     }
-    binding.endpoints.set(canonicalUrl(result.url), kind);
+    binding.endpoints.set(canonicalUrl(result.url), {
+      kind,
+      authorizationServer: expectedIssuer,
+    });
   }
 }
 
@@ -825,22 +894,53 @@ function serializeBody(body: unknown, headers: Headers): string | undefined {
   return JSON.stringify(body);
 }
 
-function confidentialClientKey(bindingKey: string, clientId: string): string {
-  return `client:${Buffer.from(`${bindingKey}\u0000${clientId}`, "utf8").toString("base64url")}`;
+function sanitizeDcrResponse(
+  responseBody: Record<string, unknown>
+): Record<string, unknown> {
+  const browserSafe = { ...responseBody };
+  delete browserSafe.client_secret;
+  delete browserSafe.client_secret_expires_at;
+  return browserSafe;
+}
+
+function confidentialClientKey(
+  bindingKey: string,
+  authorizationServer: string | undefined,
+  clientId: string
+): string {
+  return `client:${Buffer.from(
+    `${bindingKey}\u0000${authorizationServer ?? "unknown"}\u0000${clientId}`,
+    "utf8"
+  ).toString("base64url")}`;
 }
 
 async function retainConfidentialClient(options: {
   responseBody: Record<string, unknown>;
   binding: Binding;
   bindingKey: string;
+  authorizationServer?: string;
+  targetUrl: string;
   clients: Map<string, ConfidentialClient>;
   stateStore: OAuthProxyStateStore;
 }): Promise<Record<string, unknown>> {
-  const { responseBody, binding, bindingKey, clients, stateStore } = options;
+  const {
+    responseBody,
+    binding,
+    bindingKey,
+    authorizationServer,
+    targetUrl,
+    clients,
+    stateStore,
+  } = options;
   const clientId = responseBody.client_id;
   const clientSecret = responseBody.client_secret;
   if (typeof clientId !== "string" || typeof clientSecret !== "string") {
-    return responseBody;
+    // A successful DCR response must never echo a secret that we could not
+    // bind to a valid client ID. This also handles partially malformed JSON.
+    const browserSafe = { ...responseBody };
+    delete browserSafe.client_secret;
+    delete browserSafe.client_secret_expires_at;
+    return browserSafe;
   }
 
   const returnedMethod = responseBody.token_endpoint_auth_method;
@@ -852,28 +952,41 @@ async function retainConfidentialClient(options: {
         ? "client_secret_basic"
         : "client_secret_post";
   const upstreamExpiry = responseBody.client_secret_expires_at;
-  const expiresAt =
+  const expiresAt: number | null =
     upstreamExpiry === 0
-      ? Date.now() + CONFIDENTIAL_CLIENT_TTL_MS
+      ? null
       : typeof upstreamExpiry === "number" && upstreamExpiry > 0
         ? upstreamExpiry * 1000
         : Date.now() + CONFIDENTIAL_CLIENT_TTL_MS;
 
   pruneConfidentialClients(clients);
+  const key = confidentialClientKey(
+    bindingKey,
+    authorizationServer ?? targetUrl,
+    clientId
+  );
+  const previous = clients.get(key);
   const client = {
     clientSecret,
     authMethod,
     expiresAt,
+    revision: Math.max((previous?.revision ?? 0) + 1, Date.now()),
+    updatedAt: Date.now(),
   } satisfies ConfidentialClient;
-  const key = confidentialClientKey(bindingKey, clientId);
-  clients.set(key, client);
-  await storeSet(stateStore, key, client, Math.max(1, expiresAt - Date.now()));
-  while (clients.size > MAX_CONFIDENTIAL_CLIENTS) {
-    const oldest = clients.keys().next().value as string | undefined;
-    if (!oldest) break;
-    clients.delete(oldest);
-    await storeDelete(stateStore, oldest);
+  const persisted = await storeSetIfNewer(
+    stateStore,
+    key,
+    client,
+    clientTtl(client)
+  );
+  if (!persisted) {
+    const latest = await storeGet<unknown>(stateStore, key);
+    const latestClient = normalizeConfidentialClient(latest);
+    if (latestClient && compareVersions(client, latestClient) < 0) {
+      cacheConfidentialClient(clients, key, latestClient);
+    }
   }
+  cacheConfidentialClient(clients, key, client);
 
   const browserSafe = { ...responseBody };
   delete browserSafe.client_secret;
@@ -886,6 +999,7 @@ async function applyConfidentialClientAuthentication(options: {
   body: string | undefined;
   headers: Headers;
   bindingKey: string;
+  authorizationServer?: string;
   clients: Map<string, ConfidentialClient>;
   stateStore: OAuthProxyStateStore;
   serverUrl: string;
@@ -900,6 +1014,7 @@ async function applyConfidentialClientAuthentication(options: {
     stateStore,
     serverUrl,
     targetUrl,
+    authorizationServer,
     resolveConfidentialClient,
   } = options;
   if (
@@ -915,39 +1030,62 @@ async function applyConfidentialClientAuthentication(options: {
   const clientId = params.get("client_id");
   if (!clientId) return body;
 
-  const key = confidentialClientKey(bindingKey, clientId);
-  const persistedClient = await storeGet<unknown>(stateStore, key);
-  let client: ConfidentialClient | undefined;
-  if (isConfidentialClient(persistedClient)) {
+  const key = confidentialClientKey(
+    bindingKey,
+    authorizationServer ?? targetUrl,
+    clientId
+  );
+  let localClient = clients.get(key);
+  if (localClient && isExpired(localClient.expiresAt)) {
+    clients.delete(key);
+    localClient = undefined;
+  }
+  const persistedClient = normalizeConfidentialClient(
+    await storeGet<unknown>(stateStore, key)
+  );
+  let client: ConfidentialClient | undefined = localClient;
+  if (
+    persistedClient &&
+    (!client || compareVersions(client, persistedClient) < 0)
+  ) {
     client = persistedClient;
-    clients.set(key, persistedClient);
-  } else {
-    client = clients.get(key);
+    cacheConfidentialClient(clients, key, persistedClient);
   }
   if (client === undefined && resolveConfidentialClient) {
     const resolved = await resolveConfidentialClient({
       serverUrl,
       targetUrl,
       clientId,
+      authorizationServer,
     });
     if (resolved) {
       client = {
         clientSecret: resolved.clientSecret,
         authMethod: resolved.authMethod,
         expiresAt:
-          resolved.expiresAt ?? Date.now() + CONFIDENTIAL_CLIENT_TTL_MS,
+          resolved.expiresAt === 0
+            ? null
+            : (resolved.expiresAt ?? Date.now() + CONFIDENTIAL_CLIENT_TTL_MS),
+        revision: Date.now(),
+        updatedAt: Date.now(),
       };
-      clients.set(key, client);
-      await storeSet(
+      const persisted = await storeSetIfNewer(
         stateStore,
         key,
         client,
-        Math.max(1, client.expiresAt - Date.now())
+        clientTtl(client)
       );
+      if (!persisted) {
+        const latest = normalizeConfidentialClient(
+          await storeGet<unknown>(stateStore, key)
+        );
+        if (latest && compareVersions(client, latest) < 0) client = latest;
+      }
+      cacheConfidentialClient(clients, key, client);
     }
   }
   if (!client) return body;
-  if (client.expiresAt <= Date.now()) {
+  if (isExpired(client.expiresAt)) {
     clients.delete(key);
     await storeDelete(stateStore, key);
     return body;
@@ -977,20 +1115,69 @@ function pruneConfidentialClients(
 ): void {
   const now = Date.now();
   for (const [key, client] of clients) {
-    if (client.expiresAt <= now) clients.delete(key);
+    if (isExpired(client.expiresAt, now)) clients.delete(key);
   }
 }
 
-function isConfidentialClient(value: unknown): value is ConfidentialClient {
-  return Boolean(
-    value &&
-    typeof value === "object" &&
-    typeof (value as ConfidentialClient).clientSecret === "string" &&
-    ((value as ConfidentialClient).authMethod === "client_secret_basic" ||
-      (value as ConfidentialClient).authMethod === "client_secret_post") &&
-    typeof (value as ConfidentialClient).expiresAt === "number" &&
-    Number.isFinite((value as ConfidentialClient).expiresAt)
-  );
+function isExpired(expiresAt: number | null, now = Date.now()): boolean {
+  return expiresAt !== null && expiresAt <= now;
+}
+
+function clientTtl(client: ConfidentialClient): number | undefined {
+  return client.expiresAt === null
+    ? undefined
+    : Math.max(1, client.expiresAt - Date.now());
+}
+
+function cacheConfidentialClient(
+  clients: Map<string, ConfidentialClient>,
+  key: string,
+  client: ConfidentialClient
+): void {
+  const local = clients.get(key);
+  if (!local || compareVersions(local, client) < 0) clients.set(key, client);
+  pruneConfidentialClients(clients);
+  while (clients.size > MAX_CONFIDENTIAL_CLIENTS) {
+    const oldest = clients.keys().next().value as string | undefined;
+    if (oldest === undefined) break;
+    clients.delete(oldest);
+  }
+}
+
+function normalizeConfidentialClient(
+  value: unknown
+): ConfidentialClient | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.clientSecret !== "string" ||
+    (record.authMethod !== "client_secret_basic" &&
+      record.authMethod !== "client_secret_post")
+  ) {
+    return undefined;
+  }
+  const expiresAt = record.expiresAt;
+  if (
+    expiresAt !== null &&
+    (typeof expiresAt !== "number" || !Number.isFinite(expiresAt))
+  ) {
+    return undefined;
+  }
+  const revision =
+    typeof record.revision === "number" && Number.isFinite(record.revision)
+      ? record.revision
+      : 0;
+  const updatedAt =
+    typeof record.updatedAt === "number" && Number.isFinite(record.updatedAt)
+      ? record.updatedAt
+      : 0;
+  return {
+    clientSecret: record.clientSecret,
+    authMethod: record.authMethod,
+    expiresAt: expiresAt as number | null,
+    revision,
+    updatedAt,
+  };
 }
 
 async function readRequestCapped(
@@ -1067,11 +1254,20 @@ async function loadBinding(
   );
   if (persisted !== undefined) {
     const binding = deserializeBinding(persisted);
+    const local = bindings.get(key);
     if (Date.now() - binding.updatedAt <= BINDING_TTL_MS) {
-      bindings.set(key, binding);
-      return binding;
+      if (!local || compareVersions(local, binding) < 0) {
+        bindings.set(key, binding);
+        pruneBindings(bindings);
+        return binding;
+      }
+      return local;
     }
-    await storeDelete(stateStore, bindingStoreKey(key));
+    if (!local || Date.now() - local.updatedAt > BINDING_TTL_MS) {
+      await storeDelete(stateStore, bindingStoreKey(key));
+    } else {
+      return local;
+    }
   }
   const existing = bindings.get(key);
   if (existing && Date.now() - existing.updatedAt <= BINDING_TTL_MS) {
@@ -1087,13 +1283,35 @@ async function saveBinding(
   key: string,
   binding: Binding
 ): Promise<void> {
-  bindings.set(key, binding);
-  await storeSet(
+  const now = Date.now();
+  const next: Binding = {
+    ...binding,
+    revision: Math.max(binding.revision + 1, now),
+    updatedAt: now,
+  };
+  const persisted = await storeSetIfNewer(
     stateStore,
     bindingStoreKey(key),
-    serializeBinding(binding),
+    serializeBinding(next),
     BINDING_TTL_MS
   );
+  if (persisted === false) {
+    const latest = await storeGet<SerializedBinding>(
+      stateStore,
+      bindingStoreKey(key)
+    );
+    if (latest !== undefined) {
+      const latestBinding = deserializeBinding(latest);
+      bindings.set(
+        key,
+        compareVersions(next, latestBinding) < 0 ? latestBinding : next
+      );
+    } else {
+      bindings.set(key, next);
+    }
+  } else {
+    bindings.set(key, next);
+  }
   pruneBindings(bindings);
 }
 
@@ -1102,14 +1320,16 @@ function emptyBinding(): Binding {
     authorizationServers: new Set(),
     endpoints: new Map(),
     tokenEndpointAuthMethods: new Set(),
+    revision: 0,
     updatedAt: Date.now(),
   };
 }
 
 type SerializedBinding = {
   authorizationServers: string[];
-  endpoints: Array<[string, OAuthEndpointKind]>;
+  endpoints: Array<[string, OAuthEndpointKind | BoundEndpoint]>;
   tokenEndpointAuthMethods: string[];
+  revision?: number;
   updatedAt: number;
 };
 
@@ -1118,6 +1338,7 @@ function serializeBinding(binding: Binding): SerializedBinding {
     authorizationServers: [...binding.authorizationServers],
     endpoints: [...binding.endpoints.entries()],
     tokenEndpointAuthMethods: [...binding.tokenEndpointAuthMethods],
+    revision: binding.revision,
     updatedAt: binding.updatedAt,
   };
 }
@@ -1127,20 +1348,63 @@ function deserializeBinding(value: SerializedBinding): Binding {
     !Array.isArray(value.authorizationServers) ||
     !Array.isArray(value.endpoints) ||
     !Array.isArray(value.tokenEndpointAuthMethods) ||
-    typeof value.updatedAt !== "number"
+    !value.authorizationServers.every(
+      (entry): entry is string => typeof entry === "string"
+    ) ||
+    !value.tokenEndpointAuthMethods.every(
+      (entry): entry is string => typeof entry === "string"
+    ) ||
+    !Number.isFinite(value.updatedAt) ||
+    (value.revision !== undefined &&
+      (!Number.isFinite(value.revision) || value.revision < 0))
   ) {
     throw new InvalidUpstreamError("OAuth proxy state is invalid");
   }
+  const endpoints = new Map<string, BoundEndpoint>();
+  for (const entry of value.endpoints) {
+    if (!Array.isArray(entry) || typeof entry[0] !== "string") {
+      throw new InvalidUpstreamError("OAuth proxy state is invalid");
+    }
+    const endpoint = entry[1];
+    if (typeof endpoint === "string" && isOAuthEndpointKind(endpoint)) {
+      endpoints.set(entry[0], { kind: endpoint });
+    } else if (
+      endpoint &&
+      typeof endpoint === "object" &&
+      typeof endpoint.kind === "string" &&
+      isOAuthEndpointKind(endpoint.kind)
+    ) {
+      endpoints.set(entry[0], {
+        kind: endpoint.kind,
+        authorizationServer:
+          typeof endpoint.authorizationServer === "string"
+            ? endpoint.authorizationServer
+            : undefined,
+      });
+    } else {
+      throw new InvalidUpstreamError("OAuth proxy state is invalid");
+    }
+  }
   return {
     authorizationServers: new Set(value.authorizationServers),
-    endpoints: new Map(value.endpoints),
+    endpoints,
     tokenEndpointAuthMethods: new Set(value.tokenEndpointAuthMethods),
+    revision: value.revision ?? value.updatedAt,
     updatedAt: value.updatedAt,
   };
 }
 
 function bindingStoreKey(key: string): string {
   return `binding:${Buffer.from(key, "utf8").toString("base64url")}`;
+}
+
+function isOAuthEndpointKind(value: string): value is OAuthEndpointKind {
+  return (
+    value === "registration" ||
+    value === "token" ||
+    value === "revocation" ||
+    value === "introspection"
+  );
 }
 
 function pruneBindings(bindings: Map<string, Binding>): void {
@@ -1153,6 +1417,14 @@ function pruneBindings(bindings: Map<string, Binding>): void {
     if (!oldest) break;
     bindings.delete(oldest);
   }
+}
+
+function compareVersions(
+  a: { revision: number; updatedAt: number },
+  b: { revision: number; updatedAt: number }
+): number {
+  if (a.revision !== b.revision) return a.revision - b.revision;
+  return a.updatedAt - b.updatedAt;
 }
 
 function canonicalUrl(url: URL): string {
@@ -1232,7 +1504,7 @@ function corsResponse(origin: string | undefined): Response {
   headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   headers.set(
     "Access-Control-Allow-Headers",
-    "Accept, Authorization, Content-Type"
+    "Accept, Authorization, Content-Type, DPoP"
   );
   headers.set("Access-Control-Max-Age", "600");
   return new Response(null, { status: 204, headers });
@@ -1363,25 +1635,29 @@ async function storeGet<T>(
 ): Promise<T | undefined> {
   try {
     return await store.get<T>(key);
-  } catch (error) {
-    throw new OAuthProxyStateStoreError(
-      error instanceof Error ? error.message : "OAuth proxy state read failed"
-    );
+  } catch {
+    // Store errors can contain Redis URLs, hostnames, or other sensitive
+    // provider details. Keep the public/logged error deliberately generic.
+    throw new OAuthProxyStateStoreError("OAuth proxy state read failed");
   }
 }
 
-async function storeSet<T>(
+async function storeSetIfNewer<T>(
   store: OAuthProxyStateStore,
   key: string,
   value: T,
-  ttlMs: number
-): Promise<void> {
+  ttlMs?: number
+): Promise<boolean> {
   try {
+    if (store.setIfNewer) return await store.setIfNewer(key, value, ttlMs);
+    const current = await store.get<unknown>(key);
+    if (current !== undefined && compareUnknownVersions(current, value) >= 0) {
+      return false;
+    }
     await store.set(key, value, ttlMs);
-  } catch (error) {
-    throw new OAuthProxyStateStoreError(
-      error instanceof Error ? error.message : "OAuth proxy state write failed"
-    );
+    return true;
+  } catch {
+    throw new OAuthProxyStateStoreError("OAuth proxy state write failed");
   }
 }
 
@@ -1391,9 +1667,62 @@ async function storeDelete(
 ): Promise<void> {
   try {
     await store.delete(key);
+  } catch {
+    throw new OAuthProxyStateStoreError("OAuth proxy state delete failed");
+  }
+}
+
+function compareUnknownVersions(a: unknown, b: unknown): number {
+  const version = (value: unknown) => {
+    if (!value || typeof value !== "object")
+      return { revision: 0, updatedAt: 0 };
+    const record = value as Record<string, unknown>;
+    return {
+      revision:
+        typeof record.revision === "number" && Number.isFinite(record.revision)
+          ? record.revision
+          : 0,
+      updatedAt:
+        typeof record.updatedAt === "number" &&
+        Number.isFinite(record.updatedAt)
+          ? record.updatedAt
+          : 0,
+    };
+  };
+  return compareVersions(version(a), version(b));
+}
+
+async function consumeRateLimit(
+  c: Context,
+  limiter: RateLimiterMemory,
+  globalLimiter: RateLimiterMemory,
+  key: string
+): Promise<Response | undefined> {
+  try {
+    await globalLimiter.consume("inspector-api:global");
+    await limiter.consume(key);
+    return undefined;
   } catch (error) {
-    throw new OAuthProxyStateStoreError(
-      error instanceof Error ? error.message : "OAuth proxy state delete failed"
-    );
+    return inspectorRateLimitResponse(c, error);
+  }
+}
+
+async function withKeyLock<T>(
+  locks: Map<string, Promise<void>>,
+  key: string,
+  operation: () => Promise<T>
+): Promise<T> {
+  const previous = locks.get(key);
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  locks.set(key, current);
+  if (previous) await previous.catch(() => undefined);
+  try {
+    return await operation();
+  } finally {
+    release();
+    if (locks.get(key) === current) locks.delete(key);
   }
 }

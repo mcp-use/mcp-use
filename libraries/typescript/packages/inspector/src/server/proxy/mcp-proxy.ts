@@ -13,7 +13,9 @@ import { logger } from "hono/logger";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 import {
   INSPECTOR_API_RATE_LIMIT,
+  INSPECTOR_GLOBAL_API_RATE_LIMIT,
   INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
+  inspectorServerRateLimitKey,
   inspectorRateLimitResponse,
 } from "../rate-limit.js";
 // ponytail: vendored from mcp-use/src/server/middleware/mcp-proxy.ts — keep in sync manually.
@@ -73,9 +75,11 @@ interface McpProxyOptions {
   enableLogging?: boolean;
   /** Shared process-local limiter for Inspector proxy and OAuth routes. */
   rateLimiter?: RateLimiterMemory;
+  /** Higher process-wide backstop against target-key rotation abuse. */
+  globalRateLimiter?: RateLimiterMemory;
   /** Optional source label for logs when Inspector shares a dev server process. */
   logPrefix?: string;
-  /** Explicit browser origins; an empty list preserves the anonymous wildcard default. */
+  /** Explicit browser origins. Omission preserves legacy wildcard CORS; `[]` denies cross-origin callers. */
   allowedOrigins?: readonly string[];
 }
 
@@ -140,11 +144,21 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
       points: INSPECTOR_API_RATE_LIMIT,
       duration: INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
     });
+  const globalRateLimiter =
+    options.globalRateLimiter ??
+    new RateLimiterMemory({
+      points: INSPECTOR_GLOBAL_API_RATE_LIMIT,
+      duration: INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
+    });
   const rateLimit = async (c: Context, next: Next) => {
     try {
-      // RateLimiterMemory prefixes and stringifies keys. The Hono request
-      // wrapper therefore maps every request to one mounted-instance budget.
-      await rateLimiter.consume(c.req as unknown as string);
+      // Keep independent budgets per actual target. Passing the Request object
+      // here stringifies every request to "[object Request]" and creates one
+      // accidental process-wide bucket.
+      await globalRateLimiter.consume("inspector-api:global");
+      await rateLimiter.consume(
+        inspectorServerRateLimitKey("mcp", c.req.header("X-Target-URL"))
+      );
     } catch (error) {
       return inspectorRateLimitResponse(c, error);
     }
@@ -157,7 +171,7 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
   app.use(
     `${basePath}/*`,
     cors({
-      origin: createCorsOriginResolver(options.allowedOrigins ?? []),
+      origin: createCorsOriginResolver(options.allowedOrigins),
       allowHeaders: [
         "Authorization",
         "Content-Type",
@@ -170,6 +184,7 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
         "Mcp-Protocol-Version",
         "Mcp-Method",
         "Mcp-Name",
+        "DPoP",
         "Last-Event-ID",
         "X-Server-Id",
         "X-Requested-With",
@@ -195,19 +210,25 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
     );
   }
 
+  // CORS preflights do not carry the browser's capability. Authenticate every
+  // other request before it can consume either relay budget, so rejected
+  // callers cannot exhaust a valid user's target bucket.
+  app.use(`${basePath}/*`, async (c, next) => {
+    if (
+      c.req.method !== "OPTIONS" &&
+      options.authenticate &&
+      !(await options.authenticate(c))
+    ) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+    return next();
+  });
+
   app.use(`${basePath}/*`, rateLimit);
 
   // Handle all HTTP methods for the proxy
   app.all(`${basePath}/*`, async (c) => {
     try {
-      // Optional authentication
-      if (options.authenticate) {
-        const isAuthenticated = await options.authenticate(c);
-        if (!isAuthenticated) {
-          return c.json({ error: "Unauthorized" }, 401);
-        }
-      }
-
       const targetUrl = c.req.header("X-Target-URL");
 
       if (!targetUrl) {
@@ -393,9 +414,9 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
 }
 
 function createCorsOriginResolver(
-  allowedOrigins: readonly string[]
+  allowedOrigins: readonly string[] | undefined
 ): "*" | ((origin: string) => string) {
-  if (allowedOrigins.length === 0) return "*";
+  if (allowedOrigins === undefined) return "*";
   const origins = new Set(allowedOrigins.map(normalizeOrigin));
   return (origin: string) => {
     try {

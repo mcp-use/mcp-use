@@ -28,6 +28,14 @@ export interface MountInspectorOptions {
   sandboxOrigin?: string | null;
   /** Explicit cross-origin callers of the OAuth BFF. Same-origin is implicit. */
   oauthProxyAllowedOrigins?: readonly string[];
+  /** Explicit cross-origin callers of the MCP proxy. Omission preserves legacy wildcard CORS. */
+  mcpProxyAllowedOrigins?: readonly string[];
+  /** Optional product authentication; upstream Authorization remains separate. */
+  authenticate?: InspectorProxyRoutesConfig["authenticate"];
+  /** Shared OAuth state store for a mounted multi-replica Inspector. */
+  oauthProxyStateStore?: InspectorProxyRoutesConfig["oauthProxyStateStore"];
+  /** Server-side confidential-client resolver for hosted OAuth. */
+  oauthProxyConfidentialClientResolver?: InspectorProxyRoutesConfig["oauthProxyConfidentialClientResolver"];
   /** Allow OAuth and MCP proxy requests to loopback targets (default `true`). */
   oauthProxyAllowLoopback?: boolean;
   /** Optional source label for logs when Inspector shares a dev server process. */
@@ -128,11 +136,16 @@ function registerInspectorRoutes(
 ): void {
   const routesConfig: InspectorProxyRoutesConfig = {
     oauthProxyAllowedOrigins: options?.oauthProxyAllowedOrigins ?? [],
+    mcpProxyAllowedOrigins: options?.mcpProxyAllowedOrigins,
     // A mounted inspector can end up publicly reachable (hosted deployments),
     // where loopback proxying is SSRF into the host's own services. Default to
     // blocking loopback; local dev tooling opts in explicitly.
     oauthProxyAllowLoopback: options?.oauthProxyAllowLoopback ?? false,
     logPrefix: options?.logPrefix,
+    authenticate: options?.authenticate,
+    oauthProxyStateStore: options?.oauthProxyStateStore,
+    oauthProxyConfidentialClientResolver:
+      options?.oauthProxyConfidentialClientResolver,
   };
   if (options?.autoConnectUrl !== undefined) {
     routesConfig.autoConnectUrl = options.autoConnectUrl;

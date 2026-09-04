@@ -18,6 +18,7 @@ export {
   createMemoryOAuthProxyStateStore,
   createRedisOAuthProxyStateStore,
   decodeOAuthProxyEncryptionKey,
+  type OAuthProxyEncryptionKey,
   type OAuthProxyStateStore,
 } from "./proxy/oauth-state-store.js";
 export type {

@@ -88,6 +88,9 @@ describe("Inspector OAuth BFF confidential clients", () => {
     expect(response.headers.get("access-control-allow-origin")).toBe(
       inspectorOrigin
     );
+    expect(response.headers.get("access-control-allow-headers")).toContain(
+      "DPoP"
+    );
   });
 
   it("keeps DCR secrets off the browser and restores client_secret_post", async () => {
@@ -172,6 +175,48 @@ describe("Inspector OAuth BFF confidential clients", () => {
     });
   });
 
+  it("does not echo a secret from a malformed successful DCR response", async () => {
+    const leakedSecret = "malformed-response-secret";
+    const fetchFn = vi.fn<typeof fetch>(async (input) => {
+      const url = input.toString();
+      if (url === resourceMetadataUrl) {
+        return jsonResponse({
+          resource: serverUrl,
+          authorization_servers: [issuer],
+        });
+      }
+      if (url === authorizationMetadataUrl) {
+        return jsonResponse({
+          issuer,
+          registration_endpoint: registrationUrl,
+        });
+      }
+      if (url === registrationUrl) {
+        return new Response(`{"client_secret":"${leakedSecret}"`, {
+          headers: { "content-type": "application/json" },
+        });
+      }
+      return new Response("not found", { status: 404 });
+    });
+    vi.stubGlobal("fetch", fetchFn);
+
+    const app = new Hono();
+    mountOAuthProxy(app, { basePath: "/oauth", enableLogging: false });
+    expect((await app.fetch(metadataRequest(resourceMetadataUrl))).status).toBe(
+      200
+    );
+    expect(
+      (await app.fetch(metadataRequest(authorizationMetadataUrl))).status
+    ).toBe(200);
+
+    const response = await app.fetch(
+      proxyRequest(registrationUrl, { client_name: "malformed" })
+    );
+    const responseBody = await response.text();
+    expect(response.status).toBe(502);
+    expect(responseBody).not.toContain(leakedSecret);
+  });
+
   it("shares bindings and DCR credentials across proxy replicas", async () => {
     const fetchFn = vi.fn<typeof fetch>(async (input, init) => {
       const url = input.toString();
@@ -246,5 +291,34 @@ describe("Inspector OAuth BFF confidential clients", () => {
       status: 200,
       body: { access_token: "shared-token" },
     });
+  });
+
+  it("does not expose state-store error details in logs or responses", async () => {
+    const secret = "redis-password-must-not-leak";
+    const stateStore: OAuthProxyStateStore = {
+      async get() {
+        throw new Error(`connection failed: ${secret}`);
+      },
+      async set() {
+        throw new Error(secret);
+      },
+      async delete() {
+        throw new Error(secret);
+      },
+    };
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const app = new Hono();
+    mountOAuthProxy(app, {
+      basePath: "/oauth",
+      stateStore,
+      enableLogging: true,
+    });
+
+    const response = await app.fetch(metadataRequest(resourceMetadataUrl));
+    const responseBody = await response.text();
+    expect(response.status).toBe(503);
+    expect(responseBody).not.toContain(secret);
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain(secret);
+    errorSpy.mockRestore();
   });
 });

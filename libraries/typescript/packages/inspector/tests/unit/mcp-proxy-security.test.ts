@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import RateLimiterMemory from "rate-limiter-flexible/lib/RateLimiterMemory.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { mountMcpProxy } from "../../src/server/proxy/mcp-proxy";
 
@@ -9,6 +10,39 @@ afterEach(() => {
 });
 
 describe("Inspector MCP proxy request isolation", () => {
+  it("distinguishes omitted origins (legacy wildcard) from an explicit empty list", async () => {
+    const legacy = new Hono();
+    mountMcpProxy(legacy, {
+      path: "/inspector/api/proxy",
+      enableLogging: false,
+    });
+    const legacyPreflight = await legacy.fetch(
+      new Request(proxyUrl, {
+        method: "OPTIONS",
+        headers: { Origin: "https://legacy.example" },
+      })
+    );
+    expect(legacyPreflight.headers.get("access-control-allow-origin")).toBe(
+      "*"
+    );
+
+    const explicit = new Hono();
+    mountMcpProxy(explicit, {
+      path: "/inspector/api/proxy",
+      enableLogging: false,
+      allowedOrigins: [],
+    });
+    const explicitPreflight = await explicit.fetch(
+      new Request(proxyUrl, {
+        method: "OPTIONS",
+        headers: { Origin: "https://legacy.example" },
+      })
+    );
+    expect(
+      explicitPreflight.headers.get("access-control-allow-origin")
+    ).toBeNull();
+  });
+
   it("allows only configured browser origins and MCP protocol headers", async () => {
     const app = new Hono();
     mountMcpProxy(app, {
@@ -65,7 +99,9 @@ describe("Inspector MCP proxy request isolation", () => {
     await embedded.fetch(request());
     expect(logSpy.mock.calls).not.toHaveLength(0);
     expect(
-      logSpy.mock.calls.every(([line]) => String(line).startsWith("[inspector]"))
+      logSpy.mock.calls.every(([line]) =>
+        String(line).startsWith("[inspector]")
+      )
     ).toBe(true);
 
     logSpy.mockClear();
@@ -74,7 +110,9 @@ describe("Inspector MCP proxy request isolation", () => {
     await standalone.fetch(request());
     expect(logSpy.mock.calls).not.toHaveLength(0);
     expect(
-      logSpy.mock.calls.every(([line]) => !String(line).startsWith("[inspector]"))
+      logSpy.mock.calls.every(
+        ([line]) => !String(line).startsWith("[inspector]")
+      )
     ).toBe(true);
     logSpy.mockRestore();
   });
@@ -117,6 +155,41 @@ describe("Inspector MCP proxy request isolation", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("set-cookie")).toBeNull();
     expect(fetchFn).toHaveBeenCalledOnce();
+  });
+
+  it("authenticates before consuming the target budget", async () => {
+    const fetchFn = vi.fn<typeof fetch>(async (_input, init) => {
+      const headers = new Headers(init?.headers);
+      expect(headers.get("authorization")).toBe("Bearer upstream-token");
+      return new Response("ok");
+    });
+    vi.stubGlobal("fetch", fetchFn);
+    const app = new Hono();
+    mountMcpProxy(app, {
+      path: "/inspector/api/proxy",
+      enableLogging: false,
+      rateLimiter: new RateLimiterMemory({ points: 1, duration: 60 }),
+      authenticate: (c) =>
+        c.req.header("X-Inspector-Relay-Token") === "relay-token",
+    });
+
+    const denied = await app.fetch(
+      new Request(proxyUrl, {
+        headers: { "X-Target-URL": "https://93.184.216.34/mcp" },
+      })
+    );
+    expect(denied.status).toBe(401);
+
+    const allowed = await app.fetch(
+      new Request(proxyUrl, {
+        headers: {
+          "X-Target-URL": "https://93.184.216.34/mcp",
+          Authorization: "Bearer upstream-token",
+          "X-Inspector-Relay-Token": "relay-token",
+        },
+      })
+    );
+    expect(allowed.status).toBe(200);
   });
 
   it("removes bearer authorization across a cross-origin redirect", async () => {
