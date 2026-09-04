@@ -57,8 +57,7 @@
     "build": "rimraf dist && tsup && tsc --emitDeclarationOnly --declaration",
     "dev": "tsc --watch",
     "test": "vitest",
-    "test:run": "vitest run",
-    "test:package": "pnpm build && node --test tests/package/ai-sdk-package.test.mjs"
+    "test:run": "vitest run"
   },
   "dependencies": {
     "@modelcontextprotocol/client": "2.0.0",
