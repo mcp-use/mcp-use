@@ -31,16 +31,26 @@ jobs:
         uses: actions/github-script@v9
         with:
           script: |
+            const { data: run } = await github.rest.actions.getWorkflowRun({
+              ...context.repo, run_id: context.payload.workflow_run.id,
+            });
+            const repository = `${context.repo.owner}/${context.repo.repo}`;
+            if (run.repository?.full_name !== repository || run.head_repository?.full_name !== repository ||
+                run.head_branch !== 'canary' || !['push', 'workflow_dispatch'].includes(run.event) ||
+                run.conclusion !== 'success' || run.path !== '.github/workflows/typescript-release.yml') {
+              throw new Error('Refusing a marker from an untrusted release run');
+            }
             const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
               ...context.repo, run_id: context.payload.workflow_run.id,
             });
             core.setOutput('exists', artifacts.some(a => a.name === 'railway-deploy-marker' && !a.expired));
       - uses: actions/download-artifact@v8
-        if: steps.marker.outputs.exists == 'true'
+        if: github.event_name == 'workflow_run' && steps.marker.outputs.exists == 'true'
         with:
           name: railway-deploy-marker
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/release-marker
       - name: Select exact npm versions
         id: versions
         env:
@@ -49,9 +59,14 @@ jobs:
           if [ "$EVENT" = workflow_dispatch ]; then
             scaffolder=$(npm view --prefer-online create-mcp-use-app@latest version)
             sdk=$(npm view --prefer-online mcp-use@canary version)
-          elif [ -f railway-deploy-marker.txt ]; then
-            scaffolder=$(sed -n 's/^scaffolder=//p' railway-deploy-marker.txt)
-            sdk=$(sed -n 's/^sdk=//p' railway-deploy-marker.txt)
+          elif [ "$EVENT" = workflow_run ] && [ -f "$RUNNER_TEMP/release-marker/railway-deploy-marker.txt" ]; then
+            marker="$RUNNER_TEMP/release-marker/railway-deploy-marker.txt"
+            # Treat the marker as data, never as shell code or workspace files.
+            [[ "$(sed -n 's/^packages_published=//p' "$marker")" = true ]] || exit 1
+            [[ "$(sed -n 's/^branch=//p' "$marker")" = canary ]] || exit 1
+            [[ "$(sed -n 's/^sha=//p' "$marker")" =~ ^[a-f0-9]{40}$ ]] || exit 1
+            scaffolder=$(sed -n 's/^scaffolder=//p' "$marker")
+            sdk=$(sed -n 's/^sdk=//p' "$marker")
           else
             echo 'run=false' >> "$GITHUB_OUTPUT"
             exit 0
