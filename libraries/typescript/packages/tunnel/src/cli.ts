@@ -13,8 +13,12 @@ export function usage(): string {
   return [
     "Usage: mcp-tunnel <LOCAL_PORT> [--relay RELAY_URL] [--subdomain SUBDOMAIN] [--local-host HOST]",
     "",
+    "Options:",
+    "  --local-host HOST  Override the Host header sent to the local server (default: localhost)",
+    "                     (The original public tunnel host is preserved in x-forwarded-host)",
+    "",
     "Environment:",
-    "  MCP_USE_WS_RELAY  Override the WebSocket relay API origin",
+    "  MCP_USE_WS_RELAY   Override the WebSocket relay API origin",
   ].join("\n");
 }
 
@@ -35,12 +39,9 @@ export function parseArgs(args: readonly string[]): CliOptions {
       if (value === undefined) throw new Error("--subdomain requires a value");
       options.subdomain = value;
       index += 1;
-    } else if (
-      argument === "--local-host" ||
-      argument === "--local-host-header"
-    ) {
+    } else if (argument === "--local-host") {
       const value = args[index + 1];
-      if (value === undefined) throw new Error(`${argument} requires a value`);
+      if (value === undefined) throw new Error("--local-host requires a value");
       options.localHostHeader = value;
       index += 1;
     } else if (argument?.startsWith("-")) {

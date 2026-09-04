@@ -41,18 +41,11 @@ describe("mcp-tunnel CLI", () => {
     });
   });
 
-  it("parses local-host options", () => {
+  it("parses local-host option", () => {
     expect(parseArgs(["3000", "--local-host", "127.0.0.1"])).toEqual({
       help: false,
       port: 3000,
       localHostHeader: "127.0.0.1",
-    });
-    expect(
-      parseArgs(["3000", "--local-host-header", "example.internal"])
-    ).toEqual({
-      help: false,
-      port: 3000,
-      localHostHeader: "example.internal",
     });
   });
 
@@ -64,14 +57,12 @@ describe("mcp-tunnel CLI", () => {
     expect(() => parseArgs(["3000", "--local-host"])).toThrow(
       "--local-host requires a value"
     );
-    expect(() => parseArgs(["3000", "--local-host-header"])).toThrow(
-      "--local-host-header requires a value"
-    );
   });
 
   it("documents WebSocket relay and local-host configuration", () => {
     expect(usage()).toContain("MCP_USE_WS_RELAY");
     expect(usage()).toContain("[--local-host HOST]");
+    expect(usage()).toContain("x-forwarded-host");
   });
 
   it("defaults localHostHeader to localhost in runTunnelCli", async () => {
