@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.3.1-canary.0
+
+### Patch Changes
+
+- 322a6d3: Clean up sandbox proxy message listener and cancel pending readiness wait on `ViewRenderer` unmount.
+
 ## 2.3.0
 
 ### Minor Changes

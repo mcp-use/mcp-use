@@ -1,7 +1,7 @@
 {
   "name": "@mcp-use/client",
   "type": "module",
-  "version": "2.3.0",
+  "version": "2.3.1-canary.0",
   "description": "MCP client for connecting to Model Context Protocol servers — sessions, connectors, and OAuth. Part of the mcp-use v2 framework.",
   "author": "mcp-use, Inc.",
   "license": "MIT",
