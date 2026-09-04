@@ -184,10 +184,33 @@ function createExpressInspectorMiddleware(
       return;
     }
 
-    const request = expressRequestToFetchRequest(req, url);
+    let finished = false;
+    const abort = new AbortController();
+    res.on("close", () => {
+      if (!finished) {
+        abort.abort();
+      }
+    });
+    if (res.destroyed === true) {
+      abort.abort();
+    }
+
+    const request = expressRequestToFetchRequest(req, url, abort.signal);
     void fetch(request)
-      .then((fetchResponse) => writeFetchResponse(res, fetchResponse))
-      .catch(next);
+      .then((fetchResponse) =>
+        writeFetchResponse(res, fetchResponse, abort.signal)
+      )
+      .catch((error) => {
+        // The client going away aborts the outbound fetch and the body
+        // read. That is a completed request, not an Express error.
+        if (abort.signal.aborted) {
+          return;
+        }
+        next(error);
+      })
+      .finally(() => {
+        finished = true;
+      });
   };
 }
 
@@ -208,11 +231,13 @@ function firstHeaderValue(value: string | string[] | undefined): string {
 
 function expressRequestToFetchRequest(
   req: Request,
-  url: URL
+  url: URL,
+  signal: AbortSignal
 ): globalThis.Request {
   const init: RequestInit & { duplex?: "half" } = {
     method: req.method,
     headers: req.headers as HeadersInit,
+    signal,
   };
 
   if (req.method !== "GET" && req.method !== "HEAD") {
@@ -244,7 +269,8 @@ function bodyToRequestBody(body: unknown): BodyInit {
 
 async function writeFetchResponse(
   res: Response,
-  fetchResponse: globalThis.Response
+  fetchResponse: globalThis.Response,
+  signal: AbortSignal
 ): Promise<void> {
   res.status(fetchResponse.status);
   fetchResponse.headers.forEach((value, key) => {
@@ -258,13 +284,33 @@ async function writeFetchResponse(
     return;
   }
 
+  // The MCP proxy serves long-lived SSE responses. Without this, a client
+  // disconnecting mid-stream (res "close") left this loop pumping the
+  // upstream body into a dead socket forever, so the upstream response was
+  // never released. Mirrors the abort wiring in packages/server/node-bridge.ts.
   const reader = fetchResponse.body.getReader();
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    res.write(value);
+  const cancelReader = () => {
+    void reader.cancel().catch(() => {
+      // Best-effort: the reader may already be closed or errored.
+    });
+  };
+  if (signal.aborted) {
+    cancelReader();
+  } else {
+    signal.addEventListener("abort", cancelReader, { once: true });
   }
-  res.end();
+
+  try {
+    while (!signal.aborted) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (signal.aborted) break;
+      res.write(value);
+    }
+  } finally {
+    signal.removeEventListener("abort", cancelReader);
+    res.end();
+  }
 }
 
 function isMountableApp(

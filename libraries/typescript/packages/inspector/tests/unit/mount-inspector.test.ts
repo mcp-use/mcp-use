@@ -1,7 +1,28 @@
 import express from "express";
 import { Hono } from "hono";
+import http from "node:http";
 import { describe, expect, it } from "vitest";
 import { mountInspector } from "../../src/server/index.js";
+
+// Bound a wait without leaving the timer pending when the wait wins:
+// a live timer keeps the vitest worker alive for its full duration.
+async function raceWithTimeout(
+  promise: Promise<void>,
+  ms: number,
+  message: string
+): Promise<void> {
+  let handle: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      promise,
+      new Promise<void>((_resolve, reject) => {
+        handle = setTimeout(() => reject(new Error(message)), ms);
+      }),
+    ]);
+  } finally {
+    if (handle) clearTimeout(handle);
+  }
+}
 
 describe("mountInspector", () => {
   it("returns a Fetch handler with a fully local, prefix-scoped Inspector", async () => {
@@ -233,4 +254,161 @@ describe("mountInspector", () => {
       });
     }
   });
+
+  it("releases the upstream stream when the Express client disconnects mid-response", async () => {
+    // Upstream MCP-style SSE server: writes an initial chunk immediately, then
+    // keeps the connection open indefinitely with periodic pings, and reports
+    // when the *inbound* request (the proxy's fetch to it) is closed.
+    let upstreamRequestClosed = false;
+    let resolveUpstreamClosed: () => void = () => {};
+    const upstreamClosed = new Promise<void>((resolve) => {
+      resolveUpstreamClosed = resolve;
+    });
+    let upstreamInterval: ReturnType<typeof setInterval> | undefined;
+
+    const upstream = http.createServer((req, res) => {
+      res.writeHead(200, {
+        "content-type": "text/event-stream",
+        "cache-control": "no-cache",
+      });
+      res.write(": ping\n\n");
+      upstreamInterval = setInterval(() => {
+        res.write(": ping\n\n");
+      }, 20);
+      req.on("close", () => {
+        upstreamRequestClosed = true;
+        resolveUpstreamClosed();
+      });
+    });
+    await new Promise<void>((resolve) => upstream.listen(0, resolve));
+
+    const app = express();
+    // Loopback opt-in: this test proxies to its own 127.0.0.1 SSE server.
+    mountInspector(app, { basePath: "/mcp", oauthProxyAllowLoopback: true });
+    const server = app.listen(0);
+
+    let controller: AbortController | undefined;
+    try {
+      const upstreamAddress = upstream.address();
+      const appAddress = server.address();
+      if (
+        !upstreamAddress ||
+        typeof upstreamAddress === "string" ||
+        !appAddress ||
+        typeof appAddress === "string"
+      ) {
+        throw new Error("Test servers did not bind TCP ports");
+      }
+      const upstreamOrigin = `http://127.0.0.1:${upstreamAddress.port}`;
+      const appOrigin = `http://127.0.0.1:${appAddress.port}`;
+
+      controller = new AbortController();
+      const response = await fetch(`${appOrigin}/mcp/inspector/api/proxy`, {
+        headers: { "x-target-url": `${upstreamOrigin}/stream` },
+        signal: controller.signal,
+      });
+      expect(response.status).toBe(200);
+      if (!response.body) {
+        throw new Error("Proxied response had no body");
+      }
+
+      // Prove the stream is actually flowing end-to-end before disconnecting.
+      const reader = response.body.getReader();
+      const first = await reader.read();
+      expect(first.done).toBe(false);
+
+      // Simulate the Express client disconnecting mid-stream.
+      controller.abort();
+
+      // A fixed middleware releases the upstream promptly; an unfixed one
+      // never does, so bound the wait instead of hanging the suite.
+      await raceWithTimeout(
+        upstreamClosed,
+        3000,
+        "upstream connection was not released after client disconnect"
+      );
+
+      expect(upstreamRequestClosed).toBe(true);
+    } finally {
+      if (upstreamInterval) clearInterval(upstreamInterval);
+      controller?.abort();
+      server.closeAllConnections();
+      upstream.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await new Promise<void>((resolve) => upstream.close(() => resolve()));
+    }
+  }, 10000);
+
+  it("releases the upstream when the client disconnects before response headers", async () => {
+    // The upstream accepts the request and never responds, so the abort
+    // has to travel through the outbound fetch itself. Cancelling the
+    // response reader cannot help here: there is no response yet.
+    let upstreamRequestClosed = false;
+    let resolveUpstreamClosed: () => void = () => {};
+    const upstreamClosed = new Promise<void>((resolve) => {
+      resolveUpstreamClosed = resolve;
+    });
+    let sawRequest: () => void = () => {};
+    const requestArrived = new Promise<void>((resolve) => {
+      sawRequest = resolve;
+    });
+
+    const upstream = http.createServer((req) => {
+      sawRequest();
+      req.on("close", () => {
+        upstreamRequestClosed = true;
+        resolveUpstreamClosed();
+      });
+      // Deliberately never write a status line or headers.
+    });
+    await new Promise<void>((resolve) => upstream.listen(0, resolve));
+
+    const app = express();
+    mountInspector(app, { basePath: "/mcp", oauthProxyAllowLoopback: true });
+    const server = app.listen(0);
+
+    let controller: AbortController | undefined;
+    try {
+      const upstreamAddress = upstream.address();
+      const appAddress = server.address();
+      if (
+        !upstreamAddress ||
+        typeof upstreamAddress === "string" ||
+        !appAddress ||
+        typeof appAddress === "string"
+      ) {
+        throw new Error("Test servers did not bind TCP ports");
+      }
+      const upstreamOrigin = `http://127.0.0.1:${upstreamAddress.port}`;
+      const appOrigin = `http://127.0.0.1:${appAddress.port}`;
+
+      controller = new AbortController();
+      const pending = fetch(`${appOrigin}/mcp/inspector/api/proxy`, {
+        headers: { "x-target-url": `${upstreamOrigin}/stream` },
+        signal: controller.signal,
+      }).catch(() => undefined);
+
+      // Only abort once the upstream is actually holding the request open.
+      await raceWithTimeout(
+        requestArrived,
+        3000,
+        "upstream never received the proxied request"
+      );
+      controller.abort();
+      await pending;
+
+      await raceWithTimeout(
+        upstreamClosed,
+        3000,
+        "upstream connection was not released after a pre-header disconnect"
+      );
+      expect(upstreamRequestClosed).toBe(true);
+    } finally {
+      controller?.abort();
+      server.closeAllConnections();
+      upstream.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await new Promise<void>((resolve) => upstream.close(() => resolve()));
+    }
+  }, 10000);
 });
