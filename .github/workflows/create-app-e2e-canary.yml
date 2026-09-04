@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   versions:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -53,13 +53,8 @@ jobs:
           path: ${{ runner.temp }}/release-marker
       - name: Select exact npm versions
         id: versions
-        env:
-          EVENT: ${{ github.event_name }}
         run: |
-          if [ "$EVENT" = workflow_dispatch ]; then
-            scaffolder=$(npm view --prefer-online create-mcp-use-app@latest version)
-            sdk=$(npm view --prefer-online mcp-use@canary version)
-          elif [ "$EVENT" = workflow_run ] && [ -f "$RUNNER_TEMP/release-marker/railway-deploy-marker.txt" ]; then
+          if [ -f "$RUNNER_TEMP/release-marker/railway-deploy-marker.txt" ]; then
             marker="$RUNNER_TEMP/release-marker/railway-deploy-marker.txt"
             # Treat the marker as data, never as shell code or workspace files.
             [[ "$(sed -n 's/^packages_published=//p' "$marker")" = true ]] || exit 1
@@ -75,9 +70,31 @@ jobs:
           [[ "$sdk" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-canary\.[0-9]+)?$ ]] || exit 1
           printf 'run=true\nscaffolder=%s\nsdk=%s\n' "$scaffolder" "$sdk" >> "$GITHUB_OUTPUT"
 
+  manual-versions:
+    # No artifact download or artifact parsing in the manual execution job.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.versions.outputs.run }}
+      scaffolder: ${{ steps.versions.outputs.scaffolder }}
+      sdk: ${{ steps.versions.outputs.sdk }}
+    steps:
+      - name: Select current npm versions
+        id: versions
+        run: |
+          scaffolder=$(npm view --prefer-online create-mcp-use-app@latest version)
+          sdk=$(npm view --prefer-online mcp-use@canary version)
+          [[ "$scaffolder" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-canary\.[0-9]+)?$ ]] || exit 1
+          [[ "$sdk" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-canary\.[0-9]+)?$ ]] || exit 1
+          printf 'run=true\nscaffolder=%s\nsdk=%s\n' "$scaffolder" "$sdk" >> "$GITHUB_OUTPUT"
+
   smoke:
-    needs: versions
-    if: needs.versions.outputs.run == 'true'
+    needs: [versions, manual-versions]
+    # One selector is always skipped. Still fail closed if the active one fails.
+    if: >-
+      always() && !cancelled() && !failure() &&
+      (needs.versions.outputs.run == 'true' || needs.manual-versions.outputs.run == 'true')
     name: Scaffold / ${{ matrix.pm }} / ${{ matrix.template }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -87,8 +104,8 @@ jobs:
         pm: [npm, yarn]
         template: [starter, mcp-apps, blank]
     env:
-      SCAFFOLDER: ${{ needs.versions.outputs.scaffolder }}
-      SDK: ${{ needs.versions.outputs.sdk }}
+      SCAFFOLDER: ${{ needs.versions.outputs.scaffolder || needs.manual-versions.outputs.scaffolder }}
+      SDK: ${{ needs.versions.outputs.sdk || needs.manual-versions.outputs.sdk }}
       MCP_USE_ANONYMIZED_TELEMETRY: "false"
     steps:
       - uses: actions/setup-node@v7
