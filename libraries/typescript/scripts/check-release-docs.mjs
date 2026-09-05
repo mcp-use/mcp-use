@@ -26,11 +26,12 @@ function stableVersion(version) {
 }
 
 function entries(text) {
-  // Comments and examples are not published changelog entries.
+  // Comments and examples are not published changelog entries. Preserve a
+  // separator so stripping them cannot join fragments into a fabricated tag.
   const content = text
-    .replace(/<!--[^]*?-->/g, "")
-    .replace(/\{\/\*[^]*?\*\/\}/g, "")
-    .replace(/^```[^]*?^```[^\n]*$/gm, "");
+    .replace(/<!--[^]*?-->/g, "\n")
+    .replace(/\{\/\*[^]*?\*\/\}/g, "\n")
+    .replace(/^```[^]*?^```[^\n]*$/gm, "\n");
   return [...content.matchAll(/<Update\b([^>]*?)>([^]*?)<\/Update>/g)].map(
     ([, attributes, body]) => ({
       version: attributes.match(/\blabel\s*=\s*["']v([^"']+)["']/)?.[1],

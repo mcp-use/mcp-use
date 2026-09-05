@@ -74,6 +74,8 @@ test("docs reject missing, stale, duplicate, hidden, and empty entries", () => {
     entry("2.4.3") + docs[tsDoc],
     docs[tsDoc] + docs[tsDoc],
     `<!-- ${docs[tsDoc]} -->`,
+    docs[tsDoc].replace("<Update", "<Up<!-- comment -->date"),
+    docs[tsDoc].replace("<Update", "<Up{/* comment */}date"),
     `{/* ${docs[tsDoc]} */}`,
     `\`\`\`mdx\n${docs[tsDoc]}\n\`\`\``,
     entry("2.4.4", "## Coming soon"),
