@@ -160,6 +160,18 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
   /** Latest deferred (settled or in-flight) for the loopback response. */
   private lastFlow: Deferred<NodeOAuthAuthorizationResponse> | null = null;
   private pendingTimer: NodeJS.Timeout | null = null;
+  /**
+   * Synchronously set before the first `await` in `redirectToAuthorization()`
+   * to reserve the authorization slot. Prevents a second concurrent call from
+   * passing the `pending` check while the first is still initializing.
+   */
+  private authorizing = false;
+  /**
+   * Set by {@link dispose} while initialization is still awaiting storage or
+   * `startLoopback()`. The in-flight `redirectToAuthorization()` must abort
+   * instead of arming `pending` and leaking the loopback listener.
+   */
+  private initCancelled = false;
 
   private constructor(
     serverUrl: string,
@@ -372,31 +384,75 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
    * the browser-open attempt completes.
    */
   async redirectToAuthorization(authorizationUrl: URL): Promise<void> {
-    if (this.pending) {
+    if (this.pending || this.authorizing) {
       throw new Error(
         "NodeOAuthClientProvider: an authorization is already in progress"
       );
     }
 
-    if (this.shouldPersistSelectedPort) {
-      await this.kv.set("port", String(this.port));
-      this.shouldPersistSelectedPort = false;
+    // Reserve the slot synchronously before any await so that concurrent
+    // callers observe `authorizing === true` and are rejected immediately.
+    // Create `lastFlow` now so `completeOAuthFlow()` can await
+    // `getAuthorizationResponse()` before initialization finishes.
+    this.authorizing = true;
+    this.initCancelled = false;
+    const flow = createDeferred<NodeOAuthAuthorizationResponse>();
+    this.lastFlow = flow;
+    flow.promise.catch(() => {});
+
+    try {
+      if (this.shouldPersistSelectedPort) {
+        await this.kv.set("port", String(this.port));
+        this.shouldPersistSelectedPort = false;
+      }
+
+      if (this.initCancelled || this.lastFlow !== flow) {
+        throw new OAuthFlowError("cancelled", "Flow cancelled");
+      }
+
+      const sanitizedUrl = await this.session.storeAuthorizationState(
+        authorizationUrl,
+        { flowType: "redirect" }
+      );
+      this.authorizationUrl = sanitizedUrl;
+
+      if (this.initCancelled || this.lastFlow !== flow) {
+        throw new OAuthFlowError("cancelled", "Flow cancelled");
+      }
+
+      await this.startLoopback();
+
+      if (this.initCancelled || this.lastFlow !== flow) {
+        this.stopLoopback();
+        throw new OAuthFlowError("cancelled", "Flow cancelled");
+      }
+
+      this.pending = flow;
+      this.authorizing = false;
+    } catch (err) {
+      if (this.lastFlow !== flow) {
+        throw err;
+      }
+      this.authorizing = false;
+      this.stopLoopback();
+      const cancelled =
+        this.initCancelled ||
+        (err instanceof OAuthFlowError && err.code === "cancelled");
+      let flowError: Error;
+      if (cancelled) {
+        flowError =
+          err instanceof OAuthFlowError
+            ? err
+            : new OAuthFlowError("cancelled", "Flow cancelled");
+      } else if (err instanceof Error) {
+        flowError = err;
+      } else {
+        flowError = new Error(String(err));
+      }
+      flow.reject(flowError);
+      throw flowError;
     }
 
-    const sanitizedUrl = await this.session.storeAuthorizationState(
-      authorizationUrl,
-      { flowType: "redirect" }
-    );
-    this.authorizationUrl = sanitizedUrl;
-
-    await this.startLoopback();
-
-    this.pending = createDeferred<NodeOAuthAuthorizationResponse>();
-    this.lastFlow = this.pending;
-    // Swallow unhandled rejections — callers may not subscribe before the
-    // callback fires, but `getAuthorizationCode()` still returns the same
-    // settled promise so the rejection is observable when awaited.
-    this.pending.promise.catch(() => {});
     this.pendingTimer = setTimeout(() => {
       this.rejectPending(
         new OAuthFlowError(
@@ -462,10 +518,13 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
    * reject with an {@link OAuthFlowError} whose code is `"cancelled"`.
    */
   dispose(): void {
+    this.initCancelled = true;
+    this.authorizing = false;
     if (this.pending) {
       this.rejectPending(new OAuthFlowError("cancelled", "Flow cancelled"));
     } else {
       this.stopLoopback();
+      this.lastFlow?.reject(new OAuthFlowError("cancelled", "Flow cancelled"));
     }
   }
 
@@ -482,7 +541,7 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
    * again (which would throw "already in progress").
    */
   get hasPendingFlow(): boolean {
-    return this.pending !== null;
+    return this.pending !== null || this.authorizing;
   }
 
   // --- Loopback internals ---
