@@ -275,6 +275,7 @@ interface PromptEntry<TUser, TEnv extends Env> {
 /** Node HTTP listener returned by `listen()`. */
 interface NodeHttpListener {
   close(callback?: (error?: Error) => void): void;
+  closeAllConnections?(): void;
   once(event: "error", listener: (error: unknown) => void): void;
   listen(port: number, hostname: string, callback?: () => void): NodeHttpServer;
   address(): { port: number } | string | null;
@@ -360,6 +361,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   #handler: McpHttpHandler | undefined;
   #eventBus: ServerEventBus | undefined;
   #httpServer: NodeHttpListener | undefined;
+  #listenPromise: Promise<{ port: number; url: string }> | undefined;
+  #listenCleanupPromise: Promise<void> | undefined;
   #oauthResource: URL | undefined;
   #oauthResourceResolved = false;
   #oauthResourceConfigurationAbsent = false;
@@ -1003,70 +1006,109 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     url: string;
   }> {
     this.#assertOpen("listen()");
-    await this.#ensureSkillsPrimed();
-    const host = resolveListenHost(options.host, this.#config.host);
-    const requestedPort = resolveListenPort(port, this.#config.port);
-    this.#assertListenOAuthConfiguration(host);
-
-    return new Promise((resolve, reject) => {
-      let resolveFetch: ((fetch: FetchHandler) => void) | undefined;
-      let rejectFetch: ((error: unknown) => void) | undefined;
-      const fetchReady = new Promise<FetchHandler>(
-        (resolveFetchPromise, rejectFetchPromise) => {
-          resolveFetch = resolveFetchPromise;
-          rejectFetch = rejectFetchPromise;
-        }
+    if (this.#httpServer !== undefined || this.#listenPromise !== undefined) {
+      throw new Error(
+        "Cannot call listen() while the server is already listening."
       );
-      void fetchReady.catch(() => undefined);
+    }
 
-      let settled = false;
-      const rejectAndClose = (error: unknown) => {
-        if (!settled) {
-          settled = true;
-          reject(error);
-        }
-        rejectFetch?.(error);
-        void new Promise<void>((closeResolve) =>
-          server.close(() => closeResolve())
-        )
-          .catch(() => undefined)
-          .finally(() => {
-            if (this.#httpServer === server) {
-              this.#httpServer = undefined;
-            }
-          });
-      };
+    const listenPromise = (async () => {
+      await this.#ensureSkillsPrimed();
+      const host = resolveListenHost(options.host, this.#config.host);
+      const requestedPort = resolveListenPort(port, this.#config.port);
+      this.#assertListenOAuthConfiguration(host);
 
-      const nodeHandler = toNodeHandler({
-        fetch: async (request) => (await fetchReady)(request),
-      });
-      const server = createNodeHttpServer((req, res) => {
-        void nodeHandler(req, res);
-      }) as NodeHttpListener;
-
-      server.once("error", rejectAndClose);
-      server.listen(requestedPort, host, () => {
-        try {
-          const address = server.address();
-          const boundPort =
-            typeof address === "object" && address !== null
-              ? address.port
-              : requestedPort;
-          const { fetch } = this.#ensureMounted("listen", boundPort, host);
-          resolveFetch?.(fetch);
-          if (!settled) {
-            settled = true;
-            resolve({
-              port: boundPort,
-              url: `http://localhost:${boundPort}${this.#basePath()}`,
-            });
+      return new Promise<{ port: number; url: string }>((resolve, reject) => {
+        let resolveFetch: ((fetch: FetchHandler) => void) | undefined;
+        let rejectFetch: ((error: unknown) => void) | undefined;
+        const fetchReady = new Promise<FetchHandler>(
+          (resolveFetchPromise, rejectFetchPromise) => {
+            resolveFetch = resolveFetchPromise;
+            rejectFetch = rejectFetchPromise;
           }
-        } catch (error) {
-          rejectAndClose(error);
-        }
+        );
+        void fetchReady.catch(() => undefined);
+
+        let settled = false;
+        const nodeHandler = toNodeHandler({
+          fetch: async (request) => (await fetchReady)(request),
+        });
+        const server = createNodeHttpServer((req, res) => {
+          void nodeHandler(req, res);
+        }) as NodeHttpListener;
+
+        let cleanupPromise: Promise<void> | undefined;
+        const rejectAndClose = (error: unknown): Promise<void> => {
+          rejectFetch?.(error);
+          if (!cleanupPromise) {
+            try {
+              server.closeAllConnections?.();
+            } catch {
+              // ignore if not supported
+            }
+            cleanupPromise = new Promise<void>((closeResolve) => {
+              try {
+                server.close(() => closeResolve());
+              } catch {
+                closeResolve();
+              }
+            })
+              .catch(() => undefined)
+              .finally(() => {
+                if (this.#httpServer === server) {
+                  this.#httpServer = undefined;
+                }
+                if (!settled) {
+                  settled = true;
+                  reject(error);
+                }
+              });
+            this.#listenCleanupPromise = cleanupPromise;
+          }
+          return cleanupPromise;
+        };
+
+        server.once("error", (error) => {
+          void rejectAndClose(error);
+        });
+        server.listen(requestedPort, host, () => {
+          try {
+            if (this.#closed) {
+              void rejectAndClose(
+                new Error("Cannot use the server after it has closed.")
+              );
+              return;
+            }
+            const address = server!.address();
+            const boundPort =
+              typeof address === "object" && address !== null
+                ? address.port
+                : requestedPort;
+            const { fetch } = this.#ensureMounted("listen", boundPort, host);
+            resolveFetch?.(fetch);
+            this.#httpServer = server;
+            if (!settled) {
+              settled = true;
+              resolve({
+                port: boundPort,
+                url: `http://localhost:${boundPort}${this.#basePath()}`,
+              });
+            }
+          } catch (error) {
+            void rejectAndClose(error);
+          }
+        });
       });
-      this.#httpServer = server;
-    });
+    })();
+
+    this.#listenPromise = listenPromise;
+    try {
+      return await listenPromise;
+    } finally {
+      if (this.#listenPromise === listenPromise) {
+        this.#listenPromise = undefined;
+      }
+    }
   }
 
   /**
@@ -1078,6 +1120,13 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    */
   async close(): Promise<void> {
     this.#closed = true;
+    if (this.#listenPromise !== undefined) {
+      await this.#listenPromise.catch(() => undefined);
+    }
+    if (this.#listenCleanupPromise !== undefined) {
+      await this.#listenCleanupPromise;
+      this.#listenCleanupPromise = undefined;
+    }
     await Promise.allSettled([...this.#proxyOperations]);
 
     const errors: unknown[] = [];
@@ -1096,6 +1145,11 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     }
     const httpServer = this.#httpServer;
     if (httpServer !== undefined) {
+      try {
+        httpServer.closeAllConnections?.();
+      } catch {
+        // ignore if not supported
+      }
       try {
         await new Promise<void>((resolve, reject) => {
           httpServer.close((err) => (err ? reject(err) : resolve()));
