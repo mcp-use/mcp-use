@@ -6,6 +6,8 @@ on:
     branches: [main, canary]
     paths:
       - "libraries/typescript/**"
+      - "docs/typescript/changelog/changelog.mdx"
+      - "docs/inspector/changelog.mdx"
       - ".github/workflows/typescript-release.yml"
       - ".github/actions/setup-typescript/**"
       - ".github/scripts/**"
@@ -60,6 +62,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RECOVER_TAGS: ${{ inputs.repair_metadata && 'all' || 'true' }}
         run: bash ../../.github/scripts/prepare-typescript-release.sh
+      - name: Require changelog docs for stable publication
+        if: steps.prepare.outputs.publish == 'true' && github.ref_name == 'main'
+        run: pnpm check:release-docs --plan "$RUNNER_TEMP/release-plan.json"
       - name: Build final package versions
         if: steps.prepare.outputs.publish == 'true'
         run: |

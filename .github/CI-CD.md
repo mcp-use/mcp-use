@@ -1,6 +1,6 @@
 # TypeScript CI and releases
 
-Ordinary PRs get one TypeScript check job: install, build, formatting, lint, unused-dependency checks, release-tool tests, and package tests. The package tests include server and CLI type checks. These jobs receive no AI API credentials.
+Ordinary PRs get one TypeScript check job: install, PR changeset validation, build, formatting, lint, unused-dependency checks, release-tool tests, and package tests. The package tests include server and CLI type checks. These jobs receive no AI API credentials.
 
 Expensive compatibility checks and preview publishing are separate. Python CI and Python release behavior are unchanged.
 
@@ -31,6 +31,26 @@ A workflow dispatch means **Actions → workflow name → Run workflow → branc
 
 The normal checks use Node 24 and pnpm 11.13.1. Installs use the committed lockfile. Version preparation is the only release stage allowed to refresh that lockfile. The platform workflow retains Node 22 compatibility coverage.
 
+## Add PR changesets
+
+TypeScript PRs targeting **main and canary** run **Check PR changesets** before the build. The check runs `pnpm exec changeset status --since <PR-base-SHA>` and fails when a package changed without a changeset in that PR. An older changeset already on the base branch does not satisfy the check. Maintainer-approved fork runs receive the original PR base SHA too.
+
+From `libraries/typescript`, run `pnpm changeset` and commit the generated file. For a package change that intentionally needs no release, such as tests or internal tooling, commit `pnpm changeset --empty`. Documentation and CI changes outside the packages do not need a package release.
+
+The trusted canary-to-main promotion is exempt from needing an extra changeset when its prerelease changesets are already applied. The stable version PR created by `github-actions[bot]` also needs no extra changeset. Both still run the release docs check. These exceptions do not apply to an ordinary PR or a fork whose branch happens to use the same name.
+
+## Prepare docs before stable promotion
+
+Before merging **canary into main**, prepare the release notes on canary:
+
+- Update `docs/typescript/changelog/changelog.mdx` for the SDK, client, agent, CLI, tunnel, and scaffolder. Its release label uses the projected stable `mcp-use` version.
+- Update `docs/inspector/changelog.mdx` for Inspector changes. Its label uses the projected stable `@mcp-use/inspector` version.
+- Prepend one matching `<Update label="vX.Y.Z">` entry with release-note bullets. Strip the `-canary.N` suffix. Already-published notes with only whitespace changes, commented examples, duplicate entries, and empty headings do not satisfy promotion.
+
+The check calculates projected versions without changing manifests. It runs before the build on the promotion PR, before the stable version PR is created, on the bot's version PR, and before stable artifacts are built or published. The bot's version PR can inherit notes already reviewed during promotion. Only affected changelog audiences are required. Canary prerelease publication continues without this stable-release gate.
+
+To check a promotion locally, run `pnpm check:release-docs --base <main-commit-SHA>` from `libraries/typescript`. Maintainers must still review the content for accuracy: CI validates versions, placement, and nonempty changed entries, not whether the prose describes every change.
+
 ## Release canary packages
 
 1. Merge a PR with changesets into `canary`.
@@ -50,7 +70,7 @@ Both channels share a concurrency group with `cancel-in-progress: false` and `qu
 
 ## Promote a stable release
 
-1. Merge `canary` into `main` after compatibility checks pass.
+1. Prepare the docs changelog on canary, then merge `canary` into `main` after release-readiness and compatibility checks pass.
 2. The release workflow opens one `release/typescript-stable` PR to exit prerelease mode, update versions and changelogs, and refresh the lockfile. If that PR is already open, it reports the existing PR.
 3. Review and merge the version PR. Its commit title does not control whether publication runs.
 4. The workflow follows the same build, test, pack, install, publish, and verification sequence, using npm's `latest` channel.

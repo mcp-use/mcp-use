@@ -38,7 +38,7 @@
     "version": "changeset version && pnpm install --no-frozen-lockfile",
     "version:exit-prerelease": "node scripts/version-packages.mjs",
     "release-channel": "node scripts/release-channel.mjs",
-    "test:release-channel": "node --test scripts/release-channel.test.mjs scripts/release-packages.test.mjs",
+    "test:release-channel": "node --test scripts/release-channel.test.mjs scripts/release-packages.test.mjs scripts/release-readiness.test.mjs",
     "version:check": "changeset status",
     "verify:release-install": "node scripts/verify-release-install.mjs",
     "verify:examples": "node packages/server/examples/verify-examples.mjs",
@@ -46,7 +46,9 @@
     "test_app:mcp-server": "rimraf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template mcp-server && cd test_app && pnpm install && pnpm dev",
     "test_app:mcp-apps": "rimraf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template mcp-apps && cd test_app && pnpm install && pnpm dev",
     "test_app:blank": "rimraf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template blank && cd test_app && pnpm install && pnpm dev",
-    "test:ci": "pnpm --filter @mcp-use/client test:run && pnpm --filter mcp-use test:run && pnpm --filter @mcp-use/agent test:unit && pnpm --filter @mcp-use/inspector test:unit && pnpm --filter @mcp-use/cli test:run && pnpm --filter @mcp-use/tunnel test:run && pnpm --filter create-mcp-use-app test"
+    "test:ci": "pnpm --filter @mcp-use/client test:run && pnpm --filter mcp-use test:run && pnpm --filter @mcp-use/agent test:unit && pnpm --filter @mcp-use/inspector test:unit && pnpm --filter @mcp-use/cli test:run && pnpm --filter @mcp-use/tunnel test:run && pnpm --filter create-mcp-use-app test",
+    "check:pr-changesets": "node scripts/check-pr-changesets.mjs",
+    "check:release-docs": "node scripts/check-release-docs.mjs"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.1",

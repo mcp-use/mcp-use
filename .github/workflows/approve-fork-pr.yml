@@ -27,6 +27,7 @@ jobs:
     outputs:
       sha: ${{ steps.promote.outputs.sha }}
       branch: ${{ steps.promote.outputs.branch }}
+      base_sha: ${{ steps.promote.outputs.base_sha }}
       python: ${{ steps.changed.outputs.python }}
       typescript: ${{ steps.changed.outputs.typescript }}
     steps:
@@ -54,6 +55,7 @@ jobs:
             }
 
             core.setOutput('sha', headSha);
+            core.setOutput('base_sha', pr.data.base.sha);
             core.setOutput('branch', branch);
 
       - name: Detect changed areas from PR files
@@ -70,7 +72,7 @@ jobs:
 
             const python = paths.some(p => p.startsWith('libraries/python/'));
             const ciChanged = paths.includes('.github/workflows/ci.yml') || paths.includes('.github/workflows/approve-fork-pr.yml');
-            const typescript = ciChanged || paths.some(p => p.startsWith('libraries/typescript/') || p.startsWith('.github/workflows/typescript-') || p.startsWith('.github/actions/setup-typescript/') || p.startsWith('.github/scripts/'));
+            const typescript = ciChanged || paths.some(p => p.startsWith('libraries/typescript/') || p === 'docs/typescript/changelog/changelog.mdx' || p === 'docs/inspector/changelog.mdx' || p.startsWith('.github/workflows/typescript-') || p.startsWith('.github/actions/setup-typescript/') || p.startsWith('.github/scripts/'));
 
             core.setOutput('python', String(python));
             core.setOutput('typescript', String(typescript));
@@ -99,6 +101,7 @@ jobs:
     uses: ./.github/workflows/ci.yml
     with:
       ref: ${{ needs.promote.outputs.sha }}
+      pr_base_sha: ${{ needs.promote.outputs.base_sha }}
       python: ${{ needs.promote.outputs.python == 'true' }}
       typescript: ${{ needs.promote.outputs.typescript == 'true' }}
     secrets: inherit

@@ -26,6 +26,10 @@ on:
         required: false
         type: boolean
         default: true
+      pr_base_sha:
+        description: Exact PR base SHA for maintainer-approved reusable runs
+        type: string
+        default: ""
 
 jobs:
   detect-changes:
@@ -52,6 +56,8 @@ jobs:
               - 'libraries/python/**'
             typescript:
               - 'libraries/typescript/**'
+              - 'docs/typescript/changelog/changelog.mdx'
+              - 'docs/inspector/changelog.mdx'
               - '.github/workflows/ci.yml'
               - '.github/workflows/typescript-ci.yml'
               - '.github/scripts/**'
@@ -555,3 +561,8 @@ jobs:
     uses: ./.github/workflows/typescript-ci.yml
     with:
       ref: ${{ inputs.ref || github.sha }}
+      pr_base_sha: ${{ inputs.pr_base_sha || github.event.pull_request.base.sha || '' }}
+      pr_release_mode: >-
+        ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.base_ref == 'main' && github.head_ref == 'canary' && 'promotion' ||
+            github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.base_ref == 'main' && github.head_ref == 'release/typescript-stable' && github.event.pull_request.user.login == 'github-actions[bot]' && 'version' ||
+            'ordinary' }}

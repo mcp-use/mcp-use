@@ -21,6 +21,8 @@ if [[ "$channel" == stable ]] && { [[ -f .changeset/pre.json ]] || [[ -n "$(node
     exit 0
   fi
   pnpm release-channel preflight --channel stable
+  # Docs must exist for the projected stable versions before opening the version PR.
+  pnpm check:release-docs
   git checkout -b "$branch"
   if [[ -f .changeset/pre.json ]]; then
     pnpm changeset pre exit
