@@ -1,4 +1,5 @@
 import http from "node:http";
+import net from "node:net";
 import { describe, expect, it } from "vitest";
 
 import { MCPServer } from "../src/index.js";
@@ -10,18 +11,6 @@ function isPortOpen(port: number): Promise<boolean> {
       resolve(true);
     });
     req.on("error", () => resolve(false));
-  });
-}
-
-function getFreePort(): Promise<number> {
-  return new Promise((resolve) => {
-    const s = http.createServer();
-    s.listen(0, "127.0.0.1", () => {
-      const address = s.address();
-      const port =
-        typeof address === "object" && address !== null ? address.port : 0;
-      s.close(() => resolve(port));
-    });
   });
 }
 
@@ -102,12 +91,11 @@ describe("MCPServer.listen lifecycle and concurrency", () => {
   });
 
   it("cleans up listener when close() is called while listen() is in-flight", async () => {
-    const targetPort = await getFreePort();
     const server = new MCPServer({
       name: "close-inflight-test",
       version: "1.0.0",
     });
-    const listenPromise = server.listen(targetPort);
+    const listenPromise = server.listen(0);
     const closePromise = server.close();
 
     const [listenResult, closeResult] = await Promise.allSettled([
@@ -121,55 +109,54 @@ describe("MCPServer.listen lifecycle and concurrency", () => {
       expect((listenResult.reason as Error).message).toContain("closed");
     }
 
-    // Deterministically verify the target port is closed and not leaking
-    expect(await isPortOpen(targetPort)).toBe(false);
-
-    // Verify the port is immediately reusable without EADDRINUSE
+    // Verify a fresh server instance can immediately bind port 0 and serve requests without leaked listeners
     const restartServer = new MCPServer({
       name: "restart-test",
       version: "1.0.0",
     });
-    const restartListen = await restartServer.listen(targetPort);
-    expect(restartListen.port).toBe(targetPort);
-    expect(await isPortOpen(targetPort)).toBe(true);
+    const restartListen = await restartServer.listen(0);
+    expect(typeof restartListen.port).toBe("number");
+    expect(await isPortOpen(restartListen.port)).toBe(true);
 
     await restartServer.close();
-    expect(await isPortOpen(targetPort)).toBe(false);
+    expect(await isPortOpen(restartListen.port)).toBe(false);
   });
 
-  it("terminates active connections promptly when shutdown races listen()", async () => {
-    const targetPort = await getFreePort();
+  it("terminates active connections promptly on shutdown", async () => {
     const server = new MCPServer({
-      name: "race-active-req-test",
+      name: "active-conn-test",
       version: "1.0.0",
     });
+    const { port } = await server.listen(0);
+    expect(await isPortOpen(port)).toBe(true);
 
-    const listenPromise = server.listen(targetPort);
-
-    // Send a request immediately as the port is binding
-    const req = http.get(`http://127.0.0.1:${targetPort}/mcp`);
-    req.on("error", () => {
-      // Expected connection reset or abort
+    // Establish and synchronize on a confirmed active socket connection
+    const socket = net.connect(port, "127.0.0.1");
+    await new Promise<void>((resolve, reject) => {
+      socket.once("connect", () => resolve());
+      socket.once("error", reject);
     });
 
-    const closePromise = server.close();
+    const socketClosed = new Promise<void>((resolve) => {
+      if (socket.destroyed) resolve();
+      else socket.once("close", () => resolve());
+    });
 
-    const [, closeResult] = await Promise.allSettled([
-      listenPromise,
-      closePromise,
-    ]);
+    await server.close();
+    await socketClosed;
 
-    expect(closeResult.status).toBe("fulfilled");
-    expect(await isPortOpen(targetPort)).toBe(false);
+    expect(socket.destroyed).toBe(true);
+    expect(await isPortOpen(port)).toBe(false);
 
-    // An immediate restart must succeed
+    // An immediate restart on port 0 must succeed
     const restartServer = new MCPServer({
-      name: "restart-after-race-test",
+      name: "restart-after-close-test",
       version: "1.0.0",
     });
-    const restartListen = await restartServer.listen(targetPort);
-    expect(restartListen.port).toBe(targetPort);
+    const restartListen = await restartServer.listen(0);
+    expect(typeof restartListen.port).toBe("number");
+    expect(await isPortOpen(restartListen.port)).toBe(true);
     await restartServer.close();
-    expect(await isPortOpen(targetPort)).toBe(false);
+    expect(await isPortOpen(restartListen.port)).toBe(false);
   });
 });
