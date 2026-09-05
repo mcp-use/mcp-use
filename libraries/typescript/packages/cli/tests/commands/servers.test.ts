@@ -84,6 +84,89 @@ describe("server environment output safety", () => {
       updated: true,
     });
   });
+
+  it("clears an existing sensitive flag when --secret is not repeated on update, and warns", async () => {
+    api.request
+      .mockResolvedValueOnce([{ id: "env_1", key: "TOKEN", sensitive: true }])
+      .mockResolvedValueOnce({
+        id: "env_1",
+        key: "TOKEN",
+        value: "rotated",
+      });
+    const stdout = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
+
+    await expect(
+      runServers(["env", "set", "server_1", "TOKEN=rotated", "--json"])
+    ).resolves.toBe(0);
+
+    expect(api.request).toHaveBeenLastCalledWith(
+      "/servers/server_1/env-variables/env_1",
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          key: "TOKEN",
+          value: "rotated",
+          branch: null,
+          environments: ["production"],
+          sensitive: false,
+        }),
+      }
+    );
+
+    const output = stdout.mock.calls.flat().join("");
+    expect(JSON.parse(output)).toMatchObject({
+      secret: false,
+    });
+  });
+
+  it("prints a human-readable warning when a write downgrades an existing secret", async () => {
+    api.request
+      .mockResolvedValueOnce([{ id: "env_1", key: "TOKEN", sensitive: true }])
+      .mockResolvedValueOnce({
+        id: "env_1",
+        key: "TOKEN",
+        value: "rotated",
+      });
+    const stdout = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
+
+    await expect(
+      runServers(["env", "set", "server_1", "TOKEN=rotated"])
+    ).resolves.toBe(0);
+
+    const output = stdout.mock.calls.flat().join("");
+    expect(output).toContain("is no longer write-only");
+  });
+
+  it("does not mark a brand-new variable sensitive by default", async () => {
+    api.request.mockResolvedValueOnce([]).mockResolvedValueOnce({
+      id: "env_2",
+      key: "NEW_VAR",
+      value: "value",
+    });
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(
+      runServers(["env", "set", "server_1", "NEW_VAR=value", "--json"])
+    ).resolves.toBe(0);
+
+    expect(api.request).toHaveBeenLastCalledWith(
+      "/servers/server_1/env-variables",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          key: "NEW_VAR",
+          value: "value",
+          branch: null,
+          environments: ["production"],
+          sensitive: false,
+        }),
+      }
+    );
+  });
 });
 
 describe("server environment deletion", () => {
