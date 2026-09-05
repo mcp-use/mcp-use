@@ -29,7 +29,7 @@ Commands:
   update <id-or-slug>          Update server metadata or build configuration
   delete <id-or-slug>          Delete a server
   env list <server>            List environment variable metadata
-  env set <server> <KEY=VALUE> Create or update an environment variable (--secret required on every write to keep it sensitive)
+  env set <server> <KEY=VALUE> Create or update an environment variable
   env unset <server> <key>     Delete an environment variable
 
 Run mcp-use servers <command> --help for all options.
@@ -51,7 +51,7 @@ const COMMAND_HELP: Record<string, string> = {
   delete: `Usage: mcp-use servers delete <id-or-slug> [options]\n\nOptions:\n  --org <id-or-slug>  Override the active organization\n  --yes               Confirm deletion without prompting\n  --json              Emit the deletion result; never prompt\n  -h, --help          Show this help`,
   env: `Usage: mcp-use servers env <list|set|unset> [options]\n\nCommands:\n  list <server>             List keys and metadata; values are never returned\n  set <server> <KEY=VALUE> Create or update a value\n  unset <server> <key>     Delete a value\n\nRun mcp-use servers env <command> --help for all options.`,
   "env list": `Usage: mcp-use servers env list <server> [options]\n\nOptions:\n  --org <id-or-slug>  Override the active organization\n  --branch <name>     Select preview variables for a branch\n  --json              Emit metadata only; never values\n  -h, --help          Show this help`,
-  "env set": `Usage: mcp-use servers env set <server> <KEY=VALUE> [options]\n\nOptions:\n  --org <id-or-slug>  Override the active organization\n  --branch <name>     Set a preview value for a branch (default: production)\n  --secret            Store the value as a sensitive, write-only secret. Required on every write, including updates and rotations. Without this flag, the value is stored as non-sensitive, even if the existing variable was sensitive.\n  --json              Emit mutation metadata only; never the value\n  -h, --help          Show this help`,
+  "env set": `Usage: mcp-use servers env set <server> <KEY=VALUE> [options]\n\nOptions:\n  --org <id-or-slug>  Override the active organization\n  --branch <name>     Set a preview value for a branch (default: production)\n  --secret            Store the value as a write-only secret. Required on every write to keep it write-only.\n  --json              Emit mutation metadata only; never the value\n  -h, --help          Show this help`,
   "env unset": `Usage: mcp-use servers env unset <server> <key> [options]\n\nOptions:\n  --org <id-or-slug>  Override the active organization\n  --branch <name>     Delete a preview value for a branch\n  --yes               Confirm deletion without prompting\n  --json              Emit the deletion result; never prompt\n  -h, --help          Show this help`,
 };
 
@@ -318,11 +318,12 @@ async function envSet(argv: readonly string[], json: boolean): Promise<number> {
     branch: values.branch ?? null,
     secret: values.secret === true,
     updated: existing !== undefined,
-    ...(downgradesExistingSecret ? { downgradedFromSecret: true } : {}),
   };
   const message = downgradesExistingSecret
-    ? `Set ${key}. Warning: this variable was previously sensitive and is now stored as non-sensitive because --secret was not passed.`
-    : `Set ${key}.`;
+    ? `Warning: ${key} is no longer write-only.`
+    : values.secret === true
+      ? `Set ${key} (saved as write-only).`
+      : `Set ${key} (saved as non-sensitive).`;
   printResult(result, json, message);
   return 0;
 }

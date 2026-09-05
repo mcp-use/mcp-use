@@ -117,7 +117,7 @@ describe("server environment output safety", () => {
 
     const output = stdout.mock.calls.flat().join("");
     expect(JSON.parse(output)).toMatchObject({
-      downgradedFromSecret: true,
+      secret: false,
     });
   });
 
@@ -138,8 +138,7 @@ describe("server environment output safety", () => {
     ).resolves.toBe(0);
 
     const output = stdout.mock.calls.flat().join("");
-    expect(output).toContain("previously sensitive");
-    expect(output).toContain("non-sensitive");
+    expect(output).toContain("is no longer write-only");
   });
 
   it("does not mark a brand-new variable sensitive by default", async () => {
