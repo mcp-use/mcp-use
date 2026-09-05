@@ -121,6 +121,28 @@ describe("server environment deletion", () => {
   });
 });
 
+describe("server list argument validation", () => {
+  it("rejects a bad page size before authenticating", async () => {
+    const stderr = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+
+    await expect(runServers(["list", "--limit", "0", "--json"])).resolves.toBe(
+      2
+    );
+
+    // Nothing should reach the cloud for a command line that cannot run.
+    expect(cloudApiForOrganization).not.toHaveBeenCalled();
+    expect(api.request).not.toHaveBeenCalled();
+    expect(JSON.parse(stderr.mock.calls.flat().join(""))).toEqual({
+      error: {
+        code: "usage_error",
+        message: "--limit must be an integer from 1 to 100.",
+      },
+    });
+  });
+});
+
 describe("server human output", () => {
   it("renders a compact list instead of raw API JSON", async () => {
     api.request.mockResolvedValue({
