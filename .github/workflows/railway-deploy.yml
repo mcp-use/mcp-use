@@ -15,8 +15,13 @@ on:
           - canary
           - main
 
+concurrency:
+  group: railway-${{ inputs.branch || github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
 jobs:
   deploy:
+    timeout-minutes: 20
     name: Deploy to Railway
     runs-on: ubuntu-latest
     # For workflow_run: only run if the release workflow completed successfully
@@ -24,6 +29,7 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     permissions:
       actions: read
+      contents: read
     steps:
       - name: Determine branch (manual trigger)
         if: github.event_name == 'workflow_dispatch'
@@ -112,13 +118,16 @@ jobs:
             execSync(`unzip -q "${zipPath}" -d "${extractPath}"`);
             
             // Read marker file
-            const markerPath = path.join(extractPath, '.railway-deploy-marker');
+            const markerPath = path.join(extractPath, 'railway-deploy-marker.txt');
             const markerContent = fs.readFileSync(markerPath, 'utf8');
             
             // Parse branch from marker
             const branchMatch = markerContent.match(/branch=(.+)/);
             const branch = branchMatch ? branchMatch[1].trim() : null;
             
+            const sha = markerContent.match(/^sha=([a-f0-9]{40})$/m)?.[1];
+            if (!['main', 'canary'].includes(branch) || !sha) throw new Error('Invalid verified release marker');
+            core.setOutput('sha', sha);
             core.setOutput('branch', branch);
             core.info(`📦 Branch from marker: ${branch}`);
 
@@ -162,7 +171,7 @@ jobs:
         with:
           # For manual trigger: use input branch (already validated as canary/main)
           # For automatic trigger: use branch from validated marker (not workflow_run.head_branch for security)
-          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.branch || steps.marker-info.outputs.branch }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.branch || steps.marker-info.outputs.sha }}
           fetch-depth: 0
 
       - name: Deploy to Railway

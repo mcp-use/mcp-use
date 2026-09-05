@@ -281,7 +281,9 @@ async function registryMetadata(name) {
   const response = await fetch(url, {
     headers: { accept: "application/vnd.npm.install-v1+json" },
     cache: "no-store",
+    signal: AbortSignal.timeout(30_000),
   });
+  if (response.status === 404) return { versions: {}, "dist-tags": {} };
   if (!response.ok)
     throw new Error(`npm registry returned ${response.status} for ${name}`);
   return response.json();
@@ -384,10 +386,51 @@ async function snapshot(channel, output) {
       }
     }
 
+    // Recover npm publishes that completed before tags were pushed. Never
+    // infer a source revision: npm must supply the original gitHead.
+    const tagExists =
+      ["true", "all"].includes(option("--recover-tags", "false")) &&
+      spawnSync(
+        "git",
+        [
+          "show-ref",
+          "--verify",
+          "--quiet",
+          `refs/tags/${manifest.name}@${manifest.version}`,
+        ],
+        { cwd: workspaceRoot }
+      ).status === 0;
+    const recovery =
+      ["true", "all"].includes(option("--recover-tags", "false")) &&
+      published &&
+      distTags[tag] === manifest.version &&
+      (!tagExists || option("--recover-tags") === "all") &&
+      (channel === "stable"
+        ? !semver.prerelease(manifest.version)
+        : semver.prerelease(manifest.version)?.[0] === "canary");
+    let sourceSha = published ? versions[manifest.version]?.gitHead : undefined;
+    if (recovery && !sourceSha && !option("--registry-file")) {
+      const response = await fetch(
+        `https://registry.npmjs.org/${encodeURIComponent(manifest.name)}/${manifest.version}`,
+        { signal: AbortSignal.timeout(30_000) }
+      );
+      if (!response.ok)
+        throw new Error(
+          `Could not read original source for ${manifest.name}@${manifest.version}`
+        );
+      sourceSha = (await response.json()).gitHead;
+    }
+    if (recovery && !/^[a-f0-9]{40}$/u.test(sourceSha ?? "")) {
+      throw new Error(
+        `Cannot recover ${manifest.name}@${manifest.version}: npm has no source gitHead. Inspect the original release run before creating its tag.`
+      );
+    }
     releases.push({
       name: manifest.name,
       version: manifest.version,
-      target: !published,
+      target: !published || recovery,
+      published,
+      sourceSha,
       channelTag: tag,
       distTagsBefore: distTags,
     });
@@ -416,6 +459,16 @@ async function verifyOnce(plan) {
         } catch (error) {
           errors.push(error instanceof Error ? error.message : String(error));
         }
+      }
+      if (
+        !release.published &&
+        release.integrity &&
+        versions[release.version]?.dist?.integrity !==
+          `sha512-${release.integrity}`
+      ) {
+        errors.push(
+          `${release.name}@${release.version} tarball integrity differs from the verified artifact`
+        );
       }
       if (afterTags[release.channelTag] !== release.version) {
         errors.push(
@@ -476,6 +529,12 @@ function writeTags(planFile, output) {
 const [command] = process.argv.slice(2);
 
 try {
+  if (
+    ["prepare", "validate", "preflight", "snapshot"].includes(command) &&
+    !["stable", "canary"].includes(option("--channel"))
+  ) {
+    throw new Error("Expected --channel stable or --channel canary");
+  }
   if (command === "pending") {
     console.log(pendingChangesets().join("\n"));
   } else if (command === "prepare") {
