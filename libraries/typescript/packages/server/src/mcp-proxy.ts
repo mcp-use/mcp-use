@@ -116,6 +116,10 @@ export interface ProxyResource {
   description?: string | undefined;
   /** Resource media type. */
   mimeType?: string | undefined;
+  /** Upstream client hints, e.g. audience and priority. */
+  annotations?: ResourceDefinition["annotations"] | undefined;
+  /** Upstream extension metadata advertised on `resources/list`. */
+  _meta?: ResourceDefinition["_meta"] | undefined;
 }
 
 /** Prompt metadata consumed while introspecting an upstream connection. */
@@ -413,6 +417,10 @@ function mountPlan(host: ProxyMountHost, plan: ProxyNamespacePlan): void {
         ...(resource.mimeType !== undefined && {
           mimeType: resource.mimeType,
         }),
+        ...(resource.annotations !== undefined && {
+          annotations: resource.annotations,
+        }),
+        ...(resource._meta !== undefined && { _meta: resource._meta }),
       },
       async (_uri, ctx) =>
         plan.connection.readResource(upstreamUri, { signal: ctx.signal })
