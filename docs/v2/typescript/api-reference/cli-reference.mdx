@@ -507,6 +507,7 @@ mcp-use servers env unset srv_abc123 API_KEY --yes
 - `--secret` marks a value sensitive.
 - `--branch <name>` scopes preview environment variables to a branch. Omit `--branch` for production resolution.
 - `env unset` prompts for confirmation unless `--yes` is set.
+- `env unset` fails when no matching variable exists in the resolved scope. It exits non-zero with the error code `env_variable_not_found` instead of reporting a deletion that did not happen. `--branch` is part of that resolution, so unsetting a production key while `--branch` is supplied is a miss, not a fallback.
 
 ## `client`
 
