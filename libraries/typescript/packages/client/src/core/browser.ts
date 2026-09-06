@@ -94,6 +94,8 @@ export class BrowserMCPClient extends BaseMCPClient {
       gatewayUrl,
       serverId,
       reconnectionOptions,
+      roots,
+      defaultRequestOptions,
     } = serverConfig;
 
     if (!url) {
@@ -130,6 +132,8 @@ export class BrowserMCPClient extends BaseMCPClient {
       gatewayUrl,
       serverId,
       reconnectionOptions,
+      roots,
+      defaultRequestOptions,
     };
 
     logger.debug(
