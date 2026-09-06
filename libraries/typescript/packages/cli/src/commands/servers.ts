@@ -360,13 +360,17 @@ async function envUnset(
     (variable) =>
       variable.key === key && (variable.branch ?? undefined) === values.branch
   );
-  if (existing !== undefined) {
+  const found = existing !== undefined;
+  if (found) {
     await api.request(
       `/servers/${encodeURIComponent(server)}/env-variables/${encodeURIComponent(existing.id)}`,
       { method: "DELETE" }
     );
   }
-  printResult({ deleted: key }, json, `Deleted ${key}.`);
+  const scope =
+    values.branch === undefined ? "" : ` on branch ${values.branch}`;
+  const message = found ? `Deleted ${key}.` : `${key} does not exist${scope}.`;
+  printResult({ deleted: found, key }, json, message);
   return 0;
 }
 

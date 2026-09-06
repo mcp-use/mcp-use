@@ -294,3 +294,79 @@ describe("server trigger configuration", () => {
     expect(api.request).not.toHaveBeenCalled();
   });
 });
+
+describe("server environment unset", () => {
+  it("reports a real deletion when the variable exists", async () => {
+    api.request
+      .mockResolvedValueOnce([{ id: "env_1", key: "TOKEN" }])
+      .mockResolvedValueOnce(undefined);
+    const stdout = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
+
+    await expect(
+      runServers(["env", "unset", "server_1", "TOKEN", "--yes", "--json"])
+    ).resolves.toBe(0);
+
+    expect(api.request).toHaveBeenCalledWith(
+      "/servers/server_1/env-variables/env_1",
+      { method: "DELETE" }
+    );
+    expect(JSON.parse(stdout.mock.calls.flat().join(""))).toEqual({
+      deleted: true,
+      key: "TOKEN",
+    });
+  });
+
+  it("reports that nothing was deleted when the variable does not exist", async () => {
+    api.request.mockResolvedValueOnce([]);
+    const stdout = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
+
+    await expect(
+      runServers([
+        "env",
+        "unset",
+        "server_1",
+        "DOES_NOT_EXIST",
+        "--yes",
+        "--json",
+      ])
+    ).resolves.toBe(0);
+
+    expect(api.request).toHaveBeenCalledTimes(1);
+    expect(api.request).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ method: "DELETE" })
+    );
+    expect(JSON.parse(stdout.mock.calls.flat().join(""))).toEqual({
+      deleted: false,
+      key: "DOES_NOT_EXIST",
+    });
+  });
+
+  it("names the branch when the variable is absent on that branch", async () => {
+    api.request.mockResolvedValueOnce([{ id: "env_1", key: "TOKEN" }]);
+    const stdout = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
+
+    await expect(
+      runServers([
+        "env",
+        "unset",
+        "server_1",
+        "TOKEN",
+        "--branch",
+        "feature",
+        "--yes",
+      ])
+    ).resolves.toBe(0);
+
+    expect(api.request).toHaveBeenCalledTimes(1);
+    expect(stdout.mock.calls.flat().join("")).toContain(
+      "TOKEN does not exist on branch feature."
+    );
+  });
+});

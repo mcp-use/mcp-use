@@ -506,6 +506,7 @@ mcp-use servers env unset srv_abc123 API_KEY --yes
 - `--secret` stores a value as write-only, but this must be passed on **every** write to the variable, including updates and rotations. Omitting `--secret` on an update stores the value as non-sensitive, even if the existing variable was previously write-only. The CLI prints a short warning (`Warning: <key> is no longer write-only.`) when a write would downgrade an existing write-only variable this way; the resulting state is always reflected in the existing `secret` field of `--json` output.
 - `--branch <name>` scopes preview environment variables to a branch. Omit `--branch` for production resolution.
 - `env unset` prompts for confirmation unless `--yes` is set.
+- `env unset` reports what actually happened. It prints `Deleted <key>.` only when a matching variable existed, and `<key> does not exist.` otherwise — naming the branch when `--branch` is supplied. `--json` output carries a boolean `deleted` field so scripts can tell a real deletion from a no-op. Removing a key that is not set is not an error; the exit code is `0` either way.
 
 ## `client`
 
