@@ -55,6 +55,7 @@ export interface AgentStep {
 }
 
 import type { RunOptions } from "./run_options.js";
+import type { ProviderMessage } from "../llm/types.js";
 
 /**
  * Helper function to normalize run options from either old-style positional arguments
@@ -72,6 +73,7 @@ function normalizeRunOptions<T>(
   maxSteps?: number;
   manageConnector?: boolean;
   externalHistory?: BaseMessage[];
+  messages?: ProviderMessage[];
   outputSchema?: ZodSchema<T>;
   signal?: AbortSignal;
 } {
@@ -83,6 +85,7 @@ function normalizeRunOptions<T>(
       maxSteps: options.maxSteps,
       manageConnector: options.manageConnector,
       externalHistory: options.externalHistory,
+      messages: options.messages,
       outputSchema: options.schema,
       signal: options.signal,
     };
@@ -97,6 +100,53 @@ function normalizeRunOptions<T>(
     outputSchema,
     signal,
   };
+}
+
+/**
+ * Convert provider-neutral ProviderMessage[] to LangChain BaseMessage[].
+ *
+ * Supports user, assistant (with optional tool calls), tool, and system roles.
+ */
+function convertProviderMessagesToLangChain(
+  messages: ProviderMessage[],
+  HumanMessageCls: typeof HumanMessage,
+  AIMessageCls: typeof AIMessage,
+  SystemMessageCls: typeof SystemMessage,
+  ToolMessageCls: typeof ToolMessage
+): BaseMessage[] {
+  return messages.map((m) => {
+    const content =
+      typeof m.content === "string"
+        ? m.content
+        : m.content.map((p) => (p.type === "text" ? p.text : "")).join("");
+
+    if (m.role === "user") {
+      return new HumanMessageCls(content);
+    }
+    if (m.role === "system") {
+      return new SystemMessageCls(content);
+    }
+    if (m.role === "assistant") {
+      if (m.toolCalls?.length) {
+        return new AIMessageCls({
+          content,
+          tool_calls: m.toolCalls.map((tc) => ({
+            id: tc.id,
+            name: tc.name,
+            args: tc.args,
+          })),
+        });
+      }
+      return new AIMessageCls(content);
+    }
+    if (m.role === "tool") {
+      return new ToolMessageCls({
+        content,
+        tool_call_id: m.toolCallId ?? "",
+      });
+    }
+    return new HumanMessageCls(content);
+  });
 }
 
 /** Runs a LangChain tool-calling agent against MCP servers. */
@@ -1186,6 +1236,7 @@ export class MCPAgent {
       maxSteps: steps,
       manageConnector: manage,
       externalHistory: history,
+      messages: extraMessages,
       outputSchema: schema,
       signal: abortSignal,
     } = normalizeRunOptions(
@@ -1202,14 +1253,17 @@ export class MCPAgent {
       return this.remoteAgent.run(query, steps, manage, history, schema);
     }
 
-    const generator = this.stream<T>(
-      query,
-      steps,
-      manage,
-      history,
+    // Pass messages via the options-object overload to preserve the field that
+    // the positional-argument signature cannot carry.
+    const generator = this.stream<T>({
+      prompt: query,
+      maxSteps: steps,
+      manageConnector: manage,
+      externalHistory: history,
+      messages: extraMessages,
       schema,
-      abortSignal
-    );
+      signal: abortSignal,
+    });
     return this._consumeAndReturn(generator);
   }
 
@@ -1250,6 +1304,7 @@ export class MCPAgent {
       maxSteps: steps,
       manageConnector: manage,
       externalHistory: history,
+      messages: extraMessages,
       outputSchema: schema,
       signal: abortSignal,
     } = normalizeRunOptions(
@@ -1342,8 +1397,23 @@ export class MCPAgent {
       // With dynamic tool reload: if tools change mid-execution, we interrupt and restart
       const maxRestarts = 3; // Prevent infinite restart loops
       let restartCount = 0;
+
+      // Convert RunOptions.messages (provider-neutral) to LangChain messages and
+      // insert them after history but before the current prompt, matching the
+      // ordering documented in RunOptions.externalHistory.
+      const convertedMessages = extraMessages?.length
+        ? convertProviderMessagesToLangChain(
+            extraMessages,
+            HumanMessage,
+            AIMessage,
+            SystemMessage,
+            ToolMessage
+          )
+        : [];
+
       const accumulatedMessages: BaseMessage[] = [
         ...langchainHistory,
+        ...convertedMessages,
         new HumanMessage(query),
       ];
 
@@ -1801,6 +1871,7 @@ export class MCPAgent {
       maxSteps: steps,
       manageConnector: manage,
       externalHistory: history,
+      messages: extraMessages,
       outputSchema: schema,
       signal: abortSignal,
     } = normalized;
@@ -1866,9 +1937,22 @@ export class MCPAgent {
         }
       }
 
+      // Convert RunOptions.messages (provider-neutral) to LangChain messages and
+      // insert them after history but before the current prompt.
+      const convertedMessages = extraMessages?.length
+        ? convertProviderMessagesToLangChain(
+            extraMessages,
+            HumanMessage,
+            AIMessage,
+            SystemMessage,
+            ToolMessage
+          )
+        : [];
+
       // Prepare inputs
       const inputs: BaseMessage[] = [
         ...langchainHistory,
+        ...convertedMessages,
         new HumanMessage(query),
       ];
 
