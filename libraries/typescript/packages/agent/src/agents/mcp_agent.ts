@@ -32,6 +32,7 @@ import { normalizeRunOptions } from "./normalize_run_options.js";
 import type { RunOptions } from "./run_options.js";
 import { RemoteAgent } from "./remote.js";
 import type { BaseMessage, MCPServerConfig } from "./types.js";
+import { withResolvedAuthTokens } from "./types.js";
 
 export type {
   ProviderName,
@@ -242,7 +243,9 @@ export class MCPAgent {
 
     if (!this.client && this.mcpServersConfig && !this.hasLiveConnections()) {
       const { MCPClient } = await import("@mcp-use/client");
-      this.client = new MCPClient({ mcpServers: this.mcpServersConfig });
+      this.client = new MCPClient({
+        mcpServers: withResolvedAuthTokens(this.mcpServersConfig),
+      });
       this.clientOwnedByAgent = true;
     }
 

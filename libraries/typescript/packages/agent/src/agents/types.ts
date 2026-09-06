@@ -40,6 +40,30 @@ export interface MCPServerConfig {
   authToken?: string;
 }
 
+/**
+ * Move a legacy `auth_token` onto the `authToken` the client actually reads.
+ *
+ * `MCPServerConfig` advertises both spellings so a configuration written for
+ * the Python SDK still loads, but `@mcp-use/client` only ever reads
+ * `authToken`. Without this the snake-case form is dropped and the connection
+ * goes out with no `Authorization` header and no warning.
+ *
+ * @param servers - Server configurations keyed by name.
+ * @returns The same map with the legacy token resolved.
+ */
+export function withResolvedAuthTokens(
+  servers: Record<string, MCPServerConfig>
+): Record<string, MCPServerConfig> {
+  return Object.fromEntries(
+    Object.entries(servers).map(([name, config]) => [
+      name,
+      config.authToken === undefined && config.auth_token !== undefined
+        ? { ...config, authToken: config.auth_token }
+        : config,
+    ])
+  );
+}
+
 /** Options shared by explicit and simplified LangChain agents. */
 export interface CommonAgentOptions {
   /** Maximum model calls per run. Defaults to `5`. */

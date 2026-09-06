@@ -34,6 +34,7 @@ import type {
   MCPAgentOptions,
   MCPServerConfig,
 } from "./types.js";
+import { withResolvedAuthTokens } from "./types.js";
 import { createLLMFromString, type LLMConfig } from "./utils/llm_provider.js";
 
 /** Tool invocation details yielded by the LangChain agent. */
@@ -355,7 +356,9 @@ export class MCPAgent {
         );
         // Dynamically import MCPClient (Node.js version)
         const { MCPClient } = await import("@mcp-use/client");
-        this.client = new MCPClient({ mcpServers: this.mcpServersConfig });
+        this.client = new MCPClient({
+          mcpServers: withResolvedAuthTokens(this.mcpServersConfig),
+        });
         logger.debug("✅ MCPClient created successfully");
       }
 
