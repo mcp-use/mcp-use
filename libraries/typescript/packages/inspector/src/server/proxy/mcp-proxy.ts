@@ -341,6 +341,13 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
 
+      // The client disconnected before the upstream responded, so the abort
+      // we now propagate to the outbound fetch rejects here. That is the
+      // expected shutdown path, and nothing is left to read a body.
+      if (error instanceof Error && error.name === "AbortError") {
+        return new Response(null, { status: 499 });
+      }
+
       // Get targetUrl for better error logging
       const targetUrl = c.req.header("X-Target-URL");
 

@@ -202,8 +202,14 @@ function createExpressInspectorMiddleware(
       )
       .catch((error) => {
         // The client going away aborts the outbound fetch and the body
-        // read. That is a completed request, not an Express error.
-        if (abort.signal.aborted) {
+        // read. That is a completed request, not an Express error. Require
+        // both the abort and an AbortError, so a genuine failure that races
+        // the disconnect still reaches Express.
+        if (
+          abort.signal.aborted &&
+          error instanceof Error &&
+          error.name === "AbortError"
+        ) {
           return;
         }
         next(error);
