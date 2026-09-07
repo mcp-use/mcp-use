@@ -213,7 +213,7 @@ describe("RunOptions.messages forwarding", () => {
     await agent.initialize();
 
     const result = await agent.run({ prompt: "hello" });
-    expect(result).toBeTruthy();
+    expect(result).toBe("Test response");
   });
 
   it("streamEvents(): forwards RunOptions.messages before the prompt", async () => {

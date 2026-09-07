@@ -140,9 +140,15 @@ function convertProviderMessagesToLangChain(
       return new AIMessageCls(content);
     }
     if (m.role === "tool") {
+      if (!m.toolCallId) {
+        throw new Error(
+          "RunOptions.messages: tool message is missing toolCallId. " +
+            "Every tool message must reference the id of the assistant tool call it responds to."
+        );
+      }
       return new ToolMessageCls({
         content,
-        tool_call_id: m.toolCallId ?? "",
+        tool_call_id: m.toolCallId,
       });
     }
     return new HumanMessageCls(content);
@@ -1250,6 +1256,12 @@ export class MCPAgent {
 
     // Delegate to remote agent if in remote mode
     if (this.isRemote && this.remoteAgent) {
+      if (extraMessages?.length) {
+        throw new Error(
+          "RunOptions.messages is not supported in remote mode. " +
+            "The remote agent protocol does not carry a pre-seeded message list."
+        );
+      }
       return this.remoteAgent.run(query, steps, manage, history, schema);
     }
 
