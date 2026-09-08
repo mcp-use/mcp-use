@@ -142,6 +142,7 @@ export abstract class BaseConnector {
   protected connected = false;
   private connectPromise: Promise<void> | null = null;
   private disconnectPromise: Promise<void> | null = null;
+  private disconnectGeneration = 0;
   protected readonly opts: ConnectorInitOptions;
   protected notificationHandlers: NotificationHandler[] = [];
   protected rootsCache: Root[] = [];
@@ -475,8 +476,15 @@ export abstract class BaseConnector {
    * @returns A promise that resolves when the connector is connected.
    */
   async connect(): Promise<void> {
+    const generation = this.disconnectGeneration;
     while (this.disconnectPromise) {
       await this.disconnectPromise;
+    }
+
+    // A later disconnect also cancels attempts queued behind an earlier
+    // teardown. No resources belong to this attempt yet, so do not clean up.
+    if (generation !== this.disconnectGeneration) {
+      throw new Error("Connection cancelled by disconnect");
     }
 
     if (this.connected) {
@@ -491,7 +499,7 @@ export abstract class BaseConnector {
     const currentConnect = (async () => {
       try {
         await this.establishTransport();
-        if (this.disconnectPromise) {
+        if (generation !== this.disconnectGeneration) {
           throw new Error("Connection cancelled by disconnect");
         }
         this.connected = true;
@@ -556,6 +564,9 @@ export abstract class BaseConnector {
    * @returns A promise that resolves after cleanup completes.
    */
   async disconnect(): Promise<void> {
+    // Advance even when joining existing cleanup: callers may have queued
+    // a reconnect since that cleanup began.
+    this.disconnectGeneration++;
     if (this.disconnectPromise) {
       return this.disconnectPromise;
     }
