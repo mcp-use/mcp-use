@@ -290,15 +290,12 @@ async function envSet(argv: readonly string[], json: boolean): Promise<number> {
     (variable) =>
       variable.key === key && (variable.branch ?? undefined) === values.branch
   );
-  const sensitive = values.secret === true;
-  const downgradesExistingSecret =
-    existing?.sensitive === true && sensitive === false;
   const body = {
     key,
     value,
     branch: values.branch ?? null,
     environments: values.branch === undefined ? ["production"] : ["preview"],
-    sensitive,
+    sensitive: values.secret === true,
   };
   if (existing === undefined) {
     await api.request<unknown>(
@@ -319,12 +316,11 @@ async function envSet(argv: readonly string[], json: boolean): Promise<number> {
     secret: values.secret === true,
     updated: existing !== undefined,
   };
-  const message = downgradesExistingSecret
-    ? `Warning: ${key} is no longer write-only.`
-    : values.secret === true
-      ? `Set ${key} (saved as write-only).`
-      : `Set ${key} (saved as non-sensitive).`;
-  printResult(result, json, message);
+  printResult(
+    result,
+    json,
+    values.secret === true ? `Set ${key} (saved as write-only).` : `Set ${key}.`
+  );
   return 0;
 }
 

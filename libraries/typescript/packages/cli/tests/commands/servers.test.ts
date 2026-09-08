@@ -85,7 +85,7 @@ describe("server environment output safety", () => {
     });
   });
 
-  it("clears an existing sensitive flag when --secret is not repeated on update, and warns", async () => {
+  it("clears an existing sensitive flag when --secret is not repeated on update", async () => {
     api.request
       .mockResolvedValueOnce([{ id: "env_1", key: "TOKEN", sensitive: true }])
       .mockResolvedValueOnce({
@@ -119,26 +119,6 @@ describe("server environment output safety", () => {
     expect(JSON.parse(output)).toMatchObject({
       secret: false,
     });
-  });
-
-  it("prints a human-readable warning when a write downgrades an existing secret", async () => {
-    api.request
-      .mockResolvedValueOnce([{ id: "env_1", key: "TOKEN", sensitive: true }])
-      .mockResolvedValueOnce({
-        id: "env_1",
-        key: "TOKEN",
-        value: "rotated",
-      });
-    const stdout = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation(() => true);
-
-    await expect(
-      runServers(["env", "set", "server_1", "TOKEN=rotated"])
-    ).resolves.toBe(0);
-
-    const output = stdout.mock.calls.flat().join("");
-    expect(output).toContain("is no longer write-only");
   });
 
   it("does not mark a brand-new variable sensitive by default", async () => {
