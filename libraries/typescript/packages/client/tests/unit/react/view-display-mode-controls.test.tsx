@@ -79,12 +79,16 @@ describe("useViewDisplayModeControls document chrome coordinator", () => {
     document.documentElement.removeAttribute(WIDGET_FULLSCREEN_DOCUMENT_ATTR);
   });
 
-  it("preserves fullscreen attributes when mounting an inline sibling", async () => {
+  it("preserves fullscreen attributes when mounting or transitioning an inline sibling", async () => {
     // Single fullscreen widget establishes document mode
     await renderWidgets({ w1: "fullscreen" });
     expectDocumentMode("fullscreen");
 
-    // Mounting an inline sibling does not strip fullscreen attributes
+    // Sibling mounts in PiP while widget 1 is fullscreen
+    await renderWidgets({ w1: "fullscreen", w2: "pip" });
+    expectDocumentMode("fullscreen");
+
+    // Sibling transitions pip -> inline (re-running its effect) without stripping fullscreen attributes
     await renderWidgets({ w1: "fullscreen", w2: "inline" });
     expectDocumentMode("fullscreen");
 
