@@ -10,240 +10,118 @@ import {
 } from "../../../src/react/view/use-display-mode.js";
 import type { ViewDisplayMode } from "../../../src/react/view/types.js";
 
-function WidgetHost({
-  displayMode,
-  setDisplayMode = () => {},
-}: {
-  displayMode: ViewDisplayMode;
-  setDisplayMode?: (mode: ViewDisplayMode) => void;
-}) {
+function WidgetHost({ displayMode }: { displayMode: ViewDisplayMode }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   useViewDisplayModeControls({
     containerRef,
     displayMode,
-    setDisplayMode,
+    setDisplayMode: () => {},
   });
   return <div ref={containerRef} />;
 }
 
 describe("useViewDisplayModeControls document chrome coordinator", () => {
+  let renderer: ReactTestRenderer | null = null;
+
+  async function renderWidgets(
+    widgets: Record<string, ViewDisplayMode>
+  ): Promise<void> {
+    const element = (
+      <div>
+        {Object.entries(widgets).map(([key, displayMode]) => (
+          <WidgetHost key={key} displayMode={displayMode} />
+        ))}
+      </div>
+    );
+
+    await act(async () => {
+      if (renderer === null) {
+        renderer = create(element);
+      } else {
+        renderer.update(element);
+      }
+    });
+  }
+
+  function expectDocumentMode(expectedMode: "fullscreen" | "pip" | null): void {
+    const modeAttr = document.documentElement.getAttribute(
+      WIDGET_DISPLAY_MODE_ATTR
+    );
+    const hasFullscreenAttr = document.documentElement.hasAttribute(
+      WIDGET_FULLSCREEN_DOCUMENT_ATTR
+    );
+
+    if (expectedMode === "fullscreen") {
+      expect(modeAttr).toBe("fullscreen");
+      expect(hasFullscreenAttr).toBe(true);
+    } else if (expectedMode === "pip") {
+      expect(modeAttr).toBe("pip");
+      expect(hasFullscreenAttr).toBe(false);
+    } else {
+      expect(modeAttr).toBeNull();
+      expect(hasFullscreenAttr).toBe(false);
+    }
+  }
+
   beforeEach(() => {
     document.documentElement.removeAttribute(WIDGET_DISPLAY_MODE_ATTR);
     document.documentElement.removeAttribute(WIDGET_FULLSCREEN_DOCUMENT_ATTR);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    if (renderer !== null) {
+      await act(async () => {
+        renderer?.unmount();
+      });
+      renderer = null;
+    }
     document.documentElement.removeAttribute(WIDGET_DISPLAY_MODE_ATTR);
     document.documentElement.removeAttribute(WIDGET_FULLSCREEN_DOCUMENT_ATTR);
   });
 
-  it("sets and clears document attributes for a single fullscreen widget", async () => {
-    let renderer!: ReactTestRenderer;
+  it("preserves fullscreen attributes when mounting an inline sibling", async () => {
+    // Single fullscreen widget establishes document mode
+    await renderWidgets({ w1: "fullscreen" });
+    expectDocumentMode("fullscreen");
 
-    await act(async () => {
-      renderer = create(<WidgetHost displayMode="fullscreen" />);
-    });
+    // Mounting an inline sibling does not strip fullscreen attributes
+    await renderWidgets({ w1: "fullscreen", w2: "inline" });
+    expectDocumentMode("fullscreen");
 
-    expect(
-      document.documentElement.getAttribute(WIDGET_DISPLAY_MODE_ATTR)
-    ).toBe("fullscreen");
-    expect(
-      document.documentElement.hasAttribute(WIDGET_FULLSCREEN_DOCUMENT_ATTR)
-    ).toBe(true);
+    // Adding another inline sibling still retains fullscreen
+    await renderWidgets({ w1: "fullscreen", w2: "inline", w3: "inline" });
+    expectDocumentMode("fullscreen");
 
-    // Transition back to inline
-    await act(async () => {
-      renderer.update(<WidgetHost displayMode="inline" />);
-    });
-
-    expect(
-      document.documentElement.hasAttribute(WIDGET_DISPLAY_MODE_ATTR)
-    ).toBe(false);
-    expect(
-      document.documentElement.hasAttribute(WIDGET_FULLSCREEN_DOCUMENT_ATTR)
-    ).toBe(false);
-
-    await act(async () => {
-      renderer.unmount();
-    });
+    // Returning the fullscreen widget to inline clears document attributes
+    await renderWidgets({ w1: "inline", w2: "inline", w3: "inline" });
+    expectDocumentMode(null);
   });
 
-  it("sets and clears document attributes for a single pip widget", async () => {
-    let renderer!: ReactTestRenderer;
+  it("preserves fullscreen when unmounting one of two fullscreen widgets and clears on last unmount", async () => {
+    // Two fullscreen widgets both register
+    await renderWidgets({ w1: "fullscreen", w2: "fullscreen" });
+    expectDocumentMode("fullscreen");
 
-    await act(async () => {
-      renderer = create(<WidgetHost displayMode="pip" />);
-    });
+    // Unmounting one fullscreen widget preserves fullscreen for the sibling
+    await renderWidgets({ w2: "fullscreen" });
+    expectDocumentMode("fullscreen");
 
-    expect(
-      document.documentElement.getAttribute(WIDGET_DISPLAY_MODE_ATTR)
-    ).toBe("pip");
-    expect(
-      document.documentElement.hasAttribute(WIDGET_FULLSCREEN_DOCUMENT_ATTR)
-    ).toBe(false);
-
-    await act(async () => {
-      renderer.unmount();
-    });
-
-    expect(
-      document.documentElement.hasAttribute(WIDGET_DISPLAY_MODE_ATTR)
-    ).toBe(false);
+    // Unmounting the last fullscreen widget clears both document attributes
+    await renderWidgets({});
+    expectDocumentMode(null);
   });
 
-  it("does not strip fullscreen attributes when an inline sibling transitions, mounts, or updates", async () => {
-    let root!: ReactTestRenderer;
+  it("prioritizes fullscreen over PiP, falls back to PiP, and clears on return to inline", async () => {
+    // Fullscreen takes precedence over PiP
+    await renderWidgets({ w1: "fullscreen", w2: "pip" });
+    expectDocumentMode("fullscreen");
 
-    function MultiWidgetTimeline({
-      widget1Mode,
-      widget2Mode,
-      showWidget3 = false,
-    }: {
-      widget1Mode: ViewDisplayMode;
-      widget2Mode: ViewDisplayMode;
-      showWidget3?: boolean;
-    }) {
-      return (
-        <div>
-          <WidgetHost displayMode={widget1Mode} />
-          <WidgetHost displayMode={widget2Mode} />
-          {showWidget3 && <WidgetHost displayMode="inline" />}
-        </div>
-      );
-    }
+    // Fullscreen exits; falls back to remaining widget's PiP mode
+    await renderWidgets({ w1: "inline", w2: "pip" });
+    expectDocumentMode("pip");
 
-    // Mount with Widget 1 in fullscreen and Widget 2 in pip
-    await act(async () => {
-      root = create(
-        <MultiWidgetTimeline widget1Mode="fullscreen" widget2Mode="pip" />
-      );
-    });
-
-    expect(
-      document.documentElement.getAttribute(WIDGET_DISPLAY_MODE_ATTR)
-    ).toBe("fullscreen");
-    expect(
-      document.documentElement.hasAttribute(WIDGET_FULLSCREEN_DOCUMENT_ATTR)
-    ).toBe(true);
-
-    // Transition sibling Widget 2 from pip -> inline (re-running its effect) while Widget 1 stays fullscreen
-    await act(async () => {
-      root.update(
-        <MultiWidgetTimeline widget1Mode="fullscreen" widget2Mode="inline" />
-      );
-    });
-
-    // Fullscreen must remain active and not be stripped by Widget 2 transitioning to inline
-    expect(
-      document.documentElement.getAttribute(WIDGET_DISPLAY_MODE_ATTR)
-    ).toBe("fullscreen");
-    expect(
-      document.documentElement.hasAttribute(WIDGET_FULLSCREEN_DOCUMENT_ATTR)
-    ).toBe(true);
-
-    // Dynamically mount a 3rd inline widget
-    await act(async () => {
-      root.update(
-        <MultiWidgetTimeline
-          widget1Mode="fullscreen"
-          widget2Mode="inline"
-          showWidget3={true}
-        />
-      );
-    });
-
-    expect(
-      document.documentElement.getAttribute(WIDGET_DISPLAY_MODE_ATTR)
-    ).toBe("fullscreen");
-    expect(
-      document.documentElement.hasAttribute(WIDGET_FULLSCREEN_DOCUMENT_ATTR)
-    ).toBe(true);
-
-    // When Widget 1 returns to inline, document attributes clear
-    await act(async () => {
-      root.update(
-        <MultiWidgetTimeline
-          widget1Mode="inline"
-          widget2Mode="inline"
-          showWidget3={true}
-        />
-      );
-    });
-
-    expect(
-      document.documentElement.hasAttribute(WIDGET_DISPLAY_MODE_ATTR)
-    ).toBe(false);
-    expect(
-      document.documentElement.hasAttribute(WIDGET_FULLSCREEN_DOCUMENT_ATTR)
-    ).toBe(false);
-
-    await act(async () => {
-      root.unmount();
-    });
-  });
-
-  it("prioritizes fullscreen over pip and falls back to pip when fullscreen exits", async () => {
-    let root!: ReactTestRenderer;
-
-    function MultiWidgetTimeline({
-      widget1Mode,
-      widget2Mode,
-    }: {
-      widget1Mode: ViewDisplayMode;
-      widget2Mode: ViewDisplayMode;
-    }) {
-      return (
-        <div>
-          <WidgetHost displayMode={widget1Mode} />
-          <WidgetHost displayMode={widget2Mode} />
-        </div>
-      );
-    }
-
-    await act(async () => {
-      root = create(
-        <MultiWidgetTimeline widget1Mode="fullscreen" widget2Mode="pip" />
-      );
-    });
-
-    // Fullscreen takes precedence over pip
-    expect(
-      document.documentElement.getAttribute(WIDGET_DISPLAY_MODE_ATTR)
-    ).toBe("fullscreen");
-    expect(
-      document.documentElement.hasAttribute(WIDGET_FULLSCREEN_DOCUMENT_ATTR)
-    ).toBe(true);
-
-    // When Widget 1 exits fullscreen, Widget 2's pip mode takes effect
-    await act(async () => {
-      root.update(
-        <MultiWidgetTimeline widget1Mode="inline" widget2Mode="pip" />
-      );
-    });
-
-    expect(
-      document.documentElement.getAttribute(WIDGET_DISPLAY_MODE_ATTR)
-    ).toBe("pip");
-    expect(
-      document.documentElement.hasAttribute(WIDGET_FULLSCREEN_DOCUMENT_ATTR)
-    ).toBe(false);
-
-    // When Widget 2 also exits pip, all document attributes clear
-    await act(async () => {
-      root.update(
-        <MultiWidgetTimeline widget1Mode="inline" widget2Mode="inline" />
-      );
-    });
-
-    expect(
-      document.documentElement.hasAttribute(WIDGET_DISPLAY_MODE_ATTR)
-    ).toBe(false);
-    expect(
-      document.documentElement.hasAttribute(WIDGET_FULLSCREEN_DOCUMENT_ATTR)
-    ).toBe(false);
-
-    await act(async () => {
-      root.unmount();
-    });
+    // Remaining widget exits PiP; clears document attributes
+    await renderWidgets({ w1: "inline", w2: "inline" });
+    expectDocumentMode(null);
   });
 });
