@@ -12,6 +12,7 @@
   },
   "changesets": [
     "fix-viewrenderer-sandbox-cleanup",
-    "loud-pans-repeat"
+    "loud-pans-repeat",
+    "tunnel-cli-default-localhost-header"
   ]
 }
