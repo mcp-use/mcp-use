@@ -1,5 +1,12 @@
 # mcp-use
 
+## 2.4.4-canary.4
+
+### Patch Changes
+
+- Updated dependencies [b86bf80]
+  - @mcp-use/cli@4.1.12-canary.3
+
 ## 2.4.4-canary.3
 
 ### Patch Changes

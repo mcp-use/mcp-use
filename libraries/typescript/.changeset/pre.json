@@ -16,6 +16,7 @@
     "fix-usemcp-reference-stability",
     "fix-viewrenderer-sandbox-cleanup",
     "loud-pans-repeat",
+    "servers-list-validate-before-auth",
     "tunnel-cli-default-localhost-header"
   ]
 }
