@@ -384,6 +384,113 @@ describe("deploy agent contract", () => {
     });
   });
 
+  it("applies .gitignore patterns and negation when packaging managed servers", async () => {
+    const directory = await project("gitignore-managed-app");
+    await writeFile(join(directory, "index.ts"), "export const ok = true;\n");
+    await writeFile(
+      join(directory, ".gitignore"),
+      [
+        "# Ignore local database",
+        "*.sqlite",
+        "",
+        "# Ignore temporary logs with negation exception",
+        "logs/*",
+        "!logs/keep.log",
+        "",
+        "# Directory pattern with trailing slash",
+        "temp-cache/",
+        "",
+        "# Root-anchored pattern",
+        "/root-only.txt",
+        "",
+        "# Relative path glob",
+        "nested/*.tmp",
+      ].join("\n")
+    );
+    await writeFile(join(directory, "data.sqlite"), "binary data\n");
+    await mkdir(join(directory, "logs"));
+    await writeFile(join(directory, "logs", "app.log"), "error\n");
+    await writeFile(join(directory, "logs", "keep.log"), "retained\n");
+    await mkdir(join(directory, "temp-cache"));
+    await writeFile(join(directory, "temp-cache", "scratch.json"), "123\n");
+    await writeFile(join(directory, "root-only.txt"), "ignored at root\n");
+    await mkdir(join(directory, "sub"));
+    await writeFile(
+      join(directory, "sub", "root-only.txt"),
+      "included in sub\n"
+    );
+    await mkdir(join(directory, "nested"));
+    await writeFile(join(directory, "nested", "one.tmp"), "temp\n");
+    await mkdir(join(directory, "nested", "deep"));
+    await writeFile(
+      join(directory, "nested", "deep", "two.tmp"),
+      "not matched by nested/*.tmp\n"
+    );
+
+    api.multipartRequest.mockResolvedValue({
+      server: { id: "srv_gitignore", slug: "gitignore-managed-app" },
+      deploymentId: "dep_gitignore",
+    });
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(
+      runDeploy([directory, "--no-github", "--region", "US", "--json"])
+    ).resolves.toBe(0);
+
+    const form = api.multipartRequest.mock.calls[0]![1] as FormData;
+    const entries = await archiveEntries(form.get("sourceFile") as Blob);
+
+    // Included files
+    expect(entries).toContain("app/index.ts");
+    expect(entries).toContain("app/.gitignore");
+    expect(entries).toContain("app/logs/keep.log");
+    expect(entries).toContain("app/sub/root-only.txt");
+    expect(entries).toContain("app/nested/deep/two.tmp");
+
+    // Excluded files by .gitignore
+    expect(entries).not.toContain("app/data.sqlite");
+    expect(entries).not.toContain("app/logs/app.log");
+    expect(entries).not.toContain("app/root-only.txt");
+    expect(entries).not.toContain("app/nested/one.tmp");
+    expect(entries.some((entry) => entry.includes("temp-cache"))).toBe(false);
+  });
+
+  it("ensures critical baseline exclusions cannot be bypassed by .gitignore negation", async () => {
+    const directory = await project("gitignore-bypass-safety");
+    await writeFile(join(directory, "index.ts"), "export const ok = true;\n");
+    await writeFile(
+      join(directory, ".gitignore"),
+      ["!.env", "!.envrc", "!.git", "!node_modules", "!.DS_Store"].join("\n")
+    );
+    await writeFile(join(directory, ".env"), "SECRET=leak\n");
+    await writeFile(join(directory, ".envrc"), "SECRET=leak\n");
+    await writeFile(join(directory, ".DS_Store"), "os metadata\n");
+    await mkdir(join(directory, "node_modules"));
+    await writeFile(
+      join(directory, "node_modules", "dep.js"),
+      "console.log('dep');\n"
+    );
+
+    api.multipartRequest.mockResolvedValue({
+      server: { id: "srv_bypass", slug: "gitignore-bypass-safety" },
+      deploymentId: "dep_bypass",
+    });
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(
+      runDeploy([directory, "--no-github", "--region", "US", "--json"])
+    ).resolves.toBe(0);
+
+    const form = api.multipartRequest.mock.calls[0]![1] as FormData;
+    const entries = await archiveEntries(form.get("sourceFile") as Blob);
+
+    expect(entries).toContain("app/index.ts");
+    expect(entries).not.toContain("app/.env");
+    expect(entries).not.toContain("app/.envrc");
+    expect(entries).not.toContain("app/.DS_Store");
+    expect(entries.some((entry) => entry.includes("node_modules"))).toBe(false);
+  });
+
   it("accepts -y as the documented non-interactive consent alias", async () => {
     const directory = await project("short-yes");
     api.multipartRequest.mockResolvedValue({
