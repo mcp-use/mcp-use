@@ -141,6 +141,25 @@ describe("server list argument validation", () => {
       },
     });
   });
+
+  it("rejects a bad skip before authenticating", async () => {
+    const stderr = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+
+    await expect(runServers(["list", "--skip", "abc", "--json"])).resolves.toBe(
+      2
+    );
+
+    expect(cloudApiForOrganization).not.toHaveBeenCalled();
+    expect(api.request).not.toHaveBeenCalled();
+    expect(JSON.parse(stderr.mock.calls.flat().join(""))).toEqual({
+      error: {
+        code: "usage_error",
+        message: "--skip must be a non-negative integer.",
+      },
+    });
+  });
 });
 
 describe("server human output", () => {
