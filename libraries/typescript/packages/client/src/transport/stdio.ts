@@ -360,26 +360,42 @@ export class StdioConnectionManager extends ConnectionManager<StdioClientTranspo
       this._childProcess ??
       (connection as unknown as { _process?: ChildProcess })._process;
 
-    if (child && child.exitCode === null && child.signalCode === null) {
-      await Promise.race([
-        new Promise<void>((resolve) => {
+    try {
+      if (child && child.exitCode === null && child.signalCode === null) {
+        let timedOut = false;
+        let timeout: NodeJS.Timeout | undefined;
+        const exited = new Promise<void>((resolve) => {
           child.once("exit", () => resolve());
           child.once("close", () => resolve());
-        }),
-        new Promise<void>((resolve) => {
-          const timer = setTimeout(() => {
-            if (child.exitCode === null && child.signalCode === null) {
-              try {
-                child.kill("SIGKILL");
-              } catch {
-                /* already exited */
-              }
+        });
+
+        await Promise.race([
+          exited,
+          new Promise<void>((resolve) => {
+            timeout = setTimeout(() => {
+              timedOut = true;
+              resolve();
+            }, 2000);
+            timeout?.unref?.();
+          }),
+        ]);
+
+        if (timeout) {
+          clearTimeout(timeout);
+        }
+
+        if (timedOut) {
+          if (child.exitCode === null && child.signalCode === null) {
+            try {
+              child.kill("SIGKILL");
+            } catch {
+              /* already exited */
             }
-            resolve();
-          }, 2000);
-          timer.unref?.();
-        }),
-      ]);
+          }
+          await exited;
+        }
+      }
+    } finally {
       this._childProcess = null;
     }
   }
