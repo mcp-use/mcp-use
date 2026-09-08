@@ -12,6 +12,7 @@
   },
   "changesets": [
     "fancy-crabs-unite",
+    "fix-usemcp-reference-stability",
     "fix-viewrenderer-sandbox-cleanup",
     "loud-pans-repeat",
     "tunnel-cli-default-localhost-header"

@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.3.1-canary.1
+
+### Patch Changes
+
+- ce6b9e1: Stabilize `clientInfo` and `proxyConfig` dependencies in `useMcp` to prevent reconnection loops on parent component re-renders.
+
 ## 2.3.1-canary.0
 
 ### Patch Changes
