@@ -1,5 +1,11 @@
 # mcp-use
 
+## 2.4.4-canary.1
+
+### Patch Changes
+
+- 15843cf: Fix `createJwtVerifier` reporting a malformed `resource` option as an OAuth `invalid_token` error naming the token's resource claim. A configuration mistake at server startup now throws a `TypeError`, matching `oauthCustomProvider` and the other provider URL options.
+
 ## 2.4.4-canary.0
 
 ### Patch Changes
