@@ -52,7 +52,7 @@ const COMMAND_HELP: Record<string, string> = {
   delete: `Usage: mcp-use servers delete <id-or-slug> [options]\n\nOptions:\n  --org <id-or-slug>  Override the active organization\n  --yes               Confirm deletion without prompting\n  --json              Emit the deletion result; never prompt\n  -h, --help          Show this help`,
   env: `Usage: mcp-use servers env <list|set|unset> [options]\n\nCommands:\n  list <server>             List keys and metadata; values are never returned\n  set <server> <KEY=VALUE> Create or update a value\n  unset <server> <key>     Delete a value\n\nRun mcp-use servers env <command> --help for all options.`,
   "env list": `Usage: mcp-use servers env list <server> [options]\n\nOptions:\n  --org <id-or-slug>  Override the active organization\n  --branch <name>     Select preview variables for a branch\n  --json              Emit metadata only; never values\n  -h, --help          Show this help`,
-  "env set": `Usage: mcp-use servers env set <server> <KEY=VALUE> [options]\n\nOptions:\n  --org <id-or-slug>  Override the active organization\n  --branch <name>     Set a preview value for a branch (default: production)\n  --secret            Mark the value sensitive\n  --json              Emit mutation metadata only; never the value\n  -h, --help          Show this help`,
+  "env set": `Usage: mcp-use servers env set <server> <KEY=VALUE> [options]\n\nOptions:\n  --org <id-or-slug>  Override the active organization\n  --branch <name>     Set a preview value for a branch (default: production)\n  --secret            Store the value as a write-only secret. Required on every write to keep it write-only.\n  --json              Emit mutation metadata only; never the value\n  -h, --help          Show this help`,
   "env unset": `Usage: mcp-use servers env unset <server> <key> [options]\n\nOptions:\n  --org <id-or-slug>  Override the active organization\n  --branch <name>     Delete a preview value for a branch\n  --yes               Confirm deletion without prompting\n  --json              Emit the deletion result; never prompt\n  -h, --help          Show this help`,
 };
 
@@ -317,7 +317,11 @@ async function envSet(argv: readonly string[], json: boolean): Promise<number> {
     secret: values.secret === true,
     updated: existing !== undefined,
   };
-  printResult(result, json, `Set ${key}.`);
+  printResult(
+    result,
+    json,
+    values.secret === true ? `Set ${key} (saved as write-only).` : `Set ${key}.`
+  );
   return 0;
 }
 

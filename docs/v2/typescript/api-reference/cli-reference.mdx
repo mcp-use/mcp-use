@@ -504,7 +504,7 @@ mcp-use servers env unset srv_abc123 API_KEY --yes
 
 - `env list` returns metadata only. Values are never returned.
 - `env set` creates a production variable when `--branch` is omitted, or a preview variable when it is supplied.
-- `--secret` marks a value sensitive.
+- `--secret` stores a value as write-only. It must be passed on **every** write to the variable, including updates and rotations: omitting it stores the value as non-sensitive, even if the variable was previously write-only.
 - `--branch <name>` scopes preview environment variables to a branch. Omit `--branch` for production resolution.
 - `env unset` prompts for confirmation unless `--yes` is set.
 
