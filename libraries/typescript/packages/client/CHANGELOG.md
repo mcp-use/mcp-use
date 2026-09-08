@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.3.1-canary.2
+
+### Patch Changes
+
+- 6e6de8b: Prevent duplicate subprocesses and HTTP transports from concurrent connection attempts. Coordinate connection and disconnection calls so a later disconnect cancels in-flight and queued reconnects, releasing resources before shutdown completes.
+
 ## 2.3.1-canary.1
 
 ### Patch Changes
