@@ -1,5 +1,11 @@
 # mcp-use
 
+## 2.4.4-canary.5
+
+### Patch Changes
+
+- 40af3ec: Fix proxied resources losing their `annotations` and `_meta`. `ResourceDefinition` carries both and the local registration path preserves them, but the proxy mount copied only `title`, `description` and `mimeType`, so composing an upstream server through `use()` stripped its client hints and extension metadata from `resources/list`.
+
 ## 2.4.4-canary.4
 
 ### Patch Changes
