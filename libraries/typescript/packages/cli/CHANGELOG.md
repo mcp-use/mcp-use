@@ -1,5 +1,11 @@
 # @mcp-use/cli
 
+## 4.1.12-canary.2
+
+### Patch Changes
+
+- d6614ff: Report a malformed JSON argument to `client` and `screenshot` as a usage error instead of letting the engine's `SyntaxError` escape. A bad `{...}` or `key:=<json>` value exited 1 with a bare parser message and no indication of which argument was wrong, while every other grammar mistake in the same parser exits 2.
+
 ## 4.1.12-canary.1
 
 ### Patch Changes
