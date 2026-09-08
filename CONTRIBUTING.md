@@ -274,11 +274,11 @@ pnpm --filter mcp-use test
 pnpm --filter @mcp-use/inspector test
 pnpm --filter @mcp-use/cli test
 
-# Run unit tests only (mcp-use package)
-pnpm --filter mcp-use test:unit
+# Run server tests
+pnpm --filter mcp-use test:run
 
 # Run agent integration tests (requires OPENAI_API_KEY)
-pnpm --filter mcp-use test:integration:agent
+pnpm --filter @mcp-use/agent test:integration:agent
 ```
 
 ### Changesets
