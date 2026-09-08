@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { parseMcpArguments } from "../../src/commands/client.js";
 import { resolveOrganization } from "../../src/commands/cloud-api.js";
+import { UsageError } from "../../src/commands/shared.js";
 
 describe("greenfield CLI command helpers", () => {
   it("parses string and typed MCP arguments", () => {
@@ -23,6 +24,16 @@ describe("greenfield CLI command helpers", () => {
       city: "Paris",
       days: 2,
     });
+  });
+
+  it("reports malformed JSON as a usage error naming the argument", () => {
+    expect(() => parseMcpArguments(["{bad json"])).toThrow(UsageError);
+    expect(() => parseMcpArguments(["{bad json"])).toThrow(
+      /^The JSON argument is not valid JSON: /
+    );
+    expect(() => parseMcpArguments(["count:={bad"])).toThrow(
+      /^The value for "count" is not valid JSON: /
+    );
   });
 
   it("resolves organizations only by id or slug", () => {
