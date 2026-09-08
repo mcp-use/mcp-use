@@ -114,12 +114,8 @@ export class CodeModeConnector extends BaseConnector {
     this._tools = this._createToolsList();
   }
 
-  async connect(): Promise<void> {
-    this.connected = true;
-  }
-
-  async disconnect(): Promise<void> {
-    this.connected = false;
+  protected override async establishTransport(): Promise<void> {
+    // No-op: wraps an existing MCPClient without separate transport setup
   }
 
   get publicIdentifier(): Record<string, string> {

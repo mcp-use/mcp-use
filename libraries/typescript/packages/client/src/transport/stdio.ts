@@ -101,12 +101,7 @@ export class StdioConnector extends BaseConnector {
    *
    * @returns A promise that resolves after protocol negotiation completes.
    */
-  async connect(): Promise<void> {
-    if (this.connected) {
-      logger.debug("Already connected to MCP implementation");
-      return;
-    }
-
+  protected override async establishTransport(): Promise<void> {
     logger.debug(`Connecting to MCP implementation via stdio: ${this.command}`);
     try {
       // 1. Build server parameters for the transport
@@ -192,7 +187,6 @@ export class StdioConnector extends BaseConnector {
       await this.client.connect(transport);
       this.setupRoundProgressForwarding();
 
-      this.connected = true;
       this.setupNotificationHandler();
       // Inbound request handlers (roots/sampling/elicitation) were registered before connect()
       logger.debug(
@@ -207,7 +201,6 @@ export class StdioConnector extends BaseConnector {
       });
     } catch (err) {
       logger.error(`Failed to connect to MCP implementation: ${err}`);
-      await this.cleanupResources();
       throw err;
     }
   }
