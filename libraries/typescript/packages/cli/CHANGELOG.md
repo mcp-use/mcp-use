@@ -1,5 +1,11 @@
 # @mcp-use/cli
 
+## 4.1.12-canary.1
+
+### Patch Changes
+
+- 290d7c4: Document that `--secret` must be passed on every `servers env set` write, including updates and rotations, and say so in the success message when a value is stored write-only
+
 ## 4.1.12-canary.0
 
 ### Patch Changes
