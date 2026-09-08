@@ -90,8 +90,8 @@ async function list(argv: readonly string[], json: boolean): Promise<number> {
     strict: true,
     options: commonListOptions(),
   });
-  const { api, organizationId } = await cloudApiForOrganization(values.org);
   const { limit, skip } = parsePagination(values.limit, values.skip);
+  const { api, organizationId } = await cloudApiForOrganization(values.org);
   const query = new URLSearchParams({
     organizationId,
     limit: String(limit),
