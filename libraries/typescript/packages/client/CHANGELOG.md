@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.3.1-canary.3
+
+### Patch Changes
+
+- 4740f9b: Replace the temporary `@mcp-use/ext-apps` package alias with the official `@modelcontextprotocol/ext-apps` 2.0.0 release. The upstream release includes the SDK v2 role-isolation work previously carried by the fork.
+
 ## 2.3.1-canary.2
 
 ### Patch Changes
