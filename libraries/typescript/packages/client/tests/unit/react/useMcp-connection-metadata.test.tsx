@@ -544,12 +544,25 @@ describe("useMcp connection metadata", () => {
       { name: "tool-1", description: "First page" },
       { name: "tool-2", description: "Second page" },
     ];
-    const { result } = await renderFor("modern", false, {}, (connection) => {
-      (connection as any).listAllTools = vi
-        .fn()
-        .mockResolvedValue({ tools: paginatedTools });
-    });
+    const listAllToolsMock = vi
+      .fn()
+      .mockResolvedValue({ tools: paginatedTools });
+    const { result, getResult } = await renderFor(
+      "modern",
+      false,
+      {},
+      (connection) => {
+        (connection as any).listAllTools = listAllToolsMock;
+      }
+    );
 
     expect(result.state).toBe("ready");
+
+    await act(async () => {
+      await result.refreshTools();
+    });
+
+    expect(listAllToolsMock).toHaveBeenCalledTimes(1);
+    expect(getResult().tools).toEqual(paginatedTools);
   });
 });
