@@ -1,5 +1,11 @@
 # mcp-use
 
+## 2.5.0-canary.6
+
+### Minor Changes
+
+- f55671b: Show a public chat button on MCP landing pages when public chat is enabled.
+
 ## 2.4.4-canary.5
 
 ### Patch Changes
