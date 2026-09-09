@@ -1,0 +1,76 @@
+name: TypeScript checks
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Exact commit to test
+        required: true
+        type: string
+      pr_base_sha:
+        description: Exact PR base SHA; empty for non-PR runs
+        type: string
+        default: ""
+      pr_release_mode:
+        description: ordinary, promotion, or bot version PR
+        type: string
+        default: ordinary
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: typescript-checks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  MCP_USE_ANONYMIZED_TELEMETRY: "false"
+  HUSKY: "0"
+
+jobs:
+  check:
+    name: TypeScript checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: libraries/typescript
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup-typescript
+      - name: Check PR changesets
+        if: inputs.pr_base_sha != '' || github.event_name == 'pull_request'
+        env:
+          PR_BASE_SHA: ${{ inputs.pr_base_sha || github.event.pull_request.base.sha }}
+          PR_RELEASE_MODE: ${{ inputs.pr_release_mode || 'ordinary' }}
+        run: pnpm check:pr-changesets
+      - name: Require release docs before stable promotion
+        if: inputs.pr_release_mode == 'promotion' || inputs.pr_release_mode == 'version'
+        env:
+          PR_BASE_SHA: ${{ inputs.pr_base_sha || github.event.pull_request.base.sha }}
+          PR_RELEASE_MODE: ${{ inputs.pr_release_mode }}
+        run: |
+          if [ "$PR_RELEASE_MODE" = version ]; then
+            # The version PR inherits the docs already reviewed on canary.
+            pnpm check:release-docs --base "$PR_BASE_SHA" --allow-existing
+          else
+            pnpm check:release-docs --base "$PR_BASE_SHA"
+          fi
+      - name: Build workspace once
+        run: pnpm build
+      - name: Check formatting and lint
+        run: pnpm format:check && pnpm lint
+      - name: Check unused dependencies
+        run: pnpm exec knip --reporter github-actions
+      - name: Test release tooling
+        run: pnpm test:release-channel
+      - name: Test packages without API credentials
+        run: pnpm test:ci
+      - name: Check stable promotion baseline
+        if: github.event_name == 'pull_request' && github.base_ref == 'main' && github.head_ref == 'canary'
+        run: pnpm release-channel preflight --channel stable

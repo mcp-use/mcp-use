@@ -16,9 +16,14 @@ permissions:
   actions: read
   contents: read
 
+concurrency:
+  group: sdk-evals-synthesis
+  cancel-in-progress: false
+
 jobs:
   synthesize:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Check credentials
         env:
@@ -134,9 +139,10 @@ jobs:
         working-directory: evaluator
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DAYS: ${{ inputs.days || '7' }}
         run: |
           pnpm synthesize \
-            --days "${{ github.event.inputs.days || '7' }}" \
+            --days "$DAYS" \
             --results-dir ../synthesis-input/runs \
             --model gpt-5.6-sol
 

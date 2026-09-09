@@ -1,4 +1,4 @@
-name: Inspector E2E Tests (Sequential)
+name: Inspector E2E Tests (Sequential, paid)
 
 permissions:
   contents: read
@@ -22,11 +22,17 @@ permissions:
 on:
   workflow_dispatch:
 
+concurrency:
+  group: inspector-e2e-sequential-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # ── Job 1: Mix mode ──────────────────────────────────────────────────────
   e2e-mix:
     name: "E2E (mix)"
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/canary'
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: libraries/typescript
@@ -35,9 +41,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v4
         with:
-          version: 10.6.1
+          version: 11.13.1
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -47,7 +53,7 @@ jobs:
           cache-dependency-path: libraries/typescript/pnpm-lock.yaml
 
       - name: Install Dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Build Packages
         run: pnpm build
@@ -87,8 +93,9 @@ jobs:
   e2e-prod:
     name: "E2E (prod)"
     needs: e2e-mix
-    if: always()
+    if: always() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/canary')
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: libraries/typescript
@@ -97,9 +104,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v4
         with:
-          version: 10.6.1
+          version: 11.13.1
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -109,7 +116,7 @@ jobs:
           cache-dependency-path: libraries/typescript/pnpm-lock.yaml
 
       - name: Install Dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Build Packages
         run: pnpm build
@@ -149,8 +156,9 @@ jobs:
   e2e-builtin:
     name: "E2E (builtin)"
     needs: e2e-prod
-    if: always()
+    if: always() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/canary')
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: libraries/typescript
@@ -159,9 +167,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v4
         with:
-          version: 10.6.1
+          version: 11.13.1
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -171,7 +179,7 @@ jobs:
           cache-dependency-path: libraries/typescript/pnpm-lock.yaml
 
       - name: Install Dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Build Packages
         run: pnpm build

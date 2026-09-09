@@ -1,0 +1,20 @@
+name: Set up TypeScript
+description: Install the pinned pnpm workspace with its committed lockfile.
+inputs:
+  node-version:
+    description: Node.js version
+    default: "24"
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@v4
+      with:
+        version: 11.13.1
+    - uses: actions/setup-node@v7
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: pnpm
+        cache-dependency-path: libraries/typescript/pnpm-lock.yaml
+    - shell: bash
+      working-directory: libraries/typescript
+      run: pnpm install --frozen-lockfile

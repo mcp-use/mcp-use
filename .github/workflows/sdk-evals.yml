@@ -19,6 +19,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: sdk-evals
+  cancel-in-progress: false
+
 jobs:
   eval:
     name: eval (Codex · ${{ matrix.task }})

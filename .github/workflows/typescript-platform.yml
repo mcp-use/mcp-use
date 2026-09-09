@@ -1,0 +1,42 @@
+name: TypeScript platform compatibility
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, canary]
+    paths:
+      - "libraries/typescript/**"
+      - ".github/workflows/typescript-platform.yml"
+      - ".github/actions/setup-typescript/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: typescript-platform-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cli:
+    name: CLI / ${{ matrix.os }} / Node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            node: "22.23.1"
+          - os: windows-latest
+            node: "24"
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-typescript
+        with:
+          node-version: ${{ matrix.node }}
+      - working-directory: libraries/typescript
+        run: pnpm build
+      - working-directory: libraries/typescript
+        run: pnpm --filter @mcp-use/cli test:run

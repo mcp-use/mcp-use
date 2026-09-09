@@ -1,0 +1,33 @@
+name: TypeScript paid integration
+
+# Paid AI calls are explicit and run only from maintained branches.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: typescript-paid-integration
+  cancel-in-progress: false
+
+jobs:
+  openai:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/canary'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-typescript
+      - working-directory: libraries/typescript
+        run: pnpm build
+      - name: Test native OpenAI integration
+        working-directory: libraries/typescript
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          MCP_USE_ANONYMIZED_TELEMETRY: "false"
+        run: |
+          test -n "$OPENAI_API_KEY" || { echo '::error::OPENAI_API_KEY is required'; exit 1; }
+          pnpm --filter @mcp-use/agent test:integration:native-openai

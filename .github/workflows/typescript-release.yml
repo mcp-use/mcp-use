@@ -1,629 +1,138 @@
 name: TypeScript Release
 
+# Keep this filename: npm trusted publishing is configured against it.
 on:
   push:
-    branches:
-      - main
-      - canary
+    branches: [main, canary]
     paths:
       - "libraries/typescript/**"
+      - "docs/typescript/changelog/changelog.mdx"
+      - "docs/inspector/changelog.mdx"
       - ".github/workflows/typescript-release.yml"
+      - ".github/actions/setup-typescript/**"
+      - ".github/scripts/**"
   workflow_dispatch:
     inputs:
-      force_publish:
-        description: "Force publish packages"
-        required: false
+      repair_metadata:
+        description: Re-verify current versions and repair tags, GitHub releases, and deployment markers
         type: boolean
         default: false
 
-concurrency: ${{ github.workflow }}-${{ github.ref }}
+permissions:
+  contents: read
+
+# Both channels mutate the same npm packages. Never interrupt a publisher.
+concurrency:
+  group: typescript-release
+  cancel-in-progress: false
+  queue: max
+
+env:
+  HUSKY: "0"
+  MCP_USE_ANONYMIZED_TELEMETRY: "false"
 
 jobs:
   release:
     name: Release
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/canary'
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       contents: write
       pull-requests: write
       id-token: write
+    defaults:
+      run:
+        working-directory: libraries/typescript
     steps:
-      - name: Checkout Repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
+          # Resolve the branch once, after acquiring the release lock. It can
+          # include a version commit made by an earlier queued run.
+          ref: ${{ github.ref_name }}
           fetch-depth: 0
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 11.13.1
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          # npm 12 (used for trusted publishing) requires Node 22.22+, 24.15+,
-          # or 26+. Pin the current LTS line rather than the unsupported Node 23.
-          node-version: 24
-          cache: "pnpm"
-          cache-dependency-path: libraries/typescript/pnpm-lock.yaml
-          registry-url: "https://registry.npmjs.org"
-
-      - name: Update npm for trusted publishing
-        run: npm install -g npm@latest
-
-      - name: Install Dependencies
-        working-directory: libraries/typescript
-        run: pnpm install --frozen-lockfile
-
-      - name: Build Packages
-        working-directory: libraries/typescript
-        run: pnpm build
-
-      - name: Verify packed release installation
-        working-directory: libraries/typescript
+      - uses: ./.github/actions/setup-typescript
+      - name: Set up npm trusted publishing
+        run: npm install -g npm@12.0.2
+      - name: Test release tooling
+        run: pnpm test:release-channel
+      - name: Prepare versions or recover an interrupted release
+        id: prepare
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RECOVER_TAGS: ${{ inputs.repair_metadata && 'all' || 'true' }}
+        run: bash ../../.github/scripts/prepare-typescript-release.sh
+      - name: Require changelog docs for stable publication
+        if: steps.prepare.outputs.publish == 'true' && github.ref_name == 'main'
+        run: pnpm check:release-docs --plan "$RUNNER_TEMP/release-plan.json"
+      - name: Build final package versions
+        if: steps.prepare.outputs.publish == 'true'
+        run: |
+          node scripts/release-packages.mjs assert-source "$RUNNER_TEMP/release-plan.json"
+          pnpm build
+      - name: Test final package versions
+        if: steps.prepare.outputs.publish == 'true'
+        run: pnpm test:ci
+      - name: Pack and validate all package entry points
+        if: steps.prepare.outputs.publish == 'true'
+        run: node scripts/release-packages.mjs pack "$RUNNER_TEMP/release-plan.json" "$RUNNER_TEMP/release-artifacts"
+      - name: Verify the packed installation
+        if: steps.prepare.outputs.publish == 'true'
+        env:
+          MCP_USE_PACKED_ARTIFACT_DIR: ${{ runner.temp }}/release-artifacts
         run: pnpm verify:release-install
-
-      # ============================================================================
-      # CANARY BRANCH: Prerelease workflow
-      # ============================================================================
-
-      - name: Enter Prerelease Mode (Canary)
-        if: github.ref == 'refs/heads/canary'
-        run: |
-          cd libraries/typescript
-          if [ ! -f .changeset/pre.json ]; then
-            echo "Entering canary prerelease mode..."
-            pnpm changeset pre enter canary
-            cd ../..
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add libraries/typescript/.changeset/pre.json
-            git commit -m "chore: enter canary prerelease mode" || echo "No changes to commit"
-            git push
-          else
-            echo "Already in prerelease mode"
-          fi
-
-      - name: Check for changesets (Canary)
-        if: github.ref == 'refs/heads/canary'
-        working-directory: libraries/typescript
-        id: has-changesets
-        run: |
-          PENDING="$(pnpm --silent release-channel pending)"
-          if [ -n "$PENDING" ]; then
-            echo "has_changesets=true" >> $GITHUB_OUTPUT
-            echo "Found pending changesets:"
-            echo "$PENDING"
-          else
-            echo "has_changesets=false" >> $GITHUB_OUTPUT
-            echo "No pending changesets found"
-          fi
-
-      - name: Verify canary release baseline
-        if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
-        working-directory: libraries/typescript
-        run: pnpm release-channel preflight --channel canary
-
-      - name: Prepare and validate canary release plan
-        if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
-        working-directory: libraries/typescript
-        run: |
-          pnpm release-channel prepare --channel canary
-          pnpm changeset status --since origin/main --output "$RUNNER_TEMP/canary-changeset-status.json"
-          pnpm release-channel validate --channel canary --plan "$RUNNER_TEMP/canary-changeset-status.json"
-
-      - name: Version packages (Canary)
-        if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
-        run: |
-          cd libraries/typescript
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          pnpm changeset version
-          cd ../..
-          git add .
-          git commit -m "chore(typescript): version packages (canary)" || echo "No changes to commit"
-          git push
-
-      - name: Build versioned packages (Canary)
-        if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
-        working-directory: libraries/typescript
-        run: pnpm build
-
-      - name: Create canary release plan
-        if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
-        working-directory: libraries/typescript
-        run: pnpm release-channel snapshot --channel canary --output canary-release-plan.json
-
-      - name: Publish packages (Canary)
-        if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
-        id: publish-canary
+      - name: Publish verified tarballs
+        if: steps.prepare.outputs.publish == 'true'
+        id: publish
+        # npm may accept a package but lose the response. Registry verification
+        # below decides whether the complete release actually succeeded.
         continue-on-error: true
-        working-directory: libraries/typescript
-        env:
-          # Packages were built and packed above. Keep concurrent publishing from
-          # running lifecycle hooks that can mutate another package's artifacts.
-          NPM_CONFIG_IGNORE_SCRIPTS: "true"
-        run: |
-          # Using npm trusted publishing (OIDC) - no token needed
-          pnpm changeset publish
-          echo "✅ Published canary packages to npm using trusted publishing"
-
-      - name: Verify canary packages and dist-tags
-        if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
-        working-directory: libraries/typescript
-        env:
-          VERIFY_ATTEMPTS: 12
-          VERIFY_DELAY_SECONDS: 10
-        run: pnpm release-channel verify --plan canary-release-plan.json
-
-      - name: Tag + push tags (Canary)
-        if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -e
-
-          # Ensure we're on the latest commit (commits were pushed in previous step)
-          git fetch --tags --force
-          git pull origin canary
-
-          cd libraries/typescript
-          pnpm changeset tag
-          pnpm release-channel tags --plan canary-release-plan.json --output ../../.release-tags
-          cd ../..
-
-          if [ ! -s .release-tags ]; then
-            echo "ℹ️  Release plan contains no new tags"
-            exit 0
-          fi
-
-          NEW_TAGS=$(cat .release-tags)
-          echo "📦 Tags created: $NEW_TAGS"
-          while IFS= read -r tag; do
-            git show-ref --verify --quiet "refs/tags/$tag"
-            git push origin "refs/tags/$tag"
-          done < .release-tags
-          echo "✅ Pushed tags"
-
-      - name: Create GitHub Releases (Canary)
-        if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
-        uses: actions/github-script@v7
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/release-packages.mjs publish "$RUNNER_TEMP/release-plan.json"
+      - name: Verify npm artifacts and dist-tags
+        if: steps.prepare.outputs.publish == 'true'
+        run: pnpm release-channel verify --plan "$RUNNER_TEMP/release-plan.json"
+      - name: Create tags and GitHub releases for verified versions
+        if: steps.prepare.outputs.publish == 'true'
+        uses: actions/github-script@v9
         with:
           script: |
-            const fs = require('fs')
-            const path = require('path')
-            const owner = context.repo.owner
-            const repo = context.repo.repo
-
-            const tagsFile = path.join(process.env.GITHUB_WORKSPACE, '.release-tags')
-            if (!fs.existsSync(tagsFile)) {
-              core.info(`No tags file found at ${tagsFile}`)
-              return
-            }
-
-            const tags = fs.readFileSync(tagsFile, 'utf8').trim().split(/\s+/).filter(Boolean)
-            if (!tags.length) {
-              core.info('Tags file is empty')
-              return
-            }
-
-            const isPrerelease = context.ref === 'refs/heads/canary'
-            core.info(`Creating GitHub releases for tags: ${tags.join(', ')} (prerelease=${isPrerelease})`)
-
-            function parseTag(tag) {
-              // Tag formats:
-              // - @scope/package@version
-              // - package@version
-              const atIndex = tag.lastIndexOf('@')
-              if (atIndex <= 0) return null
-              const pkg = tag.slice(0, atIndex)
-              const version = tag.slice(atIndex + 1)
-              const pkgDir = pkg.startsWith('@') ? pkg.split('/').slice(1).join('/') : pkg
-              return { pkg, version, pkgDir }
-            }
-
-            function extractChangelogSection(changelog, version) {
-              // Mimics the old awk: get content after "## <version...>" until next "## "
-              const lines = changelog.split(/\r?\n/)
-              let found = false
-              const out = []
-              for (const line of lines) {
-                if (line.startsWith('## ')) {
-                  if (found) break
-                  if (line.includes(version)) {
-                    found = true
-                    continue
-                  }
-                }
-                if (found) out.push(line)
-              }
-              const body = out.join('\n').trim()
-              return body.length ? body : null
-            }
-
-            for (const tag of tags) {
-              core.info(`\nProcessing tag: ${tag}`)
-              const parsed = parseTag(tag)
-              if (!parsed) {
-                core.warning(`Could not parse tag: ${tag}`)
-                continue
-              }
-
-              // Skip if release exists
-              try {
-                await github.rest.repos.getReleaseByTag({ owner, repo, tag })
-                core.info(`Release already exists for ${tag}, skipping`)
-                continue
-              } catch (e) {
-                if (e.status !== 404) throw e
-              }
-
-              const changelogFile = path.join(process.env.GITHUB_WORKSPACE, 'libraries', 'typescript', 'packages', parsed.pkgDir, 'CHANGELOG.md')
-              let notes = `Release ${parsed.version} of ${parsed.pkg}`
-
-              if (fs.existsSync(changelogFile)) {
-                const changelog = fs.readFileSync(changelogFile, 'utf8')
-                const section = extractChangelogSection(changelog, parsed.version)
-                if (section) {
-                  notes = section
-                } else {
-                  core.info(`No changelog entry found for version ${parsed.version} in ${changelogFile}`)
-                }
-              } else {
-                core.info(`No CHANGELOG.md found at ${changelogFile}`)
-              }
-
-              const name = `${parsed.pkg} ${parsed.version}`
-              const make_latest = (!isPrerelease && parsed.pkg === 'mcp-use') ? 'true' : 'false'
-
-              await github.rest.repos.createRelease({
-                owner,
-                repo,
-                tag_name: tag,
-                name,
-                body: notes,
-                prerelease: isPrerelease,
-                make_latest,
-              })
-
-              core.info(`Created release for ${tag}`)
-            }
-
-      - name: Create deployment marker (Canary)
-        if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
+            await require('./.github/scripts/typescript-release-notes.cjs')({ github, context, core });
+      - name: Write verified deployment marker
+        if: steps.prepare.outputs.publish == 'true'
         run: |
-          echo "packages_published=true" > .railway-deploy-marker
-          echo "branch=canary" >> .railway-deploy-marker
-
-      - name: Upload deployment marker (Canary)
-        if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
-        uses: actions/upload-artifact@v4
+          printf 'packages_published=true\nbranch=%s\nsha=%s\n' "$GITHUB_REF_NAME" "$(git rev-parse HEAD)" > "$RUNNER_TEMP/railway-deploy-marker.txt"
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const plan = JSON.parse(fs.readFileSync(`${process.env.RUNNER_TEMP}/release-plan.json`, 'utf8'));
+          const version = name => plan.releases.find(r => r.name === name).version;
+          fs.appendFileSync(`${process.env.RUNNER_TEMP}/railway-deploy-marker.txt`, `scaffolder=${version('create-mcp-use-app')}\nsdk=${version('mcp-use')}\n`);
+          JS
+      - name: Upload deployment marker
+        if: steps.prepare.outputs.publish == 'true'
+        uses: actions/upload-artifact@v7
         with:
           name: railway-deploy-marker
-          path: .railway-deploy-marker
-          retention-days: 1
-
-      # ============================================================================
-      # MAIN BRANCH: Stable release workflow
-      # ============================================================================
-
-      - name: Check if in prerelease mode (Main)
-        if: github.ref == 'refs/heads/main'
-        working-directory: libraries/typescript
-        id: check-prerelease
-        run: |
-          if [ -f .changeset/pre.json ]; then
-            echo "in_prerelease=true" >> $GITHUB_OUTPUT
-            echo "🐤 Detected prerelease mode on main branch"
-          else
-            echo "in_prerelease=false" >> $GITHUB_OUTPUT
-            echo "ℹ️  Not in prerelease mode"
-          fi
-
-      - name: Create exit prerelease PR (Main)
-        if: github.ref == 'refs/heads/main' && steps.check-prerelease.outputs.in_prerelease == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          cd libraries/typescript
-          pnpm release-channel preflight --channel stable
-          cd ../..
-
-          # Create new branch (from repo root)
-          BRANCH_NAME="release/exit-prerelease-$(date +%s)"
-          git checkout -b "$BRANCH_NAME"
-
-          # Exit prerelease mode
-          cd libraries/typescript
-          echo "Exiting prerelease mode..."
-          pnpm changeset pre exit
-
-          # Version packages
-          echo "Versioning packages..."
-          pnpm version:exit-prerelease
-
-          # changeset version updates workspace dependency metadata. Refresh the
-          # lockfile now so the release PR is reproducible and main remains clean.
-          pnpm install --no-frozen-lockfile
-
-          # Go back to repo root for git operations
-          cd ../..
-
-          # Commit changes
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .
-          git commit -m "chore(release): exit prerelease mode and version packages"
-
-          # Push branch
-          git push origin "$BRANCH_NAME"
-
-          # Create PR
-          gh pr create \
-            --base main \
-            --head "$BRANCH_NAME" \
-            --title "release(typescript): Exit prerelease mode and version packages" \
-            --body "This PR exits prerelease mode and versions packages for stable release.
-
-          ## Changes:
-
-          - ✅ Exited prerelease mode (removed \`pre.json\`)
-          - ✅ Versioned packages to stable versions
-          - ✅ Updated CHANGELOGs
-
-          ## After merging:
-
-          - ✅ Packages will be automatically published to npm with \`latest\` tag
-          - ✅ Git tags will be pushed
-          - ✅ GitHub release will be created
-
-          ---
-
-          **This PR was automatically created after merging canary to main.**"
-
-          echo "✅ Created exit prerelease PR"
-
-      - name: Check if this is a release commit (Main)
-        if: github.ref == 'refs/heads/main' && steps.check-prerelease.outputs.in_prerelease == 'false'
-        id: check-release
-        run: |
-          COMMIT_MSG=$(git log -1 --pretty=%B)
-
-          if echo "$COMMIT_MSG" | grep -q "chore(release): exit prerelease mode" || [ "${{ github.event.inputs.force_publish }}" = "true" ]; then
-            echo "should_publish=true" >> $GITHUB_OUTPUT
-            echo "🚀 Detected release commit - will publish packages"
-          else
-            echo "should_publish=false" >> $GITHUB_OUTPUT
-            echo "ℹ️  Not a release commit - skipping publish"
-          fi
-
-      - name: Publish packages (Main)
-        if: github.ref == 'refs/heads/main' &&
-          steps.check-prerelease.outputs.in_prerelease == 'false' &&
-          steps.check-release.outputs.should_publish == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Packages were built and packed above. Keep concurrent publishing from
-          # running lifecycle hooks that can mutate another package's artifacts.
-          NPM_CONFIG_IGNORE_SCRIPTS: "true"
-        id: publish-main
+          path: ${{ runner.temp }}/railway-deploy-marker.txt
+          retention-days: 7
+      - name: Notify stable release
+        if: steps.prepare.outputs.publish == 'true' && github.ref_name == 'main'
         continue-on-error: true
-        run: |
-          # Configure git identity - changesets creates annotated tags (git tag -m),
-          # which fail without user.name/user.email configured
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          # Ensure we're on the latest commit and have all remote refs
-          git fetch --tags --force
-          git checkout main
-          git pull origin main
-
-          cd libraries/typescript
-          pnpm release-channel preflight --channel stable
-          pnpm release-channel snapshot --channel stable --output stable-release-plan.json
-          pnpm changeset publish
-          echo "✅ Stable publish command completed"
-
-      - name: Verify stable packages and dist-tags
-        if: github.ref == 'refs/heads/main' &&
-          steps.check-prerelease.outputs.in_prerelease == 'false' &&
-          steps.check-release.outputs.should_publish == 'true'
-        working-directory: libraries/typescript
-        env:
-          VERIFY_ATTEMPTS: 12
-          VERIFY_DELAY_SECONDS: 10
-        run: pnpm release-channel verify --plan stable-release-plan.json
-
-      - name: Tag and push verified stable packages
-        if: github.ref == 'refs/heads/main' &&
-          steps.check-prerelease.outputs.in_prerelease == 'false' &&
-          steps.check-release.outputs.should_publish == 'true'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch --tags --force
-          cd libraries/typescript
-          pnpm changeset tag
-          pnpm release-channel tags --plan stable-release-plan.json --output ../../.release-tags
-          cd ../..
-          while IFS= read -r tag; do
-            git show-ref --verify --quiet "refs/tags/$tag"
-            git push origin "refs/tags/$tag"
-          done < .release-tags
-
-      - name: Create deployment marker (Main)
-        if: github.ref == 'refs/heads/main' &&
-          steps.check-prerelease.outputs.in_prerelease == 'false' &&
-          steps.check-release.outputs.should_publish == 'true'
-        run: |
-          echo "packages_published=true" > .railway-deploy-marker
-          echo "branch=main" >> .railway-deploy-marker
-
-      - name: Upload deployment marker (Main)
-        if: github.ref == 'refs/heads/main' &&
-          steps.check-prerelease.outputs.in_prerelease == 'false' &&
-          steps.check-release.outputs.should_publish == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: railway-deploy-marker
-          path: .railway-deploy-marker
-          retention-days: 1
-
-      - name: Reset canary to main
-        if: github.ref == 'refs/heads/main' && steps.check-prerelease.outputs.in_prerelease == 'false' && steps.check-release.outputs.should_publish == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Configure git
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          # Fetch latest changes
-          git fetch origin
-
-          # Checkout canary and reset to main (clean slate with stable versions)
-          git checkout canary
-          git reset --hard origin/main
-
-          # Force push canary (since we did a reset)
-          git push --force origin canary
-
-          echo "✅ Reset canary to main (canary workflow will auto-enter prerelease mode)"
-
-      - name: Create GitHub Release (Main)
-        if: github.ref == 'refs/heads/main' && steps.check-prerelease.outputs.in_prerelease == 'false' && steps.check-release.outputs.should_publish == 'true'
-        uses: actions/github-script@v7
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          script: |
-            const fs = require('fs')
-            const path = require('path')
-            const owner = context.repo.owner
-            const repo = context.repo.repo
-
-            const tagsFile = path.join(process.env.GITHUB_WORKSPACE, '.release-tags')
-            if (!fs.existsSync(tagsFile)) {
-              core.info(`No tags file found at ${tagsFile}`)
-              return
-            }
-
-            const tags = fs.readFileSync(tagsFile, 'utf8').trim().split(/\s+/).filter(Boolean)
-            if (!tags.length) {
-              core.info('Tags file is empty')
-              return
-            }
-
-            const isPrerelease = false
-            core.info(`Creating GitHub releases for tags: ${tags.join(', ')}`)
-
-            function parseTag(tag) {
-              const atIndex = tag.lastIndexOf('@')
-              if (atIndex <= 0) return null
-              const pkg = tag.slice(0, atIndex)
-              const version = tag.slice(atIndex + 1)
-              const pkgDir = pkg.startsWith('@') ? pkg.split('/').slice(1).join('/') : pkg
-              return { pkg, version, pkgDir }
-            }
-
-            function extractChangelogSection(changelog, version) {
-              const lines = changelog.split(/\r?\n/)
-              let found = false
-              const out = []
-              for (const line of lines) {
-                if (line.startsWith('## ')) {
-                  if (found) break
-                  if (line.includes(version)) {
-                    found = true
-                    continue
-                  }
-                }
-                if (found) out.push(line)
-              }
-              const body = out.join('\n').trim()
-              return body.length ? body : null
-            }
-
-            for (const tag of tags) {
-              core.info(`\nProcessing tag: ${tag}`)
-              const parsed = parseTag(tag)
-              if (!parsed) {
-                core.warning(`Could not parse tag: ${tag}`)
-                continue
-              }
-
-              try {
-                await github.rest.repos.getReleaseByTag({ owner, repo, tag })
-                core.info(`Release already exists for ${tag}, skipping`)
-                continue
-              } catch (e) {
-                if (e.status !== 404) throw e
-              }
-
-              const changelogFile = path.join(process.env.GITHUB_WORKSPACE, 'libraries', 'typescript', 'packages', parsed.pkgDir, 'CHANGELOG.md')
-              let notes = `Release ${parsed.version} of ${parsed.pkg}`
-
-              if (fs.existsSync(changelogFile)) {
-                const changelog = fs.readFileSync(changelogFile, 'utf8')
-                const section = extractChangelogSection(changelog, parsed.version)
-                if (section) {
-                  notes = section
-                } else {
-                  core.info(`No changelog entry found for version ${parsed.version} in ${changelogFile}`)
-                }
-              } else {
-                core.info(`No CHANGELOG.md found at ${changelogFile}`)
-              }
-
-              const name = `${parsed.pkg} ${parsed.version}`
-              const make_latest = (parsed.pkg === 'mcp-use') ? 'true' : 'false'
-
-              await github.rest.repos.createRelease({
-                owner,
-                repo,
-                tag_name: tag,
-                name,
-                body: notes,
-                prerelease: isPrerelease,
-                make_latest,
-              })
-
-              core.info(`Created release for ${tag}`)
-            }
-
-      - name: Send Discord notification (Main)
-        if: github.ref == 'refs/heads/main' && steps.check-prerelease.outputs.in_prerelease == 'false' && steps.check-release.outputs.should_publish == 'true'
-        run: |
-          # Read tags and find the main mcp-use package release
-          if [ ! -f .release-tags ]; then
-            echo "No release tags found, skipping Discord notification"
-            exit 0
-          fi
-
-          # Find the main mcp-use package tag (not scoped @mcp-use/* packages)
-          MAIN_TAG=$(grep -E '^mcp-use@' .release-tags | head -1)
-          if [ -z "$MAIN_TAG" ]; then
-            echo "No main mcp-use package tag found, skipping"
-            exit 0
-          fi
-
-          VERSION="${MAIN_TAG#mcp-use@}"
-          RELEASE_URL="https://github.com/mcp-use/mcp-use/releases/tag/${MAIN_TAG}"
-          RELEASE_BODY=$(gh release view "$MAIN_TAG" --json body -q '.body' | head -c 1800)
-
-          PAYLOAD=$(jq -n \
-            --arg title "TypeScript v${VERSION}" \
-            --arg url "$RELEASE_URL" \
-            --arg desc "$RELEASE_BODY" \
-            '{embeds: [{title: $title, url: $url, description: $desc, color: 5814783}]}')
-
-          curl -s -H "Content-Type: application/json" \
-            -d "$PAYLOAD" \
-            "$WEBHOOK_URL"
-
-          echo "✅ Sent Discord notification for mcp-use@${VERSION}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WEBHOOK_URL: ${{ secrets.DISCORD_RELEASE_CHANNEL_WEBHOOK_URL }}
+        run: |
+          if [ -z "$WEBHOOK_URL" ]; then exit 0; fi
+          tag=$(node -e 'const p=require(process.env.RUNNER_TEMP + "/release-plan.json"); const r=p.releases.find(r=>r.target && r.name==="mcp-use"); console.log(r ? `${r.name}@${r.version}` : "")')
+          if [ -z "$tag" ]; then exit 0; fi
+          notes=$(gh release view "$tag" --json body --jq .body)
+          payload=$(jq -n --arg title "TypeScript ${tag#mcp-use@}" --arg url "https://github.com/$GITHUB_REPOSITORY/releases/tag/$tag" --arg notes "$notes" '{embeds:[{title:$title,url:$url,description:($notes[:1800]),color:5814783}]}')
+          curl --fail-with-body --silent --show-error -H 'Content-Type: application/json' --data "$payload" "$WEBHOOK_URL"
+      - name: Save release plan and tarballs for diagnosis
+        if: always() && steps.prepare.outputs.publish == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: typescript-release-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/release-plan.json
+            ${{ runner.temp }}/release-artifacts/*.tgz
+          retention-days: 14

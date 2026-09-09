@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: publish-inspector-docker-${{ github.event.workflow_run.head_sha || github.run_id }}
+  group: publish-inspector-docker
   cancel-in-progress: false
 
 jobs:
@@ -22,14 +22,73 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: read
+    timeout-minutes: 30
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
+      - name: Find verified release marker
+        id: marker
+        if: github.event_name == 'workflow_run'
+        uses: actions/github-script@v9
         with:
-          ref: ${{ github.event.workflow_run.head_sha || 'main' }}
+          script: |
+            const { data: run } = await github.rest.actions.getWorkflowRun({
+              ...context.repo, run_id: context.payload.workflow_run.id,
+            });
+            const repository = `${context.repo.owner}/${context.repo.repo}`;
+            if (run.repository?.full_name !== repository || run.head_repository?.full_name !== repository ||
+                run.head_branch !== 'main' || !['push', 'workflow_dispatch'].includes(run.event) ||
+                run.conclusion !== 'success' || run.path !== '.github/workflows/typescript-release.yml') {
+              throw new Error('Refusing a marker from an untrusted release run');
+            }
+            const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
+              ...context.repo, run_id: context.payload.workflow_run.id,
+            });
+            core.setOutput('exists', artifacts.some(a => a.name === 'railway-deploy-marker' && !a.expired));
+      - uses: actions/download-artifact@v8
+        if: github.event_name == 'workflow_run' && steps.marker.outputs.exists == 'true'
+        with:
+          name: railway-deploy-marker
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/release-marker
+      - name: Read verified source revision
+        id: source
+        if: github.event_name == 'workflow_run' && steps.marker.outputs.exists == 'true'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require('node:fs');
+            const path = require('node:path');
+            const marker = fs.readFileSync(path.join(process.env.RUNNER_TEMP, 'release-marker/railway-deploy-marker.txt'), 'utf8');
+            const field = name => {
+              const values = marker.split('\n').filter(line => line.startsWith(`${name}=`));
+              if (values.length !== 1) throw new Error(`Missing or duplicate marker field: ${name}`);
+              return values[0].slice(name.length + 1);
+            };
+            const sha = field('sha');
+            if (field('packages_published') !== 'true' || field('branch') !== 'main' || !/^[a-f0-9]{40}$/.test(sha)) {
+              throw new Error('Invalid stable release marker');
+            }
+            // A syntactically valid SHA must also belong to the trusted branch.
+            // The publisher can have advanced beyond workflow_run.head_sha
+            // after acquiring its lock, so equality with that SHA is not valid.
+            const { data: comparison } = await github.rest.repos.compareCommits({
+              ...context.repo, base: sha, head: 'main',
+            });
+            if (!['ahead', 'identical'].includes(comparison.status)) {
+              throw new Error('Release source is not part of main');
+            }
+            core.setOutput('sha', sha);
+      - name: Checkout source
+        if: github.event_name == 'workflow_dispatch' || steps.marker.outputs.exists == 'true'
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.source.outputs.sha || 'main' }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Determine stable Inspector version
+        if: github.event_name == 'workflow_dispatch' || steps.marker.outputs.exists == 'true'
         id: version
         run: |
           set -euo pipefail
