@@ -62,7 +62,7 @@
   "dependencies": {
     "@modelcontextprotocol/client": "2.0.0",
     "@modelcontextprotocol/core": "2.0.0",
-    "@modelcontextprotocol/ext-apps": "npm:@mcp-use/ext-apps@1.7.4-pr720.1"
+    "@modelcontextprotocol/ext-apps": "2.0.0"
   },
   "peerDependencies": {
     "@e2b/code-interpreter": "^2.6.1",
