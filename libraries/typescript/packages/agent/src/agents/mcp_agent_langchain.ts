@@ -1896,12 +1896,6 @@ export class MCPAgent {
 
     // Delegate to remote agent if in remote mode (streamEvents is not supported remotely)
     if (this.isRemote && this.remoteAgent) {
-      if (extraMessages?.length) {
-        throw new Error(
-          "RunOptions.messages is not supported in remote mode. " +
-            "The remote agent protocol does not carry a pre-seeded message list."
-        );
-      }
       throw new Error(
         "streamEvents() is not supported in remote mode. Use stream() or run() instead."
       );

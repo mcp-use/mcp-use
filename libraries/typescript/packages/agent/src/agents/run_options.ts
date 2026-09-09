@@ -21,7 +21,13 @@ export interface RunOptions<T = string> {
    * stored memory.
    */
   externalHistory?: BaseMessage[];
-  /** Provider-neutral messages appended before `prompt`. */
+  /**
+   * Provider-neutral messages appended before `prompt`.
+   *
+   * Not supported when the agent was constructed with `agentId` (remote mode):
+   * the remote agent protocol does not carry a pre-seeded message list and will
+   * throw at runtime if this field is non-empty.
+   */
   messages?: ProviderMessage[];
   /**
    * Zod schema for a typed result.
