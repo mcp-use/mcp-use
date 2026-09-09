@@ -1,4 +1,4 @@
-import { chat, streamChat } from "./providers/index.js";
+import { chat, streamChat, withOpenRouterConfig } from "./providers/index.js";
 import type {
   LlmStreamEvent,
   ProviderConfig,
@@ -49,6 +49,9 @@ export interface LlmDriver {
 export function createLlmDriver(config: ProviderConfig): LlmDriver {
   if (config.provider === "openai") {
     return new OpenAIResponsesDriver(config);
+  }
+  if (config.provider === "openrouter") {
+    return new OpenAIResponsesDriver(withOpenRouterConfig(config));
   }
   return new RestLlmDriver(config);
 }
