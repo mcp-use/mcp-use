@@ -1,4 +1,8 @@
-import type { CallToolResult, Tool } from "@modelcontextprotocol/client";
+import type {
+  CallToolResult,
+  RequestOptions,
+  Tool,
+} from "@modelcontextprotocol/client";
 import type { MCPClient } from "../core/node.js";
 import { BaseConnector } from "../transport/base.js";
 
@@ -186,8 +190,33 @@ export class CodeModeConnector extends BaseConnector {
   }
 
   // Override tools getter to return static list immediately
-  get tools(): Tool[] {
+  override get tools(): Tool[] {
     return this._tools;
+  }
+
+  override async listTools(options?: RequestOptions): Promise<Tool[]> {
+    if (!this.connected) {
+      throw new Error("MCP client is not connected");
+    }
+    options?.signal?.throwIfAborted();
+    return [...this._tools];
+  }
+
+  /**
+   * List all tools available in code mode.
+   *
+   * @param options - Optional request options.
+   * @returns Complete list of tools across all pages.
+   */
+  override async listAllTools(options?: RequestOptions): Promise<{
+    /** Complete list of tools across all pages. */
+    tools: Tool[];
+  }> {
+    if (!this.connected) {
+      throw new Error("MCP client is not connected");
+    }
+    options?.signal?.throwIfAborted();
+    return { tools: [...this._tools] };
   }
 
   async initialize(): Promise<any> {

@@ -342,6 +342,25 @@ export class MCPConnection {
   }
 
   /**
+   * List all tools from the server, automatically handling pagination.
+   *
+   * @param options - Request options
+   * @returns Complete list of all tools
+   *
+   * @example
+   * ```typescript
+   * const result = await session.listAllTools();
+   * console.log(`Total tools: ${result.tools.length}`);
+   * ```
+   */
+  async listAllTools(options?: RequestOptions): Promise<{
+    /** Complete list of tools across all pages. */
+    tools: Tool[];
+  }> {
+    return this.connector.listAllTools(options);
+  }
+
+  /**
    * Get the server capabilities advertised during initialization.
    *
    * @returns Server capabilities object

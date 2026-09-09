@@ -64,6 +64,11 @@ export interface ProxyConnection {
   supports?(capability: string): boolean;
   /** List upstream tools. */
   listTools(): Promise<ProxyTool[]>;
+  /** List upstream tools with pagination when supported. */
+  listAllTools?(): Promise<{
+    /** Complete list of tools across all pages. */
+    tools: ProxyTool[];
+  }>;
   /** Forward a tool call. */
   callTool(
     name: string,
@@ -294,7 +299,11 @@ async function introspect(
   let tools: ProxyTool[] = [];
   if (supports(connection, "tools")) {
     try {
-      tools = await connection.listTools();
+      if (typeof connection.listAllTools === "function") {
+        tools = (await connection.listAllTools()).tools;
+      } else {
+        tools = await connection.listTools();
+      }
     } catch (error) {
       proxyDiagnostic(
         `Failed to introspect tools from upstream MCP server "${namespace}"`,

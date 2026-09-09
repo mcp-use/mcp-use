@@ -88,8 +88,23 @@ export abstract class BaseAdapter<T> {
       return [];
     }
 
-    // Convert and collect tools
-    for (const tool of connector.tools) {
+    // Convert and collect tools (preferring listAllTools if available)
+    const duck = connector as {
+      listAllTools?: () => Promise<{ tools: any[] }>;
+    };
+    let tools = connector.tools;
+    if (typeof duck.listAllTools === "function") {
+      try {
+        const result = await duck.listAllTools();
+        if (result?.tools) {
+          tools = result.tools;
+        }
+      } catch (e) {
+        logger.debug("Failed to list all tools, falling back to cache:", e);
+      }
+    }
+
+    for (const tool of tools) {
       const converted = this.convertTool(tool, connector);
       if (converted) {
         connectorTools.push(converted);

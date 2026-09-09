@@ -325,8 +325,8 @@ export abstract class BaseConnector {
       logger.debug(
         "[Auto] Refreshing tools cache due to list_changed notification"
       );
-      const result = await this.client.listTools();
-      this.toolsCache = (result.tools ?? []) as Tool[];
+      const result = await this.listAllTools();
+      this.toolsCache = result.tools ?? [];
       logger.debug(
         `[Auto] Refreshed tools cache: ${this.toolsCache.length} tools`
       );
@@ -567,10 +567,8 @@ export abstract class BaseConnector {
     // Fetch and cache tools
     // Gracefully handle servers that don't implement tools/list or have no tools
     try {
-      const listToolsRes = await this.executeRequest(() =>
-        this.client!.listTools(undefined, defaultRequestOptions)
-      );
-      this.toolsCache = (listToolsRes.tools ?? []) as Tool[];
+      const listToolsRes = await this.listAllTools(defaultRequestOptions);
+      this.toolsCache = listToolsRes.tools ?? [];
       logger.debug(`Fetched ${this.toolsCache.length} tools from server`);
     } catch (err: unknown) {
       if (isOAuthInteractionRequired(err)) throw err;
@@ -694,9 +692,7 @@ export abstract class BaseConnector {
       throw new Error("MCP client is not connected");
     }
     logger.debug("[listTools] Fetching fresh tools from server...");
-    const result = await this.executeRequest(() =>
-      this.client!.listTools(undefined, options)
-    );
+    const result = await this.listAllTools(options);
     // Create a new array to ensure React detects the change (avoid reference equality issues)
     const tools = result.tools ? [...result.tools] : [];
     logger.debug(
@@ -704,6 +700,64 @@ export abstract class BaseConnector {
       tools.map((t) => t.name)
     );
     return tools;
+  }
+
+  /**
+   * List all tools from the server, automatically handling pagination
+   *
+   * @param options - Request options
+   * @returns Complete list of all tools
+   */
+  async listAllTools(options?: RequestOptions): Promise<{
+    /** Tools returned across all result pages. */
+    tools: Tool[];
+  }> {
+    // Held across the pagination loop below: `disconnect()` clears
+    // `this.client`, and re-reading it once per page would dereference null
+    // mid-listing instead of failing on the closed transport.
+    const client = this.client;
+    if (!client) {
+      throw new Error("MCP client is not connected");
+    }
+
+    try {
+      logger.debug("Listing all tools (with auto-pagination)");
+      return await this.executeRequest(async () => {
+        const allTools: Tool[] = [];
+        const seenCursors = new Set<string>();
+        let cursor: string | undefined = undefined;
+
+        do {
+          options?.signal?.throwIfAborted();
+          const result: { tools?: Tool[]; nextCursor?: string } =
+            await client.listTools(
+              cursor !== undefined ? { cursor } : undefined,
+              options
+            );
+          allTools.push(...(result.tools || []));
+          cursor = result.nextCursor;
+          if (cursor !== undefined) {
+            if (seenCursors.has(cursor)) {
+              throw new Error(
+                "tools/list returned a repeated pagination cursor"
+              );
+            }
+            seenCursors.add(cursor);
+          }
+        } while (cursor !== undefined);
+
+        return { tools: allTools };
+      });
+    } catch (err: unknown) {
+      if (isOAuthInteractionRequired(err)) throw err;
+      const error = err as Error & { code?: number };
+      // Gracefully handle if server does not implement tools/list
+      if (error.code === -32601) {
+        logger.debug("Server does not implement tools/list, assuming no tools");
+        return { tools: [] };
+      }
+      throw err;
+    }
   }
 
   /**

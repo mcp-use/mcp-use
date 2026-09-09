@@ -346,6 +346,51 @@ describe("MCPServer.proxy", () => {
     );
   });
 
+  it("prefers listAllTools over listTools when present on upstream connection", async () => {
+    const parent = new MCPServer({ name: "parent", version: "1.0.0" });
+    servers.push(parent);
+    const listToolsSpy = vi
+      .fn()
+      .mockResolvedValue([{ name: "tool1", description: "Page 1" }]);
+    const listAllToolsSpy = vi.fn().mockResolvedValue({
+      tools: [
+        { name: "tool1", description: "Page 1" },
+        { name: "tool2", description: "Page 2" },
+      ],
+    });
+    const connection = {
+      info: { server: { name: "upstream" } },
+      listTools: listToolsSpy,
+      listAllTools: listAllToolsSpy,
+      async callTool() {
+        return { content: [] };
+      },
+      async readResource() {
+        return { contents: [] };
+      },
+      async listPrompts() {
+        return { prompts: [] };
+      },
+      async getPrompt() {
+        return { messages: [] };
+      },
+    };
+
+    await expect(parent.proxy(connection as any)).resolves.toBeUndefined();
+    const { url: parentUrl } = await parent.listen(0);
+    const client = await connectClient(parentUrl);
+    clients.push(client);
+
+    const { tools } = await client.listTools();
+    expect(tools).toHaveLength(2);
+    expect(tools.map((t) => t.name)).toEqual([
+      "upstream_tool1",
+      "upstream_tool2",
+    ]);
+    expect(listAllToolsSpy).toHaveBeenCalledTimes(1);
+    expect(listToolsSpy).not.toHaveBeenCalled();
+  });
+
   it("rejects a direct anonymous connection without a proxy namespace", async () => {
     const parent = new MCPServer({ name: "parent", version: "1.0.0" });
     servers.push(parent);

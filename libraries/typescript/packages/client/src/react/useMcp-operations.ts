@@ -183,11 +183,21 @@ export function useMcpOperations(params: Params) {
     if (params.stateRef.current !== "ready" || !params.connectionRef.current)
       return;
     try {
-      params.setTools(
-        (await executeWithAuthorizationSignal(params, () =>
-          params.connectionRef.current!.listTools()
-        )) || []
-      );
+      const connection = params.connectionRef.current;
+      const duck = connection as {
+        listAllTools?: () => Promise<{ tools: any[] }>;
+      };
+      const tools =
+        typeof duck.listAllTools === "function"
+          ? (
+              await executeWithAuthorizationSignal(params, () =>
+                duck.listAllTools!()
+              )
+            ).tools
+          : await executeWithAuthorizationSignal(params, () =>
+              connection.listTools()
+            );
+      params.setTools(tools || []);
     } catch (error) {
       params.addLog("error", "Failed to refresh tools:", error);
     }
