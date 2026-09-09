@@ -89,10 +89,35 @@ describe("CodeModeConnector protocol contract", () => {
       await expect(connector.listAllResources()).resolves.toEqual({
         resources: [],
       });
+      await expect(connector.listResourceTemplates()).resolves.toEqual({
+        resourceTemplates: [],
+      });
       await expect(connector.listPrompts()).resolves.toEqual({ prompts: [] });
       await expect(connector.listAllPrompts()).resolves.toEqual({
         prompts: [],
       });
+    });
+
+    it("throws when resource and prompt listing are called with an aborted signal", async () => {
+      const connector = new CodeModeConnector(createMockMcpClient());
+      const controller = new AbortController();
+      controller.abort();
+
+      await expect(
+        connector.listResources(undefined, { signal: controller.signal })
+      ).rejects.toThrow();
+      await expect(
+        connector.listAllResources({ signal: controller.signal })
+      ).rejects.toThrow();
+      await expect(
+        connector.listResourceTemplates({ signal: controller.signal })
+      ).rejects.toThrow();
+      await expect(
+        connector.listPrompts({ signal: controller.signal })
+      ).rejects.toThrow();
+      await expect(
+        connector.listAllPrompts({ signal: controller.signal })
+      ).rejects.toThrow();
     });
 
     it("throws for resources and prompts when disconnected", async () => {
@@ -103,6 +128,9 @@ describe("CodeModeConnector protocol contract", () => {
         "MCP client is not connected"
       );
       await expect(connector.listAllResources()).rejects.toThrow(
+        "MCP client is not connected"
+      );
+      await expect(connector.listResourceTemplates()).rejects.toThrow(
         "MCP client is not connected"
       );
       await expect(connector.listPrompts()).rejects.toThrow(
@@ -125,6 +153,68 @@ describe("CodeModeConnector protocol contract", () => {
           { signal: controller.signal }
         )
       ).rejects.toThrow();
+    });
+
+    it("cancels execute_code mid-flight when signal is aborted during execution", async () => {
+      let resolveExecution!: (val: any) => void;
+      const executionPromise = new Promise((resolve) => {
+        resolveExecution = resolve;
+      });
+      const mockClient = createMockMcpClient();
+      vi.mocked(mockClient.executeCode).mockImplementation(
+        () => executionPromise as any
+      );
+      const connector = new CodeModeConnector(mockClient);
+
+      const controller = new AbortController();
+      const callPromise = connector.callTool(
+        "execute_code",
+        { code: "while(true){}" },
+        { signal: controller.signal }
+      );
+
+      expect(mockClient.executeCode).toHaveBeenCalled();
+      controller.abort(new Error("Operation cancelled mid-flight"));
+
+      await expect(callPromise).rejects.toThrow(
+        "Operation cancelled mid-flight"
+      );
+
+      resolveExecution({
+        result: "done",
+        logs: [],
+        error: null,
+        execution_time: 10,
+      });
+    });
+
+    it("cancels search_tools mid-flight when signal is aborted during execution", async () => {
+      let resolveSearch!: (val: any) => void;
+      const searchPromise = new Promise((resolve) => {
+        resolveSearch = resolve;
+      });
+      const mockClient = createMockMcpClient();
+      vi.mocked(mockClient.searchTools).mockImplementation(
+        () => searchPromise as any
+      );
+      const connector = new CodeModeConnector(mockClient);
+
+      const controller = new AbortController();
+      const callPromise = connector.callTool(
+        "search_tools",
+        { query: "test" },
+        { signal: controller.signal }
+      );
+
+      expect(mockClient.searchTools).toHaveBeenCalled();
+      controller.abort(new Error("Search cancelled mid-flight"));
+
+      await expect(callPromise).rejects.toThrow("Search cancelled mid-flight");
+
+      resolveSearch({
+        meta: { total_tools: 0, namespaces: [], result_count: 0 },
+        results: [],
+      });
     });
 
     it("executes code via callTool", async () => {
@@ -208,6 +298,25 @@ describe("CodeModeConnector protocol contract", () => {
       ]);
       expect(aiTools["execute_code"]?.type).toBe("dynamic");
       expect(aiTools["search_tools"]?.type).toBe("dynamic");
+    });
+
+    it("throws when session.listResources or listAllResources is called with an aborted signal", async () => {
+      const connector = new CodeModeConnector(createMockMcpClient());
+      const session = new MCPSession(connector);
+      await session.initialize();
+
+      const controller = new AbortController();
+      controller.abort();
+
+      await expect(
+        session.listResources(undefined, { signal: controller.signal })
+      ).rejects.toThrow();
+      await expect(
+        session.listAllResources({ signal: controller.signal })
+      ).rejects.toThrow();
+      await expect(
+        session.listResourceTemplates({ signal: controller.signal })
+      ).rejects.toThrow();
     });
   });
 

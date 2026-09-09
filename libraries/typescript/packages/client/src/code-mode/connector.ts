@@ -99,6 +99,51 @@ Remember: Always discover and understand available tools before attempting to us
 const DETAIL_LEVELS = new Set(["names", "descriptions", "full"]);
 
 /**
+ * Throws if the signal is aborted, using the signal's reason or a standard AbortError.
+ */
+function throwIfAborted(signal?: AbortSignal): void {
+  if (!signal?.aborted) return;
+  if (typeof signal.throwIfAborted === "function") {
+    signal.throwIfAborted();
+  }
+  throw signal.reason ?? new Error("This operation was aborted");
+}
+
+/**
+ * Races an async operation against an AbortSignal, rejecting immediately if the signal aborts.
+ */
+function raceAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) {
+    return promise;
+  }
+  throwIfAborted(signal);
+
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => {
+      signal.removeEventListener("abort", onAbort);
+      try {
+        throwIfAborted(signal);
+      } catch (err) {
+        reject(err);
+      }
+    };
+
+    signal.addEventListener("abort", onAbort, { once: true });
+
+    promise.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (error) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(error);
+      }
+    );
+  });
+}
+
+/**
  * CodeModeConnector provides a special "code mode" interface for executing JavaScript/TypeScript
  * code with access to MCP tools. Unlike other connectors, it doesn't establish its own external
  * connection - instead, it wraps an already-connected BaseMCPClient and exposes special tools
@@ -212,7 +257,7 @@ export class CodeModeConnector extends BaseConnector {
     if (!this.connected) {
       throw new Error("MCP client is not connected");
     }
-    options?.signal?.throwIfAborted();
+    throwIfAborted(options?.signal);
     return [...this._tools];
   }
 
@@ -239,31 +284,52 @@ export class CodeModeConnector extends BaseConnector {
     };
   }
 
-  override async listResources(): Promise<{ resources: any[] }> {
+  override async listResources(
+    _cursor?: string,
+    options?: RequestOptions
+  ): Promise<{ resources: any[] }> {
     if (!this.connected) {
       throw new Error("MCP client is not connected");
     }
+    throwIfAborted(options?.signal);
     return { resources: [] };
   }
 
-  override async listAllResources(): Promise<{ resources: any[] }> {
+  override async listAllResources(
+    options?: RequestOptions
+  ): Promise<{ resources: any[] }> {
     if (!this.connected) {
       throw new Error("MCP client is not connected");
     }
+    throwIfAborted(options?.signal);
     return { resources: [] };
   }
 
-  override async listPrompts(): Promise<{ prompts: any[] }> {
+  override async listResourceTemplates(
+    options?: RequestOptions
+  ): Promise<{ resourceTemplates: any[] }> {
     if (!this.connected) {
       throw new Error("MCP client is not connected");
     }
+    throwIfAborted(options?.signal);
+    return { resourceTemplates: [] };
+  }
+
+  override async listPrompts(
+    options?: RequestOptions
+  ): Promise<{ prompts: any[] }> {
+    if (!this.connected) {
+      throw new Error("MCP client is not connected");
+    }
+    throwIfAborted(options?.signal);
     return { prompts: [] };
   }
 
-  async listAllPrompts(): Promise<{ prompts: any[] }> {
+  async listAllPrompts(options?: RequestOptions): Promise<{ prompts: any[] }> {
     if (!this.connected) {
       throw new Error("MCP client is not connected");
     }
+    throwIfAborted(options?.signal);
     return { prompts: [] };
   }
 
@@ -275,7 +341,7 @@ export class CodeModeConnector extends BaseConnector {
     if (!this.connected) {
       throw new Error("MCP client is not connected");
     }
-    options?.signal?.throwIfAborted();
+    throwIfAborted(options?.signal);
 
     if (name === "execute_code") {
       const code = args.code as string;
@@ -283,7 +349,10 @@ export class CodeModeConnector extends BaseConnector {
 
       // We need to access executeCode on the client
       // Since BaseConnector doesn't know about executeCode, we cast client
-      const result = await this.mcpClient.executeCode(code, timeout);
+      const result = await raceAbort(
+        this.mcpClient.executeCode(code, timeout),
+        options?.signal
+      );
 
       return {
         content: [
@@ -300,9 +369,12 @@ export class CodeModeConnector extends BaseConnector {
         | "descriptions"
         | "full";
 
-      const result = await this.mcpClient.searchTools(
-        query,
-        DETAIL_LEVELS.has(detailLevel) ? detailLevel : "full"
+      const result = await raceAbort(
+        this.mcpClient.searchTools(
+          query,
+          DETAIL_LEVELS.has(detailLevel) ? detailLevel : "full"
+        ),
+        options?.signal
       );
 
       return {
