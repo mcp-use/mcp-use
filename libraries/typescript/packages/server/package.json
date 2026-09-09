@@ -125,7 +125,7 @@
     "@mcp-use/inspector": "workspace:*",
     "@modelcontextprotocol/client": "2.0.0",
     "@modelcontextprotocol/core": "2.0.0",
-    "@modelcontextprotocol/ext-apps": "npm:@mcp-use/ext-apps@1.7.4-pr720.1",
+    "@modelcontextprotocol/ext-apps": "2.0.0",
     "@modelcontextprotocol/server": "2.0.0",
     "hono": "^4.12.34",
     "jose": "^6.1.3"
