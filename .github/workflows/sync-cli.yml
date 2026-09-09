@@ -32,7 +32,7 @@ jobs:
 
       - name: Clone mirror repo
         env:
-          MIRROR_TOKEN: ${{ secrets.INSPECTOR_MIRROR_TOKEN }}
+          MIRROR_TOKEN: ${{ secrets.CLI_MIRROR_TOKEN }}
         run: |
           set -euo pipefail
           test -n "$MIRROR_TOKEN"
@@ -87,7 +87,7 @@ jobs:
 
       - name: Commit and push to mirror repo
         env:
-          MIRROR_TOKEN: ${{ secrets.INSPECTOR_MIRROR_TOKEN }}
+          MIRROR_TOKEN: ${{ secrets.CLI_MIRROR_TOKEN }}
           TARGET_BRANCH: ${{ steps.vars.outputs.target_branch }}
         run: |
           set -euo pipefail
