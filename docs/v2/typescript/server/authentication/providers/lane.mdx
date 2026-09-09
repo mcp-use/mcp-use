@@ -4,7 +4,7 @@ description: "Configure Lane OAuth authentication and Lane's consent gate for a 
 icon: "id-card"
 ---
 
-Use the Lane provider when your MCP server sells to agents acting for KYC-verified people through [Lane](https://www.getonlane.com). Lane is a standard OAuth 2.1 authorization server: MCP clients register with it through Dynamic Client Registration and complete the authorization flow directly. On top of that, Lane adds a consent gate on the server: application tools refuse until the calling agent runs the reserved `lane_register_session` tool, which performs a server-side token exchange and records a connection for the calling credential.
+Use the Lane provider when your MCP server sells to agents acting for KYC-verified people through [Lane](https://www.getonlane.com). Lane is a standard OAuth 2.1 authorization server: MCP clients register with it through Dynamic Client Registration and complete the authorization flow directly. On top of that, Lane adds a consent gate on the server: application tools refuse until the calling agent runs the reserved `lane_register_session` tool, which performs a server-side token exchange and records a connection for the calling user and agent client.
 
 The provider verifies Lane access tokens and installs the gate, the two reserved tools, the `lane://auth-guide` resource, the root-path protected-resource document, and the instructions that steer agents to the step-up.
 
@@ -73,13 +73,15 @@ Client credentials and the issuer are read from the environment when the options
 
 ## How the gate works
 
-Every request to the MCP endpoint needs a valid Lane bearer, the same as any other mcp-use OAuth provider. After that:
+`initialize`, `tools/list`, and the `notifications/initialized` handshake work without authentication. Every tool call, including `lane_register_session` and `lane_session_info`, requires a valid Lane bearer or receives HTTP 401. Other MCP methods also require authentication. Supplied credentials are always verified, including during discovery.
+
+After authentication:
 
 1. A verified caller with no recorded connection gets an error result from every application tool naming `lane_register_session`. The `initialize` instructions and the auth guide say the same thing.
-2. The agent calls `lane_register_session`. The server exchanges the caller's bearer for a token scoped to this server using the confidential client, records the granted scopes under the caller's subject and token `jti`, and returns `{ ok, personalized, scopes }`. The exchanged token never reaches the model.
+2. The agent calls `lane_register_session`. The server exchanges the caller's bearer for a token scoped to this server using the confidential client, records the granted scopes under the caller's subject and OAuth `client_id`, and returns `{ ok, personalized, scopes }`. The exchanged token never reaches the model.
 3. Application tools now run. A tool listed in `scopes` additionally requires every listed scope on the connection, or it returns an `insufficient_scope` error result.
 
-Connections are keyed by the token `jti`, so a refreshed access token is a new credential and the agent must run the step-up again. `lane_session_info` reports the current state at any point and accepts an optional `probe_scope`.
+Connections are keyed by `(sub, client_id)`. A refreshed bearer for the same user and client reuses the connection until it expires or is removed. The connection stores the registration token’s `jti` for auditing; it is not part of the lookup key. `lane_session_info` reports the current state at any point and accepts an optional `probe_scope`.
 
 Authority comes from the recorded connection, never from the bearer's own `scope` claim. `ctx.auth.permissions` is therefore always empty; `ctx.auth.user` carries the pairwise `id`, the calling `agentId`, and the `credentialId`.
 
@@ -92,15 +94,15 @@ import type { LaneConnectionStore } from "mcp-use/oauth/lane";
 
 const connections: LaneConnectionStore = {
   async get(key) {
-    return (await kv.get(`lane:${key.sub}:${key.jti}`)) ?? null;
+    return (await kv.get(`lane:${JSON.stringify([key.sub, key.clientId])}`)) ?? null;
   },
   async put(key, value) {
     const record = { ...value, createdAt: Date.now() };
-    await kv.set(`lane:${key.sub}:${key.jti}`, record);
+    await kv.set(`lane:${JSON.stringify([key.sub, key.clientId])}`, record);
     return record;
   },
   async delete(key) {
-    await kv.delete(`lane:${key.sub}:${key.jti}`);
+    await kv.delete(`lane:${JSON.stringify([key.sub, key.clientId])}`);
   },
 };
 ```
@@ -112,10 +114,12 @@ Run the server on the host Lane claimed and connect with an OAuth-capable MCP cl
 Confirm these cases:
 
 - `GET /.well-known/oauth-protected-resource` and the path-inserted form both name Lane's issuer.
+- Anonymous initialization and tool listing succeed; an anonymous tool call returns HTTP 401.
 - The client completes the authorization flow with Lane.
 - `lane_session_info` reports `connected: false` before the step-up.
 - An application tool returns the "Login incomplete" error result before the step-up.
 - `lane_register_session` returns `ok: true`, and the same tool then succeeds.
+- A refreshed bearer for the same user and client can use the existing connection. A different client must register its own connection.
 
 ## Next steps
 

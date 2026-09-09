@@ -5,7 +5,7 @@
  * application-level consent gate: every application tool refuses until the
  * calling agent runs the reserved `lane_register_session` tool, which performs
  * a server-side RFC 8693 token exchange and records a connection for the
- * calling credential. This module verifies Lane access tokens and installs
+ * calling user and agent client. This module verifies Lane access tokens and installs
  * that gate, the reserved tools, the auth-guide resource, the root-path
  * protected-resource document, and the step-up instructions.
  *
@@ -84,6 +84,8 @@ const DEFAULT_SCOPES_SUPPORTED = [
 /**
  * Creates a Lane OAuth provider.
  *
+ * Initialization and tool listing are public. Every tool call requires a valid
+ * bearer, including the provider-owned registration and session-info tools.
  * Tokens are verified against Lane's JWKS and must be audienced to this
  * server's canonical resource. Authority for application tools comes from the
  * connection recorded by `lane_register_session`, never from the bearer's own
@@ -177,6 +179,7 @@ export function oauthLaneProvider(
   return oauthCustomProvider<LaneOAuthUser>({
     ...resourceOptions,
     scopesSupported,
+    allowAnonymousDiscovery: true,
     createTokenVerifier: (resource) =>
       verifierOption === undefined
         ? laneVerifier(
@@ -213,7 +216,7 @@ export function oauthLaneProvider(
 /**
  * Adds the checks Lane requires on top of the shared JWT verifier: the token
  * type must be `at+jwt` so an ID token cannot be replayed as an access token,
- * and `jti` must be present because connections are keyed by it.
+ * and `jti` must be present to identify the credential used for registration.
  */
 function laneVerifier(inner: OAuthTokenVerifier): OAuthTokenVerifier {
   return {

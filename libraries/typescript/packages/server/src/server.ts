@@ -7,6 +7,7 @@ import {
   CLIENT_INFO_META_KEY,
   PROTOCOL_VERSION_META_KEY,
   isJSONRPCRequest,
+  isJSONRPCNotification,
   isInputRequiredResult,
   type ClientCapabilities,
   type McpHttpHandler,
@@ -1505,6 +1506,24 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           }),
         });
         protectWithBearer = async (request, next) => {
+          if (
+            provider.allowAnonymousDiscovery === true &&
+            request.method === "POST" &&
+            !request.headers.has("authorization")
+          ) {
+            const body = getRequestBag(request).parsedBody;
+            // Inspect the same parsed body delivered to the MCP handler. Never
+            // exempt a batch or a tool call, including provider-owned tools.
+            if (
+              (isJSONRPCRequest(body) &&
+                (body.method === "initialize" ||
+                  body.method === "tools/list")) ||
+              (isJSONRPCNotification(body) &&
+                body.method === "notifications/initialized")
+            ) {
+              return next();
+            }
+          }
           const result = await gate(request);
           if (result instanceof Response) {
             return result;
@@ -1517,8 +1536,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         // Authenticate the exact MCP route before the user-owned Hono app
         // runs. This makes verified identity available to route middleware
         // while leaving OAuth discovery, assets, and unrelated custom routes
-        // public. The explicitly public HTML landing-page carveout remains the
-        // only unauthenticated request allowed through this route.
+        // public. Providers can opt into anonymous MCP discovery; the public
+        // HTML landing page is controlled separately.
         httpApp.use("*", async (context, next) => {
           if (new URL(context.req.url).pathname !== basePath) {
             await next();

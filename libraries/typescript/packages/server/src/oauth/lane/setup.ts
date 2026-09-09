@@ -91,7 +91,7 @@ export function createLaneSetup(
 
       const connection = await liveLaneConnection(config.connections, {
         sub: claims.sub,
-        jti: claims.jti,
+        clientId: claims.agentId,
       });
       const scopes = connection?.scopes ?? [];
 
@@ -166,8 +166,9 @@ export function createLaneSetup(
             : undefined;
 
         await config.connections.put(
-          { sub: claims.sub, jti: claims.jti },
+          { sub: claims.sub, clientId: claims.agentId },
           {
+            jti: claims.jti,
             scopes: granted.scopes,
             accessToken: granted.accessToken,
             ...(granted.expiresIn !== undefined && {
@@ -209,7 +210,7 @@ export function createLaneSetup(
           }
           const connection = await liveLaneConnection(config.connections, {
             sub: claims.sub,
-            jti: claims.jti,
+            clientId: claims.agentId,
           });
           const probe = params["probe_scope"];
           return textResult(
@@ -287,11 +288,14 @@ function claimsFromPayload(
 ): LaneClaims | undefined {
   const sub = requiredString(payload, "sub");
   const jti = requiredString(payload, "jti");
-  if (sub === undefined || jti === undefined) return undefined;
+  const agentId = requiredString(payload, "client_id");
+  if (sub === undefined || jti === undefined || agentId === undefined) {
+    return undefined;
+  }
   return {
     sub,
     jti,
-    agentId: requiredString(payload, "client_id") ?? "",
+    agentId,
     issuer: requiredString(payload, "iss") ?? "",
     authTime: numberValue(payload, "auth_time"),
   };

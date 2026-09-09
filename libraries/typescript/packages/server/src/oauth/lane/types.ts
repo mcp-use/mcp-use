@@ -2,7 +2,7 @@ import type { OAuthTokenVerifier } from "@modelcontextprotocol/server";
 
 import type { OAuthResourceOptions } from "../provider.js";
 
-/** Reserved tool that completes Lane's step-up for the calling credential. */
+/** Reserved tool that completes Lane's step-up for the calling user and agent client. */
 export const LANE_STEP_UP_TOOL = "lane_register_session";
 
 /** Reserved diagnostic tool reporting what Lane knows about the caller. */
@@ -29,7 +29,7 @@ export interface LaneOAuthUser {
   id: string;
   /** OAuth `client_id` of the calling agent application. */
   agentId: string;
-  /** Token `jti`; identifies the credential a connection is recorded for. */
+  /** Token `jti`; identifies the credential used on this request. */
   credentialId: string;
   /** Claimed merchant host the token was minted for, when present. */
   host?: string;
@@ -41,16 +41,18 @@ export interface LaneOAuthUser {
   authTime?: number;
 }
 
-/** Identifies one connection: a subject on one credential. */
+/** Identifies one connection: a subject using one OAuth client. */
 export interface LaneConnectionKey {
   /** Pairwise subject from the verified token. */
   sub: string;
-  /** Token `jti`. A refreshed token is a new credential. */
-  jti: string;
+  /** OAuth `client_id`; stays stable when the client refreshes its bearer. */
+  clientId: string;
 }
 
 /** Data recorded when a step-up completes. */
 export interface LaneConnectionInput {
+  /** Token `jti` used to establish this connection, retained for auditing only. */
+  jti: string;
   /** Scopes granted by the token exchange. This is the caller's authority. */
   scopes: string[];
   /** Exchanged access token. Stores may discard it; nothing reads it back. */

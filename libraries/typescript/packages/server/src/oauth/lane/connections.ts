@@ -12,13 +12,13 @@ export type MemoryLaneConnectionStore = LaneConnectionStore & {
 };
 
 function keyOf(key: LaneConnectionKey): string {
-  return `${key.sub} ${key.jti}`;
+  return JSON.stringify([key.sub, key.clientId]);
 }
 
 /**
  * Process-local connection store. Correct for a single server instance and
  * for development; two replicas with separate memory stores disagree about
- * whether a credential is connected. The exchanged access token is not
+ * whether a user and client are connected. The exchanged access token is not
  * retained because nothing reads it back.
  */
 export function memoryLaneConnectionStore(): MemoryLaneConnectionStore {
