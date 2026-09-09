@@ -1,0 +1,106 @@
+name: Sync CLI subfolder to mcp-use/mcp-use-cli
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+      - main
+      - canary
+    paths:
+      - 'libraries/typescript/packages/cli/**'
+      - '.github/workflows/sync-cli.yml'
+  workflow_dispatch:
+
+jobs:
+  sync-cli:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout monorepo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine target branch
+        id: vars
+        run: |
+          set -euo pipefail
+          # Use the same branch name in the mirror repo.
+          echo "target_branch=${GITHUB_REF#refs/heads/}" >> "$GITHUB_OUTPUT"
+
+      - name: Clone mirror repo
+        env:
+          MIRROR_TOKEN: ${{ secrets.INSPECTOR_MIRROR_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$MIRROR_TOKEN"
+          git clone --no-checkout \
+            "https://x-access-token:${MIRROR_TOKEN}@github.com/mcp-use/mcp-use-cli.git" \
+            /tmp/mcp-use-cli-mirror
+          cd /tmp/mcp-use-cli-mirror
+          git fetch origin
+          git checkout -B "${{ steps.vars.outputs.target_branch }}" \
+            "origin/${{ steps.vars.outputs.target_branch }}" || \
+            git checkout -B "${{ steps.vars.outputs.target_branch }}"
+
+      - name: Replace contents with CLI subfolder
+        run: |
+          set -euo pipefail
+          cd /tmp/mcp-use-cli-mirror
+          find . -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
+
+          rsync -av --delete --exclude '.git' \
+            "$GITHUB_WORKSPACE/libraries/typescript/packages/cli/" \
+            /tmp/mcp-use-cli-mirror/
+
+      - name: Inject mirror notice into README
+        env:
+          TARGET_BRANCH: ${{ steps.vars.outputs.target_branch }}
+        run: |
+          set -euo pipefail
+          cd /tmp/mcp-use-cli-mirror
+
+          notice=$(cat <<EOF
+          > ⚠️ This is a read-only mirror of \`libraries/typescript/packages/cli\` in the [mcp-use/mcp-use](https://github.com/mcp-use/mcp-use) monorepo.
+          >
+          > 🚀 Please submit issues and pull requests to the monorepo instead.
+          >
+          > 🛠 This branch mirrors: \`$TARGET_BRANCH\`
+          >
+          > 🌐 Source folder: \`libraries/typescript/packages/cli\`
+          EOF
+          )
+
+          if [ -f README.md ]; then
+            awk 'BEGIN{printed=0} !printed { if ($0 ~ /^> ⚠️ This is a read-only mirror/) { while (getline && $0 !~ /^$/) {}; next } } { print }' README.md > README.tmp
+            mv README.tmp README.md
+            {
+              printf '%s\n\n' "$notice"
+              cat README.md
+            } > README.with-notice
+            mv README.with-notice README.md
+          else
+            printf '%s\n' "$notice" > README.md
+          fi
+
+      - name: Commit and push to mirror repo
+        env:
+          MIRROR_TOKEN: ${{ secrets.INSPECTOR_MIRROR_TOKEN }}
+          TARGET_BRANCH: ${{ steps.vars.outputs.target_branch }}
+        run: |
+          set -euo pipefail
+          cd /tmp/mcp-use-cli-mirror
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "No changes to mirror."
+            exit 0
+          fi
+
+          git commit -m "Mirror update from mcp-use/mcp-use@${GITHUB_SHA} on ${TARGET_BRANCH}"
+          git push --force origin "${TARGET_BRANCH}"
