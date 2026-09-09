@@ -284,10 +284,20 @@ export class CodeModeConnector extends BaseConnector {
     };
   }
 
+  /**
+   * Code mode internal server does not expose resources. Returns an empty list.
+   *
+   * @param _cursor - Optional pagination cursor (unused).
+   * @param options - Optional request options.
+   * @returns Empty resource list.
+   */
   override async listResources(
     _cursor?: string,
     options?: RequestOptions
-  ): Promise<{ resources: any[] }> {
+  ): Promise<{
+    /** Empty resource list in code mode. */
+    resources: any[];
+  }> {
     if (!this.connected) {
       throw new Error("MCP client is not connected");
     }
@@ -295,9 +305,16 @@ export class CodeModeConnector extends BaseConnector {
     return { resources: [] };
   }
 
-  override async listAllResources(
-    options?: RequestOptions
-  ): Promise<{ resources: any[] }> {
+  /**
+   * Code mode internal server does not expose resources. Returns an empty list.
+   *
+   * @param options - Optional request options.
+   * @returns Empty resource list.
+   */
+  override async listAllResources(options?: RequestOptions): Promise<{
+    /** Empty resource list in code mode. */
+    resources: any[];
+  }> {
     if (!this.connected) {
       throw new Error("MCP client is not connected");
     }
@@ -305,9 +322,16 @@ export class CodeModeConnector extends BaseConnector {
     return { resources: [] };
   }
 
-  override async listResourceTemplates(
-    options?: RequestOptions
-  ): Promise<{ resourceTemplates: any[] }> {
+  /**
+   * Code mode internal server does not expose resource templates. Returns an empty list.
+   *
+   * @param options - Optional request options.
+   * @returns Empty resource template list.
+   */
+  override async listResourceTemplates(options?: RequestOptions): Promise<{
+    /** Empty resource template list in code mode. */
+    resourceTemplates: any[];
+  }> {
     if (!this.connected) {
       throw new Error("MCP client is not connected");
     }
@@ -315,9 +339,16 @@ export class CodeModeConnector extends BaseConnector {
     return { resourceTemplates: [] };
   }
 
-  override async listPrompts(
-    options?: RequestOptions
-  ): Promise<{ prompts: any[] }> {
+  /**
+   * Code mode internal server does not expose prompts. Returns an empty list.
+   *
+   * @param options - Optional request options.
+   * @returns Empty prompt list.
+   */
+  override async listPrompts(options?: RequestOptions): Promise<{
+    /** Empty prompt list in code mode. */
+    prompts: any[];
+  }> {
     if (!this.connected) {
       throw new Error("MCP client is not connected");
     }
@@ -325,7 +356,16 @@ export class CodeModeConnector extends BaseConnector {
     return { prompts: [] };
   }
 
-  async listAllPrompts(options?: RequestOptions): Promise<{ prompts: any[] }> {
+  /**
+   * Code mode internal server does not expose prompts. Returns an empty list.
+   *
+   * @param options - Optional request options.
+   * @returns Empty prompt list.
+   */
+  async listAllPrompts(options?: RequestOptions): Promise<{
+    /** Empty prompt list in code mode. */
+    prompts: any[];
+  }> {
     if (!this.connected) {
       throw new Error("MCP client is not connected");
     }
