@@ -81,9 +81,11 @@ caller's bearer now comes from `ctx.auth.accessToken`.
 
 ## Differences from Lane's 1.34 adapter
 
-- mcp-use v2 requires a bearer for every MCP request, including `initialize`
-  and `tools/list`. Lane's adapter answered those anonymously and returned 401
-  only on `tools/call`; its `anonymousToolList` option has no equivalent here.
+- `oauthLaneProvider` allows anonymous `initialize`, the
+  `notifications/initialized` handshake, and the full `tools/list` response.
+  Every tool call, including `lane_register_session` and `lane_session_info`,
+  requires a valid bearer or returns HTTP 401. Other MCP methods remain
+  authenticated. Supplied credentials are always verified.
 - Tokens audienced to Lane's canonical resource (`https://app-mcp.getonlane.com`)
   are not accepted. The token must name this server's `/mcp` URL.
 - Enforcement supports `gate-all` and `log-only`. The adapter's fail-open
@@ -91,3 +93,8 @@ caller's bearer now comes from `ctx.auth.accessToken`.
   implemented; per-tool requirements come from the `scopes` map.
 - Connections live in `memoryLaneConnectionStore()`, which is correct for one
   process. Multi-instance deployments need a shared `LaneConnectionStore`.
+
+Connections are keyed by `(sub, client_id)`, so refreshing a bearer for the same
+user and client preserves registration until the connection expires or is
+removed. The connection retains the registration token's `jti` for auditing.
+Different users and clients need their own connections.
