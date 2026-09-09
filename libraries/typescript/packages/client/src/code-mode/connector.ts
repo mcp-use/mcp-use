@@ -1,4 +1,9 @@
-import type { CallToolResult, Tool } from "@modelcontextprotocol/client";
+import type {
+  CallToolResult,
+  ProtocolEra,
+  RequestOptions,
+  Tool,
+} from "@modelcontextprotocol/client";
 import type { MCPClient } from "../core/node.js";
 import { BaseConnector } from "../transport/base.js";
 
@@ -112,6 +117,13 @@ export class CodeModeConnector extends BaseConnector {
     this.mcpClient = client;
     this.connected = true; // No connection phase needed - immediately ready
     this._tools = this._createToolsList();
+    this.toolsCache = this._tools;
+    this.capabilitiesCache = { tools: {} };
+    this.serverInfoCache = {
+      name: "code_mode",
+      version: "1.0.0",
+      description: "MCP Code Mode Internal Server",
+    };
   }
 
   async connect(): Promise<void> {
@@ -186,19 +198,85 @@ export class CodeModeConnector extends BaseConnector {
   }
 
   // Override tools getter to return static list immediately
-  get tools(): Tool[] {
+  override get tools(): Tool[] {
     return this._tools;
   }
 
-  async initialize(): Promise<any> {
-    this.toolsCache = this._tools;
-    return { capabilities: {}, version: "1.0.0" };
+  /**
+   * Returns fresh tools available in code mode.
+   *
+   * @param options - Optional per-request options (e.g. abort signal).
+   * @returns List of Tool objects for execute_code and search_tools.
+   */
+  override async listTools(options?: RequestOptions): Promise<Tool[]> {
+    if (!this.connected) {
+      throw new Error("MCP client is not connected");
+    }
+    options?.signal?.throwIfAborted();
+    return [...this._tools];
   }
 
-  async callTool(
+  override get protocolEra(): ProtocolEra | undefined {
+    return this.connected ? "modern" : undefined;
+  }
+
+  override get negotiatedProtocolVersion(): string | undefined {
+    return this.connected ? "2026-07-28" : undefined;
+  }
+
+  override async initialize(): Promise<any> {
+    this.toolsCache = this._tools;
+    this.capabilitiesCache = { tools: {} };
+    this.serverInfoCache = {
+      name: "code_mode",
+      version: "1.0.0",
+      description: "MCP Code Mode Internal Server",
+    };
+    return {
+      capabilities: this.capabilitiesCache,
+      serverInfo: this.serverInfoCache,
+      protocolVersion: "2026-07-28",
+    };
+  }
+
+  override async listResources(): Promise<{ resources: any[] }> {
+    if (!this.connected) {
+      throw new Error("MCP client is not connected");
+    }
+    return { resources: [] };
+  }
+
+  override async listAllResources(): Promise<{ resources: any[] }> {
+    if (!this.connected) {
+      throw new Error("MCP client is not connected");
+    }
+    return { resources: [] };
+  }
+
+  override async listPrompts(): Promise<{ prompts: any[] }> {
+    if (!this.connected) {
+      throw new Error("MCP client is not connected");
+    }
+    return { prompts: [] };
+  }
+
+  async listAllPrompts(): Promise<{ prompts: any[] }> {
+    if (!this.connected) {
+      throw new Error("MCP client is not connected");
+    }
+    return { prompts: [] };
+  }
+
+  override async callTool(
     name: string,
-    args: Record<string, any>
+    args: Record<string, any>,
+    options?: RequestOptions
   ): Promise<CallToolResult> {
+    if (!this.connected) {
+      throw new Error("MCP client is not connected");
+    }
+    options?.signal?.throwIfAborted();
+
     if (name === "execute_code") {
       const code = args.code as string;
       const timeout = (args.timeout as number) || 30000;
