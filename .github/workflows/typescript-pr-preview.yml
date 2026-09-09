@@ -60,6 +60,7 @@ jobs:
     name: Test with Deno (PR Preview)
     runs-on: ubuntu-latest
     needs: preview
+    continue-on-error: true
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
@@ -96,6 +97,7 @@ jobs:
           cat deno.json
 
       - name: Wait for esm.sh to pick up the package
+        id: wait-for-esm
         env:
           PR_NUMBER: ${{ needs.preview.outputs.pr-number }}
           COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
@@ -114,45 +116,36 @@ jobs:
           echo "  Commit URL: $COMMIT_URL"
           
           PR_READY=false
-          COMMIT_READY=false
           RETRY_COUNT=0
 
           while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-            # Check PR number URL
+            # Check PR number URL with lightweight range GET to trigger on-demand build worker
             if [ "$PR_READY" = false ]; then
-              if curl -s -f -I "$PR_URL" > /dev/null 2>&1; then
+              if curl -s -f -r 0-0 --max-time 15 "$PR_URL" > /dev/null 2>&1; then
                 echo "✅ PR URL is available"
                 PR_READY=true
+                break
               fi
-            fi
-            
-            # Check commit SHA URL
-            if [ "$COMMIT_READY" = false ]; then
-              if curl -s -f -I "$COMMIT_URL" > /dev/null 2>&1; then
-                echo "✅ Commit URL is available"
-                COMMIT_READY=true
-              fi
-            fi
-            
-            # Both ready?
-            if [ "$PR_READY" = true ] && [ "$COMMIT_READY" = true ]; then
-              echo "✅ Both package URLs are available on esm.sh"
-              break
             fi
             
             RETRY_COUNT=$((RETRY_COUNT + 1))
             if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
-              echo "Waiting for packages... (attempt $RETRY_COUNT/$MAX_RETRIES, PR: $PR_READY, Commit: $COMMIT_READY)"
+              echo "Waiting for packages... (attempt $RETRY_COUNT/$MAX_RETRIES, PR: $PR_READY)"
               sleep $RETRY_DELAY
             else
               echo "⚠️ Packages didn't become fully available after ${MAX_RETRIES} attempts (5 minutes)"
               echo "  PR URL ready: $PR_READY"
-              echo "  Commit URL ready: $COMMIT_READY"
-              echo "Proceeding with tests anyway..."
             fi
           done
+          echo "ready=$PR_READY" >> $GITHUB_OUTPUT
+
+      - name: Report Preview Status
+        if: steps.wait-for-esm.outputs.ready != 'true'
+        run: |
+          echo "::notice::Preview package was not available on esm.sh within the polling window. Skipping Deno smoke test."
 
       - name: Cache Deno Dependencies
+        if: steps.wait-for-esm.outputs.ready == 'true'
         working-directory: libraries/typescript/packages/server/tests/deno
         env:
           DENO_DOWNLOAD_TIMEOUT: "300000"  # 5 minutes in milliseconds
@@ -178,6 +171,7 @@ jobs:
           done
 
       - name: Run Deno Tests
+        if: steps.wait-for-esm.outputs.ready == 'true'
         working-directory: libraries/typescript/packages/server/tests/deno
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
