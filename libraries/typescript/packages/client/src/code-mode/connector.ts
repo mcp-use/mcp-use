@@ -356,23 +356,6 @@ export class CodeModeConnector extends BaseConnector {
     return { prompts: [] };
   }
 
-  /**
-   * Code mode internal server does not expose prompts. Returns an empty list.
-   *
-   * @param options - Optional request options.
-   * @returns Empty prompt list.
-   */
-  async listAllPrompts(options?: RequestOptions): Promise<{
-    /** Empty prompt list in code mode. */
-    prompts: any[];
-  }> {
-    if (!this.connected) {
-      throw new Error("MCP client is not connected");
-    }
-    throwIfAborted(options?.signal);
-    return { prompts: [] };
-  }
-
   override async callTool(
     name: string,
     args: Record<string, any>,

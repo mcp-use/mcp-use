@@ -93,9 +93,6 @@ describe("CodeModeConnector protocol contract", () => {
         resourceTemplates: [],
       });
       await expect(connector.listPrompts()).resolves.toEqual({ prompts: [] });
-      await expect(connector.listAllPrompts()).resolves.toEqual({
-        prompts: [],
-      });
     });
 
     it("throws when resource and prompt listing are called with an aborted signal", async () => {
@@ -115,9 +112,6 @@ describe("CodeModeConnector protocol contract", () => {
       await expect(
         connector.listPrompts({ signal: controller.signal })
       ).rejects.toThrow();
-      await expect(
-        connector.listAllPrompts({ signal: controller.signal })
-      ).rejects.toThrow();
     });
 
     it("throws for resources and prompts when disconnected", async () => {
@@ -134,9 +128,6 @@ describe("CodeModeConnector protocol contract", () => {
         "MCP client is not connected"
       );
       await expect(connector.listPrompts()).rejects.toThrow(
-        "MCP client is not connected"
-      );
-      await expect(connector.listAllPrompts()).rejects.toThrow(
         "MCP client is not connected"
       );
     });
