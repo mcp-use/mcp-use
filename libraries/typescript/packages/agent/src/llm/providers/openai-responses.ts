@@ -15,7 +15,7 @@ import type {
 import {
   buildEndpoint,
   buildHeaders,
-  readOpenAIError,
+  throwLlmRequestError,
 } from "./openai-shared.js";
 import { tokenUsageFromRecord } from "../usage.js";
 
@@ -197,6 +197,9 @@ function buildResponsesBody(
   if (params.config.maxTokens !== undefined) {
     body.max_output_tokens = params.config.maxTokens;
   }
+  if (params.config.temperature !== undefined) {
+    body.temperature = params.config.temperature;
+  }
   return body;
 }
 
@@ -261,11 +264,13 @@ export async function* streamResponsesTurn(
     headers: buildHeaders(params.config),
     body: JSON.stringify(buildResponsesBody(params, true)),
     signal: params.signal,
+    ...(params.config.credentials
+      ? { credentials: params.config.credentials }
+      : {}),
   });
 
-  if (!res.ok || !res.body) {
-    throw new Error(await readOpenAIError(res));
-  }
+  if (!res.ok) await throwLlmRequestError(res);
+  if (!res.body) throw new Error("OpenAI Responses stream has no body");
 
   const callBuffers = new Map<
     string,
@@ -389,11 +394,12 @@ export async function completeResponsesTurn(
     headers: buildHeaders(params.config),
     body: JSON.stringify(buildResponsesBody(params, false)),
     signal: params.signal,
+    ...(params.config.credentials
+      ? { credentials: params.config.credentials }
+      : {}),
   });
 
-  if (!res.ok) {
-    throw new Error(await readOpenAIError(res));
-  }
+  if (!res.ok) await throwLlmRequestError(res);
 
   const json = (await res.json()) as Record<string, unknown>;
   const status = json.status;
