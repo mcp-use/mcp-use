@@ -9,6 +9,7 @@ These examples use direct external authorization servers:
 - [Keycloak](./keycloak/)
 - [Better Auth](./better-auth/)
 - [Convex](./convex/)
+- [Lane](./lane/)
 - [Mixed OAuth with Better Auth](./mixed-oauth/)
 
 Each server exposes only the `get-user-info` tool. It never issues, proxies, or
