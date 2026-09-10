@@ -5,6 +5,7 @@ import type {
 import { Client } from "@modelcontextprotocol/client";
 import type { StdioServerParameters } from "@modelcontextprotocol/client/stdio";
 import type { Writable } from "node:stream";
+import type { ChildProcess } from "node:child_process";
 
 import process from "node:process";
 import type { ConnectorInitOptions } from "./base.js";
@@ -216,6 +217,15 @@ export class StdioConnector extends BaseConnector {
       "command&args": `${this.command} ${this.args.join(" ")}`,
     };
   }
+
+  /**
+   * Returns the process ID of the running child process, if started.
+   */
+  get pid(): number | null {
+    return (
+      (this.connectionManager as StdioConnectionManager | null)?.pid ?? null
+    );
+  }
 }
 
 /**
@@ -226,6 +236,8 @@ export class StdioConnectionManager extends ConnectionManager<StdioClientTranspo
   private readonly errlog: Writable;
   private _transport: StdioClientTransport | null = null;
   private _stderrSource: NodeJS.ReadableStream | null = null;
+  private _childProcess: ChildProcess | null = null;
+  private _closePromise: Promise<void> | null = null;
   private readonly _onErrlogError = (error: Error): void => {
     logger.warn(`Error writing child stderr to errlog: ${error}`);
   };
@@ -245,6 +257,20 @@ export class StdioConnectionManager extends ConnectionManager<StdioClientTranspo
     this.errlog = errlog;
   }
 
+  /**
+   * Returns the underlying spawned child process, if started.
+   */
+  get childProcess(): ChildProcess | null {
+    return this._childProcess;
+  }
+
+  /**
+   * Returns the process ID of the spawned child process, if started.
+   */
+  get pid(): number | null {
+    return this._childProcess?.pid ?? this._transport?.pid ?? null;
+  }
+
   protected async establishConnection(): Promise<StdioClientTransport> {
     // The SDK defaults stderr to "inherit", which leaves `transport.stderr`
     // null and makes the forwarding below dead code. Default to "pipe" so
@@ -252,13 +278,38 @@ export class StdioConnectionManager extends ConnectionManager<StdioClientTranspo
     // after the spread on purpose: an explicit `stderr: undefined` in
     // serverParams would otherwise defeat the default.
     const stderr = this.serverParams.stderr ?? "pipe";
-    this._transport = new StdioClientTransport({
+    const transport = new StdioClientTransport({
       ...this.serverParams,
       stderr,
     });
+    this._transport = transport;
+
+    // Wrap start() to capture the spawned ChildProcess instance as soon as it launches
+    const originalStart = transport.start.bind(transport);
+    transport.start = async () => {
+      await originalStart();
+      const proc = (transport as unknown as { _process?: ChildProcess })
+        ._process;
+      if (proc) {
+        this._childProcess = proc;
+      }
+    };
+
+    // Wrap close() so multiple callers (e.g. SDK legacyHandshake error handler
+    // and subsequent cleanupResources) join the same in-flight teardown promise
+    // instead of returning an instant no-op once transport._process is cleared.
+    const originalClose = transport.close.bind(transport);
+    transport.close = () => {
+      if (!this._closePromise) {
+        this._closePromise = originalClose().finally(() => {
+          this._closePromise = null;
+        });
+      }
+      return this._closePromise;
+    };
 
     // Only "pipe" leaves a readable stream; "inherit" and "ignore" do not.
-    const childStderr = this._transport.stderr;
+    const childStderr = transport.stderr;
     if (stderr === "pipe" && childStderr && "pipe" in childStderr) {
       this._stderrSource = childStderr as unknown as NodeJS.ReadableStream;
       // `errlog` is caller-owned and may be reused across reconnects, so the
@@ -272,25 +323,73 @@ export class StdioConnectionManager extends ConnectionManager<StdioClientTranspo
     }
 
     logger.debug(`${this.constructor.name} connected successfully`);
-    return this._transport;
+    return transport;
   }
 
   protected async closeConnection(
-    _connection: StdioClientTransport
+    connection: StdioClientTransport
   ): Promise<void> {
     if (this._stderrSource) {
       this._stderrSource.unpipe(this.errlog);
       this.errlog.off("error", this._onErrlogError);
       this._stderrSource = null;
     }
-    if (this._transport) {
+
+    const transport = this._transport ?? connection;
+    if (transport) {
       try {
-        await this._transport.close();
+        await transport.close();
       } catch (e) {
         logger.warn(`Error closing stdio transport: ${e}`);
       } finally {
-        this._transport = null;
+        if (this._transport === transport) {
+          this._transport = null;
+        }
       }
+    }
+
+    // Process exit join barrier: Ensure the predecessor process has truly exited
+    const child =
+      this._childProcess ??
+      (connection as unknown as { _process?: ChildProcess })._process;
+
+    try {
+      if (child && child.exitCode === null && child.signalCode === null) {
+        let timedOut = false;
+        let timeout: NodeJS.Timeout | undefined;
+        const exited = new Promise<void>((resolve) => {
+          child.once("exit", () => resolve());
+          child.once("close", () => resolve());
+        });
+
+        await Promise.race([
+          exited,
+          new Promise<void>((resolve) => {
+            timeout = setTimeout(() => {
+              timedOut = true;
+              resolve();
+            }, 2000);
+            timeout?.unref?.();
+          }),
+        ]);
+
+        if (timeout) {
+          clearTimeout(timeout);
+        }
+
+        if (timedOut) {
+          if (child.exitCode === null && child.signalCode === null) {
+            try {
+              child.kill("SIGKILL");
+            } catch {
+              /* already exited */
+            }
+          }
+          await exited;
+        }
+      }
+    } finally {
+      this._childProcess = null;
     }
   }
 }
