@@ -584,8 +584,9 @@ export class HttpConnector extends BaseConnector {
   }
 
   /**
-   * Tee an SSE response so v2 MRTR progress can be correlated even when the
-   * upstream SDK does not carry the original callback to retry request IDs.
+   * Observe an SSE response via an in-line pass-through TransformStream so v2 MRTR
+   * progress can be correlated without duplicating stream buffers or leaking sockets
+   * on aborted requests.
    */
   private observeSseProgress(response: Response): Response {
     if (
@@ -594,44 +595,33 @@ export class HttpConnector extends BaseConnector {
     ) {
       return response;
     }
-    const [body, observed] = response.body.tee();
-    void (async () => {
-      const reader = observed.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const events = buffer.split(/\r?\n\r?\n/);
-          buffer = events.pop() ?? "";
-          for (const event of events) {
-            for (const line of event.split(/\r?\n/)) {
-              if (!line.startsWith("data:")) continue;
-              try {
-                const message = JSON.parse(line.slice(5).trim()) as {
-                  method?: string;
-                  params?: unknown;
-                };
-                if (message.method === "notifications/progress") {
-                  this.forwardRoundProgress(message.params);
-                }
-              } catch {
-                // Ignore malformed/non-JSON SSE data; the SDK remains authoritative.
+    const decoder = new TextDecoder();
+    let buffer = "";
+    const observer = new TransformStream<Uint8Array, Uint8Array>({
+      transform: (chunk, controller) => {
+        buffer += decoder.decode(chunk, { stream: true });
+        const events = buffer.split(/\r?\n\r?\n/);
+        buffer = events.pop() ?? "";
+        for (const event of events) {
+          for (const line of event.split(/\r?\n/)) {
+            if (!line.startsWith("data:")) continue;
+            try {
+              const message = JSON.parse(line.slice(5).trim()) as {
+                method?: string;
+                params?: unknown;
+              };
+              if (message.method === "notifications/progress") {
+                this.forwardRoundProgress(message.params);
               }
+            } catch {
+              // Ignore malformed/non-JSON SSE data; the SDK remains authoritative.
             }
           }
         }
-      } catch (error) {
-        if (!(error instanceof DOMException && error.name === "AbortError")) {
-          logger.debug("Progress observer stream ended:", error);
-        }
-      } finally {
-        reader.releaseLock();
-      }
-    })();
-    return new Response(body, {
+        controller.enqueue(chunk);
+      },
+    });
+    return new Response(response.body.pipeThrough(observer), {
       status: response.status,
       statusText: response.statusText,
       headers: response.headers,
