@@ -80,9 +80,18 @@ importers:
         specifier: ^9.39.4
         version: 9.39.4
     devDependencies:
+      '@changesets/assemble-release-plan':
+        specifier: 6.0.10
+        version: 6.0.10
       '@changesets/cli':
         specifier: ^2.31.1
         version: 2.31.1(@types/node@25.6.0)
+      '@changesets/config':
+        specifier: 3.1.4
+        version: 3.1.4
+      '@changesets/read':
+        specifier: 0.6.7
+        version: 0.6.7
       '@types/node':
         specifier: ^25.6.0
         version: 25.6.0
@@ -12407,7 +12416,7 @@ snapshots:
       obug: 2.1.1
       std-env: 4.1.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@22.20.1)(@vitest/coverage-v8@4.1.10)(happy-dom@20.10.6)(jsdom@27.4.0(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@22.20.1)(esbuild@0.27.1)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.3))
+      vitest: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@25.6.0)(@vitest/coverage-v8@4.1.10)(happy-dom@20.10.6)(jsdom@27.4.0(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.6.0)(esbuild@0.27.1)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.3))
 
   '@vitest/expect@4.1.10':
     dependencies:

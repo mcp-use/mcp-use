@@ -108,6 +108,7 @@ jobs:
         working-directory: libraries/typescript
         run: |
           pnpm release-channel prepare --channel canary
+          pnpm release-channel preflight --channel canary
           pnpm changeset status --since origin/main --output "$RUNNER_TEMP/canary-changeset-status.json"
           pnpm release-channel validate --channel canary --plan "$RUNNER_TEMP/canary-changeset-status.json"
 
@@ -118,6 +119,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           pnpm changeset version
+          pnpm install --lockfile-only --ignore-scripts --no-frozen-lockfile
           cd ../..
           git add .
           git commit -m "chore(typescript): version packages (canary)" || echo "No changes to commit"
@@ -302,6 +304,8 @@ jobs:
         with:
           name: railway-deploy-marker
           path: .railway-deploy-marker
+          include-hidden-files: true
+          if-no-files-found: error
           retention-days: 1
 
       # ============================================================================
@@ -469,6 +473,8 @@ jobs:
         with:
           name: railway-deploy-marker
           path: .railway-deploy-marker
+          include-hidden-files: true
+          if-no-files-found: error
           retention-days: 1
 
       - name: Reset canary to main

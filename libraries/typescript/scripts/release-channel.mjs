@@ -1,8 +1,20 @@
 import { spawnSync } from "node:child_process";
-import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+import {
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+  mkdtempSync,
+  rmSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import semver from "semver";
+import {
+  prepareRelease,
+  internalMetadata,
+  metadataErrors,
+} from "./release-propagation.mjs";
 
 import {
   packedArtifactErrors,
@@ -131,107 +143,6 @@ function packageNamesForChangesets(ids) {
   return new Set(releasesForChangesets(ids).map(({ name }) => name));
 }
 
-function stableVersion(version) {
-  const parsed = semver.parse(version);
-  if (!parsed) throw new Error(`Invalid package version: ${version}`);
-  return `${parsed.major}.${parsed.minor}.${parsed.patch}`;
-}
-
-function stablePeerParts(range, tag, baseline) {
-  if (range.startsWith("workspace:")) {
-    const workspaceRange = range.slice("workspace:".length);
-    if (workspaceRange === "~") return [`~${stableVersion(baseline)}`];
-    if (workspaceRange !== "*" && workspaceRange !== "^") {
-      return [workspaceRange];
-    }
-    return [`^${stableVersion(baseline)}`];
-  }
-
-  const retained = range
-    .split("||")
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .filter((part) => !part.includes(`-${tag}.`));
-  return retained.length ? retained : [`^${stableVersion(baseline)}`];
-}
-
-function prepareCanaryPeerRanges(channel) {
-  const pre = prereleaseState();
-  if (channel !== "canary") {
-    throw new Error("Peer-range preparation is only supported for canary");
-  }
-  if (pre?.mode !== "pre" || pre.tag !== "canary") {
-    throw new Error(
-      "Canary peer-range preparation requires .changeset/pre.json in canary prerelease mode"
-    );
-  }
-
-  const directTypes = highestReleaseTypes(
-    releasesForChangesets(pendingChangesets())
-  );
-  const entries = manifestEntries();
-  const packages = new Map(
-    entries.map((entry) => [entry.manifest.name, entry])
-  );
-  const changed = new Set();
-
-  for (const [dependency, type] of directTypes) {
-    if (type === "major") continue;
-    const dependencyEntry = packages.get(dependency);
-    if (!dependencyEntry) continue;
-
-    const nextBase = semver.inc(dependencyEntry.manifest.version, type);
-    if (!nextBase) {
-      throw new Error(
-        `Cannot calculate the next ${type} version for ${dependency}@${dependencyEntry.manifest.version}`
-      );
-    }
-    const nextCanary = `${nextBase}-${pre.tag}.0`;
-    const baseline =
-      pre.initialVersions?.[dependency] ?? dependencyEntry.manifest.version;
-
-    for (const entry of entries) {
-      const currentRange = entry.manifest.peerDependencies?.[dependency];
-      if (!currentRange) continue;
-      if (
-        !currentRange.startsWith("workspace:") &&
-        semver.satisfies(dependencyEntry.manifest.version, currentRange) &&
-        semver.satisfies(nextCanary, currentRange)
-      ) {
-        continue;
-      }
-
-      const prereleaseRange = `^${nextBase}-${pre.tag}.0`;
-      const currentBase = stableVersion(dependencyEntry.manifest.version);
-      const currentPrereleaseRange = semver.prerelease(
-        dependencyEntry.manifest.version
-      )
-        ? `^${currentBase}-${pre.tag}.0`
-        : undefined;
-      const desiredRange = [
-        ...stablePeerParts(currentRange, pre.tag, baseline),
-        currentPrereleaseRange,
-        prereleaseRange,
-      ]
-        .filter(Boolean)
-        .filter((part, index, parts) => parts.indexOf(part) === index)
-        .join(" || ");
-      if (desiredRange === currentRange) continue;
-
-      entry.manifest.peerDependencies[dependency] = desiredRange;
-      changed.add(entry);
-      console.log(
-        `${entry.manifest.name} peer ${dependency}: ${currentRange} -> ${desiredRange}`
-      );
-    }
-  }
-
-  for (const entry of changed) writeJson(entry.file, entry.manifest);
-  console.log(
-    `Prepared ${changed.size} package(s) for the Canary release plan`
-  );
-}
-
 function validateReleasePlan(channel, planFile) {
   const plan = readJson(planFile);
   if (channel !== "canary") {
@@ -343,16 +254,84 @@ function sameJson(left, right) {
   );
 }
 
+function sameMetadata(left, right) {
+  return ["dependencies", "optionalDependencies", "peerDependencies"].every(
+    (field) => sameJson(left[field], right[field])
+  );
+}
+
+function packManifest(entry) {
+  const scratch = mkdtempSync(join(tmpdir(), "release-manifest-"));
+  try {
+    const result = spawnSync(
+      "pnpm",
+      ["pack", "--pack-destination", scratch, "--json"],
+      {
+        cwd: join(entry.file, ".."),
+        encoding: "utf8",
+        env: { ...process.env, npm_config_ignore_scripts: "true" },
+      }
+    );
+    if (result.status !== 0) throw new Error(result.stderr || result.stdout);
+    const tarballs = readdirSync(scratch).filter((file) =>
+      file.endsWith(".tgz")
+    );
+    if (tarballs.length !== 1)
+      throw new Error(
+        `Expected one packed artifact for ${entry.manifest.name}`
+      );
+    const manifest = spawnSync(
+      "tar",
+      ["-xOf", join(scratch, tarballs[0]), "package/package.json"],
+      { encoding: "utf8" }
+    );
+    if (manifest.status !== 0) throw new Error(manifest.stderr);
+    return JSON.parse(manifest.stdout);
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+}
+
 async function snapshot(channel, output) {
   const tag = channel === "stable" ? "latest" : "canary";
   const releases = [];
+  const entries = manifestEntries();
+  const versionsInPlan = new Map(
+    entries.map(({ manifest }) => [manifest.name, manifest.version])
+  );
+  const effective = [];
 
-  for (const manifest of manifests()) {
+  for (const entry of entries) {
+    const manifest = option("--registry-file")
+      ? entry.manifest
+      : packManifest(entry);
     const metadata = await registryMetadata(manifest.name);
     const versions = metadata.versions ?? {};
     const distTags = metadata["dist-tags"] ?? {};
     const published = Object.hasOwn(versions, manifest.version);
     const latest = distTags.latest;
+    const expectedMetadata = internalMetadata(manifest, versionsInPlan);
+    const publishedManifest = versions[manifest.version];
+    if (
+      published &&
+      !sameMetadata(
+        expectedMetadata,
+        internalMetadata(publishedManifest, versionsInPlan)
+      )
+    ) {
+      throw new Error(
+        `${manifest.name}@${manifest.version} has changed published metadata but no new version; release this package`
+      );
+    }
+    effective.push(
+      published
+        ? {
+            ...publishedManifest,
+            name: manifest.name,
+            version: manifest.version,
+          }
+        : manifest
+    );
 
     if (!published) {
       if (channel === "stable" && semver.prerelease(manifest.version)) {
@@ -390,8 +369,12 @@ async function snapshot(channel, output) {
       target: !published,
       channelTag: tag,
       distTagsBefore: distTags,
+      expectedMetadata,
     });
   }
+
+  const errors = metadataErrors(effective);
+  if (errors.length) throw new Error(errors.join("\n"));
 
   const plan = { channel, releases };
   writeFileSync(output, `${JSON.stringify(plan, null, 2)}\n`);
@@ -402,10 +385,33 @@ async function snapshot(channel, output) {
 
 async function verifyOnce(plan) {
   const errors = [];
+  const versionsInPlan = new Map(
+    plan.releases.map((release) => [release.name, release.version])
+  );
+  const effective = [];
   for (const release of plan.releases) {
     const metadata = await registryMetadata(release.name);
     const versions = metadata.versions ?? {};
     const afterTags = metadata["dist-tags"] ?? {};
+    const published = versions[release.version];
+    if (published) {
+      effective.push({
+        ...published,
+        name: release.name,
+        version: release.version,
+      });
+      if (
+        release.expectedMetadata &&
+        !sameMetadata(
+          release.expectedMetadata,
+          internalMetadata(published, versionsInPlan)
+        )
+      ) {
+        errors.push(
+          `${release.name}@${release.version} published metadata differs from the verified release plan`
+        );
+      }
+    }
 
     if (release.target) {
       if (!Object.hasOwn(versions, release.version)) {
@@ -435,6 +441,7 @@ async function verifyOnce(plan) {
       );
     }
   }
+  errors.push(...metadataErrors(effective));
   if (errors.length) throw new Error(errors.join("\n"));
 }
 
@@ -479,7 +486,7 @@ try {
   if (command === "pending") {
     console.log(pendingChangesets().join("\n"));
   } else if (command === "prepare") {
-    prepareCanaryPeerRanges(option("--channel"));
+    await prepareRelease(workspaceRoot, option("--channel"));
   } else if (command === "validate") {
     validateReleasePlan(
       option("--channel"),
