@@ -505,4 +505,70 @@ describe("MCPServer.proxy", () => {
     await call;
     expect(forwarded).toEqual([1, 2]);
   });
+
+  it("forwards cancellation signal to upstream getPrompt when rendering a proxied prompt", async () => {
+    let mountedPrompt:
+      | ((
+          params: Record<string, unknown>,
+          ctx: { signal: AbortSignal }
+        ) => Promise<unknown>)
+      | undefined;
+    const host: ProxyMountHost = {
+      isStarted: () => false,
+      hasTool: () => false,
+      hasResource: () => false,
+      hasPrompt: () => false,
+      registerTool: () => {
+        throw new Error("unexpected tool registration");
+      },
+      registerResource: () => {
+        throw new Error("unexpected resource registration");
+      },
+      registerPrompt: (_definition, callback) => {
+        mountedPrompt = callback as unknown as typeof mountedPrompt;
+      },
+      trackOwner: () => {},
+    };
+    const getPromptSpy = vi.fn().mockResolvedValue({ messages: [] });
+    const connection: ProxyConnection = {
+      info: { server: { name: "prompt-cancellation" } },
+      supports: (capability) => capability === "prompts",
+      async listTools() {
+        return [];
+      },
+      async callTool() {
+        return { content: [] };
+      },
+      async readResource() {
+        return { contents: [] };
+      },
+      async listPrompts() {
+        return {
+          prompts: [
+            {
+              name: "generate",
+              arguments: [{ name: "topic", required: true }],
+            },
+          ],
+        };
+      },
+      getPrompt: getPromptSpy,
+    };
+
+    await mountProxyConnection(host, connection);
+    expect(mountedPrompt).toBeDefined();
+
+    const controller = new AbortController();
+    await mountedPrompt!(
+      { topic: "architecture" },
+      { signal: controller.signal }
+    );
+
+    expect(getPromptSpy).toHaveBeenCalledTimes(1);
+    expect(getPromptSpy).toHaveBeenCalledWith(
+      "generate",
+      { topic: "architecture" },
+      { signal: controller.signal }
+    );
+  });
 });

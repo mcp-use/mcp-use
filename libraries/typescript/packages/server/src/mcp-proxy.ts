@@ -84,7 +84,8 @@ export interface ProxyConnection {
   /** Render an upstream prompt. */
   getPrompt(
     name: string,
-    args: Record<string, unknown>
+    args: Record<string, unknown>,
+    options?: ProxyRequestOptions
   ): Promise<GetPromptResult>;
 }
 
@@ -437,7 +438,8 @@ function mountPlan(host: ProxyMountHost, plan: ProxyNamespacePlan): void {
         }),
         schema: passthroughJsonSchema(promptArgsToJsonSchema(prompt.arguments)),
       },
-      async (params) => plan.connection.getPrompt(upstreamName, params)
+      async (params, ctx) =>
+        plan.connection.getPrompt(upstreamName, params, { signal: ctx.signal })
     );
   }
 }
