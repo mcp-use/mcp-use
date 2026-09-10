@@ -1,5 +1,13 @@
 # @mcp-use/cli
 
+## 4.1.12
+
+### Patch Changes
+
+- 485c79c: Report a malformed JSON argument to `client` and `screenshot` as a usage error instead of letting the engine's `SyntaxError` escape. A bad `{...}` or `key:=<json>` value exited 1 with a bare parser message and no indication of which argument was wrong, while every other grammar mistake in the same parser exits 2.
+- 485c79c: Document that `--secret` must be passed on every `servers env set` write, including updates and rotations, and say so in the success message when a value is stored write-only
+- 485c79c: Fix `servers list` reporting a bad `--limit` or `--skip` as `Not logged in.` when signed out. Pagination was validated after the cloud client was created, so an invalid page size surfaced as an operational failure with exit 1 instead of the usage error with exit 2 that `deployments list` already returns for the same input.
+
 ## 4.1.12-canary.3
 
 ### Patch Changes

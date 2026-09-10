@@ -1,5 +1,14 @@
 # @mcp-use/client
 
+## 2.3.1
+
+### Patch Changes
+
+- 485c79c: Stabilize `clientInfo` and `proxyConfig` dependencies in `useMcp` to prevent reconnection loops on parent component re-renders.
+- 485c79c: Clean up sandbox proxy message listener and cancel pending readiness wait on `ViewRenderer` unmount.
+- 485c79c: Prevent duplicate subprocesses and HTTP transports from concurrent connection attempts. Coordinate connection and disconnection calls so a later disconnect cancels in-flight and queued reconnects, releasing resources before shutdown completes.
+- 485c79c: Replace the temporary `@mcp-use/ext-apps` package alias with the official `@modelcontextprotocol/ext-apps` 2.0.0 release. The upstream release includes the SDK v2 role-isolation work previously carried by the fork.
+
 ## 2.3.1-canary.3
 
 ### Patch Changes

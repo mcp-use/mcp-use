@@ -1,5 +1,11 @@
 # @mcp-use/tunnel
 
+## 0.2.1
+
+### Patch Changes
+
+- 485c79c: Default `localHostHeader` to `localhost` in standalone `mcp-tunnel` CLI to match `mcp-use start --tunnel` and prevent DNS-rebinding / host-validation rejections on local servers.
+
 ## 0.2.1-canary.0
 
 ### Patch Changes

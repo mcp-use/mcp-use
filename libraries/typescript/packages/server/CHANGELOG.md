@@ -1,5 +1,23 @@
 # mcp-use
 
+## 2.5.0
+
+### Minor Changes
+
+- 485c79c: Show a public chat button on MCP landing pages when public chat is enabled.
+
+### Patch Changes
+
+- 485c79c: Fix `createJwtVerifier` reporting a malformed `resource` option as an OAuth `invalid_token` error naming the token's resource claim. A configuration mistake at server startup now throws a `TypeError`, matching `oauthCustomProvider` and the other provider URL options.
+- 485c79c: Fix proxied resources losing their `annotations` and `_meta`. `ResourceDefinition` carries both and the local registration path preserves them, but the proxy mount copied only `title`, `description` and `mimeType`, so composing an upstream server through `use()` stripped its client hints and extension metadata from `resources/list`.
+- 485c79c: Replace the temporary `@mcp-use/ext-apps` package alias with the official `@modelcontextprotocol/ext-apps` 2.0.0 release. The upstream release includes the SDK v2 role-isolation work previously carried by the fork.
+- Updated dependencies [485c79c]
+- Updated dependencies [485c79c]
+- Updated dependencies [485c79c]
+- Updated dependencies [485c79c]
+  - @mcp-use/cli@4.1.12
+  - @mcp-use/inspector@20.3.8
+
 ## 2.5.0-canary.8
 
 ### Patch Changes
