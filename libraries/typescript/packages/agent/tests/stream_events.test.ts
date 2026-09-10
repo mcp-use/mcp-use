@@ -279,8 +279,13 @@ describe("mCPAgent streamEvents()", () => {
       break;
     }
 
-    // Verify that maxSteps was set on the agent instance
-    expect(agent["maxSteps"]).toBe(5);
+    // The budget reaches modelCallLimitMiddleware through the run context,
+    // and the constructor value stays the default for later calls.
+    expect(mockStreamEvents.mock.calls[0]?.[1]).toMatchObject({
+      context: { runLimit: 5 },
+      recursionLimit: 15,
+    });
+    expect(agent["maxSteps"]).toBe(3);
   });
 
   it("should handle external history", async () => {
