@@ -29,8 +29,13 @@ export interface ViewResourceFacts {
   /** Sandbox permissions the view needs → `_meta.ui.permissions`. */
   permissions?: UiPermissions;
   /**
-   * Dedicated origin hint for hosts that render views on a separate domain →
-   * `_meta.ui.domain`.
+   * Dedicated UI origin for ChatGPT and other hosts → `_meta.ui.domain`.
+   * Use an HTTPS origin such as `https://app.example.com`. HTTP(S) URL values
+   * are normalized to their origin for compatibility with older configs.
+   * On Claude resource reads, the framework instead hashes the full public
+   * MCP endpoint resolved from `MCP_URL` (origin + server `basePath`, or a full
+   * endpoint URL) or the forwarded/request URL. Omit to use the host default.
+   * Do not overwrite the generated domain in response middleware.
    */
   domain?: string;
   /** Ask the host to draw a border around the view → `_meta.ui.prefersBorder`. */

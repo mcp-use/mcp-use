@@ -13,7 +13,7 @@ Treat the installed `mcp-use` package, its exported types, generated declaration
 2. Scaffold a new stable project with `create-mcp-use-app@latest` and the appropriate template. Match the package version or dist-tag when working on beta, canary, or an existing versioned project.
 3. Read only the references needed for the task:
    - [Server](references/server.md) for tools, resources, prompts, MCP middleware, request context, and result envelopes.
-   - [Views](references/views.md) for interactive MCP Apps, React hooks, model context, host capabilities, assets, and CSP.
+   - [Views](references/views.md) for interactive MCP Apps, React hooks, model context, host capabilities, assets, CSP, and endpoint/UI domain handling.
    - [Authentication](references/auth.md) for OAuth providers, verified identity, scopes, permissions, and authorization.
    - [Skills over MCP](references/skills-over-mcp.md) when a server should ship reusable workflows alongside its tools.
    - [Advanced features](references/advanced-features.md) for OpenAPI, proxying, notifications, subscriptions, and elicitation.

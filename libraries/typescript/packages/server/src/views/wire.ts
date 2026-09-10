@@ -10,6 +10,7 @@ import {
 import { buildMergedResourceCsp, type BuildCspOptions } from "./csp-env.js";
 import {
   hasExplicitAssetsBase,
+  normalizeViewDomain,
   originFromAssetsBase,
   resolveAssetsBase,
   resolveServerOrigin,
@@ -164,7 +165,7 @@ export function buildResourceUiMeta(
     ui["permissions"] = authorFacts.permissions;
   }
   if (authorFacts?.domain !== undefined) {
-    ui["domain"] = authorFacts.domain;
+    ui["domain"] = normalizeViewDomain(authorFacts.domain);
   }
   if (authorFacts?.prefersBorder !== undefined) {
     ui["prefersBorder"] = authorFacts.prefersBorder;
