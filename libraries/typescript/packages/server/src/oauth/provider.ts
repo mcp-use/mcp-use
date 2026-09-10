@@ -111,6 +111,13 @@ export interface CustomOAuthProviderOptions<
    * requires. See {@link OAuthProviderHost}.
    */
   setup?: (host: OAuthProviderHost) => void;
+  /**
+   * Allows unauthenticated POST requests for `initialize`, `tools/list`, and
+   * `notifications/initialized`. All other MCP methods still require a bearer.
+   * Supplied credentials are always verified, including discovery requests.
+   * Defaults to `false`; enabled automatically by the Lane provider.
+   */
+  allowAnonymousDiscovery?: boolean;
 }
 
 /** OAuth resource-server provider accepted by the mcp-use server constructor. */
@@ -157,6 +164,15 @@ export function oauthCustomProvider<TUser>(
     throw new TypeError("setup must be a function when provided");
   }
 
+  if (
+    options.allowAnonymousDiscovery !== undefined &&
+    typeof options.allowAnonymousDiscovery !== "boolean"
+  ) {
+    throw new TypeError(
+      "allowAnonymousDiscovery must be a boolean when provided"
+    );
+  }
+
   assertOAuthMetadata(options.oauthMetadata);
   if (options.resource !== undefined) {
     assertResourceUrl(options.resource);
@@ -185,6 +201,9 @@ export function oauthCustomProvider<TUser>(
     oauthMetadata: options.oauthMetadata,
     mapAuthInfo: options.mapAuthInfo,
     ...(options.setup !== undefined && { setup: options.setup }),
+    ...(options.allowAnonymousDiscovery !== undefined && {
+      allowAnonymousDiscovery: options.allowAnonymousDiscovery,
+    }),
     ...(options.resource !== undefined && { resource: options.resource }),
     ...(options.requiredScopes !== undefined && {
       requiredScopes: [...options.requiredScopes],
