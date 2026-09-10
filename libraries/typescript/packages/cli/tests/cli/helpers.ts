@@ -3,49 +3,110 @@ import { randomBytes } from "node:crypto";
 import {
   cpSync,
   mkdirSync,
+  mkdtempSync,
+  readdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { createServer, type Server } from "node:net";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 
-const here = dirname(fileURLToPath(import.meta.url));
-const serverPackageRoot = join(here, "..", "..", "..", "server");
-
-/** Absolute path to the committed basic fixture project. */
-export const FIXTURE_BASIC = join(here, "fixtures", "basic");
-
-/** Absolute path to the views fixture project. */
-export const FIXTURE_VIEWS = join(here, "fixtures", "views");
+import { templateEnvVar, type FixtureKind } from "./fixture-projects.js";
 
 /**
- * Scratch root for mutable fixture copies. Each copy receives a local
- * `node_modules/mcp-use` link, matching the package layout of an installed
- * consumer without creating a workspace dependency cycle between the CLI and
- * server packages.
+ * Scratch root for mutable fixture copies, under the OS temp directory.
+ *
+ * Resolved through `realpathSync.native` because the temp path the OS reports
+ * is not the real one: macOS hands out `/var/folders/...` for a directory that
+ * lives at `/private/var/folders/...`, and Windows hands out an 8.3 short
+ * path. Vite compares the project root against resolved file paths and serves
+ * anything it believes is outside the root through `/@fs/`, which changes the
+ * asset URLs a fixture's own views are served under.
  */
-export const TMP_ROOT = join(here, ".tmp");
+export const TMP_ROOT = createTmpRoot();
 
-/** Copy a committed fixture into a fresh scratch dir; returns its path. */
+function createTmpRoot(): string {
+  // mkdtemp per worker rather than one fixed directory: a fixed root is shared
+  // by concurrent runs and worktrees on the same host, and an interrupted run
+  // leaves its copies behind for good.
+  const root = mkdtempSync(join(tmpdir(), "mcp-use-cli-tests-"));
+  return realpathSync.native(root);
+}
+
+/** Path to the installed template project prepared in `globalSetup`. */
+function templateFor(kind: FixtureKind): string {
+  const template = process.env[templateEnvVar(kind)];
+  if (template === undefined) {
+    throw new Error(
+      `Fixture template for "${kind}" is missing. These tests need the ` +
+        `globalSetup in vitest.config.ts to install the fixture projects.`
+    );
+  }
+  return template;
+}
+
+/**
+ * Copy a prepared fixture into a fresh scratch dir; returns its path.
+ *
+ * Sources are copied so each test owns its mutable state, while the installed
+ * packages are linked in one by one. Linking rather than copying keeps this at
+ * a few milliseconds instead of duplicating a ~100MB install per test, and
+ * linking the entries rather than the whole directory leaves `node_modules`
+ * itself writable, which is where Vite puts its optimizer cache.
+ */
 export function copyFixture(
   label: string,
-  fixture: "basic" | "views" = "basic"
+  fixture: FixtureKind = "basic"
 ): string {
-  const source = fixture === "views" ? FIXTURE_VIEWS : FIXTURE_BASIC;
+  const template = templateFor(fixture);
   const dest = join(TMP_ROOT, `${label}-${randomBytes(4).toString("hex")}`);
   mkdirSync(dest, { recursive: true });
-  cpSync(source, dest, { recursive: true });
+  cpSync(template, dest, {
+    recursive: true,
+    filter: (source) => !source.startsWith(join(template, "node_modules")),
+  });
+
+  const installed = join(template, "node_modules");
   const nodeModules = join(dest, "node_modules");
   mkdirSync(nodeModules, { recursive: true });
-  symlinkSync(serverPackageRoot, join(nodeModules, "mcp-use"), "junction");
+  // Junctions can only point at directories, so a plain entry such as npm's
+  // `.package-lock.json` has to be copied. On Windows the wrong type here is
+  // an EPERM rather than a silent fallback.
+  for (const entry of readdirSync(installed, { withFileTypes: true })) {
+    const from = join(installed, entry.name);
+    const to = join(nodeModules, entry.name);
+    if (entry.isDirectory()) symlinkSync(from, to, "junction");
+    else cpSync(from, to);
+  }
   return dest;
 }
 
-/** Remove a scratch dir, ignoring failures. */
+const pendingRemovals: string[] = [];
+
+/**
+ * Remove a scratch path, ignoring failures.
+ *
+ * Whole fixture copies wait until the worker exits. Vite's dependency
+ * optimizer keeps writing into `.mcp-use/cache/deps_temp_*` after the dev
+ * server is told to close, and deleting the project out from under it
+ * surfaces as an unhandled rejection that fails the run even when every test
+ * passed. Copies are sources and symlinks, so holding them costs little.
+ * Paths inside a copy, which tests delete to set up missing-file cases, still
+ * go immediately.
+ */
 export function removeDir(dir: string): void {
+  if (dirname(dir) === TMP_ROOT) {
+    pendingRemovals.push(dir);
+    return;
+  }
+  removeNow(dir);
+}
+
+function removeNow(dir: string): void {
   try {
     rmSync(dir, {
       recursive: true,
@@ -54,9 +115,15 @@ export function removeDir(dir: string): void {
       retryDelay: 100,
     });
   } catch {
-    // best effort: Vite may still be finishing optimizer temp cleanup.
+    // best effort: the OS temp directory is cleaned up regardless.
   }
 }
+
+process.once("exit", () => {
+  for (const dir of pendingRemovals) removeNow(dir);
+  // The root is this worker's own mkdtemp directory, so nothing else needs it.
+  removeNow(TMP_ROOT);
+});
 
 /** Bind the basic fixture's add tool to a named view for CLI error tests. */
 export function bindBasicToolToView(cwd: string, viewName: string): void {
