@@ -1,5 +1,29 @@
 # @mcp-use/cli
 
+## 4.1.12-canary.3
+
+### Patch Changes
+
+- b86bf80: Fix `servers list` reporting a bad `--limit` or `--skip` as `Not logged in.` when signed out. Pagination was validated after the cloud client was created, so an invalid page size surfaced as an operational failure with exit 1 instead of the usage error with exit 2 that `deployments list` already returns for the same input.
+
+## 4.1.12-canary.2
+
+### Patch Changes
+
+- d6614ff: Report a malformed JSON argument to `client` and `screenshot` as a usage error instead of letting the engine's `SyntaxError` escape. A bad `{...}` or `key:=<json>` value exited 1 with a bare parser message and no indication of which argument was wrong, while every other grammar mistake in the same parser exits 2.
+
+## 4.1.12-canary.1
+
+### Patch Changes
+
+- 290d7c4: Document that `--secret` must be passed on every `servers env set` write, including updates and rotations, and say so in the success message when a value is stored write-only
+
+## 4.1.12-canary.0
+
+### Patch Changes
+
+- @mcp-use/inspector@20.3.8-canary.0
+
 ## 4.1.11
 
 ### Patch Changes

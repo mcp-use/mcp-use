@@ -1,5 +1,39 @@
 # @mcp-use/agent
 
+## 2.0.16-canary.4
+
+### Patch Changes
+
+- c1ad74e: Fix OpenRouter BYOK requests to OpenAI models returning neither a model response nor an actionable provider error by routing those models through the Responses API.
+
+## 2.0.16-canary.3
+
+### Patch Changes
+
+- Updated dependencies [4740f9b]
+  - @mcp-use/client@2.3.1-canary.3
+
+## 2.0.16-canary.2
+
+### Patch Changes
+
+- Updated dependencies [6e6de8b]
+  - @mcp-use/client@2.3.1-canary.2
+
+## 2.0.16-canary.1
+
+### Patch Changes
+
+- Updated dependencies [ce6b9e1]
+  - @mcp-use/client@2.3.1-canary.1
+
+## 2.0.16-canary.0
+
+### Patch Changes
+
+- Updated dependencies [322a6d3]
+  - @mcp-use/client@2.3.1-canary.0
+
 ## 2.0.15
 
 ### Patch Changes

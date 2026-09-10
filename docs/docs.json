@@ -300,8 +300,8 @@
                       "v2/typescript/getting-started/welcome",
                       "v2/typescript/getting-started/quickstart",
                       "v2/typescript/getting-started/templates",
-                      "v2/typescript/changelog/changelog",
-                      "v2/inspector/changelog"
+                      "typescript/changelog/changelog",
+                      "inspector/changelog"
                     ]
                   },
                   {
@@ -885,6 +885,14 @@
     {
       "source": "/changelog",
       "destination": "/python/changelog/changelog"
+    },
+    {
+      "source": "/v2/typescript/changelog/changelog",
+      "destination": "/typescript/changelog/changelog"
+    },
+    {
+      "source": "/v2/inspector/changelog",
+      "destination": "/inspector/changelog"
     },
     {
       "source": "/typescript/server/migration",

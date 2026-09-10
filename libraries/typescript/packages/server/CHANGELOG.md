@@ -1,5 +1,66 @@
 # mcp-use
 
+## 2.5.0-canary.8
+
+### Patch Changes
+
+- Updated dependencies [e7ff4a2]
+  - @mcp-use/inspector@20.3.8-canary.1
+
+## 2.5.0-canary.7
+
+### Patch Changes
+
+- 4740f9b: Replace the temporary `@mcp-use/ext-apps` package alias with the official `@modelcontextprotocol/ext-apps` 2.0.0 release. The upstream release includes the SDK v2 role-isolation work previously carried by the fork.
+  - @mcp-use/cli@4.1.12-canary.3
+  - @mcp-use/inspector@20.3.8-canary.0
+
+## 2.5.0-canary.6
+
+### Minor Changes
+
+- f55671b: Show a public chat button on MCP landing pages when public chat is enabled.
+
+## 2.4.4-canary.5
+
+### Patch Changes
+
+- 40af3ec: Fix proxied resources losing their `annotations` and `_meta`. `ResourceDefinition` carries both and the local registration path preserves them, but the proxy mount copied only `title`, `description` and `mimeType`, so composing an upstream server through `use()` stripped its client hints and extension metadata from `resources/list`.
+
+## 2.4.4-canary.4
+
+### Patch Changes
+
+- Updated dependencies [b86bf80]
+  - @mcp-use/cli@4.1.12-canary.3
+
+## 2.4.4-canary.3
+
+### Patch Changes
+
+- Updated dependencies [d6614ff]
+  - @mcp-use/cli@4.1.12-canary.2
+
+## 2.4.4-canary.2
+
+### Patch Changes
+
+- Updated dependencies [290d7c4]
+  - @mcp-use/cli@4.1.12-canary.1
+
+## 2.4.4-canary.1
+
+### Patch Changes
+
+- 15843cf: Fix `createJwtVerifier` reporting a malformed `resource` option as an OAuth `invalid_token` error naming the token's resource claim. A configuration mistake at server startup now throws a `TypeError`, matching `oauthCustomProvider` and the other provider URL options.
+
+## 2.4.4-canary.0
+
+### Patch Changes
+
+- @mcp-use/cli@4.1.12-canary.0
+- @mcp-use/inspector@20.3.8-canary.0
+
 ## 2.4.3
 
 ### Patch Changes

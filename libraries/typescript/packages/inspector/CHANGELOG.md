@@ -1,5 +1,18 @@
 # @mcp-use/inspector
 
+## 20.3.8-canary.1
+
+### Patch Changes
+
+- e7ff4a2: Rebuild the standalone Inspector with the current Agent OpenRouter Responses API fix and repair the published framework peer metadata. Automatically propagate future bundle rebuilds and metadata changes through the release plan without adding Inspector runtime dependencies.
+
+## 20.3.8-canary.0
+
+### Patch Changes
+
+- @mcp-use/agent@2.0.16-canary.0
+- mcp-use@2.4.4-canary.0
+
 ## 20.3.7
 
 ## 20.3.7-canary.1

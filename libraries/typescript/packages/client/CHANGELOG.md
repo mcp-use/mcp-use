@@ -1,5 +1,29 @@
 # @mcp-use/client
 
+## 2.3.1-canary.3
+
+### Patch Changes
+
+- 4740f9b: Replace the temporary `@mcp-use/ext-apps` package alias with the official `@modelcontextprotocol/ext-apps` 2.0.0 release. The upstream release includes the SDK v2 role-isolation work previously carried by the fork.
+
+## 2.3.1-canary.2
+
+### Patch Changes
+
+- 6e6de8b: Prevent duplicate subprocesses and HTTP transports from concurrent connection attempts. Coordinate connection and disconnection calls so a later disconnect cancels in-flight and queued reconnects, releasing resources before shutdown completes.
+
+## 2.3.1-canary.1
+
+### Patch Changes
+
+- ce6b9e1: Stabilize `clientInfo` and `proxyConfig` dependencies in `useMcp` to prevent reconnection loops on parent component re-renders.
+
+## 2.3.1-canary.0
+
+### Patch Changes
+
+- 322a6d3: Clean up sandbox proxy message listener and cancel pending readiness wait on `ViewRenderer` unmount.
+
 ## 2.3.0
 
 ### Minor Changes

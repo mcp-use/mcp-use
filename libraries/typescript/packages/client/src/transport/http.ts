@@ -531,12 +531,7 @@ export class HttpConnector extends BaseConnector {
    * @returns A promise that resolves after protocol negotiation completes.
    * @throws An error with `code: 401` when authentication is required.
    */
-  async connect(): Promise<void> {
-    if (this.connected) {
-      logger.debug("Already connected to MCP implementation");
-      return;
-    }
-
+  protected override async establishTransport(): Promise<void> {
     const baseUrl = this.baseUrl;
     logger.debug(`Connecting to MCP implementation via HTTP: ${baseUrl}`);
 
@@ -558,8 +553,6 @@ export class HttpConnector extends BaseConnector {
       logger.debug("Streamable HTTP connect failed", err);
       const { fallbackReason, is401Error, httpStatusCode } =
         this.classifyStreamableHttpFailure(err);
-
-      await this.cleanupResources();
 
       if (is401Error) {
         logger.info("Authentication required");
@@ -802,7 +795,6 @@ export class HttpConnector extends BaseConnector {
         },
       } as any;
 
-      this.connected = true;
       this.transportType = "streamable-http";
       // Inbound request handlers (roots/sampling/elicitation) were registered before connect()
       logger.debug(

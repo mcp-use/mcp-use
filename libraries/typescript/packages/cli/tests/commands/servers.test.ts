@@ -84,6 +84,69 @@ describe("server environment output safety", () => {
       updated: true,
     });
   });
+
+  it("clears an existing sensitive flag when --secret is not repeated on update", async () => {
+    api.request
+      .mockResolvedValueOnce([{ id: "env_1", key: "TOKEN", sensitive: true }])
+      .mockResolvedValueOnce({
+        id: "env_1",
+        key: "TOKEN",
+        value: "rotated",
+      });
+    const stdout = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
+
+    await expect(
+      runServers(["env", "set", "server_1", "TOKEN=rotated", "--json"])
+    ).resolves.toBe(0);
+
+    expect(api.request).toHaveBeenLastCalledWith(
+      "/servers/server_1/env-variables/env_1",
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          key: "TOKEN",
+          value: "rotated",
+          branch: null,
+          environments: ["production"],
+          sensitive: false,
+        }),
+      }
+    );
+
+    const output = stdout.mock.calls.flat().join("");
+    expect(JSON.parse(output)).toMatchObject({
+      secret: false,
+    });
+  });
+
+  it("does not mark a brand-new variable sensitive by default", async () => {
+    api.request.mockResolvedValueOnce([]).mockResolvedValueOnce({
+      id: "env_2",
+      key: "NEW_VAR",
+      value: "value",
+    });
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(
+      runServers(["env", "set", "server_1", "NEW_VAR=value", "--json"])
+    ).resolves.toBe(0);
+
+    expect(api.request).toHaveBeenLastCalledWith(
+      "/servers/server_1/env-variables",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          key: "NEW_VAR",
+          value: "value",
+          branch: null,
+          environments: ["production"],
+          sensitive: false,
+        }),
+      }
+    );
+  });
 });
 
 describe("server environment deletion", () => {
@@ -116,6 +179,47 @@ describe("server environment deletion", () => {
         code: "env_variable_not_found",
         message:
           "Environment variable not found on server_1 (branch feature): TOKEN",
+      },
+    });
+  });
+});
+
+describe("server list argument validation", () => {
+  it("rejects a bad page size before authenticating", async () => {
+    const stderr = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+
+    await expect(runServers(["list", "--limit", "0", "--json"])).resolves.toBe(
+      2
+    );
+
+    // Nothing should reach the cloud for a command line that cannot run.
+    expect(cloudApiForOrganization).not.toHaveBeenCalled();
+    expect(api.request).not.toHaveBeenCalled();
+    expect(JSON.parse(stderr.mock.calls.flat().join(""))).toEqual({
+      error: {
+        code: "usage_error",
+        message: "--limit must be an integer from 1 to 100.",
+      },
+    });
+  });
+
+  it("rejects a bad skip before authenticating", async () => {
+    const stderr = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+
+    await expect(runServers(["list", "--skip", "abc", "--json"])).resolves.toBe(
+      2
+    );
+
+    expect(cloudApiForOrganization).not.toHaveBeenCalled();
+    expect(api.request).not.toHaveBeenCalled();
+    expect(JSON.parse(stderr.mock.calls.flat().join(""))).toEqual({
+      error: {
+        code: "usage_error",
+        message: "--skip must be a non-negative integer.",
       },
     });
   });
