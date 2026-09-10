@@ -197,7 +197,10 @@ function buildResponsesBody(
   if (params.config.maxTokens !== undefined) {
     body.max_output_tokens = params.config.maxTokens;
   }
-  if (params.config.temperature !== undefined) {
+  if (
+    params.config.provider === "openrouter" &&
+    params.config.temperature !== undefined
+  ) {
     body.temperature = params.config.temperature;
   }
   return body;
