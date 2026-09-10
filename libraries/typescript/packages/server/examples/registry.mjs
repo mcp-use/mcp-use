@@ -79,6 +79,7 @@ export const examples = [
   external("auth/keycloak"),
   external("auth/supabase"),
   external("auth/workos"),
+  external("daytona"),
   configuration(
     "openapi",
     "Loads the live weather.gov OpenAPI document; deterministic fixture coverage is deferred."
