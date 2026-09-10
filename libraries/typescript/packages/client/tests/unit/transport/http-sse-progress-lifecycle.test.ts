@@ -7,18 +7,16 @@ describe("HttpConnector observeSseProgress TransformStream lifecycle", () => {
     const progressSpy = vi.spyOn(connector as any, "forwardRoundProgress");
 
     const encoder = new TextEncoder();
+    const chunk1 =
+      'data: {"jsonrpc":"2.0","method":"notifications/progress","params":{"progress":50,"total":100}}\n\n';
+    const chunk2 =
+      'data: {"jsonrpc":"2.0","result":{"content":[{"type":"text","text":"done"}]}}\n\n';
+    const expectedFullText = chunk1 + chunk2;
+
     const source = new ReadableStream<Uint8Array>({
       start(controller) {
-        controller.enqueue(
-          encoder.encode(
-            'data: {"jsonrpc":"2.0","method":"notifications/progress","params":{"progress":50,"total":100}}\n\n'
-          )
-        );
-        controller.enqueue(
-          encoder.encode(
-            'data: {"jsonrpc":"2.0","result":{"content":[{"type":"text","text":"done"}]}}\n\n'
-          )
-        );
+        controller.enqueue(encoder.encode(chunk1));
+        controller.enqueue(encoder.encode(chunk2));
         controller.close();
       },
     });
@@ -33,8 +31,7 @@ describe("HttpConnector observeSseProgress TransformStream lifecycle", () => {
 
     expect(progressSpy).toHaveBeenCalledTimes(1);
     expect(progressSpy).toHaveBeenCalledWith({ progress: 50, total: 100 });
-    expect(text).toContain("notifications/progress");
-    expect(text).toContain("done");
+    expect(text).toBe(expectedFullText);
   });
 
   it("propagates consumer cancellation upstream to the underlying stream source", async () => {
@@ -103,15 +100,15 @@ describe("HttpConnector observeSseProgress TransformStream lifecycle", () => {
     const connector = new HttpConnector("https://mcp.example.com/mcp");
     const progressSpy = vi.spyOn(connector as any, "forwardRoundProgress");
     const encoder = new TextEncoder();
+    const chunk1 = "data: invalid-json-payload\n\n";
+    const chunk2 =
+      'data: {"jsonrpc":"2.0","method":"notifications/progress","params":{"progress":100}}\n\n';
+    const expectedFullText = chunk1 + chunk2;
 
     const source = new ReadableStream<Uint8Array>({
       start(controller) {
-        controller.enqueue(encoder.encode("data: invalid-json-payload\n\n"));
-        controller.enqueue(
-          encoder.encode(
-            'data: {"jsonrpc":"2.0","method":"notifications/progress","params":{"progress":100}}\n\n'
-          )
-        );
+        controller.enqueue(encoder.encode(chunk1));
+        controller.enqueue(encoder.encode(chunk2));
         controller.close();
       },
     });
@@ -126,7 +123,7 @@ describe("HttpConnector observeSseProgress TransformStream lifecycle", () => {
 
     expect(progressSpy).toHaveBeenCalledTimes(1);
     expect(progressSpy).toHaveBeenCalledWith({ progress: 100 });
-    expect(text).toContain("invalid-json-payload");
+    expect(text).toBe(expectedFullText);
   });
 
   it("propagates stream read errors downstream to the consumer", async () => {
