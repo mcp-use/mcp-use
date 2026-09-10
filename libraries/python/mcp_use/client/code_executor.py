@@ -9,8 +9,8 @@ direct tool calls.
 import asyncio
 import io
 import re
-import time
 from contextlib import redirect_stderr, redirect_stdout
+from time import perf_counter
 from typing import TYPE_CHECKING, Any
 
 from mcp_use.logging import logger
@@ -59,7 +59,7 @@ class CodeExecutor:
             logger.debug("Connecting to configured servers for code execution...")
             await self.client.create_all_sessions()
 
-        start_time = time.time()
+        start_time = perf_counter()
         logs: list[str] = []
         result = None
         error = None
@@ -93,7 +93,7 @@ class CodeExecutor:
             error = str(e)
             logger.error(f"Code execution error: {e}")
 
-        execution_time = time.time() - start_time
+        execution_time = perf_counter() - start_time
 
         # Capture any stdout/stderr that wasn't captured by our print wrapper
         if stdout_capture.getvalue():
