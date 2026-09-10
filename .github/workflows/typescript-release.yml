@@ -153,7 +153,9 @@ jobs:
         if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
         working-directory: libraries/typescript
         env:
-          VERIFY_ATTEMPTS: 12
+          # npm scans accepted publishes before making them installable. Allow
+          # twenty minutes, including the documented 5-15+ minute scan window.
+          VERIFY_ATTEMPTS: 120
           VERIFY_DELAY_SECONDS: 10
         run: pnpm release-channel verify --plan canary-release-plan.json
 
@@ -436,7 +438,7 @@ jobs:
           steps.check-release.outputs.should_publish == 'true'
         working-directory: libraries/typescript
         env:
-          VERIFY_ATTEMPTS: 12
+          VERIFY_ATTEMPTS: 120
           VERIFY_DELAY_SECONDS: 10
         run: pnpm release-channel verify --plan stable-release-plan.json
 

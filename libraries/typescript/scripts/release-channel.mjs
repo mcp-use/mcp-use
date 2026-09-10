@@ -447,7 +447,9 @@ async function verifyOnce(plan) {
 
 async function verify(planFile) {
   const plan = readJson(planFile);
-  const attempts = Number(process.env.VERIFY_ATTEMPTS ?? 12);
+  // An accepted npm publish can remain unavailable during publish-time scanning.
+  // https://github.blog/changelog/2026-07-28-npm-publish-time-malware-scanning-and-dual-use-metadata/
+  const attempts = Number(process.env.VERIFY_ATTEMPTS ?? 120);
   const delaySeconds = Number(process.env.VERIFY_DELAY_SECONDS ?? 10);
   let lastError;
 
