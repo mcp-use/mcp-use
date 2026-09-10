@@ -20,6 +20,7 @@
     "loud-pans-repeat",
     "proxy-resource-metadata",
     "quiet-connectors-close",
+    "repair-inspector-bundled-release",
     "retire-ext-apps-fork",
     "servers-list-validate-before-auth",
     "tunnel-cli-default-localhost-header"
