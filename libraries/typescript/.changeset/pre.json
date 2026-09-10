@@ -12,6 +12,7 @@
   },
   "changesets": [
     "bright-chats-link",
+    "calm-router-responses",
     "cli-bad-json-usage-error",
     "fancy-crabs-unite",
     "fix-usemcp-reference-stability",
