@@ -301,6 +301,7 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
           headers,
           body: currentBody,
           redirect: "manual",
+          signal: c.req.raw.signal,
         });
         const location = response.headers.get("location");
         if (!(response.status >= 300 && response.status < 400 && location)) {
@@ -339,6 +340,26 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
+
+      // The client disconnected before the upstream responded, so the abort
+      // we now propagate to the outbound fetch rejects here. That is the
+      // expected shutdown path, and nothing is left to read a body.
+      //
+      // fetch rejects with signal.reason verbatim, and the reason is not
+      // ours to choose. The Express adapter aborts with no argument, so
+      // there it is a DOMException named AbortError, but @hono/node-server
+      // aborts with a plain string, so an Error test alone would miss every
+      // disconnect on the standalone inspector. Accept the reason itself,
+      // and keep the name arm for the serialized-reason path where identity
+      // does not hold.
+      const { signal } = c.req.raw;
+      if (
+        signal.aborted &&
+        (error === signal.reason ||
+          (error instanceof Error && error.name === "AbortError"))
+      ) {
+        return new Response(null, { status: 499 });
+      }
 
       // Get targetUrl for better error logging
       const targetUrl = c.req.header("X-Target-URL");
