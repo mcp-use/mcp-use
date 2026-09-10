@@ -11,7 +11,7 @@ const readChangesets = readModule.default ?? readModule;
 const generatedPrefix = "propagated-";
 
 // Build inputs, not npm dependencies. These packages ship embedded workspace code.
-export const bundledInputs = {
+const bundledInputs = {
   "@mcp-use/inspector": ["@mcp-use/agent", "@mcp-use/client"],
   "@mcp-use/cli": ["@mcp-use/tunnel"],
 };
