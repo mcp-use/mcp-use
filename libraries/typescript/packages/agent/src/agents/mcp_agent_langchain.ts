@@ -1278,6 +1278,9 @@ export class MCPAgent {
     let success = false;
     let finalOutput: string | null = null;
     let stepsTaken = 0;
+    // Budget for this call only. The constructor value stays the default for
+    // later calls that do not pass one.
+    const stepBudget = steps ?? this.maxSteps;
 
     try {
       // 1. Initialize if needed
@@ -1360,8 +1363,12 @@ export class MCPAgent {
           tags: this.getTags(),
           // Set trace name for LangChain/Langfuse
           runName: this.metadata.trace_name || "mcp-use-agent",
+          // modelCallLimitMiddleware reads runLimit from the run context
+          // first, so the per-call budget applies without rebuilding the
+          // executor the middleware was baked into.
+          context: { runLimit: stepBudget },
           // Set recursion limit to 3x maxSteps to account for model calls + tool executions
-          recursionLimit: this.maxSteps * 3,
+          recursionLimit: stepBudget * 3,
           // Pass sessionId for Langfuse if present in metadata
           ...(this.metadata.session_id && {
             sessionId: this.metadata.session_id,
@@ -1608,7 +1615,7 @@ export class MCPAgent {
         maxStepsConfigured: this.maxSteps,
         memoryEnabled: this.memoryEnabled,
         useServerManager: this.useServerManager,
-        maxStepsUsed: steps ?? null,
+        maxStepsUsed: stepBudget,
         manageConnector: manage ?? true,
         externalHistoryUsed: history !== undefined,
         stepsTaken,
@@ -1811,6 +1818,9 @@ export class MCPAgent {
     let eventCount = 0;
     let totalResponseLength = 0;
     let finalResponse = "";
+    // Budget for this call only. Writing it back to this.maxSteps would raise
+    // the ceiling for every later call that does not pass one.
+    const stepBudget = steps ?? this.maxSteps;
 
     // Enhance query with schema information if structured output is requested
     if (schema) {
@@ -1831,9 +1841,6 @@ export class MCPAgent {
       if (!agentExecutor) {
         throw new Error("MCP agent failed to initialize");
       }
-
-      // Set max iterations
-      this.maxSteps = steps ?? this.maxSteps;
 
       const display_query =
         typeof query === "string" && query.length > 50
@@ -1885,8 +1892,12 @@ export class MCPAgent {
           tags: this.getTags(),
           // Set trace name for LangChain/Langfuse
           runName: this.metadata.trace_name || "mcp-use-agent",
+          // modelCallLimitMiddleware reads runLimit from the run context
+          // first, so the per-call budget applies without rebuilding the
+          // executor the middleware was baked into.
+          context: { runLimit: stepBudget },
           // Set recursion limit to 3x maxSteps to account for model calls + tool executions
-          recursionLimit: this.maxSteps * 3,
+          recursionLimit: stepBudget * 3,
           // Pass sessionId for Langfuse if present in metadata
           ...(this.metadata.session_id && {
             sessionId: this.metadata.session_id,
@@ -2075,7 +2086,7 @@ export class MCPAgent {
         maxStepsConfigured: this.maxSteps,
         memoryEnabled: this.memoryEnabled,
         useServerManager: this.useServerManager,
-        maxStepsUsed: steps ?? null,
+        maxStepsUsed: stepBudget,
         manageConnector: manage ?? true,
         externalHistoryUsed: history !== undefined,
         response: `[STREAMED RESPONSE - ${totalResponseLength} chars]`,
