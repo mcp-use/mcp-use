@@ -2,4 +2,4 @@
 "@mcp-use/agent": patch
 ---
 
-Use OpenRouter's Responses API transport for OpenAI model slugs.
+Fix OpenRouter BYOK requests to OpenAI models returning neither a model response nor an actionable provider error by routing those models through the Responses API.
