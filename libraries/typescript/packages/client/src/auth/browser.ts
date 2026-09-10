@@ -66,6 +66,8 @@ export interface BrowserOAuthOptions {
   /**
    * Pre-registered OAuth client information. When set, the SDK skips
    * Dynamic Client Registration and uses this client_id directly.
+   * Confidential clients require `oauthProxyUrl` and popup OAuth; their secret
+   * remains in opener memory and is omitted from persisted callback state.
    * Required for proxy-mode auth servers (e.g. Slack, WorkOS proxy)
    * that strip `registration_endpoint` from metadata.
    */
@@ -86,8 +88,10 @@ export interface BrowserOAuthOptions {
 export class BrowserOAuthClientProvider implements OAuthClientProvider {
   /** Protected MCP server URL associated with this provider. */
   readonly serverUrl: string;
-  /** Pre-registered public client information, when configured. */
+  /** Pre-registered client information, when configured. */
   readonly staticClientInfo?: OAuthClientInformation;
+  /** Whether the popup callback must return the code for an opener-owned exchange. */
+  readonly completeAuthorizationInOpener: boolean;
   private session: OAuthSessionStore;
   private readonly storage: LocalStorageKVStore;
 
@@ -112,9 +116,15 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     | undefined;
 
   constructor(serverUrl: string, options: BrowserOAuthOptions = {}) {
-    if (options.staticClientInfo?.client_secret) {
+    const hasClientSecret = Boolean(options.staticClientInfo?.client_secret);
+    if (hasClientSecret && !options.oauthProxyUrl) {
       throw new Error(
-        "Browser OAuth clients must be public clients; staticClientInfo.client_secret is not allowed."
+        "Browser confidential OAuth clients require oauthProxyUrl so the client secret is never sent directly to the authorization server."
+      );
+    }
+    if (hasClientSecret && options.useRedirectFlow) {
+      throw new Error(
+        "Browser confidential OAuth clients require popup OAuth; redirect flow cannot keep the client secret in memory."
       );
     }
     this.serverUrl = serverUrl;
@@ -130,6 +140,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     this.connectionUrl = options.connectionUrl;
     this.proxyOAuthRequests = options.proxyOAuthRequests ?? true;
     this.staticClientInfo = options.staticClientInfo;
+    this.completeAuthorizationInOpener = hasClientSecret;
     this.onPopupWindow = options.onPopupWindow;
   }
 
@@ -579,8 +590,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   }
 
   /**
-   * Return the stored public OAuth client ID. Browser providers do not retain
-   * client secrets.
+   * Return the configured OAuth client ID without exposing its secret.
    */
   async getClientCredentials(): Promise<{
     /** Public OAuth client identifier. */
@@ -597,6 +607,11 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
    * use `redirectToAuthorization` for that.
    */
   async prepareAuthorizationUrl(authorizationUrl: URL): Promise<string> {
+    const publicStaticClientInfo = this.staticClientInfo
+      ? (({ client_secret: _secret, ...publicInfo }) => publicInfo)(
+          this.staticClientInfo
+        )
+      : undefined;
     const prepared = await this.session.storeAuthorizationState(
       authorizationUrl,
       {
@@ -605,11 +620,14 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
           ...(this.clientMetadataUrl
             ? { clientMetadataUrl: this.clientMetadataUrl }
             : {}),
-          ...(this.staticClientInfo
-            ? { staticClientInfo: this.staticClientInfo }
+          ...(publicStaticClientInfo
+            ? { staticClientInfo: publicStaticClientInfo }
             : {}),
           ...(this.scope ? { scope: this.scope } : {}),
         },
+        ...(this.completeAuthorizationInOpener
+          ? { completeAuthorizationInOpener: true }
+          : {}),
         flowType: this.useRedirectFlow ? "redirect" : "popup",
         returnUrl:
           typeof window !== "undefined" ? window.location.href : undefined,

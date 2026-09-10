@@ -114,6 +114,43 @@ describe("useMcp manual authentication failures", () => {
     vi.clearAllMocks();
   });
 
+  it("forwards generic pre-registered client credentials to the browser provider", async () => {
+    function TestComponent() {
+      useMcp({
+        url: "https://mcp.example.com/mcp",
+        oauthProxyUrl: "https://app.example.com/inspector/api/oauth",
+        oauth: {
+          clientId: "pre-registered-client",
+          clientSecret: "confidential-secret",
+          scope: "read write",
+        },
+        autoReconnect: false,
+        autoRetry: false,
+        logLevel: "silent",
+      });
+      return null;
+    }
+
+    let renderer: ReturnType<typeof create>;
+    await act(async () => {
+      renderer = create(<TestComponent />);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mocks.createBrowserOAuthProvider).toHaveBeenCalledWith(
+      expect.objectContaining({
+        staticClientInfo: {
+          client_id: "pre-registered-client",
+          client_secret: "confidential-secret",
+        },
+        scope: "read write",
+      })
+    );
+
+    await act(async () => renderer!.unmount());
+  });
+
   it("surfaces pre-redirect auth errors without starting the popup runner", async () => {
     let latest: ReturnType<typeof useMcp> | undefined;
 

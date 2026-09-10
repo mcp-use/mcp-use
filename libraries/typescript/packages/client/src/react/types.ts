@@ -325,6 +325,7 @@ export type UseMcpOptions = {
    *   url: 'https://mcp.example.com',
    *   oauth: {
    *     clientId: 'my-preregistered-client-id',
+   *     clientSecret: 'kept-in-memory-until-token-exchange',
    *     clientMetadataUrl: 'https://app.example.com/oauth/client-metadata.json',
    *     scope: 'openid profile email',
    *   },
@@ -334,6 +335,12 @@ export type UseMcpOptions = {
   oauth?: {
     /** Pre-registered OAuth client_id. */
     clientId?: string;
+    /**
+     * Pre-registered confidential-client secret. Requires `clientId`, a
+     * configured `oauthProxyUrl`, and popup OAuth. The secret is kept in the
+     * opener's memory and is never written to callback state or localStorage.
+     */
+    clientSecret?: string;
     /**
      * Public HTTPS OAuth Client ID Metadata Document URL (CIMD).
      * The document must contain a matching client_id and redirect_uris.

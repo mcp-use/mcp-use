@@ -146,13 +146,33 @@ export async function completeOAuthFlow(
     return;
   }
 
-  await waitForBrowserAuthComplete(flowProvider, timeoutMs);
+  const browserResult = await waitForBrowserAuthComplete(
+    flowProvider,
+    timeoutMs
+  );
+  if (browserResult?.authorizationCode) {
+    if (options.finishAuthorization) {
+      await options.finishAuthorization(
+        browserResult.authorizationCode,
+        browserResult.issuer
+      );
+    } else {
+      await auth(provider, {
+        serverUrl,
+        authorizationCode: browserResult.authorizationCode,
+        ...(browserResult.issuer !== undefined
+          ? { iss: browserResult.issuer }
+          : {}),
+        fetchFn,
+      });
+    }
+  }
 }
 
 async function waitForBrowserAuthComplete(
   provider: FlowProvider,
   timeoutMs: number
-): Promise<void> {
+): Promise<{ authorizationCode?: string; issuer?: string } | undefined> {
   if (typeof window === "undefined") {
     throw new Error(
       "OAuth redirect requires a browser environment or a provider with getAuthorizationCode()"
@@ -193,7 +213,12 @@ async function waitForBrowserAuthComplete(
 
     switch (result.kind) {
       case "success":
-        return;
+        return {
+          ...(result.authorizationCode
+            ? { authorizationCode: result.authorizationCode }
+            : {}),
+          ...(result.issuer ? { issuer: result.issuer } : {}),
+        };
       case "cancelled":
         throw new Error("OAuth authentication was cancelled.");
       case "timeout":
