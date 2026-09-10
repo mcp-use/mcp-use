@@ -2,10 +2,16 @@
 
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
-import { cors } from "hono/cors";
 import open from "open";
 import { registerInspectorShell } from "./inspector-shell.js";
 import { registerInspectorProxyRoutes } from "./proxy-routes.js";
+import { createConfidentialClientResolver } from "./cli-config.js";
+import {
+  createMemoryOAuthProxyStateStore,
+  createRedisOAuthProxyStateStore,
+  decodeOAuthProxyEncryptionKey,
+} from "./proxy/index.js";
+import type { OAuthProxyEncryptionKey } from "./proxy/index.js";
 import {
   findAvailablePort,
   formatErrorDiagnostic,
@@ -77,14 +83,6 @@ Examples:
 }
 
 const app = new Hono();
-
-app.use(
-  "*",
-  cors({
-    origin: "*",
-    exposeHeaders: ["*"],
-  })
-);
 // The CLI is primarily local dev tooling, where proxying to localhost MCP
 // servers is the main use case — but the published Docker image runs this same
 // CLI with NODE_ENV=production on a public port, where loopback proxying is
@@ -94,10 +92,55 @@ const allowLoopback = process.env.INSPECTOR_ALLOW_LOOPBACK
   ? process.env.INSPECTOR_ALLOW_LOOPBACK === "true"
   : process.env.NODE_ENV !== "production";
 
+const oauthAllowedOrigins = parseOrigins(
+  process.env.INSPECTOR_OAUTH_ALLOWED_ORIGINS
+);
+const production = process.env.NODE_ENV === "production";
+const mcpOriginValue = process.env.INSPECTOR_MCP_ALLOWED_ORIGINS;
+const mcpAllowedOrigins =
+  mcpOriginValue !== undefined
+    ? parseOrigins(mcpOriginValue)
+    : process.env.INSPECTOR_OAUTH_ALLOWED_ORIGINS !== undefined
+      ? oauthAllowedOrigins
+      : production
+        ? []
+        : undefined;
+const redisUrl = process.env.INSPECTOR_OAUTH_REDIS_URL ?? process.env.REDIS_URL;
+const encryptionKeyValue = process.env.INSPECTOR_OAUTH_ENCRYPTION_KEY;
+const oauthStateStoreMode = parseOAuthStateStoreMode(
+  process.env.INSPECTOR_OAUTH_STATE_STORE,
+  redisUrl,
+  encryptionKeyValue,
+  production
+);
+const oauthProxyStateStore =
+  oauthStateStoreMode === "redis"
+    ? createRedisOAuthProxyStateStore({
+        url: redisUrl!,
+        encryptionKey: decodeOAuthProxyEncryptionKey(encryptionKeyValue!),
+        encryptionKeyId: process.env.INSPECTOR_OAUTH_ENCRYPTION_KEY_ID,
+        decryptionKeys: parsePreviousEncryptionKeys(
+          process.env.INSPECTOR_OAUTH_PREVIOUS_ENCRYPTION_KEYS_JSON
+        ),
+        keyPrefix:
+          process.env.INSPECTOR_OAUTH_REDIS_KEY_PREFIX ??
+          `mcp-use:inspector:oauth:${process.env.NODE_ENV ?? "development"}:`,
+      })
+    : oauthStateStoreMode === "memory"
+      ? createMemoryOAuthProxyStateStore()
+      : undefined;
+const oauthProxyConfidentialClientResolver = createConfidentialClientResolver(
+  process.env.INSPECTOR_OAUTH_CONFIDENTIAL_CLIENTS_JSON
+);
+
 registerInspectorProxyRoutes(app, {
   autoConnectUrl: mcpUrl,
-  oauthProxyAllowedOrigins: [],
+  oauthProxyAllowedOrigins: oauthAllowedOrigins,
+  mcpProxyAllowedOrigins: mcpAllowedOrigins,
   oauthProxyAllowLoopback: allowLoopback,
+  oauth: oauthStateStoreMode !== "disabled",
+  oauthProxyStateStore,
+  oauthProxyConfidentialClientResolver,
 });
 
 registerInspectorShell(app, {
@@ -105,10 +148,16 @@ registerInspectorShell(app, {
   manufactChatUrl: process.env.MANUFACT_CHAT_URL,
 });
 
+let shutdownStarted = false;
+process.once("SIGTERM", () => void shutdown("SIGTERM"));
+process.once("SIGINT", () => void shutdown("SIGINT"));
+let activeServer: ReturnType<typeof serve> | undefined;
+
 async function startServer() {
   try {
+    await oauthProxyStateStore?.ready?.();
     const port = await findAvailablePort(startPort);
-    serve({
+    const server = serve({
       fetch: app.fetch,
       port,
     });
@@ -131,6 +180,7 @@ async function startServer() {
         console.error(`Browser open error: ${formatErrorDiagnostic(error)}`);
       }
     }
+    activeServer = server;
     return { port, fetch: app.fetch };
   } catch (error) {
     console.error(
@@ -141,3 +191,90 @@ async function startServer() {
 }
 
 startServer();
+
+async function shutdown(signal: string): Promise<void> {
+  if (shutdownStarted) return;
+  shutdownStarted = true;
+  const deadline = new Promise<void>((resolve) => setTimeout(resolve, 2_000));
+  await Promise.race([
+    Promise.allSettled([
+      closeHttpServer(activeServer),
+      oauthProxyStateStore?.close?.(),
+    ]).then(() => undefined),
+    deadline,
+  ]);
+  console.log(`MCP Inspector stopped (${signal}).`);
+  process.exit(0);
+}
+
+function closeHttpServer(
+  server: ReturnType<typeof serve> | undefined
+): Promise<void> {
+  if (!server) return Promise.resolve();
+  return new Promise((resolve) => server.close(() => resolve()));
+}
+
+type OAuthStateStoreMode = "disabled" | "memory" | "redis";
+
+function parseOAuthStateStoreMode(
+  value: string | undefined,
+  redisUrl: string | undefined,
+  encryptionKey: string | undefined,
+  production: boolean
+): OAuthStateStoreMode {
+  const mode = value?.trim().toLowerCase();
+  if (mode && mode !== "disabled" && mode !== "memory" && mode !== "redis") {
+    throw new Error(
+      "INSPECTOR_OAUTH_STATE_STORE must be one of disabled, memory, or redis"
+    );
+  }
+  const resolved =
+    (mode as OAuthStateStoreMode | undefined) ??
+    (redisUrl || encryptionKey ? "redis" : production ? "disabled" : "memory");
+  if (resolved === "redis" && (!redisUrl || !encryptionKey)) {
+    throw new Error(
+      "Redis OAuth state mode requires INSPECTOR_OAUTH_REDIS_URL (or REDIS_URL) and INSPECTOR_OAUTH_ENCRYPTION_KEY"
+    );
+  }
+  return resolved;
+}
+
+function parsePreviousEncryptionKeys(
+  value: string | undefined
+): OAuthProxyEncryptionKey[] | undefined {
+  if (!value) return undefined;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new Error(
+      "INSPECTOR_OAUTH_PREVIOUS_ENCRYPTION_KEYS_JSON must be valid JSON"
+    );
+  }
+  if (!Array.isArray(parsed)) {
+    throw new Error(
+      "INSPECTOR_OAUTH_PREVIOUS_ENCRYPTION_KEYS_JSON must be an array"
+    );
+  }
+  return parsed.map((entry) => {
+    if (!entry || typeof entry !== "object") {
+      throw new Error("Invalid previous OAuth encryption key entry");
+    }
+    const record = entry as Record<string, unknown>;
+    if (typeof record.id !== "string" || typeof record.key !== "string") {
+      throw new Error("Invalid previous OAuth encryption key entry");
+    }
+    return {
+      id: record.id,
+      key: decodeOAuthProxyEncryptionKey(record.key),
+    };
+  });
+}
+
+function parseOrigins(value: string | undefined): string[] {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+}

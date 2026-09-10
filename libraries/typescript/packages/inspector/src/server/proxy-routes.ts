@@ -1,9 +1,16 @@
 import type { Hono } from "hono";
 import { RateLimiterMemory } from "rate-limiter-flexible";
-import { mountMcpProxy, mountOAuthProxy } from "./proxy/index.js";
+import {
+  mountMcpProxy,
+  mountOAuthProxy,
+  type InspectorRelayAuthenticator,
+  type OAuthProxyConfidentialClientResolver,
+  type OAuthProxyStateStore,
+} from "./proxy/index.js";
 import {
   INSPECTOR_API_RATE_LIMIT,
   INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
+  defaultInspectorGlobalRateLimiter,
 } from "./rate-limit.js";
 
 export type InspectorProxyRoutesConfig = {
@@ -11,12 +18,22 @@ export type InspectorProxyRoutesConfig = {
   autoConnectUrl?: string | null;
   /** Explicit cross-origin callers of the OAuth BFF. Same-origin is implicit. */
   oauthProxyAllowedOrigins?: readonly string[];
+  /** Explicit cross-origin callers of the MCP CORS proxy. */
+  mcpProxyAllowedOrigins?: readonly string[];
   /** Allow the OAuth BFF to reach loopback servers in local development. */
   oauthProxyAllowLoopback?: boolean;
   /** Mount OAuth BFF routes (default true). */
   oauth?: boolean;
   /** Optional source label for logs when Inspector shares a dev server process. */
   logPrefix?: string;
+  /** Mount MCP CORS proxy routes (default true). */
+  mcp?: boolean;
+  /** Durable state shared by every OAuth proxy replica. */
+  oauthProxyStateStore?: OAuthProxyStateStore;
+  /** Server-side provider configuration for confidential OAuth clients. */
+  oauthProxyConfidentialClientResolver?: OAuthProxyConfidentialClientResolver;
+  /** Authentication boundary for the product relay (upstream Authorization is separate). */
+  authenticate?: InspectorRelayAuthenticator;
 };
 
 /**
@@ -34,8 +51,20 @@ export function registerInspectorProxyRoutes(
     points: INSPECTOR_API_RATE_LIMIT,
     duration: INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
   });
+  const globalRateLimiter = defaultInspectorGlobalRateLimiter;
 
-  app.get(p("/inspector/health"), (c) => {
+  app.get(p("/inspector/health"), async (c) => {
+    const stateStore = config?.oauthProxyStateStore;
+    const stateStoreProbe = stateStore?.probe
+      ? stateStore.probe.bind(stateStore)
+      : stateStore?.ready?.bind(stateStore);
+    if (stateStoreProbe) {
+      try {
+        await withHealthTimeout(stateStoreProbe, 1_000);
+      } catch {
+        return c.json({ status: "unavailable" }, 503);
+      }
+    }
     return c.json({
       status: "ok",
       protocol: "mcp-use-inspector-preview",
@@ -44,12 +73,17 @@ export function registerInspectorProxyRoutes(
     });
   });
 
-  mountMcpProxy(app, {
-    path: p("/inspector/api/proxy"),
-    allowLoopback,
-    rateLimiter: apiRateLimiter,
-    logPrefix: config?.logPrefix,
-  });
+  if (config?.mcp !== false) {
+    mountMcpProxy(app, {
+      path: p("/inspector/api/proxy"),
+      allowLoopback,
+      rateLimiter: apiRateLimiter,
+      globalRateLimiter,
+      logPrefix: config?.logPrefix,
+      allowedOrigins: config?.mcpProxyAllowedOrigins,
+      authenticate: config?.authenticate,
+    });
+  }
 
   if (mountOAuth) {
     mountOAuthProxy(app, {
@@ -60,6 +94,10 @@ export function registerInspectorProxyRoutes(
       allowedOrigins: config?.oauthProxyAllowedOrigins ?? [],
       allowLoopback,
       rateLimiter: apiRateLimiter,
+      globalRateLimiter,
+      stateStore: config?.oauthProxyStateStore,
+      resolveConfidentialClient: config?.oauthProxyConfidentialClientResolver,
+      authenticate: config?.authenticate,
     });
   }
 
@@ -68,5 +106,24 @@ export function registerInspectorProxyRoutes(
     app.get(p("/inspector/config.json"), (c) => {
       return c.json({ autoConnectUrl: autoConnectUrl ?? null });
     });
+  }
+}
+
+async function withHealthTimeout(
+  operation: () => Promise<void>,
+  ms: number
+): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error("Inspector state store readiness timeout")),
+      ms
+    );
+    timer.unref?.();
+  });
+  try {
+    await Promise.race([operation(), timeout]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
   }
 }
