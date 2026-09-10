@@ -26,6 +26,12 @@ published version is an error. All peer ranges must accept the exact versions in
 the release set using normal npm prerelease semantics. Registry verification
 checks the same metadata after publication, in addition to package files and tags.
 
+npm scans packages before making accepted publishes installable. Verification
+allows twenty minutes for availability (120 attempts, ten seconds apart), while
+still failing on a missing artifact or incompatible metadata. A successful publish
+command alone is not proof that consumers can install the release. See
+[npm's publish-time scanning announcement](https://github.blog/changelog/2026-07-28-npm-publish-time-malware-scanning-and-dual-use-metadata/).
+
 When adding a package that embeds workspace code, add its build inputs to
 `bundledInputs` and a regression case in `release-propagation.test.mjs`. Do not add
 runtime dependencies just to influence release selection.
