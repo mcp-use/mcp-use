@@ -24,9 +24,9 @@ export interface RunOptions<T = string> {
   /**
    * Provider-neutral messages appended before `prompt`.
    *
-   * Not supported when the agent was constructed with `agentId` (remote mode):
-   * the remote agent protocol does not carry a pre-seeded message list and will
-   * throw at runtime if this field is non-empty.
+   * Not supported when the agent was constructed with `agentId` (remote mode).
+   * Both the native agent and the LangChain agent throw at runtime if this
+   * field is non-empty and the agent is in remote mode.
    */
   messages?: ProviderMessage[];
   /**
