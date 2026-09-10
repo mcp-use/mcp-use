@@ -88,7 +88,6 @@ export interface MCPServerConfig {
   transport?: "http" | "sse";
   headers?: Record<string, string>;
   authToken?: string;
-  auth_token?: string;
   command?: string;
   args?: string[];
   env?: Record<string, string>;

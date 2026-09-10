@@ -34,8 +34,6 @@ export interface MCPServerConfig {
   url?: string;
   /** HTTP headers sent to a remote MCP server. */
   headers?: Record<string, string>;
-  /** Legacy snake-case authentication token. */
-  auth_token?: string;
   /** Authentication token sent to a remote MCP server. */
   authToken?: string;
 }
