@@ -1,0 +1,114 @@
+---
+title: "Daytona"
+description: "Add a run_code tool that executes code in a Daytona sandbox and returns the output through MCP."
+icon: "/v2/typescript/cookbook/daytona.svg"
+---
+
+Give your existing mcp-use server a `run_code` tool. Each call creates a fresh Daytona sandbox, runs the code, and deletes the sandbox afterward.
+
+## Try the live example
+
+Run code through our deployed Daytona server. Pick a suggestion or ask the chat to run your own snippet.
+
+<div className="cookbook-chat-embed">
+<iframe
+  src="https://inspector.manufact.com/inspector?embedded=true&autoConnect=https%3A%2F%2Fwarm-zero-k48ul.run.mcp-use.com%2Fmcp&embeddedConfig=%7B%22singleTab%22%3Atrue%2C%22defaultTab%22%3A%22chat%22%2C%22visibleTabs%22%3A%5B%22chat%22%5D%2C%22chatHideTitle%22%3Atrue%2C%22chatHideServerUrl%22%3Atrue%2C%22chatQuickQuestions%22%3A%5B%22Use%20run_code%20to%20run%20Python%20that%20prints%20the%20first%2010%20Fibonacci%20numbers.%22%2C%22Use%20run_code%20to%20run%20JavaScript%20that%20calculates%20the%20sum%20of%20the%20squares%20from%201%20to%2010.%22%5D%7D"
+  title="Daytona live example — MCP Inspector chat"
+  width="100%"
+  height="500"
+  style={{ border: "1px solid var(--gray-200, #737373)", borderRadius: "12px" }}
+  allow="clipboard-write"
+/>
+</div>
+
+[Open the example in a new tab](https://inspector.manufact.com/inspector?embedded=true&autoConnect=https%3A%2F%2Fwarm-zero-k48ul.run.mcp-use.com%2Fmcp&embeddedConfig=%7B%22singleTab%22%3Atrue%2C%22defaultTab%22%3A%22chat%22%2C%22visibleTabs%22%3A%5B%22chat%22%5D%2C%22chatHideTitle%22%3Atrue%2C%22chatHideServerUrl%22%3Atrue%2C%22chatQuickQuestions%22%3A%5B%22Use%20run_code%20to%20run%20Python%20that%20prints%20the%20first%2010%20Fibonacci%20numbers.%22%2C%22Use%20run_code%20to%20run%20JavaScript%20that%20calculates%20the%20sum%20of%20the%20squares%20from%201%20to%2010.%22%5D%7D).
+
+## Prerequisites
+
+- A working [mcp-use server](/v2/typescript/getting-started/quickstart).
+- A [Daytona API key](https://app.daytona.io/).
+
+## Add the integration
+
+Install the Daytona SDK in your server project:
+
+```bash
+npm install @daytona/sdk@0.210.0
+```
+
+Add your key to `.env`:
+
+```bash .env
+DAYTONA_API_KEY=your_daytona_api_key
+```
+
+Add the highlighted lines to your existing server, or copy this complete example into `src/index.ts`:
+
+```typescript src/index.ts highlight={1,10-39}
+import { Daytona } from "@daytona/sdk";
+import { MCPServer } from "mcp-use";
+import { z } from "zod";
+
+const server = new MCPServer({
+  name: "daytona-example",
+  version: "1.0.0",
+});
+
+server.tool(
+  {
+    name: "run_code",
+    description: "Run code in a fresh Daytona sandbox and return its output.",
+    inputSchema: z.object({
+      code: z.string().min(1).max(100_000),
+      language: z.enum(["python", "typescript", "javascript"]).default("python"),
+    }),
+  },
+  async ({ code, language }) => {
+    const daytona = new Daytona(); // Reads DAYTONA_API_KEY.
+    const sandbox = await daytona.create(
+      { language, autoStopInterval: 5, autoDeleteInterval: 0 },
+      { timeout: 60 },
+    );
+
+    try {
+      const result = await sandbox.process.codeRun(code, undefined, 30);
+      return {
+        isError: result.exitCode !== 0,
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({ output: result.result, exitCode: result.exitCode }),
+        }],
+      };
+    } finally {
+      await daytona.delete(sandbox, 30, true);
+    }
+  },
+);
+
+export default server;
+```
+
+## Try it
+
+Start or restart your server so it loads the key:
+
+```bash
+npm run dev
+```
+
+In the Inspector, select **Tools → run_code** and enter:
+
+```json
+{
+  "language": "python",
+  "code": "print(sum([1, 2, 3]))"
+}
+```
+
+The result contains `output: "6\n"` and `exitCode: 0`. With a model configured in the Inspector's **Chat** tab, try:
+
+```text
+Use run_code to run Python that prints the first 10 Fibonacci numbers.
+```
+
+Each call uses your Daytona account and discards its sandbox files afterward. Code execution has a 30-second timeout; sandbox creation and deletion have separate timeouts.
