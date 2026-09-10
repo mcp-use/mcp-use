@@ -1,7 +1,8 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   resolveAssetsBase,
+  resolveMcpEndpoint,
   resolveServerOrigin,
   resolveRequestOriginFromHeaders,
 } from "../../src/views/origin.js";
@@ -85,5 +86,56 @@ describe("resolveRequestOriginFromHeaders", () => {
         })
       )
     ).toBe("https://fruit.example.com");
+  });
+});
+
+describe("resolveMcpEndpoint", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it.each([
+    ["https://example.com", "/mcp", "https://example.com/mcp"],
+    ["https://example.com/", "/custom/mcp", "https://example.com/custom/mcp"],
+    ["https://example.com/mcp", "/mcp", "https://example.com/mcp"],
+    [
+      "https://example.com/proxy/mcp/",
+      "/mcp",
+      "https://example.com/proxy/mcp/",
+    ],
+    [
+      "https://example.com/mcp?tenant=1",
+      "/mcp",
+      "https://example.com/mcp?tenant=1",
+    ],
+    ["https://example.com", "/", "https://example.com/"],
+  ])("resolves MCP_URL %s with route %s", (value, basePath, expected) => {
+    vi.stubEnv("MCP_URL", value);
+    vi.stubEnv("MCP_ASSETS_URL", "https://cdn.example.com/assets");
+    expect(resolveMcpEndpoint(req("http://localhost:3000/mcp"), basePath)).toBe(
+      expected
+    );
+    expect(resolveMcpEndpoint(undefined, basePath)).toBe(expected);
+  });
+
+  it.each([undefined, "not-a-url"])(
+    "uses the forwarded origin with request path when MCP_URL is %s",
+    (value) => {
+      vi.stubEnv("MCP_URL", value);
+      expect(
+        resolveMcpEndpoint(
+          req("http://localhost:3000/custom/mcp?tenant=1", {
+            forwarded: "proto=https;host=public.example.com",
+          }),
+          "/custom/mcp"
+        )
+      ).toBe("https://public.example.com/custom/mcp?tenant=1");
+    }
+  );
+
+  it("uses the request endpoint without an override and has no stdio default", () => {
+    vi.stubEnv("MCP_URL", undefined);
+    expect(resolveMcpEndpoint(req("https://example.com/mcp"), "/mcp")).toBe(
+      "https://example.com/mcp"
+    );
+    expect(resolveMcpEndpoint(undefined, "/mcp")).toBeUndefined();
   });
 });

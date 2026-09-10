@@ -15,6 +15,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createHash } from "node:crypto";
 import {
   afterAll,
   afterEach,
@@ -575,7 +576,7 @@ describe("views server core (e2e over HTTP)", () => {
     });
   });
 
-  it("hashes ui.domain on resources/read for Claude clients", async () => {
+  it("hashes the full MCP endpoint on resources/read for Claude clients", async () => {
     const read = await claudeClient.readResource({
       uri: "ui://views/product-search-result.html",
     });
@@ -583,14 +584,14 @@ describe("views server core (e2e over HTTP)", () => {
       | Record<string, unknown>
       | undefined;
     expect(ui?.["domain"]).toBe(
-      "36009c725adb9960af4aebe6278959e8.claudemcpcontent.com"
+      `${createHash("sha256").update(url).digest("hex").slice(0, 32)}.claudemcpcontent.com`
     );
     // Only the domain is rewritten; the rest of _meta.ui is untouched.
     expect(ui?.["permissions"]).toEqual({ clipboardWrite: {} });
     expect(ui?.["prefersBorder"]).toBe(true);
   });
 
-  it("hashes ui.domain on resources/read for Claude clients on the legacy wire", async () => {
+  it("hashes the full MCP endpoint on resources/read for Claude clients on the legacy wire", async () => {
     const read = await legacyClaudeClient.readResource({
       uri: "ui://views/product-search-result.html",
     });
@@ -598,7 +599,7 @@ describe("views server core (e2e over HTTP)", () => {
       | Record<string, unknown>
       | undefined;
     expect(ui?.["domain"]).toBe(
-      "36009c725adb9960af4aebe6278959e8.claudemcpcontent.com"
+      `${createHash("sha256").update(url).digest("hex").slice(0, 32)}.claudemcpcontent.com`
     );
   });
 

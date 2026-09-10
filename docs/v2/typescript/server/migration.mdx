@@ -511,6 +511,12 @@ Native View documents are generated MCP resources. Do not register
 
 Move existing widget CSP domains to `view.csp`.
 
+Set `view.domain` to the HTTPS UI origin for ChatGPT. Claude resource reads derive
+the sandbox domain from the full MCP endpoint, using `MCP_URL` plus `basePath` or
+the public request URL. Remove response helpers that overwrite generated
+`_meta.ui.domain`. See [UI origin and endpoint migration](/v2/typescript/mcp-apps/content-security-policy#endpoint-resolution-and-migration)
+for legacy URL values, proxy configuration, and metadata precedence.
+
 ### Handle View URIs cached by ChatGPT
 
 v1 served widgets at `ui://widget/<name>.html`, and sometimes
