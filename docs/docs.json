@@ -456,6 +456,19 @@
                 ]
               },
               {
+                "tab": "Cookbook",
+                "icon": "book-open",
+                "groups": [
+                  {
+                    "group": "Recipes",
+                    "pages": [
+                      "v2/typescript/cookbook/index",
+                      "v2/typescript/cookbook/daytona"
+                    ]
+                  }
+                ]
+              },
+              {
                 "tab": "API Reference",
                 "icon": "terminal",
                 "href": "https://api-reference.mcp-use.com"

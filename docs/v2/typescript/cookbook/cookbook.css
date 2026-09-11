@@ -1,0 +1,23 @@
+/* The cookbook overview is a directory, not a step in a reading sequence. */
+html[data-current-path="/v2/typescript/cookbook"] #pagination,
+html[data-current-path="/v2/typescript/cookbook/"] #pagination {
+  display: none;
+}
+
+/* Give the interactive example more room without widening the recipe text. */
+@media (min-width: 1280px) {
+  .cookbook-chat-embed {
+    width: calc(100% + 128px);
+    margin-left: -64px;
+  }
+}
+
+/* A mask lets the brand glyph inherit the sidebar label's color in every state. */
+#sidebar-content a[href="/v2/typescript/cookbook/daytona"] > div:has(> img) {
+  background-color: currentColor;
+  mask: url("/v2/typescript/cookbook/daytona.svg") center / 16px 16px no-repeat;
+}
+
+#sidebar-content a[href="/v2/typescript/cookbook/daytona"] img {
+  visibility: hidden;
+}
