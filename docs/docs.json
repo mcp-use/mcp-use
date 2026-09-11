@@ -463,7 +463,8 @@
                     "group": "Recipes",
                     "pages": [
                       "v2/typescript/cookbook/index",
-                      "v2/typescript/cookbook/daytona"
+                      "v2/typescript/cookbook/daytona",
+                      "v2/typescript/cookbook/nextjs"
                     ]
                   }
                 ]
