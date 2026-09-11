@@ -72,3 +72,6 @@ test_app
 # Deno test artifacts
 deno-test-temp
 *.tgz
+
+# Scratch fixture copies made by the CLI tests
+.tmp

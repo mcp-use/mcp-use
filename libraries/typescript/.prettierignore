@@ -13,6 +13,7 @@
 **/.tsup/**
 **/.vite/**
 **/.mcp-use/**
+**/.tmp/**
 **/playwright-report/**
 **/src/skills/vendor/*.min.js
 
