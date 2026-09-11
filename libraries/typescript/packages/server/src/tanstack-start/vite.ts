@@ -121,7 +121,10 @@ export function mcpUseTanStackStart(
       "The MCP views config must not include mcpUseTanStackStart(). Use a separate viewsConfig."
     );
   }
-  const basePath = (options.basePath ?? "/api/mcp").replace(/\/+$/, "");
+  const configuredBasePath = options.basePath ?? "/api/mcp";
+  let end = configuredBasePath.length;
+  while (end > 0 && configuredBasePath[end - 1] === "/") end--;
+  const basePath = configuredBasePath.slice(0, end);
   if (!basePath.startsWith("/") || basePath === "" || /[:*?#]/.test(basePath)) {
     throw new Error(
       "mcpUseTanStackStart basePath must be a concrete absolute path."
@@ -151,7 +154,8 @@ export function mcpUseTanStackStart(
       }
       if (build === undefined)
         throw new Error("TanStack Start MCP build has not initialized.");
-      return `export async function loadTanStackStartBuild() { return ${JSON.stringify(await build)}; }`;
+      const serializedBuild = JSON.stringify(await build);
+      return `export async function loadTanStackStartBuild() { return JSON.parse(${JSON.stringify(serializedBuild)}); }`;
     },
   };
 }
