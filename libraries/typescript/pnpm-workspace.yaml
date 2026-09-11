@@ -59,6 +59,9 @@ overrides:
   qs: ">=6.15.2"
   preact: ">=10.28.2"
   zod: 4.4.3
+  # A2UI's renderer and schema conversion currently require the Zod 3 API.
+  "@a2ui/react>zod": 3.25.76
+  "@a2ui/web_core>zod": 3.25.76
   jsondiffpatch: ">=0.7.2"
   esbuild: 0.27.1
   vite: "8.0.16"
