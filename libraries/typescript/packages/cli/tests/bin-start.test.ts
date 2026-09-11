@@ -248,6 +248,17 @@ describe("parseArgs", () => {
     expect(parseArgs(["build"]).sourceMaps).toBe(false);
   });
 
+  it("selects an isolated Vite configuration for framework view builds", () => {
+    expect(parseArgs(["build"]).viewsConfig).toBeUndefined();
+    expect(parseArgs(["build", "--no-views-config"]).viewsConfig).toBe(false);
+    expect(
+      parseArgs(["build", "--views-config=views.vite.config.ts"]).viewsConfig
+    ).toBe("views.vite.config.ts");
+    expect(() => parseArgs(["build", "--views-config"])).toThrow(
+      "Missing value"
+    );
+  });
+
   it("parses --inline for build without changing the default", () => {
     expect(parseArgs(["build", "--inline"]).inline).toBe(true);
     expect(parseArgs(["build"]).inline).toBe(false);

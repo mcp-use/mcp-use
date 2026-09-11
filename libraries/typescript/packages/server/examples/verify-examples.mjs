@@ -11,12 +11,15 @@ import { createHash } from "node:crypto";
 import {
   access,
   chmod,
+  cp,
   mkdir,
+  mkdtemp,
   readFile,
   rm,
   writeFile,
 } from "node:fs/promises";
 import { createServer } from "node:net";
+import { tmpdir } from "node:os";
 import { request as httpRequest } from "node:http";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -146,7 +149,27 @@ async function verifyWithClient(cwd, example, packageJson) {
   }
   const port = await freePort();
   const logPath = join(artifactRoot, `${example.id.replaceAll("/", "-")}.log`);
-  const server = startExample(cwd, example, port, logPath);
+  // Run packaged framework apps outside the checkout, without source files,
+  // node_modules or .mcp-use/build, to catch accidental runtime dependencies.
+  const runtimeCwd = example.portableOutput
+    ? await mkdtemp(join(tmpdir(), `mcp-use-${example.id}-`))
+    : cwd;
+  if (example.portableOutput) {
+    await cp(
+      join(cwd, example.portableOutput),
+      join(runtimeCwd, example.portableOutput),
+      { recursive: true }
+    );
+    await writeFile(
+      join(runtimeCwd, "package.json"),
+      JSON.stringify({
+        private: true,
+        type: "module",
+        scripts: { start: packageJson.scripts.start },
+      })
+    );
+  }
+  const server = startExample(runtimeCwd, example, port, logPath);
   const origin = `http://127.0.0.1:${port}`;
   const websitePort =
     example.launch === "nextjs-standalone" ? await freePort() : undefined;
@@ -195,6 +218,8 @@ async function verifyWithClient(cwd, example, packageJson) {
     await client?.closeAllSessions().catch(() => undefined);
     await stop(server);
     if (website) await stop(website);
+    if (runtimeCwd !== cwd)
+      await rm(runtimeCwd, { recursive: true, force: true });
     process.off("uncaughtException", ignoreExpectedTransportClose);
   }
 }
@@ -358,6 +383,57 @@ async function assertScenario(connection, example, origin) {
         throw new Error(
           `Expected evil Host/Origin to be rejected with 403, received ${rejected}.`
         );
+      return;
+    }
+    case "tanstack-start": {
+      const landing = await fetch(origin);
+      const html = await landing.text();
+      if (
+        !landing.ok ||
+        !html.includes("TanStack Start + mcp-use") ||
+        !html.includes("MCP view ready")
+      ) {
+        throw new Error(
+          "TanStack Start did not server-render the shared card."
+        );
+      }
+      const preflight = await fetch(`${origin}/api/mcp`, {
+        method: "OPTIONS",
+        redirect: "manual",
+        headers: { origin: "https://example.test" },
+      });
+      if (
+        preflight.status !== 204 ||
+        preflight.headers.get("access-control-allow-origin") !== "*"
+      ) {
+        throw new Error("TanStack Start MCP preflight failed or redirected.");
+      }
+      const greeting = await connection.callTool("greet", { name: "Ada" });
+      if (!text(greeting).includes("Hello, Ada!"))
+        throw new Error("TanStack Start greet failed.");
+      const result = await connection.callTool("show-status-card", {});
+      if (result.structuredContent?.title !== "MCP view ready")
+        throw new Error("TanStack Start view result was lost.");
+      for (const method of ["GET", "HEAD"]) {
+        const asset = await fetch(
+          `${origin}/api/mcp/_mcp-use/public/tanstack-start-mark.svg`,
+          { method }
+        );
+        if (
+          !asset.ok ||
+          !asset.headers.get("content-type")?.includes("image/svg+xml")
+        )
+          throw new Error("TanStack Start public view asset failed.");
+        if (asset.headers.get("access-control-allow-origin") !== "*")
+          throw new Error("TanStack Start asset CORS failed.");
+        if (method === "HEAD" && (await asset.text()) !== "")
+          throw new Error("HEAD returned an asset body.");
+      }
+      const missing = await fetch(
+        `${origin}/api/mcp/_mcp-use/public/missing.svg`
+      );
+      if (missing.status !== 404)
+        throw new Error("Missing TanStack Start asset was not 404.");
       return;
     }
     case "nextjs": {

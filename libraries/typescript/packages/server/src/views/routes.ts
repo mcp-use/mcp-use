@@ -4,11 +4,44 @@ import {
   pathnameOf,
   type FetchHandler,
 } from "../fetch-app.js";
-import type { ViewManifestEntry } from "./types.js";
+import type { EmbeddedViewAssets, ViewManifestEntry } from "./types.js";
 
 const PUBLIC_BUILD_DIR = ".mcp-use/build/views/public";
 const PUBLIC_DEV_DIR = "public";
 const VIEW_ASSETS_BUILD_ROOT = ".mcp-use/build/views";
+
+function serveEmbeddedAsset(
+  assets: EmbeddedViewAssets,
+  path: string,
+  request: Request,
+  deferCors: boolean | undefined
+): Response {
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(path);
+  } catch {
+    return new Response("Not Found", { status: 404 });
+  }
+  if (decoded.includes("\\") || decoded.split("/").includes("..")) {
+    return new Response("Not Found", { status: 404 });
+  }
+  const asset = Object.hasOwn(assets, decoded) ? assets[decoded] : undefined;
+  if (asset === undefined) return new Response("Not Found", { status: 404 });
+  return new Response(
+    request.method === "HEAD"
+      ? null
+      : Uint8Array.from(atob(asset.body), (character) =>
+          character.charCodeAt(0)
+        ),
+    {
+      headers: {
+        "Content-Type": asset.contentType,
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        ...(deferCors !== true && { "Access-Control-Allow-Origin": "*" }),
+      },
+    }
+  );
+}
 
 /**
  * Fetch handler for built view bundles under
@@ -25,7 +58,11 @@ const VIEW_ASSETS_BUILD_ROOT = ".mcp-use/build/views";
 export function createViewAssetsHandler(
   basePath: string,
   views: ReadonlyMap<string, ViewManifestEntry>,
-  options?: { projectRoot?: string; deferCors?: boolean }
+  options?: {
+    projectRoot?: string;
+    deferCors?: boolean;
+    assets?: EmbeddedViewAssets;
+  }
 ): FetchHandler | undefined {
   if (views.size === 0) {
     return undefined;
@@ -54,6 +91,15 @@ export function createViewAssetsHandler(
     const entry = views.get(viewName);
     if (entry === undefined || entry.kind !== "external") {
       return new Response("Not Found", { status: 404 });
+    }
+
+    if (options?.assets !== undefined) {
+      return serveEmbeddedAsset(
+        options.assets,
+        remainder,
+        request,
+        options.deferCors
+      );
     }
 
     const [{ join }, { resolvePublicFilePath, servePublicFile }] =
@@ -96,6 +142,7 @@ export function createViewPublicHandler(
     projectRoot?: string;
     deferCors?: boolean;
     enabled?: boolean;
+    assets?: EmbeddedViewAssets;
   }
 ): FetchHandler | undefined {
   if (views.size === 0 && options?.enabled !== true) {
@@ -124,6 +171,15 @@ export function createViewPublicHandler(
     }
     if (subpath.length === 0) {
       return new Response("Not Found", { status: 404 });
+    }
+
+    if (options?.assets !== undefined) {
+      return serveEmbeddedAsset(
+        options.assets,
+        `public/${encodedSubpath}`,
+        request,
+        options.deferCors
+      );
     }
 
     const [{ join }, { resolvePublicFilePath, servePublicFile }] =

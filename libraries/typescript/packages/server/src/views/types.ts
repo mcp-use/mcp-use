@@ -103,3 +103,24 @@ export type ViewManifestEntry =
 export interface ViewsManifest {
   [viewName: string]: ViewManifestEntry;
 }
+
+/** Static view/public files embedded by framework build plugins. @internal */
+export interface EmbeddedViewAssets {
+  /** Paths relative to the generated views directory, including `public/`. */
+  [path: string]: {
+    /** Base64-encoded file bytes. */
+    body: string;
+    /** HTTP media type for this file. */
+    contentType: string;
+  };
+}
+
+/** Runtime registration supplied by build tooling. @internal */
+export interface ViewRegistrationOptions {
+  /** Whether view URLs target a development module server. */
+  dev?: boolean;
+  /** Source project used by filesystem-backed assets. */
+  projectRoot?: string;
+  /** Bundled assets used instead of filesystem reads, including on misses. */
+  assets?: EmbeddedViewAssets;
+}

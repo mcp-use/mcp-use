@@ -1,0 +1,5 @@
+.output/
+.tanstack/
+dist/
+.mcp-use/
+node_modules/
