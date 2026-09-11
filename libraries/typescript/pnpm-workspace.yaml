@@ -86,6 +86,9 @@ overrides:
   lodash-es: ">=4.17.24"
   joi: ">=18.2.1"
   "@babel/core": ">=7.29.1"
+  # Start's compiler imports Babel 7's default export; Babel 8 removed it.
+  "@tanstack/start-plugin-core>@babel/core": "^7.29.1"
+  "@tanstack/router-plugin>@babel/core": "^7.29.1"
   path-to-regexp: ">=8.4.0"
   yaml: ">=2.8.3"
   "@eslint/plugin-kit": ">=0.3.4"

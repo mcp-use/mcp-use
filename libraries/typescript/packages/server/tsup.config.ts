@@ -55,6 +55,10 @@ export default defineConfig([
       "internal/skills-loader-unavailable":
         "src/skills/node-loader-unavailable.ts",
       "next/index": "src/next/index.ts",
+      "tanstack-start/index": "src/tanstack-start/index.ts",
+      "tanstack-start/vite": "src/tanstack-start/vite.ts",
+      "internal/tanstack-start-build":
+        "src/tanstack-start/build-unavailable.ts",
     },
     // ESM-only: the v2 @modelcontextprotocol/* packages ship no CJS entry, so a
     // CJS build of this package could never load them.
@@ -69,6 +73,7 @@ export default defineConfig([
       "@mcp-use/cli",
       "#mcp-use-node-http",
       "#mcp-use-skills-loader",
+      "#mcp-use-tanstack-start-build",
     ],
     define: packageVersionDefine,
     esbuildOptions: minifyFrameworkOutput,

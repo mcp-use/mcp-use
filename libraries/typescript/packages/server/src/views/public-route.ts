@@ -16,6 +16,12 @@ const PUBLIC_CONTENT_TYPES: Record<string, string> = {
   ".woff2": "font/woff2",
 };
 
+/** Resolve the media type of a generated or public asset. @internal */
+export function publicContentType(filename: string): string {
+  const extension = filename.slice(filename.lastIndexOf(".")).toLowerCase();
+  return PUBLIC_CONTENT_TYPES[extension] ?? "application/octet-stream";
+}
+
 /**
  * Resolve a request subpath to an on-disk file under `publicRoot`, rejecting
  * path traversal.
@@ -77,10 +83,7 @@ export async function servePublicFile(
   options: { deferCors?: boolean; head?: boolean } = {}
 ): Promise<Response> {
   const { readFile } = await import("node:fs/promises");
-  const { extname } = await import("node:path");
-
-  const ext = extname(diskPath).toLowerCase();
-  const contentType = PUBLIC_CONTENT_TYPES[ext] ?? "application/octet-stream";
+  const contentType = publicContentType(diskPath);
   const body =
     options.head === true ? null : new Uint8Array(await readFile(diskPath));
   return new Response(body, {
