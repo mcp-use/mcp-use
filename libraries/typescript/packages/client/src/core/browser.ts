@@ -1,6 +1,10 @@
 import type { OAuthClientProvider } from "@modelcontextprotocol/client";
 import type { AutoOAuthOptions, CallbackConfig } from "./config.js";
-import { normalizeClientInfo, resolveCallbacks } from "./config.js";
+import {
+  normalizeClientInfo,
+  resolveCallbacks,
+  resolveClientOptions,
+} from "./config.js";
 import type { BaseConnector } from "../transport/base.js";
 import { HttpConnector } from "../transport/http.js";
 import {
@@ -94,6 +98,8 @@ export class BrowserMCPClient extends BaseMCPClient {
       gatewayUrl,
       serverId,
       reconnectionOptions,
+      roots,
+      defaultRequestOptions,
     } = serverConfig;
 
     if (!url) {
@@ -120,7 +126,7 @@ export class BrowserMCPClient extends BaseMCPClient {
       authProvider,
       detectMixedAuth,
       wrapTransport,
-      clientOptions,
+      clientOptions: resolveClientOptions(clientOptions),
       onSampling: resolved.onSampling,
       onElicitation: resolved.onElicitation,
       onNotification: resolved.onNotification,
@@ -130,6 +136,8 @@ export class BrowserMCPClient extends BaseMCPClient {
       gatewayUrl,
       serverId,
       reconnectionOptions,
+      roots,
+      defaultRequestOptions,
     };
 
     logger.debug(
