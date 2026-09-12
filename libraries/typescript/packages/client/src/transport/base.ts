@@ -584,6 +584,22 @@ export abstract class BaseConnector {
    * @returns The capabilities advertised by the server.
    * @throws When {@link BaseConnector.connect} has not completed.
    */
+  /**
+   * Layer per-call options over the configured defaults.
+   *
+   * `defaultRequestOptions` is documented as the options helper methods use
+   * when they issue SDK requests, overridable per call, so a caller that omits
+   * options must still get the configured timeout and cancellation settings.
+   *
+   * @param options - Per-call options, if any.
+   * @returns The merged options, or undefined when neither side supplies any.
+   */
+  private requestOptions(options?: RequestOptions): RequestOptions | undefined {
+    const defaults = this.opts.defaultRequestOptions;
+    if (defaults === undefined) return options;
+    return options === undefined ? defaults : { ...defaults, ...options };
+  }
+
   async initialize(
     defaultRequestOptions: RequestOptions = this.opts.defaultRequestOptions ??
       {}
@@ -702,7 +718,8 @@ export abstract class BaseConnector {
     // add a no-op callback to trigger the SDK to add progressToken to the request.
     // The SDK only adds progressToken when onprogress is present, which is required
     // for the server to send progress notifications that reset the timeout.
-    let enhancedOptions = options ? { ...options } : undefined;
+    const merged = this.requestOptions(options);
+    let enhancedOptions = merged ? { ...merged } : undefined;
     if (
       enhancedOptions?.resetTimeoutOnProgress &&
       !enhancedOptions.onprogress
@@ -753,7 +770,7 @@ export abstract class BaseConnector {
     }
     logger.debug("[listTools] Fetching fresh tools from server...");
     const result = await this.executeRequest(() =>
-      this.client!.listTools(undefined, options)
+      this.client!.listTools(undefined, this.requestOptions(options))
     );
     // Create a new array to ensure React detects the change (avoid reference equality issues)
     const tools = result.tools ? [...result.tools] : [];
@@ -778,7 +795,7 @@ export abstract class BaseConnector {
 
     logger.debug("Listing resources", cursor ? `with cursor: ${cursor}` : "");
     return await this.executeRequest(() =>
-      this.client!.listResources({ cursor }, options)
+      this.client!.listResources({ cursor }, this.requestOptions(options))
     );
   }
 
@@ -814,7 +831,10 @@ export abstract class BaseConnector {
 
         do {
           const result: { resources?: any[]; nextCursor?: string } =
-            await client.listResources({ cursor }, options);
+            await client.listResources(
+              { cursor },
+              this.requestOptions(options)
+            );
           allResources.push(...(result.resources || []));
           cursor = result.nextCursor;
         } while (cursor);
@@ -845,7 +865,10 @@ export abstract class BaseConnector {
 
     logger.debug("Listing resource templates");
     return await this.executeRequest(() =>
-      this.client!.listResourceTemplates(undefined, options)
+      this.client!.listResourceTemplates(
+        undefined,
+        this.requestOptions(options)
+      )
     );
   }
 
@@ -865,7 +888,7 @@ export abstract class BaseConnector {
     }
     logger.debug("[complete] Requesting completions for:", params.ref);
     const result = await this.executeRequest(() =>
-      this.client!.complete(params, options)
+      this.client!.complete(params, this.requestOptions(options))
     );
     logger.debug(
       `[complete] Received ${result.completion.values.length} suggestions`
@@ -887,7 +910,7 @@ export abstract class BaseConnector {
 
     logger.debug(`Reading resource ${uri}`);
     const res = await this.executeRequest(() =>
-      this.client!.readResource({ uri }, options)
+      this.client!.readResource({ uri }, this.requestOptions(options))
     );
     return res;
   }
@@ -905,7 +928,7 @@ export abstract class BaseConnector {
 
     logger.debug(`Subscribing to resource: ${uri}`);
     return await this.executeRequest(() =>
-      this.client!.subscribeResource({ uri }, options)
+      this.client!.subscribeResource({ uri }, this.requestOptions(options))
     );
   }
 
@@ -922,7 +945,7 @@ export abstract class BaseConnector {
 
     logger.debug(`Unsubscribing from resource: ${uri}`);
     return await this.executeRequest(() =>
-      this.client!.unsubscribeResource({ uri }, options)
+      this.client!.unsubscribeResource({ uri }, this.requestOptions(options))
     );
   }
 
@@ -944,7 +967,9 @@ export abstract class BaseConnector {
 
     try {
       logger.debug("Listing prompts");
-      return await this.executeRequest(() => this.client!.listPrompts());
+      return await this.executeRequest(() =>
+        this.client!.listPrompts(undefined, this.requestOptions())
+      );
     } catch (err: unknown) {
       const error = err as Error & { code?: number };
       // Gracefully handle if server advertises but doesn't actually support it
@@ -975,7 +1000,10 @@ export abstract class BaseConnector {
 
     logger.debug(`Getting prompt ${name}`);
     return await this.executeRequest(() =>
-      this.client!.getPrompt({ name, arguments: args }, options)
+      this.client!.getPrompt(
+        { name, arguments: args },
+        this.requestOptions(options)
+      )
     );
   }
 
@@ -1004,7 +1032,7 @@ export abstract class BaseConnector {
       this.client!.request(
         { method, params: params ?? {} },
         passthroughResultSchema,
-        options
+        this.requestOptions(options)
       )
     );
   }
