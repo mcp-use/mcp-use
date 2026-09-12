@@ -108,6 +108,37 @@ async function fixture() {
 }
 
 describe("HTTP lifecycle with a real legacy MCP session", () => {
+  it("propagates cancellation of an observed SSE response to its source", async () => {
+    const connector = new HttpConnector("http://127.0.0.1:1/mcp", {
+      protocolNegotiation: "legacy",
+    });
+    let cancelReason: unknown;
+    let resolveCancelled: () => void;
+    const cancelled = new Promise<void>((resolve) => {
+      resolveCancelled = resolve;
+    });
+    const source = new ReadableStream<Uint8Array>({
+      cancel(reason) {
+        cancelReason = reason;
+        resolveCancelled();
+      },
+    });
+    const response = new Response(source, {
+      headers: { "content-type": "text/event-stream" },
+    });
+
+    const observed = (
+      connector as unknown as {
+        observeSseProgress(response: Response): Response;
+      }
+    ).observeSseProgress(response);
+    const reason = new Error("consumer cancelled");
+    await observed.body?.cancel(reason);
+    await cancelled;
+
+    expect(cancelReason).toBe(reason);
+  });
+
   it("shares one session across concurrent connects and closes its stream on disconnect", async () => {
     const server = await fixture();
     const { connector } = server;
