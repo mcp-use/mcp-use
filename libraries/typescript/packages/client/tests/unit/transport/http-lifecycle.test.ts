@@ -134,7 +134,22 @@ describe("HTTP lifecycle with a real legacy MCP session", () => {
     ).observeSseProgress(response);
     const reason = new Error("consumer cancelled");
     await observed.body?.cancel(reason);
-    await cancelled;
+    let cancellationTimeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        cancelled,
+        new Promise<never>((_, reject) => {
+          cancellationTimeout = setTimeout(
+            () => reject(new Error("source cancellation was not propagated")),
+            1_000
+          );
+        }),
+      ]);
+    } finally {
+      if (cancellationTimeout) {
+        clearTimeout(cancellationTimeout);
+      }
+    }
 
     expect(cancelReason).toBe(reason);
   });
