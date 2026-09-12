@@ -72,3 +72,6 @@ test_app
 # Deno test artifacts
 deno-test-temp
 *.tgz
+
+# CLI test scratch copies (packages/cli/tests/cli/helpers.ts TMP_ROOT)
+packages/cli/tests/cli/.tmp/
