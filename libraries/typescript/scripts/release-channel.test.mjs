@@ -60,13 +60,19 @@ function run(root, registryFile, ...args) {
   );
 }
 
-function writeChangeset(root, id, releases, summary = "Test change.") {
+function writeChangeset(
+  root,
+  id,
+  releases,
+  summary = "Test change.",
+  lineEnding = "\n"
+) {
   const frontmatter = releases
     .map(({ name, type }) => `"${name}": ${type}`)
-    .join("\n");
+    .join(lineEnding);
   writeFileSync(
     join(root, ".changeset", `${id}.md`),
-    `---\n${frontmatter}\n---\n\n${summary}\n`
+    `---${lineEnding}${frontmatter}${lineEnding}---${lineEnding}${lineEnding}${summary}${lineEnding}`
   );
 }
 
@@ -255,85 +261,117 @@ test("ignores changesets already applied in prerelease mode", () => {
   assert.equal(result.stdout.trim(), "");
 });
 
-test("prepares internal peer ranges for pending Canary changes", () => {
+test("prepares internal peer ranges for LF and CRLF changesets", () => {
+  for (const lineEnding of ["\n", "\r\n"]) {
+    const { root, registryFile } = fixture({
+      localVersion: "2.0.4",
+      latest: "2.0.4",
+      canary: "2.0.5-canary.6",
+      published: ["2.0.4", "2.0.5-canary.6"],
+    });
+    mkdirSync(join(root, "packages", "client"), { recursive: true });
+    mkdirSync(join(root, "packages", "agent"), { recursive: true });
+    mkdirSync(join(root, "packages", "inspector"), { recursive: true });
+    writeFileSync(
+      join(root, "packages", "client", "package.json"),
+      JSON.stringify({
+        name: "@mcp-use/client",
+        version: "2.0.1",
+        peerDependencies: { "mcp-use": "workspace:*" },
+      })
+    );
+    writeFileSync(
+      join(root, "packages", "server", "package.json"),
+      JSON.stringify({
+        name: "mcp-use",
+        version: "2.0.5-canary.6",
+        peerDependencies: { "@mcp-use/client": "^2.0.1" },
+      })
+    );
+    writeFileSync(
+      join(root, "packages", "agent", "package.json"),
+      JSON.stringify({ name: "@mcp-use/agent", version: "2.0.2-canary.4" })
+    );
+    writeFileSync(
+      join(root, "packages", "inspector", "package.json"),
+      JSON.stringify({
+        name: "@mcp-use/inspector",
+        version: "20.0.5-canary.6",
+        peerDependencies: { "@mcp-use/agent": "^2.0.1" },
+      })
+    );
+    writeChangeset(
+      root,
+      "skills",
+      [
+        { name: "@mcp-use/agent", type: "patch" },
+        { name: "@mcp-use/client", type: "minor" },
+        { name: "mcp-use", type: "minor" },
+      ],
+      "Test change.",
+      lineEnding
+    );
+    writePreState(root, {
+      "@mcp-use/agent": "2.0.1",
+      "@mcp-use/client": "2.0.1",
+      "@mcp-use/inspector": "20.0.4",
+      "mcp-use": "2.0.4",
+    });
+
+    const result = run(root, registryFile, "prepare", "--channel", "canary");
+    assert.equal(result.status, 0, result.stderr);
+    const server = JSON.parse(
+      readFileSync(join(root, "packages", "server", "package.json"), "utf8")
+    );
+    assert.equal(
+      server.peerDependencies["@mcp-use/client"],
+      "^2.0.1 || ^2.1.0-canary.0"
+    );
+    const client = JSON.parse(
+      readFileSync(join(root, "packages", "client", "package.json"), "utf8")
+    );
+    assert.equal(
+      client.peerDependencies["mcp-use"],
+      "^2.0.4 || ^2.0.5-canary.0 || ^2.1.0-canary.0"
+    );
+    const inspector = JSON.parse(
+      readFileSync(join(root, "packages", "inspector", "package.json"), "utf8")
+    );
+    assert.equal(
+      inspector.peerDependencies["@mcp-use/agent"],
+      "^2.0.1 || ^2.0.2-canary.0"
+    );
+
+    const repeated = run(root, registryFile, "prepare", "--channel", "canary");
+    assert.equal(repeated.status, 0, repeated.stderr);
+    assert.equal(
+      readFileSync(join(root, "packages", "client", "package.json"), "utf8"),
+      `${JSON.stringify(client, null, 2)}\n`
+    );
+  }
+});
+
+test("checks Canary baselines for packages in CRLF changesets", () => {
   const { root, registryFile } = fixture({
-    localVersion: "2.0.4",
-    latest: "2.0.4",
-    canary: "2.0.5-canary.6",
-    published: ["2.0.4", "2.0.5-canary.6"],
+    localVersion: "2.0.5-canary.0",
+    latest: "2.0.5",
+    canary: "2.0.5-canary.0",
+    published: ["2.0.4", "2.0.5", "2.0.5-canary.0"],
   });
-  mkdirSync(join(root, "packages", "client"), { recursive: true });
-  mkdirSync(join(root, "packages", "agent"), { recursive: true });
-  mkdirSync(join(root, "packages", "inspector"), { recursive: true });
-  writeFileSync(
-    join(root, "packages", "client", "package.json"),
-    JSON.stringify({
-      name: "@mcp-use/client",
-      version: "2.0.1",
-      peerDependencies: { "mcp-use": "workspace:*" },
-    })
+  writeChangeset(
+    root,
+    "windows-change",
+    [{ name: "mcp-use", type: "patch" }],
+    "Windows-authored change.",
+    "\r\n"
   );
-  writeFileSync(
-    join(root, "packages", "server", "package.json"),
-    JSON.stringify({
-      name: "mcp-use",
-      version: "2.0.5-canary.6",
-      peerDependencies: { "@mcp-use/client": "^2.0.1" },
-    })
-  );
-  writeFileSync(
-    join(root, "packages", "agent", "package.json"),
-    JSON.stringify({ name: "@mcp-use/agent", version: "2.0.2-canary.4" })
-  );
-  writeFileSync(
-    join(root, "packages", "inspector", "package.json"),
-    JSON.stringify({
-      name: "@mcp-use/inspector",
-      version: "20.0.5-canary.6",
-      peerDependencies: { "@mcp-use/agent": "^2.0.1" },
-    })
-  );
-  writeChangeset(root, "skills", [
-    { name: "@mcp-use/agent", type: "patch" },
-    { name: "@mcp-use/client", type: "minor" },
-    { name: "mcp-use", type: "minor" },
-  ]);
-  writePreState(root, {
-    "@mcp-use/agent": "2.0.1",
-    "@mcp-use/client": "2.0.1",
-    "@mcp-use/inspector": "20.0.4",
-    "mcp-use": "2.0.4",
-  });
+  writePreState(root, { "mcp-use": "2.0.4" });
 
-  const result = run(root, registryFile, "prepare", "--channel", "canary");
-  assert.equal(result.status, 0, result.stderr);
-  const server = JSON.parse(
-    readFileSync(join(root, "packages", "server", "package.json"), "utf8")
-  );
-  assert.equal(
-    server.peerDependencies["@mcp-use/client"],
-    "^2.0.1 || ^2.1.0-canary.0"
-  );
-  const client = JSON.parse(
-    readFileSync(join(root, "packages", "client", "package.json"), "utf8")
-  );
-  assert.equal(
-    client.peerDependencies["mcp-use"],
-    "^2.0.4 || ^2.0.5-canary.0 || ^2.1.0-canary.0"
-  );
-  const inspector = JSON.parse(
-    readFileSync(join(root, "packages", "inspector", "package.json"), "utf8")
-  );
-  assert.equal(
-    inspector.peerDependencies["@mcp-use/agent"],
-    "^2.0.1 || ^2.0.2-canary.0"
-  );
-
-  const repeated = run(root, registryFile, "prepare", "--channel", "canary");
-  assert.equal(repeated.status, 0, repeated.stderr);
-  assert.equal(
-    readFileSync(join(root, "packages", "client", "package.json"), "utf8"),
-    `${JSON.stringify(client, null, 2)}\n`
+  const result = run(root, registryFile, "preflight", "--channel", "canary");
+  assert.notEqual(result.status, 0);
+  assert.match(
+    result.stderr,
+    /mcp-use canary baseline: 2\.0\.4 is below npm latest 2\.0\.5/u
   );
 });
 
