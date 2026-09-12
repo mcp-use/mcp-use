@@ -36,6 +36,13 @@ vi.mock("../../../src/adapters/langchain_adapter.js", () => ({
 /** Constructor default every case below overrides or falls back to. */
 const DEFAULT_MAX_STEPS = 5;
 
+/**
+ * Public entry points that take a per-call budget. `run` delegates to `stream`
+ * with positional arguments, so the options-object overload of `stream` needs
+ * its own cases rather than riding on the `run` ones.
+ */
+type Path = "run" | "stream" | "streamEvents";
+
 describe("per-call maxSteps", () => {
   let agent: MCPAgent;
   let stream: ReturnType<typeof vi.fn>;
@@ -69,7 +76,7 @@ describe("per-call maxSteps", () => {
 
   /** Drain a path and return the config its executor call received. */
   async function budgetFor(
-    path: "run" | "streamEvents",
+    path: Path,
     maxSteps?: number
   ): Promise<{ runLimit?: number; recursionLimit?: number }> {
     const options = {
@@ -78,12 +85,16 @@ describe("per-call maxSteps", () => {
     };
     if (path === "run") {
       await agent.run(options);
+    } else if (path === "stream") {
+      for await (const _ of agent.stream(options)) {
+        // drain
+      }
     } else {
       for await (const _ of agent.streamEvents(options)) {
         // drain
       }
     }
-    const mock = path === "run" ? stream : streamEvents;
+    const mock = path === "streamEvents" ? streamEvents : stream;
     const config = mock.mock.calls.at(-1)?.[1] as {
       context?: { runLimit?: number };
       recursionLimit?: number;
@@ -97,6 +108,8 @@ describe("per-call maxSteps", () => {
   it.each([
     ["run", 2, 6],
     ["run", 20, 60],
+    ["stream", 2, 6],
+    ["stream", 20, 60],
     ["streamEvents", 2, 6],
     ["streamEvents", 20, 60],
   ] as const)(
@@ -109,7 +122,7 @@ describe("per-call maxSteps", () => {
     }
   );
 
-  it.each(["run", "streamEvents"] as const)(
+  it.each(["run", "stream", "streamEvents"] as const)(
     "%s() leaves the constructor default in place for the next call",
     async (path) => {
       await budgetFor(path, 20);
