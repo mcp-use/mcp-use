@@ -113,7 +113,7 @@ function releasesForChangesets(ids) {
     const contents = readFileSync(
       join(workspaceRoot, ".changeset", `${id}.md`),
       "utf8"
-    );
+    ).replaceAll("\r\n", "\n");
     const frontmatter = contents.match(/^---\n([\s\S]*?)\n---/u)?.[1] ?? "";
     for (const line of frontmatter.split("\n")) {
       const match = line.match(
