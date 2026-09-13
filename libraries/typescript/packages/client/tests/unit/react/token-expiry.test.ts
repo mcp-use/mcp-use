@@ -29,7 +29,9 @@ describe("getOAuthTokenExpiry", () => {
       exp,
       sub: "auth0|65f8a9d0_123-abc",
       scope: "read:mcp write:mcp",
+      pad: "ǿ",
     });
+    expect(tokenWithUnderscore).toContain("_");
     expect(getOAuthTokenExpiry({ access_token: tokenWithUnderscore })).toBe(
       exp * 1000
     );
@@ -104,6 +106,14 @@ describe("getOAuthTokenExpiry", () => {
         expires_in: 60,
       })
     ).toBe(Date.now() + 60_000);
+    // Invalid UTF-8 byte sequence
+    const invalidUtf8Token = `header.${Buffer.from([0xff]).toString("base64url")}.sig`;
+    expect(
+      getOAuthTokenExpiry({
+        access_token: invalidUtf8Token,
+        expires_in: 60,
+      })
+    ).toBe(Date.now() + 60_000);
     vi.useRealTimers();
   });
 
@@ -124,7 +134,13 @@ describe("getOAuthTokenExpiry", () => {
     ).toBe(Date.now() + 60_000);
     expect(
       getOAuthTokenExpiry({
-        access_token: jwt({ exp: NaN }),
+        access_token: jwt({ exp: 0 }),
+        expires_in: 60,
+      })
+    ).toBe(Date.now() + 60_000);
+    expect(
+      getOAuthTokenExpiry({
+        access_token: jwt({ exp: null as unknown as number }),
         expires_in: 60,
       })
     ).toBe(Date.now() + 60_000);
