@@ -286,7 +286,10 @@ export abstract class BaseConnector {
       logger.debug(
         "[Auto] Refreshing tools cache due to list_changed notification"
       );
-      const result = await this.client.listTools();
+      const result = await this.client.listTools(
+        undefined,
+        this.requestOptions()
+      );
       this.toolsCache = (result.tools ?? []) as Tool[];
       logger.debug(
         `[Auto] Refreshed tools cache: ${this.toolsCache.length} tools`
@@ -568,17 +571,6 @@ export abstract class BaseConnector {
   }
 
   /**
-   * Initialise the MCP session **after** `connect()` has succeeded.
-   *
-   * In the SDK, `Client.connect(transport)` automatically performs the
-   * protocol‑level `initialize` handshake, so we only need to cache the list of
-   * tools and expose some server info.
-   *
-   * @param defaultRequestOptions - Options used while fetching the initial tool list.
-   * @returns The capabilities advertised by the server.
-   * @throws When {@link BaseConnector.connect} has not completed.
-   */
-  /**
    * Layer per-call options over the configured defaults.
    *
    * `defaultRequestOptions` is documented as the options helper methods use
@@ -594,6 +586,17 @@ export abstract class BaseConnector {
     return options === undefined ? defaults : { ...defaults, ...options };
   }
 
+  /**
+   * Initialise the MCP session **after** `connect()` has succeeded.
+   *
+   * In the SDK, `Client.connect(transport)` automatically performs the
+   * protocol‑level `initialize` handshake, so we only need to cache the list of
+   * tools and expose some server info.
+   *
+   * @param defaultRequestOptions - Options used while fetching the initial tool list.
+   * @returns The capabilities advertised by the server.
+   * @throws When {@link BaseConnector.connect} has not completed.
+   */
   async initialize(
     defaultRequestOptions: RequestOptions = this.opts.defaultRequestOptions ??
       {}
