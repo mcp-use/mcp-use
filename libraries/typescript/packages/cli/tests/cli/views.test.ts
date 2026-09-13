@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
+import { emptyTest as it } from "./fixtures.js";
 
 import {
   discoverViews,
@@ -10,26 +10,14 @@ import {
 } from "../../src/cli/views.js";
 
 describe("discoverViews", () => {
-  const dirs: string[] = [];
-
-  afterEach(() => {
-    for (const dir of dirs.splice(0)) {
-      rmSync(dir, { recursive: true, force: true });
-    }
+  it("returns an empty list when views/ is missing", ({ project }) => {
+    expect(discoverViews(project.cwd)).toEqual([]);
   });
 
-  function tempProject(): string {
-    const dir = mkdtempSync(join(tmpdir(), "mcp-use-views-"));
-    dirs.push(dir);
-    return dir;
-  }
-
-  it("returns an empty list when views/ is missing", () => {
-    expect(discoverViews(tempProject())).toEqual([]);
-  });
-
-  it("finds views/foo/view.tsx and ignores dirs without view.tsx", () => {
-    const cwd = tempProject();
+  it("finds views/foo/view.tsx and ignores dirs without view.tsx", ({
+    project,
+  }) => {
+    const cwd = project.cwd;
     mkdirSync(join(cwd, "views", "foo"), { recursive: true });
     writeFileSync(
       join(cwd, "views", "foo", "view.tsx"),
@@ -45,8 +33,8 @@ describe("discoverViews", () => {
     ]);
   });
 
-  it("does not discover legacy resources/ paths", () => {
-    const cwd = tempProject();
+  it("does not discover legacy resources/ paths", ({ project }) => {
+    const cwd = project.cwd;
     mkdirSync(join(cwd, "resources", "legacy"), { recursive: true });
     writeFileSync(
       join(cwd, "resources", "legacy", "view.tsx"),
@@ -56,8 +44,10 @@ describe("discoverViews", () => {
     expect(discoverViews(cwd)).toEqual([]);
   });
 
-  it("discovers an explicit views directory relative to the project root", () => {
-    const cwd = tempProject();
+  it("discovers an explicit views directory relative to the project root", ({
+    project,
+  }) => {
+    const cwd = project.cwd;
     mkdirSync(join(cwd, "src", "mcp", "views", "card"), {
       recursive: true,
     });

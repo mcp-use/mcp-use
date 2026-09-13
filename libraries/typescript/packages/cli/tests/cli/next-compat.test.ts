@@ -1,7 +1,8 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect } from "vitest";
+import { it } from "./fixtures.js";
+import type { TestProjects } from "./project.js";
 
 import {
   isNextProject,
@@ -9,18 +10,14 @@ import {
   nextStandaloneCompatPlugin,
 } from "../../src/cli/next-compat.js";
 
-const dirs: string[] = [];
 const keys = ["MCP_USE_ENV_PRIORITY", "MCP_USE_SHELL_PRIORITY"] as const;
 
 afterEach(() => {
-  for (const dir of dirs.splice(0))
-    rmSync(dir, { recursive: true, force: true });
   for (const key of keys) delete process.env[key];
 });
 
-function project(next = true): string {
-  const cwd = mkdtempSync(join(tmpdir(), "mcp-use-next-compat-"));
-  dirs.push(cwd);
+function nextProject(projects: TestProjects, next = true): string {
+  const { cwd } = projects.create("empty");
   writeFileSync(
     join(cwd, "package.json"),
     JSON.stringify(next ? { dependencies: { next: "16.0.0" } } : {})
@@ -29,13 +26,15 @@ function project(next = true): string {
 }
 
 describe("standalone Next compatibility", () => {
-  it("detects Next only from the selected project root", () => {
-    expect(isNextProject(project())).toBe(true);
-    expect(isNextProject(project(false))).toBe(false);
+  it("detects Next only from the selected project root", ({ projects }) => {
+    expect(isNextProject(nextProject(projects))).toBe(true);
+    expect(isNextProject(nextProject(projects, false))).toBe(false);
   });
 
-  it("loads Next development env files in priority order without replacing shell values", () => {
-    const cwd = project();
+  it("loads Next development env files in priority order without replacing shell values", ({
+    projects,
+  }) => {
+    const cwd = nextProject(projects);
     writeFileSync(join(cwd, ".env"), "MCP_USE_ENV_PRIORITY=base\n");
     writeFileSync(
       join(cwd, ".env.development"),
@@ -57,8 +56,10 @@ describe("standalone Next compatibility", () => {
     expect(process.env.MCP_USE_SHELL_PRIORITY).toBe("shell");
   });
 
-  it("only resolves server-runtime shims for SSR imports", async () => {
-    const plugin = nextStandaloneCompatPlugin(project());
+  it("only resolves server-runtime shims for SSR imports", async ({
+    projects,
+  }) => {
+    const plugin = nextStandaloneCompatPlugin(nextProject(projects));
     const resolveId = plugin.resolveId as unknown as (
       source: string,
       importer: string | undefined,

@@ -14,17 +14,15 @@ import {
   Client,
   StreamableHTTPClientTransport,
 } from "@modelcontextprotocol/client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, vi } from "vitest";
+import { it, viewsTest } from "./fixtures.js";
 
-import { runDev } from "../../src/cli/index.js";
 import {
   bindBasicToolToView,
-  copyFixture,
   getFreePort,
   listToolNames,
   mcpRequest,
   occupyPort,
-  removeDir,
   waitFor,
 } from "./helpers.js";
 
@@ -45,108 +43,9 @@ vi.mock("@mcp-use/tunnel", () => ({
   }),
 }));
 
-interface DevHandle {
-  url: string;
-  logs: readonly string[];
-  stop: () => Promise<void>;
-}
-
-const cleanups: (() => Promise<void> | void)[] = [];
-let originalMcpUrl: string | undefined;
-let originalPort: string | undefined;
-
-beforeEach(() => {
-  originalMcpUrl = process.env["MCP_URL"];
-  originalPort = process.env["PORT"];
-});
-
-afterEach(async () => {
+afterEach(() => {
   tunnelState.url = null;
-  const errors: unknown[] = [];
-  try {
-    while (cleanups.length > 0) {
-      try {
-        await cleanups.pop()?.();
-      } catch (error) {
-        errors.push(error);
-      }
-    }
-  } finally {
-    if (originalMcpUrl === undefined) {
-      delete process.env["MCP_URL"];
-    } else {
-      process.env["MCP_URL"] = originalMcpUrl;
-    }
-    if (originalPort === undefined) {
-      delete process.env["PORT"];
-    } else {
-      process.env["PORT"] = originalPort;
-    }
-  }
-  if (errors.length === 1) {
-    throw errors[0];
-  }
-  if (errors.length > 1) {
-    throw new AggregateError(errors, "test cleanup failed");
-  }
 });
-
-/** Start runDev in-process and wait for the ready log to learn the URL. */
-async function startDev(
-  cwd: string,
-  port: number,
-  host?: string,
-  inspector?: boolean
-): Promise<DevHandle> {
-  const lines: string[] = [];
-  const logSpy = vi
-    .spyOn(console, "log")
-    .mockImplementation((...args: unknown[]) => {
-      lines.push(args.map(String).join(" "));
-    });
-  const warnSpy = vi
-    .spyOn(console, "warn")
-    .mockImplementation((...args: unknown[]) => {
-      lines.push(args.map(String).join(" "));
-    });
-
-  const controller = new AbortController();
-  const done = runDev({
-    cwd,
-    port,
-    ...(host !== undefined && { host }),
-    ...(inspector !== undefined && { inspector }),
-    signal: controller.signal,
-  });
-  // Surface startup failures instead of hanging in waitFor.
-  let startupError: unknown;
-  done.catch((error: unknown) => (startupError = error));
-
-  try {
-    const endpointLine = await waitFor(async () => {
-      if (startupError !== undefined) throw startupError;
-      return lines.find((l) => l.includes("MCP endpoint"));
-    });
-    const url = /(https?:\/\/\S+)/.exec(endpointLine)?.[1];
-    if (url === undefined) throw new Error(`no URL in: ${endpointLine}`);
-    return {
-      url,
-      logs: lines,
-      stop: async () => {
-        controller.abort();
-        await done;
-        logSpy.mockRestore();
-        warnSpy.mockRestore();
-      },
-    };
-  } catch (error) {
-    logSpy.mockRestore();
-    warnSpy.mockRestore();
-    controller.abort();
-    await done.catch(() => {});
-    throw error;
-  }
-}
 
 function installFakeInspector(cwd: string): void {
   const projectManifestPath = join(cwd, "package.json");
@@ -222,13 +121,14 @@ export default new MCPServer({
 }
 
 describe("runDev", () => {
-  it("ignores duplicate shutdown signals until async teardown finishes", async () => {
-    const cwd = copyFixture("dev-duplicate-shutdown-signal");
-    cleanups.push(() => removeDir(cwd));
-
+  it("ignores duplicate shutdown signals until async teardown finishes", async ({
+    project,
+  }) => {
+    // Exclude listeners installed while loading dependencies, before runDev starts.
+    await import("../../src/cli/index.js");
     const existingSigint = new Set(process.listeners("SIGINT"));
-    const dev = await startDev(cwd, await getFreePort());
-    cleanups.push(dev.stop);
+    const dev = await project.startDev();
+
     const sigint = process
       .listeners("SIGINT")
       .find((listener) => !existingSigint.has(listener));
@@ -242,8 +142,10 @@ describe("runDev", () => {
     expect(process.listeners("SIGINT")).not.toContain(sigint);
   });
 
-  it("omits invalid skills on reload while preserving valid siblings", async () => {
-    const cwd = copyFixture("dev-skills");
+  it("omits invalid skills on reload while preserving valid siblings", async ({
+    project,
+  }) => {
+    const { cwd } = project;
     const skillDir = join(cwd, "skills", "refunds");
     mkdirSync(join(skillDir, "references"), { recursive: true });
     const skillFile = join(skillDir, "SKILL.md");
@@ -259,8 +161,7 @@ describe("runDev", () => {
       join(siblingDir, "SKILL.md"),
       "---\nname: shipping\ndescription: Track shipments\n---\n# Shipping\n"
     );
-    const dev = await startDev(cwd, await getFreePort(), undefined, false);
-    cleanups.push(dev.stop, () => removeDir(cwd));
+    const dev = await project.startDev({ inspector: false });
 
     expect(await mcpRequest(dev.url, "skills/list")).toMatchObject({
       result: {
@@ -272,7 +173,7 @@ describe("runDev", () => {
     });
 
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    cleanups.push(() => errorSpy.mockRestore());
+    project.defer(() => errorSpy.mockRestore());
     writeFileSync(skillFile, "---\nname: wrong\ndescription: Invalid\n---\n");
     await waitFor(async () => {
       const body = await mcpRequest(dev.url, "skills/list");
@@ -367,8 +268,10 @@ describe("runDev", () => {
     });
   });
 
-  it("watches supporting files in a configured skills directory", async () => {
-    const cwd = copyFixture("dev-custom-skills");
+  it("watches supporting files in a configured skills directory", async ({
+    project,
+  }) => {
+    const { cwd } = project;
     const entry = join(cwd, "src", "index.ts");
     writeFileSync(
       entry,
@@ -386,8 +289,8 @@ describe("runDev", () => {
     const policy = join(skillDir, "references", "policy.md");
     writeFileSync(policy, "Policy v1\n");
 
-    const dev = await startDev(cwd, await getFreePort(), undefined, false);
-    cleanups.push(dev.stop, () => removeDir(cwd));
+    const dev = await project.startDev({ inspector: false });
+
     expect(
       await mcpRequest(dev.url, "resources/read", {
         uri: "skill://refunds/references/policy.md",
@@ -408,54 +311,58 @@ describe("runDev", () => {
     });
   });
 
-  it("reloads skill files when the configured skills directory overlaps views", async () => {
-    const cwd = copyFixture("dev-overlapping-skills-views", "views");
-    const entry = join(cwd, "src", "index.ts");
-    writeFileSync(
-      entry,
-      readFileSync(entry, "utf8").replace(
-        'name: "fixture-views", version: "1.0.0"',
-        'name: "fixture-views", version: "1.0.0", skills: { directory: "views" }'
-      )
-    );
-    const skillDir = join(cwd, "views", "product-search-result");
-    writeFileSync(
-      join(skillDir, "SKILL.md"),
-      "---\nname: product-search-result\ndescription: Product search guidance\n---\n"
-    );
-    const guide = join(skillDir, "guide.md");
-    writeFileSync(guide, "Guidance v1\n");
+  viewsTest(
+    "reloads skill files when the configured skills directory overlaps views",
+    async ({ project }) => {
+      const { cwd } = project;
+      const entry = join(cwd, "src", "index.ts");
+      writeFileSync(
+        entry,
+        readFileSync(entry, "utf8").replace(
+          'name: "fixture-views", version: "1.0.0"',
+          'name: "fixture-views", version: "1.0.0", skills: { directory: "views" }'
+        )
+      );
+      const skillDir = join(cwd, "views", "product-search-result");
+      writeFileSync(
+        join(skillDir, "SKILL.md"),
+        "---\nname: product-search-result\ndescription: Product search guidance\n---\n"
+      );
+      const guide = join(skillDir, "guide.md");
+      writeFileSync(guide, "Guidance v1\n");
 
-    const dev = await startDev(cwd, await getFreePort(), undefined, false);
-    cleanups.push(dev.stop, () => removeDir(cwd));
-    expect(
-      await mcpRequest(dev.url, "resources/read", {
-        uri: "skill://product-search-result/guide.md",
-      })
-    ).toMatchObject({ result: { contents: [{ text: "Guidance v1\n" }] } });
+      const dev = await project.startDev({ inspector: false });
 
-    writeFileSync(guide, "Skills Guidance v2\n");
-    await waitFor(async () => {
-      const body = await mcpRequest(dev.url, "resources/read", {
-        uri: "skill://product-search-result/guide.md",
+      expect(
+        await mcpRequest(dev.url, "resources/read", {
+          uri: "skill://product-search-result/guide.md",
+        })
+      ).toMatchObject({ result: { contents: [{ text: "Guidance v1\n" }] } });
+
+      writeFileSync(guide, "Skills Guidance v2\n");
+      await waitFor(async () => {
+        const body = await mcpRequest(dev.url, "resources/read", {
+          uri: "skill://product-search-result/guide.md",
+        });
+        const result = body["result"] as {
+          contents?: Array<{ text?: string }>;
+        };
+        return result.contents?.[0]?.text === "Skills Guidance v2\n"
+          ? true
+          : undefined;
       });
-      const result = body["result"] as {
-        contents?: Array<{ text?: string }>;
-      };
-      return result.contents?.[0]?.text === "Skills Guidance v2\n"
-        ? true
-        : undefined;
-    });
-  });
+    }
+  );
 
-  it("mounts the project-local Inspector on the existing dev listener", async () => {
-    const cwd = copyFixture("dev-inspector-installed");
-    cleanups.push(() => removeDir(cwd));
+  it("mounts the project-local Inspector on the existing dev listener", async ({
+    project,
+  }) => {
+    const { cwd } = project;
+
     installFakeInspector(cwd);
 
     const port = await getFreePort();
-    const dev = await startDev(cwd, port);
-    cleanups.push(dev.stop);
+    const dev = await project.startDev({ port });
 
     const origin = dev.url.replace(/\/mcp$/, "");
     const shell = await fetch(`${origin}/mcp/inspector`);
@@ -492,13 +399,13 @@ describe("runDev", () => {
     });
   });
 
-  it("serves the built-in Inspector without a project dependency", async () => {
-    const cwd = copyFixture("dev-inspector-missing");
-    cleanups.push(() => removeDir(cwd));
+  it("serves the built-in Inspector without a project dependency", async ({
+    project,
+  }) => {
+    const { cwd } = project;
 
     const port = await getFreePort();
-    const dev = await startDev(cwd, port);
-    cleanups.push(dev.stop);
+    const dev = await project.startDev({ port });
 
     await waitFor(async () =>
       (await fetch(`${dev.url}/inspector`)).status === 200 ? true : undefined
@@ -509,27 +416,24 @@ describe("runDev", () => {
     );
   });
 
-  it("supports an intentional headless dev run", async () => {
-    const cwd = copyFixture("dev-inspector-disabled");
-    cleanups.push(() => removeDir(cwd));
+  it("supports an intentional headless dev run", async ({ project }) => {
+    const { cwd } = project;
+
     installFakeInspector(cwd);
 
     const port = await getFreePort();
-    const dev = await startDev(cwd, port, undefined, false);
-    cleanups.push(dev.stop);
+    const dev = await project.startDev({ port, inspector: false });
 
     expect((await fetch(`${dev.url}/inspector`)).status).toBe(404);
     expect(dev.logs.join("\n")).not.toContain("Inspector is not installed");
     expect(dev.logs.some((line) => line.includes("➜ Inspector:"))).toBe(false);
   });
 
-  it("creates a missing root mcp-env.d.ts", async () => {
-    const cwd = copyFixture("dev-tools-declaration");
-    cleanups.push(() => removeDir(cwd));
+  it("creates a missing root mcp-env.d.ts", async ({ project }) => {
+    const { cwd } = project;
 
     const port = await getFreePort();
-    const dev = await startDev(cwd, port);
-    cleanups.push(dev.stop);
+    const dev = await project.startDev({ port });
 
     expect(existsSync(join(cwd, "mcp-env.d.ts"))).toBe(true);
     expect(readFileSync(join(cwd, "mcp-env.d.ts"), "utf8")).toContain(
@@ -540,13 +444,13 @@ describe("runDev", () => {
     );
   });
 
-  it("serves the MCP endpoint and reloads on file change", async () => {
-    const cwd = copyFixture("dev");
-    cleanups.push(() => removeDir(cwd));
+  it("serves the MCP endpoint and reloads on file change", async ({
+    project,
+  }) => {
+    const { cwd } = project;
 
     const port = await getFreePort();
-    const dev = await startDev(cwd, port);
-    cleanups.push(dev.stop);
+    const dev = await project.startDev({ port });
 
     expect(dev.url).toBe(`http://localhost:${port}/mcp`);
     expect(await listToolNames(dev.url)).toEqual(["add"]);
@@ -572,7 +476,7 @@ export default server;`
 
     // --- A broken save keeps the previous handler alive (never crashes).
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    cleanups.push(() => errorSpy.mockRestore());
+    project.defer(() => errorSpy.mockRestore());
     writeFileSync(entry, "this is not valid typescript {{{\n");
     await waitFor(async () =>
       errorSpy.mock.calls.some((call) =>
@@ -584,53 +488,61 @@ export default server;`
     expect(await listToolNames(dev.url)).toEqual(["add", "subtract"]);
   });
 
-  it("runs a tool-only server without a views directory", async () => {
-    const cwd = copyFixture("dev-zero-views-missing");
-    cleanups.push(() => removeDir(cwd));
+  it("runs a tool-only server without a views directory", async ({
+    project,
+  }) => {
+    const { cwd } = project;
 
-    const dev = await startDev(cwd, await getFreePort(), undefined, false);
-    cleanups.push(dev.stop);
+    const dev = await project.startDev({ inspector: false });
+
     expect(await listToolNames(dev.url)).toEqual(["add"]);
     expect(dev.logs).toContain("[mcp-use] views directory not configured.");
     expect(dev.logs.join("\n")).not.toContain("no views were primed");
   });
 
-  it.each([
+  it.for([
     ["an empty views directory", false],
     ["a view directory without a React component", true],
-  ])("runs a tool-only server with %s", async (_label, nestedDirectory) => {
-    const cwd = copyFixture(`dev-zero-views-${String(nestedDirectory)}`);
-    cleanups.push(() => removeDir(cwd));
-    const viewsDir = nestedDirectory
-      ? join(cwd, "views", "unfinished")
-      : join(cwd, "views");
-    mkdirSync(viewsDir, { recursive: true });
+  ])(
+    "runs a tool-only server with %s",
+    async ([_label, nestedDirectory], { project }) => {
+      const { cwd } = project;
 
-    const dev = await startDev(cwd, await getFreePort(), undefined, false);
-    cleanups.push(dev.stop);
-    expect(await listToolNames(dev.url)).toEqual(["add"]);
-    expect(dev.logs).not.toContain("[mcp-use] views directory not configured.");
-    expect(dev.logs.join("\n")).not.toContain("no views were primed");
-  });
+      const viewsDir = nestedDirectory
+        ? join(cwd, "views", "unfinished")
+        : join(cwd, "views");
+      mkdirSync(viewsDir, { recursive: true });
 
-  it("fails precisely when a tool binds a view and no view component exists", async () => {
-    const cwd = copyFixture("dev-zero-views-bound");
-    cleanups.push(() => removeDir(cwd));
+      const dev = await project.startDev({ inspector: false });
+
+      expect(await listToolNames(dev.url)).toEqual(["add"]);
+      expect(dev.logs).not.toContain(
+        "[mcp-use] views directory not configured."
+      );
+      expect(dev.logs.join("\n")).not.toContain("no views were primed");
+    }
+  );
+
+  it("fails precisely when a tool binds a view and no view component exists", async ({
+    project,
+  }) => {
+    const { cwd } = project;
+
     mkdirSync(join(cwd, "views", "unfinished"), { recursive: true });
     bindBasicToolToView(cwd, "does-not-exist");
 
-    await expect(runDev({ cwd, port: await getFreePort() })).rejects.toThrow(
+    await expect(project.startDev()).rejects.toThrow(
       'Tool "add" is bound to view "does-not-exist" which is not in the primed views registry.'
     );
   });
 
-  it("notifies connected clients after server catalog reloads", async () => {
-    const cwd = copyFixture("dev-list-changed");
-    cleanups.push(() => removeDir(cwd));
+  it("notifies connected clients after server catalog reloads", async ({
+    project,
+  }) => {
+    const { cwd } = project;
 
     const port = await getFreePort();
-    const dev = await startDev(cwd, port);
-    cleanups.push(dev.stop);
+    const dev = await project.startDev({ port });
 
     const changes = { tools: 0, prompts: 0, resources: 0 };
     const catalogs: {
@@ -674,8 +586,8 @@ export default server;`
         },
       }
     );
+    project.defer(() => client.close());
     await client.connect(new StreamableHTTPClientTransport(new URL(dev.url)));
-    cleanups.push(() => client.close());
     await Promise.all([
       client.listTools(),
       client.listPrompts(),
@@ -740,47 +652,46 @@ export default server;`
     );
   });
 
-  it("probes upward when the requested port is taken", async () => {
-    const cwd = copyFixture("dev-port");
-    cleanups.push(() => removeDir(cwd));
+  it("probes upward when the requested port is taken", async ({ project }) => {
+    const { cwd } = project;
 
     const port = await getFreePort();
     const blocker = await occupyPort(port);
-    cleanups.push(() => new Promise<void>((r) => blocker.close(() => r())));
+    project.defer(() => new Promise<void>((r) => blocker.close(() => r())));
 
-    const dev = await startDev(cwd, port);
-    cleanups.push(dev.stop);
+    const dev = await project.startDev({ port });
 
     const boundPort = Number(new URL(dev.url).port);
     expect(boundPort).toBeGreaterThan(port);
     expect(await listToolNames(dev.url)).toEqual(["add"]);
   });
 
-  it("probes upward when a wildcard listener already owns the port on loopback", async () => {
-    const cwd = copyFixture("dev-port-wildcard");
-    cleanups.push(() => removeDir(cwd));
+  it("probes upward when a wildcard listener already owns the port on loopback", async ({
+    project,
+  }) => {
+    const { cwd } = project;
 
     const port = await getFreePort();
     const blocker = await occupyPort(port, "::");
-    cleanups.push(() => new Promise<void>((r) => blocker.close(() => r())));
+    project.defer(() => new Promise<void>((r) => blocker.close(() => r())));
 
-    const dev = await startDev(cwd, port);
-    cleanups.push(dev.stop);
+    const dev = await project.startDev({ port });
 
     const boundPort = Number(new URL(dev.url).port);
     expect(boundPort).toBeGreaterThan(port);
     expect(await listToolNames(dev.url)).toEqual(["add"]);
   });
 
-  it("uses the actual local listener origin for OAuth entries", async () => {
+  it("uses the actual local listener origin for OAuth entries", async ({
+    project,
+  }) => {
     delete process.env["MCP_URL"];
-    const cwd = copyFixture("dev-oauth");
-    cleanups.push(() => removeDir(cwd));
+    const { cwd } = project;
+
     writeOAuthEntry(cwd, "/api/mcp");
 
     const port = await getFreePort();
-    const dev = await startDev(cwd, port);
-    cleanups.push(dev.stop);
+    const dev = await project.startDev({ port });
 
     const metadata = await fetch(
       `http://localhost:${port}/.well-known/oauth-protected-resource/api/mcp`
@@ -793,20 +704,22 @@ export default server;`
     expect(process.env["PORT"]).toBe(String(port));
   });
 
-  it("uses the probed local port as the OAuth resource", async () => {
+  it("uses the probed local port as the OAuth resource", async ({
+    project,
+  }) => {
     delete process.env["MCP_URL"];
-    const cwd = copyFixture("dev-oauth-port");
-    cleanups.push(() => removeDir(cwd));
+    const { cwd } = project;
+
     writeOAuthEntry(cwd);
 
     const requestedPort = await getFreePort();
     const blocker = await occupyPort(requestedPort);
-    cleanups.push(
+    project.defer(
       () => new Promise<void>((resolve) => blocker.close(() => resolve()))
     );
 
-    const dev = await startDev(cwd, requestedPort);
-    cleanups.push(dev.stop);
+    const dev = await project.startDev({ port: requestedPort });
+
     const actualPort = Number(new URL(dev.url).port);
 
     expect(actualPort).toBeGreaterThan(requestedPort);
@@ -819,15 +732,14 @@ export default server;`
     expect(process.env["MCP_URL"]).toBeUndefined();
   });
 
-  it("preserves an explicit MCP_URL for OAuth entries", async () => {
+  it("preserves an explicit MCP_URL for OAuth entries", async ({ project }) => {
     process.env["MCP_URL"] = "https://configured.example.test";
-    const cwd = copyFixture("dev-oauth-explicit-resource");
-    cleanups.push(() => removeDir(cwd));
+    const { cwd } = project;
+
     writeOAuthEntry(cwd);
 
     const port = await getFreePort();
-    const dev = await startDev(cwd, port);
-    cleanups.push(dev.stop);
+    const dev = await project.startDev({ port });
 
     const metadata = await fetch(
       `http://localhost:${port}/.well-known/oauth-protected-resource/mcp`
@@ -838,10 +750,12 @@ export default server;`
     expect(process.env["MCP_URL"]).toBe("https://configured.example.test");
   });
 
-  it("does not leak a synthetic MCP_URL when startup fails", async () => {
+  it("does not leak a synthetic MCP_URL when startup fails", async ({
+    project,
+  }) => {
     delete process.env["MCP_URL"];
-    const cwd = copyFixture("dev-oauth-startup-failure");
-    cleanups.push(() => removeDir(cwd));
+    const { cwd } = project;
+
     writeOAuthEntry(cwd);
     writeFileSync(
       join(cwd, "src", "index.ts"),
@@ -850,20 +764,22 @@ throw new Error("startup failure after MCPServer construction");
 `
     );
 
-    await expect(runDev({ cwd, port: await getFreePort() })).rejects.toThrow(
+    await expect(project.startDev()).rejects.toThrow(
       "startup failure after MCPServer construction"
     );
     expect(process.env["MCP_URL"]).toBeUndefined();
   });
 
-  it("does not reuse a prior run's local OAuth identity", async () => {
+  it("does not reuse a prior run's local OAuth identity", async ({
+    project,
+  }) => {
     delete process.env["MCP_URL"];
-    const cwd = copyFixture("dev-oauth-sequential-runs");
-    cleanups.push(() => removeDir(cwd));
+    const { cwd } = project;
+
     writeOAuthEntry(cwd);
 
     const firstPort = await getFreePort();
-    const first = await startDev(cwd, firstPort);
+    const first = await project.startDev({ port: firstPort });
     const firstMetadata = await fetch(
       `http://localhost:${firstPort}/.well-known/oauth-protected-resource/mcp`
     );
@@ -874,8 +790,8 @@ throw new Error("startup failure after MCPServer construction");
     expect(process.env["MCP_URL"]).toBeUndefined();
 
     const secondPort = await getFreePort();
-    const second = await startDev(cwd, secondPort);
-    cleanups.push(second.stop);
+    const second = await project.startDev({ port: secondPort });
+
     const secondMetadata = await fetch(
       `http://localhost:${secondPort}/.well-known/oauth-protected-resource/mcp`
     );
@@ -885,15 +801,17 @@ throw new Error("startup failure after MCPServer construction");
     expect(process.env["MCP_URL"]).toBeUndefined();
   });
 
-  it("uses the same canonical local resource after reload", async () => {
+  it("uses the same canonical local resource after reload", async ({
+    project,
+  }) => {
     delete process.env["MCP_URL"];
-    const cwd = copyFixture("dev-oauth-reload");
-    cleanups.push(() => removeDir(cwd));
+    const { cwd } = project;
+
     writeOAuthEntry(cwd, "/api/mcp");
 
     const port = await getFreePort();
-    const dev = await startDev(cwd, port);
-    cleanups.push(dev.stop);
+    const dev = await project.startDev({ port });
+
     const entry = join(cwd, "src", "index.ts");
     writeFileSync(entry, `${readFileSync(entry, "utf8")}\n// reload\n`);
     await waitFor(async () =>
@@ -909,25 +827,29 @@ throw new Error("startup failure after MCPServer construction");
     expect(process.env["MCP_URL"]).toBeUndefined();
   });
 
-  it("does not configure OAuth from a public listener or request Host", async () => {
+  it("does not configure OAuth from a public listener or request Host", async ({
+    project,
+  }) => {
     delete process.env["MCP_URL"];
-    const cwd = copyFixture("dev-oauth-public");
-    cleanups.push(() => removeDir(cwd));
+    const { cwd } = project;
+
     writeOAuthEntry(cwd);
 
     await expect(
-      runDev({ cwd, port: await getFreePort("0.0.0.0"), host: "0.0.0.0" })
+      project.startDev({ port: await getFreePort("0.0.0.0"), host: "0.0.0.0" })
     ).rejects.toThrow("OAuth requires an explicit resource or MCP_URL");
     expect(process.env["MCP_URL"]).toBeUndefined();
   });
 
-  it("rejects an entry without a default MCPServer export", async () => {
-    const cwd = copyFixture("dev-bad");
-    cleanups.push(() => removeDir(cwd));
+  it("rejects an entry without a default MCPServer export", async ({
+    project,
+  }) => {
+    const { cwd } = project;
+
     writeFileSync(join(cwd, "src", "index.ts"), "export const nope = 1;\n");
 
     const port = await getFreePort();
-    await expect(runDev({ cwd, port })).rejects.toThrow(
+    await expect(project.startDev({ port })).rejects.toThrow(
       /export default server/
     );
   });
@@ -936,13 +858,13 @@ throw new Error("startup failure after MCPServer construction");
   // binds before any routing. Origin is not validated unless the server sets
   // allowedOrigins.
   // Raw node:http requests because fetch() sanitizes Host/Origin headers.
-  it("rejects non-localhost Host but accepts foreign Origin (DNS rebinding)", async () => {
-    const cwd = copyFixture("dev-rebind");
-    cleanups.push(() => removeDir(cwd));
+  it("rejects non-localhost Host but accepts foreign Origin (DNS rebinding)", async ({
+    project,
+  }) => {
+    const { cwd } = project;
 
     const port = await getFreePort();
-    const dev = await startDev(cwd, port);
-    cleanups.push(dev.stop);
+    const dev = await project.startDev({ port });
 
     // MCP endpoint: rebound Host is rejected; foreign Origin is allowed.
     expect(await rawStatus(dev.url, { host: "evil.example.com" })).toBe(403);
@@ -965,14 +887,15 @@ throw new Error("startup failure after MCPServer construction");
     expect(await rawStatus(dev.url, { origin: "null" })).not.toBe(403);
   });
 
-  it("keeps the loopback-capable Inspector off the public tunnel host", async () => {
-    const cwd = copyFixture("dev-inspector-tunnel-policy");
-    cleanups.push(() => removeDir(cwd));
+  it("keeps the loopback-capable Inspector off the public tunnel host", async ({
+    project,
+  }) => {
+    const { cwd } = project;
+
     installFakeInspector(cwd);
 
     const port = await getFreePort();
-    const dev = await startDev(cwd, port);
-    cleanups.push(dev.stop);
+    const dev = await project.startDev({ port });
 
     const startTunnel = await fetch(
       `${dev.url}/inspector/api/dev/start-tunnel`,
@@ -1046,536 +969,564 @@ async function rawGetBody(
 }
 
 describe("runDev (views)", () => {
-  it("serves Vite modules through a public sandbox hostname", async () => {
-    process.env["MCP_URL"] = "https://sandbox.example.com/mcp";
-    const cwd = copyFixture("dev-views", "views");
-    cleanups.push(() => removeDir(cwd));
+  viewsTest(
+    "serves Vite modules through a public sandbox hostname",
+    async ({ project }) => {
+      process.env["MCP_URL"] = "https://sandbox.example.com/mcp";
+      const { cwd } = project;
 
-    const port = await getFreePort("0.0.0.0");
-    const dev = await startDev(cwd, port, "0.0.0.0");
-    cleanups.push(dev.stop);
-    const base = `http://127.0.0.1:${port}`;
-    const moduleUrl = `${base}/@vite/client`;
+      const port = await getFreePort("0.0.0.0");
+      const dev = await project.startDev({ port, host: "0.0.0.0" });
 
-    expect(
-      await rawStatus(
-        moduleUrl,
-        {
-          host: "sandbox.example.com",
-          origin: "https://vibe.example.com",
-        },
-        "GET"
-      )
-    ).toBe(200);
+      const base = `http://127.0.0.1:${port}`;
+      const moduleUrl = `${base}/@vite/client`;
 
-    const response = await fetch(moduleUrl, {
-      headers: { origin: "https://vibe.example.com" },
-    });
-    expect(response.status).toBe(200);
-    expect(response.headers.get("access-control-allow-origin")).toBe("*");
-    const viteClient = await response.text();
-    expect(viteClient).toContain("sandbox.example.com");
-    expect(viteClient).toContain('const socketProtocol = "wss"');
-    expect(viteClient).toContain("const hmrPort = 443");
-  });
-
-  it("shuts down with active MCP subscriptions and HMR WebSockets", async () => {
-    const cwd = copyFixture("dev-active-connections-shutdown", "views");
-    cleanups.push(() => removeDir(cwd));
-
-    const port = await getFreePort();
-    const dev = await startDev(cwd, port);
-    cleanups.push(dev.stop);
-
-    const client = new Client(
-      { name: "dev-shutdown-test", version: "1.0.0" },
-      {
-        versionNegotiation: { mode: { pin: "2026-07-28" } },
-        listChanged: {
-          tools: {
-            autoRefresh: true,
-            debounceMs: 0,
-            onChanged: () => {},
+      expect(
+        await rawStatus(
+          moduleUrl,
+          {
+            host: "sandbox.example.com",
+            origin: "https://vibe.example.com",
           },
+          "GET"
+        )
+      ).toBe(200);
+
+      const response = await fetch(moduleUrl, {
+        headers: { origin: "https://vibe.example.com" },
+      });
+      expect(response.status).toBe(200);
+      expect(response.headers.get("access-control-allow-origin")).toBe("*");
+      const viteClient = await response.text();
+      expect(viteClient).toContain("sandbox.example.com");
+      expect(viteClient).toContain('const socketProtocol = "wss"');
+      expect(viteClient).toContain("const hmrPort = 443");
+    }
+  );
+
+  viewsTest(
+    "shuts down with active MCP subscriptions and HMR WebSockets",
+    async ({ project }) => {
+      const { cwd } = project;
+
+      const port = await getFreePort();
+      const dev = await project.startDev({ port });
+
+      const client = new Client(
+        { name: "dev-shutdown-test", version: "1.0.0" },
+        {
+          versionNegotiation: { mode: { pin: "2026-07-28" } },
+          listChanged: {
+            tools: {
+              autoRefresh: true,
+              debounceMs: 0,
+              onChanged: () => {},
+            },
+          },
+        }
+      );
+      project.defer(() => client.close().catch(() => {}));
+      await client.connect(new StreamableHTTPClientTransport(new URL(dev.url)));
+      await waitFor(async () =>
+        dev.logs.some((line) => line.includes("subscriptions/listen"))
+          ? true
+          : undefined
+      );
+
+      const ws = new WebSocket(`ws://127.0.0.1:${port}/`, "vite-hmr");
+
+      project.defer(() => ws.close());
+      await new Promise<void>((resolve, reject) => {
+        ws.addEventListener("open", () => resolve(), { once: true });
+        ws.addEventListener(
+          "error",
+          () => reject(new Error("HMR websocket failed to connect")),
+          { once: true }
+        );
+      });
+      const wsClosed = new Promise<void>((resolve) => {
+        ws.addEventListener("close", () => resolve(), { once: true });
+      });
+
+      const shutdown = await Promise.race([
+        dev.stop().then(() => "stopped" as const),
+        new Promise<"timed-out">((resolve) => {
+          setTimeout(() => resolve("timed-out"), 5_000);
+        }),
+      ]);
+
+      expect(shutdown).toBe("stopped");
+      await expect(wsClosed).resolves.toBeUndefined();
+
+      const rebound = await occupyPort(port);
+      await new Promise<void>((resolve) => rebound.close(() => resolve()));
+    },
+    30_000
+  );
+
+  viewsTest(
+    "serves view documents, virtual entries, and reloads on view add",
+    async ({ project }) => {
+      const { cwd } = project;
+
+      const port = await getFreePort();
+      const dev = await project.startDev({ port });
+
+      const base = dev.url.replace(/\/mcp$/, "");
+
+      const readBody = await mcpRequest(
+        dev.url,
+        "resources/read",
+        {
+          uri: "ui://views/product-search-result.html",
         },
-      }
-    );
-    await client.connect(new StreamableHTTPClientTransport(new URL(dev.url)));
-    cleanups.push(() => client.close().catch(() => {}));
-    await waitFor(async () =>
-      dev.logs.some((line) => line.includes("subscriptions/listen"))
-        ? true
-        : undefined
-    );
-
-    const ws = new WebSocket(`ws://127.0.0.1:${port}/`, "vite-hmr");
-    await new Promise<void>((resolve, reject) => {
-      ws.addEventListener("open", () => resolve(), { once: true });
-      ws.addEventListener(
-        "error",
-        () => reject(new Error("HMR websocket failed to connect")),
-        { once: true }
+        { ui: true }
       );
-    });
-    cleanups.push(() => ws.close());
-    const wsClosed = new Promise<void>((resolve) => {
-      ws.addEventListener("close", () => resolve(), { once: true });
-    });
+      const docHtml = (readBody["result"] as { contents: { text: string }[] })
+        .contents[0]!.text;
+      expect(docHtml).toContain('id="root"');
+      expect(docHtml).toContain("/@vite/client");
+      expect(docHtml).toMatch(/virtual:mcp-use\/views\/product-search-result/);
 
-    const shutdown = await Promise.race([
-      dev.stop().then(() => "stopped" as const),
-      new Promise<"timed-out">((resolve) => {
-        setTimeout(() => resolve("timed-out"), 5_000);
-      }),
-    ]);
+      const virtualMatch =
+        /src="([^"]+virtual:mcp-use\/views\/product-search-result[^"]*)"/.exec(
+          docHtml
+        );
+      expect(virtualMatch).not.toBeNull();
+      const virtualUrl = new URL(virtualMatch![1]!, base).href;
+      const virtualResponse = await fetch(virtualUrl);
+      expect(virtualResponse.status).toBe(200);
+      const virtualJs = await virtualResponse.text();
+      expect(virtualJs).toMatch(/bootstrapView/);
+      expect(virtualJs).toContain("import * as viewModule from");
+      expect(virtualJs).toContain("bootstrapView(viewModule)");
 
-    expect(shutdown).toBe("stopped");
-    await expect(wsClosed).resolves.toBeUndefined();
+      // The tunnel hostname becomes known after Vite starts. The framework's
+      // dynamic Host validator authorizes it, then presents it to Vite as the
+      // already-allowed localhost host so module requests are not blocked by
+      // Vite's static allowlist.
+      tunnelState.url = "https://fake.local.mcp-use.run";
+      const tunnelViteClient = await rawGetBody(`${base}/@vite/client`, {
+        host: "fake.local.mcp-use.run",
+        origin: "null",
+      });
+      expect(tunnelViteClient).toContain("createHotContext");
+      expect(tunnelViteClient).toContain("updateStyle");
+      expect(tunnelViteClient).toContain("new WebSocket");
+      tunnelState.url = null;
 
-    const rebound = await occupyPort(port);
-    await new Promise<void>((resolve) => rebound.close(() => resolve()));
-  }, 30_000);
-
-  it("serves view documents, virtual entries, and reloads on view add", async () => {
-    const cwd = copyFixture("dev-views", "views");
-    cleanups.push(() => removeDir(cwd));
-
-    const port = await getFreePort();
-    const dev = await startDev(cwd, port);
-    cleanups.push(dev.stop);
-
-    const base = dev.url.replace(/\/mcp$/, "");
-
-    const readBody = await mcpRequest(
-      dev.url,
-      "resources/read",
-      {
-        uri: "ui://views/product-search-result.html",
-      },
-      { ui: true }
-    );
-    const docHtml = (readBody["result"] as { contents: { text: string }[] })
-      .contents[0]!.text;
-    expect(docHtml).toContain('id="root"');
-    expect(docHtml).toContain("/@vite/client");
-    expect(docHtml).toMatch(/virtual:mcp-use\/views\/product-search-result/);
-
-    const virtualMatch =
-      /src="([^"]+virtual:mcp-use\/views\/product-search-result[^"]*)"/.exec(
-        docHtml
+      // Vite module CORS:
+      // without a tunnel, a validated loopback Origin is reflected exactly
+      // (with Vary: Origin) so a local MCP host can load the module graph…
+      const loopbackOrigin = "http://localhost:6274";
+      const loopbackResponse = await fetch(virtualUrl, {
+        headers: { origin: loopbackOrigin },
+      });
+      expect(loopbackResponse.status).toBe(200);
+      expect(loopbackResponse.headers.get("access-control-allow-origin")).toBe(
+        loopbackOrigin
       );
-    expect(virtualMatch).not.toBeNull();
-    const virtualUrl = new URL(virtualMatch![1]!, base).href;
-    const virtualResponse = await fetch(virtualUrl);
-    expect(virtualResponse.status).toBe(200);
-    const virtualJs = await virtualResponse.text();
-    expect(virtualJs).toMatch(/bootstrapView/);
-    expect(virtualJs).toContain("import * as viewModule from");
-    expect(virtualJs).toContain("bootstrapView(viewModule)");
+      expect(loopbackResponse.headers.get("vary")).toMatch(/Origin/i);
 
-    // The tunnel hostname becomes known after Vite starts. The framework's
-    // dynamic Host validator authorizes it, then presents it to Vite as the
-    // already-allowed localhost host so module requests are not blocked by
-    // Vite's static allowlist.
-    tunnelState.url = "https://fake.local.mcp-use.run";
-    const tunnelViteClient = await rawGetBody(`${base}/@vite/client`, {
-      host: "fake.local.mcp-use.run",
-      origin: "null",
-    });
-    expect(tunnelViteClient).toContain("createHotContext");
-    expect(tunnelViteClient).toContain("updateStyle");
-    expect(tunnelViteClient).toContain("new WebSocket");
-    tunnelState.url = null;
+      // …while foreign and missing Origin get no ACAO…
+      const foreignResponse = await fetch(virtualUrl, {
+        headers: { origin: "https://host.example" },
+      });
+      expect(foreignResponse.status).toBe(200);
+      expect(
+        foreignResponse.headers.get("access-control-allow-origin")
+      ).toBeNull();
 
-    // Vite module CORS:
-    // without a tunnel, a validated loopback Origin is reflected exactly
-    // (with Vary: Origin) so a local MCP host can load the module graph…
-    const loopbackOrigin = "http://localhost:6274";
-    const loopbackResponse = await fetch(virtualUrl, {
-      headers: { origin: loopbackOrigin },
-    });
-    expect(loopbackResponse.status).toBe(200);
-    expect(loopbackResponse.headers.get("access-control-allow-origin")).toBe(
-      loopbackOrigin
-    );
-    expect(loopbackResponse.headers.get("vary")).toMatch(/Origin/i);
+      // …opaque sandbox iframes (`Origin: null`) get `null` so dev widgets load.
+      const nullOriginResponse = await fetch(virtualUrl, {
+        headers: { origin: "null" },
+      });
+      expect(nullOriginResponse.status).toBe(200);
+      expect(
+        nullOriginResponse.headers.get("access-control-allow-origin")
+      ).toBe("null");
 
-    // …while foreign and missing Origin get no ACAO…
-    const foreignResponse = await fetch(virtualUrl, {
-      headers: { origin: "https://host.example" },
-    });
-    expect(foreignResponse.status).toBe(200);
-    expect(
-      foreignResponse.headers.get("access-control-allow-origin")
-    ).toBeNull();
+      const noOriginResponse = await fetch(virtualUrl);
+      expect(noOriginResponse.status).toBe(200);
+      expect(
+        noOriginResponse.headers.get("access-control-allow-origin")
+      ).toBeNull();
 
-    // …opaque sandbox iframes (`Origin: null`) get `null` so dev widgets load.
-    const nullOriginResponse = await fetch(virtualUrl, {
-      headers: { origin: "null" },
-    });
-    expect(nullOriginResponse.status).toBe(200);
-    expect(nullOriginResponse.headers.get("access-control-allow-origin")).toBe(
-      "null"
-    );
+      // …and `*` while a tunnel is active, since hosts rendering through it
+      // fetch modules in CORS mode from their own (or opaque) origins.
+      tunnelState.url = "https://fake.local.mcp-use.run";
+      const tunneledResponse = await fetch(virtualUrl, {
+        headers: { origin: "https://host.example" },
+      });
+      expect(tunneledResponse.status).toBe(200);
+      expect(tunneledResponse.headers.get("access-control-allow-origin")).toBe(
+        "*"
+      );
 
-    const noOriginResponse = await fetch(virtualUrl);
-    expect(noOriginResponse.status).toBe(200);
-    expect(
-      noOriginResponse.headers.get("access-control-allow-origin")
-    ).toBeNull();
+      const viewModuleResponse = await fetch(
+        `${base}/views/product-search-result/view.tsx`
+      );
+      expect(viewModuleResponse.status).toBe(200);
 
-    // …and `*` while a tunnel is active, since hosts rendering through it
-    // fetch modules in CORS mode from their own (or opaque) origins.
-    tunnelState.url = "https://fake.local.mcp-use.run";
-    const tunneledResponse = await fetch(virtualUrl, {
-      headers: { origin: "https://host.example" },
-    });
-    expect(tunneledResponse.status).toBe(200);
-    expect(tunneledResponse.headers.get("access-control-allow-origin")).toBe(
-      "*"
-    );
+      const assetImportResponse = await fetch(
+        `${base}/views/product-search-result/badge.png?import`
+      );
+      expect(assetImportResponse.status).toBe(200);
+      const assetImportJs = await assetImportResponse.text();
+      // Vite `server.origin` is the browsable origin: `localhost`, not the
+      // 127.0.0.1 bind address.
+      expect(assetImportJs).toMatch(
+        new RegExp(
+          `http://localhost:${port}/views/product-search-result/badge\\.png`
+        )
+      );
 
-    const viewModuleResponse = await fetch(
-      `${base}/views/product-search-result/view.tsx`
-    );
-    expect(viewModuleResponse.status).toBe(200);
+      const publicResponse = await fetch(
+        `${base}/mcp/_mcp-use/public/test.txt`
+      );
+      expect(publicResponse.status).toBe(200);
+      expect(publicResponse.headers.get("cache-control")).toBe(
+        "public, max-age=0, must-revalidate"
+      );
+      expect(await publicResponse.text()).toBe(
+        readFileSync(join(cwd, "public", "test.txt"), "utf8")
+      );
 
-    const assetImportResponse = await fetch(
-      `${base}/views/product-search-result/badge.png?import`
-    );
-    expect(assetImportResponse.status).toBe(200);
-    const assetImportJs = await assetImportResponse.text();
-    // Vite `server.origin` is the browsable origin: `localhost`, not the
-    // 127.0.0.1 bind address.
-    expect(assetImportJs).toMatch(
-      new RegExp(
-        `http://localhost:${port}/views/product-search-result/badge\\.png`
-      )
-    );
+      const docConfigMatch =
+        /__mcpUseViewConfig=\{[^}]*"publicBase":"([^"]+)"/.exec(docHtml);
+      expect(docConfigMatch).not.toBeNull();
+      expect(docConfigMatch![1]).toBe(
+        `http://localhost:${port}/mcp/_mcp-use/public/`
+      );
 
-    const publicResponse = await fetch(`${base}/mcp/_mcp-use/public/test.txt`);
-    expect(publicResponse.status).toBe(200);
-    expect(publicResponse.headers.get("cache-control")).toBe(
-      "public, max-age=0, must-revalidate"
-    );
-    expect(await publicResponse.text()).toBe(
-      readFileSync(join(cwd, "public", "test.txt"), "utf8")
-    );
+      const toolsBody = await mcpRequest(
+        dev.url,
+        "tools/list",
+        {},
+        { ui: true }
+      );
+      const searchTool = (
+        toolsBody["result"] as {
+          tools: { name: string; _meta?: Record<string, unknown> }[];
+        }
+      ).tools.find((t) => t.name === "search-products");
+      expect(searchTool?._meta?.["ui"]).toMatchObject({
+        resourceUri: "ui://views/product-search-result.html",
+      });
 
-    const docConfigMatch =
-      /__mcpUseViewConfig=\{[^}]*"publicBase":"([^"]+)"/.exec(docHtml);
-    expect(docConfigMatch).not.toBeNull();
-    expect(docConfigMatch![1]).toBe(
-      `http://localhost:${port}/mcp/_mcp-use/public/`
-    );
-
-    const toolsBody = await mcpRequest(dev.url, "tools/list", {}, { ui: true });
-    const searchTool = (
-      toolsBody["result"] as {
-        tools: { name: string; _meta?: Record<string, unknown> }[];
-      }
-    ).tools.find((t) => t.name === "search-products");
-    expect(searchTool?._meta?.["ui"]).toMatchObject({
-      resourceUri: "ui://views/product-search-result.html",
-    });
-
-    const resourcesBody = await mcpRequest(
-      dev.url,
-      "resources/list",
-      {},
-      { ui: true }
-    );
-    const viewResource = (
-      resourcesBody["result"] as {
-        resources: {
-          uri: string;
-          _meta?: Record<string, unknown>;
-        }[];
-      }
-    ).resources.find((r) => r.uri === "ui://views/product-search-result.html");
-    const connectDomains = (
-      viewResource?._meta?.["ui"] as
-        | { csp?: { connectDomains?: string[] } }
-        | undefined
-    )?.csp?.connectDomains;
-    expect(connectDomains).toEqual(
-      expect.arrayContaining([`ws://localhost:${port}`])
-    );
-
-    mkdirSync(join(cwd, "views", "extra-view"), { recursive: true });
-    writeFileSync(
-      join(cwd, "views", "extra-view", "view.tsx"),
-      `export default function Extra() { return <div>extra</div>; }\n`
-    );
-
-    await waitFor(async () => {
-      const list = await mcpRequest(
+      const resourcesBody = await mcpRequest(
         dev.url,
         "resources/list",
         {},
         { ui: true }
       );
-      const uris = (
-        list["result"] as { resources: { uri: string }[] }
-      ).resources.map((r) => r.uri);
-      return uris.includes("ui://views/extra-view.html") ? true : undefined;
-    });
-  }, 60_000);
-
-  it("reconciles adjacent server and view events as one project generation", async () => {
-    const cwd = copyFixture("dev-view-bind-before-add", "views");
-    cleanups.push(() => removeDir(cwd));
-
-    const dev = await startDev(cwd, await getFreePort());
-    cleanups.push(dev.stop);
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    cleanups.push(() => errorSpy.mockRestore());
-
-    const entry = join(cwd, "src", "index.ts");
-    const source = readFileSync(entry, "utf8");
-    writeFileSync(
-      entry,
-      source.replace('name: "product-search-result"', 'name: "late-view"')
-    );
-
-    // Editors emit separate watcher events for a multi-file save. The entry
-    // and view manifest must be reconciled as one immutable generation.
-    mkdirSync(join(cwd, "views", "late-view"), { recursive: true });
-    writeFileSync(
-      join(cwd, "views", "late-view", "view.tsx"),
-      `export default function LateView() { return <div>late</div>; }\n`
-    );
-
-    await waitFor(async () => {
-      const list = await mcpRequest(
-        dev.url,
-        "resources/list",
-        {},
-        { ui: true }
+      const viewResource = (
+        resourcesBody["result"] as {
+          resources: {
+            uri: string;
+            _meta?: Record<string, unknown>;
+          }[];
+        }
+      ).resources.find(
+        (r) => r.uri === "ui://views/product-search-result.html"
       );
-      const uris = (
-        list["result"] as { resources: { uri: string }[] }
-      ).resources.map((resource) => resource.uri);
-      return uris.includes("ui://views/late-view.html") ? true : undefined;
-    });
-
-    const tools = await mcpRequest(dev.url, "tools/list", {}, { ui: true });
-    const searchTool = (
-      tools["result"] as {
-        tools: { name: string; _meta?: Record<string, unknown> }[];
-      }
-    ).tools.find((tool) => tool.name === "search-products");
-    expect(searchTool?._meta?.["ui"]).toMatchObject({
-      resourceUri: "ui://views/late-view.html",
-    });
-    expect(
-      errorSpy.mock.calls.some((call) =>
-        String(call[0]).includes("reload failed")
-      )
-    ).toBe(false);
-  }, 60_000);
-
-  it("reports a missing view in the latest settled generation and keeps the previous handler", async () => {
-    const cwd = copyFixture("dev-view-missing-after-reload", "views");
-    cleanups.push(() => removeDir(cwd));
-
-    const dev = await startDev(cwd, await getFreePort());
-    cleanups.push(dev.stop);
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    cleanups.push(() => errorSpy.mockRestore());
-
-    const entry = join(cwd, "src", "index.ts");
-    const source = readFileSync(entry, "utf8");
-    writeFileSync(
-      entry,
-      source.replace('name: "product-search-result"', 'name: "missing-view"')
-    );
-
-    await waitFor(async () =>
-      errorSpy.mock.calls.some((call) =>
-        call
-          .map(String)
-          .join(" ")
-          .includes("which is not in the primed views registry")
-      )
-        ? true
-        : undefined
-    );
-
-    const tools = await mcpRequest(dev.url, "tools/list", {}, { ui: true });
-    const searchTool = (
-      tools["result"] as {
-        tools: { name: string; _meta?: Record<string, unknown> }[];
-      }
-    ).tools.find((tool) => tool.name === "search-products");
-    expect(searchTool?._meta?.["ui"]).toMatchObject({
-      resourceUri: "ui://views/product-search-result.html",
-    });
-  }, 60_000);
-
-  it("discards a candidate superseded while its server entry is evaluating", async () => {
-    const cwd = copyFixture("dev-stale-reload-generation", "views");
-    cleanups.push(() => removeDir(cwd));
-
-    const dev = await startDev(cwd, await getFreePort());
-    cleanups.push(dev.stop);
-
-    const entry = join(cwd, "src", "index.ts");
-    const marker = join(cwd, ".stale-generation-started");
-    const source = readFileSync(entry, "utf8");
-    writeFileSync(
-      entry,
-      [
-        `import { writeFileSync as markGeneration } from "node:fs";`,
-        `markGeneration(${JSON.stringify(marker)}, "started");`,
-        `await new Promise((resolve) => setTimeout(resolve, 250));`,
-        source.replace("Search products", "Stale description"),
-      ].join("\n")
-    );
-
-    await waitFor(async () => (existsSync(marker) ? true : undefined));
-    writeFileSync(
-      entry,
-      source.replace("Search products", "Latest description")
-    );
-
-    await waitFor(async () => {
-      const body = await mcpRequest(dev.url, "tools/list", {}, { ui: true });
-      const tool = (
-        body["result"] as { tools: { name: string; description?: string }[] }
-      ).tools.find((candidate) => candidate.name === "search-products");
-      return tool?.description === "Latest description" ? true : undefined;
-    });
-
-    expect(
-      dev.logs.filter((line) => line === "[mcp-use] reloaded server entry")
-    ).toHaveLength(1);
-  }, 60_000);
-
-  it("hot-updates a view.tsx edit without a full document reload", async () => {
-    // Regression: without React Fast Refresh (auto-injected
-    // @vitejs/plugin-react + the refresh preamble in the virtual entry),
-    // every view.tsx edit fell back to Vite `full-reload` — reloading the
-    // srcdoc iframe document and wiping all view state.
-    const cwd = copyFixture("dev-views-hmr", "views");
-    cleanups.push(() => removeDir(cwd));
-
-    const port = await getFreePort();
-    const dev = await startDev(cwd, port);
-    cleanups.push(dev.stop);
-    const base = dev.url.replace(/\/mcp$/, "");
-
-    // The virtual entry pins the Fast Refresh contract: preamble first,
-    // self-accept last.
-    const entryResponse = await fetch(
-      `${base}/@id/__x00__virtual:mcp-use/views/product-search-result`
-    );
-    expect(entryResponse.status).toBe(200);
-    const entryJs = await entryResponse.text();
-    expect(entryJs).toContain("@vitejs/plugin-react/preamble");
-    expect(entryJs).toContain("import.meta.hot.accept()");
-    expect(entryJs).toContain("import * as viewModule from");
-    expect(entryJs).toContain("bootstrapView(viewModule)");
-
-    const messages: { type: string; updates?: { path: string }[] }[] = [];
-    const ws = new WebSocket(`ws://127.0.0.1:${port}/`, "vite-hmr");
-    ws.addEventListener("message", (event) => {
-      messages.push(
-        JSON.parse(String(event.data)) as (typeof messages)[number]
+      const connectDomains = (
+        viewResource?._meta?.["ui"] as
+          | { csp?: { connectDomains?: string[] } }
+          | undefined
+      )?.csp?.connectDomains;
+      expect(connectDomains).toEqual(
+        expect.arrayContaining([`ws://localhost:${port}`])
       );
-    });
-    await new Promise<void>((resolve, reject) => {
-      ws.addEventListener("open", () => resolve());
-      ws.addEventListener("error", () =>
-        reject(new Error("HMR websocket failed to connect"))
+
+      mkdirSync(join(cwd, "views", "extra-view"), { recursive: true });
+      writeFileSync(
+        join(cwd, "views", "extra-view", "view.tsx"),
+        `export default function Extra() { return <div>extra</div>; }\n`
       );
-    });
-    cleanups.push(() => ws.close());
 
-    // Populate the client module graph the way a browser loading the view
-    // document would: fetch each module and, recursively, its static
-    // imports. A 504 is Vite's "outdated optimize dep" — retry like a
-    // browser reload of the request would.
-    const seen = new Set<string>();
-    const loadModule = async (url: string): Promise<void> => {
-      const abs = url.startsWith("http") ? url : `${base}${url}`;
-      if (seen.has(abs) || seen.size > 60) return;
-      seen.add(abs);
-      let response = await fetch(abs);
-      if (response.status === 504) {
-        response = await fetch(abs);
-      }
-      if (!response.ok) return;
-      const js = await response.text();
-      const imports = [...js.matchAll(/from\s+"([^"]+)"|import\s+"([^"]+)"/g)]
-        .map((m) => m[1] ?? m[2])
-        .filter((s): s is string => s !== undefined && s.startsWith("/"));
-      for (const specifier of imports) {
-        await loadModule(specifier);
-      }
-    };
-    await loadModule("/@id/__x00__virtual:mcp-use/views/product-search-result");
-    const viewModule = await fetch(
-      `${base}/views/product-search-result/view.tsx`
-    );
-    // Fast Refresh wrapped the view component module.
-    expect(await viewModule.text()).toContain("RefreshRuntime");
+      await waitFor(async () => {
+        const list = await mcpRequest(
+          dev.url,
+          "resources/list",
+          {},
+          { ui: true }
+        );
+        const uris = (
+          list["result"] as { resources: { uri: string }[] }
+        ).resources.map((r) => r.uri);
+        return uris.includes("ui://views/extra-view.html") ? true : undefined;
+      });
+    },
+    60_000
+  );
 
-    // Cold-loading the view runtime must not ask the iframe to reload. Vibe's
-    // srcdoc guest is torn down by a full reload before its module graph can
-    // finish, so lazy optimizer discovery otherwise becomes a reload loop.
-    await new Promise((r) => setTimeout(r, 1000));
-    expect(messages.filter((m) => m.type === "full-reload")).toEqual([]);
-    messages.length = 0;
+  viewsTest(
+    "reconciles adjacent server and view events as one project generation",
+    async ({ project }) => {
+      const { cwd } = project;
 
-    // Vibe writes managed-process output into this root-level file. It is not
-    // application source and must not produce the endless full-reload loop
-    // that tears down the srcdoc guest before Fast Refresh can run.
-    writeFileSync(join(cwd, ".dev-server-logs.txt"), "dev process output\n");
-    await new Promise((r) => setTimeout(r, 300));
-    expect(messages).toEqual([]);
+      const dev = await project.startDev();
 
-    const viewPath = join(cwd, "views", "product-search-result", "view.tsx");
-    const viewSource = readFileSync(viewPath, "utf8");
-    // Vibe's remote filesystem can surface an editor save as unlink + add
-    // rather than a simple change event. This must stay on the client HMR
-    // path: rebuilding the MCP server publishes catalog invalidations, which
-    // remount the Inspector result and wipes component state.
-    rmSync(viewPath);
-    writeFileSync(viewPath, viewSource.replace("results", "hot-results"));
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      project.defer(() => errorSpy.mockRestore());
 
-    const update = await waitFor(async () =>
-      messages.find(
-        (m) =>
-          m.type === "update" &&
-          m.updates?.some((u) => u.path.endsWith("/view.tsx"))
-      )
-    );
-    expect(update).toBeDefined();
-    expect(messages.filter((m) => m.type === "full-reload")).toEqual([]);
-    await new Promise((r) => setTimeout(r, 200));
-    expect(
-      dev.logs.filter((line) => line === "[mcp-use] reloaded server entry")
-    ).toEqual([]);
-  }, 60_000);
+      const entry = join(cwd, "src", "index.ts");
+      const source = readFileSync(entry, "utf8");
+      writeFileSync(
+        entry,
+        source.replace('name: "product-search-result"', 'name: "late-view"')
+      );
 
-  it("runs two dev servers concurrently with HMR on each main port", async () => {
+      // Editors emit separate watcher events for a multi-file save. The entry
+      // and view manifest must be reconciled as one immutable generation.
+      mkdirSync(join(cwd, "views", "late-view"), { recursive: true });
+      writeFileSync(
+        join(cwd, "views", "late-view", "view.tsx"),
+        `export default function LateView() { return <div>late</div>; }\n`
+      );
+
+      await waitFor(async () => {
+        const list = await mcpRequest(
+          dev.url,
+          "resources/list",
+          {},
+          { ui: true }
+        );
+        const uris = (
+          list["result"] as { resources: { uri: string }[] }
+        ).resources.map((resource) => resource.uri);
+        return uris.includes("ui://views/late-view.html") ? true : undefined;
+      });
+
+      const tools = await mcpRequest(dev.url, "tools/list", {}, { ui: true });
+      const searchTool = (
+        tools["result"] as {
+          tools: { name: string; _meta?: Record<string, unknown> }[];
+        }
+      ).tools.find((tool) => tool.name === "search-products");
+      expect(searchTool?._meta?.["ui"]).toMatchObject({
+        resourceUri: "ui://views/late-view.html",
+      });
+      expect(
+        errorSpy.mock.calls.some((call) =>
+          String(call[0]).includes("reload failed")
+        )
+      ).toBe(false);
+    },
+    60_000
+  );
+
+  viewsTest(
+    "reports a missing view in the latest settled generation and keeps the previous handler",
+    async ({ project }) => {
+      const { cwd } = project;
+
+      const dev = await project.startDev();
+
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      project.defer(() => errorSpy.mockRestore());
+
+      const entry = join(cwd, "src", "index.ts");
+      const source = readFileSync(entry, "utf8");
+      writeFileSync(
+        entry,
+        source.replace('name: "product-search-result"', 'name: "missing-view"')
+      );
+
+      await waitFor(async () =>
+        errorSpy.mock.calls.some((call) =>
+          call
+            .map(String)
+            .join(" ")
+            .includes("which is not in the primed views registry")
+        )
+          ? true
+          : undefined
+      );
+
+      const tools = await mcpRequest(dev.url, "tools/list", {}, { ui: true });
+      const searchTool = (
+        tools["result"] as {
+          tools: { name: string; _meta?: Record<string, unknown> }[];
+        }
+      ).tools.find((tool) => tool.name === "search-products");
+      expect(searchTool?._meta?.["ui"]).toMatchObject({
+        resourceUri: "ui://views/product-search-result.html",
+      });
+    },
+    60_000
+  );
+
+  viewsTest(
+    "discards a candidate superseded while its server entry is evaluating",
+    async ({ project }) => {
+      const { cwd } = project;
+
+      const dev = await project.startDev();
+
+      const entry = join(cwd, "src", "index.ts");
+      const marker = join(cwd, ".stale-generation-started");
+      const source = readFileSync(entry, "utf8");
+      writeFileSync(
+        entry,
+        [
+          `import { writeFileSync as markGeneration } from "node:fs";`,
+          `markGeneration(${JSON.stringify(marker)}, "started");`,
+          `await new Promise((resolve) => setTimeout(resolve, 250));`,
+          source.replace("Search products", "Stale description"),
+        ].join("\n")
+      );
+
+      await waitFor(async () => (existsSync(marker) ? true : undefined));
+      writeFileSync(
+        entry,
+        source.replace("Search products", "Latest description")
+      );
+
+      await waitFor(async () => {
+        const body = await mcpRequest(dev.url, "tools/list", {}, { ui: true });
+        const tool = (
+          body["result"] as { tools: { name: string; description?: string }[] }
+        ).tools.find((candidate) => candidate.name === "search-products");
+        return tool?.description === "Latest description" ? true : undefined;
+      });
+
+      expect(
+        dev.logs.filter((line) => line === "[mcp-use] reloaded server entry")
+      ).toHaveLength(1);
+    },
+    60_000
+  );
+
+  viewsTest(
+    "hot-updates a view.tsx edit without a full document reload",
+    async ({ project }) => {
+      // Regression: without React Fast Refresh (auto-injected
+      // @vitejs/plugin-react + the refresh preamble in the virtual entry),
+      // every view.tsx edit fell back to Vite `full-reload` — reloading the
+      // srcdoc iframe document and wiping all view state.
+      const { cwd } = project;
+
+      const port = await getFreePort();
+      const dev = await project.startDev({ port });
+
+      const base = dev.url.replace(/\/mcp$/, "");
+
+      // The virtual entry pins the Fast Refresh contract: preamble first,
+      // self-accept last.
+      const entryResponse = await fetch(
+        `${base}/@id/__x00__virtual:mcp-use/views/product-search-result`
+      );
+      expect(entryResponse.status).toBe(200);
+      const entryJs = await entryResponse.text();
+      expect(entryJs).toContain("@vitejs/plugin-react/preamble");
+      expect(entryJs).toContain("import.meta.hot.accept()");
+      expect(entryJs).toContain("import * as viewModule from");
+      expect(entryJs).toContain("bootstrapView(viewModule)");
+
+      const messages: { type: string; updates?: { path: string }[] }[] = [];
+      const ws = new WebSocket(`ws://127.0.0.1:${port}/`, "vite-hmr");
+      project.defer(() => ws.close());
+      ws.addEventListener("message", (event) => {
+        messages.push(
+          JSON.parse(String(event.data)) as (typeof messages)[number]
+        );
+      });
+      await new Promise<void>((resolve, reject) => {
+        ws.addEventListener("open", () => resolve());
+        ws.addEventListener("error", () =>
+          reject(new Error("HMR websocket failed to connect"))
+        );
+      });
+
+      // Populate the client module graph the way a browser loading the view
+      // document would: fetch each module and, recursively, its static
+      // imports. A 504 is Vite's "outdated optimize dep" — retry like a
+      // browser reload of the request would.
+      const seen = new Set<string>();
+      const loadModule = async (url: string): Promise<void> => {
+        const abs = url.startsWith("http") ? url : `${base}${url}`;
+        if (seen.has(abs) || seen.size > 60) return;
+        seen.add(abs);
+        let response = await fetch(abs);
+        if (response.status === 504) {
+          response = await fetch(abs);
+        }
+        if (!response.ok) return;
+        const js = await response.text();
+        const imports = [...js.matchAll(/from\s+"([^"]+)"|import\s+"([^"]+)"/g)]
+          .map((m) => m[1] ?? m[2])
+          .filter((s): s is string => s !== undefined && s.startsWith("/"));
+        for (const specifier of imports) {
+          await loadModule(specifier);
+        }
+      };
+      await loadModule(
+        "/@id/__x00__virtual:mcp-use/views/product-search-result"
+      );
+      const viewModule = await fetch(
+        `${base}/views/product-search-result/view.tsx`
+      );
+      // Fast Refresh wrapped the view component module.
+      expect(await viewModule.text()).toContain("RefreshRuntime");
+
+      // Cold-loading the view runtime must not ask the iframe to reload. Vibe's
+      // srcdoc guest is torn down by a full reload before its module graph can
+      // finish, so lazy optimizer discovery otherwise becomes a reload loop.
+      await new Promise((r) => setTimeout(r, 1000));
+      expect(messages.filter((m) => m.type === "full-reload")).toEqual([]);
+      messages.length = 0;
+
+      // Vibe writes managed-process output into this root-level file. It is not
+      // application source and must not produce the endless full-reload loop
+      // that tears down the srcdoc guest before Fast Refresh can run.
+      writeFileSync(join(cwd, ".dev-server-logs.txt"), "dev process output\n");
+      await new Promise((r) => setTimeout(r, 300));
+      expect(messages).toEqual([]);
+
+      const viewPath = join(cwd, "views", "product-search-result", "view.tsx");
+      const viewSource = readFileSync(viewPath, "utf8");
+      // Vibe's remote filesystem can surface an editor save as unlink + add
+      // rather than a simple change event. This must stay on the client HMR
+      // path: rebuilding the MCP server publishes catalog invalidations, which
+      // remount the Inspector result and wipes component state.
+      rmSync(viewPath);
+      writeFileSync(viewPath, viewSource.replace("results", "hot-results"));
+
+      const update = await waitFor(async () =>
+        messages.find(
+          (m) =>
+            m.type === "update" &&
+            m.updates?.some((u) => u.path.endsWith("/view.tsx"))
+        )
+      );
+      expect(update).toBeDefined();
+      expect(messages.filter((m) => m.type === "full-reload")).toEqual([]);
+      await new Promise((r) => setTimeout(r, 200));
+      expect(
+        dev.logs.filter((line) => line === "[mcp-use] reloaded server entry")
+      ).toEqual([]);
+    },
+    60_000
+  );
+
+  it("runs two dev servers concurrently with HMR on each main port", async ({
+    projects,
+  }) => {
     // Regression: the HMR websocket must ride the main HTTP listener
     // (server.hmr.server), not a fixed side port — a hardcoded HMR port made
     // the second concurrent `mcp-use dev` process fail to bind.
-    const cwdA = copyFixture("dev-views-a", "views");
-    const cwdB = copyFixture("dev-views-b", "views");
-    cleanups.push(
-      () => removeDir(cwdA),
-      () => removeDir(cwdB)
-    );
+    const projectA = projects.create("views");
+    const cwdA = projectA.cwd;
+    const projectB = projects.create("views");
+    const cwdB = projectB.cwd;
 
     const portA = await getFreePort();
-    const devA = await startDev(cwdA, portA);
-    cleanups.push(devA.stop);
+    const devA = await projectA.startDev({ port: portA });
+
     const portB = await getFreePort();
-    const devB = await startDev(cwdB, portB);
-    cleanups.push(devB.stop);
+    const devB = await projectB.startDev({ port: portB });
 
     // Vite's HMR client speaks the `vite-hmr` subprotocol and greets with a
     // `connected` message; an upgrade succeeding on the MAIN port proves the
@@ -1583,6 +1534,7 @@ describe("runDev (views)", () => {
     const probeHmr = async (port: number): Promise<string> =>
       new Promise((resolve, reject) => {
         const ws = new WebSocket(`ws://127.0.0.1:${port}/`, "vite-hmr");
+        projects.defer(() => ws.close());
         const timer = setTimeout(() => {
           ws.close();
           reject(new Error(`no HMR greeting on port ${port}`));
