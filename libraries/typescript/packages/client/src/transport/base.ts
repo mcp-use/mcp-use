@@ -568,6 +568,18 @@ export abstract class BaseConnector {
   }
 
   /**
+   * Whether {@link BaseConnector.initialize} has completed for the current
+   * connection.
+   *
+   * Reading {@link BaseConnector.tools} throws before initialization, so a
+   * caller that wants to decide whether to initialize has to ask here instead.
+   * Disconnecting clears the cached tool list and returns this to `false`.
+   */
+  get isInitialized(): boolean {
+    return this.toolsCache !== null;
+  }
+
+  /**
    * Initialise the MCP session **after** `connect()` has succeeded.
    *
    * In the SDK, `Client.connect(transport)` automatically performs the
