@@ -126,10 +126,10 @@ jobs:
 
             RETRY_COUNT=$((RETRY_COUNT + 1))
             if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
-              echo "Waiting for package... (attempt $RETRY_COUNT/$MAX_RETRIES)"
+              echo "Waiting for package... (attempt $RETRY_COUNT/$MAX_RETRIES, next retry in ${RETRY_DELAY}s)"
               sleep $RETRY_DELAY
             else
-              echo "⚠️ Package didn't become available after ${MAX_RETRIES} attempts (5 minutes)"
+              echo "⚠️ Package didn't become available after ${MAX_RETRIES} attempts (~7 minutes)"
             fi
           done
           echo "ready=$READY" >> $GITHUB_OUTPUT
