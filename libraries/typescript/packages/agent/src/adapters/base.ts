@@ -288,16 +288,6 @@ export abstract class BaseAdapter<T> {
   }
 
   /**
-   * Check if a connector is initialized and has tools.
-   *
-   * @param connector - The connector to check.
-   * @returns True if the connector is initialized and has tools, false otherwise.
-   */
-  private checkConnectorInitialized(connector: BaseConnector): boolean {
-    return Boolean(connector.tools && connector.tools.length);
-  }
-
-  /**
    * Ensure a connector is initialized.
    *
    * @param connector - The connector to initialize.
@@ -306,8 +296,8 @@ export abstract class BaseAdapter<T> {
   private async ensureConnectorInitialized(
     connector: BaseConnector
   ): Promise<boolean> {
-    if (!this.checkConnectorInitialized(connector)) {
-      logger.debug("Connector doesn't have tools, initializing it");
+    if (!connector.isInitialized) {
+      logger.debug("Connector is not initialized, initializing it");
       try {
         await connector.initialize();
         return true;
