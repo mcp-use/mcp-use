@@ -411,4 +411,114 @@ describe("mountInspector", () => {
       await new Promise<void>((resolve) => upstream.close(() => resolve()));
     }
   }, 10000);
+
+  it("does not end the downstream response cleanly when the upstream stream fails", async () => {
+    // Upstream sends headers and one chunk, then destroys the socket, so the
+    // proxy's reader.read() rejects with TypeError: terminated. res.end() must
+    // NOT run: ending in `finally` closed the response as if it had completed,
+    // so the client could not tell a truncated stream from a finished one.
+    const upstream = http.createServer((req, res) => {
+      res.writeHead(200, {
+        "content-type": "text/event-stream",
+        "cache-control": "no-cache",
+      });
+      res.write(": ping\n\n");
+      setTimeout(() => res.socket?.destroy(), 20);
+    });
+    await new Promise<void>((resolve) => upstream.listen(0, resolve));
+
+    const app = express();
+    mountInspector(app, { basePath: "/mcp", oauthProxyAllowLoopback: true });
+    const server = app.listen(0);
+
+    try {
+      const upstreamAddress = upstream.address();
+      const appAddress = server.address();
+      if (
+        !upstreamAddress ||
+        typeof upstreamAddress === "string" ||
+        !appAddress ||
+        typeof appAddress === "string"
+      ) {
+        throw new Error("Test servers did not bind TCP ports");
+      }
+
+      const response = await fetch(
+        `http://127.0.0.1:${appAddress.port}/mcp/inspector/api/proxy`,
+        {
+          headers: {
+            "x-target-url": `http://127.0.0.1:${upstreamAddress.port}/stream`,
+          },
+        }
+      );
+      expect(response.status).toBe(200);
+
+      // The stream must fail rather than finish: reading to completion rejects
+      // because the response was never cleanly ended.
+      await expect(response.text()).rejects.toThrow();
+    } finally {
+      server.closeAllConnections();
+      upstream.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await new Promise<void>((resolve) => upstream.close(() => resolve()));
+    }
+  }, 10000);
+
+  it("handles a disconnect after headers but before the buffered body completes", async () => {
+    // Non-streaming path: headers land, then the client goes away while the body
+    // is still arriving. proxyResponse() awaits response.arrayBuffer(), so that
+    // read rejects; returning it unawaited let the rejection escape the
+    // cancellation handler and surface as an AbortError stack plus a 500.
+    const upstream = http.createServer((req, res) => {
+      res.writeHead(200, {
+        "content-type": "application/json",
+        "content-length": "64",
+      });
+      res.write('{"partial":');
+      // never finishes the body
+    });
+    await new Promise<void>((resolve) => upstream.listen(0, resolve));
+
+    const app = express();
+    mountInspector(app, { basePath: "/mcp", oauthProxyAllowLoopback: true });
+    const server = app.listen(0);
+
+    let controller: AbortController | undefined;
+    try {
+      const upstreamAddress = upstream.address();
+      const appAddress = server.address();
+      if (
+        !upstreamAddress ||
+        typeof upstreamAddress === "string" ||
+        !appAddress ||
+        typeof appAddress === "string"
+      ) {
+        throw new Error("Test servers did not bind TCP ports");
+      }
+
+      const target = `http://127.0.0.1:${upstreamAddress.port}/json`;
+      controller = new AbortController();
+      const pending = fetch(
+        `http://127.0.0.1:${appAddress.port}/mcp/inspector/api/proxy`,
+        { headers: { "x-target-url": target }, signal: controller.signal }
+      ).catch(() => undefined);
+
+      await new Promise<void>((resolve) => setTimeout(resolve, 50));
+      controller.abort();
+      await pending;
+
+      // The server must stay healthy: an escaped rejection would take the
+      // request down with a 500 rather than a quiet cancellation.
+      const probe = await fetch(
+        `http://127.0.0.1:${appAddress.port}/mcp/inspector`
+      );
+      expect(probe.status).toBe(200);
+    } finally {
+      controller?.abort();
+      server.closeAllConnections();
+      upstream.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await new Promise<void>((resolve) => upstream.close(() => resolve()));
+    }
+  }, 10000);
 });

@@ -305,7 +305,7 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
         });
         const location = response.headers.get("location");
         if (!(response.status >= 300 && response.status < 400 && location)) {
-          return proxyResponse(response);
+          return await proxyResponse(response);
         }
         if (redirectCount >= MAX_REDIRECTS) {
           return c.json({ error: "Too many upstream redirects" }, 502);
