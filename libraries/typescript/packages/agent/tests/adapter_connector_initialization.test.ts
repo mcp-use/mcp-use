@@ -3,13 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { LangChainAdapter } from "../src/adapters/langchain_adapter.js";
 
-/**
- * The adapter initializes a connector on demand. It used to decide by reading
- * `connector.tools`, which throws before `initialize()` has run, so the
- * on-demand path threw instead of taking itself.
- */
 class ProbeConnector extends BaseConnector {
-  /** Number of completed `initialize()` calls. */
   initializeCount = 0;
 
   constructor(private readonly toolNames: string[]) {

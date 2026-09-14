@@ -567,14 +567,7 @@ export abstract class BaseConnector {
     return this.client != null;
   }
 
-  /**
-   * Whether {@link BaseConnector.initialize} has completed for the current
-   * connection.
-   *
-   * Reading {@link BaseConnector.tools} throws before initialization, so a
-   * caller that wants to decide whether to initialize has to ask here instead.
-   * Disconnecting clears the cached tool list and returns this to `false`.
-   */
+  /** Whether {@link BaseConnector.initialize} has completed for this connection. */
   get isInitialized(): boolean {
     return this.toolsCache !== null;
   }
