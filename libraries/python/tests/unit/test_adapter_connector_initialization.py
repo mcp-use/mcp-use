@@ -52,6 +52,25 @@ class TestConnectorIsInitialized:
         connector._initialized = False
         assert BaseConnector.is_initialized.fget(connector) is False
 
+    def test_websocket_connector_is_initialized_lifecycle(self):
+        """Test WebSocketConnector initializes and resets _initialized flag properly."""
+        from mcp_use.client.connectors.websocket import WebSocketConnector
+
+        ws_connector = WebSocketConnector("ws://localhost:8080/mcp")
+        assert ws_connector.is_initialized is False
+        with pytest.raises(RuntimeError, match="MCP client is not initialized"):
+            _ = ws_connector.tools
+
+        # Simulate initialized with 0 tools
+        ws_connector._initialized = True
+        ws_connector._tools = []
+        assert ws_connector.is_initialized is True
+        assert ws_connector.tools == []
+
+        # Simulate cleanup
+        ws_connector._initialized = False
+        assert ws_connector.is_initialized is False
+
 
 class TestAdapterConnectorInitialization:
     """Tests for BaseAdapter initialization checking and error handling."""

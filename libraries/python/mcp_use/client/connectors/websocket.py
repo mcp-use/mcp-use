@@ -59,6 +59,7 @@ class WebSocketConnector(BaseConnector):
         self.pending_requests: dict[str, asyncio.Future] = {}
         self._tools: list[Tool] | None = None
         self._connected = False
+        self._initialized = False
 
     async def connect(self) -> None:
         """Establish a connection to the MCP implementation."""
@@ -172,8 +173,9 @@ class WebSocketConnector(BaseConnector):
                 self._connection_manager = None
                 self.ws = None
 
-        # Reset tools
+        # Reset tools and initialization flag
         self._tools = None
+        self._initialized = False
 
         if errors:
             logger.warning(f"Encountered {len(errors)} errors during resource cleanup")
@@ -212,6 +214,7 @@ class WebSocketConnector(BaseConnector):
         # Get available tools
         tools_result = await self.list_tools()
         self._tools = [Tool(**tool) for tool in tools_result]
+        self._initialized = True
 
         logger.debug(f"MCP session initialized with {len(self._tools)} tools")
         return result
@@ -225,9 +228,9 @@ class WebSocketConnector(BaseConnector):
     @property
     def tools(self) -> list[Tool]:
         """Get the list of available tools."""
-        if not self._tools:
-            raise RuntimeError("MCP client is not initialized")
-        return self._tools
+        if not self._initialized:
+            raise RuntimeError("MCP client is not initialized. Call initialize() first.")
+        return self._tools or []
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> Any:
         """Call an MCP tool with the given arguments."""

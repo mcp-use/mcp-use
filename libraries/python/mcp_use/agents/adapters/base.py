@@ -343,8 +343,7 @@ class BaseAdapter(Generic[T], ABC):
         """
         if not self._check_connector_initialized(connector):
             logger.debug(
-                f"Connector {getattr(connector, 'public_identifier', connector)} "
-                "is not initialized, initializing it"
+                f"Connector {getattr(connector, 'public_identifier', connector)} is not initialized, initializing it"
             )
             try:
                 await connector.initialize()
