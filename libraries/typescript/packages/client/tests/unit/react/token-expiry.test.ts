@@ -117,7 +117,22 @@ describe("getOAuthTokenExpiry", () => {
     vi.useRealTimers();
   });
 
-  it("falls back to expires_in when exp claim is not a positive finite number", () => {
+  it("resolves nonpositive finite exp as past timestamp instead of falling back to expires_in", () => {
+    expect(
+      getOAuthTokenExpiry({
+        access_token: jwt({ exp: 0 }),
+        expires_in: 60,
+      })
+    ).toBe(0);
+    expect(
+      getOAuthTokenExpiry({
+        access_token: jwt({ exp: -100 }),
+        expires_in: 60,
+      })
+    ).toBe(-100_000);
+  });
+
+  it("falls back to expires_in when exp claim is not a finite number", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
     expect(
@@ -128,19 +143,19 @@ describe("getOAuthTokenExpiry", () => {
     ).toBe(Date.now() + 60_000);
     expect(
       getOAuthTokenExpiry({
-        access_token: jwt({ exp: -100 }),
-        expires_in: 60,
-      })
-    ).toBe(Date.now() + 60_000);
-    expect(
-      getOAuthTokenExpiry({
-        access_token: jwt({ exp: 0 }),
-        expires_in: 60,
-      })
-    ).toBe(Date.now() + 60_000);
-    expect(
-      getOAuthTokenExpiry({
         access_token: jwt({ exp: null as unknown as number }),
+        expires_in: 60,
+      })
+    ).toBe(Date.now() + 60_000);
+    expect(
+      getOAuthTokenExpiry({
+        access_token: jwt({ exp: NaN }),
+        expires_in: 60,
+      })
+    ).toBe(Date.now() + 60_000);
+    expect(
+      getOAuthTokenExpiry({
+        access_token: jwt({ exp: Infinity }),
         expires_in: 60,
       })
     ).toBe(Date.now() + 60_000);

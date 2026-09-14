@@ -34,8 +34,7 @@ export function getOAuthTokenExpiry(tokens: {
           typeof payload === "object" &&
           payload !== null &&
           typeof payload.exp === "number" &&
-          Number.isFinite(payload.exp) &&
-          payload.exp > 0
+          Number.isFinite(payload.exp)
         ) {
           return payload.exp * 1000;
         }
