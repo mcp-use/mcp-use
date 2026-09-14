@@ -27,6 +27,19 @@ type FlowProvider = OAuthClientProvider & {
 /** Host callback used to complete the official transport's pending OAuth flow. */
 type FinishOAuthAuthorization = (code: string, iss?: string) => Promise<void>;
 
+const SYSTEM_NETWORK_ERROR_CODES = new Set([
+  "ECONNREFUSED",
+  "ENOTFOUND",
+  "ETIMEDOUT",
+  "ECONNRESET",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+  "EPIPE",
+  "EAI_AGAIN",
+  "ENETDOWN",
+  "ECONNABORTED",
+]);
+
 /**
  * True if the error (or a wrapped cause) is an HTTP 401 / UnauthorizedError
  * that should trigger the OAuth completion dance.
@@ -50,9 +63,9 @@ export function isUnauthorized(err: unknown, depth = 0): boolean {
     // Transport-layer network failures cannot be HTTP 401 responses.
     const code = (err as { code?: unknown }).code;
     const isSystemNetworkError =
-      (typeof code === "string" && /^E[A-Z0-9_]+$/.test(code)) ||
+      (typeof code === "string" && SYSTEM_NETWORK_ERROR_CODES.has(code)) ||
       (typeof (err as Error).message === "string" &&
-        /\bE(?:CONNREFUSED|NOTFOUND|TIMEDOUT|CONNRESET|HOSTUNREACH|NETUNREACH)\b/.test(
+        /\bE(?:CONNREFUSED|NOTFOUND|TIMEDOUT|CONNRESET|HOSTUNREACH|NETUNREACH|AI_AGAIN|PIPE|NETDOWN|CONNABORTED)\b/.test(
           (err as Error).message
         ));
 
@@ -68,10 +81,13 @@ export function isUnauthorized(err: unknown, depth = 0): boolean {
       // Match HTTP 401 status patterns while excluding duration or port numbers
       if (/\b(?:http\s*|status\s*|code\s*|error\s*)?401\b/i.test(message)) {
         const isDurationOrPort =
-          /\b401\s*(?:ms|s|min|sec|seconds?|milliseconds?)\b/i.test(message) ||
+          /\b401\s*(?:ms|milliseconds?|s|sec|seconds?|min|minutes?|m|h|hours?)\b/i.test(
+            message
+          ) ||
           /\b(?:port|address|addr)\s*[:=]?\s*401\b/i.test(message) ||
-          (message.includes(":401") &&
-            /\b(?:127\.0\.0\.1|localhost|0\.0\.0\.0)\b/.test(message));
+          /(?:https?:\/\/[^\s/:]+|\[[0-9a-fA-F:]+\]|\b\d{1,3}(?:\.\d{1,3}){3}\b|\blocalhost\b|\b[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+):401\b/i.test(
+            message
+          );
 
         if (!isDurationOrPort) return true;
       }

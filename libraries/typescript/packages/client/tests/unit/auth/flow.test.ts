@@ -91,6 +91,24 @@ describe("isUnauthorized", () => {
       { code: "ETIMEDOUT" }
     );
     expect(isUnauthorized(timeoutNetwork)).toBe(false);
+
+    const dnsAgainFailure = Object.assign(
+      new Error("getaddrinfo EAI_AGAIN server401.example.com"),
+      { code: "EAI_AGAIN" }
+    );
+    expect(isUnauthorized(dnsAgainFailure)).toBe(false);
+
+    const messageOnlyDnsAgain = new Error(
+      "getaddrinfo EAI_AGAIN server401.example.com"
+    );
+    expect(isUnauthorized(messageOnlyDnsAgain)).toBe(false);
+
+    // Non-network application codes like ERR_UNAUTHORIZED must not be suppressed
+    const appUnauthorized = Object.assign(
+      new Error("Unauthorized access to resource"),
+      { code: "ERR_UNAUTHORIZED" }
+    );
+    expect(isUnauthorized(appUnauthorized)).toBe(true);
   });
 
   it("does not false-positive on duration timeouts or port strings", () => {
@@ -103,9 +121,30 @@ describe("isUnauthorized", () => {
     expect(isUnauthorized(new Error("Operation timed out after 401s"))).toBe(
       false
     );
+    expect(
+      isUnauthorized(new Error("Operation timed out after 401 minutes"))
+    ).toBe(false);
+    expect(
+      isUnauthorized(new Error("Operation timed out after 401 minute"))
+    ).toBe(false);
     expect(isUnauthorized(new Error("connect to port 401 failed"))).toBe(false);
     expect(
       isUnauthorized(new Error("Connection failed to 127.0.0.1:401"))
+    ).toBe(false);
+    expect(
+      isUnauthorized(new Error("Connection failed to 192.168.1.100:401"))
+    ).toBe(false);
+    expect(
+      isUnauthorized(new Error("Connection failed to [2001:db8::1]:401"))
+    ).toBe(false);
+    expect(isUnauthorized(new Error("Connection failed to [::1]:401"))).toBe(
+      false
+    );
+    expect(
+      isUnauthorized(new Error("Failed to reach api.service.internal:401"))
+    ).toBe(false);
+    expect(
+      isUnauthorized(new Error("Failed to fetch https://remote.host:401/api"))
     ).toBe(false);
   });
 
@@ -122,12 +161,18 @@ describe("isUnauthorized", () => {
 
     expect(isUnauthorized({ response: { status: 401 } })).toBe(true);
 
-    // Deep recursion safeguard (depth > 5 returns false)
-    let deep: any = { status: 401 };
-    for (let i = 0; i < 7; i++) {
-      deep = { cause: deep };
+    // Deep recursion safeguard (depth <= 5 is detected, depth > 5 returns false)
+    let atDepth5: unknown = { status: 401 };
+    for (let i = 0; i < 5; i++) {
+      atDepth5 = new Error(`wrapper ${i}`, { cause: atDepth5 });
     }
-    expect(isUnauthorized(deep)).toBe(false);
+    expect(isUnauthorized(atDepth5)).toBe(true);
+
+    let atDepth6: unknown = { status: 401 };
+    for (let i = 0; i < 6; i++) {
+      atDepth6 = new Error(`wrapper ${i}`, { cause: atDepth6 });
+    }
+    expect(isUnauthorized(atDepth6)).toBe(false);
   });
 
   it("safely handles nullish and non-error inputs", () => {
