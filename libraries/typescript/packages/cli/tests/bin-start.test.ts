@@ -1,21 +1,15 @@
+import { fetchWithTimeout as fetch } from "./support/requests.js";
 /**
  * Tests for the `mcp-use` bin: argv parsing, port precedence, and the inline
  * `start` command run against real on-disk fixtures — a temp project with a
  * `.mcp-use/build/` workspace containing a manifest and a built entry, with
  * zero mocks of the filesystem or module loader.
  */
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { existsSync } from "node:fs";
+import { createServer } from "node:net";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import {
-  afterAll,
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, vi } from "vitest";
 
 const tunnelMocks = vi.hoisted(() => ({
   create: vi.fn(),
@@ -29,7 +23,7 @@ vi.mock("@mcp-use/tunnel", () => ({
 
 import { parseArgs, resolveHost, resolvePort } from "../src/bin/args.js";
 import { main } from "../src/bin/main.js";
-import { runStart } from "../src/bin/start.js";
+import { it } from "./support/production.js";
 
 const { mountInspector } = vi.hoisted(() => ({
   mountInspector: vi.fn(),
@@ -68,12 +62,17 @@ let http;
 const server = {
   async listen(port = 3000) {
     http = createServer((req, res) => { res.end("hello from built server"); });
-    await new Promise((resolve) => http.listen(port, "127.0.0.1", resolve));
+    await new Promise((resolve, reject) => {
+      http.once("error", reject);
+      http.listen(port, "127.0.0.1", resolve);
+    });
     const bound = http.address().port;
     return { port: bound, url: \`http://127.0.0.1:\${bound}/mcp\` };
   },
   async close() {
-    await new Promise((resolve) => http.close(resolve));
+    const closed = new Promise((resolve) => http.close(resolve));
+    http.closeAllConnections();
+    await closed;
   },
 };
 export default server;
@@ -111,58 +110,6 @@ const server = {
 };
 export default server;
 `;
-
-const tempDirs: string[] = [];
-
-/** Create a temp project with a `.mcp-use/build/` workspace fixture. */
-async function makeProject(options?: {
-  entrySource?: string;
-  manifest?: string;
-}): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "mcp-use-bin-"));
-  tempDirs.push(cwd);
-  const buildDir = join(cwd, ".mcp-use", "build");
-  await mkdir(buildDir, { recursive: true });
-  await writeFile(
-    join(buildDir, "manifest.json"),
-    options?.manifest ??
-      JSON.stringify({
-        buildId: "test",
-        entryPoint: "index.js",
-        createdAt: new Date().toISOString(),
-      })
-  );
-  if (options?.entrySource !== undefined) {
-    await writeFile(join(buildDir, "index.js"), options.entrySource);
-  }
-  return cwd;
-}
-
-/**
- * Snapshot the shutdown signal listeners so the ones a `main(["start", ...])`
- * call registers can be removed again without going through process.exit.
- */
-function captureSignalListeners(): { release(): void } {
-  const before = {
-    SIGINT: new Set(process.listeners("SIGINT")),
-    SIGTERM: new Set(process.listeners("SIGTERM")),
-  } as const;
-  return {
-    release() {
-      for (const signal of ["SIGINT", "SIGTERM"] as const) {
-        for (const listener of process.listeners(signal)) {
-          if (!before[signal].has(listener)) process.off(signal, listener);
-        }
-      }
-    },
-  };
-}
-
-afterAll(async () => {
-  await Promise.all(
-    tempDirs.map((dir) => rm(dir, { recursive: true, force: true }))
-  );
-});
 
 beforeEach(() => {
   tunnelMocks.start.mockReset();
@@ -334,44 +281,57 @@ describe("resolveHost", () => {
 });
 
 describe("runStart", () => {
-  it("errors actionably when there is no build", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "mcp-use-bin-empty-"));
-    tempDirs.push(cwd);
-    await expect(runStart({ cwd })).rejects.toThrow(/mcp-use build/);
-    await expect(runStart({ cwd })).rejects.toThrow(/no production build/i);
+  it("errors actionably when there is no build", async ({
+    makeProject,
+    start,
+  }) => {
+    const cwd = await makeProject({ empty: true });
+    await expect(start({ cwd })).rejects.toThrow(/mcp-use build/);
+    await expect(start({ cwd })).rejects.toThrow(/no production build/i);
   });
 
-  it("errors on a manifest without an entryPoint", async () => {
+  it("errors on a manifest without an entryPoint", async ({
+    makeProject,
+    start,
+  }) => {
     const cwd = await makeProject({ manifest: `{ "buildId": "x" }` });
-    await expect(runStart({ cwd })).rejects.toThrow(/invalid build manifest/i);
+    await expect(start({ cwd })).rejects.toThrow(/invalid build manifest/i);
   });
 
-  it("errors when the entry has no default export", async () => {
+  it("errors when the entry has no default export", async ({
+    makeProject,
+    start,
+  }) => {
     const cwd = await makeProject({ entrySource: `export const x = 1;` });
-    await expect(runStart({ cwd })).rejects.toThrow(/no default export/);
+    await expect(start({ cwd })).rejects.toThrow(/no default export/);
   });
 
-  it("errors when the default export has no listen()", async () => {
+  it("errors when the default export has no listen()", async ({
+    makeProject,
+    start,
+  }) => {
     const cwd = await makeProject({
       entrySource: `export default { notAServer: true };`,
     });
-    await expect(runStart({ cwd })).rejects.toThrow(/listen/);
+    await expect(start({ cwd })).rejects.toThrow(/listen/);
   });
 
-  it("starts the built entry and responds over HTTP", async () => {
+  it("starts the built entry and responds over HTTP", async ({
+    makeProject,
+    start,
+  }) => {
     const cwd = await makeProject({ entrySource: HTTP_ENTRY });
-    const started = await runStart({ cwd, port: 0 });
-    try {
-      expect(started.port).toBeGreaterThan(0);
-      expect(started.url).toBe(`http://127.0.0.1:${started.port}/mcp`);
-      const response = await fetch(started.url);
-      expect(await response.text()).toBe("hello from built server");
-    } finally {
-      await started.close();
-    }
+    const started = await start({ cwd, port: 0 });
+    expect(started.port).toBeGreaterThan(0);
+    expect(started.url).toBe(`http://127.0.0.1:${started.port}/mcp`);
+    const response = await fetch(started.url);
+    expect(await response.text()).toBe("hello from built server");
   });
 
-  it("mounts Inspector on the existing production listener only when requested", async () => {
+  it("mounts Inspector on the existing production listener only when requested", async ({
+    makeProject,
+    start,
+  }) => {
     mountInspector.mockImplementation(
       () => async () => new Response("inspector")
     );
@@ -379,21 +339,20 @@ describe("runStart", () => {
     const manifestPath = join(cwd, ".mcp-use", "build", "manifest.json");
     const before = await readFile(manifestPath, "utf8");
 
-    const started = await runStart({ cwd, port: 0, withInspector: true });
-    try {
-      expect(started.url).toBe(`http://localhost:${started.port}/api/mcp`);
-      expect(mountInspector).toHaveBeenCalledWith({
-        basePath: "/api/mcp",
-        devMode: false,
-        oauthProxyAllowLoopback: false,
-      });
-      await expect(readFile(manifestPath, "utf8")).resolves.toBe(before);
-    } finally {
-      await started.close();
-    }
+    const started = await start({ cwd, port: 0, withInspector: true });
+    expect(started.url).toBe(`http://localhost:${started.port}/api/mcp`);
+    expect(mountInspector).toHaveBeenCalledWith({
+      basePath: "/api/mcp",
+      devMode: false,
+      oauthProxyAllowLoopback: false,
+    });
+    await expect(readFile(manifestPath, "utf8")).resolves.toBe(before);
   });
 
-  it("starts a tunnel after binding and closes both resources", async () => {
+  it("starts a tunnel after binding and closes both resources", async ({
+    makeProject,
+    start,
+  }) => {
     const cwd = await makeProject({ entrySource: HTTP_ENTRY });
     tunnelMocks.start.mockImplementationOnce(async (port: number) => {
       const response = await fetch(`http://127.0.0.1:${port}/mcp`);
@@ -404,7 +363,7 @@ describe("runStart", () => {
       };
     });
 
-    const started = await runStart({ cwd, port: 0, tunnel: true });
+    const started = await start({ cwd, port: 0, tunnel: true });
 
     expect(tunnelMocks.create).toHaveBeenCalledWith(
       join(cwd, ".mcp-use", "state", "tunnel.json"),
@@ -418,7 +377,10 @@ describe("runStart", () => {
     await expect(fetch(started.url)).rejects.toThrow();
   });
 
-  it("closes the bound server when tunnel startup fails", async () => {
+  it("closes the bound server when tunnel startup fails", async ({
+    makeProject,
+    start,
+  }) => {
     const cwd = await makeProject({ entrySource: HTTP_ENTRY });
     let boundPort: number | undefined;
     tunnelMocks.start.mockImplementationOnce(async (port: number) => {
@@ -426,7 +388,7 @@ describe("runStart", () => {
       throw new Error("tunnel unavailable");
     });
 
-    await expect(runStart({ cwd, port: 0, tunnel: true })).rejects.toThrow(
+    await expect(start({ cwd, port: 0, tunnel: true })).rejects.toThrow(
       "tunnel unavailable"
     );
 
@@ -437,59 +399,62 @@ describe("runStart", () => {
     ).rejects.toThrow();
   });
 
-  it("coexists with Inspector routing on the production listener", async () => {
+  it("coexists with Inspector routing on the production listener", async ({
+    makeProject,
+    start,
+  }) => {
     mountInspector.mockImplementation(
       () => async () => new Response("inspector")
     );
     const cwd = await makeProject({ entrySource: INSPECTOR_ENTRY });
 
-    const started = await runStart({
+    const started = await start({
       cwd,
       port: 4568,
       withInspector: true,
       tunnel: true,
     });
-    try {
-      expect(mountInspector).toHaveBeenCalledWith({
-        basePath: "/api/mcp",
-        devMode: false,
-        oauthProxyAllowLoopback: false,
-      });
-      expect(tunnelMocks.start).toHaveBeenCalledWith(4568);
-      expect(started.tunnelUrl).toBe(
-        "https://public-test.local.mcp-use.run/api/mcp"
-      );
-    } finally {
-      await started.close();
-    }
+    expect(mountInspector).toHaveBeenCalledWith({
+      basePath: "/api/mcp",
+      devMode: false,
+      oauthProxyAllowLoopback: false,
+    });
+    expect(tunnelMocks.start).toHaveBeenCalledWith(4568);
+    expect(started.tunnelUrl).toBe(
+      "https://public-test.local.mcp-use.run/api/mcp"
+    );
   });
 
-  it("applies address precedence: flags over env over server config over defaults", async () => {
+  it("applies address precedence: flags over env over server config over defaults", async ({
+    makeProject,
+    start,
+  }) => {
     const cwd = await makeProject({ entrySource: ADDRESS_ENTRY });
 
     vi.stubEnv("PORT", "4123");
     vi.stubEnv("HOST", "env-host");
-    expect((await runStart({ cwd, port: 5001, host: "flag-host" })).url).toBe(
+    expect((await start({ cwd, port: 5001, host: "flag-host" })).url).toBe(
       "http://flag-host:5001/mcp"
     );
-    expect((await runStart({ cwd })).url).toBe("http://env-host:4123/mcp");
+    expect((await start({ cwd })).url).toBe("http://env-host:4123/mcp");
 
     vi.stubEnv("PORT", undefined);
     vi.stubEnv("HOST", undefined);
-    expect((await runStart({ cwd })).url).toBe(
-      "http://configured-host:4321/mcp"
-    );
+    expect((await start({ cwd })).url).toBe("http://configured-host:4321/mcp");
   });
 
-  it("sets NODE_ENV=production only when unset", async () => {
+  it("sets NODE_ENV=production only when unset", async ({
+    makeProject,
+    start,
+  }) => {
     const cwd = await makeProject({ entrySource: ECHO_ENTRY });
 
     vi.stubEnv("NODE_ENV", undefined);
-    await runStart({ cwd, port: 5002 });
+    await start({ cwd, port: 5002 });
     expect(process.env.NODE_ENV).toBe("production");
 
     vi.stubEnv("NODE_ENV", "staging");
-    await runStart({ cwd, port: 5003 });
+    await start({ cwd, port: 5003 });
     expect(process.env.NODE_ENV).toBe("staging");
   });
 });
@@ -527,7 +492,9 @@ describe("main", () => {
     );
   });
 
-  it("prints the public MCP URL and stops the tunnel on a signal", async () => {
+  it("prints the public MCP URL and stops the tunnel on a signal", async ({
+    makeProject,
+  }) => {
     const cwd = await makeProject({ entrySource: ECHO_ENTRY });
     const logs = vi.spyOn(console, "log").mockImplementation(() => {});
     const exit = vi
@@ -553,53 +520,42 @@ describe("main", () => {
     expect(sigint).toBeDefined();
     expect(sigterm).toBeDefined();
 
-    try {
-      sigint?.("SIGINT");
-      sigterm?.("SIGTERM");
-      await vi.waitFor(() => {
-        expect(exit).toHaveBeenCalledWith(0);
-      });
-      expect(tunnelMocks.stop).toHaveBeenCalledOnce();
-    } finally {
-      if (sigint !== undefined) process.off("SIGINT", sigint);
-      if (sigterm !== undefined) process.off("SIGTERM", sigterm);
-    }
+    sigint?.("SIGINT");
+    sigterm?.("SIGTERM");
+    await vi.waitFor(() => {
+      expect(exit).toHaveBeenCalledWith(0);
+    });
+    expect(tunnelMocks.stop).toHaveBeenCalledOnce();
   });
 
-  it("says nothing about the inspector when start does not mount it", async () => {
+  it("says nothing about the inspector when start does not mount it", async ({
+    makeProject,
+  }) => {
     const cwd = await makeProject({ entrySource: ECHO_ENTRY });
     const logs = vi.spyOn(console, "log").mockImplementation(() => {});
-    const signals = captureSignalListeners();
 
-    try {
-      await expect(
-        main(["start", "--path", cwd, "--port", "4567"])
-      ).resolves.toBe(0);
-      expect(logs.mock.calls.flat().join("\n")).not.toContain("inspector");
-    } finally {
-      signals.release();
-    }
+    await expect(
+      main(["start", "--path", cwd, "--port", "4567"])
+    ).resolves.toBe(0);
+    expect(logs.mock.calls.flat().join("\n")).not.toContain("inspector");
   });
 
-  it("prints the inspector URL when start mounts it", async () => {
+  it("prints the inspector URL when start mounts it", async ({
+    makeProject,
+  }) => {
     mountInspector.mockImplementation(
       () => async () => new Response("inspector")
     );
     const cwd = await makeProject({ entrySource: INSPECTOR_ENTRY });
     const logs = vi.spyOn(console, "log").mockImplementation(() => {});
-    const signals = captureSignalListeners();
 
-    try {
-      await expect(
-        main(["start", "--path", cwd, "--port", "4567", "--with-inspector"])
-      ).resolves.toBe(0);
-      const output = logs.mock.calls.flat().join("\n");
-      expect(output).toContain(
-        "mcp-use inspector at http://localhost:4567/api/mcp/inspector"
-      );
-    } finally {
-      signals.release();
-    }
+    await expect(
+      main(["start", "--path", cwd, "--port", "4567", "--with-inspector"])
+    ).resolves.toBe(0);
+    const output = logs.mock.calls.flat().join("\n");
+    expect(output).toContain(
+      "mcp-use inspector at http://localhost:4567/api/mcp/inspector"
+    );
   });
 
   it("prints client help for client --help", async () => {
@@ -623,3 +579,62 @@ describe("main", () => {
     expect(output).toMatch(/Entry not found/);
   });
 });
+
+// Verify the fixture after Vitest has torn down deliberately failing test bodies.
+const failureProjects: string[] = [];
+const failurePorts: number[] = [];
+const failureListeners: NodeJS.SignalsListener[] = [];
+let failureServerStarted: boolean | undefined;
+let failureMainStarted: boolean | undefined;
+
+afterAll(async () => {
+  if (failureServerStarted !== undefined)
+    expect(failureServerStarted).toBe(true);
+  if (failureMainStarted !== undefined) expect(failureMainStarted).toBe(true);
+  if (process.env.KEEP_TEST_PROJECTS !== "1") {
+    for (const cwd of failureProjects) expect(existsSync(cwd)).toBe(false);
+  }
+  for (const listener of failureListeners)
+    expect(process.listeners("SIGINT")).not.toContain(listener);
+  for (const port of failurePorts) {
+    const server = createServer();
+    try {
+      await new Promise<void>((resolve, reject) => {
+        server.once("error", reject);
+        server.listen(port, "127.0.0.1", resolve);
+      });
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  }
+});
+
+it.fails(
+  "closes the production listener after an assertion fails",
+  async ({ makeProject, start }) => {
+    failureServerStarted = false;
+    const cwd = await makeProject({ entrySource: HTTP_ENTRY });
+    failureProjects.push(cwd);
+    const started = await start({ cwd, port: 0 });
+    failurePorts.push(started.port);
+    failureServerStarted = true;
+    expect("deliberate failure").toBe("success");
+  }
+);
+
+it.fails(
+  "restores main's signal listeners after an early assertion fails",
+  async ({ makeProject }) => {
+    failureMainStarted = false;
+    const cwd = await makeProject({ entrySource: ECHO_ENTRY });
+    failureProjects.push(cwd);
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const before = new Set(process.listeners("SIGINT"));
+    await main(["start", "--path", cwd, "--port", "4567"]);
+    failureListeners.push(
+      ...process.listeners("SIGINT").filter((listener) => !before.has(listener))
+    );
+    failureMainStarted = failureListeners.length > 0;
+    expect("deliberate failure").toBe("success");
+  }
+);

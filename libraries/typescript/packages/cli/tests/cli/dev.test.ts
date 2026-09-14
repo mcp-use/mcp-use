@@ -1,3 +1,5 @@
+import { trackWebSocket, waitForOpen } from "../support/websocket.js";
+import { fetchWithTimeout as fetch } from "../support/requests.js";
 /**
  * e2e tests for runDev: a real Vite dev server + module runner serving the
  * fixture over HTTP, including edit-triggered reload and error resilience.
@@ -1033,25 +1035,19 @@ describe("runDev (views)", () => {
           : undefined
       );
 
-      const ws = new WebSocket(`ws://127.0.0.1:${port}/`, "vite-hmr");
+      const ws = trackWebSocket(project, `ws://127.0.0.1:${port}/`, "vite-hmr");
 
-      project.defer(() => ws.close());
-      await new Promise<void>((resolve, reject) => {
-        ws.addEventListener("open", () => resolve(), { once: true });
-        ws.addEventListener(
-          "error",
-          () => reject(new Error("HMR websocket failed to connect")),
-          { once: true }
-        );
-      });
+      await waitForOpen(ws);
       const wsClosed = new Promise<void>((resolve) => {
         ws.addEventListener("close", () => resolve(), { once: true });
       });
 
+      let shutdownTimer: ReturnType<typeof setTimeout> | undefined;
+      project.defer(() => clearTimeout(shutdownTimer));
       const shutdown = await Promise.race([
         dev.stop().then(() => "stopped" as const),
         new Promise<"timed-out">((resolve) => {
-          setTimeout(() => resolve("timed-out"), 5_000);
+          shutdownTimer = setTimeout(() => resolve("timed-out"), 5_000);
         }),
       ]);
 
@@ -1426,19 +1422,13 @@ describe("runDev (views)", () => {
       expect(entryJs).toContain("bootstrapView(viewModule)");
 
       const messages: { type: string; updates?: { path: string }[] }[] = [];
-      const ws = new WebSocket(`ws://127.0.0.1:${port}/`, "vite-hmr");
-      project.defer(() => ws.close());
+      const ws = trackWebSocket(project, `ws://127.0.0.1:${port}/`, "vite-hmr");
       ws.addEventListener("message", (event) => {
         messages.push(
           JSON.parse(String(event.data)) as (typeof messages)[number]
         );
       });
-      await new Promise<void>((resolve, reject) => {
-        ws.addEventListener("open", () => resolve());
-        ws.addEventListener("error", () =>
-          reject(new Error("HMR websocket failed to connect"))
-        );
-      });
+      await waitForOpen(ws);
 
       // Populate the client module graph the way a browser loading the view
       // document would: fetch each module and, recursively, its static
@@ -1533,12 +1523,16 @@ describe("runDev (views)", () => {
     // websocket shares the one listener.
     const probeHmr = async (port: number): Promise<string> =>
       new Promise((resolve, reject) => {
-        const ws = new WebSocket(`ws://127.0.0.1:${port}/`, "vite-hmr");
-        projects.defer(() => ws.close());
+        const ws = trackWebSocket(
+          projects,
+          `ws://127.0.0.1:${port}/`,
+          "vite-hmr"
+        );
         const timer = setTimeout(() => {
           ws.close();
           reject(new Error(`no HMR greeting on port ${port}`));
         }, 10_000);
+        projects.defer(() => clearTimeout(timer));
         ws.addEventListener("message", (event) => {
           clearTimeout(timer);
           ws.close();

@@ -2,6 +2,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:net";
 import { join } from "node:path";
+import { fetchWithTimeout as fetch } from "../support/requests.js";
+export { waitFor } from "../support/requests.js";
 
 /** Bind the basic fixture's add tool to a named view for CLI error tests. */
 export function bindBasicToolToView(cwd: string, viewName: string): void {
@@ -82,28 +84,6 @@ export async function listToolNames(baseUrl: string): Promise<string[]> {
   const body = await mcpRequest(baseUrl, "tools/list");
   const result = body["result"] as { tools: { name: string }[] };
   return result.tools.map((t) => t.name).sort();
-}
-
-/** Poll `probe` until it resolves truthy or the timeout elapses. */
-export async function waitFor<T>(
-  probe: () => Promise<T | undefined>,
-  { timeout = 15000, interval = 200 } = {}
-): Promise<T> {
-  const deadline = Date.now() + timeout;
-  let lastError: unknown;
-  while (Date.now() < deadline) {
-    try {
-      const value = await probe();
-      if (value !== undefined) return value;
-    } catch (error) {
-      lastError = error;
-    }
-    await new Promise((r) => setTimeout(r, interval));
-  }
-  throw new Error(
-    `waitFor timed out after ${timeout}ms` +
-      (lastError !== undefined ? `; last error: ${String(lastError)}` : "")
-  );
 }
 
 /**

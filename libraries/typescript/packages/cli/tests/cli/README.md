@@ -54,3 +54,11 @@ the retained root is printed. Git, ESLint, and Prettier ignore scratch projects
 because forced termination can prevent teardown. No cleanup mechanism can run
 after SIGKILL or power loss; old retained roots must be removed when no longer
 needed.
+
+The project lifecycle uses the package-wide resource scope described in
+[../README.md](../README.md). `project.defer(cleanup, "resource name")` also
+returns an idempotent close function and passes a cancellation signal to cleanup.
+Shutdown has a five-second deadline plus one second of cancellation grace. A
+resource that still cannot stop causes an explicit cleanup failure and retention
+of the run's files; the runner does not claim that an active resource was cleaned
+up merely because a timer expired.

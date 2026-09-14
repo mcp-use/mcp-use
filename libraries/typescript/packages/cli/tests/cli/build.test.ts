@@ -1,3 +1,4 @@
+import { fetchWithTimeout as fetch } from "../support/requests.js";
 /** e2e tests for runBuild: real Vite build of the fixture, real import. */
 import {
   existsSync,

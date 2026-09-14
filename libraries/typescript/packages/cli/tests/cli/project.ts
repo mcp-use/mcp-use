@@ -1,16 +1,15 @@
 import {
   cpSync,
   mkdirSync,
-  mkdtempSync,
   readFileSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
-import { rm } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { vi } from "vitest";
+import { TestScope, type Cleanup } from "../support/scope.js";
 import { getFreePort } from "./helpers.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -19,7 +18,6 @@ const serverRoot = join(here, "../../../server");
 
 /** An empty project needs no dependencies; runnable fixtures use the checkout. */
 export type FixtureKind = "basic" | "views" | "empty";
-type Cleanup = () => void | Promise<void>;
 
 /** A running local CLI server, automatically stopped by its project fixture. */
 export interface DevHandle {
@@ -30,20 +28,19 @@ export interface DevHandle {
 
 /** Owns all projects and resources acquired by one test, including partial setup. */
 export class TestProjects {
-  private readonly directories: string[] = [];
-  private readonly cleanups: Cleanup[] = [];
-  private disposal: Promise<void> | undefined;
-  private readonly environment = {
-    MCP_URL: process.env.MCP_URL,
-    PORT: process.env.PORT,
-  };
+  readonly scope: TestScope;
 
-  constructor(private readonly root: string) {}
+  constructor(
+    private readonly root: string,
+    scope?: TestScope
+  ) {
+    this.scope = scope ?? new TestScope(root);
+    this.scope.preserveEnv("MCP_URL", "PORT");
+  }
 
   /** Create an independent mutable project backed by explicitly linked local packages. */
   create(kind: FixtureKind = "basic"): TestProject {
-    const cwd = mkdtempSync(join(this.root, `${kind}-`));
-    this.directories.push(cwd);
+    const cwd = this.scope.directory(`${kind}-`, this.root);
     if (kind !== "empty") {
       cpSync(join(here, "fixtures", kind), cwd, { recursive: true });
       const manifest = JSON.parse(
@@ -69,48 +66,12 @@ export class TestProjects {
   }
 
   /** Register a resource immediately after acquiring it. Resources close in reverse order. */
-  defer(cleanup: Cleanup): void {
-    this.cleanups.push(cleanup);
+  defer(cleanup: Cleanup, label?: string): () => Promise<void> {
+    return this.scope.defer(cleanup, label);
   }
 
-  /** Stop all resources before deleting any project; report every cleanup failure. */
   dispose(): Promise<void> {
-    return (this.disposal ??= this.disposeAll());
-  }
-
-  private async disposeAll(): Promise<void> {
-    const errors: unknown[] = [];
-    while (this.cleanups.length) {
-      try {
-        await this.cleanups.pop()!();
-      } catch (error) {
-        errors.push(error);
-      }
-    }
-    for (const [name, value] of Object.entries(this.environment)) {
-      if (value === undefined) delete process.env[name];
-      else process.env[name] = value;
-    }
-    if (process.env.KEEP_TEST_PROJECTS !== "1") {
-      for (const cwd of this.directories) {
-        try {
-          await rm(cwd, {
-            recursive: true,
-            force: true,
-            maxRetries: 5,
-            retryDelay: 100,
-          });
-        } catch (error) {
-          errors.push(
-            new Error(`Could not remove CLI test project: ${cwd}`, {
-              cause: error,
-            })
-          );
-        }
-      }
-    }
-    if (errors.length)
-      throw new AggregateError(errors, "CLI test cleanup failed");
+    return this.scope.dispose();
   }
 }
 
@@ -129,8 +90,8 @@ export class TestProject {
   }
 
   /** Track an additional test-owned client, listener or mock. */
-  defer(cleanup: Cleanup): void {
-    this.owner.defer(cleanup);
+  defer(cleanup: Cleanup, label?: string): () => Promise<void> {
+    return this.owner.defer(cleanup, label);
   }
 
   /** Start the CLI source under test; even failed startup is owned and awaited. */
@@ -138,6 +99,7 @@ export class TestProject {
     options: { port?: number; host?: string; inspector?: boolean } = {}
   ): Promise<DevHandle> {
     const { runDev } = await import("../../src/cli/index.js");
+    this.owner.scope.preserveSignals("SIGINT", "SIGTERM");
     const port = options.port ?? (await getFreePort());
     const lines: string[] = [];
     const record = (...args: unknown[]) => {
@@ -147,21 +109,25 @@ export class TestProject {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(record);
     const controller = new AbortController();
     let done: Promise<void> = Promise.resolve();
-    let stopped: Promise<void> | undefined;
     let startupFailed = false;
-    const stop = (): Promise<void> =>
-      (stopped ??= (async () => {
-        controller.abort();
-        try {
-          await done;
-        } finally {
-          logSpy.mockRestore();
-          warnSpy.mockRestore();
-        }
-      })());
-    this.defer(async () => {
-      if (!startupFailed) await stop();
-    });
+    let logsRestored = false;
+    const restoreLogs = () => {
+      if (logsRestored) return;
+      logsRestored = true;
+      logSpy.mockRestore();
+      warnSpy.mockRestore();
+    };
+    this.owner.scope.restore(restoreLogs);
+    const stop = this.owner.scope.defer(async () => {
+      controller.abort();
+      try {
+        await done;
+      } catch (error) {
+        if (!startupFailed) throw error;
+      } finally {
+        restoreLogs();
+      }
+    }, `dev server in ${this.cwd}`);
 
     try {
       done = runDev({

@@ -1,4 +1,5 @@
-import { inject, test } from "vitest";
+import { inject } from "vitest";
+import { it as test } from "../support/fixtures.js";
 import { TestProjects, type FixtureKind, type TestProject } from "./project.js";
 
 /** Shared lifecycle for CLI projects; no resources are allocated for pure unit tests. */
@@ -8,14 +9,8 @@ export const it = test.extend<{
   project: TestProject;
 }>({
   fixtureKind: "basic",
-  // eslint-disable-next-line no-empty-pattern -- Vitest discovers dependencies from destructured parameters.
-  projects: async ({}, use) => {
-    const projects = new TestProjects(inject("cliScratchRoot"));
-    try {
-      await use(projects);
-    } finally {
-      await projects.dispose();
-    }
+  projects: async ({ scope }, use) => {
+    await use(new TestProjects(inject("cliScratchRoot"), scope));
   },
   project: async ({ projects, fixtureKind }, use) => {
     await use(projects.create(fixtureKind));
