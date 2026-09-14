@@ -1,15 +1,17 @@
 import {
   Client,
   discoverOAuthProtectedResourceMetadata,
-  SdkError,
   SdkHttpError,
   StreamableHTTPClientTransport,
-  UnauthorizedError,
   type ClientOptions,
   type OAuthClientProvider,
   type VersionNegotiationMode,
 } from "@modelcontextprotocol/client";
-import { completeOAuthFlow, isOAuthInteractionRequired } from "../auth/flow.js";
+import {
+  completeOAuthFlow,
+  isOAuthInteractionRequired,
+  isUnauthorized,
+} from "../auth/flow.js";
 import type { MCPAuthorizationInfo } from "../core/session.js";
 import { DialectJsonSchemaValidator } from "../utils/json-schema-validator.js";
 import { logger } from "../utils/logging.js";
@@ -17,26 +19,6 @@ import type { ConnectorInitOptions } from "./base.js";
 import { BaseConnector } from "./base.js";
 
 const MIXED_AUTH_DISCOVERY_TIMEOUT_MS = 2_000;
-
-/**
- * Detect a 401 anywhere in an error / cause chain. Under
- * `versionNegotiation: "auto"` a connect-time 401 can surface wrapped as
- * `SdkError(EraNegotiationFailed)` with the `UnauthorizedError` at
- * `error.data.cause` (rather than a bare `SdkHttpError`), so we walk the chain.
- */
-function detectUnauthorized(err: unknown, depth = 0): boolean {
-  if (!err || depth > 5) return false;
-  if (err instanceof UnauthorizedError) return true;
-  if (err instanceof SdkHttpError && err.status === 401) return true;
-  if (err instanceof Error) {
-    if (err.cause) {
-      if (detectUnauthorized(err.cause, depth + 1)) return true;
-    }
-    const data = err instanceof SdkError ? (err.data as any) : undefined;
-    if (data?.cause && detectUnauthorized(data.cause, depth + 1)) return true;
-  }
-  return false;
-}
 
 /** Client identity advertised to an MCP server during connection setup. */
 export type ClientInfo = {
@@ -498,10 +480,7 @@ export class HttpConnector extends BaseConnector {
     if (err instanceof Error) {
       const errorStr = err.toString();
       const errorMsg = err.message || "";
-      is401Error =
-        detectUnauthorized(err) ||
-        errorStr.includes("401") ||
-        errorMsg.includes("Unauthorized");
+      is401Error = isUnauthorized(err);
 
       if (
         errorStr.includes("Missing session ID") ||

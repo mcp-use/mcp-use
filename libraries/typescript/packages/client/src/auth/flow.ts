@@ -34,18 +34,64 @@ type FinishOAuthAuthorization = (code: string, iss?: string) => Promise<void>;
 export function isUnauthorized(err: unknown, depth = 0): boolean {
   if (!err || depth > 5) return false;
   if (err instanceof UnauthorizedError) return true;
-  if (err instanceof Error) {
+
+  if (typeof err === "object" && err !== null) {
+    if ((err as Error).name === "UnauthorizedError") return true;
+
+    // Structured status checks (covers fetch Response, SdkHttpError, axios, express, etc.)
+    const status =
+      (err as { status?: unknown }).status ??
+      (err as { statusCode?: unknown }).statusCode ??
+      (err as { code?: unknown }).code;
+
+    if (status === 401 || status === "401") return true;
+
+    // Categorical rejection of OS/network system errors (e.g. ECONNREFUSED, ENOTFOUND, ETIMEDOUT).
+    // Transport-layer network failures cannot be HTTP 401 responses.
     const code = (err as { code?: unknown }).code;
-    if (code === 401) return true;
-    if (err.name === "UnauthorizedError") return true;
-    const message = err.message ?? "";
-    if (message.includes("401") || message.includes("Unauthorized")) {
+    const isSystemNetworkError =
+      (typeof code === "string" && /^E[A-Z0-9_]+$/.test(code)) ||
+      (typeof (err as Error).message === "string" &&
+        /\bE(?:CONNREFUSED|NOTFOUND|TIMEDOUT|CONNRESET|HOSTUNREACH|NETUNREACH)\b/.test(
+          (err as Error).message
+        ));
+
+    if (!isSystemNetworkError) {
+      const message =
+        typeof (err as Error).message === "string"
+          ? (err as Error).message
+          : String(err);
+
+      // Match case-insensitive word-boundary "unauthorized"
+      if (/\bunauthorized\b/i.test(message)) return true;
+
+      // Match HTTP 401 status patterns while excluding duration or port numbers
+      if (/\b(?:http\s*|status\s*|code\s*|error\s*)?401\b/i.test(message)) {
+        const isDurationOrPort =
+          /\b401\s*(?:ms|s|min|sec|seconds?|milliseconds?)\b/i.test(message) ||
+          /\b(?:port|address|addr)\s*[:=]?\s*401\b/i.test(message) ||
+          (message.includes(":401") &&
+            /\b(?:127\.0\.0\.1|localhost|0\.0\.0\.0)\b/.test(message));
+
+        if (!isDurationOrPort) return true;
+      }
+    }
+
+    // Inspect nested causes (standard Error.cause, MCP SdkError data.cause, response)
+    if (
+      err instanceof Error &&
+      err.cause &&
+      isUnauthorized(err.cause, depth + 1)
+    ) {
       return true;
     }
-    if (err.cause && isUnauthorized(err.cause, depth + 1)) return true;
     const data = (err as { data?: { cause?: unknown } }).data;
     if (data?.cause && isUnauthorized(data.cause, depth + 1)) return true;
+
+    const response = (err as { response?: unknown }).response;
+    if (response && isUnauthorized(response, depth + 1)) return true;
   }
+
   return false;
 }
 

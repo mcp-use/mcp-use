@@ -29,6 +29,114 @@ describe("isUnauthorized", () => {
     expect(isUnauthorized(new Error("HTTP 401 from server"))).toBe(true);
     expect(isUnauthorized(new Error("other"))).toBe(false);
   });
+
+  it("detects structured status and statusCode properties", () => {
+    expect(isUnauthorized({ status: 401 })).toBe(true);
+    expect(isUnauthorized({ status: "401" })).toBe(true);
+    expect(isUnauthorized({ statusCode: 401 })).toBe(true);
+    expect(isUnauthorized({ statusCode: "401" })).toBe(true);
+    expect(
+      isUnauthorized(
+        Object.assign(new Error("Custom message"), { status: 401 })
+      )
+    ).toBe(true);
+    expect(
+      isUnauthorized(
+        Object.assign(new Error("Custom message"), { statusCode: 401 })
+      )
+    ).toBe(true);
+  });
+
+  it("detects case-insensitive unauthorized and HTTP 401 message patterns", () => {
+    expect(isUnauthorized(new Error("401 Unauthorized"))).toBe(true);
+    expect(isUnauthorized(new Error("Server returned 401"))).toBe(true);
+    expect(isUnauthorized(new Error("unauthorized request"))).toBe(true);
+    expect(isUnauthorized(new Error("Status: 401"))).toBe(true);
+    expect(isUnauthorized(new Error("Error 401: Invalid token"))).toBe(true);
+  });
+
+  it("does not false-positive on network connection errors on port 4010-4019 or port 401", () => {
+    const wrappedRefusal = new TypeError("fetch failed", {
+      cause: Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:4010"), {
+        code: "ECONNREFUSED",
+      }),
+    });
+    expect(isUnauthorized(wrappedRefusal)).toBe(false);
+
+    const directRefusal = Object.assign(
+      new Error("connect ECONNREFUSED 127.0.0.1:4010"),
+      { code: "ECONNREFUSED" }
+    );
+    expect(isUnauthorized(directRefusal)).toBe(false);
+
+    const refusalOnPort401 = Object.assign(
+      new Error("connect ECONNREFUSED 127.0.0.1:401"),
+      { code: "ECONNREFUSED" }
+    );
+    expect(isUnauthorized(refusalOnPort401)).toBe(false);
+
+    const unencodedRefusalWithoutCode = new Error(
+      "connect ECONNREFUSED 127.0.0.1:4010"
+    );
+    expect(isUnauthorized(unencodedRefusalWithoutCode)).toBe(false);
+
+    const dnsFailure = Object.assign(
+      new Error("getaddrinfo ENOTFOUND server-4010.local"),
+      { code: "ENOTFOUND" }
+    );
+    expect(isUnauthorized(dnsFailure)).toBe(false);
+
+    const timeoutNetwork = Object.assign(
+      new Error("connect ETIMEDOUT 192.168.40.10:4010"),
+      { code: "ETIMEDOUT" }
+    );
+    expect(isUnauthorized(timeoutNetwork)).toBe(false);
+  });
+
+  it("does not false-positive on duration timeouts or port strings", () => {
+    expect(isUnauthorized(new Error("Request timed out after 401ms"))).toBe(
+      false
+    );
+    expect(isUnauthorized(new Error("Request timed out after 401 ms"))).toBe(
+      false
+    );
+    expect(isUnauthorized(new Error("Operation timed out after 401s"))).toBe(
+      false
+    );
+    expect(isUnauthorized(new Error("connect to port 401 failed"))).toBe(false);
+    expect(
+      isUnauthorized(new Error("Connection failed to 127.0.0.1:401"))
+    ).toBe(false);
+  });
+
+  it("recursively inspects cause, data.cause, and response", () => {
+    expect(
+      isUnauthorized(new Error("Top-level wrapper", { cause: { status: 401 } }))
+    ).toBe(true);
+
+    expect(
+      isUnauthorized({
+        data: { cause: new UnauthorizedError("nested SDK error") },
+      })
+    ).toBe(true);
+
+    expect(isUnauthorized({ response: { status: 401 } })).toBe(true);
+
+    // Deep recursion safeguard (depth > 5 returns false)
+    let deep: any = { status: 401 };
+    for (let i = 0; i < 7; i++) {
+      deep = { cause: deep };
+    }
+    expect(isUnauthorized(deep)).toBe(false);
+  });
+
+  it("safely handles nullish and non-error inputs", () => {
+    expect(isUnauthorized(null)).toBe(false);
+    expect(isUnauthorized(undefined)).toBe(false);
+    expect(isUnauthorized(0)).toBe(false);
+    expect(isUnauthorized("")).toBe(false);
+    expect(isUnauthorized({})).toBe(false);
+  });
 });
 
 describe("completeOAuthFlow", () => {
