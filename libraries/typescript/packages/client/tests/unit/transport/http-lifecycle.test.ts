@@ -186,7 +186,35 @@ describe("HTTP lifecycle with a real legacy MCP session", () => {
     ).observeSseProgress(response);
 
     expect(await observed.text()).toBe(progressEvent + dataEvent);
+    await new Promise<void>((resolve) => queueMicrotask(resolve));
     expect(progress).toEqual([{ progress: 1 }]);
+  });
+
+  it("keeps SSE bytes readable when a progress handler throws", async () => {
+    const connector = new HttpConnector("http://127.0.0.1:1/mcp", {
+      protocolNegotiation: "legacy",
+    });
+    (
+      connector as unknown as {
+        activeProgressHandlers: Set<(params: unknown) => void>;
+      }
+    ).activeProgressHandlers.add(() => {
+      throw new Error("observer failure");
+    });
+    const progressEvent =
+      'data: {"jsonrpc":"2.0","method":"notifications/progress","params":{"progress":1}}\n\n';
+    const response = new Response(progressEvent, {
+      headers: { "content-type": "text/event-stream" },
+    });
+
+    const observed = (
+      connector as unknown as {
+        observeSseProgress(response: Response): Response;
+      }
+    ).observeSseProgress(response);
+
+    expect(await observed.text()).toBe(progressEvent);
+    await new Promise<void>((resolve) => queueMicrotask(resolve));
   });
 
   it("shares one session across concurrent connects and closes its stream on disconnect", async () => {

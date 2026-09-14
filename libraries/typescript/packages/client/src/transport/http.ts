@@ -603,7 +603,17 @@ export class HttpConnector extends BaseConnector {
                 params?: unknown;
               };
               if (message.method === "notifications/progress") {
-                this.forwardRoundProgress(message.params);
+                // Keep observation out of the transport's backpressure path.
+                // A consumer callback must not prevent the SDK from receiving
+                // the original SSE bytes.
+                queueMicrotask(() => {
+                  try {
+                    this.forwardRoundProgress(message.params);
+                  } catch {
+                    // Progress callbacks are observational; response delivery
+                    // remains authoritative even if one throws.
+                  }
+                });
               }
             } catch {
               // Ignore malformed/non-JSON SSE data; the SDK remains authoritative.
