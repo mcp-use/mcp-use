@@ -61,15 +61,24 @@ describe("sanitizeUrl", () => {
       );
     });
 
-    it("encodes raw unencoded spaces and unsafe characters in paths", () => {
-      expect(sanitizeUrl("https://example.com/foo bar/baz")).toBe(
-        "https://example.com/foo%20bar/baz"
-      );
+    it("encodes raw unencoded special characters in paths", () => {
       expect(sanitizeUrl("https://example.com/docs/C++")).toBe(
         "https://example.com/docs/C%2B%2B"
       );
       expect(sanitizeUrl("https://example.com/foo|bar")).toBe(
         "https://example.com/foo%7Cbar"
+      );
+      expect(sanitizeUrl("https://example.com/foo;bar")).toBe(
+        "https://example.com/foo%3Bbar"
+      );
+      expect(sanitizeUrl("https://example.com/user@data")).toBe(
+        "https://example.com/user%40data"
+      );
+    });
+
+    it("handles paths with spaces normalized during URL parsing", () => {
+      expect(sanitizeUrl("https://example.com/foo bar/baz")).toBe(
+        "https://example.com/foo%20bar/baz"
       );
     });
 
