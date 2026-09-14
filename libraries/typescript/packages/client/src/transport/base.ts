@@ -570,16 +570,6 @@ export abstract class BaseConnector {
     return this.client != null;
   }
 
-  /**
-   * Layer per-call options over the configured defaults.
-   *
-   * `defaultRequestOptions` is documented as the options helper methods use
-   * when they issue SDK requests, overridable per call, so a caller that omits
-   * options must still get the configured timeout and cancellation settings.
-   *
-   * @param options - Per-call options, if any.
-   * @returns The merged options, or undefined when neither side supplies any.
-   */
   private requestOptions(options?: RequestOptions): RequestOptions | undefined {
     const defaults = this.opts.defaultRequestOptions;
     if (defaults === undefined) return options;

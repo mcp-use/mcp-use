@@ -2,12 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import { BaseConnector } from "../../../src/transport/base.js";
 
-/**
- * `defaultRequestOptions` is documented as the options helper methods use when
- * they issue SDK requests, overridable per call. Only `initialize` read it, so
- * a caller that omitted options silently got the SDK defaults instead of the
- * timeout and cancellation settings the server config asked for.
- */
 class ProbeConnector extends BaseConnector {
   async connect(): Promise<void> {}
 
@@ -16,7 +10,6 @@ class ProbeConnector extends BaseConnector {
   }
 }
 
-/** Options each SDK call was invoked with, keyed by method. */
 function connectorWithRecorder(defaults?: Record<string, unknown>): {
   connector: ProbeConnector;
   seen: Record<string, unknown>;
