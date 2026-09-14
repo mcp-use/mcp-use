@@ -313,15 +313,24 @@ class BaseAdapter(Generic[T], ABC):
         return prompts
 
     def _check_connector_initialized(self, connector: BaseConnector) -> bool:
-        """Check if a connector is initialized and has tools.
+        """Check if a connector is initialized.
 
         Args:
             connector: The connector to check.
 
         Returns:
-            True if the connector is initialized and has tools, False otherwise.
+            True if the connector is initialized, False otherwise.
         """
-        return bool(getattr(connector, "tools", None))
+        is_initialized = getattr(connector, "is_initialized", None)
+        if is_initialized is not None:
+            return bool(is_initialized)
+
+        # Fallback for custom or mock connectors that do not define is_initialized
+        try:
+            tools = getattr(connector, "tools", None)
+            return tools is not None
+        except (RuntimeError, AttributeError):
+            return False
 
     async def _ensure_connector_initialized(self, connector: BaseConnector) -> bool:
         """Ensure a connector is initialized.
@@ -333,7 +342,10 @@ class BaseAdapter(Generic[T], ABC):
             True if initialization succeeded, False otherwise.
         """
         if not self._check_connector_initialized(connector):
-            logger.debug("Connector doesn't have tools, initializing it")
+            logger.debug(
+                f"Connector {getattr(connector, 'public_identifier', connector)} "
+                "is not initialized, initializing it"
+            )
             try:
                 await connector.initialize()
                 return True

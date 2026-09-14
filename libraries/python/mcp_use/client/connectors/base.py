@@ -306,6 +306,16 @@ class BaseConnector(ABC):
         return result
 
     @property
+    def is_initialized(self) -> bool:
+        """Return whether the connector has been initialized.
+
+        Returns:
+            True if initialize() has been called and the session is initialized,
+            False otherwise.
+        """
+        return self._initialized
+
+    @property
     def tools(self) -> list[Tool]:
         """Get the list of available tools.
 
