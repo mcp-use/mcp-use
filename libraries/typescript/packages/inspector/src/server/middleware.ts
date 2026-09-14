@@ -316,8 +316,10 @@ async function writeFetchResponse(
     // Only a completed stream ends the downstream response. Ending in `finally`
     // would also end it when reader.read() throws on a genuine upstream failure,
     // so the Express error handler saw the error with res.writableEnded already
-    // true and could no longer change the response.
-    res.end();
+    // true and could no longer change the response. The abort check matters
+    // too: cancelling the reader resolves a pending read with `done`,
+    // which would otherwise end a response the client has already abandoned.
+    if (!signal.aborted) res.end();
   } finally {
     signal.removeEventListener("abort", cancelReader);
   }

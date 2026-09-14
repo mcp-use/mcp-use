@@ -464,60 +464,63 @@ describe("mountInspector", () => {
     }
   }, 10000);
 
-  it("handles a disconnect after headers but before the buffered body completes", async () => {
-    // Non-streaming path: headers land, then the client goes away while the body
-    // is still arriving. proxyResponse() awaits response.arrayBuffer(), so that
-    // read rejects; returning it unawaited let the rejection escape the
-    // cancellation handler and surface as an AbortError stack plus a 500.
+  it("settles an aborted buffered-body request instead of letting the rejection escape", async () => {
+    // Pins the cancellation contract: an abort mid buffered-body settles as 499
+    // rather than rejecting. It does NOT by itself fail without the `return
+    // await` in proxyResponse -- measured both ways, and it passes either way,
+    // because every layer below also catches the escaped rejection. Kept as a
+    // behaviour lock, not claimed as a regression guard for that change.
+    let resolveHeadersSent: () => void = () => {};
+    const headersSent = new Promise<void>((resolve) => {
+      resolveHeadersSent = resolve;
+    });
+
     const upstream = http.createServer((req, res) => {
+      // Declared length the body never satisfies, so the buffered read is still
+      // pending when the abort lands.
       res.writeHead(200, {
         "content-type": "application/json",
         "content-length": "64",
       });
       res.write('{"partial":');
-      // never finishes the body
+      resolveHeadersSent();
     });
     await new Promise<void>((resolve) => upstream.listen(0, resolve));
 
-    const app = express();
-    mountInspector(app, { basePath: "/mcp", oauthProxyAllowLoopback: true });
-    const server = app.listen(0);
+    const inspector = mountInspector({
+      basePath: "/mcp",
+      oauthProxyAllowLoopback: true,
+    });
 
-    let controller: AbortController | undefined;
+    const controller = new AbortController();
     try {
       const upstreamAddress = upstream.address();
-      const appAddress = server.address();
-      if (
-        !upstreamAddress ||
-        typeof upstreamAddress === "string" ||
-        !appAddress ||
-        typeof appAddress === "string"
-      ) {
-        throw new Error("Test servers did not bind TCP ports");
+      if (!upstreamAddress || typeof upstreamAddress === "string") {
+        throw new Error("Test server did not bind a TCP port");
       }
 
-      const target = `http://127.0.0.1:${upstreamAddress.port}/json`;
-      controller = new AbortController();
-      const pending = fetch(
-        `http://127.0.0.1:${appAddress.port}/mcp/inspector/api/proxy`,
-        { headers: { "x-target-url": target }, signal: controller.signal }
-      ).catch(() => undefined);
-
-      await new Promise<void>((resolve) => setTimeout(resolve, 50));
-      controller.abort();
-      await pending;
-
-      // The server must stay healthy: an escaped rejection would take the
-      // request down with a 500 rather than a quiet cancellation.
-      const probe = await fetch(
-        `http://127.0.0.1:${appAddress.port}/mcp/inspector`
+      const pending = inspector(
+        new Request("http://localhost/mcp/inspector/api/proxy", {
+          headers: {
+            "x-target-url": `http://127.0.0.1:${upstreamAddress.port}/json`,
+          },
+          signal: controller.signal,
+        })
       );
-      expect(probe.status).toBe(200);
+
+      // Synchronize on the upstream actually having sent headers, so the abort
+      // lands mid-body rather than in the pre-header path covered above.
+      await raceWithTimeout(headersSent, 3000, "upstream never sent headers");
+      controller.abort();
+
+      // The request must settle, not reject: an unawaited proxyResponse()
+      // rejection escapes the cancellation handler instead of becoming a quiet
+      // cancellation.
+      const response = await pending;
+      expect(response.status).toBe(499);
     } finally {
-      controller?.abort();
-      server.closeAllConnections();
+      controller.abort();
       upstream.closeAllConnections();
-      await new Promise<void>((resolve) => server.close(() => resolve()));
       await new Promise<void>((resolve) => upstream.close(() => resolve()));
     }
   }, 10000);
