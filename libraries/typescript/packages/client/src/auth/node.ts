@@ -525,7 +525,7 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
     }
   }
 
-  private stopLoopback(): void {
+  private stopLoopback(activeSocket?: import("node:net").Socket): void {
     if (this.pendingTimer) {
       clearTimeout(this.pendingTimer);
       this.pendingTimer = null;
@@ -534,29 +534,77 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
       const server = this.server;
       this.server = null;
       server.close();
-      if (typeof server.closeAllConnections === "function") {
-        server.closeAllConnections();
-      }
+
       for (const socket of this.sockets) {
-        socket.destroy();
+        if (socket !== activeSocket) {
+          socket.destroy();
+        }
       }
       this.sockets.clear();
+
+      if (activeSocket && !activeSocket.destroyed) {
+        // Active response socket has already received the response headers & body;
+        // let it finish closing cleanly via Connection: close, or destroy after fallback.
+        const timer = setTimeout(() => {
+          activeSocket.destroy();
+        }, 1_000);
+        timer.unref?.();
+        activeSocket.once("close", () => clearTimeout(timer));
+      } else if (
+        !activeSocket &&
+        typeof server.closeAllConnections === "function"
+      ) {
+        server.closeAllConnections();
+      }
     }
     this.authorizationUrl = null;
   }
 
-  private resolvePending(response: NodeOAuthAuthorizationResponse): void {
+  private resolvePending(
+    response: NodeOAuthAuthorizationResponse,
+    activeSocket?: import("node:net").Socket
+  ): void {
     const p = this.pending;
     this.pending = null;
-    this.stopLoopback();
+    this.stopLoopback(activeSocket);
     p?.resolve(response);
   }
 
-  private rejectPending(err: Error): void {
+  private rejectPending(
+    err: Error,
+    activeSocket?: import("node:net").Socket
+  ): void {
     const p = this.pending;
     this.pending = null;
-    this.stopLoopback();
+    this.stopLoopback(activeSocket);
     p?.reject(err);
+  }
+
+  private deferUntilResponseFinished(
+    res: import("node:http").ServerResponse,
+    callback: () => void
+  ): void {
+    if (res.writableFinished) {
+      callback();
+      return;
+    }
+
+    let settled = false;
+    const onDone = () => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(safetyTimer);
+        res.removeListener("finish", onDone);
+        res.removeListener("close", onDone);
+        callback();
+      }
+    };
+
+    const safetyTimer = setTimeout(onDone, 1_000);
+    safetyTimer.unref?.();
+
+    res.once("finish", onDone);
+    res.once("close", onDone);
   }
 
   private handleCallback(
@@ -599,7 +647,11 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
       res.setHeader("content-type", "text/html; charset=utf-8");
       res.setHeader("connection", "close");
       res.end(FAILURE_HTML(err, errDesc));
-      this.rejectPending(new OAuthFlowError(err, errDesc));
+
+      const activeSocket = res.socket ?? undefined;
+      this.deferUntilResponseFinished(res, () => {
+        this.rejectPending(new OAuthFlowError(err, errDesc), activeSocket);
+      });
       return;
     }
 
@@ -615,7 +667,14 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
     res.setHeader("content-type", "text/html; charset=utf-8");
     res.setHeader("connection", "close");
     res.end(SUCCESS_HTML);
-    this.resolvePending({ code, ...(iss !== undefined ? { iss } : {}) });
+
+    const activeSocket = res.socket ?? undefined;
+    this.deferUntilResponseFinished(res, () => {
+      this.resolvePending(
+        { code, ...(iss !== undefined ? { iss } : {}) },
+        activeSocket
+      );
+    });
   }
 }
 
