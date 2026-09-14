@@ -154,6 +154,41 @@ describe("HTTP lifecycle with a real legacy MCP session", () => {
     expect(cancelReason).toBe(reason);
   });
 
+  it("forwards SSE progress without changing the response bytes", async () => {
+    const connector = new HttpConnector("http://127.0.0.1:1/mcp", {
+      protocolNegotiation: "legacy",
+    });
+    const progress: unknown[] = [];
+    (
+      connector as unknown as {
+        activeProgressHandlers: Set<(params: unknown) => void>;
+      }
+    ).activeProgressHandlers.add((params) => progress.push(params));
+    const encoder = new TextEncoder();
+    const progressEvent =
+      'data: {"jsonrpc":"2.0","method":"notifications/progress","params":{"progress":1}}\n\n';
+    const dataEvent = 'data: {"jsonrpc":"2.0","result":"payload"}\n\n';
+    const response = new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(encoder.encode(progressEvent));
+          controller.enqueue(encoder.encode(dataEvent));
+          controller.close();
+        },
+      }),
+      { headers: { "content-type": "text/event-stream" } }
+    );
+
+    const observed = (
+      connector as unknown as {
+        observeSseProgress(response: Response): Response;
+      }
+    ).observeSseProgress(response);
+
+    expect(await observed.text()).toBe(progressEvent + dataEvent);
+    expect(progress).toEqual([{ progress: 1 }]);
+  });
+
   it("shares one session across concurrent connects and closes its stream on disconnect", async () => {
     const server = await fixture();
     const { connector } = server;
