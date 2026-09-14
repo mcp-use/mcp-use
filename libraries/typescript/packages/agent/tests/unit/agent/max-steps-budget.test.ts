@@ -1,12 +1,3 @@
-/**
- * Per-call maxSteps, observed at the executor boundary.
- *
- * modelCallLimitMiddleware takes its runLimit when the executor is built, so
- * the effect of a per-call budget is only visible in the config the executor
- * is invoked with. Both the executor and the middleware are mocked here, so
- * these assert forwarding rather than enforcement.
- */
-
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MCPAgent } from "../../../src/agents/mcp_agent_langchain.js";
@@ -33,14 +24,8 @@ vi.mock("../../../src/adapters/langchain_adapter.js", () => ({
   },
 }));
 
-/** Constructor default every case below overrides or falls back to. */
 const DEFAULT_MAX_STEPS = 5;
 
-/**
- * Public entry points that take a per-call budget. `run` delegates to `stream`
- * with positional arguments, so the options-object overload of `stream` needs
- * its own cases rather than riding on the `run` ones.
- */
 type Path = "run" | "stream" | "streamEvents";
 
 describe("per-call maxSteps", () => {
@@ -62,8 +47,6 @@ describe("per-call maxSteps", () => {
     streamEvents = vi.fn().mockImplementation(async function* () {
       yield { event: "on_chain_end", data: { output: "ok" } };
     });
-    // Inject the executor and mark the agent ready, so initialize() does not
-    // build a real one over the top of it.
     Object.assign(agent as never as Record<string, unknown>, {
       _agentExecutor: { stream, streamEvents, invoke: vi.fn() },
       _initialized: true,
@@ -74,7 +57,6 @@ describe("per-call maxSteps", () => {
     vi.clearAllMocks();
   });
 
-  /** Drain a path and return the config its executor call received. */
   async function budgetFor(
     path: Path,
     maxSteps?: number
@@ -83,16 +65,14 @@ describe("per-call maxSteps", () => {
       prompt: "q",
       ...(maxSteps !== undefined && { maxSteps }),
     };
+    const drained: unknown[] = [];
     if (path === "run") {
       await agent.run(options);
     } else if (path === "stream") {
-      for await (const _ of agent.stream(options)) {
-        // drain
-      }
+      for await (const event of agent.stream(options)) drained.push(event);
     } else {
-      for await (const _ of agent.streamEvents(options)) {
-        // drain
-      }
+      for await (const event of agent.streamEvents(options))
+        drained.push(event);
     }
     const mock = path === "streamEvents" ? streamEvents : stream;
     const config = mock.mock.calls.at(-1)?.[1] as {

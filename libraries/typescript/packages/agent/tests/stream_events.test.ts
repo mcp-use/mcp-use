@@ -279,8 +279,6 @@ describe("mCPAgent streamEvents()", () => {
       break;
     }
 
-    // The budget reaches modelCallLimitMiddleware through the run context,
-    // and the constructor value stays the default for later calls.
     expect(mockStreamEvents.mock.calls[0]?.[1]).toMatchObject({
       context: { runLimit: 5 },
       recursionLimit: 15,

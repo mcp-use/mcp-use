@@ -1278,8 +1278,6 @@ export class MCPAgent {
     let success = false;
     let finalOutput: string | null = null;
     let stepsTaken = 0;
-    // Budget for this call only. The constructor value stays the default for
-    // later calls that do not pass one.
     const stepBudget = steps ?? this.maxSteps;
 
     try {
@@ -1363,9 +1361,6 @@ export class MCPAgent {
           tags: this.getTags(),
           // Set trace name for LangChain/Langfuse
           runName: this.metadata.trace_name || "mcp-use-agent",
-          // modelCallLimitMiddleware reads runLimit from the run context
-          // first, so the per-call budget applies without rebuilding the
-          // executor the middleware was baked into.
           context: { runLimit: stepBudget },
           // Set recursion limit to 3x maxSteps to account for model calls + tool executions
           recursionLimit: stepBudget * 3,
@@ -1818,8 +1813,6 @@ export class MCPAgent {
     let eventCount = 0;
     let totalResponseLength = 0;
     let finalResponse = "";
-    // Budget for this call only. Writing it back to this.maxSteps would raise
-    // the ceiling for every later call that does not pass one.
     const stepBudget = steps ?? this.maxSteps;
 
     // Enhance query with schema information if structured output is requested
@@ -1892,9 +1885,6 @@ export class MCPAgent {
           tags: this.getTags(),
           // Set trace name for LangChain/Langfuse
           runName: this.metadata.trace_name || "mcp-use-agent",
-          // modelCallLimitMiddleware reads runLimit from the run context
-          // first, so the per-call budget applies without rebuilding the
-          // executor the middleware was baked into.
           context: { runLimit: stepBudget },
           // Set recursion limit to 3x maxSteps to account for model calls + tool executions
           recursionLimit: stepBudget * 3,
