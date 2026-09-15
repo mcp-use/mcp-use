@@ -148,7 +148,7 @@ describe("responsesReasoningFields", () => {
 });
 
 describe("Responses SSE event mapping", () => {
-  it("matches function argument events by item_id while preserving call_id", async () => {
+  it("matches function argument events by item_id or call_id while preserving call_id", async () => {
     const events = [
       {
         type: "response.output_item.added",
@@ -166,7 +166,8 @@ describe("Responses SSE event mapping", () => {
       },
       {
         type: "response.function_call_arguments.done",
-        item_id: "fc_123",
+        // Compatibility producers can still identify these events by call_id.
+        call_id: "call_abc",
         arguments: '{"city":"Paris"}',
       },
     ];
@@ -178,14 +179,17 @@ describe("Responses SSE event mapping", () => {
       .mockResolvedValue(new Response(body, { status: 200 }));
 
     const result = [];
-    for await (const event of streamResponsesTurn({
-      config: { provider: "openai", model: "gpt-4o-mini", apiKey: "test" },
-      messages: [],
-      tools: [],
-    })) {
-      result.push(event);
+    try {
+      for await (const event of streamResponsesTurn({
+        config: { provider: "openai", model: "gpt-4o-mini", apiKey: "test" },
+        messages: [],
+        tools: [],
+      })) {
+        result.push(event);
+      }
+    } finally {
+      fetchMock.mockRestore();
     }
-    fetchMock.mockRestore();
 
     expect(result).toEqual([
       {
