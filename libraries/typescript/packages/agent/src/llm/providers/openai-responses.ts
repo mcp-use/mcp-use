@@ -277,7 +277,13 @@ export async function* streamResponsesTurn(
 
   const callBuffers = new Map<
     string,
-    { index: number; name: string; argsJson: string; started: boolean }
+    {
+      index: number;
+      callId: string;
+      name: string;
+      argsJson: string;
+      started: boolean;
+    }
   >();
   let nextIndex = 0;
   let completedOutput: unknown[] = [];
@@ -308,8 +314,11 @@ export async function* streamResponsesTurn(
           typeof item.call_id === "string" ? item.call_id : `call_${nextIndex}`;
         const name = typeof item.name === "string" ? item.name : "";
         const idx = nextIndex++;
-        callBuffers.set(callId, {
+        // Arguments events carry `item_id`, not `call_id`; buffer on the item id.
+        const itemId = typeof item.id === "string" ? item.id : callId;
+        callBuffers.set(itemId, {
           index: idx,
+          callId,
           name,
           argsJson: "",
           started: true,
@@ -325,15 +334,15 @@ export async function* streamResponsesTurn(
     }
 
     if (type === "response.function_call_arguments.delta") {
-      const callId = typeof parsed.call_id === "string" ? parsed.call_id : "";
+      const itemId = typeof parsed.item_id === "string" ? parsed.item_id : "";
       const delta = typeof parsed.delta === "string" ? parsed.delta : "";
-      const buf = callBuffers.get(callId);
+      const buf = callBuffers.get(itemId);
       if (buf && delta.length > 0) {
         buf.argsJson += delta;
         yield {
           type: "tool-call-args-delta",
           index: buf.index,
-          toolCallId: callId,
+          toolCallId: buf.callId,
           toolName: buf.name,
           argsDelta: delta,
         };
@@ -342,16 +351,16 @@ export async function* streamResponsesTurn(
     }
 
     if (type === "response.function_call_arguments.done") {
-      const callId = typeof parsed.call_id === "string" ? parsed.call_id : "";
+      const itemId = typeof parsed.item_id === "string" ? parsed.item_id : "";
       const argsRaw =
         typeof parsed.arguments === "string" ? parsed.arguments : "";
-      const buf = callBuffers.get(callId);
+      const buf = callBuffers.get(itemId);
       if (buf) {
         if (argsRaw) buf.argsJson = argsRaw;
         yield {
           type: "tool-call-ready",
           index: buf.index,
-          toolCallId: callId,
+          toolCallId: buf.callId,
           toolName: buf.name,
           args: parseArgs(buf.argsJson || argsRaw),
         };
