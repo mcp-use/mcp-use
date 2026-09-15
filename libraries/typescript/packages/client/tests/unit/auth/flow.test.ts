@@ -220,6 +220,21 @@ describe("isUnauthorized", () => {
       }
     }
     expect(isUnauthorized(new HTTP401Error())).toBe(true);
+
+    // Custom error whose toString() throws must not break isUnauthorized
+    const throwingToStringError = new Error("unauthorized request");
+    throwingToStringError.toString = () => {
+      throw new Error("poisoned toString");
+    };
+    expect(isUnauthorized(throwingToStringError)).toBe(true);
+
+    const nonAuthThrowingToString = new Error(
+      "connect ECONNREFUSED 127.0.0.1:4010"
+    );
+    nonAuthThrowingToString.toString = () => {
+      throw new Error("poisoned toString");
+    };
+    expect(isUnauthorized(nonAuthThrowingToString)).toBe(false);
   });
 
   it("recursively inspects cause, data.cause, and response", () => {

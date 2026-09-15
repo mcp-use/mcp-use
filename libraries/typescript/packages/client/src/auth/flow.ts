@@ -86,17 +86,31 @@ export function isUnauthorized(err: unknown, depth = 0): boolean {
         typeof (err as Error).message === "string"
           ? (err as Error).message
           : "";
-      const errorStr =
-        typeof (err as { toString?: () => string }).toString === "function" &&
-        (err as { toString?: () => string }).toString !==
-          Object.prototype.toString
-          ? String(err)
-          : "";
       const errorName =
         typeof (err as Error).name === "string" ? (err as Error).name : "";
 
+      let errorStr = "";
+      try {
+        if (
+          typeof (err as { toString?: () => string }).toString === "function" &&
+          (err as { toString?: () => string }).toString !==
+            Object.prototype.toString
+        ) {
+          errorStr = String(err);
+        }
+      } catch {
+        // Ignore errors from throwing or poisoned custom toString implementations.
+      }
+
+      let fallbackStr = "";
+      try {
+        fallbackStr = String(err);
+      } catch {
+        // Ignore errors from String(err) fallback.
+      }
+
       const fullText =
-        `${errorName} ${errorMsg} ${errorStr}`.trim() || String(err);
+        `${errorName} ${errorMsg} ${errorStr}`.trim() || fallbackStr;
 
       // Match case-insensitive "unauthorized", including UnauthorizedError, UnauthorizedException, etc.
       if (/\bunauthorized(?:[a-z0-9_]+)?\b/i.test(fullText)) return true;
