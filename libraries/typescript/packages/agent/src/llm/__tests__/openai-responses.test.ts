@@ -148,7 +148,7 @@ describe("responsesReasoningFields", () => {
 });
 
 describe("Responses SSE event mapping", () => {
-  it("matches function argument events by item_id or call_id while preserving call_id", async () => {
+  it("matches function argument events by item_id while preserving call_id", async () => {
     const events = [
       {
         type: "response.output_item.added",
@@ -166,8 +166,7 @@ describe("Responses SSE event mapping", () => {
       },
       {
         type: "response.function_call_arguments.done",
-        // Compatibility producers can still identify these events by call_id.
-        call_id: "call_abc",
+        item_id: "fc_123",
         arguments: '{"city":"Paris"}',
       },
     ];
@@ -204,6 +203,61 @@ describe("Responses SSE event mapping", () => {
         toolCallId: "call_abc",
         toolName: "get_weather",
         argsDelta: '{"city":',
+      },
+      {
+        type: "tool-call-ready",
+        index: 0,
+        toolCallId: "call_abc",
+        toolName: "get_weather",
+        args: { city: "Paris" },
+      },
+      { type: "done" },
+    ]);
+  });
+
+  it("matches function argument done events by call_id for compatibility producers", async () => {
+    const events = [
+      {
+        type: "response.output_item.added",
+        item: {
+          type: "function_call",
+          id: "fc_123",
+          call_id: "call_abc",
+          name: "get_weather",
+        },
+      },
+      {
+        type: "response.function_call_arguments.done",
+        call_id: "call_abc",
+        arguments: '{"city":"Paris"}',
+      },
+    ];
+    const body = events
+      .map((event) => `data: ${JSON.stringify(event)}\n\n`)
+      .join("");
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(body, { status: 200 }));
+
+    const result = [];
+    try {
+      for await (const event of streamResponsesTurn({
+        config: { provider: "openai", model: "gpt-4o-mini", apiKey: "test" },
+        messages: [],
+        tools: [],
+      })) {
+        result.push(event);
+      }
+    } finally {
+      fetchMock.mockRestore();
+    }
+
+    expect(result).toEqual([
+      {
+        type: "tool-call-start",
+        index: 0,
+        toolCallId: "call_abc",
+        toolName: "get_weather",
       },
       {
         type: "tool-call-ready",
