@@ -143,9 +143,56 @@ describe("isUnauthorized", () => {
     expect(
       isUnauthorized(new Error("Failed to reach api.service.internal:401"))
     ).toBe(false);
+    expect(isUnauthorized(new Error("Failed to reach singlehost:401"))).toBe(
+      false
+    );
     expect(
       isUnauthorized(new Error("Failed to fetch https://remote.host:401/api"))
     ).toBe(false);
+    expect(
+      isUnauthorized(new Error("connect EADDRNOTAVAIL 2001:db8::5:401"))
+    ).toBe(false);
+    expect(isUnauthorized(new Error("connect EAGAIN myhost:401"))).toBe(false);
+    expect(isUnauthorized(new Error("connect EHOSTDOWN 10.0.0.1:401"))).toBe(
+      false
+    );
+    expect(isUnauthorized(new Error("connect EPROTO server:401"))).toBe(false);
+    expect(isUnauthorized(new Error("connect EWOULDBLOCK myhost:401"))).toBe(
+      false
+    );
+  });
+
+  it("prioritizes HTTP 401 status when URL/host also uses port 401 or includes durations", () => {
+    expect(
+      isUnauthorized(
+        new Error("Request to http://localhost:401 failed with status 401")
+      )
+    ).toBe(true);
+    expect(
+      isUnauthorized(
+        new Error(
+          "Request to http://localhost:401/callback returned HTTP status 401"
+        )
+      )
+    ).toBe(true);
+    expect(
+      isUnauthorized(
+        new Error("Request to [::1]:401 failed with status code: 401")
+      )
+    ).toBe(true);
+    expect(
+      isUnauthorized(new Error("Failed to fetch from http://api:401: HTTP 401"))
+    ).toBe(true);
+    expect(
+      isUnauthorized(new Error("Request to myhost:401 failed (401)"))
+    ).toBe(true);
+    expect(
+      isUnauthorized(
+        new Error(
+          "Operation timed out after 401ms on http://localhost:401, server returned 401"
+        )
+      )
+    ).toBe(true);
   });
 
   it("recursively inspects cause, data.cause, and response", () => {

@@ -38,6 +38,18 @@ const SYSTEM_NETWORK_ERROR_CODES = new Set([
   "EAI_AGAIN",
   "ENETDOWN",
   "ECONNABORTED",
+  "EADDRNOTAVAIL",
+  "EADDRINUSE",
+  "EHOSTDOWN",
+  "EPROTO",
+  "EAGAIN",
+  "EWOULDBLOCK",
+  "EINPROGRESS",
+  "ENOTCONN",
+  "ENETRESET",
+  "EISCONN",
+  "EALREADY",
+  "ECANCELED",
 ]);
 
 /**
@@ -65,7 +77,7 @@ export function isUnauthorized(err: unknown, depth = 0): boolean {
     const isSystemNetworkError =
       (typeof code === "string" && SYSTEM_NETWORK_ERROR_CODES.has(code)) ||
       (typeof (err as Error).message === "string" &&
-        /\bE(?:CONNREFUSED|NOTFOUND|TIMEDOUT|CONNRESET|HOSTUNREACH|NETUNREACH|AI_AGAIN|PIPE|NETDOWN|CONNABORTED)\b/.test(
+        /\bE(?:CONNREFUSED|NOTFOUND|TIMEDOUT|CONNRESET|HOSTUNREACH|NETUNREACH|AI_AGAIN|PIPE|NETDOWN|CONNABORTED|ADDRNOTAVAIL|ADDRINUSE|HOSTDOWN|PROTO|AGAIN|WOULDBLOCK|INPROGRESS|NOTCONN|NETRESET|ISCONN|ALREADY|CANCELED)\b/.test(
           (err as Error).message
         ));
 
@@ -78,18 +90,29 @@ export function isUnauthorized(err: unknown, depth = 0): boolean {
       // Match case-insensitive word-boundary "unauthorized"
       if (/\bunauthorized\b/i.test(message)) return true;
 
-      // Match HTTP 401 status patterns while excluding duration or port numbers
-      if (/\b(?:http\s*|status\s*|code\s*|error\s*)?401\b/i.test(message)) {
-        const isDurationOrPort =
-          /\b401\s*(?:ms|milliseconds?|s|sec|seconds?|min|minutes?|m|h|hours?)\b/i.test(
-            message
-          ) ||
-          /\b(?:port|address|addr)\s*[:=]?\s*401\b/i.test(message) ||
-          /(?:https?:\/\/[^\s/:]+|\[[0-9a-fA-F:]+\]|\b\d{1,3}(?:\.\d{1,3}){3}\b|\blocalhost\b|\b[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+):401\b/i.test(
-            message
+      // Explicit HTTP 401 status takes precedence over port/duration occurrences
+      if (
+        /\b(?:http(?:\s*status)?|status(?:\s*code)?|error)\s*[:=]?\s*401\b/i.test(
+          message
+        )
+      ) {
+        return true;
+      }
+
+      // Check if message contains 401 outside of durations or port numbers
+      if (/\b401\b/.test(message)) {
+        const stripped = message
+          .replace(
+            /\b401\s*(?:ms|milliseconds?|s|sec|seconds?|min|minutes?|m|h|hours?)\b/gi,
+            ""
+          )
+          .replace(/\b(?:port|address|addr)\s*[:=]?\s*401\b/gi, "")
+          .replace(
+            /(?:https?:\/\/[^\s/:]+|\[[0-9a-fA-F:]+\]|\b[0-9a-fA-F]+(?::[0-9a-fA-F]*)+|\b\d{1,3}(?:\.\d{1,3}){3}\b|\b[a-zA-Z0-9_-]+(?:\.[a-zA-Z0-9_.-]+)*):401\b/gi,
+            ""
           );
 
-        if (!isDurationOrPort) return true;
+        if (/\b401\b/.test(stripped)) return true;
       }
     }
 
