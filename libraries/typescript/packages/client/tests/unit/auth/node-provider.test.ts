@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { createServer as createNetServer } from "node:net";
+import { createConnection, createServer as createNetServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -156,6 +156,54 @@ describe("NodeOAuthClientProvider", () => {
     });
     await expect(legacyCodePromise).resolves.toBe("authorization-code");
     expect(openBrowser).toHaveBeenCalledOnce();
+  });
+
+  it("closes a keep-alive callback socket after returning the success response", async () => {
+    const provider = await NodeOAuthClientProvider.create(
+      "https://mcp.example.com/mcp",
+      {
+        authTimeoutMs: 5_000,
+        kvStore: new MemoryKVStore(),
+        openBrowser: vi.fn(),
+        preferredPort: 35_500 + (process.pid % 1_000),
+        portRange: 100,
+      }
+    );
+    const authorizationUrl = new URL("https://auth.example.com/authorize");
+    authorizationUrl.searchParams.set("state", "test-state");
+
+    try {
+      await provider.redirectToAuthorization(authorizationUrl);
+      const responsePromise = provider.getAuthorizationResponse();
+      const socket = createConnection({
+        host: "127.0.0.1",
+        port: provider.callbackPort,
+      });
+      const response = await new Promise<string>((resolve, reject) => {
+        let data = "";
+        socket.setEncoding("utf8");
+        socket.once("error", reject);
+        socket.on("data", (chunk) => {
+          data += chunk;
+        });
+        socket.once("end", () => resolve(data));
+        socket.once("connect", () => {
+          socket.write(
+            "GET /callback?code=authorization-code&state=test-state HTTP/1.1\r\n" +
+              "Host: 127.0.0.1\r\n" +
+              "Connection: keep-alive\r\n\r\n"
+          );
+        });
+      });
+
+      expect(response).toContain("HTTP/1.1 200");
+      expect(response).toMatch(/connection: close/i);
+      await expect(responsePromise).resolves.toEqual({
+        code: "authorization-code",
+      });
+    } finally {
+      provider.dispose();
+    }
   });
 
   it("re-binds the loopback listener after a failed bind instead of leaking a dead server handle", async () => {

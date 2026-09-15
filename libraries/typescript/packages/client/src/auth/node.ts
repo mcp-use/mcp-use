@@ -572,6 +572,10 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
     if (err) {
       res.statusCode = 400;
       res.setHeader("content-type", "text/html; charset=utf-8");
+      // Completing a callback also tears down the loopback listener. Without
+      // this, an HTTP/1.1 keep-alive client can keep the listener (and a CLI
+      // process waiting for it) alive after the flow has settled.
+      res.setHeader("connection", "close");
       res.end(FAILURE_HTML(err, errDesc));
       this.rejectPending(new OAuthFlowError(err, errDesc));
       return;
@@ -586,6 +590,7 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
 
     res.statusCode = 200;
     res.setHeader("content-type", "text/html; charset=utf-8");
+    res.setHeader("connection", "close");
     res.end(SUCCESS_HTML);
     this.resolvePending({ code, ...(iss !== undefined ? { iss } : {}) });
   }
