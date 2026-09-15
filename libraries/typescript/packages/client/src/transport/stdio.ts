@@ -185,7 +185,6 @@ export class StdioConnector extends BaseConnector {
       );
 
       await this.client.connect(transport);
-      this.setupRoundProgressForwarding();
 
       this.setupNotificationHandler();
       // Inbound request handlers (roots/sampling/elicitation) were registered before connect()

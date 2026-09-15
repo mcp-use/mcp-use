@@ -576,61 +576,6 @@ export class HttpConnector extends BaseConnector {
     }
   }
 
-  /**
-   * Tee an SSE response so v2 MRTR progress can be correlated even when the
-   * upstream SDK does not carry the original callback to retry request IDs.
-   */
-  private observeSseProgress(response: Response): Response {
-    if (
-      !response.body ||
-      !response.headers.get("content-type")?.includes("text/event-stream")
-    ) {
-      return response;
-    }
-    const [body, observed] = response.body.tee();
-    void (async () => {
-      const reader = observed.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const events = buffer.split(/\r?\n\r?\n/);
-          buffer = events.pop() ?? "";
-          for (const event of events) {
-            for (const line of event.split(/\r?\n/)) {
-              if (!line.startsWith("data:")) continue;
-              try {
-                const message = JSON.parse(line.slice(5).trim()) as {
-                  method?: string;
-                  params?: unknown;
-                };
-                if (message.method === "notifications/progress") {
-                  this.forwardRoundProgress(message.params);
-                }
-              } catch {
-                // Ignore malformed/non-JSON SSE data; the SDK remains authoritative.
-              }
-            }
-          }
-        }
-      } catch (error) {
-        if (!(error instanceof DOMException && error.name === "AbortError")) {
-          logger.debug("Progress observer stream ended:", error);
-        }
-      } finally {
-        reader.releaseLock();
-      }
-    })();
-    return new Response(body, {
-      status: response.status,
-      statusText: response.statusText,
-      headers: response.headers,
-    });
-  }
-
   private async connectWithStreamableHttp(baseUrl: string): Promise<void> {
     try {
       logger.debug("[HttpConnector] Connecting with Streamable HTTP", {
@@ -646,23 +591,6 @@ export class HttpConnector extends BaseConnector {
         headers: this.headers,
       });
 
-      const baseFetch = this.customFetch ?? globalThis.fetch.bind(globalThis);
-      const observedFetch: typeof fetch = async (input, init) => {
-        const response = await baseFetch(input, init);
-        const requestHeaders = new Headers(
-          input instanceof Request ? input.headers : undefined
-        );
-        new Headers(init?.headers).forEach((value, key) => {
-          requestHeaders.set(key, value);
-        });
-        // subscriptions/listen owns its SSE reader and acknowledgement state.
-        // Re-wrapping that response breaks the SDK's per-request stream hooks;
-        // the progress observer is only for ordinary request/response calls.
-        return requestHeaders.get("mcp-method") === "subscriptions/listen"
-          ? response
-          : this.observeSseProgress(response);
-      };
-
       // Create StreamableHTTPClientTransport directly
       // The official SDK's StreamableHTTPClientTransport automatically handles session IDs
       // when client.connect() is called - it sends initialize, gets session ID from response header,
@@ -671,7 +599,7 @@ export class HttpConnector extends BaseConnector {
         new URL(baseUrl),
         {
           authProvider: this.opts.authProvider, // ← Pass OAuth provider to SDK
-          fetch: observedFetch,
+          fetch: this.customFetch,
           requestInit: {
             headers: this.headers,
           },
