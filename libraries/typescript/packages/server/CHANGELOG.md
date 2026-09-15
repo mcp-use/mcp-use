@@ -1,5 +1,14 @@
 # mcp-use
 
+## 2.5.1-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+- Updated dependencies
+  - @mcp-use/cli@4.1.13-canary.0
+  - @mcp-use/inspector@20.3.9-canary.0
+
 ## 2.5.0
 
 ### Minor Changes

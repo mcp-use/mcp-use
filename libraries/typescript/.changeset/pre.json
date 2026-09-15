@@ -10,5 +10,8 @@
     "mcp-use": "2.5.0",
     "@mcp-use/tunnel": "0.2.1"
   },
-  "changesets": []
+  "changesets": [
+    "propagated-b4b4cb29059907a4",
+    "quiet-progress-handlers"
+  ]
 }
