@@ -130,6 +130,20 @@ describe("createDevApiHandler", () => {
     expect(tunnel.stop).toHaveBeenCalled();
   });
 
+  it("serves dev routes when basePath is the root", async () => {
+    // assertServerConfig accepts basePath "/", and naive interpolation would
+    // build "//inspector/api/dev/info", which no client requests.
+    const tunnel = fakeTunnel();
+    const handler = createDevApiHandler(
+      { getBasePath: () => "/", port, tunnel: tunnel.manager },
+      async () => new Response("fallback", { status: 418 })
+    );
+
+    const res = await handler(new Request(`${origin}/inspector/api/dev/info`));
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({ fromCli: true });
+  });
+
   it("delegates non-matching paths to the fallback handler", async () => {
     const tunnel = fakeTunnel();
     const fallback = vi.fn(async () => new Response("mcp"));
