@@ -88,6 +88,7 @@ export interface MCPServerConfig {
   transport?: "http" | "sse";
   headers?: Record<string, string>;
   authToken?: string;
+  /** @deprecated Use {@link MCPServerConfig.authToken} instead. */
   auth_token?: string;
   command?: string;
   args?: string[];
