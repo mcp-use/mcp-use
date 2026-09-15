@@ -285,6 +285,13 @@ export async function* streamResponsesTurn(
       started: boolean;
     }
   >();
+
+  // OpenAI events normally use `item_id`, but compatibility producers can
+  // still send the protocol `call_id`. Keep one buffer per output item and
+  // accept either identifier when consuming argument events.
+  const findCallBuffer = (id: string) =>
+    callBuffers.get(id) ??
+    [...callBuffers.values()].find((buffer) => buffer.callId === id);
   let nextIndex = 0;
   let completedOutput: unknown[] = [];
 
@@ -343,7 +350,7 @@ export async function* streamResponsesTurn(
             ? parsed.call_id
             : "";
       const delta = typeof parsed.delta === "string" ? parsed.delta : "";
-      const buf = callBuffers.get(itemId);
+      const buf = findCallBuffer(itemId);
       if (buf && delta.length > 0) {
         buf.argsJson += delta;
         yield {
@@ -366,7 +373,7 @@ export async function* streamResponsesTurn(
             : "";
       const argsRaw =
         typeof parsed.arguments === "string" ? parsed.arguments : "";
-      const buf = callBuffers.get(itemId);
+      const buf = findCallBuffer(itemId);
       if (buf) {
         if (argsRaw) buf.argsJson = argsRaw;
         yield {
