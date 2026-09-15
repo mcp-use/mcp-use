@@ -82,26 +82,37 @@ export function isUnauthorized(err: unknown, depth = 0): boolean {
         ));
 
     if (!isSystemNetworkError) {
-      const message =
+      const errorMsg =
         typeof (err as Error).message === "string"
           ? (err as Error).message
-          : String(err);
+          : "";
+      const errorStr =
+        typeof (err as { toString?: () => string }).toString === "function" &&
+        (err as { toString?: () => string }).toString !==
+          Object.prototype.toString
+          ? String(err)
+          : "";
+      const errorName =
+        typeof (err as Error).name === "string" ? (err as Error).name : "";
 
-      // Match case-insensitive word-boundary "unauthorized"
-      if (/\bunauthorized\b/i.test(message)) return true;
+      const fullText =
+        `${errorName} ${errorMsg} ${errorStr}`.trim() || String(err);
 
-      // Explicit HTTP 401 status takes precedence over port/duration occurrences
+      // Match case-insensitive "unauthorized", including UnauthorizedError, UnauthorizedException, etc.
+      if (/\bunauthorized(?:[a-z0-9_]+)?\b/i.test(fullText)) return true;
+
+      // Explicit HTTP 401 status takes precedence over port occurrences, but excludes duration units
       if (
-        /\b(?:http(?:\s*status)?|status(?:\s*code)?|error)\s*[:=]?\s*401\b/i.test(
-          message
+        /\b(?:http(?:\s*(?:status|code|response))?|status(?:\s*code)?|response(?:\s*code)?|code|error)\s*[:=]?\s*401(?!\s*(?:ms|milliseconds?|s|sec|seconds?|min|minutes?|m|h|hours?)\b)\b/i.test(
+          fullText
         )
       ) {
         return true;
       }
 
-      // Check if message contains 401 outside of durations or port numbers
-      if (/\b401\b/.test(message)) {
-        const stripped = message
+      // Check if text contains 401 outside of durations or port numbers
+      if (/\b(?:HTTP)?401(?:Error|Exception)?\b/i.test(fullText)) {
+        const stripped = fullText
           .replace(
             /\b401\s*(?:ms|milliseconds?|s|sec|seconds?|min|minutes?|m|h|hours?)\b/gi,
             ""
@@ -112,7 +123,7 @@ export function isUnauthorized(err: unknown, depth = 0): boolean {
             ""
           );
 
-        if (/\b401\b/.test(stripped)) return true;
+        if (/\b(?:HTTP)?401(?:Error|Exception)?\b/i.test(stripped)) return true;
       }
     }
 

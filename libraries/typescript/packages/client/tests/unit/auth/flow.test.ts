@@ -193,6 +193,33 @@ describe("isUnauthorized", () => {
         )
       )
     ).toBe(true);
+    expect(isUnauthorized(new Error("Server returned code:401"))).toBe(true);
+    expect(isUnauthorized(new Error("HTTP response:401"))).toBe(true);
+    expect(isUnauthorized(new Error("status:401"))).toBe(true);
+  });
+
+  it("handles duration after error and message-only UnauthorizedError without false triggers", () => {
+    // Duration immediately following error prefix must not trigger 401
+    expect(isUnauthorized(new Error("Error: 401 ms elapsed"))).toBe(false);
+    expect(isUnauthorized(new Error("Error: 401ms timeout"))).toBe(false);
+    expect(isUnauthorized(new Error("error 401 seconds elapsed"))).toBe(false);
+
+    // Message-only UnauthorizedError (e.g. across process/serialization boundary)
+    expect(isUnauthorized(new Error("UnauthorizedError: token expired"))).toBe(
+      true
+    );
+    expect(
+      isUnauthorized(new Error("UnauthorizedException: access denied"))
+    ).toBe(true);
+
+    // Constructor name carrying 401 prefix
+    class HTTP401Error extends Error {
+      constructor() {
+        super("request failed");
+        this.name = "HTTP401Error";
+      }
+    }
+    expect(isUnauthorized(new HTTP401Error())).toBe(true);
   });
 
   it("recursively inspects cause, data.cause, and response", () => {
