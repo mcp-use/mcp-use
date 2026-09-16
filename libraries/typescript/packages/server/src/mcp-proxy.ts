@@ -105,6 +105,8 @@ export interface ProxyTool {
   outputSchema?: Record<string, unknown> | undefined;
   /** Upstream behavioral hints. */
   annotations?: ToolAnnotations | undefined;
+  /** Upstream extension metadata advertised on `tools/list`. */
+  _meta?: ToolDefinition["_meta"] | undefined;
 }
 
 /** Resource metadata consumed while introspecting an upstream connection. */
@@ -367,6 +369,7 @@ function mountPlan(host: ProxyMountHost, plan: ProxyNamespacePlan): void {
       ...(tool.outputSchema !== undefined && {
         outputSchema: passthroughJsonSchema(tool.outputSchema),
       }),
+      ...(tool._meta !== undefined && { _meta: tool._meta }),
     };
     const upstreamName = tool.name;
     const callback = async (
