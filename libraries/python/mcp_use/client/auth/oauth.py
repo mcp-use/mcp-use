@@ -269,6 +269,14 @@ class OAuth:
         else:
             logger.debug("Using provided OAuth metadata, skipping discovery")
 
+        # Refresh needs the token endpoint, hence after metadata discovery
+        if token_data and token_data.refresh_token:
+            logger.debug("Existing token is expired but has a refresh token, attempting refresh")
+            refreshed_auth = await self.refresh_token()
+            if refreshed_auth:
+                logger.debug("OAuth.initialize returning refreshed BearerAuth")
+                return refreshed_auth
+
         logger.debug("OAuth.initialize finished, no valid token available yet")
         return None
 
