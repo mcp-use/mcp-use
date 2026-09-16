@@ -31,3 +31,12 @@ html[data-current-path="/v2/typescript/cookbook/"] #pagination {
 #sidebar-content a[href="/v2/typescript/cookbook/nextjs"] img {
   visibility: hidden;
 }
+
+#sidebar-content a[href="/v2/typescript/cookbook/upstash"] > div:has(> img) {
+  background-color: currentColor;
+  mask: url("/v2/typescript/cookbook/upstash.svg") center / 16px 16px no-repeat;
+}
+
+#sidebar-content a[href="/v2/typescript/cookbook/upstash"] img {
+  visibility: hidden;
+}
