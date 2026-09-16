@@ -102,6 +102,8 @@ class WebSocketConnector(BaseConnector):
                 request_id = data.get("id")
                 if request_id and request_id in self.pending_requests:
                     future = self.pending_requests.pop(request_id)
+                    if future.done():
+                        continue
                     if "result" in data:
                         future.set_result(data["result"])
                     elif "error" in data:
@@ -190,19 +192,19 @@ class WebSocketConnector(BaseConnector):
         future = asyncio.Future()
         self.pending_requests[request_id] = future
 
-        # Send the request
-        await self.ws.send(json.dumps({"id": request_id, "method": method, "params": params or {}}))
-
-        logger.debug(f"Sent request {request_id} method: {method}")
-
-        # Wait for the response
         try:
+            # Send the request
+            await self.ws.send(json.dumps({"id": request_id, "method": method, "params": params or {}}))
+
+            logger.debug(f"Sent request {request_id} method: {method}")
+
+            # Wait for the response
             return await future
         except Exception as e:
-            # Remove the request from pending requests
-            self.pending_requests.pop(request_id, None)
             logger.error(f"Error waiting for response to request {request_id}: {e}")
             raise
+        finally:
+            self.pending_requests.pop(request_id, None)
 
     async def initialize(self) -> dict[str, Any]:
         """Initialize the MCP session and return session information."""
