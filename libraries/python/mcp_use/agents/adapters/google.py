@@ -72,7 +72,7 @@ class GoogleMCPAdapter(BaseAdapter[types.FunctionDeclaration]):
         function_declaration = types.FunctionDeclaration(
             name=tool_name,
             description=mcp_resource.description,
-            parameters_json_schema={"input_schema": {"type": "object", "properties": {}}},
+            parameters_json_schema={"type": "object", "properties": {}},
         )
         return function_declaration
 
