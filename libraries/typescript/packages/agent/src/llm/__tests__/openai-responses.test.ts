@@ -270,6 +270,86 @@ describe("Responses SSE event mapping", () => {
     ]);
   });
 
+  it("ignores unknown and ambiguous compatibility IDs without changing another call", async () => {
+    const events = [
+      {
+        type: "response.output_item.added",
+        item: {
+          type: "function_call",
+          id: "item_one",
+          call_id: "shared",
+          name: "one",
+        },
+      },
+      {
+        type: "response.output_item.added",
+        item: {
+          type: "function_call",
+          id: "item_two",
+          call_id: "shared",
+          name: "two",
+        },
+      },
+      {
+        type: "response.function_call_arguments.delta",
+        call_id: "shared",
+        delta: '{"wrong":true}',
+      },
+      {
+        type: "response.function_call_arguments.done",
+        item_id: "missing",
+        arguments: '{"wrong":true}',
+      },
+      {
+        type: "response.function_call_arguments.done",
+        item_id: "item_two",
+        arguments: '{"right":true}',
+      },
+    ];
+    const body = events
+      .map((event) => `data: ${JSON.stringify(event)}\n\n`)
+      .join("");
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(body, { status: 200 }));
+
+    const result = [];
+    try {
+      for await (const event of streamResponsesTurn({
+        config: { provider: "openai", model: "gpt-4o-mini", apiKey: "test" },
+        messages: [],
+        tools: [],
+      })) {
+        result.push(event);
+      }
+    } finally {
+      fetchMock.mockRestore();
+    }
+
+    expect(result).toEqual([
+      {
+        type: "tool-call-start",
+        index: 0,
+        toolCallId: "shared",
+        toolName: "one",
+      },
+      {
+        type: "tool-call-start",
+        index: 1,
+        toolCallId: "shared",
+        toolName: "two",
+      },
+      {
+        type: "tool-call-ready",
+        index: 1,
+        toolCallId: "shared",
+        toolName: "two",
+        args: { right: true },
+      },
+      { type: "done" },
+    ]);
+  });
+
   it("parses function_call_arguments.done into tool-call-ready shape", () => {
     const payload = {
       type: "response.function_call_arguments.done",

@@ -289,9 +289,17 @@ export async function* streamResponsesTurn(
   // OpenAI events normally use `item_id`, but compatibility producers can
   // still send the protocol `call_id`. Keep one buffer per output item and
   // accept either identifier when consuming argument events.
-  const findCallBuffer = (id: string) =>
-    callBuffers.get(id) ??
-    [...callBuffers.values()].find((buffer) => buffer.callId === id);
+  const findCallBuffer = (id: string) => {
+    const itemBuffer = callBuffers.get(id);
+    if (itemBuffer) return itemBuffer;
+
+    // A compatibility call_id must identify exactly one output item. Choosing
+    // the first duplicate would attach streamed arguments to the wrong call.
+    const matches = [...callBuffers.values()].filter(
+      (buffer) => buffer.callId === id
+    );
+    return matches.length === 1 ? matches[0] : undefined;
+  };
   let nextIndex = 0;
   let completedOutput: unknown[] = [];
 
