@@ -80,7 +80,7 @@ export default app;
 
 ## Path Customization
 
-`basePath` defaults to `/mcp`, so the Inspector lives at `/mcp/inspector`. Set `basePath: ''` for `/inspector`, or use another MCP prefix.
+`basePath` defaults to `/mcp`, so the Inspector lives at `/mcp/inspector`. Set `basePath: '/'` for `/inspector`, or use another MCP prefix. An empty string is rejected: `basePath` must be an absolute pathname, so it has to start with `/`.
 
 ### Hono with Custom Path
 
@@ -112,7 +112,7 @@ mountInspector(app, {
 
 | Option                    | Type             | Default                             | Description                                             |
 | ------------------------- | ---------------- | ----------------------------------- | ------------------------------------------------------- |
-| `basePath`                | `string`         | `'/mcp'`                            | MCP prefix; Inspector mounts at `${basePath}/inspector` |
+| `basePath`                | `string`         | `'/mcp'`                            | MCP prefix; Inspector mounts under it, at `/inspector` when `basePath` is `'/'` |
 | `autoConnectUrl`          | `string \| null` | Current request origin + `basePath` | MCP server URL to auto-connect on load; `null` disables |
 | `devMode`                 | `boolean`        | `true`                              | Enables same-origin sandbox for MCP Apps widgets        |
 | `sandboxOrigin`           | `string \| null` | `undefined`                         | Override the sandbox origin for MCP Apps widgets        |

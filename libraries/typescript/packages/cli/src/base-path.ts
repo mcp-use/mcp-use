@@ -10,12 +10,14 @@
  *
  * @param basePath - Absolute server base pathname, possibly `"/"`.
  * @param childPath - Path to place under `basePath`, with or without a leading
- * slash.
+ * slash. An empty child yields `basePath` itself, so the result never gains a
+ * trailing empty segment.
  * @returns The joined absolute pathname, never containing an empty segment.
  *
  * @internal
  */
 export function pathUnderBase(basePath: string, childPath: string): string {
   const child = childPath.replace(/^\/+/, "");
+  if (child === "") return basePath;
   return basePath === "/" ? `/${child}` : `${basePath}/${child}`;
 }
