@@ -21,12 +21,11 @@ function toolError(message: string) {
 server.use("mcp:tools/call", async (ctx, next) => {
   if (ctx.params.name !== "generate_report") return next();
 
-  if (
-    !process.env.UPSTASH_REDIS_REST_URL?.trim() ||
-    !process.env.UPSTASH_REDIS_REST_TOKEN?.trim()
-  ) {
+  const url = process.env.MCP_USE_UPSTASH_REDIS_REST_URL?.trim();
+  const token = process.env.MCP_USE_UPSTASH_REDIS_REST_TOKEN?.trim();
+  if (!url || !token) {
     return toolError(
-      "Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN in .env and restart the server."
+      "Set MCP_USE_UPSTASH_REDIS_REST_URL and MCP_USE_UPSTASH_REDIS_REST_TOKEN in .env and restart the server."
     );
   }
 
@@ -34,7 +33,7 @@ server.use("mcp:tools/call", async (ctx, next) => {
   // retain their own meaning after next() runs.
   try {
     limiter ??= new Ratelimit({
-      redis: Redis.fromEnv(),
+      redis: new Redis({ url, token }),
       limiter: Ratelimit.slidingWindow(3, "30 s"),
       prefix: "mcp-use:upstash-example",
       analytics: false,
