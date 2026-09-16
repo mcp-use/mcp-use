@@ -6,7 +6,8 @@ html[data-current-path="/v2/typescript/cookbook/"] #pagination {
 
 /* Give the interactive example more room without widening the recipe text. */
 @media (min-width: 1280px) {
-  .cookbook-chat-embed {
+  .cookbook-chat-embed,
+  .cookbook-tools-embed {
     width: calc(100% + 128px);
     margin-left: -64px;
   }

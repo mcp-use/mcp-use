@@ -8,6 +8,27 @@ Add a shared quota to your existing mcp-use server. [Upstash Redis](https://upst
 
 This recipe allows three `generate_report` calls per 30-second sliding window. The report is a local calculation, so you can try the integration with just an Upstash account. Use the same middleware around an expensive API call, export, or sandbox operation.
 
+## Try the live example
+
+Select **generate_report**, enter `[10, 20, 30]` in **values**, and click **Execute**. Repeat the call to see a report followed by a rate-limit error. No chat model or API key is needed to use the demo.
+
+<div className="cookbook-tools-embed">
+<iframe
+  src="https://inspector.manufact.com/inspector?embedded=true&autoConnect=https%3A%2F%2Fmanufact-upstash-example.run.mcp-use.com%2Fmcp&embeddedConfig=%7B%22singleTab%22%3Atrue%2C%22defaultTab%22%3A%22tools%22%2C%22visibleTabs%22%3A%5B%22tools%22%5D%7D"
+  title="Upstash live example — MCP Inspector tools"
+  width="100%"
+  height="560"
+  style={{ border: "1px solid var(--gray-200, #737373)", borderRadius: "12px" }}
+  allow="clipboard-write"
+/>
+</div>
+
+[Open the example in a new tab](https://inspector.manufact.com/inspector?embedded=true&autoConnect=https%3A%2F%2Fmanufact-upstash-example.run.mcp-use.com%2Fmcp&embeddedConfig=%7B%22singleTab%22%3Atrue%2C%22defaultTab%22%3A%22tools%22%2C%22visibleTabs%22%3A%5B%22tools%22%5D%7D).
+
+<Note>
+  All visitors share this demo's quota. You may hit the limit on your first call if someone else has used it. Wait about a minute and try again, or run your own copy below for an isolated demo.
+</Note>
+
 ## Prerequisites
 
 - A working [mcp-use server](/v2/typescript/getting-started/quickstart).
@@ -169,4 +190,4 @@ From an unused quota, execute four calls in quick succession. The first three re
 
 The limiter counts admitted attempts, even if the tool later fails. This demo does not authenticate callers; add authentication before using it to enforce customer quotas.
 
-See the [complete Upstash example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/upstash) for the runnable project and tests, or [Upstash's rate-limit documentation](https://upstash.com/docs/redis/sdks/ratelimit-ts/overview) for more algorithms.
+See the [complete Upstash example](https://github.com/manufacts/mcp-use-upstash-example) for the runnable project and tests, or [Upstash's rate-limit documentation](https://upstash.com/docs/redis/sdks/ratelimit-ts/overview) for more algorithms.
