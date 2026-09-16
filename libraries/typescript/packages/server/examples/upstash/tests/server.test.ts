@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { limit, fromEnv } = vi.hoisted(() => ({
+const { limit, redisConstructor } = vi.hoisted(() => ({
   limit: vi.fn(),
-  fromEnv: vi.fn(() => ({})),
+  redisConstructor: vi.fn(function () {
+    return {};
+  }),
 }));
 
-vi.mock("@upstash/redis", () => ({ Redis: { fromEnv } }));
+vi.mock("@upstash/redis", () => ({ Redis: redisConstructor }));
 vi.mock("@upstash/ratelimit", () => ({
   Ratelimit: class {
     static slidingWindow = vi.fn();
@@ -52,9 +54,9 @@ function report() {
 beforeEach(async () => {
   vi.resetModules();
   limit.mockReset();
-  fromEnv.mockClear();
-  vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://redis.example.test");
-  vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "test-token");
+  redisConstructor.mockClear();
+  vi.stubEnv("MCP_USE_UPSTASH_REDIS_REST_URL", "https://redis.example.test");
+  vi.stubEnv("MCP_USE_UPSTASH_REDIS_REST_TOKEN", "test-token");
   vi.stubEnv("MCP_USE_ANONYMIZED_TELEMETRY", "false");
   server = (await import("../src/index.js")).default;
 });
@@ -91,7 +93,11 @@ describe("Upstash tool middleware over MCP", () => {
     expect((await report()).isError).not.toBe(true);
     expect(limit).toHaveBeenCalledTimes(5);
     expect(limit).toHaveBeenLastCalledWith("generate_report");
-    expect(fromEnv).toHaveBeenCalledTimes(1);
+    expect(redisConstructor).toHaveBeenCalledTimes(1);
+    expect(redisConstructor).toHaveBeenCalledWith({
+      url: "https://redis.example.test",
+      token: "test-token",
+    });
   });
 
   it("does not consume quota when discovering tools", async () => {
@@ -102,14 +108,19 @@ describe("Upstash tool middleware over MCP", () => {
     expect(limit).not.toHaveBeenCalled();
   });
 
-  it.each(["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"])(
+  it.each([
+    "MCP_USE_UPSTASH_REDIS_REST_URL",
+    "MCP_USE_UPSTASH_REDIS_REST_TOKEN",
+  ])(
     "keeps discovery available but blocks execution without %s",
     async (variable) => {
       vi.stubEnv(variable, "");
       expect((await request("tools/list")).tools).toHaveLength(1);
       const result = await report();
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("Set UPSTASH_REDIS_REST_URL");
+      expect(result.content[0].text).toContain(
+        "Set MCP_USE_UPSTASH_REDIS_REST_URL"
+      );
       expect(limit).not.toHaveBeenCalled();
     }
   );

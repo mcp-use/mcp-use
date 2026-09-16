@@ -24,8 +24,8 @@ Create an Upstash Redis database and copy its REST URL and REST token from the
 [Upstash console](https://console.upstash.com/) into `.env`:
 
 ```dotenv
-UPSTASH_REDIS_REST_URL=https://your-database.upstash.io
-UPSTASH_REDIS_REST_TOKEN=your-rest-token
+MCP_USE_UPSTASH_REDIS_REST_URL=https://your-database.upstash.io
+MCP_USE_UPSTASH_REDIS_REST_TOKEN=your-rest-token
 ```
 
 Start the server:
