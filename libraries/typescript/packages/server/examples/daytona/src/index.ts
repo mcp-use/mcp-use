@@ -9,6 +9,8 @@ const server = new MCPServer({
     "Run Python, TypeScript, or JavaScript in a fresh Daytona sandbox.",
 });
 
+let daytona: Daytona | undefined;
+
 /** Execute one code snippet and delete its isolated sandbox after the attempt. */
 export const runCode = server.tool(
   {
@@ -36,14 +38,13 @@ export const runCode = server.tool(
       };
     }
 
-    let daytona: Daytona | undefined;
     let sandbox: Sandbox | undefined;
     let output: string | undefined;
     let exitCode: number | undefined;
     let error: string | undefined;
     let cleanupError: string | undefined;
     try {
-      daytona = new Daytona();
+      daytona ??= new Daytona();
       // Auto-stop/delete also limits leftovers if the server exits unexpectedly.
       sandbox = await daytona.create(
         { language, autoStopInterval: 5, autoDeleteInterval: 0 },
