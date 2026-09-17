@@ -88,6 +88,7 @@ export const examples = [
   external("auth/supabase"),
   external("auth/workos"),
   external("daytona"),
+  external("sentry"),
   external("upstash"),
   configuration(
     "openapi",
