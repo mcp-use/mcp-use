@@ -2,7 +2,7 @@ name: Release notes
 
 on:
   pull_request:
-    branches: [canary, main]
+    types: [opened, synchronize, reopened, edited]
 
 permissions:
   contents: read
