@@ -71,6 +71,7 @@ export const examples = [
   local("resource-template-completion", {
     resourceTemplates: ["repository-file"],
   }),
+  local("views/a2ui", { tools: ["render-ui"], view: true }),
   local("views/basic", { tools: ["search-fruits"], view: true }),
   local("views/excalidraw", { view: true }),
   local("views/file-upload", { view: true }),
