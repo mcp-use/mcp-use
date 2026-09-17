@@ -1,5 +1,6 @@
 import type { ProviderName } from "@mcp-use/agent";
 import type { ComponentProps } from "react";
+import type { CloudModel } from "./useManagedCloudModel";
 import { ChevronDown, Key } from "lucide-react";
 import { cn } from "@/client/lib/utils";
 import { useTheme } from "@/client/context/ThemeContext";
@@ -100,6 +101,7 @@ export function ModelConfigBadge({
   provider,
   model,
   displayName,
+  managedModel,
   mode = "byok",
   className,
   ...props
@@ -107,12 +109,19 @@ export function ModelConfigBadge({
   provider: ProviderName;
   model: string;
   displayName?: string;
+  managedModel?: CloudModel | null;
   mode?: "managed" | "byok";
   className?: string;
 } & Omit<ComponentProps<"button">, "children">) {
-  const label = displayName ?? model;
-  const iconProvider =
-    mode === "managed" && provider === "openai-compatible"
+  // Managed transport config can still describe the default model. Use the
+  // selected catalog entry for both the label and logo when it is available.
+  const selectedModel = mode === "managed" ? managedModel : null;
+  const label = selectedModel
+    ? formatManagedModelName(selectedModel.name, selectedModel.provider)
+    : (displayName ?? model);
+  const iconProvider = selectedModel
+    ? openRouterSlugToProvider(selectedModel.provider)
+    : mode === "managed" && provider === "openai-compatible"
       ? openRouterSlugToProvider(model)
       : provider;
 
