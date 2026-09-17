@@ -6,14 +6,79 @@ export const changelogs = [
   "docs/inspector/changelog.mdx",
 ];
 
+// Package code, shipped assets/templates, and build configuration affect releases.
+// Keep the workflow unfiltered so unrelated PRs still report a successful check.
+export function isSdkPath(path) {
+  const match = /^libraries\/typescript\/packages\/[^/]+\/(.+)$/.exec(path);
+  if (!match) return false;
+  const relative = match[1];
+  // Generator templates are shipped assets, including their docs and examples.
+  if (relative.startsWith("src/templates/")) return true;
+  if (
+    /(^|\/)(?:docs?|examples?|tests?|__tests__|__mocks__|__snapshots__|fixtures|e2e|coverage)(?:\/|$)/.test(
+      relative,
+    )
+  )
+    return false;
+  if (/\.(?:test|spec|stories)\.[^/]+$/.test(relative)) return false;
+  if (/\.(?:md|mdx|rst)$/.test(relative)) return false;
+  if (
+    /^(?:(?:vitest|playwright|jest|eslint|typedoc|tsdoc|doctor)\.config\.|(?:typedoc|tsdoc)\.json$|tsconfig\.test\.json$|test-)/.test(
+      relative,
+    )
+  )
+    return false;
+  if (
+    /^(?:pnpm-lock\.yaml|yarn\.lock|package-lock\.json|\.[^/]+)$/.test(relative)
+  )
+    return false;
+  return true;
+}
+
 export function checkReleaseNotes({ base, head, baseBranch, headBranch, cwd }) {
   const git = (...args) =>
     execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
   const ancestor = git("merge-base", base, head);
   const read = (ref, path) => git("show", `${ref}:${path}`);
 
-  if (baseBranch === "canary") {
-    // Existing prerelease changesets on canary do not belong to this PR.
+  const promotion = baseBranch === "main" && headBranch === "canary";
+  const changed = git(
+    "diff",
+    "--no-renames",
+    "--name-only",
+    "-z",
+    ancestor,
+    head,
+  ).split("\0");
+  const sdkPaths = changed.filter(isSdkPath);
+  // Stable version PRs are generated after promotion and consume changesets.
+  // Only exempt package metadata; source changes on these branches still count.
+  const versionPr =
+    baseBranch === "main" && /^release\/exit-prerelease-\d+$/.test(headBranch);
+  const sdkChanged = sdkPaths.some((path) => {
+    if (!/^libraries\/typescript\/packages\/[^/]+\/package\.json$/.test(path))
+      return true;
+    if (versionPr) return false;
+    const manifest = (ref) => {
+      // Added/deleted packages must count even when one side has no manifest.
+      if (!git("ls-tree", "--name-only", ref, "--", path)) return null;
+      const {
+        version,
+        scripts,
+        devDependencies,
+        description,
+        keywords,
+        ...published
+      } = JSON.parse(read(ref, path));
+      return published;
+    };
+    return (
+      JSON.stringify(manifest(ancestor)) !== JSON.stringify(manifest(head))
+    );
+  });
+
+  if (!promotion && sdkChanged) {
+    // Existing changesets on the target branch do not belong to this PR.
     const added = git(
       "diff",
       "--no-renames",
@@ -33,28 +98,28 @@ export function checkReleaseNotes({ base, head, baseBranch, headBranch, cwd }) {
       );
     const valid = added.some((path) => {
       const content = read(head, path).replace(/\r\n/g, "\n");
-      // Empty changesets (--- / ---) explicitly mark non-release work.
+      // SDK changes require a release entry; an empty changeset is insufficient.
       const match = /^---\n([\s\S]*?)\n?---(?:\n|$)([\s\S]*)$/.exec(content);
       if (!match) return false;
       const releases = match[1].trim();
       return (
-        !releases ||
-        (releases
+        Boolean(releases) &&
+        releases
           .split("\n")
           .every((line) =>
             /^\s*["'][^"']+["']:\s*(major|minor|patch)\s*$/.test(line),
           ) &&
-          Boolean(match[2].trim()))
+        Boolean(match[2].trim())
       );
     });
     return valid
       ? []
       : [
-          "Add a new changeset for this PR: cd libraries/typescript && pnpm changeset. For docs, tests, or internal-only work, use pnpm changeset --empty. Existing or edited changesets do not count.",
+          "This PR changes TypeScript SDK packages. Add a new release changeset: cd libraries/typescript && pnpm changeset. Empty, existing, or edited changesets do not count.",
         ];
   }
 
-  if (baseBranch === "main" && headBranch === "canary") {
+  if (promotion) {
     const entries = (content) =>
       [...content.matchAll(/<Update\b[^>]*>([\s\S]*?)<\/Update>/g)]
         .map((match) => match[1].replace(/\s+/g, " ").trim())
