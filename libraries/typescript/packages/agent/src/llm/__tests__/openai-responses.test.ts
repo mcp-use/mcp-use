@@ -168,8 +168,16 @@ function sseResponse(events: unknown[]): Response {
 /**
  * Wire shape of a streamed tool call. The arguments events carry `item_id`
  * (the output item's `id`), never `call_id`.
+ *
+ * `correlation` selects which of the two the arguments events carry, so the
+ * nonstandard `call_id` producer can be exercised too.
  */
-function toolCallEvents(callId = "call_abc", itemId = "fc_abc"): unknown[] {
+function toolCallEvents(
+  callId = "call_abc",
+  itemId = "fc_abc",
+  correlation: "item_id" | "call_id" = "item_id"
+): unknown[] {
+  const correlationValue = correlation === "item_id" ? itemId : callId;
   return [
     {
       type: "response.output_item.added",
@@ -184,21 +192,21 @@ function toolCallEvents(callId = "call_abc", itemId = "fc_abc"): unknown[] {
     },
     {
       type: "response.function_call_arguments.delta",
-      item_id: itemId,
+      [correlation]: correlationValue,
       output_index: 0,
       delta: '{"city":',
       sequence_number: 1,
     },
     {
       type: "response.function_call_arguments.delta",
-      item_id: itemId,
+      [correlation]: correlationValue,
       output_index: 0,
       delta: '"Paris"}',
       sequence_number: 2,
     },
     {
       type: "response.function_call_arguments.done",
-      item_id: itemId,
+      [correlation]: correlationValue,
       output_index: 0,
       arguments: '{"city":"Paris"}',
       sequence_number: 3,
@@ -233,6 +241,44 @@ describe("Responses SSE event mapping", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(sseResponse(toolCallEvents()))
+    );
+
+    const turn = streamResponsesTurn({
+      config: { provider: "openai", model: "gpt-4o-mini", apiKey: "k" },
+      input: [{ role: "user", content: "weather in Paris?" }],
+      tools: TOOLS,
+    });
+    const events: LlmStreamEvent[] = [];
+    for (;;) {
+      const next = await turn.next();
+      if (next.done) break;
+      events.push(next.value);
+    }
+
+    expect(events).toContainEqual({
+      type: "tool-call-args-delta",
+      index: 0,
+      toolCallId: "call_abc",
+      toolName: "get_weather",
+      argsDelta: '{"city":',
+    });
+    expect(events).toContainEqual({
+      type: "tool-call-ready",
+      index: 0,
+      toolCallId: "call_abc",
+      toolName: "get_weather",
+      args: { city: "Paris" },
+    });
+  });
+
+  it("still correlates argument events from a call_id-only producer", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          sseResponse(toolCallEvents("call_abc", "fc_abc", "call_id"))
+        )
     );
 
     const turn = streamResponsesTurn({
