@@ -35,6 +35,22 @@ We have a quick list of common questions to get you started engaging with this p
 
 ### Creating a Changeset (Required for Contributors)
 
+Every PR targeting `canary` must add a new changeset file. An existing changeset
+already on canary, or an edit to an existing one, does not satisfy the
+`release-notes-check` CI job. For docs, tests, Python, or internal-only changes
+that do not need a TypeScript release, run `pnpm changeset --empty` and commit it.
+
+Before merging `canary` into `main`, add or update a release `<Update>` entry in
+both `docs/typescript/changelog/changelog.mdx` and `docs/inspector/changelog.mdx`.
+Generated package `CHANGELOG.md` files, metadata-only edits, and whitespace-only
+edits do not satisfy this check. Other PRs into `main` (including automated
+version PRs) are unaffected by this gate.
+
+Repository administrators must require the `release-notes-check` status check in
+the branch protection rules or rulesets for **both `canary` and `main`** to block
+merges when it fails. The workflow runs on every PR to these branches, including
+docs-only PRs, so the required check is always reported.
+
 ```bash
 pnpm changeset
 ```
