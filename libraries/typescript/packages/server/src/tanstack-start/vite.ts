@@ -11,6 +11,18 @@ const BUILD_IMPORT = "#mcp-use-tanstack-start-build";
 const VIRTUAL_BUILD = "\0mcp-use:tanstack-start-build";
 const BUILD_GUARD = "MCP_USE_TANSTACK_START_BUILD";
 
+const JS_SOURCE_ESCAPE_MAP: Record<string, string> = {
+  "<": "\\u003C",
+  ">": "\\u003E",
+  "/": "\\u002F",
+  "\u2028": "\\u2028",
+  "\u2029": "\\u2029",
+};
+
+function escapeUnsafeForJsSource(value: string): string {
+  return value.replace(/[<>/\u2028\u2029]/g, (char) => JS_SOURCE_ESCAPE_MAP[char] ?? char);
+}
+
 /** Options for the TanStack Start Vite integration. */
 export interface TanStackStartOptions {
   /** Server entry relative to the Vite project root. Defaults to `src/mcp/server.ts`. */
@@ -154,7 +166,10 @@ export function mcpUseTanStackStart(
         throw new Error("TanStack Start MCP build has not initialized.");
       build ??= buildTanStackStartMcp(root, options, basePath);
       const serializedBuild = JSON.stringify(await build);
-      return `export async function loadTanStackStartBuild() { return JSON.parse(${JSON.stringify(serializedBuild)}); }`;
+      const serializedBuildLiteral = escapeUnsafeForJsSource(
+        JSON.stringify(serializedBuild)
+      );
+      return `export async function loadTanStackStartBuild() { return JSON.parse(${serializedBuildLiteral}); }`;
     },
   };
 }
