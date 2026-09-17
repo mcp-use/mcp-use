@@ -13,16 +13,16 @@ Expose a `greet` tool at `/api/mcp` in your existing TanStack Start app. TanStac
 
 ## Add the integration
 
-Install mcp-use and Zod in your TanStack Start project:
+Install the canary release of mcp-use, which includes the TanStack Start adapter, and Zod in your project:
 
 ```bash
-npm install mcp-use zod
+npm install mcp-use@canary zod
 ```
 
-If your app does not already use Nitro, install it for the Node.js server build:
+If your app does not already use Nitro 3, install the version used by the example for the Node.js server build:
 
 ```bash
-npm install -D nitro
+npm install -D nitro@3.0.260903-beta
 ```
 
 Keep the MCP server and its handler in `src/mcp`. Add a catch-all server route inside your existing `src/routes` directory:
@@ -164,4 +164,4 @@ Run the tool. It returns `Hello, Ada!`.
 
 Use your app's port if it differs from `3000`. The plugin builds MCP views when Vite starts. Restart the dev server after changing views, shared view components, public assets, or skills.
 
-See the [complete TanStack Start example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/tanstack-start) for a runnable application with a shared UI card, an OAuth discovery route, and production build instructions.
+See the [complete TanStack Start example](https://github.com/mcp-use/mcp-use/tree/canary/libraries/typescript/packages/server/examples/tanstack-start) for a runnable application with a shared UI card, an OAuth discovery route, and production build instructions.
