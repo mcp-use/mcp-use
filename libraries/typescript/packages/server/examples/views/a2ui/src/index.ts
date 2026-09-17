@@ -1,5 +1,5 @@
 import { MCPServer } from "mcp-use";
-import { z } from "zod/v4";
+import { z } from "zod-v4";
 
 import { specSchema } from "../views/generative-ui/catalog.js";
 
