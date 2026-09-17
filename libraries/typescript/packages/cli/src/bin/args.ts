@@ -24,6 +24,8 @@ export interface ParsedArgs {
   mcpDir: string | undefined;
   /** View source directory selected by `--views-dir`. */
   viewsDir: string | undefined;
+  /** Discover the project's Vite config for views; `--no-views-config` disables it. */
+  viewsConfig: boolean;
   /** Value of `--host`, or `undefined` if the flag was not passed. */
   host: string | undefined;
   /** Whether `--tunnel` was passed (dev/start only). */
@@ -69,6 +71,7 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
     path: undefined,
     mcpDir: undefined,
     viewsDir: undefined,
+    viewsConfig: true,
     host: undefined,
     tunnel: false,
     open: true,
@@ -140,6 +143,9 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
         break;
       case "--views-dir":
         args.viewsDir = takeValue();
+        break;
+      case "--no-views-config":
+        args.viewsConfig = false;
         break;
       case "--host":
         args.host = takeValue();

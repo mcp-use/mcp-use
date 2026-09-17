@@ -116,7 +116,11 @@ import {
   type SkillsSnapshot,
 } from "./skills/types.js";
 import { supportsViews } from "./views/capabilities.js";
-import type { ViewResourceFacts } from "./views/types.js";
+import type {
+  EmbeddedViewAssets,
+  ViewRegistrationOptions,
+  ViewResourceFacts,
+} from "./views/types.js";
 import {
   createViewPublicHandler,
   createViewAssetsHandler,
@@ -350,6 +354,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     }
   >();
   #viewsPrimed = false;
+  #embeddedViewAssets: EmbeddedViewAssets | undefined;
   /** When true, resource CSP emission includes the HMR websocket origin. */
   #viewsDevMode = false;
   /** Project root for filesystem-backed view bundle and public routes. */
@@ -594,7 +599,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    */
   [registerViews](
     views: ViewsManifest,
-    options?: { dev?: boolean; projectRoot?: string }
+    options?: ViewRegistrationOptions
   ): void {
     if (this.#viewsPrimed) {
       throw new Error(
@@ -603,6 +608,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     }
     this.#assertNotStarted("views", "manifest");
     this.#viewsDevMode = options?.dev === true;
+    this.#embeddedViewAssets = options?.assets;
     if (options?.projectRoot !== undefined) {
       this.#viewsProjectRoot = options.projectRoot;
     }
@@ -623,10 +629,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    *
    * @internal
    */
-  __primeViews(
-    views: ViewsManifest,
-    options?: { dev?: boolean; projectRoot?: string }
-  ): void {
+  __primeViews(views: ViewsManifest, options?: ViewRegistrationOptions): void {
     this[registerViews](views, options);
   }
 
@@ -1518,6 +1521,9 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         projectRoot: this.#viewsProjectRoot,
         enabled: hasLocalBrandingAsset(this.#branding),
         deferCors: deferViewCors,
+        ...(this.#embeddedViewAssets !== undefined && {
+          assets: this.#embeddedViewAssets,
+        }),
       });
       if (viewHandler !== undefined) {
         this.app.on(
@@ -1531,7 +1537,13 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         const viewAssetsHandler = createViewAssetsHandler(
           basePath,
           this.#views,
-          { projectRoot: this.#viewsProjectRoot, deferCors: deferViewCors }
+          {
+            projectRoot: this.#viewsProjectRoot,
+            deferCors: deferViewCors,
+            ...(this.#embeddedViewAssets !== undefined && {
+              assets: this.#embeddedViewAssets,
+            }),
+          }
         );
         if (viewAssetsHandler !== undefined) {
           this.app.on(

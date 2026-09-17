@@ -9,3 +9,9 @@ declare module "#mcp-use-skills-loader" {
     conventionalDirectory?: string
   ): import("./skills/types.js").SkillsSnapshot | undefined;
 }
+
+declare module "#mcp-use-tanstack-start-build" {
+  export function loadTanStackStartBuild(): Promise<
+    import("./tanstack-start/types.js").TanStackStartBuild
+  >;
+}

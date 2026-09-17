@@ -18,7 +18,7 @@
     "packages/server": {
       "entry": ["src/oauth/**/*.ts", "tests/**/*.{ts,tsx}"],
       "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"],
-      "ignoreUnresolved": ["#mcp-use-node-http", "#mcp-use-skills-loader"]
+      "ignoreUnresolved": ["#mcp-use-node-http", "#mcp-use-skills-loader", "#mcp-use-tanstack-start-build"]
     },
     "packages/agent": {
       "entry": ["tests/**/*.ts", "examples/**/*.ts"],
