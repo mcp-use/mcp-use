@@ -316,7 +316,10 @@ export async function* streamResponsesTurn(
         const idx = nextIndex++;
         // Argument events carry `item_id`, not `call_id`, so the buffer is
         // indexed by the item id. `call_id` is kept as a second key for
-        // producers that identify the call that way.
+        // producers that identify the call that way. Both keys are prefixed:
+        // the two identifiers come from the producer and share no namespace,
+        // so one call's item id could otherwise overwrite another's call id
+        // and hand that call's arguments to the wrong tool.
         const buffer = {
           index: idx,
           callId,
@@ -324,8 +327,11 @@ export async function* streamResponsesTurn(
           argsJson: "",
           started: true,
         };
-        callBuffers.set(typeof item.id === "string" ? item.id : callId, buffer);
-        callBuffers.set(callId, buffer);
+        callBuffers.set(
+          `item:${typeof item.id === "string" ? item.id : callId}`,
+          buffer
+        );
+        callBuffers.set(`call:${callId}`, buffer);
         yield {
           type: "tool-call-start",
           index: idx,
@@ -340,7 +346,8 @@ export async function* streamResponsesTurn(
       const itemId = typeof parsed.item_id === "string" ? parsed.item_id : "";
       const callId = typeof parsed.call_id === "string" ? parsed.call_id : "";
       const delta = typeof parsed.delta === "string" ? parsed.delta : "";
-      const buf = callBuffers.get(itemId) ?? callBuffers.get(callId);
+      const buf =
+        callBuffers.get(`item:${itemId}`) ?? callBuffers.get(`call:${callId}`);
       if (buf && delta.length > 0) {
         buf.argsJson += delta;
         yield {
@@ -359,7 +366,8 @@ export async function* streamResponsesTurn(
       const callId = typeof parsed.call_id === "string" ? parsed.call_id : "";
       const argsRaw =
         typeof parsed.arguments === "string" ? parsed.arguments : "";
-      const buf = callBuffers.get(itemId) ?? callBuffers.get(callId);
+      const buf =
+        callBuffers.get(`item:${itemId}`) ?? callBuffers.get(`call:${callId}`);
       if (buf) {
         if (argsRaw) buf.argsJson = argsRaw;
         yield {
