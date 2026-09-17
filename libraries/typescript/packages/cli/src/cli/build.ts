@@ -80,6 +80,8 @@ export interface BuildOptions {
   mcpDir?: string;
   /** Explicit views directory, absolute or relative to `cwd`. */
   viewsDir?: string;
+  /** Discover the project's Vite config for views. Defaults to `true`. */
+  viewsConfig?: boolean;
   /** Emit source maps for the server and view bundles. */
   sourceMaps?: boolean;
   /**
@@ -332,7 +334,8 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     console.log("[mcp-use] views directory not configured.");
   }
   const views = discoverViews(options.cwd, viewsDirectory);
-  const userViteConfig = resolveUserViteConfig(options.cwd);
+  const userViteConfig =
+    options.viewsConfig === false ? false : resolveUserViteConfig(options.cwd);
   const sourceMaps = options.sourceMaps === true;
   const inline = options.inline === true;
   let bindingServer:
@@ -342,13 +345,14 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     options.mcpDir === undefined ? "skills" : join(options.mcpDir, "skills");
 
   if (views.length === 0) {
+    let skillsSnapshot: SkillsSnapshot | undefined;
     bindingServer ??= await createBindingValidationServer(
       options.cwd,
       paths.cache,
       false
     );
     try {
-      const skillsSnapshot = await validateViewBindingsAtBuild(
+      skillsSnapshot = await validateViewBindingsAtBuild(
         bindingServer.environments.ssr,
         entry,
         {},
@@ -406,6 +410,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
       entryPoint: BUILD_ENTRY_NAME,
       createdAt: new Date().toISOString(),
       views: {},
+      ...(skillsSnapshot !== undefined && { skills: skillsSnapshot }),
     };
     await mkdir(paths.build, { recursive: true });
     await writeFile(
@@ -535,6 +540,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     entryPoint: BUILD_ENTRY_NAME,
     createdAt: new Date().toISOString(),
     views: viewsManifest,
+    ...(skillsSnapshot !== undefined && { skills: skillsSnapshot }),
   };
   await mkdir(paths.build, { recursive: true });
   await writeFile(
