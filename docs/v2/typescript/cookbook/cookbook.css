@@ -15,6 +15,7 @@ html[data-current-path="/v2/typescript/cookbook/"] #pagination {
 /* A mask lets the brand glyph inherit the sidebar label's color in every state. */
 #sidebar-content a[href="/v2/typescript/cookbook/daytona"] > div:has(> img) {
   background-color: currentColor;
+  -webkit-mask: url("/v2/typescript/cookbook/daytona.svg") center / 16px 16px no-repeat;
   mask: url("/v2/typescript/cookbook/daytona.svg") center / 16px 16px no-repeat;
 }
 
