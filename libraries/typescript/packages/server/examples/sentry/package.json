@@ -10,7 +10,8 @@
     "build": "mcp-use build",
     "start": "mcp-use start",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "verify": "node ../verify-examples.mjs --example=sentry"
   },
   "dependencies": {
     "@sentry/node": "10.63.0",
