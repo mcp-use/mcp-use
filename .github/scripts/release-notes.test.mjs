@@ -10,7 +10,7 @@ const changeset = "libraries/typescript/.changeset/";
 const release = '---\n"mcp-use": patch\n---\n\nFix a bug.\n';
 const entry = '<Update label="v1.0.0">Initial release</Update>\n';
 
-function fixture(t, { sdk = true } = {}) {
+function fixture(t, { sdk = true, existingChangelogs = changelogs } = {}) {
   const cwd = mkdtempSync(join(tmpdir(), "release-notes-"));
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
   const git = (...args) =>
@@ -36,7 +36,7 @@ function fixture(t, { sdk = true } = {}) {
   git("init", "-q");
   git("config", "commit.gpgsign", "false");
   write(`${changeset}existing.md`, release);
-  for (const path of changelogs) write(path, entry);
+  for (const path of existingChangelogs) write(path, entry);
   const base = commit();
   if (sdk)
     write(
@@ -239,5 +239,94 @@ test("deleted SDK source files still require a changeset", (t) => {
       headBranch: "feature",
     }).length,
     1,
+  );
+});
+
+test("renaming an inherited changeset cannot satisfy the SDK gate", (t) => {
+  const f = fixture(t);
+  f.git("mv", `${changeset}existing.md`, `${changeset}renamed.md`);
+  // Explicit rename detection must work even if disabled in local Git config.
+  f.git("config", "diff.renames", "false");
+  assert.equal(f.check("main").length, 1);
+  f.write(
+    `${changeset}actual-new.md`,
+    release.replace("Fix a bug.", "New SDK fix."),
+  );
+  assert.deepEqual(f.check("main"), []);
+});
+
+test("comments and code examples cannot create changelog entries", (t) => {
+  const f = fixture(t);
+  const hidden = '<Update label="v2.0.0">Hidden release</Update>';
+  for (const wrapper of [
+    (text) => `<!--\n${text}\n-->`,
+    (text) => `{/*\n${text}\n*/}`,
+    (text) => `\`\`\`mdx\n${text}\n\`\`\``,
+    (text) => `~~~~mdx\n${text}\n~~~~`,
+    (text) => `\`${text}\``,
+    (text) => `---\nexample: '${text}'\n---\n`,
+  ]) {
+    for (const path of changelogs)
+      f.write(path, wrapper(hidden) + "\n" + entry);
+    assert.equal(f.check("main", "canary").length, 2);
+  }
+});
+
+test("comment-only updates inside real entries do not count", (t) => {
+  const f = fixture(t);
+  for (const path of changelogs) {
+    f.write(
+      path,
+      entry.replace(
+        "Initial release",
+        "Initial release<!-- New note -->{/* Other note */}",
+      ),
+    );
+  }
+  assert.equal(f.check("main", "canary").length, 2);
+});
+
+test("code examples inside real entries still count as release content", (t) => {
+  const f = fixture(t);
+  for (const path of changelogs) {
+    f.write(
+      path,
+      '<Update label="v2.0.0">\n```tsx\n<Update>Example</Update>\n```\n</Update>',
+    );
+  }
+  assert.deepEqual(f.check("main", "canary"), []);
+});
+
+test("new changelog paths use an empty baseline", (t) => {
+  for (const existingChangelogs of [[], [changelogs[0]]]) {
+    const f = fixture(t, { existingChangelogs });
+    for (const path of changelogs)
+      f.write(path, entry.replace("Initial release", "New release"));
+    assert.deepEqual(f.check("main", "canary"), []);
+  }
+});
+
+test("missing or deleted head changelogs report actionable failures", (t) => {
+  const f = fixture(t);
+  rmSync(join(f.cwd, changelogs[0]));
+  const errors = f.check("main", "canary");
+  assert.equal(errors.length, 2);
+  assert.ok(errors[0].includes(`entry in ${changelogs[0]}`));
+  const missing = fixture(t, { existingChangelogs: [] });
+  assert.equal(missing.check("main", "canary").length, 2);
+});
+
+test("unexpected Git failures are not treated as missing changelogs", (t) => {
+  const f = fixture(t);
+  assert.throws(
+    () =>
+      checkReleaseNotes({
+        cwd: f.cwd,
+        base: "missing-ref",
+        head: f.base,
+        baseBranch: "main",
+        headBranch: "canary",
+      }),
+    /Command failed/,
   );
 });
