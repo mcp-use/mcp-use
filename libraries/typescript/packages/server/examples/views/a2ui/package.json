@@ -4,12 +4,16 @@
   "version": "0.0.0",
   "private": true,
   "description": "Model-generated A2UI layouts rendered inside an MCP App.",
-  "engines": { "node": ">=22.22.2" },
+  "engines": {
+    "node": ">=22.22.2"
+  },
   "scripts": {
     "dev": "mcp-use dev",
     "build": "mcp-use build",
     "start": "mcp-use start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "verify": "node ../../verify-examples.mjs --example=views-a2ui",
+    "test": "node --test tests/catalog.test.mjs"
   },
   "dependencies": {
     "@a2ui/react": "0.11.0",
@@ -17,7 +21,7 @@
     "mcp-use": "workspace:*",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "zod": "^4.4.3"
+    "zod": "3.25.76"
   },
   "devDependencies": {
     "@types/node": "^22.20.0",
