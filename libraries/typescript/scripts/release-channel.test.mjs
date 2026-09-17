@@ -18,6 +18,22 @@ function fixture({ localVersion, latest, canary, published = [] }) {
   mkdirSync(join(root, "packages", "server"), { recursive: true });
   mkdirSync(join(root, ".changeset"));
   writeFileSync(
+    join(root, ".changeset", "config.json"),
+    JSON.stringify({
+      changelog: false,
+      commit: false,
+      fixed: [],
+      linked: [],
+      access: "public",
+      baseBranch: "main",
+      updateInternalDependencies: "patch",
+      ignore: [],
+      ___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH: {
+        onlyUpdatePeerDependentsWhenOutOfRange: true,
+      },
+    })
+  );
+  writeFileSync(
     join(root, "packages", "server", "package.json"),
     JSON.stringify({ name: "mcp-use", version: localVersion })
   );

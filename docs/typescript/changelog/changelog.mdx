@@ -6,6 +6,50 @@ tag: "New"
 rss: true
 ---
 
+<Update label="v2.5.0" description="September 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=2.5.0&title=Public%20chat%20CTA&date=2026-09&lang=typescript" alt="Release 2.5.0" />
+  </Frame>
+  ## Public chat CTA
+  Minor release adding a landing-page chat button plus client, CLI, and agent lifecycle fixes.
+
+- **New** (server): the HTML landing page shows a “Go to chat” button when public chat is ready (`#2496`)
+- **Fix** (server): proxied `resources/list` keeps upstream `annotations` and `_meta` (`#2469`)
+- **Fix** (server): a malformed `createJwtVerifier` `resource` option throws `TypeError` at startup instead of reporting `invalid_token` (`#2412`)
+- **Fix** (@mcp-use/client): concurrent connect and disconnect calls are coalesced; a later disconnect cancels in-flight reconnects (`#2458`)
+- **Fix** (@mcp-use/client): `useMcp` stabilizes `clientInfo` and `proxyConfig` dependencies so parent re-renders do not reconnect (`#2403`)
+- **Fix** (@mcp-use/client): `ViewRenderer` removes the sandbox listener and cancels the readiness wait on unmount (`#2421`)
+- **Fix** (@mcp-use/cli): `servers list` validates `--limit` and `--skip` before authenticating so bad pagination is a usage error instead of “Not logged in.” (`#2448`)
+- **Fix** (@mcp-use/cli): a malformed JSON argument to `client` or `screenshot` is a usage error (exit 2) (`#2444`)
+- **Fix** (@mcp-use/cli): `--secret` must be passed on every `servers env set` write; omitting it stores the value as non-sensitive (`#2423`)
+- **Fix** (@mcp-use/tunnel): standalone `mcp-tunnel` defaults `localHostHeader` to `localhost` (`#2456`)
+- **Fix** (@mcp-use/agent): OpenRouter BYOK requests to OpenAI models use the Responses API (`#2501`)
+- **Update**: replace the `@mcp-use/ext-apps` package alias with official `@modelcontextprotocol/ext-apps` 2.0.0 (`#2498`)
+- **Fix** (@mcp-use/inspector): standalone Inspector rebuilds with the agent OpenRouter fix and repaired peer metadata; see the Inspector changelog (`#2504`)
+- **Documentation** (@mcp-use/cli): CLI reference states that `--secret` must be passed on every `servers env set` write (`#2423`)
+- **Update**: Updated @mcp-use/inspector to v20.3.8
+- **Update**: Updated @mcp-use/cli to v4.1.12
+</Update>
+
+<Update label="v2.4.3" description="September 2026">
+  ## AI SDK adapter & stricter CLI deletes
+  Patch release adding a dependency-free Vercel AI SDK adapter and failing CLI deletes when the target does not exist.
+
+- **New** (@mcp-use/client): `createAiSdkTools` exposes MCP tools as AI SDK dynamic tools (v5–v7) without adding an AI SDK dependency; example at `packages/client/examples/node/ai-sdk-openai` (`#2441`)
+- **Fix** (@mcp-use/cli): `servers env unset` and `client remove` fail when the target does not exist instead of printing a success line (`#2411`)
+- **Documentation**: elicitation samples no longer teach the removed `ctx.elicit` API (`#2409`); custom JWT docs distinguish `aud` from the RFC 8707 `resource` request parameter (`#2443`)
+- **Update**: Updated @mcp-use/inspector to v20.3.7
+- **Update**: Updated @mcp-use/cli to v4.1.11
+</Update>
+
+<Update label="v2.4.2" description="September 2026">
+  ## Publish artifact preservation
+  Patch release keeping package builds intact while npm pack runs.
+
+- **Fix**: concurrent publishing no longer drops the Client build while its tarball is created, and packed artifacts are checked for declared files and entry points (`#2428`)
+- **Update**: Updated @mcp-use/inspector to v20.3.6
+</Update>
+
 <Update label="v2.4.1" description="September 2026">
   ## OAuth loopback recovery & scaffold help
   Patch release recovering Node OAuth after a failed loopback bind, dropping a dead scaffold flag, and fixing Inspector chat widget connections.

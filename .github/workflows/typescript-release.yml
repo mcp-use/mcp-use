@@ -108,6 +108,7 @@ jobs:
         working-directory: libraries/typescript
         run: |
           pnpm release-channel prepare --channel canary
+          pnpm release-channel preflight --channel canary
           pnpm changeset status --since origin/main --output "$RUNNER_TEMP/canary-changeset-status.json"
           pnpm release-channel validate --channel canary --plan "$RUNNER_TEMP/canary-changeset-status.json"
 
@@ -118,6 +119,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           pnpm changeset version
+          pnpm install --lockfile-only --ignore-scripts --no-frozen-lockfile
           cd ../..
           git add .
           git commit -m "chore(typescript): version packages (canary)" || echo "No changes to commit"
@@ -151,7 +153,9 @@ jobs:
         if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
         working-directory: libraries/typescript
         env:
-          VERIFY_ATTEMPTS: 12
+          # npm scans accepted publishes before making them installable. Allow
+          # twenty minutes, including the documented 5-15+ minute scan window.
+          VERIFY_ATTEMPTS: 120
           VERIFY_DELAY_SECONDS: 10
         run: pnpm release-channel verify --plan canary-release-plan.json
 
@@ -302,6 +306,8 @@ jobs:
         with:
           name: railway-deploy-marker
           path: .railway-deploy-marker
+          include-hidden-files: true
+          if-no-files-found: error
           retention-days: 1
 
       # ============================================================================
@@ -432,7 +438,7 @@ jobs:
           steps.check-release.outputs.should_publish == 'true'
         working-directory: libraries/typescript
         env:
-          VERIFY_ATTEMPTS: 12
+          VERIFY_ATTEMPTS: 120
           VERIFY_DELAY_SECONDS: 10
         run: pnpm release-channel verify --plan stable-release-plan.json
 
@@ -469,6 +475,8 @@ jobs:
         with:
           name: railway-deploy-marker
           path: .railway-deploy-marker
+          include-hidden-files: true
+          if-no-files-found: error
           retention-days: 1
 
       - name: Reset canary to main

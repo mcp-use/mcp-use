@@ -64,6 +64,7 @@ export async function runTunnelCli(args: readonly string[]): Promise<void> {
     {
       ...(options.relayUrl !== undefined && { relayUrl: options.relayUrl }),
       ...(options.subdomain !== undefined && { subdomain: options.subdomain }),
+      localHostHeader: "localhost",
     }
   );
   const tunnel = await manager.start(options.port);

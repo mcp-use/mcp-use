@@ -3,6 +3,7 @@ import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import semver from "semver";
+import { prepareRelease } from "./release-propagation.mjs";
 
 const workspaceRoot = process.cwd();
 const changesetDirectory = join(workspaceRoot, ".changeset");
@@ -104,4 +105,8 @@ if (preState?.mode === "exit") {
   normalizeInternalPeerRanges();
 }
 
+await prepareRelease(
+  workspaceRoot,
+  preState?.mode === "pre" ? preState.tag : "stable"
+);
 runChangeset(["version"]);

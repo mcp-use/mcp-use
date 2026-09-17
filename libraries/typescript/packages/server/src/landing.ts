@@ -106,6 +106,17 @@ function getManufactInspectorUrl(serverUrl: string): string {
   return `${MANUFACT_INSPECTOR_ORIGIN}/inspector?${params.toString()}`;
 }
 
+function getPublicChatUrls(serverUrl: string): {
+  chatUrl: string;
+  readyUrl: string;
+} {
+  const origin = new URL(serverUrl).origin;
+  return {
+    chatUrl: new URL("/chat", origin).href,
+    readyUrl: new URL("/chat/ready", origin).href,
+  };
+}
+
 const LOGO_SVG_PATHS = {
   path1:
     "M105.933 0C164.437 0.000115889 211.865 47.607 211.865 106.333C211.865 131.828 210.494 158.401 221.068 181.6L228.976 198.947C243.585 230.997 269.266 256.7 301.304 271.336L316.156 278.121C340.143 289.079 367.695 287.335 394.067 287.335C452.572 287.335 500 334.942 500 393.668C500 452.394 452.572 500.001 394.067 500.001C335.563 500.001 288.135 452.394 288.135 393.668C288.135 368.974 289.241 343.275 278.992 320.807L270.587 302.38C255.949 270.289 230.214 244.565 198.118 229.939L180.164 221.758C157.282 211.331 131.078 212.666 105.933 212.666C47.4278 212.666 4.92992e-05 165.059 0 106.333C0 47.607 47.4278 0 105.933 0Z",
@@ -373,6 +384,7 @@ export function generateLandingPage(options: LandingPageOptions): string {
   const vscodeInsidersDeepLink = generateVSCodeInsidersDeepLink(url, name);
   const claudeCommand = generateClaudeCommand(url, name);
   const manufactInspectorUrl = getManufactInspectorUrl(url);
+  const { chatUrl, readyUrl } = getPublicChatUrls(url);
 
   const safeName = escapeHtml(name);
   const safeDescription = description ? escapeHtml(description) : "";
@@ -587,6 +599,8 @@ body {
 .hero-cta-row {
   display: flex;
   justify-content: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
   margin: 0.35rem 0 0.5rem;
 }
 .hero-primary-btn {
@@ -606,6 +620,23 @@ body {
   background: linear-gradient(180deg, #334155 0%, #1e293b 100%);
   text-decoration: none;
   color: #fff;
+}
+.hero-secondary-btn {
+  display: inline-block;
+  padding: 0.625rem 1.25rem;
+  background: rgba(255,255,255,0.72);
+  color: #172037;
+  border: 1px solid rgba(23,32,55,0.2);
+  border-radius: 9999px;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  transition: background 0.15s;
+}
+.hero-secondary-btn:hover {
+  background: #fff;
+  text-decoration: none;
+  color: #172037;
 }
 .hero-url-block .url-block { max-width: 100%; }
 .hero-url-block .url-box {
@@ -781,7 +812,8 @@ a:hover { text-decoration: underline; }
             </div>
           </div>
           <div class="hero-cta-row">
-            <a href="${escapeHtml(manufactInspectorUrl)}" class="hero-primary-btn" target="_blank" rel="noopener noreferrer">Open in Inspector</a>
+            <a id="public-chat-link" href="${escapeHtml(chatUrl)}" data-ready-url="${escapeHtml(readyUrl)}" class="hero-primary-btn" target="_blank" rel="noopener noreferrer" hidden>Go to chat</a>
+            <a id="inspector-link" href="${escapeHtml(manufactInspectorUrl)}" class="hero-primary-btn" target="_blank" rel="noopener noreferrer">Open in Inspector</a>
           </div>
           <div class="hero-powered">
             <span>Powered by</span>
@@ -922,6 +954,18 @@ a:hover { text-decoration: underline; }
     });
   });
   panels.forEach(function(p){ if(!p.classList.contains('active')) p.hidden = true; });
+  var chatLink = document.getElementById('public-chat-link');
+  var inspectorLink = document.getElementById('inspector-link');
+  if (chatLink && inspectorLink) {
+    var readyUrl = chatLink.getAttribute('data-ready-url');
+    if (readyUrl) {
+      fetch(readyUrl, { cache: 'no-store', credentials: 'omit' }).then(function(response){
+        if (!response.ok) return;
+        chatLink.hidden = false;
+        inspectorLink.classList.replace('hero-primary-btn', 'hero-secondary-btn');
+      }).catch(function(){});
+    }
+  }
 })();
 </script>
 </body>

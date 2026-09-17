@@ -505,4 +505,62 @@ describe("MCPServer.proxy", () => {
     await call;
     expect(forwarded).toEqual([1, 2]);
   });
+
+  it("preserves upstream resource annotations and _meta", async () => {
+    let mounted: Record<string, unknown> | undefined;
+    const host: ProxyMountHost = {
+      isStarted: () => false,
+      hasTool: () => false,
+      hasResource: () => false,
+      hasPrompt: () => false,
+      registerTool: () => {
+        throw new Error("unexpected tool registration");
+      },
+      registerResource: (definition) => {
+        mounted = definition as unknown as Record<string, unknown>;
+      },
+      registerPrompt: () => {
+        throw new Error("unexpected prompt registration");
+      },
+      trackOwner: () => {},
+    };
+    const connection: ProxyConnection = {
+      info: { server: { name: "docs" } },
+      supports: (capability) => capability === "resources",
+      async listTools() {
+        return [];
+      },
+      async callTool() {
+        return { content: [] };
+      },
+      async listResources() {
+        return {
+          resources: [
+            {
+              name: "guide",
+              uri: "https://docs.example.com/guide",
+              annotations: { audience: ["user"], priority: 0.8 },
+              _meta: { "example.com/category": "reference" },
+            },
+          ],
+        };
+      },
+      async readResource() {
+        return { contents: [] };
+      },
+      async listPrompts() {
+        return { prompts: [] };
+      },
+      async getPrompt() {
+        return { messages: [] };
+      },
+    };
+
+    await mountProxyConnection(host, connection);
+
+    expect(mounted).toMatchObject({
+      annotations: { audience: ["user"], priority: 0.8 },
+      _meta: { "example.com/category": "reference" },
+    });
+  });
 });

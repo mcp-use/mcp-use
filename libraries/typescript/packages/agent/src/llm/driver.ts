@@ -1,4 +1,4 @@
-import { chat, streamChat } from "./providers/index.js";
+import { chat, streamChat, withOpenRouterConfig } from "./providers/index.js";
 import type {
   LlmStreamEvent,
   ProviderConfig,
@@ -26,6 +26,10 @@ export interface LlmDriverCompleteResult {
   toolCalls: ProviderToolCall[];
 }
 
+function isOpenRouterOpenAIModel(model: string): boolean {
+  return /^~?openai\//i.test(model);
+}
+
 /** Pluggable LLM backend for the native tool loop. */
 export interface LlmDriver {
   readonly managesToolLoop?: boolean;
@@ -49,6 +53,12 @@ export interface LlmDriver {
 export function createLlmDriver(config: ProviderConfig): LlmDriver {
   if (config.provider === "openai") {
     return new OpenAIResponsesDriver(config);
+  }
+  if (
+    config.provider === "openrouter" &&
+    isOpenRouterOpenAIModel(config.model)
+  ) {
+    return new OpenAIResponsesDriver(withOpenRouterConfig(config));
   }
   return new RestLlmDriver(config);
 }

@@ -1,5 +1,36 @@
 # @mcp-use/inspector
 
+## 20.3.9-canary.1
+
+### Patch Changes
+
+- 76a7973: Mark the `auth_token` alias deprecated on both `MCPServerConfig` types. v2 renamed it to `authToken` and nothing has read the snake-case spelling since, so setting it produces no `Authorization` header. The field stays for now so existing TypeScript consumers keep compiling, and editors flag it at the call site instead. Removal waits for the next major.
+
+## 20.3.9-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
+## 20.3.8
+
+### Patch Changes
+
+- 485c79c: Rebuild the standalone Inspector with the current Agent OpenRouter Responses API fix and repair the published framework peer metadata. Automatically propagate future bundle rebuilds and metadata changes through the release plan without adding Inspector runtime dependencies.
+
+## 20.3.8-canary.1
+
+### Patch Changes
+
+- e7ff4a2: Rebuild the standalone Inspector with the current Agent OpenRouter Responses API fix and repair the published framework peer metadata. Automatically propagate future bundle rebuilds and metadata changes through the release plan without adding Inspector runtime dependencies.
+
+## 20.3.8-canary.0
+
+### Patch Changes
+
+- @mcp-use/agent@2.0.16-canary.0
+- mcp-use@2.4.4-canary.0
+
 ## 20.3.7
 
 ## 20.3.7-canary.1

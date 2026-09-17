@@ -52,6 +52,8 @@ export interface JwtVerifierOptions {
  *
  * @param options - Issuer, keys, and claims to enforce.
  * @returns A verifier accepted anywhere an `OAuthTokenVerifier` is taken.
+ * @throws TypeError if `resource` is not an absolute HTTPS URL, or an HTTP URL
+ * for localhost, without credentials, query, or fragment.
  * @throws TypeError if `audience` is combined with `issuerBoundAccessTokens`.
  */
 export function createJwtVerifier(
@@ -59,7 +61,7 @@ export function createJwtVerifier(
 ): OAuthTokenVerifier {
   // jose overloads key material vs JWKS getters; runtime accepts either.
   const key = options.key ?? createRemoteJWKSet(options.jwksUrl);
-  const configuredResource = canonicalUrl(options.resource);
+  const configuredResource = configuredResourceUrl(options.resource);
   const configuredAudience = verifierAudience(options.audience);
   if (
     configuredAudience !== undefined &&
@@ -303,7 +305,33 @@ function validAudience(value: unknown): value is string | string[] {
   );
 }
 
-function canonicalUrl(value: URL | string): URL {
+/**
+ * Canonicalizes the `resource` option a verifier is constructed with.
+ *
+ * Deliberately not `normalizedProviderUrl`: that helper prefixes `https://`
+ * onto a scheme-less string, which is right for a provider domain but would
+ * quietly accept a malformed resource from a JavaScript caller that the types
+ * do not constrain.
+ */
+function configuredResourceUrl(value: URL | string): URL {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new TypeError(RESOURCE_URL_REQUIREMENT);
+  }
+  if (!isAllowedHttpUrl(url)) {
+    throw new TypeError(RESOURCE_URL_REQUIREMENT);
+  }
+  url.pathname = url.pathname === "/" ? "/" : url.pathname.replace(/\/+$/, "");
+  return url;
+}
+
+const RESOURCE_URL_REQUIREMENT =
+  "resource must use HTTPS, or HTTP for localhost, without credentials, query, or fragment";
+
+/** Canonicalizes the `resource` claim carried by a token. */
+function canonicalUrl(value: string): URL {
   try {
     const url = new URL(value);
     if (!isAllowedHttpUrl(url)) {

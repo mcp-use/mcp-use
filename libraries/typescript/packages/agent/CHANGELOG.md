@@ -1,5 +1,64 @@
 # @mcp-use/agent
 
+## 2.0.17-canary.1
+
+### Patch Changes
+
+- e213f5a: Fix `maxSteps` passed to `run`, `stream` or `streamEvents` not limiting model calls. The budget is baked into `modelCallLimitMiddleware` when the executor is built, so a per-call value never reached it: `run` and `stream` dropped it entirely, and `streamEvents` wrote it to the instance without rebuilding anything. It now goes through the run context, which the middleware reads first, and the constructor value stays the default for later calls.
+- 76a7973: Mark the `auth_token` alias deprecated on both `MCPServerConfig` types. v2 renamed it to `authToken` and nothing has read the snake-case spelling since, so setting it produces no `Authorization` header. The field stays for now so existing TypeScript consumers keep compiling, and editors flag it at the call site instead. Removal waits for the next major.
+
+## 2.0.17-canary.0
+
+### Patch Changes
+
+- Updated dependencies [6f818f8]
+  - @mcp-use/client@2.3.2-canary.0
+
+## 2.0.16
+
+### Patch Changes
+
+- 485c79c: Fix OpenRouter BYOK requests to OpenAI models returning neither a model response nor an actionable provider error by routing those models through the Responses API.
+- Updated dependencies [485c79c]
+- Updated dependencies [485c79c]
+- Updated dependencies [485c79c]
+- Updated dependencies [485c79c]
+  - @mcp-use/client@2.3.1
+
+## 2.0.16-canary.4
+
+### Patch Changes
+
+- c1ad74e: Fix OpenRouter BYOK requests to OpenAI models returning neither a model response nor an actionable provider error by routing those models through the Responses API.
+
+## 2.0.16-canary.3
+
+### Patch Changes
+
+- Updated dependencies [4740f9b]
+  - @mcp-use/client@2.3.1-canary.3
+
+## 2.0.16-canary.2
+
+### Patch Changes
+
+- Updated dependencies [6e6de8b]
+  - @mcp-use/client@2.3.1-canary.2
+
+## 2.0.16-canary.1
+
+### Patch Changes
+
+- Updated dependencies [ce6b9e1]
+  - @mcp-use/client@2.3.1-canary.1
+
+## 2.0.16-canary.0
+
+### Patch Changes
+
+- Updated dependencies [322a6d3]
+  - @mcp-use/client@2.3.1-canary.0
+
 ## 2.0.15
 
 ### Patch Changes

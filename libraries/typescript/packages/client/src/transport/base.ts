@@ -8,7 +8,6 @@ import type {
   ElicitRequestURLParams,
   ElicitResult,
   AuthProvider,
-  JSONRPCMessage,
   Notification,
   OAuthClientProvider,
   ProtocolEra,
@@ -140,12 +139,12 @@ export abstract class BaseConnector {
   protected serverInfoCache: MCPServerInfo | null = null;
   protected authorizationCache: MCPAuthorizationInfo | undefined;
   protected connected = false;
+  private connectPromise: Promise<void> | null = null;
+  private disconnectPromise: Promise<void> | null = null;
+  private disconnectGeneration = 0;
   protected readonly opts: ConnectorInitOptions;
   protected notificationHandlers: NotificationHandler[] = [];
   protected rootsCache: Root[] = [];
-  private activeProgressHandlers = new Set<
-    NonNullable<RequestOptions["onprogress"]>
-  >();
 
   /**
    * Creates a connector with shared SDK and callback options.
@@ -189,10 +188,6 @@ export abstract class BaseConnector {
    */
   onNotification(handler: NotificationHandler): void {
     this.notificationHandlers.push(handler);
-    // Wire up to SDK client if already connected
-    if (this.client) {
-      this.setupNotificationHandler();
-    }
   }
 
   /** Forward a normalized notification to every registered consumer. */
@@ -263,7 +258,7 @@ export abstract class BaseConnector {
     const client = this.client as any;
     const handlersMap = client._notificationHandlers as Map<
       string,
-      (notification: Notification) => Promise<void>
+      (notification: Notification, ...args: unknown[]) => Promise<void>
     >;
 
     for (const method of [
@@ -272,47 +267,13 @@ export abstract class BaseConnector {
     ]) {
       const originalHandler = handlersMap.get(method);
       if (originalHandler) {
-        handlersMap.set(method, async (notification: Notification) => {
-          await originalHandler(notification);
+        handlersMap.set(method, async (notification, ...args) => {
+          // SDK handlers also receive the negotiated wire codec. Preserve all
+          // arguments so their validation and built-in dispatch remain intact.
+          await originalHandler(notification, ...args);
           await this.forwardNotification(notification);
         });
       }
-    }
-  }
-
-  /**
-   * Forward v2 MRTR progress whose retry request IDs are not associated with
-   * the original call callback by the current SDK beta.
-   *
-   * ponytail: fallback is enabled only when exactly one progress-aware call is
-   * active; remove it when the upstream SDK propagates handlers to MRTR rounds.
-   */
-  protected setupRoundProgressForwarding(): void {
-    if (!this.client) return;
-    const sdkClient = this.client as unknown as {
-      _onnotification: (message: JSONRPCMessage) => void | Promise<void>;
-      _progressHandlers?: Map<unknown, unknown>;
-    };
-    const original = sdkClient._onnotification.bind(this.client);
-    sdkClient._onnotification = async (message: JSONRPCMessage) => {
-      if (
-        message &&
-        typeof message === "object" &&
-        (message as { method?: unknown }).method === "notifications/progress"
-      ) {
-        this.forwardRoundProgress((message as { params?: unknown }).params);
-      }
-      await original?.(message);
-    };
-  }
-
-  /** Forward progress parsed from a transport stream to the active call. */
-  protected forwardRoundProgress(params: unknown): void {
-    if (this.activeProgressHandlers.size === 1) {
-      const [handler] = this.activeProgressHandlers;
-      handler?.(
-        params as Parameters<NonNullable<RequestOptions["onprogress"]>>[0]
-      );
     }
   }
 
@@ -466,9 +427,58 @@ export abstract class BaseConnector {
   /**
    * Establishes the transport connection and creates the SDK client.
    *
+   * Coalesces concurrent connection attempts, synchronizes with ongoing
+   * disconnections, and guarantees that orphaned processes or transports
+   * are not leaked on failure or rapid disconnect.
+   *
    * @returns A promise that resolves when the connector is connected.
    */
-  abstract connect(): Promise<void>;
+  async connect(): Promise<void> {
+    const generation = this.disconnectGeneration;
+    while (this.disconnectPromise) {
+      await this.disconnectPromise;
+    }
+
+    // A later disconnect also cancels attempts queued behind an earlier
+    // teardown. No resources belong to this attempt yet, so do not clean up.
+    if (generation !== this.disconnectGeneration) {
+      throw new Error("Connection cancelled by disconnect");
+    }
+
+    if (this.connected) {
+      logger.debug("Already connected to MCP implementation");
+      return;
+    }
+
+    if (this.connectPromise) {
+      return this.connectPromise;
+    }
+
+    const currentConnect = (async () => {
+      try {
+        await this.establishTransport();
+        if (generation !== this.disconnectGeneration) {
+          throw new Error("Connection cancelled by disconnect");
+        }
+        this.connected = true;
+      } catch (err) {
+        this.connected = false;
+        await this.cleanupResources();
+        throw err;
+      } finally {
+        this.connectPromise = null;
+      }
+    })();
+
+    this.connectPromise = currentConnect;
+    return this.connectPromise;
+  }
+
+  /**
+   * Subclasses override this method to perform transport-specific connection logic.
+   * Default implementation is a no-op for backwards compatibility.
+   */
+  protected async establishTransport(): Promise<void> {}
 
   /**
    * Returns transport-specific fields suitable for logs and telemetry.
@@ -506,18 +516,50 @@ export abstract class BaseConnector {
   /**
    * Disconnects the SDK client and releases transport resources.
    *
+   * Coalesces concurrent calls and coordinates with in-flight connections
+   * to ensure no child processes or transports are orphaned.
+   *
    * @returns A promise that resolves after cleanup completes.
    */
   async disconnect(): Promise<void> {
-    if (!this.connected) {
+    // Advance even when joining existing cleanup: callers may have queued
+    // a reconnect since that cleanup began.
+    this.disconnectGeneration++;
+    if (this.disconnectPromise) {
+      return this.disconnectPromise;
+    }
+
+    if (!this.connected && !this.connectPromise) {
       logger.debug("Not connected to MCP implementation");
       return;
     }
 
-    logger.debug("Disconnecting from MCP implementation");
-    await this.cleanupResources();
-    this.connected = false;
-    logger.debug("Disconnected from MCP implementation");
+    const currentDisconnect = (async () => {
+      let connectFailed = false;
+      try {
+        // If a connection attempt is in flight, await it first so that partial
+        // or just-created resources are settled and safely cleaned up.
+        if (this.connectPromise) {
+          try {
+            await this.connectPromise;
+          } catch {
+            connectFailed = true;
+          }
+        }
+
+        if (!connectFailed) {
+          logger.debug("Disconnecting from MCP implementation");
+          await this.cleanupResources();
+        }
+        this.connected = false;
+        logger.debug("Disconnected from MCP implementation");
+      } finally {
+        this.disconnectPromise = null;
+      }
+    })();
+
+    this.disconnectPromise = currentDisconnect;
+    return this.disconnectPromise;
   }
 
   /** Whether an SDK client currently exists for this connector. */
@@ -669,17 +711,11 @@ export abstract class BaseConnector {
     }
 
     logger.debug(`Calling tool '${name}' with args`, args);
-    const progressHandler = enhancedOptions?.onprogress;
-    if (progressHandler) this.activeProgressHandlers.add(progressHandler);
-    try {
-      const res = await this.executeRequest(() =>
-        this.client!.callTool({ name, arguments: args }, enhancedOptions)
-      );
-      logger.debug(`Tool '${name}' returned`, res);
-      return res as CallToolResult;
-    } finally {
-      if (progressHandler) this.activeProgressHandlers.delete(progressHandler);
-    }
+    const res = await this.executeRequest(() =>
+      this.client!.callTool({ name, arguments: args }, enhancedOptions)
+    );
+    logger.debug(`Tool '${name}' returned`, res);
+    return res as CallToolResult;
   }
 
   /**

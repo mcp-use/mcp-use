@@ -6,6 +6,29 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v20.3.8" description="September 2026">
+  ## Bundled Inspector rebuild
+  Patch release paired with `mcp-use` v2.5.0, rebuilding the standalone Inspector with the agent OpenRouter fix.
+
+- **Fix**: rebuild the standalone Inspector with the OpenRouter Responses API agent fix and repair published framework peer metadata (`#2504`)
+- **Update**: Updated mcp-use to v2.5.0
+</Update>
+
+<Update label="v20.3.7" description="September 2026">
+  ## Workspace package alignment
+  Patch release paired with `mcp-use` v2.4.3; there are no Inspector-specific source changes.
+
+- **Update**: Updated mcp-use to v2.4.3
+</Update>
+
+<Update label="v20.3.6" description="September 2026">
+  ## Publish artifact preservation
+  Patch release paired with `mcp-use` v2.4.2, keeping package builds intact while npm pack runs.
+
+- **Fix**: concurrent publishing no longer drops the Client build while its tarball is created, and packed artifacts are checked for declared files and entry points (`#2428`)
+- **Update**: Updated mcp-use to v2.4.2
+</Update>
+
 <Update label="v20.3.5" description="September 2026">
   ## Chat widgets use the connection id
   Patch release paired with `mcp-use` v2.4.1, rendering chat MCP Apps against the registered connection.

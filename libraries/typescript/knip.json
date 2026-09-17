@@ -12,7 +12,8 @@
   ],
   "workspaces": {
     ".": {
-      "project": ["*.{js,ts}"]
+      "entry": ["scripts/release-channel.mjs", "scripts/version-packages.mjs", "scripts/release-*.test.mjs"],
+      "project": ["*.{js,ts}", "scripts/release-*.mjs", "scripts/version-packages.mjs"]
     },
     "packages/server": {
       "entry": ["src/oauth/**/*.ts", "tests/**/*.{ts,tsx}"],
