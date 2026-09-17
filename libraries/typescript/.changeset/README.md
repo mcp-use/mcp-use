@@ -39,10 +39,12 @@ PRs targeting **any branch** must add a new, non-empty changeset when they chang
 releasable TypeScript package code, shipped assets/templates, build configuration,
 or runtime package metadata under `libraries/typescript/packages/`. An existing
 changeset on the target branch or an edit to one does not satisfy the check.
+New changesets must collectively cover every changed releasable package.
 
 Docs, Python, examples, tests (including colocated tests), test configuration,
 and repository CI/tooling-only PRs do not need a changeset. Package version-only,
-dev-dependency, and script-only edits are also excluded. Generator templates are
+dev-dependency, description, keywords, and script-only edits are also excluded.
+Generator templates are
 shipped assets and count even when they contain documentation or examples.
 
 Before merging `canary` into `main`, add or update a release `<Update>` entry in

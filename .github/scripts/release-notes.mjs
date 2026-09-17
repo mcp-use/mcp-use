@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { isDeepStrictEqual } from "node:util";
 import { pathToFileURL } from "node:url";
 
 export const changelogs = [
@@ -37,7 +38,8 @@ export function isSdkPath(path) {
     )
   )
     return false;
-  if (/\.(?:test|spec|stories)\.[^/]+$/.test(relative)) return false;
+  if (/[.-](?:test|spec|stories)\.[^/]+$/.test(relative)) return false;
+  if (/^(?:tests?|specs?)\.[^/]+$/.test(relative)) return false;
   if (/\.(?:md|mdx|rst)$/.test(relative)) return false;
   if (
     /^(?:(?:vitest|playwright|jest|eslint|typedoc|tsdoc|doctor)\.config\.|(?:typedoc|tsdoc)\.json$|tsconfig\.test\.json$|test-)/.test(
@@ -76,7 +78,7 @@ export function checkReleaseNotes({ base, head, baseBranch, headBranch, cwd }) {
   // Only exempt package metadata; source changes on these branches still count.
   const versionPr =
     baseBranch === "main" && /^release\/exit-prerelease-\d+$/.test(headBranch);
-  const sdkChanged = sdkPaths.some((path) => {
+  const releasePaths = sdkPaths.filter((path) => {
     if (!/^libraries\/typescript\/packages\/[^/]+\/package\.json$/.test(path))
       return true;
     if (versionPr) return false;
@@ -91,14 +93,27 @@ export function checkReleaseNotes({ base, head, baseBranch, headBranch, cwd }) {
         keywords,
         ...published
       } = JSON.parse(read(ref, path));
+      // Conditional exports/imports resolve in key order; preserve that order.
+      for (const field of ["exports", "imports"])
+        if (field in published)
+          published[field] = JSON.stringify(published[field]);
       return published;
     };
-    return (
-      JSON.stringify(manifest(ancestor)) !== JSON.stringify(manifest(head))
-    );
+    return !isDeepStrictEqual(manifest(ancestor), manifest(head));
   });
 
-  if (!promotion && sdkChanged) {
+  const packages = new Set();
+  for (const directory of new Set(
+    releasePaths.map((path) => path.split("/").slice(0, 4).join("/")),
+  )) {
+    const path = `${directory}/package.json`;
+    const content = readIfPresent(head, path) || readIfPresent(ancestor, path);
+    if (!content) throw new Error(`Missing package manifest: ${path}`);
+    const manifest = JSON.parse(content);
+    if (!manifest.private) packages.add(manifest.name);
+  }
+
+  if (!promotion && packages.size) {
     // Existing changesets on the target branch do not belong to this PR.
     const added = git(
       "diff",
@@ -117,27 +132,27 @@ export function checkReleaseNotes({ base, head, baseBranch, headBranch, cwd }) {
           path,
         ),
       );
-    const valid = added.some((path) => {
+    const covered = new Set();
+    for (const path of added) {
       const content = read(head, path).replace(/\r\n/g, "\n");
       // SDK changes require a release entry; an empty changeset is insufficient.
       const match = /^---\n([\s\S]*?)\n?---(?:\n|$)([\s\S]*)$/.exec(content);
-      if (!match) return false;
+      if (!match) continue;
       const releases = match[1].trim();
-      return (
-        Boolean(releases) &&
-        releases
-          .split("\n")
-          .every((line) =>
-            /^\s*["'][^"']+["']:\s*(major|minor|patch)\s*$/.test(line),
-          ) &&
-        Boolean(match[2].trim())
-      );
-    });
-    return valid
-      ? []
-      : [
-          "This PR changes TypeScript SDK packages. Add a new release changeset: cd libraries/typescript && pnpm changeset. Empty, existing, or edited changesets do not count.",
-        ];
+      const lines = releases
+        .split("\n")
+        .map((line) =>
+          /^\s*["']([^"']+)["']:\s*(major|minor|patch)\s*$/.exec(line),
+        );
+      if (releases && lines.every(Boolean) && match[2].trim())
+        for (const line of lines) covered.add(line[1]);
+    }
+    const missing = [...packages].filter((name) => !covered.has(name));
+    return missing.length
+      ? [
+          `This PR changes TypeScript SDK packages. Add new release changesets covering: ${missing.join(", ")}. Run: cd libraries/typescript && pnpm changeset. Empty, existing, or edited changesets do not count.`,
+        ]
+      : [];
   }
 
   if (promotion) {
