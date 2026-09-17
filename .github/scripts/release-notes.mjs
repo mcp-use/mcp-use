@@ -6,6 +6,23 @@ export const changelogs = [
   "docs/inspector/changelog.mdx",
 ];
 
+function changelogEntries(content) {
+  // Ignore comments and frontmatter. Mask code examples so literal Update tags
+  // cannot create entries, but code changes inside real entries still count.
+  const visible = content
+    .replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "")
+    .replace(
+      /<!--[\s\S]*?-->|\{\/\*[\s\S]*?\*\/\}|^ {0,3}(`{3,}|~{3,})[^\n]*\n[\s\S]*?^ {0,3}\1[ \t]*\r?$|(`+)[\s\S]*?\2/gm,
+      (block) =>
+        block.startsWith("<!--") || block.startsWith("{/*")
+          ? ""
+          : block.replaceAll("<", "&lt;").replaceAll(">", "&gt;"),
+    );
+  return [...visible.matchAll(/<Update\b[^>]*>([\s\S]*?)<\/Update>/g)]
+    .map((match) => match[1].replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+}
+
 // Package code, shipped assets/templates, and build configuration affect releases.
 // Keep the workflow unfiltered so unrelated PRs still report a successful check.
 export function isSdkPath(path) {
@@ -40,6 +57,10 @@ export function checkReleaseNotes({ base, head, baseBranch, headBranch, cwd }) {
     execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
   const ancestor = git("merge-base", base, head);
   const read = (ref, path) => git("show", `${ref}:${path}`);
+  // Missing paths are expected when introducing a changelog. Other Git errors
+  // still throw; do not turn repository failures into an empty baseline.
+  const readIfPresent = (ref, path) =>
+    git("ls-tree", "--name-only", ref, "--", path) ? read(ref, path) : "";
 
   const promotion = baseBranch === "main" && headBranch === "canary";
   const changed = git(
@@ -81,7 +102,7 @@ export function checkReleaseNotes({ base, head, baseBranch, headBranch, cwd }) {
     // Existing changesets on the target branch do not belong to this PR.
     const added = git(
       "diff",
-      "--no-renames",
+      "--find-renames",
       "--diff-filter=A",
       "--name-only",
       "-z",
@@ -120,13 +141,9 @@ export function checkReleaseNotes({ base, head, baseBranch, headBranch, cwd }) {
   }
 
   if (promotion) {
-    const entries = (content) =>
-      [...content.matchAll(/<Update\b[^>]*>([\s\S]*?)<\/Update>/g)]
-        .map((match) => match[1].replace(/\s+/g, " ").trim())
-        .filter(Boolean);
     return changelogs.flatMap((path) => {
-      const previous = new Set(entries(read(ancestor, path)));
-      const updated = entries(read(head, path)).some(
+      const previous = new Set(changelogEntries(readIfPresent(ancestor, path)));
+      const updated = changelogEntries(readIfPresent(head, path)).some(
         (entry) => !previous.has(entry),
       );
       return updated
