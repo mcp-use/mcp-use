@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 20.3.9-canary.2
+
+### Patch Changes
+
+- 99414e0: Updated dependency `hono` to `^4.13.5`.
+
 ## 20.3.9-canary.1
 
 ### Patch Changes

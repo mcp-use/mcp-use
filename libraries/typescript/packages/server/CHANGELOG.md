@@ -1,5 +1,14 @@
 # mcp-use
 
+## 2.5.1-canary.2
+
+### Patch Changes
+
+- 9c1440a: Updated dependency `next` to `^16.3.3`.
+- 99414e0: Updated dependency `hono` to `^4.13.5`.
+- Updated dependencies [99414e0]
+  - @mcp-use/inspector@20.3.9-canary.2
+
 ## 2.5.1-canary.1
 
 ### Patch Changes

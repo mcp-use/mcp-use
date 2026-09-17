@@ -12,6 +12,9 @@
   },
   "changesets": [
     "agent-per-call-max-steps",
+    "dependabot-14f829fa",
+    "dependabot-6ba5a61f",
+    "dependabot-c0bce363",
     "deprecate-auth-token-alias",
     "propagated-b4b4cb29059907a4",
     "quiet-progress-handlers"

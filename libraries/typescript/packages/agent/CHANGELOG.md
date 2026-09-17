@@ -1,5 +1,11 @@
 # @mcp-use/agent
 
+## 2.0.17-canary.2
+
+### Patch Changes
+
+- e590397: Updated dependency `vitest` to `4.1.11`.
+
 ## 2.0.17-canary.1
 
 ### Patch Changes
