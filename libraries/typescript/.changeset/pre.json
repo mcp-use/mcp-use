@@ -12,6 +12,7 @@
   },
   "changesets": [
     "agent-per-call-max-steps",
+    "curated-inspector-cloud-providers",
     "dependabot-14f829fa",
     "dependabot-6ba5a61f",
     "dependabot-c0bce363",
