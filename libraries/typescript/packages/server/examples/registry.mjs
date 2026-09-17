@@ -44,6 +44,13 @@ export const examples = [
     scenario: "nextjs-standalone",
     view: true,
   }),
+  local("tanstack-start", {
+    tools: ["greet", "show-status-card"],
+    endpoint: "/api/mcp",
+    scenario: "tanstack-start",
+    view: true,
+    portableOutput: ".output",
+  }),
   local("public-landing", { tools: ["greet"], landing: true }),
   local("events", {
     tools: ["ping", "recent-events"],
