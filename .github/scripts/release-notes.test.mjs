@@ -37,6 +37,21 @@ function fixture(t, { sdk = true, existingChangelogs = changelogs } = {}) {
   git("config", "commit.gpgsign", "false");
   write(`${changeset}existing.md`, release);
   for (const path of existingChangelogs) write(path, entry);
+  for (const name of [
+    "server",
+    "client",
+    "agent",
+    "cli",
+    "inspector",
+    "tunnel",
+    "create-mcp-use-app",
+  ])
+    write(
+      `libraries/typescript/packages/${name}/package.json`,
+      JSON.stringify({
+        name: name === "server" ? "mcp-use" : `@mcp-use/${name}`,
+      }),
+    );
   const base = commit();
   if (sdk)
     write(
@@ -163,6 +178,10 @@ test("docs, Python, examples, tests, and tooling changes need no changeset", (t)
     "libraries/typescript/packages/cli/vitest.config.ts",
     "libraries/typescript/packages/server/tsconfig.test.json",
     "libraries/typescript/packages/agent/typedoc.json",
+    "libraries/typescript/packages/server/scripts/env-url-csp-runtime-test.mjs",
+    "libraries/typescript/packages/server/test.ts",
+    "libraries/typescript/packages/server/tests.ts",
+    "libraries/typescript/packages/server/spec.ts",
   ])
     f.write(path, "test-only content");
   assert.deepEqual(f.check("main"), []);
@@ -329,4 +348,59 @@ test("unexpected Git failures are not treated as missing changelogs", (t) => {
       }),
     /Command failed/,
   );
+});
+
+test("changesets must collectively cover changed packages", (t) => {
+  const f = fixture(t);
+  f.write(
+    `${changeset}unrelated.md`,
+    release.replace("mcp-use", "@mcp-use/client"),
+  );
+  assert.match(f.check()[0], /covering: mcp-use/);
+  f.write(`${changeset}server.md`, release);
+  assert.deepEqual(f.check(), []);
+  f.write("libraries/typescript/packages/agent/src/index.ts", "SDK change");
+  assert.match(f.check()[0], /@mcp-use\/agent/);
+  f.write(`${changeset}agent.md`, release.replace("mcp-use", "@mcp-use/agent"));
+  assert.deepEqual(f.check(), []);
+});
+
+test("manifest key order is ignored except for conditional resolution", (t) => {
+  const f = fixture(t, { sdk: false });
+  const path = "libraries/typescript/packages/server/package.json";
+  f.write(
+    path,
+    JSON.stringify({
+      name: "mcp-use",
+      dependencies: { a: "1", b: "2" },
+      exports: { node: "./node.js", default: "./default.js" },
+    }),
+  );
+  const base = f.commit();
+  const check = () =>
+    checkReleaseNotes({
+      cwd: f.cwd,
+      base,
+      head: f.commit(),
+      baseBranch: "canary",
+      headBranch: "feature",
+    });
+  f.write(
+    path,
+    JSON.stringify({
+      exports: { node: "./node.js", default: "./default.js" },
+      dependencies: { b: "2", a: "1" },
+      name: "mcp-use",
+    }),
+  );
+  assert.deepEqual(check(), []);
+  f.write(
+    path,
+    JSON.stringify({
+      name: "mcp-use",
+      dependencies: { a: "1", b: "2" },
+      exports: { default: "./default.js", node: "./node.js" },
+    }),
+  );
+  assert.equal(check().length, 1);
 });
