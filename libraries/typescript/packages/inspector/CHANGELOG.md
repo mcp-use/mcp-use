@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 20.3.9-canary.3
+
+### Patch Changes
+
+- cf8ce39: Fix the managed chat model badge showing the default OpenAI logo when a Claude or Gemini model is selected. Use the selected cloud model for both its name and provider logo.
+
 ## 20.3.9-canary.2
 
 ### Patch Changes
