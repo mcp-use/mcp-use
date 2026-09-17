@@ -24,9 +24,12 @@ This monitors registered tool callbacks, not transport failures or validation re
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm verify
 ```
 
 Tests invoke the server over MCP and use real Sentry spans and error processing with a local transport. No Sentry account or network access is needed for the tests.
+
+`pnpm verify` runs the registered example's type and configuration checks without contacting Sentry. Live provider verification is deferred; use the Inspector steps above with your DSN to check telemetry delivery.
 
 ## Standalone demo
 
