@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "zod/v4";
 
 const id = z
   .string()
@@ -50,7 +50,9 @@ const component = z.discriminatedUnion("component", [
     label: text,
     value: binding,
     options: z
-      .array(z.object({ label: z.string(), value: z.string() }))
+      .array(
+        z.object({ label: z.string().max(3000), value: z.string().max(3000) })
+      )
       .min(1)
       .max(12),
     variant: z.enum(["mutuallyExclusive", "multipleSelection"]),
@@ -103,8 +105,10 @@ export const specSchema = z
         visit(child, path);
       visited.add(key);
     }
+    visit("root");
+    if (visited.size !== nodes.size)
+      fail("All components must be reachable from root.");
     for (const node of spec.components) {
-      visit(node.id);
       for (const value of Object.values(node)) {
         if (
           value &&

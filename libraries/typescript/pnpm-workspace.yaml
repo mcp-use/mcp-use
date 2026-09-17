@@ -60,6 +60,7 @@ overrides:
   preact: ">=10.28.2"
   zod: 4.4.3
   # A2UI's renderer and schema conversion currently require the Zod 3 API.
+  "mcp-use-example-a2ui>zod": 3.25.76
   "@a2ui/react>zod": 3.25.76
   "@a2ui/web_core>zod": 3.25.76
   jsondiffpatch: ">=0.7.2"
