@@ -1,0 +1,29 @@
+{
+  "name": "mcp-use-example-tanstack-start",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev --port 3000",
+    "build": "vite build",
+    "start": "node .output/server/index.mjs",
+    "typecheck": "tsc --noEmit",
+    "verify": "node ../verify-examples.mjs --example=tanstack-start"
+  },
+  "dependencies": {
+    "@tanstack/react-router": "1.170.33",
+    "@tanstack/react-start": "1.168.50",
+    "mcp-use": "workspace:*",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "6.0.5",
+    "nitro": "3.0.260903-beta",
+    "typescript": "^5.9.3",
+    "vite": "8.0.16"
+  }
+}
