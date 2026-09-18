@@ -1,62 +1,9 @@
-/** Shared test helpers: fixture copying, raw 2026-07-28 MCP requests, polling. */
-import { randomBytes } from "node:crypto";
-import {
-  cpSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from "node:fs";
+/** Shared CLI assertions, raw MCP requests, and polling. */
+import { readFileSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:net";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-
-const here = dirname(fileURLToPath(import.meta.url));
-const serverPackageRoot = join(here, "..", "..", "..", "server");
-
-/** Absolute path to the committed basic fixture project. */
-export const FIXTURE_BASIC = join(here, "fixtures", "basic");
-
-/** Absolute path to the views fixture project. */
-export const FIXTURE_VIEWS = join(here, "fixtures", "views");
-
-/**
- * Scratch root for mutable fixture copies. Each copy receives a local
- * `node_modules/mcp-use` link, matching the package layout of an installed
- * consumer without creating a workspace dependency cycle between the CLI and
- * server packages.
- */
-export const TMP_ROOT = join(here, ".tmp");
-
-/** Copy a committed fixture into a fresh scratch dir; returns its path. */
-export function copyFixture(
-  label: string,
-  fixture: "basic" | "views" = "basic"
-): string {
-  const source = fixture === "views" ? FIXTURE_VIEWS : FIXTURE_BASIC;
-  const dest = join(TMP_ROOT, `${label}-${randomBytes(4).toString("hex")}`);
-  mkdirSync(dest, { recursive: true });
-  cpSync(source, dest, { recursive: true });
-  const nodeModules = join(dest, "node_modules");
-  mkdirSync(nodeModules, { recursive: true });
-  symlinkSync(serverPackageRoot, join(nodeModules, "mcp-use"), "junction");
-  return dest;
-}
-
-/** Remove a scratch dir, ignoring failures. */
-export function removeDir(dir: string): void {
-  try {
-    rmSync(dir, {
-      recursive: true,
-      force: true,
-      maxRetries: 5,
-      retryDelay: 100,
-    });
-  } catch {
-    // best effort: Vite may still be finishing optimizer temp cleanup.
-  }
-}
+import { join } from "node:path";
+import { fetchWithTimeout as fetch } from "../support/requests.js";
+export { waitFor } from "../support/requests.js";
 
 /** Bind the basic fixture's add tool to a named view for CLI error tests. */
 export function bindBasicToolToView(cwd: string, viewName: string): void {
@@ -137,28 +84,6 @@ export async function listToolNames(baseUrl: string): Promise<string[]> {
   const body = await mcpRequest(baseUrl, "tools/list");
   const result = body["result"] as { tools: { name: string }[] };
   return result.tools.map((t) => t.name).sort();
-}
-
-/** Poll `probe` until it resolves truthy or the timeout elapses. */
-export async function waitFor<T>(
-  probe: () => Promise<T | undefined>,
-  { timeout = 15000, interval = 200 } = {}
-): Promise<T> {
-  const deadline = Date.now() + timeout;
-  let lastError: unknown;
-  while (Date.now() < deadline) {
-    try {
-      const value = await probe();
-      if (value !== undefined) return value;
-    } catch (error) {
-      lastError = error;
-    }
-    await new Promise((r) => setTimeout(r, interval));
-  }
-  throw new Error(
-    `waitFor timed out after ${timeout}ms` +
-      (lastError !== undefined ? `; last error: ${String(lastError)}` : "")
-  );
 }
 
 /**

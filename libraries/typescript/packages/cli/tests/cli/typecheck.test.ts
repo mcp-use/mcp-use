@@ -1,15 +1,9 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, vi } from "vitest";
+import { it } from "./fixtures.js";
 
 import { runTypecheck } from "../../src/cli/typecheck.js";
-import { copyFixture, removeDir } from "./helpers.js";
-
-const dirs: string[] = [];
-
-afterAll(() => {
-  for (const dir of dirs) removeDir(dir);
-});
 
 /** Minimal strict tsconfig for a scratch fixture. */
 function writeTsconfig(cwd: string, include: string[]): void {
@@ -28,9 +22,11 @@ function writeTsconfig(cwd: string, include: string[]): void {
 }
 
 describe("runTypecheck", () => {
-  it("creates mcp-env.d.ts before tsc checks unexported tool refs", async () => {
-    const cwd = copyFixture("typecheck");
-    dirs.push(cwd);
+  it("creates mcp-env.d.ts before tsc checks unexported tool refs", async ({
+    project,
+  }) => {
+    const { cwd } = project;
+
     writeFileSync(
       join(cwd, "logo.svg"),
       '<svg xmlns="http://www.w3.org/2000/svg"></svg>'
@@ -59,9 +55,11 @@ describe("runTypecheck", () => {
     );
   });
 
-  it("reports success on stdout when the project is clean", async () => {
-    const cwd = copyFixture("typecheck-clean");
-    dirs.push(cwd);
+  it("reports success on stdout when the project is clean", async ({
+    project,
+  }) => {
+    const { cwd } = project;
+
     writeTsconfig(cwd, ["src/**/*", "mcp-env.d.ts"]);
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
 
@@ -78,9 +76,11 @@ describe("runTypecheck", () => {
     }
   });
 
-  it("stays silent about success when tsc reports errors", async () => {
-    const cwd = copyFixture("typecheck-errors");
-    dirs.push(cwd);
+  it("stays silent about success when tsc reports errors", async ({
+    project,
+  }) => {
+    const { cwd } = project;
+
     writeFileSync(join(cwd, "bad.ts"), "export const port: number = 'nope';\n");
     writeTsconfig(cwd, ["src/**/*", "bad.ts", "mcp-env.d.ts"]);
     const log = vi.spyOn(console, "log").mockImplementation(() => {});

@@ -1,8 +1,9 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, vi } from "vitest";
+
+import { it as base } from "../support/fixtures.js";
 
 const AUTHORIZATION_LAUNCHER_URL = "http://127.0.0.1:33418/authorize";
 
@@ -64,105 +65,106 @@ const connection = {
   readResource: vi.fn(),
 };
 
-let homeDirectory: string;
 let runClient: (argv: readonly string[]) => Promise<number>;
 let stdout = "";
 let stderr = "";
-let stdinTtyDescriptor: PropertyDescriptor | undefined;
 
-beforeEach(async () => {
-  vi.resetAllMocks();
-  vi.resetModules();
-  mocks.config = undefined;
-  mocks.connectError = undefined;
-  mocks.connectCall.mockReset();
-  mocks.triggerOAuth = false;
-  mocks.logger.level = "info";
-  homeDirectory = await mkdtemp(join(tmpdir(), "mcp-use-client-"));
-  vi.stubEnv("HOME", homeDirectory);
-  vi.stubEnv("USERPROFILE", homeDirectory);
-  stdinTtyDescriptor = Object.getOwnPropertyDescriptor(process.stdin, "isTTY");
-  setStdinTty(false);
+const it = base.extend<{ clientSetup: void }>({
+  clientSetup: [
+    async ({ home, scope }, use) => {
+      // Request the isolated home before importing client configuration code.
+      void home;
+      vi.resetAllMocks();
+      vi.resetModules();
+      mocks.config = undefined;
+      mocks.connectError = undefined;
+      mocks.connectCall.mockReset();
+      mocks.triggerOAuth = false;
+      mocks.logger.level = "info";
+      scope.preserveProperty(process.stdin, "isTTY");
+      setStdinTty(false);
 
-  stdout = "";
-  stderr = "";
-  vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
-    stdout += String(chunk);
-    return true;
-  });
-  vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
-    stderr += String(chunk);
-    return true;
-  });
+      stdout = "";
+      stderr = "";
+      vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+        stdout += String(chunk);
+        return true;
+      });
+      vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+        stderr += String(chunk);
+        return true;
+      });
 
-  connection.callTool.mockResolvedValue({
-    content: [{ type: "text", text: "called" }],
-  });
-  connection.discoverAuthorization.mockImplementation(
-    async () => connection.authorization
-  );
-  connection.authenticate.mockResolvedValue(undefined);
-  connection.authorization = undefined;
-  connection.disconnect.mockResolvedValue(undefined);
-  connection.getPrompt.mockResolvedValue({
-    messages: [{ role: "user", content: { type: "text", text: "Hello, Ada" } }],
-  });
-  connection.listPrompts.mockResolvedValue([{ name: "hello" }]);
-  connection.listResources.mockResolvedValue([{ uri: "file:///notes.txt" }]);
-  connection.listTools.mockResolvedValue([
-    { name: "echo", description: "Echo input" },
-  ]);
-  connection.readResource.mockResolvedValue({
-    contents: [{ uri: "file:///notes.txt", text: "notes" }],
-  });
+      connection.callTool.mockResolvedValue({
+        content: [{ type: "text", text: "called" }],
+      });
+      connection.discoverAuthorization.mockImplementation(
+        async () => connection.authorization
+      );
+      connection.authenticate.mockResolvedValue(undefined);
+      connection.authorization = undefined;
+      connection.disconnect.mockResolvedValue(undefined);
+      connection.getPrompt.mockResolvedValue({
+        messages: [
+          { role: "user", content: { type: "text", text: "Hello, Ada" } },
+        ],
+      });
+      connection.listPrompts.mockResolvedValue([{ name: "hello" }]);
+      connection.listResources.mockResolvedValue([
+        { uri: "file:///notes.txt" },
+      ]);
+      connection.listTools.mockResolvedValue([
+        { name: "echo", description: "Echo input" },
+      ]);
+      connection.readResource.mockResolvedValue({
+        contents: [{ uri: "file:///notes.txt", text: "notes" }],
+      });
 
-  mocks.question.mockResolvedValue("");
-  mocks.createInterface.mockReturnValue({
-    close: mocks.closePrompt,
-    question: mocks.question,
-  });
-  mocks.loadClientPackage.mockResolvedValue({
-    logger: mocks.logger,
-    createOAuthProvider: async (
-      _url: string,
-      options: { openBrowser: (url: string) => Promise<void> }
-    ) => ({ options }),
-    MCPClient: class {
-      constructor(config: {
-        mcpServers: Record<string, { authProvider?: unknown }>;
-      }) {
-        mocks.config = config;
-      }
-
-      async connect(name: string): Promise<typeof connection> {
-        mocks.connectCall(name);
-        if (mocks.connectError !== undefined) throw mocks.connectError;
-        const provider = mocks.config?.mcpServers[name]?.authProvider as
-          | { options: { openBrowser: (url: string) => Promise<void> } }
-          | undefined;
-        if (mocks.triggerOAuth && provider !== undefined) {
-          await provider.options.openBrowser(AUTHORIZATION_LAUNCHER_URL);
-          if (mocks.logger.level === "silent") {
-            await new Promise<never>(() => {});
+      mocks.question.mockResolvedValue("");
+      mocks.createInterface.mockReturnValue({
+        close: mocks.closePrompt,
+        question: mocks.question,
+      });
+      mocks.loadClientPackage.mockResolvedValue({
+        logger: mocks.logger,
+        createOAuthProvider: async (
+          _url: string,
+          options: { openBrowser: (url: string) => Promise<void> }
+        ) => ({ options }),
+        MCPClient: class {
+          constructor(config: {
+            mcpServers: Record<string, { authProvider?: unknown }>;
+          }) {
+            mocks.config = config;
           }
-        }
-        return connection;
-      }
-    },
-  });
 
-  ({ runClient } = await import("../../src/commands/client.js"));
+          async connect(name: string): Promise<typeof connection> {
+            mocks.connectCall(name);
+            if (mocks.connectError !== undefined) throw mocks.connectError;
+            const provider = mocks.config?.mcpServers[name]?.authProvider as
+              | { options: { openBrowser: (url: string) => Promise<void> } }
+              | undefined;
+            if (mocks.triggerOAuth && provider !== undefined) {
+              await provider.options.openBrowser(AUTHORIZATION_LAUNCHER_URL);
+              if (mocks.logger.level === "silent") {
+                await new Promise<never>(() => {});
+              }
+            }
+            return connection;
+          }
+        },
+      });
+
+      ({ runClient } = await import("../../src/commands/client.js"));
+      await use();
+    },
+    { auto: true },
+  ],
 });
 
-afterEach(async () => {
-  if (stdinTtyDescriptor === undefined) {
-    Reflect.deleteProperty(process.stdin, "isTTY");
-  } else {
-    Object.defineProperty(process.stdin, "isTTY", stdinTtyDescriptor);
-  }
+afterEach(() => {
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
-  await rm(homeDirectory, { recursive: true, force: true });
 });
 
 describe("client JSON output", () => {

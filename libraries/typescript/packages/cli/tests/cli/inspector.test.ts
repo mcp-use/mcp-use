@@ -1,22 +1,17 @@
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
+import { it } from "../support/fixtures.js";
+import type { TestScope } from "../support/scope.js";
 
 import { loadProjectInspector } from "../../src/cli/inspector.js";
 
-const temporaryDirectories: string[] = [];
-
 async function projectWithInspector(
+  scope: TestScope,
   source?: string,
   exportsMap = '{".":"./index.js"}'
 ): Promise<string> {
-  const cwd = join(
-    tmpdir(),
-    `mcp-use-inspector-loader-${process.pid}-${Date.now()}-${temporaryDirectories.length}`
-  );
-  temporaryDirectories.push(cwd);
-  await mkdir(cwd, { recursive: true });
+  const cwd = scope.directory("inspector-");
   await writeFile(
     join(cwd, "package.json"),
     source === undefined
@@ -35,24 +30,21 @@ async function projectWithInspector(
   return cwd;
 }
 
-afterEach(async () => {
-  await Promise.all(
-    temporaryDirectories
-      .splice(0)
-      .map((directory) => rm(directory, { recursive: true, force: true }))
-  );
-});
-
 describe("loadProjectInspector", () => {
-  it("loads the framework Inspector when the project has no direct override", async () => {
-    const cwd = await projectWithInspector();
+  it("loads the framework Inspector when the project has no direct override", async ({
+    scope,
+  }) => {
+    const cwd = await projectWithInspector(scope);
     await expect(loadProjectInspector(cwd)).resolves.toMatchObject({
       installed: true,
     });
   });
 
-  it("loads mountInspector from the project's dependency graph", async () => {
+  it("loads mountInspector from the project's dependency graph", async ({
+    scope,
+  }) => {
     const cwd = await projectWithInspector(
+      scope,
       "export const mountInspector = () => async () => new Response('mounted')\n"
     );
     const loaded = await loadProjectInspector(cwd);
@@ -71,8 +63,9 @@ describe("loadProjectInspector", () => {
     ).resolves.toMatchObject({ status: 200 });
   });
 
-  it("supports a root-only project override", async () => {
+  it("supports a root-only project override", async ({ scope }) => {
     const cwd = await projectWithInspector(
+      scope,
       "export const mountInspector = () => async () => new Response('mounted')\n",
       '"./index.js"'
     );
@@ -81,8 +74,13 @@ describe("loadProjectInspector", () => {
     });
   });
 
-  it("rejects an installed package without the v2 mount contract", async () => {
-    const cwd = await projectWithInspector("export const other = true\n");
+  it("rejects an installed package without the v2 mount contract", async ({
+    scope,
+  }) => {
+    const cwd = await projectWithInspector(
+      scope,
+      "export const other = true\n"
+    );
     await expect(loadProjectInspector(cwd)).rejects.toThrow(
       "does not export mountInspector"
     );

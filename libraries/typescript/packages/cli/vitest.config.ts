@@ -9,6 +9,7 @@ export default defineConfig({
     environment: "node",
     include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
     exclude: ["node_modules/**", "dist/**", "tests/cli/.tmp/**"],
+    globalSetup: ["tests/cli/global-setup.ts"],
     testTimeout: 60000,
     hookTimeout: 60000,
   },

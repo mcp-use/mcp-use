@@ -10,6 +10,7 @@ export default [
   {
     ignores: [
       "**/.mcp-use/**",
+      "**/packages/cli/tests/cli/.tmp/**",
       "**/node_modules/**",
       "**/dist/**",
       "**/build/**",

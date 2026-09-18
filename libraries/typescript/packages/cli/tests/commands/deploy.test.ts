@@ -1,18 +1,9 @@
-import {
-  chmod,
-  mkdtemp,
-  mkdir,
-  readFile,
-  rm,
-  symlink,
-  writeFile,
-} from "node:fs/promises";
-import { execFileSync } from "node:child_process";
-import { tmpdir } from "node:os";
+import { chmod, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
+import { execFileSync } from "../support/process.mjs";
 import { join, sep } from "node:path";
 import { gunzipSync } from "node:zlib";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, vi } from "vitest";
 
 const { api, cloudApiForOrganization } = vi.hoisted(() => {
   const api = {
@@ -38,50 +29,15 @@ import {
   runDeploy,
 } from "../../src/commands/deploy.js";
 
-const directories: string[] = [];
+import { it } from "../support/git.js";
 
-afterEach(async () => {
+afterEach(() => {
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
   api.request.mockReset();
   api.multipartRequest.mockReset();
   cloudApiForOrganization.mockClear();
-  await Promise.all(
-    directories
-      .splice(0)
-      .map((directory) => rm(directory, { recursive: true, force: true }))
-  );
 });
-
-async function project(name: string): Promise<string> {
-  const directory = await mkdtemp(join(tmpdir(), "mcp-use-deploy-"));
-  directories.push(directory);
-  await writeFile(
-    join(directory, "package.json"),
-    `${JSON.stringify({ name, dependencies: { "mcp-use": "*" } })}\n`
-  );
-  return directory;
-}
-
-function initializeRepository(
-  directory: string,
-  remote: string | null = "https://github.com/example/project.git"
-): void {
-  execFileSync("git", ["init", "-b", "main"], { cwd: directory });
-  execFileSync("git", ["config", "user.email", "test@example.com"], {
-    cwd: directory,
-  });
-  execFileSync("git", ["config", "user.name", "CLI Test"], {
-    cwd: directory,
-  });
-  execFileSync("git", ["add", "."], { cwd: directory });
-  execFileSync("git", ["commit", "-m", "Initial commit"], { cwd: directory });
-  if (remote !== null) {
-    execFileSync("git", ["remote", "add", "origin", remote], {
-      cwd: directory,
-    });
-  }
-}
 
 describe("deploy agent contract", () => {
   it("shows complete offline help without resolving cloud state", async () => {
@@ -120,8 +76,10 @@ describe("deploy agent contract", () => {
     expect(cloudApiForOrganization).not.toHaveBeenCalled();
   });
 
-  it("requires an explicit source mode for a headless gitless project", async () => {
-    const directory = await project("headless");
+  it("requires an explicit source mode for a headless gitless project", async ({
+    git,
+  }) => {
+    const directory = git.project("headless");
     const stderr = vi
       .spyOn(process.stderr, "write")
       .mockImplementation(() => true);
@@ -151,9 +109,11 @@ describe("deploy agent contract", () => {
     expect(api.multipartRequest).not.toHaveBeenCalled();
   });
 
-  it("requires an explicit source mode for a repository without origin", async () => {
-    const directory = await project("no-origin");
-    initializeRepository(directory, null);
+  it("requires an explicit source mode for a repository without origin", async ({
+    git,
+  }) => {
+    const directory = git.project("no-origin");
+    git.init(directory, null);
     const stderr = vi
       .spyOn(process.stderr, "write")
       .mockImplementation(() => true);
@@ -186,8 +146,10 @@ describe("deploy agent contract", () => {
     expect(cloudApiForOrganization).not.toHaveBeenCalled();
   });
 
-  it("does not replace a linked GitHub server with managed source", async () => {
-    const directory = await project("linked-github");
+  it("does not replace a linked GitHub server with managed source", async ({
+    git,
+  }) => {
+    const directory = git.project("linked-github");
     const linkDirectory = join(directory, ".mcp-use", "cloud");
     await mkdir(linkDirectory, { recursive: true });
     await writeFile(
@@ -222,8 +184,8 @@ describe("deploy agent contract", () => {
     expect(api.multipartRequest).not.toHaveBeenCalled();
   });
 
-  it("rejects GitHub trigger options for managed uploads", async () => {
-    const directory = await project("managed-trigger-conflict");
+  it("rejects GitHub trigger options for managed uploads", async ({ git }) => {
+    const directory = git.project("managed-trigger-conflict");
     const stderr = vi
       .spyOn(process.stderr, "write")
       .mockImplementation(() => true);
@@ -238,8 +200,8 @@ describe("deploy agent contract", () => {
     expect(api.multipartRequest).not.toHaveBeenCalled();
   });
 
-  it("returns a stable usage error for a missing env file", async () => {
-    const directory = await project("missing-env-file");
+  it("returns a stable usage error for a missing env file", async ({ git }) => {
+    const directory = git.project("missing-env-file");
     const stderr = vi
       .spyOn(process.stderr, "write")
       .mockImplementation(() => true);
@@ -265,8 +227,10 @@ describe("deploy agent contract", () => {
     expect(api.multipartRequest).not.toHaveBeenCalled();
   });
 
-  it("rejects managed source and Dockerfile paths outside the project", async () => {
-    const directory = await project("path-containment");
+  it("rejects managed source and Dockerfile paths outside the project", async ({
+    git,
+  }) => {
+    const directory = git.project("path-containment");
     const stderr = vi
       .spyOn(process.stderr, "write")
       .mockImplementation(() => true);
@@ -300,8 +264,10 @@ describe("deploy agent contract", () => {
     expect(api.multipartRequest).not.toHaveBeenCalled();
   });
 
-  it("creates a managed server from a local source archive", async () => {
-    const directory = await project("managed-app");
+  it("creates a managed server from a local source archive", async ({
+    git,
+  }) => {
+    const directory = git.project("managed-app");
     await writeFile(join(directory, "index.ts"), "export const ok = true;\n");
     await writeFile(join(directory, ".env"), "SECRET=do-not-upload\n");
     await writeFile(join(directory, ".envrc"), "SECRET=also-do-not-upload\n");
@@ -384,8 +350,10 @@ describe("deploy agent contract", () => {
     });
   });
 
-  it("accepts -y as the documented non-interactive consent alias", async () => {
-    const directory = await project("short-yes");
+  it("accepts -y as the documented non-interactive consent alias", async ({
+    git,
+  }) => {
+    const directory = git.project("short-yes");
     api.multipartRequest.mockResolvedValue({
       server: { id: "srv_short_yes", slug: "short-yes" },
       deploymentId: "dep_short_yes",
@@ -397,9 +365,11 @@ describe("deploy agent contract", () => {
     ).resolves.toBe(0);
   });
 
-  it("rejects an unsupported origin with recovery commands", async () => {
-    const directory = await project("unsupported-origin");
-    initializeRepository(
+  it("rejects an unsupported origin with recovery commands", async ({
+    git,
+  }) => {
+    const directory = git.project("unsupported-origin");
+    git.init(
       directory,
       "https://token-secret@gitlab.com/example/unsupported-origin.git"
     );
@@ -427,12 +397,14 @@ describe("deploy agent contract", () => {
     });
   });
 
-  it("reports unexpected read-only Git probe failures without guessing state", async () => {
+  it("reports unexpected read-only Git probe failures without guessing state", async ({
+    git,
+  }) => {
     // This fixture is a POSIX shell wrapper; Windows Git behavior is covered
     // by the remaining deploy contract tests.
     if (process.platform === "win32") return;
-    const directory = await project("probe-failure");
-    initializeRepository(directory);
+    const directory = git.project("probe-failure");
+    git.init(directory);
     const bin = join(directory, "fake-bin");
     await mkdir(bin);
     const wrapper = join(bin, "git");
@@ -477,9 +449,9 @@ describe("deploy agent contract", () => {
     expect(api.request).not.toHaveBeenCalled();
   });
 
-  it("rejects detached HEAD unless a branch is explicit", async () => {
-    const directory = await project("detached-head");
-    initializeRepository(directory);
+  it("rejects detached HEAD unless a branch is explicit", async ({ git }) => {
+    const directory = git.project("detached-head");
+    git.init(directory);
     execFileSync("git", ["checkout", "--detach"], { cwd: directory });
     const stderr = vi
       .spyOn(process.stderr, "write")
@@ -497,9 +469,11 @@ describe("deploy agent contract", () => {
     });
   });
 
-  it("requires explicit consent before committing a dirty repository", async () => {
-    const directory = await project("dirty-repository");
-    initializeRepository(directory);
+  it("requires explicit consent before committing a dirty repository", async ({
+    git,
+  }) => {
+    const directory = git.project("dirty-repository");
+    git.init(directory);
     await writeFile(
       join(directory, "changed.ts"),
       "export const changed = true;\n"
@@ -523,15 +497,10 @@ describe("deploy agent contract", () => {
     expect(api.request).not.toHaveBeenCalled();
   });
 
-  it("maps rejected pushes to a stable remediation error", async () => {
-    const directory = await project("rejected-push");
-    initializeRepository(
-      directory,
-      "https://github.com/example/rejected-push.git"
-    );
-    const bareRemote = await mkdtemp(join(tmpdir(), "mcp-use-rejected-"));
-    directories.push(bareRemote);
-    execFileSync("git", ["init", "--bare"], { cwd: bareRemote });
+  it("maps rejected pushes to a stable remediation error", async ({ git }) => {
+    const directory = git.project("rejected-push");
+    git.init(directory, "https://github.com/example/rejected-push.git");
+    const bareRemote = git.bare();
     const hook = join(bareRemote, "hooks", "pre-receive");
     await writeFile(
       hook,
@@ -568,9 +537,11 @@ describe("deploy agent contract", () => {
     expect(api.request).not.toHaveBeenCalled();
   });
 
-  it("reports a missing GitHub installation without attempting creation", async () => {
-    const directory = await project("missing-installation");
-    initializeRepository(directory);
+  it("reports a missing GitHub installation without attempting creation", async ({
+    git,
+  }) => {
+    const directory = git.project("missing-installation");
+    git.init(directory);
     api.request.mockResolvedValue({ installations: [] });
     const stderr = vi
       .spyOn(process.stderr, "write")
@@ -586,25 +557,22 @@ describe("deploy agent contract", () => {
     });
   });
 
-  it("preserves the created repository when Git identity is missing", async () => {
-    const directory = await project("missing-identity");
+  it("preserves the created repository when Git identity is missing", async ({
+    git,
+  }) => {
+    const directory = git.project("missing-identity");
     const emptyGitConfig = join(directory, "empty-gitconfig");
     await writeFile(emptyGitConfig, "");
-    const previousGlobal = process.env.GIT_CONFIG_GLOBAL;
-    const previousNoSystem = process.env.GIT_CONFIG_NOSYSTEM;
-    const identityEnvironment = [
+    vi.stubEnv("GIT_CONFIG_GLOBAL", emptyGitConfig);
+    vi.stubEnv("GIT_CONFIG_NOSYSTEM", "1");
+    for (const name of [
       "GIT_AUTHOR_NAME",
       "GIT_AUTHOR_EMAIL",
       "GIT_COMMITTER_NAME",
       "GIT_COMMITTER_EMAIL",
       "EMAIL",
-    ] as const;
-    const previousIdentity = Object.fromEntries(
-      identityEnvironment.map((key) => [key, process.env[key]])
-    );
-    process.env.GIT_CONFIG_GLOBAL = emptyGitConfig;
-    process.env.GIT_CONFIG_NOSYSTEM = "1";
-    for (const key of identityEnvironment) process.env[key] = "";
+    ])
+      vi.stubEnv(name, "");
     api.request.mockImplementation(async (path: string) => {
       if (path.startsWith("/github/installations?")) {
         return {
@@ -630,20 +598,7 @@ describe("deploy agent contract", () => {
       .spyOn(process.stderr, "write")
       .mockImplementation(() => true);
 
-    try {
-      await expect(runDeploy([directory, "--yes", "--json"])).resolves.toBe(1);
-    } finally {
-      if (previousGlobal === undefined) delete process.env.GIT_CONFIG_GLOBAL;
-      else process.env.GIT_CONFIG_GLOBAL = previousGlobal;
-      if (previousNoSystem === undefined)
-        delete process.env.GIT_CONFIG_NOSYSTEM;
-      else process.env.GIT_CONFIG_NOSYSTEM = previousNoSystem;
-      for (const key of identityEnvironment) {
-        const previous = previousIdentity[key];
-        if (previous === undefined) delete process.env[key];
-        else process.env[key] = previous;
-      }
-    }
+    await expect(runDeploy([directory, "--yes", "--json"])).resolves.toBe(1);
 
     const identityError = JSON.parse(stderr.mock.calls.flat().join(""));
     expect(identityError, JSON.stringify(identityError)).toMatchObject({
@@ -666,8 +621,10 @@ describe("deploy agent contract", () => {
     ).toBe("https://github.com/example/missing-identity.git");
   });
 
-  it("returns a stable repository-creation failure with alternatives", async () => {
-    const directory = await project("repo-create-failure");
+  it("returns a stable repository-creation failure with alternatives", async ({
+    git,
+  }) => {
+    const directory = git.project("repo-create-failure");
     api.request.mockImplementation(async (path: string) => {
       if (path.startsWith("/github/installations?")) {
         return {
@@ -704,9 +661,11 @@ describe("deploy agent contract", () => {
     });
   });
 
-  it("reports inaccessible GitHub repositories with install and retry steps", async () => {
-    const directory = await project("missing-access");
-    initializeRepository(directory);
+  it("reports inaccessible GitHub repositories with install and retry steps", async ({
+    git,
+  }) => {
+    const directory = git.project("missing-access");
+    git.init(directory);
     api.request.mockImplementation(async (path: string) => {
       if (path.startsWith("/github/installations?")) {
         return {
@@ -739,9 +698,11 @@ describe("deploy agent contract", () => {
     });
   });
 
-  it("reports when server creation does not start a deployment", async () => {
-    const directory = await project("missing-deployment");
-    initializeRepository(directory);
+  it("reports when server creation does not start a deployment", async ({
+    git,
+  }) => {
+    const directory = git.project("missing-deployment");
+    git.init(directory);
     api.request.mockImplementation(
       async (path: string, init?: { body?: string }) => {
         if (path.startsWith("/github/installations?")) {
@@ -800,8 +761,8 @@ describe("deploy agent contract", () => {
     );
   });
 
-  it("auto-detects and reuses a linked managed server", async () => {
-    const directory = await project("managed-redeploy");
+  it("auto-detects and reuses a linked managed server", async ({ git }) => {
+    const directory = git.project("managed-redeploy");
     const linkDirectory = join(directory, ".mcp-use", "cloud");
     await mkdir(linkDirectory, { recursive: true });
     await writeFile(
@@ -839,8 +800,10 @@ describe("deploy agent contract", () => {
     });
   });
 
-  it("synchronizes configuration before a linked managed redeploy", async () => {
-    const directory = await project("managed-config-redeploy");
+  it("synchronizes configuration before a linked managed redeploy", async ({
+    git,
+  }) => {
+    const directory = git.project("managed-config-redeploy");
     const linkDirectory = join(directory, ".mcp-use", "cloud");
     await mkdir(linkDirectory, { recursive: true });
     await writeFile(
@@ -891,8 +854,10 @@ describe("deploy agent contract", () => {
     });
   });
 
-  it("uploads the workspace root and preserves managed root-dir configuration", async () => {
-    const directory = await project("workspace-root");
+  it("uploads the workspace root and preserves managed root-dir configuration", async ({
+    git,
+  }) => {
+    const directory = git.project("workspace-root");
     await writeFile(
       join(directory, "package.json"),
       `${JSON.stringify({ name: "workspace-root", workspaces: ["apps/*"] })}\n`
@@ -933,8 +898,10 @@ describe("deploy agent contract", () => {
     expect(entries).toContain("app/apps/server/index.ts");
   });
 
-  it("rejects unresolved workspace dependencies in standalone uploads", async () => {
-    const directory = await project("workspace-child");
+  it("rejects unresolved workspace dependencies in standalone uploads", async ({
+    git,
+  }) => {
+    const directory = git.project("workspace-child");
     await writeFile(
       join(directory, "package.json"),
       `${JSON.stringify({
@@ -959,27 +926,11 @@ describe("deploy agent contract", () => {
     expect(api.multipartRequest).not.toHaveBeenCalled();
   });
 
-  it("uses the installation row UUID when creating a GitHub server", async () => {
-    const directory = await project("github-deploy");
-    execFileSync("git", ["init", "-b", "main"], { cwd: directory });
-    execFileSync("git", ["config", "user.email", "test@example.com"], {
-      cwd: directory,
-    });
-    execFileSync("git", ["config", "user.name", "CLI Test"], {
-      cwd: directory,
-    });
-    execFileSync("git", ["add", "."], { cwd: directory });
-    execFileSync("git", ["commit", "-m", "Initial commit"], { cwd: directory });
-    execFileSync(
-      "git",
-      [
-        "remote",
-        "add",
-        "origin",
-        "https://github.com/example/github-deploy.git",
-      ],
-      { cwd: directory }
-    );
+  it("uses the installation row UUID when creating a GitHub server", async ({
+    git,
+  }) => {
+    const directory = git.project("github-deploy");
+    git.init(directory, "https://github.com/example/github-deploy.git");
     api.request.mockImplementation(
       async (path: string, init?: { body?: string }) => {
         if (path.startsWith("/github/installations?")) {
@@ -1030,9 +981,11 @@ describe("deploy agent contract", () => {
     ).toBe("");
   });
 
-  it("synchronizes configuration before a linked GitHub redeploy", async () => {
-    const directory = await project("github-config-redeploy");
-    initializeRepository(
+  it("synchronizes configuration before a linked GitHub redeploy", async ({
+    git,
+  }) => {
+    const directory = git.project("github-config-redeploy");
+    git.init(
       directory,
       "https://github.com/example/github-config-redeploy.git"
     );

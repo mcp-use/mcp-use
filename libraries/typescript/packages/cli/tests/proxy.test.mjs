@@ -1,19 +1,17 @@
 import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
 import test from "node:test";
 
-const execFileAsync = promisify(execFile);
+import { runProcess } from "./support/process.mjs";
 
 test("runs the standalone prebuilt CLI with its own version", async () => {
   const cliPackage = JSON.parse(
     await readFile(new URL("../package.json", import.meta.url), "utf8")
   );
-  const { stdout, stderr } = await execFileAsync(
+  const { stdout, stderr } = await runProcess(
     process.execPath,
     [fileURLToPath(new URL("../dist/bin.js", import.meta.url)), "--version"],
     { cwd: fileURLToPath(new URL("..", import.meta.url)) }
@@ -36,7 +34,7 @@ test("runs the mcp-use compatibility bin with the framework version", async () =
   assert.deepEqual(serverPackage.bin, { "mcp-use": "./dist/bin.js" });
   assert.deepEqual(cliPackage.bin, { "mcp-use": "./dist/bin.js" });
 
-  const { stdout, stderr } = await execFileAsync(
+  const { stdout, stderr } = await runProcess(
     process.execPath,
     [
       fileURLToPath(new URL("../../server/dist/bin.js", import.meta.url)),
@@ -67,16 +65,16 @@ test(
     );
 
     const pack = async (cwd) => {
-      const { stdout } = await execFileAsync(
+      const { stdout } = await runProcess(
         "pnpm",
         ["pack", "--pack-destination", artifacts, "--json"],
-        { cwd }
+        { cwd, signal: t.signal, timeout: 60_000 }
       );
       return JSON.parse(stdout).filename;
     };
     const cliTarball = await pack(cliRoot);
     const serverTarball = await pack(serverRoot);
-    await execFileAsync(
+    await runProcess(
       "npm",
       [
         "install",
@@ -87,7 +85,7 @@ test(
         cliTarball,
         serverTarball,
       ],
-      { cwd: consumer }
+      { cwd: consumer, signal: t.signal, timeout: 120_000 }
     );
 
     const cliPackage = JSON.parse(
@@ -108,13 +106,14 @@ test(
       "dist",
       "bin.js"
     );
-    const linked = await execFileAsync(npmBin, ["--version"], {
+    const linked = await runProcess(npmBin, ["--version"], {
       cwd: consumer,
+      signal: t.signal,
     });
-    const collided = await execFileAsync(
+    const collided = await runProcess(
       process.execPath,
       [installedCliBin, "--version"],
-      { cwd: consumer }
+      { cwd: consumer, signal: t.signal, timeout: 120_000 }
     );
 
     assert.notEqual(cliPackage.version, serverPackage.version);
