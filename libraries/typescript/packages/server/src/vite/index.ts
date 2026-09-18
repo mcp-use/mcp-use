@@ -86,7 +86,11 @@ async function publicAssets(directory: string): Promise<EmbeddedViewAssets> {
  */
 export function mcpUse(options: McpUseOptions = {}): PluginOption[] {
   const basePath = (options.basePath ?? "/mcp").replace(/\/+$/, "");
-  if (!basePath.startsWith("/") || basePath.includes("//") || /[:*?#\s]/.test(basePath)) {
+  if (
+    !basePath.startsWith("/") ||
+    basePath.includes("//") ||
+    /[:*?#\s]/.test(basePath)
+  ) {
     throw new Error("mcpUse basePath must be a concrete absolute path.");
   }
   let config: ResolvedConfig;

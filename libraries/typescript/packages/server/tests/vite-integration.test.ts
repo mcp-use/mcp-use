@@ -44,7 +44,10 @@ async function start(base = "/") {
     root,
     base,
     logLevel: "warn",
-    plugins: [mcpUse({ entry: "server.ts", viewsDir: "views", basePath: "/api/mcp" }), react()],
+    plugins: [
+      mcpUse({ entry: "server.ts", viewsDir: "views", basePath: "/api/mcp" }),
+      react(),
+    ],
     server: { host: "127.0.0.1", port: 0 },
   });
   await vite.listen();
