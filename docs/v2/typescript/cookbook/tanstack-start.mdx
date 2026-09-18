@@ -116,13 +116,12 @@ The plugin's `basePath` must match the one on `MCPServer`.
 
 ### Mount the endpoint
 
-Create the handler in `src/mcp/handler.server.ts`:
+Create the handler in `src/mcp/handler.server.ts`. The Vite plugin loads the authored server in its dedicated MCP environment, so this route module does not import `server.ts`:
 
 ```typescript src/mcp/handler.server.ts
 import { createTanStackStartHandler } from "mcp-use/tanstack-start";
-import server from "./server";
 
-export const handler = createTanStackStartHandler(server);
+export const handler = createTanStackStartHandler();
 ```
 
 Create a catch-all server route at `src/routes/api.mcp.$.ts`. Forward all HTTP methods to the handler so it can serve the MCP endpoint and nested asset paths:
@@ -162,6 +161,6 @@ Select **Tools → greet** and enter:
 
 Run the tool. It returns `Hello, Ada!`.
 
-Use your app's port if it differs from `3000`. The plugin builds MCP views when Vite starts. Restart the dev server after changing views, shared view components, public assets, or skills.
+Use your app's port if it differs from `3000`. MCP views share the application's browser environment for React Fast Refresh and CSS HMR. Server edits replace the MCP instance and interrupt active requests; failed edits retain the last working instance. View registrations and skills refresh without restarting Vite. Configure React, CSS and aliases in the main Vite config.
 
 See the [complete TanStack Start example](https://github.com/mcp-use/mcp-use/tree/canary/libraries/typescript/packages/server/examples/tanstack-start) for a runnable application with a shared UI card, an OAuth discovery route, and production build instructions.
