@@ -125,9 +125,6 @@ importers:
       eslint-plugin-tsdoc:
         specifier: ^0.5.2
         version: 0.5.2(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)
-      husky:
-        specifier: ^9.1.7
-        version: 9.1.7
       knip:
         specifier: ^5.88.1
         version: 5.88.1(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@types/node@25.6.0)(typescript@5.9.3)
@@ -6667,11 +6664,6 @@ packages:
 
   human-id@4.1.3:
     resolution: {integrity: sha512-tsYlhAYpjCKa//8rXZ9DqKEawhPoSytweBC2eNvcaDK+57RZLHGqNs3PZTQO6yekLFSuvA6AlnAfrw1uBvtb+Q==}
-    hasBin: true
-
-  husky@9.1.7:
-    resolution: {integrity: sha512-5gs5ytaNjBrh5Ow3zrvdUUY+0VxIuWVL4i9irt6friV+BqdCfmV11CQTWMiBYWHbXhco+J1kHfTOUkePhCDvMA==}
-    engines: {node: '>=18'}
     hasBin: true
 
   iceberg-js@0.8.1:
@@ -14076,8 +14068,6 @@ snapshots:
       - supports-color
 
   human-id@4.1.3: {}
-
-  husky@9.1.7: {}
 
   iceberg-js@0.8.1: {}
 
