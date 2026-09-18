@@ -567,6 +567,11 @@ export abstract class BaseConnector {
     return this.client != null;
   }
 
+  /** Whether {@link BaseConnector.initialize} has completed for this connection. */
+  get isInitialized(): boolean {
+    return this.toolsCache !== null;
+  }
+
   /**
    * Initialise the MCP session **after** `connect()` has succeeded.
    *
