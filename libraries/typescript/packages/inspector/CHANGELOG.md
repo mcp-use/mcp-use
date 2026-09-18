@@ -1,5 +1,16 @@
 # @mcp-use/inspector
 
+## 20.3.9
+
+### Patch Changes
+
+- b1bda25: Limit the Inspector's Manufact cloud provider picker to OpenAI, Anthropic, and Google. Preserve existing selections from other providers with accurate labels, while keeping the full cloud model catalog and BYOK OpenRouter support available for evals and other cloud features.
+- b1bda25: Updated dependency `hono` to `^4.13.5`.
+- b1bda25: Mark the `auth_token` alias deprecated on both `MCPServerConfig` types. v2 renamed it to `authToken` and nothing has read the snake-case spelling since, so setting it produces no `Authorization` header. The field stays for now so existing TypeScript consumers keep compiling, and editors flag it at the call site instead. Removal waits for the next major.
+- b1bda25: Fix the managed chat model badge showing the default OpenAI logo when a Claude or Gemini model is selected. Use the selected cloud model for both its name and provider logo.
+- b1bda25: Rebuild bundled workspace code and synchronize published internal package metadata.
+- b1bda25: Save and display server aliases consistently, including after reload, without reconnecting when only the alias changes.
+
 ## 20.3.9-canary.5
 
 ### Patch Changes
