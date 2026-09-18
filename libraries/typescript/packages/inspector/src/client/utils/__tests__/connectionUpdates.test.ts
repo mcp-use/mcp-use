@@ -8,8 +8,10 @@ import {
   protocolNegotiationForMode,
   toEditableConnectionConfig,
   toMcpServerConfig,
+  saveStoredConnectionConfig,
   type EditableConnectionConfig,
 } from "../connectionUpdates";
+import { getServerDisplayName } from "../servers";
 
 function createLocalStorage(): Storage {
   const values = new Map<string, string>();
@@ -37,6 +39,90 @@ function editable(
     ...overrides,
   };
 }
+
+describe("inspector alias updates", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("recognizes persisted aliases with implicit form defaults", () => {
+    const current = toMcpServerConfig(editable({ name: "Old alias" }));
+    const next = editable({
+      name: "New alias",
+      requestTimeout: 10000,
+      resetTimeoutOnProgress: true,
+      maxTotalTimeout: 60000,
+    });
+    expect(isAliasOnlyConnectionUpdate(current, next)).toBe(true);
+    expect(
+      isAliasOnlyConnectionUpdate(current, { ...next, name: "Old alias" })
+    ).toBe(false);
+    expect(
+      isAliasOnlyConnectionUpdate(current, { ...next, requestTimeout: 20000 })
+    ).toBe(false);
+    expect(
+      isAliasOnlyConnectionUpdate(current, {
+        ...next,
+        headers: { "X-Test": "changed" },
+      })
+    ).toBe(false);
+  });
+
+  it("compares live headers rather than sanitized persisted headers", () => {
+    const next = editable({
+      name: "New alias",
+      headers: { Authorization: "Bearer test" },
+    });
+    const server = {
+      ...toMcpServerConfig(next),
+      id: next.url,
+      name: "MCP name",
+      displayName: "Old alias",
+    } as McpServer;
+    const current = toEditableConnectionConfig(
+      server,
+      editable({ name: "Old alias" })
+    );
+    expect(isAliasOnlyConnectionUpdate(current, next)).toBe(true);
+  });
+
+  it("persists renamed and cleared aliases across storage reloads", () => {
+    vi.stubGlobal("localStorage", createLocalStorage());
+    const original = editable({ name: "Old alias" });
+    new InspectorConnectionStorageProvider().setServer(
+      original.url,
+      toMcpServerConfig(original)
+    );
+
+    for (const name of ["QA Conformance", original.url]) {
+      const next = editable({ name });
+      const before = new InspectorConnectionStorageProvider().getServers()[
+        original.url
+      ];
+      expect(isAliasOnlyConnectionUpdate(before, next)).toBe(true);
+      saveStoredConnectionConfig(original.url, next);
+      const saved = new InspectorConnectionStorageProvider().getServers()[
+        original.url
+      ];
+      expect(saved.displayName).toBe(name);
+      expect(
+        getServerDisplayName({ ...saved, name: "ConformanceTestServer" })
+      ).toBe(name === original.url ? "ConformanceTestServer" : name);
+    }
+  });
+
+  it("migrates legacy stored aliases without replacing current display names", () => {
+    vi.stubGlobal("localStorage", createLocalStorage());
+    const url = "https://example.com/mcp";
+    for (const displayName of [undefined, "Current alias"]) {
+      localStorage.setItem(
+        "mcp-inspector-connections",
+        JSON.stringify({ [url]: { url, name: "Legacy alias", displayName } })
+      );
+      expect(
+        new InspectorConnectionStorageProvider().getServers()[url].displayName
+      ).toBe(displayName ?? "Legacy alias");
+    }
+  });
+});
 
 describe("inspector protocol negotiation", () => {
   it("maps inspector modes to official SDK negotiation values", () => {

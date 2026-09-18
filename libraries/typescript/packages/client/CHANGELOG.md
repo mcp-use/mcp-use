@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.3.2-canary.0
+
+### Patch Changes
+
+- 6f818f8: Restore SDK progress and cancellation notification handling by forwarding the SDK handler arguments. Remove obsolete SDK v2 beta progress workarounds, including the extra HTTP SSE reader, and preserve progress routing across concurrent calls and multi-round retries.
+
 ## 2.3.1
 
 ### Patch Changes

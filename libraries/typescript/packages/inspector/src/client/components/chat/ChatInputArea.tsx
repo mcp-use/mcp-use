@@ -64,7 +64,7 @@ interface ChatInputAreaProps {
     isLoading?: boolean;
   };
   modelBadgeMode?: "managed" | "byok";
-  modelDisplayName?: string;
+  managedModel?: import("./useManagedCloudModel").CloudModel | null;
   /** Optional followup suggestions rendered above the chat input. */
   followups?: string[];
   /** Called when a followup suggestion is selected. */
@@ -108,7 +108,7 @@ export function ChatInputArea({
   freeTierInfo,
   managedCloudInfo,
   modelBadgeMode = "byok",
-  modelDisplayName,
+  managedModel,
   followups = [],
   onFollowupSelect,
   pendingElicitationRequests,
@@ -129,7 +129,7 @@ export function ChatInputArea({
             <ModelConfigBadge
               provider={llmConfig.provider}
               model={llmConfig.model}
-              displayName={modelDisplayName}
+              managedModel={managedModel}
               mode={modelBadgeMode}
               className="shrink-0"
               onClick={() => onConfigDialogOpenChange(true)}

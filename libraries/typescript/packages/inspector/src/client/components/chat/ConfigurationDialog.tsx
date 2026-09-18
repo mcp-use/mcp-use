@@ -168,17 +168,8 @@ interface ConfigurationDialogProps {
 }
 
 const CHAT_CONFIG_TABS_ID = "chat-config-source";
-
-function cloudProviderToName(provider: string): ProviderName {
-  if (
-    provider === "openai" ||
-    provider === "anthropic" ||
-    provider === "google"
-  ) {
-    return provider;
-  }
-  return "openrouter";
-}
+// Curate only this picker; cloud evals and BYOK still use the full catalog.
+const CLOUD_PICKER_PROVIDERS = ["openai", "anthropic", "google"];
 
 async function fetchOpenAICompatibleModels(
   baseUrl: string,
@@ -484,9 +475,14 @@ export function ConfigurationDialog({
   const selectedCloudModel = managedCloudInfo?.models.find(
     (m) => m.id === managedCloudInfo.selectedModelId
   );
-  const cloudProviders = Object.keys(cloudModelsByProvider);
+  const cloudProviders = CLOUD_PICKER_PROVIDERS.filter(
+    (provider) => cloudModelsByProvider[provider]?.length
+  );
   const activeCloudProvider =
     selectedCloudModel?.provider ?? cloudProviders[0] ?? "";
+  const isLegacyCloudSelection =
+    !!selectedCloudModel &&
+    !CLOUD_PICKER_PROVIDERS.includes(selectedCloudModel.provider);
   const cloudModelsForProvider = activeCloudProvider
     ? (cloudModelsByProvider[activeCloudProvider] ?? [])
     : [];
@@ -599,7 +595,7 @@ export function ConfigurationDialog({
                   leading={
                     activeCloudProvider ? (
                       <ProviderIcon
-                        provider={cloudProviderToName(activeCloudProvider)}
+                        provider={activeCloudProvider}
                         className="shrink-0"
                       />
                     ) : undefined
@@ -608,19 +604,24 @@ export function ConfigurationDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  {isLegacyCloudSelection && (
+                    <SelectItem
+                      value={activeCloudProvider}
+                      label={getProviderLabel(activeCloudProvider)}
+                      disabled
+                    >
+                      {getProviderLabel(activeCloudProvider)} (current)
+                    </SelectItem>
+                  )}
                   {cloudProviders.map((provider) => (
                     <SelectItem
                       key={provider}
                       value={provider}
-                      label={getProviderLabel(cloudProviderToName(provider))}
+                      label={getProviderLabel(provider)}
                     >
                       <div className="flex items-center gap-2">
-                        <ProviderIcon
-                          provider={cloudProviderToName(provider)}
-                        />
-                        <span>
-                          {getProviderLabel(cloudProviderToName(provider))}
-                        </span>
+                        <ProviderIcon provider={provider} />
+                        <span>{getProviderLabel(provider)}</span>
                       </div>
                     </SelectItem>
                   ))}
@@ -759,14 +760,13 @@ export function ConfigurationDialog({
                         aria-expanded={cloudComboboxOpen}
                         className="w-full justify-between rounded-md"
                         data-testid="chat-config-cloud-model-select"
+                        disabled={isLegacyCloudSelection}
                       >
                         <span className="inline-flex min-w-0 items-center gap-2 truncate">
                           {selectedCloudModel ? (
                             <>
                               <ProviderIcon
-                                provider={cloudProviderToName(
-                                  selectedCloudModel.provider
-                                )}
+                                provider={selectedCloudModel.provider}
                                 className="shrink-0"
                               />
                               <span className="truncate">

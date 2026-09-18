@@ -1,5 +1,51 @@
 # mcp-use
 
+## 2.5.1-canary.5
+
+### Patch Changes
+
+- Updated dependencies [67ba680]
+  - @mcp-use/inspector@20.3.9-canary.5
+
+## 2.5.1-canary.4
+
+### Patch Changes
+
+- Updated dependencies [0e5ff4b]
+  - @mcp-use/inspector@20.3.9-canary.4
+
+## 2.5.1-canary.3
+
+### Patch Changes
+
+- Updated dependencies [cf8ce39]
+  - @mcp-use/inspector@20.3.9-canary.3
+
+## 2.5.1-canary.2
+
+### Patch Changes
+
+- 9c1440a: Updated dependency `next` to `^16.3.3`.
+- 99414e0: Updated dependency `hono` to `^4.13.5`.
+- Updated dependencies [99414e0]
+  - @mcp-use/inspector@20.3.9-canary.2
+
+## 2.5.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [76a7973]
+  - @mcp-use/inspector@20.3.9-canary.1
+
+## 2.5.1-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+- Updated dependencies
+  - @mcp-use/cli@4.1.13-canary.0
+  - @mcp-use/inspector@20.3.9-canary.0
+
 ## 2.5.0
 
 ### Minor Changes

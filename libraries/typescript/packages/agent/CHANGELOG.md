@@ -1,5 +1,25 @@
 # @mcp-use/agent
 
+## 2.0.17-canary.2
+
+### Patch Changes
+
+- e590397: Updated dependency `vitest` to `4.1.11`.
+
+## 2.0.17-canary.1
+
+### Patch Changes
+
+- e213f5a: Fix `maxSteps` passed to `run`, `stream` or `streamEvents` not limiting model calls. The budget is baked into `modelCallLimitMiddleware` when the executor is built, so a per-call value never reached it: `run` and `stream` dropped it entirely, and `streamEvents` wrote it to the instance without rebuilding anything. It now goes through the run context, which the middleware reads first, and the constructor value stays the default for later calls.
+- 76a7973: Mark the `auth_token` alias deprecated on both `MCPServerConfig` types. v2 renamed it to `authToken` and nothing has read the snake-case spelling since, so setting it produces no `Authorization` header. The field stays for now so existing TypeScript consumers keep compiling, and editors flag it at the call site instead. Removal waits for the next major.
+
+## 2.0.17-canary.0
+
+### Patch Changes
+
+- Updated dependencies [6f818f8]
+  - @mcp-use/client@2.3.2-canary.0
+
 ## 2.0.16
 
 ### Patch Changes

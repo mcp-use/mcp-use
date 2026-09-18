@@ -8,7 +8,6 @@ import type {
   ElicitRequestURLParams,
   ElicitResult,
   AuthProvider,
-  JSONRPCMessage,
   Notification,
   OAuthClientProvider,
   ProtocolEra,
@@ -146,9 +145,6 @@ export abstract class BaseConnector {
   protected readonly opts: ConnectorInitOptions;
   protected notificationHandlers: NotificationHandler[] = [];
   protected rootsCache: Root[] = [];
-  private activeProgressHandlers = new Set<
-    NonNullable<RequestOptions["onprogress"]>
-  >();
 
   /**
    * Creates a connector with shared SDK and callback options.
@@ -192,10 +188,6 @@ export abstract class BaseConnector {
    */
   onNotification(handler: NotificationHandler): void {
     this.notificationHandlers.push(handler);
-    // Wire up to SDK client if already connected
-    if (this.client) {
-      this.setupNotificationHandler();
-    }
   }
 
   /** Forward a normalized notification to every registered consumer. */
@@ -266,7 +258,7 @@ export abstract class BaseConnector {
     const client = this.client as any;
     const handlersMap = client._notificationHandlers as Map<
       string,
-      (notification: Notification) => Promise<void>
+      (notification: Notification, ...args: unknown[]) => Promise<void>
     >;
 
     for (const method of [
@@ -275,47 +267,13 @@ export abstract class BaseConnector {
     ]) {
       const originalHandler = handlersMap.get(method);
       if (originalHandler) {
-        handlersMap.set(method, async (notification: Notification) => {
-          await originalHandler(notification);
+        handlersMap.set(method, async (notification, ...args) => {
+          // SDK handlers also receive the negotiated wire codec. Preserve all
+          // arguments so their validation and built-in dispatch remain intact.
+          await originalHandler(notification, ...args);
           await this.forwardNotification(notification);
         });
       }
-    }
-  }
-
-  /**
-   * Forward v2 MRTR progress whose retry request IDs are not associated with
-   * the original call callback by the current SDK beta.
-   *
-   * ponytail: fallback is enabled only when exactly one progress-aware call is
-   * active; remove it when the upstream SDK propagates handlers to MRTR rounds.
-   */
-  protected setupRoundProgressForwarding(): void {
-    if (!this.client) return;
-    const sdkClient = this.client as unknown as {
-      _onnotification: (message: JSONRPCMessage) => void | Promise<void>;
-      _progressHandlers?: Map<unknown, unknown>;
-    };
-    const original = sdkClient._onnotification.bind(this.client);
-    sdkClient._onnotification = async (message: JSONRPCMessage) => {
-      if (
-        message &&
-        typeof message === "object" &&
-        (message as { method?: unknown }).method === "notifications/progress"
-      ) {
-        this.forwardRoundProgress((message as { params?: unknown }).params);
-      }
-      await original?.(message);
-    };
-  }
-
-  /** Forward progress parsed from a transport stream to the active call. */
-  protected forwardRoundProgress(params: unknown): void {
-    if (this.activeProgressHandlers.size === 1) {
-      const [handler] = this.activeProgressHandlers;
-      handler?.(
-        params as Parameters<NonNullable<RequestOptions["onprogress"]>>[0]
-      );
     }
   }
 
@@ -753,17 +711,11 @@ export abstract class BaseConnector {
     }
 
     logger.debug(`Calling tool '${name}' with args`, args);
-    const progressHandler = enhancedOptions?.onprogress;
-    if (progressHandler) this.activeProgressHandlers.add(progressHandler);
-    try {
-      const res = await this.executeRequest(() =>
-        this.client!.callTool({ name, arguments: args }, enhancedOptions)
-      );
-      logger.debug(`Tool '${name}' returned`, res);
-      return res as CallToolResult;
-    } finally {
-      if (progressHandler) this.activeProgressHandlers.delete(progressHandler);
-    }
+    const res = await this.executeRequest(() =>
+      this.client!.callTool({ name, arguments: args }, enhancedOptions)
+    );
+    logger.debug(`Tool '${name}' returned`, res);
+    return res as CallToolResult;
   }
 
   /**

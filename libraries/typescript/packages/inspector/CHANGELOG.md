@@ -1,5 +1,41 @@
 # @mcp-use/inspector
 
+## 20.3.9-canary.5
+
+### Patch Changes
+
+- 67ba680: Save and display server aliases consistently, including after reload, without reconnecting when only the alias changes.
+
+## 20.3.9-canary.4
+
+### Patch Changes
+
+- 0e5ff4b: Limit the Inspector's Manufact cloud provider picker to OpenAI, Anthropic, and Google. Preserve existing selections from other providers with accurate labels, while keeping the full cloud model catalog and BYOK OpenRouter support available for evals and other cloud features.
+
+## 20.3.9-canary.3
+
+### Patch Changes
+
+- cf8ce39: Fix the managed chat model badge showing the default OpenAI logo when a Claude or Gemini model is selected. Use the selected cloud model for both its name and provider logo.
+
+## 20.3.9-canary.2
+
+### Patch Changes
+
+- 99414e0: Updated dependency `hono` to `^4.13.5`.
+
+## 20.3.9-canary.1
+
+### Patch Changes
+
+- 76a7973: Mark the `auth_token` alias deprecated on both `MCPServerConfig` types. v2 renamed it to `authToken` and nothing has read the snake-case spelling since, so setting it produces no `Authorization` header. The field stays for now so existing TypeScript consumers keep compiling, and editors flag it at the call site instead. Removal waits for the next major.
+
+## 20.3.9-canary.0
+
+### Patch Changes
+
+- Rebuild bundled workspace code and synchronize published internal package metadata.
+
 ## 20.3.8
 
 ### Patch Changes

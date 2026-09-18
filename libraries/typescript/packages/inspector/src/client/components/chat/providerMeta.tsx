@@ -1,5 +1,6 @@
 import type { ProviderName } from "@mcp-use/agent";
 import type { ComponentProps } from "react";
+import type { CloudModel } from "./useManagedCloudModel";
 import { ChevronDown, Key } from "lucide-react";
 import { cn } from "@/client/lib/utils";
 import { useTheme } from "@/client/context/ThemeContext";
@@ -72,15 +73,24 @@ const MANAGED_PROVIDER_LABELS: Record<string, string> = {
   openai: "OpenAI",
   anthropic: "Anthropic",
   google: "Google",
+  deepseek: "DeepSeek",
+  "z-ai": "Z.AI",
+  nvidia: "NVIDIA",
+  minimax: "MiniMax",
+  moonshotai: "Moonshot AI",
+  inclusionai: "InclusionAI",
+  "nex-agi": "Nex AGI",
+  "x-ai": "xAI",
+  thinkingmachines: "Thinking Machines",
+  mistralai: "Mistral AI",
+  stepfun: "StepFun",
+  "aion-labs": "Aion Labs",
+  "bytedance-seed": "ByteDance Seed",
+  "ibm-granite": "IBM Granite",
+  "arcee-ai": "Arcee AI",
+  rekaai: "Reka AI",
+  kwaipilot: "KwaiPilot",
 };
-
-function openRouterSlugToProvider(slug: string): ProviderName {
-  const prefix = slug.split("/")[0]?.toLowerCase();
-  if (prefix === "openai" || prefix === "anthropic" || prefix === "google") {
-    return prefix;
-  }
-  return "openrouter";
-}
 
 export function formatManagedModelName(name: string, provider: string): string {
   const raw = name.trim();
@@ -100,6 +110,7 @@ export function ModelConfigBadge({
   provider,
   model,
   displayName,
+  managedModel,
   mode = "byok",
   className,
   ...props
@@ -107,13 +118,20 @@ export function ModelConfigBadge({
   provider: ProviderName;
   model: string;
   displayName?: string;
+  managedModel?: CloudModel | null;
   mode?: "managed" | "byok";
   className?: string;
 } & Omit<ComponentProps<"button">, "children">) {
-  const label = displayName ?? model;
-  const iconProvider =
-    mode === "managed" && provider === "openai-compatible"
-      ? openRouterSlugToProvider(model)
+  // Managed transport config can still describe the default model. Use the
+  // selected catalog entry for both the label and logo when it is available.
+  const selectedModel = mode === "managed" ? managedModel : null;
+  const label = selectedModel
+    ? formatManagedModelName(selectedModel.name, selectedModel.provider)
+    : (displayName ?? model);
+  const iconProvider = selectedModel
+    ? selectedModel.provider
+    : mode === "managed" && provider === "openai-compatible"
+      ? model.split("/")[0] || provider
       : provider;
 
   return (
@@ -144,7 +162,9 @@ export function ModelConfigBadge({
   );
 }
 
-export function getProviderLabel(provider: ProviderName): string {
+export function getProviderLabel(provider: string): string {
+  const managedLabel = MANAGED_PROVIDER_LABELS[provider];
+  if (managedLabel) return managedLabel;
   switch (provider) {
     case "openai":
       return "OpenAI";
@@ -159,12 +179,17 @@ export function getProviderLabel(provider: ProviderName): string {
     case "ollama":
       return "Ollama";
     default:
-      return provider;
+      // Cloud model authors are not limited to the agent's API providers.
+      // Preserve their identity instead of presenting them all as OpenRouter.
+      return provider
+        .split(/[-_]/)
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
   }
 }
 
 function getProviderIconSrc(
-  provider: ProviderName,
+  provider: string,
   resolvedTheme: "light" | "dark"
 ): string | null {
   switch (provider) {
@@ -189,7 +214,7 @@ export function ProviderIcon({
   provider,
   className,
 }: {
-  provider: ProviderName;
+  provider: string;
   className?: string;
 }) {
   const { resolvedTheme } = useTheme();

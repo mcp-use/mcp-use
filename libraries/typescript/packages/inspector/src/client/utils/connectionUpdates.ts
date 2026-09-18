@@ -95,6 +95,7 @@ function getAutoProxyFallbackAddress(
 interface ConnectionLike {
   url?: string;
   name?: string;
+  displayName?: string;
   transportType?: "http" | "sse";
   connectionMode?: ConnectionMode;
   connectionType?: "Direct" | "Via Proxy";
@@ -194,6 +195,7 @@ export function saveStoredConnectionConfig(
     const merged = {
       ...allServers[id],
       ...config,
+      displayName: config.name?.trim() || config.url,
     };
     const sanitizedServers = Object.fromEntries(
       Object.entries({ ...allServers, [id]: merged }).flatMap(
@@ -311,6 +313,12 @@ function normalizeStoredServerConfig(
 
   return {
     ...(rest as McpServerConfig),
+    displayName:
+      typeof stored.displayName === "string"
+        ? stored.displayName
+        : typeof stored.name === "string"
+          ? stored.name
+          : undefined,
     ...(headers && !normalizedProxyConfig?.proxyAddress ? { headers } : {}),
     ...(normalizedProxyConfig ? { proxyConfig: normalizedProxyConfig } : {}),
     ...(normalizedAutoProxyFallback !== undefined
@@ -483,7 +491,11 @@ function normalizeConnection(
 
   return {
     url: normalizedUrl,
-    name: connection.name?.trim() || normalizedUrl,
+    name:
+      ("displayName" in connection
+        ? connection.displayName
+        : connection.name
+      )?.trim() || normalizedUrl,
     transportType: connection.transportType || "http",
     proxyAddress,
     connectionMode: normalizeConnectionMode(
@@ -496,13 +508,17 @@ function normalizeConnection(
     oauthClientSecret: connection.oauth?.clientSecret?.trim() || "",
     oauthScope: connection.oauth?.scope?.trim() || "",
     requestTimeout:
-      "requestTimeout" in connection ? connection.requestTimeout : undefined,
+      ("requestTimeout" in connection
+        ? connection.requestTimeout
+        : undefined) ?? 10000,
     resetTimeoutOnProgress:
-      "resetTimeoutOnProgress" in connection
+      ("resetTimeoutOnProgress" in connection
         ? connection.resetTimeoutOnProgress
-        : undefined,
+        : undefined) ?? true,
     maxTotalTimeout:
-      "maxTotalTimeout" in connection ? connection.maxTotalTimeout : undefined,
+      ("maxTotalTimeout" in connection
+        ? connection.maxTotalTimeout
+        : undefined) ?? 60000,
     protocolMode: protocolModeFromNegotiation(connection.protocolNegotiation),
   };
 }

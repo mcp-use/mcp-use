@@ -6,6 +6,20 @@ tag: "New"
 rss: true
 ---
 
+<Update label="v2.5.1" description="September 2026">
+  ## Agent step limits & client progress routing
+  Patch release fixing per-call agent budgets and SDK notification handling, with Inspector cloud model selection improvements.
+
+- **Fix** (@mcp-use/agent): `maxSteps` passed to `run`, `stream`, or `streamEvents` limits model calls for that invocation while preserving the constructor default for later calls (`#2437`)
+- **Fix** (@mcp-use/client): progress and cancellation notifications reach the SDK handlers with all required arguments; progress stays associated with the correct call across concurrent requests and multi-round retries (`#2548`)
+- **Update** (@mcp-use/agent): `MCPServerConfig.auth_token` is deprecated but retained for type compatibility; use `authToken` to send an authentication token (`#2486`)
+- **Fix** (@mcp-use/inspector): managed chat uses the selected model's branding and a curated cloud provider picker; see the [Inspector changelog](/inspector/changelog) (`#2575`, `#2576`)
+- **Update** (server): update Hono to `^4.13.5` and Next.js to `^16.3.3` (`#2492`, `#2495`)
+- **Update**: the TypeScript workspace no longer installs Husky Git hooks; contributors must run formatting and lint checks manually (`#2582`)
+- **Update**: Updated @mcp-use/inspector to v20.3.9
+- **Update**: Updated @mcp-use/cli to v4.1.13
+</Update>
+
 <Update label="v2.5.0" description="September 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=2.5.0&title=Public%20chat%20CTA&date=2026-09&lang=typescript" alt="Release 2.5.0" />
