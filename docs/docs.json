@@ -465,6 +465,7 @@
                       "v2/typescript/cookbook/index",
                       "v2/typescript/cookbook/daytona",
                       "v2/typescript/cookbook/nextjs",
+                      "v2/typescript/cookbook/tanstack-start",
                       "v2/typescript/cookbook/upstash",
                       "v2/typescript/cookbook/sentry"
                     ]
