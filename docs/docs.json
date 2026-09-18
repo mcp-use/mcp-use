@@ -199,7 +199,8 @@
                           "inspector/command-palette",
                           "inspector/integration",
                           "inspector/self-hosting",
-                          "inspector/debugging-chatgpt-apps"
+                          "inspector/debugging-chatgpt-apps",
+                          "inspector/webmcp-inspector"
                         ]
                       },
                       "tunneling/index"
@@ -447,7 +448,8 @@
                           "inspector/command-palette",
                           "inspector/integration",
                           "inspector/self-hosting",
-                          "inspector/debugging-chatgpt-apps"
+                          "inspector/debugging-chatgpt-apps",
+                          "inspector/webmcp-inspector"
                         ]
                       },
                       "tunneling/index"

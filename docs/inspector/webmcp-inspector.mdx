@@ -1,0 +1,103 @@
+---
+title: "WebMCP Inspector"
+description: "Inspect and call the WebMCP tools a web page registers, from a Chrome side panel."
+icon: "chrome"
+---
+
+The WebMCP Inspector is a Chrome extension that inspects the WebMCP server a web page
+exposes. It opens as a side panel next to the page, lists the tools that page registers,
+and lets you call them with typed inputs and read the results without leaving the tab.
+
+Reach for it when you are building WebMCP into a website and need to answer questions like:
+
+- Are my tools actually registered, and with the schemas I expect?
+- Does a tool run correctly with a given set of parameters?
+- Do tools appear and disappear as they should when the page state or route changes?
+
+It is built with [WXT](https://wxt.dev), React, and TypeScript, and reuses components from
+the [mcp-use Inspector](/inspector/index). Unlike the Inspector, it does not connect to
+remote MCP servers — it only talks to the WebMCP API of the page in the active tab.
+
+The source lives at [mcp-use/webmcp-inspector](https://github.com/mcp-use/webmcp-inspector).
+
+<Note>
+  WebMCP is experimental. If the API is unavailable on a page, enable **WebMCP for testing**
+  in `chrome://flags` and relaunch a compatible Chromium build.
+</Note>
+
+## Install the prebuilt build
+
+The extension is not on the Chrome Web Store. Download the prebuilt zip and load it
+unpacked:
+
+<Steps>
+  <Step title="Download the build">
+    Grab [`webmcp-inspector.zip`](https://github.com/mcp-use/webmcp-inspector/releases/latest/download/webmcp-inspector.zip).
+    That link always serves the latest release. Unzip it somewhere you can keep it —
+    Chrome loads the unpacked folder from disk.
+  </Step>
+  <Step title="Enable Developer mode">
+    Open `chrome://extensions` and turn on **Developer mode**.
+  </Step>
+  <Step title="Load unpacked">
+    Click **Load unpacked** and select the unzipped folder.
+  </Step>
+  <Step title="Open the panel">
+    Open a WebMCP-enabled page and click the extension's toolbar icon to open the side panel.
+  </Step>
+</Steps>
+
+<Tip>
+  Clicking the toolbar icon is what grants the extension access to the current site, so
+  click it again after you switch to another site. Chrome internal pages and the Chrome
+  Web Store cannot be inspected.
+</Tip>
+
+## Inspect and call tools
+
+With the panel open, the tool list shows each tool the page registered with its
+description and parameter count, and a search box to filter them. Select a tool to get a
+form generated from its schema, fill it in, and run it with **Execute** (or
+`Cmd/Ctrl + Enter`).
+
+The panel validates input against the tool's JSON Schema before execution, and offers a
+raw JSON mode when a form is awkward for nested inputs. Results are shown with timing and
+errors, in a split you can drag or expand to fullscreen. Requests you want to keep can be
+saved by name; saved requests are stored locally and scoped to the site's origin.
+
+The list refreshes automatically when the page registers or removes tools, when you change
+tabs, and on page loads.
+
+## Build from source
+
+Use Node 22.12+ and pnpm.
+
+```bash
+git clone https://github.com/mcp-use/webmcp-inspector
+cd webmcp-inspector
+pnpm install
+pnpm build
+```
+
+Then load `.output/chrome-mv3` unpacked, following the same `chrome://extensions` steps as
+above.
+
+For iterating on the extension itself, `pnpm dev` runs a WXT development build with hot
+reload; load `.output/chrome-mv3-dev` instead. `pnpm zip` produces a release zip in
+`.output`.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="mcp-use Inspector" icon="monitor" href="/inspector/index">
+    Debug a remote or local MCP server from the browser: tools, resources, prompts, chat,
+    and widgets.
+  </Card>
+  <Card
+    title="Chrome WebMCP docs"
+    icon="book-open"
+    href="https://developer.chrome.com/docs/ai/webmcp/imperative-api"
+  >
+    The imperative WebMCP API a page uses to register the tools this extension inspects.
+  </Card>
+</CardGroup>
