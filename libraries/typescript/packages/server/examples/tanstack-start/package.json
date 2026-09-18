@@ -7,7 +7,8 @@
     "build": "vite build",
     "start": "node .output/server/index.mjs",
     "typecheck": "tsc --noEmit",
-    "verify": "node ../verify-examples.mjs --example=tanstack-start"
+    "verify": "node ../verify-examples.mjs --example=tanstack-start",
+    "verify:dev": "node ../verify-tanstack-dev.mjs"
   },
   "dependencies": {
     "@tanstack/react-router": "1.170.33",
