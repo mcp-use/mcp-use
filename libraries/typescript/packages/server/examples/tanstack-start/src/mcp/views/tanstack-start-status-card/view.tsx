@@ -1,7 +1,7 @@
 import { Image, ThemeProvider, useToolContext } from "mcp-use/react";
 import { StatusCard } from "@/components/StatusCard";
 
-/** MCP view compiled independently of the Start application. */
+/** MCP view sharing browser modules and HMR with the Start application. */
 export default function TanStackStartStatusCardView() {
   const tool = useToolContext<"show-status-card">();
   const card = tool.status === "ready" ? tool.toolOutput : undefined;

@@ -1,34 +1,51 @@
-# Embedded MCP server in TanStack Start
+# MCP with TanStack Start and Vite environments
 
 This example serves a TanStack Start website and an mcp-use server from one
 application. Start owns the listener; MCP is mounted at `/api/mcp`.
 
-From this directory, run `pnpm dev` and open http://localhost:3000. Connect an
-MCP client to http://localhost:3000/api/mcp and call `greet` or `show-status-card`.
-The card component is shared by the website and the MCP App view.
+Run `pnpm dev`, open http://localhost:3000, and connect an MCP client to
+http://localhost:3000/api/mcp. Call `greet` or `show-status-card`. The card
+component is shared by the website and the MCP App view.
 
-The integration has three parts:
+## Integration
 
 - `src/mcp/server.ts` default-exports an `MCPServer`, without calling `listen()`.
-- `vite.config.ts` adds `mcpUseTanStackStart` from `mcp-use/tanstack-start/vite`
-  before the Start and React plugins.
-- `src/routes/api.mcp.$.ts` forwards requests to `createTanStackStartHandler`
-  from `mcp-use/tanstack-start`, including nested MCP asset paths.
+- `vite.config.ts` places `mcpUseTanStackStart()` before Start, Nitro and React.
+- `src/mcp/handler.server.ts` calls `createTanStackStartHandler()` with no argument.
+  Do not import the authored server into Start's route graph.
+- The MCP catch-all and OAuth discovery routes forward to that same handler.
 
-The plugin compiles views when the server first imports the MCP handler.
-Restart `pnpm dev` after changing
-views, shared view components, public assets or skills. This initial integration
-does not provide widget HMR. Browser-safe components and tsconfig aliases work
-in views; Start server functions and router context are not available there.
+`mcpUseTanStackStart()` wraps the reusable `mcpUse()` plugin exported from
+`mcp-use/vite`. Both accept `entry`, `viewsDir`, and `basePath`. The base path
+must match the authored server. `viewsConfig` has been removed: configure
+aliases, React, and CSS plugins in the application's Vite config. Import any
+application/Tailwind stylesheet needed by a view from that view or a shared
+component; the integration does not inject a second Tailwind setup.
 
-The plugin automatically isolates the view build from the application's Vite
-config. React, Tailwind and tsconfig aliases are supported. Custom Vite plugins
-from the website, such as SVG-to-React transforms, do not apply to views or their
-shared components.
+## Development
 
-Configure CORS on `MCPServer`, as shown here. When adding OAuth, configure its
-public resource URL and keep the `/.well-known/oauth-protected-resource/$`
-route forwarding to the same handler. It returns 404 while OAuth is disabled.
+The `mcp` Vite environment owns the MCP entry and its dependency graph. Views
+share the website's `client` environment and HMR websocket. Start/Nitro can run
+routes in a worker; a private streaming endpoint on the existing Vite listener
+forwards requests to the MCP environment without another port.
+
+- View and CSS edits use React Fast Refresh/HMR, preserving state where React
+  supports it. Shared components update in both the website and MCP iframe.
+- Server edits prepare a replacement, switch to it, and close the old instance.
+  Active MCP exchanges are interrupted. Calls are not automatically retried.
+- Failed server edits retain the last working instance. Fixing the file reloads
+  it without restarting Vite.
+- Adding/removing views or editing skills refreshes MCP registrations. Adding
+  the first view also works without restarting.
+- Public assets are read from the source directory on each request.
+
+Configure MCP endpoint CORS on `MCPServer`. Browser modules use Vite's
+`server.cors` policy; the integration's default also permits opaque (`null`)
+iframe origins. Configure `server.origin`, `server.hmr`, and `server.cors` in
+Vite when using a public development URL or a host with another iframe origin.
+
+Browser-safe shared components work in views. Start router context and server
+functions are not automatically available inside an MCP iframe.
 
 ## Production and verification
 
@@ -38,14 +55,20 @@ pnpm start
 pnpm verify
 ```
 
-This example targets React + Vite + Node using Nitro's `node-server` preset.
-The MCP manifest, view bundles, public assets and skills are embedded in the
-server build; `.mcp-use/` and the source files are not runtime dependencies.
-Embedding assets increases the server bundle size. Deploy Nitro's complete
-`.output/` directory, which also contains the website's client assets.
+This example targets React + Vite 8 + Node using Nitro's `node-server` preset.
+Production builds views in a separate `mcpViews` environment because Start's
+client manifest requires a single application entry. That build uses relative
+asset URLs suitable for embedded views. The `mcp` build embeds view bundles,
+public assets and skills, and Start/Nitro packages the compiled MCP handler.
+Deploy the complete `.output/` directory. Source files and `.mcp-use/` are not
+runtime dependencies; embedding assets increases the server bundle size.
 
-`pnpm verify` builds the example and checks MCP negotiation, tool calls, view
-resources, generated bundles, public assets, CORS, HEAD and the rendered website.
-Workspace contributors must build `@mcp-use/cli`, `mcp-use` and
-`@mcp-use/client` first. TanStack's generated `src/routeTree.gen.ts` is checked in
-so typechecking works before the first Vite invocation.
+`pnpm verify` checks MCP negotiation, tool calls, views, generated bundles,
+public assets, CORS, HEAD and the rendered website in the production output.
+Workspace contributors can also run `pnpm verify:dev` to launch Chromium and
+verify shared-component state preservation, CSS HMR, server edits and error
+recovery in an opaque-origin MCP iframe. It uses the workspace Inspector's
+Playwright installation. Run `pnpm verify:dev --production` to verify a
+production iframe with CSS, imported images and lazy chunks after removing
+the test source checkout. Build `@mcp-use/tunnel`, `@mcp-use/cli`, `mcp-use` and
+`@mcp-use/client` before running these checks.
