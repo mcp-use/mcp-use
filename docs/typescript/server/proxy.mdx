@@ -102,6 +102,8 @@ The proxy introspects each upstream once during setup and forwards:
 - Static resource metadata and reads
 - Prompt metadata, argument schemas, and prompt requests
 
+Extension metadata on upstream tools and resources is re-advertised as the upstream published it, so vendor-namespaced `_meta` keys survive the hop. The two MCP Apps keys that describe a tool's view binding, `ui.resourceUri` and its legacy flat `ui/resourceUri` spelling, plus `ui.visibility`, are the exception: the gateway derives those from its own tool definition and drops any inherited copies, because an upstream `ui://` URI does not resolve against the gateway's namespaced resource URIs.
+
 The initial v2 implementation does not proxy resource templates, completions, subscriptions, upstream list-change re-synchronization, or legacy push-style sampling and elicitation callbacks.
 
 ## Run the complete example
