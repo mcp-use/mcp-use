@@ -1,5 +1,21 @@
 # mcp-use
 
+## 2.5.1
+
+### Patch Changes
+
+- b1bda25: Updated dependency `next` to `^16.3.3`.
+- b1bda25: Updated dependency `hono` to `^4.13.5`.
+- b1bda25: Rebuild bundled workspace code and synchronize published internal package metadata.
+- Updated dependencies [b1bda25]
+- Updated dependencies [b1bda25]
+- Updated dependencies [b1bda25]
+- Updated dependencies [b1bda25]
+- Updated dependencies [b1bda25]
+- Updated dependencies [b1bda25]
+  - @mcp-use/inspector@20.3.9
+  - @mcp-use/cli@4.1.13
+
 ## 2.5.1-canary.5
 
 ### Patch Changes
