@@ -221,7 +221,12 @@ async function verifyWithClient(cwd, example, packageJson) {
     if (server) await stop(server);
     if (website) await stop(website);
     if (runtimeCwd !== cwd)
-      await rm(runtimeCwd, { recursive: true, force: true });
+      await rm(runtimeCwd, {
+        recursive: true,
+        force: true,
+        maxRetries: 5,
+        retryDelay: 200,
+      });
     process.off("uncaughtException", ignoreExpectedTransportClose);
   }
 }
@@ -715,12 +720,47 @@ async function run(command, args, cwd, logPath) {
 }
 
 async function stop(child) {
-  signalChildTree(child, "SIGTERM");
-  await Promise.race([
-    new Promise((resolvePromise) => child.once("exit", resolvePromise)),
-    new Promise((resolvePromise) => setTimeout(resolvePromise, 2_000)),
-  ]);
-  signalChildTree(child, "SIGKILL");
+  if (process.platform === "win32" && child.pid !== undefined) {
+    // Killing pnpm alone leaves its server descendants holding output files.
+    const killer = spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], {
+      stdio: "ignore",
+    });
+    await waitForExit(killer, 5_000);
+  } else {
+    signalChildTree(child, "SIGTERM");
+    await waitForExit(child, 2_000);
+    signalChildTree(child, "SIGKILL");
+  }
+  if (!(await waitForExit(child, 5_000))) {
+    throw new Error(
+      `Example process ${child.pid} did not exit after shutdown.`
+    );
+  }
+}
+
+function waitForExit(child, timeoutMs) {
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return Promise.resolve(true);
+  }
+  return new Promise((resolvePromise, reject) => {
+    const timer = setTimeout(() => finish(false), timeoutMs);
+    const onExit = () => finish(true);
+    const onError = (error) => {
+      cleanup();
+      reject(error);
+    };
+    function cleanup() {
+      clearTimeout(timer);
+      child.off("exit", onExit);
+      child.off("error", onError);
+    }
+    function finish(exited) {
+      cleanup();
+      resolvePromise(exited);
+    }
+    child.once("exit", onExit);
+    child.once("error", onError);
+  });
 }
 
 function signalChildTree(child, signal) {
