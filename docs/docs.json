@@ -335,6 +335,7 @@
                               "v2/typescript/server/authentication/providers/better-auth",
                               "v2/typescript/server/authentication/providers/clerk",
                               "v2/typescript/server/authentication/providers/convex",
+                              "v2/typescript/server/authentication/providers/lane",
                               "v2/typescript/server/authentication/providers/keycloak",
                               "v2/typescript/server/authentication/providers/supabase",
                               "v2/typescript/server/authentication/providers/workos",
