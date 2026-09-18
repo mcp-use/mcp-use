@@ -1,10 +1,10 @@
 import { randomBytes } from "node:crypto";
-import { readFile, readdir } from "node:fs/promises";
+import { readFile, readdir, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import {
   BuildEnvironment,
   createRunnableDevEnvironment,
-  createServer,
   defaultAllowedOrigins,
   isRunnableDevEnvironment,
   normalizePath,
@@ -80,7 +80,8 @@ async function publicAssets(directory: string): Promise<EmbeddedViewAssets> {
  * Run MCP in a dedicated Vite environment and serve live browser view modules.
  * Pair with a framework route adapter that imports the generated MCP handler.
  * The host supplies its React and CSS plugins. Production builds embed view
- * assets and skills into the MCP output; runtime imports never load Vite.
+ * assets and skills into the MCP output and validate the compiled server using
+ * the host's production configuration; runtime imports never load Vite.
  * @param options - Source directories and MCP endpoint.
  * @returns Plugins placed before the host framework plugins.
  */
@@ -232,7 +233,7 @@ export function mcpUse(options: McpUseOptions = {}): PluginOption[] {
               ssr: true,
               rollupOptions: {
                 input: ENTRY,
-                output: { entryFileNames: "index.js" },
+                output: { entryFileNames: "server.mjs" },
               },
             },
           };
@@ -393,10 +394,7 @@ export function mcpUse(options: McpUseOptions = {}): PluginOption[] {
           "The MCP handler must only be imported by a server route."
         );
       if (id === ENTRY)
-        return `import server from ${JSON.stringify(entry)};
-        server.__primeViews(${JSON.stringify(manifest)}, {assets:${JSON.stringify(assets)}});
-        server.__primeSkills(${JSON.stringify(skills)});
-        export const handleMcpRequest = request => server.fetch(request);`;
+        return `export { default } from ${JSON.stringify(entry)};`;
       if (!devServer)
         return `export { handleMcpRequest } from ${JSON.stringify(normalizePath(resolve(config.root, ".mcp-use/vite/mcp/index.js")))};`;
       const address = devServer.httpServer?.address();
@@ -485,33 +483,39 @@ export function mcpUse(options: McpUseOptions = {}): PluginOption[] {
       if (!client.isBuilt) await builder.build(client);
       if (config.publicDir)
         Object.assign(assets, await publicAssets(config.publicDir));
-      const validation = await createServer({
-        configFile: false,
-        root: config.root,
-        envDir: false,
-        logLevel: "error",
-        resolve: { alias: config.resolve.alias, tsconfigPaths: true },
-        server: { middlewareMode: true, hmr: false, ws: false },
-      });
-      let candidate: MCPServer | undefined;
-      try {
-        const environment = validation.environments.ssr!;
-        if (!isRunnableDevEnvironment(environment))
-          throw new Error("MCP build validation requires Node.");
-        candidate = await prepare(
-          (await environment.runner.import<{ default: MCPServer }>(entry))
-            .default,
-          false
-        );
-      } finally {
-        try {
-          await candidate?.close();
-        } finally {
-          await validation.close();
-        }
-      }
+      // Validate the actual production module, including host build plugins,
+      // defines and mode-specific env values. A second dev server cannot
+      // reproduce the MCP build environment's transforms or resolution.
       const mcp = builder.environments.mcp!;
       if (!mcp.isBuilt) await builder.build(mcp);
+      const outputDirectory = resolve(config.root, mcp.config.build.outDir);
+      const compiledEntry = pathToFileURL(join(outputDirectory, "server.mjs"));
+      compiledEntry.searchParams.set(
+        "validation",
+        randomBytes(12).toString("hex")
+      );
+      let candidate: MCPServer | undefined;
+      try {
+        const compiled = (await import(
+          /* @vite-ignore */ compiledEntry.href
+        )) as {
+          default: MCPServer;
+        };
+        candidate = await prepare(compiled.default, false);
+      } finally {
+        await candidate?.close();
+      }
+      // Snapshot discovery needs a live server, so add the runtime wrapper
+      // only after validation. Downstream framework builds consume this entry
+      // and the same compiled server; the authored code is compiled just once.
+      await writeFile(
+        join(outputDirectory, "index.js"),
+        `import server from "./server.mjs";
+server.__primeViews(${JSON.stringify(manifest)}, {assets:${JSON.stringify(assets)}});
+server.__primeSkills(${JSON.stringify(skills)});
+export const handleMcpRequest = request => server.fetch(request);
+`
+      );
     },
   };
   return [plugin, viewsPlugin];
