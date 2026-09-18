@@ -88,6 +88,7 @@ export const examples = [
   external("auth/supabase"),
   external("auth/workos"),
   external("daytona"),
+  external("upstash"),
   configuration(
     "openapi",
     "Loads the live weather.gov OpenAPI document; deterministic fixture coverage is deferred."
