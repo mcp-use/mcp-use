@@ -21,7 +21,13 @@ export interface RunOptions<T = string> {
    * stored memory.
    */
   externalHistory?: BaseMessage[];
-  /** Provider-neutral messages appended before `prompt`. */
+  /**
+   * Provider-neutral messages appended before `prompt`.
+   *
+   * Not supported when the agent was constructed with `agentId` (remote mode).
+   * Both the native agent and the LangChain agent throw at runtime if this
+   * field is non-empty and the agent is in remote mode.
+   */
   messages?: ProviderMessage[];
   /**
    * Zod schema for a typed result.

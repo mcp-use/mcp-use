@@ -478,6 +478,12 @@ export class MCPAgent {
       );
     }
     if (this.isRemote && this.remoteAgent) {
+      if (options.messages?.length) {
+        throw new Error(
+          "RunOptions.messages is not supported in remote mode. " +
+            "The remote agent protocol does not carry a pre-seeded message list."
+        );
+      }
       return this.remoteAgent.run(
         options.prompt ?? "",
         options.maxSteps,
@@ -538,6 +544,12 @@ export class MCPAgent {
       signal
     );
     if (this.isRemote && this.remoteAgent) {
+      if (options.messages?.length) {
+        throw new Error(
+          "RunOptions.messages is not supported in remote mode. " +
+            "The remote agent protocol does not carry a pre-seeded message list."
+        );
+      }
       const result = await this.remoteAgent.run(
         options.prompt ?? "",
         options.maxSteps,
