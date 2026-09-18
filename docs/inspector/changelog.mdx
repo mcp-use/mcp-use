@@ -6,6 +6,17 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v20.3.9" description="September 2026">
+  ## Managed chat model branding & provider selection
+  Patch release paired with `mcp-use` v2.5.1, showing the selected cloud model accurately and simplifying provider selection.
+
+- **Fix**: managed chat badges use the selected cloud model's name and provider logo instead of the default transport model's branding (`#2575`)
+- **Enhancement**: the Manufact cloud provider picker offers OpenAI, Anthropic, and Google; existing selections from other providers remain visible with accurate labels, while evals retain the full catalog and BYOK OpenRouter remains available (`#2576`)
+- **Update**: `MCPServerConfig.auth_token` is deprecated but retained for type compatibility; use `authToken` to send an authentication token (`#2486`)
+- **Update**: update Hono to `^4.13.5` (`#2492`)
+- **Update**: Updated mcp-use to v2.5.1
+</Update>
+
 <Update label="v20.3.8" description="September 2026">
   ## Bundled Inspector rebuild
   Patch release paired with `mcp-use` v2.5.0, rebuilding the standalone Inspector with the agent OpenRouter fix.
