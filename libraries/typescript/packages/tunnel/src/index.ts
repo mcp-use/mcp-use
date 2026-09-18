@@ -709,6 +709,23 @@ async function connectTunnel(
       },
       { once: true }
     );
+
+    socket.addEventListener(
+      "close",
+      (event) => {
+        if (!ready) {
+          clearTimeout(timeout);
+          reject(
+            new Error(
+              `Tunnel setup failed (${event.code}${
+                event.reason === "" ? "" : `: ${event.reason}`
+              })`
+            )
+          );
+        }
+      },
+      { once: true }
+    );
   });
 
   socket.addEventListener("close", (event) => {
