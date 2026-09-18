@@ -1,0 +1,90 @@
+body {
+  margin: 0;
+}
+.a2ui-canvas {
+  --a2ui-spacing-m: 16px;
+  --a2ui-spacing-s: 8px;
+  --a2ui-checkbox-margin: 0;
+  --a2ui-checkbox-label-font-weight: 450;
+  --a2ui-color-primary: #466c52;
+  --a2ui-color-on-surface: var(--color-text-primary, #202b24);
+  color: var(--color-text-primary, #202b24);
+  font-family: var(--font-sans, system-ui, sans-serif);
+  background: var(--color-background-primary, #fff);
+  padding: 28px;
+  max-width: 960px;
+  box-sizing: border-box;
+  --a2ui-card-padding: 20px;
+  --a2ui-card-margin: 0;
+  --a2ui-card-border-radius: 12px;
+  --a2ui-card-background: var(--color-background-secondary, #f7f9f7);
+  margin: 0 auto;
+  line-height: 1.5;
+}
+.a2ui-canvas h2 {
+  font-size: 28px;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  margin: 0;
+}
+.a2ui-canvas p {
+  margin: 0;
+}
+.a2ui-canvas label {
+  display: block;
+  font-size: 14px;
+}
+.a2ui-canvas
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.a2ui-canvas textarea {
+  display: block;
+  box-sizing: border-box;
+  margin-top: 8px;
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--color-border-primary, #cbd3cd);
+  border-radius: 8px;
+  background: var(--color-background-secondary, #f7f9f7);
+  color: inherit;
+  font: inherit;
+}
+.a2ui-canvas input[type="checkbox"],
+.a2ui-canvas input[type="radio"] {
+  accent-color: #466c52;
+}
+.a2ui-canvas button {
+  border: 0;
+  border-radius: 8px;
+  background: #466c52;
+  color: white;
+  padding: 12px 18px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.a2ui-canvas button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+.a2ui-canvas :focus-visible {
+  outline: 2px solid #7c9d85;
+  outline-offset: 3px;
+}
+@media (max-width: 420px) {
+  .a2ui-canvas {
+    padding: 18px;
+  }
+}
+
+.a2ui-canvas label:has(input[type="radio"]) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.a2ui-canvas input[type="radio"] {
+  display: inline-block;
+  width: auto;
+  margin: 0;
+  padding: 0;
+}
