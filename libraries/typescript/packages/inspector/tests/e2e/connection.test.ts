@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type Request } from "@playwright/test";
 import {
   configureLLMAPI,
   connectToConformanceServer,
@@ -262,6 +262,22 @@ test.describe("Inspector MCP Server Connections", () => {
     page,
   }) => {
     await page.goto("http://localhost:3000/inspector");
+    await expect(page.getByTestId("server-tile-status-ready")).toBeVisible();
+
+    const initializeRequests: Request[] = [];
+    const trackInitialize = (request: Request) => {
+      if (request.method() !== "POST") return;
+      try {
+        const body = request.postDataJSON();
+        const messages = Array.isArray(body) ? body : [body];
+        if (messages.some((message) => message?.method === "initialize")) {
+          initializeRequests.push(request);
+        }
+      } catch {
+        // Ignore non-JSON requests, such as telemetry.
+      }
+    };
+    page.on("request", trackInitialize);
 
     await page.getByTestId("server-tile-settings").click();
 
@@ -277,7 +293,8 @@ test.describe("Inspector MCP Server Connections", () => {
       timeout: 3000,
     });
 
-    await page.goto("http://localhost:3000/inspector");
+    // Client-side navigation preserves the active MCP session.
+    await page.getByRole("link", { name: /mcp-use.*Inspector/ }).click();
     await expect(
       page.getByRole("heading", { name: "QA Conformance" })
     ).toBeVisible();
@@ -293,6 +310,8 @@ test.describe("Inspector MCP Server Connections", () => {
     await expect(
       page.getByTestId("tool-execution-results-text-content")
     ).toContainText("Echo: Alias check");
+    expect(initializeRequests).toHaveLength(0);
+    page.off("request", trackInitialize);
 
     await page.goto("http://localhost:3000/inspector");
     await page.reload();

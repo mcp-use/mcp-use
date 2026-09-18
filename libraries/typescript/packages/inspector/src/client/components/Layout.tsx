@@ -23,6 +23,7 @@ import {
   protocolModeFromNegotiation,
   protocolNegotiationForMode,
   saveStoredConnectionConfig,
+  toEditableConnectionConfig,
   toMcpServerConfig,
   type EditableConnectionConfig,
 } from "@/client/utils/connectionUpdates";
@@ -460,11 +461,14 @@ export function Layout({ children }: LayoutProps) {
     (config: EditableConnectionConfig) => {
       if (!selectedServerId) return;
 
-      const currentConnection =
-        getStoredConnectionConfig<EditableConnectionConfig>(selectedServerId) ||
-        connections.find(
-          (connection: McpServer) => connection.id === selectedServerId
-        );
+      const server = connections.find(
+        (connection: McpServer) => connection.id === selectedServerId
+      );
+      const storedConfig =
+        getStoredConnectionConfig<EditableConnectionConfig>(selectedServerId);
+      const currentConnection = server
+        ? toEditableConnectionConfig(server, storedConfig)
+        : storedConfig;
 
       if (config.url !== selectedServerId) {
         removeConnection(selectedServerId);
