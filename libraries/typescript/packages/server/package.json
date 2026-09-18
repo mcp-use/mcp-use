@@ -33,7 +33,7 @@
       "node": "@mcp-use/cli/internal/skills-loader",
       "default": "./dist/internal/skills-loader-unavailable.js"
     },
-    "#mcp-use-tanstack-start-build": "./dist/internal/tanstack-start-build.js"
+    "#mcp-use-vite-handler": "./dist/internal/vite-handler.js"
   },
   "exports": {
     ".": {
@@ -107,6 +107,10 @@
     "./tanstack-start/vite": {
       "types": "./dist/tanstack-start/vite.d.ts",
       "import": "./dist/tanstack-start/vite.js"
+    },
+    "./vite": {
+      "types": "./dist/vite/index.d.ts",
+      "import": "./dist/vite/index.js"
     }
   },
   "module": "./dist/index.js",
