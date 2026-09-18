@@ -7,9 +7,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { MCPServer } from "../src/index.js";
-import type { ProxyConnection } from "../src/index.js";
+import type { MetaObject, ProxyConnection } from "../src/index.js";
 import { mountProxyConnection } from "../src/mcp-proxy.js";
 import type { ProxyMountHost } from "../src/mcp-proxy.js";
+import { buildToolUiMeta } from "../src/views/wire.js";
 
 async function connectClient(url: string): Promise<Client> {
   const client = new Client(
@@ -532,7 +533,14 @@ describe("MCPServer.proxy", () => {
           {
             name: "search",
             annotations: { readOnlyHint: true },
-            _meta: { "example.com/category": "reference" },
+            _meta: {
+              "example.com/category": "reference",
+              ui: {
+                resourceUri: "ui://views/upstream.html",
+                customField: { preserved: true },
+              },
+              "ui/resourceUri": "ui://views/upstream.html",
+            },
           },
         ];
       },
@@ -558,6 +566,13 @@ describe("MCPServer.proxy", () => {
     expect(mounted).toMatchObject({
       annotations: { readOnlyHint: true },
       _meta: { "example.com/category": "reference" },
+    });
+
+    expect(
+      buildToolUiMeta(undefined, undefined, mounted?.["_meta"] as MetaObject)
+    ).toEqual({
+      "example.com/category": "reference",
+      ui: { customField: { preserved: true } },
     });
   });
 
