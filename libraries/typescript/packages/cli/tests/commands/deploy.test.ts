@@ -47,9 +47,15 @@ afterEach(async () => {
   api.multipartRequest.mockReset();
   cloudApiForOrganization.mockClear();
   await Promise.all(
-    directories
-      .splice(0)
-      .map((directory) => rm(directory, { recursive: true, force: true }))
+    directories.splice(0).map((directory) =>
+      // Retry transient filesystem errors while removing Git repositories.
+      rm(directory, {
+        recursive: true,
+        force: true,
+        maxRetries: 5,
+        retryDelay: 100,
+      })
+    )
   );
 });
 
