@@ -51,3 +51,8 @@ export {
   POSTHOG_API_KEY,
 } from "./telemetry/index.js";
 export { logger } from "./utils/logging.js";
+
+// Jev integrations are server-side only; credentials must not enter browser bundles.
+export { JevError, type JevOptions } from "./jev/service.js";
+export { JevRoutingError } from "./jev/router.js";
+export { MCPFirewallError, type JevFirewallOptions } from "./jev/firewall.js";

@@ -100,6 +100,10 @@ global.__callMcpTool = async (server, tool, args) => {
 
 // Global search_tools helper
 global.search_tools = async (query, detailLevel = 'full') => {
+    if (${Boolean(this.client.jevToolRouter)}) {
+        const response = await global.__callMcpTool('code_mode', 'search_tools', { query, detail_level: detailLevel });
+        return response.results;
+    }
     const allTools = ${JSON.stringify(
       Object.entries(tools).flatMap(([server, serverTools]) =>
         serverTools.map((tool) => ({

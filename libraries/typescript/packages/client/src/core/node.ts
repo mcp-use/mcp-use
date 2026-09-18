@@ -1,3 +1,6 @@
+import { JevService, type JevOptions } from "../jev/service.js";
+import { JevToolRouter } from "../jev/router.js";
+import { JevFirewall, type JevFirewallOptions } from "../jev/firewall.js";
 import type {
   ElicitRequestFormParams,
   ElicitRequestURLParams,
@@ -108,6 +111,10 @@ export type ExecutorOptions = VMExecutorOptions | E2BExecutorOptions;
  * Advanced configuration for code execution mode.
  */
 export interface CodeModeConfig {
+  /** Discovery strategy. Defaults to the existing keyword search. */
+  toolSearch?: "keyword" | "jev";
+  /** Minimum Jev Choice confidence before returning a selected tool. Default: 0.7. */
+  routingConfidence?: number;
   /** Whether to enable code execution mode */
   enabled: boolean;
   /** Executor type or custom implementation. Defaults to "vm" */
@@ -120,6 +127,10 @@ export interface CodeModeConfig {
  * Options for configuring MCPClient behavior.
  */
 export interface MCPClientOptions {
+  /** Shared TypeSafe Jev service configuration. Requires opt-in routing or firewall. */
+  jev?: JevOptions;
+  /** Opt-in tool-result injection classifier. Failures withhold the result. */
+  firewall?: boolean | JevFirewallOptions;
   /** Enable code execution mode (simple boolean or advanced configuration) */
   codeMode?: boolean | CodeModeConfig;
   /**
@@ -266,6 +277,19 @@ export class MCPClient extends BaseMCPClient {
    * ```
    */
   public codeMode: boolean = false;
+  /** @internal Shared by the built-in tool discovery helpers. */
+  public readonly jevToolRouter?: JevToolRouter;
+  private readonly _jevFirewall?: JevFirewall;
+
+  protected override configureConnector(
+    connector: BaseConnector,
+    serverName: string
+  ): void {
+    if (this._jevFirewall) {
+      connector.toolResultGuard = (result, tool, options) =>
+        this._jevFirewall!.check(result, serverName, tool, options?.signal);
+    }
+  }
   private _codeExecutor: BaseCodeExecutor | null = null;
   private _codeExecutorConfig:
     | CodeExecutorType
@@ -359,6 +383,26 @@ export class MCPClient extends BaseMCPClient {
       }
     }
 
+    const codeConfig =
+      typeof options?.codeMode === "object" ? options.codeMode : undefined;
+    if (
+      (codeModeEnabled && codeConfig?.toolSearch === "jev") ||
+      options?.firewall
+    ) {
+      const service = new JevService(options?.jev);
+      if (codeModeEnabled && codeConfig?.toolSearch === "jev") {
+        this.jevToolRouter = new JevToolRouter(
+          service,
+          codeConfig.routingConfidence
+        );
+      }
+      if (options?.firewall) {
+        this._jevFirewall = new JevFirewall(
+          service,
+          typeof options.firewall === "object" ? options.firewall : {}
+        );
+      }
+    }
     this.codeMode = codeModeEnabled;
     this._codeExecutorConfig = executorConfig;
     this._executorOptions = executorOptions;

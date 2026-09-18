@@ -132,6 +132,13 @@ export interface ConnectorInitOptions {
  * {@link BaseConnector.initialize}, before invoking protocol operations.
  */
 export abstract class BaseConnector {
+  /** @internal Installed by MCPClient before connecting. Runs before results are logged or returned. */
+  toolResultGuard?: (
+    result: CallToolResult,
+    name: string,
+    options?: RequestOptions
+  ) => Promise<void>;
+
   protected client: Client | null = null;
   protected connectionManager: ConnectionManager<any> | null = null;
   protected toolsCache: Tool[] | null = null;
@@ -714,6 +721,7 @@ export abstract class BaseConnector {
     const res = await this.executeRequest(() =>
       this.client!.callTool({ name, arguments: args }, enhancedOptions)
     );
+    await this.toolResultGuard?.(res as CallToolResult, name, options);
     logger.debug(`Tool '${name}' returned`, res);
     return res as CallToolResult;
   }

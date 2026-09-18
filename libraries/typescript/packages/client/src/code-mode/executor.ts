@@ -9,7 +9,7 @@ export interface ExecutionResult {
   execution_time: number;
 }
 
-interface ToolSearchResult {
+export interface ToolSearchResult {
   name: string;
   server: string;
   description?: string;
@@ -157,7 +157,7 @@ export abstract class BaseCodeExecutor {
 
           for (const tool of tools) {
             // Build tool info based on detail level (before filtering)
-            if (detailLevel === "names") {
+            if (detailLevel === "names" && !this.client.jevToolRouter) {
               allTools.push({ name: tool.name, server: serverName });
             } else if (detailLevel === "descriptions") {
               allTools.push({
@@ -181,7 +181,15 @@ export abstract class BaseCodeExecutor {
 
       // Filter by query if provided
       let filteredTools = allTools;
-      if (query) {
+      if (this.client.jevToolRouter) {
+        filteredTools = await this.client.jevToolRouter.select(query, allTools);
+        if (detailLevel === "names") {
+          filteredTools = filteredTools.map(({ name, server }) => ({
+            name,
+            server,
+          }));
+        }
+      } else if (query) {
         filteredTools = allTools.filter((tool) => {
           const nameMatch = tool.name.toLowerCase().includes(queryLower);
           const descMatch = tool.description
