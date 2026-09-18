@@ -50,9 +50,9 @@ functions are not automatically available inside an MCP iframe.
 ## Production and verification
 
 ```sh
+pnpm verify
 pnpm build
 pnpm start
-pnpm verify
 ```
 
 This example targets React + Vite 8 + Node using Nitro's `node-server` preset.
