@@ -709,6 +709,23 @@ async function connectTunnel(
       },
       { once: true }
     );
+
+    socket.addEventListener(
+      "close",
+      (event) => {
+        if (!ready) {
+          clearTimeout(timeout);
+          reject(
+            new Error(
+              `Tunnel setup failed (${event.code}${
+                event.reason === "" ? "" : `: ${event.reason}`
+              })`
+            )
+          );
+        }
+      },
+      { once: true }
+    );
   });
 
   socket.addEventListener("close", (event) => {
@@ -871,7 +888,12 @@ export function createTunnelManager(
       relayBase,
       options.subdomain ?? requestedSubdomain
     );
-    return attach(port, reservation);
+    try {
+      return await attach(port, reservation);
+    } catch (error) {
+      await releaseTunnel(relayBase, stateFromReservation(reservation));
+      throw error;
+    }
   };
 
   scheduleRespawn = (): void => {
