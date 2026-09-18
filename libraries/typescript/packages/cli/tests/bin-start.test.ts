@@ -248,6 +248,14 @@ describe("parseArgs", () => {
     expect(parseArgs(["build"]).sourceMaps).toBe(false);
   });
 
+  it("discovers view config by default and allows opting out", () => {
+    expect(parseArgs(["build"]).viewsConfig).toBe(true);
+    expect(parseArgs(["build", "--no-views-config"]).viewsConfig).toBe(false);
+    expect(() =>
+      parseArgs(["build", "--views-config=views.vite.config.ts"])
+    ).toThrow("Unknown option: --views-config");
+  });
+
   it("parses --inline for build without changing the default", () => {
     expect(parseArgs(["build", "--inline"]).inline).toBe(true);
     expect(parseArgs(["build"]).inline).toBe(false);
