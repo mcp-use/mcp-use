@@ -888,7 +888,12 @@ export function createTunnelManager(
       relayBase,
       options.subdomain ?? requestedSubdomain
     );
-    return attach(port, reservation);
+    try {
+      return await attach(port, reservation);
+    } catch (error) {
+      await releaseTunnel(relayBase, stateFromReservation(reservation));
+      throw error;
+    }
   };
 
   scheduleRespawn = (): void => {

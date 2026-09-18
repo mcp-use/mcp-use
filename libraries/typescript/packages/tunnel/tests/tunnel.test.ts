@@ -144,6 +144,7 @@ describe("createTunnelManager", () => {
     await expect(tunnel.start(3000)).rejects.toThrow(
       "Tunnel setup failed (1008: Invalid token)"
     );
+    expect(deleteRequests).toBe(1);
   });
 
   it("uses the configured relay and requested subdomain", async () => {
