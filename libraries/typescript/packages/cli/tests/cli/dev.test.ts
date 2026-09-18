@@ -1494,19 +1494,26 @@ describe("runDev (views)", () => {
 
     // Populate the client module graph the way a browser loading the view
     // document would: fetch each module and, recursively, its static
-    // imports. A 504 is Vite's "outdated optimize dep" — retry like a
-    // browser reload of the request would.
+    // imports. Dependency optimization can invalidate a response (504) or
+    // reset its connection; retry initial loads like a browser would. Keep
+    // the HMR assertions below outside this bounded startup retry.
     const seen = new Set<string>();
     const loadModule = async (url: string): Promise<void> => {
       const abs = url.startsWith("http") ? url : `${base}${url}`;
       if (seen.has(abs) || seen.size > 60) return;
       seen.add(abs);
-      let response = await fetch(abs);
-      if (response.status === 504) {
-        response = await fetch(abs);
-      }
-      if (!response.ok) return;
-      const js = await response.text();
+      const js = await waitFor(async () => {
+        const response = await fetch(abs);
+        if (response.status === 504) {
+          await response.body?.cancel();
+          return undefined;
+        }
+        if (!response.ok) {
+          await response.body?.cancel();
+          return "";
+        }
+        return response.text();
+      });
       const imports = [...js.matchAll(/from\s+"([^"]+)"|import\s+"([^"]+)"/g)]
         .map((m) => m[1] ?? m[2])
         .filter((s): s is string => s !== undefined && s.startsWith("/"));
