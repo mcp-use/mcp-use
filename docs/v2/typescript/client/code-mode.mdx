@@ -68,6 +68,105 @@ release anything on its behalf. A non-arrow function is invoked with the
 }}
 ```
 
+## Jev tool selection
+
+Use TypeSafe's [Jev API](https://docs.typesafe.ai/api) to select a tool by intent
+instead of keyword matching. This is an opt-in discovery mode; the configured
+VM, E2B, or custom executor still runs the code.
+
+```typescript
+const client = new MCPClient(config, {
+  codeMode: {
+    enabled: true,
+    toolSearch: "jev", // default: "keyword"
+    routingConfidence: 0.7,
+  },
+  jev: {
+    apiKey: process.env.TYPESAFE_API_KEY, // also read automatically
+    model: "jev-latest",
+    timeoutMs: 10_000,
+    maxRequestBytes: 128 * 1024,
+  },
+  firewall: { blockThreshold: 0.2 }, // optional; uses the same Jev service
+});
+await client.createAllSessions();
+
+const tools = await client.searchTools(
+  "Find the pull request that fixes login",
+);
+// tools.results contains the selected tool's server, name, description and schema.
+// The agent can then generate arguments and call it through executeCode.
+```
+
+Nonempty queries return at most one tool, or no results when Jev chooses
+`none`. Empty queries list the catalog locally. `names`, `descriptions`, and
+`full` retain their existing response formats. Selection sends the query and
+catalog names/descriptions to TypeSafe; it does not execute tools or generate
+arguments. The selected schema is returned from the local catalog.
+
+Catalogs above 254 tools are divided into Choice batches, each with a `none`
+option. Further rounds compare the batch winners. This requires multiple API
+requests and does not guarantee the latency or accuracy of a single Choice.
+Every decision must meet `routingConfidence`. This default is a starting point,
+not an accuracy guarantee; evaluate it against your own requests.
+
+Low confidence, malformed answers, request limits, and service failures throw
+`JevRoutingError` rather than silently selecting a tool. Catch it in your host
+application to escalate to an LLM or human, or explicitly use keyword discovery
+on a separate client. Inside built-in code execution, an uncaught error appears
+in `ExecutionResult.error`. A custom executor must use the client's `searchTools`
+or its inherited discovery helper to participate in Jev selection.
+
+## Jev tool-result firewall
+
+Enable `firewall: true` (default threshold `0.2`) or
+`firewall: { blockThreshold: 0.2 }` to classify final MCP tool results for prompt
+injection. It works independently of code mode:
+
+```typescript
+import { MCPClient, MCPFirewallError } from "@mcp-use/client";
+
+const client = new MCPClient(config, {
+  jev: { apiKey: process.env.TYPESAFE_API_KEY },
+  firewall: true,
+});
+const session = await client.createSession("github");
+
+try {
+  const result = await session.callTool("get_issue", { number: 123 });
+  // Only allowed results reach this point.
+} catch (error) {
+  if (!(error instanceof MCPFirewallError)) throw error;
+  // Stop this workflow and request trusted review.
+  // error.reason is "injection" or "unavailable"; the raw result is withheld.
+} finally {
+  await client.close();
+}
+```
+
+The firewall sends the entire serialized result to TypeSafe, including
+`structuredContent`, embedded resource text, error results, and `_meta`. Use it
+only for data you permit this service to process. `baseUrl` can point to an
+explicitly trusted HTTPS proxy. The API key stays on the Node.js host, including
+when using E2B.
+
+Results at or above `blockThreshold` are withheld before the connector returns
+or logs them. API errors, timeouts, invalid verdicts, and oversized requests also
+withhold the result. Requests are never silently truncated. Allowed results are
+returned unchanged. There are no automatic retries, so a classifier failure does
+not repeat the MCP tool's side effects. Configure thresholds and trusted review
+for your workload; this probabilistic classifier can miss attacks and flag
+benign content.
+
+Protection applies to final `callTool` results through client-created built-in
+connectors, including direct session calls, agent adapters, VM calls, and E2B
+calls. It does not authorize tool execution or undo side effects, inspect binary
+image/audio content, or cover prompts, resource reads, discovery metadata,
+notifications, or progress callbacks. Calls through a raw SDK client or a custom
+connector that overrides `callTool` without invoking the base implementation
+must provide their own checks. This is an additional detection layer, not a
+sandbox or a complete security boundary.
+
 ## Agent integration
 
 Use with `@mcp-use/agent` and `PROMPTS.CODE_MODE`:

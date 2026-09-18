@@ -56,6 +56,12 @@ function isOAuthClientProvider(
  * @see {@link MCPSession} for session management
  */
 export abstract class BaseMCPClient {
+  /** Configure cross-cutting connector behavior before initialization. */
+  protected configureConnector(
+    _connector: BaseConnector,
+    _serverName: string
+  ): void {}
+
   /**
    * Internal configuration object containing MCP server definitions.
    */
@@ -366,6 +372,7 @@ export abstract class BaseMCPClient {
       const connector = await Promise.resolve(
         this.createConnectorFromConfig(serverConfig)
       );
+      this.configureConnector(connector, serverName);
       const session = new MCPSession(connector);
       if (autoInitialize) {
         await session.initialize();
