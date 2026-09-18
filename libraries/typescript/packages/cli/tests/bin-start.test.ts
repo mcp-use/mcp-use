@@ -231,6 +231,12 @@ describe("parseArgs", () => {
     expect(parseArgs(["start"]).tunnel).toBe(false);
   });
 
+  it("rejects a value on a boolean flag instead of ignoring it", () => {
+    expect(() => parseArgs(["dev", "--tunnel=false"])).toThrow(
+      "--tunnel does not take a value"
+    );
+  });
+
   it("parses --no-open (auto-open defaults to on)", () => {
     expect(parseArgs(["dev", "--no-open"]).open).toBe(false);
     expect(parseArgs(["dev"]).open).toBe(true);

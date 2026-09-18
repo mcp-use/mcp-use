@@ -52,12 +52,13 @@ export interface ParsedArgs {
 /**
  * Parse the `mcp-use` argv (everything after the node binary and script path).
  *
- * Supports `--flag value` and `--flag=value` forms. The first bare token is
- * taken as the subcommand.
+ * Supports `--flag value` and `--flag=value` forms for flags that take a
+ * value. Boolean switches take no value: `--tunnel=false` is rejected rather
+ * than read as `--tunnel`. The first bare token is taken as the subcommand.
  *
  * @param argv - Raw arguments, typically `process.argv.slice(2)`.
- * @throws Error on an unknown flag, a missing flag value, an out-of-range
- * port, or a second positional argument.
+ * @throws Error on an unknown flag, a missing flag value, a value passed to a
+ * boolean switch, an out-of-range port, or a second positional argument.
  *
  * @internal
  */
@@ -106,9 +107,16 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
       }
     }
 
+    // Set by `takeValue` so the boolean switches below, which never call it,
+    // can be told apart from value-taking flags.
+    let inlineConsumed = false;
+
     /** Consume the flag's value: inline (`=`) or the next argv token. */
     const takeValue = (): string => {
-      if (inline !== undefined) return inline;
+      if (inline !== undefined) {
+        inlineConsumed = true;
+        return inline;
+      }
       const next = argv[++i];
       if (next === undefined || next.startsWith("-")) {
         throw new Error(`Missing value for ${flag}`);
@@ -170,6 +178,13 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
           throw new Error(`Unexpected argument: ${flag}`);
         }
         args.command = flag;
+    }
+
+    // A boolean switch reaching here never called `takeValue`, so an inline
+    // value was silently discarded and the flag applied regardless. Rejecting
+    // it keeps `--tunnel=false` from opening a public tunnel.
+    if (inline !== undefined && !inlineConsumed) {
+      throw new Error(`${flag} does not take a value`);
     }
   }
 
