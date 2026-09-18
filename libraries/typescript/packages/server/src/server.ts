@@ -116,6 +116,7 @@ import {
   type SkillsSnapshot,
 } from "./skills/types.js";
 import { supportsViews } from "./views/capabilities.js";
+import { resolveMcpEndpoint } from "./views/origin.js";
 import type { ViewResourceFacts } from "./views/types.js";
 import {
   createViewPublicHandler,
@@ -2048,12 +2049,14 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           basePath,
           viewName
         );
-        // Claude serves view resources from a hashed sandbox origin derived
-        // from the authored domain. Applied on read only, matching v1.
+        // UI origin and MCP endpoint identity are separate. Claude hashes the
+        // full public endpoint, never the website or asset origin.
         const meta = await applyClaudeResourceDomain(
           buildResourceUiMeta(authorFacts, readOptions),
           requestClientInfo(ctx),
-          (req ?? metaOptions.request)?.headers.get("user-agent")
+          (req ?? metaOptions.request)?.headers.get("user-agent"),
+          resolveMcpEndpoint(req ?? metaOptions.request, basePath) ??
+            authorFacts?.domain
         );
         return {
           contents: [
