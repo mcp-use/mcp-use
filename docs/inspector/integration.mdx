@@ -82,6 +82,8 @@ export default app;
 
 `basePath` defaults to `/mcp`, so the Inspector lives at `/mcp/inspector`. Set `basePath: ''` for `/inspector`, or use another MCP prefix.
 
+When you configure `MCPServer` instead of calling `mountInspector` yourself, use `basePath: '/'` for the root: server config validation requires an absolute pathname and rejects `''`. The Inspector treats `''` and `'/'` alike, so both land at `/inspector`.
+
 ### Hono with Custom Path
 
 ```typescript
@@ -112,7 +114,7 @@ mountInspector(app, {
 
 | Option                    | Type             | Default                             | Description                                             |
 | ------------------------- | ---------------- | ----------------------------------- | ------------------------------------------------------- |
-| `basePath`                | `string`         | `'/mcp'`                            | MCP prefix; Inspector mounts at `${basePath}/inspector` |
+| `basePath`                | `string`         | `'/mcp'`                            | MCP prefix; Inspector mounts at `${basePath}/inspector`, so `/inspector` when it is `''` or `'/'` |
 | `autoConnectUrl`          | `string \| null` | Current request origin + `basePath` | MCP server URL to auto-connect on load; `null` disables |
 | `devMode`                 | `boolean`        | `true`                              | Enables same-origin sandbox for MCP Apps widgets        |
 | `sandboxOrigin`           | `string \| null` | `undefined`                         | Override the sandbox origin for MCP Apps widgets        |
