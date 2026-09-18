@@ -13,9 +13,19 @@ import { logger } from "hono/logger";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 import {
   INSPECTOR_API_RATE_LIMIT,
+  defaultInspectorGlobalPreAuthRateLimiter,
+  defaultInspectorGlobalRateLimiter,
+  defaultInspectorPreAuthRateLimiter,
   INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
+  inspectorRelayPreAuthKey,
+  inspectorServerRateLimitKey,
   inspectorRateLimitResponse,
 } from "../rate-limit.js";
+import {
+  INSPECTOR_RELAY_CAPABILITY_HEADER,
+  inspectorRelayTarget,
+  type InspectorRelayAuthenticator,
+} from "../relay-auth.js";
 // ponytail: vendored from mcp-use/src/server/middleware/mcp-proxy.ts — keep in sync manually.
 import { isSafeProxyTarget } from "./oauth-proxy.js";
 
@@ -38,13 +48,13 @@ interface McpProxyOptions {
    *
    * @example
    * ```typescript
-   * authenticate: async (c) => {
-   *   const apiKey = c.req.header("X-API-Key");
-   *   return apiKey === process.env.API_KEY;
+   * authenticate: async (c, target) => {
+   *   const capability = c.req.header("X-Inspector-Relay-Token");
+   *   return verifyCapability(capability, target);
    * }
    * ```
    */
-  authenticate?: (c: Context) => Promise<boolean> | boolean;
+  authenticate?: InspectorRelayAuthenticator;
 
   /**
    * Optional request validator to check if target URL is allowed
@@ -73,8 +83,16 @@ interface McpProxyOptions {
   enableLogging?: boolean;
   /** Shared process-local limiter for Inspector proxy and OAuth routes. */
   rateLimiter?: RateLimiterMemory;
+  /** Higher process-wide backstop against target-key rotation abuse. */
+  globalRateLimiter?: RateLimiterMemory;
+  /** Per-client limiter protecting the product authentication callback. */
+  preAuthRateLimiter?: RateLimiterMemory;
+  /** Process-wide limiter protecting the product authentication callback. */
+  globalPreAuthRateLimiter?: RateLimiterMemory;
   /** Optional source label for logs when Inspector shares a dev server process. */
   logPrefix?: string;
+  /** Explicit browser origins. Omission preserves legacy wildcard CORS; `[]` denies cross-origin callers. */
+  allowedOrigins?: readonly string[];
 }
 
 /** Whether an MCP response must remain streaming instead of being buffered. */
@@ -113,9 +131,9 @@ export function isOpenEndedSseResponse(
  * // With authentication
  * mountMcpProxy(app, {
  *   path: "/api/proxy",
- *   authenticate: async (c) => {
- *     const token = c.req.header("Authorization");
- *     return token === `Bearer ${process.env.SECRET_TOKEN}`;
+ *   authenticate: async (c, target) => {
+ *     const capability = c.req.header("X-Inspector-Relay-Token");
+ *     return verifyCapability(capability, target);
  *   },
  *   validateRequest: (targetUrl) => {
  *     // Only allow specific domains
@@ -138,11 +156,22 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
       points: INSPECTOR_API_RATE_LIMIT,
       duration: INSPECTOR_RATE_LIMIT_WINDOW_SECONDS,
     });
+  const globalRateLimiter =
+    options.globalRateLimiter ?? defaultInspectorGlobalRateLimiter;
+  const preAuthRateLimiter =
+    options.preAuthRateLimiter ?? defaultInspectorPreAuthRateLimiter;
+  const globalPreAuthRateLimiter =
+    options.globalPreAuthRateLimiter ??
+    defaultInspectorGlobalPreAuthRateLimiter;
   const rateLimit = async (c: Context, next: Next) => {
     try {
-      // RateLimiterMemory prefixes and stringifies keys. The Hono request
-      // wrapper therefore maps every request to one mounted-instance budget.
-      await rateLimiter.consume(c.req as unknown as string);
+      // Keep independent budgets per actual target. Passing the Request object
+      // here stringifies every request to "[object Request]" and creates one
+      // accidental process-wide bucket.
+      await globalRateLimiter.consume("inspector-api:global");
+      await rateLimiter.consume(
+        inspectorServerRateLimitKey("mcp", c.req.header("X-Target-URL"))
+      );
     } catch (error) {
       return inspectorRateLimitResponse(c, error);
     }
@@ -155,7 +184,7 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
   app.use(
     `${basePath}/*`,
     cors({
-      origin: "*",
+      origin: createCorsOriginResolver(options.allowedOrigins),
       allowHeaders: [
         "Authorization",
         "Content-Type",
@@ -165,10 +194,23 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
         "Mcp-Session-Id",
         "mcp-session-id",
         "mcp-protocol-version",
+        "Mcp-Protocol-Version",
+        "Mcp-Method",
+        "Mcp-Name",
+        "DPoP",
+        INSPECTOR_RELAY_CAPABILITY_HEADER,
+        "Last-Event-ID",
         "X-Server-Id",
         "X-Requested-With",
       ],
-      exposeHeaders: ["*"],
+      exposeHeaders: [
+        "Mcp-Session-Id",
+        "Mcp-Protocol-Version",
+        "WWW-Authenticate",
+        "Location",
+        "Retry-After",
+        "X-Accel-Buffering",
+      ],
     })
   );
 
@@ -182,19 +224,26 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
     );
   }
 
+  // CORS preflights do not carry the browser's capability. Authenticate every
+  // other request before it can consume either relay budget, so rejected
+  // callers cannot exhaust a valid user's target bucket.
+  app.use(`${basePath}/*`, async (c, next) => {
+    const authenticationResponse = await authenticateTarget(
+      c,
+      inspectorRelayTarget(c.req.header("X-Target-URL"), c.req.method),
+      options.authenticate,
+      preAuthRateLimiter,
+      globalPreAuthRateLimiter
+    );
+    if (authenticationResponse) return authenticationResponse;
+    return next();
+  });
+
   app.use(`${basePath}/*`, rateLimit);
 
   // Handle all HTTP methods for the proxy
   app.all(`${basePath}/*`, async (c) => {
     try {
-      // Optional authentication
-      if (options.authenticate) {
-        const isAuthenticated = await options.authenticate(c);
-        if (!isAuthenticated) {
-          return c.json({ error: "Unauthorized" }, 401);
-        }
-      }
-
       const targetUrl = c.req.header("X-Target-URL");
 
       if (!targetUrl) {
@@ -264,6 +313,7 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
           !lowerKey.startsWith("x-forwarded-") &&
           !lowerKey.startsWith("cf-") &&
           lowerKey !== "x-original-host" &&
+          lowerKey !== INSPECTOR_RELAY_CAPABILITY_HEADER.toLowerCase() &&
           lowerKey !== "host" &&
           lowerKey !== "origin" &&
           lowerKey !== "referer" &&
@@ -311,6 +361,29 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
         }
 
         const redirectUrl = new URL(location, currentUrl);
+        let nextMethod = currentMethod;
+        let nextBody = currentBody;
+        if (
+          response.status === 303 ||
+          ((response.status === 301 || response.status === 302) &&
+            currentMethod === "POST")
+        ) {
+          nextMethod = "GET";
+          nextBody = undefined;
+        }
+
+        // A redirect can change both the capability target and the effective
+        // method. Re-authenticate that exact destination before doing any
+        // validation or fetch so a valid capability cannot be replayed to a
+        // different target through an open redirect.
+        const authenticationResponse = await authenticateTarget(
+          c,
+          inspectorRelayTarget(redirectUrl.toString(), nextMethod),
+          options.authenticate,
+          preAuthRateLimiter,
+          globalPreAuthRateLimiter
+        );
+        if (authenticationResponse) return authenticationResponse;
         if (
           !(await isSafeProxyTarget(
             redirectUrl.toString(),
@@ -325,15 +398,13 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
           deleteHeader(headers, "authorization");
           deleteHeader(headers, "proxy-authorization");
         }
-        if (
-          response.status === 303 ||
-          ((response.status === 301 || response.status === 302) &&
-            currentMethod === "POST")
-        ) {
-          currentMethod = "GET";
-          currentBody = undefined;
+        if (nextMethod !== currentMethod) {
+          currentMethod = nextMethod;
+          currentBody = nextBody;
           deleteHeader(headers, "content-type");
           deleteHeader(headers, "content-length");
+        } else {
+          currentBody = nextBody;
         }
         currentUrl = redirectUrl.toString();
       }
@@ -379,10 +450,58 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
   });
 }
 
+function createCorsOriginResolver(
+  allowedOrigins: readonly string[] | undefined
+): "*" | ((origin: string) => string) {
+  if (allowedOrigins === undefined) return "*";
+  const origins = new Set(allowedOrigins.map(normalizeOrigin));
+  return (origin: string) => {
+    try {
+      const normalized = normalizeOrigin(origin);
+      return origins.has(normalized) ? normalized : "";
+    } catch {
+      return "";
+    }
+  };
+}
+
+function normalizeOrigin(origin: string): string {
+  const url = new URL(origin);
+  if (url.pathname !== "/" || url.search || url.hash) {
+    throw new Error(`MCP proxy allowed origin must be an origin: ${origin}`);
+  }
+  return url.origin;
+}
+
 function deleteHeader(headers: Record<string, string>, name: string): void {
   for (const key of Object.keys(headers)) {
     if (key.toLowerCase() === name) delete headers[key];
   }
+}
+
+async function authenticateTarget(
+  c: Context,
+  target: ReturnType<typeof inspectorRelayTarget>,
+  authenticate: InspectorRelayAuthenticator | undefined,
+  preAuthRateLimiter: RateLimiterMemory,
+  globalPreAuthRateLimiter: RateLimiterMemory
+): Promise<Response | undefined> {
+  if (c.req.method === "OPTIONS" || !authenticate) return undefined;
+  try {
+    await preAuthRateLimiter.consume(
+      inspectorRelayPreAuthKey(
+        c.req.header("CF-Connecting-IP"),
+        c.req.header("X-Forwarded-For")
+      )
+    );
+    await globalPreAuthRateLimiter.consume("inspector-relay:preauth:global");
+  } catch (error) {
+    return inspectorRateLimitResponse(c, error);
+  }
+  if (!(await authenticate(c, target))) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+  return undefined;
 }
 
 async function proxyResponse(response: Response): Promise<Response> {

@@ -354,13 +354,75 @@ services:
 
 ### Environment Variables
 
-All configuration is optional. The inspector works out of the box with sensible defaults.
+The standalone CLI has three explicit OAuth state modes. Local/self-hosted
+development defaults to `memory`, while a production CLI defaults to
+`disabled` so an MCP-only deployment starts without OAuth infrastructure. Set
+`redis` for a multi-replica hosted Inspector; set `memory` only for a deliberate
+single-process deployment.
 
 | Variable   | Default    | Description                  |
 | ---------- | ---------- | ---------------------------- |
 | `NODE_ENV` | production | Node.js environment          |
 | `PORT`     | 8080       | Port to run the inspector on |
 | `HOST`     | 0.0.0.0    | Host to bind to              |
+| `INSPECTOR_OAUTH_STATE_STORE` | `memory` locally, `disabled` in production | `disabled`, `memory`, or `redis` |
+| `INSPECTOR_OAUTH_REDIS_URL` (or `REDIS_URL`) | — | Shared Redis URL required when state mode is `redis` |
+| `INSPECTOR_OAUTH_ENCRYPTION_KEY` | — | Base64-encoded 32-byte AES key required when state mode is `redis` |
+| `INSPECTOR_OAUTH_ENCRYPTION_KEY_ID` | `current` | Non-secret key ID written into new encryption envelopes |
+| `INSPECTOR_OAUTH_PREVIOUS_ENCRYPTION_KEYS_JSON` | — | Server-only JSON array of `{ "id", "key" }` old keys accepted during rotation |
+| `INSPECTOR_OAUTH_REDIS_KEY_PREFIX` | environment-scoped | Redis namespace; keep development and production prefixes separate |
+| `INSPECTOR_OAUTH_ALLOWED_ORIGINS` | — | Comma-separated exact browser origins allowed for OAuth |
+| `INSPECTOR_MCP_ALLOWED_ORIGINS` | OAuth origins (or no cross-origin access in production) | Comma-separated exact browser origins allowed for MCP; omission is legacy wildcard only in local mode |
+| `INSPECTOR_OAUTH_CONFIDENTIAL_CLIENTS_JSON` | — | Server-only JSON array of configured confidential clients |
+| `INSPECTOR_ALLOW_LOOPBACK` | `true` locally, `false` in production | Permit loopback upstream targets |
+
+`INSPECTOR_OAUTH_CONFIDENTIAL_CLIENTS_JSON` is intentionally read only by the
+server. Its shape is:
+
+```json
+[
+  {
+    "serverUrls": ["https://mcp.example.com/mcp"],
+    "authorizationServers": ["https://login.example.com"],
+    "clientId": "server-issued-client-id",
+    "clientSecret": "server-issued-client-secret",
+    "authMethod": "client_secret_post"
+  }
+]
+```
+
+Secrets are never included in browser responses or logs. Do not use `*` for
+OAuth or hosted MCP origins; list every product origin explicitly. DCR state is
+encrypted at rest, uses revision-aware writes, and accepts old key IDs only
+when those old keys are explicitly configured. Configure these values in the
+secret manager (Infisical/Railway) before routing application OAuth traffic to
+the hosted Inspector.
+
+Exact-origin CORS is not caller authentication. The reusable `mountInspector`
+and `mountOAuthProxy` APIs accept an `authenticate` callback so the embedding
+application can verify its own session or signed capability before any
+upstream request. The callback is invoked as `(c, target)`; existing one-
+argument callbacks remain valid, while hosted verifiers should use the target
+context below to bind a capability without parsing or cloning the request body:
+
+```ts
+type InspectorRelayTarget = {
+  origin: string;
+  pathname: string;
+  method: string;
+};
+```
+
+The browser-facing capability belongs in the distinct
+`X-Inspector-Relay-Token` header. Both relay preflights allow it, and the
+relay strips it before every upstream request. Upstream `Authorization` is a
+separate application credential and must not be reused as the relay
+capability. A publicly reachable product relay therefore remains a rollout
+blocker until Cloud or an edge gateway supplies that user/session- and
+target-bound authentication boundary, plus a distributed rate limit. The
+Inspector's built-in rate limiter is a bounded per-process backstop, not a
+multi-replica product authorization mechanism; PR #2260's relay rate-limit
+changes are not implicitly included here.
 
 ---
 
