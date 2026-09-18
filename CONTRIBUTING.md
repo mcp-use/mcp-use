@@ -255,11 +255,19 @@ pnpm lint
 pnpm lint:fix
 ```
 
-### Pre-commit Hooks (TypeScript)
+### Commit Checks (TypeScript)
 
-The TypeScript library uses **Husky** + **lint-staged** for pre-commit hooks. When you run `pnpm install`, Husky is automatically set up via the `prepare` script.
+TypeScript does not install Git hooks. Run the formatting and lint commands above before opening a PR; CI checks both. Commits do not automatically format files or stage changes.
 
-The hooks automatically run Prettier and ESLint on staged `.js`, `.jsx`, `.ts`, and `.tsx` files.
+If you previously installed Husky, you can remove its repository-local hook setting from the repository root:
+
+```bash
+if [ "$(git config --local --get core.hooksPath)" = "libraries/typescript/.husky/_" ]; then
+  git config --local --unset core.hooksPath
+fi
+```
+
+This setting is shared by linked worktrees. Run the cleanup from a checkout with permission to write the shared Git config. The guard preserves custom hook paths.
 
 ### Running Tests
 
