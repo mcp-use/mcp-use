@@ -510,6 +510,7 @@ describe("MCPServer.proxy", () => {
     let mountedPrompt:
       | ((params: Record<string, unknown>, ctx: unknown) => Promise<unknown>)
       | undefined;
+    let getPromptCalls = 0;
     const host: ProxyMountHost = {
       isStarted: () => false,
       hasTool: () => false,
@@ -542,6 +543,7 @@ describe("MCPServer.proxy", () => {
         return { prompts: [{ name: "summarize" }] };
       },
       async getPrompt(_name, _args, options) {
+        getPromptCalls += 1;
         expect(options?.signal).toBe(signal);
         return { messages: [] };
       },
@@ -551,6 +553,7 @@ describe("MCPServer.proxy", () => {
     await mountProxyConnection(host, connection);
     expect(mountedPrompt).toBeDefined();
     await mountedPrompt?.({}, { signal });
+    expect(getPromptCalls).toBe(1);
   });
 
   it("preserves upstream resource annotations and _meta", async () => {
