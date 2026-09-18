@@ -1,58 +1,31 @@
-import { EventEmitter } from "node:events";
-import { beforeEach, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { MCPServer } from "../src/server.js";
 import { mcpUseTanStackStart } from "../src/tanstack-start/vite.js";
 
-const mocks = vi.hoisted(() => ({
-  spawn: vi.fn(),
-  readFile: vi.fn(),
-  readdir: vi.fn(),
-}));
-vi.mock("node:child_process", () => ({ spawn: mocks.spawn }));
-vi.mock("node:fs/promises", () => ({
-  readFile: mocks.readFile,
-  readdir: mocks.readdir,
-}));
-
-beforeEach(() => {
-  vi.resetAllMocks();
-  mocks.spawn.mockImplementation(() => {
-    const child = new EventEmitter();
-    queueMicrotask(() => child.emit("exit", 0));
-    return child;
+describe("TanStack Start plugin configuration", () => {
+  it.each(["/", "/api//mcp", "/api mcp", "/api\tmcp", "relative", "/api?mcp", "/api#mcp"])("rejects invalid basePath %j before building", (basePath) => {
+    expect(() => mcpUseTanStackStart({ basePath })).toThrow("concrete absolute path");
   });
-  mocks.readFile.mockResolvedValue(JSON.stringify({ views: {} }));
-  mocks.readdir.mockResolvedValue([]);
 });
 
-it("builds once on server import, skipping configuration, unrelated modules and client imports", async () => {
-  const plugin = mcpUseTanStackStart();
-  const configure = plugin.configResolved as (config: { root: string }) => void;
-  const load = plugin.load as (
-    this: unknown,
-    id: string
-  ) => Promise<string | undefined>;
-  configure({ root: "/tmp/start-app" });
-  expect(mocks.spawn).not.toHaveBeenCalled();
-  const server = { environment: { config: { consumer: "server" } } };
-  const client = { environment: { config: { consumer: "client" } } };
-  expect(await load.call(client, "unrelated-module")).toBeUndefined();
-  await expect(
-    load.call(client, "\0mcp-use:tanstack-start-build")
-  ).rejects.toThrow("server route");
-  expect(mocks.spawn).not.toHaveBeenCalled();
-  const [first, second] = await Promise.all([
-    load.call(server, "\0mcp-use:tanstack-start-build"),
-    load.call(server, "\0mcp-use:tanstack-start-build"),
-  ]);
-  expect(mocks.spawn).toHaveBeenCalledOnce();
-  expect(mocks.spawn).toHaveBeenCalledWith(
-    process.execPath,
-    expect.arrayContaining(["build", "--no-views-config"]),
-    expect.objectContaining({ cwd: "/tmp/start-app" })
-  );
-  expect(second).toBe(first);
-  const module = await import(
-    `data:text/javascript,${encodeURIComponent(first!)}`
-  );
-  expect((await module.loadTanStackStartBuild()).basePath).toBe("/mcp");
+it("decodes embedded assets only on the first GET and keeps response bodies independent", async () => {
+  const server = new MCPServer({ name: "asset-cache", version: "1", basePath: "/mcp" });
+  server.__primeViews({}, { assets: {
+    "public/cache.svg": { body: btoa("<svg>cache</svg>"), contentType: "image/svg+xml" },
+  } });
+  await server.__mount();
+  const decode = vi.spyOn(globalThis, "atob");
+  try {
+    const url = "http://localhost/mcp/_mcp-use/public/cache.svg";
+    await server.fetch(new Request(url, { method: "HEAD" }));
+    expect(decode).not.toHaveBeenCalled();
+    const first = await server.fetch(new Request(url));
+    const second = await server.fetch(new Request(url));
+    expect(await first.text()).toBe("<svg>cache</svg>");
+    expect(await second.text()).toBe("<svg>cache</svg>");
+    expect(decode).toHaveBeenCalledOnce();
+  } finally {
+    decode.mockRestore();
+    await server.close();
+  }
 });

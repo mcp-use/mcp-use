@@ -10,8 +10,6 @@ declare module "#mcp-use-skills-loader" {
   ): import("./skills/types.js").SkillsSnapshot | undefined;
 }
 
-declare module "#mcp-use-tanstack-start-build" {
-  export function loadTanStackStartBuild(): Promise<
-    import("./tanstack-start/types.js").TanStackStartBuild
-  >;
+declare module "#mcp-use-vite-handler" {
+  export function handleMcpRequest(request: Request): Promise<Response>;
 }
