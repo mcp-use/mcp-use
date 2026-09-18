@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 20.3.9-canary.5
+
+### Patch Changes
+
+- 67ba680: Save and display server aliases consistently, including after reload, without reconnecting when only the alias changes.
+
 ## 20.3.9-canary.4
 
 ### Patch Changes

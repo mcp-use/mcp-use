@@ -19,6 +19,7 @@
     "deprecate-auth-token-alias",
     "fix-managed-model-logo",
     "propagated-b4b4cb29059907a4",
-    "quiet-progress-handlers"
+    "quiet-progress-handlers",
+    "tidy-server-aliases"
   ]
 }
