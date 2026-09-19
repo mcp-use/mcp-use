@@ -1131,15 +1131,18 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     return this.#config.basePath ?? "/mcp";
   }
 
+  #hasAuth(): boolean {
+    return (
+      this.#config.oauth !== undefined || this.#config.requestAuth !== undefined
+    );
+  }
+
   #resolveOAuthResource(
     mode: "listen" | "handler",
     listenPort?: number,
     listenHost?: string
   ): URL | undefined {
-    if (
-      this.#config.oauth === undefined &&
-      this.#config.requestAuth === undefined
-    ) {
+    if (!this.#hasAuth()) {
       return undefined;
     }
     if (this.#oauthResourceResolved) {
@@ -1166,10 +1169,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   }
 
   #assertListenOAuthConfiguration(host: string): void {
-    if (
-      this.#config.oauth === undefined &&
-      this.#config.requestAuth === undefined
-    ) {
+    if (!this.#hasAuth()) {
       return;
     }
     if (["127.0.0.1", "localhost", "::1"].includes(host)) {
@@ -1224,9 +1224,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         observers_complete: this.#mcpEventListeners.filter(
           ({ phase }) => phase === "complete"
         ).length,
-        oauth_configured:
-          this.#config.oauth !== undefined ||
-          this.#config.requestAuth !== undefined,
+        oauth_configured: this.#hasAuth(),
         cors_configured: this.#config.cors !== undefined,
         request_state_configured: this.#config.requestState !== undefined,
         legacy_policy: this.#config.legacy ?? "stateless",
@@ -2254,10 +2252,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   #toRequestContext(
     ctx: ServerContext
   ): RequestContext<TUser, HasOAuth<TUser>, TEnv> {
-    if (
-      this.#config.oauth === undefined &&
-      this.#config.requestAuth === undefined
-    ) {
+    if (!this.#hasAuth()) {
       return toRequestContext<TEnv>(ctx) as RequestContext<
         TUser,
         HasOAuth<TUser>,
