@@ -45,7 +45,7 @@ export interface OAuthSessionStoreOptions {
   clientUri?: string;
   /** Public OAuth client logo URL. */
   logoUri?: string;
-  /** OAuth redirect URI. */
+  /** OAuth redirect URI; HTTP loopback callbacks register as local native clients. */
   callbackUrl?: string;
   /** OAuth Client ID Metadata Document URL. */
   clientMetadataUrl?: string;
@@ -142,8 +142,17 @@ export class OAuthSessionStore {
   }
 
   get clientMetadata(): OAuthClientMetadata {
+    const callback = URL.canParse(this.redirectUrl)
+      ? new URL(this.redirectUrl)
+      : undefined;
+    // OIDC registration defaults to "web", which strict issuers reject for
+    // loopback callbacks used by local clients such as the desktop Inspector.
+    const nativeLoopback =
+      callback?.protocol === "http:" &&
+      ["localhost", "127.0.0.1", "[::1]"].includes(callback.hostname);
     return {
       redirect_uris: [this.redirectUrl],
+      ...(nativeLoopback ? { application_type: "native" } : {}),
       token_endpoint_auth_method: "none",
       grant_types: ["authorization_code", "refresh_token"],
       response_types: ["code"],

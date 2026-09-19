@@ -1,6 +1,6 @@
 import { MCPServer } from "../src/index.js";
 import { toAuthenticatedRequestContext } from "../src/context.js";
-import type { OAuthProvider } from "../src/oauth/index.js";
+import type { OAuthProvider, RequestAuthOptions } from "../src/oauth/index.js";
 import { oauthAuth0Provider, type Auth0OAuthUser } from "../src/oauth/auth0.js";
 import {
   oauthBetterAuthProvider,
@@ -41,6 +41,7 @@ interface TestUser {
 }
 
 declare const provider: OAuthProvider<TestUser>;
+declare const requestAuth: RequestAuthOptions<TestUser>;
 
 function verifyStructuralProviderTyping(
   tokenVerifier: OAuthTokenVerifier,
@@ -80,6 +81,24 @@ function assertOAuthAuthFields<TUser>(auth: OAuthAuth<TUser>): void {
 // This function is intentionally not invoked: tsconfig.test.json typechecks
 // the callback contracts while Vitest has no runtime provider to configure.
 function verifyOAuthCallbackTyping(): void {
+  const engineAuthenticated = new MCPServer({
+    name: "engine-authenticated",
+    version: "1.0.0",
+    requestAuth,
+  });
+  engineAuthenticated.tool({ name: "whoami" }, (_params, ctx) => {
+    const user: TestUser = ctx.auth.user;
+    assertOAuthAuthFields(ctx.auth);
+    return { content: [{ type: "text", text: user.id }] };
+  });
+  // @ts-expect-error Request authentication and a token provider are mutually exclusive.
+  new MCPServer<TestUser>({
+    name: "both",
+    version: "1.0.0",
+    oauth: provider,
+    requestAuth,
+  });
+
   const authenticated = new MCPServer({
     name: "authenticated",
     version: "1.0.0",

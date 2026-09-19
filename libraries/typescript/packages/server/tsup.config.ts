@@ -32,6 +32,8 @@ export default defineConfig([
       "oauth/supabase": "src/oauth/supabase.ts",
       "oauth/keycloak": "src/oauth/keycloak.ts",
       "oauth/better-auth": "src/oauth/better-auth.ts",
+      "oauth/better-auth-mcp": "src/oauth/better-auth-mcp.ts",
+      "oauth/native-identity": "src/oauth/native-identity.ts",
       "oauth/scalekit": "src/oauth/scalekit.ts",
       "oauth/convex": "src/oauth/convex.ts",
       // Keep the OpenAPI integration in a sibling chunk. `MCPServer` imports
@@ -44,6 +46,8 @@ export default defineConfig([
       // Completion normalization is a synchronous internal dependency kept
       // outside the root entry's independently enforced size budget.
       "internal/resource-completion": "src/resource-completion.ts",
+      // Keep shared configuration validation in an internal sibling chunk.
+      "internal/config": "src/config.ts",
       // Internal-only validation entry; absent from package exports.
       "internal/usage": "src/usage.ts",
       // Runtime-only binary: owns `mcp-use start` and delegates development

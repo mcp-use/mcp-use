@@ -102,23 +102,34 @@ export function wrapOAuthTokenVerifier<TUser>(
   return {
     async verifyAccessToken(token: string): Promise<AuthInfo> {
       const authInfo = await tokenVerifier.verifyAccessToken(token);
-      assertVerifiedAuthInfo(authInfo);
-      assertResourceBinding(authInfo, canonicalResource);
-
-      let mapped: OAuthExtra<TUser>;
-      try {
-        mapped = provider.mapAuthInfo(authInfo);
-      } catch (error) {
-        throw invalidToken("Token identity mapping failed", error);
-      }
-      assertMappedExtra(mapped);
-
-      return {
-        ...authInfo,
-        scopes: [...authInfo.scopes],
-        extra: { ...authInfo.extra, ...mapped },
-      };
+      return mapVerifiedAuthInfo(authInfo, canonicalResource, (info) =>
+        provider.mapAuthInfo(info)
+      );
     },
+  };
+}
+
+/** @internal Validates verifier output and maps its identity into callback context. */
+export function mapVerifiedAuthInfo<TUser>(
+  authInfo: AuthInfo,
+  expectedResource: URL,
+  mapAuthInfo: (authInfo: AuthInfo) => OAuthExtra<TUser>
+): AuthInfo {
+  assertVerifiedAuthInfo(authInfo);
+  assertResourceBinding(authInfo, expectedResource);
+
+  let mapped: OAuthExtra<TUser>;
+  try {
+    mapped = mapAuthInfo(authInfo);
+  } catch (error) {
+    throw invalidToken("Token identity mapping failed", error);
+  }
+  assertMappedExtra(mapped);
+
+  return {
+    ...authInfo,
+    scopes: [...authInfo.scopes],
+    extra: { ...authInfo.extra, ...mapped },
   };
 }
 
