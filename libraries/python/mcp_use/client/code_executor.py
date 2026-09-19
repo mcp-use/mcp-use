@@ -19,6 +19,22 @@ if TYPE_CHECKING:
     from mcp_use.client.client import MCPClient
 
 
+def _tool_identifier(tool_name: str) -> str:
+    """Return the identifier ``tool_name`` is exposed under in code mode.
+
+    Args:
+        tool_name: Tool name as reported by the server.
+
+    Returns:
+        A valid Python identifier, or an empty string when the name has no
+        character that can be used in one.
+    """
+    identifier = re.sub(r"[^a-zA-Z0-9_]", "_", tool_name)
+    if identifier and not identifier[0].isalpha() and identifier[0] != "_":
+        identifier = f"_{identifier}"
+    return identifier
+
+
 class CodeExecutor:
     """Executes Python code with access to MCP tools in a restricted namespace.
 
@@ -201,8 +217,8 @@ class CodeExecutor:
 
                 for tool in tools:
                     tool_name = tool.name
-                    # Sanitize tool name to be a valid Python identifier
-                    sanitized_name = re.sub(r"[^a-zA-Z0-9_]", "_", tool_name)
+                    # Identifier this tool is exposed under in the namespace
+                    sanitized_name = _tool_identifier(tool_name)
                     if not sanitized_name:
                         # A tool name without a single usable character cannot be
                         # exposed as an identifier. Skip that tool instead of
@@ -210,8 +226,6 @@ class CodeExecutor:
                         # other tools of this server as well.
                         logger.warning(f"Skipping tool with an unusable name on server {server_name}: {tool_name!r}")
                         continue
-                    if not sanitized_name[0].isalpha() and sanitized_name[0] != "_":
-                        sanitized_name = f"_{sanitized_name}"
 
                     # Create wrapper function for this tool
                     wrapper = self._create_tool_wrapper(server_name, tool_name, tool)
@@ -310,6 +324,10 @@ class CodeExecutor:
                         all_namespaces.add(server_name)
 
                     for tool in tools:
+                        # Keep discovery in sync with the execution namespace, which
+                        # cannot expose a tool name without a usable character.
+                        if not _tool_identifier(tool.name):
+                            continue
                         # Build tool info based on detail level (before filtering)
                         if detail_level == "names":
                             tool_info = {
