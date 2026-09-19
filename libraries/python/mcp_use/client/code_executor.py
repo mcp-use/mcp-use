@@ -199,19 +199,45 @@ class CodeExecutor:
                 # Create namespace object for this server
                 server_namespace = type(server_name, (), {})()
 
-                for tool in tools:
+                # Identifiers already exposed for this server, mapped to the tool
+                # name they belong to.
+                exposed: dict[str, str] = {}
+
+                # A tool whose own name is already the identifier claims it first, so
+                # a name that has to be rewritten cannot take it. `sorted` is stable,
+                # so the order the server reported is kept within both groups.
+                ordered_tools = sorted(tools, key=lambda entry: re.sub(r"[^a-zA-Z0-9_]", "_", entry.name) != entry.name)
+
+                for tool in ordered_tools:
                     tool_name = tool.name
                     # Sanitize tool name to be a valid Python identifier
                     sanitized_name = re.sub(r"[^a-zA-Z0-9_]", "_", tool_name)
                     if not sanitized_name[0].isalpha() and sanitized_name[0] != "_":
                         sanitized_name = f"_{sanitized_name}"
 
+                    # Distinct tool names can sanitize to the same identifier, for
+                    # example "weather.get" and "weather-get". Give the later one a
+                    # suffixed name instead of silently replacing the wrapper of the
+                    # first, which would make one of the two tools unreachable.
+                    if sanitized_name in exposed and exposed[sanitized_name] != tool_name:
+                        base_name = sanitized_name
+                        suffix = 2
+                        while f"{base_name}_{suffix}" in exposed:
+                            suffix += 1
+                        sanitized_name = f"{base_name}_{suffix}"
+                        logger.warning(
+                            f"Tool {tool_name!r} of server {server_name} also sanitizes to {base_name!r}; "
+                            f"exposing it as {sanitized_name!r}"
+                        )
+
                     # Create wrapper function for this tool
                     wrapper = self._create_tool_wrapper(server_name, tool_name, tool)
                     setattr(server_namespace, sanitized_name, wrapper)
-                    # Also keep original name if it's valid, just in case
-                    if sanitized_name != tool_name and tool_name.isidentifier():
+                    exposed[sanitized_name] = tool_name
+                    # Also keep original name if it's valid and still free, just in case
+                    if sanitized_name != tool_name and tool_name.isidentifier() and tool_name not in exposed:
                         setattr(server_namespace, tool_name, wrapper)
+                        exposed[tool_name] = tool_name
 
                 tool_namespaces[server_name] = server_namespace
                 logger.debug(f"Added namespace '{server_name}' with {len(tools)} tools")

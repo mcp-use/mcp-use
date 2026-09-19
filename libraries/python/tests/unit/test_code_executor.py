@@ -424,3 +424,147 @@ return a + b
 
         assert result["error"] is None
         assert result["result"] == 3
+
+
+class TestCodeExecutorToolNameCollisions:
+    """Distinct tool names must stay reachable after sanitization."""
+
+    @pytest.mark.asyncio
+    async def test_colliding_names_do_not_replace_each_other(self, mock_client, code_executor):
+        """`weather.get` and `weather-get` both sanitize to `weather_get`."""
+        mock_session = AsyncMock()
+
+        dotted = Mock()
+        dotted.name = "weather.get"
+        dotted.description = "Get the weather"
+        dotted.inputSchema = {}
+
+        dashed = Mock()
+        dashed.name = "weather-get"
+        dashed.description = "Get the weather as well"
+        dashed.inputSchema = {}
+
+        mock_session.list_tools = AsyncMock(return_value=[dotted, dashed])
+        mock_session.call_tool = AsyncMock(return_value=Mock(content=[Mock(text="ok")]))
+
+        mock_client.sessions = {"weather": mock_session}
+        mock_client.get_session = Mock(return_value=mock_session)
+        mock_client.get_server_names = Mock(return_value=[])
+
+        code = "first = await weather.weather_get()\nsecond = await weather.weather_get_2()\nreturn [first, second]\n"
+
+        result = await code_executor.execute(code, timeout=5.0)
+
+        assert result["error"] is None
+        assert result["result"] == ["ok", "ok"]
+        called = [call.args[0] for call in mock_session.call_tool.await_args_list]
+        assert called == ["weather.get", "weather-get"]
+
+    @pytest.mark.asyncio
+    async def test_collision_is_reported(self, mock_client, code_executor, caplog):
+        """The agent is told about the renamed tool instead of losing it quietly."""
+        mock_session = AsyncMock()
+
+        dotted = Mock()
+        dotted.name = "weather.get"
+        dotted.description = "Get the weather"
+        dotted.inputSchema = {}
+
+        dashed = Mock()
+        dashed.name = "weather-get"
+        dashed.description = "Get the weather as well"
+        dashed.inputSchema = {}
+
+        mock_session.list_tools = AsyncMock(return_value=[dotted, dashed])
+        mock_client.sessions = {"weather": mock_session}
+        mock_client.get_server_names = Mock(return_value=[])
+
+        with caplog.at_level("WARNING"):
+            namespace = await code_executor._build_namespace()
+
+        assert hasattr(namespace["weather"], "weather_get")
+        assert hasattr(namespace["weather"], "weather_get_2")
+        assert "weather-get" in caplog.text
+        assert "weather_get_2" in caplog.text
+
+    @pytest.mark.asyncio
+    async def test_exact_name_wins_the_identifier(self, mock_client, code_executor):
+        """`get_stock` keeps `get_stock`; `get-stock` is exposed as `get_stock_2`."""
+        mock_session = AsyncMock()
+
+        dashed = Mock()
+        dashed.name = "get-stock"
+        dashed.description = "Dashed name"
+        dashed.inputSchema = {}
+
+        plain = Mock()
+        plain.name = "get_stock"
+        plain.description = "Plain name"
+        plain.inputSchema = {}
+
+        # The server reports the dashed name first
+        mock_session.list_tools = AsyncMock(return_value=[dashed, plain])
+        mock_session.call_tool = AsyncMock(return_value=Mock(content=[Mock(text="ok")]))
+
+        mock_client.sessions = {"stocks": mock_session}
+        mock_client.get_session = Mock(return_value=mock_session)
+        mock_client.get_server_names = Mock(return_value=[])
+
+        code = "first = await stocks.get_stock()\nsecond = await stocks.get_stock_2()\nreturn [first, second]\n"
+
+        result = await code_executor.execute(code, timeout=5.0)
+
+        assert result["error"] is None
+        called = [call.args[0] for call in mock_session.call_tool.await_args_list]
+        assert called == ["get_stock", "get-stock"]
+
+    @pytest.mark.asyncio
+    async def test_repeated_tool_name_is_not_renamed(self, mock_client, code_executor, caplog):
+        """The same name listed twice keeps one wrapper and warns about nothing."""
+        mock_session = AsyncMock()
+
+        first = Mock()
+        first.name = "weather.get"
+        first.description = "Get the weather"
+        first.inputSchema = {}
+
+        second = Mock()
+        second.name = "weather.get"
+        second.description = "Get the weather again"
+        second.inputSchema = {}
+
+        mock_session.list_tools = AsyncMock(return_value=[first, second])
+        mock_client.sessions = {"weather": mock_session}
+        mock_client.get_server_names = Mock(return_value=[])
+
+        with caplog.at_level("WARNING"):
+            namespace = await code_executor._build_namespace()
+
+        exposed = [name for name in vars(namespace["weather"]) if not name.startswith("__")]
+        assert exposed == ["weather_get"]
+        assert "collides" not in caplog.text and "sanitizes" not in caplog.text
+
+    @pytest.mark.asyncio
+    async def test_rewritten_name_keeps_its_original_identifier_alias(self, mock_client, code_executor):
+        """`café` is reachable both as `caf_` and under its own name."""
+        mock_session = AsyncMock()
+
+        accented = Mock()
+        accented.name = "café"
+        accented.description = "Unicode name"
+        accented.inputSchema = {}
+
+        mock_session.list_tools = AsyncMock(return_value=[accented])
+        mock_session.call_tool = AsyncMock(return_value=Mock(content=[Mock(text="ok")]))
+
+        mock_client.sessions = {"store": mock_session}
+        mock_client.get_session = Mock(return_value=mock_session)
+        mock_client.get_server_names = Mock(return_value=[])
+
+        code = "first = await store.caf_()\nsecond = await store.café()\nreturn [first, second]\n"
+
+        result = await code_executor.execute(code, timeout=5.0)
+
+        assert result["error"] is None
+        called = [call.args[0] for call in mock_session.call_tool.await_args_list]
+        assert called == ["café", "café"]
