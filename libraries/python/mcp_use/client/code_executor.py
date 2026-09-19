@@ -9,7 +9,9 @@ direct tool calls.
 import asyncio
 import io
 import re
+import textwrap
 import time
+import tokenize
 from contextlib import redirect_stderr, redirect_stdout
 from typing import TYPE_CHECKING, Any
 
@@ -17,6 +19,59 @@ from mcp_use.logging import logger
 
 if TYPE_CHECKING:
     from mcp_use.client.client import MCPClient
+
+# Tokens that never start a statement: the statement starts at the first token
+# after them.
+_NON_STARTING_TOKENS = frozenset(
+    {
+        tokenize.NEWLINE,
+        tokenize.NL,
+        tokenize.INDENT,
+        tokenize.DEDENT,
+        tokenize.COMMENT,
+        tokenize.ENDMARKER,
+    }
+)
+
+
+def _indent_logical_lines(code: str, prefix: str = "    ") -> str:
+    """Indent the first line of every logical line of ``code``.
+
+    Code is executed by nesting it in an async function, so its statements need
+    one more level of indentation. Only the line that starts a logical line is
+    touched: continuation lines (inside brackets, after a backslash, or inside a
+    multi-line string literal) are copied verbatim, because indenting them would
+    change the value of multi-line strings.
+
+    Args:
+        code: Source code to indent.
+        prefix: Indentation to add, four spaces by default.
+
+    Returns:
+        The indented source code.
+    """
+    # The tokenizer treats a lone "\r" as part of the line while compile()
+    # translates it to "\n", so normalize line endings first to keep the line
+    # numbers reported by the tokenizer aligned with the lines indexed below.
+    code = code.replace("\r\n", "\n").replace("\r", "\n")
+
+    starts: set[int] = set()
+    at_statement_start = True
+
+    try:
+        for token in tokenize.generate_tokens(io.StringIO(code).readline):
+            if token.type == tokenize.NEWLINE:
+                at_statement_start = True
+            elif at_statement_start and token.type not in _NON_STARTING_TOKENS:
+                starts.add(token.start[0])
+                at_statement_start = False
+    except tokenize.TokenError:
+        # Unbalanced brackets or an unterminated string literal: indent every
+        # line so that compile() reports the syntax error to the caller.
+        return textwrap.indent(code, prefix)
+
+    lines = code.splitlines(keepends=True)
+    return "".join(f"{prefix}{line}" if number in starts else line for number, line in enumerate(lines, start=1))
 
 
 class CodeExecutor:
@@ -115,9 +170,7 @@ class CodeExecutor:
         """
         # Always wrap code in an async function to support top-level await
         # and return statements
-        wrapped_code = "async def __execute_wrapper__():\n"
-        for line in code.split("\n"):
-            wrapped_code += f"    {line}\n"
+        wrapped_code = "async def __execute_wrapper__():\n" + _indent_logical_lines(code)
 
         # Compile and execute the wrapper function definition
         compiled_wrapped = compile(wrapped_code, "<agent_code>", "exec")
