@@ -1,7 +1,7 @@
 import type { Icon, ServerOptions } from "@modelcontextprotocol/server";
 
 import type { LoggingOptions } from "./logging.js";
-import type { OAuthProvider } from "./oauth/index.js";
+import type { OAuthProvider, RequestAuthOptions } from "./oauth/index.js";
 import type { SkillsOptions } from "./skills/types.js";
 
 /**
@@ -151,13 +151,13 @@ interface BaseServerConfig {
    */
   legacy?: "stateless" | "reject";
   /**
-   * Expose the HTML landing page without bearer authentication when OAuth is
-   * configured.
+   * Expose the HTML landing page without authentication when `oauth` or
+   * `requestAuth` is configured.
    *
    * The landing page itself is always mounted at `basePath` for browser GET
-   * and HEAD requests that explicitly accept `text/html`. Without OAuth it is
-   * public. With OAuth, it requires a valid bearer token unless this option is
-   * `true`. MCP protocol requests remain protected in either case.
+   * and HEAD requests that explicitly accept `text/html`. Without authentication
+   * it is public. Otherwise, the configured authenticator runs unless this
+   * option is `true`. MCP protocol requests remain protected in either case.
    *
    * @defaultValue `false`
    */
@@ -259,13 +259,35 @@ export interface CorsOptions {
  * @throws TypeError When `basePath` is present but not an absolute URL
  * pathname without empty segments, trailing slash, query, fragment, or
  * whitespace, or when `skills` is not a boolean or valid configuration
- * object.
+ * object, or when authentication modes are combined or invalid.
  */
 export function assertServerConfig(config: {
   basePath?: unknown;
   port?: unknown;
   skills?: unknown;
+  oauth?: unknown;
+  requestAuth?: unknown;
 }): void {
+  if (config.oauth !== undefined && config.requestAuth !== undefined) {
+    throw new TypeError("oauth and requestAuth cannot be configured together");
+  }
+  if (config.requestAuth !== undefined) {
+    const auth = config.requestAuth;
+    if (
+      auth === null ||
+      typeof auth !== "object" ||
+      !("resource" in auth) ||
+      (typeof auth.resource !== "string" && !(auth.resource instanceof URL)) ||
+      !("authenticate" in auth) ||
+      typeof auth.authenticate !== "function" ||
+      !("mapAuthInfo" in auth) ||
+      typeof auth.mapAuthInfo !== "function"
+    ) {
+      throw new TypeError(
+        "requestAuth requires resource, authenticate, and mapAuthInfo"
+      );
+    }
+  }
   if (config.basePath !== undefined) {
     if (typeof config.basePath !== "string") {
       throw new TypeError(
@@ -313,20 +335,31 @@ export function assertServerConfig(config: {
 /**
  * Server identity and behavior, passed to `new MCPServer(...)`.
  *
- * A user type other than `never` requires an OAuth provider, preventing a
+ * A user type other than `never` requires an authenticator, preventing a
  * callback from declaring authenticated context without authentication at
- * runtime. Omitting the type keeps the no-OAuth API ergonomic.
+ * runtime. Omitting the type keeps the unauthenticated API ergonomic.
  */
 export type ServerConfig<TUser = never> = BaseServerConfig &
   ([TUser] extends [never]
     ? {
         /** OAuth is unavailable when no authenticated user type is declared. */
         oauth?: undefined;
+        /** Request authentication is unavailable without an authenticated user type. */
+        requestAuth?: undefined;
       }
-    : {
-        /**
-         * External OAuth resource-server provider. Callback contexts receive
-         * this provider's user type as required `ctx.auth.user`.
-         */
-        oauth: OAuthProvider<TUser>;
-      });
+    :
+        | {
+            /**
+             * External OAuth resource-server provider. Callback contexts receive
+             * this provider's user type as required `ctx.auth.user`.
+             */
+            oauth: OAuthProvider<TUser>;
+            /** Request authentication cannot be combined with an OAuth provider. */
+            requestAuth?: never;
+          }
+        | {
+            /** External engine that verifies requests and supplies typed callback identity. */
+            requestAuth: RequestAuthOptions<TUser>;
+            /** OAuth provider verification cannot be combined with request authentication. */
+            oauth?: never;
+          });

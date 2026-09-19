@@ -88,6 +88,26 @@ describe("OAuthSessionStore", () => {
       expect(md.client_name).toBe("test-client");
       expect(md.client_uri).toBe("https://test.example.com");
       expect(md.logo_uri).toBe("https://test.example.com/logo.png");
+      expect(md.application_type).toBeUndefined();
+    });
+
+    it.each(["localhost", "127.0.0.1"])(
+      "registers an HTTP %s callback as a native client",
+      (host) => {
+        const callbackUrl = `http://${host}:3000/inspector/oauth/callback`;
+        const { session } = createStore({ ...DEFAULT_OPTS, callbackUrl });
+        expect(session.clientMetadata.application_type).toBe("native");
+        expect(session.clientMetadata.redirect_uris).toEqual([callbackUrl]);
+      }
+    );
+
+    it.each([
+      "http://example.com/oauth/callback",
+      "http://localhost.example.com/oauth/callback",
+      "https://localhost/oauth/callback",
+    ])("does not classify %s as HTTP loopback", (callbackUrl) => {
+      const { session } = createStore({ ...DEFAULT_OPTS, callbackUrl });
+      expect(session.clientMetadata.application_type).toBeUndefined();
     });
   });
 

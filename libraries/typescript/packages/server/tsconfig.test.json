@@ -4,6 +4,8 @@
   // tests/type-level.test.ts rely on this (vitest itself does not typecheck).
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    // Vitest runs in Node, including the client's Node OAuth provider export.
+    "customConditions": ["node"],
     "composite": false,
     "declaration": false,
     "declarationMap": false,

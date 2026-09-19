@@ -1,0 +1,33 @@
+{
+  "name": "mcp-use-example-auth-firebase",
+  "private": true,
+  "type": "module",
+  "description": "Firebase Google sign-in through the shared native MCP OAuth engine.",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "migrate": "tsx src/migrate.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "mcp-use": "workspace:*",
+    "better-auth": "1.7.4",
+    "@better-auth/oauth-provider": "1.7.4",
+    "@hono/node-server": "^2.0.5",
+    "pg": "^8.16.3",
+    "jose": "^6.1.3",
+    "zod": "^4.4.3",
+    "@better-auth/mcp": "1.7.4",
+    "@better-auth/cimd": "1.7.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "typescript": "^7.0.2",
+    "@types/pg": "^8.15.5",
+    "tsx": "^4.21.0"
+  }
+}

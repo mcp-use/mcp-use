@@ -76,6 +76,10 @@ export const examples = [
   external("auth/better-auth"),
   external("auth/clerk"),
   external("auth/convex"),
+  configuration(
+    "auth/firebase",
+    "Firebase sign-in requires project credentials and persistent SQL storage; only type checks run here."
+  ),
   external("auth/keycloak"),
   external("auth/supabase"),
   external("auth/workos"),
