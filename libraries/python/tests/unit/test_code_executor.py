@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, Mock
 import pytest
 
 from mcp_use.client.client import MCPClient
-from mcp_use.client.code_executor import CodeExecutor
+from mcp_use.client.code_executor import CodeExecutor, _indent_logical_lines
 
 
 @pytest.fixture
@@ -424,3 +424,131 @@ return a + b
 
         assert result["error"] is None
         assert result["result"] == 3
+
+
+class TestIndentLogicalLines:
+    """The wrapper indents statements only; everything else stays verbatim."""
+
+    def test_only_statement_lines_are_indented(self):
+        """Lines inside a multi-line string keep their original indentation."""
+        code = 'value = """a\nb"""\nreturn value\n'
+
+        assert _indent_logical_lines(code) == '    value = """a\nb"""\n    return value\n'
+
+    def test_continuation_lines_are_untouched(self):
+        """Bracketed and backslash continuations do not need extra indentation."""
+        code = "value = sum([\n1,\n])\nother = 1 + \\\n2\nreturn value + other\n"
+        expected = "    value = sum([\n1,\n])\n    other = 1 + \\\n2\n    return value + other\n"
+
+        assert _indent_logical_lines(code) == expected
+
+    def test_other_line_boundary_characters_are_not_line_breaks(self):
+        """`\\f`, `\\u2028` and friends stay inside the line, as in the tokenizer."""
+        code = 'value = """a\fb\u2028c"""\nreturn value\n'
+        expected = '    value = """a\fb\u2028c"""\n    return value\n'
+
+        assert _indent_logical_lines(code) == expected
+
+    def test_unterminated_string_indents_every_line(self):
+        """A source that cannot be tokenized falls back to the blanket indent."""
+        code = 'value = """oops\nreturn value\n'
+
+        assert _indent_logical_lines(code) == '    value = """oops\n    return value\n'
+
+    def test_unbalanced_brackets_indent_every_line(self):
+        """Same fallback for brackets that are never closed."""
+        code = "value = sum([1,\n2\n"
+
+        assert _indent_logical_lines(code) == "    value = sum([1,\n    2\n"
+
+    def test_line_endings_are_normalized(self):
+        """Line endings are normalized so tokenizer line numbers stay in sync."""
+        code = 'value = """a\r\nb"""\r\nreturn value\r\n'
+
+        assert _indent_logical_lines(code) == '    value = """a\nb"""\n    return value\n'
+
+
+class TestCodeExecutorSourceFidelity:
+    """Code must run exactly as written, including multi-line string literals."""
+
+    @pytest.mark.asyncio
+    async def test_multiline_string_is_not_reindented(self, code_executor):
+        """String contents must not receive the indentation added by the wrapper."""
+        code = 'value = """first\nsecond\nthird"""\nreturn value\n'
+
+        result = await code_executor.execute(code, timeout=5.0)
+
+        assert result["error"] is None
+        assert result["result"] == "first\nsecond\nthird"
+
+    @pytest.mark.asyncio
+    async def test_multiline_string_keeps_its_own_indentation(self, code_executor):
+        """Indentation inside a string literal is data, not layout."""
+        code = 'value = """def f():\n    return 1\n"""\nreturn value\n'
+
+        result = await code_executor.execute(code, timeout=5.0)
+
+        assert result["error"] is None
+        assert result["result"] == "def f():\n    return 1\n"
+
+    @pytest.mark.asyncio
+    async def test_multiline_fstring_is_not_reindented(self, code_executor):
+        """Replacement fields on continuation lines are part of the literal."""
+        code = 'x = 7\nvalue = f"""a\n{x}\nc"""\nreturn value\n'
+
+        result = await code_executor.execute(code, timeout=5.0)
+
+        assert result["error"] is None
+        assert result["result"] == "a\n7\nc"
+
+    @pytest.mark.asyncio
+    async def test_multiline_string_sent_to_tool_is_unmodified(self, mock_client, code_executor):
+        """Tools must receive the payload exactly as the agent wrote it."""
+        mock_session = AsyncMock()
+        mock_tool = Mock()
+        mock_tool.name = "echo"
+        mock_tool.description = "Echo a payload"
+        mock_tool.inputSchema = {}
+        mock_session.list_tools = AsyncMock(return_value=[mock_tool])
+        mock_session.call_tool = AsyncMock(return_value=Mock(content=[Mock(text="ok")]))
+
+        mock_client.sessions = {"server": mock_session}
+        mock_client.get_session = Mock(return_value=mock_session)
+        mock_client.get_server_names = Mock(return_value=[])
+
+        code = 'payload = """SELECT *\nFROM users\n"""\nreturn await server.echo(payload=payload)\n'
+
+        result = await code_executor.execute(code, timeout=5.0)
+
+        assert result["error"] is None
+        mock_session.call_tool.assert_awaited_once_with("echo", {"payload": "SELECT *\nFROM users\n"})
+
+    @pytest.mark.asyncio
+    async def test_nested_blocks_and_standalone_comments(self, code_executor):
+        """Blocks, blank lines and comments still nest correctly."""
+        code = "total = 0\nfor i in range(3):\n# standalone comment\n    if i:\n        total += i\n\nreturn total\n"
+
+        result = await code_executor.execute(code, timeout=5.0)
+
+        assert result["error"] is None
+        assert result["result"] == 3
+
+    @pytest.mark.asyncio
+    async def test_top_level_await_and_return_still_supported(self, code_executor):
+        """The wrapper exists to support top-level await and return."""
+        code = "await asyncio.sleep(0)\nreturn 'done'\n"
+
+        result = await code_executor.execute(code, timeout=5.0)
+
+        assert result["error"] is None
+        assert result["result"] == "done"
+
+    @pytest.mark.asyncio
+    async def test_string_with_form_feed_keeps_its_value(self, code_executor):
+        """Form feed is data inside a literal, not a line break."""
+        code = 'value = """a\fb"""\nreturn value\n'
+
+        result = await code_executor.execute(code, timeout=5.0)
+
+        assert result["error"] is None
+        assert result["result"] == "a\fb"
