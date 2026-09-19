@@ -276,10 +276,6 @@ async function whoami(argv: readonly string[], json: boolean): Promise<number> {
   });
   const config = await readCloudConfig();
   const identity = await (await CloudApi.create()).identity();
-  // Resolve the organization the way `org current` and
-  // `cloudApiForOrganization` do, so `whoami` names the organization the rest
-  // of the CLI actually operates against rather than reporting none whenever
-  // the local config has no explicit selection.
   const organization =
     identity.organizations.find(
       (item) => item.id === (config.orgId ?? identity.defaultOrganizationId)
