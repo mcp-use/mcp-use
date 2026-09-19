@@ -203,7 +203,12 @@ class CodeExecutor:
                 # name they belong to.
                 exposed: dict[str, str] = {}
 
-                for tool in tools:
+                # A tool whose own name is already the identifier claims it first, so
+                # a name that has to be rewritten cannot take it. `sorted` is stable,
+                # so the order the server reported is kept within both groups.
+                ordered_tools = sorted(tools, key=lambda entry: re.sub(r"[^a-zA-Z0-9_]", "_", entry.name) != entry.name)
+
+                for tool in ordered_tools:
                     tool_name = tool.name
                     # Sanitize tool name to be a valid Python identifier
                     sanitized_name = re.sub(r"[^a-zA-Z0-9_]", "_", tool_name)
