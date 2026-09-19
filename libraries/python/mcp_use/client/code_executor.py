@@ -203,6 +203,13 @@ class CodeExecutor:
                     tool_name = tool.name
                     # Sanitize tool name to be a valid Python identifier
                     sanitized_name = re.sub(r"[^a-zA-Z0-9_]", "_", tool_name)
+                    if not sanitized_name:
+                        # A tool name without a single usable character cannot be
+                        # exposed as an identifier. Skip that tool instead of
+                        # failing the whole namespace, which would hide the
+                        # other tools of this server as well.
+                        logger.warning(f"Skipping tool with an unusable name on server {server_name}: {tool_name!r}")
+                        continue
                     if not sanitized_name[0].isalpha() and sanitized_name[0] != "_":
                         sanitized_name = f"_{sanitized_name}"
 

@@ -424,3 +424,58 @@ return a + b
 
         assert result["error"] is None
         assert result["result"] == 3
+
+
+class TestCodeExecutorToolNamespaces:
+    """Namespaces must survive tool entries whose name cannot be used."""
+
+    @pytest.mark.asyncio
+    async def test_unusable_tool_name_does_not_hide_other_tools(self, mock_client, code_executor):
+        """One malformed name must not remove the other tools of that server."""
+        mock_session = AsyncMock()
+
+        broken = Mock()
+        broken.name = ""
+        broken.description = "No usable name"
+        broken.inputSchema = {}
+
+        usable = Mock()
+        usable.name = "read_file"
+        usable.description = "Read a file"
+        usable.inputSchema = {}
+
+        mock_session.list_tools = AsyncMock(return_value=[broken, usable])
+        mock_session.call_tool = AsyncMock(return_value=Mock(content=[Mock(text="content")]))
+
+        mock_client.sessions = {"files": mock_session}
+        mock_client.get_session = Mock(return_value=mock_session)
+        mock_client.get_server_names = Mock(return_value=[])
+
+        code = 'return await files.read_file(path="a.txt")\n'
+
+        result = await code_executor.execute(code, timeout=5.0)
+
+        assert result["error"] is None
+        assert result["result"] == "content"
+        mock_session.call_tool.assert_awaited_once_with("read_file", {"path": "a.txt"})
+
+    @pytest.mark.asyncio
+    async def test_server_with_only_unusable_names_is_still_registered(self, mock_client, code_executor):
+        """The namespace exists, so other servers stay reachable through it."""
+        mock_session = AsyncMock()
+
+        broken = Mock()
+        broken.name = ""
+        broken.description = "No usable name"
+        broken.inputSchema = {}
+
+        mock_session.list_tools = AsyncMock(return_value=[broken])
+        mock_client.sessions = {"files": mock_session}
+        mock_client.get_server_names = Mock(return_value=[])
+
+        code = "return __tool_namespaces\n"
+
+        result = await code_executor.execute(code, timeout=5.0)
+
+        assert result["error"] is None
+        assert result["result"] == ["files"]
