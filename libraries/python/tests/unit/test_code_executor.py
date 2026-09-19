@@ -442,6 +442,25 @@ class TestIndentLogicalLines:
 
         assert _indent_logical_lines(code) == expected
 
+    def test_other_line_boundary_characters_are_not_line_breaks(self):
+        """`\\f`, `\\u2028` and friends stay inside the line, as in the tokenizer."""
+        code = 'value = """a\fb\u2028c"""\nreturn value\n'
+        expected = '    value = """a\fb\u2028c"""\n    return value\n'
+
+        assert _indent_logical_lines(code) == expected
+
+    def test_unterminated_string_indents_every_line(self):
+        """A source that cannot be tokenized falls back to the blanket indent."""
+        code = 'value = """oops\nreturn value\n'
+
+        assert _indent_logical_lines(code) == '    value = """oops\n    return value\n'
+
+    def test_unbalanced_brackets_indent_every_line(self):
+        """Same fallback for brackets that are never closed."""
+        code = "value = sum([1,\n2\n"
+
+        assert _indent_logical_lines(code) == "    value = sum([1,\n    2\n"
+
     def test_line_endings_are_normalized(self):
         """Line endings are normalized so tokenizer line numbers stay in sync."""
         code = 'value = """a\r\nb"""\r\nreturn value\r\n'
@@ -523,3 +542,13 @@ class TestCodeExecutorSourceFidelity:
 
         assert result["error"] is None
         assert result["result"] == "done"
+
+    @pytest.mark.asyncio
+    async def test_string_with_form_feed_keeps_its_value(self, code_executor):
+        """Form feed is data inside a literal, not a line break."""
+        code = 'value = """a\fb"""\nreturn value\n'
+
+        result = await code_executor.execute(code, timeout=5.0)
+
+        assert result["error"] is None
+        assert result["result"] == "a\fb"

@@ -70,8 +70,11 @@ def _indent_logical_lines(code: str, prefix: str = "    ") -> str:
         # line so that compile() reports the syntax error to the caller.
         return textwrap.indent(code, prefix)
 
-    lines = code.splitlines(keepends=True)
-    return "".join(f"{prefix}{line}" if number in starts else line for number, line in enumerate(lines, start=1))
+    # Split on "\n" only: str.splitlines() also breaks on characters such as
+    # "\f" or "\u2028", which the tokenizer counts as part of the line, and the
+    # line numbers above come from the tokenizer.
+    lines = code.split("\n")
+    return "\n".join(f"{prefix}{line}" if number in starts else line for number, line in enumerate(lines, start=1))
 
 
 class CodeExecutor:
