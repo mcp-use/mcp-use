@@ -259,7 +259,7 @@ class HttpConnector(BaseConnector):
             # Clean up the failed streamable HTTP connection manager
             if connection_manager:
                 try:
-                    await connection_manager.stop()
+                    await connection_manager.stop(timeout=5)
                 except Exception:
                     pass
 

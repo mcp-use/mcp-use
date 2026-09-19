@@ -160,7 +160,7 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
         self.assertEqual(self.connector._connection_manager, mock_sse_cm_instance)
         self.assertTrue(self.connector._connected)
         self.assertIsNotNone(self.connector.client_session)
-        mock_streamable_cm_instance.stop.assert_awaited_once()
+        mock_streamable_cm_instance.stop.assert_awaited_once_with(timeout=5)
 
     @patch("mcp_use.client.connectors.http.StreamableHttpConnectionManager")
     @patch("mcp_use.client.connectors.http.ClientSession")
@@ -242,9 +242,9 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
     async def test_connect_failure(self, mock_streamable_cm_class, mock_sse_cm_class, _):
         """Test handling connection failures."""
         # Setup mocks for streamable HTTP failure
-        mock_streamable_cm_instance = MagicMock()
+        mock_streamable_cm_instance = MagicMock(spec=StreamableHttpConnectionManager)
         mock_streamable_cm_instance.start = AsyncMock()
-        mock_streamable_cm_instance.close = AsyncMock()
+        mock_streamable_cm_instance.stop = AsyncMock()
         mock_streamable_cm_instance.start.side_effect = Exception("Streamable HTTP failed")
         mock_streamable_cm_class.return_value = mock_streamable_cm_instance
 
@@ -265,6 +265,7 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
         # Verify both connection managers were attempted
         mock_streamable_cm_class.assert_called_once()
         mock_sse_cm_class.assert_called_once()
+        mock_streamable_cm_instance.stop.assert_awaited_once_with(timeout=5)
 
         # Verify state remains unchanged
         self.assertIsNone(self.connector.client_session)
