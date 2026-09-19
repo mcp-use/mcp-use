@@ -424,3 +424,100 @@ return a + b
 
         assert result["error"] is None
         assert result["result"] == 3
+
+
+class TestCodeExecutorToolNamespaces:
+    """Namespaces must survive tool entries whose name cannot be used."""
+
+    @pytest.mark.asyncio
+    async def test_unusable_tool_name_does_not_hide_other_tools(self, mock_client, code_executor):
+        """One malformed name must not remove the other tools of that server."""
+        mock_session = AsyncMock()
+
+        broken = Mock()
+        broken.name = ""
+        broken.description = "No usable name"
+        broken.inputSchema = {}
+
+        usable = Mock()
+        usable.name = "read_file"
+        usable.description = "Read a file"
+        usable.inputSchema = {}
+
+        mock_session.list_tools = AsyncMock(return_value=[broken, usable])
+        mock_session.call_tool = AsyncMock(return_value=Mock(content=[Mock(text="content")]))
+
+        mock_client.sessions = {"files": mock_session}
+        mock_client.get_session = Mock(return_value=mock_session)
+        mock_client.get_server_names = Mock(return_value=[])
+
+        code = 'return await files.read_file(path="a.txt")\n'
+
+        result = await code_executor.execute(code, timeout=5.0)
+
+        assert result["error"] is None
+        assert result["result"] == "content"
+        mock_session.call_tool.assert_awaited_once_with("read_file", {"path": "a.txt"})
+
+    @pytest.mark.asyncio
+    async def test_unusable_names_do_not_hide_other_servers(self, mock_client, code_executor):
+        """A server whose tools are all unusable stays registered, others stay callable."""
+        broken_session = AsyncMock()
+        broken = Mock()
+        broken.name = ""
+        broken.description = "No usable name"
+        broken.inputSchema = {}
+        broken_session.list_tools = AsyncMock(return_value=[broken])
+
+        other_session = AsyncMock()
+        usable = Mock()
+        usable.name = "read_file"
+        usable.description = "Read a file"
+        usable.inputSchema = {}
+        other_session.list_tools = AsyncMock(return_value=[usable])
+        other_session.call_tool = AsyncMock(return_value=Mock(content=[Mock(text="content")]))
+
+        sessions = {"files": broken_session, "other": other_session}
+        mock_client.sessions = sessions
+        mock_client.get_session = Mock(side_effect=lambda name: sessions[name])
+        mock_client.get_server_names = Mock(return_value=[])
+
+        code = (
+            "namespaces = __tool_namespaces\n"
+            'content = await other.read_file(path="a.txt")\n'
+            "return [namespaces, content]\n"
+        )
+
+        result = await code_executor.execute(code, timeout=5.0)
+
+        assert result["error"] is None
+        assert result["result"] == [["files", "other"], "content"]
+
+    @pytest.mark.asyncio
+    async def test_search_tools_does_not_advertise_unusable_tools(self, mock_client, code_executor):
+        """Discovery matches the namespace: a name that cannot be called is not listed."""
+        mock_session = AsyncMock()
+
+        broken = Mock()
+        broken.name = ""
+        broken.description = "No usable name"
+        broken.inputSchema = {}
+
+        usable = Mock()
+        usable.name = "read_file"
+        usable.description = "Read a file"
+        usable.inputSchema = {}
+
+        mock_session.list_tools = AsyncMock(return_value=[broken, usable])
+        mock_client.sessions = {"files": mock_session}
+        mock_client.get_server_names = Mock(return_value=[])
+
+        code = (
+            "result = await search_tools()\n"
+            'return {"names": [tool["name"] for tool in result["results"]], "total": result["meta"]["total_tools"]}\n'
+        )
+
+        result = await code_executor.execute(code, timeout=5.0)
+
+        assert result["error"] is None
+        assert result["result"] == {"names": ["read_file"], "total": 1}
