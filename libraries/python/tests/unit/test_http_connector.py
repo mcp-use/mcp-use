@@ -12,7 +12,7 @@ from mcp.types import EmptyResult, ErrorData, Prompt, Resource, Tool
 from mcp_use.client.auth.bearer import BearerAuth
 from mcp_use.client.connectors.http import HttpConnector
 from mcp_use.client.middleware.middleware import CallbackClientSession
-from mcp_use.client.task_managers import SseConnectionManager
+from mcp_use.client.task_managers import SseConnectionManager, StreamableHttpConnectionManager
 
 
 @patch("mcp_use.client.connectors.base.logger")
@@ -102,10 +102,10 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
     async def test_connect_with_sse(self, mock_client_session_class, mock_streamable_cm_class, mock_sse_cm_class, _):
         """Test connecting to the MCP implementation using SSE fallback."""
         # Setup streamable HTTP to fail during initialization
-        mock_streamable_cm_instance = MagicMock()
+        mock_streamable_cm_instance = MagicMock(spec=StreamableHttpConnectionManager)
         mock_streamable_cm_instance.start = AsyncMock()
         mock_streamable_cm_instance.start.return_value = ("read_stream", "write_stream")
-        mock_streamable_cm_instance.close = AsyncMock()
+        mock_streamable_cm_instance.stop = AsyncMock()
         mock_streamable_cm_class.return_value = mock_streamable_cm_instance
 
         # Setup SSE to succeed
@@ -160,6 +160,7 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
         self.assertEqual(self.connector._connection_manager, mock_sse_cm_instance)
         self.assertTrue(self.connector._connected)
         self.assertIsNotNone(self.connector.client_session)
+        mock_streamable_cm_instance.stop.assert_awaited_once()
 
     @patch("mcp_use.client.connectors.http.StreamableHttpConnectionManager")
     @patch("mcp_use.client.connectors.http.ClientSession")
