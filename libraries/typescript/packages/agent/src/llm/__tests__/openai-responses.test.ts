@@ -8,6 +8,28 @@ import {
 import { toolResultToContent } from "../toolResultParts";
 import type { ProviderMessage } from "../types";
 
+async function collectStream(events: Record<string, unknown>[]) {
+  const body = events
+    .map((event) => `data: ${JSON.stringify(event)}\n\n`)
+    .join("");
+  const fetchMock = vi
+    .spyOn(globalThis, "fetch")
+    .mockResolvedValue(new Response(body, { status: 200 }));
+  const result = [];
+  try {
+    for await (const event of streamResponsesTurn({
+      config: { provider: "openai", model: "gpt-4o-mini", apiKey: "test" },
+      input: [],
+      tools: [],
+    })) {
+      result.push(event);
+    }
+  } finally {
+    fetchMock.mockRestore();
+  }
+  return result;
+}
+
 describe("seedInputFromMessages", () => {
   it("maps system to instructions and user/assistant/tool history to input items", () => {
     const messages: ProviderMessage[] = [
@@ -148,6 +170,97 @@ describe("responsesReasoningFields", () => {
 });
 
 describe("Responses SSE event mapping", () => {
+  it("keeps compatibility call_id matching unambiguous across item boundaries", async () => {
+    const result = await collectStream([
+      {
+        type: "response.output_item.added",
+        item: {
+          type: "function_call",
+          id: "first",
+          call_id: "shared",
+          name: "one",
+        },
+      },
+      {
+        type: "response.output_item.added",
+        item: {
+          type: "function_call",
+          id: "second",
+          call_id: "shared",
+          name: "two",
+        },
+      },
+      {
+        type: "response.function_call_arguments.done",
+        item_id: "first",
+        arguments: '{"first":true}',
+      },
+      {
+        type: "response.function_call_arguments.done",
+        call_id: "shared",
+        arguments: '{"second":true}',
+      },
+    ]);
+
+    expect(result).toContainEqual({
+      type: "tool-call-ready",
+      index: 1,
+      toolCallId: "shared",
+      toolName: "two",
+      args: { second: true },
+    });
+  });
+
+  it("does not attach an ambiguous compatibility event when item IDs are missing", async () => {
+    const result = await collectStream([
+      {
+        type: "response.output_item.added",
+        item: { type: "function_call", call_id: "shared", name: "one" },
+      },
+      {
+        type: "response.output_item.added",
+        item: { type: "function_call", call_id: "shared", name: "two" },
+      },
+      {
+        type: "response.function_call_arguments.done",
+        call_id: "shared",
+        arguments: '{"wrong":true}',
+      },
+    ]);
+
+    expect(result.filter((event) => event.type === "tool-call-ready")).toEqual(
+      []
+    );
+  });
+
+  it("falls back to call_id when a supplied item_id does not match", async () => {
+    const result = await collectStream([
+      {
+        type: "response.output_item.added",
+        item: {
+          type: "function_call",
+          id: "actual",
+          call_id: "call_abc",
+          name: "weather",
+        },
+      },
+      {
+        type: "response.function_call_arguments.done",
+        item_id: "stale",
+        call_id: "call_abc",
+        arguments: '{"city":"Paris"}',
+      },
+    ]);
+
+    expect(result).toContainEqual({
+      type: "tool-call-ready",
+      index: 0,
+      toolCallId: "call_abc",
+      toolName: "weather",
+      args: { city: "Paris" },
+    });
+  });
+
   it("matches function argument events by item_id while preserving call_id", async () => {
     const events = [
       {
@@ -170,25 +283,7 @@ describe("Responses SSE event mapping", () => {
         arguments: '{"city":"Paris"}',
       },
     ];
-    const body = events
-      .map((event) => `data: ${JSON.stringify(event)}\n\n`)
-      .join("");
-    const fetchMock = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue(new Response(body, { status: 200 }));
-
-    const result = [];
-    try {
-      for await (const event of streamResponsesTurn({
-        config: { provider: "openai", model: "gpt-4o-mini", apiKey: "test" },
-        input: [],
-        tools: [],
-      })) {
-        result.push(event);
-      }
-    } finally {
-      fetchMock.mockRestore();
-    }
+    const result = await collectStream(events);
 
     expect(result).toEqual([
       {
@@ -232,25 +327,7 @@ describe("Responses SSE event mapping", () => {
         arguments: '{"city":"Paris"}',
       },
     ];
-    const body = events
-      .map((event) => `data: ${JSON.stringify(event)}\n\n`)
-      .join("");
-    const fetchMock = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue(new Response(body, { status: 200 }));
-
-    const result = [];
-    try {
-      for await (const event of streamResponsesTurn({
-        config: { provider: "openai", model: "gpt-4o-mini", apiKey: "test" },
-        input: [],
-        tools: [],
-      })) {
-        result.push(event);
-      }
-    } finally {
-      fetchMock.mockRestore();
-    }
+    const result = await collectStream(events);
 
     expect(result).toEqual([
       {
@@ -306,25 +383,7 @@ describe("Responses SSE event mapping", () => {
         arguments: '{"right":true}',
       },
     ];
-    const body = events
-      .map((event) => `data: ${JSON.stringify(event)}\n\n`)
-      .join("");
-    const fetchMock = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue(new Response(body, { status: 200 }));
-
-    const result = [];
-    try {
-      for await (const event of streamResponsesTurn({
-        config: { provider: "openai", model: "gpt-4o-mini", apiKey: "test" },
-        input: [],
-        tools: [],
-      })) {
-        result.push(event);
-      }
-    } finally {
-      fetchMock.mockRestore();
-    }
+    const result = await collectStream(events);
 
     expect(result).toEqual([
       {

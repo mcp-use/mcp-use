@@ -278,6 +278,7 @@ export async function* streamResponsesTurn(
   const callBuffers = new Map<
     string,
     {
+      key: string;
       index: number;
       callId: string;
       name: string;
@@ -330,10 +331,14 @@ export async function* streamResponsesTurn(
         // Arguments events identify the output item (`item_id`), rather than
         // the protocol call id. Keep the latter for consumers while indexing
         // the buffer by the id used by the streaming events.
-        const itemId = typeof item.id === "string" ? item.id : callId;
-        const name = typeof item.name === "string" ? item.name : "";
         const idx = nextIndex++;
+        // Some compatibility producers omit item.id. Do not use call_id as
+        // the map key in that case: multiple output items may share it.
+        const itemId =
+          typeof item.id === "string" ? item.id : `__response_item_${idx}`;
+        const name = typeof item.name === "string" ? item.name : "";
         callBuffers.set(itemId, {
+          key: itemId,
           index: idx,
           callId,
           name,
@@ -351,14 +356,10 @@ export async function* streamResponsesTurn(
     }
 
     if (type === "response.function_call_arguments.delta") {
-      const itemId =
-        typeof parsed.item_id === "string"
-          ? parsed.item_id
-          : typeof parsed.call_id === "string"
-            ? parsed.call_id
-            : "";
+      const itemId = typeof parsed.item_id === "string" ? parsed.item_id : "";
+      const callId = typeof parsed.call_id === "string" ? parsed.call_id : "";
       const delta = typeof parsed.delta === "string" ? parsed.delta : "";
-      const buf = findCallBuffer(itemId);
+      const buf = findCallBuffer(itemId) ?? findCallBuffer(callId);
       if (buf && delta.length > 0) {
         buf.argsJson += delta;
         yield {
@@ -373,17 +374,15 @@ export async function* streamResponsesTurn(
     }
 
     if (type === "response.function_call_arguments.done") {
-      const itemId =
-        typeof parsed.item_id === "string"
-          ? parsed.item_id
-          : typeof parsed.call_id === "string"
-            ? parsed.call_id
-            : "";
+      const itemId = typeof parsed.item_id === "string" ? parsed.item_id : "";
+      const callId = typeof parsed.call_id === "string" ? parsed.call_id : "";
       const argsRaw =
         typeof parsed.arguments === "string" ? parsed.arguments : "";
-      const buf = findCallBuffer(itemId);
+      const buf = findCallBuffer(itemId) ?? findCallBuffer(callId);
       if (buf) {
         if (argsRaw) buf.argsJson = argsRaw;
+        // A completed item must not make a later duplicate call_id ambiguous.
+        callBuffers.delete(buf.key);
         yield {
           type: "tool-call-ready",
           index: buf.index,
