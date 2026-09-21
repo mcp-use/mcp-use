@@ -1,0 +1,70 @@
+name: Close Python PRs
+
+on:
+  pull_request_target:
+    types: [opened]
+
+permissions:
+  pull-requests: write
+
+concurrency:
+  group: close-python-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  close-python-pr:
+    runs-on: ubuntu-latest
+    steps:
+      # Use only GitHub API metadata. Never check out or execute PR code here.
+      - name: Close new Python PRs with contribution guidance
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pull_number = context.payload.pull_request.number;
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner, repo, pull_number, per_page: 100,
+            });
+            // Include previous paths so renaming a file out of Python is detected.
+            const paths = files.flatMap(file =>
+              [file.filename, file.previous_filename].filter(Boolean)
+            );
+            const touches = language => paths.some(path =>
+              [`libraries/${language}/`, `examples/${language}/`, `docs/${language}/`]
+                .some(prefix => path.startsWith(prefix))
+            );
+            if (!touches('python') || touches('typescript')) {
+              core.info('Not a Python-only PR; leaving it for normal review.');
+              return;
+            }
+
+            // Check history as well as the trigger: rerunning the original opened
+            // workflow must never close a PR that was reopened for manual review.
+            const events = await github.paginate(github.rest.issues.listEvents, {
+              owner, repo, issue_number: pull_number, per_page: 100,
+            });
+            if (events.some(event => event.event === 'reopened')) {
+              core.info('Previously reopened; leaving it for manual review.');
+              return;
+            }
+            const { data: pr } = await github.rest.pulls.get({
+              owner, repo, pull_number,
+            });
+            if (pr.state !== 'open') return;
+
+            const marker = '<!-- close-python-prs -->';
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number: pull_number, per_page: 100,
+            });
+            if (!comments.some(comment =>
+              comment.user?.login === 'github-actions[bot]' &&
+              comment.body?.includes(marker)
+            )) {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: pull_number,
+                body: `${marker}\nThanks for taking the time to contribute. Our focus right now is on the TypeScript SDK, so we're limiting Python PRs to fixes for concrete problems that contributors have run into firsthand. We're automatically closing new Python PRs for now. If this was prompted by something you hit in practice, please reply here with what you were doing when it came up and how to reproduce it. A maintainer can reopen the PR and take another look. Reopened PRs are left open for manual review.`,
+              });
+            }
+            await github.rest.pulls.update({
+              owner, repo, pull_number, state: 'closed',
+            });
