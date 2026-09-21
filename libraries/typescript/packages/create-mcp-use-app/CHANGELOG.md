@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 2.0.7-canary.0
+
+### Patch Changes
+
+- 3b0b76e: Add `types: ["node"]` to the template tsconfigs. The templates install `@types/node` with TypeScript 7, which no longer loads `@types` packages on its own, so `mcp-use typecheck` failed with TS2591 on the first `process.env` read or `node:` import.
+
 ## 2.0.6
 
 ### Patch Changes
