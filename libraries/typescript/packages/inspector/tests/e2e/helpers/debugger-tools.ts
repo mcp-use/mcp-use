@@ -187,6 +187,8 @@ export async function changeCspMode(
         : "debugger-csp-option-widget-declared"
     )
     .click();
+  // Selecting a mode does not close the dialog.
+  await page.keyboard.press("Escape");
   await expect(page.getByTestId("debugger-csp-dialog")).not.toBeVisible();
 }
 
@@ -252,17 +254,15 @@ export async function navigateToResourcesAndSelectWeather(
   page: Page
 ): Promise<void> {
   await page
-    .getByRole("tab", { name: /Resources/ })
+    .locator('[data-testid="tab-resources"]:visible')
     .first()
     .click();
   await expect(page.getByRole("heading", { name: "Resources" })).toBeVisible();
   await page.getByTestId("resource-item-weather-display").click();
-  // Widget requires props - wait for props wall text (iframe only appears after props are set)
-  await expect(
-    page.getByText(
-      "This widget requires props, set or generate them in the props debugger"
-    )
-  ).toBeVisible({ timeout: 5000 });
+  // The view mounts directly in the resource preview; props are applied on top.
+  await expect(page.getByTestId("resource-widget-preview")).toBeVisible({
+    timeout: 10000,
+  });
 }
 
 /**
@@ -323,13 +323,17 @@ export async function configurePropsManually(
   // Enter preset name
   await page.getByTestId("props-config-preset-name").fill(presetName);
 
-  // For schema-based props, SchemaFormField uses id={name} on inputs
-  // We need to fill each prop value by finding the input with id matching the field name
-  for (const [key, value] of Object.entries(props)) {
-    // Schema fields are rendered by SchemaFormField - look for input with id attribute
-    const input = page.locator(`input#${key}`);
-    await expect(input).toBeVisible({ timeout: 2000 });
-    await input.fill(value);
+  // The weather view declares no props schema, so the dialog shows the
+  // generic key/value form: one empty pair to start, "Add Prop" for more.
+  const entries = Object.entries(props);
+  for (const [index, [key, value]] of entries.entries()) {
+    if (index > 0) {
+      await page.getByTestId("props-config-add-prop").click();
+    }
+    const keyInput = page.getByTestId(`props-config-key-${index}`);
+    await expect(keyInput).toBeVisible({ timeout: 2000 });
+    await keyInput.fill(key);
+    await page.getByTestId(`props-config-value-${index}`).fill(value);
   }
 
   // Save the preset
