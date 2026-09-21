@@ -295,6 +295,11 @@ test.describe("Inspector MCP Server Connections", () => {
     ).toBeVisible({
       timeout: 3000,
     });
+    // The toast fires before the metadata update is applied; wait for the
+    // header's server switcher to pick up the alias before navigating.
+    await expect(
+      page.getByRole("button", { name: /QA Conformance/ }).first()
+    ).toBeVisible({ timeout: 10000 });
 
     // Client-side navigation preserves the active MCP session.
     await page.getByRole("link", { name: /mcp-use.*Inspector/ }).click();
