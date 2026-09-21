@@ -1,0 +1,26 @@
+{
+  "name": "mcp-use-example-upstash",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Example: rate-limit MCP tool calls with Upstash Redis.",
+  "engines": { "node": ">=22.22.2" },
+  "scripts": {
+    "dev": "mcp-use dev",
+    "build": "mcp-use build",
+    "start": "mcp-use start",
+    "typecheck": "tsc --noEmit",
+    "verify": "node ../verify-examples.mjs --example=upstash"
+  },
+  "dependencies": {
+    "@upstash/ratelimit": "2.0.8",
+    "@upstash/redis": "1.38.4",
+    "mcp-use": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.0.16"
+  }
+}
