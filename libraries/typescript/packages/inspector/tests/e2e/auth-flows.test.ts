@@ -3,13 +3,13 @@
  *
  * Tests for API Key, Custom Header, and OAuth authentication flows in the inspector.
  *
- * IMPORTANT: Start authentication test servers before running these tests:
+ * The fixture servers are started by this file's beforeAll hook:
  * 1. API Key server: Port 3003
  * 2. Custom Header server: Port 3004
- * 3. OAuth mock servers: Ports 3105-3108 (Linear, Supabase, GitHub, Vercel)
+ * 3. OAuth mock servers: issuers on 3005-3008, MCP servers on 3105-3108
+ *    (Linear, Supabase, GitHub, Vercel)
  *
- * Run from inspector package root:
- * pnpm test:e2e auth-flows.test.ts
+ * They share fixed ports, so this file runs in a single worker.
  */
 
 import { expect, test } from "@playwright/test";
@@ -23,6 +23,23 @@ import {
   navigateToServerTools,
   addCustomHeader,
 } from "./helpers/auth";
+import { AuthServersManager } from "./fixtures/auth-servers.js";
+
+// Fixed ports mean the fixtures cannot be shared across parallel workers:
+// "default" keeps this file in one worker (overriding fullyParallel) without
+// serial's skip-the-rest-after-a-failure behaviour.
+test.describe.configure({ mode: "default" });
+
+let authServers: AuthServersManager;
+
+test.beforeAll(async () => {
+  authServers = new AuthServersManager();
+  await authServers.startAll();
+});
+
+test.afterAll(async () => {
+  await authServers?.stopAll();
+});
 
 test.describe("API Key Authentication", () => {
   test.beforeEach(async ({ page, context }) => {

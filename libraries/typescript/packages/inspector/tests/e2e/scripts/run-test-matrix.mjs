@@ -257,7 +257,8 @@ async function main() {
     // Build playwright args with test exclusions
     const playwrightArgs = ["test"];
 
-    // Skip auth tests for all modes
+    // auth-flows and oauth-emulate start their own fixture servers and target the
+    // standalone inspector at :3000, so they run in prod/mix but not builtin.
     // Skip connection and setup tests for builtin mode only (they test external server scenarios)
     // Skip HMR tests for prod and mix modes (HMR only works in builtin dev mode)
     if (mode === "builtin") {
@@ -269,12 +270,9 @@ async function main() {
         "⏭️  Skipping auth-flows, connection, oauth-emulate, and setup tests (not applicable for builtin mode)\n"
       );
     } else {
-      playwrightArgs.push(
-        "--grep-invert",
-        "auth-flows.test.ts|hmr.test.ts|python.test.ts"
-      );
+      playwrightArgs.push("--grep-invert", "hmr.test.ts|python.test.ts");
       console.log(
-        "⏭️  Skipping auth-flows and HMR tests (HMR only works in builtin dev mode)\n"
+        "⏭️  Skipping HMR tests (HMR only works in builtin dev mode) and python tests (separate runner)\n"
       );
     }
 
