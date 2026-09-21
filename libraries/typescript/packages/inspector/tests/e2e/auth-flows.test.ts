@@ -18,7 +18,7 @@
 import { expect, test } from "@playwright/test";
 import {
   addCustomHeaderInSettingsTab,
-  reconnectFromDashboard,
+  returnToDashboardAndWaitReady,
   connectToApiKeyServer,
   connectToCustomHeaderServer,
   connectToOAuthServer,
@@ -395,8 +395,8 @@ test.describe("Authentication - Add after connection", () => {
       "Bearer test-api-key-12345"
     );
 
-    // Saving does not restart a failed connection; reconnect from the tile.
-    await reconnectFromDashboard(page, "ApiKeyTestServer");
+    // Saving remounts the connection with the header; wait for it in-app.
+    await returnToDashboardAndWaitReady(page, "ApiKeyTestServer");
 
     await navigateToServerTools(page, serverUrl);
     await executeToolAndVerifyAuth(
@@ -426,7 +426,7 @@ test.describe("Authentication - Add after connection", () => {
       "custom-auth-token-xyz"
     );
 
-    await reconnectFromDashboard(page, "CustomHeaderTestServer");
+    await returnToDashboardAndWaitReady(page, "CustomHeaderTestServer");
 
     await navigateToServerTools(page, serverUrl);
     await executeToolAndVerifyAuth(page, "verify_auth");

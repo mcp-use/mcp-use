@@ -54,17 +54,20 @@ export async function addCustomHeaderInSettingsTab(
 }
 
 /**
- * Reconnect a server from its dashboard tile and wait for it to become ready.
- * Saving new connection options does not restart a connection that already
- * failed, so callers trigger the reconnect explicitly.
+ * Return to the dashboard with client-side navigation and wait for the server
+ * to become ready.
+ *
+ * Saving connection options remounts the connection with the new settings,
+ * but the "Connection settings updated" toast fires before the update is
+ * awaited and persisted. A full page load at that moment restores the stale
+ * stored config (without the new headers), so navigate in-app instead.
  */
-export async function reconnectFromDashboard(
+export async function returnToDashboardAndWaitReady(
   page: Page,
   serverName: string
 ): Promise<void> {
-  await page.goto(INSPECTOR_URL);
-  await page.getByTestId("server-tile-reconnect").click();
-  await waitForServerState(page, serverName, "ready", 15000);
+  await page.getByRole("link", { name: /mcp-use.*Inspector/ }).click();
+  await waitForServerState(page, serverName, "ready", 20000);
 }
 
 /**
