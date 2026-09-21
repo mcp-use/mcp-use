@@ -11,7 +11,7 @@ import {
   type InspectorProtocolMode,
 } from "@/client/utils/connectionUpdates";
 import type { McpServer } from "@mcp-use/client/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 export function useConnectionFormState(
@@ -34,13 +34,21 @@ export function useConnectionFormState(
   const [clientSecret, setClientSecret] = useState("");
   const [scope, setScope] = useState("");
 
+  // Re-initialise the form only when the edited connection changes, not on
+  // every state update of the same connection. A failing connection retries
+  // and re-renders continuously, which used to wipe in-progress edits.
+  const connectionRef = useRef(connection);
+  connectionRef.current = connection;
+  const connectionId = connection?.id ?? null;
+
   useEffect(() => {
-    if (!connection || !enabled) return;
+    const current = connectionRef.current;
+    if (!current || connectionId === null || !enabled) return;
 
     const storedConfig = getStoredConnectionConfig<EditableConnectionConfig>(
-      connection.id
+      current.id
     );
-    const editable = toEditableConnectionConfig(connection, storedConfig);
+    const editable = toEditableConnectionConfig(current, storedConfig);
 
     setUrl(editable.url);
     setAlias(editable.name || editable.url);
@@ -79,7 +87,7 @@ export function useConnectionFormState(
     if (editable.maxTotalTimeout !== undefined) {
       setMaxTotalTimeout(String(editable.maxTotalTimeout));
     }
-  }, [connection, enabled]);
+  }, [connectionId, enabled]);
 
   const buildConfig = (): EditableConnectionConfig | null => {
     if (!url.trim()) return null;
