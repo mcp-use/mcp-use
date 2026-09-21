@@ -6,7 +6,7 @@ import type {
 } from "@modelcontextprotocol/server";
 import type { Env } from "hono";
 
-import type { RequestContext } from "./context.js";
+import type { OAuthMode, RequestContext } from "./context.js";
 
 /** Declares a prompt's identity and argument schema. First argument to {@link MCPServer.prompt}. */
 export interface PromptDefinition {
@@ -50,7 +50,7 @@ export type InferPromptInput<T> = T extends {
 export type PromptCallback<
   TInput = Record<string, unknown>,
   TUser = never,
-  HasOAuth extends boolean = false,
+  HasOAuth extends OAuthMode = false,
   TEnv extends Env = Env,
 > = (
   params: TInput,

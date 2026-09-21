@@ -258,14 +258,41 @@ export interface CorsOptions {
  *
  * @throws TypeError When `basePath` is present but not an absolute URL
  * pathname without empty segments, trailing slash, query, fragment, or
- * whitespace, or when `skills` is not a boolean or valid configuration
- * object.
+ * whitespace, when `skills` is not a boolean or valid configuration object,
+ * or when `allowAnonymous` / `authChallenge` are malformed or set without an
+ * OAuth provider.
  */
 export function assertServerConfig(config: {
   basePath?: unknown;
   port?: unknown;
   skills?: unknown;
+  oauth?: unknown;
+  allowAnonymous?: unknown;
+  authChallenge?: unknown;
 }): void {
+  if (
+    config.allowAnonymous !== undefined &&
+    typeof config.allowAnonymous !== "boolean"
+  ) {
+    throw new TypeError("allowAnonymous must be a boolean");
+  }
+  if (config.allowAnonymous === true && config.oauth === undefined) {
+    throw new TypeError("allowAnonymous requires an OAuth provider");
+  }
+  if (config.authChallenge !== undefined) {
+    if (
+      config.authChallenge !== "http" &&
+      config.authChallenge !== "tool-result" &&
+      config.authChallenge !== "auto"
+    ) {
+      throw new TypeError(
+        'authChallenge must be "http", "tool-result", or "auto"'
+      );
+    }
+    if (config.oauth === undefined) {
+      throw new TypeError("authChallenge requires an OAuth provider");
+    }
+  }
   if (config.basePath !== undefined) {
     if (typeof config.basePath !== "string") {
       throw new TypeError(
@@ -311,22 +338,77 @@ export function assertServerConfig(config: {
 }
 
 /**
+ * How the server represents an authentication challenge on `tools/call`.
+ *
+ * - `"http"`: the MCP specification's transport challenge — `401` for a
+ *   missing or invalid token, `403` for insufficient scopes, both with a
+ *   `WWW-Authenticate: Bearer` header. Claude and spec-conformant clients
+ *   start or step up OAuth from this response.
+ * - `"tool-result"`: HTTP `200` with an `isError` tool result whose
+ *   `_meta["mcp/www_authenticate"]` carries the same challenge. ChatGPT opens
+ *   its sign-in UI from this shape and does not react to a `401` on a tool
+ *   call.
+ * - `"auto"`: `"tool-result"` when the `User-Agent` header contains
+ *   `chatgpt` or `openai` (case-insensitive), otherwise `"http"`.
+ *
+ * Only the representation changes; token verification, scope enforcement,
+ * and every non-`tools/call` failure (always HTTP) are identical.
+ */
+export type AuthChallengeFormat = "http" | "tool-result" | "auto";
+
+/**
  * Server identity and behavior, passed to `new MCPServer(...)`.
  *
  * A user type other than `never` requires an OAuth provider, preventing a
  * callback from declaring authenticated context without authentication at
  * runtime. Omitting the type keeps the no-OAuth API ergonomic.
+ *
+ * `TAnonymous` mirrors {@link allowAnonymous}: when `true`, callbacks see an
+ * optional `ctx.auth` because anonymous callers can reach public tools.
  */
-export type ServerConfig<TUser = never> = BaseServerConfig &
+export type ServerConfig<
+  TUser = never,
+  TAnonymous extends boolean = false,
+> = BaseServerConfig &
   ([TUser] extends [never]
     ? {
         /** OAuth is unavailable when no authenticated user type is declared. */
         oauth?: undefined;
+        /** Requires an OAuth provider. */
+        allowAnonymous?: never;
+        /** Requires an OAuth provider. */
+        authChallenge?: never;
       }
     : {
         /**
          * External OAuth resource-server provider. Callback contexts receive
-         * this provider's user type as required `ctx.auth.user`.
+         * this provider's user type as required `ctx.auth.user`, or as
+         * optional `ctx.auth` when {@link allowAnonymous} is `true`.
          */
         oauth: OAuthProvider<TUser>;
+        /**
+         * Serve public and protected tools from one endpoint (mixed auth).
+         *
+         * When `true`, `initialize`, `ping`, list requests, and calls to
+         * tools that declare a `noauth` scheme run without a bearer token.
+         * Every other request — including calls to tools without
+         * `securitySchemes`, `resources/read` (except view resources of
+         * public tools), and `prompts/get` — still requires a verified token
+         * with the provider's `requiredScopes` plus the tool's `oauth2`
+         * scopes. A supplied token is always verified, even on public tools;
+         * invalid or expired tokens are refused with `401`.
+         *
+         * When `false` or omitted, the whole MCP endpoint requires a token,
+         * as before.
+         *
+         * @defaultValue `false`
+         */
+        allowAnonymous?: TAnonymous;
+        /**
+         * Representation of `tools/call` authentication failures. See
+         * {@link AuthChallengeFormat}.
+         *
+         * @defaultValue `"auto"`
+         */
+        authChallenge?: AuthChallengeFormat;
       });

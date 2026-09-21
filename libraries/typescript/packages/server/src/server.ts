@@ -68,11 +68,15 @@ import { createMcpMount } from "./mount-mcp.js";
 import { normalizeCompletions } from "./resource-completion.js";
 import { registerOpenAPITools } from "./openapi/index.js";
 import type { FromOpenAPIOptions } from "./openapi/types.js";
-import {
-  getOAuthProtectedResourceMetadataUrl,
-  requireBearerAuth,
-} from "./oauth/index.js";
+import { getOAuthProtectedResourceMetadataUrl } from "./oauth/index.js";
 import { authInfoFromRequest, oauthMetadata } from "./oauth/adapters.js";
+import { createOAuthGate } from "./oauth/gate.js";
+import {
+  assertToolSecuritySchemes,
+  resolveToolAuthPolicy,
+  SECURITY_SCHEMES_META_KEY,
+  type ToolAuthPolicy,
+} from "./oauth/policy.js";
 import {
   getOAuthProviderOptions,
   resolveConfiguredOAuthResource,
@@ -144,7 +148,11 @@ import {
  * Safe because the SDK validates params against the definition's schema
  * before any callback runs.
  */
-type HasOAuth<TUser> = [TUser] extends [never] ? false : true;
+type HasOAuth<TUser, TAnonymous extends boolean> = [TUser] extends [never]
+  ? false
+  : TAnonymous extends true
+    ? "optional"
+    : true;
 
 interface ClientUsage {
   client_name: string;
@@ -227,7 +235,7 @@ function clientUsage(
 }
 
 /** Type-erased registry entry replayed when a per-request SDK server is built. */
-interface ToolEntry<TUser, TEnv extends Env> {
+interface ToolEntry<TUser, TEnv extends Env, TAnonymous extends boolean> {
   /** Declarative tool metadata and schemas supplied at registration time. */
   definition: ToolDefinition;
   /** Tool callback widened for heterogeneous storage in the registry. */
@@ -235,28 +243,32 @@ interface ToolEntry<TUser, TEnv extends Env> {
     Record<string, unknown>,
     never,
     TUser,
-    HasOAuth<TUser>,
+    HasOAuth<TUser, TAnonymous>,
     TEnv
   >;
 }
 
 /** Static resource definition and callback retained for per-request replay. */
-interface ResourceEntry<TUser, TEnv extends Env> {
+interface ResourceEntry<TUser, TEnv extends Env, TAnonymous extends boolean> {
   /** Declarative resource metadata supplied at registration time. */
   definition: ResourceDefinition;
   /** Callback invoked when the registered resource URI is read. */
-  callback: ResourceCallback<TUser, HasOAuth<TUser>, TEnv>;
+  callback: ResourceCallback<TUser, HasOAuth<TUser, TAnonymous>, TEnv>;
 }
 
 /** Parameterized resource definition and type-erased callback registry entry. */
-interface ResourceTemplateEntry<TUser, TEnv extends Env> {
+interface ResourceTemplateEntry<
+  TUser,
+  TEnv extends Env,
+  TAnonymous extends boolean,
+> {
   /** Declarative template metadata, including its URI template. */
   definition: ResourceTemplateDefinition;
   /** Template callback widened to store every inferred variable shape. */
   callback: ResourceTemplateCallback<
     Record<string, TemplateVariableValue>,
     TUser,
-    HasOAuth<TUser>,
+    HasOAuth<TUser, TAnonymous>,
     TEnv
   >;
   /** SDK callback map normalized once at author-time registration. */
@@ -264,14 +276,14 @@ interface ResourceTemplateEntry<TUser, TEnv extends Env> {
 }
 
 /** Prompt definition and type-erased callback retained for request-time replay. */
-interface PromptEntry<TUser, TEnv extends Env> {
+interface PromptEntry<TUser, TEnv extends Env, TAnonymous extends boolean> {
   /** Declarative prompt metadata and optional argument schema. */
   definition: PromptDefinition;
   /** Prompt callback widened to store every inferred argument shape. */
   callback: PromptCallback<
     Record<string, unknown>,
     TUser,
-    HasOAuth<TUser>,
+    HasOAuth<TUser, TAnonymous>,
     TEnv
   >;
 }
@@ -325,18 +337,27 @@ function registerFetchMiddleware<TEnv extends Env>(
  * await server.listen(3000);
  * ```
  */
-export class MCPServer<TUser = never, TEnv extends Env = Env> {
-  readonly #config: ServerConfig<TUser>;
+export class MCPServer<
+  TUser = never,
+  TEnv extends Env = Env,
+  TAnonymous extends boolean = false,
+> {
+  readonly #config: ServerConfig<TUser, TAnonymous>;
+  /** Per-tool authentication policy, resolved once at first mount. */
+  #toolAuthPolicies: Map<string, ToolAuthPolicy> | undefined;
   /** Dev-only source label injected before mounting colocated Inspector routes. */
   #requestLogPrefix: string | undefined;
   readonly #branding: ReturnType<typeof normalizeServerBranding>;
-  readonly #tools = new Map<string, ToolEntry<TUser, TEnv>>();
-  readonly #resources = new Map<string, ResourceEntry<TUser, TEnv>>();
+  readonly #tools = new Map<string, ToolEntry<TUser, TEnv, TAnonymous>>();
+  readonly #resources = new Map<
+    string,
+    ResourceEntry<TUser, TEnv, TAnonymous>
+  >();
   readonly #resourceTemplates = new Map<
     string,
-    ResourceTemplateEntry<TUser, TEnv>
+    ResourceTemplateEntry<TUser, TEnv, TAnonymous>
   >();
-  readonly #prompts = new Map<string, PromptEntry<TUser, TEnv>>();
+  readonly #prompts = new Map<string, PromptEntry<TUser, TEnv, TAnonymous>>();
   readonly #views = new Map<string, ViewManifestEntry>();
   #skills: SkillsSnapshot | undefined;
   #skillsPrimed = false;
@@ -464,7 +485,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    * Nothing binds or listens until {@link MCPServer.listen} or
    * the first request reaches {@link MCPServer.fetch}.
    */
-  constructor(config: ServerConfig<TUser>) {
+  constructor(config: ServerConfig<TUser, TAnonymous>) {
     assertServerConfig(config);
     this.#config = config;
     this.#branding = normalizeServerBranding(config);
@@ -561,12 +582,14 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       InferToolInput<T>,
       InferToolOutput<T>,
       TUser,
-      HasOAuth<TUser>,
+      HasOAuth<TUser, TAnonymous>,
       TEnv
     >
   ): ToolRef<InferToolName<T>, InferToolInput<T>, InferToolOutput<T>> {
     this.#assertNotStarted("tool", definition.name);
+    assertToolSecuritySchemes(definition, this.#toolAuthPolicyOptions());
     this.#validateToolViewBinding(definition);
+    this.#toolAuthPolicies = undefined;
     this.#openApiTools.delete(definition.name);
     this.#proxiedTools.delete(definition.name);
     this.#tools.set(definition.name, {
@@ -575,7 +598,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         Record<string, unknown>,
         never,
         TUser,
-        HasOAuth<TUser>,
+        HasOAuth<TUser, TAnonymous>,
         TEnv
       >,
     });
@@ -675,7 +698,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   /** Register a static resource readable at `definition.uri`. */
   resource(
     definition: ResourceDefinition,
-    callback: ResourceCallback<TUser, HasOAuth<TUser>, TEnv>
+    callback: ResourceCallback<TUser, HasOAuth<TUser, TAnonymous>, TEnv>
   ): this {
     this.#assertNotStarted("resource", definition.name);
     const previous = this.#resources.get(definition.name);
@@ -699,7 +722,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     callback: ResourceTemplateCallback<
       InferTemplateParams<{ uriTemplate: TUriTemplate }>,
       TUser,
-      HasOAuth<TUser>,
+      HasOAuth<TUser, TAnonymous>,
       TEnv
     >
   ): this {
@@ -714,7 +737,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       callback: callback as ResourceTemplateCallback<
         Record<string, TemplateVariableValue>,
         TUser,
-        HasOAuth<TUser>,
+        HasOAuth<TUser, TAnonymous>,
         TEnv
       >,
     });
@@ -727,7 +750,12 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    */
   prompt<T extends PromptDefinition>(
     definition: T,
-    callback: PromptCallback<InferPromptInput<T>, TUser, HasOAuth<TUser>, TEnv>
+    callback: PromptCallback<
+      InferPromptInput<T>,
+      TUser,
+      HasOAuth<TUser, TAnonymous>,
+      TEnv
+    >
   ): this {
     this.#assertNotStarted("prompt", definition.name);
     this.#proxiedPrompts.delete(definition.name);
@@ -736,7 +764,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       callback: callback as PromptCallback<
         Record<string, unknown>,
         TUser,
-        HasOAuth<TUser>,
+        HasOAuth<TUser, TAnonymous>,
         TEnv
       >,
     });
@@ -1251,6 +1279,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       hasPrompt: (name) => this.#prompts.has(name),
       registerTool: (definition, callback) => {
         this.#assertNotStarted("tool", definition.name);
+        this.#toolAuthPolicies = undefined;
         this.#proxiedTools.add(definition.name);
         this.#tools.set(definition.name, {
           definition,
@@ -1258,7 +1287,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
             Record<string, unknown>,
             never,
             TUser,
-            HasOAuth<TUser>,
+            HasOAuth<TUser, TAnonymous>,
             TEnv
           >,
         });
@@ -1270,7 +1299,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           definition,
           callback: callback as unknown as ResourceCallback<
             TUser,
-            HasOAuth<TUser>,
+            HasOAuth<TUser, TAnonymous>,
             TEnv
           >,
         });
@@ -1283,7 +1312,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           callback: callback as unknown as PromptCallback<
             Record<string, unknown>,
             TUser,
-            HasOAuth<TUser>,
+            HasOAuth<TUser, TAnonymous>,
             TEnv
           >,
         });
@@ -1421,54 +1450,43 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         }
       );
 
-      let protectWithBearer: (
-        request: Request,
-        next: () => Promise<Response>
-      ) => Promise<Response> = async (_request, next) => next();
       if (resource !== undefined) {
         const provider = this.#config.oauth!;
         const providerOptions = getOAuthProviderOptions(provider);
-        const gate = requireBearerAuth({
+        const allowAnonymous = this.#config.allowAnonymous === true;
+        const policies = this.#resolveToolAuthPolicies();
+        const publicResourceUris = this.#publicViewResourceUris(policies);
+        const gate = createOAuthGate({
           verifier: wrapOAuthTokenVerifier(provider, resource),
           resourceMetadataUrl: getOAuthProtectedResourceMetadataUrl(resource),
-          ...(providerOptions.requiredScopes !== undefined && {
-            requiredScopes: providerOptions.requiredScopes,
-          }),
+          baselineScopes: providerOptions.requiredScopes ?? [],
+          allowAnonymous,
+          challenge: this.#config.authChallenge ?? "auto",
+          toolPolicy: (name) => policies.get(name),
+          isPublicResource: (uri) => publicResourceUris.has(uri),
         });
-        protectWithBearer = async (request, next) => {
-          const result = await gate(request);
-          if (result instanceof Response) {
-            return result;
-          }
-          const bag = getRequestBag(request);
-          bag.authInfo = result;
-          return next();
-        };
 
         // Authenticate the exact MCP route before the user-owned Hono app
         // runs. This makes verified identity available to route middleware
         // while leaving OAuth discovery, assets, and unrelated custom routes
-        // public. The explicitly public HTML landing-page carveout remains the
-        // only unauthenticated request allowed through this route.
+        // public. The HTML landing page passes through when it is explicitly
+        // public or when the server serves anonymous callers.
         httpApp.use("*", async (context, next) => {
           if (new URL(context.req.url).pathname !== basePath) {
             await next();
             return;
           }
           if (
-            this.#config.publicLandingPage === true &&
+            (this.#config.publicLandingPage === true || allowAnonymous) &&
             isHtmlNavigationRequest(context.req.raw)
           ) {
             await next();
             return;
           }
-          const response = await protectWithBearer(
-            context.req.raw,
-            async () => {
-              await next();
-              return context.res;
-            }
-          );
+          const response = await gate(context.req.raw, async () => {
+            await next();
+            return context.res;
+          });
           context.res = response;
           return response;
         });
@@ -1929,23 +1947,40 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     };
 
     // JSON Schema's root `$schema` declaration selects the dialect used for
-    // validation. Do not normalize it away from a tool descriptor.
-    wrapListMethod("tools/list", "tools");
+    // validation. Do not normalize it away from a tool descriptor. The
+    // top-level `securitySchemes` field is added here because the SDK's
+    // descriptor builder only forwards fields the core schema knows about.
+    const policies = this.#resolveToolAuthPolicies();
+    wrapListMethod("tools/list", "tools", (tools) =>
+      tools.map((tool) => {
+        const wire = policies.get(tool.name)?.wire;
+        return wire === undefined
+          ? tool
+          : ({ ...tool, securitySchemes: wire } as typeof tool);
+      })
+    );
     wrapListMethod("resources/list", "resources");
     wrapListMethod("prompts/list", "prompts");
   }
 
   #registerTool(
     server: SdkMcpServer,
-    { definition, callback }: ToolEntry<TUser, TEnv>
+    { definition, callback }: ToolEntry<TUser, TEnv, TAnonymous>
   ): void {
     const view = definition.view;
 
-    const toolMeta = buildToolUiMeta(
+    const uiMeta = buildToolUiMeta(
       view?.name,
       definition.visibility,
       definition._meta
     );
+    const wireSchemes = this.#resolveToolAuthPolicies().get(
+      definition.name
+    )?.wire;
+    const toolMeta =
+      wireSchemes === undefined
+        ? uiMeta
+        : { ...uiMeta, [SECURITY_SCHEMES_META_KEY]: wireSchemes };
     const config = {
       ...(definition.title !== undefined && { title: definition.title }),
       ...(definition.description !== undefined && {
@@ -2083,7 +2118,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
 
   #registerResource(
     server: SdkMcpServer,
-    { definition, callback }: ResourceEntry<TUser, TEnv>
+    { definition, callback }: ResourceEntry<TUser, TEnv, TAnonymous>
   ): void {
     server.registerResource(
       definition.name,
@@ -2124,7 +2159,11 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
 
   #registerResourceTemplate(
     server: SdkMcpServer,
-    { definition, callback, complete }: ResourceTemplateEntry<TUser, TEnv>
+    {
+      definition,
+      callback,
+      complete,
+    }: ResourceTemplateEntry<TUser, TEnv, TAnonymous>
   ): void {
     const template = new ResourceTemplate(definition.uriTemplate, {
       list: undefined,
@@ -2194,7 +2233,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
 
   #registerPrompt(
     server: SdkMcpServer,
-    { definition, callback }: PromptEntry<TUser, TEnv>
+    { definition, callback }: PromptEntry<TUser, TEnv, TAnonymous>
   ): void {
     const config = {
       ...(definition.title !== undefined && { title: definition.title }),
@@ -2245,18 +2284,66 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
 
   #toRequestContext(
     ctx: ServerContext
-  ): RequestContext<TUser, HasOAuth<TUser>, TEnv> {
-    if (this.#config.oauth === undefined) {
+  ): RequestContext<TUser, HasOAuth<TUser, TAnonymous>, TEnv> {
+    if (
+      this.#config.oauth === undefined ||
+      (this.#config.allowAnonymous === true && ctx.http?.authInfo === undefined)
+    ) {
+      // Anonymous callers on a mixed-auth server reach public and
+      // optional-auth callbacks with `ctx.auth` absent.
       return toRequestContext<TEnv>(ctx) as RequestContext<
         TUser,
-        HasOAuth<TUser>,
+        HasOAuth<TUser, TAnonymous>,
         TEnv
       >;
     }
     return toAuthenticatedRequestContext<TUser, TEnv>(ctx) as RequestContext<
       TUser,
-      HasOAuth<TUser>,
+      HasOAuth<TUser, TAnonymous>,
       TEnv
     >;
+  }
+
+  #toolAuthPolicyOptions(): {
+    hasOAuth: boolean;
+    allowAnonymous: boolean;
+    baselineScopes: readonly string[];
+  } {
+    return {
+      hasOAuth: this.#config.oauth !== undefined,
+      allowAnonymous: this.#config.allowAnonymous === true,
+      baselineScopes: this.#config.oauth?.requiredScopes ?? [],
+    };
+  }
+
+  /**
+   * Resolve every registered tool's authentication policy. Cached until the
+   * next tool registration; the registry is immutable once the server starts.
+   */
+  #resolveToolAuthPolicies(): Map<string, ToolAuthPolicy> {
+    if (this.#toolAuthPolicies !== undefined) {
+      return this.#toolAuthPolicies;
+    }
+    const options = this.#toolAuthPolicyOptions();
+    const policies = new Map<string, ToolAuthPolicy>();
+    for (const [name, entry] of this.#tools) {
+      policies.set(name, resolveToolAuthPolicy(entry.definition, options));
+    }
+    this.#toolAuthPolicies = policies;
+    return policies;
+  }
+
+  /**
+   * View resource URIs readable anonymously: those bound to a tool whose
+   * policy admits anonymous callers.
+   */
+  #publicViewResourceUris(policies: Map<string, ToolAuthPolicy>): Set<string> {
+    const uris = new Set<string>();
+    for (const [viewName, binding] of this.#viewBindings) {
+      if (policies.get(binding.toolName)?.access !== "protected") {
+        uris.add(viewResourceUri(viewName));
+      }
+    }
+    return uris;
   }
 }

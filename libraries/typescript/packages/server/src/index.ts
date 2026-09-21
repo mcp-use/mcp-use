@@ -89,7 +89,11 @@ export type {
   StandardSchemaWithJSON,
 } from "@modelcontextprotocol/server";
 
-export type { ServerConfig, CorsOptions } from "./config.js";
+export type {
+  AuthChallengeFormat,
+  CorsOptions,
+  ServerConfig,
+} from "./config.js";
 export { registerSkills, SKILLS_EXTENSION_ID } from "./skills/types.js";
 export type {
   SkillsOptions,
@@ -144,6 +148,7 @@ export type {
 } from "./openapi/index.js";
 export type {
   OAuthAuth,
+  OAuthMode,
   RequestClientContext,
   RequestContext,
   UserContext,
@@ -156,6 +161,7 @@ export type {
   ToolDefinition,
   ToolRef,
   ToolResult,
+  ToolSecurityScheme,
   ToolViewConfig,
 } from "./tools.js";
 export type {

@@ -7,7 +7,7 @@ import type {
 } from "@modelcontextprotocol/server";
 import type { Env } from "hono";
 
-import type { RequestContext } from "./context.js";
+import type { OAuthMode, RequestContext } from "./context.js";
 
 /** Declares a static resource at a fixed URI. First argument to {@link MCPServer.resource}. */
 export interface ResourceDefinition {
@@ -52,7 +52,7 @@ export interface ResourceDefinition {
  */
 export type ResourceCallback<
   TUser = never,
-  HasOAuth extends boolean = false,
+  HasOAuth extends OAuthMode = false,
   TEnv extends Env = Env,
 > = (
   uri: URL,
@@ -189,7 +189,7 @@ export type InferTemplateParams<T> = T extends {
 export type ResourceTemplateCallback<
   TParams = Record<string, TemplateVariableValue>,
   TUser = never,
-  HasOAuth extends boolean = false,
+  HasOAuth extends OAuthMode = false,
   TEnv extends Env = Env,
 > = (
   uri: URL,
