@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 20.3.10-canary.0
+
+### Patch Changes
+
+- 8f7b6ac: Fix tall MCP Apps overflowing the tool result view by allowing the result content to grow and scroll without clipping the top of the app behind the response toolbar.
+
 ## 20.3.9
 
 ### Patch Changes
