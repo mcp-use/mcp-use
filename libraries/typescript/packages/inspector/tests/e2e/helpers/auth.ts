@@ -54,6 +54,20 @@ export async function addCustomHeaderInSettingsTab(
 }
 
 /**
+ * Reconnect a server from its dashboard tile and wait for it to become ready.
+ * Saving new connection options does not restart a connection that already
+ * failed, so callers trigger the reconnect explicitly.
+ */
+export async function reconnectFromDashboard(
+  page: Page,
+  serverName: string
+): Promise<void> {
+  await page.goto(INSPECTOR_URL);
+  await page.getByTestId("server-tile-reconnect").click();
+  await waitForServerState(page, serverName, "ready", 15000);
+}
+
+/**
  * Connect to API Key server with or without authentication
  */
 export async function connectToApiKeyServer(

@@ -186,10 +186,8 @@ test.describe("Conformance UI widgets - Resources Tab", () => {
     const resultContent = page.getByTestId("resource-result-json");
     await expect(resultContent).toContainText('"uri"');
 
-    await page
-      .getByRole("button", { name: /Component|Preview|MCP Apps/ })
-      .first()
-      .click();
+    // The header toggle reads "Preview" (the "MCP Apps" pill is a badge).
+    await page.getByRole("button", { name: /Preview/ }).click();
     // Back to the component preview
     await expect(page.getByTestId("resource-widget-preview")).toBeVisible({
       timeout: 10000,
