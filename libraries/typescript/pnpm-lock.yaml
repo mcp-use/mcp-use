@@ -75,9 +75,7 @@ overrides:
   nanoid@>=4.0.0 <5.0.9: ^5.0.9
 
 patchedDependencies:
-  '@modelcontextprotocol/server@2.0.0':
-    hash: 2a5f5402571efdc40802e9603a3dd09e22588b4aacad710814c204d79568091e
-    path: patches/@modelcontextprotocol__server@2.0.0.patch
+  '@modelcontextprotocol/server@2.0.0': 2a5f5402571efdc40802e9603a3dd09e22588b4aacad710814c204d79568091e
 
 importers:
 
