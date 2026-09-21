@@ -353,7 +353,7 @@ mcp-use whoami
 mcp-use whoami
 ```
 
-**Notes and behavior:** The command reads `~/.mcp-use/config.json`.
+**Notes and behavior:** The command reads `~/.mcp-use/config.json`. When that file selects no organization, it reports the account default, matching `org current` and the `servers`/`deployments` commands. This is the usual case when authenticating with `MCP_USE_API_KEY` instead of `mcp-use login`.
 
 ### `logout`
 
