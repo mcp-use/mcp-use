@@ -10,6 +10,7 @@ export default defineConfig({
     index: "src/index.ts",
     bin: "src/bin.ts",
     "internal/skills-loader": "src/skills/node-loader.ts",
+    "internal/vite": "src/internal/vite.ts",
     "next-server-shims": "src/cli/next-server-shims.ts",
     "commands/start": "src/commands/start.ts",
     "commands/dev": "src/commands/dev.ts",
