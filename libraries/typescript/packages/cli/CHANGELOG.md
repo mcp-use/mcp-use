@@ -1,5 +1,12 @@
 # @mcp-use/cli
 
+## 4.1.15-canary.2
+
+### Patch Changes
+
+- 3e8a1d6: Resolve the organization in `mcp-use whoami` the same way `org current` and every `servers`/`deployments` command already do, by falling back to the account default when the local config has no explicit selection. Authenticating with `MCP_USE_API_KEY` without running `mcp-use login` previously made `whoami` report `organization: null` while the rest of the CLI read and mutated that organization's resources.
+- 01dedad: Trim `skills.directory` before resolving it. The blank check already tested the trimmed value, but the untrimmed string was passed to `resolve`, so `skills: { directory: " skills" }` resolved to a sibling directory with a leading space and no skills were discovered.
+
 ## 4.1.15-canary.1
 
 ### Patch Changes
