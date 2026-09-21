@@ -1,5 +1,11 @@
 # @mcp-use/client
 
+## 2.3.3-canary.0
+
+### Patch Changes
+
+- b906d63: Prevent sibling inline MCP View widgets from clobbering global document fullscreen and pip attributes.
+
 ## 2.3.2
 
 ### Patch Changes
