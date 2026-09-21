@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { decodeJwt } from "jose";
 import { DatabaseSync } from "node:sqlite";
 import { betterAuth } from "better-auth";
@@ -6,7 +6,11 @@ import { getMigrations } from "better-auth/db/migration";
 import { jwt } from "better-auth/plugins";
 
 import { createNativeMcpAuth } from "../src/oauth/better-auth-mcp.js";
-import { NativeIdentityError } from "../src/oauth/native-identity.js";
+import {
+  NativeIdentityError,
+  type NativeIdentityAdapter,
+  type NativeIdentityRevalidation,
+} from "../src/oauth/native-identity.js";
 import {
   authorize,
   OAuthBrowser,
@@ -17,10 +21,14 @@ import {
 
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => {
+  vi.useRealTimers();
   for (const close of cleanup.splice(0).reverse()) await close();
 });
 
-async function nativeBroker(database?: DatabaseSync) {
+async function nativeBroker(
+  database?: DatabaseSync,
+  overrides: Partial<NativeIdentityAdapter> = {}
+) {
   const account = { status: "valid" as "valid" | "invalid" | "unavailable" };
   const identity = {
     subject: "native-user",
@@ -50,6 +58,7 @@ async function nativeBroker(database?: DatabaseSync) {
             async checkStatus() {
               return account.status;
             },
+            ...overrides,
           },
         },
       }),
@@ -74,12 +83,203 @@ async function nativeBroker(database?: DatabaseSync) {
   return {
     broker,
     account,
+    identity,
     grant: (thumbprint?: string) =>
       authorize(broker, browser, login, thumbprint),
   };
 }
 
 describe("Better Auth MCP broker (real engine and SQLite)", () => {
+  it.each(["valid", "invalid", "reject"] as const)(
+    "times out a hung refresh and fences late %s completion while holding the client lock",
+    async (late) => {
+      const revalidate =
+        vi.fn<NonNullable<NativeIdentityAdapter["revalidate"]>>();
+      const fixture = await nativeBroker(undefined, {
+        revalidate: (...args) => revalidate(...args),
+      });
+      const { broker, identity, grant } = fixture;
+      revalidate.mockResolvedValue({ status: "valid", identity });
+      const authorization = await grant();
+      const issued = await tokens(await broker.token(authorization.fields));
+      const before = broker.session(issued.access_token)!;
+      const refreshBefore = broker.refreshRows();
+      let started!: () => void;
+      const entered = new Promise<void>((resolve) => {
+        started = resolve;
+      });
+      let finish!: (result: NativeIdentityRevalidation) => void;
+      let fail!: (error: Error) => void;
+      let providerSignal!: AbortSignal;
+      revalidate.mockClear();
+      revalidate.mockImplementationOnce((_binding, signal) => {
+        providerSignal = signal;
+        started();
+        return new Promise((resolve, reject) => {
+          finish = resolve;
+          fail = reject;
+        });
+      });
+      const renew = () =>
+        broker.integration.handle(
+          new Request(`${broker.base}/oauth2/token`, {
+            method: "POST",
+            headers: { "content-type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+              grant_type: "refresh_token",
+              client_id: authorization.clientId,
+              refresh_token: issued.refresh_token,
+              resource: broker.resource,
+            }),
+          })
+        );
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      const pending = renew();
+      await entered;
+      await vi.advanceTimersByTimeAsync(10_001);
+      expect((await pending)!.status).toBe(503);
+      expect(providerSignal.aborted).toBe(true);
+      expect(
+        broker.session(issued.access_token)!.nativeLeaseOwner
+      ).toBeTruthy();
+      const overlapping = renew();
+      await vi.advanceTimersByTimeAsync(1_001);
+      expect((await overlapping)!.status).toBe(503);
+      expect(revalidate).toHaveBeenCalledTimes(1);
+      // Revocation does not revalidate the session: only the client lock can
+      // prevent this mutation while the timed-out refresh is still running.
+      const revocation = broker.integration.handle(
+        new Request(`${broker.base}/oauth2/revoke`, {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            client_id: authorization.clientId,
+            token: issued.refresh_token,
+            token_type_hint: "refresh_token",
+          }),
+        })
+      );
+      await vi.advanceTimersByTimeAsync(1_001);
+      expect((await revocation)!.status).toBe(503);
+      expect(broker.refreshRows()).toEqual(refreshBefore);
+      if (late === "reject") fail(new Error("late provider failure"));
+      else
+        finish(
+          late === "valid"
+            ? {
+                status: "valid",
+                identity: {
+                  ...identity,
+                  profile: { name: "Late profile" },
+                  binding: { rotated: true },
+                },
+              }
+            : { status: "invalid" }
+        );
+      await vi.waitFor(() =>
+        expect(broker.session(issued.access_token)!.nativeLeaseOwner).toBeNull()
+      );
+      expect(broker.session(issued.access_token)).toEqual({
+        ...before,
+        updatedAt: expect.any(String),
+      });
+      expect(broker.refreshRows()).toEqual(refreshBefore);
+      vi.useRealTimers();
+      expect((await renew())!.status).toBe(200);
+    }
+  );
+
+  it.each(["valid", "invalid"] as const)(
+    "discards a %s provider result after the session lease changes owners",
+    async (status) => {
+      const revalidate =
+        vi.fn<NonNullable<NativeIdentityAdapter["revalidate"]>>();
+      const { broker, identity, grant } = await nativeBroker(undefined, {
+        revalidate,
+      });
+      revalidate.mockResolvedValue({ status: "valid", identity });
+      const authorization = await grant();
+      const issued = await tokens(await broker.token(authorization.fields));
+      const before = broker.session(issued.access_token)!;
+      const refreshBefore = broker.refreshRows();
+      revalidate.mockImplementationOnce(async () => {
+        const prefix = `mcp_${broker.auth.basePath.split("/")[2]}_`;
+        broker.db
+          .prepare(
+            `UPDATE "${prefix}session" SET nativeLeaseOwner = ? WHERE id = ?`
+          )
+          .run("another-worker", String(before.id));
+        return status === "invalid"
+          ? { status }
+          : {
+              status: "valid",
+              identity: { ...identity, binding: { rotated: true } },
+            };
+      });
+      expect(
+        (
+          await broker.token({
+            grant_type: "refresh_token",
+            client_id: authorization.clientId,
+            refresh_token: issued.refresh_token,
+          })
+        ).status
+      ).toBe(503);
+      expect(broker.session(issued.access_token)).toMatchObject({
+        nativeLeaseOwner: "another-worker",
+        nativeBinding: before.nativeBinding,
+        nativeProfile: before.nativeProfile,
+      });
+      expect(broker.refreshRows()).toEqual(refreshBefore);
+    }
+  );
+
+  it("cancels expiry recovery without applying a late revocation", async () => {
+    const revalidate =
+      vi.fn<NonNullable<NativeIdentityAdapter["revalidate"]>>();
+    const checkStatus = vi
+      .fn<NonNullable<NativeIdentityAdapter["checkStatus"]>>()
+      .mockResolvedValue("valid");
+    const { broker, identity, grant } = await nativeBroker(undefined, {
+      revalidate,
+      checkStatus,
+    });
+    revalidate.mockResolvedValue({ status: "valid", identity });
+    const issued = await tokens(await broker.token((await grant()).fields));
+    const before = broker.session(issued.access_token)!;
+    checkStatus.mockResolvedValue("expired");
+    let started!: () => void;
+    const entered = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    let finish!: (result: NativeIdentityRevalidation) => void;
+    revalidate.mockImplementationOnce((_binding, signal) => {
+      expect(signal.aborted).toBe(false);
+      started();
+      return new Promise((resolve) => {
+        finish = resolve;
+      });
+    });
+    const controller = new AbortController();
+    const pending = broker.integration.requestAuth.authenticate(
+      new Request(broker.resource, {
+        headers: { authorization: `Bearer ${issued.access_token}` },
+        signal: controller.signal,
+      })
+    );
+    await entered;
+    controller.abort();
+    expect(await pending).toMatchObject({ status: 503 });
+    finish({ status: "invalid" });
+    await vi.waitFor(() =>
+      expect(broker.session(issued.access_token)!.nativeLeaseOwner).toBeNull()
+    );
+    expect(broker.session(issued.access_token)).toEqual({
+      ...before,
+      updatedAt: expect.any(String),
+    });
+  });
+
   it("isolates two MCP engines from existing application sessions, keys and business data", async () => {
     const database = new DatabaseSync(":memory:");
     cleanup.push(async () => database.close());

@@ -26,6 +26,7 @@ import {
   type NativeIdentityProfile,
 } from "./native-identity.js";
 import type { OAuthExtra } from "./provider.js";
+import { boundedOperation } from "./bounded-operation.js";
 
 /** Public native identity exposed to MCP tools; never includes native credentials. */
 export interface NativeOAuthUser {
@@ -45,7 +46,8 @@ export interface BetterAuthNativeIdentityOptions {
    * `linked` checks the native session at every MCP token issuance/renewal.
    * `strict` also checks current native status before every MCP request, without
    * caching successful checks. Providers must implement read-only `checkStatus`.
-   * Checks time out after ten seconds; outages reject requests temporarily.
+   * Checks and revalidation time out after ten seconds; outages reject requests
+   * temporarily. Expired credentials are renewed under the session lease.
    * `independent` deliberately uses the engine session's own lifetime.
    */
   sessionPolicy: "strict" | "linked" | "independent";
@@ -81,7 +83,6 @@ interface NativeSession {
 
 const flowLifetime = 300;
 const leaseLifetime = 45;
-const statusCheckTimeoutMs = 10_000;
 const keySchema = z.string().regex(/^[a-z][a-z0-9-]{0,63}$/);
 const querySchema = z.string().max(16_384);
 const nonceSchema = z.string().regex(/^[a-f0-9]{64}$/);
@@ -227,9 +228,11 @@ export function createNativeIdentityBridge(
 
   async function identityForToken(
     sessionId: string,
-    userId: string
+    userId: string,
+    signal: AbortSignal
   ): Promise<NativeOAuthUser> {
     const session = await readSession(sessionId, userId);
+    if (signal.aborted) throw new NativeIdentityError("unavailable");
     if (sessionPolicy === "independent") return sessionIdentity(session);
     const adapter = providers.get(session.nativeProvider)!;
     const database = currentContext().adapter;
@@ -277,12 +280,19 @@ export function createNativeIdentityBridge(
           })
         )
       );
-      const result = await adapter.revalidate!(binding);
+      if (signal.aborted) throw new NativeIdentityError("unavailable");
+      // Await the provider itself: the token guard must stay held until it stops.
+      // The HTTP boundary returns a bounded failure while this call drains.
+      const result = await adapter.revalidate!(binding, signal);
+      if (signal.aborted || Date.now() >= until * 1000)
+        throw new NativeIdentityError("unavailable");
       if (result.status !== "valid")
         throw new NativeIdentityError(result.status);
       if (result.identity.subject !== session.nativeSubject)
         throw new NativeIdentityError("invalid");
       const identity = publicIdentity(session.nativeProvider, result.identity);
+      const nativeBinding = await encodeBinding(result.identity.binding);
+      if (signal.aborted) throw new NativeIdentityError("unavailable");
       const updated = await database.updateMany({
         model: "session",
         where: [
@@ -291,7 +301,7 @@ export function createNativeIdentityBridge(
         ],
         update: {
           nativeProfile: JSON.stringify(identity.profile),
-          nativeBinding: await encodeBinding(result.identity.binding),
+          nativeBinding,
           nativeLeaseOwner: null,
           nativeLeaseUntil: null,
         },
@@ -299,8 +309,16 @@ export function createNativeIdentityBridge(
       if (updated !== 1) throw new NativeIdentityError("unavailable");
       return identity;
     } catch (error) {
-      if (error instanceof NativeIdentityError && error.code === "invalid") {
-        await database.deleteMany({ model: "session", where: owned() });
+      if (
+        !signal.aborted &&
+        error instanceof NativeIdentityError &&
+        error.code === "invalid"
+      ) {
+        const deleted = await database.deleteMany({
+          model: "session",
+          where: owned(),
+        });
+        if (deleted !== 1) throw new NativeIdentityError("unavailable");
       } else {
         await database.updateMany({
           model: "session",
@@ -308,16 +326,20 @@ export function createNativeIdentityBridge(
           update: { nativeLeaseOwner: null, nativeLeaseUntil: null },
         });
       }
-      throw error;
+      throw signal.aborted ? new NativeIdentityError("unavailable") : error;
     }
   }
 
   const extension: OAuthProviderExtension = {
     claims: {
-      async accessToken({ sessionId, user }) {
+      async accessToken({ sessionId, user, ctx }) {
         try {
           if (!sessionId || !user) throw new NativeIdentityError("invalid");
-          const identity = await identityForToken(sessionId, user.id);
+          const identity = await identityForToken(
+            sessionId,
+            user.id,
+            ctx.request?.signal ?? AbortSignal.timeout(10_000)
+          );
           return {
             native_identity: identity,
             email: identity.profile.email,
@@ -572,68 +594,89 @@ export function createNativeIdentityBridge(
     plugin,
     extension,
     async checkSession(claims, request) {
-      try {
-        if (typeof claims.sid !== "string" || typeof claims.sub !== "string")
-          return "invalid";
-        const native = publicIdentitySchema.safeParse(
-          claims["native_identity"]
-        );
-        if (!native.success) return "invalid";
-        const session = await readSession(claims.sid, claims.sub);
-        if (
-          native.data.subject !== session.nativeSubject ||
-          native.data.source !== session.nativeSource
-        )
-          return "invalid";
-        if (sessionPolicy !== "strict") return "valid";
-        if (!session.nativeBinding) return "invalid";
-
-        const binding = bindingSchema.parse(
-          JSON.parse(
-            await symmetricDecrypt({
-              key: currentContext().secretConfig,
-              data: session.nativeBinding,
-            })
-          )
-        );
-        const status = await checkNativeStatus(
-          providers.get(session.nativeProvider)!,
-          binding,
-          request.signal
-        );
-        if (status === "invalid") {
-          // An older status check must not delete a concurrently renewed binding.
-          await currentContext().adapter.deleteMany({
-            model: "session",
-            where: [
-              { field: "id", value: session.id },
-              { field: "userId", value: session.userId },
-              { field: "nativeProvider", value: session.nativeProvider },
-              { field: "nativeSource", value: session.nativeSource },
-              { field: "nativeSubject", value: session.nativeSubject },
-              { field: "nativeBinding", value: session.nativeBinding },
-            ],
-          });
-          return "invalid";
-        }
-        if (status !== "valid") return "unavailable";
-        // Another worker may have invalidated this session during the remote check.
-        const current = await readSession(session.id, session.userId);
-        if (
-          current.nativeProvider !== session.nativeProvider ||
-          current.nativeSource !== session.nativeSource ||
-          current.nativeSubject !== session.nativeSubject
-        )
-          return "invalid";
-        if (request.signal.aborted) return "unavailable";
-        return current.nativeBinding === session.nativeBinding
-          ? "valid"
-          : "unavailable";
-      } catch (error) {
-        return error instanceof NativeIdentityError && error.code === "invalid"
-          ? "invalid"
-          : "unavailable";
-      }
+      return boundedOperation<"valid" | "invalid" | "unavailable">(
+        request.signal,
+        async (signal) => {
+          try {
+            if (
+              typeof claims.sid !== "string" ||
+              typeof claims.sub !== "string"
+            )
+              return "invalid";
+            const native = publicIdentitySchema.safeParse(
+              claims["native_identity"]
+            );
+            if (!native.success) return "invalid";
+            let session = await readSession(claims.sid, claims.sub);
+            if (
+              native.data.subject !== session.nativeSubject ||
+              native.data.source !== session.nativeSource
+            )
+              return "invalid";
+            if (sessionPolicy !== "strict") return "valid";
+            for (let attempt = 0; attempt < 2; attempt++) {
+              if (!session.nativeBinding) return "invalid";
+              const binding = bindingSchema.parse(
+                JSON.parse(
+                  await symmetricDecrypt({
+                    key: currentContext().secretConfig,
+                    data: session.nativeBinding,
+                  })
+                )
+              );
+              if (signal.aborted) return "unavailable";
+              const status = await providers.get(session.nativeProvider)!
+                .checkStatus!(binding, signal);
+              if (signal.aborted) return "unavailable";
+              if (status === "expired" && attempt === 0) {
+                await identityForToken(session.id, session.userId, signal);
+                session = await readSession(session.id, session.userId);
+                if (
+                  native.data.subject !== session.nativeSubject ||
+                  native.data.source !== session.nativeSource
+                )
+                  return "invalid";
+                continue;
+              }
+              if (status === "invalid") {
+                // An older status check must not delete a concurrently renewed binding.
+                await currentContext().adapter.deleteMany({
+                  model: "session",
+                  where: [
+                    { field: "id", value: session.id },
+                    { field: "userId", value: session.userId },
+                    { field: "nativeProvider", value: session.nativeProvider },
+                    { field: "nativeSource", value: session.nativeSource },
+                    { field: "nativeSubject", value: session.nativeSubject },
+                    { field: "nativeBinding", value: session.nativeBinding },
+                  ],
+                });
+                return "invalid";
+              }
+              if (status !== "valid") return "unavailable";
+              // Another worker may have invalidated this session during the remote check.
+              const current = await readSession(session.id, session.userId);
+              if (
+                current.nativeProvider !== session.nativeProvider ||
+                current.nativeSource !== session.nativeSource ||
+                current.nativeSubject !== session.nativeSubject
+              )
+                return "invalid";
+              if (signal.aborted) return "unavailable";
+              return current.nativeBinding === session.nativeBinding
+                ? "valid"
+                : "unavailable";
+            }
+            return "unavailable";
+          } catch (error) {
+            return error instanceof NativeIdentityError &&
+              error.code === "invalid"
+              ? "invalid"
+              : "unavailable";
+          }
+        },
+        () => "unavailable"
+      );
     },
     mapAuthInfo(info) {
       const payload = info.extra?.payload;
@@ -642,34 +685,6 @@ export function createNativeIdentityBridge(
       return { user, payload, permissions: [...info.scopes] };
     },
   };
-}
-
-async function checkNativeStatus(
-  adapter: NativeIdentityAdapter,
-  binding: NativeIdentityBinding,
-  requestSignal: AbortSignal
-): Promise<"valid" | "invalid" | "unavailable"> {
-  if (requestSignal.aborted) return "unavailable";
-  const controller = new AbortController();
-  const abort = () => controller.abort();
-  requestSignal.addEventListener("abort", abort, { once: true });
-  const timer = setTimeout(abort, statusCheckTimeoutMs);
-  let onAbort: (() => void) | undefined;
-  try {
-    const aborted = new Promise<"unavailable">((resolve) => {
-      onAbort = () => resolve("unavailable");
-      controller.signal.addEventListener("abort", onAbort, { once: true });
-    });
-    const status = await Promise.race([
-      adapter.checkStatus!(binding, controller.signal),
-      aborted,
-    ]);
-    return controller.signal.aborted ? "unavailable" : status;
-  } finally {
-    clearTimeout(timer);
-    requestSignal.removeEventListener("abort", abort);
-    if (onAbort) controller.signal.removeEventListener("abort", onAbort);
-  }
 }
 
 function authError(error: unknown): APIError {

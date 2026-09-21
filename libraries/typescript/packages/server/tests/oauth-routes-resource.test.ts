@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MCPServer } from "../src/index.js";
 import {
@@ -88,7 +88,6 @@ function challenge(response: Response): string {
 describe("OAuth HTTP route acceptance", () => {
   it("delegates complete requests and engine challenges while exposing isolated typed identities", async () => {
     const resource = new URL("https://request-host.example.test/mcp");
-    const observed: Request[] = [];
     const engine = new MCPServer<{ id: string }>({
       name: "request-auth-test",
       version: "1.0.0",
@@ -96,7 +95,6 @@ describe("OAuth HTTP route acceptance", () => {
       requestAuth: {
         resource,
         async authenticate(req) {
-          observed.push(req);
           if (!req.headers.has("DPoP")) {
             return new Response("engine challenge", {
               status: 401,
@@ -106,7 +104,8 @@ describe("OAuth HTTP route acceptance", () => {
               },
             });
           }
-          await Promise.resolve();
+          // Authentication may inspect the JSON without consuming MCP's copy.
+          expect(await req.json()).toMatchObject({ method: "tools/call" });
           return {
             token: req.headers.get("authorization")!,
             clientId: "client",
@@ -173,7 +172,11 @@ describe("OAuth HTTP route acceptance", () => {
       );
       for (const [index, response] of responses.entries()) {
         expect(response.status).toBe(200);
-        expect(observed[index + 1]).toBe(requests[index]);
+        // Check the body contract, not whether the verifier got a different object.
+        expect(await requests[index]!.json()).toMatchObject({
+          method: "tools/call",
+          params: { name: "whoami" },
+        });
         expect(await response.json()).toMatchObject({
           result: {
             content: [
@@ -188,6 +191,7 @@ describe("OAuth HTTP route acceptance", () => {
   });
 
   it("fails closed on request authenticator errors and invalid success data", async () => {
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
     const resource = new URL("https://request-host.example.test/mcp");
     const valid: OAuthAuthInfo = {
       token: "token",
@@ -248,6 +252,16 @@ describe("OAuth HTTP route acceptance", () => {
         await engine.close();
       }
     }
+    expect(warning.mock.calls.map((call) => call[1]?.stage)).toEqual([
+      "authenticate",
+      "validateAuthInfo",
+      "validateAuthInfo",
+      "mapAuthInfo",
+    ]);
+    const logs = JSON.stringify(warning.mock.calls);
+    expect(logs).not.toMatch(/private credentials|private identity/);
+    expect(logs).toContain(resource.href);
+    warning.mockRestore();
   });
 
   it("returns OAuth wire errors and a canonical path-aware challenge", async () => {

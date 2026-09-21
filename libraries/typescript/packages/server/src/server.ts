@@ -81,7 +81,6 @@ import {
   validateOAuthResource,
   wrapOAuthTokenVerifier,
 } from "./oauth/internal.js";
-import { createRequestAuthenticator } from "./oauth/request-auth.js";
 import type {
   InferPromptInput,
   PromptCallback,
@@ -1441,7 +1440,11 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         const requestAuth = this.#config.requestAuth;
         let gate: (request: Request) => Promise<AuthInfo | Response>;
         if (requestAuth !== undefined) {
-          gate = createRequestAuthenticator(requestAuth, resource);
+          const authenticator = import("./oauth/request-auth.js").then(
+            ({ createRequestAuthenticator }) =>
+              createRequestAuthenticator(requestAuth, resource)
+          );
+          gate = async (request) => (await authenticator)(request);
         } else {
           const provider = this.#config.oauth!;
           const providerOptions = getOAuthProviderOptions(provider);

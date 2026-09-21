@@ -1,4 +1,11 @@
-import { createRemoteJWKSet, customFetch, errors, jwtVerify } from "jose";
+import {
+  createRemoteJWKSet,
+  customFetch,
+  errors,
+  jwksCache,
+  jwtVerify,
+  type JWKSCacheInput,
+} from "jose";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -40,15 +47,17 @@ export interface FirebaseCredentials {
 
 /** Separates rejected credentials from Firebase service failures. */
 export class FirebaseIdentityError extends Error {
-  /** Only invalid sessions should be revoked; unavailable services may recover. */
-  readonly code: "invalid_session" | "unavailable";
+  /** Expired ID tokens can be renewed; only invalid sessions should be revoked. */
+  readonly code: "invalid_session" | "token_expired" | "unavailable";
 
   /** Creates a sanitized error without embedding credentials or upstream output. */
-  constructor(code: "invalid_session" | "unavailable") {
+  constructor(code: "invalid_session" | "token_expired" | "unavailable") {
     super(
       code === "invalid_session"
         ? "Firebase session is invalid; sign in again"
-        : "Firebase authentication is temporarily unavailable"
+        : code === "token_expired"
+          ? "Firebase ID token needs renewal"
+          : "Firebase authentication is temporarily unavailable"
     );
     this.name = "FirebaseIdentityError";
     this.code = code;
@@ -102,22 +111,40 @@ export function createFirebaseIdentity(config: FirebaseWebConfig) {
       "Firebase appId must be the web application identifier"
     );
   }
-  const keys = createRemoteJWKSet(
-    new URL(
-      "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"
-    ),
-    { [customFetch]: boundedFetch, timeoutDuration: 10_000 }
-  );
+  const keyCache: JWKSCacheInput = {};
 
-  async function verifyToken(idToken: string): Promise<FirebaseIdentity> {
+  async function verifyToken(
+    idToken: string,
+    signal?: AbortSignal
+  ): Promise<FirebaseIdentity> {
     assertToken(idToken);
     try {
+      if (signal?.aborted) throw new FirebaseIdentityError("unavailable");
+      // Share cached keys, but keep each outbound fetch tied to its own request.
+      const keys = createRemoteJWKSet(
+        new URL(
+          "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"
+        ),
+        {
+          [jwksCache]: keyCache,
+          [customFetch]: (url, init) =>
+            boundedFetch(url, {
+              ...init,
+              signal: AbortSignal.any([
+                ...(init?.signal ? [init.signal] : []),
+                ...(signal ? [signal] : []),
+              ]),
+            }),
+          timeoutDuration: 10_000,
+        }
+      );
       const { payload, protectedHeader } = await jwtVerify(idToken, keys, {
         algorithms: ["RS256"],
         issuer,
         audience: projectId,
         requiredClaims: ["sub", "exp", "iat", "auth_time"],
       });
+      if (signal?.aborted) throw new FirebaseIdentityError("unavailable");
       const now = Date.now() / 1000;
       const firebase = payload["firebase"];
       const authTime = payload["auth_time"];
@@ -154,9 +181,11 @@ export function createFirebaseIdentity(config: FirebaseWebConfig) {
         authTime,
       };
     } catch (error) {
+      if (signal?.aborted) throw new FirebaseIdentityError("unavailable");
       if (error instanceof FirebaseIdentityError) throw error;
+      if (error instanceof errors.JWTExpired)
+        throw new FirebaseIdentityError("token_expired");
       if (
-        error instanceof errors.JWTExpired ||
         error instanceof errors.JWTClaimValidationFailed ||
         error instanceof errors.JWTInvalid ||
         error instanceof errors.JWSInvalid ||
@@ -172,7 +201,8 @@ export function createFirebaseIdentity(config: FirebaseWebConfig) {
 
   async function refresh(
     refreshToken: string,
-    expected: Pick<FirebaseIdentity, "uid" | "authTime">
+    expected: Pick<FirebaseIdentity, "uid" | "authTime">,
+    signal?: AbortSignal
   ) {
     assertToken(refreshToken);
     const refreshed = await firebaseRequest(
@@ -180,7 +210,8 @@ export function createFirebaseIdentity(config: FirebaseWebConfig) {
       new URLSearchParams({
         grant_type: "refresh_token",
         refresh_token: refreshToken,
-      })
+      }),
+      signal
     );
     const idToken = refreshed["access_token"] ?? refreshed["id_token"];
     if (
@@ -189,7 +220,7 @@ export function createFirebaseIdentity(config: FirebaseWebConfig) {
     ) {
       throw new FirebaseIdentityError("unavailable");
     }
-    const identity = await checkStatus(idToken, expected);
+    const identity = await checkStatus(idToken, expected, signal);
     assertToken(refreshed["refresh_token"]);
     return { identity, refreshToken: refreshed["refresh_token"], idToken };
   }
@@ -200,7 +231,7 @@ export function createFirebaseIdentity(config: FirebaseWebConfig) {
     signal?: AbortSignal
   ): Promise<FirebaseIdentity> {
     if (signal?.aborted) throw new FirebaseIdentityError("unavailable");
-    const identity = await verifyToken(idToken);
+    const identity = await verifyToken(idToken, signal);
     if (
       identity.uid !== expected.uid ||
       identity.authTime !== expected.authTime

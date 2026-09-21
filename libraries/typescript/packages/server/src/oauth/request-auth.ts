@@ -19,6 +19,7 @@ export interface RequestAuthOptions<TUser> {
    *
    * Responses pass through unchanged. Thrown errors and invalid verifier output
    * fail closed with a generic 503 response without exposing error details.
+   * Receives a clone so reading its body leaves the MCP request body available.
    */
   authenticate: (request: Request) => Promise<AuthInfo | Response>;
   /** Maps verified authentication information into user, claims and permissions. */
@@ -31,14 +32,23 @@ export function createRequestAuthenticator<TUser>(
   resource: URL
 ): (request: Request) => Promise<AuthInfo | Response> {
   return async (request) => {
+    let stage = "authenticate";
     try {
-      const result = await options.authenticate(request);
+      const result = await options.authenticate(request.clone());
+      stage = "validateAuthInfo";
       return result instanceof Response
         ? result
-        : mapVerifiedAuthInfo(result, resource, (info) =>
-            options.mapAuthInfo(info)
-          );
+        : mapVerifiedAuthInfo(result, resource, (info) => {
+            stage = "mapAuthInfo";
+            return options.mapAuthInfo(info);
+          });
     } catch {
+      // Provider errors can contain credentials. Log only our own context.
+      console.warn("[mcp-use] Request authentication failed", {
+        stage,
+        method: request.method,
+        resource: resource.href,
+      });
       return Response.json(
         { error: "temporarily_unavailable" },
         { status: 503, headers: { "Cache-Control": "no-store" } }

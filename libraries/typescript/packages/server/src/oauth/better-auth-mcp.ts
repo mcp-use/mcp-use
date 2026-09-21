@@ -21,6 +21,7 @@ import { decodeJwt, type JWTPayload } from "jose";
 
 import type { RequestAuthOptions } from "./request-auth.js";
 import { validateOAuthResource } from "./internal.js";
+import { boundedOperation } from "./bounded-operation.js";
 
 export {
   createNativeMcpAuth,
@@ -70,6 +71,9 @@ export interface BetterAuthMcpOptions<TUser> {
    * Operations are never replayed. Multi-process deployments must supply a shared
    * store guard because engine 1.7.4 does not atomically invalidate refresh
    * families during concurrent rotation/revocation.
+   * Token responses time out after ten seconds and abort the engine request.
+   * The guard must retain its lock until `operation` settles, including after
+   * cancellation, so unfinished engine writes cannot overlap a later operation.
    */
   runTokenOperation?: (
     /** Unverified request hint used only to select the serialization key. */
@@ -292,7 +296,20 @@ export async function betterAuthMcp<TUser>(
         if (request.method === "POST" && tokenPaths.has(path)) {
           const clientId = await operationClient(bounded);
           if (!clientId) return bodyFailure(400);
-          return runTokenOperation(clientId, () => auth.handler(bounded));
+          return boundedOperation(
+            bounded.signal,
+            (signal) =>
+              runTokenOperation(clientId, () =>
+                signal.aborted
+                  ? Promise.resolve(bodyFailure(503))
+                  : auth.handler(new Request(bounded, { signal }))
+              ),
+            () =>
+              Response.json(
+                { error: "temporarily_unavailable" },
+                { status: 503, headers: { "Cache-Control": "no-store" } }
+              )
+          );
         }
         return auth.handler(bounded);
       }

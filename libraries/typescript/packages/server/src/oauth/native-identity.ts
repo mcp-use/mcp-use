@@ -77,20 +77,25 @@ export interface NativeIdentityAdapter {
   /**
    * Check a privately stored session reference when the app requires linkage.
    * The bridge must reject a changed subject and persist replacement bindings.
+   * Honor cancellation and stop outbound work when supported. Cancelled or late
+   * results are discarded; the bridge retains the lease until this call settles.
    */
   revalidate?(
-    binding: NativeIdentityBinding
+    binding: NativeIdentityBinding,
+    signal: AbortSignal
   ): Promise<NativeIdentityRevalidation>;
   /**
    * Read current native account/session status for strict request verification.
    * Must not rotate credentials, replace the binding, or cache a valid result.
    * Return `invalid` only for an authoritative rejection and `unavailable` for
    * outages or an inconclusive response. Honor the abort signal when supported.
+   * Return `expired` when only the stored credentials need renewal. The bridge
+   * revalidates under the session lease, persists the binding, and retries once.
    */
   checkStatus?(
     binding: NativeIdentityBinding,
     signal: AbortSignal
-  ): Promise<"valid" | "invalid" | "unavailable">;
+  ): Promise<"valid" | "invalid" | "unavailable" | "expired">;
 }
 
 /** Sanitized native authentication failure without upstream credentials. */
@@ -283,14 +288,19 @@ export function createFirebaseAdminIdentityAdapter(
         throw firebaseError(error);
       }
     },
-    async revalidate(binding) {
+    async revalidate(binding, signal) {
       try {
+        if (signal.aborted) return { status: "unavailable" };
+        const identity = await identityFromBinding(binding);
+        if (signal.aborted) return { status: "unavailable" };
         return {
           status: "valid",
-          identity: await identityFromBinding(binding),
+          identity,
         };
       } catch (error) {
-        return { status: firebaseError(error).code };
+        return {
+          status: signal.aborted ? "unavailable" : firebaseError(error).code,
+        };
       }
     },
     async checkStatus(binding, signal) {

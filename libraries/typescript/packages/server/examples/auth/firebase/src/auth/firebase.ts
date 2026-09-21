@@ -59,7 +59,7 @@ export function firebaseIdentityAdapter(
         throw nativeError(error);
       }
     },
-    async revalidate(binding) {
+    async revalidate(binding, signal) {
       if (
         !isRecord(binding) ||
         typeof binding.uid !== "string" ||
@@ -69,10 +69,16 @@ export function firebaseIdentityAdapter(
         return { status: "invalid" };
       }
       try {
-        const verified = await firebase.refresh(binding.refreshToken, {
-          uid: binding.uid,
-          authTime: binding.authTime,
-        });
+        if (signal.aborted) return { status: "unavailable" };
+        const verified = await firebase.refresh(
+          binding.refreshToken,
+          {
+            uid: binding.uid,
+            authTime: binding.authTime,
+          },
+          signal
+        );
+        if (signal.aborted) return { status: "unavailable" };
         return {
           status: "valid",
           identity: normalize(
@@ -82,7 +88,9 @@ export function firebaseIdentityAdapter(
           ),
         };
       } catch (error) {
-        return { status: nativeError(error).code };
+        return {
+          status: signal.aborted ? "unavailable" : nativeError(error).code,
+        };
       }
     },
     async checkStatus(binding, signal) {
@@ -104,7 +112,11 @@ export function firebaseIdentityAdapter(
         );
         return signal.aborted ? "unavailable" : "valid";
       } catch (error) {
-        return signal.aborted ? "unavailable" : nativeError(error).code;
+        if (signal.aborted) return "unavailable";
+        return error instanceof FirebaseIdentityError &&
+          error.code === "token_expired"
+          ? "expired"
+          : nativeError(error).code;
       }
     },
   };
@@ -112,7 +124,8 @@ export function firebaseIdentityAdapter(
 
 function nativeError(error: unknown): NativeIdentityError {
   return new NativeIdentityError(
-    error instanceof FirebaseIdentityError && error.code === "invalid_session"
+    error instanceof FirebaseIdentityError &&
+      (error.code === "invalid_session" || error.code === "token_expired")
       ? "invalid"
       : "unavailable"
   );
