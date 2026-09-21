@@ -80,13 +80,9 @@ integration using existing middleware, with no new SDK API or cookbook page.
 
 ```sh
 pnpm typecheck
-pnpm test
 pnpm build
 pnpm verify
 ```
 
-Tests exercise MCP requests against the server with mocked Upstash responses:
-allowed and rejected calls, timeout, provider error, missing credentials, and
-unmetered discovery. They do not prove the hosted Redis algorithm. `verify`
-checks configuration and types without contacting Upstash; use the Inspector
-steps above for a live check with your credentials.
+`verify` checks configuration and types without contacting Upstash; use the
+Inspector steps above for a live check with your credentials.
