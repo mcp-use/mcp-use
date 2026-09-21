@@ -107,13 +107,15 @@ describe("published CLI boundaries", () => {
     }
   });
 
-  it("keeps the edge entry under one hundred thousand bytes and its static graph under one hundred twenty-four KiB", async () => {
+  it("keeps the edge entry under one hundred thousand bytes and its static graph under one hundred thirty-four KiB", async () => {
     const entry = new URL("index.js", DIST);
     const graph = await buildStaticGraph(entry);
     const graphBytes = await sumFileBytes(graph.files.keys());
 
     expect((await stat(entry)).size).toBeLessThanOrEqual(100_000);
-    expect(graphBytes).toBeLessThanOrEqual(124 * 1024);
+    // Raised from 124 KiB when the mixed-auth gate and per-tool policy
+    // resolver joined the static graph (about 9 KiB).
+    expect(graphBytes).toBeLessThanOrEqual(134 * 1024);
   });
 
   it("keeps the unpacked framework artifact below five MiB", async () => {

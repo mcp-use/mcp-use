@@ -2,9 +2,7 @@ import {
   oauthProviderAuthServerMetadata,
   oauthProviderOpenIdConfigMetadata,
 } from "@better-auth/oauth-provider";
-import type { MiddlewareHandler } from "hono";
-import { MCPServer, getRequestBag, type FetchMiddleware } from "mcp-use";
-import { bearerAuth, oauthMetadata } from "mcp-use/oauth";
+import { MCPServer } from "mcp-use";
 import { oauthBetterAuthProvider } from "mcp-use/oauth/better-auth";
 
 import { createDemoAuth, demoScopes } from "./auth.js";
@@ -20,69 +18,89 @@ const protectedScope = "demo:protected";
 const provider = oauthBetterAuthProvider({
   authURL,
   resource,
+  // Baseline scope every protected call must carry. Tool-level `oauth2`
+  // scopes add to it.
   requiredScopes: [protectedScope],
   scopesSupported: [...demoScopes],
   resourceName: "mcp-use mixed OAuth demo",
 });
 const auth = createDemoAuth({ origin: origin.origin, resource: resource.href });
 
+// `oauth` publishes RFC 9728 discovery metadata and verifies bearer tokens.
+// `allowAnonymous` keeps initialize, tools/list, and `noauth` tools open, so
+// a client can connect and browse before it ever signs in. Every tool's
+// `securitySchemes` is both the enforced policy and the metadata clients see.
 const server = new MCPServer({
   name: "mixed-oauth-demo",
   version: "1.0.0",
   description:
     "A local mcp-use v2 server with public discovery and one OAuth-protected tool.",
+  oauth: provider,
+  allowAnonymous: true,
   cors: {
     origin: [origin.origin, "http://localhost:4173", "http://127.0.0.1:4173"],
     credentials: true,
   },
 });
 
-// Advertise RFC 9728 protected-resource metadata without installing the
-// endpoint-wide OAuth gate from MCPServer({ oauth }). This distinction is what
-// keeps initialize, tools/list, and public_ping anonymous.
-server.use("*", honoAdapter(oauthMetadata(provider, resource)));
-
-// Apply the official SDK bearer verifier only to the protected tools/call.
-// A missing token therefore becomes a real HTTP 401 with resource_metadata in
-// WWW-Authenticate, which lets an OAuth-capable client authenticate and retry.
-server.use("/mcp", async (context, next) => {
-  if (!(await isProtectedToolCall(context.req.raw))) {
-    await next();
-    return;
-  }
-
-  return bearerAuth(provider, resource)(context.req.raw, async () => {
-    await next();
-    return context.res;
-  });
-});
-
+// Public: runs without a token. A supplied token is still verified.
 server.tool(
   {
     name: "public_ping",
     description: "Public tool that works before and after authentication.",
+    securitySchemes: [{ type: "noauth" }],
   },
-  async () => ({
+  async (_args, ctx) => ({
     content: [
       {
         type: "text",
-        text: "Public pong. This request did not require OAuth.",
+        text: ctx.auth
+          ? `Public pong for ${ctx.auth.user.id}. This request carried a token but did not require one.`
+          : "Public pong. This request did not require OAuth.",
       },
     ],
   })
 );
 
+// Protected: without a token the server answers 401 + WWW-Authenticate (or a
+// ChatGPT-style tool-result challenge), the client signs in, and the retry
+// reaches this callback with `ctx.auth` populated.
 server.tool(
   {
     name: "protected_profile",
     description:
       "Protected tool that triggers OAuth and succeeds when the client retries with a bearer token.",
+    securitySchemes: [{ type: "oauth2", scopes: [protectedScope] }],
+    authErrorMessage: "Sign in to view your profile.",
   },
-  async () => ({
+  async (_args, ctx) => ({
     content: [
       {
         type: "text",
-        text: "Authenticated profile unlocked. The protected tool call resumed after OAuth.",
+        text: `Authenticated profile unlocked for ${ctx.auth?.user.id}. Scopes: ${ctx.auth?.scopes.join(" ")}.`,
+      },
+    ],
+  })
+);
+
+// Optional: public behavior with an authenticated upgrade. The gate never
+// challenges this tool; the callback decides what a token unlocks.
+server.tool(
+  {
+    name: "welcome",
+    description: "Greets anonymous visitors and welcomes back signed-in users.",
+    securitySchemes: [
+      { type: "noauth" },
+      { type: "oauth2", scopes: ["profile"] },
+    ],
+  },
+  async (_args, ctx) => ({
+    content: [
+      {
+        type: "text",
+        text: ctx.auth?.scopes.includes("profile")
+          ? `Welcome back, ${ctx.auth.user.name ?? ctx.auth.user.id}!`
+          : "Welcome! Sign in to personalize this greeting.",
       },
     ],
   })
@@ -114,7 +132,7 @@ server.get("/", (context) =>
     <main>
       <h1>mcp-use mixed OAuth demo</h1>
       <p>MCP endpoint: <code>${resource.href}</code></p>
-      <p><code>public_ping</code> is anonymous; <code>protected_profile</code> requires <code>${protectedScope}</code>.</p>
+      <p><code>public_ping</code> is anonymous, <code>welcome</code> upgrades with a token, and <code>protected_profile</code> requires <code>${protectedScope}</code>.</p>
       <p><a href="/mcp/inspector">Open the Inspector</a></p>
     </main>
   </body>
@@ -136,38 +154,6 @@ function resolveOrigin(value: string): URL {
     );
   }
   return url;
-}
-
-function honoAdapter(middleware: FetchMiddleware): MiddlewareHandler {
-  return async (context, next) =>
-    middleware(context.req.raw, async () => {
-      await next();
-      return context.res;
-    });
-}
-
-async function isProtectedToolCall(request: Request): Promise<boolean> {
-  if (request.method !== "POST") return false;
-  let parsedBody = getRequestBag(request).parsedBody;
-  if (parsedBody === undefined) {
-    try {
-      parsedBody = await request.clone().json();
-    } catch {
-      return false;
-    }
-  }
-  const messages = Array.isArray(parsedBody) ? parsedBody : [parsedBody];
-  return messages.some((message) => {
-    if (message === null || typeof message !== "object") return false;
-    const record = message as Record<string, unknown>;
-    if (record["method"] !== "tools/call") return false;
-    const params = record["params"];
-    return (
-      params !== null &&
-      typeof params === "object" &&
-      (params as Record<string, unknown>)["name"] === "protected_profile"
-    );
-  });
 }
 
 const signInPage = `<!doctype html>

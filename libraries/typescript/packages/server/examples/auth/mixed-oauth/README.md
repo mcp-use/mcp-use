@@ -1,14 +1,20 @@
 # Mixed OAuth
 
 This self-contained local demo proves the complete mixed-auth lifecycle with a
-normal `MCPServer`:
+normal `MCPServer` configured with `oauth` **and** `allowAnonymous: true`:
 
-- `initialize`, `tools/list`, and `public_ping` work anonymously.
+- `initialize`, `tools/list`, `public_ping`, and `welcome` work anonymously.
 - RFC 9728 protected-resource metadata advertises OAuth and the
   `demo:protected` scope.
-- `protected_profile` is guarded at the HTTP boundary. Without a token it
-  returns a real `401` and a `WWW-Authenticate` challenge containing
-  `resource_metadata`.
+- `protected_profile` declares `securitySchemes: [{ type: "oauth2", scopes:
+  ["demo:protected"] }]`. Without a token the server answers a real `401` with
+  a `WWW-Authenticate` challenge containing `resource_metadata` and `scope`.
+  A ChatGPT user agent receives the equivalent `isError` tool result carrying
+  `_meta["mcp/www_authenticate"]` instead.
+- `welcome` declares both `noauth` and `oauth2`, so it runs anonymously and
+  personalizes its reply once the client signs in with the `profile` scope.
+- `tools/list` advertises every tool's `securitySchemes` (top level and
+  `_meta`) so hosts can show which tools need sign-in before calling them.
 - Better Auth owns dynamic client registration, PKCE, anonymous sign-in,
   consent, token issuance, refresh, and JWKS.
 - After authorization, the client retries `protected_profile` with the bearer
@@ -50,10 +56,18 @@ npx @mcp-use/inspector --port 4173 --url http://localhost:3000/mcp
 
 It opens `http://localhost:4173/inspector` and connects to the demo server.
 
-## Why the server does not use `MCPServer({ oauth })`
+## How the gate works
 
-The `oauth` constructor option intentionally protects the complete MCP
-endpoint. This demo instead composes the public v2 server with
-`oauthMetadata(...)` globally and `bearerAuth(...)` only for
-`tools/call:protected_profile`. That is the distinction between mixed OAuth and
-whole-server OAuth.
+`MCPServer({ oauth })` alone protects the complete MCP endpoint: every request
+needs a bearer token. Adding `allowAnonymous: true` moves the decision to each
+tool's `securitySchemes`:
+
+| Declaration                                        | Behavior                                                  |
+| -------------------------------------------------- | --------------------------------------------------------- |
+| omitted                                            | Protected; requires the provider's `requiredScopes`       |
+| `[{ type: "noauth" }]`                             | Public; a supplied token is verified but not required     |
+| `[{ type: "oauth2", scopes }]`                     | Protected; requires `requiredScopes` plus `scopes`        |
+| `[{ type: "noauth" }, { type: "oauth2", scopes }]` | Public, with `ctx.auth` populated when a token is present |
+
+Resource reads and prompts stay protected. Invalid or expired tokens are always
+refused with `401`, even on public tools, so clients refresh promptly.

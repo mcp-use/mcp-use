@@ -327,6 +327,7 @@
                         "pages": [
                           "v2/typescript/server/authentication/index",
                           "v2/typescript/server/authentication/user-context",
+                          "v2/typescript/server/authentication/mixed-auth",
                           {
                             "group": "OAuth Providers",
                             "icon": "plug",

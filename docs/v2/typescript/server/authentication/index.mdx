@@ -82,6 +82,8 @@ When `oauth` is configured:
 - invalid, expired, incorrectly resourced tokens, and tokens missing configured `requiredScopes` are rejected before tool code runs;
 - callbacks receive the verified access token, identity, scopes, permissions, expiry, client ID when present, and resource.
 
+To let clients connect and call some tools before signing in, add `allowAnonymous: true` and declare each tool's `securitySchemes`. See [Mixed Authentication](/v2/typescript/server/authentication/mixed-auth).
+
 ## Next steps
 
 <CardGroup cols={2}>
@@ -91,6 +93,13 @@ When `oauth` is configured:
     href="/v2/typescript/server/authentication/user-context"
   >
     Use verified identity and authorization data inside callbacks.
+  </Card>
+  <Card
+    title="Mixed Authentication"
+    icon="door-open"
+    href="/v2/typescript/server/authentication/mixed-auth"
+  >
+    Serve public and protected tools from one endpoint.
   </Card>
   <Card
     title="Custom Provider"

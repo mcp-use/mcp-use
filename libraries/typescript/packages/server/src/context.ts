@@ -244,15 +244,32 @@ type RequestContextBase<TEnv extends Env> = Omit<Context<TEnv>, "req"> & {
 };
 
 /**
+ * How verified OAuth identity reaches a callback's `ctx.auth`.
+ *
+ * - `false`: no OAuth provider is configured; `auth` is never present.
+ * - `true`: every request is authenticated before callbacks run; `auth` is
+ *   always present.
+ * - `"optional"`: the server allows anonymous callers (`allowAnonymous`), so
+ *   `auth` is present only when the request carried a verified token.
+ */
+export type OAuthMode = boolean | "optional";
+
+/**
  * Per-request callback context, authenticated when OAuth is configured.
+ *
+ * The `HasOAuth` parameter is an {@link OAuthMode}: `true` guarantees
+ * `auth`, `"optional"` makes it nullable for mixed-auth servers, and `false`
+ * removes it.
  */
 export type RequestContext<
   TUser = never,
-  HasOAuth extends boolean = false,
+  HasOAuth extends OAuthMode = false,
   TEnv extends Env = Env,
 > = HasOAuth extends true
   ? RequestContextBase<TEnv> & { auth: OAuthAuth<TUser> }
-  : RequestContextBase<TEnv> & { auth?: never };
+  : HasOAuth extends "optional"
+    ? RequestContextBase<TEnv> & { auth?: OAuthAuth<TUser> }
+    : RequestContextBase<TEnv> & { auth?: never };
 
 type MappedOAuthAuthInfo<TUser> = AuthInfo & {
   expiresAt: number;

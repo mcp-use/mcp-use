@@ -252,6 +252,65 @@ function verifyOAuthCallbackTyping(): void {
 
 void verifyOAuthCallbackTyping;
 
+// Type-level only: mixed-auth servers expose an optional `ctx.auth`.
+function verifyMixedAuthCallbackTyping(): void {
+  const mixed = new MCPServer({
+    name: "mixed",
+    version: "1.0.0",
+    oauth: provider,
+    allowAnonymous: true,
+    authChallenge: "auto",
+  });
+  mixed.tool(
+    {
+      name: "browse",
+      securitySchemes: [{ type: "noauth" }],
+      authErrorMessage: "Sign in first.",
+    },
+    (_params, ctx) => {
+      const maybeAuth: OAuthAuth<TestUser> | undefined = ctx.auth;
+      const id: string | undefined = ctx.auth?.user.id;
+      // @ts-expect-error auth is optional when anonymous callers are allowed
+      const required: string = ctx.auth.user.id;
+      void [maybeAuth, id, required];
+      return { content: [] };
+    }
+  );
+  mixed.resource({ name: "profile", uri: "user://profile" }, (_uri, ctx) => {
+    const id: string | undefined = ctx.auth?.user.id;
+    return { contents: [{ uri: "user://profile", text: id ?? "anonymous" }] };
+  });
+  mixed.prompt({ name: "greet" }, (_params, ctx) => {
+    const id: string | undefined = ctx.auth?.user.id;
+    return {
+      messages: [
+        { role: "user", content: { type: "text", text: id ?? "anonymous" } },
+      ],
+    };
+  });
+
+  const strict = new MCPServer({
+    name: "strict",
+    version: "1.0.0",
+    oauth: provider,
+    allowAnonymous: false,
+  });
+  strict.tool({ name: "whoami" }, (_params, ctx) => {
+    const id: string = ctx.auth.user.id;
+    return { content: [{ type: "text", text: id }] };
+  });
+
+  const invalid = new MCPServer({
+    name: "x",
+    version: "1",
+    // @ts-expect-error allowAnonymous requires an OAuth provider
+    allowAnonymous: true,
+  });
+  void invalid;
+}
+
+void verifyMixedAuthCallbackTyping;
+
 it("throws when authenticated callbacks lack mapped AuthInfo", () => {
   expect(() =>
     toAuthenticatedRequestContext<TestUser>({
