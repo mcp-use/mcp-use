@@ -235,6 +235,9 @@ export async function executeToolAndVerifyAuth(
  */
 export async function navigateToServerTools(page: Page, serverUrl: string) {
   await page.getByTestId(`server-tile-${serverUrl}`).click();
+  // The inspector restores the last active tab (e.g. Connection Settings
+  // after editing auth); select Tools explicitly.
+  await page.locator('[data-testid="tab-tools"]:visible').click();
   await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
 }
 
