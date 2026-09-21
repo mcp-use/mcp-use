@@ -11,6 +11,7 @@
  */
 
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import waitOn from "wait-on";
@@ -47,13 +48,18 @@ const conformanceServerDir = resolve(
   inspectorDir,
   "../server/examples/conformance"
 );
+// Invoke the mcp-use CLI through the built server package instead of pnpm's
+// bin shim. pnpm only links workspace bins that exist at install time, and
+// mcp-use is built after install, so `pnpm build` inside the conformance
+// example fails with "mcp-use: not found" on a fresh checkout (and in CI).
+const mcpUseBin = resolve(inspectorDir, "../server/dist/bin.js");
 const builtinPort = Number(process.env.TEST_PORT || 3000);
 
 // Track child processes for cleanup
 const childProcesses = [];
 
 // Cleanup handler
-function cleanup() {
+function cleanup(exitCode = 0) {
   console.log("\n🧹 Cleaning up processes...");
   childProcesses.forEach((proc) => {
     try {
@@ -62,11 +68,11 @@ function cleanup() {
       // Process may already be dead
     }
   });
-  process.exit(0);
+  process.exit(exitCode);
 }
 
-process.on("SIGINT", cleanup);
-process.on("SIGTERM", cleanup);
+process.on("SIGINT", () => cleanup(130));
+process.on("SIGTERM", () => cleanup(143));
 
 // Helper to run a command and wait for it to complete
 function runCommand(command, args, cwd, description) {
@@ -153,9 +159,14 @@ async function waitForUrl(url, description) {
 async function main() {
   try {
     // Step 1: Build conformance server (needed for all modes)
+    if (!existsSync(mcpUseBin)) {
+      throw new Error(
+        `mcp-use CLI not found at ${mcpUseBin}. Run "pnpm build" in libraries/typescript first.`
+      );
+    }
     await runCommand(
-      "pnpm",
-      ["build"],
+      "node",
+      [mcpUseBin, "build"],
       conformanceServerDir,
       "Building conformance server"
     );
@@ -185,8 +196,8 @@ async function main() {
 
       // Start conformance server in dev mode (includes built-in inspector)
       await startBackgroundProcess(
-        "pnpm",
-        ["dev", "--port", String(builtinPort), "--no-open"],
+        "node",
+        [mcpUseBin, "dev", "--port", String(builtinPort), "--no-open"],
         conformanceServerDir,
         "Starting conformance server with built-in inspector",
         playwrightEnv
@@ -210,8 +221,8 @@ async function main() {
 
       // Start conformance server on port 3002
       await startBackgroundProcess(
-        "pnpm",
-        ["start", "--port", "3002"],
+        "node",
+        [mcpUseBin, "start", "--port", "3002"],
         conformanceServerDir,
         "Starting conformance server on port 3002",
         playwrightEnv
@@ -229,8 +240,8 @@ async function main() {
 
       // Start conformance server on port 3002
       await startBackgroundProcess(
-        "pnpm",
-        ["start", "--port", "3002"],
+        "node",
+        [mcpUseBin, "start", "--port", "3002"],
         conformanceServerDir,
         "Starting conformance server on port 3002",
         playwrightEnv
@@ -309,13 +320,13 @@ async function main() {
       } else {
         console.log(`\n❌ Tests failed with code ${code}\n`);
       }
-      cleanup();
-      process.exit(code);
+      // cleanup() exits the process; pass the Playwright exit code through so
+      // test failures (and setup failures) are reported as failures.
+      cleanup(code ?? 1);
     });
   } catch (err) {
     console.error(`\n❌ Error: ${err.message}\n`);
-    cleanup();
-    process.exit(1);
+    cleanup(1);
   }
 }
 

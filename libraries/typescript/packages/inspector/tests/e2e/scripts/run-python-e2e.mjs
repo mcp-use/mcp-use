@@ -32,7 +32,7 @@ const PYTHON_SERVER_PORT = 8000;
 
 const childProcesses = [];
 
-function cleanup() {
+function cleanup(exitCode = 0) {
   console.log("\n🧹 Cleaning up processes...");
   childProcesses.forEach((proc) => {
     try {
@@ -41,11 +41,11 @@ function cleanup() {
       // ignore
     }
   });
-  process.exit(0);
+  process.exit(exitCode);
 }
 
-process.on("SIGINT", cleanup);
-process.on("SIGTERM", cleanup);
+process.on("SIGINT", () => cleanup(130));
+process.on("SIGTERM", () => cleanup(143));
 
 function runCommand(command, args, cwd, description) {
   return new Promise((resolve, reject) => {
@@ -219,13 +219,12 @@ async function main() {
       } else {
         console.log(`\n❌ Tests failed with code ${code}\n`);
       }
-      cleanup();
-      process.exit(code ?? 0);
+      // cleanup() exits the process; pass the Playwright exit code through.
+      cleanup(code ?? 1);
     });
   } catch (err) {
     console.error("\n❌ Error:", err.message, "\n");
-    cleanup();
-    process.exit(1);
+    cleanup(1);
   }
 }
 
