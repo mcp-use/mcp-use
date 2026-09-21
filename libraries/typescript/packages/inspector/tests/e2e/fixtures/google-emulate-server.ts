@@ -17,7 +17,10 @@ const INSPECTOR_OAUTH_CALLBACK = "http://localhost:3000/inspector/oauth/callback
 
 export const STATIC_CLIENT_ID =
   "mcp-emulate-test-client.apps.googleusercontent.com";
-export const STATIC_CLIENT_SECRET = "GOCSPX-mcp-emulate-test-secret";
+// The inspector is a public OAuth client (browser + PKCE) and never sends a
+// client_secret, by design. The emulator compares secrets byte-for-byte, so a
+// client seeded with an empty secret accepts token requests that carry none.
+const PUBLIC_CLIENT_SECRET = "";
 
 export const GOOGLE_MOCK_USER = {
   email: "testuser@example.com",
@@ -50,7 +53,7 @@ export async function startGoogleEmulateFixture(): Promise<GoogleEmulateHandle> 
         oauth_clients: [
           {
             client_id: STATIC_CLIENT_ID,
-            client_secret: STATIC_CLIENT_SECRET,
+            client_secret: PUBLIC_CLIENT_SECRET,
             redirect_uris: [MCP_SERVER_OAUTH_CALLBACK, INSPECTOR_OAUTH_CALLBACK],
           },
         ],
@@ -76,7 +79,8 @@ export async function startGoogleEmulateFixture(): Promise<GoogleEmulateHandle> 
           token_endpoint: `${emulatorUrl}/oauth2/token`,
           response_types_supported: ["code"],
           grant_types_supported: ["authorization_code", "refresh_token"],
-          token_endpoint_auth_methods_supported: ["client_secret_post"],
+          // Public client: no client authentication at the token endpoint.
+          token_endpoint_auth_methods_supported: ["none"],
         },
         createTokenVerifier: () => ({
           async verifyAccessToken(token: string) {

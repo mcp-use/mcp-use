@@ -5,16 +5,16 @@
  * backend from the start.
  *
  * The emulated Google issuer has no dynamic client registration endpoint, so
- * the static client credentials seeded into the emulator are registered in the
+ * the static public client seeded into the emulator is registered in the
  * connect form first; otherwise the client fails with "Incompatible auth
- * server: does not support dynamic client registration".
+ * server: does not support dynamic client registration". The inspector is a
+ * public OAuth client (PKCE, no client_secret) by design.
  */
 
 import { expect, test } from "@playwright/test";
 import {
   GOOGLE_MOCK_USER,
   STATIC_CLIENT_ID,
-  STATIC_CLIENT_SECRET,
   startGoogleEmulateFixture,
   type GoogleEmulateHandle,
 } from "./fixtures/google-emulate-server.js";
@@ -46,21 +46,7 @@ test.beforeEach(async ({ page, context }) => {
 function describeOAuthFlow(connectionMode: ConnectionMode): void {
   test.describe(`OAuth flow via emulate Google (${connectionMode})`, () => {
     test("completes OAuth and reaches ready state", async ({ page }) => {
-      // Known gap, both modes: the inspector is a public OAuth client and
-      // never sends the static client_secret entered in the Authentication
-      // dialog (neither the browser exchange nor the proxy exchange), while the
-      // emulated Google issuer requires one ("The client_secret is incorrect").
-      // The flow otherwise works end to end: static client registered, consent
-      // page driven, callback reached. Expected failure until confidential
-      // clients are supported.
-      test.fail(
-        true,
-        `${connectionMode}: static client_secret is not sent to the token endpoint`
-      );
-      await fillOAuthClientCredentials(page, {
-        clientId: STATIC_CLIENT_ID,
-        clientSecret: STATIC_CLIENT_SECRET,
-      });
+      await fillOAuthClientCredentials(page, { clientId: STATIC_CLIENT_ID });
       await page.getByTestId("connection-form-url-input").fill(fixture.mcpUrl);
 
       if (connectionMode !== "auto") {
