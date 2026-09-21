@@ -3,20 +3,29 @@
  * modes (useRedirectFlow: true), so the user-picker page is driven identically.
  * Auto starts direct and can fall back; forced Proxy routes through the inspector
  * backend from the start.
+ *
+ * The emulated Google issuer has no dynamic client registration endpoint, so
+ * the static client credentials seeded into the emulator are registered in the
+ * connect form first; otherwise the client fails with "Incompatible auth
+ * server: does not support dynamic client registration".
  */
 
 import { expect, test } from "@playwright/test";
 import {
   GOOGLE_MOCK_USER,
+  STATIC_CLIENT_ID,
+  STATIC_CLIENT_SECRET,
   startGoogleEmulateFixture,
   type GoogleEmulateHandle,
 } from "./fixtures/google-emulate-server.js";
+import { fillOAuthClientCredentials } from "./helpers/auth";
 
 type ConnectionMode = "auto" | "proxy";
 
 // Both variants share one fixture on fixed ports (the MCP server's registered
 // redirect URI pins us to a known port), so they must run in the same worker.
-test.describe.configure({ mode: "serial" });
+// "default" does that without serial's skip-the-rest-after-a-failure behaviour.
+test.describe.configure({ mode: "default" });
 
 let fixture: GoogleEmulateHandle;
 
@@ -37,6 +46,18 @@ test.beforeEach(async ({ page, context }) => {
 function describeOAuthFlow(connectionMode: ConnectionMode): void {
   test.describe(`OAuth flow via emulate Google (${connectionMode})`, () => {
     test("completes OAuth and reaches ready state", async ({ page }) => {
+      // Auto mode runs the exchange in the browser, which is a public client:
+      // @mcp-use/client never sends a static client_secret, and the emulated
+      // Google issuer requires one ("The client_secret is incorrect"). Proxy
+      // mode exchanges the code through the inspector backend.
+      test.fail(
+        connectionMode === "auto",
+        "Browser OAuth clients are public; static client_secret is not sent"
+      );
+      await fillOAuthClientCredentials(page, {
+        clientId: STATIC_CLIENT_ID,
+        clientSecret: STATIC_CLIENT_SECRET,
+      });
       await page.getByTestId("connection-form-url-input").fill(fixture.mcpUrl);
 
       if (connectionMode !== "auto") {

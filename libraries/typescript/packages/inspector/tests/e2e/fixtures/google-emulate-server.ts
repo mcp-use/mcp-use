@@ -11,9 +11,13 @@ import { oauthCustomProvider } from "mcp-use/oauth";
 const GOOGLE_EMULATOR_PORT = 4101;
 const MCP_SERVER_PORT = 4201;
 const MCP_SERVER_OAUTH_CALLBACK = `http://localhost:${MCP_SERVER_PORT}/oauth/callback`;
+// The inspector is the OAuth client: both Auto (direct) and Proxy modes return
+// to its own callback route, so the emulator must accept that redirect URI.
+const INSPECTOR_OAUTH_CALLBACK = "http://localhost:3000/inspector/oauth/callback";
 
-const STATIC_CLIENT_ID = "mcp-emulate-test-client.apps.googleusercontent.com";
-const STATIC_CLIENT_SECRET = "GOCSPX-mcp-emulate-test-secret";
+export const STATIC_CLIENT_ID =
+  "mcp-emulate-test-client.apps.googleusercontent.com";
+export const STATIC_CLIENT_SECRET = "GOCSPX-mcp-emulate-test-secret";
 
 export const GOOGLE_MOCK_USER = {
   email: "testuser@example.com",
@@ -47,7 +51,7 @@ export async function startGoogleEmulateFixture(): Promise<GoogleEmulateHandle> 
           {
             client_id: STATIC_CLIENT_ID,
             client_secret: STATIC_CLIENT_SECRET,
-            redirect_uris: [MCP_SERVER_OAUTH_CALLBACK],
+            redirect_uris: [MCP_SERVER_OAUTH_CALLBACK, INSPECTOR_OAUTH_CALLBACK],
           },
         ],
       },

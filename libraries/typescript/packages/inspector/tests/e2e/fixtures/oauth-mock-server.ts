@@ -222,7 +222,7 @@ export class OAuthMockServerHelper {
 
   async start() {
     try {
-      const { default: OAuth2Server } = await import("oauth2-mock-server");
+      const { OAuth2Server } = await import("oauth2-mock-server");
 
       this.oauthServer = new OAuth2Server();
       await this.oauthServer.issuer.keys.generate("RS256");
