@@ -1,0 +1,193 @@
+---
+title: "Upstash"
+description: "Rate-limit MCP tool calls with Upstash Redis before running the tool."
+icon: "/v2/typescript/cookbook/upstash.svg"
+---
+
+Add a shared quota to your existing mcp-use server. [Upstash Redis](https://upstash.com/docs/redis/overall/getstarted) stores the counters, and `@upstash/ratelimit` checks them before a tool runs—even when requests reach different server instances.
+
+This recipe allows three `generate_report` calls per 30-second sliding window. The report is a local calculation, so you can try the integration with just an Upstash account. Use the same middleware around an expensive API call, export, or sandbox operation.
+
+## Try the live example
+
+Select **generate_report**, enter `[10, 20, 30]` in **values**, and click **Execute**. Repeat the call to see a report followed by a rate-limit error. No chat model or API key is needed to use the demo.
+
+<div className="cookbook-tools-embed">
+<iframe
+  src="https://inspector.manufact.com/inspector?embedded=true&autoConnect=https%3A%2F%2Fmanufact-upstash-example.run.mcp-use.com%2Fmcp&embeddedConfig=%7B%22singleTab%22%3Atrue%2C%22defaultTab%22%3A%22tools%22%2C%22visibleTabs%22%3A%5B%22tools%22%5D%7D"
+  title="Upstash live example — MCP Inspector tools"
+  width="100%"
+  height="560"
+  style={{ border: "1px solid var(--gray-200, #737373)", borderRadius: "12px" }}
+  allow="clipboard-write"
+/>
+</div>
+
+[Open the example in a new tab](https://inspector.manufact.com/inspector?embedded=true&autoConnect=https%3A%2F%2Fmanufact-upstash-example.run.mcp-use.com%2Fmcp&embeddedConfig=%7B%22singleTab%22%3Atrue%2C%22defaultTab%22%3A%22tools%22%2C%22visibleTabs%22%3A%5B%22tools%22%5D%7D).
+
+<Note>
+  All visitors share this demo's quota. You may hit the limit on your first call if someone else has used it. Wait about a minute and try again, or run your own copy below for an isolated demo.
+</Note>
+
+## Prerequisites
+
+- A working [mcp-use server](/v2/typescript/getting-started/quickstart).
+- An [Upstash Redis database](https://console.upstash.com/redis) and its REST URL and read/write REST token. The read-only token cannot update rate-limit counters.
+
+## Add the integration
+
+Install the Redis client and rate limiter in your server project:
+
+```bash
+npm install @upstash/redis@1.38.4 @upstash/ratelimit@2.0.8
+```
+
+Copy the credentials from your database's **REST** connection panel into `.env`. Use these prefixed names even though the Upstash console shows names without `MCP_USE_`:
+
+```bash .env
+MCP_USE_UPSTASH_REDIS_REST_URL=https://your-database.upstash.io
+MCP_USE_UPSTASH_REDIS_REST_TOKEN=your-rest-token
+```
+
+Keep `.env` out of version control. Both values stay on the server.
+
+Add the highlighted middleware to your existing server, or copy this complete example into `src/index.ts`. It checks only `generate_report`; other tools and tool discovery continue normally.
+
+```typescript src/index.ts highlight={1-2,12-68}
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
+import { MCPServer } from "mcp-use";
+import { z } from "zod";
+
+const server = new MCPServer({
+  name: "upstash-example",
+  version: "1.0.0",
+  description: "Generate a report with a shared Upstash rate limit.",
+});
+
+let limiter: Ratelimit | undefined;
+
+function toolError(message: string) {
+  return {
+    isError: true,
+    content: [{ type: "text" as const, text: message }],
+  };
+}
+
+server.use("mcp:tools/call", async (ctx, next) => {
+  if (ctx.params.name !== "generate_report") return next();
+
+  const url = process.env.MCP_USE_UPSTASH_REDIS_REST_URL?.trim();
+  const token = process.env.MCP_USE_UPSTASH_REDIS_REST_TOKEN?.trim();
+  if (!url || !token) {
+    return toolError(
+      "Set MCP_USE_UPSTASH_REDIS_REST_URL and MCP_USE_UPSTASH_REDIS_REST_TOKEN in .env and restart the server."
+    );
+  }
+
+  // Only provider setup/checking belongs in this catch; tool errors should
+  // retain their own meaning after next() runs.
+  try {
+    limiter ??= new Ratelimit({
+      redis: new Redis({ url, token }),
+      limiter: Ratelimit.slidingWindow(3, "30 s"),
+      prefix: "mcp-use:upstash-example",
+      analytics: false,
+      timeout: 3_000,
+    });
+
+    // All callers share this demo quota, including across server instances.
+    // For per-customer limits, key by a verified user/tenant ID + tool name.
+    const { success, reason, reset } = await limiter.limit("generate_report");
+
+    // Upstash allows calls on timeout by default. This example fails closed.
+    if (reason === "timeout") {
+      return toolError("The quota check timed out. Please try again shortly.");
+    }
+    if (!success) {
+      const retryAfterSeconds = Math.max(
+        1,
+        Math.ceil((reset - Date.now()) / 1_000)
+      );
+      return toolError(
+        `Rate limit reached: 3 reports per 30 seconds, shared by all callers. Retry in about ${retryAfterSeconds} seconds.`
+      );
+    }
+  } catch {
+    // Redis errors may contain request details; never return them to clients.
+    return toolError(
+      "Could not check the quota. Check your Upstash credentials and service availability, then try again."
+    );
+  }
+
+  return next();
+});
+
+/** Generate a local numeric report after the shared quota check succeeds. */
+export const generateReport = server.tool(
+  {
+    name: "generate_report",
+    description:
+      "Summarize numeric values. Limited to 3 calls per 30 seconds across all callers; wait before retrying a rate-limit error.",
+    inputSchema: z.object({
+      values: z.array(z.number().min(-1e9).max(1e9)).min(1).max(1_000),
+    }),
+  },
+  async ({ values }) => {
+    // A fast local calculation keeps this demo independent of paid APIs.
+    // Replace this callback with your expensive report or sandbox operation.
+    const total = values.reduce((sum, value) => sum + value, 0);
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: JSON.stringify({
+            count: values.length,
+            total,
+            average: total / values.length,
+            minimum: Math.min(...values),
+            maximum: Math.max(...values),
+          }),
+        },
+      ],
+    };
+  }
+);
+
+/** Upstash example server; the mcp-use CLI owns its HTTP listener. */
+export default server;
+```
+
+The middleware returns `isError: true` when the quota is exhausted, so the caller receives an MCP tool error and the report callback does not run. Missing credentials, Redis failures, and quota-check timeouts also block execution. Upstash normally allows requests after its timeout; the explicit `reason === "timeout"` check makes this example reject them.
+
+## Try it
+
+Start or restart your server so it loads `.env`:
+
+```bash
+npm run dev
+```
+
+Open the Inspector URL printed by the CLI. Select **Tools → generate_report** and enter:
+
+```json
+{ "values": [10, 20, 30] }
+```
+
+A successful call returns:
+
+```json
+{ "count": 3, "total": 60, "average": 20, "minimum": 10, "maximum": 30 }
+```
+
+From an unused quota, execute four calls in quick succession. The first three return reports; the fourth returns `Rate limit reached`. Its retry time is approximate because the sliding window also accounts for calls in the previous window. After a full minute without calls, try again. Restarting the server does not clear the Redis counters.
+
+## Adapt the quota
+
+- Change `Ratelimit.slidingWindow(3, "30 s")` to choose the allowance and window.
+- Change `prefix` to separate deployments that use the same Redis database.
+- Replace the constant `generate_report` key with a verified user or tenant ID plus the tool name for customer-specific quotas. Do not trust an ID supplied in tool arguments or an arbitrary header.
+
+The limiter counts admitted attempts, even if the tool later fails. This demo does not authenticate callers; add authentication before using it to enforce customer quotas.
+
+See the [complete Upstash example](https://github.com/manufacts/mcp-use-upstash-example) for the runnable project and tests, or [Upstash's rate-limit documentation](https://upstash.com/docs/redis/sdks/ratelimit-ts/overview) for more algorithms.
