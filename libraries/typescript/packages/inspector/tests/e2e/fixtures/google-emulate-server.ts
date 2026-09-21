@@ -82,7 +82,9 @@ export async function startGoogleEmulateFixture(): Promise<GoogleEmulateHandle> 
           // Public client: no client authentication at the token endpoint.
           token_endpoint_auth_methods_supported: ["none"],
         },
-        createTokenVerifier: () => ({
+        // The verifier is bound to the canonical MCP resource; v2 rejects
+        // verified tokens that do not echo it back.
+        createTokenVerifier: (protectedResource) => ({
           async verifyAccessToken(token: string) {
             const res = await fetch(`${emulatorUrl}/oauth2/v2/userinfo`, {
               headers: { Authorization: `Bearer ${token}` },
@@ -98,6 +100,7 @@ export async function startGoogleEmulateFixture(): Promise<GoogleEmulateHandle> 
               clientId: STATIC_CLIENT_ID,
               scopes: ["openid", "email", "profile"],
               expiresAt: Math.floor(Date.now() / 1000) + 3600,
+              resource: protectedResource,
               extra: { payload },
             };
           },
