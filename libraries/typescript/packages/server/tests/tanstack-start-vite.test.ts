@@ -3,6 +3,15 @@ import { MCPServer } from "../src/server.js";
 import { mcpUseTanStackStart } from "../src/tanstack-start/vite.js";
 
 describe("TanStack Start plugin configuration", () => {
+  it("accepts trailing slashes and rejects long paths with repeated separators", () => {
+    expect(() =>
+      mcpUseTanStackStart({ basePath: "/api/mcp///" })
+    ).not.toThrow();
+    expect(() =>
+      mcpUseTanStackStart({ basePath: `/api${"/".repeat(20_000)}x` })
+    ).toThrow("concrete absolute path");
+  });
+
   it.each([
     "/",
     "/api//mcp",

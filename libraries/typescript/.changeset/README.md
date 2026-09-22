@@ -35,6 +35,32 @@ We have a quick list of common questions to get you started engaging with this p
 
 ### Creating a Changeset (Required for Contributors)
 
+PRs targeting **any branch** must add a new, non-empty changeset when they change
+releasable TypeScript package code, shipped assets/templates, build configuration,
+or runtime package metadata under `libraries/typescript/packages/`. An existing
+changeset on the target branch or an edit to one does not satisfy the check.
+New changesets must collectively cover every changed releasable package.
+
+Docs, Python, examples, tests (including colocated tests), test configuration,
+and repository CI/tooling-only PRs do not need a changeset. Package version-only,
+dev-dependency, description, keywords, and script-only edits are also excluded.
+Generator templates are
+shipped assets and count even when they contain documentation or examples.
+
+Before merging `canary` into `main`, add or update a release `<Update>` entry in
+both `docs/typescript/changelog/changelog.mdx` and `docs/inspector/changelog.mdx`.
+This promotion uses the changelog gate instead of requiring another changeset.
+Generated package `CHANGELOG.md` files, metadata-only edits, and whitespace-only
+edits do not satisfy the changelog gate. Automated `release/exit-prerelease-*`
+PRs into main may update package manifests without adding another changeset;
+source edits on those branches still require one.
+
+Repository administrators must require the `release-notes-check` status check in
+the branch protection rules or rulesets for **both `canary` and `main`** to block
+merges when it fails. The workflow reports success when no relevant SDK files
+changed, so required checks never remain pending on docs/Python/test-only PRs.
+It also reruns when a PR is retargeted.
+
 ```bash
 pnpm changeset
 ```

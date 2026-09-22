@@ -86,7 +86,10 @@ async function publicAssets(directory: string): Promise<EmbeddedViewAssets> {
  * @returns Plugins placed before the host framework plugins.
  */
 export function mcpUse(options: McpUseOptions = {}): PluginOption[] {
-  const basePath = (options.basePath ?? "/mcp").replace(/\/+$/, "");
+  const configuredBasePath = options.basePath ?? "/mcp";
+  let end = configuredBasePath.length;
+  while (end > 0 && configuredBasePath[end - 1] === "/") end--;
+  const basePath = configuredBasePath.slice(0, end);
   if (
     !basePath.startsWith("/") ||
     basePath.includes("//") ||
