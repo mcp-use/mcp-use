@@ -18,35 +18,52 @@ const WIDGET_PIP_SHELL_CLASSES = [
 const WIDGET_FULLSCREEN_DOCUMENT_ATTR = "data-mcp-widget-fullscreen";
 const WIDGET_DISPLAY_MODE_ATTR = "data-mcp-widget-display-mode";
 
+const activeDocumentDisplayModes = new Map<symbol, ViewDisplayMode>();
+
+function reconcileDocumentDisplayMode(): void {
+  if (typeof document === "undefined") return;
+
+  const activeModes = activeDocumentDisplayModes.values();
+  let documentMode: ViewDisplayMode | undefined;
+  for (const mode of activeModes) {
+    if (mode === "fullscreen") {
+      documentMode = mode;
+      break;
+    }
+    if (mode === "pip") documentMode = mode;
+  }
+
+  if (documentMode) {
+    document.documentElement.setAttribute(
+      WIDGET_DISPLAY_MODE_ATTR,
+      documentMode
+    );
+  } else {
+    document.documentElement.removeAttribute(WIDGET_DISPLAY_MODE_ATTR);
+  }
+
+  if (documentMode === "fullscreen") {
+    document.documentElement.setAttribute(WIDGET_FULLSCREEN_DOCUMENT_ATTR, "");
+  } else {
+    document.documentElement.removeAttribute(WIDGET_FULLSCREEN_DOCUMENT_ATTR);
+  }
+}
+
 function useWidgetDisplayModeDocumentChrome(
   displayMode: ViewDisplayMode
 ): void {
   useEffect(() => {
     if (typeof document === "undefined") return;
-    if (displayMode === "pip" || displayMode === "fullscreen") {
-      document.documentElement.setAttribute(
-        WIDGET_DISPLAY_MODE_ATTR,
-        displayMode
-      );
-      if (displayMode === "fullscreen") {
-        document.documentElement.setAttribute(
-          WIDGET_FULLSCREEN_DOCUMENT_ATTR,
-          ""
-        );
-      } else {
-        document.documentElement.removeAttribute(
-          WIDGET_FULLSCREEN_DOCUMENT_ATTR
-        );
-      }
-      return () => {
-        document.documentElement.removeAttribute(WIDGET_DISPLAY_MODE_ATTR);
-        document.documentElement.removeAttribute(
-          WIDGET_FULLSCREEN_DOCUMENT_ATTR
-        );
-      };
-    }
-    document.documentElement.removeAttribute(WIDGET_DISPLAY_MODE_ATTR);
-    document.documentElement.removeAttribute(WIDGET_FULLSCREEN_DOCUMENT_ATTR);
+    if (displayMode !== "pip" && displayMode !== "fullscreen") return;
+
+    const widget = Symbol("widget-display-mode");
+    activeDocumentDisplayModes.set(widget, displayMode);
+    reconcileDocumentDisplayMode();
+
+    return () => {
+      activeDocumentDisplayModes.delete(widget);
+      reconcileDocumentDisplayMode();
+    };
   }, [displayMode]);
 }
 
