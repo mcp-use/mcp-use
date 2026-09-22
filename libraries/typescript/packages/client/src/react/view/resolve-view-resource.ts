@@ -49,7 +49,10 @@ export function resolveViewResource(options: {
     if (typeof firstContent.text === "string") {
       htmlContent = firstContent.text;
     } else if (typeof firstContent.blob === "string") {
-      htmlContent = atob(firstContent.blob);
+      const bytes = Uint8Array.from(atob(firstContent.blob), (char) =>
+        char.charCodeAt(0)
+      );
+      htmlContent = new TextDecoder().decode(bytes);
     }
   }
 
