@@ -14,6 +14,7 @@ const issuer = "https://issuer.example.test";
 const originalMcpUrl = process.env["MCP_URL"];
 
 afterEach(() => {
+  vi.restoreAllMocks();
   if (originalMcpUrl === undefined) {
     delete process.env["MCP_URL"];
   } else {
@@ -261,7 +262,6 @@ describe("OAuth HTTP route acceptance", () => {
     const logs = JSON.stringify(warning.mock.calls);
     expect(logs).not.toMatch(/private credentials|private identity/);
     expect(logs).toContain(resource.href);
-    warning.mockRestore();
   });
 
   it("returns OAuth wire errors and a canonical path-aware challenge", async () => {

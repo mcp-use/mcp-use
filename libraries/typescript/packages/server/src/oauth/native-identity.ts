@@ -77,8 +77,11 @@ export interface NativeIdentityAdapter {
   /**
    * Check a privately stored session reference when the app requires linkage.
    * The bridge must reject a changed subject and persist replacement bindings.
-   * Honor cancellation and stop outbound work when supported. Cancelled or late
-   * results are discarded; the bridge retains the lease until this call settles.
+   * Honor cancellation before starting work. If credentials can rotate, finish
+   * the in-flight renewal within a bounded timeout and return its valid replacement
+   * even after cancellation. The bridge saves it only while it still owns the
+   * unexpired lease; the cancelled request remains rejected. Other cancelled
+   * results are discarded. The lease remains held until this call settles.
    */
   revalidate?(
     binding: NativeIdentityBinding,

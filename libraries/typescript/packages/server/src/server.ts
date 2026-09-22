@@ -1223,7 +1223,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         observers_complete: this.#mcpEventListeners.filter(
           ({ phase }) => phase === "complete"
         ).length,
-        oauth_configured: this.#hasAuth(),
+        oauth_configured: this.#config.oauth !== undefined,
+        request_auth_configured: this.#config.requestAuth !== undefined,
         cors_configured: this.#config.cors !== undefined,
         request_state_configured: this.#config.requestState !== undefined,
         legacy_policy: this.#config.legacy ?? "stateless",

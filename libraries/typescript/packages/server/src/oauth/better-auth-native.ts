@@ -290,10 +290,10 @@ export function createNativeIdentityBridge(
     try {
       const binding = await decodeBinding(session);
       if (signal.aborted) throw new NativeIdentityError("unavailable");
-      // Await the provider itself: the token guard must stay held until it stops.
-      // The HTTP boundary returns a bounded failure while this call drains.
+      // Keep the guard until the provider settles. A cancelled request still
+      // needs a valid rotated binding saved before another renewal can run.
       const result = await adapter.revalidate!(binding, signal);
-      if (signal.aborted || Date.now() >= until * 1000)
+      if (Date.now() >= until * 1000)
         throw new NativeIdentityError("unavailable");
       if (result.status !== "valid")
         throw new NativeIdentityError(result.status);
@@ -301,7 +301,6 @@ export function createNativeIdentityBridge(
         throw new NativeIdentityError("invalid");
       const identity = publicIdentity(session.nativeProvider, result.identity);
       const nativeBinding = await encodeBinding(result.identity.binding);
-      if (signal.aborted) throw new NativeIdentityError("unavailable");
       const updated = await database.updateMany({
         model: "session",
         where: [
@@ -316,6 +315,9 @@ export function createNativeIdentityBridge(
         },
       });
       if (updated !== 1) throw new NativeIdentityError("unavailable");
+      // Persisting credentials does not authorize the cancelled request or
+      // permit the engine to issue MCP tokens for it.
+      if (signal.aborted) throw new NativeIdentityError("unavailable");
       return identity;
     } catch (error) {
       if (

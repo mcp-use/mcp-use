@@ -4,7 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 import { betterAuth, type BetterAuthPlugin } from "better-auth";
 import { getMigrations } from "better-auth/db/migration";
 import { jwt } from "better-auth/plugins";
-import { symmetricEncrypt } from "better-auth/crypto";
+import { symmetricDecrypt, symmetricEncrypt } from "better-auth/crypto";
 import { mcp } from "@better-auth/mcp";
 
 import {
@@ -306,7 +306,7 @@ describe("Better Auth MCP broker (real engine and SQLite)", () => {
   );
 
   it.each(["valid", "invalid", "reject"] as const)(
-    "times out a hung refresh and fences late %s completion while holding the client lock",
+    "times out a hung refresh and handles late %s completion while holding the client lock",
     async (late) => {
       const revalidate =
         vi.fn<NonNullable<NativeIdentityAdapter["revalidate"]>>();
@@ -397,8 +397,22 @@ describe("Better Auth MCP broker (real engine and SQLite)", () => {
       );
       expect(broker.session(issued.access_token)).toEqual({
         ...before,
+        ...(late === "valid" && {
+          nativeProfile: JSON.stringify({ name: "Late profile" }),
+          nativeBinding: expect.any(String),
+        }),
         updatedAt: expect.any(String),
       });
+      if (late === "valid") {
+        expect(
+          JSON.parse(
+            await symmetricDecrypt({
+              key: broker.secret,
+              data: String(broker.session(issued.access_token)!.nativeBinding),
+            })
+          )
+        ).toEqual({ rotated: true });
+      }
       expect(broker.refreshRows()).toEqual(refreshBefore);
       expect((await renew())!.status).toBe(200);
     }

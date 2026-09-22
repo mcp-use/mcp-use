@@ -10,7 +10,7 @@ import {
   type FirebaseWebConfig,
 } from "./identity.js";
 
-/** Uses Firebase's live account lookup for strict checks without rotating credentials. */
+/** Checks Firebase account status and renews credentials under the native bridge's lease. */
 export function firebaseIdentityAdapter(
   config: FirebaseWebConfig
 ): NativeIdentityAdapter {
@@ -70,15 +70,12 @@ export function firebaseIdentityAdapter(
       }
       try {
         if (signal.aborted) return { status: "unavailable" };
-        const verified = await firebase.refresh(
-          binding.refreshToken,
-          {
-            uid: binding.uid,
-            authTime: binding.authTime,
-          },
-          signal
-        );
-        if (signal.aborted) return { status: "unavailable" };
+        // Each Firebase request is bounded. Once rotation starts, finish
+        // verification so the bridge can save the replacement after cancellation.
+        const verified = await firebase.refresh(binding.refreshToken, {
+          uid: binding.uid,
+          authTime: binding.authTime,
+        });
         return {
           status: "valid",
           identity: normalize(

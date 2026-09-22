@@ -149,7 +149,10 @@ export class OAuthSessionStore {
     // loopback callbacks used by local clients such as the desktop Inspector.
     const nativeLoopback =
       callback?.protocol === "http:" &&
-      ["localhost", "127.0.0.1", "[::1]"].includes(callback.hostname);
+      (callback.hostname === "localhost" ||
+        callback.hostname.endsWith(".localhost") ||
+        callback.hostname === "[::1]" ||
+        /^127(?:\.\d{1,3}){3}$/.test(callback.hostname));
     return {
       redirect_uris: [this.redirectUrl],
       ...(nativeLoopback ? { application_type: "native" } : {}),

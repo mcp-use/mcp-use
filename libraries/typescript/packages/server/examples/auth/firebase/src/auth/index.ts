@@ -4,7 +4,6 @@ import {
   type NativeMcpAuthOptions,
   type NativeOAuthUser,
 } from "mcp-use/oauth/better-auth-mcp";
-import type { OAuthResourceOptions } from "mcp-use/oauth";
 import { firebaseIdentityAdapter } from "./firebase.js";
 import type { FirebaseWebConfig } from "./identity.js";
 import { renderFirebaseConsent, renderFirebaseLogin } from "./pages.js";
@@ -13,7 +12,10 @@ import { renderFirebaseConsent, renderFirebaseLogin } from "./pages.js";
 export type FirebaseOAuthUser = NativeOAuthUser;
 
 /** Application configuration for the Firebase example's shared OAuth engine. */
-export interface FirebaseAuthOptions extends OAuthResourceOptions {
+export interface FirebaseAuthOptions extends Pick<
+  NativeMcpAuthOptions,
+  "requiredScopes"
+> {
   /** Canonical public MCP endpoint. */
   resource: URL | string;
   /** Existing public Firebase web configuration. */
@@ -44,7 +46,19 @@ export async function createFirebaseAuth(options: FirebaseAuthOptions) {
     runTokenOperation: options.runTokenOperation,
   });
   return {
-    getMigrations: engine.getMigrations,
+    async getMigrations() {
+      const schema = await engine.getMigrations();
+      if (schema.schemaProblems.length) {
+        // Both startup and the migrate command must report problems that the
+        // automatic migration cannot fix instead of suggesting another retry.
+        console.error(
+          "Firebase authentication schema requires manual repair; pnpm migrate cannot fix these problems:",
+          schema.schemaProblems
+        );
+        throw new Error("Authentication schema requires manual repair");
+      }
+      return schema;
+    },
     async connect() {
       const integration = await engine.connect();
       return {

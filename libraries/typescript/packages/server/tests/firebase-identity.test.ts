@@ -53,10 +53,12 @@ async function firebaseSource() {
     refreshFailure: 0,
     revoked: false,
     disabled: false,
+    lookupUser: {} as Record<string, unknown>,
     claims: {} as JWTPayload,
     refreshes: 0,
     lookups: 0,
     refreshInputs: [] as string[],
+    afterRefresh: undefined as (() => Promise<void>) | undefined,
   };
   const refreshTokens = new Set(["initial-refresh"]);
   const idTokens = new Set<string>();
@@ -118,8 +120,10 @@ async function firebaseSource() {
         // Exercise a provider that invalidates its previous token on rotation.
         refreshTokens.delete(refreshToken);
         refreshTokens.add(nextRefreshToken);
+        const idToken = await sign(state.claims);
+        await state.afterRefresh?.();
         return Response.json({
-          id_token: await sign(state.claims),
+          id_token: idToken,
           refresh_token: nextRefreshToken,
         });
       }
@@ -147,6 +151,7 @@ async function firebaseSource() {
               emailVerified: true,
               disabled: state.disabled,
               validSince: String(authTime + (state.revoked ? 1 : 0)),
+              ...state.lookupUser,
             },
           ],
         });
@@ -206,6 +211,62 @@ function expireIdToken() {
 }
 
 describe("Firebase REST identity and strict MCP sessions", () => {
+  it("saves a Firebase rotation after cancellation and retries the same MCP refresh token", async () => {
+    const f = await firebaseBroker();
+    const before = await f.binding();
+    const refreshBefore = f.broker.refreshRows();
+    let received!: () => void;
+    const rotated = new Promise<void>((resolve) => {
+      received = resolve;
+    });
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    f.state.afterRefresh = async () => {
+      received();
+      await held;
+    };
+    const controller = new AbortController();
+    const pending = f.broker.integration.handle(
+      new Request(`${f.broker.base}/oauth2/token`, {
+        method: "POST",
+        signal: controller.signal,
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          grant_type: "refresh_token",
+          client_id: f.grant.clientId,
+          refresh_token: f.issued.refresh_token,
+          resource: f.broker.resource,
+        }),
+      })
+    );
+    try {
+      await rotated;
+      controller.abort();
+      expect((await pending)!.status).toBe(503);
+      expect(f.broker.refreshRows()).toEqual(refreshBefore);
+    } finally {
+      f.state.afterRefresh = undefined;
+      release();
+    }
+    await vi.waitFor(() =>
+      expect(
+        f.broker.session(f.issued.access_token)!.nativeLeaseOwner
+      ).toBeNull()
+    );
+    expect((await f.binding()).refreshToken).not.toBe(before.refreshToken);
+    expect(f.broker.refreshRows()).toEqual(refreshBefore);
+    const renewed = await tokens(
+      await f.broker.token({
+        grant_type: "refresh_token",
+        client_id: f.grant.clientId,
+        refresh_token: f.issued.refresh_token,
+      })
+    );
+    expect((await f.broker.tool(renewed.access_token)).status).toBe(200);
+  });
+
   it("resumes an idle user after ID-token expiry, saves the renewed binding, and checks it again", async () => {
     const f = await firebaseBroker();
     const before = await f.binding();
@@ -233,6 +294,49 @@ describe("Firebase REST identity and strict MCP sessions", () => {
     expect(renewed.status).toBe(200);
     expect(f.state.refreshInputs.at(-1)).toBe(after.refreshToken);
   });
+
+  it.each([
+    "disabled",
+    "revoked",
+    "unverified email",
+    "changed email",
+    "different tenant",
+    "different user",
+  ])(
+    "rejects a still-valid ID token when account lookup reports %s",
+    async (reason) => {
+      const f = await firebaseBroker();
+      const refreshes = f.state.refreshes;
+      const lookups = f.state.lookups;
+      if (reason === "disabled") f.state.disabled = true;
+      if (reason === "revoked") f.state.revoked = true;
+      if (reason === "unverified email")
+        f.state.lookupUser.emailVerified = false;
+      if (reason === "changed email")
+        f.state.lookupUser.email = "other@example.test";
+      if (reason === "different tenant")
+        f.state.lookupUser.tenantId = "other-tenant";
+      if (reason === "different user")
+        f.state.lookupUser.localId = "other-user";
+      expect((await f.broker.tool(f.issued.access_token)).status).toBe(401);
+      expect(f.state.lookups).toBe(lookups + 1);
+      expect(f.state.refreshes).toBe(refreshes);
+      expect(f.broker.executions).toBe(0);
+      expect(f.broker.session(f.issued.access_token)).toBeUndefined();
+      f.state.disabled = false;
+      f.state.revoked = false;
+      f.state.lookupUser = {};
+      expect(
+        (
+          await f.broker.token({
+            grant_type: "refresh_token",
+            client_id: f.grant.clientId,
+            refresh_token: f.issued.refresh_token,
+          })
+        ).status
+      ).toBe(400);
+    }
+  );
 
   it.each(["revoked", "disabled", "refresh rejected"])(
     "keeps an expired-token session rejected when Firebase reports %s",

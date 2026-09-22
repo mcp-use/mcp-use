@@ -50,9 +50,11 @@ async function main() {
       schema.toBeCreated.length ||
       schema.toBeAdded.length ||
       schema.toBeAddedIndexes.length ||
-      schema.unsafeChanges.length ||
-      schema.schemaProblems.length
+      schema.unsafeChanges.length
     ) {
+      console.error(
+        "Authentication schema is out of date. Run pnpm migrate before starting."
+      );
       throw new Error("Authentication schema needs migration");
     }
     const integration = await application.connect();
@@ -136,7 +138,7 @@ await main().catch((error: unknown) => {
     );
   } else {
     console.error(
-      "Firebase MCP could not start. Check configuration and database access; run npm run migrate if the schema is missing."
+      "Firebase MCP could not start. Check configuration, database access, and any schema diagnostics above."
     );
   }
   process.exitCode = 1;

@@ -1,7 +1,6 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { symmetricDecrypt } from "better-auth/crypto";
 import { decodeJwt } from "jose";
-import { setTimeout as delay } from "node:timers/promises";
 import { MCPClient, NodeOAuthClientProvider } from "@mcp-use/client";
 
 import { createOAuthMcpAuth } from "../src/oauth/better-auth-mcp.js";
@@ -16,7 +15,11 @@ import { startOidcProvider } from "./helpers/oidc-provider.js";
 import { listenFetch } from "./helpers/listen-fetch.js";
 
 const cleanup: Array<() => Promise<void>> = [];
+// Advance protocol time explicitly; sockets and cancellation deadlines stay real.
+beforeEach(() => vi.useFakeTimers({ toFake: ["Date"] }));
 afterEach(async () => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
   for (const close of cleanup.splice(0).reverse()) await close();
 });
 
@@ -100,6 +103,182 @@ async function upstreamBroker(
 }
 
 describe("generic MCP broker with an independent OAuth issuer", () => {
+  it.each(["access_token", "refresh_token"] as const)(
+    "renews %s without an optional introspection subject, but still rejects a different subject",
+    async (tokenType) => {
+      const f = await upstreamBroker("post", true, 60, tokenType);
+      const actualFetch = globalThis.fetch;
+      let wrongSubject = false;
+      vi.stubGlobal(
+        "fetch",
+        async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+          const response = await actualFetch(input, init);
+          const url = new URL(
+            input instanceof Request ? input.url : String(input)
+          );
+          if (
+            url.href === `${f.upstream.origin}/token/introspection` &&
+            response.ok
+          ) {
+            const body = await response.json();
+            if (wrongSubject) body.sub = "another-user";
+            else delete body.sub;
+            return Response.json(body);
+          }
+          return response;
+        }
+      );
+      const first = await f.login();
+      let credentials = first.credentials;
+      for (let renewal = 0; renewal < 2; renewal++) {
+        credentials = await tokens(
+          await f.broker.token({
+            grant_type: "refresh_token",
+            client_id: first.grant.clientId,
+            refresh_token: credentials.refresh_token,
+          })
+        );
+        expect((await f.broker.tool(credentials.access_token)).status).toBe(
+          200
+        );
+      }
+      wrongSubject = true;
+      expect((await f.broker.tool(credentials.access_token)).status).toBe(401);
+      expect(f.broker.executions).toBe(2);
+    }
+  );
+
+  it("saves an upstream rotation after cancellation without consuming the MCP refresh token", async () => {
+    const f = await upstreamBroker();
+    const first = await f.login();
+    const before = f.broker.session(
+      first.credentials.access_token
+    )!.upstreamBinding;
+    const refreshBefore = f.broker.refreshRows();
+    const actualFetch = globalThis.fetch;
+    let received!: () => void;
+    const rotated = new Promise<void>((resolve) => {
+      received = resolve;
+    });
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    vi.stubGlobal(
+      "fetch",
+      async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+        const response = await actualFetch(input, init);
+        const url = new URL(
+          input instanceof Request ? input.url : String(input)
+        );
+        if (url.href === `${f.upstream.origin}/token` && response.ok) {
+          // The real issuer has consumed the old refresh token before cancellation.
+          const body = await response.json();
+          received();
+          await held;
+          return Response.json(body);
+        }
+        return response;
+      }
+    );
+    const controller = new AbortController();
+    const pending = f.broker.integration.handle(
+      new Request(`${f.broker.base}/oauth2/token`, {
+        method: "POST",
+        signal: controller.signal,
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          grant_type: "refresh_token",
+          client_id: first.grant.clientId,
+          refresh_token: first.credentials.refresh_token,
+          resource: f.broker.resource,
+        }),
+      })
+    );
+    try {
+      await rotated;
+      controller.abort();
+      expect((await pending)!.status).toBe(503);
+      expect(f.broker.refreshRows()).toEqual(refreshBefore);
+    } finally {
+      release();
+    }
+    await vi.waitFor(() => {
+      const binding = f.broker.session(
+        first.credentials.access_token
+      )!.upstreamBinding;
+      expect(JSON.parse(String(binding)).refreshingUntil).toBeUndefined();
+      expect(binding).not.toBe(before);
+    });
+    expect(f.broker.refreshRows()).toEqual(refreshBefore);
+    expect((await f.broker.tool(first.credentials.access_token)).status).toBe(
+      200
+    );
+    const renewed = await tokens(
+      await f.broker.token({
+        grant_type: "refresh_token",
+        client_id: first.grant.clientId,
+        refresh_token: first.credentials.refresh_token,
+      })
+    );
+    expect((await f.broker.tool(renewed.access_token)).status).toBe(200);
+  });
+
+  it.each(["replaced", "deleted"] as const)(
+    "does not overwrite a session %s during an upstream rotation",
+    async (change) => {
+      const f = await upstreamBroker();
+      const first = await f.login();
+      const before = f.broker.session(first.credentials.access_token)!;
+      const replacement = JSON.stringify({
+        ...JSON.parse(String(before.upstreamBinding)),
+        refreshOwner: "another-worker",
+        refreshingUntil: Date.now() + 45_000,
+      });
+      const table = `mcp_${f.broker.auth.basePath.split("/")[2]}_session`;
+      const actualFetch = globalThis.fetch;
+      vi.stubGlobal(
+        "fetch",
+        async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+          const response = await actualFetch(input, init);
+          const url = new URL(
+            input instanceof Request ? input.url : String(input)
+          );
+          if (url.href === `${f.upstream.origin}/token` && response.ok) {
+            // Simulate a different worker changing ownership or revoking the
+            // session after the issuer rotated, before this worker can save it.
+            const body = await response.json();
+            if (change === "deleted") {
+              f.broker.db
+                .prepare(`DELETE FROM "${table}" WHERE id = ?`)
+                .run(String(before.id));
+            } else {
+              f.broker.db
+                .prepare(
+                  `UPDATE "${table}" SET upstreamBinding = ? WHERE id = ?`
+                )
+                .run(replacement, String(before.id));
+            }
+            return Response.json(body);
+          }
+          return response;
+        }
+      );
+      expect(
+        (
+          await f.broker.token({
+            grant_type: "refresh_token",
+            client_id: first.grant.clientId,
+            refresh_token: first.credentials.refresh_token,
+          })
+        ).status
+      ).toBe(503);
+      const session = f.broker.session(first.credentials.access_token);
+      if (change === "deleted") expect(session).toBeUndefined();
+      else expect(session!.upstreamBinding).toBe(replacement);
+    }
+  );
+
   it("keeps rotated upstream credentials when their subsequent introspection is unavailable", async () => {
     const f = await upstreamBroker("post", true, 60, "access_token", 2);
     const first = await f.login();
@@ -107,7 +286,7 @@ describe("generic MCP broker with an independent OAuth issuer", () => {
       first.credentials.access_token
     )!.upstreamBinding;
     const expiry = JSON.parse(String(before)).tokenExpiresAt as number;
-    await delay(Math.max(0, expiry * 1000 - Date.now()) + 25);
+    vi.setSystemTime(expiry * 1000 + 25);
     f.upstream.control.failIntrospectionAfterToken = true;
     expect((await f.broker.tool(first.credentials.access_token)).status).toBe(
       503
@@ -132,7 +311,7 @@ describe("generic MCP broker with an independent OAuth issuer", () => {
       first.credentials.access_token
     )!.upstreamBinding;
     const expiry = JSON.parse(String(before)).tokenExpiresAt as number;
-    await delay(Math.max(0, expiry * 1000 - Date.now()) + 25);
+    vi.setSystemTime(expiry * 1000 + 25);
     let release!: () => void;
     f.upstream.control.tokenWait = new Promise<void>((resolve) => {
       release = resolve;
@@ -150,16 +329,23 @@ describe("generic MCP broker with an independent OAuth issuer", () => {
       await vi.waitFor(() => expect(f.upstream.tokenCalls).toBe(calls + 1));
       controller.abort();
       expect(await pending).toMatchObject({ status: 503 });
-      await vi.waitFor(() =>
-        expect(
-          f.broker.session(first.credentials.access_token)!.upstreamBinding
-        ).toBe(before)
-      );
+      expect(
+        JSON.parse(
+          String(
+            f.broker.session(first.credentials.access_token)!.upstreamBinding
+          )
+        ).refreshOwner
+      ).toBeTruthy();
     } finally {
       release();
       f.upstream.control.tokenWait = undefined;
       f.upstream.control.tokenFault = "none";
     }
+    await vi.waitFor(() =>
+      expect(
+        f.broker.session(first.credentials.access_token)!.upstreamBinding
+      ).toBe(before)
+    );
     expect((await f.broker.tool(first.credentials.access_token)).status).toBe(
       200
     );
@@ -185,7 +371,7 @@ describe("generic MCP broker with an independent OAuth issuer", () => {
       )!.upstreamBinding;
       const expiry = (JSON.parse(String(before)) as { tokenExpiresAt: number })
         .tokenExpiresAt;
-      await delay(Math.max(0, expiry * 1000 - Date.now()) + 25);
+      vi.setSystemTime(expiry * 1000 + 25);
       const calls = f.upstream.tokenCalls;
       const responses = await Promise.all([
         f.broker.tool(first.credentials.access_token),
@@ -215,7 +401,7 @@ describe("generic MCP broker with an independent OAuth issuer", () => {
       first.credentials.access_token
     )!.upstreamBinding;
     const expiry = JSON.parse(String(before)).tokenExpiresAt as number;
-    await delay(Math.max(0, expiry * 1000 - Date.now()) + 25);
+    vi.setSystemTime(expiry * 1000 + 25);
     f.upstream.control.tokenFault = "unavailable";
     expect((await f.broker.tool(first.credentials.access_token)).status).toBe(
       503
@@ -235,7 +421,7 @@ describe("generic MCP broker with an independent OAuth issuer", () => {
     const expiry = JSON.parse(
       String(f.broker.session(first.credentials.access_token)!.upstreamBinding)
     ).tokenExpiresAt as number;
-    await delay(Math.max(0, expiry * 1000 - Date.now()) + 25);
+    vi.setSystemTime(expiry * 1000 + 25);
     f.upstream.control.tokenFault = "invalid_grant";
     expect((await f.broker.tool(first.credentials.access_token)).status).toBe(
       401
@@ -331,7 +517,7 @@ describe("generic MCP broker with an independent OAuth issuer", () => {
     const firstClaims = decodeJwt(first.access_token);
     const originalGrant = broker.refreshRows()[0]!;
     expect(typeof originalGrant.authorizationCodeId).toBe("string");
-    await delay(2100);
+    vi.setSystemTime(firstClaims.exp! * 1000 + 25);
     expect(firstClaims.exp).toBeLessThanOrEqual(Date.now() / 1000);
     upstream.control.fault = "unavailable";
     await expect(connection.callTool("identity", {})).rejects.toThrow();

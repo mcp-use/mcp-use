@@ -138,7 +138,6 @@ interface UpstreamBinding {
   tokenExpiresAt?: number;
   refreshingUntil?: number;
   refreshOwner?: string;
-  renewed?: boolean;
 }
 
 /**
@@ -467,12 +466,12 @@ function upstreamIdentity(
           stored = JSON.parse(session.upstreamBinding) as UpstreamBinding;
         };
         if (expired) await renew();
+        if (checkSignal.aborted) return "unavailable";
         let checked = await introspect(
           provider,
           account.accountId,
           await decryptOAuthToken(stored.token, context),
-          checkSignal,
-          stored.renewed
+          checkSignal
         );
         if (checked.status !== "valid") return checked.status;
         if (
@@ -481,12 +480,12 @@ function upstreamIdentity(
           (stored.refreshToken || stored.tokenType === "refresh_token")
         ) {
           await renew();
+          if (checkSignal.aborted) return "unavailable";
           checked = await introspect(
             provider,
             account.accountId,
             await decryptOAuthToken(stored.token, context),
-            checkSignal,
-            true
+            checkSignal
           );
           if (checked.status !== "valid") return checked.status;
         }
@@ -574,6 +573,7 @@ function upstreamIdentity(
       update: { upstreamBinding: locked },
     });
     if (acquired !== 1) throw unavailable();
+    let replacement: string | undefined;
     try {
       let tokenUrl = provider.config.tokenUrl;
       if (!tokenUrl && provider.config.discoveryUrl) {
@@ -598,10 +598,13 @@ function upstreamIdentity(
         authentication: provider.config.authentication,
         tokenEndpoint: tokenUrl,
       });
+      if (signal.aborted) throw unavailable();
+      // Once sent, a refresh can consume the old token. Finish this bounded
+      // exchange and save its replacement even if the caller has disconnected.
       const response = await fetch(tokenUrl, {
         ...request,
         method: "POST",
-        signal,
+        signal: AbortSignal.timeout(10_000),
         redirect: "error",
         cache: "no-store",
       });
@@ -643,7 +646,7 @@ function upstreamIdentity(
             ? "expires_in"
             : "refresh_token_expires_in"
         ];
-      const updated = JSON.stringify({
+      replacement = JSON.stringify({
         providerId: binding.providerId,
         subject: binding.subject,
         tokenType: binding.tokenType,
@@ -654,19 +657,18 @@ function upstreamIdentity(
         lifetime > 0
           ? { tokenExpiresAt: Math.floor(Date.now() / 1000) + lifetime }
           : {}),
-        renewed: true,
       } satisfies UpstreamBinding);
-      if (signal.aborted || Date.now() >= until) throw unavailable();
+      if (Date.now() >= until) throw unavailable();
       const changed = await context.adapter.updateMany({
         model: "session",
         where: [
           ...owned,
           { field: "expiresAt", operator: "gt", value: new Date() },
         ],
-        update: { upstreamBinding: updated },
+        update: { upstreamBinding: replacement },
       });
       if (changed !== 1) throw unavailable();
-      return updated;
+      return replacement;
     } catch (error) {
       if (
         !signal.aborted &&
@@ -678,7 +680,9 @@ function upstreamIdentity(
         await context.adapter.updateMany({
           model: "session",
           where: owned,
-          update: { upstreamBinding: original },
+          // Retry only while this renewal still owns the row. Never restore a
+          // consumed token or overwrite another worker's replacement/revocation.
+          update: { upstreamBinding: replacement ?? original },
         });
       }
       throw error;
@@ -832,8 +836,7 @@ async function introspect(
   provider: ConfiguredProvider,
   subject: string,
   token: string,
-  signal: AbortSignal,
-  requireSubject = false
+  signal: AbortSignal
 ): Promise<{
   status: "valid" | "invalid" | "unavailable";
   expiresAt?: number;
@@ -870,7 +873,6 @@ async function introspect(
   if (result["active"] === false) return { status: "invalid" };
   if (
     result["active"] !== true ||
-    (requireSubject && typeof result["sub"] !== "string") ||
     (result["sub"] !== undefined && typeof result["sub"] !== "string") ||
     (result["client_id"] !== undefined &&
       typeof result["client_id"] !== "string") ||

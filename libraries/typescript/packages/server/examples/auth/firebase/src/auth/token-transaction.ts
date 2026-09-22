@@ -41,12 +41,14 @@ export function createTokenTransactions(pool?: Pool) {
       let client: PoolClient;
       try {
         client = await pool.connect();
-      } catch {
+      } catch (error) {
+        logFailure("connect", clientId, error);
         return unavailable(true);
       }
       const scope: RequestConnection = { client, unavailable: false };
-      const failed = () => {
+      const failed = (error: Error) => {
         scope.unavailable = true;
+        logFailure("connection", clientId, error);
       };
       client.on("error", failed);
       scope.client = new Proxy(client, {
@@ -99,7 +101,8 @@ export function createTokenTransactions(pool?: Pool) {
         // The operation may already have written token state. Do not advertise
         // a retry when the connection's outcome is uncertain.
         return scope.unavailable ? unavailable(false) : response;
-      } catch {
+      } catch (error) {
+        logFailure(operationStarted ? "operation" : "lock", clientId, error);
         broken = true;
         return unavailable(!operationStarted);
       } finally {
@@ -111,7 +114,8 @@ export function createTokenTransactions(pool?: Pool) {
               "SELECT pg_advisory_unlock(hashtext($1), hashtext($2))",
               [namespace, clientId]
             );
-          } catch {
+          } catch (error) {
+            logFailure("unlock", clientId, error);
             broken = true;
           }
         }
@@ -120,6 +124,24 @@ export function createTokenTransactions(pool?: Pool) {
       }
     },
   };
+}
+
+function logFailure(stage: string, operationKey: string, error: unknown): void {
+  const code =
+    error !== null && typeof error === "object" && "code" in error
+      ? error.code
+      : undefined;
+  // PostgreSQL messages/details can contain SQL parameters, credentials or row
+  // values. Stage, error type and SQLSTATE/network code identify the failure
+  // without writing those values to logs. The key identifies the client/grant.
+  console.error("[firebase-mcp] OAuth database operation failed", {
+    stage,
+    operationKey,
+    errorType: error instanceof Error ? error.name : "UnknownError",
+    ...(typeof code === "string" && /^[A-Z0-9_]{2,40}$/.test(code)
+      ? { code }
+      : {}),
+  });
 }
 
 function unavailable(beforeOperation: boolean): Response {
