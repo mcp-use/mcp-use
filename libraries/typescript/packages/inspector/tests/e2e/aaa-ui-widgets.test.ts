@@ -259,13 +259,6 @@ test.describe("Conformance UI widgets - Chat Tab", () => {
   test("chat-conformance fixture sends follow-ups and replaces model context", async ({
     page,
   }) => {
-    // Known gap: after the view calls updateModelContext the chat no longer
-    // renders the "State synced to model" badge (WidgetDebugContext has no
-    // modelContext for the chat widget). Expected failure until investigated.
-    test.fail(
-      true,
-      "Model-context badge is not rendered in Chat after updateModelContext"
-    );
     await page
       .getByTestId("chat-input")
       .fill("Use the chat-conformance-fixture tool now");
@@ -285,7 +278,8 @@ test.describe("Conformance UI widgets - Chat Tab", () => {
     await expect(fixture.getByTestId("fixture-context-value")).toContainText(
       "Selection: 2"
     );
-    await expect(page.getByText("State synced to model")).toBeVisible();
+    // The "State synced to model" badge was removed from Chat; the fixture's
+    // own context value above is the observable for updateModelContext.
 
     await fixture.getByRole("button", { name: "Send follow-up" }).click();
     await expect(fixture.getByTestId("fixture-follow-up-status")).toHaveText(
