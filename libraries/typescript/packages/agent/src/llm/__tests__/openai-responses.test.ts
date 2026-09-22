@@ -181,7 +181,7 @@ describe("Responses SSE event mapping", () => {
     try {
       for await (const event of streamResponsesTurn({
         config: { provider: "openai", model: "gpt-4o-mini", apiKey: "test" },
-        messages: [],
+        input: [],
         tools: [],
       })) {
         result.push(event);
@@ -243,7 +243,7 @@ describe("Responses SSE event mapping", () => {
     try {
       for await (const event of streamResponsesTurn({
         config: { provider: "openai", model: "gpt-4o-mini", apiKey: "test" },
-        messages: [],
+        input: [],
         tools: [],
       })) {
         result.push(event);
@@ -307,7 +307,7 @@ describe("Responses SSE event mapping", () => {
     try {
       for await (const event of streamResponsesTurn({
         config: { provider: "openai", model: "gpt-4o-mini", apiKey: "test" },
-        messages: [],
+        input: [],
         tools: [],
       })) {
         result.push(event);
@@ -387,7 +387,7 @@ describe("Responses SSE event mapping", () => {
     try {
       for await (const event of streamResponsesTurn({
         config: { provider: "openai", model: "gpt-4o-mini", apiKey: "test" },
-        messages: [],
+        input: [],
         tools: [],
       })) {
         result.push(event);
