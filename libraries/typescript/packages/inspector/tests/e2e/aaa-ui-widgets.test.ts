@@ -146,10 +146,7 @@ test.describe("Conformance UI widgets - Resources Tab", () => {
       await navigateToTools(page);
     }
 
-    await page
-      .locator('[data-testid="tab-resources"]:visible')
-      .first()
-      .click();
+    await page.locator('[data-testid="tab-resources"]:visible').first().click();
     await expect(
       page.getByRole("heading", { name: "Resources" })
     ).toBeVisible();
@@ -249,7 +246,10 @@ test.describe("Conformance UI widgets - Chat Tab", () => {
     // Each selector row is a button named after the tool. Match by role so the
     // (mounted but hidden) Tools tab list does not interfere.
     await expect(
-      page.getByRole("button", { name: "chat-conformance-fixture", exact: true })
+      page.getByRole("button", {
+        name: "chat-conformance-fixture",
+        exact: true,
+      })
     ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "chat-conformance-helper", exact: true })
@@ -278,14 +278,35 @@ test.describe("Conformance UI widgets - Chat Tab", () => {
     await expect(fixture.getByTestId("fixture-context-value")).toContainText(
       "Selection: 2"
     );
-    // The "State synced to model" badge was removed from Chat; the fixture's
-    // own context value above is the observable for updateModelContext.
 
+    // Chat rejects view follow-ups while a turn is still streaming, so wait
+    // for the first turn to finish (the send button leaves its stop state).
+    await expect(page.getByTestId("chat-send-button")).toHaveAttribute(
+      "title",
+      "Send",
+      { timeout: 45000 }
+    );
+
+    // The view's <ModelContext> must reach the model: the follow-up turn's LLM
+    // request carries it as a system message.
+    const followUpRequest = page.waitForRequest(
+      (request) =>
+        request.method() === "POST" &&
+        (request.postData() ?? "").includes(
+          "Follow up from fixture selection 2"
+        ),
+      { timeout: 45000 }
+    );
     await fixture.getByRole("button", { name: "Send follow-up" }).click();
+    expect((await followUpRequest).postData()).toContain(
+      "Fixture selection is 2"
+    );
     await expect(fixture.getByTestId("fixture-follow-up-status")).toHaveText(
       "sent",
       { timeout: 45000 }
     );
+
+    await expect(page.getByText("State synced to model")).toBeVisible();
   });
 
   test("apps-sdk-only-card in chat - should show raw result without widget", async ({
