@@ -76,6 +76,12 @@ export abstract class BaseMCPClient {
     Promise<void>
   >();
 
+  /** Invalidates creations started before a server configuration is removed. */
+  private readonly serverRemovalEpochs = new WeakMap<
+    ServerConfig,
+    Map<string, number>
+  >();
+
   /**
    * List of server names that have active sessions.
    * This array is kept in sync with the sessions map and can be used
@@ -200,10 +206,15 @@ export abstract class BaseMCPClient {
    * @see {@link closeSession} for properly closing sessions before removal
    */
   public async removeServer(name: string): Promise<void> {
-    if (!this.config.mcpServers?.[name]) return;
+    const serverConfig = this.config.mcpServers?.[name];
+    if (!serverConfig) return;
+
+    const epochs = this.serverRemovalEpochs.get(serverConfig) ?? new Map();
+    epochs.set(name, (epochs.get(name) ?? 0) + 1);
+    this.serverRemovalEpochs.set(serverConfig, epochs);
 
     await this.closeSession(name);
-    delete this.config.mcpServers[name];
+    delete this.config.mcpServers?.[name];
     trackClientRemoveServer(name);
   }
 
@@ -336,11 +347,15 @@ export abstract class BaseMCPClient {
       logger.warn("No MCP servers defined in config");
     }
 
-    if (!servers[serverName]) {
+    const configuredServer = servers[serverName];
+    if (!configuredServer) {
       throw new Error(`Server '${serverName}' not found in config`);
     }
 
-    let serverConfig: ServerConfig = { ...servers[serverName] };
+    const removalEpoch =
+      this.serverRemovalEpochs.get(configuredServer)?.get(serverName) ?? 0;
+
+    let serverConfig: ServerConfig = { ...configuredServer };
     let oauthProvider: OAuthClientProvider | undefined;
 
     if (shouldAutoProvisionOAuth(serverConfig)) {
@@ -400,6 +415,22 @@ export abstract class BaseMCPClient {
       );
       await completeOAuthFlow(oauthProvider, httpConfig.url);
       session = await openSession();
+    }
+
+    if (
+      (this.serverRemovalEpochs.get(configuredServer)?.get(serverName) ?? 0) !==
+      removalEpoch
+    ) {
+      try {
+        await this.disconnectSession(session);
+      } catch (e) {
+        logger.error(
+          `Error disconnecting session for removed server '${serverName}': ${e}`
+        );
+      }
+      throw new Error(
+        `Server '${serverName}' was removed during session creation`
+      );
     }
 
     const previous = this.sessions[serverName];

@@ -41,6 +41,22 @@ class TestMCPClient extends BaseMCPClient {
   }
 }
 
+class InitializingMCPClient extends BaseMCPClient {
+  constructor(private readonly connector: BaseConnector) {
+    super({
+      mcpServers: { server: { url: "https://example.com/mcp", oauth: false } },
+    });
+  }
+
+  protected createConnectorFromConfig(): BaseConnector {
+    return this.connector;
+  }
+
+  protected async createDefaultOAuthProvider(): Promise<never> {
+    throw new Error("not needed for these tests");
+  }
+}
+
 function makeDeferred() {
   let resolve!: () => void;
   const promise = new Promise<void>((r) => {
@@ -117,5 +133,48 @@ describe("BaseMCPClient.closeSession slot guard", () => {
     expect(session.disconnect).toHaveBeenCalledTimes(1);
     expect(client.getSession("server")).toBeNull();
     expect(client.getServerNames()).not.toContain("server");
+  });
+
+  it("does not install a session after its server is removed during initialization", async () => {
+    const initialization = makeDeferred();
+    const initializing = makeDeferred();
+    const connector = {
+      connect: vi.fn(async () => {}),
+      initialize: vi.fn(() => {
+        initializing.resolve();
+        return initialization.promise;
+      }),
+      disconnect: vi.fn(async () => {}),
+    } as unknown as BaseConnector;
+    const client = new InitializingMCPClient(connector);
+
+    const creating = client.createSession("server");
+    await initializing.promise;
+    expect(connector.initialize).toHaveBeenCalledTimes(1);
+
+    await client.removeServer("server");
+    expect(client.getServerNames()).not.toContain("server");
+
+    initialization.resolve();
+    await expect(creating).rejects.toThrow(/removed.*during session creation/i);
+    expect(client.getSession("server")).toBeNull();
+    expect(client.activeSessions).not.toContain("server");
+    expect(connector.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows the same configuration to be added again after removal", async () => {
+    const connector = {
+      disconnect: vi.fn(async () => {}),
+    } as unknown as BaseConnector;
+    const client = new InitializingMCPClient(connector);
+    const config = client.getServerConfig("server");
+    expect(config).toBeDefined();
+
+    await client.removeServer("server");
+    client.addServer("server", config!);
+
+    const session = await client.createSession("server", false);
+    expect(client.getSession("server")).toBe(session);
+    expect(client.activeSessions).toContain("server");
   });
 });
