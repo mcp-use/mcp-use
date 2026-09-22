@@ -1,0 +1,6 @@
+.env
+.env.*.local
+firebase-config.json
+.mcp-use/
+node_modules/
+dist/

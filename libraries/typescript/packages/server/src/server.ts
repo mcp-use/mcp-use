@@ -8,6 +8,7 @@ import {
   PROTOCOL_VERSION_META_KEY,
   isJSONRPCRequest,
   isInputRequiredResult,
+  type AuthInfo,
   type ClientCapabilities,
   type McpHttpHandler,
   type McpRequestContext,
@@ -77,6 +78,7 @@ import {
   getOAuthProviderOptions,
   resolveConfiguredOAuthResource,
   resolveLocalOAuthResource,
+  validateOAuthResource,
   wrapOAuthTokenVerifier,
 } from "./oauth/internal.js";
 import type {
@@ -454,8 +456,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   /**
    * Create a server. `config.name` and `config.version` identify the server
    * to clients during initialization. `config.basePath` (default `"/mcp"`)
-   * is both the MCP route and the path of the OAuth protected-resource
-   * identity, so any explicit OAuth resource URL must use that exact path.
+   * is both the MCP route and the path of its protected-resource identity,
+   * so `oauth.resource` and `requestAuth.resource` must use that exact path.
    * Nothing binds or listens until {@link MCPServer.listen} or
    * the first request reaches {@link MCPServer.fetch}.
    */
@@ -490,6 +492,12 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       this.#oauthResource = resource;
       this.#oauthResourceResolved = resource !== undefined;
       this.#oauthResourceConfigurationAbsent = resource === undefined;
+    } else if (config.requestAuth !== undefined) {
+      this.#oauthResource = validateOAuthResource(
+        config.requestAuth.resource,
+        this.#basePath()
+      );
+      this.#oauthResourceResolved = true;
     }
   }
 
@@ -1122,12 +1130,18 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     return this.#config.basePath ?? "/mcp";
   }
 
+  #hasAuth(): boolean {
+    return (
+      this.#config.oauth !== undefined || this.#config.requestAuth !== undefined
+    );
+  }
+
   #resolveOAuthResource(
     mode: "listen" | "handler",
     listenPort?: number,
     listenHost?: string
   ): URL | undefined {
-    if (this.#config.oauth === undefined) {
+    if (!this.#hasAuth()) {
       return undefined;
     }
     if (this.#oauthResourceResolved) {
@@ -1154,7 +1168,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   }
 
   #assertListenOAuthConfiguration(host: string): void {
-    if (this.#config.oauth === undefined) {
+    if (!this.#hasAuth()) {
       return;
     }
     if (["127.0.0.1", "localhost", "::1"].includes(host)) {
@@ -1210,6 +1224,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           ({ phase }) => phase === "complete"
         ).length,
         oauth_configured: this.#config.oauth !== undefined,
+        request_auth_configured: this.#config.requestAuth !== undefined,
         cors_configured: this.#config.cors !== undefined,
         request_state_configured: this.#config.requestState !== undefined,
         legacy_policy: this.#config.legacy ?? "stateless",
@@ -1390,8 +1405,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       this.#validateViewBindingsAtMount();
 
       const resource = this.#resolveOAuthResource(mode, listenPort, listenHost);
-      if (resource !== undefined) {
-        const provider = this.#config.oauth!;
+      if (resource !== undefined && this.#config.oauth !== undefined) {
+        const provider = this.#config.oauth;
         middlewares.push(oauthMetadata(provider, resource));
       }
 
@@ -1418,21 +1433,31 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         }
       );
 
-      let protectWithBearer: (
+      let protectRequest: (
         request: Request,
         next: () => Promise<Response>
       ) => Promise<Response> = async (_request, next) => next();
       if (resource !== undefined) {
-        const provider = this.#config.oauth!;
-        const providerOptions = getOAuthProviderOptions(provider);
-        const gate = requireBearerAuth({
-          verifier: wrapOAuthTokenVerifier(provider, resource),
-          resourceMetadataUrl: getOAuthProtectedResourceMetadataUrl(resource),
-          ...(providerOptions.requiredScopes !== undefined && {
-            requiredScopes: providerOptions.requiredScopes,
-          }),
-        });
-        protectWithBearer = async (request, next) => {
+        const requestAuth = this.#config.requestAuth;
+        let gate: (request: Request) => Promise<AuthInfo | Response>;
+        if (requestAuth !== undefined) {
+          const authenticator = import("./oauth/request-auth.js").then(
+            ({ createRequestAuthenticator }) =>
+              createRequestAuthenticator(requestAuth, resource)
+          );
+          gate = async (request) => (await authenticator)(request);
+        } else {
+          const provider = this.#config.oauth!;
+          const providerOptions = getOAuthProviderOptions(provider);
+          gate = requireBearerAuth({
+            verifier: wrapOAuthTokenVerifier(provider, resource),
+            resourceMetadataUrl: getOAuthProtectedResourceMetadataUrl(resource),
+            ...(providerOptions.requiredScopes !== undefined && {
+              requiredScopes: providerOptions.requiredScopes,
+            }),
+          });
+        }
+        protectRequest = async (request, next) => {
           const result = await gate(request);
           if (result instanceof Response) {
             return result;
@@ -1459,13 +1484,10 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
             await next();
             return;
           }
-          const response = await protectWithBearer(
-            context.req.raw,
-            async () => {
-              await next();
-              return context.res;
-            }
-          );
+          const response = await protectRequest(context.req.raw, async () => {
+            await next();
+            return context.res;
+          });
           context.res = response;
           return response;
         });
@@ -2234,7 +2256,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   #toRequestContext(
     ctx: ServerContext
   ): RequestContext<TUser, HasOAuth<TUser>, TEnv> {
-    if (this.#config.oauth === undefined) {
+    if (!this.#hasAuth()) {
       return toRequestContext<TEnv>(ctx) as RequestContext<
         TUser,
         HasOAuth<TUser>,

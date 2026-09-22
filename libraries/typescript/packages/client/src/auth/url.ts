@@ -30,8 +30,12 @@ export function sanitizeUrl(raw: string): string {
   // Don't allow any other scheme than http(s)
   if (url.protocol !== "https:" && url.protocol !== "http:") abort();
 
-  // Hostnames can't be updated, but let's reject if they contain anything suspicious
-  if (url.hostname !== encodeURIComponent(url.hostname)) abort();
+  // URL already validates bracketed IPv6 literals; their colons and brackets
+  // must not be treated as suspicious percent-encoded hostname characters.
+  const ipv6Literal =
+    url.hostname.startsWith("[") && url.hostname.endsWith("]");
+  if (!ipv6Literal && url.hostname !== encodeURIComponent(url.hostname))
+    abort();
 
   // Forcibly sanitise all the pieces of the URL
   if (url.username) url.username = encodeURIComponent(url.username);

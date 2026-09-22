@@ -88,6 +88,44 @@ describe("OAuthSessionStore", () => {
       expect(md.client_name).toBe("test-client");
       expect(md.client_uri).toBe("https://test.example.com");
       expect(md.logo_uri).toBe("https://test.example.com/logo.png");
+      expect(md.application_type).toBeUndefined();
+    });
+
+    it.each([
+      "localhost",
+      "dev.localhost",
+      "127.0.0.1",
+      "127.0.0.2",
+      "127.255.255.255",
+      "[::1]",
+    ])("registers an HTTP %s callback as a native client", (host) => {
+      const callbackUrl = `http://${host}:3000/inspector/oauth/callback`;
+      const { session } = createStore({ ...DEFAULT_OPTS, callbackUrl });
+      expect(session.clientMetadata.application_type).toBe("native");
+      expect(session.clientMetadata.redirect_uris).toEqual([callbackUrl]);
+    });
+
+    it.each([
+      "http://example.com/oauth/callback",
+      "http://localhost.example.com/oauth/callback",
+      "http://127.0.0.1.example.com/oauth/callback",
+      "http://128.0.0.1/oauth/callback",
+      "http://[2001:db8::1]/oauth/callback",
+      "http://[::]/oauth/callback",
+      "https://[::1]/oauth/callback",
+      "https://localhost/oauth/callback",
+    ])("does not classify %s as HTTP loopback", (callbackUrl) => {
+      const { session } = createStore({ ...DEFAULT_OPTS, callbackUrl });
+      expect(session.clientMetadata.application_type).toBeUndefined();
+    });
+
+    it.each([
+      "http://[not-an-ip]/oauth/callback",
+      "http://[::1].example.com/oauth/callback",
+      "http://127.0.0.999/oauth/callback",
+      "ftp://localhost/oauth/callback",
+    ])("rejects invalid callback %s", (callbackUrl) => {
+      expect(() => createStore({ ...DEFAULT_OPTS, callbackUrl })).toThrow();
     });
   });
 

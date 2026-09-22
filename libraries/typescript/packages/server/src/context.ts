@@ -147,11 +147,11 @@ export interface RequestClientContext {
  * Per-request context passed to tool/resource/prompt callbacks.
  */
 export type OAuthAuth<TUser> = {
-  /** Authenticated application user mapped by the OAuth provider. */
+  /** Authenticated application user mapped by the configured authenticator. */
   user: TUser;
   /** Verified access-token claims or introspection data. */
   payload: Record<string, unknown>;
-  /** Raw bearer token for authenticated downstream requests. */
+  /** Verified access token; request-bound tokens also require a matching proof. */
   accessToken: string;
   /** OAuth scopes granted to the access token. */
   scopes: string[];
@@ -244,7 +244,7 @@ type RequestContextBase<TEnv extends Env> = Omit<Context<TEnv>, "req"> & {
 };
 
 /**
- * Per-request callback context, authenticated when OAuth is configured.
+ * Per-request callback context, authenticated when `oauth` or `requestAuth` is configured.
  */
 export type RequestContext<
   TUser = never,

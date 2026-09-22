@@ -1,17 +1,20 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MCPServer } from "../src/index.js";
 import {
   OAuthError,
   OAuthErrorCode,
   oauthCustomProvider,
+  type OAuthAuthInfo,
   type OAuthMetadata,
+  type RequestAuthOptions,
 } from "../src/oauth/index.js";
 
 const issuer = "https://issuer.example.test";
 const originalMcpUrl = process.env["MCP_URL"];
 
 afterEach(() => {
+  vi.restoreAllMocks();
   if (originalMcpUrl === undefined) {
     delete process.env["MCP_URL"];
   } else {
@@ -84,6 +87,183 @@ function challenge(response: Response): string {
 }
 
 describe("OAuth HTTP route acceptance", () => {
+  it("delegates complete requests and engine challenges while exposing isolated typed identities", async () => {
+    const resource = new URL("https://request-host.example.test/mcp");
+    const engine = new MCPServer<{ id: string }>({
+      name: "request-auth-test",
+      version: "1.0.0",
+      logging: { enabled: false },
+      requestAuth: {
+        resource,
+        async authenticate(req) {
+          if (!req.headers.has("DPoP")) {
+            return new Response("engine challenge", {
+              status: 401,
+              headers: {
+                "WWW-Authenticate": 'DPoP error="use_dpop_nonce"',
+                "DPoP-Nonce": "engine-nonce",
+              },
+            });
+          }
+          // Authentication may inspect the JSON without consuming MCP's copy.
+          expect(await req.json()).toMatchObject({ method: "tools/call" });
+          return {
+            token: req.headers.get("authorization")!,
+            clientId: "client",
+            scopes: ["tools:read"],
+            expiresAt: Date.now() / 1000 + 60,
+            resource,
+          };
+        },
+        mapAuthInfo: (info) => ({
+          user: { id: info.token },
+          payload: {},
+          permissions: info.scopes,
+        }),
+      },
+    });
+    engine.tool({ name: "whoami" }, (_params, ctx) => ({
+      content: [{ type: "text", text: ctx.auth.user.id }],
+    }));
+    try {
+      const denied = await engine.fetch(request("/mcp"));
+      expect(denied.status).toBe(401);
+      expect(challenge(denied)).toBe('DPoP error="use_dpop_nonce"');
+      expect(denied.headers.get("DPoP-Nonce")).toBe("engine-nonce");
+      expect(await denied.text()).toBe("engine challenge");
+      for (const path of [
+        "/.well-known/oauth-authorization-server",
+        "/.well-known/oauth-protected-resource/mcp",
+      ]) {
+        expect((await engine.fetch(request(path))).status).toBe(404);
+      }
+      const requests = ["alice", "bob"].map((identity) =>
+        request("/mcp", {
+          method: "POST",
+          headers: {
+            authorization: `DPoP ${identity}`,
+            DPoP: `proof-${identity}`,
+            "content-type": "application/json",
+            accept: "application/json, text/event-stream",
+            "mcp-protocol-version": "2026-07-28",
+            "mcp-method": "tools/call",
+            "mcp-name": "whoami",
+          },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "tools/call",
+            params: {
+              name: "whoami",
+              arguments: {},
+              _meta: {
+                "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+                "io.modelcontextprotocol/clientInfo": {
+                  name: "test",
+                  version: "1.0.0",
+                },
+                "io.modelcontextprotocol/clientCapabilities": {},
+              },
+            },
+          }),
+        })
+      );
+      const responses = await Promise.all(
+        requests.map((req) => engine.getHandler()(req))
+      );
+      for (const [index, response] of responses.entries()) {
+        expect(response.status).toBe(200);
+        // Check the body contract, not whether the verifier got a different object.
+        expect(await requests[index]!.json()).toMatchObject({
+          method: "tools/call",
+          params: { name: "whoami" },
+        });
+        expect(await response.json()).toMatchObject({
+          result: {
+            content: [
+              { type: "text", text: `DPoP ${index === 0 ? "alice" : "bob"}` },
+            ],
+          },
+        });
+      }
+    } finally {
+      await engine.close();
+    }
+  });
+
+  it("fails closed on request authenticator errors and invalid success data", async () => {
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const resource = new URL("https://request-host.example.test/mcp");
+    const valid: OAuthAuthInfo = {
+      token: "token",
+      clientId: "client",
+      scopes: [],
+      resource,
+      expiresAt: Date.now() / 1000 + 60,
+    };
+    const mapAuthInfo = () => ({
+      user: { id: "user" },
+      payload: {},
+      permissions: [],
+    });
+    const options: RequestAuthOptions<{ id: string }>[] = [
+      {
+        resource,
+        mapAuthInfo,
+        authenticate: async () => {
+          throw new Error("private credentials");
+        },
+      },
+      {
+        resource,
+        mapAuthInfo,
+        authenticate: async () => ({ ...valid, expiresAt: 1 }),
+      },
+      {
+        resource,
+        mapAuthInfo,
+        authenticate: async () => ({
+          ...valid,
+          resource: new URL("https://wrong.example/mcp"),
+        }),
+      },
+      {
+        resource,
+        authenticate: async () => valid,
+        mapAuthInfo: () => {
+          throw new Error("private identity");
+        },
+      },
+    ];
+    for (const requestAuth of options) {
+      const engine = new MCPServer({
+        name: "invalid-auth",
+        version: "1.0.0",
+        requestAuth,
+        logging: { enabled: false },
+      });
+      try {
+        const response = await engine.fetch(request("/mcp"));
+        expect(response.status).toBe(503);
+        expect(response.headers.get("Cache-Control")).toBe("no-store");
+        expect(await response.json()).toEqual({
+          error: "temporarily_unavailable",
+        });
+      } finally {
+        await engine.close();
+      }
+    }
+    expect(warning.mock.calls.map((call) => call[1]?.stage)).toEqual([
+      "authenticate",
+      "validateAuthInfo",
+      "validateAuthInfo",
+      "mapAuthInfo",
+    ]);
+    const logs = JSON.stringify(warning.mock.calls);
+    expect(logs).not.toMatch(/private credentials|private identity/);
+    expect(logs).toContain(resource.href);
+  });
+
   it("returns OAuth wire errors and a canonical path-aware challenge", async () => {
     const handler = server({
       basePath: "/api/mcp",
