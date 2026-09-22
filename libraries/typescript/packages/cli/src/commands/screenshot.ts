@@ -123,8 +123,8 @@ export async function runScreenshot(argv: readonly string[]): Promise<number> {
     if (values.theme !== "light" && values.theme !== "dark") {
       throw new UsageError("--theme must be light or dark.");
     }
-    const width = positive(values.width, "--width");
-    const height = positive(values.height, "--height");
+    const width = parseDimension(values.width, "--width");
+    const height = parseDimension(values.height, "--height");
     const scale = Number(values["device-scale-factor"]);
     if (!Number.isFinite(scale) || scale <= 0 || scale > 4) {
       throw new UsageError(
@@ -758,6 +758,18 @@ function positive(value: string | undefined, name: string): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) {
     throw new UsageError(`${name} must be positive.`);
+  }
+  return parsed;
+}
+
+/** Parse a screenshot dimension accepted by Chrome's device metrics command. */
+export function parseDimension(
+  value: string | undefined,
+  name: string
+): number {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 10_000_000) {
+    throw new UsageError(`${name} must be an integer from 1 to 10000000.`);
   }
   return parsed;
 }
