@@ -605,7 +605,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     this.#proxiedTools.delete(definition.name);
     this.#tools.set(definition.name, {
       definition,
-      callback: callback as unknown as ToolCallback<
+      callback: callback as ToolCallback<
         Record<string, unknown>,
         never,
         TUser,
@@ -730,11 +730,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       this.#proxiedResources.delete(previous.definition.uri);
     this.#resources.set(definition.name, {
       definition,
-      callback: callback as unknown as ResourceCallback<
-        TUser,
-        HasOAuth<TUser>,
-        TEnv
-      >,
+      callback: callback as ResourceCallback<TUser, HasOAuth<TUser>, TEnv>,
       policy,
     });
     return this;
@@ -774,7 +770,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     this.#resourceTemplates.set(definition.name, {
       definition,
       ...(complete !== undefined && { complete }),
-      callback: callback as unknown as ResourceTemplateCallback<
+      callback: callback as ResourceTemplateCallback<
         Record<string, TemplateVariableValue>,
         TUser,
         HasOAuth<TUser>,
@@ -808,7 +804,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     this.#proxiedPrompts.delete(definition.name);
     this.#prompts.set(definition.name, {
       definition,
-      callback: callback as unknown as PromptCallback<
+      callback: callback as PromptCallback<
         Record<string, unknown>,
         TUser,
         HasOAuth<TUser>,
@@ -2009,7 +2005,9 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       tools.map((tool) => {
         const entry = this.#tools.get(tool.name);
         const schemes =
-          entry === undefined ? undefined : this.#advertisedSchemes(entry);
+          entry === undefined
+            ? undefined
+            : this.#advertisedSecuritySchemes(entry);
         return schemes === undefined
           ? tool
           : ({ ...tool, securitySchemes: schemes } as typeof tool);
@@ -2030,7 +2028,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     );
     // Hand-written `_meta.securitySchemes` is already in `uiMeta`; only the
     // generated schemes are added here.
-    const toolMeta = this.#generatesSchemes(entry)
+    const toolMeta = this.#generatesSecuritySchemes(entry)
       ? {
           ...uiMeta,
           [SECURITY_SCHEMES_META_KEY]: securitySchemesFor(policy),
@@ -2389,17 +2387,18 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    * Whether mcp-use generates `securitySchemes` for a tool: on every tool of
    * a `mixedAuth` server, and on any tool that declares `auth`.
    */
-  #generatesSchemes(entry: ToolEntry<TUser, TEnv>): boolean {
+  #generatesSecuritySchemes(entry: ToolEntry<TUser, TEnv>): boolean {
     return this.#config.mixedAuth === true || entry.policy.declared;
   }
 
   /**
    * The top-level `securitySchemes` for a tool on `tools/list`: generated
    * from `auth`, or a copy of hand-written `_meta.securitySchemes` on tools
-   * that generate none.
+   * that generate none. `unknown` because a hand-written value is passed
+   * through exactly as the developer wrote it, without validation.
    */
-  #advertisedSchemes(entry: ToolEntry<TUser, TEnv>): unknown {
-    return this.#generatesSchemes(entry)
+  #advertisedSecuritySchemes(entry: ToolEntry<TUser, TEnv>): unknown {
+    return this.#generatesSecuritySchemes(entry)
       ? securitySchemesFor(entry.policy)
       : entry.definition._meta?.[SECURITY_SCHEMES_META_KEY];
   }
