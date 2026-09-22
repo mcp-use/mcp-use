@@ -812,7 +812,7 @@ a:hover { text-decoration: underline; }
             </div>
           </div>
           <div class="hero-cta-row">
-            <a id="public-chat-link" href="${escapeHtml(chatUrl)}" data-ready-url="${escapeHtml(readyUrl)}" class="hero-primary-btn" target="_blank" rel="noopener noreferrer" hidden>Go to chat</a>
+            <a id="public-chat-link" href="${escapeHtml(chatUrl)}" data-ready-url="${escapeHtml(readyUrl)}" class="hero-primary-btn" target="_blank" rel="noopener noreferrer" hidden style="display:none">Go to chat</a>
             <a id="inspector-link" href="${escapeHtml(manufactInspectorUrl)}" class="hero-primary-btn" target="_blank" rel="noopener noreferrer">Open in Inspector</a>
           </div>
           <div class="hero-powered">
@@ -962,6 +962,7 @@ a:hover { text-decoration: underline; }
       fetch(readyUrl, { cache: 'no-store', credentials: 'omit' }).then(function(response){
         if (!response.ok) return;
         chatLink.hidden = false;
+        chatLink.style.display = 'inline-block';
         inspectorLink.classList.replace('hero-primary-btn', 'hero-secondary-btn');
       }).catch(function(){});
     }
