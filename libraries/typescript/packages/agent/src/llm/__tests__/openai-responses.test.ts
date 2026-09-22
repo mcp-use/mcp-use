@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 import { afterEach, describe, expect, it, vi } from "vitest";
-=======
-import { describe, expect, it, vi } from "vitest";
->>>>>>> fix(agent): correlate Responses tool arguments by item id
 import {
   extractFunctionCalls,
   responsesReasoningFields,
@@ -186,7 +182,7 @@ describe("Responses SSE event mapping", () => {
     try {
       for await (const event of streamResponsesTurn({
         config: { provider: "openai", model: "gpt-4o-mini", apiKey: "test" },
-        messages: [],
+        input: [],
         tools: [],
       })) {
         result.push(event);
@@ -248,7 +244,7 @@ describe("Responses SSE event mapping", () => {
     try {
       for await (const event of streamResponsesTurn({
         config: { provider: "openai", model: "gpt-4o-mini", apiKey: "test" },
-        messages: [],
+        input: [],
         tools: [],
       })) {
         result.push(event);
@@ -312,7 +308,7 @@ describe("Responses SSE event mapping", () => {
     try {
       for await (const event of streamResponsesTurn({
         config: { provider: "openai", model: "gpt-4o-mini", apiKey: "test" },
-        messages: [],
+        input: [],
         tools: [],
       })) {
         result.push(event);
@@ -392,7 +388,7 @@ describe("Responses SSE event mapping", () => {
     try {
       for await (const event of streamResponsesTurn({
         config: { provider: "openai", model: "gpt-4o-mini", apiKey: "test" },
-        messages: [],
+        input: [],
         tools: [],
       })) {
         result.push(event);
