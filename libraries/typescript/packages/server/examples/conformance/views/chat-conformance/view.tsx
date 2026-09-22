@@ -53,7 +53,9 @@ function ChatConformanceContent() {
           onClick={() => {
             setFollowUpStatus("sending");
             void sendFollowUp({
-              prompt: `Follow up from fixture selection ${selection}`,
+              // Ask for a plain reply so the follow-up turn stays short and
+              // doesn't render another fixture view.
+              prompt: `Follow up from fixture selection ${selection}. Reply in one short sentence without calling any tools.`,
             }).then(
               () => setFollowUpStatus("sent"),
               (error: unknown) =>

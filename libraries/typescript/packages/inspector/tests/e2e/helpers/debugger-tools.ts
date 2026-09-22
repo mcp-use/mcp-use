@@ -8,10 +8,13 @@ const TOGGLE_UPDATE_TIMEOUT = 5000 * CI_MULTIPLIER;
 /**
  * Outer AppFrame iframe inside the MCP Apps host container.
  * DOM: [data-testid="mcp-app-frame"][data-mcp-app-tool] > div > iframe
+ * Chat can render the same tool more than once (the model may call it again),
+ * so this targets the first view for that tool.
  */
 function mcpAppOuterFrame(page: Page, toolName: string): FrameLocator {
   return page
     .locator(`[data-testid="mcp-app-frame"][data-mcp-app-tool="${toolName}"]`)
+    .first()
     .frameLocator("iframe");
 }
 
