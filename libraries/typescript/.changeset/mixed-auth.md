@@ -11,4 +11,4 @@ Add mixed authentication to `MCPServer`: serve public, optional, and sign-in too
 - Tools advertise `securitySchemes` generated from `auth` on `tools/list`, at the top level and in `_meta.securitySchemes`. A hand-written `_meta.securitySchemes` on a tool without `auth` is now also copied to the top level; setting it next to `auth` or on a `mixedAuth` server throws at registration.
 - `auth: { scopes }` also works without `mixedAuth`, adding those scopes to the endpoint-wide requirement.
 
-The `mixed-oauth` example now uses this API instead of a hand-rolled gate.
+The `mixed-oauth` example now uses this API instead of a hand-rolled gate, covers every `auth` value on tools, resources, templates, prompts, and views, and can run behind `mcp-use dev --tunnel` for testing in Claude and ChatGPT.

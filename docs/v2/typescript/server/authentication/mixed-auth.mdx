@@ -369,7 +369,7 @@ These throw a `TypeError` at construction or registration instead of failing at 
 
 ## Verify locally
 
-The [mixed-oauth example](https://github.com/mcp-use/mcp-use/tree/canary/libraries/typescript/packages/server/examples/auth/mixed-oauth) runs a Better Auth authorization server and a `mixedAuth` server on `http://localhost:3000/mcp`. `public_ping` is public, `welcome` is optional with the `profile` scope, and `protected_profile` omits `auth`. From the example's directory:
+The [mixed-oauth example](https://github.com/mcp-use/mcp-use/tree/canary/libraries/typescript/packages/server/examples/auth/mixed-oauth) runs a Better Auth authorization server and a `mixedAuth` server on `http://localhost:3000/mcp`, with a tool, resource, or prompt for every `auth` value. Its names start with their access level: `public_ping` is public, `optional_welcome` is optional with the `profile` scope, and `protected_profile` omits `auth`. From the example's directory:
 
 ```bash
 pnpm dev
@@ -409,7 +409,7 @@ curl -s http://localhost:3000/mcp \
   -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"protected_profile","arguments":{},"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientInfo":{"name":"curl","version":"0"},"io.modelcontextprotocol/clientCapabilities":{}}}}'
 ```
 
-To test the full sign-in and retry loop in a host, expose the server over a public HTTPS tunnel and add it as a custom connector. Ask for the public tool first, then the sign-in one.
+To test the full sign-in and retry loop in Claude or ChatGPT, run the example with `pnpm dev --tunnel`, restart it with `MCP_URL` set to the tunnel's origin, and add the tunnel's `/mcp` URL as a custom connector. The example's README lists every item and a test checklist.
 
 ## Next steps
 

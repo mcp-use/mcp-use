@@ -1,31 +1,41 @@
 # Mixed OAuth
 
-This self-contained local demo proves the complete mixed-auth lifecycle with a
-normal `MCPServer` configured with `oauth` **and** `mixedAuth: true`:
+A test bed for mixed authentication: one `MCPServer` with `oauth` and
+`mixedAuth: true`, serving every `auth` value on tools, resources, resource
+templates, prompts, and views. A built-in Better Auth server handles dynamic
+client registration, PKCE, sign-in, consent, and tokens, all in memory.
 
-- `initialize`, `tools/list`, `public_ping`, and `welcome` work signed out.
-- RFC 9728 protected-resource metadata advertises OAuth and the
-  `demo:protected` scope.
-- `protected_profile` omits `auth`, so it requires sign-in with the
-  provider's `requiredScopes` (`demo:protected`). Without a token the server
-  answers a real `401` with a `WWW-Authenticate` challenge containing
-  `resource_metadata` and `scope`. A ChatGPT user agent receives the
-  equivalent `isError` tool result carrying `_meta["mcp/www_authenticate"]`
-  instead.
-- `welcome` declares `auth: { optional: true, scopes: ["profile"] }`, so it
-  runs for everyone and personalizes its reply when the token carries
-  `profile`.
-- `tools/list` advertises the `securitySchemes` generated from each tool's
-  `auth` (top level and `_meta`) so ChatGPT knows which tools need sign-in.
-- Better Auth owns dynamic client registration, PKCE, anonymous sign-in,
-  consent, token issuance, refresh, and JWKS.
-- After authorization, the client retries `protected_profile` with the bearer
-  token and receives its result.
+Sign-in is anonymous and needs no credentials, so anyone who can reach the
+server can get a token. Everything resets when the process stops. This is a
+testing tool, not a production identity setup.
 
-Everything is in memory and resets when the process stops. It is deliberately
-a runnable local example, not a production identity setup.
+## Items
 
-## Run it
+Names start with their access level. Every response says what the server saw:
+`signed out`, or the user ID and the scopes on the token.
+
+| Name                       | Kind              | `auth`                               | Signed out  |
+| -------------------------- | ----------------- | ------------------------------------ | ----------- |
+| `public_ping`              | tool              | `"public"`                           | runs        |
+| `optional_whoami`          | tool              | `"optional"`                         | runs        |
+| `optional_welcome`         | tool              | `{ optional: true, scopes: ["profile"] }` | runs; personalized only with `profile` |
+| `protected_profile`        | tool              | omitted                              | sign-in     |
+| `protected_update_profile` | tool              | `{ scopes: ["profile"] }`            | sign-in, then step-up to `profile` |
+| `public_card`              | tool with a view  | `"public"`                           | runs; view readable |
+| `protected_card`           | tool with a view  | omitted                              | sign-in; view needs sign-in |
+| `demo://public/catalog`    | resource          | `"public"`                           | readable    |
+| `demo://optional/greeting` | resource          | `"optional"`                         | readable    |
+| `demo://protected/profile` | resource          | omitted                              | sign-in     |
+| `demo://public/items/{id}` | resource template | `"public"`                           | readable    |
+| `demo://protected/notes/{id}` | resource template | `{ scopes: ["email"] }`           | sign-in, then step-up to `email` |
+| `public_tips`              | prompt            | `"public"`                           | runs        |
+| `optional_greeting`        | prompt            | `"optional"`                         | runs        |
+| `protected_summary`        | prompt            | omitted                              | sign-in     |
+
+"Sign-in" items also need the provider's required scopes, `demo:protected` by
+default.
+
+## Run it locally
 
 From this directory:
 
@@ -33,45 +43,110 @@ From this directory:
 pnpm dev
 ```
 
-The command starts the server at `http://localhost:3000/mcp` and opens the
-embedded Inspector. If port 3000 is occupied, use the alternate URL printed by
-the CLI. If the browser does not open automatically, visit
+The server starts at `http://localhost:3000/mcp` and opens the Inspector at
 `http://localhost:3000/mcp/inspector`.
 
-## Test the two flows
+## Check the flow without a host
 
-1. Connect and call `public_ping`. It succeeds without authentication.
-2. Confirm the Inspector says **This server is using mixed auth.** and offers
-   **Authenticate**.
-3. Either click that button before calling a protected tool, or call
-   `protected_profile` first to exercise deferred authentication.
-4. In the OAuth window, click **Continue**, then **Allow**.
-5. The window returns to the Inspector callback, closes, and the pending
-   `protected_profile` call resumes successfully.
-6. Call `public_ping` again to confirm public tools still work after OAuth.
+With the server running, `pnpm check-flow` plays the part of a host. It
+registers a client, signs in, consents (fully and with a scope declined),
+exchanges tokens, and checks every item signed out, signed in, after a scope
+step-up, and with a declined scope. It also checks bad tokens and the ChatGPT
+error-result format, and exits non-zero on any failure.
 
-To run the standalone Inspector on the origin allowed by this demo:
-
-```bash
-npx @mcp-use/inspector --port 4173 --url http://localhost:3000/mcp
+```sh
+pnpm dev           # in one terminal
+pnpm check-flow    # in another; pass an origin to check a tunnel URL
 ```
 
-It opens `http://localhost:4173/inspector` and connects to the demo server.
+## Test with and without required scopes
+
+`REQUIRED_SCOPES` sets the provider baseline that every sign-in call needs. It
+defaults to `demo:protected`.
+
+```sh
+# Default: every sign-in item needs demo:protected
+pnpm dev
+
+# No baseline: sign-in items need only a valid token
+REQUIRED_SCOPES= pnpm dev
+```
+
+Without a baseline, tools with `auth` omitted or `"optional"` advertise an
+`oauth2` scheme with empty scopes on `tools/list`. ChatGPT is reported to
+ignore such a scheme, so this mode is how to check whether ChatGPT still shows
+sign-in for them.
+
+## Test in Claude and ChatGPT
+
+Both hosts need a public HTTPS URL. Use the CLI tunnel:
+
+1. Start the tunnel once and note the `Tunnel:` URL it prints, for example
+   `https://abc123.local.mcp-use.run/mcp`:
+
+   ```sh
+   pnpm dev --tunnel
+   ```
+
+   The subdomain is saved in `.mcp-use/state/tunnel.json`, so later runs reuse
+   the same URL.
+
+2. Restart with `MCP_URL` set to that URL's origin (without `/mcp`), so the
+   authorization server, tokens, and protected-resource metadata all use the
+   public URL:
+
+   ```sh
+   MCP_URL=https://abc123.local.mcp-use.run pnpm dev --tunnel
+   ```
+
+3. Add `https://abc123.local.mcp-use.run/mcp` as a custom connector in Claude,
+   and in ChatGPT with developer mode on. Connect without signing in.
+
+Then work through the list. The server log shows every request and its status.
+
+- Ask for `public_ping`, `optional_whoami`, and `public_card`. They run signed
+  out, and `public_card` renders its view.
+- Ask for `protected_profile`. The host shows sign-in. Continue, then allow.
+  The call retries and reports your user ID.
+- Ask for `optional_whoami` again. It now reports the identity and scopes.
+- Ask for `protected_update_profile`. A token without `profile` gets a scope
+  step-up; allow `profile` and the retry succeeds. `optional_welcome` then
+  personalizes its greeting.
+- Ask for `optional_welcome` with a token that lacks `profile`. It runs and
+  falls back to a generic greeting instead of asking for the scope.
+- Read `demo://protected/profile` and `demo://protected/notes/1`, and fetch
+  `protected_summary`, while signed out. Note whether the host shows sign-in or
+  only an error.
+- Check whether you can sign in from the host's connector settings before
+  calling any sign-in tool, and whether the host fetches the tool list again
+  afterwards.
+
+### Consent and scopes
+
+The consent page lists each requested scope with a checkbox. Uncheck a scope
+to get a token without it, which is how to test a signed-in caller who lacks a
+scope.
+
+Better Auth remembers what each user already allowed and skips consent for
+those scopes. To start over as a new user, sign in from a private window or
+disconnect and reconnect the connector.
+
+Every client that registers is allowed to request all demo scopes, whatever
+scope it registered with, so scope step-up never fails with `invalid_scope`.
 
 ## How the gate works
 
-`MCPServer({ oauth })` alone protects the complete MCP endpoint: every request
-needs a bearer token. Adding `mixedAuth: true` lets anyone connect and list,
-and moves the decision to each tool's `auth`:
+`MCPServer({ oauth })` alone protects the whole MCP endpoint. Adding
+`mixedAuth: true` lets anyone connect and list, and moves the decision to each
+item's `auth`:
 
-| `auth`                             | Behavior                                                    |
-| ---------------------------------- | ----------------------------------------------------------- |
-| omitted                            | Sign-in; requires the provider's `requiredScopes`           |
-| `"public"`                         | Anyone; a token that is sent is still verified              |
-| `"optional"`                       | Anyone; `ctx.auth` is set when the caller is signed in      |
-| `{ scopes }`                       | Sign-in; requires `requiredScopes` plus `scopes`            |
-| `{ scopes, optional: true }`       | Anyone; the scopes are advertised and the callback checks them |
+| `auth`                       | Behavior                                                        |
+| ---------------------------- | --------------------------------------------------------------- |
+| omitted                      | Sign-in; needs the provider's required scopes                   |
+| `"public"`                   | Anyone; a token that is sent is still verified                  |
+| `"optional"`                 | Anyone; `ctx.auth` is set when the caller is signed in          |
+| `{ scopes }`                 | Sign-in; needs the required scopes plus `scopes`                |
+| `{ scopes, optional: true }` | Anyone; the scopes are advertised and the callback checks them  |
 
-Resources, resource templates, and prompts take the same `auth` field and
-require sign-in when it is omitted. Invalid or expired tokens are always
-refused with `401`, even on public tools, so clients refresh promptly.
+Invalid or expired tokens are refused with `401` on every item, public ones
+included, so clients refresh them.
