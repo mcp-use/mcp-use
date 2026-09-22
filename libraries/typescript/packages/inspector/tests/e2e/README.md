@@ -141,6 +141,7 @@ pnpm test:e2e:codegen
 
 - `setup.test.ts` - Smoke tests for basic inspector functionality
 - `connection.test.ts` - Tests for server connection management
+- `v2-conformance.test.ts` - v2-only conformance coverage (header params, JSON Schema 2020-12, list_changed notifications, Notifications/Elicitation tabs, input_required elicitation)
 - `tools.test.ts` - Tests for MCP tool execution
 - `fixtures/conformance-server.ts` - Helper to start real conformance server
 
