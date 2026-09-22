@@ -89,7 +89,10 @@ export class AuthServersManager {
       }
     }
 
-    // Note: API Key and Custom Header servers don't have explicit stop methods
+    await Promise.all([
+      this.apiKeyServer?.close?.(),
+      this.customHeaderServer?.close?.(),
+    ]);
     console.log("All authentication test servers stopped!");
   }
 

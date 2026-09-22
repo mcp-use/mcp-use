@@ -18,6 +18,11 @@ test.describe("Inspector Chat Tests", () => {
   // Tests run sequentially to avoid interference between chat sessions
 
   test.beforeEach(async ({ page, context }) => {
+    test.skip(
+      !process.env.OPENAI_API_KEY,
+      "OPENAI_API_KEY required for chat tests"
+    );
+
     // Clear localStorage and cookies before each test
     await context.clearCookies();
 

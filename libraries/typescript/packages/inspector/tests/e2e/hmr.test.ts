@@ -99,7 +99,8 @@ async function toolNames(page: Page): Promise<string[]> {
 }
 
 test.describe("v2 server reload propagation", () => {
-  test.describe.configure({ mode: "serial" });
+  // Each test backs up and restores the fixture files itself, so one failure
+  // must not skip the rest. The runner forces --workers=1 for this file.
   const skipReason = skipIfNotSupported("hmr");
   test.skip(!!skipReason, skipReason || undefined);
 
