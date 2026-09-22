@@ -8,6 +8,7 @@ import type { ViewDisplayMode } from "../../src/react/view/types.js";
 
 const DISPLAY_MODE_ATTR = "data-mcp-widget-display-mode";
 const FULLSCREEN_ATTR = "data-mcp-widget-fullscreen";
+let renderer: ReactTestRenderer | undefined;
 
 function DisplayModeWidget({ mode }: { mode: ViewDisplayMode }) {
   useViewDisplayModeControls({
@@ -18,15 +19,15 @@ function DisplayModeWidget({ mode }: { mode: ViewDisplayMode }) {
   return null;
 }
 
-afterEach(() => {
+afterEach(async () => {
+  await act(async () => renderer?.unmount());
+  renderer = undefined;
   document.documentElement.removeAttribute(DISPLAY_MODE_ATTR);
   document.documentElement.removeAttribute(FULLSCREEN_ATTR);
 });
 
 describe("document display mode chrome", () => {
   it("keeps fullscreen attributes when an inline sibling mounts", async () => {
-    let renderer!: ReactTestRenderer;
-
     await act(async () => {
       renderer = create(
         <>
@@ -40,13 +41,9 @@ describe("document display mode chrome", () => {
       "fullscreen"
     );
     expect(document.documentElement.hasAttribute(FULLSCREEN_ATTR)).toBe(true);
-
-    await act(async () => renderer.unmount());
   });
 
   it("falls back to another active widget mode on update and unmount", async () => {
-    let renderer!: ReactTestRenderer;
-
     await act(async () => {
       renderer = create(
         <>
@@ -74,7 +71,8 @@ describe("document display mode chrome", () => {
     );
     expect(document.documentElement.hasAttribute(FULLSCREEN_ATTR)).toBe(false);
 
-    await act(async () => renderer.unmount());
+    await act(async () => renderer?.unmount());
+    renderer = undefined;
 
     expect(document.documentElement.hasAttribute(DISPLAY_MODE_ATTR)).toBe(
       false
