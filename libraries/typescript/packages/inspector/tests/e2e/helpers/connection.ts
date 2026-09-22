@@ -43,9 +43,7 @@ export async function openTab(
  * rendered in the <li> beside the tab button, not inside it.
  */
 export function tabCountBadge(page: Page, id: InspectorTabId): Locator {
-  return page
-    .locator("li", { has: tabLocator(page, id) })
-    .getByText(/^\d+$/);
+  return page.locator("li", { has: tabLocator(page, id) }).getByText(/^\d+$/);
 }
 
 /** Turn the sidebar RPC panel on if it is not already open. */
