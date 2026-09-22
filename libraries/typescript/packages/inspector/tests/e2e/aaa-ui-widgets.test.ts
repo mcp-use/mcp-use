@@ -258,6 +258,9 @@ test.describe("Conformance UI widgets - Chat Tab", () => {
   test("chat-conformance fixture sends follow-ups and replaces model context", async ({
     page,
   }) => {
+    // Two LLM turns plus a view round-trip; dev-mode (builtin) runs need the
+    // extra headroom.
+    test.slow();
     await page
       .getByTestId("chat-input")
       .fill("Use the chat-conformance-fixture tool now");
@@ -302,12 +305,13 @@ test.describe("Conformance UI widgets - Chat Tab", () => {
     expect((await followUpRequest).postData()).toContain(
       "Fixture selection is 2"
     );
+    // The view's follow-up resolves once the whole follow-up turn completes.
     await expect(fixture.getByTestId("fixture-follow-up-status")).toHaveText(
       "sent",
-      { timeout: 45000 }
+      { timeout: 90000 }
     );
 
-    await expect(page.getByText("State synced to model")).toBeVisible();
+    await expect(page.getByText("State synced to model").first()).toBeVisible();
   });
 
   test("apps-sdk-only-card in chat - should show raw result without widget", async ({
