@@ -1,5 +1,33 @@
 # mcp-use
 
+## 2.6.0-canary.5
+
+### Patch Changes
+
+- f143d66: Validate Vite integration base paths without a slow trailing-slash regular expression on long paths.
+
+## 2.6.0-canary.4
+
+### Patch Changes
+
+- 257e44a: Keep the public chat button hidden when public chat is unavailable.
+
+## 2.6.0-canary.3
+
+### Patch Changes
+
+- Updated dependencies [3e8a1d6]
+- Updated dependencies [01dedad]
+  - @mcp-use/cli@4.1.15-canary.2
+
+## 2.6.0-canary.2
+
+### Patch Changes
+
+- Updated dependencies
+  - @mcp-use/inspector@20.3.11-canary.2
+  - @mcp-use/cli@4.1.15-canary.1
+
 ## 2.6.0-canary.1
 
 ### Patch Changes

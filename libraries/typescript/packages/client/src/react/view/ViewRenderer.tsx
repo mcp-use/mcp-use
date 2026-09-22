@@ -1000,6 +1000,9 @@ function ViewRendererBase({
           <iframe
             ref={iframeRef}
             title={`MCP App: ${toolName}`}
+            // Match the sandbox document's default scheme so a dark host does
+            // not make the browser paint an opaque canvas behind the view.
+            style={{ colorScheme: "normal" }}
             className={
               showHostBorder
                 ? "w-full h-full bg-transparent border border-border rounded-xl"
