@@ -976,15 +976,17 @@ jobs:
       - name: Pack create-mcp-use-app
         working-directory: libraries/typescript/packages/create-mcp-use-app
         run: npm pack
+      # pnpm pack rewrites workspace:* to concrete versions (as `changeset
+      # publish` does), so these tarballs install outside the monorepo.
       - name: Pack @mcp-use/cli
         working-directory: libraries/typescript/packages/cli
-        run: npm pack
+        run: pnpm pack
       - name: Pack @mcp-use/inspector
         working-directory: libraries/typescript/packages/inspector
-        run: npm pack
+        run: pnpm pack
       - name: Pack mcp-use
         working-directory: libraries/typescript/packages/server
-        run: npm pack
+        run: pnpm pack
       - name: Upload All Package Artifacts
         uses: actions/upload-artifact@v7
         with:
@@ -1000,6 +1002,7 @@ jobs:
     needs: create-mcp-use-app-build
     name: "typescript/create-app-tests"
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -1065,44 +1068,107 @@ jobs:
           [ -f "test-app/index.ts" ] || exit 1
           echo "✅ Project created successfully"
 
+      - name: Install dependencies from this build (non --dev flag only)
+        if: matrix.flag == ''
+        shell: bash
+        working-directory: test-app
+        env:
+          PM: ${{ matrix.pm }}
+        run: |
+          # Point the scaffolded app at this build's tarballs instead of the
+          # published mcp-use, then install with the matrix package manager.
+          node - <<'EOF'
+          const fs = require("fs");
+          const path = require("path");
+          const tarball = (dir, prefix) => {
+            const name = fs
+              .readdirSync(path.join("..", "packages", dir))
+              .find((file) => file.startsWith(prefix) && file.endsWith(".tgz"));
+            if (!name) throw new Error(`No ${prefix}*.tgz in packages/${dir}`);
+            return `file:../packages/${dir}/${name}`;
+          };
+          const transitive = {
+            "@mcp-use/cli": tarball("cli", "mcp-use-cli-"),
+            "@mcp-use/inspector": tarball("inspector", "mcp-use-inspector-"),
+          };
+          const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+          pkg.dependencies["mcp-use"] = tarball("server", "mcp-use-");
+          if (process.env.PM === "npm") pkg.overrides = transitive;
+          if (process.env.PM === "yarn") pkg.resolutions = transitive;
+          if (process.env.PM === "pnpm") {
+            fs.writeFileSync(
+              "pnpm-workspace.yaml",
+              "overrides:\n" +
+                Object.entries(transitive)
+                  .map(([name, spec]) => `  "${name}": "${spec}"\n`)
+                  .join("")
+            );
+          }
+          fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n");
+          console.log(JSON.stringify(pkg.dependencies, null, 2));
+          EOF
+
+          case "$PM" in
+            npm) npm install ;;
+            yarn) yarn install ;;
+            pnpm) pnpm install ;;
+          esac
+
       - name: Test dev command (non --dev flag only)
         if: matrix.flag == ''
         shell: bash
         working-directory: test-app
+        env:
+          PORT: "3000"
         run: |
-          # Start dev server in background
-          case "${{ matrix.pm }}" in
-            npm)
-              npm run dev &
-              ;;
-            yarn)
-              yarn dev &
-              ;;
-            pnpm)
-              pnpm dev &
-              ;;
-          esac
+          URL="http://localhost:$PORT/mcp"
 
-          DEV_PID=$!
-
-          # Wait for server to start (10 seconds should be enough)
-          sleep 10
-
-          # Kill the dev server
-          if [ "${{ runner.os }}" == "Windows" ]; then
-            # On Windows, kill by port is more reliable than DEV_PID
-            # because bash's $! may not map to the actual Windows process ID
-            DEV_PORT=3000
-            for pid in $(netstat -ano 2>/dev/null | grep ":$DEV_PORT " | grep "LISTENING" | awk '{print $5}' | sort -u); do
-              taskkill //PID $pid //F 2>/dev/null || true
+          stop_dev() {
+            if [ "$RUNNER_OS" == "Windows" ]; then
+              # Kill by listening port only. $! is an MSYS PID, not a Windows
+              # PID, so passing it to taskkill can hit an unrelated (or
+              # recycled) process tree, including the runner itself.
+              for pid in $(netstat -ano 2>/dev/null | grep ":$PORT " | grep "LISTENING" | awk '{print $5}' | sort -u); do
+                taskkill //PID "$pid" //T //F >/dev/null 2>&1 || true
+              done
+            else
+              for pid in $(lsof -ti "tcp:$PORT" -sTCP:LISTEN 2>/dev/null); do
+                kill "$pid" 2>/dev/null || true
+              done
+            fi
+            kill "$DEV_PID" 2>/dev/null || true
+            # Bounded wait: never block the job on a process that won't exit.
+            for _ in $(seq 1 10); do
+              kill -0 "$DEV_PID" 2>/dev/null || return 0
+              sleep 1
             done
-            # Also try the process tree kill as fallback
-            taskkill //PID $DEV_PID //T //F 2>/dev/null || true
-          else
-            kill $DEV_PID 2>/dev/null || true
+            echo "::warning::Dev process still running; leaving it to runner cleanup"
+          }
+
+          case "${{ matrix.pm }}" in
+            npm) npm run dev > dev.log 2>&1 & ;;
+            yarn) yarn dev > dev.log 2>&1 & ;;
+            pnpm) pnpm dev > dev.log 2>&1 & ;;
+          esac
+          DEV_PID=$!
+          trap stop_dev EXIT
+
+          # Any non-5xx HTTP response from the MCP endpoint means the server is up.
+          CODE=000
+          for _ in $(seq 1 90); do
+            CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 "$URL" || true)
+            if [ "$CODE" != "000" ] || ! kill -0 "$DEV_PID" 2>/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          echo "::group::dev server output"
+          cat dev.log
+          echo "::endgroup::"
+
+          if [ "$CODE" == "000" ] || [ "$CODE" -ge 500 ]; then
+            echo "::error::Dev server did not come up at $URL (last HTTP status: $CODE)"
+            exit 1
           fi
-
-          # Wait for process to exit
-          wait $DEV_PID 2>/dev/null || true
-
-          echo "✅ Dev server started and stopped successfully"
+          echo "✅ Dev server responded at $URL (HTTP $CODE)"
