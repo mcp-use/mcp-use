@@ -1042,7 +1042,7 @@ jobs:
       - name: Scaffold, install and run dev
         shell: bash
         run: >-
-          node libraries/typescript/packages/create-mcp-use-app/scripts/e2e-scaffold.mjs
+          node libraries/typescript/packages/create-mcp-use-app/e2e/scaffold.mjs
           --pm ${{ matrix.pm }}
           --template ${{ matrix.template }}
           --packages ./packages

@@ -7,7 +7,7 @@
  * manager × template; it has no dependencies so it runs outside the monorepo.
  *
  * Usage:
- *   node scripts/e2e-scaffold.mjs --pm <npm|yarn|pnpm> --template <name>
+ *   node e2e/scaffold.mjs --pm <npm|yarn|pnpm> --template <name>
  *     --packages <dir> [--dev] [--work-dir <dir>] [--port <n>]
  *
  * `--packages` is searched recursively for the create-mcp-use-app, mcp-use,
@@ -56,7 +56,7 @@ if (
   !values.packages
 ) {
   console.error(
-    "Usage: e2e-scaffold.mjs --pm <npm|yarn|pnpm> --template <name> --packages <dir> [--dev] [--work-dir <dir>] [--port <n>]"
+    "Usage: scaffold.mjs --pm <npm|yarn|pnpm> --template <name> --packages <dir> [--dev] [--work-dir <dir>] [--port <n>]"
   );
   process.exit(2);
 }
@@ -106,7 +106,16 @@ try {
 
 function scaffold() {
   const createArgs = [APP_NAME, "--template", values.template];
-  if (values.dev) createArgs.push("--dev");
+  if (values.dev) {
+    createArgs.push("--dev");
+  } else {
+    // Pin the tarball's version so scaffolding skips the npm dist-tag lookup
+    // (a network flake source); the install step swaps in the tarball anyway.
+    const sdkVersion = path
+      .basename(tarballs["mcp-use"])
+      .replace(/^mcp-use-(.+)\.tgz$/, "$1");
+    createArgs.push("--sdk-version", sdkVersion);
+  }
   const tarball = tarballs["create-mcp-use-app"];
   const commands = {
     npm: [
