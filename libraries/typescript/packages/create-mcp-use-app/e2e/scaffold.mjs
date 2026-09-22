@@ -184,6 +184,12 @@ function useLocalTarballs() {
 
 async function checkDevServer() {
   const url = `http://127.0.0.1:${port}/mcp`;
+  // Otherwise a leftover listener could answer for a dev server that never
+  // started (mcp-use dev moves to the next free port when this one is taken).
+  if ((await probe(url)) !== null) {
+    fail(`Port ${port} is already in use; pass --port to pick another`);
+  }
+
   const child = spawnCommand(pm, pm === "npm" ? ["run", "dev"] : ["dev"], {
     cwd: appDir,
     env: { ...process.env, PORT: String(port) },
@@ -198,6 +204,10 @@ async function checkDevServer() {
       exitCode = code ?? signal;
       resolve();
     });
+    child.once("error", (error) => {
+      exitCode = error.message;
+      resolve();
+    });
   });
   const stop = () => stopTree(child, exited);
   process.once("SIGINT", () => stop().then(() => process.exit(130)));
@@ -210,8 +220,10 @@ async function checkDevServer() {
       }
       const status = await probe(url);
       if (status !== null) {
-        if (status >= 500)
+        // GET /mcp answers 2xx; a 404 would mean the MCP route is missing.
+        if (status < 200 || status >= 300) {
           fail(`Dev server responded HTTP ${status} at ${url}`);
+        }
         console.log(`✅ Dev server responded at ${url} (HTTP ${status})`);
         return;
       }
