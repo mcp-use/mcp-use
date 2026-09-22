@@ -6,6 +6,35 @@ tag: "New"
 rss: true
 ---
 
+<Update label="v2.6.0" description="September 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=2.6.0&title=TanStack%20Start%20integration&date=2026-09&lang=typescript" alt="Release 2.6.0" />
+  </Frame>
+  ## TanStack Start integration
+  Minor release adding Vite-powered MCP servers in TanStack Start, along with client, CLI, scaffold, and documentation updates.
+
+- **New** (server): `mcp-use/vite`, `mcp-use/tanstack-start`, and `mcp-use/tanstack-start/vite` mount an MCP server in a TanStack Start route; a dedicated Vite environment reloads server code, skills, and views during development and builds deployable assets for production (`#2517`)
+- **Fix** (server): the landing page hides the public chat button until public chat is available (`#2612`)
+- **Fix** (server): Vite integration base-path validation handles long paths with repeated slashes without slow regex matching
+- **Fix** (@mcp-use/client): sibling inline widgets preserve each other's fullscreen and picture-in-picture document state, and MCP App iframes remain transparent in dark hosts (`#2454`, `#2610`)
+- **Fix** (@mcp-use/cli): `whoami` uses the account's default organization when none is selected locally, and whitespace around `skills.directory` no longer breaks skill discovery (`#2570`, `#2597`)
+- **Fix** (create-mcp-use-app): template tsconfigs load Node types explicitly so new projects typecheck with TypeScript 7 (`#2595`)
+- **Documentation**: new cookbook recipes cover Daytona code execution, Next.js, Upstash rate limiting, Sentry error tracking, and TanStack Start; examples also show A2UI generative views (`#2513`, `#2515`, `#2564`, `#2566`, `#2572`, `#2518`)
+- **Update**: release CI checks SDK changesets and changelog entries (`#2579`)
+- **Update**: Updated @mcp-use/inspector to v20.3.11; see the [Inspector changelog](/inspector/changelog)
+- **Update**: Updated @mcp-use/cli to v4.1.15
+- **Update**: Updated create-mcp-use-app to v2.0.7
+</Update>
+
+<Update label="v2.5.2" description="September 2026">
+  ## Scrollable Inspector app results
+  Patch release keeping tall MCP App tool results accessible in Inspector.
+
+- **Fix** (@mcp-use/inspector): tall MCP App results scroll within the tool result panel; see the [Inspector changelog](/inspector/changelog) (`#2598`)
+- **Update**: Updated @mcp-use/inspector to v20.3.10
+- **Update**: Updated @mcp-use/cli to v4.1.14
+</Update>
+
 <Update label="v2.5.1" description="September 2026">
   ## Agent step limits & client progress routing
   Patch release fixing per-call agent budgets and SDK notification handling, with Inspector cloud model selection improvements.

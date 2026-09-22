@@ -6,6 +6,7 @@ const {
   createInterface,
   identity,
   question,
+  readCloudConfig,
   writeCloudConfig,
   withApiKey,
 } = vi.hoisted(() => {
@@ -28,6 +29,7 @@ const {
     createInterface: vi.fn(),
     identity,
     question: vi.fn(),
+    readCloudConfig: vi.fn(async () => ({})),
     writeCloudConfig: vi.fn(async () => {}),
     withApiKey: vi.fn(() => ({ identity: async () => identity })),
   };
@@ -37,9 +39,12 @@ vi.mock("node:readline/promises", () => ({ createInterface }));
 
 vi.mock("../../src/commands/cloud-api.js", () => ({
   cloudAuthUrl: () => "https://cloud.example.test",
-  CloudApi: { withApiKey },
+  CloudApi: {
+    withApiKey,
+    create: async () => ({ identity: async () => identity }),
+  },
   clearCloudConfig,
-  readCloudConfig: vi.fn(),
+  readCloudConfig,
   resolveOrganization: (
     organizations: Array<{ id: string; slug: string | null }>,
     selector: string
@@ -83,6 +88,25 @@ afterEach(() => {
   });
   identity.defaultOrganizationId = "org_1";
   vi.restoreAllMocks();
+});
+
+describe("whoami", () => {
+  it("reports the account default organization when the config has no selection", async () => {
+    // Reachable via MCP_USE_API_KEY without ever running `mcp-use login`, so
+    // config.orgId is absent while the rest of the CLI still resolves the
+    // account default.
+    readCloudConfig.mockResolvedValue({});
+    const chunks: string[] = [];
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      chunks.push(String(chunk));
+      return true;
+    });
+
+    await expect(runIdentity("whoami", ["--json"])).resolves.toBe(0);
+    expect(JSON.parse(chunks.join(""))).toMatchObject({
+      organization: { id: "org_1", name: "Acme" },
+    });
+  });
 });
 
 describe("logout UX", () => {
