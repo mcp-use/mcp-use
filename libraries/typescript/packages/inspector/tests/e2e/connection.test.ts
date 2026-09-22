@@ -123,7 +123,10 @@ test.describe("Inspector MCP Server Connections", () => {
       /does not advertise the Skills over MCP extension/
     );
     // Tools stays the active tab because the disabled control ignores clicks.
-    await expect(tabLocator(page, "tools")).toHaveAttribute("data-active", "true");
+    await expect(tabLocator(page, "tools")).toHaveAttribute(
+      "data-active",
+      "true"
+    );
   });
 
   test("new servers appear first and the scroll area keeps bottom spacing", async ({
@@ -1116,10 +1119,7 @@ test.describe("Inspector MCP Server Connections", () => {
     page,
   }) => {
     // Navigate to Prompts tab using role selector (handles collapsed/expanded states)
-    await page
-      .locator('[data-testid="tab-prompts"]:visible')
-      .first()
-      .click();
+    await page.locator('[data-testid="tab-prompts"]:visible').first().click();
     await expect(page.getByRole("heading", { name: "Prompts" })).toBeVisible();
 
     // Select the prompt
@@ -1138,10 +1138,7 @@ test.describe("Inspector MCP Server Connections", () => {
     page,
   }) => {
     // Navigate to Prompts tab using role selector (handles collapsed/expanded states)
-    await page
-      .locator('[data-testid="tab-prompts"]:visible')
-      .first()
-      .click();
+    await page.locator('[data-testid="tab-prompts"]:visible').first().click();
     await expect(page.getByRole("heading", { name: "Prompts" })).toBeVisible();
 
     // Select the prompt
@@ -1167,10 +1164,7 @@ test.describe("Inspector MCP Server Connections", () => {
     page,
   }) => {
     // Navigate to Prompts tab using role selector (handles collapsed/expanded states)
-    await page
-      .locator('[data-testid="tab-prompts"]:visible')
-      .first()
-      .click();
+    await page.locator('[data-testid="tab-prompts"]:visible').first().click();
     await expect(page.getByRole("heading", { name: "Prompts" })).toBeVisible();
 
     // Select the prompt
@@ -1203,10 +1197,7 @@ test.describe("Inspector MCP Server Connections", () => {
     page,
   }) => {
     // Navigate to Prompts tab using role selector (handles collapsed/expanded states)
-    await page
-      .locator('[data-testid="tab-prompts"]:visible')
-      .first()
-      .click();
+    await page.locator('[data-testid="tab-prompts"]:visible').first().click();
     await expect(page.getByRole("heading", { name: "Prompts" })).toBeVisible();
 
     // Select the prompt
@@ -1230,10 +1221,7 @@ test.describe("Inspector MCP Server Connections", () => {
     page,
   }) => {
     // Navigate to Resources tab
-    await page
-      .locator('[data-testid="tab-resources"]:visible')
-      .first()
-      .click();
+    await page.locator('[data-testid="tab-resources"]:visible').first().click();
     await expect(
       page.getByRole("heading", { name: "Resources" })
     ).toBeVisible();
@@ -1260,10 +1248,7 @@ test.describe("Inspector MCP Server Connections", () => {
     page,
   }) => {
     // Navigate to Resources tab
-    await page
-      .locator('[data-testid="tab-resources"]:visible')
-      .first()
-      .click();
+    await page.locator('[data-testid="tab-resources"]:visible').first().click();
     await expect(
       page.getByRole("heading", { name: "Resources" })
     ).toBeVisible();
@@ -1290,10 +1275,7 @@ test.describe("Inspector MCP Server Connections", () => {
     page,
   }) => {
     // Navigate to Resources tab
-    await page
-      .locator('[data-testid="tab-resources"]:visible')
-      .first()
-      .click();
+    await page.locator('[data-testid="tab-resources"]:visible').first().click();
     await expect(
       page.getByRole("heading", { name: "Resources" })
     ).toBeVisible();

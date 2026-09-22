@@ -27,7 +27,8 @@ export async function addCustomHeaderInConnectForm(
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
   await dialog.getByTestId("custom-headers-add-button").click();
-  const index = (await dialog.getByTestId(/^custom-header-row-\d+$/).count()) - 1;
+  const index =
+    (await dialog.getByTestId(/^custom-header-row-\d+$/).count()) - 1;
   await dialog.getByTestId(`custom-header-name-${index}`).fill(name);
   await dialog.getByTestId(`custom-header-value-${index}`).fill(value);
   await dialog.getByTestId("custom-headers-save-button").click();
@@ -134,7 +135,9 @@ export async function fillOAuthClientCredentials(
   await page.getByTestId("connection-form-auth-button").click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
-  await dialog.getByTestId("auth-dialog-client-id-input").fill(options.clientId);
+  await dialog
+    .getByTestId("auth-dialog-client-id-input")
+    .fill(options.clientId);
   if (options.clientSecret !== undefined) {
     await dialog
       .getByTestId("auth-dialog-client-secret-input")
