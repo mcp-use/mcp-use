@@ -6,6 +6,7 @@ const bundledServerDependencies = [
   "@hono/node-server",
   "@mcp-use/client",
   "open",
+  "redis",
   "rate-limiter-flexible",
 ];
 const rateLimiterMemoryShim = fileURLToPath(
@@ -14,6 +15,12 @@ const rateLimiterMemoryShim = fileURLToPath(
 const rateLimiterMemoryAdapter = fileURLToPath(
   import.meta.resolve("rate-limiter-flexible/lib/RateLimiterMemory.js")
 );
+// Redis is bundled to keep the standalone Inspector self-contained. Its
+// CommonJS transitive dependencies use require("node:crypto") and friends;
+// provide the native ESM-safe require that those modules expect.
+const nodeRequireBanner = {
+  js: 'import { createRequire } from "node:module"; const require = createRequire(import.meta.url);',
+};
 
 function bundleOnlyMemoryRateLimiter(options: {
   alias?: Record<string, string>;
@@ -37,6 +44,7 @@ export default defineConfig([
     minify: true,
     dts: true,
     noExternal: bundledServerDependencies,
+    banner: nodeRequireBanner,
     esbuildOptions: bundleOnlyMemoryRateLimiter,
   },
   {
@@ -51,6 +59,7 @@ export default defineConfig([
     dts: false,
     clean: false,
     noExternal: bundledServerDependencies,
+    banner: nodeRequireBanner,
     esbuildOptions: bundleOnlyMemoryRateLimiter,
   },
 ]);
