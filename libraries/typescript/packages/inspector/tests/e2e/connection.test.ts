@@ -2,9 +2,13 @@ import { expect, test, type Page, type Request } from "@playwright/test";
 import {
   configureLLMAPI,
   connectToConformanceServer,
+  countRpcMessages,
+  mcpJsonRpc,
   navigateToTools,
+  openRpcPanel,
+  tabCountBadge,
+  tabLocator,
 } from "./helpers/connection";
-import { getTestMatrix } from "./helpers/test-matrix";
 
 /**
  * Connection-ready precondition for sampling/elicitation tools.
@@ -33,13 +37,8 @@ async function expectPendingRequestEnqueued(
   );
   await expect(executingControl).toBeVisible({ timeout: 5000 });
 
-  // TabCountBadge shows pending count on the visible Sampling/Elicitation tab
-  // (works whether the tab bar is collapsed or expanded; no new product test IDs)
-  const visibleTab = page.locator(`[data-testid="tab-${kind}"]:visible`);
-  const pendingBadge = visibleTab
-    .locator(":scope > span")
-    .filter({ hasText: /^1$/ });
-  await expect(pendingBadge).toBeVisible({ timeout: 5000 });
+  // The sidebar renders the pending count beside the Sampling/Elicitation tab
+  await expect(tabCountBadge(page, kind)).toHaveText("1", { timeout: 5000 });
 }
 
 test.describe("Inspector MCP Server Connections", () => {
@@ -102,7 +101,7 @@ test.describe("Inspector MCP Server Connections", () => {
     await page.goto("http://localhost:3000/inspector");
     await page.getByTestId("server-tile-settings").click();
 
-    await expect(page.locator('[data-slot="card-title"]')).toHaveAllText([
+    await expect(page.locator('[data-slot="card-title"]')).toHaveText([
       "Endpoint",
       "Configuration",
       "Authentication",
@@ -110,17 +109,24 @@ test.describe("Inspector MCP Server Connections", () => {
     ]);
   });
 
-  test("shows the Skills tab and empty state without the extension", async ({
+  test("shows the Skills tab disabled when the server has no Skills extension", async ({
     page,
   }) => {
-    const skillsTab = page.locator('[data-testid="tab-skills"]:visible');
+    // The conformance server does not advertise Skills over MCP, so the tab is
+    // rendered but disabled, with the reason in its tooltip/title.
+    const skillsTab = tabLocator(page, "skills");
     await expect(skillsTab).toBeVisible();
     await expect(skillsTab).not.toContainText(/\d/);
-    await skillsTab.click();
-    await expect(page.getByText("No skills available")).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Validate all" })
-    ).toBeDisabled();
+    await expect(skillsTab).toHaveAttribute("aria-disabled", "true");
+    await expect(skillsTab).toHaveAttribute(
+      "title",
+      /does not advertise the Skills over MCP extension/
+    );
+    // Tools stays the active tab because the disabled control ignores clicks.
+    await expect(tabLocator(page, "tools")).toHaveAttribute(
+      "data-active",
+      "true"
+    );
   });
 
   test("new servers appear first and the scroll area keeps bottom spacing", async ({
@@ -234,12 +240,11 @@ test.describe("Inspector MCP Server Connections", () => {
       "http://localhost:3002/mcp"
     );
 
-    await page.getByTestId("connection-form-config-button").click();
+    // The Connection Settings tab renders the configuration fields inline.
     await expect(
       page.getByTestId("config-dialog-request-timeout-input")
     ).toBeVisible();
     await page.getByTestId("config-dialog-request-timeout-input").fill("60000");
-    await page.getByRole("button", { name: "Save" }).first().click();
 
     await page.getByTestId("connection-form-save-button").click();
 
@@ -249,7 +254,8 @@ test.describe("Inspector MCP Server Connections", () => {
       timeout: 3000,
     });
 
-    await page.reload();
+    // Saving keeps you on the Connection Settings tab; check the dashboard.
+    await page.goto("http://localhost:3000/inspector");
     await expect(
       page.getByRole("heading", { name: "ConformanceTestServer" })
     ).toBeVisible();
@@ -281,10 +287,11 @@ test.describe("Inspector MCP Server Connections", () => {
 
     await page.getByTestId("server-tile-settings").click();
 
-    await expect(page.getByTestId("connection-form-alias-input")).toBeVisible();
-    await page
-      .getByTestId("connection-form-alias-input")
-      .fill("QA Conformance");
+    // The form is populated asynchronously from the connection; typing before
+    // that lands gets overwritten. Wait for the initial value first.
+    const aliasInput = page.getByTestId("connection-form-alias-input");
+    await expect(aliasInput).toHaveValue("http://localhost:3002/mcp");
+    await aliasInput.fill("QA Conformance");
     await page.getByTestId("connection-form-save-button").click();
 
     await expect(
@@ -292,6 +299,11 @@ test.describe("Inspector MCP Server Connections", () => {
     ).toBeVisible({
       timeout: 3000,
     });
+    // The toast fires before the metadata update is applied; wait for the
+    // header's server switcher to pick up the alias before navigating.
+    await expect(
+      page.getByRole("button", { name: /QA Conformance/ }).first()
+    ).toBeVisible({ timeout: 10000 });
 
     // Client-side navigation preserves the active MCP session.
     await page.getByRole("link", { name: /mcp-use.*Inspector/ }).click();
@@ -300,6 +312,8 @@ test.describe("Inspector MCP Server Connections", () => {
     ).toBeVisible();
 
     await page.getByTestId("server-tile-http://localhost:3002/mcp").click();
+    // The last active tab (Connection Settings) is restored; go to Tools.
+    await tabLocator(page, "tools").click();
     await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
     await page.getByTestId("tool-item-test_simple_text").click();
     await expect(
@@ -335,12 +349,10 @@ test.describe("Inspector MCP Server Connections", () => {
       "http://localhost:3002/mcp"
     );
 
-    await page.getByTestId("connection-form-config-button").click();
     await expect(
       page.getByTestId("config-dialog-request-timeout-input")
     ).toBeVisible();
     await page.getByTestId("config-dialog-request-timeout-input").fill("45000");
-    await page.getByRole("button", { name: "Save" }).first().click();
 
     await page.getByTestId("connection-form-save-button").click();
 
@@ -359,9 +371,7 @@ test.describe("Inspector MCP Server Connections", () => {
     await page.getByTestId("server-tile-settings").click();
     await expect(page.getByTestId("connection-form-url-input")).toBeVisible();
 
-    await page.getByTestId("connection-form-config-button").click();
     await page.getByTestId("config-dialog-request-timeout-input").fill("30000");
-    await page.getByRole("button", { name: "Save" }).first().click();
     await page.getByTestId("connection-form-save-button").click();
 
     await expect(
@@ -437,6 +447,9 @@ test.describe("Inspector MCP Server Connections", () => {
       .getByTestId("connection-form-url-input")
       .fill("http://localhost:29999/mcp");
     await page.getByTestId("connection-form-save-button").click();
+    await expect(
+      page.getByText("Connection settings updated").first()
+    ).toBeVisible({ timeout: 5000 });
 
     await page.goto("http://localhost:3000/inspector");
     await expect(page.getByTestId("server-tile-status-failed")).toBeVisible({
@@ -635,18 +648,13 @@ test.describe("Inspector MCP Server Connections", () => {
       page.getByTestId("tool-execution-results-text-content")
     ).toContainText("Tool execution completed with logging");
 
-    // Verify RPC panel shows increased message count (log notifications)
-    const messageCountBadge = page.getByTestId("rpc-message-count").first();
-    await expect(messageCountBadge).toBeVisible({ timeout: 5000 });
-
-    // Expand RPC panel to check for log notifications
-    await page.getByTestId("rpc-panel-toggle").first().click();
-
-    // Wait for and verify log notifications are present in RPC panel
-    // The conformance server sends 3 log messages via notifications/message
-    await expect(
-      page.getByTestId("rpc-message-notifications-message").first()
-    ).toBeVisible();
+    // Open the RPC panel (sidebar switch) and verify the log notifications.
+    // The conformance server sends 3 notifications/message frames; the panel
+    // coalesces consecutive same-method notifications into one "×N" row.
+    await openRpcPanel(page);
+    const logRows = page.getByTestId("rpc-message-notifications-message");
+    await expect(logRows.first()).toBeVisible({ timeout: 5000 });
+    expect(await countRpcMessages(logRows)).toBeGreaterThanOrEqual(3);
   });
 
   test("test_tool_with_progress - should accept steps param and show progress", async ({
@@ -669,28 +677,25 @@ test.describe("Inspector MCP Server Connections", () => {
       page.getByTestId("tool-execution-results-text-content")
     ).toContainText("Completed 3 steps");
 
-    // If RPC panel is not already expanded, expand it
-    const rpcPanelToggle = page.getByTestId("rpc-panel-toggle").first();
-    if (await rpcPanelToggle.isVisible()) {
-      await rpcPanelToggle.click();
-      await page.waitForTimeout(300); // Wait for panel expansion animation
-    }
-
-    // Wait for and verify progress notifications are present in RPC panel
-    // The conformance server sends progress notifications via notifications/progress
-    const progressMessages = page.getByTestId(
-      "rpc-message-notifications-progress"
-    );
-    await expect(progressMessages.first()).toBeVisible({ timeout: 5000 });
-
-    // Verify we have at least 3 progress notifications (for steps 1, 2, 3)
-    const count = await progressMessages.count();
-    expect(count).toBeGreaterThanOrEqual(3);
+    // Open the RPC panel and verify the progress notifications (one per step).
+    // Consecutive notifications/progress frames coalesce into a single "×N" row.
+    await openRpcPanel(page);
+    const progressRows = page.getByTestId("rpc-message-notifications-progress");
+    await expect(progressRows.first()).toBeVisible({ timeout: 5000 });
+    expect(await countRpcMessages(progressRows)).toBeGreaterThanOrEqual(3);
   });
 
   test("test_sampling - should accept prompt param and handle sampling request", async ({
     page,
   }) => {
+    // The stateless conformance server cannot deliver server-to-client
+    // requests (see examples/conformance/expected-failures.yml:
+    // tools-call-sampling), and modern connections do not advertise sampling
+    // at all. Sampling coverage needs a stateful legacy fixture.
+    test.skip(
+      true,
+      "Stateless conformance server cannot serve legacy sampling requests"
+    );
     await page.getByTestId("tool-item-test_sampling").click();
     await expect(
       page.getByTestId("tool-execution-execute-button")
@@ -728,10 +733,19 @@ test.describe("Inspector MCP Server Connections", () => {
       return;
     }
 
+    // The stateless conformance server cannot deliver server-to-client
+    // requests (see examples/conformance/expected-failures.yml:
+    // tools-call-sampling), and modern connections do not advertise sampling
+    // at all. Sampling coverage needs a stateful legacy fixture.
+    test.skip(
+      true,
+      "Stateless conformance server cannot serve legacy sampling requests"
+    );
+
     // Configure LLM first
     await configureLLMAPI(page);
 
-    await page.getByRole("tab", { name: /Tools/ }).first().click();
+    await tabLocator(page, "tools").click();
     await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
 
     // Execute sampling tool
@@ -981,13 +995,13 @@ test.describe("Inspector MCP Server Connections", () => {
 
     const untitledMulti = page.getByTestId("elicitation-field-untitledMulti");
     await expect(untitledMulti).toBeVisible();
-    await untitledMulti.getByLabel("option1").click();
-    await untitledMulti.getByLabel("option3").click();
+    await untitledMulti.getByLabel("option1", { exact: true }).first().click();
+    await untitledMulti.getByLabel("option3", { exact: true }).first().click();
 
     const titledMulti = page.getByTestId("elicitation-field-titledMulti");
     await expect(titledMulti).toBeVisible();
-    await titledMulti.getByLabel("value1").click();
-    await titledMulti.getByLabel("value3").click();
+    await titledMulti.getByLabel("value1", { exact: true }).first().click();
+    await titledMulti.getByLabel("value3", { exact: true }).first().click();
 
     await page.getByTestId("elicitation-accept-button").click();
 
@@ -1061,23 +1075,10 @@ test.describe("Inspector MCP Server Connections", () => {
     page,
   }) => {
     // Get the tools list directly from the MCP server via JSON-RPC
-    const { serverUrl } = getTestMatrix();
-    const toolsList = await page.evaluate(async (url) => {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "tools/list",
-          params: {},
-        }),
-      });
-      return response.json();
-    }, serverUrl);
+    const toolsList = await mcpJsonRpc<{ tools: any[] }>(page, "tools/list");
 
     // Find the test_record_schema tool
-    const tool = toolsList.result.tools.find(
+    const tool = toolsList.tools.find(
       (t: any) => t.name === "test_record_schema"
     );
     expect(tool).toBeDefined();
@@ -1118,10 +1119,7 @@ test.describe("Inspector MCP Server Connections", () => {
     page,
   }) => {
     // Navigate to Prompts tab using role selector (handles collapsed/expanded states)
-    await page
-      .getByRole("tab", { name: /Prompts/ })
-      .first()
-      .click();
+    await page.locator('[data-testid="tab-prompts"]:visible').first().click();
     await expect(page.getByRole("heading", { name: "Prompts" })).toBeVisible();
 
     // Select the prompt
@@ -1140,10 +1138,7 @@ test.describe("Inspector MCP Server Connections", () => {
     page,
   }) => {
     // Navigate to Prompts tab using role selector (handles collapsed/expanded states)
-    await page
-      .getByRole("tab", { name: /Prompts/ })
-      .first()
-      .click();
+    await page.locator('[data-testid="tab-prompts"]:visible').first().click();
     await expect(page.getByRole("heading", { name: "Prompts" })).toBeVisible();
 
     // Select the prompt
@@ -1169,10 +1164,7 @@ test.describe("Inspector MCP Server Connections", () => {
     page,
   }) => {
     // Navigate to Prompts tab using role selector (handles collapsed/expanded states)
-    await page
-      .getByRole("tab", { name: /Prompts/ })
-      .first()
-      .click();
+    await page.locator('[data-testid="tab-prompts"]:visible').first().click();
     await expect(page.getByRole("heading", { name: "Prompts" })).toBeVisible();
 
     // Select the prompt
@@ -1205,10 +1197,7 @@ test.describe("Inspector MCP Server Connections", () => {
     page,
   }) => {
     // Navigate to Prompts tab using role selector (handles collapsed/expanded states)
-    await page
-      .getByRole("tab", { name: /Prompts/ })
-      .first()
-      .click();
+    await page.locator('[data-testid="tab-prompts"]:visible').first().click();
     await expect(page.getByRole("heading", { name: "Prompts" })).toBeVisible();
 
     // Select the prompt
@@ -1232,10 +1221,7 @@ test.describe("Inspector MCP Server Connections", () => {
     page,
   }) => {
     // Navigate to Resources tab
-    await page
-      .getByRole("tab", { name: /Resources/ })
-      .first()
-      .click();
+    await page.locator('[data-testid="tab-resources"]:visible').first().click();
     await expect(
       page.getByRole("heading", { name: "Resources" })
     ).toBeVisible();
@@ -1262,10 +1248,7 @@ test.describe("Inspector MCP Server Connections", () => {
     page,
   }) => {
     // Navigate to Resources tab
-    await page
-      .getByRole("tab", { name: /Resources/ })
-      .first()
-      .click();
+    await page.locator('[data-testid="tab-resources"]:visible').first().click();
     await expect(
       page.getByRole("heading", { name: "Resources" })
     ).toBeVisible();
@@ -1292,10 +1275,7 @@ test.describe("Inspector MCP Server Connections", () => {
     page,
   }) => {
     // Navigate to Resources tab
-    await page
-      .getByRole("tab", { name: /Resources/ })
-      .first()
-      .click();
+    await page.locator('[data-testid="tab-resources"]:visible').first().click();
     await expect(
       page.getByRole("heading", { name: "Resources" })
     ).toBeVisible();
