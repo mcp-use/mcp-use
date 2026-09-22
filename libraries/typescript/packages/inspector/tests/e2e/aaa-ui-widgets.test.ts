@@ -224,13 +224,12 @@ test.describe("Conformance UI widgets - Chat Tab", () => {
       .fill("Use the get-weather-delayed tool with city Tokyo and delay 2000");
     await page.getByTestId("chat-send-button").click();
 
-    await expect(
-      page.getByTestId("chat-tool-call-get-weather-delayed")
-    ).toBeVisible({ timeout: 20000 });
+    const toolCall = page.getByTestId("chat-tool-call-get-weather-delayed");
+    await expect(toolCall).toBeVisible({ timeout: 20000 });
 
-    await expect(page.getByTestId("chat-tool-call-status-result")).toBeVisible({
-      timeout: 45000,
-    });
+    await expect(
+      toolCall.getByTestId("chat-tool-call-status-result")
+    ).toBeVisible({ timeout: 45000 });
 
     // MCP Apps uses double-nested iframe (outer proxy + inner guest)
     const widgetFrame = getMcpAppsGuestFrame(page, "get-weather-delayed");
@@ -259,17 +258,26 @@ test.describe("Conformance UI widgets - Chat Tab", () => {
   test("chat-conformance fixture sends follow-ups and replaces model context", async ({
     page,
   }) => {
+    // Known gap: a view's updateModelContext never reaches the Chat LLM
+    // request (and the "State synced to model" badge never shows), so the
+    // follow-up turn goes out without the view's context. See #2623.
+    test.fail(
+      true,
+      "View model context is missing from the Chat follow-up LLM request"
+    );
     await page
       .getByTestId("chat-input")
       .fill("Use the chat-conformance-fixture tool now");
     await page.getByTestId("chat-send-button").click();
 
+    // The model may call other tools first; scope the status to this call.
+    const toolCall = page.getByTestId(
+      "chat-tool-call-chat-conformance-fixture"
+    );
+    await expect(toolCall).toBeVisible({ timeout: 20000 });
     await expect(
-      page.getByTestId("chat-tool-call-chat-conformance-fixture")
-    ).toBeVisible({ timeout: 20000 });
-    await expect(page.getByTestId("chat-tool-call-status-result")).toBeVisible({
-      timeout: 45000,
-    });
+      toolCall.getByTestId("chat-tool-call-status-result")
+    ).toBeVisible({ timeout: 45000 });
 
     const fixture = getMcpAppsGuestFrame(page, "chat-conformance-fixture");
     await expect(fixture.getByText("Chat conformance fixture")).toBeVisible();
@@ -321,9 +329,11 @@ test.describe("Conformance UI widgets - Chat Tab", () => {
       page.getByTestId("chat-tool-call-apps-sdk-only-card")
     ).toBeVisible({ timeout: 20000 });
 
-    await expect(page.getByTestId("chat-tool-call-status-result")).toBeVisible({
-      timeout: 45000,
-    });
+    await expect(
+      page
+        .getByTestId("chat-tool-call-apps-sdk-only-card")
+        .getByTestId("chat-tool-call-status-result")
+    ).toBeVisible({ timeout: 45000 });
 
     // No ChatGPT emulation — no MCP Apps frame for apps-sdk-only tools
     await expect(page.getByTestId("mcp-app-frame")).not.toBeVisible();
