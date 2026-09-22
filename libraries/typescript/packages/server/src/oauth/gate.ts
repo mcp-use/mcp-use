@@ -8,12 +8,15 @@ import {
   type OAuthTokenVerifier,
 } from "@modelcontextprotocol/server";
 
-import type { AuthChallengeFormat } from "../config.js";
 import { getRequestBag, type FetchMiddleware } from "../fetch-app.js";
-import type { ToolAuthPolicy } from "./policy.js";
-
-/** @internal `_meta` key ChatGPT reads for a tool-result auth challenge. */
-export const WWW_AUTHENTICATE_META_KEY = "mcp/www_authenticate" as const;
+import {
+  authChallengeHttpResponse,
+  authChallengeToolResult,
+  createAuthChallenge,
+  prefersToolResultChallenge,
+  type AuthChallengeReason,
+} from "./challenge.js";
+import type { AuthPolicy } from "./policy.js";
 
 /** @internal Options for {@link createOAuthGate}. */
 export interface OAuthGateOptions {
@@ -21,50 +24,57 @@ export interface OAuthGateOptions {
   verifier: OAuthTokenVerifier;
   /** RFC 9728 metadata URL advertised in every challenge. */
   resourceMetadataUrl: string;
-  /** Provider `requiredScopes`, enforced on every protected request. */
+  /** Provider `requiredScopes`, enforced on every sign-in request. */
   baselineScopes: readonly string[];
-  /** Whether anonymous discovery and public tools are served. */
-  allowAnonymous: boolean;
-  /** Representation of `tools/call` failures. */
-  challenge: AuthChallengeFormat;
-  /** Policy for a registered tool, or `undefined` for an unknown name. */
-  toolPolicy: (name: string) => ToolAuthPolicy | undefined;
-  /** Whether a resource URI may be read anonymously. */
-  isPublicResource: (uri: string) => boolean;
+  /** Whether signed-out callers may connect, list, and use public items. */
+  mixedAuth: boolean;
+  /** Policy for a tool name, or `undefined` for an unknown tool. */
+  toolPolicy: (name: string) => AuthPolicy | undefined;
+  /** Policy for a resource URI as `resources/read` resolves it. */
+  resourcePolicy: (uri: string) => AuthPolicy | undefined;
+  /** Policy for a `completion/complete` `ref/resource` URI. */
+  completionResourcePolicy: (uri: string) => AuthPolicy | undefined;
+  /** Policy for a prompt name, or `undefined` for an unknown prompt. */
+  promptPolicy: (name: string) => AuthPolicy | undefined;
 }
 
-/** Reason an authenticated operation was refused. */
-type RefusalReason = "missing_token" | "invalid_token" | "insufficient_scope";
-
-/** Methods an anonymous caller may issue on a mixed-auth server. */
-const ANONYMOUS_METHODS = new Set([
+/**
+ * Methods a signed-out caller may issue on a `mixedAuth` server regardless of
+ * any item's `auth`: discovery (`initialize` on 2025-era protocols,
+ * `server/discover` on 2026-07-28), `ping`, the list methods, and the
+ * 2025-era `logging/setLevel`, which reads no data. Refusing any of these
+ * would make hosts demand sign-in at connection time. Every method not
+ * listed here and not tied to an item requires sign-in.
+ */
+const SIGNED_OUT_METHODS = new Set([
   "initialize",
+  "server/discover",
   "ping",
   "tools/list",
   "resources/list",
   "resources/templates/list",
   "prompts/list",
+  "logging/setLevel",
 ]);
 
-const CHATGPT_USER_AGENT = /chatgpt|openai/i;
-
-interface ParsedOperation {
+interface ParsedMessage {
   method: string;
   id: string | number | undefined;
   params: Record<string, unknown> | undefined;
 }
 
 interface Requirement {
+  /** Whether the request needs a verified token. */
   required: boolean;
+  /** Every scope the token must carry when `required`. */
   scopes: readonly string[];
-  message: string | undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function parseOperation(body: unknown): ParsedOperation | undefined {
+function parseMessage(body: unknown): ParsedMessage | undefined {
   if (!isRecord(body) || typeof body["method"] !== "string") return undefined;
   const id = body["id"];
   const params = body["params"];
@@ -75,37 +85,29 @@ function parseOperation(body: unknown): ParsedOperation | undefined {
   };
 }
 
-function isModernEnvelope(operation: ParsedOperation): boolean {
-  const meta = operation.params?.["_meta"];
+function isModernEnvelope(message: ParsedMessage): boolean {
+  const meta = message.params?.["_meta"];
   return isRecord(meta) && meta[PROTOCOL_VERSION_META_KEY] !== undefined;
 }
 
-function defaultMessage(
-  reason: RefusalReason,
-  scopes: readonly string[]
-): string {
-  if (reason === "missing_token") {
-    return "Authentication is required for this request.";
-  }
-  if (reason === "invalid_token") {
-    return "The access token is invalid or expired.";
-  }
-  return scopes.length > 0
-    ? `Additional permissions are required: ${scopes.join(" ")}.`
-    : "Additional permissions are required.";
+function stringParam(
+  params: Record<string, unknown> | undefined,
+  key: string
+): string | undefined {
+  const value = params?.[key];
+  return typeof value === "string" ? value : undefined;
 }
 
 /**
  * Build the bearer gate that fronts the MCP endpoint.
  *
- * Verifies any supplied token first (an invalid or expired token is always
- * refused), then decides from the JSON-RPC method and the tool policy
- * whether the operation may proceed anonymously. Protected operations need a
- * token whose scopes cover the provider baseline plus the tool's `oauth2`
+ * A token that is sent is always verified first; an invalid or expired one is
+ * refused with `401` on every request. Then the JSON-RPC method and the
+ * targeted item's policy decide whether the request needs sign-in, and which
  * scopes. Verified identity is stashed on the request bag for the mount.
  *
- * Without `allowAnonymous`, every request is protected with the baseline
- * scopes, and tool-level `oauth2` scopes still add to that requirement.
+ * Without `mixedAuth`, every request needs a token with the provider's
+ * `requiredScopes`, plus the scopes of the item it targets.
  *
  * @internal
  */
@@ -114,111 +116,146 @@ export function createOAuthGate(options: OAuthGateOptions): FetchMiddleware {
     verifier,
     resourceMetadataUrl,
     baselineScopes,
-    allowAnonymous,
-    challenge,
+    mixedAuth,
     toolPolicy,
-    isPublicResource,
+    resourcePolicy,
+    completionResourcePolicy,
+    promptPolicy,
   } = options;
 
-  const requirementFor = (
-    operation: ParsedOperation | undefined
-  ): Requirement => {
-    const baseline: Requirement = {
-      required: true,
-      scopes: baselineScopes,
-      message: undefined,
-    };
-    if (operation === undefined) {
-      // Notifications, malformed bodies, and non-JSON-RPC requests: the SDK
-      // answers these itself. Anonymous servers let them through.
-      return { ...baseline, required: !allowAnonymous };
-    }
-    if (operation.method === "tools/call") {
-      const name = operation.params?.["name"];
-      const policy = typeof name === "string" ? toolPolicy(name) : undefined;
-      if (policy === undefined) return baseline;
-      if (!allowAnonymous) {
-        return {
-          required: true,
-          scopes: policy.scopes,
-          message: policy.message,
-        };
+  /**
+   * Policies of the items a message targets, or `undefined` when its method
+   * is not tied to items. A missing entry is an unknown item.
+   */
+  const itemPolicies = (
+    message: ParsedMessage
+  ): (AuthPolicy | undefined)[] | undefined => {
+    const { params } = message;
+    switch (message.method) {
+      case "tools/call": {
+        const name = stringParam(params, "name");
+        return [name === undefined ? undefined : toolPolicy(name)];
       }
-      return {
-        required: policy.access === "protected",
-        scopes: policy.scopes,
-        message: policy.message,
-      };
-    }
-    if (!allowAnonymous) return baseline;
-    if (ANONYMOUS_METHODS.has(operation.method)) {
-      return { ...baseline, required: false };
-    }
-    if (operation.method === "resources/read") {
-      const uri = operation.params?.["uri"];
-      if (typeof uri === "string" && isPublicResource(uri)) {
-        return { ...baseline, required: false };
+      case "prompts/get": {
+        const name = stringParam(params, "name");
+        return [name === undefined ? undefined : promptPolicy(name)];
       }
+      case "resources/read":
+      case "resources/subscribe":
+      case "resources/unsubscribe": {
+        const uri = stringParam(params, "uri");
+        return [uri === undefined ? undefined : resourcePolicy(uri)];
+      }
+      case "completion/complete": {
+        // Completers never see identity, so completing an item's arguments
+        // follows that item's `auth`.
+        const ref = params?.["ref"];
+        if (!isRecord(ref)) return [undefined];
+        if (ref["type"] === "ref/prompt") {
+          const name = stringParam(ref, "name");
+          return [name === undefined ? undefined : promptPolicy(name)];
+        }
+        if (ref["type"] === "ref/resource") {
+          const uri = stringParam(ref, "uri");
+          return [
+            uri === undefined ? undefined : completionResourcePolicy(uri),
+          ];
+        }
+        return [undefined];
+      }
+      case "subscriptions/listen": {
+        // List-changed notifications reveal nothing the open list methods do
+        // not; resource subscriptions follow each resource's `auth`.
+        const filter = params?.["notifications"];
+        const uris = isRecord(filter)
+          ? filter["resourceSubscriptions"]
+          : undefined;
+        if (uris === undefined) return [];
+        if (!Array.isArray(uris)) return [undefined];
+        return uris.map((uri) =>
+          typeof uri === "string" ? resourcePolicy(uri) : undefined
+        );
+      }
+      default:
+        return undefined;
     }
-    if (
-      operation.id === undefined &&
-      operation.method.startsWith("notifications/")
+  };
+
+  const requirementFor = (message: ParsedMessage | undefined): Requirement => {
+    const scopes = new Set<string>();
+    let required = !mixedAuth;
+    const policies = message === undefined ? undefined : itemPolicies(message);
+
+    if (policies !== undefined) {
+      for (const policy of policies) {
+        if (policy === undefined) {
+          required = true;
+        } else if (!mixedAuth || policy.access === "sign-in") {
+          required = true;
+          for (const scope of policy.scopes) scopes.add(scope);
+        }
+      }
+    } else if (
+      message !== undefined &&
+      !SIGNED_OUT_METHODS.has(message.method) &&
+      !(message.id === undefined && message.method.startsWith("notifications/"))
     ) {
-      return { ...baseline, required: false };
+      // Unknown methods default to sign-in. Non-JSON-RPC bodies (`message`
+      // undefined) and notifications are answered by the SDK without
+      // running any callback.
+      required = true;
     }
-    return baseline;
+
+    if (!required) return { required: false, scopes: [] };
+    for (const scope of baselineScopes) scopes.add(scope);
+    return { required: true, scopes: [...scopes] };
+  };
+
+  const requirementForBody = (body: unknown): Requirement => {
+    if (!Array.isArray(body)) return requirementFor(parseMessage(body));
+    // 2025-era JSON-RPC batches: the strictest element decides.
+    const scopes = new Set<string>();
+    let required = false;
+    for (const element of body) {
+      const requirement = requirementFor(parseMessage(element));
+      if (!requirement.required) continue;
+      required = true;
+      for (const scope of requirement.scopes) scopes.add(scope);
+    }
+    return { required, scopes: [...scopes] };
   };
 
   const refuse = (
     request: Request,
-    operation: ParsedOperation | undefined,
-    reason: RefusalReason,
-    scopes: readonly string[],
-    message: string | undefined,
-    cause?: OAuthError
+    message: ParsedMessage | undefined,
+    reason: AuthChallengeReason,
+    requirement: Requirement,
+    details: { missingScopes?: readonly string[]; description?: string } = {}
   ): Response => {
-    const code =
-      reason === "insufficient_scope"
-        ? OAuthErrorCode.InsufficientScope
-        : OAuthErrorCode.InvalidToken;
-    const text =
-      message ??
-      (reason === "invalid_token" && cause !== undefined
-        ? cause.message
-        : defaultMessage(reason, scopes));
-    const http = bearerAuthChallengeResponse(new OAuthError(code, text), {
-      requiredScopes: [...scopes],
+    const challenge = createAuthChallenge({
+      reason,
+      // A bad token on a public or optional item still hints the baseline,
+      // so the client's refresh or re-authorization asks for it.
+      scopes: requirement.required ? requirement.scopes : baselineScopes,
       resourceMetadataUrl,
+      ...details,
     });
-
     if (
-      operation === undefined ||
-      operation.method !== "tools/call" ||
-      operation.id === undefined ||
-      !useToolResultChallenge(request)
+      message === undefined ||
+      message.method !== "tools/call" ||
+      message.id === undefined ||
+      !prefersToolResultChallenge(request)
     ) {
-      return http;
+      return authChallengeHttpResponse(challenge);
     }
-
-    const header = http.headers.get("WWW-Authenticate");
     return Response.json({
       jsonrpc: "2.0",
-      id: operation.id,
+      id: message.id,
       result: {
-        ...(isModernEnvelope(operation) && { resultType: "complete" }),
-        content: [{ type: "text", text }],
-        isError: true,
-        _meta: {
-          [WWW_AUTHENTICATE_META_KEY]: header === null ? [] : [header],
-        },
+        ...(isModernEnvelope(message) && { resultType: "complete" }),
+        ...authChallengeToolResult(challenge),
       },
     });
-  };
-
-  const useToolResultChallenge = (request: Request): boolean => {
-    if (challenge === "tool-result") return true;
-    if (challenge === "http") return false;
-    return CHATGPT_USER_AGENT.test(request.headers.get("user-agent") ?? "");
   };
 
   return async (request, next) => {
@@ -231,8 +268,9 @@ export function createOAuthGate(options: OAuthGateOptions): FetchMiddleware {
         // Leave the SDK to report the malformed body.
       }
     }
-    const operation = parseOperation(body);
-    const requirement = requirementFor(operation);
+    // Batches always get HTTP challenges.
+    const message = Array.isArray(body) ? undefined : parseMessage(body);
+    const requirement = requirementForBody(body);
 
     let authInfo: AuthInfo | undefined;
     const authorization = request.headers.get("authorization");
@@ -240,42 +278,36 @@ export function createOAuthGate(options: OAuthGateOptions): FetchMiddleware {
       try {
         authInfo = await verifyBearerToken(authorization, { verifier });
       } catch (error) {
-        if (!(error instanceof OAuthError)) {
+        if (
+          !(error instanceof OAuthError) ||
+          (error.code !== OAuthErrorCode.InvalidToken &&
+            error.code !== OAuthErrorCode.InsufficientScope)
+        ) {
+          // Verifier outages are server errors, not sign-in challenges.
           return bearerAuthChallengeResponse(error, { resourceMetadataUrl });
         }
-        if (
-          error.code === OAuthErrorCode.InvalidToken &&
-          authorization === null
-        ) {
-          return refuse(
-            request,
-            operation,
-            "missing_token",
-            requirement.scopes,
-            requirement.message
-          );
+        if (error.code === OAuthErrorCode.InsufficientScope) {
+          return refuse(request, message, "insufficient_scope", requirement, {
+            description: error.message,
+          });
         }
-        return refuse(
-          request,
-          operation,
-          "invalid_token",
-          requirement.scopes,
-          requirement.message,
-          error
-        );
+        return authorization === null
+          ? refuse(request, message, "missing_token", requirement)
+          : refuse(request, message, "invalid_token", requirement, {
+              description: error.message,
+            });
       }
     }
 
     if (requirement.required && authInfo !== undefined) {
       const granted = new Set(authInfo.scopes);
-      if (!requirement.scopes.every((scope) => granted.has(scope))) {
-        return refuse(
-          request,
-          operation,
-          "insufficient_scope",
-          requirement.scopes,
-          requirement.message
-        );
+      const missingScopes = requirement.scopes.filter(
+        (scope) => !granted.has(scope)
+      );
+      if (missingScopes.length > 0) {
+        return refuse(request, message, "insufficient_scope", requirement, {
+          missingScopes,
+        });
       }
     }
 

@@ -244,22 +244,69 @@ type RequestContextBase<TEnv extends Env> = Omit<Context<TEnv>, "req"> & {
 };
 
 /**
+ * Who may use a tool, resource, resource template, or prompt on an OAuth
+ * server. Declared as the definition's `auth` field.
+ *
+ * - `"public"`: anyone may use it, signed in or not.
+ * - `"optional"`: anyone may use it; `ctx.auth` is set when the caller is
+ *   signed in.
+ * - `{ scopes }`: sign-in required with every listed scope plus the
+ *   provider's `requiredScopes`.
+ * - `{ scopes, optional: true }`: anyone may use it. The scopes are only
+ *   advertised; the callback checks `ctx.auth.scopes` itself.
+ *
+ * Omitting `auth` means sign-in with the provider's `requiredScopes`.
+ * `"public"` and `"optional"` require `mixedAuth: true` on the server.
+ */
+export type ToolAuth =
+  | "public"
+  | "optional"
+  | { scopes: readonly string[]; optional?: false }
+  | { scopes: readonly string[]; optional: true };
+
+/**
  * How verified OAuth identity reaches a callback's `ctx.auth`.
  *
  * - `false`: no OAuth provider is configured; `auth` is never present.
- * - `true`: every request is authenticated before callbacks run; `auth` is
- *   always present.
- * - `"optional"`: the server allows anonymous callers (`allowAnonymous`), so
- *   `auth` is present only when the request carried a verified token.
+ * - `true`: the item requires sign-in, so `auth` is always present.
+ * - `"optional"`: the item admits signed-out callers (`auth: "public"` or
+ *   `"optional"`), so `auth` is present only when the request carried a
+ *   verified token.
  */
 export type OAuthMode = boolean | "optional";
+
+/** A `ToolAuth` value that requires sign-in. */
+type SignInAuth = {
+  readonly scopes: readonly string[];
+  readonly optional?: false;
+};
+
+/**
+ * The {@link OAuthMode} of one item's callback, read from its literal `auth`
+ * value. Anything that might admit signed-out callers, including a widened
+ * {@link ToolAuth}, yields an optional `ctx.auth`.
+ *
+ * @internal
+ */
+export type ItemOAuthMode<TUser, TAuth> = [TUser] extends [never]
+  ? false
+  : [TAuth] extends [SignInAuth | undefined]
+    ? true
+    : "optional";
+
+/**
+ * The `auth` value of a definition type, or `undefined` when it has none.
+ *
+ * @internal
+ */
+export type DefinitionAuth<T> = "auth" extends keyof T ? T["auth"] : undefined;
 
 /**
  * Per-request callback context, authenticated when OAuth is configured.
  *
  * The `HasOAuth` parameter is an {@link OAuthMode}: `true` guarantees
- * `auth`, `"optional"` makes it nullable for mixed-auth servers, and `false`
- * removes it.
+ * `auth`, `"optional"` makes it nullable for items that admit signed-out
+ * callers, and `false` removes it.
  */
 export type RequestContext<
   TUser = never,

@@ -143,8 +143,8 @@ server.tool({ name: "request-info" }, async (_input, ctx) => {
 Client metadata is self-reported and must not be used for authorization.
 `ctx.auth` is available only when the server has an OAuth provider; use its
 verified provider user for access control. On a server with
-`allowAnonymous: true`, declare each tool's `securitySchemes` to mark it
-public, protected, or optionally authenticated; see
+`mixedAuth: true`, a tool's `auth` field marks it `"public"`, `"optional"`, or
+sign-in with extra `scopes`; see
 [Mixed Authentication](/v2/typescript/server/authentication/mixed-auth).
 
 ## Notify tool-list listeners

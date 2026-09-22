@@ -28,7 +28,7 @@ import {
   oauthWorkOSProvider,
   type WorkOSOAuthUser,
 } from "../src/oauth/workos.js";
-import type { OAuthAuth } from "../src/index.js";
+import type { OAuthAuth, ToolAuth } from "../src/index.js";
 import type {
   OAuthMetadata,
   OAuthTokenVerifier,
@@ -41,6 +41,7 @@ interface TestUser {
 }
 
 declare const provider: OAuthProvider<TestUser>;
+declare const widenedAuth: ToolAuth;
 
 function verifyStructuralProviderTyping(
   tokenVerifier: OAuthTokenVerifier,
@@ -252,40 +253,129 @@ function verifyOAuthCallbackTyping(): void {
 
 void verifyOAuthCallbackTyping;
 
-// Type-level only: mixed-auth servers expose an optional `ctx.auth`.
-function verifyMixedAuthCallbackTyping(): void {
+// Type-level only: `ctx.auth` is narrowed per item from its literal `auth`.
+function verifyItemAuthTyping(): void {
   const mixed = new MCPServer({
     name: "mixed",
     version: "1.0.0",
     oauth: provider,
-    allowAnonymous: true,
-    authChallenge: "auto",
+    mixedAuth: true,
+  });
+
+  mixed.tool({ name: "browse_catalog", auth: "public" }, (_params, ctx) => {
+    const maybeAuth: OAuthAuth<TestUser> | undefined = ctx.auth;
+    const id: string | undefined = ctx.auth?.user.id;
+    // @ts-expect-error ctx.auth may be missing on a public tool
+    void ctx.auth.user.id;
+    void [maybeAuth, id];
+    return { content: [] };
+  });
+  mixed.tool({ name: "recommend", auth: "optional" }, (_params, ctx) => {
+    // @ts-expect-error ctx.auth may be missing on an optional tool
+    void ctx.auth.user.id;
+    return { content: [] };
   });
   mixed.tool(
     {
-      name: "browse",
-      securitySchemes: [{ type: "noauth" }],
-      authErrorMessage: "Sign in first.",
+      name: "recommend_scoped",
+      auth: { scopes: ["orders:read"], optional: true },
     },
     (_params, ctx) => {
-      const maybeAuth: OAuthAuth<TestUser> | undefined = ctx.auth;
-      const id: string | undefined = ctx.auth?.user.id;
-      // @ts-expect-error auth is optional when anonymous callers are allowed
-      const required: string = ctx.auth.user.id;
-      void [maybeAuth, id, required];
+      const scoped: boolean = ctx.auth?.scopes.includes("orders:read") ?? false;
+      // @ts-expect-error optional scopes never guarantee ctx.auth
+      void ctx.auth.scopes;
+      void scoped;
       return { content: [] };
     }
   );
-  mixed.resource({ name: "profile", uri: "user://profile" }, (_uri, ctx) => {
-    const id: string | undefined = ctx.auth?.user.id;
-    return { contents: [{ uri: "user://profile", text: id ?? "anonymous" }] };
+  mixed.tool({ name: "order_history" }, (_params, ctx) => {
+    const id: string = ctx.auth.user.id;
+    return { content: [{ type: "text", text: id }] };
   });
-  mixed.prompt({ name: "greet" }, (_params, ctx) => {
-    const id: string | undefined = ctx.auth?.user.id;
+  mixed.tool(
+    { name: "create_checkout", auth: { scopes: ["checkout"] } },
+    (_params, ctx) => {
+      const id: string = ctx.auth.user.id;
+      return { content: [{ type: "text", text: id }] };
+    }
+  );
+  mixed.tool(
+    { name: "explicit", auth: { scopes: ["checkout"], optional: false } },
+    (_params, ctx) => {
+      const id: string = ctx.auth.user.id;
+      return { content: [{ type: "text", text: id }] };
+    }
+  );
+
+  // A widened declaration might admit signed-out callers, so ctx.auth stays
+  // optional rather than claiming an identity the gate may not guarantee.
+  mixed.tool({ name: "widened", auth: widenedAuth }, (_params, ctx) => {
+    // @ts-expect-error a widened ToolAuth may be public
+    void ctx.auth.user.id;
+    return { content: [] };
+  });
+  const toggled = { scopes: ["a"], optional: Math.random() > 0.5 };
+  mixed.tool({ name: "toggled", auth: toggled }, (_params, ctx) => {
+    // @ts-expect-error optional: boolean may be true
+    void ctx.auth.user.id;
+    return { content: [] };
+  });
+
+  mixed.resource(
+    { name: "catalog", uri: "shop://catalog", auth: "public" },
+    (_uri, ctx) => {
+      // @ts-expect-error ctx.auth may be missing on a public resource
+      void ctx.auth.user.id;
+      return { contents: [{ uri: "shop://catalog", text: "" }] };
+    }
+  );
+  mixed.resource({ name: "profile", uri: "shop://me" }, (_uri, ctx) => {
+    const id: string = ctx.auth.user.id;
+    return { contents: [{ uri: "shop://me", text: id }] };
+  });
+  mixed.resourceTemplate(
+    { name: "product", uriTemplate: "shop://products/{id}", auth: "public" },
+    (_uri, params, ctx) => {
+      const productId: string | string[] = params.id;
+      // @ts-expect-error ctx.auth may be missing on a public template
+      void ctx.auth.user.id;
+      void productId;
+      return { contents: [] };
+    }
+  );
+  mixed.resourceTemplate(
+    { name: "order", uriTemplate: "shop://orders/{id}" },
+    (_uri, params, ctx) => {
+      const orderId: string | string[] = params.id;
+      const id: string = ctx.auth.user.id;
+      void [orderId, id];
+      return { contents: [] };
+    }
+  );
+  mixed.resourceTemplate(
+    {
+      name: "invoice",
+      uriTemplate: "shop://invoices/{id}",
+      auth: { scopes: ["billing"] },
+    },
+    (_uri, _params, ctx) => {
+      const id: string = ctx.auth.user.id;
+      void id;
+      return { contents: [] };
+    }
+  );
+  mixed.prompt({ name: "gift_ideas", auth: "optional" }, (_params, ctx) => {
+    // @ts-expect-error ctx.auth may be missing on an optional prompt
+    void ctx.auth.user.id;
+    const text = ctx.auth
+      ? `Suggest gifts for ${ctx.auth.user.id}.`
+      : "Suggest popular gifts.";
+    return { messages: [{ role: "user", content: { type: "text", text } }] };
+  });
+  mixed.prompt({ name: "upsell" }, (_params, ctx) => {
+    const id: string = ctx.auth.user.id;
     return {
-      messages: [
-        { role: "user", content: { type: "text", text: id ?? "anonymous" } },
-      ],
+      messages: [{ role: "user", content: { type: "text", text: id } }],
     };
   });
 
@@ -293,23 +383,40 @@ function verifyMixedAuthCallbackTyping(): void {
     name: "strict",
     version: "1.0.0",
     oauth: provider,
-    allowAnonymous: false,
+    mixedAuth: false,
   });
   strict.tool({ name: "whoami" }, (_params, ctx) => {
     const id: string = ctx.auth.user.id;
     return { content: [{ type: "text", text: id }] };
   });
 
+  const noOAuth = new MCPServer({
+    name: "plain",
+    version: "1",
+    mixedAuth: false,
+  });
+  noOAuth.tool({ name: "anything" }, (_params, ctx) => {
+    // @ts-expect-error auth is unavailable without an OAuth provider
+    void ctx.auth.user;
+    return { content: [] };
+  });
+
   const invalid = new MCPServer({
     name: "x",
     version: "1",
-    // @ts-expect-error allowAnonymous requires an OAuth provider
-    allowAnonymous: true,
+    // @ts-expect-error mixedAuth requires an OAuth provider
+    mixedAuth: true,
   });
   void invalid;
+
+  mixed.tool(
+    // @ts-expect-error auth accepts "public", "optional", or { scopes }
+    { name: "typo", auth: "anonymous" },
+    () => ({ content: [] })
+  );
 }
 
-void verifyMixedAuthCallbackTyping;
+void verifyItemAuthTyping;
 
 it("throws when authenticated callbacks lack mapped AuthInfo", () => {
   expect(() =>

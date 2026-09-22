@@ -1,20 +1,22 @@
 # Mixed OAuth
 
 This self-contained local demo proves the complete mixed-auth lifecycle with a
-normal `MCPServer` configured with `oauth` **and** `allowAnonymous: true`:
+normal `MCPServer` configured with `oauth` **and** `mixedAuth: true`:
 
-- `initialize`, `tools/list`, `public_ping`, and `welcome` work anonymously.
+- `initialize`, `tools/list`, `public_ping`, and `welcome` work signed out.
 - RFC 9728 protected-resource metadata advertises OAuth and the
   `demo:protected` scope.
-- `protected_profile` declares `securitySchemes: [{ type: "oauth2", scopes:
-  ["demo:protected"] }]`. Without a token the server answers a real `401` with
-  a `WWW-Authenticate` challenge containing `resource_metadata` and `scope`.
-  A ChatGPT user agent receives the equivalent `isError` tool result carrying
-  `_meta["mcp/www_authenticate"]` instead.
-- `welcome` declares both `noauth` and `oauth2`, so it runs anonymously and
-  personalizes its reply once the client signs in with the `profile` scope.
-- `tools/list` advertises every tool's `securitySchemes` (top level and
-  `_meta`) so hosts can show which tools need sign-in before calling them.
+- `protected_profile` omits `auth`, so it requires sign-in with the
+  provider's `requiredScopes` (`demo:protected`). Without a token the server
+  answers a real `401` with a `WWW-Authenticate` challenge containing
+  `resource_metadata` and `scope`. A ChatGPT user agent receives the
+  equivalent `isError` tool result carrying `_meta["mcp/www_authenticate"]`
+  instead.
+- `welcome` declares `auth: { optional: true, scopes: ["profile"] }`, so it
+  runs for everyone and personalizes its reply when the token carries
+  `profile`.
+- `tools/list` advertises the `securitySchemes` generated from each tool's
+  `auth` (top level and `_meta`) so ChatGPT knows which tools need sign-in.
 - Better Auth owns dynamic client registration, PKCE, anonymous sign-in,
   consent, token issuance, refresh, and JWKS.
 - After authorization, the client retries `protected_profile` with the bearer
@@ -59,15 +61,17 @@ It opens `http://localhost:4173/inspector` and connects to the demo server.
 ## How the gate works
 
 `MCPServer({ oauth })` alone protects the complete MCP endpoint: every request
-needs a bearer token. Adding `allowAnonymous: true` moves the decision to each
-tool's `securitySchemes`:
+needs a bearer token. Adding `mixedAuth: true` lets anyone connect and list,
+and moves the decision to each tool's `auth`:
 
-| Declaration                                        | Behavior                                                  |
-| -------------------------------------------------- | --------------------------------------------------------- |
-| omitted                                            | Protected; requires the provider's `requiredScopes`       |
-| `[{ type: "noauth" }]`                             | Public; a supplied token is verified but not required     |
-| `[{ type: "oauth2", scopes }]`                     | Protected; requires `requiredScopes` plus `scopes`        |
-| `[{ type: "noauth" }, { type: "oauth2", scopes }]` | Public, with `ctx.auth` populated when a token is present |
+| `auth`                             | Behavior                                                    |
+| ---------------------------------- | ----------------------------------------------------------- |
+| omitted                            | Sign-in; requires the provider's `requiredScopes`           |
+| `"public"`                         | Anyone; a token that is sent is still verified              |
+| `"optional"`                       | Anyone; `ctx.auth` is set when the caller is signed in      |
+| `{ scopes }`                       | Sign-in; requires `requiredScopes` plus `scopes`            |
+| `{ scopes, optional: true }`       | Anyone; the scopes are advertised and the callback checks them |
 
-Resource reads and prompts stay protected. Invalid or expired tokens are always
+Resources, resource templates, and prompts take the same `auth` field and
+require sign-in when it is omitted. Invalid or expired tokens are always
 refused with `401`, even on public tools, so clients refresh promptly.

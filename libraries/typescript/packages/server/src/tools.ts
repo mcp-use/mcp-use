@@ -9,7 +9,7 @@ import type { Env } from "hono";
 
 import type { McpUiResourceCsp } from "@modelcontextprotocol/ext-apps";
 
-import type { OAuthMode, RequestContext } from "./context.js";
+import type { OAuthMode, RequestContext, ToolAuth } from "./context.js";
 import type { UiPermissions } from "./views/types.js";
 
 /**
@@ -49,31 +49,6 @@ export interface ToolViewConfig {
    */
   prefersBorder?: boolean;
 }
-
-/**
- * One authentication scheme a tool accepts, declared on
- * {@link ToolDefinition.securitySchemes}.
- *
- * `noauth` marks the tool callable without credentials. `oauth2` requires a
- * verified bearer token carrying every listed scope in addition to the
- * provider's `requiredScopes`. Declaring both on one tool makes
- * authentication optional: anonymous calls run, and a verified identity is
- * exposed on `ctx.auth` when the client supplies one.
- */
-export type ToolSecurityScheme =
-  | {
-      /** The tool runs without credentials. */
-      type: "noauth";
-    }
-  | {
-      /** The tool requires an OAuth 2.1 bearer token. */
-      type: "oauth2";
-      /**
-       * Scopes the token must carry, beyond the provider's `requiredScopes`.
-       * Advertised to clients and enforced before the callback runs.
-       */
-      scopes: string[];
-    };
 
 /** Declares a tool's identity, LLM-facing description, and schemas. First argument to {@link MCPServer.tool}. */
 export interface ToolDefinition {
@@ -126,34 +101,20 @@ export interface ToolDefinition {
    */
   visibility?: "model" | "app";
   /**
-   * Authentication the tool accepts, enforced before the callback runs and
-   * advertised on `tools/list` (top-level `securitySchemes` and
-   * `_meta.securitySchemes`).
+   * Who may call the tool on an OAuth server. See {@link ToolAuth}.
    *
-   * Requires an OAuth provider for `oauth2` entries and `allowAnonymous: true`
-   * for `noauth` entries. With `allowAnonymous`, a tool that omits this field
-   * is protected and inherits the provider's `requiredScopes`. At most one
-   * scheme of each type may appear. `oauth2` scopes combine with the
-   * provider's `requiredScopes`; the combined set must not be empty.
+   * Checked before the callback runs. On a `mixedAuth` server, and on any
+   * tool that declares `auth`, mcp-use also advertises the matching
+   * `securitySchemes` on `tools/list` for hosts such as ChatGPT. Omitted
+   * means sign-in with the provider's `requiredScopes`.
    *
    * @example
    * ```ts
-   * securitySchemes: [
-   *   { type: "noauth" },
-   *   { type: "oauth2", scopes: ["profile"] },
-   * ]
+   * auth: "public"
+   * auth: { scopes: ["checkout"] }
    * ```
    */
-  securitySchemes?: ToolSecurityScheme[];
-  /**
-   * Human-readable text returned when a call to this tool is refused for
-   * authentication reasons. It becomes the `error_description` of the
-   * `WWW-Authenticate` challenge and the text of the tool-result challenge
-   * used by hosts such as ChatGPT. Must be a single line.
-   *
-   * @defaultValue A generic message describing the failure reason.
-   */
-  authErrorMessage?: string;
+  auth?: ToolAuth;
   /**
    * Bind this tool to a view for MCP Apps rendering. Requires
    * {@link ToolDefinition.outputSchema} — the view reads the result's

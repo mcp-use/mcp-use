@@ -1,16 +1,16 @@
 ---
 title: "Mixed Authentication"
-description: "Serve public and protected tools from one OAuth-enabled MCP server."
+description: "Serve public, optional, and sign-in tools, resources, and prompts from one OAuth-enabled mcp-use TypeScript server that works in Claude and ChatGPT."
 icon: "door-open"
 ---
 
-Mixed authentication (also called lazy authentication) lets one MCP endpoint expose tools that work without an account next to tools that require one. Clients connect, list tools, and call public tools anonymously. The server challenges for credentials only when a protected tool is invoked, and the client signs the user in and retries.
+Mixed authentication lets one MCP server URL expose tools that anyone can use next to tools that need sign-in. Clients connect and list tools without signing in. The server asks for sign-in only when a signed-out user calls a tool that needs it, and the client signs the user in and retries.
 
-A shop is the typical case: browse the catalog without signing in, then authenticate to check out. The same server URL works in Claude and ChatGPT.
+A shop is the typical case: people browse the catalog without an account and sign in when they check out. The same server works in Claude and ChatGPT.
 
-## Enable anonymous access
+## Enable mixed authentication
 
-Keep the `oauth` provider on the server and add `allowAnonymous: true`. Each tool then declares what it accepts through `securitySchemes`.
+Keep the `oauth` provider on the server, add `mixedAuth: true`, and declare `auth` on each tool that does not need sign-in.
 
 ```typescript
 import { MCPServer } from "mcp-use";
@@ -24,56 +24,46 @@ const server = new MCPServer({
     subdomain: process.env.WORKOS_SUBDOMAIN!,
     requiredScopes: ["shop"],
   }),
-  allowAnonymous: true,
+  // Anyone can connect and list tools. Each tool's `auth` decides who can call it.
+  mixedAuth: true,
 });
 
-// Public: runs without a token.
+// Public: anyone can browse.
 server.tool(
   {
     name: "browse_catalog",
     description: "Browse the product catalog.",
-    securitySchemes: [{ type: "noauth" }],
+    auth: "public",
   },
   async () => ({
-    content: [{ type: "text", text: "Coffee, Tea" }],
+    content: [{ type: "text", text: "Coffee, Tea, Cocoa" }],
   }),
 );
 
-// Protected: the gate verifies the token and scopes before this runs.
+// Sign-in with an extra scope. Refused before the callback runs unless the
+// token carries "checkout" plus the provider's requiredScopes.
 server.tool(
   {
     name: "create_checkout",
     description: "Create a checkout for the selected products.",
     inputSchema: z.object({ productIds: z.array(z.string()).min(1) }),
-    securitySchemes: [{ type: "oauth2", scopes: ["checkout"] }],
-    authErrorMessage: "Sign in to complete your purchase.",
+    auth: { scopes: ["checkout"] },
   },
   async ({ productIds }, ctx) => ({
     content: [
-      { type: "text", text: await checkout(productIds, ctx.auth!) },
+      {
+        type: "text",
+        text: await createCheckout(productIds, ctx.auth.user.id),
+      },
     ],
   }),
 );
 
-// Optional: public behavior, richer when the caller is signed in.
+// Omitted: sign-in with the provider's requiredScopes.
 server.tool(
-  {
-    name: "welcome",
-    description: "Show a welcome message.",
-    securitySchemes: [
-      { type: "noauth" },
-      { type: "oauth2", scopes: ["profile"] },
-    ],
-  },
+  { name: "order_history", description: "List the signed-in user's orders." },
   async (_args, ctx) => ({
-    content: [
-      {
-        type: "text",
-        text: ctx.auth?.scopes.includes("profile")
-          ? "Welcome back!"
-          : "Welcome! Browse our catalog.",
-      },
-    ],
+    content: [{ type: "text", text: await ordersFor(ctx.auth.user.id) }],
   }),
 );
 
@@ -82,90 +72,312 @@ export default server;
 
 WorkOS is only the example. Every mcp-use OAuth provider supports mixed authentication.
 
-## Tool policies
+- `mixedAuth` requires an `oauth` provider. Setting it without one is a type error and throws a `TypeError` at construction. It is a constructor option, not a provider option.
+- `mixedAuth` does not make anything public. Tools, resources, and prompts without `auth` still require sign-in.
+- With `mixedAuth` off (the default), every request to the MCP endpoint needs a valid token.
+- Every tool stays in `tools/list` for every caller. A signed-out user must see a sign-in tool, or the model never calls it and sign-in never starts.
+- A server with `mixedAuth: true` and no public or optional items is valid. Anyone can connect and see what it offers, and every call needs sign-in. Directories and indexers can probe it before anyone signs in.
 
-With an OAuth provider and `allowAnonymous: true`, `securitySchemes` is the single source of truth. It decides what the gate enforces before the callback runs and what `tools/list` advertises.
+## Choose an `auth` value
 
-| Declaration                                        | Enforcement                                            | `ctx.auth`             |
-| -------------------------------------------------- | ------------------------------------------------------ | ---------------------- |
-| omitted                                            | Protected; the provider's `requiredScopes` are required | Present                |
-| `[{ type: "noauth" }]`                             | Anonymous calls run                                    | Present when supplied  |
-| `[{ type: "oauth2", scopes }]`                     | `requiredScopes` plus `scopes` are required            | Present                |
-| `[{ type: "noauth" }, { type: "oauth2", scopes }]` | Anonymous calls run                                    | Present when supplied  |
+Tools, resources, resource templates, and prompts all accept the same `auth` field. The provider's `requiredScopes` is the baseline for every sign-in check.
 
-Rules that follow from this table:
+| `auth` value                 | Who can use it                                                        | `ctx.auth`         |
+| ---------------------------- | --------------------------------------------------------------------- | ------------------ |
+| `"public"`                   | Anyone. A token, if sent, is still verified                           | possibly undefined |
+| `"optional"`                 | Anyone. The callback sees who is signed in                            | possibly undefined |
+| `{ scopes, optional: true }` | Anyone. The scopes are advertised, and the callback checks them       | possibly undefined |
+| `{ scopes }`                 | Signed-in callers whose token has every listed scope and the baseline | required           |
+| omitted                      | Signed-in callers whose token has the baseline                        | required           |
 
-- Tools that omit `securitySchemes` stay protected. Public access is always an explicit declaration.
-- The provider's `requiredScopes` is the baseline for every protected call. Tool scopes add to it, and every scope in the combined set is required.
-- For optional-auth tools, a valid token that lacks the `oauth2` scopes still gets the public path. The callback must check `ctx.auth.scopes` before doing anything privileged.
-- A supplied token is always verified, even on public tools. Invalid or expired tokens receive `401` so the client refreshes instead of silently running anonymously.
-- `initialize`, `ping`, and every list request are anonymous. `resources/read` and `prompts/get` require a token, except for view resources bound to a public or optional-auth tool.
+- A token that is sent is always verified, even on public items. An invalid or expired token gets `401` so the client refreshes it instead of silently getting the signed-out result.
+- `"public"`, `"optional"`, and `optional: true` require `mixedAuth: true`.
+- `{ scopes }` requires an OAuth provider. It also works without `mixedAuth`; see [Without `mixedAuth`](#without-mixedauth).
+- `{ scopes: [] }` means "the baseline only" and requires the provider to have `requiredScopes`.
 
-Declare at most one scheme of each type. Because `allowAnonymous` makes `ctx.auth` optional, TypeScript reports `ctx.auth.user` as a possible `undefined` access in every callback; use `ctx.auth?.user` or a guard, or `ctx.auth!` in a tool whose declaration guarantees a token.
+## Optional tools
 
-## How clients see the challenge
-
-The gate runs before the request reaches the MCP handler, so a refused call never produces a normal tool result. What the refusal looks like depends on the host:
-
-- **Claude and spec-conformant clients** react only to the HTTP status. A missing or invalid token gets `401 Unauthorized`; a valid token without the required scopes gets `403 Forbidden`. Both carry `WWW-Authenticate: Bearer` with `resource_metadata`, `scope` (the full combined scope set), and `error_description`. Claude shows a Connect card, runs OAuth, and retries the same call.
-- **ChatGPT** does not start OAuth from a `401` on a tool call. It expects HTTP `200` with an `isError` tool result whose `_meta["mcp/www_authenticate"]` carries the same challenge, together with the `securitySchemes` metadata on `tools/list`.
-
-`authChallenge` on the server selects the representation:
-
-| Value           | Behavior                                                                 |
-| --------------- | ------------------------------------------------------------------------ |
-| `"auto"`        | Default. `"tool-result"` when the `User-Agent` contains `chatgpt` or `openai`, otherwise `"http"` |
-| `"http"`        | Always `401` / `403` with `WWW-Authenticate`                              |
-| `"tool-result"` | Always `200` with the `isError` result and `_meta["mcp/www_authenticate"]` |
-
-Only the representation changes. Token verification, scope enforcement, and the response to every request other than `tools/call` are identical. Set `authChallenge` explicitly when a proxy rewrites user agents or when you build for a host that is neither Claude nor ChatGPT.
-
-`authErrorMessage` customizes the text of both representations. The SDK keeps ownership of the status code, the challenge header, and the `isError` flag.
+An optional tool runs for everyone and branches on `ctx.auth`.
 
 ```typescript
 server.tool(
   {
-    name: "create_checkout",
-    securitySchemes: [{ type: "oauth2", scopes: ["checkout"] }],
-    authErrorMessage: "Sign in to complete your purchase.",
+    name: "recommend_products",
+    description: "Suggest products. Personalized when the user is signed in.",
+    auth: "optional",
   },
-  handler,
+  async (_args, ctx) => {
+    if (!ctx.auth) {
+      return {
+        content: [
+          { type: "text", text: `Bestsellers: ${await bestsellers()}` },
+        ],
+      };
+    }
+    const history = await orderHistory(ctx.auth.user.id);
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Picked for you: ${await recommendFrom(history)}`,
+        },
+      ],
+    };
+  },
 );
 ```
 
+| Request                  | Result                                                                    |
+| ------------------------ | ------------------------------------------------------------------------- |
+| No token                 | The callback runs with no `ctx.auth` and returns bestsellers              |
+| Valid token              | The callback runs with `ctx.auth` set and returns personalized picks      |
+| Expired or invalid token | Refused with `401` (or the ChatGPT error result) before the callback runs |
+
+### Optional tools with scopes
+
+`{ optional: true, scopes }` advertises scopes that unlock more, but never refuses a caller. The gate does not check the scopes, even for a signed-in token that lacks them, so the callback checks them itself.
+
+```typescript
+server.tool(
+  {
+    name: "recommend_products",
+    auth: { optional: true, scopes: ["orders:read"] },
+  },
+  async (_args, ctx) => {
+    // Check the scope, not just ctx.auth: a signed-in token may lack orders:read.
+    if (ctx.auth?.scopes.includes("orders:read")) {
+      return personalized(ctx.auth.user.id);
+    }
+    return bestsellersResult();
+  },
+);
+```
+
+A signed-in user without the scope gets the same result as a signed-out user. That is common: the user signed in earlier for a tool that needed fewer scopes, or declined a scope on the consent screen.
+
 <Note>
-  Ordinary callback errors, such as a product that is out of stock, are still ordinary tool results and never trigger OAuth. Only the gate produces an authentication challenge.
+  An optional tool cannot bring up a sign-in prompt. It can mention signing in
+  in its text, but the prompt only appears when the user calls a sign-in tool,
+  or signs in or reconnects from the host.
 </Note>
 
-## Advertised metadata
+## `ctx.auth` types
 
-Every tool on an `allowAnonymous` server carries its effective schemes on `tools/list`, both as a top-level `securitySchemes` field and under `_meta.securitySchemes`. Tools without a declaration advertise `[{ type: "oauth2", scopes: <requiredScopes> }]`, so hosts can show which tools need sign-in before calling them. Scopes in the advertised `oauth2` entry are the combined set the gate will demand.
+`server.tool()`, `server.resource()`, `server.resourceTemplate()`, and `server.prompt()` read the literal `auth` value. Sign-in items get a required `ctx.auth`, and public and optional items get one that is possibly `undefined`.
 
-ChatGPT ignores an `oauth2` scheme with an empty scope list. Registration fails when a tool's combined scope set is empty, so either give the provider `requiredScopes` or list scopes on the tool.
+```typescript
+server.tool({ name: "browse_catalog", auth: "public" }, (_args, ctx) => {
+  const id: string | undefined = ctx.auth?.user.id;
+  return { content: [] };
+});
+
+server.tool({ name: "order_history" }, (_args, ctx) => {
+  const id: string = ctx.auth.user.id; // signed-out calls never reach here
+  return { content: [] };
+});
+```
+
+When `auth` comes from a variable typed as `ToolAuth`, or `optional` is a `boolean`, the value could admit signed-out callers, so `ctx.auth` is typed as possibly `undefined`. Write the value inline, or give the variable a literal type, to get a required `ctx.auth`.
+
+## Resources, resource templates, and prompts
+
+Resources, resource templates, and prompts take the same `auth` field with the same default: omitted means sign-in.
+
+```typescript
+// Public: the catalog can be read before sign-in.
+server.resource(
+  { name: "catalog", uri: "shop://catalog", auth: "public" },
+  async () => ({
+    contents: [{ uri: "shop://catalog", text: await catalogJson() }],
+  }),
+);
+
+// Public template: applies to every URI it matches.
+server.resourceTemplate(
+  { name: "product", uriTemplate: "shop://products/{id}", auth: "public" },
+  async (uri, { id }) => ({
+    contents: [{ uri: uri.href, text: await productJson(String(id)) }],
+  }),
+);
+
+// Omitted: sign-in required, so ctx.auth is required.
+server.resource({ name: "profile", uri: "shop://me" }, async (_uri, ctx) => ({
+  contents: [
+    {
+      uri: "shop://me",
+      text: JSON.stringify(await profileFor(ctx.auth.user.id)),
+    },
+  ],
+}));
+
+// Optional prompt: personalized when signed in.
+server.prompt(
+  {
+    name: "gift_ideas",
+    description: "Suggest gifts from the catalog.",
+    auth: "optional",
+  },
+  async (_args, ctx) => ({
+    messages: [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: ctx.auth
+            ? `Suggest gifts based on ${ctx.auth.user.id}'s past orders.`
+            : "Suggest popular gifts from the catalog.",
+        },
+      },
+    ],
+  }),
+);
+```
+
+- `resources/read` and `prompts/get` follow the item's `auth`. The list methods are always open on a `mixedAuth` server.
+- `auth` on a resource template applies to every URI the template matches. When several templates match one URI, the strictest `auth` applies.
+- A tool's view resource follows its tool. The view of a public or optional tool can be read signed out, so its UI loads before sign-in. The view of a sign-in tool needs a token with the baseline scopes.
+- `resources/subscribe`, `subscriptions/listen`, and `completion/complete` follow the `auth` of the resource or prompt they reference.
+- Resources and prompts get no `securitySchemes` metadata. That field only exists for tools.
+- A refused resource read or prompt fetch always gets HTTP `401` or `403`.
 
 <Warning>
-  A user-supplied `_meta.securitySchemes` is descriptive only and is never enforced. With `allowAnonymous: true`, registering a tool that sets it without the top-level field throws, pointing at the migration. Setting both throws as well; the `_meta` entry is derived from the top-level field.
+  Whether Claude or ChatGPT shows a sign-in prompt when a resource read or
+  prompt fetch is refused is untested. Both hosts document sign-in prompts only
+  for tool calls.
 </Warning>
 
-## Without `allowAnonymous`
+## Signed-out requests
 
-`oauth` without `allowAnonymous` keeps the previous endpoint-wide behavior: every request needs a token with the provider's `requiredScopes`. Two additions apply there too:
+On a `mixedAuth` server, a signed-out caller can always send:
 
-- A tool may still declare `[{ type: "oauth2", scopes }]`. Those scopes are enforced in addition to the baseline and advertised on `tools/list`.
-- `noauth` is rejected at registration because the endpoint gate contradicts it.
+- `initialize` (2025-era protocols) and `server/discover` (2026-07-28);
+- `ping` and `logging/setLevel`, which read no data;
+- `tools/list`, `resources/list`, `resources/templates/list`, and `prompts/list`;
+- notifications;
+- an HTML browser request for the landing page at the MCP path.
+
+`tools/call`, `resources/read`, `prompts/get`, and the subscription and completion methods follow the targeted item's `auth`. Unknown tools, resources, and prompts require sign-in. Every other method, including `tasks/*` and the skills methods, requires sign-in.
+
+## How hosts see a refused call
+
+The server refuses a call before the callback runs. Claude and ChatGPT need the refusal in different forms, so mcp-use picks the format from the `User-Agent` header.
+
+- **Claude and other spec clients** start OAuth only from HTTP `401`, or from `403` with `error="insufficient_scope"`, with a `WWW-Authenticate` header. Claude treats a `200` with `isError: true` as an ordinary tool failure.
+- **ChatGPT** needs `securitySchemes` on each tool in `tools/list`, then a `200` tool result with `isError: true` and `_meta["mcp/www_authenticate"]`. It does not start OAuth from a `401` on a tool call.
+
+A refused `tools/call` from a `User-Agent` that matches `chatgpt` or `openai` (case-insensitive) gets the tool-result format. Every other `tools/call`, including one without a `User-Agent`, and every refusal of another method gets HTTP.
+
+No token:
+
+```http
+HTTP/1.1 401 Unauthorized
+WWW-Authenticate: Bearer error="invalid_token", error_description="Authentication is required for this request.", scope="shop checkout", resource_metadata="https://shop.example.com/.well-known/oauth-protected-resource/mcp"
+```
+
+Token missing a scope:
+
+```http
+HTTP/1.1 403 Forbidden
+WWW-Authenticate: Bearer error="insufficient_scope", error_description="Additional permissions are required: checkout.", scope="shop checkout", resource_metadata="https://shop.example.com/.well-known/oauth-protected-resource/mcp"
+```
+
+ChatGPT, no token:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 7,
+  "result": {
+    "content": [
+      { "type": "text", "text": "Authentication is required for this request." }
+    ],
+    "isError": true,
+    "_meta": {
+      "mcp/www_authenticate": [
+        "Bearer error=\"invalid_token\", error_description=\"Authentication is required for this request.\", scope=\"shop checkout\", resource_metadata=\"https://shop.example.com/.well-known/oauth-protected-resource/mcp\""
+      ]
+    }
+  }
+}
+```
+
+- `scope` is the full set the call needs, the baseline plus the item's scopes, not only the missing ones. Claude does not reliably remember scopes from an earlier step-up.
+- The messages are fixed defaults. An invalid or expired token carries the verifier's reason instead.
+- Ordinary callback errors, such as an out-of-stock product, are ordinary tool results and never start OAuth.
+
+## Tool list metadata
+
+mcp-use generates `securitySchemes` from `auth` for every tool on a `mixedAuth` server, and for every tool that declares `auth` on other servers. The schemes appear at the top level of each tool, where ChatGPT reads them, and are mirrored in `_meta.securitySchemes`.
+
+| `auth`                       | `securitySchemes`                                                     |
+| ---------------------------- | --------------------------------------------------------------------- |
+| `"public"`                   | `[{ type: "noauth" }]`                                                |
+| `"optional"`                 | `[{ type: "noauth" }, { type: "oauth2", scopes: baseline }]`          |
+| `{ scopes, optional: true }` | `[{ type: "noauth" }, { type: "oauth2", scopes: baseline + scopes }]` |
+| `{ scopes }`                 | `[{ type: "oauth2", scopes: baseline + scopes }]`                     |
+| omitted                      | `[{ type: "oauth2", scopes: baseline }]`                              |
+
+```json
+{
+  "name": "create_checkout",
+  "inputSchema": {
+    "type": "object",
+    "properties": { "productIds": { "type": "array" } }
+  },
+  "securitySchemes": [{ "type": "oauth2", "scopes": ["shop", "checkout"] }],
+  "_meta": {
+    "securitySchemes": [{ "type": "oauth2", "scopes": ["shop", "checkout"] }]
+  }
+}
+```
+
+ChatGPT ignores an `oauth2` scheme with an empty scope list. Give the provider `requiredScopes` so omitted and `"optional"` tools advertise a scope.
+
+### Hand-written `_meta.securitySchemes`
+
+Some servers already set `_meta.securitySchemes` on tools by hand for ChatGPT. mcp-use enforces nothing based on it.
+
+| Case                                                | Behavior                                                           |
+| --------------------------------------------------- | ------------------------------------------------------------------ |
+| Tool without `auth` on a server without `mixedAuth` | Passed through and copied to the top-level `securitySchemes` field |
+| Tool that declares `auth`                           | Throws at registration. The metadata is generated from `auth`      |
+| Tool without `auth` on a `mixedAuth` server         | Throws at registration. Declare `auth` instead                     |
+
+On a `mixedAuth` server, omitted `auth` means sign-in, so a hand-written `noauth` scheme would tell ChatGPT the opposite of what the server enforces.
+
+## Invalid configurations
+
+These throw a `TypeError` at construction or registration instead of failing at request time.
+
+| Configuration                                                           | Why it is rejected                                                                    |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `mixedAuth: true` without `oauth`                                       | Nothing to sign in with. Also a type error                                            |
+| `auth: "public"`, `"optional"`, or `optional: true` without `mixedAuth` | Every request needs a token, so the item could never be used signed out               |
+| `auth: { scopes }` without `oauth`                                      | No provider to verify the scopes                                                      |
+| `scopes: []` when the provider has no `requiredScopes`                  | ChatGPT ignores an `oauth2` scheme with empty scopes, so it would never offer sign-in |
+| `auth` and `_meta.securitySchemes` on one tool                          | The metadata is generated from `auth`; two sources can drift apart                    |
+| `_meta.securitySchemes` without `auth` on a `mixedAuth` server          | Omitted `auth` means sign-in, which a hand-written `noauth` would contradict          |
+| An `auth` value other than the forms above                              | Includes unknown fields such as `scope`                                               |
+
+## Without `mixedAuth`
+
+`oauth` without `mixedAuth` keeps endpoint-wide authentication: every request needs a token with the provider's `requiredScopes`.
+
+- `auth: { scopes }` still works on tools, resources, resource templates, and prompts. Those scopes are enforced on top of the baseline.
+- Tools that declare `auth` advertise their generated `securitySchemes`. Tools without it advertise nothing, unless they set `_meta.securitySchemes` by hand.
+- `"public"`, `"optional"`, and `optional: true` throw at registration.
 
 ## Verify locally
 
-The [mixed-oauth example](https://github.com/mcp-use/mcp-use/tree/canary/libraries/typescript/packages/server/examples/auth/mixed-oauth) runs a Better Auth authorization server and this policy on `http://localhost:3000/mcp`. From its directory:
+The [mixed-oauth example](https://github.com/mcp-use/mcp-use/tree/canary/libraries/typescript/packages/server/examples/auth/mixed-oauth) runs a Better Auth authorization server and a `mixedAuth` server on `http://localhost:3000/mcp`. `public_ping` is public, `welcome` is optional with the `profile` scope, and `protected_profile` omits `auth`. From the example's directory:
 
 ```bash
 pnpm dev
 ```
 
-The commands below show the three responses without a client:
+Call the public tool without a token. The response is `200` with the tool result:
 
 ```bash
-# Public tool: 200 without a token
 curl -s http://localhost:3000/mcp \
   -H 'content-type: application/json' \
   -H 'accept: application/json, text/event-stream' \
@@ -174,8 +386,9 @@ curl -s http://localhost:3000/mcp \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"public_ping","arguments":{},"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientInfo":{"name":"curl","version":"0"},"io.modelcontextprotocol/clientCapabilities":{}}}}'
 ```
 
+Call the sign-in tool without a token. The response is `401` with `WWW-Authenticate`:
+
 ```bash
-# Protected tool: 401 with WWW-Authenticate
 curl -si http://localhost:3000/mcp \
   -H 'content-type: application/json' \
   -H 'accept: application/json, text/event-stream' \
@@ -184,8 +397,9 @@ curl -si http://localhost:3000/mcp \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"protected_profile","arguments":{},"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientInfo":{"name":"curl","version":"0"},"io.modelcontextprotocol/clientCapabilities":{}}}}'
 ```
 
+Send the same call as ChatGPT. The response is `200` with an `isError` result and `_meta["mcp/www_authenticate"]`:
+
 ```bash
-# Same call as ChatGPT: 200 with an isError result and _meta["mcp/www_authenticate"]
 curl -s http://localhost:3000/mcp \
   -H 'user-agent: ChatGPT/1.0' \
   -H 'content-type: application/json' \
@@ -195,7 +409,7 @@ curl -s http://localhost:3000/mcp \
   -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"protected_profile","arguments":{},"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientInfo":{"name":"curl","version":"0"},"io.modelcontextprotocol/clientCapabilities":{}}}}'
 ```
 
-To test the full sign-in and retry loop in a host, expose the server over a public HTTPS tunnel and add it as a custom connector. Ask for the public tool first, then the protected one.
+To test the full sign-in and retry loop in a host, expose the server over a public HTTPS tunnel and add it as a custom connector. Ask for the public tool first, then the sign-in one.
 
 ## Next steps
 

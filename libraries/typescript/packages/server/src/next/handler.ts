@@ -1,8 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import type { Env } from "hono";
-
 import type { MCPServer } from "../server.js";
 import type { ViewManifestEntry, ViewsManifest } from "../views/types.js";
 
@@ -87,8 +85,8 @@ function parseBuildManifest(raw: string, manifestPath: string): ViewsManifest {
  * export const { GET, POST, DELETE, OPTIONS } = createNextHandler(server);
  * ```
  */
-export function createNextHandler<TUser, TAnonymous extends boolean = false>(
-  server: MCPServer<TUser, Env, TAnonymous>
+export function createNextHandler<TUser>(
+  server: MCPServer<TUser>
 ): NextMcpHandlers {
   const projectRoot = process.cwd();
   const manifestPath = join(

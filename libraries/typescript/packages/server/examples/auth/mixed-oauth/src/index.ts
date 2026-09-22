@@ -18,8 +18,8 @@ const protectedScope = "demo:protected";
 const provider = oauthBetterAuthProvider({
   authURL,
   resource,
-  // Baseline scope every protected call must carry. Tool-level `oauth2`
-  // scopes add to it.
+  // Baseline scope every sign-in call must carry. A tool's `auth.scopes`
+  // add to it.
   requiredScopes: [protectedScope],
   scopesSupported: [...demoScopes],
   resourceName: "mcp-use mixed OAuth demo",
@@ -27,28 +27,28 @@ const provider = oauthBetterAuthProvider({
 const auth = createDemoAuth({ origin: origin.origin, resource: resource.href });
 
 // `oauth` publishes RFC 9728 discovery metadata and verifies bearer tokens.
-// `allowAnonymous` keeps initialize, tools/list, and `noauth` tools open, so
-// a client can connect and browse before it ever signs in. Every tool's
-// `securitySchemes` is both the enforced policy and the metadata clients see.
+// `mixedAuth` lets anyone connect and list tools before signing in. It does
+// not make anything public: each tool's `auth` decides who can call it, and
+// mcp-use turns it into the `securitySchemes` ChatGPT reads on tools/list.
 const server = new MCPServer({
   name: "mixed-oauth-demo",
   version: "1.0.0",
   description:
     "A local mcp-use v2 server with public discovery and one OAuth-protected tool.",
   oauth: provider,
-  allowAnonymous: true,
+  mixedAuth: true,
   cors: {
     origin: [origin.origin, "http://localhost:4173", "http://127.0.0.1:4173"],
     credentials: true,
   },
 });
 
-// Public: runs without a token. A supplied token is still verified.
+// Public: runs without a token. A token that is sent is still verified.
 server.tool(
   {
     name: "public_ping",
     description: "Public tool that works before and after authentication.",
-    securitySchemes: [{ type: "noauth" }],
+    auth: "public",
   },
   async (_args, ctx) => ({
     content: [
@@ -62,37 +62,34 @@ server.tool(
   })
 );
 
-// Protected: without a token the server answers 401 + WWW-Authenticate (or a
-// ChatGPT-style tool-result challenge), the client signs in, and the retry
-// reaches this callback with `ctx.auth` populated.
+// Sign-in: omitting `auth` requires a token with the provider's
+// requiredScopes. Without one, the server answers 401 + WWW-Authenticate (or
+// a ChatGPT-style tool-result challenge), the client signs in, and the retry
+// reaches this callback with `ctx.auth` set.
 server.tool(
   {
     name: "protected_profile",
     description:
       "Protected tool that triggers OAuth and succeeds when the client retries with a bearer token.",
-    securitySchemes: [{ type: "oauth2", scopes: [protectedScope] }],
-    authErrorMessage: "Sign in to view your profile.",
   },
   async (_args, ctx) => ({
     content: [
       {
         type: "text",
-        text: `Authenticated profile unlocked for ${ctx.auth?.user.id}. Scopes: ${ctx.auth?.scopes.join(" ")}.`,
+        text: `Authenticated profile unlocked for ${ctx.auth.user.id}. Scopes: ${ctx.auth.scopes.join(" ")}.`,
       },
     ],
   })
 );
 
-// Optional: public behavior with an authenticated upgrade. The gate never
-// challenges this tool; the callback decides what a token unlocks.
+// Optional with scopes: runs for everyone and advertises `profile`. The gate
+// never refuses it, even for a token without `profile`, so the callback checks
+// the scope itself.
 server.tool(
   {
     name: "welcome",
     description: "Greets anonymous visitors and welcomes back signed-in users.",
-    securitySchemes: [
-      { type: "noauth" },
-      { type: "oauth2", scopes: ["profile"] },
-    ],
+    auth: { optional: true, scopes: ["profile"] },
   },
   async (_args, ctx) => ({
     content: [

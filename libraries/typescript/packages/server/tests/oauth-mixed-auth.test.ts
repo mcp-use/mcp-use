@@ -1,40 +1,44 @@
 /**
- * Mixed authentication: `allowAnonymous` plus per-tool `securitySchemes`.
+ * Mixed authentication: `mixedAuth` on the server plus `auth` on tools,
+ * resources, resource templates, and prompts.
  *
- * Exercises the HTTP gate over `server.fetch` with the stateless 2026-07-28
- * envelope: anonymous discovery, public/optional/protected tool policies,
- * scope step-up, both challenge representations, and the metadata emitted on
- * `tools/list`.
+ * Exercises the HTTP gate over `server.fetch`, mostly on the stateless
+ * 2026-07-28 envelope: signed-out discovery, every `auth` value, the
+ * generated `securitySchemes`, both challenge formats, and the configurations
+ * that must throw.
  */
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { MCPServer, type ToolSecurityScheme } from "../src/index.js";
+import { MCPServer, type ToolAuth } from "../src/index.js";
 import {
   OAuthError,
   OAuthErrorCode,
   oauthCustomProvider,
   type OAuthMetadata,
 } from "../src/oauth/index.js";
+import { viewResourceUri } from "../src/views/constants.js";
 
 const issuer = "https://issuer.example.test";
 const resource = "https://shop.example.test/mcp";
 const resourceMetadata =
   'resource_metadata="https://shop.example.test/.well-known/oauth-protected-resource/mcp"';
+const chatgpt = { "user-agent": "ChatGPT/1.0 (+https://openai.com/bot)" };
 
 interface TestUser {
   id: string;
 }
 
 /**
- * Token vocabulary: `scopes:a,b` grants those scopes; `invalid` and `expired`
- * fail verification; anything else grants the provider baseline only.
+ * Token vocabulary: `scopes:a,b` grants exactly those scopes; `user:<id>`
+ * grants the baseline as user `<id>`; `invalid` and `expired` fail
+ * verification; anything else grants the baseline. Users default to `user-1`.
  */
 function provider(requiredScopes: readonly string[] = ["shop"]) {
   return oauthCustomProvider<TestUser>({
     resource,
     requiredScopes,
-    scopesSupported: ["shop", "checkout", "profile"],
+    scopesSupported: ["shop", "checkout", "profile", "orders:read"],
     createTokenVerifier: (boundResource) => ({
       verifyAccessToken: async (token) => {
         if (token === "invalid") {
@@ -56,13 +60,23 @@ function provider(requiredScopes: readonly string[] = ["shop"]) {
       },
     }),
     oauthMetadata: { issuer } as OAuthMetadata,
-    mapAuthInfo: () => ({
-      user: { id: "user-1" },
-      payload: { sub: "user-1" },
+    mapAuthInfo: (authInfo) => ({
+      user: {
+        id: authInfo.token.startsWith("user:")
+          ? authInfo.token.slice("user:".length)
+          : "user-1",
+      },
+      payload: {},
       permissions: [],
     }),
   });
 }
+
+const ENVELOPE = {
+  "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+  "io.modelcontextprotocol/clientInfo": { name: "test", version: "0" },
+  "io.modelcontextprotocol/clientCapabilities": {},
+};
 
 function rpc(
   method: string,
@@ -73,29 +87,28 @@ function rpc(
     jsonrpc: "2.0",
     ...(id !== undefined && { id }),
     method,
-    params: {
-      ...params,
-      _meta: {
-        "io.modelcontextprotocol/protocolVersion": "2026-07-28",
-        "io.modelcontextprotocol/clientInfo": { name: "test", version: "0" },
-        "io.modelcontextprotocol/clientCapabilities": {},
-      },
-    },
+    params: { ...params, _meta: ENVELOPE },
   };
 }
 
 /**
  * POST a JSON-RPC body. The 2026-07-28 wire mirrors the method and subject
- * (tool name or resource URI) into `Mcp-*` headers; the SDK rejects requests
- * where they disagree.
+ * (tool or prompt name, or resource URI) into `Mcp-*` headers; the SDK
+ * rejects requests where they disagree. Legacy bodies carry no envelope and
+ * no `Mcp-*` headers.
  */
 function post(
-  body: Record<string, unknown>,
-  headers: Record<string, string> = {}
+  body: unknown,
+  headers: Record<string, string> = {},
+  options: { legacy?: boolean } = {}
 ): Request {
-  const method = body["method"];
-  const params = body["params"] as Record<string, unknown> | undefined;
-  const modern = typeof method === "string" && method !== "initialize";
+  const single =
+    typeof body === "object" && body !== null && !Array.isArray(body)
+      ? (body as Record<string, unknown>)
+      : undefined;
+  const method = single?.["method"];
+  const params = single?.["params"] as Record<string, unknown> | undefined;
+  const modern = options.legacy !== true && typeof method === "string";
   const name = params?.["name"];
   const uri = params?.["uri"];
   return new Request(resource, {
@@ -128,6 +141,17 @@ function call(
   return post(rpc("tools/call", { name, arguments: args }), headers);
 }
 
+function read(uri: string, headers: Record<string, string> = {}): Request {
+  return post(rpc("resources/read", { uri }), headers);
+}
+
+function getPrompt(
+  name: string,
+  headers: Record<string, string> = {}
+): Request {
+  return post(rpc("prompts/get", { name }), headers);
+}
+
 function challenge(response: Response): string {
   const value = response.headers.get("www-authenticate");
   expect(value).not.toBeNull();
@@ -141,123 +165,215 @@ async function resultText(response: Response): Promise<string> {
   return body.result.content[0]!.text;
 }
 
-function shopServer(
-  options: {
-    authChallenge?: "http" | "tool-result" | "auto";
-    requiredScopes?: readonly string[];
-  } = {}
-) {
+async function resourceText(response: Response): Promise<string> {
+  const body = (await response.json()) as {
+    result: { contents: Array<{ text: string }> };
+  };
+  return body.result.contents[0]!.text;
+}
+
+function who(auth: { user: TestUser; scopes: string[] } | undefined): string {
+  return auth === undefined ? "signed-out" : auth.user.id;
+}
+
+function shopServer(options: { requiredScopes?: readonly string[] } = {}) {
   const server = new MCPServer({
     name: "shop",
     version: "1.0.0",
     oauth: provider(options.requiredScopes),
-    allowAnonymous: true,
-    ...(options.authChallenge !== undefined && {
-      authChallenge: options.authChallenge,
-    }),
+    mixedAuth: true,
     logging: { enabled: false },
   });
 
   server.tool(
+    { name: "browse_catalog", description: "Public.", auth: "public" },
+    async (_args, ctx) => ({
+      content: [{ type: "text", text: `catalog:${who(ctx.auth)}` }],
+    })
+  );
+  server.tool(
+    { name: "recommend", description: "Optional.", auth: "optional" },
+    async (_args, ctx) => ({
+      content: [{ type: "text", text: `recommend:${who(ctx.auth)}` }],
+    })
+  );
+  server.tool(
     {
-      name: "browse_catalog",
-      description: "Public catalog.",
-      securitySchemes: [{ type: "noauth" }],
+      name: "recommend_scoped",
+      description: "Optional with scopes.",
+      auth: { optional: true, scopes: ["orders:read"] },
     },
     async (_args, ctx) => ({
       content: [
-        { type: "text", text: `catalog:${ctx.auth?.user.id ?? "anonymous"}` },
+        {
+          type: "text",
+          text: ctx.auth?.scopes.includes("orders:read")
+            ? "personalized"
+            : `bestsellers:${who(ctx.auth)}`,
+        },
       ],
     })
   );
-
   server.tool(
     {
       name: "create_checkout",
-      description: "Protected checkout.",
+      description: "Sign-in with an extra scope.",
       inputSchema: z.object({ productIds: z.array(z.string()) }),
-      securitySchemes: [{ type: "oauth2", scopes: ["checkout"] }],
-      authErrorMessage: "Sign in to complete your purchase.",
+      auth: { scopes: ["checkout"] },
     },
     async ({ productIds }, ctx) => ({
       content: [
         {
           type: "text",
-          text: `checkout:${ctx.auth?.user.id}:${productIds.join("+")}`,
+          text: `checkout:${ctx.auth.user.id}:${productIds.join("+")}`,
         },
       ],
     })
   );
-
   server.tool(
-    {
-      name: "welcome",
-      description: "Optional auth.",
-      securitySchemes: [
-        { type: "noauth" },
-        { type: "oauth2", scopes: ["profile"] },
-      ],
-    },
+    { name: "order_history", description: "Sign-in, baseline scopes." },
     async (_args, ctx) => ({
-      content: [
-        {
-          type: "text",
-          text: ctx.auth?.scopes.includes("profile")
-            ? "welcome back"
-            : "welcome stranger",
-        },
-      ],
+      content: [{ type: "text", text: `orders:${ctx.auth.user.id}` }],
     })
   );
 
-  server.tool(
-    { name: "account", description: "Inherits the provider policy." },
-    async (_args, ctx) => ({
-      content: [{ type: "text", text: `account:${ctx.auth?.user.id}` }],
+  server.resource(
+    { name: "catalog", uri: "shop://catalog", auth: "public" },
+    async (uri, ctx) => ({
+      contents: [{ uri: uri.href, text: `catalog:${who(ctx.auth)}` }],
     })
   );
-
-  server.resource({ name: "secret", uri: "shop://secret" }, async (uri) => ({
-    contents: [{ uri: uri.href, text: "secret" }],
+  server.resource({ name: "profile", uri: "shop://me" }, async (uri, ctx) => ({
+    contents: [{ uri: uri.href, text: `me:${ctx.auth.user.id}` }],
   }));
-  server.prompt({ name: "upsell" }, async () => ({
-    messages: [{ role: "user", content: { type: "text", text: "buy more" } }],
+  server.resourceTemplate(
+    {
+      name: "product",
+      uriTemplate: "shop://products/{id}",
+      auth: "public",
+      complete: { id: ["coffee", "tea"] },
+    },
+    async (uri, params) => ({
+      contents: [{ uri: uri.href, text: `product:${String(params.id)}` }],
+    })
+  );
+  server.resourceTemplate(
+    {
+      name: "invoice",
+      uriTemplate: "shop://invoices/{id}",
+      auth: { scopes: ["checkout"] },
+      complete: { id: ["1", "2"] },
+    },
+    async (uri, params, ctx) => ({
+      contents: [
+        {
+          uri: uri.href,
+          text: `invoice:${String(params.id)}:${ctx.auth.user.id}`,
+        },
+      ],
+    })
+  );
+
+  server.prompt(
+    { name: "gift_ideas", auth: "optional" },
+    async (_args, ctx) => ({
+      messages: [
+        {
+          role: "user",
+          content: { type: "text", text: `gifts:${who(ctx.auth)}` },
+        },
+      ],
+    })
+  );
+  server.prompt({ name: "upsell" }, async (_args, ctx) => ({
+    messages: [
+      {
+        role: "user",
+        content: { type: "text", text: `upsell:${ctx.auth.user.id}` },
+      },
+    ],
   }));
 
   return server;
 }
 
-describe("mixed auth: anonymous discovery", () => {
-  it("serves initialize and list requests without a token", async () => {
+describe("mixed auth: signed-out discovery", () => {
+  it("serves initialize, ping, server/discover, and every list method without a token", async () => {
     const handler = shopServer().fetch;
     const initialize = await handler(
-      post({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "initialize",
-        params: {
-          protocolVersion: "2025-11-25",
-          capabilities: {},
-          clientInfo: { name: "test", version: "0" },
+      post(
+        {
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: {
+            protocolVersion: "2025-11-25",
+            capabilities: {},
+            clientInfo: { name: "test", version: "0" },
+          },
         },
-      })
+        {},
+        { legacy: true }
+      )
     );
     expect(initialize.status).toBe(200);
+    // `ping` exists only on the 2025-era wire.
+    const ping = await handler(
+      post({ jsonrpc: "2.0", id: 2, method: "ping" }, {}, { legacy: true })
+    );
+    expect(ping.status).toBe(200);
 
-    for (const method of ["tools/list", "resources/list", "prompts/list"]) {
+    for (const method of [
+      "server/discover",
+      "tools/list",
+      "resources/list",
+      "resources/templates/list",
+      "prompts/list",
+    ]) {
       const response = await handler(post(rpc(method)));
       expect(response.status, method).toBe(200);
+      const body = (await response.json()) as { error?: unknown };
+      expect(body.error, method).toBeUndefined();
     }
   });
 
-  it("advertises securitySchemes on tools/list at the top level and in _meta", async () => {
+  it("requires sign-in for methods it does not know", async () => {
+    const response = await shopServer().fetch(post(rpc("tasks/list")));
+    expect(response.status).toBe(401);
+    expect(challenge(response)).toContain('scope="shop"');
+  });
+
+  it("serves a mixedAuth server that has no public or optional items without warning", async () => {
+    const warn = vi.spyOn(console, "warn");
+    try {
+      const server = new MCPServer({
+        name: "directory",
+        version: "1.0.0",
+        oauth: provider(),
+        mixedAuth: true,
+        logging: { enabled: false },
+      });
+      server.tool({ name: "private" }, async (_args, ctx) => ({
+        content: [{ type: "text", text: ctx.auth.user.id }],
+      }));
+      expect((await server.fetch(post(rpc("tools/list")))).status).toBe(200);
+      expect((await server.fetch(call("private"))).status).toBe(401);
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+});
+
+describe("mixed auth: tools/list metadata", () => {
+  it("generates securitySchemes from auth at the top level and in _meta", async () => {
     const response = await shopServer().fetch(post(rpc("tools/list")));
     const body = (await response.json()) as {
       result: {
         tools: Array<{
           name: string;
-          securitySchemes?: ToolSecurityScheme[];
-          _meta?: { securitySchemes?: ToolSecurityScheme[] };
+          securitySchemes?: unknown;
+          _meta?: { securitySchemes?: unknown };
         }>;
       };
     };
@@ -266,83 +382,120 @@ describe("mixed auth: anonymous discovery", () => {
     expect(byName.get("browse_catalog")?.securitySchemes).toEqual([
       { type: "noauth" },
     ]);
-    // Tool scopes union with the provider baseline in both the advertised
-    // metadata and the enforced requirement.
+    expect(byName.get("recommend")?.securitySchemes).toEqual([
+      { type: "noauth" },
+      { type: "oauth2", scopes: ["shop"] },
+    ]);
+    expect(byName.get("recommend_scoped")?.securitySchemes).toEqual([
+      { type: "noauth" },
+      { type: "oauth2", scopes: ["shop", "orders:read"] },
+    ]);
     expect(byName.get("create_checkout")?.securitySchemes).toEqual([
       { type: "oauth2", scopes: ["shop", "checkout"] },
     ]);
-    expect(byName.get("welcome")?.securitySchemes).toEqual([
-      { type: "noauth" },
-      { type: "oauth2", scopes: ["shop", "profile"] },
-    ]);
-    // Undeclared tools inherit the provider policy and say so.
-    expect(byName.get("account")?.securitySchemes).toEqual([
+    expect(byName.get("order_history")?.securitySchemes).toEqual([
       { type: "oauth2", scopes: ["shop"] },
     ]);
+    expect(body.result.tools).toHaveLength(5);
     for (const tool of body.result.tools) {
-      expect(tool._meta?.securitySchemes).toEqual(tool.securitySchemes);
+      expect(tool._meta?.securitySchemes, tool.name).toEqual(
+        tool.securitySchemes
+      );
     }
   });
 
-  it("keeps resources/read and prompts/get protected", async () => {
+  it("emits no auth metadata for resources or prompts", async () => {
     const handler = shopServer().fetch;
-    const read = await handler(
-      post(rpc("resources/read", { uri: "shop://secret" }))
-    );
-    expect(read.status).toBe(401);
-    expect(challenge(read)).toContain('error="invalid_token"');
-    expect(challenge(read)).toContain(resourceMetadata);
-
-    const prompt = await handler(post(rpc("prompts/get", { name: "upsell" })));
-    expect(prompt.status).toBe(401);
-
-    const authenticated = await handler(
-      post(rpc("resources/read", { uri: "shop://secret" }), bearer("ok"))
-    );
-    expect(authenticated.status).toBe(200);
+    for (const [method, key] of [
+      ["resources/list", "resources"],
+      ["resources/templates/list", "resourceTemplates"],
+      ["prompts/list", "prompts"],
+    ] as const) {
+      const body = (await (await handler(post(rpc(method)))).json()) as {
+        result: Record<string, Array<Record<string, unknown>>>;
+      };
+      for (const item of body.result[key]!) {
+        expect(item["securitySchemes"], method).toBeUndefined();
+        expect(
+          (item["_meta"] as Record<string, unknown> | undefined)?.[
+            "securitySchemes"
+          ],
+          method
+        ).toBeUndefined();
+      }
+    }
   });
 });
 
-describe("mixed auth: tool policies", () => {
-  it("runs public tools anonymously and exposes identity when a token is supplied", async () => {
+describe("mixed auth: tools", () => {
+  it("runs public tools signed out and sets ctx.auth when a token is sent", async () => {
     const handler = shopServer().fetch;
-    const anonymous = await handler(call("browse_catalog"));
-    expect(anonymous.status).toBe(200);
-    expect(await resultText(anonymous)).toBe("catalog:anonymous");
+    const signedOut = await handler(call("browse_catalog"));
+    expect(signedOut.status).toBe(200);
+    expect(await resultText(signedOut)).toBe("catalog:signed-out");
 
-    const authenticated = await handler(call("browse_catalog", bearer("ok")));
-    expect(authenticated.status).toBe(200);
-    expect(await resultText(authenticated)).toBe("catalog:user-1");
+    const signedIn = await handler(call("browse_catalog", bearer("user:ada")));
+    expect(await resultText(signedIn)).toBe("catalog:ada");
   });
 
-  it("challenges protected tools with 401 and the combined scope set", async () => {
+  it("runs optional tools for both paths", async () => {
+    const handler = shopServer().fetch;
+    expect(await resultText(await handler(call("recommend")))).toBe(
+      "recommend:signed-out"
+    );
+    expect(
+      await resultText(await handler(call("recommend", bearer("user:ada"))))
+    ).toBe("recommend:ada");
+  });
+
+  it("never refuses an optional tool for missing scopes", async () => {
+    const handler = shopServer().fetch;
+    expect(await resultText(await handler(call("recommend_scoped")))).toBe(
+      "bestsellers:signed-out"
+    );
+    // Signed in without orders:read: the handler runs and falls back.
+    const underScoped = await handler(
+      call("recommend_scoped", bearer("user:ada"))
+    );
+    expect(underScoped.status).toBe(200);
+    expect(await resultText(underScoped)).toBe("bestsellers:ada");
+    expect(
+      await resultText(
+        await handler(
+          call("recommend_scoped", bearer("scopes:shop,orders:read"))
+        )
+      )
+    ).toBe("personalized");
+  });
+
+  it("challenges sign-in tools with 401 and the full scope set", async () => {
     const response = await shopServer().fetch(
       call("create_checkout", {}, { productIds: ["a"] })
     );
     expect(response.status).toBe(401);
     const header = challenge(response);
     expect(header).toContain('error="invalid_token"');
+    expect(header).toContain(
+      'error_description="Authentication is required for this request."'
+    );
     expect(header).toContain('scope="shop checkout"');
     expect(header).toContain(resourceMetadata);
-    expect(header).toContain(
-      'error_description="Sign in to complete your purchase."'
-    );
   });
 
-  it("steps up with 403 insufficient_scope listing every required scope", async () => {
+  it("steps up with 403 insufficient_scope, naming the missing scopes", async () => {
     const response = await shopServer().fetch(
       call("create_checkout", bearer("scopes:shop"), { productIds: ["a"] })
     );
     expect(response.status).toBe(403);
     const header = challenge(response);
     expect(header).toContain('error="insufficient_scope"');
-    expect(header).toContain('scope="shop checkout"');
     expect(header).toContain(
-      'error_description="Sign in to complete your purchase."'
+      'error_description="Additional permissions are required: checkout."'
     );
+    expect(header).toContain('scope="shop checkout"');
   });
 
-  it("runs protected tools with a sufficiently scoped token", async () => {
+  it("runs sign-in tools with a sufficiently scoped token", async () => {
     const response = await shopServer().fetch(
       call("create_checkout", bearer("scopes:shop,checkout"), {
         productIds: ["a", "b"],
@@ -352,59 +505,71 @@ describe("mixed auth: tool policies", () => {
     expect(await resultText(response)).toBe("checkout:user-1:a+b");
   });
 
-  it("treats undeclared tools as protected with the provider baseline", async () => {
+  it("requires sign-in with the provider baseline when auth is omitted", async () => {
     const handler = shopServer().fetch;
-    const anonymous = await handler(call("account"));
-    expect(anonymous.status).toBe(401);
-    expect(challenge(anonymous)).toContain('scope="shop"');
-    expect(challenge(anonymous)).toContain(
-      'error_description="Authentication is required for this request."'
-    );
+    const signedOut = await handler(call("order_history"));
+    expect(signedOut.status).toBe(401);
+    expect(challenge(signedOut)).toContain('scope="shop"');
 
     const missingBaseline = await handler(
-      call("account", bearer("scopes:profile"))
+      call("order_history", bearer("scopes:profile"))
     );
     expect(missingBaseline.status).toBe(403);
-
-    const authenticated = await handler(call("account", bearer("ok")));
-    expect(await resultText(authenticated)).toBe("account:user-1");
-  });
-
-  it("lets optional-auth tools run anonymously and check scopes themselves", async () => {
-    const handler = shopServer().fetch;
-    expect(await resultText(await handler(call("welcome")))).toBe(
-      "welcome stranger"
+    expect(challenge(missingBaseline)).toContain(
+      'error_description="Additional permissions are required: shop."'
     );
-    // A valid token without the optional scope still gets the public path.
+
     expect(
-      await resultText(await handler(call("welcome", bearer("scopes:shop"))))
-    ).toBe("welcome stranger");
-    expect(
-      await resultText(
-        await handler(call("welcome", bearer("scopes:shop,profile")))
-      )
-    ).toBe("welcome back");
+      await resultText(await handler(call("order_history", bearer("ok"))))
+    ).toBe("orders:user-1");
   });
 
-  it("refuses invalid and expired tokens even on public tools", async () => {
+  it("refuses invalid and expired tokens on every request, public ones included", async () => {
     const handler = shopServer().fetch;
+    const requests = (token: string) => [
+      call("browse_catalog", bearer(token)),
+      call("recommend", bearer(token)),
+      post(rpc("tools/list"), bearer(token)),
+      read("shop://catalog", bearer(token)),
+      getPrompt("gift_ideas", bearer(token)),
+    ];
     for (const token of ["invalid", "expired"]) {
-      const response = await handler(call("browse_catalog", bearer(token)));
-      expect(response.status, token).toBe(401);
-      expect(challenge(response)).toContain('error="invalid_token"');
+      for (const request of requests(token)) {
+        const response = await handler(request);
+        expect(response.status, token).toBe(401);
+        const header = challenge(response);
+        expect(header).toContain('error="invalid_token"');
+        // A bad token on a public item still hints the baseline.
+        expect(header).toContain('scope="shop"');
+      }
     }
   });
 
   it("challenges calls to unknown tools", async () => {
     const response = await shopServer().fetch(call("missing"));
     expect(response.status).toBe(401);
+    expect(challenge(response)).toContain('scope="shop"');
+  });
+
+  it("keeps identity isolated across concurrent signed-in and signed-out calls", async () => {
+    const handler = shopServer().fetch;
+    const calls = Array.from({ length: 12 }, (_, index) =>
+      index % 3 === 0
+        ? { expected: "recommend:signed-out", request: call("recommend") }
+        : {
+            expected: `recommend:u${index}`,
+            request: call("recommend", bearer(`user:u${index}`)),
+          }
+    );
+    const texts = await Promise.all(
+      calls.map(async ({ request }) => resultText(await handler(request)))
+    );
+    expect(texts).toEqual(calls.map(({ expected }) => expected));
   });
 });
 
-describe("mixed auth: challenge representation", () => {
-  const chatgpt = { "user-agent": "ChatGPT/1.0 (+https://openai.com/bot)" };
-
-  it("returns a tool-result challenge to ChatGPT user agents by default", async () => {
+describe("mixed auth: challenge format", () => {
+  it("returns a tool-result challenge to ChatGPT user agents", async () => {
     const response = await shopServer().fetch(
       call("create_checkout", chatgpt, { productIds: ["a"] })
     );
@@ -423,7 +588,7 @@ describe("mixed auth: challenge representation", () => {
     expect(body.result.resultType).toBe("complete");
     expect(body.result.isError).toBe(true);
     expect(body.result.content[0]?.text).toBe(
-      "Sign in to complete your purchase."
+      "Authentication is required for this request."
     );
     const [header] = body.result._meta["mcp/www_authenticate"]!;
     expect(header).toContain("Bearer ");
@@ -437,9 +602,7 @@ describe("mixed auth: challenge representation", () => {
       call(
         "create_checkout",
         { ...chatgpt, ...bearer("scopes:shop") },
-        {
-          productIds: ["a"],
-        }
+        { productIds: ["a"] }
       )
     );
     expect(response.status).toBe(200);
@@ -451,175 +614,448 @@ describe("mixed auth: challenge representation", () => {
     );
   });
 
-  it("keeps HTTP challenges for other user agents and non-tool requests", async () => {
-    const handler = shopServer().fetch;
-    const claude = await handler(
-      call(
-        "create_checkout",
-        { "user-agent": "Claude-User/1.0" },
+  it("answers the in-band challenge on the 2025-era wire without resultType", async () => {
+    const response = await shopServer().fetch(
+      post(
         {
-          productIds: ["a"],
-        }
+          jsonrpc: "2.0",
+          id: "legacy-7",
+          method: "tools/call",
+          params: { name: "order_history", arguments: {} },
+        },
+        chatgpt,
+        { legacy: true }
       )
     );
-    expect(claude.status).toBe(401);
-
-    const prompt = await handler(
-      post(rpc("prompts/get", { name: "upsell" }), chatgpt)
-    );
-    expect(prompt.status).toBe(401);
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      id: string;
+      result: { resultType?: string; isError: boolean };
+    };
+    expect(body.id).toBe("legacy-7");
+    expect(body.result.isError).toBe(true);
+    expect(body.result.resultType).toBeUndefined();
   });
 
-  it("honors an explicit authChallenge override", async () => {
-    const http = await shopServer({ authChallenge: "http" }).fetch(
-      call("create_checkout", chatgpt, { productIds: ["a"] })
-    );
-    expect(http.status).toBe(401);
+  it("keeps HTTP challenges for other or missing user agents", async () => {
+    const handler = shopServer().fetch;
+    for (const headers of [{ "user-agent": "Claude-User/1.0" }, {}]) {
+      const response = await handler(
+        call("create_checkout", headers, { productIds: ["a"] })
+      );
+      expect(response.status).toBe(401);
+    }
+  });
 
-    const toolResult = await shopServer({ authChallenge: "tool-result" }).fetch(
-      call("create_checkout", {}, { productIds: ["a"] })
+  it("always refuses resources and prompts over HTTP, even for ChatGPT", async () => {
+    const handler = shopServer().fetch;
+    expect((await handler(read("shop://me", chatgpt))).status).toBe(401);
+    expect((await handler(getPrompt("upsell", chatgpt))).status).toBe(401);
+  });
+
+  it("refuses JSON-RPC batches over HTTP when any element needs sign-in", async () => {
+    const handler = shopServer().fetch;
+    const batch = [
+      {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: { name: "browse_catalog", arguments: {} },
+      },
+      {
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/call",
+        params: { name: "create_checkout", arguments: { productIds: ["a"] } },
+      },
+    ];
+    const signedOut = await handler(post(batch, chatgpt, { legacy: true }));
+    expect(signedOut.status).toBe(401);
+    expect(challenge(signedOut)).toContain('scope="shop checkout"');
+
+    const underScoped = await handler(
+      post(batch, bearer("scopes:shop"), { legacy: true })
     );
-    expect(toolResult.status).toBe(200);
-    expect(await resultText(toolResult)).toBe(
-      "Sign in to complete your purchase."
-    );
+    expect(underScoped.status).toBe(403);
   });
 });
 
-describe("mixed auth: configuration", () => {
-  function configured(
-    securitySchemes: unknown,
-    options: {
-      oauth?: boolean;
-      allowAnonymous?: boolean;
-      requiredScopes?: readonly string[];
-      _meta?: Record<string, unknown>;
-      authErrorMessage?: string;
-    } = {}
-  ) {
-    const server =
-      options.oauth === false
-        ? new MCPServer({ name: "plain", version: "1.0.0" })
-        : new MCPServer({
-            name: "auth",
-            version: "1.0.0",
-            oauth: provider(options.requiredScopes),
-            allowAnonymous: options.allowAnonymous ?? true,
-          });
-    server.tool(
-      {
-        name: "t",
-        ...(securitySchemes !== undefined && {
-          securitySchemes: securitySchemes as ToolSecurityScheme[],
-        }),
-        ...(options._meta !== undefined && { _meta: options._meta }),
-        ...(options.authErrorMessage !== undefined && {
-          authErrorMessage: options.authErrorMessage,
-        }),
-      },
-      async () => ({ content: [] })
+describe("mixed auth: resources and prompts", () => {
+  it("serves public resources signed out and protects sign-in resources", async () => {
+    const handler = shopServer().fetch;
+    const catalog = await handler(read("shop://catalog"));
+    expect(catalog.status).toBe(200);
+    expect(await resourceText(catalog)).toBe("catalog:signed-out");
+
+    const me = await handler(read("shop://me"));
+    expect(me.status).toBe(401);
+    expect(challenge(me)).toContain('scope="shop"');
+    expect(challenge(me)).toContain(resourceMetadata);
+
+    const signedIn = await handler(read("shop://me", bearer("user:ada")));
+    expect(await resourceText(signedIn)).toBe("me:ada");
+  });
+
+  it("applies a template's auth to every URI it matches", async () => {
+    const handler = shopServer().fetch;
+    for (const id of ["1", "coffee"]) {
+      const product = await handler(read(`shop://products/${id}`));
+      expect(product.status).toBe(200);
+      expect(await resourceText(product)).toBe(`product:${id}`);
+    }
+
+    const invoice = await handler(read("shop://invoices/9"));
+    expect(invoice.status).toBe(401);
+    expect(challenge(invoice)).toContain('scope="shop checkout"');
+    expect(
+      (await handler(read("shop://invoices/9", bearer("scopes:shop")))).status
+    ).toBe(403);
+    expect(
+      await resourceText(
+        await handler(read("shop://invoices/9", bearer("scopes:shop,checkout")))
+      )
+    ).toBe("invoice:9:user-1");
+  });
+
+  it("requires sign-in for unknown resource URIs", async () => {
+    const response = await shopServer().fetch(read("shop://nowhere"));
+    expect(response.status).toBe(401);
+  });
+
+  it("applies the strictest auth when templates overlap", async () => {
+    const server = new MCPServer({
+      name: "overlap",
+      version: "1.0.0",
+      oauth: provider(),
+      mixedAuth: true,
+      logging: { enabled: false },
+    });
+    server.resourceTemplate(
+      { name: "any", uriTemplate: "docs://{+path}", auth: "public" },
+      async (uri) => ({ contents: [{ uri: uri.href, text: "any" }] })
     );
-    return server;
+    server.resourceTemplate(
+      { name: "private", uriTemplate: "docs://private/{id}" },
+      async (uri) => ({ contents: [{ uri: uri.href, text: "private" }] })
+    );
+    expect((await server.fetch(read("docs://public/readme"))).status).toBe(200);
+    expect((await server.fetch(read("docs://private/1"))).status).toBe(401);
+  });
+
+  it("follows each prompt's auth on prompts/get", async () => {
+    const handler = shopServer().fetch;
+    const gifts = await handler(getPrompt("gift_ideas"));
+    expect(gifts.status).toBe(200);
+    const body = (await gifts.json()) as {
+      result: { messages: Array<{ content: { text: string } }> };
+    };
+    expect(body.result.messages[0]?.content.text).toBe("gifts:signed-out");
+
+    expect((await handler(getPrompt("upsell"))).status).toBe(401);
+    expect((await handler(getPrompt("missing"))).status).toBe(401);
+    expect((await handler(getPrompt("upsell", bearer("ok")))).status).toBe(200);
+  });
+
+  it("follows the referenced item's auth on completion/complete", async () => {
+    const handler = shopServer().fetch;
+    const complete = (ref: Record<string, unknown>) =>
+      handler(
+        post(
+          rpc("completion/complete", {
+            ref,
+            argument: { name: "id", value: "" },
+          })
+        )
+      );
+    expect(
+      (await complete({ type: "ref/prompt", name: "gift_ideas" })).status
+    ).toBe(200);
+    expect(
+      (await complete({ type: "ref/prompt", name: "upsell" })).status
+    ).toBe(401);
+    const product = await complete({
+      type: "ref/resource",
+      uri: "shop://products/{id}",
+    });
+    expect(product.status).toBe(200);
+    const body = (await product.json()) as {
+      result: { completion: { values: string[] } };
+    };
+    expect(body.result.completion.values).toEqual(["coffee", "tea"]);
+    expect(
+      (await complete({ type: "ref/resource", uri: "shop://invoices/{id}" }))
+        .status
+    ).toBe(401);
+  });
+
+  it("follows each resource's auth on legacy resources/subscribe", async () => {
+    const handler = shopServer().fetch;
+    const subscribe = (uri: string) =>
+      handler(
+        post(
+          {
+            jsonrpc: "2.0",
+            id: 1,
+            method: "resources/subscribe",
+            params: { uri },
+          },
+          {},
+          { legacy: true }
+        )
+      );
+    expect((await subscribe("shop://me")).status).toBe(401);
+    expect((await subscribe("shop://catalog")).status).not.toBe(401);
+  });
+
+  it("follows each subscribed resource's auth on subscriptions/listen", async () => {
+    const handler = shopServer().fetch;
+    const refused = await handler(
+      post(
+        rpc("subscriptions/listen", {
+          notifications: {
+            toolsListChanged: true,
+            resourceSubscriptions: ["shop://catalog", "shop://me"],
+          },
+        })
+      )
+    );
+    expect(refused.status).toBe(401);
+
+    const listChanged = await handler(
+      post(
+        rpc("subscriptions/listen", {
+          notifications: {
+            toolsListChanged: true,
+            resourceSubscriptions: ["shop://catalog"],
+          },
+        })
+      )
+    );
+    expect(listChanged.status).toBe(200);
+    await listChanged.body?.cancel();
+  });
+
+  it("lets a view load signed out when its tool is public or optional", async () => {
+    const server = new MCPServer({
+      name: "views",
+      version: "1.0.0",
+      oauth: provider(),
+      mixedAuth: true,
+      logging: { enabled: false },
+    });
+    const outputSchema = z.object({ ok: z.boolean() });
+    for (const [name, auth] of [
+      ["public-card", "public"],
+      ["optional-card", "optional"],
+      ["private-card", undefined],
+    ] as const) {
+      server.tool(
+        {
+          name,
+          outputSchema,
+          view: { name },
+          ...(auth !== undefined && { auth }),
+        },
+        async () => ({ structuredContent: { ok: true }, content: [] })
+      );
+    }
+    server.__primeViews({
+      "public-card": { kind: "external", entry: "assets/a.js", css: [] },
+      "optional-card": { kind: "external", entry: "assets/b.js", css: [] },
+      "private-card": { kind: "external", entry: "assets/c.js", css: [] },
+    });
+    server.__primeSkills(undefined);
+
+    expect(
+      (await server.fetch(read(viewResourceUri("public-card")))).status
+    ).toBe(200);
+    expect(
+      (await server.fetch(read(viewResourceUri("optional-card")))).status
+    ).toBe(200);
+    expect(
+      (await server.fetch(read(viewResourceUri("private-card")))).status
+    ).toBe(401);
+  });
+});
+
+describe("mixed auth: invalid configurations", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function oauthServer(
+    options: { mixedAuth?: boolean; requiredScopes?: readonly string[] } = {}
+  ) {
+    return new MCPServer({
+      name: "auth",
+      version: "1.0.0",
+      oauth: provider(options.requiredScopes),
+      mixedAuth: options.mixedAuth ?? true,
+    });
   }
 
-  it("rejects allowAnonymous and authChallenge without an OAuth provider", () => {
+  function registerTool(server: MCPServer<TestUser>, auth: unknown) {
+    server.tool(
+      { name: "t", ...(auth !== undefined && { auth: auth as ToolAuth }) },
+      async () => ({ content: [] })
+    );
+  }
+
+  it("rejects mixedAuth without an OAuth provider or as a non-boolean", () => {
     expect(
       () =>
         new MCPServer({
           name: "plain",
           version: "1.0.0",
-          ...({ allowAnonymous: true } as object),
+          ...({ mixedAuth: true } as object),
         })
-    ).toThrow(/allowAnonymous requires an OAuth provider/);
-    expect(
-      () =>
-        new MCPServer({
-          name: "plain",
-          version: "1.0.0",
-          ...({ authChallenge: "http" } as object),
-        })
-    ).toThrow(/authChallenge requires an OAuth provider/);
+    ).toThrow(/mixedAuth requires an OAuth provider/);
     expect(
       () =>
         new MCPServer({
           name: "auth",
           version: "1.0.0",
           oauth: provider(),
-          ...({ authChallenge: "sometimes" } as object),
+          ...({ mixedAuth: "yes" } as object),
         })
-    ).toThrow(/authChallenge must be/);
+    ).toThrow(/mixedAuth must be a boolean/);
   });
 
-  it("rejects malformed scheme declarations", () => {
-    expect(() => configured([])).toThrow(/non-empty array/);
-    expect(() => configured([{ type: "basic" }])).toThrow(
-      /unsupported security scheme type "basic"/
-    );
-    expect(() => configured([{ type: "noauth" }, { type: "noauth" }])).toThrow(
-      /more than one noauth/
-    );
-    expect(() =>
-      configured([
-        { type: "oauth2", scopes: ["a"] },
-        { type: "oauth2", scopes: ["b"] },
-      ])
-    ).toThrow(/more than one oauth2/);
-    expect(() => configured([{ type: "oauth2", scopes: [""] }])).toThrow(
-      /non-empty strings/
-    );
-    expect(() => configured([{ type: "oauth2" }])).toThrow(/scopes must be/);
+  it('rejects "public" and "optional" without mixedAuth', () => {
+    for (const auth of [
+      "public",
+      "optional",
+      { scopes: ["a"], optional: true },
+    ]) {
+      expect(() =>
+        registerTool(oauthServer({ mixedAuth: false }), auth)
+      ).toThrow(/requires mixedAuth: true on the server/);
+      const plain = new MCPServer({ name: "plain", version: "1.0.0" });
+      expect(() =>
+        plain.tool({ name: "t", auth: auth as ToolAuth }, async () => ({
+          content: [],
+        }))
+      ).toThrow(/requires an OAuth provider with mixedAuth: true/);
+    }
   });
 
-  it("rejects declarations that contradict the server configuration", () => {
+  it("rejects scopes without an OAuth provider", () => {
+    const plain = new MCPServer({ name: "plain", version: "1.0.0" });
     expect(() =>
-      configured([{ type: "oauth2", scopes: ["a"] }], { oauth: false })
-    ).toThrow(/no OAuth provider/);
-    expect(() =>
-      configured([{ type: "noauth" }], { allowAnonymous: false })
-    ).toThrow(/set allowAnonymous: true/);
-    expect(() =>
-      configured([{ type: "oauth2", scopes: [] }], { requiredScopes: [] })
-    ).toThrow(/declare at least one scope/);
-    // An empty tool scope list is fine when the provider supplies a baseline.
-    expect(() => configured([{ type: "oauth2", scopes: [] }])).not.toThrow();
-    // noauth on a server without OAuth is descriptive and allowed.
-    expect(() =>
-      configured([{ type: "noauth" }], { oauth: false })
-    ).not.toThrow();
+      plain.tool({ name: "t", auth: { scopes: ["a"] } }, async () => ({
+        content: [],
+      }))
+    ).toThrow(/auth.scopes requires an OAuth provider/);
   });
 
-  it("guards the legacy _meta.securitySchemes field", () => {
+  it("rejects empty scopes only when the provider has no requiredScopes", () => {
     expect(() =>
-      configured([{ type: "noauth" }], {
-        _meta: { securitySchemes: [{ type: "noauth" }] },
+      registerTool(oauthServer({ requiredScopes: [] }), { scopes: [] })
+    ).toThrow(/ChatGPT ignores an oauth2 scheme without scopes/);
+    expect(() =>
+      registerTool(oauthServer({ requiredScopes: [] }), {
+        scopes: [],
+        optional: true,
       })
-    ).toThrow(/both securitySchemes and _meta.securitySchemes/);
-    expect(() =>
-      configured(undefined, {
-        _meta: { securitySchemes: [{ type: "noauth" }] },
-      })
-    ).toThrow(/descriptive only/);
-    // Without allowAnonymous the legacy field passes through untouched.
-    expect(() =>
-      configured(undefined, {
-        allowAnonymous: false,
-        _meta: { securitySchemes: [{ type: "noauth" }] },
-      })
-    ).not.toThrow();
+    ).toThrow(/auth.scopes is empty/);
+    expect(() => registerTool(oauthServer(), { scopes: [] })).not.toThrow();
   });
 
-  it("requires a single-line authErrorMessage", () => {
+  it("rejects malformed auth values", () => {
+    const cases: Array<[unknown, RegExp]> = [
+      ["anonymous", /auth must be "public", "optional", or \{ scopes/],
+      [null, /auth must be/],
+      [["a"], /auth must be/],
+      [{ scopes: "a" }, /auth.scopes must be an array of non-empty strings/],
+      [{ scopes: [" "] }, /non-empty strings/],
+      [{ scope: ["a"] }, /unknown auth field "scope"/],
+      [{ scopes: ["a"], optional: "yes" }, /auth.optional must be a boolean/],
+    ];
+    for (const [auth, message] of cases) {
+      expect(() => registerTool(oauthServer(), auth), String(auth)).toThrow(
+        message
+      );
+    }
+  });
+
+  it("names the item kind in every error", () => {
+    const server = oauthServer({ mixedAuth: false });
     expect(() =>
-      configured([{ type: "noauth" }], { authErrorMessage: "line\nbreak" })
-    ).toThrow(/single-line/);
+      server.resource(
+        { name: "r", uri: "x://r", auth: "public" },
+        async () => ({ contents: [] })
+      )
+    ).toThrow(/^Resource "r": /);
     expect(() =>
-      configured([{ type: "noauth" }], { authErrorMessage: "   " })
-    ).toThrow(/single-line/);
+      server.resourceTemplate(
+        { name: "rt", uriTemplate: "x://{id}", auth: "optional" },
+        async () => ({ contents: [] })
+      )
+    ).toThrow(/^Resource template "rt": /);
+    expect(() =>
+      server.prompt({ name: "p", auth: "public" }, async () => ({
+        messages: [],
+      }))
+    ).toThrow(/^Prompt "p": /);
+  });
+
+  it("rejects hand-written _meta.securitySchemes next to auth or on a mixedAuth server", () => {
+    const meta = { securitySchemes: [{ type: "noauth" }] };
+    expect(() =>
+      oauthServer().tool(
+        { name: "t", auth: "public", _meta: meta },
+        async () => ({ content: [] })
+      )
+    ).toThrow(/_meta.securitySchemes is generated from auth/);
+    expect(() =>
+      oauthServer({ mixedAuth: false }).tool(
+        { name: "t", auth: { scopes: ["a"] }, _meta: meta },
+        async () => ({ content: [] })
+      )
+    ).toThrow(/_meta.securitySchemes is generated from auth/);
+    expect(() =>
+      oauthServer().tool({ name: "t", _meta: meta }, async () => ({
+        content: [],
+      }))
+    ).toThrow(/on a mixedAuth server\. Declare auth/);
   });
 });
 
-describe("endpoint-wide OAuth with tool scopes", () => {
-  it("adds declared oauth2 scopes to the baseline requirement", async () => {
+describe("hand-written _meta.securitySchemes", () => {
+  it("passes through and copies to the top level on tools without auth", async () => {
+    const schemes = [{ type: "oauth2", scopes: ["legacy"] }];
+    for (const server of [
+      new MCPServer({ name: "plain", version: "1.0.0" }),
+      new MCPServer({
+        name: "strict",
+        version: "1.0.0",
+        oauth: provider(),
+        logging: { enabled: false },
+      }),
+    ]) {
+      server.tool(
+        { name: "legacy", _meta: { securitySchemes: schemes, "x/y": 1 } },
+        async () => ({ content: [] })
+      );
+      const list = await server.fetch(post(rpc("tools/list"), bearer("ok")));
+      const body = (await list.json()) as {
+        result: {
+          tools: Array<{
+            securitySchemes?: unknown;
+            _meta?: Record<string, unknown>;
+          }>;
+        };
+      };
+      const [tool] = body.result.tools;
+      expect(tool?.securitySchemes).toEqual(schemes);
+      expect(tool?._meta?.["securitySchemes"]).toEqual(schemes);
+      expect(tool?._meta?.["x/y"]).toBe(1);
+    }
+  });
+});
+
+describe("endpoint-wide OAuth (no mixedAuth)", () => {
+  it("keeps every request behind a token and enforces declared scopes", async () => {
     const server = new MCPServer({
       name: "strict",
       version: "1.0.0",
@@ -627,33 +1063,52 @@ describe("endpoint-wide OAuth with tool scopes", () => {
       logging: { enabled: false },
     });
     server.tool(
-      {
-        name: "admin",
-        securitySchemes: [{ type: "oauth2", scopes: ["admin"] }],
-      },
-      async () => ({ content: [{ type: "text", text: "ok" }] })
+      { name: "admin", auth: { scopes: ["admin"] } },
+      async (_args, ctx) => ({
+        content: [{ type: "text", text: ctx.auth.user.id }],
+      })
     );
     server.tool({ name: "plain" }, async () => ({
       content: [{ type: "text", text: "ok" }],
     }));
+    server.resource(
+      { name: "ledger", uri: "shop://ledger", auth: { scopes: ["admin"] } },
+      async (uri) => ({ contents: [{ uri: uri.href, text: "ledger" }] })
+    );
     const handler = server.fetch;
 
-    expect((await handler(post(rpc("tools/list")))).status).toBe(401);
+    for (const request of [
+      post(rpc("tools/list")),
+      post(rpc("server/discover")),
+      call("plain"),
+    ]) {
+      expect((await handler(request)).status).toBe(401);
+    }
 
     const underScoped = await handler(call("admin", bearer("scopes:shop")));
     expect(underScoped.status).toBe(403);
     expect(challenge(underScoped)).toContain('scope="shop admin"');
+    expect(
+      (await handler(call("admin", bearer("scopes:shop,admin")))).status
+    ).toBe(200);
+    expect(
+      (await handler(read("shop://ledger", bearer("scopes:shop")))).status
+    ).toBe(403);
 
-    const scoped = await handler(call("admin", bearer("scopes:shop,admin")));
-    expect(scoped.status).toBe(200);
-
-    // Undeclared tools advertise nothing and keep the baseline-only check.
+    // Only tools that declare auth advertise schemes.
     const list = await handler(post(rpc("tools/list"), bearer("ok")));
     const body = (await list.json()) as {
-      result: { tools: Array<{ name: string; securitySchemes?: unknown }> };
+      result: {
+        tools: Array<{
+          name: string;
+          securitySchemes?: unknown;
+          _meta?: { securitySchemes?: unknown };
+        }>;
+      };
     };
     const byName = new Map(body.result.tools.map((tool) => [tool.name, tool]));
     expect(byName.get("plain")?.securitySchemes).toBeUndefined();
+    expect(byName.get("plain")?._meta?.securitySchemes).toBeUndefined();
     expect(byName.get("admin")?.securitySchemes).toEqual([
       { type: "oauth2", scopes: ["shop", "admin"] },
     ]);

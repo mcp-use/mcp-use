@@ -259,39 +259,22 @@ export interface CorsOptions {
  * @throws TypeError When `basePath` is present but not an absolute URL
  * pathname without empty segments, trailing slash, query, fragment, or
  * whitespace, when `skills` is not a boolean or valid configuration object,
- * or when `allowAnonymous` / `authChallenge` are malformed or set without an
- * OAuth provider.
+ * or when `mixedAuth` is not a boolean or is `true` without an OAuth provider.
  */
 export function assertServerConfig(config: {
   basePath?: unknown;
   port?: unknown;
   skills?: unknown;
   oauth?: unknown;
-  allowAnonymous?: unknown;
-  authChallenge?: unknown;
+  mixedAuth?: unknown;
 }): void {
-  if (
-    config.allowAnonymous !== undefined &&
-    typeof config.allowAnonymous !== "boolean"
-  ) {
-    throw new TypeError("allowAnonymous must be a boolean");
+  if (config.mixedAuth !== undefined && typeof config.mixedAuth !== "boolean") {
+    throw new TypeError("mixedAuth must be a boolean");
   }
-  if (config.allowAnonymous === true && config.oauth === undefined) {
-    throw new TypeError("allowAnonymous requires an OAuth provider");
-  }
-  if (config.authChallenge !== undefined) {
-    if (
-      config.authChallenge !== "http" &&
-      config.authChallenge !== "tool-result" &&
-      config.authChallenge !== "auto"
-    ) {
-      throw new TypeError(
-        'authChallenge must be "http", "tool-result", or "auto"'
-      );
-    }
-    if (config.oauth === undefined) {
-      throw new TypeError("authChallenge requires an OAuth provider");
-    }
+  if (config.mixedAuth === true && config.oauth === undefined) {
+    throw new TypeError(
+      "mixedAuth requires an OAuth provider; set oauth on the server"
+    );
   }
   if (config.basePath !== undefined) {
     if (typeof config.basePath !== "string") {
@@ -338,77 +321,42 @@ export function assertServerConfig(config: {
 }
 
 /**
- * How the server represents an authentication challenge on `tools/call`.
- *
- * - `"http"`: the MCP specification's transport challenge — `401` for a
- *   missing or invalid token, `403` for insufficient scopes, both with a
- *   `WWW-Authenticate: Bearer` header. Claude and spec-conformant clients
- *   start or step up OAuth from this response.
- * - `"tool-result"`: HTTP `200` with an `isError` tool result whose
- *   `_meta["mcp/www_authenticate"]` carries the same challenge. ChatGPT opens
- *   its sign-in UI from this shape and does not react to a `401` on a tool
- *   call.
- * - `"auto"`: `"tool-result"` when the `User-Agent` header contains
- *   `chatgpt` or `openai` (case-insensitive), otherwise `"http"`.
- *
- * Only the representation changes; token verification, scope enforcement,
- * and every non-`tools/call` failure (always HTTP) are identical.
- */
-export type AuthChallengeFormat = "http" | "tool-result" | "auto";
-
-/**
  * Server identity and behavior, passed to `new MCPServer(...)`.
  *
  * A user type other than `never` requires an OAuth provider, preventing a
  * callback from declaring authenticated context without authentication at
  * runtime. Omitting the type keeps the no-OAuth API ergonomic.
- *
- * `TAnonymous` mirrors {@link allowAnonymous}: when `true`, callbacks see an
- * optional `ctx.auth` because anonymous callers can reach public tools.
  */
-export type ServerConfig<
-  TUser = never,
-  TAnonymous extends boolean = false,
-> = BaseServerConfig &
+export type ServerConfig<TUser = never> = BaseServerConfig &
   ([TUser] extends [never]
     ? {
         /** OAuth is unavailable when no authenticated user type is declared. */
         oauth?: undefined;
         /** Requires an OAuth provider. */
-        allowAnonymous?: never;
-        /** Requires an OAuth provider. */
-        authChallenge?: never;
+        mixedAuth?: false;
       }
     : {
         /**
          * External OAuth resource-server provider. Callback contexts receive
-         * this provider's user type as required `ctx.auth.user`, or as
-         * optional `ctx.auth` when {@link allowAnonymous} is `true`.
+         * this provider's user type as `ctx.auth.user`: required in items
+         * that need sign-in, optional in items declared `auth: "public"` or
+         * `"optional"`.
          */
         oauth: OAuthProvider<TUser>;
         /**
-         * Serve public and protected tools from one endpoint (mixed auth).
+         * Serve public, optional, and sign-in items from one endpoint.
          *
-         * When `true`, `initialize`, `ping`, list requests, and calls to
-         * tools that declare a `noauth` scheme run without a bearer token.
-         * Every other request — including calls to tools without
-         * `securitySchemes`, `resources/read` (except view resources of
-         * public tools), and `prompts/get` — still requires a verified token
-         * with the provider's `requiredScopes` plus the tool's `oauth2`
-         * scopes. A supplied token is always verified, even on public tools;
-         * invalid or expired tokens are refused with `401`.
+         * When `true`, anyone can connect and list tools, resources, and
+         * prompts without a token. It does not make anything public: each
+         * tool, resource, resource template, and prompt declares `auth`, and
+         * items without it still require sign-in with the provider's
+         * `requiredScopes`. A token that is sent is always verified, and an
+         * invalid or expired one is refused with `401`, even on public items.
          *
-         * When `false` or omitted, the whole MCP endpoint requires a token,
-         * as before.
+         * When `false` or omitted, every request to the MCP endpoint needs a
+         * valid token.
          *
          * @defaultValue `false`
          */
-        allowAnonymous?: TAnonymous;
-        /**
-         * Representation of `tools/call` authentication failures. See
-         * {@link AuthChallengeFormat}.
-         *
-         * @defaultValue `"auto"`
-         */
-        authChallenge?: AuthChallengeFormat;
+        mixedAuth?: boolean;
       });
