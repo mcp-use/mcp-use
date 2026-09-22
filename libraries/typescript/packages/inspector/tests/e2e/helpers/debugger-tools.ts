@@ -253,10 +253,7 @@ export async function verifyWidgetDebugInfo(
 export async function navigateToResourcesAndSelectWeather(
   page: Page
 ): Promise<void> {
-  await page
-    .locator('[data-testid="tab-resources"]:visible')
-    .first()
-    .click();
+  await page.locator('[data-testid="tab-resources"]:visible').first().click();
   await expect(page.getByRole("heading", { name: "Resources" })).toBeVisible();
   await page.getByTestId("resource-item-weather-display").click();
   // The view mounts directly in the resource preview; props are applied on top.
