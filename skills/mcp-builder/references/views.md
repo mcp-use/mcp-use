@@ -26,12 +26,7 @@ export default function ProductResults() {
   }
 
   const source = typeof meta?.source === "string" ? meta.source : undefined;
-  return (
-    <Results
-      items={toolOutput.items}
-      source={source}
-    />
-  );
+  return <Results items={toolOutput.items} source={source} />;
 }
 ```
 
@@ -70,3 +65,43 @@ Declare exact external origins in `view.csp`:
 - `resourceDomains` for scripts, styles, images, fonts, and media.
 - `frameDomains` for embedded frames.
 - `baseUriDomains` only for an intentional external base URI.
+
+## UI origin, endpoint identity, and host metadata
+
+For SDK versions with automatic endpoint-based Claude domains, configure the UI
+origin on the tool: `view: { name: "wave", domain: "https://wavebyvento.com" }`.
+Set `MCP_URL=https://wave-by-vento.run.mcp-use.com` and server `basePath: "/mcp"`.
+ChatGPT receives `ui.domain: "https://wavebyvento.com"`; Claude receives the first
+32 hex characters of SHA-256 of the full `https://wave-by-vento.run.mcp-use.com/mcp`
+endpoint plus `.claudemcpcontent.com`. Do not hash the website or asset origin.
+
+Inspect the installed SDK: older versions hash `view.domain` itself. Upgrade to
+endpoint-based handling before removing an existing compatibility helper. Do not
+invent `uiOrigin` or `mcpEndpoint` config fields.
+
+For View domain resolution, origin-only `MCP_URL` appends `basePath`; a URL with a
+path is the full endpoint, preserved verbatim. With OAuth, use origin-only `MCP_URL`
+because OAuth configuration requires it. Without `MCP_URL`, the SDK uses the request
+path/query and forwarded/request origin. Set the public URL explicitly when a proxy
+rewrites paths. `MCP_ASSETS_URL` controls assets, never Claude identity.
+
+HTTP(S) `view.domain` URLs normalize to origins. Use an HTTPS origin without `/mcp`
+for ChatGPT. Precomputed Claude domains remain supported but are Claude-only; replace
+them with the UI origin for cross-host apps. Omitting `view.domain` keeps host defaults.
+Without an HTTP request or `MCP_URL`, Claude falls back to the authored domain.
+
+Remove helpers that overwrite generated resource `_meta.ui.domain` after `next()`;
+they clobber Claude conversion. Preserve generated `ui` fields when adding unrelated
+metadata. Configure the resource through `view.domain`, not tool `_meta` or tool
+result `_meta`. Generated resources use standard `ui.domain` only. On manually authored
+ChatGPT resources, `openai/widgetDomain` is an alias, not an override for an invalid
+`ui.domain`; keep both consistent if both are emitted. Custom resources and response
+middleware remain author-controlled.
+
+`frameDomains` allows nested iframes inside the View. It does not set the View origin
+or fix domain validation. Add it only for actual nested embeds.
+
+Verify `resources/read` for ChatGPT and Claude, including an endpoint with `/mcp` and
+a UI origin on another host. Claude detection uses advertised client name, falling
+back to User-Agent when no name is present; unknown clients receive the UI origin.
+Do not claim host publishing validation from SDK tests alone.
