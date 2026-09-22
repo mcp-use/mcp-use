@@ -37,6 +37,10 @@ test.describe.configure({ mode: "default" });
 
 let authServers: AuthServersManager;
 
+// oauth2-mock-server issuers have no registration endpoint and accept any
+// client id at /authorize, so register a static client before connecting.
+const MOCK_OAUTH_CLIENT = { clientId: "test-client" };
+
 test.beforeAll(async () => {
   authServers = new AuthServersManager();
   await authServers.startAll();
@@ -256,7 +260,7 @@ test.describe("OAuth Authentication - Linear", () => {
 
   test("should show authenticate button for OAuth server", async ({ page }) => {
     // Connect to Linear OAuth server (port 3105 = 3005 + 100)
-    await connectToOAuthServer(page, "linear", 3105);
+    await connectToOAuthServer(page, "linear", 3105, MOCK_OAUTH_CLIENT);
 
     // Verify server appears
     await expect(
@@ -278,7 +282,7 @@ test.describe("OAuth Authentication - Linear", () => {
     // This test requires proper OAuth flow simulation
     // Skip for now until oauth2-mock-server integration is complete
 
-    await connectToOAuthServer(page, "linear", 3105);
+    await connectToOAuthServer(page, "linear", 3105, MOCK_OAUTH_CLIENT);
 
     // Wait for authenticate button
     const authenticateButton = await clickAuthenticateButton(page);
@@ -305,7 +309,7 @@ test.describe("OAuth Authentication - Supabase", () => {
     page,
   }) => {
     // Connect to Supabase OAuth server (port 3106 = 3006 + 100)
-    await connectToOAuthServer(page, "supabase", 3106);
+    await connectToOAuthServer(page, "supabase", 3106, MOCK_OAUTH_CLIENT);
 
     // Verify server appears
     await expect(
@@ -328,7 +332,7 @@ test.describe("OAuth Authentication - GitHub", () => {
 
   test("should show authenticate button for GitHub OAuth", async ({ page }) => {
     // Connect to GitHub OAuth server (port 3107 = 3007 + 100)
-    await connectToOAuthServer(page, "github", 3107);
+    await connectToOAuthServer(page, "github", 3107, MOCK_OAUTH_CLIENT);
 
     // Verify server appears
     await expect(
@@ -351,7 +355,7 @@ test.describe("OAuth Authentication - Vercel", () => {
 
   test("should show authenticate button for Vercel OAuth", async ({ page }) => {
     // Connect to Vercel OAuth server (port 3108 = 3008 + 100)
-    await connectToOAuthServer(page, "vercel", 3108);
+    await connectToOAuthServer(page, "vercel", 3108, MOCK_OAUTH_CLIENT);
 
     // Verify server appears
     await expect(
