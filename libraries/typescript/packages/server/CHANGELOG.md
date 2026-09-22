@@ -1,5 +1,11 @@
 # mcp-use
 
+## 2.6.0-canary.4
+
+### Patch Changes
+
+- 257e44a: Keep the public chat button hidden when public chat is unavailable.
+
 ## 2.6.0-canary.3
 
 ### Patch Changes
