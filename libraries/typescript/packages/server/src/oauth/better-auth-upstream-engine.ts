@@ -7,7 +7,11 @@ import type {
   GenericEndpointContext,
 } from "better-auth";
 import { APIError } from "better-auth/api";
-import { decryptOAuthToken } from "better-auth/oauth2";
+import {
+  decryptOAuthToken,
+  refreshAccessTokenRequest,
+  setTokenUtil,
+} from "better-auth/oauth2";
 import {
   genericOAuth,
   type GenericOAuthConfig,
@@ -51,7 +55,7 @@ export interface OAuthMcpProviderOptions {
   introspection?: {
     /** Provider's HTTPS introspection endpoint; loopback HTTP is allowed for development. */
     url: string;
-    /** Token from the original login to check. Expiry or revocation requires a new login; tokens are not rotated. */
+    /** Session-bound token to check. Renewed using that login's refresh credentials when available. */
     tokenType: "access_token" | "refresh_token";
     /** Client-secret authentication at introspection; defaults to `basic`. */
     authentication?: "basic" | "post";
@@ -123,6 +127,18 @@ interface UpstreamSession {
   createdAt: Date;
   expiresAt: Date;
   upstreamBinding?: string | null;
+}
+
+interface UpstreamBinding {
+  providerId: string;
+  subject: string;
+  tokenType: "access_token" | "refresh_token";
+  token: string;
+  refreshToken?: string;
+  tokenExpiresAt?: number;
+  refreshingUntil?: number;
+  refreshOwner?: string;
+  renewed?: boolean;
 }
 
 /**
@@ -347,6 +363,10 @@ function upstreamIdentity(
             provider?.introspection?.tokenType === "refresh_token"
               ? login?.fresh.refreshToken
               : login?.fresh.accessToken;
+          const tokenExpiry =
+            provider?.introspection?.tokenType === "refresh_token"
+              ? login?.fresh.refreshTokenExpiresAt
+              : login?.fresh.accessTokenExpiresAt;
           if (
             !account ||
             account.userId !== session.userId ||
@@ -366,6 +386,10 @@ function upstreamIdentity(
                 ...(provider.introspection && {
                   tokenType: provider.introspection.tokenType,
                   token,
+                  refreshToken: login.fresh.refreshToken ?? undefined,
+                  ...(tokenExpiry
+                    ? { tokenExpiresAt: tokenExpiry.getTime() / 1000 }
+                    : {}),
                 }),
               }),
             },
@@ -401,7 +425,8 @@ function upstreamIdentity(
   async function identity(
     sessionId: string,
     userId: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    renewUpstream = false
   ): Promise<NativeOAuthUser> {
     const session = await readSession(sessionId, userId);
     const accounts = await context.internalAdapter.findAccounts(userId);
@@ -427,11 +452,65 @@ function upstreamIdentity(
       const status = await checkUpstreamStatus(async (checkSignal) => {
         if (provider.checkStatus)
           return provider.checkStatus(account.accountId, checkSignal);
-        const token = await decryptOAuthToken(
-          binding["token"] as string,
-          context
+        let stored = binding as unknown as UpstreamBinding;
+        if ((stored.refreshingUntil ?? 0) > Date.now()) return "unavailable";
+        const expired =
+          typeof stored.tokenExpiresAt === "number" &&
+          stored.tokenExpiresAt <= Date.now() / 1000;
+        const renew = async () => {
+          session.upstreamBinding = await renewBinding(
+            session,
+            stored,
+            provider,
+            checkSignal
+          );
+          stored = JSON.parse(session.upstreamBinding) as UpstreamBinding;
+        };
+        if (expired) await renew();
+        let checked = await introspect(
+          provider,
+          account.accountId,
+          await decryptOAuthToken(stored.token, context),
+          checkSignal,
+          stored.renewed
         );
-        return introspect(provider, account.accountId, token, checkSignal);
+        if (checked.status !== "valid") return checked.status;
+        if (
+          renewUpstream &&
+          !expired &&
+          (stored.refreshToken || stored.tokenType === "refresh_token")
+        ) {
+          await renew();
+          checked = await introspect(
+            provider,
+            account.accountId,
+            await decryptOAuthToken(stored.token, context),
+            checkSignal,
+            true
+          );
+          if (checked.status !== "valid") return checked.status;
+        }
+        if (
+          checked.expiresAt !== undefined &&
+          checked.expiresAt !== stored.tokenExpiresAt
+        ) {
+          const updated = JSON.stringify({
+            ...stored,
+            tokenExpiresAt: checked.expiresAt,
+          });
+          if (checkSignal.aborted) return "unavailable";
+          const changed = await context.adapter.updateMany({
+            model: "session",
+            where: [
+              { field: "id", value: session.id },
+              { field: "upstreamBinding", value: session.upstreamBinding! },
+            ],
+            update: { upstreamBinding: updated },
+          });
+          if (changed !== 1) return "unavailable";
+          session.upstreamBinding = updated;
+        }
+        return "valid";
       }, signal);
       if (status === "invalid") {
         await context.adapter.deleteMany({
@@ -460,6 +539,150 @@ function upstreamIdentity(
         ...(user.image ? { image: user.image } : {}),
       },
     };
+  }
+
+  async function renewBinding(
+    session: UpstreamSession,
+    binding: UpstreamBinding,
+    provider: ConfiguredProvider,
+    signal: AbortSignal
+  ): Promise<string> {
+    const refreshToken =
+      binding.refreshToken ??
+      (binding.tokenType === "refresh_token" ? binding.token : undefined);
+    if (!refreshToken) throw invalidGrant();
+    const until = Date.now() + 45_000;
+    const locked = JSON.stringify({
+      ...binding,
+      refreshingUntil: until,
+      refreshOwner: crypto.randomUUID(),
+    });
+    const original = session.upstreamBinding!;
+    const owned = [
+      { field: "id", value: session.id },
+      { field: "userId", value: session.userId },
+      { field: "upstreamBinding", value: locked },
+    ];
+    if (signal.aborted) throw unavailable();
+    const acquired = await context.adapter.updateMany({
+      model: "session",
+      where: [
+        ...owned.slice(0, 2),
+        { field: "upstreamBinding", value: original },
+        { field: "expiresAt", operator: "gt", value: new Date() },
+      ],
+      update: { upstreamBinding: locked },
+    });
+    if (acquired !== 1) throw unavailable();
+    try {
+      let tokenUrl = provider.config.tokenUrl;
+      if (!tokenUrl && provider.config.discoveryUrl) {
+        const response = await fetch(provider.config.discoveryUrl, {
+          signal,
+          redirect: "error",
+        });
+        if (!response.ok) throw unavailable();
+        const metadata: unknown = await response.json();
+        tokenUrl =
+          isRecord(metadata) && typeof metadata["token_endpoint"] === "string"
+            ? endpoint(metadata["token_endpoint"])
+            : undefined;
+      }
+      if (!tokenUrl) throw unavailable();
+      const request = await refreshAccessTokenRequest({
+        refreshToken: await decryptOAuthToken(refreshToken, context),
+        options: {
+          clientId: provider.config.clientId,
+          clientSecret: provider.config.clientSecret,
+        },
+        authentication: provider.config.authentication,
+        tokenEndpoint: tokenUrl,
+      });
+      const response = await fetch(tokenUrl, {
+        ...request,
+        method: "POST",
+        signal,
+        redirect: "error",
+        cache: "no-store",
+      });
+      const tokens: unknown = await response.json();
+      if (!response.ok) {
+        if (
+          response.status === 400 &&
+          isRecord(tokens) &&
+          tokens["error"] === "invalid_grant"
+        )
+          throw invalidGrant();
+        throw unavailable();
+      }
+      if (
+        !isRecord(tokens) ||
+        typeof tokens["access_token"] !== "string" ||
+        !tokens["access_token"] ||
+        (tokens["refresh_token"] !== undefined &&
+          (typeof tokens["refresh_token"] !== "string" ||
+            !tokens["refresh_token"]))
+      )
+        throw unavailable();
+      const replacementRefresh =
+        tokens["refresh_token"] === undefined
+          ? refreshToken
+          : await setTokenUtil(tokens["refresh_token"], context);
+      const selected =
+        binding.tokenType === "access_token"
+          ? await setTokenUtil(tokens["access_token"], context)
+          : replacementRefresh;
+      if (
+        typeof selected !== "string" ||
+        typeof replacementRefresh !== "string"
+      )
+        throw unavailable();
+      const lifetime =
+        tokens[
+          binding.tokenType === "access_token"
+            ? "expires_in"
+            : "refresh_token_expires_in"
+        ];
+      const updated = JSON.stringify({
+        providerId: binding.providerId,
+        subject: binding.subject,
+        tokenType: binding.tokenType,
+        token: selected,
+        refreshToken: replacementRefresh,
+        ...(typeof lifetime === "number" &&
+        Number.isFinite(lifetime) &&
+        lifetime > 0
+          ? { tokenExpiresAt: Math.floor(Date.now() / 1000) + lifetime }
+          : {}),
+        renewed: true,
+      } satisfies UpstreamBinding);
+      if (signal.aborted || Date.now() >= until) throw unavailable();
+      const changed = await context.adapter.updateMany({
+        model: "session",
+        where: [
+          ...owned,
+          { field: "expiresAt", operator: "gt", value: new Date() },
+        ],
+        update: { upstreamBinding: updated },
+      });
+      if (changed !== 1) throw unavailable();
+      return updated;
+    } catch (error) {
+      if (
+        !signal.aborted &&
+        error instanceof APIError &&
+        error.body?.error === "invalid_grant"
+      ) {
+        await context.adapter.deleteMany({ model: "session", where: owned });
+      } else {
+        await context.adapter.updateMany({
+          model: "session",
+          where: owned,
+          update: { upstreamBinding: original },
+        });
+      }
+      throw error;
+    }
   }
   return {
     plugin: {
@@ -502,14 +725,15 @@ function upstreamIdentity(
     ],
     extension: {
       claims: {
-        async accessToken({ sessionId, user, ctx }) {
+        async accessToken({ sessionId, user, ctx, grantType }) {
           try {
             if (!sessionId || !user) throw invalidGrant();
             return {
               native_identity: await identity(
                 sessionId,
                 user.id,
-                ctx.request?.signal
+                ctx.request?.signal,
+                grantType === "refresh_token"
               ),
             };
           } catch (error) {
@@ -591,8 +815,12 @@ async function checkUpstreamStatus(
     });
     const status = await Promise.race([check(controller.signal), aborted]);
     return controller.signal.aborted ? "unavailable" : status;
-  } catch {
-    return "unavailable";
+  } catch (error) {
+    return !controller.signal.aborted &&
+      error instanceof APIError &&
+      error.body?.error === "invalid_grant"
+      ? "invalid"
+      : "unavailable";
   } finally {
     clearTimeout(timer);
     requestSignal?.removeEventListener("abort", abort);
@@ -604,8 +832,12 @@ async function introspect(
   provider: ConfiguredProvider,
   subject: string,
   token: string,
-  signal: AbortSignal
-): Promise<"valid" | "invalid" | "unavailable"> {
+  signal: AbortSignal,
+  requireSubject = false
+): Promise<{
+  status: "valid" | "invalid" | "unavailable";
+  expiresAt?: number;
+}> {
   const { url, tokenType, authentication = "basic" } = provider.introspection!;
   const body = new URLSearchParams({ token, token_type_hint: tokenType });
   const headers = new Headers({
@@ -632,12 +864,13 @@ async function introspect(
     cache: "no-store",
   });
   // HTTP 401 here rejects our introspection credentials, not the user's token.
-  if (!response.ok) return "unavailable";
+  if (!response.ok) return { status: "unavailable" };
   const result: unknown = await response.json();
-  if (!isRecord(result)) return "unavailable";
-  if (result["active"] === false) return "invalid";
+  if (!isRecord(result)) return { status: "unavailable" };
+  if (result["active"] === false) return { status: "invalid" };
   if (
     result["active"] !== true ||
+    (requireSubject && typeof result["sub"] !== "string") ||
     (result["sub"] !== undefined && typeof result["sub"] !== "string") ||
     (result["client_id"] !== undefined &&
       typeof result["client_id"] !== "string") ||
@@ -645,15 +878,18 @@ async function introspect(
       (typeof result["exp"] !== "number" ||
         !Number.isSafeInteger(result["exp"])))
   )
-    return "unavailable";
+    return { status: "unavailable" };
   if (
     (result["sub"] !== undefined && result["sub"] !== subject) ||
     (result["client_id"] !== undefined &&
       result["client_id"] !== provider.config.clientId) ||
     (typeof result["exp"] === "number" && result["exp"] <= Date.now() / 1000)
   )
-    return "invalid";
-  return "valid";
+    return { status: "invalid" };
+  return {
+    status: "valid",
+    ...(typeof result["exp"] === "number" ? { expiresAt: result["exp"] } : {}),
+  };
 }
 
 function endpoint(value: string | undefined): string | undefined {

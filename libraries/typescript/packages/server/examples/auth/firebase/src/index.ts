@@ -50,7 +50,8 @@ async function main() {
       schema.toBeCreated.length ||
       schema.toBeAdded.length ||
       schema.toBeAddedIndexes.length ||
-      schema.unsafeChanges.length
+      schema.unsafeChanges.length ||
+      schema.schemaProblems.length
     ) {
       throw new Error("Authentication schema needs migration");
     }

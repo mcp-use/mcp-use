@@ -9,7 +9,8 @@ interface RequestConnection {
 /**
  * Serializes one OAuth client's token mutations through their final writes.
  * Waits up to one second for a PostgreSQL lock before rejecting without running
- * the operation. SQLite uses the SDK's process-local guard instead.
+ * the operation, after acquiring a connection under the pool's configured timeout
+ * (five seconds in this example). SQLite uses the SDK's process-local guard.
  */
 export function createTokenTransactions(pool?: Pool) {
   const namespace = "mcp-use/firebase/oauth-client";
@@ -37,7 +38,12 @@ export function createTokenTransactions(pool?: Pool) {
   return {
     database: routedPool,
     async run(clientId: string, operation: () => Promise<Response>) {
-      const client = await pool.connect();
+      let client: PoolClient;
+      try {
+        client = await pool.connect();
+      } catch {
+        return unavailable(true);
+      }
       const scope: RequestConnection = { client, unavailable: false };
       const failed = () => {
         scope.unavailable = true;
@@ -60,6 +66,7 @@ export function createTokenTransactions(pool?: Pool) {
       });
       let locked = false;
       let broken = false;
+      let operationStarted = false;
       try {
         const setting = await client.query<{ lock_timeout: string }>(
           "SHOW lock_timeout"
@@ -87,13 +94,14 @@ export function createTokenTransactions(pool?: Pool) {
             ]);
           }
         }
+        operationStarted = true;
         const response = await connections.run(scope, operation);
         // The operation may already have written token state. Do not advertise
         // a retry when the connection's outcome is uncertain.
         return scope.unavailable ? unavailable(false) : response;
-      } catch (error) {
+      } catch {
         broken = true;
-        throw error;
+        return unavailable(!operationStarted);
       } finally {
         broken ||= scope.unavailable;
         scope.unavailable = true;

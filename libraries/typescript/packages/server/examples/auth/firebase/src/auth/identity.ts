@@ -220,7 +220,16 @@ export function createFirebaseIdentity(config: FirebaseWebConfig) {
     ) {
       throw new FirebaseIdentityError("unavailable");
     }
-    const identity = await checkStatus(idToken, expected, signal);
+    // Firebase's refresh endpoint rejects revoked credentials and disabled users.
+    // Verify its replacement before returning it for persistence. A separate
+    // account lookup must not lose a rotated token if that lookup is unavailable.
+    const identity = await verifyToken(idToken, signal);
+    if (
+      identity.uid !== expected.uid ||
+      identity.authTime !== expected.authTime
+    ) {
+      throw new FirebaseIdentityError("invalid_session");
+    }
     assertToken(refreshed["refresh_token"]);
     return { identity, refreshToken: refreshed["refresh_token"], idToken };
   }
@@ -293,6 +302,7 @@ export function createFirebaseIdentity(config: FirebaseWebConfig) {
       if (Date.now() / 1000 - identity.authTime > 300) {
         throw new FirebaseIdentityError("invalid_session");
       }
+      await checkStatus(credentials.idToken, identity);
       return refresh(credentials.refreshToken, identity);
     },
     refresh,

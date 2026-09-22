@@ -105,7 +105,18 @@ async function firebaseSource() {
             { error: { message: "TOKEN_EXPIRED" } },
             { status: state.refreshFailure }
           );
+        if (state.revoked || state.disabled)
+          return Response.json(
+            {
+              error: {
+                message: state.disabled ? "USER_DISABLED" : "TOKEN_EXPIRED",
+              },
+            },
+            { status: 400 }
+          );
         const nextRefreshToken = `rotated-${state.refreshes}`;
+        // Exercise a provider that invalidates its previous token on rotation.
+        refreshTokens.delete(refreshToken);
         refreshTokens.add(nextRefreshToken);
         return Response.json({
           id_token: await sign(state.claims),
@@ -210,9 +221,17 @@ describe("Firebase REST identity and strict MCP sessions", () => {
     expect(after.refreshToken).not.toBe(before.refreshToken);
     expect(f.state.refreshes).toBe(refreshes + 1);
     expect(f.state.refreshInputs.at(-1)).toBe(before.refreshToken);
-    expect(f.state.lookups).toBe(lookups + 2); // Renewal validation and the strict retry.
+    expect(f.state.lookups).toBe(lookups + 1); // Strict retry after saving the renewal.
     expect((await f.broker.tool(f.issued.access_token)).status).toBe(200);
     expect(f.state.refreshes).toBe(refreshes + 1);
+    expireIdToken();
+    const renewed = await f.broker.token({
+      grant_type: "refresh_token",
+      client_id: f.grant.clientId,
+      refresh_token: f.issued.refresh_token,
+    });
+    expect(renewed.status).toBe(200);
+    expect(f.state.refreshInputs.at(-1)).toBe(after.refreshToken);
   });
 
   it.each(["revoked", "disabled", "refresh rejected"])(
@@ -242,22 +261,43 @@ describe("Firebase REST identity and strict MCP sessions", () => {
     }
   );
 
-  it.each(["lookupFailure", "refreshFailure"] as const)(
-    "preserves credentials during %s and resumes after recovery",
-    async (failure) => {
-      const f = await firebaseBroker();
-      const before = await f.binding();
-      const refreshBefore = f.broker.refreshRows();
-      expireIdToken();
-      f.state[failure] = 503;
-      expect((await f.broker.tool(f.issued.access_token)).status).toBe(503);
-      expect(await f.binding()).toEqual(before);
-      expect(f.broker.refreshRows()).toEqual(refreshBefore);
-      expect(f.broker.executions).toBe(0);
-      f.state[failure] = 0;
-      expect((await f.broker.tool(f.issued.access_token)).status).toBe(200);
-    }
-  );
+  it("preserves credentials when the refresh endpoint is unavailable", async () => {
+    const f = await firebaseBroker();
+    const before = await f.binding();
+    const refreshBefore = f.broker.refreshRows();
+    expireIdToken();
+    f.state.refreshFailure = 503;
+    expect((await f.broker.tool(f.issued.access_token)).status).toBe(503);
+    expect(await f.binding()).toEqual(before);
+    expect(f.broker.refreshRows()).toEqual(refreshBefore);
+    expect(f.broker.executions).toBe(0);
+    f.state.refreshFailure = 0;
+    expect((await f.broker.tool(f.issued.access_token)).status).toBe(200);
+  });
+
+  it("retains a rotated credential when the following strict account lookup fails", async () => {
+    const f = await firebaseBroker();
+    const before = await f.binding();
+    const refreshBefore = f.broker.refreshRows();
+    const refreshes = f.state.refreshes;
+    expireIdToken();
+    f.state.lookupFailure = 503;
+    expect((await f.broker.tool(f.issued.access_token)).status).toBe(503);
+    const after = await f.binding();
+    expect(after.refreshToken).not.toBe(before.refreshToken);
+    expect(after).toMatchObject({ uid: before.uid, authTime: before.authTime });
+    expect(f.broker.refreshRows()).toEqual(refreshBefore);
+    expect(f.broker.executions).toBe(0);
+    f.state.lookupFailure = 0;
+    expect((await f.broker.tool(f.issued.access_token)).status).toBe(200);
+    expect(f.state.refreshes).toBe(refreshes + 1);
+    // The old credential really is unusable; recovery used the persisted replacement.
+    expect(
+      await f.adapter.revalidate!(before, new AbortController().signal)
+    ).toEqual({
+      status: "invalid",
+    });
+  });
 
   it.each(["user", "authentication"])(
     "rejects a refresh that replaces the original %s",

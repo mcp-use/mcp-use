@@ -22,6 +22,7 @@ import { decodeJwt, type JWTPayload } from "jose";
 import type { RequestAuthOptions } from "./request-auth.js";
 import { validateOAuthResource } from "./internal.js";
 import { boundedOperation } from "./bounded-operation.js";
+import { runLocalTokenOperation } from "./better-auth-grants.js";
 
 export {
   createNativeMcpAuth,
@@ -76,9 +77,11 @@ export interface BetterAuthMcpOptions<TUser> {
    * cancellation, so unfinished engine writes cannot overlap a later operation.
    */
   runTokenOperation?: (
-    /** Unverified request hint used only to select the serialization key. */
-    clientId: string,
-    operation: () => Promise<Response>
+    /** Serialization key; private engines scope it to the client and user. */
+    key: string,
+    operation: () => Promise<Response>,
+    /** Request whose token operation or grant-state check is being serialized. */
+    request?: Request
   ) => Promise<Response>;
   /** Maps verified claims in `authInfo.extra.payload` into typed tool identity. */
   mapAuthInfo: RequestAuthOptions<TUser>["mapAuthInfo"];
@@ -92,15 +95,12 @@ export interface BetterAuthMcpIntegration<TUser> {
    * Dispatches the auth namespace and discovery aliases to the engine.
    * Returns `undefined` for other routes. Mount before MCP/body parsing and
    * forward the returned Response, including all Set-Cookie headers, unchanged.
+   * Protected-resource metadata is served only at this resource's discovery path;
+   * a non-root resource leaves the root metadata route to the application.
    * Auth-namespace POST bodies are limited to 64 KiB and 10 seconds.
    */
   handle: (request: Request) => Promise<Response | undefined>;
 }
-
-const activeTokenClients = new WeakMap<
-  BetterAuthMcpInstance,
-  Map<string, Promise<void>>
->();
 
 /**
  * Connects an application-owned Better Auth MCP engine to mcp-use.
@@ -173,7 +173,6 @@ export async function betterAuthMcp<TUser>(
     `/.well-known/oauth-authorization-server${issuerPath}`,
     `${issuerPath}/.well-known/oauth-authorization-server`,
     `${issuerPath}/.well-known/openid-configuration`,
-    "/.well-known/oauth-protected-resource",
     resourceMetadataPath,
   ]);
   const tokenPaths = new Set([
@@ -299,10 +298,15 @@ export async function betterAuthMcp<TUser>(
           return boundedOperation(
             bounded.signal,
             (signal) =>
-              runTokenOperation(clientId, () =>
-                signal.aborted
-                  ? Promise.resolve(bodyFailure(503))
-                  : auth.handler(new Request(bounded, { signal }))
+              runTokenOperation(
+                clientId,
+                () =>
+                  signal.aborted
+                    ? Promise.resolve(bodyFailure(503))
+                    : auth
+                        .handler(new Request(bounded, { signal }))
+                        .then(normalizeTokenError),
+                bounded
               ),
             () =>
               Response.json(
@@ -316,6 +320,28 @@ export async function betterAuthMcp<TUser>(
       return undefined;
     },
   };
+}
+
+async function normalizeTokenError(response: Response): Promise<Response> {
+  // Better Auth 1.7.4 rejects the proof correctly but uses the wrong OAuth error.
+  // Leave missing verifiers, client-authentication failures and other 401s alone.
+  if (response.status !== 401) return response;
+  const body: unknown = await response
+    .clone()
+    .json()
+    .catch(() => undefined);
+  if (
+    !isRecord(body) ||
+    body["error"] !== "invalid_request" ||
+    body["error_description"] !== "code verification failed"
+  )
+    return response;
+  const headers = new Headers(response.headers);
+  headers.delete("content-length");
+  return Response.json(
+    { ...body, error: "invalid_grant" },
+    { status: 400, headers }
+  );
 }
 
 function engineChallengeResponse(
@@ -491,48 +517,5 @@ async function operationClient(request: Request): Promise<string | undefined> {
       : undefined;
   } catch {
     return undefined;
-  }
-}
-
-async function runLocalTokenOperation(
-  auth: BetterAuthMcpInstance,
-  clientId: string,
-  operation: () => Promise<Response>
-): Promise<Response> {
-  let active = activeTokenClients.get(auth);
-  if (!active) {
-    active = new Map();
-    activeTokenClients.set(auth, active);
-  }
-  const deadline = performance.now() + 1_000;
-  while (active.has(clientId)) {
-    const remaining = deadline - performance.now();
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const available =
-      remaining > 0 &&
-      (await Promise.race([
-        active.get(clientId)!.then(() => true),
-        new Promise<false>((resolve) => {
-          timer = setTimeout(() => resolve(false), remaining);
-        }),
-      ]));
-    clearTimeout(timer);
-    if (!available || performance.now() >= deadline) {
-      return Response.json(
-        { error: "temporarily_unavailable" },
-        {
-          status: 503,
-          headers: { "Cache-Control": "no-store", "Retry-After": "1" },
-        }
-      );
-    }
-  }
-  let release!: () => void;
-  active.set(clientId, new Promise<void>((resolve) => (release = resolve)));
-  try {
-    return await operation();
-  } finally {
-    active.delete(clientId);
-    release();
   }
 }

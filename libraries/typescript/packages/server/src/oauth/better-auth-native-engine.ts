@@ -22,6 +22,12 @@ import {
   type NativeOAuthUser,
 } from "./better-auth-native.js";
 import { validateOAuthResource } from "./internal.js";
+import {
+  createMcpGrantGuard,
+  runLocalTokenOperation,
+  hashMcpToken,
+  mcpGrantExtension,
+} from "./better-auth-grants.js";
 
 /** Connection and identity settings for a separate native MCP authorization engine. */
 export interface NativeMcpAuthOptions extends BetterAuthNativeIdentityOptions {
@@ -46,7 +52,7 @@ export interface NativeMcpAuthOptions extends BetterAuthNativeIdentityOptions {
   sessionExpiresIn?: number;
   /**
    * MCP access-token lifetime, in seconds; defaults to five minutes.
-   * Grant revocation stops renewal; issued JWTs can remain valid until expiry.
+   * JWTs issued with refresh grants are also checked against the grant's current state.
    */
   accessTokenExpiresIn?: number;
   /** Explicit legacy unauthenticated dynamic-registration fallback; defaults to false. */
@@ -248,6 +254,7 @@ export async function createMcpAuthEngine(
         accessTokenExpiresIn,
         refreshTokenExpiresIn: sessionExpiresIn,
         refreshTokenReuseInterval: 0,
+        storeTokens: { hash: hashMcpToken },
         allowDynamicClientRegistration:
           options.allowDynamicClientRegistration ?? false,
         allowUnauthenticatedClientRegistration:
@@ -258,7 +265,7 @@ export async function createMcpAuthEngine(
           { identifier: resource.href, accessTokenTtl: accessTokenExpiresIn },
         ],
         resourceSeedMode: "merge",
-        extensions: [bridge.extension],
+        extensions: [bridge.extension, mcpGrantExtension],
         schema: {
           oauthClient: model("oauthClient"),
           oauthResource: model("oauthResource"),
@@ -305,6 +312,11 @@ export async function createMcpAuthEngine(
     },
     async connect() {
       const context = await auth.$context;
+      const grants = createMcpGrantGuard(
+        context,
+        options.runTokenOperation ??
+          ((key, operation) => runLocalTokenOperation(auth, key, operation))
+      );
       const keys = await context.adapter.findMany<{ expiresAt?: Date | null }>({
         model: "jwks",
         select: ["id", "expiresAt"],
@@ -322,24 +334,18 @@ export async function createMcpAuthEngine(
         ...(options.requiredScopes !== undefined && {
           requiredScopes: options.requiredScopes,
         }),
-        ...(options.runTokenOperation !== undefined && {
-          runTokenOperation: options.runTokenOperation,
-        }),
-        checkSession: bridge.checkSession,
+        runTokenOperation: grants.run,
+        async checkSession(claims, request) {
+          const status = await grants.check(claims, request);
+          return status === "valid"
+            ? bridge.checkSession(claims, request)
+            : status;
+        },
         mapAuthInfo: bridge.mapAuthInfo,
       });
       return {
         requestAuth: integration.requestAuth,
-        handle(request) {
-          // A path-specific engine must not capture another app's root discovery.
-          if (
-            new URL(request.url).pathname ===
-              "/.well-known/oauth-protected-resource" &&
-            resource.pathname !== "/"
-          )
-            return Promise.resolve(undefined);
-          return integration.handle(request);
-        },
+        handle: integration.handle,
       };
     },
   };

@@ -231,22 +231,30 @@ export async function authorize(
   broker: Awaited<ReturnType<typeof startBroker>>,
   browser: OAuthBrowser,
   login: (query: string) => Promise<Response>,
-  dpopThumbprint?: string
+  dpopThumbprint?: string,
+  existingClientId?: string
 ) {
   const callback = `${broker.origin}/client-callback`;
-  const registration = await browser.request(`${broker.base}/oauth2/register`, {
-    application_type: "native",
-    redirect_uris: [callback],
-    token_endpoint_auth_method: "none",
-    grant_types: ["authorization_code", "refresh_token"],
-    response_types: ["code"],
-    scope: "mcp:read offline_access",
-    ...(dpopThumbprint ? { dpop_bound_access_tokens: true } : {}),
-  });
-  assert.equal(registration.status, 201);
-  const { client_id: clientId } = (await registration.json()) as {
-    client_id: string;
-  };
+  let clientId = existingClientId;
+  if (!clientId) {
+    const registration = await browser.request(
+      `${broker.base}/oauth2/register`,
+      {
+        application_type: "native",
+        redirect_uris: [callback],
+        token_endpoint_auth_method: "none",
+        grant_types: ["authorization_code", "refresh_token"],
+        response_types: ["code"],
+        scope: "mcp:read offline_access",
+        ...(dpopThumbprint ? { dpop_bound_access_tokens: true } : {}),
+      }
+    );
+    assert.equal(registration.status, 201);
+    const registered = (await registration.json()) as {
+      client_id: string;
+    };
+    clientId = registered.client_id;
+  }
   const verifier = randomBytes(32).toString("base64url");
   const state = randomUUID();
   const query = new URLSearchParams({

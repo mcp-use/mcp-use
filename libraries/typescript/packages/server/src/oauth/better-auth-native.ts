@@ -48,6 +48,7 @@ export interface BetterAuthNativeIdentityOptions {
    * caching successful checks. Providers must implement read-only `checkStatus`.
    * Checks and revalidation time out after ten seconds; outages reject requests
    * temporarily. Expired credentials are renewed under the session lease.
+   * Unreadable stored bindings invalidate the session and require a fresh login.
    * `independent` deliberately uses the engine session's own lifetime.
    */
   sessionPolicy: "strict" | "linked" | "independent";
@@ -219,6 +220,21 @@ export function createNativeIdentityBridge(
     return session;
   }
 
+  async function decodeBinding(
+    session: NativeSession
+  ): Promise<NativeIdentityBinding> {
+    const key = currentContext().secretConfig;
+    try {
+      if (!session.nativeBinding) throw new NativeIdentityError("invalid");
+      return bindingSchema.parse(
+        JSON.parse(await symmetricDecrypt({ key, data: session.nativeBinding }))
+      );
+    } catch {
+      // Local corruption or an unavailable decryption key cannot recover on retry.
+      throw new NativeIdentityError("invalid");
+    }
+  }
+
   function sessionIdentity(session: NativeSession): NativeOAuthUser {
     return publicIdentity(session.nativeProvider, {
       subject: session.nativeSubject,
@@ -237,7 +253,7 @@ export function createNativeIdentityBridge(
     const adapter = providers.get(session.nativeProvider)!;
     const database = currentContext().adapter;
     const now = Math.floor(Date.now() / 1000);
-    if ((session.nativeLeaseUntil ?? 0) > now || !session.nativeBinding) {
+    if ((session.nativeLeaseUntil ?? 0) > now) {
       throw new NativeIdentityError("unavailable");
     }
     const owner = randomNonce();
@@ -272,14 +288,7 @@ export function createNativeIdentityBridge(
       },
     ];
     try {
-      const binding = bindingSchema.parse(
-        JSON.parse(
-          await symmetricDecrypt({
-            key: currentContext().secretConfig,
-            data: session.nativeBinding,
-          })
-        )
-      );
+      const binding = await decodeBinding(session);
       if (signal.aborted) throw new NativeIdentityError("unavailable");
       // Await the provider itself: the token guard must stay held until it stops.
       // The HTTP boundary returns a bounded failure while this call drains.
@@ -615,18 +624,20 @@ export function createNativeIdentityBridge(
               return "invalid";
             if (sessionPolicy !== "strict") return "valid";
             for (let attempt = 0; attempt < 2; attempt++) {
-              if (!session.nativeBinding) return "invalid";
-              const binding = bindingSchema.parse(
-                JSON.parse(
-                  await symmetricDecrypt({
-                    key: currentContext().secretConfig,
-                    data: session.nativeBinding,
-                  })
+              let status: "valid" | "invalid" | "unavailable" | "expired";
+              try {
+                const binding = await decodeBinding(session);
+                if (signal.aborted) return "unavailable";
+                status = await providers.get(session.nativeProvider)!
+                  .checkStatus!(binding, signal);
+              } catch (error) {
+                if (
+                  !(error instanceof NativeIdentityError) ||
+                  error.code !== "invalid"
                 )
-              );
-              if (signal.aborted) return "unavailable";
-              const status = await providers.get(session.nativeProvider)!
-                .checkStatus!(binding, signal);
+                  throw error;
+                status = "invalid";
+              }
               if (signal.aborted) return "unavailable";
               if (status === "expired" && attempt === 0) {
                 await identityForToken(session.id, session.userId, signal);

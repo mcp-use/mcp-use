@@ -1,11 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { decodeJwt } from "jose";
 import { DatabaseSync } from "node:sqlite";
-import { betterAuth } from "better-auth";
+import { betterAuth, type BetterAuthPlugin } from "better-auth";
 import { getMigrations } from "better-auth/db/migration";
 import { jwt } from "better-auth/plugins";
+import { symmetricEncrypt } from "better-auth/crypto";
+import { mcp } from "@better-auth/mcp";
 
-import { createNativeMcpAuth } from "../src/oauth/better-auth-mcp.js";
+import {
+  betterAuthMcp,
+  createNativeMcpAuth,
+} from "../src/oauth/better-auth-mcp.js";
 import {
   NativeIdentityError,
   type NativeIdentityAdapter,
@@ -65,8 +70,7 @@ async function nativeBroker(
     database
   );
   cleanup.push(broker.close);
-  const browser = new OAuthBrowser([broker.origin]);
-  const login = async (query: string) => {
+  const login = async (query: string, browser: OAuthBrowser) => {
     const begin = await browser.request(`${broker.base}/native/start`, {
       provider: "fixture",
       oauth_query: query,
@@ -84,12 +88,223 @@ async function nativeBroker(
     broker,
     account,
     identity,
-    grant: (thumbprint?: string) =>
-      authorize(broker, browser, login, thumbprint),
+    grant: (thumbprint?: string, clientId?: string) => {
+      const browser = new OAuthBrowser([broker.origin]);
+      return authorize(
+        broker,
+        browser,
+        (query) => login(query, browser),
+        thumbprint,
+        clientId
+      );
+    },
   };
 }
 
 describe("Better Auth MCP broker (real engine and SQLite)", () => {
+  it("returns invalid_grant for a PKCE mismatch without issuing credentials", async () => {
+    const { broker, grant } = await nativeBroker();
+    const authorization = await grant();
+    const rejected = await broker.token({
+      ...authorization.fields,
+      code_verifier: "wrong".repeat(16),
+    });
+    expect(rejected.status).toBe(400);
+    expect(await rejected.json()).toMatchObject({ error: "invalid_grant" });
+    expect(broker.refreshRows()).toEqual([]);
+    expect((await broker.token(authorization.fields)).status).toBe(400);
+    const missing = { ...(await grant()).fields };
+    delete (missing as Partial<typeof missing>).code_verifier;
+    const malformed = await broker.token(missing);
+    expect(await malformed.json()).toMatchObject({ error: "invalid_request" });
+  });
+
+  it("rejects still-unexpired JWTs after grant revocation without rejecting normal rotation", async () => {
+    const { broker, grant } = await nativeBroker();
+    const registration = await fetch(`${broker.base}/oauth2/register`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        application_type: "native",
+        redirect_uris: [`${broker.origin}/client-callback`],
+        token_endpoint_auth_method: "none",
+        grant_types: ["authorization_code"],
+        response_types: ["code"],
+        scope: "mcp:read offline_access",
+      }),
+    });
+    expect(registration.status).toBe(201);
+    const registered = await registration.json();
+    const authorization = await grant(undefined, registered.client_id);
+    const first = await tokens(await broker.token(authorization.fields));
+    const second = await tokens(
+      await broker.token({
+        grant_type: "refresh_token",
+        client_id: authorization.clientId,
+        refresh_token: first.refresh_token,
+      })
+    );
+    expect((await broker.tool(first.access_token)).status).toBe(200);
+    expect((await broker.tool(second.access_token)).status).toBe(200);
+    const revoked = await fetch(`${broker.base}/oauth2/revoke`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: authorization.clientId,
+        token: `Bearer ${second.refresh_token}`,
+        token_type_hint: "refresh_token",
+        // Unrelated fields must not select a different serialization key.
+        grant_type: "authorization_code",
+        code: "irrelevant",
+        refresh_token: "irrelevant",
+      }),
+    });
+    expect(revoked.status).toBe(200);
+    for (const issued of [first, second]) {
+      expect(decodeJwt(issued.access_token).exp).toBeGreaterThan(
+        Date.now() / 1000
+      );
+      expect((await broker.tool(issued.access_token)).status).toBe(401);
+    }
+    const fresh = await tokens(
+      await broker.token(
+        (await grant(undefined, authorization.clientId)).fields
+      )
+    );
+    expect((await broker.tool(fresh.access_token)).status).toBe(200);
+    expect((await broker.tool(first.access_token)).status).toBe(401);
+  });
+
+  it("lets another user sharing the client renew while one user's provider is stalled", async () => {
+    let user = "alice";
+    let blocked = false;
+    let entered!: () => void;
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const identity = (subject: string) => ({ subject, binding: { subject } });
+    const { broker, grant } = await nativeBroker(undefined, {
+      async authenticate() {
+        return { identity: identity(user) };
+      },
+      async revalidate(binding) {
+        const subject = (binding as { subject: string }).subject;
+        if (subject === "alice" && blocked) {
+          entered();
+          await pending;
+        }
+        return { status: "valid", identity: identity(subject) };
+      },
+    });
+    const firstGrant = await grant();
+    const first = await tokens(await broker.token(firstGrant.fields));
+    user = "bob";
+    const second = await tokens(
+      await broker.token((await grant(undefined, firstGrant.clientId)).fields)
+    );
+    const renew = (token: string) =>
+      broker.token({
+        grant_type: "refresh_token",
+        client_id: firstGrant.clientId,
+        refresh_token: token,
+      });
+    blocked = true;
+    const alice = renew(first.refresh_token);
+    await started;
+    try {
+      const bob = await tokens(await renew(second.refresh_token));
+      expect((await broker.tool(bob.access_token)).status).toBe(200);
+    } finally {
+      release();
+    }
+    expect((await alice).status).toBe(200);
+  });
+
+  it.each(["/", "/mcp"])(
+    "owns only the discovery route for resource %s",
+    async (path) => {
+      const database = new DatabaseSync(":memory:");
+      cleanup.push(async () => database.close());
+      const resource = `http://localhost:3130${path}`;
+      const auth = betterAuth({
+        database,
+        baseURL: "http://localhost:3130",
+        secret: "discovery-fixture-secret-0123456789",
+        plugins: [
+          jwt(),
+          mcp({
+            resource,
+            loginPage: "/login",
+            consentPage: "/consent",
+          }) as ReturnType<typeof mcp> & BetterAuthPlugin,
+        ],
+      });
+      const integration = await betterAuthMcp({
+        auth,
+        resource,
+        mapAuthInfo: () => ({ user: null, payload: {}, permissions: [] }),
+      });
+      const discovery = "/.well-known/oauth-protected-resource";
+      const own = await integration.handle(
+        new Request(
+          `http://localhost:3130${discovery}${path === "/" ? "" : path}`
+        )
+      );
+      expect(own?.status).toBe(200);
+      expect(await own!.json()).toMatchObject({ resource });
+      const other = path === "/" ? `${discovery}/another-mcp` : discovery;
+      expect(
+        await integration.handle(new Request(`http://localhost:3130${other}`))
+      ).toBeUndefined();
+    }
+  );
+
+  it.each([
+    ["access", "ciphertext"],
+    ["access", "JSON"],
+    ["refresh", "ciphertext"],
+    ["refresh", "JSON"],
+  ])(
+    "rejects %s with a corrupt %s binding and permits a fresh login",
+    async (operation, corruption) => {
+      const { broker, grant } = await nativeBroker();
+      const authorization = await grant();
+      const issued = await tokens(await broker.token(authorization.fields));
+      const prefix = `mcp_${broker.auth.basePath.split("/")[2]}_`;
+      const binding =
+        corruption === "JSON"
+          ? await symmetricEncrypt({ key: broker.secret, data: "not-json" })
+          : "not-ciphertext";
+      broker.db
+        .prepare(`UPDATE "${prefix}session" SET nativeBinding = ? WHERE id = ?`)
+        .run(binding, String(decodeJwt(issued.access_token).sid));
+
+      const renew = () =>
+        broker.token({
+          grant_type: "refresh_token",
+          client_id: authorization.clientId,
+          refresh_token: issued.refresh_token,
+        });
+      if (operation === "access") {
+        expect((await broker.tool(issued.access_token)).status).toBe(401);
+      } else {
+        const rejected = await renew();
+        expect(rejected.status).toBe(400);
+        expect(await rejected.json()).toMatchObject({ error: "invalid_grant" });
+      }
+      expect(broker.session(issued.access_token)).toBeUndefined();
+      expect((await broker.tool(issued.access_token)).status).toBe(401);
+      expect((await renew()).status).toBe(400);
+      expect(broker.executions).toBe(0);
+      const signedIn = await tokens(await broker.token((await grant()).fields));
+      expect((await broker.tool(signedIn.access_token)).status).toBe(200);
+    }
+  );
+
   it.each(["valid", "invalid", "reject"] as const)(
     "times out a hung refresh and fences late %s completion while holding the client lock",
     async (late) => {
@@ -142,8 +357,10 @@ describe("Better Auth MCP broker (real engine and SQLite)", () => {
       expect(
         broker.session(issued.access_token)!.nativeLeaseOwner
       ).toBeTruthy();
+      // Grant lookup includes asynchronous crypto. Use the real lock deadline
+      // rather than advancing a fake clock before that lookup has completed.
+      vi.useRealTimers();
       const overlapping = renew();
-      await vi.advanceTimersByTimeAsync(1_001);
       expect((await overlapping)!.status).toBe(503);
       expect(revalidate).toHaveBeenCalledTimes(1);
       // Revocation does not revalidate the session: only the client lock can
@@ -159,7 +376,6 @@ describe("Better Auth MCP broker (real engine and SQLite)", () => {
           }),
         })
       );
-      await vi.advanceTimersByTimeAsync(1_001);
       expect((await revocation)!.status).toBe(503);
       expect(broker.refreshRows()).toEqual(refreshBefore);
       if (late === "reject") fail(new Error("late provider failure"));
@@ -184,7 +400,6 @@ describe("Better Auth MCP broker (real engine and SQLite)", () => {
         updatedAt: expect.any(String),
       });
       expect(broker.refreshRows()).toEqual(refreshBefore);
-      vi.useRealTimers();
       expect((await renew())!.status).toBe(200);
     }
   );

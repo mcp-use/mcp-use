@@ -10,7 +10,8 @@ import Provider, { type Adapter, type ClientMetadata } from "oidc-provider";
 
 /** Independent local issuer: real codes, PKCE, signing, introspection and revocation. */
 export async function startOidcProvider(
-  authentication: "basic" | "post" = "post"
+  authentication: "basic" | "post" = "post",
+  accessTokenSeconds?: number
 ) {
   let handle = async (_request: IncomingMessage, response: ServerResponse) => {
     response.writeHead(503).end();
@@ -55,6 +56,10 @@ export async function startOidcProvider(
       },
     },
     responseTypes: ["code"],
+    rotateRefreshToken: true,
+    ...(accessTokenSeconds === undefined
+      ? {}
+      : { ttl: { AccessToken: accessTokenSeconds } }),
     pkce: { required: () => true },
     claims: {
       openid: ["sub"],
@@ -77,10 +82,28 @@ export async function startOidcProvider(
   const callback = provider.callback();
   const control = {
     fault: "none" as "none" | "unavailable" | "unauthorized" | "malformed",
+    tokenFault: "none" as "none" | "unavailable" | "invalid_grant",
+    tokenWait: undefined as Promise<void> | undefined,
+    failIntrospectionAfterToken: false,
   };
   let introspectionCalls = 0;
+  let tokenCalls = 0;
   handle = async (request, response) => {
     const url = new URL(request.url!, origin);
+    if (url.pathname === "/token") {
+      tokenCalls++;
+      const fault = control.tokenFault;
+      if (control.tokenWait) await control.tokenWait;
+      if (control.failIntrospectionAfterToken) control.fault = "unavailable";
+      if (fault !== "none") {
+        response
+          .writeHead(fault === "unavailable" ? 503 : 400, {
+            "content-type": "application/json",
+          })
+          .end(JSON.stringify({ error: fault }));
+        return;
+      }
+    }
     if (url.pathname === "/token/introspection") {
       introspectionCalls++;
       if (control.fault !== "none") {
@@ -148,6 +171,9 @@ export async function startOidcProvider(
     errors,
     get introspectionCalls() {
       return introspectionCalls;
+    },
+    get tokenCalls() {
+      return tokenCalls;
     },
     async register(callbackUrl: string) {
       const metadata: ClientMetadata = {

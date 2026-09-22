@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { symmetricDecrypt } from "better-auth/crypto";
 import { decodeJwt } from "jose";
 import { setTimeout as delay } from "node:timers/promises";
@@ -24,9 +24,13 @@ async function upstreamBroker(
   authentication: "basic" | "post" = "post",
   discovery = true,
   accessTokenSeconds = 60,
-  tokenType: "access_token" | "refresh_token" = "refresh_token"
+  tokenType: "access_token" | "refresh_token" = "refresh_token",
+  upstreamAccessSeconds?: number
 ) {
-  const upstream = await startOidcProvider(authentication);
+  const upstream = await startOidcProvider(
+    authentication,
+    upstreamAccessSeconds
+  );
   cleanup.push(async () => {
     await upstream.close();
     expect(upstream.errors).toEqual([]);
@@ -96,6 +100,156 @@ async function upstreamBroker(
 }
 
 describe("generic MCP broker with an independent OAuth issuer", () => {
+  it("keeps rotated upstream credentials when their subsequent introspection is unavailable", async () => {
+    const f = await upstreamBroker("post", true, 60, "access_token", 2);
+    const first = await f.login();
+    const before = f.broker.session(
+      first.credentials.access_token
+    )!.upstreamBinding;
+    const expiry = JSON.parse(String(before)).tokenExpiresAt as number;
+    await delay(Math.max(0, expiry * 1000 - Date.now()) + 25);
+    f.upstream.control.failIntrospectionAfterToken = true;
+    expect((await f.broker.tool(first.credentials.access_token)).status).toBe(
+      503
+    );
+    expect(f.broker.executions).toBe(0);
+    expect(
+      f.broker.session(first.credentials.access_token)!.upstreamBinding
+    ).not.toBe(before);
+    const calls = f.upstream.tokenCalls;
+    f.upstream.control.failIntrospectionAfterToken = false;
+    f.upstream.control.fault = "none";
+    expect((await f.broker.tool(first.credentials.access_token)).status).toBe(
+      200
+    );
+    expect(f.upstream.tokenCalls).toBe(calls);
+  });
+
+  it("cancels upstream renewal without letting a late rejection delete the session", async () => {
+    const f = await upstreamBroker("post", true, 60, "access_token", 2);
+    const first = await f.login();
+    const before = f.broker.session(
+      first.credentials.access_token
+    )!.upstreamBinding;
+    const expiry = JSON.parse(String(before)).tokenExpiresAt as number;
+    await delay(Math.max(0, expiry * 1000 - Date.now()) + 25);
+    let release!: () => void;
+    f.upstream.control.tokenWait = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    f.upstream.control.tokenFault = "invalid_grant";
+    const calls = f.upstream.tokenCalls;
+    const controller = new AbortController();
+    const pending = f.broker.integration.requestAuth.authenticate(
+      new Request(f.broker.resource, {
+        headers: { authorization: `Bearer ${first.credentials.access_token}` },
+        signal: controller.signal,
+      })
+    );
+    try {
+      await vi.waitFor(() => expect(f.upstream.tokenCalls).toBe(calls + 1));
+      controller.abort();
+      expect(await pending).toMatchObject({ status: 503 });
+      await vi.waitFor(() =>
+        expect(
+          f.broker.session(first.credentials.access_token)!.upstreamBinding
+        ).toBe(before)
+      );
+    } finally {
+      release();
+      f.upstream.control.tokenWait = undefined;
+      f.upstream.control.tokenFault = "none";
+    }
+    expect((await f.broker.tool(first.credentials.access_token)).status).toBe(
+      200
+    );
+  });
+
+  it.each(["basic", "post"] as const)(
+    "renews expired upstream access with %s authentication and keeps logins isolated",
+    async (authentication) => {
+      const f = await upstreamBroker(
+        authentication,
+        true,
+        60,
+        "access_token",
+        2
+      );
+      const first = await f.login();
+      const second = await f.login();
+      const before = f.broker.session(
+        first.credentials.access_token
+      )!.upstreamBinding;
+      const secondBefore = f.broker.session(
+        second.credentials.access_token
+      )!.upstreamBinding;
+      const expiry = (JSON.parse(String(before)) as { tokenExpiresAt: number })
+        .tokenExpiresAt;
+      await delay(Math.max(0, expiry * 1000 - Date.now()) + 25);
+      const calls = f.upstream.tokenCalls;
+      const responses = await Promise.all([
+        f.broker.tool(first.credentials.access_token),
+        f.broker.tool(first.credentials.access_token),
+      ]);
+      expect(responses.some((response) => response.status === 200)).toBe(true);
+      expect(
+        responses.every((response) => [200, 503].includes(response.status))
+      ).toBe(true);
+      expect(f.upstream.tokenCalls).toBe(calls + 1);
+      expect(
+        f.broker.session(first.credentials.access_token)!.upstreamBinding
+      ).not.toBe(before);
+      expect(
+        f.broker.session(second.credentials.access_token)!.upstreamBinding
+      ).toBe(secondBefore);
+      expect((await f.broker.tool(first.credentials.access_token)).status).toBe(
+        200
+      );
+    }
+  );
+
+  it("preserves an expired upstream session during a refresh outage and recovers with the same MCP token", async () => {
+    const f = await upstreamBroker("post", false, 60, "access_token", 2);
+    const first = await f.login();
+    const before = f.broker.session(
+      first.credentials.access_token
+    )!.upstreamBinding;
+    const expiry = JSON.parse(String(before)).tokenExpiresAt as number;
+    await delay(Math.max(0, expiry * 1000 - Date.now()) + 25);
+    f.upstream.control.tokenFault = "unavailable";
+    expect((await f.broker.tool(first.credentials.access_token)).status).toBe(
+      503
+    );
+    expect(
+      f.broker.session(first.credentials.access_token)!.upstreamBinding
+    ).toBe(before);
+    f.upstream.control.tokenFault = "none";
+    expect((await f.broker.tool(first.credentials.access_token)).status).toBe(
+      200
+    );
+  });
+
+  it("ends the local session when upstream refresh credentials are rejected", async () => {
+    const f = await upstreamBroker("post", true, 60, "access_token", 2);
+    const first = await f.login();
+    const expiry = JSON.parse(
+      String(f.broker.session(first.credentials.access_token)!.upstreamBinding)
+    ).tokenExpiresAt as number;
+    await delay(Math.max(0, expiry * 1000 - Date.now()) + 25);
+    f.upstream.control.tokenFault = "invalid_grant";
+    expect((await f.broker.tool(first.credentials.access_token)).status).toBe(
+      401
+    );
+    expect(f.broker.session(first.credentials.access_token)).toBeUndefined();
+    const rejected = await f.broker.token({
+      grant_type: "refresh_token",
+      client_id: first.grant.clientId,
+      refresh_token: first.credentials.refresh_token,
+    });
+    expect(rejected.status).toBe(400);
+    expect(await rejected.json()).toMatchObject({ error: "invalid_grant" });
+  });
+
   it("lets the actual client discover, register, authorize and automatically renew after expiry", async () => {
     const { broker, upstream } = await upstreamBroker("post", true, 2);
     const reservation = await listenFetch(async () => new Response(null));
@@ -179,6 +333,12 @@ describe("generic MCP broker with an independent OAuth issuer", () => {
     expect(typeof originalGrant.authorizationCodeId).toBe("string");
     await delay(2100);
     expect(firstClaims.exp).toBeLessThanOrEqual(Date.now() / 1000);
+    upstream.control.fault = "unavailable";
+    await expect(connection.callTool("identity", {})).rejects.toThrow();
+    expect((await authProvider.tokens())?.refresh_token).toBe(
+      first.refresh_token
+    );
+    upstream.control.fault = "none";
     const secondResult = await connection.callTool("identity", {});
     expect(secondResult.isError).not.toBe(true);
     expect(secondResult.content).toEqual(firstResult.content);
