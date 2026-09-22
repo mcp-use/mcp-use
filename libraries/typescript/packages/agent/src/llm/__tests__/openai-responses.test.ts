@@ -270,6 +270,76 @@ describe("Responses SSE event mapping", () => {
     ]);
   });
 
+  it("does not treat a compatibility call_id as another output item's item_id", async () => {
+    const events = [
+      {
+        type: "response.output_item.added",
+        item: {
+          type: "function_call",
+          id: "shared",
+          call_id: "first_call",
+          name: "first",
+        },
+      },
+      {
+        type: "response.output_item.added",
+        item: {
+          type: "function_call",
+          id: "item_two",
+          call_id: "shared",
+          name: "second",
+        },
+      },
+      {
+        type: "response.function_call_arguments.done",
+        call_id: "shared",
+        arguments: '{"target":"second"}',
+      },
+    ];
+    const body = events
+      .map((event) => `data: ${JSON.stringify(event)}\n\n`)
+      .join("");
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(body, { status: 200 }));
+
+    const result = [];
+    try {
+      for await (const event of streamResponsesTurn({
+        config: { provider: "openai", model: "gpt-4o-mini", apiKey: "test" },
+        messages: [],
+        tools: [],
+      })) {
+        result.push(event);
+      }
+    } finally {
+      fetchMock.mockRestore();
+    }
+
+    expect(result).toEqual([
+      {
+        type: "tool-call-start",
+        index: 0,
+        toolCallId: "first_call",
+        toolName: "first",
+      },
+      {
+        type: "tool-call-start",
+        index: 1,
+        toolCallId: "shared",
+        toolName: "second",
+      },
+      {
+        type: "tool-call-ready",
+        index: 1,
+        toolCallId: "shared",
+        toolName: "second",
+        args: { target: "second" },
+      },
+      { type: "done" },
+    ]);
+  });
+
   it("ignores unknown and ambiguous compatibility IDs without changing another call", async () => {
     const events = [
       {

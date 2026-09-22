@@ -289,14 +289,18 @@ export async function* streamResponsesTurn(
   // OpenAI events normally use `item_id`, but compatibility producers can
   // still send the protocol `call_id`. Keep one buffer per output item and
   // accept either identifier when consuming argument events.
-  const findCallBuffer = (id: string) => {
-    const itemBuffer = callBuffers.get(id);
-    if (itemBuffer) return itemBuffer;
+  const findCallBuffer = (itemId?: string, callId?: string) => {
+    // `item_id` and `call_id` occupy different namespaces. In particular, a
+    // compatibility producer can send a call_id which happens to equal a
+    // different output item's id. Only use the item map when the event
+    // explicitly identifies an item.
+    if (itemId) return callBuffers.get(itemId);
+    if (!callId) return undefined;
 
     // A compatibility call_id must identify exactly one output item. Choosing
     // the first duplicate would attach streamed arguments to the wrong call.
     const matches = [...callBuffers.values()].filter(
-      (buffer) => buffer.callId === id
+      (buffer) => buffer.callId === callId
     );
     return matches.length === 1 ? matches[0] : undefined;
   };
@@ -352,13 +356,11 @@ export async function* streamResponsesTurn(
 
     if (type === "response.function_call_arguments.delta") {
       const itemId =
-        typeof parsed.item_id === "string"
-          ? parsed.item_id
-          : typeof parsed.call_id === "string"
-            ? parsed.call_id
-            : "";
+        typeof parsed.item_id === "string" ? parsed.item_id : undefined;
+      const callId =
+        typeof parsed.call_id === "string" ? parsed.call_id : undefined;
       const delta = typeof parsed.delta === "string" ? parsed.delta : "";
-      const buf = findCallBuffer(itemId);
+      const buf = findCallBuffer(itemId, callId);
       if (buf && delta.length > 0) {
         buf.argsJson += delta;
         yield {
@@ -374,14 +376,12 @@ export async function* streamResponsesTurn(
 
     if (type === "response.function_call_arguments.done") {
       const itemId =
-        typeof parsed.item_id === "string"
-          ? parsed.item_id
-          : typeof parsed.call_id === "string"
-            ? parsed.call_id
-            : "";
+        typeof parsed.item_id === "string" ? parsed.item_id : undefined;
+      const callId =
+        typeof parsed.call_id === "string" ? parsed.call_id : undefined;
       const argsRaw =
         typeof parsed.arguments === "string" ? parsed.arguments : "";
-      const buf = findCallBuffer(itemId);
+      const buf = findCallBuffer(itemId, callId);
       if (buf) {
         if (argsRaw) buf.argsJson = argsRaw;
         yield {
