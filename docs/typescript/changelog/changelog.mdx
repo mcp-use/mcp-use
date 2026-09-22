@@ -15,6 +15,7 @@ rss: true
 
 - **New** (server): `mcp-use/vite`, `mcp-use/tanstack-start`, and `mcp-use/tanstack-start/vite` mount an MCP server in a TanStack Start route; a dedicated Vite environment reloads server code, skills, and views during development and builds deployable assets for production (`#2517`)
 - **Fix** (server): the landing page hides the public chat button until public chat is available (`#2612`)
+- **Fix** (server): Vite integration base-path validation handles long paths with repeated slashes without slow regex matching
 - **Fix** (@mcp-use/client): sibling inline widgets preserve each other's fullscreen and picture-in-picture document state, and MCP App iframes remain transparent in dark hosts (`#2454`, `#2610`)
 - **Fix** (@mcp-use/cli): `whoami` uses the account's default organization when none is selected locally, and whitespace around `skills.directory` no longer breaks skill discovery (`#2570`, `#2597`)
 - **Fix** (create-mcp-use-app): template tsconfigs load Node types explicitly so new projects typecheck with TypeScript 7 (`#2595`)
