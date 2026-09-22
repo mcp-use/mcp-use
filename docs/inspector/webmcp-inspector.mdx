@@ -25,22 +25,12 @@ The source lives at [mcp-use/webmcp-inspector](https://github.com/mcp-use/webmcp
   in `chrome://flags` and relaunch a compatible Chromium build.
 </Note>
 
-## Install the prebuilt build
-
-The extension is not on the Chrome Web Store. Download the prebuilt zip and load it
-unpacked:
+## Install from the Chrome Web Store
 
 <Steps>
-  <Step title="Download the build">
-    Grab [`webmcp-inspector.zip`](https://github.com/mcp-use/webmcp-inspector/releases/latest/download/webmcp-inspector.zip).
-    That link always serves the latest release. Unzip it somewhere you can keep it —
-    Chrome loads the unpacked folder from disk.
-  </Step>
-  <Step title="Enable Developer mode">
-    Open `chrome://extensions` and turn on **Developer mode**.
-  </Step>
-  <Step title="Load unpacked">
-    Click **Load unpacked** and select the unzipped folder.
+  <Step title="Add the extension">
+    Open the [WebMCP Inspector listing](https://chromewebstore.google.com/detail/webmcp-inspector/dgdidjgjofcenipdfaoebdeeppideadh)
+    and click **Add to Chrome**.
   </Step>
   <Step title="Open the panel">
     Open a WebMCP-enabled page and click the extension's toolbar icon to open the side panel.
@@ -68,7 +58,12 @@ saved by name; saved requests are stored locally and scoped to the site's origin
 The list refreshes automatically when the page registers or removes tools, when you change
 tabs, and on page loads.
 
-## Build from source
+## Build from source (contributors)
+
+<Note>
+  You only need this if you are working on the extension itself. To use the Inspector,
+  install it from the Chrome Web Store above.
+</Note>
 
 Use Node 22.12+ and pnpm.
 
@@ -79,8 +74,8 @@ pnpm install
 pnpm build
 ```
 
-Then load `.output/chrome-mv3` unpacked, following the same `chrome://extensions` steps as
-above.
+Then open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked**, and
+select `.output/chrome-mv3`.
 
 For iterating on the extension itself, `pnpm dev` runs a WXT development build with hot
 reload; load `.output/chrome-mv3-dev` instead. `pnpm zip` produces a release zip in
