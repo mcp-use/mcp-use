@@ -617,7 +617,10 @@ const DropdownContent = forwardRef<HTMLDivElement, DropdownContentProps>(
                     render Menu.RadioItem, which throws without it, and a
                     searchable list can filter the checked item out, leaving
                     checkedIndex undefined. */}
-                <Menu.RadioGroup value={checkedIndex ?? -1} className="contents">
+                <Menu.RadioGroup
+                  value={checkedIndex ?? -1}
+                  className="contents"
+                >
                   {children}
                 </Menu.RadioGroup>
               </Menu.Popup>
