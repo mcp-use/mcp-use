@@ -976,15 +976,17 @@ jobs:
       - name: Pack create-mcp-use-app
         working-directory: libraries/typescript/packages/create-mcp-use-app
         run: npm pack
+      # pnpm pack rewrites workspace:* to concrete versions (as `changeset
+      # publish` does), so these tarballs install outside the monorepo.
       - name: Pack @mcp-use/cli
         working-directory: libraries/typescript/packages/cli
-        run: npm pack
+        run: pnpm pack
       - name: Pack @mcp-use/inspector
         working-directory: libraries/typescript/packages/inspector
-        run: npm pack
+        run: pnpm pack
       - name: Pack mcp-use
         working-directory: libraries/typescript/packages/server
-        run: npm pack
+        run: pnpm pack
       - name: Upload All Package Artifacts
         uses: actions/upload-artifact@v7
         with:
@@ -1000,6 +1002,7 @@ jobs:
     needs: create-mcp-use-app-build
     name: "typescript/create-app-tests"
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -1036,73 +1039,11 @@ jobs:
         with:
           name: workspace-packages
           path: ./packages
-      - name: Test CLI Creation
+      - name: Scaffold, install and run dev
         shell: bash
-        run: |
-          # Get package path
-          if [ "${{ runner.os }}" == "Windows" ]; then
-            PACKAGE_PATH=$(powershell -Command "(Get-ChildItem -Recurse -Filter 'create-mcp-use-app-*.tgz' | Select-Object -First 1).FullName")
-          else
-            PACKAGE_PATH=$(realpath $(find ./packages -name 'create-mcp-use-app-*.tgz' -type f | head -n1))
-          fi
-
-          # Run create command based on PM
-          case "${{ matrix.pm }}" in
-            npm)
-              npx --yes --package="$PACKAGE_PATH" create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }}
-              ;;
-            yarn)
-              yarn dlx -p "create-mcp-use-app@file:$PACKAGE_PATH" create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }}
-              ;;
-            pnpm)
-              pnpm --package="$PACKAGE_PATH" dlx create-mcp-use-app test-app --template ${{ matrix.template }} ${{ matrix.flag }}
-              ;;
-          esac
-
-          # Verify creation
-          [ -d "test-app" ] || exit 1
-          [ -f "test-app/package.json" ] || exit 1
-          [ -f "test-app/index.ts" ] || exit 1
-          echo "✅ Project created successfully"
-
-      - name: Test dev command (non --dev flag only)
-        if: matrix.flag == ''
-        shell: bash
-        working-directory: test-app
-        run: |
-          # Start dev server in background
-          case "${{ matrix.pm }}" in
-            npm)
-              npm run dev &
-              ;;
-            yarn)
-              yarn dev &
-              ;;
-            pnpm)
-              pnpm dev &
-              ;;
-          esac
-
-          DEV_PID=$!
-
-          # Wait for server to start (10 seconds should be enough)
-          sleep 10
-
-          # Kill the dev server
-          if [ "${{ runner.os }}" == "Windows" ]; then
-            # On Windows, kill by port is more reliable than DEV_PID
-            # because bash's $! may not map to the actual Windows process ID
-            DEV_PORT=3000
-            for pid in $(netstat -ano 2>/dev/null | grep ":$DEV_PORT " | grep "LISTENING" | awk '{print $5}' | sort -u); do
-              taskkill //PID $pid //F 2>/dev/null || true
-            done
-            # Also try the process tree kill as fallback
-            taskkill //PID $DEV_PID //T //F 2>/dev/null || true
-          else
-            kill $DEV_PID 2>/dev/null || true
-          fi
-
-          # Wait for process to exit
-          wait $DEV_PID 2>/dev/null || true
-
-          echo "✅ Dev server started and stopped successfully"
+        run: >-
+          node libraries/typescript/packages/create-mcp-use-app/e2e/scaffold.mjs
+          --pm ${{ matrix.pm }}
+          --template ${{ matrix.template }}
+          --packages ./packages
+          ${{ matrix.flag }}
