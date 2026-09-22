@@ -6,6 +6,23 @@ icon: "database"
 
 Use the Convex provider when you host your own OAuth authorization server using the [Convex OAuth Provider component](https://www.convex.dev/components/codefox-inc/oauth-provider). MCP clients register directly with your Convex deployment through Dynamic Client Registration, and your MCP server verifies Convex-issued tokens.
 
+## Start from the template
+
+Use the [Convex OAuth template](https://github.com/manufacts/mcp-oauth-convex-template) for a standalone MCP server with an authenticated `whoami` tool.
+
+```bash
+git clone https://github.com/manufacts/mcp-oauth-convex-template.git
+cd mcp-oauth-convex-template
+npm ci
+cp .env.example .env
+```
+
+Configure your Convex OAuth Provider as described below, set `MCP_USE_OAUTH_CONVEX_AUTH_URL` in `.env`, then run `npm run dev`. Connect your MCP client to `http://localhost:3000/mcp`.
+
+The template hosts the MCP resource server. Your Convex deployment must provide the OAuth Provider component, login, consent, and token issuance; Convex Auth alone is not sufficient.
+
+You can also [deploy the template to Manufact](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmanufacts%2Fmcp-oauth-convex-template). Set the issuer URL in the deployment environment before starting the server. For public or tunnel deployments, set `MCP_URL` to the public MCP server origin, without `/mcp`.
+
 ## Configure Convex
 
 In your Convex deployment, set up the OAuth Provider component:
@@ -103,11 +120,11 @@ When using the Inspector, set the **Scope** to `openid profile email` if the cli
 
 <CardGroup cols={2}>
   <Card
-    title="Runnable Convex example"
+    title="Convex OAuth template"
     icon="github"
-    href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/server/examples/auth/convex"
+    href="https://github.com/manufacts/mcp-oauth-convex-template"
   >
-    Compare your setup with a working mcp-use Convex server.
+    Clone or deploy a standalone MCP server with Convex authentication.
   </Card>
   <Card
     title="Convex OAuth Provider component"
