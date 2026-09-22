@@ -340,6 +340,8 @@ type MenuPositionerProps = ComponentProps<typeof Menu.Positioner>;
 interface DropdownContentProps {
   children: ReactNode;
   className?: string;
+  /** Forwarded to the rendered popup so tests can target it. */
+  "data-testid"?: string;
   /** Index of the checked item. Drives the animated selected background and
    *  the radio-group value announced to assistive tech. */
   checkedIndex?: number;
@@ -357,6 +359,7 @@ const DropdownContent = forwardRef<HTMLDivElement, DropdownContentProps>(
       side = "bottom",
       align = "start",
       sideOffset = 6,
+      "data-testid": testId,
     },
     ref
   ) => {
@@ -485,6 +488,7 @@ const DropdownContent = forwardRef<HTMLDivElement, DropdownContentProps>(
           >
             <DropdownContext.Provider value={contentCtx}>
               <Menu.Popup
+                data-testid={testId}
                 render={
                   <Elevated
                     offset={2}
@@ -608,14 +612,17 @@ const DropdownContent = forwardRef<HTMLDivElement, DropdownContentProps>(
 
                 {/* display: contents keeps items direct flex children of the
                     popup so proximity measurement and gap layout still work,
-                    while the group provides the radio value context. */}
-                {checkedIndex != null ? (
-                  <Menu.RadioGroup value={checkedIndex} className="contents">
-                    {children}
-                  </Menu.RadioGroup>
-                ) : (
-                  children
-                )}
+                    while the group provides the radio value context. The group
+                    is always rendered: radio-style MenuItems (boolean `checked`)
+                    render Menu.RadioItem, which throws without it, and a
+                    searchable list can filter the checked item out, leaving
+                    checkedIndex undefined. */}
+                <Menu.RadioGroup
+                  value={checkedIndex ?? -1}
+                  className="contents"
+                >
+                  {children}
+                </Menu.RadioGroup>
               </Menu.Popup>
             </DropdownContext.Provider>
           </motion.div>
