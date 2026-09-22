@@ -258,13 +258,6 @@ test.describe("Conformance UI widgets - Chat Tab", () => {
   test("chat-conformance fixture sends follow-ups and replaces model context", async ({
     page,
   }) => {
-    // Known gap: a view's updateModelContext never reaches the Chat LLM
-    // request (and the "State synced to model" badge never shows), so the
-    // follow-up turn goes out without the view's context. See #2623.
-    test.fail(
-      true,
-      "View model context is missing from the Chat follow-up LLM request"
-    );
     await page
       .getByTestId("chat-input")
       .fill("Use the chat-conformance-fixture tool now");
