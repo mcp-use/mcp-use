@@ -1,5 +1,11 @@
 # mcp-use
 
+## 2.6.0-canary.5
+
+### Patch Changes
+
+- f143d66: Validate Vite integration base paths without a slow trailing-slash regular expression on long paths.
+
 ## 2.6.0-canary.4
 
 ### Patch Changes
