@@ -10,5 +10,8 @@
     "mcp-use": "2.6.0",
     "@mcp-use/tunnel": "0.2.1"
   },
-  "changesets": []
+  "changesets": [
+    "propagated-4e7ceff2ba8e4d70",
+    "tidy-screenshots-measure"
+  ]
 }
