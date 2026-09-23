@@ -9,8 +9,27 @@ import type { Env } from "hono";
 
 import type { McpUiResourceCsp } from "@modelcontextprotocol/ext-apps";
 
-import type { OAuthMode, RequestContext, ToolAuth } from "./context.js";
+import type { OAuthMode, RequestContext } from "./context.js";
 import type { UiPermissions } from "./views/types.js";
+
+/**
+ * One way a client may call a tool, from the `securitySchemes` convention
+ * ChatGPT reads on `tools/list`. See {@link ToolDefinition.securitySchemes}.
+ */
+export type ToolSecurityScheme =
+  | {
+      /** The tool runs without a token. */
+      readonly type: "noauth";
+    }
+  | {
+      /** The tool accepts an OAuth 2.1 bearer token. */
+      readonly type: "oauth2";
+      /**
+       * Scopes beyond the provider's `requiredScopes`. Use `[]` for the
+       * provider's `requiredScopes` alone.
+       */
+      readonly scopes: readonly string[];
+    };
 
 /**
  * Binds a tool to a view directory for MCP Apps rendering.
@@ -101,20 +120,27 @@ export interface ToolDefinition {
    */
   visibility?: "model" | "app";
   /**
-   * Who may call the tool on an OAuth server. See {@link ToolAuth}.
+   * How the tool may be called on an OAuth server. Checked before the
+   * callback runs, and advertised on `tools/list` for hosts such as ChatGPT.
    *
-   * Checked before the callback runs. On a `mixedAuth` server, and on any
-   * tool that declares `auth`, mcp-use also advertises the matching
-   * `securitySchemes` on `tools/list` for hosts such as ChatGPT. Omitted
-   * means sign-in with the provider's `requiredScopes`.
+   * - `[{ type: "noauth" }]`: anyone may call it; `ctx.auth` is set when the
+   *   caller is signed in.
+   * - `[{ type: "noauth" }, { type: "oauth2", scopes }]`: anyone may call it.
+   *   The scopes are only advertised, so the callback checks
+   *   `ctx.auth?.scopes` itself.
+   * - `[{ type: "oauth2", scopes }]`: sign-in required with every listed
+   *   scope plus the provider's `requiredScopes`.
+   *
+   * Omitted means sign-in with the provider's `requiredScopes`. `noauth`
+   * requires `mixedAuth: true` on the server.
    *
    * @example
    * ```ts
-   * auth: "public"
-   * auth: { scopes: ["checkout"] }
+   * securitySchemes: [{ type: "noauth" }]
+   * securitySchemes: [{ type: "oauth2", scopes: ["checkout"] }]
    * ```
    */
-  auth?: ToolAuth;
+  securitySchemes?: readonly ToolSecurityScheme[];
   /**
    * Bind this tool to a view for MCP Apps rendering. Requires
    * {@link ToolDefinition.outputSchema} — the view reads the result's

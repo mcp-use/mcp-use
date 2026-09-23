@@ -37,13 +37,14 @@ const auth = createDemoAuth({ origin: origin.origin, resource: resource.href });
 
 // `oauth` publishes RFC 9728 discovery metadata and verifies bearer tokens.
 // `mixedAuth` lets anyone connect and list tools, resources, and prompts
-// before signing in. It does not make anything public: each item's `auth`
-// decides who can use it.
+// before signing in. It does not make anything public: each tool's
+// `securitySchemes` decides who can call it, and resources and prompts always
+// need sign-in.
 const server = new MCPServer({
   name: "mixed-oauth-demo",
   version: "1.0.0",
   description:
-    "A local mcp-use server with public, optional, and sign-in tools, resources, and prompts.",
+    "A local mcp-use server with public, optional, and sign-in tools, plus sign-in resources and prompts.",
   oauth: provider,
   mixedAuth: true,
   cors: {
@@ -71,13 +72,14 @@ const cardSchema = z.object({
   scopes: z.array(z.string()),
 });
 
-// --- Tools: one per `auth` value, plus a view-bound tool on each side. ----
+// --- Tools: one per `securitySchemes` shape, plus a view-bound tool on each
+// side. ---------------------------------------------------------------------
 
 server.tool(
   {
     name: "public_ping",
     description: "Public tool. Works before and after sign-in.",
-    auth: "public",
+    securitySchemes: [{ type: "noauth" }],
   },
   async (_args, ctx) => text(`public_ping: ${caller(ctx.auth)}`)
 );
@@ -87,7 +89,7 @@ server.tool(
     name: "optional_whoami",
     description:
       "Optional tool. Runs for everyone and reports who the server thinks is calling and which scopes the token carries.",
-    auth: "optional",
+    securitySchemes: [{ type: "noauth" }, { type: "oauth2", scopes: [] }],
   },
   async (_args, ctx) => text(`optional_whoami: ${caller(ctx.auth)}`)
 );
@@ -97,7 +99,10 @@ server.tool(
     name: "optional_welcome",
     description:
       "Optional tool that advertises the profile scope. Personalized only when the token carries profile; never refused for a missing scope.",
-    auth: { optional: true, scopes: ["profile"] },
+    securitySchemes: [
+      { type: "noauth" },
+      { type: "oauth2", scopes: ["profile"] },
+    ],
   },
   async (_args, ctx) =>
     text(
@@ -111,7 +116,7 @@ server.tool(
   {
     name: "protected_profile",
     description:
-      "Sign-in tool. Omits auth, so it needs a token with the provider's required scopes.",
+      "Sign-in tool. Omits securitySchemes, so it needs a token with the provider's required scopes.",
   },
   async (_args, ctx) => text(`protected_profile: ${caller(ctx.auth)}`)
 );
@@ -121,7 +126,7 @@ server.tool(
     name: "protected_update_profile",
     description:
       "Sign-in tool that also needs the profile scope. A token without it gets a scope step-up challenge.",
-    auth: { scopes: ["profile"] },
+    securitySchemes: [{ type: "oauth2", scopes: ["profile"] }],
   },
   async (_args, ctx) => text(`protected_update_profile: ${caller(ctx.auth)}`)
 );
@@ -130,8 +135,8 @@ export const publicCard = server.tool(
   {
     name: "public_card",
     description:
-      "Public tool with a view. The view resource can be read signed out.",
-    auth: "public",
+      "Public tool with a view. Like every resource, the view needs sign-in to read.",
+    securitySchemes: [{ type: "noauth" }],
     outputSchema: cardSchema,
     view: { name: "public-card", description: "Card from a public tool" },
   },
@@ -163,27 +168,8 @@ export const protectedCard = server.tool(
   })
 );
 
-// --- Resources and resource templates. ------------------------------------
-
-server.resource(
-  { name: "public_catalog", uri: "demo://public/catalog", auth: "public" },
-  async (uri, ctx) => ({
-    contents: [{ uri: uri.href, text: `public_catalog: ${caller(ctx.auth)}` }],
-  })
-);
-
-server.resource(
-  {
-    name: "optional_greeting",
-    uri: "demo://optional/greeting",
-    auth: "optional",
-  },
-  async (uri, ctx) => ({
-    contents: [
-      { uri: uri.href, text: `optional_greeting: ${caller(ctx.auth)}` },
-    ],
-  })
-);
+// --- Resources and prompts: always sign-in with the provider's required
+// scopes. ------------------------------------------------------------------
 
 server.resource(
   { name: "protected_profile", uri: "demo://protected/profile" },
@@ -196,23 +182,8 @@ server.resource(
 
 server.resourceTemplate(
   {
-    name: "public_item",
-    uriTemplate: "demo://public/items/{id}",
-    auth: "public",
-    complete: { id: ["1", "2", "3"] },
-  },
-  async (uri, { id }, ctx) => ({
-    contents: [
-      { uri: uri.href, text: `public_item ${String(id)}: ${caller(ctx.auth)}` },
-    ],
-  })
-);
-
-server.resourceTemplate(
-  {
     name: "protected_note",
     uriTemplate: "demo://protected/notes/{id}",
-    auth: { scopes: ["email"] },
     complete: { id: ["1", "2", "3"] },
   },
   async (uri, { id }, ctx) => ({
@@ -225,39 +196,22 @@ server.resourceTemplate(
   })
 );
 
-// --- Prompts. -------------------------------------------------------------
-
-function prompt(value: string) {
-  return {
-    messages: [
-      {
-        role: "user" as const,
-        content: { type: "text" as const, text: value },
-      },
-    ],
-  };
-}
-
-server.prompt(
-  { name: "public_tips", description: "Public prompt.", auth: "public" },
-  async (_args, ctx) => prompt(`public_tips: ${caller(ctx.auth)}`)
-);
-
-server.prompt(
-  {
-    name: "optional_greeting",
-    description: "Optional prompt, personalized when signed in.",
-    auth: "optional",
-  },
-  async (_args, ctx) => prompt(`optional_greeting: ${caller(ctx.auth)}`)
-);
-
 server.prompt(
   {
     name: "protected_summary",
     description: "Sign-in prompt with the provider's required scopes.",
   },
-  async (_args, ctx) => prompt(`protected_summary: ${caller(ctx.auth)}`)
+  async (_args, ctx) => ({
+    messages: [
+      {
+        role: "user" as const,
+        content: {
+          type: "text" as const,
+          text: `protected_summary: ${caller(ctx.auth)}`,
+        },
+      },
+    ],
+  })
 );
 
 // --- Authorization server routes. -----------------------------------------

@@ -82,7 +82,7 @@ When `oauth` is configured:
 - invalid, expired, incorrectly resourced tokens, and tokens missing configured `requiredScopes` are rejected before tool code runs;
 - callbacks receive the verified access token, identity, scopes, permissions, expiry, client ID when present, and resource.
 
-To let clients connect and use some tools before signing in, add `mixedAuth: true` and declare `auth` on each public or optional tool, resource, or prompt. See [Mixed Authentication](/v2/typescript/server/authentication/mixed-auth).
+To let clients connect and call some tools before signing in, add `mixedAuth: true` and declare `securitySchemes` with `{ type: "noauth" }` on each public or optional tool. See [Mixed Authentication](/v2/typescript/server/authentication/mixed-auth).
 
 ## Next steps
 

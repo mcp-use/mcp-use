@@ -7,7 +7,7 @@ import type {
 } from "@modelcontextprotocol/server";
 import type { Env } from "hono";
 
-import type { OAuthMode, RequestContext, ToolAuth } from "./context.js";
+import type { RequestContext } from "./context.js";
 
 /** Declares a static resource at a fixed URI. First argument to {@link MCPServer.resource}. */
 export interface ResourceDefinition {
@@ -34,12 +34,6 @@ export interface ResourceDefinition {
    * metadata must be returned by the callback on each entry's own `_meta`.
    */
   _meta?: MetaObject;
-  /**
-   * Who may read the resource on an OAuth server. See {@link ToolAuth}.
-   * Checked before the callback runs; omitted means sign-in with the
-   * provider's `requiredScopes`.
-   */
-  auth?: ToolAuth;
 }
 
 /**
@@ -58,7 +52,7 @@ export interface ResourceDefinition {
  */
 export type ResourceCallback<
   TUser = never,
-  HasOAuth extends OAuthMode = false,
+  HasOAuth extends boolean = false,
   TEnv extends Env = Env,
 > = (
   uri: URL,
@@ -139,12 +133,6 @@ export interface ResourceTemplateDefinition<
    * official completion context containing already-resolved arguments.
    */
   complete?: ResourceTemplateCompletions<TUriTemplate>;
-  /**
-   * Who may read resources from this template on an OAuth server. See
-   * {@link ToolAuth}. Applies to every URI the template matches; omitted
-   * means sign-in with the provider's `requiredScopes`.
-   */
-  auth?: ToolAuth;
 }
 
 /** Strip a leading RFC 6570 operator (`+`, `#`, `.`, `/`, `;`, `?`, `&`) from a template expression. */
@@ -201,7 +189,7 @@ export type InferTemplateParams<T> = T extends {
 export type ResourceTemplateCallback<
   TParams = Record<string, TemplateVariableValue>,
   TUser = never,
-  HasOAuth extends OAuthMode = false,
+  HasOAuth extends boolean = false,
   TEnv extends Env = Env,
 > = (
   uri: URL,

@@ -28,7 +28,7 @@ import {
   oauthWorkOSProvider,
   type WorkOSOAuthUser,
 } from "../src/oauth/workos.js";
-import type { OAuthAuth, ToolAuth } from "../src/index.js";
+import type { OAuthAuth, ToolSecurityScheme } from "../src/index.js";
 import type {
   OAuthMetadata,
   OAuthTokenVerifier,
@@ -41,7 +41,7 @@ interface TestUser {
 }
 
 declare const provider: OAuthProvider<TestUser>;
-declare const widenedAuth: ToolAuth;
+declare const widenedSchemes: readonly ToolSecurityScheme[];
 
 function verifyStructuralProviderTyping(
   tokenVerifier: OAuthTokenVerifier,
@@ -253,7 +253,8 @@ function verifyOAuthCallbackTyping(): void {
 
 void verifyOAuthCallbackTyping;
 
-// Type-level only: `ctx.auth` is narrowed per item from its literal `auth`.
+// Type-level only: a tool's `ctx.auth` is narrowed from its literal
+// `securitySchemes`; resources and prompts always require sign-in.
 function verifyItemAuthTyping(): void {
   const mixed = new MCPServer({
     name: "mixed",
@@ -262,27 +263,28 @@ function verifyItemAuthTyping(): void {
     mixedAuth: true,
   });
 
-  mixed.tool({ name: "browse_catalog", auth: "public" }, (_params, ctx) => {
-    const maybeAuth: OAuthAuth<TestUser> | undefined = ctx.auth;
-    const id: string | undefined = ctx.auth?.user.id;
-    // @ts-expect-error ctx.auth may be missing on a public tool
-    void ctx.auth.user.id;
-    void [maybeAuth, id];
-    return { content: [] };
-  });
-  mixed.tool({ name: "recommend", auth: "optional" }, (_params, ctx) => {
-    // @ts-expect-error ctx.auth may be missing on an optional tool
-    void ctx.auth.user.id;
-    return { content: [] };
-  });
+  mixed.tool(
+    { name: "browse_catalog", securitySchemes: [{ type: "noauth" }] },
+    (_params, ctx) => {
+      const maybeAuth: OAuthAuth<TestUser> | undefined = ctx.auth;
+      const id: string | undefined = ctx.auth?.user.id;
+      // @ts-expect-error ctx.auth may be missing on a noauth tool
+      void ctx.auth.user.id;
+      void [maybeAuth, id];
+      return { content: [] };
+    }
+  );
   mixed.tool(
     {
       name: "recommend_scoped",
-      auth: { scopes: ["orders:read"], optional: true },
+      securitySchemes: [
+        { type: "noauth" },
+        { type: "oauth2", scopes: ["orders:read"] },
+      ],
     },
     (_params, ctx) => {
       const scoped: boolean = ctx.auth?.scopes.includes("orders:read") ?? false;
-      // @ts-expect-error optional scopes never guarantee ctx.auth
+      // @ts-expect-error noauth next to oauth2 never guarantees ctx.auth
       void ctx.auth.scopes;
       void scoped;
       return { content: [] };
@@ -293,56 +295,41 @@ function verifyItemAuthTyping(): void {
     return { content: [{ type: "text", text: id }] };
   });
   mixed.tool(
-    { name: "create_checkout", auth: { scopes: ["checkout"] } },
+    {
+      name: "create_checkout",
+      securitySchemes: [{ type: "oauth2", scopes: ["checkout"] }],
+    },
     (_params, ctx) => {
       const id: string = ctx.auth.user.id;
       return { content: [{ type: "text", text: id }] };
     }
   );
+
+  // A widened declaration might accept noauth, so ctx.auth stays optional
+  // rather than claiming an identity the gate may not guarantee.
   mixed.tool(
-    { name: "explicit", auth: { scopes: ["checkout"], optional: false } },
+    { name: "widened", securitySchemes: widenedSchemes },
+    (_params, ctx) => {
+      // @ts-expect-error a widened array may include noauth
+      void ctx.auth.user.id;
+      return { content: [] };
+    }
+  );
+
+  // A variable declared `as const` keeps its literal types.
+  const checkoutSchemes = [{ type: "oauth2", scopes: ["checkout"] }] as const;
+  mixed.tool(
+    { name: "stored", securitySchemes: checkoutSchemes },
     (_params, ctx) => {
       const id: string = ctx.auth.user.id;
       return { content: [{ type: "text", text: id }] };
     }
   );
 
-  // A widened declaration might admit signed-out callers, so ctx.auth stays
-  // optional rather than claiming an identity the gate may not guarantee.
-  mixed.tool({ name: "widened", auth: widenedAuth }, (_params, ctx) => {
-    // @ts-expect-error a widened ToolAuth may be public
-    void ctx.auth.user.id;
-    return { content: [] };
-  });
-  const toggled = { scopes: ["a"], optional: Math.random() > 0.5 };
-  mixed.tool({ name: "toggled", auth: toggled }, (_params, ctx) => {
-    // @ts-expect-error optional: boolean may be true
-    void ctx.auth.user.id;
-    return { content: [] };
-  });
-
-  mixed.resource(
-    { name: "catalog", uri: "shop://catalog", auth: "public" },
-    (_uri, ctx) => {
-      // @ts-expect-error ctx.auth may be missing on a public resource
-      void ctx.auth.user.id;
-      return { contents: [{ uri: "shop://catalog", text: "" }] };
-    }
-  );
   mixed.resource({ name: "profile", uri: "shop://me" }, (_uri, ctx) => {
     const id: string = ctx.auth.user.id;
     return { contents: [{ uri: "shop://me", text: id }] };
   });
-  mixed.resourceTemplate(
-    { name: "product", uriTemplate: "shop://products/{id}", auth: "public" },
-    (_uri, params, ctx) => {
-      const productId: string | string[] = params.id;
-      // @ts-expect-error ctx.auth may be missing on a public template
-      void ctx.auth.user.id;
-      void productId;
-      return { contents: [] };
-    }
-  );
   mixed.resourceTemplate(
     { name: "order", uriTemplate: "shop://orders/{id}" },
     (_uri, params, ctx) => {
@@ -352,26 +339,6 @@ function verifyItemAuthTyping(): void {
       return { contents: [] };
     }
   );
-  mixed.resourceTemplate(
-    {
-      name: "invoice",
-      uriTemplate: "shop://invoices/{id}",
-      auth: { scopes: ["billing"] },
-    },
-    (_uri, _params, ctx) => {
-      const id: string = ctx.auth.user.id;
-      void id;
-      return { contents: [] };
-    }
-  );
-  mixed.prompt({ name: "gift_ideas", auth: "optional" }, (_params, ctx) => {
-    // @ts-expect-error ctx.auth may be missing on an optional prompt
-    void ctx.auth.user.id;
-    const text = ctx.auth
-      ? `Suggest gifts for ${ctx.auth.user.id}.`
-      : "Suggest popular gifts.";
-    return { messages: [{ role: "user", content: { type: "text", text } }] };
-  });
   mixed.prompt({ name: "upsell" }, (_params, ctx) => {
     const id: string = ctx.auth.user.id;
     return {
@@ -410,9 +377,19 @@ function verifyItemAuthTyping(): void {
   void invalid;
 
   mixed.tool(
-    // @ts-expect-error auth accepts "public", "optional", or { scopes }
-    { name: "typo", auth: "anonymous" },
+    // @ts-expect-error securitySchemes accepts noauth and oauth2 only
+    { name: "typo", securitySchemes: [{ type: "anonymous" }] },
     () => ({ content: [] })
+  );
+  mixed.tool(
+    // @ts-expect-error oauth2 requires scopes
+    { name: "no_scopes", securitySchemes: [{ type: "oauth2" }] },
+    () => ({ content: [] })
+  );
+  mixed.resource(
+    // @ts-expect-error resources have no per-item auth
+    { name: "catalog", uri: "shop://catalog", auth: "public" },
+    () => ({ contents: [] })
   );
 }
 

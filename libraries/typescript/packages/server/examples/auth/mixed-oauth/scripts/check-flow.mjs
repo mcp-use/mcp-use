@@ -219,7 +219,8 @@ const getPrompt = (name, token) => rpc("prompts/get", { name }, token);
 // --- signed out -------------------------------------------------------------
 const list = await rpc("tools/list");
 const tools = new Map(list.body.result.tools.map((tool) => [tool.name, tool]));
-// The server's REQUIRED_SCOPES, read from the scheme of a tool that omits auth.
+// The server's REQUIRED_SCOPES, read from the scheme of a tool that omits
+// securitySchemes.
 const baseline = tools
   .get("protected_profile")
   .securitySchemes[0].scopes.join(" ");
@@ -252,31 +253,21 @@ for (const [name, scopes] of [
     `scope="${scopeOf(r.challenge) ?? ""}"`
   );
 }
-for (const [uri, expected] of [
-  ["demo://public/catalog", 200],
-  ["demo://optional/greeting", 200],
-  ["demo://protected/profile", 401],
-  ["demo://public/items/7", 200],
-  ["demo://protected/notes/7", 401],
-  ["ui://views/public-card.html", 200],
-  ["ui://views/protected-card.html", 401],
+// Resources, views included, and prompts always need sign-in.
+for (const uri of [
+  "demo://protected/profile",
+  "demo://protected/notes/7",
+  "ui://views/public-card.html",
+  "ui://views/protected-card.html",
 ]) {
   const r = await read(uri);
-  check(
-    `read ${uri} signed out -> ${expected}`,
-    r.status === expected,
-    `${r.status}`
-  );
+  check(`read ${uri} signed out -> 401`, r.status === 401, `${r.status}`);
 }
-for (const [name, expected] of [
-  ["public_tips", 200],
-  ["optional_greeting", 200],
-  ["protected_summary", 401],
-]) {
-  const r = await getPrompt(name);
+{
+  const r = await getPrompt("protected_summary");
   check(
-    `prompt ${name} signed out -> ${expected}`,
-    r.status === expected,
+    "prompt protected_summary signed out -> 401",
+    r.status === 401,
     `${r.status}`
   );
 }
@@ -312,13 +303,19 @@ check(
   r.challenge
 );
 r = await read("demo://protected/notes/1", first.access_token);
-check("protected note without email -> 403", r.status === 403, `${r.status}`);
-r = await read("ui://views/protected-card.html", first.access_token);
 check(
-  "protected view readable with the baseline",
-  r.status === 200,
-  `${r.status}`
+  "protected note readable with the baseline",
+  r.status === 200 && /signed in as/.test(r.text ?? ""),
+  r.text
 );
+for (const view of ["public-card", "protected-card"]) {
+  r = await read(`ui://views/${view}.html`, first.access_token);
+  check(
+    `${view} view readable with the baseline`,
+    r.status === 200,
+    `${r.status}`
+  );
+}
 r = await getPrompt("protected_summary", first.access_token);
 check(
   "protected_summary prompt runs",
@@ -340,8 +337,6 @@ check(
   /welcome back/.test(r.text ?? ""),
   r.text
 );
-r = await read("demo://protected/notes/1", upgraded.access_token);
-check("protected note runs with email", r.status === 200, r.text);
 
 // --- declined scope on the consent screen ----------------------------------
 console.log(

@@ -244,69 +244,47 @@ type RequestContextBase<TEnv extends Env> = Omit<Context<TEnv>, "req"> & {
 };
 
 /**
- * Who may use a tool, resource, resource template, or prompt on an OAuth
- * server. Declared as the definition's `auth` field.
- *
- * - `"public"`: anyone may use it, signed in or not.
- * - `"optional"`: anyone may use it; `ctx.auth` is set when the caller is
- *   signed in.
- * - `{ scopes }`: sign-in required with every listed scope plus the
- *   provider's `requiredScopes`.
- * - `{ scopes, optional: true }`: anyone may use it. The scopes are only
- *   advertised; the callback checks `ctx.auth.scopes` itself.
- *
- * Omitting `auth` means sign-in with the provider's `requiredScopes`.
- * `"public"` and `"optional"` require `mixedAuth: true` on the server.
- */
-export type ToolAuth =
-  | "public"
-  | "optional"
-  | { scopes: readonly string[]; optional?: false }
-  | { scopes: readonly string[]; optional: true };
-
-/**
  * How verified OAuth identity reaches a callback's `ctx.auth`.
  *
  * - `false`: no OAuth provider is configured; `auth` is never present.
  * - `true`: the item requires sign-in, so `auth` is always present.
- * - `"optional"`: the item admits signed-out callers (`auth: "public"` or
- *   `"optional"`), so `auth` is present only when the request carried a
- *   verified token.
+ * - `"optional"`: the tool accepts `noauth`, so `auth` is present only when
+ *   the request carried a verified token.
  */
 export type OAuthMode = boolean | "optional";
 
-/** A `ToolAuth` value that requires sign-in. */
-type SignInAuth = {
-  readonly scopes: readonly string[];
-  readonly optional?: false;
-};
+/** `securitySchemes` that require sign-in: no `noauth` entry. */
+type SignInSchemes = readonly { readonly type: "oauth2" }[];
 
 /**
- * The {@link OAuthMode} of one item's callback, read from its literal `auth`
- * value. Anything that might admit signed-out callers, including a widened
- * {@link ToolAuth}, yields an optional `ctx.auth`.
+ * The {@link OAuthMode} of one tool's callback, read from its literal
+ * `securitySchemes`. Anything that might accept `noauth`, including a widened
+ * array, yields an optional `ctx.auth`.
  *
  * @internal
  */
-export type ItemOAuthMode<TUser, TAuth> = [TUser] extends [never]
+export type ToolOAuthMode<TUser, TSchemes> = [TUser] extends [never]
   ? false
-  : [TAuth] extends [SignInAuth | undefined]
+  : [TSchemes] extends [SignInSchemes | undefined]
     ? true
     : "optional";
 
 /**
- * The `auth` value of a definition type, or `undefined` when it has none.
+ * The `securitySchemes` of a tool definition type, or `undefined` when it
+ * has none.
  *
  * @internal
  */
-export type DefinitionAuth<T> = "auth" extends keyof T ? T["auth"] : undefined;
+export type DefinitionSecuritySchemes<T> = "securitySchemes" extends keyof T
+  ? T["securitySchemes"]
+  : undefined;
 
 /**
  * Per-request callback context, authenticated when OAuth is configured.
  *
  * The `HasOAuth` parameter is an {@link OAuthMode}: `true` guarantees
- * `auth`, `"optional"` makes it nullable for items that admit signed-out
- * callers, and `false` removes it.
+ * `auth`, `"optional"` makes it nullable for tools that accept `noauth`, and
+ * `false` removes it.
  */
 export type RequestContext<
   TUser = never,

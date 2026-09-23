@@ -147,7 +147,6 @@ export type {
   OAuthMode,
   RequestClientContext,
   RequestContext,
-  ToolAuth,
   UserContext,
 } from "./context.js";
 export type {
@@ -158,6 +157,7 @@ export type {
   ToolDefinition,
   ToolRef,
   ToolResult,
+  ToolSecurityScheme,
   ToolViewConfig,
 } from "./tools.js";
 export type {

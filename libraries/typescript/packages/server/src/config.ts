@@ -338,20 +338,21 @@ export type ServerConfig<TUser = never> = BaseServerConfig &
     : {
         /**
          * External OAuth resource-server provider. Callback contexts receive
-         * this provider's user type as `ctx.auth.user`: required in items
-         * that need sign-in, optional in items declared `auth: "public"` or
-         * `"optional"`.
+         * this provider's user type as `ctx.auth.user`: required in callbacks
+         * that need sign-in, optional in tools whose `securitySchemes`
+         * accept `noauth`.
          */
         oauth: OAuthProvider<TUser>;
         /**
-         * Serve public, optional, and sign-in items from one endpoint.
+         * Serve signed-out and signed-in tools from one endpoint.
          *
          * When `true`, anyone can connect and list tools, resources, and
-         * prompts without a token. It does not make anything public: each
-         * tool, resource, resource template, and prompt declares `auth`, and
-         * items without it still require sign-in with the provider's
-         * `requiredScopes`. A token that is sent is always verified, and an
-         * invalid or expired one is refused with `401`, even on public items.
+         * prompts without a token. It does not make anything public: only
+         * tools whose `securitySchemes` include `noauth` run signed out.
+         * Other tools, and every resource and prompt, still require sign-in
+         * with the provider's `requiredScopes`. A token that is sent is
+         * always verified, and an invalid or expired one is refused with
+         * `401`, even on `noauth` tools.
          *
          * When `false` or omitted, every request to the MCP endpoint needs a
          * valid token.

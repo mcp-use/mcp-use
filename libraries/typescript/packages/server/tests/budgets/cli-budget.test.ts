@@ -113,9 +113,9 @@ describe("published CLI boundaries", () => {
     const graphBytes = await sumFileBytes(graph.files.keys());
 
     expect((await stat(entry)).size).toBeLessThanOrEqual(100_000);
-    // Raised from 124 KiB when mixed auth's per-item policy resolver and
-    // gate lookups joined the static graph (about 6 KiB). The OAuth gate and
-    // its challenge builder stay in a lazy chunk.
+    // Raised from 124 KiB when mixed auth's securitySchemes resolver joined
+    // the static graph (about 5 KiB). The OAuth gate and its challenge
+    // builder stay in a lazy chunk.
     expect(graphBytes).toBeLessThanOrEqual(130 * 1024);
   });
 

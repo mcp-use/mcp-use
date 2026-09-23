@@ -16,7 +16,8 @@ import {
   prefersToolResultChallenge,
   type AuthChallengeReason,
 } from "./challenge.js";
-import type { AuthPolicy } from "./policy.js";
+import type { ToolSecurityScheme } from "../tools.js";
+import { requiresSignIn, schemeScopes } from "./policy.js";
 
 /** @internal Options for {@link createOAuthGate}. */
 export interface OAuthGateOptions {
@@ -26,25 +27,19 @@ export interface OAuthGateOptions {
   resourceMetadataUrl: string;
   /** Provider `requiredScopes`, enforced on every sign-in request. */
   baselineScopes: readonly string[];
-  /** Whether signed-out callers may connect, list, and use public items. */
+  /** Whether signed-out callers may connect, list, and call `noauth` tools. */
   mixedAuth: boolean;
-  /** Policy for a tool name, or `undefined` for an unknown tool. */
-  toolPolicy: (name: string) => AuthPolicy | undefined;
-  /** Policy for a resource URI as `resources/read` resolves it. */
-  resourcePolicy: (uri: string) => AuthPolicy | undefined;
-  /** Policy for a `completion/complete` `ref/resource` URI. */
-  completionResourcePolicy: (uri: string) => AuthPolicy | undefined;
-  /** Policy for a prompt name, or `undefined` for an unknown prompt. */
-  promptPolicy: (name: string) => AuthPolicy | undefined;
+  /** Resolved schemes for a tool name, or `undefined` for an unknown tool. */
+  toolSchemes: (name: string) => readonly ToolSecurityScheme[] | undefined;
 }
 
 /**
- * Methods a signed-out caller may issue on a `mixedAuth` server regardless of
- * any item's `auth`: discovery (`initialize` on 2025-era protocols,
+ * Methods a signed-out caller may issue on a `mixedAuth` server: discovery (`initialize` on 2025-era protocols,
  * `server/discover` on 2026-07-28), `ping`, the list methods, and the
  * 2025-era `logging/setLevel`, which reads no data. Refusing any of these
- * would make hosts demand sign-in at connection time. Every method not
- * listed here and not tied to an item requires sign-in.
+ * would make hosts demand sign-in at connection time. Apart from
+ * `tools/call` on `noauth` tools and list-changed streams, every other
+ * method requires sign-in, including reading resources and getting prompts.
  */
 const SIGNED_OUT_METHODS = new Set([
   "initialize",
@@ -99,15 +94,35 @@ function stringParam(
 }
 
 /**
+ * Whether a message other than `tools/call` needs sign-in on a `mixedAuth`
+ * server. Notifications are answered by the SDK without running any
+ * callback, and a `subscriptions/listen` stream without resource
+ * subscriptions carries only list-changed notifications, which reveal
+ * nothing the open list methods do not.
+ */
+function isSignInMethod(message: ParsedMessage): boolean {
+  if (SIGNED_OUT_METHODS.has(message.method)) return false;
+  if (message.id === undefined && message.method.startsWith("notifications/")) {
+    return false;
+  }
+  if (message.method === "subscriptions/listen") {
+    const filter = message.params?.["notifications"];
+    const uris = isRecord(filter) ? filter["resourceSubscriptions"] : undefined;
+    return uris !== undefined && (!Array.isArray(uris) || uris.length > 0);
+  }
+  return true;
+}
+
+/**
  * Build the bearer gate that fronts the MCP endpoint.
  *
  * A token that is sent is always verified first; an invalid or expired one is
- * refused with `401` on every request. Then the JSON-RPC method and the
- * targeted item's policy decide whether the request needs sign-in, and which
- * scopes. Verified identity is stashed on the request bag for the mount.
+ * refused with `401` on every request. Then the JSON-RPC method, and for
+ * `tools/call` the tool's `securitySchemes`, decide whether the request needs
+ * sign-in, and which scopes. Verified identity is stashed on the request bag for the mount.
  *
  * Without `mixedAuth`, every request needs a token with the provider's
- * `requiredScopes`, plus the scopes of the item it targets.
+ * `requiredScopes`, plus the scopes of the tool it calls.
  *
  * @internal
  */
@@ -117,98 +132,29 @@ export function createOAuthGate(options: OAuthGateOptions): FetchMiddleware {
     resourceMetadataUrl,
     baselineScopes,
     mixedAuth,
-    toolPolicy,
-    resourcePolicy,
-    completionResourcePolicy,
-    promptPolicy,
+    toolSchemes,
   } = options;
 
-  /**
-   * Policies of the items a message targets, or `undefined` when its method
-   * is not tied to items. A missing entry is an unknown item.
-   */
-  const itemPolicies = (
-    message: ParsedMessage
-  ): (AuthPolicy | undefined)[] | undefined => {
-    const { params } = message;
-    switch (message.method) {
-      case "tools/call": {
-        const name = stringParam(params, "name");
-        return [name === undefined ? undefined : toolPolicy(name)];
-      }
-      case "prompts/get": {
-        const name = stringParam(params, "name");
-        return [name === undefined ? undefined : promptPolicy(name)];
-      }
-      case "resources/read":
-      case "resources/subscribe":
-      case "resources/unsubscribe": {
-        const uri = stringParam(params, "uri");
-        return [uri === undefined ? undefined : resourcePolicy(uri)];
-      }
-      case "completion/complete": {
-        // Completers never see identity, so completing an item's arguments
-        // follows that item's `auth`.
-        const ref = params?.["ref"];
-        if (!isRecord(ref)) return [undefined];
-        if (ref["type"] === "ref/prompt") {
-          const name = stringParam(ref, "name");
-          return [name === undefined ? undefined : promptPolicy(name)];
-        }
-        if (ref["type"] === "ref/resource") {
-          const uri = stringParam(ref, "uri");
-          return [
-            uri === undefined ? undefined : completionResourcePolicy(uri),
-          ];
-        }
-        return [undefined];
-      }
-      case "subscriptions/listen": {
-        // List-changed notifications reveal nothing the open list methods do
-        // not; resource subscriptions follow each resource's `auth`.
-        const filter = params?.["notifications"];
-        const uris = isRecord(filter)
-          ? filter["resourceSubscriptions"]
-          : undefined;
-        if (uris === undefined) return [];
-        if (!Array.isArray(uris)) return [undefined];
-        return uris.map((uri) =>
-          typeof uri === "string" ? resourcePolicy(uri) : undefined
-        );
-      }
-      default:
-        return undefined;
-    }
-  };
+  const open: Requirement = { required: false, scopes: [] };
+  const signIn = (extra: readonly string[] = []): Requirement => ({
+    required: true,
+    scopes: [...new Set([...baselineScopes, ...extra])],
+  });
 
   const requirementFor = (message: ParsedMessage | undefined): Requirement => {
-    const scopes = new Set<string>();
-    let required = !mixedAuth;
-    const policies = message === undefined ? undefined : itemPolicies(message);
-
-    if (policies !== undefined) {
-      for (const policy of policies) {
-        if (policy === undefined) {
-          required = true;
-        } else if (!mixedAuth || policy.access === "sign-in") {
-          required = true;
-          for (const scope of policy.scopes) scopes.add(scope);
-        }
-      }
-    } else if (
-      message !== undefined &&
-      !SIGNED_OUT_METHODS.has(message.method) &&
-      !(message.id === undefined && message.method.startsWith("notifications/"))
-    ) {
-      // Unknown methods default to sign-in. Non-JSON-RPC bodies (`message`
-      // undefined) and notifications are answered by the SDK without
-      // running any callback.
-      required = true;
+    // Non-JSON-RPC bodies are answered by the SDK without running any
+    // callback.
+    if (message === undefined) return mixedAuth ? open : signIn();
+    if (message.method === "tools/call") {
+      const name = stringParam(message.params, "name");
+      const schemes = name === undefined ? undefined : toolSchemes(name);
+      // Unknown tools require sign-in with the baseline.
+      if (schemes === undefined) return signIn();
+      if (mixedAuth && !requiresSignIn(schemes)) return open;
+      return signIn(schemeScopes(schemes));
     }
-
-    if (!required) return { required: false, scopes: [] };
-    for (const scope of baselineScopes) scopes.add(scope);
-    return { required: true, scopes: [...scopes] };
+    if (!mixedAuth || isSignInMethod(message)) return signIn();
+    return open;
   };
 
   const requirementForBody = (body: unknown): Requirement => {

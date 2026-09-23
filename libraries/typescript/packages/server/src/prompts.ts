@@ -6,7 +6,7 @@ import type {
 } from "@modelcontextprotocol/server";
 import type { Env } from "hono";
 
-import type { OAuthMode, RequestContext, ToolAuth } from "./context.js";
+import type { RequestContext } from "./context.js";
 
 /** Declares a prompt's identity and argument schema. First argument to {@link MCPServer.prompt}. */
 export interface PromptDefinition {
@@ -22,12 +22,6 @@ export interface PromptDefinition {
    * `completion/complete`.
    */
   schema?: StandardSchemaWithJSON;
-  /**
-   * Who may get the prompt on an OAuth server. See {@link ToolAuth}.
-   * Checked before the callback runs; omitted means sign-in with the
-   * provider's `requiredScopes`.
-   */
-  auth?: ToolAuth;
 }
 
 /** Infer the callback params type from a prompt definition's `schema`. */
@@ -56,7 +50,7 @@ export type InferPromptInput<T> = T extends {
 export type PromptCallback<
   TInput = Record<string, unknown>,
   TUser = never,
-  HasOAuth extends OAuthMode = false,
+  HasOAuth extends boolean = false,
   TEnv extends Env = Env,
 > = (
   params: TInput,

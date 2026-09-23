@@ -1,8 +1,9 @@
 # Mixed OAuth
 
 A test bed for mixed authentication: one `MCPServer` with `oauth` and
-`mixedAuth: true`, serving every `auth` value on tools, resources, resource
-templates, prompts, and views. A built-in Better Auth server handles dynamic
+`mixedAuth: true`, serving every `securitySchemes` shape on tools, plus
+resources, a resource template, a prompt, and views, which always need
+sign-in. A built-in Better Auth server handles dynamic
 client registration, PKCE, sign-in, consent, and tokens, all in memory.
 
 Sign-in is anonymous and needs no credentials, so anyone who can reach the
@@ -14,26 +15,24 @@ testing tool, not a production identity setup.
 Names start with their access level. Every response says what the server saw:
 `signed out`, or the user ID and the scopes on the token.
 
-| Name                       | Kind              | `auth`                               | Signed out  |
-| -------------------------- | ----------------- | ------------------------------------ | ----------- |
-| `public_ping`              | tool              | `"public"`                           | runs        |
-| `optional_whoami`          | tool              | `"optional"`                         | runs        |
-| `optional_welcome`         | tool              | `{ optional: true, scopes: ["profile"] }` | runs; personalized only with `profile` |
-| `protected_profile`        | tool              | omitted                              | sign-in     |
-| `protected_update_profile` | tool              | `{ scopes: ["profile"] }`            | sign-in, then step-up to `profile` |
-| `public_card`              | tool with a view  | `"public"`                           | runs; view readable |
-| `protected_card`           | tool with a view  | omitted                              | sign-in; view needs sign-in |
-| `demo://public/catalog`    | resource          | `"public"`                           | readable    |
-| `demo://optional/greeting` | resource          | `"optional"`                         | readable    |
-| `demo://protected/profile` | resource          | omitted                              | sign-in     |
-| `demo://public/items/{id}` | resource template | `"public"`                           | readable    |
-| `demo://protected/notes/{id}` | resource template | `{ scopes: ["email"] }`           | sign-in, then step-up to `email` |
-| `public_tips`              | prompt            | `"public"`                           | runs        |
-| `optional_greeting`        | prompt            | `"optional"`                         | runs        |
-| `protected_summary`        | prompt            | omitted                              | sign-in     |
+| Name                          | Kind              | `securitySchemes`               | Signed out                             |
+| ----------------------------- | ----------------- | ------------------------------- | -------------------------------------- |
+| `public_ping`                 | tool              | `[noauth]`                      | runs                                   |
+| `optional_whoami`             | tool              | `[noauth, oauth2([])]`          | runs                                   |
+| `optional_welcome`            | tool              | `[noauth, oauth2(["profile"])]` | runs; personalized only with `profile` |
+| `protected_profile`           | tool              | omitted                         | sign-in                                |
+| `protected_update_profile`    | tool              | `[oauth2(["profile"])]`         | sign-in, then step-up to `profile`     |
+| `public_card`                 | tool with a view  | `[noauth]`                      | runs; view needs sign-in               |
+| `protected_card`              | tool with a view  | omitted                         | sign-in; view needs sign-in            |
+| `demo://protected/profile`    | resource          | n/a                             | sign-in                                |
+| `demo://protected/notes/{id}` | resource template | n/a                             | sign-in                                |
+| `protected_summary`           | prompt            | n/a                             | sign-in                                |
 
-"Sign-in" items also need the provider's required scopes, `demo:protected` by
-default.
+`noauth` is `{ type: "noauth" }` and `oauth2(s)` is
+`{ type: "oauth2", scopes: s }`.
+
+Everything that needs sign-in also needs the provider's required scopes,
+`demo:protected` by default.
 
 ## Run it locally
 
@@ -72,8 +71,9 @@ pnpm dev
 REQUIRED_SCOPES= pnpm dev
 ```
 
-Without a baseline, tools with `auth` omitted or `"optional"` advertise an
-`oauth2` scheme with empty scopes on `tools/list`. ChatGPT is reported to
+Without a baseline, `protected_profile`, `protected_card`, and
+`optional_whoami` advertise an `oauth2` scheme with empty scopes on
+`tools/list`. ChatGPT is reported to
 ignore such a scheme, so this mode is how to check whether ChatGPT still shows
 sign-in for them.
 
@@ -105,7 +105,8 @@ Both hosts need a public HTTPS URL. Use the CLI tunnel:
 Then work through the list. The server log shows every request and its status.
 
 - Ask for `public_ping`, `optional_whoami`, and `public_card`. They run signed
-  out, and `public_card` renders its view.
+  out. Views need sign-in, so check whether ChatGPT still creates the app and
+  whether `public_card` renders its view before sign-in.
 - Ask for `protected_profile`. The host shows sign-in. Continue, then allow.
   The call retries and reports your user ID.
 - Ask for `optional_whoami` again. It now reports the identity and scopes.
@@ -137,16 +138,16 @@ scope it registered with, so scope step-up never fails with `invalid_scope`.
 ## How the gate works
 
 `MCPServer({ oauth })` alone protects the whole MCP endpoint. Adding
-`mixedAuth: true` lets anyone connect and list, and moves the decision to each
-item's `auth`:
+`mixedAuth: true` lets anyone connect and list, and moves the decision for
+each tool to its `securitySchemes`:
 
-| `auth`                       | Behavior                                                        |
-| ---------------------------- | --------------------------------------------------------------- |
-| omitted                      | Sign-in; needs the provider's required scopes                   |
-| `"public"`                   | Anyone; a token that is sent is still verified                  |
-| `"optional"`                 | Anyone; `ctx.auth` is set when the caller is signed in          |
-| `{ scopes }`                 | Sign-in; needs the required scopes plus `scopes`                |
-| `{ scopes, optional: true }` | Anyone; the scopes are advertised and the callback checks them  |
+| `securitySchemes`              | Behavior                                                       |
+| ------------------------------ | -------------------------------------------------------------- |
+| omitted                        | Sign-in; needs the provider's required scopes                  |
+| `[{ type: "noauth" }]`         | Anyone; `ctx.auth` is set when the caller is signed in         |
+| `[{ type: "noauth" }, oauth2]` | Anyone; the scopes are advertised and the callback checks them |
+| `[{ type: "oauth2", scopes }]` | Sign-in; needs the required scopes plus `scopes`               |
 
-Invalid or expired tokens are refused with `401` on every item, public ones
-included, so clients refresh them.
+Resources, resource templates, views, and prompts always need sign-in with
+the required scopes. Invalid or expired tokens are refused with `401` on every
+request, `noauth` tools included, so clients refresh them.
