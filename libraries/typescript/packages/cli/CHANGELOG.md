@@ -1,5 +1,11 @@
 # @mcp-use/cli
 
+## 4.1.16
+
+### Patch Changes
+
+- 3640505: Reject screenshot dimensions that Chrome cannot use.
+
 ## 4.1.16-canary.0
 
 ### Patch Changes
