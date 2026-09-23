@@ -697,11 +697,18 @@ describe("mixed auth: resources, prompts, and views", () => {
     );
     server.__primeViews({
       "private-card": { kind: "external", entry: "assets/p.js", css: [] },
+      // No tool binds this view, so it stays behind sign-in.
+      orphan: { kind: "external", entry: "assets/o.js", css: [] },
     });
     server.__primeSkills(undefined);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     expect(
       (await server.fetch(read(viewResourceUri("private-card")))).status
     ).toBe(200);
+    expect((await server.fetch(read(viewResourceUri("orphan")))).status).toBe(
+      401
+    );
+    warn.mockRestore();
     // The tool behind the view still requires sign-in.
     expect((await server.fetch(call("private_card"))).status).toBe(401);
   });
