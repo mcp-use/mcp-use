@@ -1,84 +1,84 @@
-# HomeScout SF — MCP Apps property search
+# HomeScout SF: property search MCP App
 
-A polished V2 MCP Apps example with a Zillow-style split view: staged San
-Francisco listings on the left and a self-contained interactive map on the
-right. It uses no listing API, map tiles, paid service, or network assets.
+An `mcp-use` MCP App with a Zillow-style split view: San Francisco listing
+cards on one side and a live map with price pins on the other.
+The model opens the view once with `search-homes`, then refines it in place
+through tools the view registers itself.
 
-## What it demonstrates
+All listings are fictional. Map tiles come from Esri's keyless Canvas basemaps
+(light or dark gray, following the host theme). No listing API, API key, or
+paid service is involved.
 
-- A view-bound `search-homes` tool returns structured staged data and iframe
-  HTML through the standard MCP Apps resource flow.
-- The React iframe reads progressive tool input/result state with
-  `useToolContext`, sends model-visible state through `ModelContext`, and uses
-  `useSendFollowUp` for UI-to-host follow-up messages.
-- `useCallTool("get-listing-details")` lets the iframe call an app-only MCP
-  tool when a card or marker is selected.
-- Six ephemeral `useViewTool` tools let the assistant/host manipulate the live
-  view: `remove-listings`, `focus-neighborhood`, `zoom-map`, `pan-map`,
-  `fit-visible-results`, and `select-listing`.
-- The view requests standard `inline` and `fullscreen` display modes.
-- Cards, map, house artwork, streets, and neighborhood metadata are entirely
-  local. Every listing is fictional/staged.
+## Live demo
 
-The staged subset covers Nob Hill, Pacific Heights, Mission District, Hayes
-Valley, Noe Valley, and SoMa. Neighborhood names can be passed naturally to
-`search-homes`, selected in the UI, or focused in the already-open view using
-`focus-neighborhood`.
+[Open the chat demo](https://inspector.manufact.com/inspector?embedded=true&autoConnect=https%3A%2F%2Fmanufact-property-search-example.run.mcp-use.com%2Fmcp&embeddedConfig=%7B%22singleTab%22%3Atrue%2C%22defaultTab%22%3A%22chat%22%2C%22visibleTabs%22%3A%5B%22chat%22%5D%7D)
+and ask for homes in San Francisco. Select **Fullscreen** to see the listing
+cards. The demo chat uses Manufact's managed model, which cannot call view
+tools, so run the example locally to try follow-up refinements.
+
+MCP endpoint: https://manufact-property-search-example.run.mcp-use.com/mcp
 
 ## Run
 
-From the repository root:
+From `libraries/typescript`, install and build the workspace if necessary:
 
-```bash
-pnpm --dir libraries/typescript/packages/server/examples/views/property-search dev
+```sh
+pnpm install
+pnpm build
+pnpm --filter mcp-use-example-views-property-search dev
 ```
 
-Open the inspector URL printed by the CLI and connect to the local MCP server.
-The default MCP endpoint is `/mcp`.
+A standalone copy you can clone and deploy lives at
+[manufacts/mcp-use-property-search-example](https://github.com/manufacts/mcp-use-property-search-example).
 
-For a production-style self-contained build:
+Open the Inspector URL printed by the CLI, select **Chat**, and configure a
+model provider with your own API key. The Inspector forwards view tools to the
+model only in this mode; the managed Manufact model cannot call them. Try these
+prompts in order:
 
-```bash
-pnpm --dir libraries/typescript/packages/server/examples/views/property-search build --inline
-pnpm --dir libraries/typescript/packages/server/examples/views/property-search start
-```
+1. "Show me homes in San Francisco."
+2. "Now search the Mission, under $2M."
+3. "Remove the two most expensive homes."
+4. "Open the cheapest one on the map and save it."
+5. "Zoom in one step."
 
-## Featured spoken demo
+The first prompt calls `search-homes` and opens the view. Every later prompt
+calls a view tool, so the open map updates without rendering a second view.
+Click **Fullscreen** in the view to switch display modes.
 
-Use these prompts in order:
+## How it works
 
-1. **"Pull up homes near San Francisco."**
-   - Call `search-homes` with `location: "San Francisco"`.
-   - The result opens with cards and the live map. Click **Fullscreen** to
-     demonstrate host-controlled display mode.
-2. **"The Clay Street and Fremont Street homes are too expensive. Remove them
-   from the listing."**
-   - Call the view tool `remove-listings` with
-     `ids: ["clay-park", "fremont-sky"]`.
-   - Both homes disappear immediately from cards and map, and `ModelContext`
-     reports the updated staged result.
-3. **"Now look for homes in Nob Hill."**
-   - Call the live view tool `focus-neighborhood` with
-     `neighborhood: "Nob Hill"` to filter and refocus without replacing the
-     iframe. The same phrase also works as a fresh `search-homes` location.
+`search-homes` returns the matching listing IDs plus the whole staged catalog in
+`structuredContent`, so the view can filter any neighborhood locally. After it
+renders, the view registers tools with `useViewTool` that filter, select, and
+move the map.
 
-Natural follow-ups that exercise the other view tools:
-
-- "Zoom in one step."
-- "Fit all the visible homes on the map."
-- "Highlight the California Street condo."
-- "Pan the map a little east."
-- "Show me Pacific Heights / the Mission / Hayes Valley / Noe Valley / SoMa."
-
-## Useful tool surface
-
-| Tool | Caller | Purpose |
+| Tool | Called by | Purpose |
 | --- | --- | --- |
-| `search-homes` | model | Create the staged result and bind the view |
-| `get-listing-details` | app | Load staged details from a card/marker click |
-| `remove-listings` | view tool | Remove homes from cards, map, and model context |
-| `focus-neighborhood` | view tool | Filter and focus a supported neighborhood |
-| `zoom-map` | view tool | Zoom in or out |
-| `pan-map` | view tool | Move the camera by relative coordinates |
-| `fit-visible-results` | view tool | Fit the current result set |
-| `select-listing` | view tool | Highlight a card and marker |
+| `search-homes` | Model | Open the view with an initial search |
+| `get-listing-details` | View (app-only) | Load extra facts when a card or pin is selected |
+| `search-in-view` | Model, via the view | Change area, price, beds, baths, home type, or sort in place |
+| `remove-listings` | Model, via the view | Hide homes from the cards and map |
+| `select-listing` | Model, via the view | Fly to a home and open its detail card |
+| `save-listings` | Model, via the view | Save or unsave homes |
+| `fit-visible-results` | Model, via the view | Fit every visible home in frame |
+| `zoom-map` | Model, via the view | Zoom in or out |
+| `pan-map` | Model, via the view | Pan north, south, east, or west |
+
+The view also reports its current area, filters, and sort to the model with
+`ModelContext`, and sends follow-up messages with `useSendFollowUp`.
+
+The catalog covers Pacific Heights, Marina, Russian Hill, Nob Hill, Hayes
+Valley, SoMa, Mission District, Noe Valley, Potrero Hill, and Bernal Heights.
+
+- `src/index.ts`: the staged catalog, `search-homes`, and `get-listing-details`.
+- `views/property-search/view.tsx`: the view, its view tools, and model context.
+- `views/property-search/map.tsx`: the Leaflet map, Esri tiles, pins, and camera controls.
+- `views/property-search/cards.tsx`: result cards and the detail panel.
+
+## Check and build
+
+```sh
+pnpm --filter mcp-use-example-views-property-search typecheck
+pnpm --filter mcp-use-example-views-property-search build
+```

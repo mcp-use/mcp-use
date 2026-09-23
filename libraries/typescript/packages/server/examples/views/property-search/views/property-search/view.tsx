@@ -795,8 +795,8 @@ function HomeScout(): React.JSX.Element {
             </div>
 
             <footer className="hs-disclaimer">
-              Fictional listings staged for this MCP Apps demo. Basemap ©
-              OpenStreetMap contributors, tiles © CARTO.
+              Fictional listings staged for this MCP Apps demo. Tiles © Esri;
+              map data © OpenStreetMap contributors, HERE, Garmin.
             </footer>
           </section>
         )}
