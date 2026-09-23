@@ -1000,9 +1000,10 @@ export abstract class BaseConnector {
    * @param options - Optional request options
    * @returns Every prompt across all result pages
    */
-  async listAllPrompts(
-    options?: RequestOptions
-  ): Promise<{ prompts: any[] }> {
+  async listAllPrompts(options?: RequestOptions): Promise<{
+    /** Prompts returned across all result pages. */
+    prompts: any[];
+  }> {
     const client = this.client;
     if (!client) {
       throw new Error("MCP client is not connected");
