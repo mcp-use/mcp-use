@@ -1299,8 +1299,9 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       }
     };
     const host: OAuthProviderHost<TUser> = {
-      resource,
+      resourceUrl: resource,
       basePath,
+      mixedAuth: this.#config.mixedAuth === true,
       use: (pattern, handler) => {
         assertActive("use");
         this.use(
@@ -1308,8 +1309,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           handler as unknown as McpMiddlewareFnFor<typeof pattern, TEnv>
         );
       },
-      registerTool: (definition, callback) => {
-        assertActive("registerTool");
+      tool: (definition, callback) => {
+        assertActive("tool");
         if (this.#tools.has(definition.name)) {
           throw new Error(
             `[mcp-use] Tool "${definition.name}" is reserved by the OAuth ` +
@@ -1318,8 +1319,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         }
         return this.tool(definition, callback as never);
       },
-      registerResource: (definition, callback) => {
-        assertActive("registerResource");
+      resource: (definition, callback) => {
+        assertActive("resource");
         if (this.#resources.has(definition.name)) {
           throw new Error(
             `[mcp-use] Resource "${definition.name}" is reserved by the OAuth ` +

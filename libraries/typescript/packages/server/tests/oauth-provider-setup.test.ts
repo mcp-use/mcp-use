@@ -47,13 +47,14 @@ function provider(setup: (host: OAuthProviderHost<TestUser>) => void) {
 
 function server(
   setup: (host: OAuthProviderHost<TestUser>) => void,
-  options: { instructions?: string } = {}
+  options: { instructions?: string; mixedAuth?: boolean } = {}
 ) {
   return new MCPServer({
     name: "shop",
     version: "1.0.0",
     oauth: provider(setup),
     logging: { enabled: false },
+    ...(options.mixedAuth !== undefined && { mixedAuth: options.mixedAuth }),
     ...(options.instructions !== undefined && {
       instructions: options.instructions,
     }),
@@ -112,8 +113,9 @@ async function text(response: Response): Promise<string> {
 describe("OAuth provider setup hook", () => {
   it("runs once, before the first request, with the resolved host values", async () => {
     const setup = vi.fn((host: OAuthProviderHost<TestUser>) => {
-      expect(host.resource.href).toBe(resource);
+      expect(host.resourceUrl.href).toBe(resource);
       expect(host.basePath).toBe("/mcp");
+      expect(host.mixedAuth).toBe(false);
     });
     const app = server(setup);
 
@@ -125,7 +127,7 @@ describe("OAuth provider setup hook", () => {
 
   it("registers provider tools behind the bearer gate, with the mapped identity", async () => {
     const app = server((host) => {
-      host.registerTool(
+      host.tool(
         { name: "register_session", description: "Step up." },
         async (_args, ctx) => ({
           content: [{ type: "text", text: `session:${ctx.auth.user.id}` }],
@@ -146,7 +148,7 @@ describe("OAuth provider setup hook", () => {
 
   it("registers provider resources", async () => {
     const app = server((host) => {
-      host.registerResource(
+      host.resource(
         { name: "connection", uri: "provider://connection" },
         async (uri, ctx) => ({
           contents: [{ uri: uri.href, text: `conn:${ctx.auth.user.id}` }],
@@ -163,7 +165,7 @@ describe("OAuth provider setup hook", () => {
 
   it("refuses provider names the application already uses", async () => {
     const toolClash = server((host) => {
-      host.registerTool({ name: "checkout" }, async () => ({ content: [] }));
+      host.tool({ name: "checkout" }, async () => ({ content: [] }));
     });
     toolClash.tool({ name: "checkout" }, async () => ({ content: [] }));
     await expect(
@@ -171,7 +173,7 @@ describe("OAuth provider setup hook", () => {
     ).rejects.toThrow('Tool "checkout" is reserved by the OAuth provider');
 
     const resourceClash = server((host) => {
-      host.registerResource(
+      host.resource(
         { name: "connection", uri: "provider://connection" },
         async (uri) => ({ contents: [{ uri: uri.href, text: "" }] })
       );
@@ -190,7 +192,7 @@ describe("OAuth provider setup hook", () => {
   it("installs mcp: middleware that can refuse application tools", async () => {
     const registered = new Set<string>();
     const app = server((host) => {
-      host.registerTool({ name: "register_session" }, async (_args, ctx) => {
+      host.tool({ name: "register_session" }, async (_args, ctx) => {
         registered.add(ctx.auth.clientId!);
         return { content: [{ type: "text", text: "registered" }] };
       });
@@ -286,7 +288,7 @@ describe("OAuth provider setup hook", () => {
 
   it("fails closed when setup throws after a partial install", async () => {
     const app = server((host) => {
-      host.registerTool({ name: "register_session" }, async () => ({
+      host.tool({ name: "register_session" }, async () => ({
         content: [],
       }));
       throw new Error("connection store unavailable");
@@ -302,16 +304,146 @@ describe("OAuth provider setup hook", () => {
   });
 });
 
+describe("OAuth provider setup hook: mixedAuth", () => {
+  it("exposes mixedAuth so a provider can require anonymous discovery", async () => {
+    const requireMixedAuth = (host: OAuthProviderHost<TestUser>) => {
+      if (!host.mixedAuth) throw new Error("provider needs mixedAuth: true");
+    };
+
+    await expect(
+      server(requireMixedAuth).fetch(post("tools/list", {}, signedIn))
+    ).rejects.toThrow("provider needs mixedAuth: true");
+
+    const app = server(requireMixedAuth, { mixedAuth: true });
+    expect((await app.fetch(post("tools/list"))).status).toBe(200);
+  });
+
+  it("applies securitySchemes to provider tools", async () => {
+    const app = server(
+      (host) => {
+        host.tool(
+          { name: "browse", securitySchemes: [{ type: "noauth" }] },
+          async (_args, ctx) => ({
+            content: [
+              { type: "text", text: `browse:${ctx.auth?.user.id ?? "guest"}` },
+            ],
+          })
+        );
+        host.tool({ name: "register_session" }, async () => ({
+          content: [{ type: "text", text: "registered" }],
+        }));
+      },
+      { mixedAuth: true }
+    );
+
+    expect(await text(await app.fetch(call("browse")))).toBe("browse:guest");
+    expect(await text(await app.fetch(call("browse", signedIn)))).toBe(
+      "browse:user-1"
+    );
+    expect((await app.fetch(call("register_session"))).status).toBe(401);
+
+    const { tools } = await result<{
+      tools: Array<{ name: string; securitySchemes?: unknown }>;
+    }>(await app.fetch(post("tools/list")));
+    expect(tools).toEqual([
+      expect.objectContaining({
+        name: "browse",
+        securitySchemes: [{ type: "noauth" }],
+      }),
+      expect.objectContaining({
+        name: "register_session",
+        securitySchemes: [{ type: "oauth2", scopes: ["shop"] }],
+      }),
+    ]);
+  });
+
+  it("keeps provider resources behind sign-in", async () => {
+    const app = server(
+      (host) => {
+        host.resource(
+          { name: "connection", uri: "provider://connection" },
+          async (uri, ctx) => ({
+            contents: [{ uri: uri.href, text: `conn:${ctx.auth.user.id}` }],
+          })
+        );
+      },
+      { mixedAuth: true }
+    );
+    const read = (headers: Record<string, string> = {}) =>
+      app.fetch(
+        post("resources/read", { uri: "provider://connection" }, headers)
+      );
+
+    expect((await read()).status).toBe(401);
+    const { contents } = await result<{ contents: Array<{ text: string }> }>(
+      await read(signedIn)
+    );
+    expect(contents[0]!.text).toBe("conn:user-1");
+  });
+
+  it("runs provider middleware on signed-out noauth calls without ctx.auth", async () => {
+    const seen: Array<string | undefined> = [];
+    const app = server(
+      (host) => {
+        host.use("mcp:tools/call", async (ctx, next) => {
+          seen.push(ctx.auth?.clientId);
+          return next();
+        });
+      },
+      { mixedAuth: true }
+    );
+    app.tool(
+      { name: "catalog", securitySchemes: [{ type: "noauth" }] },
+      async () => ({ content: [{ type: "text", text: "catalog" }] })
+    );
+
+    await app.fetch(call("catalog"));
+    await app.fetch(call("catalog", signedIn));
+    expect(seen).toEqual([undefined, "client-1"]);
+  });
+
+  it("rejects a provider noauth tool on a server without mixedAuth", async () => {
+    const app = server((host) => {
+      host.tool(
+        { name: "browse", securitySchemes: [{ type: "noauth" }] },
+        async () => ({ content: [] })
+      );
+    });
+    await expect(app.fetch(post("tools/list", {}, signedIn))).rejects.toThrow(
+      'Tool "browse": noauth requires mixedAuth: true'
+    );
+  });
+});
+
 describe("OAuth provider setup hook: types", () => {
   it("types ctx.auth with the provider's user", () => {
     server((host) => {
-      host.registerTool({ name: "signed_in" }, async (_args, ctx) => {
+      host.tool({ name: "signed_in" }, async (_args, ctx) => {
         const id: string = ctx.auth.user.id;
         // @ts-expect-error TestUser has no email
         void ctx.auth.user.email;
         return { content: [{ type: "text", text: id }] };
       });
-      host.registerResource(
+      host.tool(
+        { name: "browse", securitySchemes: [{ type: "noauth" }] },
+        async (_args, ctx) => {
+          // @ts-expect-error ctx.auth is optional on a noauth tool
+          void ctx.auth.user.id;
+          const id: string | undefined = ctx.auth?.user.id;
+          return { content: [{ type: "text", text: id ?? "guest" }] };
+        }
+      );
+      host.tool(
+        {
+          name: "orders",
+          securitySchemes: [{ type: "oauth2", scopes: ["orders"] }],
+        },
+        async (_args, ctx) => {
+          const id: string = ctx.auth.user.id;
+          return { content: [{ type: "text", text: id }] };
+        }
+      );
+      host.resource(
         { name: "profile", uri: "provider://profile" },
         async (uri, ctx) => {
           const id: string = ctx.auth.user.id;

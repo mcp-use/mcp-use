@@ -4,6 +4,7 @@ import type {
   OAuthTokenVerifier,
 } from "@modelcontextprotocol/server";
 
+import type { DefinitionSecuritySchemes, ToolOAuthMode } from "../context.js";
 import type {
   McpMiddlewareFnFor,
   McpMiddlewarePattern,
@@ -50,17 +51,24 @@ export interface OAuthResourceOptions {
  * The hook runs once, after the canonical resource is resolved and before the
  * first request is served, so everything registered here participates in the
  * same per-request registry replay as user registrations. Provider-owned
- * tools and resources sit behind the same bearer gate as application items,
- * and their callbacks receive `ctx.auth` with the provider's user type. The
- * host is only usable while the hook runs.
+ * tools and resources go through the same OAuth gate as application items,
+ * including a tool's `securitySchemes` on a `mixedAuth` server, and their
+ * callbacks receive `ctx.auth` with the provider's user type. The host is
+ * only usable while the hook runs.
  *
  * @typeParam TUser - The provider's user type, exposed as `ctx.auth.user`.
  */
 export interface OAuthProviderHost<TUser> {
-  /** Resolved canonical MCP resource URL (RFC 8707 `resource`). */
-  readonly resource: URL;
+  /** Resolved canonical MCP resource URL (the RFC 8707 `resource`). */
+  readonly resourceUrl: URL;
   /** MCP endpoint base path, for example `/mcp`. */
   readonly basePath: string;
+  /**
+   * Whether the server was constructed with `mixedAuth: true`, so signed-out
+   * clients can connect, list, and call `noauth` tools. A provider that
+   * needs anonymous discovery can throw from `setup` when this is `false`.
+   */
+  readonly mixedAuth: boolean;
   /**
    * Registers MCP middleware using the same `mcp:` patterns accepted by
    * `server.use()`.
@@ -70,20 +78,29 @@ export interface OAuthProviderHost<TUser> {
     handler: McpMiddlewareFnFor<P>
   ): void;
   /**
-   * Registers a provider-owned tool.
+   * Registers a provider-owned tool, like `server.tool()`: `ctx.auth` is
+   * required in the callback unless `definition.securitySchemes` includes
+   * `noauth`.
    *
-   * @throws If a tool with the same name is already registered.
+   * @throws If a tool with the same name is already registered, or when
+   * `definition.securitySchemes` is invalid for this server.
    */
-  registerTool<const T extends ToolDefinition>(
+  tool<const T extends ToolDefinition>(
     definition: T,
-    callback: ToolCallback<InferToolInput<T>, InferToolOutput<T>, TUser, true>
+    callback: ToolCallback<
+      InferToolInput<T>,
+      InferToolOutput<T>,
+      TUser,
+      ToolOAuthMode<TUser, DefinitionSecuritySchemes<T>>
+    >
   ): ToolRef<InferToolName<T>, InferToolInput<T>, InferToolOutput<T>>;
   /**
-   * Registers a provider-owned static resource.
+   * Registers a provider-owned static resource, like `server.resource()`.
+   * Resources always require sign-in, including on a `mixedAuth` server.
    *
    * @throws If a resource with the same name is already registered.
    */
-  registerResource<T extends ResourceDefinition>(
+  resource<T extends ResourceDefinition>(
     definition: T,
     callback: ResourceCallback<TUser, true>
   ): void;
@@ -91,7 +108,7 @@ export interface OAuthProviderHost<TUser> {
    * Every tool registered so far, application and provider-owned, in
    * registration order. Providers use it to validate the application's
    * tools, for example to refuse a destructive tool that lacks a required
-   * `_meta` tag.
+   * `_meta` tag, or one whose `securitySchemes` accepts `noauth`.
    */
   listTools(): readonly Readonly<ToolDefinition>[];
   /**
