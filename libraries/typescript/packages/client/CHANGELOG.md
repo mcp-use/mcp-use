@@ -1,5 +1,13 @@
 # @mcp-use/client
 
+## 2.3.3
+
+### Patch Changes
+
+- 4866186: Prevent sibling inline MCP View widgets from clobbering global document fullscreen and pip attributes.
+- 4866186: Keep MCP App iframe backgrounds transparent when embedded in dark hosts by matching the iframe color scheme to the sandbox document.
+- 4866186: Forward `modelContent` from the `window.openai.setWidgetState` compatibility shim to the host as `ui/update-model-context`, so view model context reaches the Inspector Chat LLM. `privateContent` and `imageIds` stay in the view, and the setter still resolves on surfaces without model context.
+
 ## 2.3.3-canary.1
 
 ### Patch Changes
