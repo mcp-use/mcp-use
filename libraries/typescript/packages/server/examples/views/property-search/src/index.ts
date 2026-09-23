@@ -7,7 +7,7 @@
  * rendering a second view. The model only ever sees the compact match summary
  * in `structuredContent`.
  *
- * Listings are fictional. Map tiles come from CARTO's free OpenStreetMap
+ * Listings are fictional. Map tiles come from Esri's keyless Canvas
  * basemaps; no listing API or paid service is involved.
  */
 import { MCPServer } from "mcp-use";
@@ -78,12 +78,12 @@ export type HomeType = z.infer<typeof homeTypeSchema>;
 export type AreaMeta = z.infer<typeof areaMetaSchema>;
 
 /**
- * Attribution required by the OpenStreetMap and CARTO basemap terms.
+ * Attribution required by the Esri Canvas basemap terms.
  *
  * Rendered by Leaflet's attribution control in the view.
  */
 const ATTRIBUTION =
-  '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · © <a href="https://carto.com/attributions">CARTO</a>';
+  'Tiles © <a href="https://www.esri.com">Esri</a> · Esri, HERE, Garmin, © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
 /** Map camera and copy for each staged neighborhood. */
 export const AREAS: readonly AreaMeta[] = [
@@ -804,8 +804,7 @@ const server = new MCPServer({
   version: "2.0.0",
   title: "HomeScout SF",
   legacy: "stateless",
-  description:
-    "Search a staged catalog of San Francisco homes on a live OpenStreetMap-backed map.",
+  description: "Search a staged catalog of San Francisco homes on a live map.",
   basePath: "/mcp",
 });
 
@@ -855,12 +854,12 @@ export const searchHomes = server.tool(
     view: {
       name: "property-search",
       description:
-        "Zillow-style San Francisco home search: OpenStreetMap basemap, price-bubble pins, and assistant-driven in-place search",
+        "Zillow-style San Francisco home search: live basemap, price-bubble pins, and assistant-driven in-place search",
       prefersBorder: false,
       csp: {
-        // CARTO's free OpenStreetMap raster basemaps.
-        resourceDomains: ["https://basemaps.cartocdn.com"],
-        connectDomains: ["https://basemaps.cartocdn.com"],
+        // Esri's keyless Canvas raster basemaps.
+        resourceDomains: ["https://server.arcgisonline.com"],
+        connectDomains: ["https://server.arcgisonline.com"],
       },
     },
   },

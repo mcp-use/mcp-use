@@ -677,6 +677,9 @@ select {
   gap: 12px;
   padding: 12px 16px;
   align-content: start;
+  /* Cards clip with overflow: hidden, which drops their automatic minimum
+     height to 0; without this, auto rows shrink to fit the panel height. */
+  grid-auto-rows: max-content;
 }
 
 .hs-app.hs-full .hs-cards {

@@ -1,0 +1,236 @@
+---
+title: "Property search"
+description: "Build a map-based home search MCP App that the chat model refines in place with view tools."
+icon: "house"
+---
+
+Build a Zillow-style MCP App: listing cards next to an interactive map with price pins. The model opens the view once with `search-homes`. After that, the view registers its own tools, so follow-ups such as "now the Mission, under $2M" update the open map instead of rendering a second view.
+
+The listings are fictional San Francisco homes. Map tiles come from Esri's keyless Canvas basemaps, so the example needs no listing API or API key.
+
+## Try the live example
+
+Ask for homes in San Francisco. Select **Fullscreen** in the view to see the listing cards, then click a card or pin to load its details.
+
+<div className="cookbook-chat-embed">
+<iframe
+  src="https://inspector.manufact.com/inspector?embedded=true&autoConnect=https%3A%2F%2Fmanufact-property-search-example.run.mcp-use.com%2Fmcp&embeddedConfig=%7B%22singleTab%22%3Atrue%2C%22defaultTab%22%3A%22chat%22%2C%22visibleTabs%22%3A%5B%22chat%22%5D%2C%22chatHideTitle%22%3Atrue%2C%22chatHideServerUrl%22%3Atrue%2C%22chatQuickQuestions%22%3A%5B%22Show%20me%20homes%20in%20San%20Francisco.%22%2C%22Show%20me%20homes%20in%20Pacific%20Heights.%22%5D%7D"
+  title="Property search live example: MCP Inspector chat"
+  width="100%"
+  height="680"
+  style={{ border: "1px solid var(--gray-200, #737373)", borderRadius: "12px" }}
+  allow="clipboard-write; fullscreen"
+/>
+</div>
+
+[Open the example in a new tab](https://inspector.manufact.com/inspector?embedded=true&autoConnect=https%3A%2F%2Fmanufact-property-search-example.run.mcp-use.com%2Fmcp&embeddedConfig=%7B%22singleTab%22%3Atrue%2C%22defaultTab%22%3A%22chat%22%2C%22visibleTabs%22%3A%5B%22chat%22%5D%2C%22chatHideTitle%22%3Atrue%2C%22chatHideServerUrl%22%3Atrue%2C%22chatQuickQuestions%22%3A%5B%22Show%20me%20homes%20in%20San%20Francisco.%22%2C%22Show%20me%20homes%20in%20Pacific%20Heights.%22%5D%7D).
+
+<Note>
+  This embedded chat runs its model on Manufact's servers, which cannot reach tools registered inside the view. Follow-up refinements such as "now the Mission, under $2M" need a host that forwards view tools to the model. To try them, [run the example](#run-the-example) with your own model provider API key.
+</Note>
+
+## Run the example
+
+The example is a complete project with about 3,500 lines of view code, so clone it instead of copying it. It requires Node.js 22.22.2 or later.
+
+```bash
+git clone https://github.com/manufacts/mcp-use-property-search-example.git
+cd mcp-use-property-search-example
+npm ci
+npm run dev
+```
+
+Open the Inspector URL printed by the CLI, select **Chat**, and configure a model provider with your own API key. The Inspector forwards view tools to the model only in this mode; the managed Manufact model cannot call them. Send these prompts in order:
+
+```text
+Show me homes in San Francisco.
+Now search the Mission, under $2M.
+Remove the most expensive home.
+Open the cheapest one on the map and save it.
+Zoom in one step.
+```
+
+The first prompt calls `search-homes` and opens the view. Each later prompt calls a view tool, and the open map updates in place. Select **Fullscreen** in the view to switch display modes.
+
+The project has four main files:
+
+| File | Contents |
+| --- | --- |
+| `src/index.ts` | The staged listings, `search-homes`, and `get-listing-details` |
+| `views/property-search/view.tsx` | The view, its view tools, and model context |
+| `views/property-search/map.tsx` | The Leaflet map, Esri tiles, price pins, and camera controls |
+| `views/property-search/cards.tsx` | Listing cards and the detail panel |
+
+## How it works
+
+The example combines five MCP Apps patterns. Each one works on its own in your server.
+
+### Open the view once with the whole dataset
+
+`search-homes` is the only tool that renders the view. Besides the matching listing IDs, it returns the whole staged catalog in `structuredContent`, so the view can filter any neighborhood locally without another server call. The tool description tells the model to use the view tools for follow-ups instead of calling `search-homes` again.
+
+```typescript src/index.ts
+export const searchHomes = server.tool(
+  {
+    name: "search-homes",
+    title: "Search San Francisco homes",
+    description:
+      "Open the interactive HomeScout map for San Francisco homes. Call this once to put the map on screen. After that, use the view's tools, such as `search-in-view`, for every follow-up search.",
+    inputSchema: z.object({
+      location: z.string().optional(),
+      maxPrice: z.number().positive().optional(),
+      minBeds: z.number().int().min(0).optional(),
+      homeType: homeTypeSchema.optional(),
+    }),
+    outputSchema: z.object({
+      area: areaSchema.nullable(),
+      matchedIds: z.array(z.string()),
+      catalog: z.object({
+        listings: z.array(listingSchema),
+        areas: z.array(areaMetaSchema),
+        attribution: z.string(),
+      }),
+    }),
+    view: {
+      name: "property-search",
+      prefersBorder: false,
+      csp: {
+        resourceDomains: ["https://server.arcgisonline.com"],
+        connectDomains: ["https://server.arcgisonline.com"],
+      },
+    },
+  },
+  async ({ location = "San Francisco", maxPrice, minBeds = 0, homeType }) => {
+    const area = resolveArea(location);
+    const matched = LISTINGS.filter(
+      (listing) =>
+        (area === null || listing.area === area) &&
+        (maxPrice === undefined || listing.price <= maxPrice) &&
+        listing.beds >= minBeds &&
+        (homeType === undefined || listing.homeType === homeType)
+    );
+    return {
+      content: [
+        {
+          type: "text",
+          text: `HomeScout is open with ${matched.length} homes. Refine from here with the view tools.`,
+        },
+      ],
+      structuredContent: {
+        area,
+        matchedIds: matched.map((listing) => listing.id),
+        catalog: { listings: LISTINGS, areas: AREAS, attribution: ATTRIBUTION },
+      },
+    };
+  }
+);
+```
+
+This excerpt is shortened. The example also accepts `minPrice` and `minBaths` filters and returns the median price.
+
+### Let the model drive the open view
+
+[`useViewTool()`](/v2/typescript/mcp-apps/interactivity) registers a tool that exists only while the view is mounted. The host lists it to the model, and the handler runs inside the view with access to React state and refs. The example registers seven view tools. This one zooms the Leaflet map:
+
+```tsx views/property-search/view.tsx
+const zoomMapDefinition = {
+  name: "zoom-map",
+  title: "Zoom the map",
+  description: "Zoom the live map in or out by whole steps.",
+  inputSchema: z.object({
+    direction: z.enum(["in", "out"]),
+    steps: z.number().int().min(1).max(4).optional().describe("Defaults to 1"),
+  }),
+  outputSchema: z.object({ zoom: z.number() }),
+} as const;
+
+// Inside the view component:
+useViewTool<typeof zoomMapDefinition>(
+  zoomMapDefinition,
+  async ({ direction, steps = 1 }) => {
+    mapRef.current?.zoomBy(direction === "in" ? steps : -steps);
+    const zoom = mapRef.current?.zoom() ?? 0;
+    return {
+      content: [{ type: "text", text: `Zoomed ${direction} to level ${zoom.toFixed(1)}.` }],
+      structuredContent: { zoom },
+    };
+  }
+);
+```
+
+| View tool | Purpose |
+| --- | --- |
+| `search-in-view` | Change the area, price, beds, baths, home type, or sort in place |
+| `remove-listings` | Hide homes from the cards and map |
+| `select-listing` | Fly to a home and open its detail card |
+| `save-listings` | Save or unsave homes |
+| `fit-visible-results` | Fit every visible home in frame |
+| `zoom-map` | Zoom in or out |
+| `pan-map` | Pan north, south, east, or west |
+
+### Keep the model in sync with the view
+
+Users also filter, remove, and select homes by clicking. [`<ModelContext>`](/v2/typescript/mcp-apps/model-context) reports the current view state to the model, so "remove the most expensive one" refers to what is on screen now:
+
+```tsx views/property-search/view.tsx
+<ModelContext
+  content={[
+    "HomeScout map is open. Use the view tools for every follow-up.",
+    `Area: ${areaLabel}. Filters: ${describeFilters(effectiveFilters)}. Sort: ${sort}.`,
+    `Visible (${visible.length}): ${visible
+      .map((listing) => `${listing.id}: ${listing.address}, ${compactPrice(listing.price)}`)
+      .join("; ")}.`,
+  ].join("\n")}
+/>
+```
+
+### Load details with an app-only tool
+
+`get-listing-details` has `visibility: "app"`, so MCP Apps hosts hide it from the model while the view can still call it. The view calls it with [`useCallTool()`](/v2/typescript/mcp-apps/interactivity) when the user selects a card or pin:
+
+```typescript src/index.ts
+export const getListingDetails = server.tool(
+  {
+    name: "get-listing-details",
+    visibility: "app",
+    inputSchema: z.object({ id: z.string() }),
+    // ...
+  },
+  async ({ id }) => {
+    // Look up the listing and return its staged details.
+  }
+);
+```
+
+```tsx views/property-search/view.tsx
+const detailsTool = useCallTool("get-listing-details");
+// On card or pin selection:
+void detailsTool.callTool({ id });
+```
+
+### Allow map tiles and fullscreen
+
+The view loads tiles from `server.arcgisonline.com`, so the tool's `view.csp` lists that origin in `resourceDomains` and `connectDomains`. Without it, the host's [Content Security Policy](/v2/typescript/mcp-apps/content-security-policy) blocks the tiles and the map renders blank.
+
+The view declares both display modes in `viewConfig` and requests fullscreen from a button with `useDisplayMode()`:
+
+```tsx views/property-search/view.tsx
+export const viewConfig: ViewConfig = {
+  autoResize: true,
+  displayModes: ["inline", "fullscreen"],
+};
+
+// Inside the view component:
+const { displayMode, availableDisplayModes, requestDisplayMode } = useDisplayMode();
+const canFullscreen = availableDisplayModes.includes("fullscreen");
+// On button click:
+void requestDisplayMode({ mode: "fullscreen" });
+```
+
+## Adapt it to your app
+
+- **Real listings:** replace the staged `LISTINGS` array with a call to your listing API inside `search-homes`. Keep the returned catalog small. For large datasets, return only the first page and fetch more from the view with an app-only tool.
+- **Another tile provider:** change the tile URL in `map.tsx`, update both CSP lists, and show the attribution your provider's terms require.
+- **Other domains:** the same shape fits any "search, then refine" app, such as hotels, restaurants, or job listings. Keep one rendering tool, move refinements into view tools, and report visible state with `ModelContext`.
+
+See the [complete property search example](https://github.com/manufacts/mcp-use-property-search-example) for the runnable project, and [Interactivity](/v2/typescript/mcp-apps/interactivity) for more on view tools, app-only tools, and follow-up messages.
