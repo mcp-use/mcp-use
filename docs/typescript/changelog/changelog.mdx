@@ -6,6 +6,27 @@ tag: "New"
 rss: true
 ---
 
+<Update label="v2.7.0" description="September 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=2.7.0&title=Mixed%20authentication&date=2026-09&lang=typescript" alt="Release 2.7.0" />
+  </Frame>
+  ## Mixed authentication
+  Minor release serving public, optional, and sign-in tools from one OAuth-enabled endpoint in Claude and ChatGPT, plus an OAuth provider setup hook.
+
+- **New** (server): `mixedAuth: true` lets clients connect and list tools, resources, and prompts without a token; it requires an `oauth` provider and makes nothing public on its own. See [Mixed authentication](/v2/typescript/server/authentication/mixed-auth) (`#2630`)
+- **New** (server): tools accept a `securitySchemes` field in the shape ChatGPT reads on `tools/list`: `[{ type: "noauth" }]` (public), `[{ type: "noauth" }, { type: "oauth2", scopes }]` (optional), or `[{ type: "oauth2", scopes }]` (sign-in with extra scopes); omitting it means sign-in with the provider's `requiredScopes`. The new `ToolSecurityScheme` type describes the entries (`#2630`)
+- **New** (server): a tool's `ctx.auth` is typed from its literal `securitySchemes`: required when the tool needs sign-in, possibly `undefined` when it accepts `noauth` (`#2630`)
+- **New** (server): refused calls are answered before the callback runs, as HTTP `401`/`403` with `WWW-Authenticate` for Claude and spec clients, or as an `isError` result with `_meta["mcp/www_authenticate"]` for ChatGPT; invalid or expired tokens always get `401`, even on public tools (`#2630`)
+- **Enhancement** (server): on a `mixedAuth` server, resources, resource templates, and prompts always require sign-in, while every tool's view loads signed out so ChatGPT can read views during app creation; tool results stay gated (`#2630`)
+- **Enhancement** (server): tools advertise their resolved `securitySchemes` on `tools/list`, top level and in `_meta.securitySchemes`; a hand-written `_meta.securitySchemes` passes through unenforced, with a warning on `mixedAuth` servers or when it differs from the declared field. `oauth2` scopes also work without `mixedAuth`, adding to the endpoint-wide requirement (`#2630`)
+- **New** (server): `oauthCustomProvider` accepts an optional synchronous `setup(host)` hook that runs once at mount to install `mcp:` middleware, register provider-owned tools, resources, resource templates, and prompts, validate app tools with `listTools()`, and rewrite instructions; `host.mixedAuth` reports signed-out access. A failed or async hook fails the mount. `OAuthProviderHost<TUser>` is exported from `mcp-use/oauth` (`#2405`)
+- **Fix** (server): `ThemeProvider` no longer remounts the view when the display mode switches between inline and fullscreen or pip, so local state and `useCallTool` results survive (`#2641`)
+- **Fix** (@mcp-use/cli): `screenshot` rejects `--width` and `--height` values Chrome cannot use (`#2617`)
+- **Documentation**: new Mixed authentication guide and `setup` hook docs for custom providers; the `mixed-oauth` example now uses `mixedAuth` and `securitySchemes`, covers every scheme shape, and runs behind `mcp-use dev --tunnel` for testing in Claude and ChatGPT (`#2630`, `#2405`)
+- **Update**: Updated @mcp-use/inspector to v20.3.12; see the [Inspector changelog](/inspector/changelog)
+- **Update**: Updated @mcp-use/cli to v4.1.16
+</Update>
+
 <Update label="v2.6.0" description="September 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=2.6.0&title=TanStack%20Start%20integration&date=2026-09&lang=typescript" alt="Release 2.6.0" />
