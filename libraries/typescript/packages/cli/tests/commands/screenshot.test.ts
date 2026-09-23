@@ -2,8 +2,28 @@ import { describe, expect, it } from "vitest";
 
 import {
   normalizeCaptureBounds,
+  parseDimension,
   readyStateFailure,
 } from "../../src/commands/screenshot.js";
+
+describe("screenshot dimensions", () => {
+  it.each([
+    ["1", 1],
+    ["768", 768],
+    ["10000000", 10_000_000],
+  ])("accepts %s pixels", (value, expected) => {
+    expect(parseDimension(value, "--width")).toBe(expected);
+  });
+
+  it.each(["0", "767.5", "10000001", "not-a-number"])(
+    "rejects %s pixels before capture",
+    (value) => {
+      expect(() => parseDimension(value, "--width")).toThrow(
+        "--width must be an integer from 1 to 10000000."
+      );
+    }
+  );
+});
 
 describe("screenshot capture bounds", () => {
   it("pixel-aligns the rendered widget instead of retaining viewport space", () => {

@@ -1,0 +1,21 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/agent": "2.0.18",
+    "@mcp-use/cli": "4.1.15",
+    "@mcp-use/client": "2.3.3",
+    "create-mcp-use-app": "2.0.7",
+    "@mcp-use/inspector": "20.3.11",
+    "mcp-use": "2.6.0",
+    "@mcp-use/tunnel": "0.2.1"
+  },
+  "changesets": [
+    "mixed-auth",
+    "oauth-provider-setup-hook",
+    "propagated-4e7ceff2ba8e4d70",
+    "propagated-bd22592e5d47f96f",
+    "theme-provider-stable-wrapper",
+    "tidy-screenshots-measure"
+  ]
+}

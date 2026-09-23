@@ -1175,6 +1175,53 @@ describe("react bridge runtime", () => {
     });
   });
 
+  it("ThemeProvider keeps child state across display mode switches", async () => {
+    resetRuntime();
+    const { bridge, init } = await startHost();
+
+    let mounts = 0;
+    let setCount: ((value: SetStateAction<number>) => void) | undefined;
+
+    function Counter() {
+      const [count, set] = useState(() => {
+        mounts += 1;
+        return 0;
+      });
+      setCount = set;
+      return <div data-testid="count">{count}</div>;
+    }
+
+    function View() {
+      return (
+        <ThemeProvider>
+          <Counter />
+        </ThemeProvider>
+      );
+    }
+
+    act(() => {
+      bootstrapView({ default: View as ComponentType });
+    });
+    await init;
+
+    await waitFor(() => {
+      expect(screen.getByTestId("count").textContent).toBe("0");
+    });
+    act(() => {
+      setCount!(3);
+    });
+
+    for (const displayMode of ["fullscreen", "inline", "pip"] as const) {
+      await act(async () => {
+        await bridge.sendHostContextChange({ displayMode });
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId("count").textContent).toBe("3");
+      });
+    }
+    expect(mounts).toBe(1);
+  });
+
   it("ViewControls stays inline until Debug expands it, then restores the prior mode", async () => {
     resetRuntime();
     const { bridge, init } = await startHost();

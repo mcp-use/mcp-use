@@ -9,8 +9,27 @@ import type { Env } from "hono";
 
 import type { McpUiResourceCsp } from "@modelcontextprotocol/ext-apps";
 
-import type { RequestContext } from "./context.js";
+import type { OAuthMode, RequestContext } from "./context.js";
 import type { UiPermissions } from "./views/types.js";
+
+/**
+ * One way a client may call a tool, from the `securitySchemes` convention
+ * ChatGPT reads on `tools/list`. See {@link ToolDefinition.securitySchemes}.
+ */
+export type ToolSecurityScheme =
+  | {
+      /** The tool runs without a token. */
+      readonly type: "noauth";
+    }
+  | {
+      /** The tool accepts an OAuth 2.1 bearer token. */
+      readonly type: "oauth2";
+      /**
+       * Scopes beyond the provider's `requiredScopes`. Use `[]` for the
+       * provider's `requiredScopes` alone.
+       */
+      readonly scopes: readonly string[];
+    };
 
 /**
  * Binds a tool to a view directory for MCP Apps rendering.
@@ -100,6 +119,28 @@ export interface ToolDefinition {
    * views via `useCallTool` while the host hides them from the model.
    */
   visibility?: "model" | "app";
+  /**
+   * How the tool may be called on an OAuth server. Checked before the
+   * callback runs, and advertised on `tools/list` for hosts such as ChatGPT.
+   *
+   * - `[{ type: "noauth" }]`: anyone may call it; `ctx.auth` is set when the
+   *   caller is signed in.
+   * - `[{ type: "noauth" }, { type: "oauth2", scopes }]`: anyone may call it.
+   *   The scopes are only advertised, so the callback checks
+   *   `ctx.auth?.scopes` itself.
+   * - `[{ type: "oauth2", scopes }]`: sign-in required with every listed
+   *   scope plus the provider's `requiredScopes`.
+   *
+   * Omitted means sign-in with the provider's `requiredScopes`. `noauth`
+   * requires `mixedAuth: true` on the server.
+   *
+   * @example
+   * ```ts
+   * securitySchemes: [{ type: "noauth" }]
+   * securitySchemes: [{ type: "oauth2", scopes: ["checkout"] }]
+   * ```
+   */
+  securitySchemes?: readonly ToolSecurityScheme[];
   /**
    * Bind this tool to a view for MCP Apps rendering. Requires
    * {@link ToolDefinition.outputSchema} — the view reads the result's
@@ -212,7 +253,7 @@ export type ToolCallback<
   TInput = Record<string, unknown>,
   TOutput = never,
   TUser = never,
-  HasOAuth extends boolean = false,
+  HasOAuth extends OAuthMode = false,
   TEnv extends Env = Env,
 > = (
   params: TInput,
