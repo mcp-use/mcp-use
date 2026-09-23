@@ -469,7 +469,8 @@
                       "v2/typescript/cookbook/nextjs",
                       "v2/typescript/cookbook/tanstack-start",
                       "v2/typescript/cookbook/upstash",
-                      "v2/typescript/cookbook/sentry"
+                      "v2/typescript/cookbook/sentry",
+                      "v2/typescript/cookbook/a2ui"
                     ]
                   }
                 ]
