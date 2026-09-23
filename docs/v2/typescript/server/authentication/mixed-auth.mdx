@@ -235,7 +235,7 @@ server.prompt(
 
 - `resources/read` and `prompts/get` follow the item's `auth`. The list methods are always open on a `mixedAuth` server.
 - `auth` on a resource template applies to every URI the template matches. When several templates match one URI, the strictest `auth` applies.
-- Every tool's view resource can be read signed out, whatever the tool's `auth`. ChatGPT reads every view while the app is being created, before anyone signs in, and a refused read blocks creation. A view is static UI; the data arrives in the tool result, which stays protected.
+- A tool's view resource follows its tool. The view of a public or optional tool can be read signed out, so its UI loads before sign-in. The view of a sign-in tool needs a token with the baseline scopes.
 - `resources/subscribe`, `subscriptions/listen`, and `completion/complete` follow the `auth` of the resource or prompt they reference.
 - Resources and prompts get no `securitySchemes` metadata. That field only exists for tools.
 - A refused resource read or prompt fetch always gets HTTP `401` or `403`.
@@ -409,7 +409,7 @@ curl -s http://localhost:3000/mcp \
   -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"protected_profile","arguments":{},"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientInfo":{"name":"curl","version":"0"},"io.modelcontextprotocol/clientCapabilities":{}}}}'
 ```
 
-To test the full sign-in and retry loop in Claude or ChatGPT, run the example with `pnpm dev --tunnel` and add the printed tunnel URL as a custom connector. The example's README lists every item and a test checklist.
+To test the full sign-in and retry loop in Claude or ChatGPT, run the example with `pnpm dev --tunnel`, restart it with `MCP_URL` set to the tunnel's origin, and add the tunnel's `/mcp` URL as a custom connector. The example's README lists every item and a test checklist.
 
 ## Next steps
 

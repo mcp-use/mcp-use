@@ -2424,17 +2424,19 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     for (const { definition, policy } of this.#resources.values()) {
       staticResources.set(definition.uri, policy);
     }
-    // Views are readable signed out whatever their tool's `auth`: ChatGPT
-    // reads every tool's view while the app is being created, before anyone
-    // signs in, and a refusal blocks creation. A view is static UI, not user
-    // data; the data arrives in the tool result, which stays protected.
-    const publicView: AuthPolicy = {
-      access: "public",
-      scopes: [],
-      declared: false,
-    };
+    // A view follows its tool: readable signed out when the tool is public
+    // or optional. Views of sign-in tools need the provider baseline only;
+    // their HTML is not user data.
     for (const viewName of this.#views.keys()) {
-      staticResources.set(viewResourceUri(viewName), publicView);
+      const toolName = this.#viewBindings.get(viewName)?.toolName;
+      const toolPolicy =
+        toolName === undefined ? undefined : this.#tools.get(toolName)?.policy;
+      staticResources.set(
+        viewResourceUri(viewName),
+        toolPolicy !== undefined && toolPolicy.access !== "sign-in"
+          ? toolPolicy
+          : signIn
+      );
     }
     for (const skillResource of this.#skills?.resources ?? []) {
       staticResources.set(skillResource.uri, signIn);
