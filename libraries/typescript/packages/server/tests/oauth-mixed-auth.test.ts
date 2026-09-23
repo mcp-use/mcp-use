@@ -882,6 +882,17 @@ describe("mixed auth: invalid configurations", () => {
           ...({ mixedAuth: "yes" } as object),
         })
     ).toThrow(/mixedAuth must be a boolean/);
+    for (const oauth of [null, {}, { createTokenVerifier: () => ({}) }]) {
+      expect(
+        () =>
+          new MCPServer({
+            name: "malformed",
+            version: "1.0.0",
+            ...({ oauth, mixedAuth: true } as object),
+          }),
+        JSON.stringify(oauth)
+      ).toThrow(/mixedAuth requires an OAuth provider/);
+    }
   });
 
   it("rejects noauth without mixedAuth", () => {
@@ -922,9 +933,16 @@ describe("mixed auth: invalid configurations", () => {
       ["noauth", /securitySchemes must be a non-empty array/],
       [[null], /each security scheme must be/],
       [[{ type: "basic" }], /unsupported security scheme type "basic"/],
-      [[{ type: "oauth2" }], /oauth2 scopes must be an array of non-empty/],
+      [[{ type: "oauth2" }], /oauth2 scopes must be an array/],
       [[{ type: "oauth2", scopes: "a" }], /oauth2 scopes must be an array/],
-      [[{ type: "oauth2", scopes: [" "] }], /non-empty strings/],
+      [[{ type: "oauth2", scopes: [""] }], /invalid oauth2 scope ""/],
+      [[{ type: "oauth2", scopes: [" "] }], /invalid oauth2 scope " "/],
+      [
+        [{ type: "oauth2", scopes: ["shop check"] }],
+        /invalid oauth2 scope "shop check"; each scope must be one/,
+      ],
+      [[{ type: "oauth2", scopes: ['a"b'] }], /invalid oauth2 scope/],
+      [[{ type: "oauth2", scopes: [1] }], /invalid oauth2 scope 1/],
       [
         [{ type: "oauth2", scope: ["a"] }],
         /unknown security scheme field "scope"/,
@@ -942,6 +960,12 @@ describe("mixed auth: invalid configurations", () => {
         /more than one oauth2/,
       ],
     ];
+    // RFC 6749 scope tokens may contain punctuation such as ":" and ",".
+    expect(() =>
+      registerTool(oauthServer(), [
+        { type: "oauth2", scopes: ["orders:read", "a,b"] },
+      ])
+    ).not.toThrow();
     for (const [schemes, message] of cases) {
       expect(
         () => registerTool(oauthServer(), schemes),

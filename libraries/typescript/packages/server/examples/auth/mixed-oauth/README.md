@@ -71,11 +71,12 @@ pnpm dev
 REQUIRED_SCOPES= pnpm dev
 ```
 
-Without a baseline, `protected_profile`, `protected_card`, and
-`optional_whoami` advertise an `oauth2` scheme with empty scopes on
-`tools/list`. ChatGPT is reported to
+Without a baseline, `protected_profile` and `protected_card` advertise an
+`oauth2` scheme with empty scopes on `tools/list`. ChatGPT is reported to
 ignore such a scheme, so this mode is how to check whether ChatGPT still shows
-sign-in for them.
+sign-in for them. `optional_whoami` asks for `openid` in this mode, because
+mcp-use rejects a declared `oauth2` scheme with empty scopes when the provider
+has no required scopes.
 
 ## Test in Claude and ChatGPT
 

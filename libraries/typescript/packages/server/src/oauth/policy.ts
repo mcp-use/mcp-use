@@ -17,6 +17,13 @@ const SCHEME_SHAPE =
   'each security scheme must be { type: "noauth" } or ' +
   '{ type: "oauth2", scopes: string[] }';
 
+/**
+ * An RFC 6749 section 3.3 scope token: printable ASCII except space, `"`,
+ * and `\`. Scopes are space-separated in challenges and token claims, so a
+ * value with whitespace would split into several scopes and never match.
+ */
+const SCOPE_TOKEN = /^[\x21\x23-\x5B\x5D-\x7E]+$/;
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -37,6 +44,7 @@ function unionScopes(
  * with the provider's `requiredScopes`.
  *
  * @throws TypeError On an empty or malformed array, a duplicate scheme type,
+ * a scope that is not a single RFC 6749 scope token,
  * `noauth` without `mixedAuth`, `oauth2` without an OAuth provider, or an
  * `oauth2` scheme whose scopes are empty when the provider has no
  * `requiredScopes`.
@@ -86,13 +94,16 @@ export function resolveSecuritySchemes(
         );
       }
       const { scopes } = scheme as Record<string, unknown>;
-      if (
-        !Array.isArray(scopes) ||
-        !scopes.every(
-          (scope) => typeof scope === "string" && scope.trim().length > 0
-        )
-      ) {
-        fail("oauth2 scopes must be an array of non-empty strings");
+      if (!Array.isArray(scopes)) {
+        fail("oauth2 scopes must be an array of scope strings");
+      }
+      for (const scope of scopes as unknown[]) {
+        if (typeof scope !== "string" || !SCOPE_TOKEN.test(scope)) {
+          fail(
+            `invalid oauth2 scope ${JSON.stringify(scope)}; each scope must ` +
+              'be one non-empty token without whitespace, ", or \\'
+          );
+        }
       }
       oauth2Scopes = scopes as readonly string[];
     } else {

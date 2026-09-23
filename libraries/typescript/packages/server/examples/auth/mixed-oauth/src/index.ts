@@ -89,7 +89,13 @@ server.tool(
     name: "optional_whoami",
     description:
       "Optional tool. Runs for everyone and reports who the server thinks is calling and which scopes the token carries.",
-    securitySchemes: [{ type: "noauth" }, { type: "oauth2", scopes: [] }],
+    // `scopes: []` means the provider's required scopes alone. Without a
+    // baseline that would be an empty oauth2 scheme, which ChatGPT ignores
+    // and mcp-use rejects, so ask for `openid` instead.
+    securitySchemes: [
+      { type: "noauth" },
+      { type: "oauth2", scopes: requiredScopes.length > 0 ? [] : ["openid"] },
+    ],
   },
   async (_args, ctx) => text(`optional_whoami: ${caller(ctx.auth)}`)
 );

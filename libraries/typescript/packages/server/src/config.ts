@@ -252,6 +252,18 @@ export interface CorsOptions {
   credentials?: boolean;
 }
 
+/** Whether a value has the shape of an {@link OAuthProvider}. */
+function isOAuthProviderLike(value: unknown): boolean {
+  if (typeof value !== "object" || value === null) return false;
+  const provider = value as Record<string, unknown>;
+  return (
+    typeof provider["createTokenVerifier"] === "function" &&
+    typeof provider["mapAuthInfo"] === "function" &&
+    typeof provider["oauthMetadata"] === "object" &&
+    provider["oauthMetadata"] !== null
+  );
+}
+
 /**
  * Runtime checks for optional {@link ServerConfig} fields that TypeScript
  * alone cannot enforce when values arrive from untyped call sites.
@@ -259,7 +271,8 @@ export interface CorsOptions {
  * @throws TypeError When `basePath` is present but not an absolute URL
  * pathname without empty segments, trailing slash, query, fragment, or
  * whitespace, when `skills` is not a boolean or valid configuration object,
- * or when `mixedAuth` is not a boolean or is `true` without an OAuth provider.
+ * or when `mixedAuth` is not a boolean or is `true` without an OAuth provider
+ * (a missing, `null`, or malformed `oauth` value).
  */
 export function assertServerConfig(config: {
   basePath?: unknown;
@@ -271,7 +284,7 @@ export function assertServerConfig(config: {
   if (config.mixedAuth !== undefined && typeof config.mixedAuth !== "boolean") {
     throw new TypeError("mixedAuth must be a boolean");
   }
-  if (config.mixedAuth === true && config.oauth === undefined) {
+  if (config.mixedAuth === true && !isOAuthProviderLike(config.oauth)) {
     throw new TypeError(
       "mixedAuth requires an OAuth provider; set oauth on the server"
     );
@@ -332,7 +345,10 @@ export type ServerConfig<TUser = never> = BaseServerConfig &
     ? {
         /** OAuth is unavailable when no authenticated user type is declared. */
         oauth?: undefined;
-        /** Requires an OAuth provider. */
+        /**
+         * Mixed authentication is unavailable without an OAuth provider;
+         * only `false` is accepted here.
+         */
         mixedAuth?: false;
       }
     : {

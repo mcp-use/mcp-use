@@ -165,9 +165,9 @@ server.tool(
 A signed-in user without the scope gets the same result as a signed-out user. That is common: the user signed in earlier for a tool that needed fewer scopes, or declined a scope on the consent screen.
 
 <Note>
-  An optional tool cannot bring up a sign-in prompt. It can mention signing in
-  in its text, but the prompt only appears when the user calls a sign-in tool,
-  or signs in or reconnects from the host.
+  An optional tool cannot bring up a sign-in prompt. Its result text can tell
+  the user to sign in, but the prompt only appears when the user calls a sign-in
+  tool, or signs in or reconnects from the host.
 </Note>
 
 ## `ctx.auth` types
@@ -317,6 +317,7 @@ These throw a `TypeError` at construction or registration instead of failing at 
 | `oauth2` without `oauth`                                             | No provider to verify tokens                                                          |
 | `oauth2` with `scopes: []` when the provider has no `requiredScopes` | ChatGPT ignores an `oauth2` scheme with empty scopes, so it would never offer sign-in |
 | An empty array, or a scheme type that appears twice                  | Omit the field for the default; one challenge can only ask for one scope set          |
+| A scope that is empty or contains whitespace, `"`, or `\`            | Scopes are space-separated in challenges and tokens, so the value could never match   |
 | An unknown scheme type or field                                      | Includes typos such as `scope` for `scopes`                                           |
 
 ## Without `mixedAuth`
