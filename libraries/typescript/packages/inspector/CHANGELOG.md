@@ -1,5 +1,14 @@
 # @mcp-use/inspector
 
+## 20.3.11
+
+### Patch Changes
+
+- 4866186: Fix two Inspector crashes and resets: searchable pickers (debugger timezone and locale) no longer unmount the app when the checked option is filtered out while typing, and Connection Settings keeps edits while a failed connection retries instead of resetting the form on every retry.
+- 4866186: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 4866186: Rebuild bundled workspace code and synchronize published internal package metadata.
+- 4866186: Rebuild bundled workspace code and synchronize published internal package metadata.
+
 ## 20.3.11-canary.2
 
 ### Patch Changes
