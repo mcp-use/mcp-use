@@ -12,6 +12,7 @@
   },
   "changesets": [
     "mixed-auth",
+    "oauth-provider-setup-hook",
     "propagated-4e7ceff2ba8e4d70",
     "propagated-bd22592e5d47f96f",
     "theme-provider-stable-wrapper",
