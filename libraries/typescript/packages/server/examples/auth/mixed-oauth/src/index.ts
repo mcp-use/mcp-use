@@ -141,7 +141,7 @@ export const publicCard = server.tool(
   {
     name: "public_card",
     description:
-      "Public tool with a view. Like every resource, the view needs sign-in to read.",
+      "Public tool with a view. The view loads signed out, like every view on a mixedAuth server.",
     securitySchemes: [{ type: "noauth" }],
     outputSchema: cardSchema,
     view: { name: "public-card", description: "Card from a public tool" },
@@ -160,7 +160,7 @@ export const protectedCard = server.tool(
   {
     name: "protected_card",
     description:
-      "Sign-in tool with a view. Reading the view resource needs the provider's required scopes.",
+      "Sign-in tool with a view. The view loads signed out, but the tool result needs sign-in.",
     outputSchema: cardSchema,
     view: { name: "protected-card", description: "Card from a sign-in tool" },
   },

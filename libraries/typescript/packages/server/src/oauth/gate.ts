@@ -31,15 +31,21 @@ export interface OAuthGateOptions {
   mixedAuth: boolean;
   /** Resolved schemes for a tool name, or `undefined` for an unknown tool. */
   toolSchemes: (name: string) => readonly ToolSecurityScheme[] | undefined;
+  /**
+   * Resource URIs that `resources/read` serves signed out on a `mixedAuth`
+   * server: the tools' views.
+   */
+  openResourceUris: Iterable<string>;
 }
 
 /**
- * Methods a signed-out caller may issue on a `mixedAuth` server: discovery (`initialize` on 2025-era protocols,
- * `server/discover` on 2026-07-28), `ping`, the list methods, and the
- * 2025-era `logging/setLevel`, which reads no data. Refusing any of these
- * would make hosts demand sign-in at connection time. Apart from
- * `tools/call` on `noauth` tools and list-changed streams, every other
- * method requires sign-in, including reading resources and getting prompts.
+ * Methods a signed-out caller may issue on a `mixedAuth` server: discovery
+ * (`initialize` on 2025-era protocols, `server/discover` on 2026-07-28),
+ * `ping`, the list methods, and the 2025-era `logging/setLevel`, which reads
+ * no data. Refusing any of these would make hosts demand sign-in at
+ * connection time. Apart from `tools/call` on `noauth` tools, reads of the
+ * tools' views, and list-changed streams, every other method requires
+ * sign-in, including reading other resources and getting prompts.
  */
 const SIGNED_OUT_METHODS = new Set([
   "initialize",
@@ -83,6 +89,15 @@ function parseMessage(body: unknown): ParsedMessage | undefined {
 function isModernEnvelope(message: ParsedMessage): boolean {
   const meta = message.params?.["_meta"];
   return isRecord(meta) && meta[PROTOCOL_VERSION_META_KEY] !== undefined;
+}
+
+/** A resource URI in the form the SDK matches registered URIs against. */
+function normalizeResourceUri(uri: string): string {
+  try {
+    return new URL(uri).toString();
+  } catch {
+    return uri;
+  }
 }
 
 function stringParam(
@@ -134,6 +149,9 @@ export function createOAuthGate(options: OAuthGateOptions): FetchMiddleware {
     mixedAuth,
     toolSchemes,
   } = options;
+  const openResources = new Set(
+    [...options.openResourceUris].map(normalizeResourceUri)
+  );
 
   const open: Requirement = { required: false, scopes: [] };
   const signIn = (extra: readonly string[] = []): Requirement => ({
@@ -153,8 +171,18 @@ export function createOAuthGate(options: OAuthGateOptions): FetchMiddleware {
       if (mixedAuth && !requiresSignIn(schemes)) return open;
       return signIn(schemeScopes(schemes));
     }
-    if (!mixedAuth || isSignInMethod(message)) return signIn();
-    return open;
+    if (!mixedAuth) return signIn();
+    if (message.method === "resources/read") {
+      // ChatGPT reads every tool's view while an app is being created,
+      // before anyone signs in, and a refused read blocks creation. A view
+      // is static UI; the data arrives in the tool result, which stays
+      // gated by the tool's securitySchemes.
+      const uri = stringParam(message.params, "uri");
+      if (uri !== undefined && openResources.has(normalizeResourceUri(uri))) {
+        return open;
+      }
+    }
+    return isSignInMethod(message) ? signIn() : open;
   };
 
   const requirementForBody = (body: unknown): Requirement => {

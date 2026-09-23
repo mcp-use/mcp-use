@@ -2,8 +2,8 @@
 
 A test bed for mixed authentication: one `MCPServer` with `oauth` and
 `mixedAuth: true`, serving every `securitySchemes` shape on tools, plus
-resources, a resource template, a prompt, and views, which always need
-sign-in. A built-in Better Auth server handles dynamic
+resources, a resource template, and a prompt, which always need sign-in, and
+views, which load signed out. A built-in Better Auth server handles dynamic
 client registration, PKCE, sign-in, consent, and tokens, all in memory.
 
 Sign-in is anonymous and needs no credentials, so anyone who can reach the
@@ -22,8 +22,8 @@ Names start with their access level. Every response says what the server saw:
 | `optional_welcome`            | tool              | `[noauth, oauth2(["profile"])]` | runs; personalized only with `profile` |
 | `protected_profile`           | tool              | omitted                         | sign-in                                |
 | `protected_update_profile`    | tool              | `[oauth2(["profile"])]`         | sign-in, then step-up to `profile`     |
-| `public_card`                 | tool with a view  | `[noauth]`                      | runs; view needs sign-in               |
-| `protected_card`              | tool with a view  | omitted                         | sign-in; view needs sign-in            |
+| `public_card`                 | tool with a view  | `[noauth]`                      | runs; view readable                    |
+| `protected_card`              | tool with a view  | omitted                         | sign-in; view readable                 |
 | `demo://protected/profile`    | resource          | n/a                             | sign-in                                |
 | `demo://protected/notes/{id}` | resource template | n/a                             | sign-in                                |
 | `protected_summary`           | prompt            | n/a                             | sign-in                                |
@@ -106,8 +106,8 @@ Both hosts need a public HTTPS URL. Use the CLI tunnel:
 Then work through the list. The server log shows every request and its status.
 
 - Ask for `public_ping`, `optional_whoami`, and `public_card`. They run signed
-  out. Views need sign-in, so check whether ChatGPT still creates the app and
-  whether `public_card` renders its view before sign-in.
+  out, and `public_card` renders its view. ChatGPT reads every view while
+  creating the app, so app creation must succeed before you sign in.
 - Ask for `protected_profile`. The host shows sign-in. Continue, then allow.
   The call retries and reports your user ID.
 - Ask for `optional_whoami` again. It now reports the identity and scopes.
@@ -149,6 +149,8 @@ each tool to its `securitySchemes`:
 | `[{ type: "noauth" }, oauth2]` | Anyone; the scopes are advertised and the callback checks them |
 | `[{ type: "oauth2", scopes }]` | Sign-in; needs the required scopes plus `scopes`               |
 
-Resources, resource templates, views, and prompts always need sign-in with
-the required scopes. Invalid or expired tokens are refused with `401` on every
+Resources, resource templates, and prompts always need sign-in with the
+required scopes. Every tool's view loads signed out, because ChatGPT reads the
+views before anyone signs in; the data arrives in the tool result, which stays
+gated. Invalid or expired tokens are refused with `401` on every
 request, `noauth` tools included, so clients refresh them.

@@ -253,15 +253,20 @@ for (const [name, scopes] of [
     `scope="${scopeOf(r.challenge) ?? ""}"`
   );
 }
-// Resources, views included, and prompts always need sign-in.
-for (const uri of [
-  "demo://protected/profile",
-  "demo://protected/notes/7",
-  "ui://views/public-card.html",
-  "ui://views/protected-card.html",
+// Resources and prompts need sign-in. Views load signed out, whatever their
+// tool declares, because ChatGPT reads them while creating the app.
+for (const [uri, expected] of [
+  ["demo://protected/profile", 401],
+  ["demo://protected/notes/7", 401],
+  ["ui://views/public-card.html", 200],
+  ["ui://views/protected-card.html", 200],
 ]) {
   const r = await read(uri);
-  check(`read ${uri} signed out -> 401`, r.status === 401, `${r.status}`);
+  check(
+    `read ${uri} signed out -> ${expected}`,
+    r.status === expected,
+    `${r.status}`
+  );
 }
 {
   const r = await getPrompt("protected_summary");

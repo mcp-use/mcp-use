@@ -73,7 +73,7 @@ export default server;
 WorkOS is only the example. Every mcp-use OAuth provider supports mixed authentication.
 
 - `mixedAuth` requires an `oauth` provider. Setting it without one is a type error and throws a `TypeError` at construction. It is a constructor option, not a provider option.
-- `mixedAuth` does not make anything public. Tools without `securitySchemes` still require sign-in, and resources and prompts always do.
+- `mixedAuth` does not make anything public. Tools without `securitySchemes` still require sign-in, and resources and prompts always do. Only the tools' views load signed out.
 - With `mixedAuth` off (the default), every request to the MCP endpoint needs a valid token.
 - Every tool stays in `tools/list` for every caller. A signed-out user must see a sign-in tool, or the model never calls it and sign-in never starts.
 - A server with `mixedAuth: true` and no `noauth` tools is valid. Anyone can connect and see what it offers, and every call needs sign-in. Directories and indexers can probe it before anyone signs in.
@@ -196,15 +196,14 @@ When `securitySchemes` comes from a variable typed as `ToolSecurityScheme[]`, th
 Resources, resource templates, and prompts have no `securitySchemes`. On an OAuth server they always require sign-in with the provider's `requiredScopes`, and their callbacks always get a required `ctx.auth`.
 
 - `resources/read`, `prompts/get`, `completion/complete`, and `resources/subscribe` require sign-in. The list methods are always open on a `mixedAuth` server.
-- A tool's view resource requires sign-in too, whatever the tool's `securitySchemes`.
+- Every tool's view loads signed out on a `mixedAuth` server, whatever the tool's `securitySchemes`. ChatGPT reads every view while an app is created, before anyone signs in, and a refused read blocks creation. A view is static UI; the data arrives in the tool result, which the tool's `securitySchemes` still gate.
 - `subscriptions/listen` is open signed out only when it subscribes to no resources, so it carries only list-changed notifications.
 - A refused resource read or prompt fetch always gets HTTP `401` or `403`.
 
 <Warning>
   Whether Claude or ChatGPT shows a sign-in prompt when a resource read or
   prompt fetch is refused is untested. Both hosts document sign-in prompts only
-  for tool calls. ChatGPT reads every tool's view when an app is created, before
-  anyone signs in.
+  for tool calls.
 </Warning>
 
 ## Signed-out requests
@@ -214,11 +213,12 @@ On a `mixedAuth` server, a signed-out caller can always send:
 - `initialize` (2025-era protocols) and `server/discover` (2026-07-28);
 - `ping` and `logging/setLevel`, which read no data;
 - `tools/list`, `resources/list`, `resources/templates/list`, and `prompts/list`;
+- `resources/read` of a tool's view;
 - `subscriptions/listen` without resource subscriptions;
 - notifications;
 - an HTML browser request for the landing page at the MCP path.
 
-`tools/call` follows the tool's `securitySchemes`. Unknown tools require sign-in. Every other method, including `resources/read`, `prompts/get`, `tasks/*`, and the skills methods, requires sign-in.
+`tools/call` follows the tool's `securitySchemes`. Unknown tools require sign-in. Every other method, including `resources/read` of other resources, `prompts/get`, `tasks/*`, and the skills methods, requires sign-in.
 
 ## How hosts see a refused call
 

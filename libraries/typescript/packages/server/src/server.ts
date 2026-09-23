@@ -1461,6 +1461,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
           baselineScopes: providerOptions.requiredScopes ?? [],
           mixedAuth,
           toolSchemes: (name) => this.#tools.get(name)?.schemes,
+          openResourceUris: [...this.#views.keys()].map(viewResourceUri),
         };
         // The gate and its challenge builder load on the first MCP request,
         // keeping them out of the static graph of servers without OAuth.

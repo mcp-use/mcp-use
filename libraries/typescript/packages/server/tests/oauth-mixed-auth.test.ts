@@ -622,7 +622,7 @@ describe("mixed auth: resources, prompts, and views", () => {
   const productRef = { type: "ref/resource", uri: "shop://products/{id}" };
   const catalogView = viewResourceUri("catalog-card");
 
-  it("requires sign-in with the provider baseline, whatever the tools declare", async () => {
+  it("requires sign-in with the provider baseline for everything but views", async () => {
     const handler = shopServer().fetch;
     const subscribe = post(
       {
@@ -638,8 +638,6 @@ describe("mixed auth: resources, prompts, and views", () => {
       ["static resource", read("shop://me")],
       ["template resource", read("shop://products/1")],
       ["unknown resource", read("shop://nowhere")],
-      // The view of a noauth tool is gated like any other resource.
-      ["view", read(catalogView)],
       ["prompt", getPrompt("upsell")],
       ["unknown prompt", getPrompt("missing")],
       ["prompt completion", complete({ type: "ref/prompt", name: "upsell" })],
@@ -681,6 +679,31 @@ describe("mixed auth: resources, prompts, and views", () => {
       result: { completion: { values: string[] } };
     };
     expect(values.result.completion.values).toEqual(["coffee", "tea"]);
+  });
+
+  it("serves every tool's view signed out, whatever the tool declares", async () => {
+    // ChatGPT reads every view while an app is created, before sign-in.
+    expect((await shopServer().fetch(read(catalogView))).status).toBe(200);
+
+    // A view of a tool that requires sign-in loads signed out too.
+    const server = oauthServer();
+    server.tool(
+      {
+        name: "private_card",
+        outputSchema: z.object({ ok: z.boolean() }),
+        view: { name: "private-card" },
+      },
+      async () => ({ structuredContent: { ok: true }, content: [] })
+    );
+    server.__primeViews({
+      "private-card": { kind: "external", entry: "assets/p.js", css: [] },
+    });
+    server.__primeSkills(undefined);
+    expect(
+      (await server.fetch(read(viewResourceUri("private-card")))).status
+    ).toBe(200);
+    // The tool behind the view still requires sign-in.
+    expect((await server.fetch(call("private_card"))).status).toBe(401);
   });
 
   it("opens subscriptions/listen signed out only without resource subscriptions", async () => {

@@ -364,8 +364,9 @@ export type ServerConfig<TUser = never> = BaseServerConfig &
          *
          * When `true`, anyone can connect and list tools, resources, and
          * prompts without a token. It does not make anything public: only
-         * tools whose `securitySchemes` include `noauth` run signed out.
-         * Other tools, and every resource and prompt, still require sign-in
+         * tools whose `securitySchemes` include `noauth` run signed out, and
+         * the tools' views load signed out so hosts can render them. Other
+         * tools, and every other resource and prompt, still require sign-in
          * with the provider's `requiredScopes`. A token that is sent is
          * always verified, and an invalid or expired one is refused with
          * `401`, even on `noauth` tools.
