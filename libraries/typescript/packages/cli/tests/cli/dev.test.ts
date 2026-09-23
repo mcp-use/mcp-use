@@ -96,7 +96,8 @@ async function startDev(
   cwd: string,
   port: number,
   host?: string,
-  inspector?: boolean
+  inspector?: boolean,
+  tunnel?: boolean
 ): Promise<DevHandle> {
   const lines: string[] = [];
   const logSpy = vi
@@ -116,6 +117,7 @@ async function startDev(
     port,
     ...(host !== undefined && { host }),
     ...(inspector !== undefined && { inspector }),
+    ...(tunnel !== undefined && { tunnel }),
     signal: controller.signal,
   });
   // Surface startup failures instead of hanging in waitFor.
@@ -815,6 +817,28 @@ export default server;`
     );
     expect(((await metadata.json()) as { resource: string }).resource).toBe(
       `http://localhost:${actualPort}/mcp`
+    );
+    expect(process.env["MCP_URL"]).toBeUndefined();
+  });
+
+  it("uses the tunnel origin as the OAuth resource with --tunnel", async () => {
+    delete process.env["MCP_URL"];
+    const cwd = copyFixture("dev-oauth-tunnel");
+    cleanups.push(() => removeDir(cwd));
+    writeOAuthEntry(cwd);
+
+    const port = await getFreePort();
+    const dev = await startDev(cwd, port, undefined, false, true);
+    cleanups.push(dev.stop);
+
+    const metadata = await fetch(
+      `http://localhost:${port}/.well-known/oauth-protected-resource/mcp`
+    );
+    expect(((await metadata.json()) as { resource: string }).resource).toBe(
+      "https://fake.local.mcp-use.run/mcp"
+    );
+    expect(dev.logs).toContain(
+      "  ➜ Tunnel:        https://fake.local.mcp-use.run/mcp"
     );
     expect(process.env["MCP_URL"]).toBeUndefined();
   });
