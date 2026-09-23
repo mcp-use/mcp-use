@@ -259,7 +259,7 @@ for (const [uri, expected] of [
   ["demo://public/items/7", 200],
   ["demo://protected/notes/7", 401],
   ["ui://views/public-card.html", 200],
-  ["ui://views/protected-card.html", 401],
+  ["ui://views/protected-card.html", 200],
 ]) {
   const r = await read(uri);
   check(

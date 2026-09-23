@@ -149,7 +149,7 @@ export const protectedCard = server.tool(
   {
     name: "protected_card",
     description:
-      "Sign-in tool with a view. Reading the view resource needs the provider's required scopes.",
+      "Sign-in tool with a view. The view resource is readable signed out; the call needs sign-in.",
     outputSchema: cardSchema,
     view: { name: "protected-card", description: "Card from a sign-in tool" },
   },

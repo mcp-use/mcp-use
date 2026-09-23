@@ -22,7 +22,7 @@ Names start with their access level. Every response says what the server saw:
 | `protected_profile`        | tool              | omitted                              | sign-in     |
 | `protected_update_profile` | tool              | `{ scopes: ["profile"] }`            | sign-in, then step-up to `profile` |
 | `public_card`              | tool with a view  | `"public"`                           | runs; view readable |
-| `protected_card`           | tool with a view  | omitted                              | sign-in; view needs sign-in |
+| `protected_card`           | tool with a view  | omitted                              | sign-in; view readable |
 | `demo://public/catalog`    | resource          | `"public"`                           | readable    |
 | `demo://optional/greeting` | resource          | `"optional"`                         | readable    |
 | `demo://protected/profile` | resource          | omitted                              | sign-in     |
@@ -79,28 +79,18 @@ sign-in for them.
 
 ## Test in Claude and ChatGPT
 
-Both hosts need a public HTTPS URL. Use the CLI tunnel:
+Both hosts need a public HTTPS URL. Start the example with the CLI tunnel:
 
-1. Start the tunnel once and note the `Tunnel:` URL it prints, for example
-   `https://abc123.local.mcp-use.run/mcp`:
+```sh
+pnpm dev --tunnel
+```
 
-   ```sh
-   pnpm dev --tunnel
-   ```
-
-   The subdomain is saved in `.mcp-use/state/tunnel.json`, so later runs reuse
-   the same URL.
-
-2. Restart with `MCP_URL` set to that URL's origin (without `/mcp`), so the
-   authorization server, tokens, and protected-resource metadata all use the
-   public URL:
-
-   ```sh
-   MCP_URL=https://abc123.local.mcp-use.run pnpm dev --tunnel
-   ```
-
-3. Add `https://abc123.local.mcp-use.run/mcp` as a custom connector in Claude,
-   and in ChatGPT with developer mode on. Connect without signing in.
+Without `MCP_URL`, `mcp-use dev --tunnel` starts the tunnel before importing
+the server and uses the tunnel's origin as `MCP_URL`, so the authorization
+server, tokens, and protected-resource metadata all use the public URL. Add
+the `Tunnel:` URL it prints, for example
+`https://abc123.local.mcp-use.run/mcp`, as a custom connector in Claude, and in
+ChatGPT with developer mode on. Connect without signing in.
 
 Then work through the list. The server log shows every request and its status.
 

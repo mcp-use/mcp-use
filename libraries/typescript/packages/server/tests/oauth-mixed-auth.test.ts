@@ -835,7 +835,7 @@ describe("mixed auth: resources and prompts", () => {
     await listChanged.body?.cancel();
   });
 
-  it("lets a view load signed out when its tool is public or optional", async () => {
+  it("lets every view load signed out, whatever its tool's auth", async () => {
     const server = new MCPServer({
       name: "views",
       version: "1.0.0",
@@ -874,7 +874,9 @@ describe("mixed auth: resources and prompts", () => {
     ).toBe(200);
     expect(
       (await server.fetch(read(viewResourceUri("private-card")))).status
-    ).toBe(401);
+    ).toBe(200);
+    // The view is only UI; the sign-in tool itself stays protected.
+    expect((await server.fetch(call("private-card"))).status).toBe(401);
   });
 });
 
