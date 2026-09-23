@@ -310,15 +310,15 @@ Move the value to the top-level `securitySchemes` field to have mcp-use enforce 
 
 These throw a `TypeError` at construction or registration instead of failing at request time.
 
-| Configuration                                                        | Why it is rejected                                                                    |
-| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `mixedAuth: true` without `oauth`                                    | Nothing to sign in with. Also a type error                                            |
-| `noauth` without `mixedAuth`                                         | Every request needs a token, so the tool could never be called signed out             |
-| `oauth2` without `oauth`                                             | No provider to verify tokens                                                          |
-| `oauth2` with `scopes: []` when the provider has no `requiredScopes` | ChatGPT ignores an `oauth2` scheme with empty scopes, so it would never offer sign-in |
-| An empty array, or a scheme type that appears twice                  | Omit the field for the default; one challenge can only ask for one scope set          |
-| A scope that is empty or contains whitespace, `"`, or `\`            | Scopes are space-separated in challenges and tokens, so the value could never match   |
-| An unknown scheme type or field                                      | Includes typos such as `scope` for `scopes`                                           |
+| Configuration                                                                                                 | Why it is rejected                                                                                  |
+| ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `mixedAuth: true` without `oauth`                                                                             | Nothing to sign in with. Also a type error                                                          |
+| `noauth` without `mixedAuth`                                                                                  | Every request needs a token, so the tool could never be called signed out                           |
+| `oauth2` without `oauth`                                                                                      | No provider to verify tokens                                                                        |
+| `oauth2` with `scopes: []` when the provider has no `requiredScopes`                                          | ChatGPT ignores an `oauth2` scheme with empty scopes, so it would never offer sign-in               |
+| An empty array, or a scheme type that appears twice                                                           | Omit the field for the default; one challenge can only ask for one scope set                        |
+| A scope that is not a single printable-ASCII RFC 6749 scope token (empty, whitespace, `"`, `\`, or non-ASCII) | Scopes are space-separated in challenges and tokens, so the value could never match a granted scope |
+| An unknown scheme type or field                                                                               | Includes typos such as `scope` for `scopes`                                                         |
 
 ## Without `mixedAuth`
 
