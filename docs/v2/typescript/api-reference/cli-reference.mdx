@@ -605,8 +605,8 @@ Pass tool arguments after the options, either as one JSON object or as
 | --------------------------- | ----------------------------------------------------------------- | ---------------------------- |
 | `--tool <name>`             | View-backed tool to call. Required.                                | None                         |
 | `--output <path>`           | Output PNG path.                                                   | Timestamped view name        |
-| `--width <px>`              | Host and widget width.                                             | `768`                        |
-| `--height <px>`             | Host viewport height; the PNG is cropped to the widget bounds.     | `720`                        |
+| `--width <px>`              | Host and widget width, an integer from `1` to `10000000`.          | `768`                        |
+| `--height <px>`             | Host viewport height, an integer from `1` to `10000000`. The PNG is cropped to the widget bounds. | `720`                        |
 | `--device-scale-factor <n>` | Pixel density, greater than 0 and at most 4.                       | `1`                          |
 | `--theme <light\|dark>`     | Host theme.                                                        | `light`                      |
 | `--wait-for <selector>`     | Wait for a selector before capture.                                | None                         |

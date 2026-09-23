@@ -63,4 +63,15 @@ describe("offline help contract", () => {
       expect(output).not.toContain("Commands:\n  dev");
     }
   );
+
+  it("documents the screenshot dimension range", async () => {
+    const stdout = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
+
+    await expect(runScreenshot(["--help"])).resolves.toBe(0);
+
+    const output = stdout.mock.calls.flat().join("");
+    expect(output.match(/integer from 1 to 10000000/g)).toHaveLength(2);
+  });
 });

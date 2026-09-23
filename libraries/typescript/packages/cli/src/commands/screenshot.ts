@@ -52,10 +52,10 @@ Source options:
 Capture options:
   --tool <name>               View-backed tool to call (required)
   --output <path>             Output PNG path (default: timestamped view name)
-  --width <px>                Host/widget width (default: 768, matching an
-                              OpenAI inline MCP App container)
-  --height <px>               Host viewport height used for responsive layout
-                              (default: 720); PNG is cropped to widget bounds
+  --width <px>                Host/widget width, integer from 1 to 10000000
+                              (default: 768, matching an OpenAI inline MCP App)
+  --height <px>               Host viewport height, integer from 1 to 10000000
+                              (default: 720, PNG cropped to widget bounds)
   --device-scale-factor <n>   Pixel density, greater than 0 and at most 4
                               (default: 1)
   --theme <light|dark>        Host theme (default: light)
