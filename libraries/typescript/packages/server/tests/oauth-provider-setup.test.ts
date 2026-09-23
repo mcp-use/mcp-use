@@ -6,6 +6,7 @@
  * Exercised over `server.fetch` on the stateless 2026-07-28 envelope.
  */
 import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 import { MCPServer } from "../src/index.js";
 import {
@@ -110,6 +111,47 @@ async function text(response: Response): Promise<string> {
   return content[0]!.text;
 }
 
+/** A provider resource, resource template, and prompt that echo the user. */
+function registerReadables(host: OAuthProviderHost<TestUser>): void {
+  host.resource(
+    { name: "connection", uri: "provider://connection" },
+    async (uri, ctx) => ({
+      contents: [{ uri: uri.href, text: `conn:${ctx.auth.user.id}` }],
+    })
+  );
+  host.resourceTemplate(
+    { name: "order", uriTemplate: "provider://orders/{id}" },
+    async (uri, params, ctx) => ({
+      contents: [
+        { uri: uri.href, text: `order:${params.id}:${ctx.auth.user.id}` },
+      ],
+    })
+  );
+  host.prompt({ name: "checkout_help" }, async (_args, ctx) => ({
+    messages: [
+      {
+        role: "user",
+        content: { type: "text", text: `help:${ctx.auth.user.id}` },
+      },
+    ],
+  }));
+}
+
+const readables = [
+  ["resources/read", { uri: "provider://connection" }, "conn:user-1"],
+  ["resources/read", { uri: "provider://orders/7" }, "order:7:user-1"],
+  ["prompts/get", { name: "checkout_help" }, "help:user-1"],
+] as const;
+
+/** The text of a `resources/read` or `prompts/get` result. */
+async function readText(response: Response): Promise<string> {
+  const read = await result<{
+    contents?: Array<{ text: string }>;
+    messages?: Array<{ content: { text: string } }>;
+  }>(response);
+  return read.contents?.[0]?.text ?? read.messages![0]!.content.text;
+}
+
 describe("OAuth provider setup hook", () => {
   it("runs once, before the first request, with the resolved host values", async () => {
     const setup = vi.fn((host: OAuthProviderHost<TestUser>) => {
@@ -146,21 +188,13 @@ describe("OAuth provider setup hook", () => {
     expect(tools.map((tool) => tool.name)).toEqual(["register_session"]);
   });
 
-  it("registers provider resources", async () => {
-    const app = server((host) => {
-      host.resource(
-        { name: "connection", uri: "provider://connection" },
-        async (uri, ctx) => ({
-          contents: [{ uri: uri.href, text: `conn:${ctx.auth.user.id}` }],
-        })
-      );
-    });
-    const { contents } = await result<{ contents: Array<{ text: string }> }>(
-      await app.fetch(
-        post("resources/read", { uri: "provider://connection" }, signedIn)
-      )
-    );
-    expect(contents[0]!.text).toBe("conn:user-1");
+  it("registers provider resources, resource templates, and prompts", async () => {
+    const app = server(registerReadables);
+    for (const [method, params, expected] of readables) {
+      expect(
+        await readText(await app.fetch(post(method, params, signedIn)))
+      ).toBe(expected);
+    }
   });
 
   it("refuses provider names the application already uses", async () => {
@@ -186,6 +220,34 @@ describe("OAuth provider setup hook", () => {
       resourceClash.fetch(post("tools/list", {}, signedIn))
     ).rejects.toThrow(
       'Resource "connection" is reserved by the OAuth provider'
+    );
+
+    const templateClash = server((host) => {
+      host.resourceTemplate(
+        { name: "order", uriTemplate: "provider://orders/{id}" },
+        async (uri) => ({ contents: [{ uri: uri.href, text: "" }] })
+      );
+    });
+    templateClash.resourceTemplate(
+      { name: "order", uriTemplate: "app://orders/{id}" },
+      async (uri) => ({ contents: [{ uri: uri.href, text: "" }] })
+    );
+    await expect(
+      templateClash.fetch(post("tools/list", {}, signedIn))
+    ).rejects.toThrow(
+      'Resource template "order" is reserved by the OAuth provider'
+    );
+
+    const promptClash = server((host) => {
+      host.prompt({ name: "checkout_help" }, async () => ({ messages: [] }));
+    });
+    promptClash.prompt({ name: "checkout_help" }, async () => ({
+      messages: [],
+    }));
+    await expect(
+      promptClash.fetch(post("tools/list", {}, signedIn))
+    ).rejects.toThrow(
+      'Prompt "checkout_help" is reserved by the OAuth provider'
     );
   });
 
@@ -357,28 +419,14 @@ describe("OAuth provider setup hook: mixedAuth", () => {
     ]);
   });
 
-  it("keeps provider resources behind sign-in", async () => {
-    const app = server(
-      (host) => {
-        host.resource(
-          { name: "connection", uri: "provider://connection" },
-          async (uri, ctx) => ({
-            contents: [{ uri: uri.href, text: `conn:${ctx.auth.user.id}` }],
-          })
-        );
-      },
-      { mixedAuth: true }
-    );
-    const read = (headers: Record<string, string> = {}) =>
-      app.fetch(
-        post("resources/read", { uri: "provider://connection" }, headers)
-      );
-
-    expect((await read()).status).toBe(401);
-    const { contents } = await result<{ contents: Array<{ text: string }> }>(
-      await read(signedIn)
-    );
-    expect(contents[0]!.text).toBe("conn:user-1");
+  it("keeps provider resources, resource templates, and prompts behind sign-in", async () => {
+    const app = server(registerReadables, { mixedAuth: true });
+    for (const [method, params, expected] of readables) {
+      expect((await app.fetch(post(method, params))).status).toBe(401);
+      expect(
+        await readText(await app.fetch(post(method, params, signedIn)))
+      ).toBe(expected);
+    }
   });
 
   it("runs provider middleware on signed-out noauth calls without ctx.auth", async () => {
@@ -448,6 +496,30 @@ describe("OAuth provider setup hook: types", () => {
         async (uri, ctx) => {
           const id: string = ctx.auth.user.id;
           return { contents: [{ uri: uri.href, text: id }] };
+        }
+      );
+      host.resourceTemplate(
+        { name: "order", uriTemplate: "provider://orders/{id}" },
+        async (uri, params, ctx) => {
+          const orderId: string | string[] = params.id;
+          // @ts-expect-error the template has no {sku} variable
+          void params.sku;
+          const id: string = ctx.auth.user.id;
+          return { contents: [{ uri: uri.href, text: `${orderId}:${id}` }] };
+        }
+      );
+      host.prompt(
+        { name: "reorder", schema: z.object({ orderId: z.string() }) },
+        async ({ orderId }, ctx) => {
+          const id: string = ctx.auth.user.id;
+          return {
+            messages: [
+              {
+                role: "user",
+                content: { type: "text", text: `${orderId}:${id}` },
+              },
+            ],
+          };
         }
       );
     });

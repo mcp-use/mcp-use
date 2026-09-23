@@ -140,16 +140,16 @@ const oauth = oauthCustomProvider<User>({
 
 The host exposes:
 
-| Member                    | Purpose                                                                                                                        |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `resourceUrl`, `basePath` | The resolved canonical resource URL and the MCP endpoint path.                                                                 |
-| `mixedAuth`               | Whether the server accepts signed-out clients. Throw from `setup` if your model needs anonymous discovery and this is `false`. |
-| `use(pattern, handler)`   | Registers `mcp:` middleware, like `server.use()`.                                                                              |
-| `tool`, `resource`        | Register provider-owned tools and static resources, like `server.tool()` and `server.resource()`.                              |
-| `listTools()`             | Returns every tool registered so far, so the provider can validate the application's tools.                                    |
-| `instructions(transform)` | Rewrites the instructions text advertised to clients. Each call receives the result of the previous one.                       |
+| Member                                           | Purpose                                                                                                                        |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `resourceUrl`, `basePath`                        | The resolved canonical resource URL and the MCP endpoint path.                                                                 |
+| `mixedAuth`                                      | Whether the server accepts signed-out clients. Throw from `setup` if your model needs anonymous discovery and this is `false`. |
+| `use(pattern, handler)`                          | Registers `mcp:` middleware, like `server.use()`.                                                                              |
+| `tool`, `resource`, `resourceTemplate`, `prompt` | Register provider-owned items, like the `server` methods of the same name.                                                     |
+| `listTools()`                                    | Returns every tool registered so far, so the provider can validate the application's tools.                                    |
+| `instructions(transform)`                        | Rewrites the instructions text advertised to clients. Each call receives the result of the previous one.                       |
 
-Provider-owned tools and resources go through the same OAuth gate as application items, and `ctx.auth` carries the provider's user type. On a [mixed authentication](/v2/typescript/server/authentication/mixed-auth) server, a provider tool can declare `securitySchemes` exactly like an application tool: with `noauth`, signed-out clients can call it and `ctx.auth` is optional. Resources always require sign-in. `mcp:` middleware also runs on signed-out calls to `noauth` tools, so check `ctx.auth` before relying on it. Registering a name that the application already uses throws, so reserved names never silently replace user tools.
+Provider-owned items go through the same OAuth gate as application items, and `ctx.auth` carries the provider's user type. On a [mixed authentication](/v2/typescript/server/authentication/mixed-auth) server, a provider tool can declare `securitySchemes` exactly like an application tool: with `noauth`, signed-out clients can call it and `ctx.auth` is optional. Resources, resource templates, and prompts always require sign-in. `mcp:` middleware also runs on signed-out calls to `noauth` tools, so check `ctx.auth` before relying on it. Registering a name that the application already uses throws, so reserved names never silently replace application items.
 
 The host only works while `setup` runs; calling it later throws. If `setup` throws, the server does not start.
 

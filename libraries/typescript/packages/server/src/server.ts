@@ -1329,6 +1329,26 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         }
         this.resource(definition, callback as never);
       },
+      resourceTemplate: (definition, callback) => {
+        assertActive("resourceTemplate");
+        if (this.#resourceTemplates.has(definition.name)) {
+          throw new Error(
+            `[mcp-use] Resource template "${definition.name}" is reserved by ` +
+              `the OAuth provider; rename the application resource template.`
+          );
+        }
+        this.resourceTemplate(definition, callback as never);
+      },
+      prompt: (definition, callback) => {
+        assertActive("prompt");
+        if (this.#prompts.has(definition.name)) {
+          throw new Error(
+            `[mcp-use] Prompt "${definition.name}" is reserved by the OAuth ` +
+              `provider; rename the application prompt.`
+          );
+        }
+        this.prompt(definition, callback as never);
+      },
       listTools: () => {
         assertActive("listTools");
         return [...this.#tools.values()].map(({ definition }) => definition);

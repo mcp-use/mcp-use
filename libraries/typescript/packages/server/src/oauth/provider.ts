@@ -9,7 +9,18 @@ import type {
   McpMiddlewareFnFor,
   McpMiddlewarePattern,
 } from "../middleware/mcp-middleware.js";
-import type { ResourceCallback, ResourceDefinition } from "../resources.js";
+import type {
+  InferPromptInput,
+  PromptCallback,
+  PromptDefinition,
+} from "../prompts.js";
+import type {
+  InferTemplateParams,
+  ResourceCallback,
+  ResourceDefinition,
+  ResourceTemplateCallback,
+  ResourceTemplateDefinition,
+} from "../resources.js";
 import type {
   InferToolInput,
   InferToolName,
@@ -51,7 +62,8 @@ export interface OAuthResourceOptions {
  * The hook runs once, after the canonical resource is resolved and before the
  * first request is served, so everything registered here participates in the
  * same per-request registry replay as user registrations. Provider-owned
- * tools and resources go through the same OAuth gate as application items,
+ * tools, resources, resource templates, and prompts go through the same
+ * OAuth gate as application items,
  * including a tool's `securitySchemes` on a `mixedAuth` server, and their
  * callbacks receive `ctx.auth` with the provider's user type. The host is
  * only usable while the hook runs.
@@ -105,6 +117,31 @@ export interface OAuthProviderHost<TUser> {
     callback: ResourceCallback<TUser, true>
   ): void;
   /**
+   * Registers a provider-owned parameterized resource, like
+   * `server.resourceTemplate()`. Resource templates always require sign-in,
+   * including on a `mixedAuth` server.
+   *
+   * @throws If a resource template with the same name is already registered.
+   */
+  resourceTemplate<const TUriTemplate extends string>(
+    definition: ResourceTemplateDefinition<TUriTemplate>,
+    callback: ResourceTemplateCallback<
+      InferTemplateParams<{ uriTemplate: TUriTemplate }>,
+      TUser,
+      true
+    >
+  ): void;
+  /**
+   * Registers a provider-owned prompt, like `server.prompt()`. Prompts always
+   * require sign-in, including on a `mixedAuth` server.
+   *
+   * @throws If a prompt with the same name is already registered.
+   */
+  prompt<T extends PromptDefinition>(
+    definition: T,
+    callback: PromptCallback<InferPromptInput<T>, TUser, true>
+  ): void;
+  /**
    * Every tool registered so far, application and provider-owned, in
    * registration order. Providers use it to validate the application's
    * tools, for example to refuse a destructive tool that lacks a required
@@ -131,7 +168,7 @@ export interface CustomOAuthProviderOptions<
   mapAuthInfo: (authInfo: OAuthAuthInfo) => OAuthExtra<TUser>;
   /**
    * Optional hook invoked once while the server mounts. Providers use it to
-   * install MCP middleware, provider-owned tools and resources, or
+   * install MCP middleware, provider-owned tools, resources, and prompts, or
    * instructions text that the authorization model requires. See {@link OAuthProviderHost}.
    */
   setup?: (host: OAuthProviderHost<TUser>) => void;
