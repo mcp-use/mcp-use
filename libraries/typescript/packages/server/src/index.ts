@@ -144,6 +144,7 @@ export type {
 } from "./openapi/index.js";
 export type {
   OAuthAuth,
+  OAuthMode,
   RequestClientContext,
   RequestContext,
   UserContext,
@@ -156,6 +157,7 @@ export type {
   ToolDefinition,
   ToolRef,
   ToolResult,
+  ToolSecurityScheme,
   ToolViewConfig,
 } from "./tools.js";
 export type {

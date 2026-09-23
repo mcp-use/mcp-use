@@ -34,7 +34,9 @@ import {
   requestClientInfo,
   toAuthenticatedRequestContext,
   toRequestContext,
+  type DefinitionSecuritySchemes,
   type RequestContext,
+  type ToolOAuthMode,
 } from "./context.js";
 import { toPromptResult, toResourceResult } from "./response-conversion.js";
 import {
@@ -68,11 +70,16 @@ import { createMcpMount } from "./mount-mcp.js";
 import { normalizeCompletions } from "./resource-completion.js";
 import { registerOpenAPITools } from "./openapi/index.js";
 import type { FromOpenAPIOptions } from "./openapi/types.js";
-import {
-  getOAuthProtectedResourceMetadataUrl,
-  requireBearerAuth,
-} from "./oauth/index.js";
+import { getOAuthProtectedResourceMetadataUrl } from "./oauth/index.js";
 import { authInfoFromRequest, oauthMetadata } from "./oauth/adapters.js";
+import type { OAuthGateOptions } from "./oauth/gate.js";
+import {
+  handWrittenSecuritySchemesWarning,
+  requiresSignIn,
+  resolveSecuritySchemes,
+  SECURITY_SCHEMES_META_KEY,
+  type SecuritySchemeOptions,
+} from "./oauth/policy.js";
 import {
   getOAuthProviderOptions,
   resolveConfiguredOAuthResource,
@@ -104,6 +111,7 @@ import type {
   ToolCallback,
   ToolDefinition,
   ToolRef,
+  ToolSecurityScheme,
   ToolViewConfig,
 } from "./tools.js";
 import { resolveToolInputSchema } from "./tools.js";
@@ -145,6 +153,13 @@ import {
  * before any callback runs.
  */
 type HasOAuth<TUser> = [TUser] extends [never] ? false : true;
+
+/**
+ * Stored tool callbacks see an optional `ctx.auth`: whether one tool's
+ * callback is guaranteed identity is decided from its `securitySchemes` at
+ * registration and enforced by the gate and `#toToolRequestContext`.
+ */
+type StoredToolOAuth<TUser> = [TUser] extends [never] ? false : "optional";
 
 interface ClientUsage {
   client_name: string;
@@ -235,9 +250,15 @@ interface ToolEntry<TUser, TEnv extends Env> {
     Record<string, unknown>,
     never,
     TUser,
-    HasOAuth<TUser>,
+    StoredToolOAuth<TUser>,
     TEnv
   >;
+  /**
+   * `definition.securitySchemes` validated and resolved at registration:
+   * `noauth` first, `oauth2` scopes including the provider's
+   * `requiredScopes`.
+   */
+  schemes: readonly ToolSecurityScheme[];
 }
 
 /** Static resource definition and callback retained for per-request replay. */
@@ -552,8 +573,13 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    * expose their {@link ToolRef} types to views:
    * `export const search = server.tool(...)`.
    *
+   * `ctx.auth` is required in the callback unless
+   * `definition.securitySchemes` includes `noauth`.
+   *
    * @returns A {@link ToolRef} carrying the tool name and phantom types for
    * inference-based view typing.
+   * @throws TypeError When `definition.securitySchemes` is invalid for this
+   * server.
    */
   tool<const T extends ToolDefinition>(
     definition: T,
@@ -561,11 +587,12 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       InferToolInput<T>,
       InferToolOutput<T>,
       TUser,
-      HasOAuth<TUser>,
+      ToolOAuthMode<TUser, DefinitionSecuritySchemes<T>>,
       TEnv
     >
   ): ToolRef<InferToolName<T>, InferToolInput<T>, InferToolOutput<T>> {
     this.#assertNotStarted("tool", definition.name);
+    const schemes = this.#resolveSecuritySchemes(definition);
     this.#validateToolViewBinding(definition);
     this.#openApiTools.delete(definition.name);
     this.#proxiedTools.delete(definition.name);
@@ -575,9 +602,10 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         Record<string, unknown>,
         never,
         TUser,
-        HasOAuth<TUser>,
+        StoredToolOAuth<TUser>,
         TEnv
       >,
+      schemes,
     });
     return Object.freeze({
       name: definition.name,
@@ -1249,6 +1277,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       hasTool: (name) => this.#tools.has(name),
       hasResource: (name) => this.#resources.has(name),
       hasPrompt: (name) => this.#prompts.has(name),
+      // Proxied tools carry no `securitySchemes`, so they require sign-in.
       registerTool: (definition, callback) => {
         this.#assertNotStarted("tool", definition.name);
         this.#proxiedTools.add(definition.name);
@@ -1258,9 +1287,10 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
             Record<string, unknown>,
             never,
             TUser,
-            HasOAuth<TUser>,
+            StoredToolOAuth<TUser>,
             TEnv
           >,
+          schemes: this.#resolveSecuritySchemes(definition),
         });
       },
       registerResource: (definition, callback) => {
@@ -1421,54 +1451,49 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         }
       );
 
-      let protectWithBearer: (
-        request: Request,
-        next: () => Promise<Response>
-      ) => Promise<Response> = async (_request, next) => next();
       if (resource !== undefined) {
         const provider = this.#config.oauth!;
         const providerOptions = getOAuthProviderOptions(provider);
-        const gate = requireBearerAuth({
+        const mixedAuth = this.#config.mixedAuth === true;
+        const gateOptions: OAuthGateOptions = {
           verifier: wrapOAuthTokenVerifier(provider, resource),
           resourceMetadataUrl: getOAuthProtectedResourceMetadataUrl(resource),
-          ...(providerOptions.requiredScopes !== undefined && {
-            requiredScopes: providerOptions.requiredScopes,
-          }),
-        });
-        protectWithBearer = async (request, next) => {
-          const result = await gate(request);
-          if (result instanceof Response) {
-            return result;
-          }
-          const bag = getRequestBag(request);
-          bag.authInfo = result;
-          return next();
+          baselineScopes: providerOptions.requiredScopes ?? [],
+          mixedAuth,
+          toolSchemes: (name) => this.#tools.get(name)?.schemes,
+          // Only views a tool binds; an unbound manifest entry stays gated.
+          openResourceUris: [...this.#viewBindings.keys()].map(viewResourceUri),
         };
+        // The gate and its challenge builder load on the first MCP request,
+        // keeping them out of the static graph of servers without OAuth.
+        let gate: Promise<FetchMiddleware> | undefined;
 
         // Authenticate the exact MCP route before the user-owned Hono app
         // runs. This makes verified identity available to route middleware
         // while leaving OAuth discovery, assets, and unrelated custom routes
-        // public. The explicitly public HTML landing-page carveout remains the
-        // only unauthenticated request allowed through this route.
+        // public. The HTML landing page passes through when it is explicitly
+        // public or on a `mixedAuth` server, where anyone may list.
         httpApp.use("*", async (context, next) => {
           if (new URL(context.req.url).pathname !== basePath) {
             await next();
             return;
           }
           if (
-            this.#config.publicLandingPage === true &&
+            (this.#config.publicLandingPage === true || mixedAuth) &&
             isHtmlNavigationRequest(context.req.raw)
           ) {
             await next();
             return;
           }
-          const response = await protectWithBearer(
-            context.req.raw,
-            async () => {
-              await next();
-              return context.res;
-            }
+          gate ??= import("./oauth/gate.js").then(({ createOAuthGate }) =>
+            createOAuthGate(gateOptions)
           );
+          const response = await (
+            await gate
+          )(context.req.raw, async () => {
+            await next();
+            return context.res;
+          });
           context.res = response;
           return response;
         });
@@ -1929,23 +1954,42 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     };
 
     // JSON Schema's root `$schema` declaration selects the dialect used for
-    // validation. Do not normalize it away from a tool descriptor.
-    wrapListMethod("tools/list", "tools");
+    // validation. Do not normalize it away from a tool descriptor. The
+    // top-level `securitySchemes` field is added here because the SDK's
+    // descriptor builder only forwards fields the core schema knows about.
+    wrapListMethod("tools/list", "tools", (tools) =>
+      tools.map((tool) => {
+        const entry = this.#tools.get(tool.name);
+        const schemes =
+          entry !== undefined && this.#generatesSecuritySchemes(entry)
+            ? entry.schemes
+            : undefined;
+        return schemes === undefined
+          ? tool
+          : ({ ...tool, securitySchemes: schemes } as typeof tool);
+      })
+    );
     wrapListMethod("resources/list", "resources");
     wrapListMethod("prompts/list", "prompts");
   }
 
-  #registerTool(
-    server: SdkMcpServer,
-    { definition, callback }: ToolEntry<TUser, TEnv>
-  ): void {
+  #registerTool(server: SdkMcpServer, entry: ToolEntry<TUser, TEnv>): void {
+    const { definition, callback, schemes } = entry;
     const view = definition.view;
 
-    const toolMeta = buildToolUiMeta(
+    const uiMeta = buildToolUiMeta(
       view?.name,
       definition.visibility,
       definition._meta
     );
+    // Hand-written `_meta.securitySchemes` is already in `uiMeta`; only the
+    // generated schemes are added here.
+    const toolMeta = this.#generatesSecuritySchemes(entry)
+      ? {
+          ...uiMeta,
+          [SECURITY_SCHEMES_META_KEY]: schemes,
+        }
+      : uiMeta;
     const config = {
       ...(definition.title !== undefined && { title: definition.title }),
       ...(definition.description !== undefined && {
@@ -1984,7 +2028,7 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         >;
         const result = await callback(
           effectiveArgs,
-          this.#toRequestContext(ctx)
+          this.#toToolRequestContext(ctx, schemes)
         );
         if (
           isInputRequiredResult(result) ||
@@ -2258,5 +2302,77 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       HasOAuth<TUser>,
       TEnv
     >;
+  }
+
+  /**
+   * Build a tool callback's context. Tools that require sign-in always
+   * receive `ctx.auth`: the gate refused signed-out calls, and a missing
+   * identity here throws rather than running the callback without one.
+   * `noauth` tools receive it only when the request carried a verified token.
+   */
+  #toToolRequestContext(
+    ctx: ServerContext,
+    schemes: readonly ToolSecurityScheme[]
+  ): RequestContext<TUser, StoredToolOAuth<TUser>, TEnv> {
+    if (
+      this.#config.oauth === undefined ||
+      (!requiresSignIn(schemes) && ctx.http?.authInfo === undefined)
+    ) {
+      return toRequestContext<TEnv>(ctx) as RequestContext<
+        TUser,
+        StoredToolOAuth<TUser>,
+        TEnv
+      >;
+    }
+    return toAuthenticatedRequestContext<TUser, TEnv>(ctx) as RequestContext<
+      TUser,
+      StoredToolOAuth<TUser>,
+      TEnv
+    >;
+  }
+
+  #securitySchemeOptions(): SecuritySchemeOptions {
+    return {
+      hasOAuth: this.#config.oauth !== undefined,
+      mixedAuth: this.#config.mixedAuth === true,
+      baselineScopes: this.#config.oauth?.requiredScopes ?? [],
+    };
+  }
+
+  /**
+   * Validate and resolve a tool's `securitySchemes`, warning about a
+   * hand-written `_meta.securitySchemes` that mcp-use does not enforce.
+   */
+  #resolveSecuritySchemes(
+    definition: ToolDefinition
+  ): readonly ToolSecurityScheme[] {
+    const options = this.#securitySchemeOptions();
+    const schemes = resolveSecuritySchemes(
+      definition.name,
+      definition.securitySchemes,
+      options
+    );
+    const warning = handWrittenSecuritySchemesWarning(
+      definition.name,
+      definition,
+      options
+    );
+    if (warning !== undefined) console.warn(warning);
+    return schemes;
+  }
+
+  /**
+   * Whether mcp-use advertises generated `securitySchemes` for a tool: when
+   * the tool declares them, and on every tool of a `mixedAuth` server except
+   * one with hand-written `_meta.securitySchemes`, which passes through
+   * untouched for backward compatibility.
+   */
+  #generatesSecuritySchemes(entry: ToolEntry<TUser, TEnv>): boolean {
+    const { definition } = entry;
+    if (definition.securitySchemes !== undefined) return true;
+    return (
+      this.#config.mixedAuth === true &&
+      definition._meta?.[SECURITY_SCHEMES_META_KEY] === undefined
+    );
   }
 }

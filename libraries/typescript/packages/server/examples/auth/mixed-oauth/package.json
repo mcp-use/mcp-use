@@ -3,7 +3,7 @@
   "type": "module",
   "version": "0.0.0",
   "private": true,
-  "description": "Example: a mixed-OAuth mcp-use server with public and protected tools.",
+  "description": "Example: a mixed-OAuth mcp-use server with public, optional, and sign-in tools, resources, prompts, and views.",
   "engines": {
     "node": ">=22.22.2"
   },
@@ -11,16 +11,22 @@
     "dev": "mcp-use dev --port 3000",
     "build": "mcp-use build",
     "start": "mcp-use start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check-flow": "node scripts/check-flow.mjs"
   },
   "dependencies": {
     "@better-auth/oauth-provider": "^1.6.2",
     "better-auth": "^1.6.2",
     "hono": "^4.13.5",
-    "mcp-use": "workspace:*"
+    "mcp-use": "workspace:*",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^22.20.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
     "typescript": "^7.0.2"
   }
 }
