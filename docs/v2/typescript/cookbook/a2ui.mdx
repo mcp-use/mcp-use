@@ -1,0 +1,376 @@
+---
+title: "A2UI"
+description: "Let the chat model generate interactive A2UI layouts and render them in an MCP App view."
+icon: "component"
+---
+
+Add a `render-ui` tool that renders model-generated [A2UI](https://a2ui.org/) layouts inside an MCP App. The model writes the component layout and initial data as tool arguments, and the stock A2UI React renderer displays them in the view.
+
+The server needs no model API key or agent runtime. The host's chat model generates the tool arguments.
+
+## Try the live example
+
+Ask the chat for a UI. Pick a suggestion or describe your own layout, then edit the inputs, sliders, and checkboxes in the result.
+
+<div className="cookbook-chat-embed">
+<iframe
+  src="https://inspector.manufact.com/inspector?embedded=true&autoConnect=https%3A%2F%2Fmanufact-a2ui-example.run.mcp-use.com%2Fmcp&embeddedConfig=%7B%22singleTab%22%3Atrue%2C%22defaultTab%22%3A%22chat%22%2C%22visibleTabs%22%3A%5B%22chat%22%5D%2C%22chatHideTitle%22%3Atrue%2C%22chatHideServerUrl%22%3Atrue%2C%22chatQuickQuestions%22%3A%5B%22Make%20an%20interactive%20weekend%20reading%20dashboard%20with%20two%20book%20cards%2C%20a%20reading-goal%20slider%2C%20and%20a%20checklist.%20Let%20me%20edit%20the%20reader%20name.%22%2C%22Build%20a%20packing%20checklist%20for%20a%20three-day%20beach%20trip%2C%20grouped%20into%20essentials%20and%20clothes%2C%20with%20an%20editable%20destination%20and%20a%20travel-style%20selector.%22%5D%7D"
+  title="A2UI live example: MCP Inspector chat"
+  width="100%"
+  height="640"
+  style={{ border: "1px solid var(--gray-200, #737373)", borderRadius: "12px" }}
+  allow="clipboard-write"
+/>
+</div>
+
+[Open the example in a new tab](https://inspector.manufact.com/inspector?embedded=true&autoConnect=https%3A%2F%2Fmanufact-a2ui-example.run.mcp-use.com%2Fmcp&embeddedConfig=%7B%22singleTab%22%3Atrue%2C%22defaultTab%22%3A%22chat%22%2C%22visibleTabs%22%3A%5B%22chat%22%5D%2C%22chatHideTitle%22%3Atrue%2C%22chatHideServerUrl%22%3Atrue%2C%22chatQuickQuestions%22%3A%5B%22Make%20an%20interactive%20weekend%20reading%20dashboard%20with%20two%20book%20cards%2C%20a%20reading-goal%20slider%2C%20and%20a%20checklist.%20Let%20me%20edit%20the%20reader%20name.%22%2C%22Build%20a%20packing%20checklist%20for%20a%20three-day%20beach%20trip%2C%20grouped%20into%20essentials%20and%20clothes%2C%20with%20an%20editable%20destination%20and%20a%20travel-style%20selector.%22%5D%7D).
+
+## Prerequisites
+
+- A working [mcp-use server](/v2/typescript/getting-started/quickstart) that can build [MCP App views](/v2/typescript/mcp-apps/quickstart).
+- Node.js 22.22.2 or later.
+
+## Add the integration
+
+The integration has three files:
+
+| File | Purpose |
+| --- | --- |
+| `views/generative-ui/catalog.ts` | The components the model may use, plus validation shared by the tool and the view |
+| `src/index.ts` | The `render-ui` tool, which accepts and returns `{ spec }` |
+| `views/generative-ui/view.tsx` | Converts the spec to A2UI messages and renders `<A2uiSurface>` |
+
+### Install A2UI
+
+Install the A2UI React renderer and its core message processor:
+
+```bash
+npm install @a2ui/react@0.11.0 @a2ui/web_core@0.10.7 react react-dom zod
+```
+
+A2UI depends on Zod 3, while mcp-use tool schemas use Zod 4. Add an `overrides` block to `package.json` so npm gives the A2UI packages their own Zod 3 copy:
+
+```json package.json
+{
+  "overrides": {
+    "@a2ui/react": { "zod": "3.25.76" },
+    "@a2ui/web_core": { "zod": "3.25.76" }
+  }
+}
+```
+
+Run `npm install` again after adding the overrides.
+
+### Define the component catalog
+
+The catalog is a subset of A2UI's basic catalog: Text, Row, Column, Card, Divider, TextField, CheckBox, Slider, and ChoicePicker. The refinement rejects specs the renderer cannot display, such as duplicate IDs, unreachable components, missing bindings, and initial values of the wrong type.
+
+```typescript views/generative-ui/catalog.ts expandable
+import { z } from "zod";
+
+const id = z
+  .string()
+  .regex(/^[a-zA-Z][\w-]*$/)
+  .max(64);
+const binding = z.object({ path: z.string().regex(/^\/[\w-]+$/) });
+const text = z.union([z.string().max(3000), binding]);
+const component = z.discriminatedUnion("component", [
+  z.object({
+    id,
+    component: z.literal("Text"),
+    text,
+    variant: z
+      .enum(["h1", "h2", "h3", "h4", "h5", "body", "caption"])
+      .optional(),
+  }),
+  z.object({
+    id,
+    component: z.literal("Column"),
+    children: z.array(id).max(40),
+  }),
+  z.object({ id, component: z.literal("Row"), children: z.array(id).max(8) }),
+  z.object({ id, component: z.literal("Card"), child: id }),
+  z.object({ id, component: z.literal("Divider") }),
+  z.object({
+    id,
+    component: z.literal("CheckBox"),
+    label: text,
+    value: binding,
+  }),
+  z.object({
+    id,
+    component: z.literal("TextField"),
+    label: text,
+    value: binding,
+    variant: z.enum(["shortText", "longText", "number"]).optional(),
+  }),
+  z.object({
+    id,
+    component: z.literal("Slider"),
+    label: text,
+    value: binding,
+    min: z.number(),
+    max: z.number(),
+  }),
+  z.object({
+    id,
+    component: z.literal("ChoicePicker"),
+    label: text,
+    value: binding,
+    options: z
+      .array(
+        z.object({ label: z.string().max(3000), value: z.string().max(3000) })
+      )
+      .min(1)
+      .max(12),
+    variant: z.enum(["mutuallyExclusive", "multipleSelection"]),
+  }),
+]);
+
+/** A small subset of A2UI's basic catalog, shared by the tool and view. */
+export const specSchema = z
+  .object({
+    components: z
+      .array(component)
+      .min(1)
+      .max(64)
+      .describe(
+        "A2UI components with unique IDs. The root component must have id 'root'. Layouts reference children by ID."
+      ),
+    data: z
+      .record(
+        z.string(),
+        z.union([z.string(), z.number(), z.boolean(), z.array(z.string())])
+      )
+      .describe(
+        "Initial values for every /key binding. CheckBox uses a boolean, Slider a number, TextField a string, ChoicePicker a string array."
+      ),
+  })
+  .superRefine((spec, ctx) => {
+    const nodes = new Map(spec.components.map((node) => [node.id, node]));
+    const fail = (message: string) => ctx.addIssue({ code: "custom", message });
+    if (nodes.size !== spec.components.length)
+      fail("Component IDs must be unique.");
+    if (!nodes.has("root")) fail("Include a component with id 'root'.");
+    const visited = new Set<string>();
+    function visit(key: string, ancestors = new Set<string>()) {
+      if (ancestors.has(key)) {
+        fail(`Circular component reference: ${key}`);
+        return;
+      }
+      if (visited.has(key)) return;
+      const node = nodes.get(key);
+      if (!node) {
+        fail(`Missing component: ${key}`);
+        return;
+      }
+      const path = new Set([...ancestors, key]);
+      for (const child of "children" in node
+        ? node.children
+        : "child" in node
+          ? [node.child]
+          : [])
+        visit(child, path);
+      visited.add(key);
+    }
+    visit("root");
+    if (visited.size !== nodes.size)
+      fail("All components must be reachable from root.");
+    for (const node of spec.components) {
+      for (const value of Object.values(node)) {
+        if (
+          value &&
+          typeof value === "object" &&
+          "path" in value &&
+          !Object.hasOwn(spec.data, value.path.slice(1))
+        )
+          fail(`Missing initial data for ${value.path}`);
+      }
+      if ("value" in node) {
+        const value = spec.data[node.value.path.slice(1)];
+        const valid =
+          node.component === "CheckBox"
+            ? typeof value === "boolean"
+            : node.component === "Slider"
+              ? typeof value === "number" &&
+                node.min < node.max &&
+                value >= node.min &&
+                value <= node.max
+              : node.component === "ChoicePicker"
+                ? Array.isArray(value) &&
+                  value.every((item) =>
+                    node.options.some((option) => option.value === item)
+                  ) &&
+                  (node.variant !== "mutuallyExclusive" || value.length <= 1)
+                : typeof value === "string";
+        if (!valid)
+          fail(
+            `Invalid initial value or range for ${node.id} (${node.component}).`
+          );
+      }
+    }
+  });
+
+/** Validated model-generated A2UI layout and initial data. */
+export type UISpec = z.infer<typeof specSchema>;
+```
+
+### Register the tool
+
+The tool description is the model's only guide to the catalog, so it lists every component, the binding rules, and a small example. The callback returns the validated spec in `structuredContent`, and `view` attaches the `generative-ui` view to the result.
+
+```typescript src/index.ts
+import { MCPServer } from "mcp-use";
+import { z } from "zod";
+
+import { specSchema } from "../views/generative-ui/catalog.js";
+
+const server = new MCPServer({
+  name: "a2ui-generative-ui",
+  version: "1.0.0",
+  title: "A2UI Generative UI",
+  description: "Model-generated A2UI layouts rendered inside an MCP App.",
+  legacy: "stateless",
+});
+
+/** Render the model's A2UI component layout in the attached MCP App. */
+export const renderUi = server.tool(
+  {
+    name: "render-ui",
+    title: "Render A2UI",
+    description: `Generate and render an interactive UI using A2UI's basic catalog.
+Write one structured spec object, not JSONL or a string. You choose the layout and content.
+Use Text, Row, Column, Card, Divider, TextField, CheckBox, Slider, and ChoicePicker.
+Put component properties directly alongside id and component (no props wrapper).
+Start with a Column named root. Refer to children by ID; a Card takes one child.
+Use Text variants h2/h3/body/caption for hierarchy and Cards for related groups.
+Bind editable controls with value: {path: "/key"} and put initial values in spec.data.
+CheckBox values are booleans, Slider values are numbers, TextField values are strings,
+and ChoicePicker values are arrays of option strings. Text can also bind to /key,
+so a Text and TextField sharing a binding update together.
+These controls edit local UI state. Do not invent submit buttons, saving, calculations,
+network requests, or actions. This example displays the completed response.
+Example: {"components":[{"id":"root","component":"Column","children":["heading","done"]},{"id":"heading","component":"Text","text":"My checklist","variant":"h2"},{"id":"done","component":"CheckBox","label":"Try A2UI","value":{"path":"/done"}}],"data":{"done":false}}`,
+    inputSchema: z.object({ spec: specSchema }),
+    outputSchema: z.object({ spec: specSchema }),
+    annotations: { readOnlyHint: true, openWorldHint: false },
+    view: { name: "generative-ui", prefersBorder: false },
+  },
+  async ({ spec }) => ({
+    content: [
+      {
+        type: "text",
+        text: `Rendered ${spec.components.length} A2UI components.`,
+      },
+    ],
+    structuredContent: { spec },
+  })
+);
+
+export default server;
+```
+
+### Render the spec in the view
+
+The view waits for the completed tool result, then passes three standard A2UI v0.9 messages to a `MessageProcessor`: `createSurface`, `updateComponents`, and `updateDataModel`. `<A2uiSurface>` renders the resulting surface and keeps its bound values in local state.
+
+```tsx views/generative-ui/view.tsx
+import { A2uiSurface, basicCatalog } from "@a2ui/react/v0_9";
+import { MessageProcessor } from "@a2ui/web_core/v0_9";
+import { ThemeProvider, useToolContext } from "mcp-use/react";
+import { useState } from "react";
+
+import type { UISpec } from "./catalog.js";
+import "./view.css";
+
+function GeneratedUI({ spec }: { spec: UISpec }) {
+  const [processor] = useState(() => {
+    const instance = new MessageProcessor([basicCatalog]);
+    instance.processMessages([
+      {
+        version: "v0.9",
+        createSurface: { surfaceId: "ui", catalogId: basicCatalog.id },
+      },
+      {
+        version: "v0.9",
+        updateComponents: { surfaceId: "ui", components: spec.components },
+      },
+      {
+        version: "v0.9",
+        updateDataModel: { surfaceId: "ui", path: "/", value: spec.data },
+      },
+    ]);
+    return instance;
+  });
+  const surface = processor.model.getSurface("ui");
+  return surface ? (
+    <A2uiSurface surface={surface} />
+  ) : (
+    <p role="alert">Unable to render this interface.</p>
+  );
+}
+
+function Content() {
+  const view = useToolContext<"render-ui">();
+  if (view.status === "error") return <p role="alert">{view.error.message}</p>;
+  if (view.status !== "ready")
+    return <p role="status">Designing your interface…</p>;
+  return (
+    <GeneratedUI
+      key={JSON.stringify(view.toolOutput.spec)}
+      spec={view.toolOutput.spec}
+    />
+  );
+}
+
+/** Render a completed model-generated A2UI spec inside an ordinary MCP App. */
+export default function GenerativeUI() {
+  return (
+    <ThemeProvider colorScheme>
+      <main className="a2ui-canvas">
+        <Content />
+      </main>
+    </ThemeProvider>
+  );
+}
+```
+
+Copy [`view.css`](https://github.com/manufacts/mcp-use-a2ui-example/blob/main/views/generative-ui/view.css) from the example for the theme, or remove the `./view.css` import to use A2UI's default styles.
+
+## Try it
+
+Start your server:
+
+```bash
+npm run dev
+```
+
+Open the Inspector URL printed by the CLI, select **Chat**, and sign in with Manufact or configure a model provider. Try:
+
+```text
+Build a packing checklist for a three-day beach trip, grouped into essentials and clothes, with an editable destination and a travel-style selector.
+```
+
+The model calls `render-ui`, and the view appears when the tool result completes. To test without a model, select **Tools → render-ui** and enter:
+
+```json
+{
+  "spec": {
+    "components": [
+      { "id": "root", "component": "Column", "children": ["heading", "done"] },
+      { "id": "heading", "component": "Text", "text": "My checklist", "variant": "h2" },
+      { "id": "done", "component": "CheckBox", "label": "Try A2UI", "value": { "path": "/done" } }
+    ],
+    "data": { "done": false }
+  }
+}
+```
+
+## Adapt it to your app
+
+- **Local state only:** inputs, checkboxes, sliders, and choices edit the view's data model. Components that share a `/key` binding update together. Edits are not sent back to the server and reset when the host recreates the view.
+- **Add components:** add the A2UI component shape to the `component` union in `catalog.ts`, then describe it in the tool description so the model knows when to use it.
+- **Add actions:** this recipe has no submit buttons or server actions. To act on user input, call a server tool from the view with [`useCallTool`](/v2/typescript/mcp-apps/interactivity).
+- **Other hosts:** the view carries its own A2UI renderer, so any MCP Apps host can display it without registering an A2UI catalog.
+
+See the [complete A2UI example](https://github.com/manufacts/mcp-use-a2ui-example) for the runnable project and catalog tests, the [A2UI React renderer](https://github.com/a2ui-project/a2ui/tree/main/renderers/react), and [A2UI inside MCP Apps](https://a2ui.org/guides/a2ui-in-mcp-apps/). For streaming partial specs into the view while the model writes them, see [Generative UI](/v2/typescript/mcp-apps/generative-ui).
