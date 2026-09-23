@@ -2,4 +2,4 @@
 "mcp-use": minor
 ---
 
-Add an optional `setup(host)` hook to `OAuthProvider`. Providers can install MCP middleware, provider-owned tools and resources, additional public discovery routes, and `initialize` instructions while the server mounts. The `OAuthProviderHost` type is exported from `mcp-use/oauth`.
+Add an optional `setup(host)` hook to `oauthCustomProvider`. The server runs it once while mounting, so a provider can install `mcp:` middleware, register provider-owned tools and resources, validate the application's tools with `listTools()`, and rewrite the advertised instructions. The `OAuthProviderHost<TUser>` type is exported from `mcp-use/oauth`.

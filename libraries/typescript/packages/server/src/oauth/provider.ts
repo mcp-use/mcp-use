@@ -9,7 +9,14 @@ import type {
   McpMiddlewarePattern,
 } from "../middleware/mcp-middleware.js";
 import type { ResourceCallback, ResourceDefinition } from "../resources.js";
-import type { ToolCallback, ToolDefinition } from "../tools.js";
+import type {
+  InferToolInput,
+  InferToolName,
+  InferToolOutput,
+  ToolCallback,
+  ToolDefinition,
+  ToolRef,
+} from "../tools.js";
 import { assertSecureHttpUrl, parseAbsoluteUrl } from "./internal.js";
 
 /** Additional verified identity information exposed by mcp-use callbacks. */
@@ -43,10 +50,13 @@ export interface OAuthResourceOptions {
  * The hook runs once, after the canonical resource is resolved and before the
  * first request is served, so everything registered here participates in the
  * same per-request registry replay as user registrations. Provider-owned
- * tools and resources are registered under authenticated callbacks and
- * receive the mapped `ctx.auth` like any other OAuth-protected callback.
+ * tools and resources sit behind the same bearer gate as application items,
+ * and their callbacks receive `ctx.auth` with the provider's user type. The
+ * host is only usable while the hook runs.
+ *
+ * @typeParam TUser - The provider's user type, exposed as `ctx.auth.user`.
  */
-export interface OAuthProviderHost {
+export interface OAuthProviderHost<TUser> {
   /** Resolved canonical MCP resource URL (RFC 8707 `resource`). */
   readonly resource: URL;
   /** MCP endpoint base path, for example `/mcp`. */
@@ -64,32 +74,30 @@ export interface OAuthProviderHost {
    *
    * @throws If a tool with the same name is already registered.
    */
-  registerTool(
-    definition: ToolDefinition,
-    callback: ToolCallback<Record<string, unknown>, never, unknown, true>
-  ): void;
+  registerTool<const T extends ToolDefinition>(
+    definition: T,
+    callback: ToolCallback<InferToolInput<T>, InferToolOutput<T>, TUser, true>
+  ): ToolRef<InferToolName<T>, InferToolInput<T>, InferToolOutput<T>>;
   /**
    * Registers a provider-owned static resource.
    *
    * @throws If a resource with the same name is already registered.
    */
-  registerResource(
-    definition: ResourceDefinition,
-    callback: ResourceCallback<unknown, true>
+  registerResource<T extends ResourceDefinition>(
+    definition: T,
+    callback: ResourceCallback<TUser, true>
   ): void;
   /**
-   * Serves an additional public `GET` route ahead of user-owned routes. The
-   * route is not protected by the bearer gate; use it for discovery documents
-   * such as alternate well-known paths.
+   * Every tool registered so far, application and provider-owned, in
+   * registration order. Providers use it to validate the application's
+   * tools, for example to refuse a destructive tool that lacks a required
+   * `_meta` tag.
    */
-  route(
-    path: `/${string}`,
-    handler: (request: Request) => Response | Promise<Response>
-  ): void;
+  listTools(): readonly Readonly<ToolDefinition>[];
   /**
-   * Rewrites the `initialize` instructions text advertised to clients. The
-   * transform receives the configured instructions (possibly `undefined`) and
-   * returns the text to advertise instead.
+   * Rewrites the instructions text advertised to clients. The transform
+   * receives the current text, including earlier transforms, and returns
+   * the text to advertise instead. The caller's config is not mutated.
    */
   instructions(transform: (current: string | undefined) => string): void;
 }
@@ -106,11 +114,10 @@ export interface CustomOAuthProviderOptions<
   mapAuthInfo: (authInfo: OAuthAuthInfo) => OAuthExtra<TUser>;
   /**
    * Optional hook invoked once while the server mounts. Providers use it to
-   * install MCP middleware, provider-owned tools and resources, additional
-   * discovery routes, or instructions text that the authorization model
-   * requires. See {@link OAuthProviderHost}.
+   * install MCP middleware, provider-owned tools and resources, or
+   * instructions text that the authorization model requires. See {@link OAuthProviderHost}.
    */
-  setup?: (host: OAuthProviderHost) => void;
+  setup?: (host: OAuthProviderHost<TUser>) => void;
 }
 
 /** OAuth resource-server provider accepted by the mcp-use server constructor. */

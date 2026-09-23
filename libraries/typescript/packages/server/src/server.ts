@@ -392,6 +392,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   #oauthResourceConfigurationAbsent = false;
   /** Instructions text set by an OAuth provider's setup hook. */
   #instructionsOverride: string | undefined;
+  /** Whether the OAuth provider's setup hook completed. */
+  #oauthProviderSetupRan = false;
   /** Whether the mounted app validates Host headers (fixed at first mount). */
   #hostValidated = false;
   readonly #mcpMiddlewares: McpMiddlewareEntry[] = [];
@@ -1275,61 +1277,75 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   }
 
   /**
-   * Build the surface handed to an OAuth provider's `setup` hook. Runs inside
-   * `#ensureMounted` before `#handler` is assigned, so delegated
-   * registrations pass `#assertNotStarted`.
+   * Run the OAuth provider's `setup` hook against a host that is usable only
+   * while the hook runs. Called inside `#ensureMounted` before `#handler` is
+   * assigned, so delegated registrations pass `#assertNotStarted`.
+   *
+   * Runs at most once per server. A hook that throws is not marked as run, so
+   * a retried mount runs it again and fails on its own earlier registrations
+   * instead of serving with a partly installed provider.
    */
-  #createOAuthProviderHost(
-    httpApp: Hono<TEnv>,
-    resource: URL,
-    basePath: string
-  ): OAuthProviderHost {
-    return {
+  #runOAuthProviderSetup(resource: URL, basePath: string): void {
+    const setup = this.#config.oauth?.setup;
+    if (setup === undefined || this.#oauthProviderSetupRan) return;
+
+    let active = true;
+    const assertActive = (method: string): void => {
+      if (!active) {
+        throw new Error(
+          `[mcp-use] OAuthProviderHost.${method}() called after the ` +
+            `provider's setup hook returned; call it from setup().`
+        );
+      }
+    };
+    const host: OAuthProviderHost<TUser> = {
       resource,
       basePath,
       use: (pattern, handler) => {
+        assertActive("use");
         this.use(
           pattern,
           handler as unknown as McpMiddlewareFnFor<typeof pattern, TEnv>
         );
       },
       registerTool: (definition, callback) => {
+        assertActive("registerTool");
         if (this.#tools.has(definition.name)) {
           throw new Error(
             `[mcp-use] Tool "${definition.name}" is reserved by the OAuth ` +
               `provider; rename the application tool.`
           );
         }
-        this.tool(
-          definition,
-          callback as unknown as ToolCallback<
-            Record<string, unknown>,
-            never,
-            TUser,
-            HasOAuth<TUser>,
-            TEnv
-          >
-        );
+        return this.tool(definition, callback as never);
       },
       registerResource: (definition, callback) => {
+        assertActive("registerResource");
         if (this.#resources.has(definition.name)) {
           throw new Error(
             `[mcp-use] Resource "${definition.name}" is reserved by the OAuth ` +
               `provider; rename the application resource.`
           );
         }
-        this.resource(
-          definition,
-          callback as unknown as ResourceCallback<TUser, HasOAuth<TUser>, TEnv>
-        );
+        this.resource(definition, callback as never);
       },
-      route: (path, handler) => {
-        httpApp.get(path, (context) => handler(context.req.raw));
+      listTools: () => {
+        assertActive("listTools");
+        return [...this.#tools.values()].map(({ definition }) => definition);
       },
       instructions: (transform) => {
-        this.#instructionsOverride = transform(this.#config.instructions);
+        assertActive("instructions");
+        this.#instructionsOverride = transform(
+          this.#instructionsOverride ?? this.#config.instructions
+        );
       },
     };
+
+    try {
+      setup(host);
+    } finally {
+      active = false;
+    }
+    this.#oauthProviderSetupRan = true;
   }
 
   #proxyHost(): ProxyMountHost {
@@ -1481,8 +1497,6 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
         }
       }
 
-      this.#validateViewBindingsAtMount();
-
       const resource = this.#resolveOAuthResource(mode, listenPort, listenHost);
       if (resource !== undefined) {
         const provider = this.#config.oauth!;
@@ -1496,13 +1510,12 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
       if (resource !== undefined) {
         // Providers extend the server before any request is served and while
         // #handler is still unset, so their registrations pass the same
-        // pre-start checks as user registrations. Runs after the shared
-        // middleware chain is registered so provider routes still get CORS,
-        // logging, and host validation.
-        this.#config.oauth!.setup?.(
-          this.#createOAuthProviderHost(httpApp, resource, basePath)
-        );
+        // pre-start checks as user registrations, and before view-binding
+        // validation below so provider items are included.
+        this.#runOAuthProviderSetup(resource, basePath);
       }
+
+      this.#validateViewBindingsAtMount();
 
       const { handler, fetch: mcpFetch } = createMcpMount(
         (ctx) => this.#buildSdkServer(ctx),

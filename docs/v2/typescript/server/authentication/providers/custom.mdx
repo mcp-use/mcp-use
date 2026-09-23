@@ -100,16 +100,22 @@ The server exposes those values as `ctx.auth.user`, `ctx.auth.payload`, and `ctx
 
 ## Extend the server from the provider
 
-Some authorization models need more than token verification: a consent step exposed as a tool, a policy check before every tool call, or a discovery document at an extra path. Pass an optional `setup(host)` hook and the server invokes it once while mounting, before the first request is served.
+Some authorization models need more than token verification: a consent step exposed as a tool, or a policy check before every tool call. Pass an optional `setup(host)` hook and the server invokes it once while mounting, before the first request is served.
 
 ```typescript
 import { oauthCustomProvider, type OAuthProviderHost } from "mcp-use/oauth";
 
-const oauth = oauthCustomProvider({
+const oauth = oauthCustomProvider<User>({
   createTokenVerifier,
   oauthMetadata,
   mapAuthInfo,
-  setup(host: OAuthProviderHost) {
+  setup(host: OAuthProviderHost<User>) {
+    for (const tool of host.listTools()) {
+      if (tool.annotations?.destructiveHint && !tool._meta?.["shop/tags"]) {
+        throw new Error(`Destructive tool "${tool.name}" needs shop/tags`);
+      }
+    }
+
     host.use("mcp:tools/call", async (ctx, next) => {
       if (!(await isAllowed(ctx.auth, ctx.params.name))) {
         return {
@@ -122,11 +128,7 @@ const oauth = oauthCustomProvider({
 
     host.registerTool(
       { name: "grant_consent", description: "Record consent." },
-      async (_params, ctx) => recordConsent(ctx.auth),
-    );
-
-    host.route("/.well-known/oauth-protected-resource", () =>
-      Response.json(protectedResourceDocument(host.resource)),
+      async (_params, ctx) => recordConsent(ctx.auth.user),
     );
 
     host.instructions((current) =>
@@ -136,7 +138,19 @@ const oauth = oauthCustomProvider({
 });
 ```
 
-The host exposes the resolved canonical `resource` and `basePath`, `use` for `mcp:` middleware, `registerTool` and `registerResource` for provider-owned registrations, `route` for extra public `GET` routes, and `instructions` to rewrite the text advertised on `initialize`. Provider-owned tools and resources run under the same bearer gate as application registrations and receive the mapped `ctx.auth`. Registering a name that the application already uses throws, so reserved names never silently replace user tools.
+The host exposes:
+
+| Member | Purpose |
+| --- | --- |
+| `resource`, `basePath` | The resolved canonical resource URL and the MCP endpoint path. |
+| `use(pattern, handler)` | Registers `mcp:` middleware, like `server.use()`. |
+| `registerTool`, `registerResource` | Register provider-owned tools and static resources. |
+| `listTools()` | Returns every tool registered so far, so the provider can validate the application's tools. |
+| `instructions(transform)` | Rewrites the instructions text advertised to clients. Each call receives the result of the previous one. |
+
+Provider-owned tools and resources sit behind the same bearer gate as application items, and `ctx.auth` carries the provider's user type. Registering a name that the application already uses throws, so reserved names never silently replace user tools.
+
+The host only works while `setup` runs; calling it later throws. If `setup` throws, the server does not start.
 
 ## Verify the integration
 
