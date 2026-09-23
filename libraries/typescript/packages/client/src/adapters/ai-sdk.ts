@@ -82,14 +82,17 @@ export interface AiSdkTool {
 }
 
 /** A source with the protocol-neutral MCP operations needed by the adapter. */
-export type AiSdkToolConnection = Pick<MCPConnection, "listTools" | "callTool">;
+export type AiSdkToolConnection = Pick<
+  MCPConnection,
+  "listTools" | "listAllTools" | "callTool"
+>;
 
 /** Options controlling MCP tool discovery, schema normalization, and metadata. */
 export interface CreateAiSdkToolsOptions {
   /**
    * Tool definitions to adapt. When omitted, the adapter fetches them with
-   * `connection.listTools()`. An explicitly supplied empty array is valid and
-   * does not trigger discovery.
+   * `connection.listAllTools()` (all pages). An explicitly supplied empty
+   * array is valid and does not trigger discovery.
    */
   tools?: MCPTool[];
   /**
@@ -118,7 +121,7 @@ export async function createAiSdkTools(
   connection: AiSdkToolConnection,
   options: CreateAiSdkToolsOptions = {}
 ): Promise<AiSdkToolSet> {
-  const tools = options.tools ?? (await connection.listTools());
+  const tools = options.tools ?? (await connection.listAllTools());
   const result = Object.create(null) as AiSdkToolSet;
 
   for (const mcpTool of tools) {

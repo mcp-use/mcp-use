@@ -342,6 +342,25 @@ export class MCPConnection {
   }
 
   /**
+   * List all tools from the server, automatically following pagination.
+   *
+   * Unlike {@link listTools}, which returns only the first page, this follows
+   * every `nextCursor` so the complete tool catalog is returned.
+   *
+   * @param options - Optional request options
+   * @returns Every tool across all result pages
+   *
+   * @example
+   * ```typescript
+   * const tools = await session.listAllTools();
+   * console.log(`All tools: ${tools.length}`);
+   * ```
+   */
+  async listAllTools(options?: RequestOptions): Promise<Tool[]> {
+    return this.connector.listAllTools(options);
+  }
+
+  /**
    * Get the server capabilities advertised during initialization.
    *
    * @returns Server capabilities object
@@ -587,6 +606,25 @@ export class MCPConnection {
    */
   async listPrompts() {
     return this.connector.listPrompts();
+  }
+
+  /**
+   * List all prompts from the server, automatically following pagination.
+   *
+   * Unlike {@link listPrompts}, which returns only the first page, this follows
+   * every `nextCursor` so the complete prompt list is returned.
+   *
+   * @param options - Optional request options
+   * @returns Prompt list gathered across all result pages
+   *
+   * @example
+   * ```typescript
+   * const { prompts } = await session.listAllPrompts();
+   * console.log(`All prompts: ${prompts.length}`);
+   * ```
+   */
+  async listAllPrompts(options?: RequestOptions) {
+    return this.connector.listAllPrompts(options);
   }
 
   /**

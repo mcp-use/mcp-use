@@ -286,8 +286,7 @@ export abstract class BaseConnector {
       logger.debug(
         "[Auto] Refreshing tools cache due to list_changed notification"
       );
-      const result = await this.client.listTools();
-      this.toolsCache = (result.tools ?? []) as Tool[];
+      this.toolsCache = await this.listAllTools();
       logger.debug(
         `[Auto] Refreshed tools cache: ${this.toolsCache.length} tools`
       );
@@ -606,13 +605,10 @@ export abstract class BaseConnector {
         }
       : null;
 
-    // Fetch and cache tools
+    // Fetch and cache tools (all pages, not just the first)
     // Gracefully handle servers that don't implement tools/list or have no tools
     try {
-      const listToolsRes = await this.executeRequest(() =>
-        this.client!.listTools(undefined, defaultRequestOptions)
-      );
-      this.toolsCache = (listToolsRes.tools ?? []) as Tool[];
+      this.toolsCache = await this.listAllTools(defaultRequestOptions);
       logger.debug(`Fetched ${this.toolsCache.length} tools from server`);
     } catch (err: unknown) {
       if (isOAuthInteractionRequired(err)) throw err;
@@ -740,6 +736,65 @@ export abstract class BaseConnector {
       tools.map((t) => t.name)
     );
     return tools;
+  }
+
+  /**
+   * List all tools from the server, following pagination to completion.
+   *
+   * {@link listTools} returns only the first page and discards `nextCursor`,
+   * so a server that paginates its catalog silently loses every tool past the
+   * first page. This method follows every `nextCursor` until the catalog is
+   * exhausted. Cursors are treated as opaque per the MCP spec: iteration ends
+   * only when `nextCursor` is absent (an empty-string cursor is a valid
+   * "there is another page" signal, not the end), and a repeated cursor is
+   * treated as a server fault and rejected rather than looped on forever.
+   *
+   * @param options - Optional request options
+   * @returns Every tool across all result pages
+   */
+  async listAllTools(options?: RequestOptions): Promise<Tool[]> {
+    // Held across the loop: disconnect() clears this.client, so re-reading it
+    // per page could dereference null mid-listing instead of failing cleanly.
+    const client = this.client;
+    if (!client) {
+      throw new Error("MCP client is not connected");
+    }
+
+    try {
+      logger.debug("[listAllTools] Fetching all tools (auto-pagination)...");
+      return await this.executeRequest(async () => {
+        const allTools: Tool[] = [];
+        const seenCursors = new Set<string>();
+        let cursor: string | undefined = undefined;
+
+        do {
+          const result: { tools?: Tool[]; nextCursor?: string } =
+            await client.listTools({ cursor }, options);
+          allTools.push(...((result.tools ?? []) as Tool[]));
+          cursor = result.nextCursor;
+          if (cursor !== undefined) {
+            if (seenCursors.has(cursor)) {
+              throw new Error(
+                "tools/list returned a repeated pagination cursor"
+              );
+            }
+            seenCursors.add(cursor);
+          }
+        } while (cursor !== undefined);
+
+        logger.debug(`[listAllTools] Returned ${allTools.length} tools`);
+        return allTools;
+      });
+    } catch (err: unknown) {
+      const error = err as Error & { code?: number };
+      // Match listTools()/initialize(): a server without tools/list has no
+      // tools rather than being an error.
+      if (error.code === -32601) {
+        logger.debug("Server does not implement tools/list, assuming no tools");
+        return [];
+      }
+      throw err;
+    }
   }
 
   /**
@@ -923,6 +978,66 @@ export abstract class BaseConnector {
     try {
       logger.debug("Listing prompts");
       return await this.executeRequest(() => this.client!.listPrompts());
+    } catch (err: unknown) {
+      const error = err as Error & { code?: number };
+      // Gracefully handle if server advertises but doesn't actually support it
+      if (error.code === -32601) {
+        logger.debug("Server advertised prompts but method not found");
+        return { prompts: [] };
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * List all prompts from the server, following pagination to completion.
+   *
+   * {@link listPrompts} returns only the first page. This follows every
+   * `nextCursor` so the full prompt list is returned, with the same opaque-
+   * cursor rules as {@link listAllTools} (absent cursor ends iteration, empty
+   * string continues, a repeated cursor is rejected).
+   *
+   * @param options - Optional request options
+   * @returns Every prompt across all result pages
+   */
+  async listAllPrompts(
+    options?: RequestOptions
+  ): Promise<{ prompts: any[] }> {
+    const client = this.client;
+    if (!client) {
+      throw new Error("MCP client is not connected");
+    }
+
+    // Check if server advertises prompts capability
+    if (!this.capabilitiesCache?.prompts) {
+      logger.debug("Server does not advertise prompts capability, skipping");
+      return { prompts: [] };
+    }
+
+    try {
+      logger.debug("Listing all prompts (with auto-pagination)");
+      return await this.executeRequest(async () => {
+        const allPrompts: any[] = [];
+        const seenCursors = new Set<string>();
+        let cursor: string | undefined = undefined;
+
+        do {
+          const result: { prompts?: any[]; nextCursor?: string } =
+            await client.listPrompts({ cursor }, options);
+          allPrompts.push(...(result.prompts ?? []));
+          cursor = result.nextCursor;
+          if (cursor !== undefined) {
+            if (seenCursors.has(cursor)) {
+              throw new Error(
+                "prompts/list returned a repeated pagination cursor"
+              );
+            }
+            seenCursors.add(cursor);
+          }
+        } while (cursor !== undefined);
+
+        return { prompts: allPrompts };
+      });
     } catch (err: unknown) {
       const error = err as Error & { code?: number };
       // Gracefully handle if server advertises but doesn't actually support it
