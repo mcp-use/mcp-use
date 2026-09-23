@@ -1,5 +1,11 @@
 # mcp-use
 
+## 2.6.1-canary.1
+
+### Patch Changes
+
+- a7c0441: Fix `ThemeProvider` remounting the view when the display mode switches between inline and fullscreen/pip. The wrapper is now always a `<div>` (`display: contents` inline), so local state and `useCallTool` results survive display mode changes (#2640).
+
 ## 2.6.1-canary.0
 
 ### Patch Changes

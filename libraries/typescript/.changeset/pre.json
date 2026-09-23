@@ -12,6 +12,7 @@
   },
   "changesets": [
     "propagated-4e7ceff2ba8e4d70",
+    "theme-provider-stable-wrapper",
     "tidy-screenshots-measure"
   ]
 }
