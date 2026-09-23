@@ -394,6 +394,8 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
   #instructionsOverride: string | undefined;
   /** Whether the OAuth provider's setup hook completed. */
   #oauthProviderSetupRan = false;
+  /** The error from a failed setup hook, rethrown on every later mount. */
+  #oauthProviderSetupFailure: { error: unknown } | undefined;
   /** Whether the mounted app validates Host headers (fixed at first mount). */
   #hostValidated = false;
   readonly #mcpMiddlewares: McpMiddlewareEntry[] = [];
@@ -1281,13 +1283,17 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
    * while the hook runs. Called inside `#ensureMounted` before `#handler` is
    * assigned, so delegated registrations pass `#assertNotStarted`.
    *
-   * Runs at most once per server. A hook that throws is not marked as run, so
-   * a retried mount runs it again and fails on its own earlier registrations
-   * instead of serving with a partly installed provider.
+   * Runs at most once per server. A hook that throws, or returns a promise,
+   * leaves the server permanently unmountable: every later mount rethrows the
+   * first error instead of re-running a hook whose middleware and
+   * instructions transforms were already partly applied.
    */
   #runOAuthProviderSetup(resource: URL, basePath: string): void {
     const setup = this.#config.oauth?.setup;
     if (setup === undefined || this.#oauthProviderSetupRan) return;
+    if (this.#oauthProviderSetupFailure !== undefined) {
+      throw this.#oauthProviderSetupFailure.error;
+    }
 
     let active = true;
     const assertActive = (method: string): void => {
@@ -1362,7 +1368,24 @@ export class MCPServer<TUser = never, TEnv extends Env = Env> {
     };
 
     try {
-      setup(host);
+      const returned: unknown = setup(host);
+      if (
+        typeof (returned as PromiseLike<unknown> | undefined)?.then ===
+        "function"
+      ) {
+        // Registrations after an `await` would land once the host is closed,
+        // so the server could serve without them. The TypeError is the
+        // failure; the late rejection is expected and would only be noise.
+        Promise.resolve(returned).catch(() => undefined);
+        throw new TypeError(
+          "[mcp-use] The OAuth provider's setup hook must be synchronous " +
+            "but returned a promise. Do async work before creating the " +
+            "provider."
+        );
+      }
+    } catch (error) {
+      this.#oauthProviderSetupFailure = { error };
+      throw error;
     } finally {
       active = false;
     }

@@ -105,11 +105,11 @@ Some authorization models need more than token verification: a consent step expo
 ```typescript
 import { oauthCustomProvider, type OAuthProviderHost } from "mcp-use/oauth";
 
-const oauth = oauthCustomProvider<User>({
+const oauth = oauthCustomProvider<AppUser>({
   createTokenVerifier,
   oauthMetadata,
   mapAuthInfo,
-  setup(host: OAuthProviderHost<User>) {
+  setup(host: OAuthProviderHost<AppUser>) {
     for (const tool of host.listTools()) {
       if (tool.annotations?.destructiveHint && !tool._meta?.["shop/tags"]) {
         throw new Error(`Destructive tool "${tool.name}" needs shop/tags`);
@@ -117,6 +117,8 @@ const oauth = oauthCustomProvider<User>({
     }
 
     host.use("mcp:tools/call", async (ctx, next) => {
+      // Let the consent tool through, or consent could never be recorded.
+      if (ctx.params.name === "grant_consent") return next();
       if (!(await isAllowed(ctx.auth, ctx.params.name))) {
         return {
           isError: true,
@@ -151,7 +153,7 @@ The host exposes:
 
 Provider-owned items go through the same OAuth gate as application items, and `ctx.auth` carries the provider's user type. On a [mixed authentication](/v2/typescript/server/authentication/mixed-auth) server, a provider tool can declare `securitySchemes` exactly like an application tool: with `noauth`, signed-out clients can call it and `ctx.auth` is optional. Resources, resource templates, and prompts always require sign-in. `mcp:` middleware also runs on signed-out calls to `noauth` tools, so check `ctx.auth` before relying on it. Registering a name that the application already uses throws, so reserved names never silently replace application items.
 
-The host only works while `setup` runs; calling it later throws. If `setup` throws, the server does not start.
+`setup` must be synchronous, and the host only works while it runs; calling it later throws. If `setup` throws or returns a promise, the server does not start, and every later request fails with the same error.
 
 ## Verify the integration
 

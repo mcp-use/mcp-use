@@ -169,7 +169,11 @@ export interface CustomOAuthProviderOptions<
   /**
    * Optional hook invoked once while the server mounts. Providers use it to
    * install MCP middleware, provider-owned tools, resources, and prompts, or
-   * instructions text that the authorization model requires. See {@link OAuthProviderHost}.
+   * instructions text that the authorization model requires. See
+   * {@link OAuthProviderHost}.
+   *
+   * The hook must be synchronous. If it throws or returns a promise, the
+   * server never mounts: every request and `listen()` rethrows that error.
    */
   setup?: (host: OAuthProviderHost<TUser>) => void;
 }

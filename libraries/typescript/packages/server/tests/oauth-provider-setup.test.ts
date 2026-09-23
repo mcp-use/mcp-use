@@ -318,20 +318,25 @@ describe("OAuth provider setup hook", () => {
     ).rejects.toThrow('destructive tool "refund" needs shop/tags');
   });
 
-  it("composes instructions transforms without mutating the config", async () => {
-    const config = "Shop tools.";
-    const app = server(
-      (host) => {
+  it("composes instructions transforms once, without mutating the config", async () => {
+    const config = {
+      name: "shop",
+      version: "1.0.0",
+      oauth: provider((host) => {
         host.instructions((current) => `${current} First.`);
         host.instructions((current) => `${current} Second.`);
-      },
-      { instructions: config }
-    );
-    const discovered = await result<{ instructions?: string }>(
-      await app.fetch(post("server/discover", {}, signedIn))
-    );
-    expect(discovered.instructions).toBe("Shop tools. First. Second.");
-    expect(config).toBe("Shop tools.");
+      }),
+      logging: { enabled: false },
+      instructions: "Shop tools.",
+    };
+    const app = new MCPServer(config);
+    for (let request = 0; request < 2; request++) {
+      const discovered = await result<{ instructions?: string }>(
+        await app.fetch(post("server/discover", {}, signedIn))
+      );
+      expect(discovered.instructions).toBe("Shop tools. First. Second.");
+    }
+    expect(config.instructions).toBe("Shop tools.");
   });
 
   it("rejects host calls after setup returns", async () => {
@@ -348,21 +353,46 @@ describe("OAuth provider setup hook", () => {
     );
   });
 
-  it("fails closed when setup throws after a partial install", async () => {
-    const app = server((host) => {
-      host.tool({ name: "register_session" }, async () => ({
-        content: [],
-      }));
-      throw new Error("connection store unavailable");
+  it("fails closed and never re-runs setup after it throws", async () => {
+    let attempts = 0;
+    const setup = vi.fn((host: OAuthProviderHost<TestUser>) => {
+      host.use("mcp:tools/call", async (_ctx, next) => next());
+      host.instructions((current) => `${current ?? ""} Gated.`);
+      // A transient failure: a re-run would succeed with the middleware and
+      // the instructions transform applied twice.
+      if (attempts++ === 0) throw new Error("connection store unavailable");
     });
-    await expect(app.fetch(post("tools/list", {}, signedIn))).rejects.toThrow(
-      "connection store unavailable"
-    );
-    // The retried mount re-runs setup, which collides with its own earlier
-    // registration instead of serving without the provider's gate.
-    await expect(app.fetch(post("tools/list", {}, signedIn))).rejects.toThrow(
-      'Tool "register_session" is reserved by the OAuth provider'
-    );
+    const app = server(setup);
+
+    for (let request = 0; request < 2; request++) {
+      await expect(app.fetch(post("tools/list", {}, signedIn))).rejects.toThrow(
+        "connection store unavailable"
+      );
+    }
+    expect(setup).toHaveBeenCalledOnce();
+  });
+
+  it("rejects an async setup hook instead of serving without its late registrations", async () => {
+    const late = vi.fn();
+    const app = server(async (host) => {
+      await Promise.resolve();
+      late();
+      host.use("mcp:tools/call", async () => ({
+        isError: true,
+        content: [{ type: "text", text: "gated" }],
+      }));
+    });
+    app.tool({ name: "buy" }, async () => ({ content: [] }));
+
+    for (let request = 0; request < 2; request++) {
+      await expect(app.fetch(call("buy", signedIn))).rejects.toThrow(
+        "setup hook must be synchronous"
+      );
+    }
+    // Let the hook resume: its late host call rejects, and that rejection
+    // is handled rather than reported as unhandled.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(late).toHaveBeenCalledOnce();
   });
 });
 
